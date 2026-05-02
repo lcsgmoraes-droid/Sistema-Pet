@@ -15,6 +15,7 @@ Autor: Sistema Pet - Pré-Prod Block 4
 Data: 2026-02-05
 """
 
+import os
 import time
 import uuid
 from typing import Optional
@@ -23,7 +24,22 @@ from fastapi import Request
 from contextvars import ContextVar
 import logging
 
+from app.services.error_event_reporter import record_request_event
+
 logger = logging.getLogger(__name__)
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None or raw == "":
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
+SLOW_REQUEST_LOG_MS = _env_int("REQUEST_CONTEXT_SLOW_MS", 3000)
 
 # ============================================================================
 # CONTEXTVARS PARA REQUEST_ID E METADATA
@@ -178,13 +194,15 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             # 4️⃣ LOGGING ESTRUTURADO (sem dados sensíveis)
             # ============================================================
             
-            # Determinar nível de log baseado no status
+            # Determinar nivel de log baseado no status e lentidao.
             if response.status_code >= 500:
                 log_level = logging.ERROR
             elif response.status_code >= 400:
                 log_level = logging.WARNING
+            elif duration_ms >= SLOW_REQUEST_LOG_MS:
+                log_level = logging.WARNING
             else:
-                log_level = logging.INFO
+                log_level = logging.DEBUG
             
             # Log estruturado com contexto completo
             logger.log(
@@ -199,6 +217,15 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
                     'client_ip': request.client.host if request.client else None,
                     'user_agent': request.headers.get('user-agent', 'unknown')[:100]  # Truncado
                 }
+            )
+
+            record_request_event(
+                request=request,
+                request_id=request_id,
+                method=method,
+                path=path,
+                status_code=response.status_code,
+                duration_ms=duration_ms,
             )
             
             # ============================================================
@@ -224,6 +251,16 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
                     'exception_message': str(e)[:200]  # Truncado por segurança
                 },
                 exc_info=True  # Inclui stack trace nos logs
+            )
+
+            record_request_event(
+                request=request,
+                request_id=request_id,
+                method=method,
+                path=path,
+                duration_ms=duration_ms,
+                exception_type=type(e).__name__,
+                exception_message=str(e),
             )
             
             raise  # Re-raise para FastAPI lidar

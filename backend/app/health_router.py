@@ -3,18 +3,24 @@ Health Check e Monitoring Endpoints
 Fornece endpoints para verificação de saúde da aplicação e métricas
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+import logging
+import os
+
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import JSONResponse
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 from datetime import datetime
 from typing import Dict, Any
 import psutil
 import time
 
-from app.db import get_session
+from app.db import engine, get_session
 from app.services.bling_flow_monitor_service import obter_resumo_monitoramento
 from app.whatsapp.models import WhatsAppSession, WhatsAppMessage
 
 router = APIRouter(prefix="/health", tags=["Health & Monitoring"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("")
@@ -31,6 +37,64 @@ async def health_check() -> Dict[str, Any]:
         "service": "Pet Shop Pro - WhatsApp IA",
         "version": "1.0.0"
     }
+
+
+@router.get("/watchdog")
+async def watchdog_health():
+    """
+    Health check operacional usado pelo Docker e pelo watchdog.
+
+    Diferente do /health simples, esta rota tenta pegar uma conexao do pool
+    e executar SELECT 1. Se o pool estiver saturado ou o banco travar, retorna
+    503 para disparar a recuperacao automatica.
+    """
+    start_time = time.perf_counter()
+    max_latency_ms = float(os.getenv("WATCHDOG_DB_MAX_LATENCY_MS", "3000"))
+
+    try:
+        with engine.connect() as connection:
+            connection.execute(text("SELECT 1"))
+
+        latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        payload = {
+            "status": "healthy",
+            "database": "connected",
+            "latency_ms": latency_ms,
+            "pool": engine.pool.status(),
+            "timestamp": datetime.utcnow().isoformat(),
+        }
+
+        if latency_ms > max_latency_ms:
+            payload["status"] = "degraded"
+            payload["message"] = "Database health check latency above limit"
+            return JSONResponse(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                content=payload,
+            )
+
+        return payload
+
+    except Exception as exc:
+        latency_ms = round((time.perf_counter() - start_time) * 1000, 2)
+        logger.error(
+            "Watchdog health check failed: %s",
+            type(exc).__name__,
+            extra={
+                "latency_ms": latency_ms,
+                "pool_status": engine.pool.status(),
+            },
+        )
+        return JSONResponse(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            content={
+                "status": "unhealthy",
+                "database": "error",
+                "error_type": type(exc).__name__,
+                "latency_ms": latency_ms,
+                "pool": engine.pool.status(),
+                "timestamp": datetime.utcnow().isoformat(),
+            },
+        )
 
 
 @router.get("/detailed")

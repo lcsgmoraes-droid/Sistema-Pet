@@ -129,6 +129,7 @@ const Layout = () => {
 
   // Contagem de lembretes pendentes para badge dinâmico
   const [lembretesCount, setLembretesCount] = useState(0);
+  const lembretesPollingRef = useRef(false);
   const [telaBloqueadaSuspeita, setTelaBloqueadaSuspeita] = useState(false);
   const overlaySuspeitoDesdeRef = useRef(new Map());
   const perfilVeterinario = isVeterinarioProfile(user);
@@ -326,7 +327,11 @@ const Layout = () => {
 
   // Buscar contagem de lembretes pendentes para badge dinâmico
   useEffect(() => {
-    const fetchLembretesCount = async () => {
+    const fetchLembretesCount = async ({ force = false } = {}) => {
+      if (lembretesPollingRef.current) return;
+      if (!force && document.visibilityState === "hidden") return;
+
+      lembretesPollingRef.current = true;
       try {
         const [pendentesResp, autoResp] = await Promise.all([
           api.get("/lembretes/pendentes"),
@@ -345,10 +350,12 @@ const Layout = () => {
         setLembretesCount(Math.max(0, pendentes + autocadastros24h));
       } catch {
         // Silencioso — não bloqueia o layout
+      } finally {
+        lembretesPollingRef.current = false;
       }
     };
-    fetchLembretesCount();
-    const interval = setInterval(fetchLembretesCount, 60000);
+    fetchLembretesCount({ force: true });
+    const interval = setInterval(fetchLembretesCount, 300000);
     return () => clearInterval(interval);
   }, []);
 

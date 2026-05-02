@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   DollarSign,
   TrendingUp,
@@ -40,12 +40,13 @@ export default function MenuCaixa({ onAbrirCaixa }) {
   const [loading, setLoading] = useState(true);
   const [mostrarSaldoTopo, setMostrarSaldoTopo] = useState(false); // Press-to-reveal (topo)
   const [mostrarValores, setMostrarValores] = useState(false); // Toggle normal (resumo)
+  const carregandoCaixaRef = useRef(false);
 
   useEffect(() => {
-    carregarCaixa();
+    carregarCaixa({ force: true });
     
-    // Atualizar a cada 30 segundos
-    const interval = setInterval(carregarCaixa, 30000);
+    // Atualizar em segundo plano sem sobrepor chamadas.
+    const interval = setInterval(carregarCaixa, 60000);
     return () => clearInterval(interval);
   }, []);
 
@@ -55,12 +56,12 @@ export default function MenuCaixa({ onAbrirCaixa }) {
         return;
       }
 
-      carregarCaixa();
+      carregarCaixa({ force: true });
     };
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        carregarCaixa();
+        carregarCaixa({ force: true });
       }
     };
 
@@ -92,7 +93,11 @@ export default function MenuCaixa({ onAbrirCaixa }) {
     setMostrarSaldoTopo(false);
   };
 
-  const carregarCaixa = async () => {
+  const carregarCaixa = async ({ force = false } = {}) => {
+    if (carregandoCaixaRef.current) return;
+    if (!force && document.visibilityState === 'hidden') return;
+
+    carregandoCaixaRef.current = true;
     try {
       const caixa = await obterCaixaAberto();
       setCaixaAberto(caixa);
@@ -105,20 +110,21 @@ export default function MenuCaixa({ onAbrirCaixa }) {
       console.error('Erro ao carregar caixa:', error);
     } finally {
       setLoading(false);
+      carregandoCaixaRef.current = false;
     }
   };
 
   const handleOperacaoSucesso = () => {
     setModalAtivo(null);
     publicarEventoCaixa('movimentacao');
-    carregarCaixa();
+    carregarCaixa({ force: true });
   };
 
   const handleCaixaAberto = async () => {
     await onAbrirCaixa();
     publicarEventoCaixa('abertura');
     // Aguardar um pouco e recarregar
-    setTimeout(carregarCaixa, 500);
+    setTimeout(() => carregarCaixa({ force: true }), 500);
   };
 
   if (loading) {

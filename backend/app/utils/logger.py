@@ -33,6 +33,8 @@ def configure_logging():
     logging.getLogger("httpx").setLevel(logging.WARNING)
     logging.getLogger("httpcore").setLevel(logging.WARNING)
     logging.getLogger("uvicorn.access").setLevel(logging.WARNING)  # Evita duplicação (usamos nosso middleware)
+    logging.getLogger("apscheduler.scheduler").setLevel(logging.WARNING)
+    logging.getLogger("apscheduler.executors.default").setLevel(logging.WARNING)
 
 # Context vars para armazenar dados por request
 trace_id_ctx: ContextVar[Optional[str]] = ContextVar('trace_id', default=None)

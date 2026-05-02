@@ -555,13 +555,159 @@ Ja foi iniciada uma primeira aplicacao em Produtos:
 
 Isso deve ser tratado como **piloto de fundacao**, nao como prioridade exclusiva de Produtos.
 
+## Inventario operacional do frontend - 2026-05-02
+
+Este inventario foi extraido do codigo atual em `frontend/src`, principalmente `App.jsx`, `pages` e `components`. Ele serve como mapa de execucao, nao como documentacao estatica definitiva.
+
+### Volume por area
+
+| Area | Arquivos aproximados | Leitura |
+| --- | ---: | --- |
+| `pages/veterinario` | 265 | Modulo mais componentizado; bom candidato para padronizacao incremental por subpasta |
+| `components/campanhas` | 64 | Ja tem decomposicao, mas precisa consolidar tabelas, badges, extrato e regras visuais |
+| `pages/banhoTosa` | 49 | Precisa reaproveitar seletores e paineis padrao |
+| `components/pdv` | 26 | Tela piloto transversal; concentra pessoa, pet, produto, financeiro, campanhas e caixa |
+| `components/produto` | 22 | Produto novo/editar ja esta separado em secoes; bom para `FormField`, `SafeMarkdownField` e `ChannelBadges` |
+| `components/clientes` | 15 | Deve alimentar `PessoaSelector`, `EntityCard` e padrao de wizard/modal |
+| `components/produtos` | 12 | Ja iniciou tabela/listagem padronizada |
+| `components/ui` | 11 | Fundacao existe, mas ainda precisa ganhar `DataTable`, `FilterBar`, `AppModal`, `EmptyState`, `NumberCell` |
+
+### Hotspots de padronizacao visual
+
+Estes arquivos combinam muito botao, modal, card, filtro, tabela ou dashboard. Sao bons alvos para migracao para componentes globais porque cada ajuste elimina muita repeticao.
+
+| Prioridade | Arquivo | Motivo principal |
+| --- | --- | --- |
+| 1 | `frontend/src/components/VendasFinanceiro.jsx` | Financeiro, filtros, cards, tabelas, dinheiro, periodo e status |
+| 2 | `frontend/src/components/PedidosCompra.jsx` | Compras, produtos, fornecedor, acoes, modais e tabelas |
+| 3 | `frontend/src/components/EntradaXML.jsx` | Arquivo muito grande, NF/itens/produtos, modais e conciliacao |
+| 4 | `frontend/src/pages/EstoqueTransferenciaParceiro.jsx` | Estoque, produtos, filtros, cards e acoes |
+| 5 | `frontend/src/pages/ecommerce/EcommerceMVP.jsx` | Produto/canal/markdown/aparencia e telas publicas |
+| 6 | `frontend/src/pages/ProdutosValidadeProxima.jsx` | Produtos, alertas, tabelas e status |
+| 7 | `frontend/src/components/ContasPagar.jsx` e `ContasReceber.jsx` | Financeiro, dinheiro, vencimento, filtros e modais |
+| 8 | `frontend/src/components/DRE.jsx` | Indicadores, periodo, dinheiro, tabelas e exportacoes |
+| 9 | `frontend/src/pages/GerenciamentoPets.jsx` | Cards desalinhados, entidade pet e acoes repetidas |
+| 10 | `frontend/src/pages/comissoes/ComissoesListagem.jsx` | Regras sensiveis, dinheiro, funcionario, tabelas e status |
+
+### Padroes repetidos encontrados
+
+| Padrao textual no codigo | Ocorrencias aproximadas | Direcao |
+| --- | ---: | --- |
+| `button` | 4206 | Migrar gradualmente para `ActionButton` e `IconActionButton` |
+| `Modal` | 1658 | Criar `AppModal` e `ConfirmDialog` antes de mexer em todos |
+| `Filtro/Filtros` | 2638 | Criar `FilterBar`, `DateRangeFilter`, `SearchInput` |
+| `toast` | 830 | Criar padrao de mensagens por tipo de operacao |
+| `Card` | 595 | Consolidar `Panel`, `MetricCard`, `EntityCard`, `InfoCard` |
+| `confirm` | 555 | Padronizar confirmacao destrutiva/sensivel |
+| `Badge` | 341 | Expandir `StatusBadge` e badges especificos |
+| `<select` | 297 | Criar `FormField`/`SelectField` e depois `Combobox` |
+| `<table` | 138 | Criar `DataTable` antes de refatorar listas grandes |
+| `dangerouslySetInnerHTML` | 1 | Manter excecao monitorada; preferir `SafeMarkdown` |
+
+### Adoção dos componentes globais
+
+| Componente | Referencias aproximadas | Estado |
+| --- | ---: | --- |
+| `ActionButton` | 90 | Ja util; precisa virar padrao obrigatorio em novas telas/refatores |
+| `Panel` | 85 | Ja entrou no PDV; precisa migrar cards soltos |
+| `StatusBadge` | 47 | Bom inicio, faltam mapeamentos por dominio |
+| `MetricCard` | 30 | Ainda pouco frente aos dashboards existentes |
+| `IconActionButton` | 10 | Prioritario para acoes de tabela |
+| `MoneyCell` | 6 | Deve ir para financeiro, DRE, vendas e relatorios |
+| `ChannelBadges` | 5 | Deve ir para produtos, campanhas, app/e-commerce |
+| `SafeMarkdown` | 3 | Deve ir para produtos, app/e-commerce, campanhas e ajuda |
+| `TutorPetSelector` | 6 | Ja existe; deve ser padrao para vet, banho/tosa, vacinas, internacoes e calculadoras |
+| `PageHeader` | 3 | Prioritario para uniformizar telas |
+| `MetricGrid` | 1 | Prioritario para dashboards/resumos |
+
+### Rotas e modulos que precisam entrar no ciclo
+
+| Grupo | Rotas principais | Componentes base obrigatorios |
+| --- | --- | --- |
+| Publico/e-commerce | `/landing`, `/ecommerce`, `/:tenantId`, `/rastreio/:token` | `SafeMarkdown`, `ChannelBadges`, `StatusBadge`, `Panel` |
+| Dashboard | `/dashboard`, `/dashboard-gerencial` | `PageHeader`, `MetricGrid`, `MetricCard`, `Panel` |
+| Pessoas/clientes | `/clientes`, `/clientes/:id/financeiro`, `/clientes/:id/timeline` | `PessoaSelector`, `EntityCard`, `DataTable`, `StatusBadge` |
+| Pets | `/pets`, `/pets/novo`, `/pets/:id`, `/pets/:id/editar` | `TutorPetSelector`, `PetInfoRow`, `EntityCard`, `ActionButton` |
+| Veterinario | `/veterinario/*` | `TutorPetSelector`, `ModuleTabs`, `FormField`, `Panel`, `DataTable` |
+| Banho & Tosa | `/banho-tosa/*` | `TutorPetSelector`, `ModuleTabs`, `Panel`, `DataTable`, `StatusBadge` |
+| Produtos/estoque | `/produtos/*`, `/estoque/*` | `ProdutoSelector`, `DataTable`, `FilterBar`, `ChannelBadges`, `StockBadge` |
+| PDV/caixa | `/pdv`, `/meus-caixas` | `PessoaSelector`, `ProdutoSelector`, `PetSelector`, `ActionButton`, `Panel`, `MetricGrid` |
+| Fiscal/Bling/compras | `/notas-fiscais/*`, `/compras/*`, `/vendas/bling-*`, `/produtos/sinc-bling` | `ProdutoSelector`, `FornecedorSelector`, `StatusBadge`, `DataTable`, `ConfirmDialog` |
+| Financeiro | `/financeiro/*` | `MoneyCell`, `DateRangeFilter`, `MetricGrid`, `DataTable`, `PaymentStatusBadge` |
+| Comissoes | `/comissoes/*` | `FuncionarioSelector`, `MoneyCell`, `StatusBadge`, `DataTable`, extrato/regra central |
+| Campanhas | `/campanhas`, `/campanhas/canais` | `PessoaSelector`, `StatusBadge`, `MetricGrid`, `DataTable`, extrato/ledger |
+| Entregas | `/entregas/*` | `FuncionarioSelector`, `StatusBadge`, `MetricGrid`, `DataTable`, `MapPanel` |
+| Cadastros/RH/Admin | `/cadastros/*`, `/rh/*`, `/admin/*`, `/configuracoes/*` | `PageHeader`, `FormField`, `DataTable`, `AppModal`, `ConfirmDialog` |
+| IA/Ajuda | `/ia/*`, `/ajuda` | `Panel`, `SafeMarkdown`, `MetricCard`, `InlineAlert` |
+
+## Onda 1 - Fundacao realmente transversal
+
+Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "embelezar tudo"; ela cria blocos pequenos e aplica em telas que mais repetem padrao.
+
+### Componentes a fechar primeiro
+
+| Componente | Por que vem agora | Telas piloto |
+| --- | --- | --- |
+| `DataTable` | Existem muitas tabelas com cabecalho, empty state, paginacao e acoes repetidas | Produtos, financeiro/vendas, pets |
+| `FilterBar` + `SearchInput` | Filtros aparecem em praticamente todos os modulos | Produtos, financeiro/vendas, pets |
+| `FormField` + `SelectField` | Muitos formularios e selects soltos | Produto editar, pet, banho/tosa agenda |
+| `AppModal` + `ConfirmDialog` | Modais e confirms estao espalhados | Produtos, PDV, campanhas |
+| `EntityCard` | Pessoas, pets e produtos precisam de alinhamento consistente | Pets, cliente no PDV, pessoas |
+| `NumberCell` + ampliar `MoneyCell` | Zero como traco e alinhamento numerico deve ser padrao | Financeiro/vendas, DRE, produtos |
+| `StockBadge` + `PaymentStatusBadge` | Status precisa parar de variar por tela | Produtos, vendas, contas |
+
+### Ordem de aplicacao da Onda 1
+
+1. **Pets**: resolver desalinhamento de cards e criar `EntityCard`/`PetInfoRow`.
+2. **Financeiro/Vendas**: aplicar `MoneyCell`, `NumberCell`, `MetricGrid`, `FilterBar` e preparar `DataTable`.
+3. **Produtos**: terminar listagem com `DataTable`/`FilterBar` e consolidar `ChannelBadges`.
+4. **PDV**: manter como vitrine de interacao compacta e aplicar `EntityCard` no cliente.
+5. **Banho & Tosa + Veterinario**: reaproveitar `TutorPetSelector` e padronizar formularios.
+
+### Progresso da Onda 1
+
+- 2026-05-02: criado `EntityCard`/`EntityInfoRow` e aplicado em `/pets`, com campos fixos mesmo vazios, botoes padronizados e card preparado para reuso em pessoas/produtos.
+- 2026-05-02: ampliado `MoneyCell` com sinal/zero como traco, criado `NumberCell` e aplicado na consulta de vendas em resumo por data, lista de vendas e itens expandidos.
+- 2026-05-02: criado `FilterBar`/`FilterRow`/`FilterAdvanced` e aplicado em `/pets` como primeiro padrao de filtros reutilizaveis.
+
+### Nao fazer nesta onda
+
+- Nao reescrever arquivos gigantes inteiros.
+- Nao mexer em regra de negocio junto com refator visual grande.
+- Nao trocar todos os botoes do sistema em massa sem validar por modulo.
+- Nao criar mais um componente se `ActionButton`, `Panel`, `StatusBadge`, `MetricCard` ou `TutorPetSelector` ja resolverem.
+
+## Onda 2 - Regras centrais auditaveis
+
+Depois da fundacao visual, atacar a logica sensivel com pouco ruido visual.
+
+| Dominio | Primeira entrega concreta |
+| --- | --- |
+| Campanhas | Extrato/ledger geral: credito, debito, conversao, estorno, origem, saldo |
+| Carimbos/cupons | Reconciliador: parametro X carimbos = 1 cupom, independente do caminho |
+| Comissoes | Reconciliador por venda: se tem comissao configurada, gera/atualiza/estorna |
+| Estoque | Extrato unico por produto: venda, compra, ajuste, cancelamento, NF, kit |
+| Financeiro/caixa | Evento unico para venda criada/editada/cancelada/reaberta/baixada |
+| DRE | Snapshot/recalculo auditavel por periodo e origem |
+
+### Nome tecnico interno
+
+Usar o termo **orquestradores/reconciliadores de dominio com ledger**.
+
+Na pratica:
+
+- Orquestrador: decide o que precisa acontecer quando uma entidade muda.
+- Reconciliador: confere e corrige o estado final esperado.
+- Ledger/extrato: registra por que houve credito, debito, estorno, cupom, comissao ou ajuste.
+
 ## Proximo passo recomendado
 
-Antes de continuar espalhando mudancas, consolidar a fundacao global:
+Continuar a **Onda 1 / Passo 2: Financeiro/Vendas**.
 
-1. Completar `ActionButton` com variante de icone (`IconActionButton`).
-2. Criar `MetricCard` e `MetricGrid`, atacando o desalinhamento de dashboards/cards como no PDV.
-3. Criar `StatusBadge` e mapear status comuns.
-4. Criar `PageHeader` e `Panel`.
-5. Aplicar primeiro no PDV como tela piloto transversal.
-6. Depois replicar por modulo seguindo a ordem da Fase 4.
+Entrega esperada:
+
+1. Levar `MoneyCell`/`NumberCell` para DRE, contas a pagar/receber e compras.
+2. Levar `FilterBar` para Financeiro/Vendas, Produtos e Compras.
+3. Preparar `DataTable` sem reescrever a tela inteira.
+4. Padronizar `StatusBadge` em vendas, contas e compras.
+5. Rodar build e validar visual local a cada fatia.

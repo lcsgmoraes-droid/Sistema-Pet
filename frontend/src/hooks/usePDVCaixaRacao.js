@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../api";
 import { contarRacoes, ehRacao } from "../helpers/deteccaoRacao";
@@ -10,13 +10,14 @@ export function usePDVCaixaRacao({ vendaAtual, destaqueAbrirCaixa }) {
   const [temCaixaAberto, setTemCaixaAberto] = useState(false);
   const [mostrarCalculadoraRacao, setMostrarCalculadoraRacao] = useState(false);
   const [racaoIdFechada, setRacaoIdFechada] = useState(null);
+  const verificandoCaixaRef = useRef(false);
 
   useEffect(() => {
-    void verificarCaixaAberto();
+    void verificarCaixaAberto({ force: true });
 
     const intervalId = setInterval(() => {
       void verificarCaixaAberto();
-    }, 30000);
+    }, 60000);
 
     return () => clearInterval(intervalId);
   }, [caixaKey]);
@@ -27,12 +28,18 @@ export function usePDVCaixaRacao({ vendaAtual, destaqueAbrirCaixa }) {
     }
   }, [destaqueAbrirCaixa, temCaixaAberto, mostrarModalAbrirCaixa]);
 
-  const verificarCaixaAberto = async () => {
+  const verificarCaixaAberto = async ({ force = false } = {}) => {
+    if (verificandoCaixaRef.current) return;
+    if (!force && document.visibilityState === "hidden") return;
+
+    verificandoCaixaRef.current = true;
     try {
       const response = await api.get("/caixas/aberto");
       setTemCaixaAberto(!!response.data);
     } catch {
       setTemCaixaAberto(false);
+    } finally {
+      verificandoCaixaRef.current = false;
     }
   };
 

@@ -36,6 +36,7 @@ export function usePDVProdutoBusca({
   const buscarProdutosAtualizados = async (termo) => {
     const response = await getProdutosVendaveis({
       busca: termo,
+      page_size: 20,
       _ts: Date.now(),
     });
 

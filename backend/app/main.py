@@ -144,6 +144,7 @@ from app.whatsapp.security_router import router as whatsapp_security_router  # S
 from app.health_router import router as health_router  # Sprint 9: Health & Monitoring
 from app.admin_fix_routes import router as admin_fix_router  # Correções administrativas
 from app.routes.health_routes import router as health_check_router  # FASE 8: Healthcheck + Readiness
+from app.routes.error_events_routes import router as error_events_router  # Observabilidade operacional
 
 # ============================================================================
 # E-COMMERCE - Loja Pública
@@ -790,6 +791,7 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 # - /ready: Readiness probe (app pronto para tráfego?)
 # - Sem autenticação, sem tenant, sem prefixo
 app.include_router(health_check_router, tags=["Infrastructure"])
+app.include_router(error_events_router)
 
 app.include_router(auth_router, tags=["Autenticação Multi-Tenant"])
 app.include_router(usuarios_router, tags=["Usuários & RBAC"])

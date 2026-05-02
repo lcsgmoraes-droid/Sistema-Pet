@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import api from "../api";
 import { listarVendas } from "../api/vendas";
 import { debugLog } from "../utils/debug";
@@ -15,8 +15,14 @@ export function usePDVVendasRecentes() {
   const [buscaNumeroVenda, setBuscaNumeroVenda] = useState("");
   const [driveAguardando, setDriveAguardando] = useState([]);
   const [driveAlertVisible, setDriveAlertVisible] = useState(false);
+  const vendasPollingRef = useRef(false);
+  const drivePollingRef = useRef(false);
 
-  const carregarVendasRecentes = async () => {
+  const carregarVendasRecentes = async ({ force = false } = {}) => {
+    if (vendasPollingRef.current) return;
+    if (!force && document.visibilityState === "hidden") return;
+
+    vendasPollingRef.current = true;
     try {
       const hoje = new Date();
       let dataInicio;
@@ -56,6 +62,8 @@ export function usePDVVendasRecentes() {
       setVendasRecentes(resultado.vendas || []);
     } catch (error) {
       console.error("Erro ao carregar vendas:", error);
+    } finally {
+      vendasPollingRef.current = false;
     }
   };
 
@@ -84,7 +92,7 @@ export function usePDVVendasRecentes() {
         retirado_por: confirmandoRetirada.nome.trim() || null,
       });
       setConfirmandoRetirada({ vendaId: null, nome: "" });
-      await carregarVendasRecentes();
+      await carregarVendasRecentes({ force: true });
     } catch (error) {
       console.error("Erro ao confirmar retirada:", error);
     }
@@ -95,17 +103,21 @@ export function usePDVVendasRecentes() {
   };
 
   useEffect(() => {
-    void carregarVendasRecentes();
+    void carregarVendasRecentes({ force: true });
 
     const intervalo = setInterval(() => {
       void carregarVendasRecentes();
-    }, 30000);
+    }, 60000);
 
     return () => clearInterval(intervalo);
   }, [filtroVendas, filtroStatus, filtroTemEntrega, buscaNumeroVenda]);
 
   useEffect(() => {
-    const verificarDrive = async () => {
+    const verificarDrive = async ({ force = false } = {}) => {
+      if (drivePollingRef.current) return;
+      if (!force && document.visibilityState === "hidden") return;
+
+      drivePollingRef.current = true;
       try {
         const response = await api.get("/ecommerce-drive/aguardando");
         const lista = response.data?.pedidos || [];
@@ -113,13 +125,15 @@ export function usePDVVendasRecentes() {
         setDriveAlertVisible(lista.length > 0);
       } catch {
         // Nao interrompe o PDV se o polling do drive falhar.
+      } finally {
+        drivePollingRef.current = false;
       }
     };
 
-    void verificarDrive();
+    void verificarDrive({ force: true });
     const intervalo = setInterval(() => {
       void verificarDrive();
-    }, 30000);
+    }, 60000);
 
     return () => clearInterval(intervalo);
   }, []);

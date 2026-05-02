@@ -46,13 +46,8 @@ EXPOSE 8000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --retries=3 --start-period=40s \
-  CMD curl -f http://localhost:8000/health || exit 1
+  CMD curl -fsS --max-time 7 http://localhost:8000/health/watchdog || exit 1
 
-# Comando de inicialização
-# 4 workers para produção (ajustar conforme CPU disponível)
-CMD ["uvicorn", "app.main:app", \
-     "--host", "0.0.0.0", \
-     "--port", "8000", \
-     "--workers", "4", \
-     "--log-level", "info", \
-     "--access-log"]
+# Comando de inicializacao
+# O watchdog reinicia o servidor se a API parar de responder ao banco.
+CMD ["python", "scripts/start_with_watchdog.py"]

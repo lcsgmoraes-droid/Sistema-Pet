@@ -33,6 +33,8 @@ import api from "../api";
 import { useAuth } from "../contexts/AuthContext";
 import HistoricoVendasClienteTab from "../pages/Financeiro/HistoricoVendasClienteTab";
 import { actionButtonClasses } from "./ui/actionStyles";
+import MoneyCell, { formatMoneyCellValue, isZeroMoneyValue } from "./ui/MoneyCell";
+import NumberCell from "./ui/NumberCell";
 
 const COLUNAS_RELATORIO_VENDAS = [
   { key: "data_venda", label: "Data", value: (v) => v.data_venda || "" },
@@ -507,22 +509,16 @@ export default function VendasFinanceiro() {
   };
 
   const formatarMoeda = (valor) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(valor || 0);
+    return formatMoneyCellValue(valor);
   };
 
-  const valorEhZeroVisual = (valor) => {
-    const numero = Number(valor || 0);
-    return Number.isFinite(numero) && Math.abs(numero) < 0.005;
-  };
+  const valorEhZeroVisual = isZeroMoneyValue;
 
   const formatarMoedaOuTraco = (valor) =>
-    valorEhZeroVisual(valor) ? "-" : formatarMoeda(valor);
+    formatMoneyCellValue(valor, { zeroAsDash: true });
 
   const formatarMoedaComSinalOuTraco = (valor, sinal) =>
-    valorEhZeroVisual(valor) ? "-" : `${sinal}${formatarMoeda(Math.abs(Number(valor || 0)))}`;
+    formatMoneyCellValue(valor, { sign: sinal, zeroAsDash: true });
 
   const formatarPercentualOuTraco = (valor) =>
     valorEhZeroVisual(valor) ? "-" : `${valor}%`;
@@ -2739,31 +2735,31 @@ export default function VendasFinanceiro() {
                         </div>
                       </td>
                       <td className="px-4 py-2 text-right">
-                        {item.quantidade}
+                        <NumberCell value={item.quantidade} zeroAsDash />
                       </td>
                       <td className="px-4 py-2 text-right">
-                        {formatarMoeda(item.ticket_medio)}
+                        <MoneyCell value={item.ticket_medio} zeroAsDash />
                       </td>
                       <td className="px-4 py-2 text-right">
-                        {formatarMoeda(item.valor_bruto)}
+                        <MoneyCell value={item.valor_bruto} zeroAsDash />
                       </td>
                       <td className="px-4 py-2 text-right">
-                        {formatarMoeda(item.taxa_entrega)}
+                        <MoneyCell value={item.taxa_entrega} zeroAsDash />
                       </td>
                       <td className="px-4 py-2 text-right">
-                        {formatarMoeda(item.desconto)}
+                        <MoneyCell value={item.desconto} zeroAsDash />
                       </td>
                       <td className="px-4 py-2 text-right">
-                        {item.percentual_desconto}%
+                        <NumberCell value={item.percentual_desconto} decimals={1} suffix="%" zeroAsDash />
                       </td>
                       <td className="px-4 py-2 text-right">
-                        {formatarMoeda(item.valor_liquido)}
+                        <MoneyCell value={item.valor_liquido} zeroAsDash />
                       </td>
                       <td className="px-4 py-2 text-right">
-                        {formatarMoeda(item.valor_recebido)}
+                        <MoneyCell value={item.valor_recebido} zeroAsDash />
                       </td>
                       <td className="px-4 py-2 text-right">
-                        {formatarMoeda(item.saldo_aberto)}
+                        <MoneyCell value={item.saldo_aberto} zeroAsDash />
                       </td>
                     </tr>
                   ))}
@@ -2798,50 +2794,56 @@ export default function VendasFinanceiro() {
                           }}
                         >
                           <td className="px-4 py-3" colSpan="2">TOTAL</td>
-                          <td className="px-4 py-3 text-right">{totalQtd}</td>
                           <td className="px-4 py-3 text-right">
-                            {formatarMoeda(ticketMedio)}
+                            <NumberCell value={totalQtd} zeroAsDash />
                           </td>
                           <td className="px-4 py-3 text-right">
-                            {formatarMoeda(totalBruto)}
+                            <MoneyCell value={ticketMedio} zeroAsDash />
                           </td>
                           <td className="px-4 py-3 text-right">
-                            {formatarMoeda(
-                              vendasPorDataCalendario.reduce(
+                            <MoneyCell value={totalBruto} zeroAsDash />
+                          </td>
+                          <td className="px-4 py-3 text-right">
+                            <MoneyCell
+                              value={vendasPorDataCalendario.reduce(
                                 (sum, item) => sum + item.taxa_entrega,
                                 0,
-                              ),
-                            )}
+                              )}
+                              zeroAsDash
+                            />
                           </td>
                           <td className="px-4 py-3 text-right">
-                            {formatarMoeda(totalDesconto)}
+                            <MoneyCell value={totalDesconto} zeroAsDash />
                           </td>
                           <td className="px-4 py-3 text-right">
-                            {percentualDesconto}%
+                            <NumberCell value={percentualDesconto} decimals={1} suffix="%" zeroAsDash />
                           </td>
                           <td className="px-4 py-3 text-right">
-                            {formatarMoeda(
-                              vendasPorDataCalendario.reduce(
+                            <MoneyCell
+                              value={vendasPorDataCalendario.reduce(
                                 (sum, item) => sum + item.valor_liquido,
                                 0,
-                              ),
-                            )}
+                              )}
+                              zeroAsDash
+                            />
                           </td>
                           <td className="px-4 py-3 text-right">
-                            {formatarMoeda(
-                              vendasPorDataCalendario.reduce(
+                            <MoneyCell
+                              value={vendasPorDataCalendario.reduce(
                                 (sum, item) => sum + item.valor_recebido,
                                 0,
-                              ),
-                            )}
+                              )}
+                              zeroAsDash
+                            />
                           </td>
                           <td className="px-4 py-3 text-right">
-                            {formatarMoeda(
-                              vendasPorDataCalendario.reduce(
+                            <MoneyCell
+                              value={vendasPorDataCalendario.reduce(
                                 (sum, item) => sum + item.saldo_aberto,
                                 0,
-                              ),
-                            )}
+                              )}
+                              zeroAsDash
+                            />
                           </td>
                         </tr>
                       );
@@ -3512,34 +3514,34 @@ export default function VendasFinanceiro() {
                       </td>
                       <td className="px-1 py-2">{venda.cliente_nome}</td>
                       <td className="px-1 py-2 text-right font-medium whitespace-nowrap">
-                        {formatarMoedaOuTraco(venda.venda_bruta)}
+                        <MoneyCell value={venda.venda_bruta} zeroAsDash />
                       </td>
                       <td
                         className="px-1 py-2 text-right text-green-700 whitespace-nowrap"
                         title="Taxa de entrega total cobrada do cliente"
                       >
-                        {formatarMoedaComSinalOuTraco(venda.taxa_loja || 0, "+")}
+                        <MoneyCell value={venda.taxa_loja || 0} sign="+" zeroAsDash />
                       </td>
                       <td className="px-1 py-2 text-right text-red-600 whitespace-nowrap">
-                        {formatarMoedaComSinalOuTraco(venda.desconto, "-")}
+                        <MoneyCell value={venda.desconto} sign="-" zeroAsDash />
                       </td>
                       <td
                         className="px-1 py-2 text-right text-blue-600 whitespace-nowrap"
                         title="Comissão repassada ao entregador"
                       >
-                        {formatarMoedaComSinalOuTraco(venda.taxa_entrega, "-")}
+                        <MoneyCell value={venda.taxa_entrega} sign="-" zeroAsDash />
                       </td>
                       <td
                         className="px-1 py-2 text-right text-orange-500 whitespace-nowrap"
                         title="Custo operacional da entrega (empresa)"
                       >
-                        {formatarMoedaComSinalOuTraco(venda.taxa_operacional || 0, "-")}
+                        <MoneyCell value={venda.taxa_operacional || 0} sign="-" zeroAsDash />
                       </td>
                       <td className="px-1 py-2 text-right text-purple-600 whitespace-nowrap">
-                        {formatarMoedaComSinalOuTraco(venda.taxa_cartao, "-")}
+                        <MoneyCell value={venda.taxa_cartao} sign="-" zeroAsDash />
                       </td>
                       <td className="px-1 py-2 text-right text-blue-600 whitespace-nowrap">
-                        {formatarMoedaComSinalOuTraco(venda.comissao, "-")}
+                        <MoneyCell value={venda.comissao} sign="-" zeroAsDash />
                       </td>
                       <td
                         className="px-1 py-2 text-right text-pink-600 whitespace-nowrap"
@@ -3549,32 +3551,30 @@ export default function VendasFinanceiro() {
                             : "Imposto oculto porque a venda nao tem NF/NFC-e emitida"
                         }
                       >
-                        {formatarMoedaComSinalOuTraco(venda.imposto || 0, "-")}
+                        <MoneyCell value={venda.imposto || 0} sign="-" zeroAsDash />
                       </td>
                       <td
                         className="px-1 py-2 text-right text-teal-600 whitespace-nowrap"
                         title="Custo com campanhas (cashback/cupom resgatado)"
                       >
-                        {venda.custo_campanha > 0
-                          ? `-${formatarMoeda(venda.custo_campanha)}`
-                          : "-"}
+                        <MoneyCell value={venda.custo_campanha} sign="-" zeroAsDash />
                       </td>
                       <td className="px-1 py-2 text-right font-medium whitespace-nowrap">
-                        {formatarMoedaOuTraco(venda.venda_liquida)}
+                        <MoneyCell value={venda.venda_liquida} zeroAsDash />
                       </td>
                       <td className="px-1 py-2 text-right text-orange-600 whitespace-nowrap">
-                        {formatarMoedaComSinalOuTraco(venda.custo_produtos, "-")}
+                        <MoneyCell value={venda.custo_produtos} sign="-" zeroAsDash />
                       </td>
                       <td
                         className={`px-1 py-2 text-right font-bold whitespace-nowrap ${venda.lucro >= 0 ? "text-green-600" : "text-red-600"}`}
                       >
-                        {formatarMoedaOuTraco(venda.lucro)}
+                        <MoneyCell value={venda.lucro} zeroAsDash />
                       </td>
                       <td className="px-1 py-2 text-right whitespace-nowrap">
-                        {formatarPercentualOuTraco(venda.margem_sobre_venda)}
+                        <NumberCell value={venda.margem_sobre_venda} decimals={1} suffix="%" zeroAsDash />
                       </td>
                       <td className="px-1 py-2 text-right whitespace-nowrap">
-                        {formatarPercentualOuTraco(venda.margem_sobre_custo)}
+                        <NumberCell value={venda.margem_sobre_custo} decimals={1} suffix="%" zeroAsDash />
                       </td>
                       <td className="px-2 py-2 text-center">
                         <span
@@ -3677,31 +3677,31 @@ export default function VendasFinanceiro() {
                                         </div>
                                       </td>
                                       <td className="px-1 py-1 text-center">
-                                        {item.quantidade}
+                                        <NumberCell value={item.quantidade} zeroAsDash />
                                       </td>
                                       <td className="px-1 py-1 text-right whitespace-nowrap">
-                                        {formatarMoedaOuTraco(item.preco_unitario)}
+                                        <MoneyCell value={item.preco_unitario} zeroAsDash />
                                       </td>
                                       <td className="px-1 py-1 text-right font-medium whitespace-nowrap">
-                                        {formatarMoedaOuTraco(item.venda_bruta)}
+                                        <MoneyCell value={item.venda_bruta} zeroAsDash />
                                       </td>
                                       <td className="px-1 py-1 text-right text-green-700 whitespace-nowrap">
-                                        {formatarMoedaComSinalOuTraco(item.taxa_loja || 0, "+")}
+                                        <MoneyCell value={item.taxa_loja || 0} sign="+" zeroAsDash />
                                       </td>
                                       <td className="px-1 py-1 text-right text-red-600 whitespace-nowrap">
-                                        {formatarMoedaComSinalOuTraco(item.desconto, "-")}
+                                        <MoneyCell value={item.desconto} sign="-" zeroAsDash />
                                       </td>
                                       <td className="px-1 py-1 text-right text-blue-600 whitespace-nowrap">
-                                        {formatarMoedaComSinalOuTraco(item.taxa_entrega, "-")}
+                                        <MoneyCell value={item.taxa_entrega} sign="-" zeroAsDash />
                                       </td>
                                       <td className="px-1 py-1 text-right text-orange-500 whitespace-nowrap">
-                                        {formatarMoedaComSinalOuTraco(item.taxa_operacional || 0, "-")}
+                                        <MoneyCell value={item.taxa_operacional || 0} sign="-" zeroAsDash />
                                       </td>
                                       <td className="px-1 py-1 text-right text-purple-600 whitespace-nowrap">
-                                        {formatarMoedaComSinalOuTraco(item.taxa_cartao, "-")}
+                                        <MoneyCell value={item.taxa_cartao} sign="-" zeroAsDash />
                                       </td>
                                       <td className="px-1 py-1 text-right text-blue-600 whitespace-nowrap">
-                                        {formatarMoedaComSinalOuTraco(item.comissao, "-")}
+                                        <MoneyCell value={item.comissao} sign="-" zeroAsDash />
                                       </td>
                                       <td
                                         className="px-1 py-1 text-right text-pink-600 whitespace-nowrap"
@@ -3711,39 +3711,37 @@ export default function VendasFinanceiro() {
                                             : "Imposto oculto porque a venda nao tem NF/NFC-e emitida"
                                         }
                                       >
-                                        {formatarMoedaComSinalOuTraco(item.imposto || 0, "-")}
+                                        <MoneyCell value={item.imposto || 0} sign="-" zeroAsDash />
                                       </td>
                                       <td className="px-1 py-1 text-right text-teal-600 whitespace-nowrap">
-                                        {(item.campanha || 0) > 0
-                                          ? `-${formatarMoeda(item.campanha)}`
-                                          : "-"}
+                                        <MoneyCell value={item.campanha} sign="-" zeroAsDash />
                                       </td>
                                       <td className="px-1 py-1 text-right font-medium whitespace-nowrap">
-                                        {formatarMoedaOuTraco(item.valor_liquido)}
+                                        <MoneyCell value={item.valor_liquido} zeroAsDash />
                                       </td>
                                       <td className="px-1 py-1 text-right text-orange-600 whitespace-nowrap">
-                                        {formatarMoedaOuTraco(item.custo_unitario)}
+                                        <MoneyCell value={item.custo_unitario} zeroAsDash />
                                       </td>
                                       <td className="px-1 py-1 text-right text-orange-600 font-medium whitespace-nowrap">
-                                        {formatarMoedaComSinalOuTraco(item.custo_total, "-")}
+                                        <MoneyCell value={item.custo_total} sign="-" zeroAsDash />
                                       </td>
                                       <td
                                         className={`px-1 py-1 text-right font-bold whitespace-nowrap ${item.lucro >= 0 ? "text-green-600" : "text-red-600"} cursor-help`}
                                         title={`Lucro unitário: ${formatarMoeda(item.lucro_unitario)}`}
                                       >
-                                        {formatarMoedaOuTraco(item.lucro)}
+                                        <MoneyCell value={item.lucro} zeroAsDash />
                                       </td>
                                       <td
                                         className="px-1 py-1 text-right whitespace-nowrap cursor-help"
                                         title={`Margem: ${item.margem_sobre_venda}%`}
                                       >
-                                        {formatarPercentualOuTraco(item.margem_sobre_venda)}
+                                        <NumberCell value={item.margem_sobre_venda} decimals={1} suffix="%" zeroAsDash />
                                       </td>
                                       <td
                                         className="px-1 py-1 text-right whitespace-nowrap cursor-help"
                                         title={`Markup: ${item.margem_sobre_custo}%`}
                                       >
-                                        {formatarPercentualOuTraco(item.margem_sobre_custo)}
+                                        <NumberCell value={item.margem_sobre_custo} decimals={1} suffix="%" zeroAsDash />
                                       </td>
                                     </tr>
                                   ))}

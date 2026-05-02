@@ -1,11 +1,24 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../api';
-import { 
-  FiPlus, FiSearch, FiFilter, FiX, FiEdit2, FiEye, FiAlertCircle,
-  FiCheckCircle, FiXCircle
-} from 'react-icons/fi';
-import { PawPrint } from 'lucide-react';
+import {
+  AlertCircle,
+  CheckCircle2,
+  Eye,
+  Filter,
+  PawPrint,
+  Pencil,
+  Plus,
+  Search,
+  X,
+  XCircle,
+} from 'lucide-react';
+import ActionButton from '../components/ui/ActionButton';
+import IconActionButton from '../components/ui/IconActionButton';
+import Panel from '../components/ui/Panel';
+import EntityCard, { EntityInfoRow } from '../components/ui/EntityCard';
+import FilterBar, { FilterAdvanced, FilterRow } from '../components/ui/FilterBar';
+import { formatarIdadeMeses } from '../helpers/idadeHelper';
 
 const GerenciamentoPets = () => {
   const navigate = useNavigate();
@@ -133,6 +146,17 @@ const GerenciamentoPets = () => {
     return `${anos} ${anos === 1 ? 'ano' : 'anos'}`;
   };
 
+  const obterIdadePet = (pet) => {
+    const idadeMeses = pet.idade_meses ?? pet.idade_aproximada;
+
+    if (idadeMeses !== null && idadeMeses !== undefined && idadeMeses !== '') {
+      const meses = Number(idadeMeses);
+      return Number.isFinite(meses) ? formatarIdadeMeses(meses) : String(idadeMeses);
+    }
+
+    return pet.data_nascimento ? calcularIdade(pet.data_nascimento) : '';
+  };
+
   const toggleAtivacao = async (pet) => {
     try {
       if (pet.ativo) {
@@ -175,22 +199,22 @@ const GerenciamentoPets = () => {
               : 'Gestão completa dos animais de estimação'}
           </p>
         </div>
-        <button
+        <ActionButton
           onClick={() => navigate('/pets/novo')}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
+          intent="create"
+          icon={Plus}
+          size="md"
         >
-          <FiPlus size={20} />
           Adicionar Pet
-        </button>
+        </ActionButton>
       </div>
 
       {/* Barra de busca e filtros */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 mb-6">
-        <form onSubmit={handleBusca} className="space-y-4">
+      <FilterBar className="mb-6" onSubmit={handleBusca}>
           {/* Busca principal */}
-          <div className="flex gap-3">
+          <FilterRow className="items-stretch">
             <div className="flex-1 relative">
-              <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
                 placeholder="Buscar tutor por nome, telefone ou CPF..."
@@ -225,7 +249,7 @@ const GerenciamentoPets = () => {
             </div>
 
             <div className="flex-1 relative">
-              <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
+              <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
                 placeholder={clienteFiltro ? 'Buscar pet pelo nome...' : 'Primeiro selecione o tutor'}
@@ -235,25 +259,28 @@ const GerenciamentoPets = () => {
                 className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
               />
             </div>
-            <button
+            <ActionButton
               type="submit"
-              className="px-6 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
+              intent="neutral"
+              size="md"
             >
               Buscar
-            </button>
-            <button
+            </ActionButton>
+            <ActionButton
               type="button"
               onClick={() => setMostrarFiltros(!mostrarFiltros)}
-              className="px-4 py-2 border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors flex items-center gap-2"
+              intent="neutral"
+              tone="soft"
+              icon={Filter}
+              size="md"
             >
-              <FiFilter />
               Filtros
-            </button>
-          </div>
+            </ActionButton>
+          </FilterRow>
 
           {/* Filtros avançados */}
           {mostrarFiltros && (
-            <div className="grid grid-cols-3 gap-4 pt-4 border-t border-gray-200">
+            <FilterAdvanced className="grid grid-cols-3 gap-4">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Cliente (Tutor)
@@ -317,31 +344,32 @@ const GerenciamentoPets = () => {
               </div>
 
               <div className="col-span-3 flex justify-end">
-                <button
+                <ActionButton
                   type="button"
                   onClick={limparFiltros}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-900 flex items-center gap-2"
+                  intent="neutral"
+                  tone="ghost"
+                  icon={X}
+                  size="sm"
                 >
-                  <FiX />
                   Limpar filtros
-                </button>
+                </ActionButton>
               </div>
-            </div>
+            </FilterAdvanced>
           )}
-        </form>
-      </div>
+      </FilterBar>
 
       {/* Erro */}
       {error && (
         <div className="mb-6 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg flex items-center gap-2">
-          <FiAlertCircle />
+          <AlertCircle size={18} />
           {error}
         </div>
       )}
 
       {/* Lista de pets */}
       {pets.length === 0 ? (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-12 text-center">
+        <Panel className="p-12 text-center">
           <PawPrint className="mx-auto text-gray-300 mb-4" size={64} />
           <h3 className="text-xl font-semibold text-gray-900 mb-2">
             Nenhum pet encontrado
@@ -351,103 +379,90 @@ const GerenciamentoPets = () => {
               ? 'Tente ajustar os filtros ou fazer uma nova busca'
               : 'Comece adicionando o primeiro pet'}
           </p>
-          <button
+          <ActionButton
             onClick={() => navigate('/pets/novo')}
-            className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors font-medium"
+            intent="create"
+            icon={Plus}
+            size="lg"
           >
-            <FiPlus />
             Adicionar Primeiro Pet
-          </button>
-        </div>
+          </ActionButton>
+        </Panel>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid auto-rows-fr grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {pets.map(pet => {
             const infoRows = [
               { label: 'Espécie:', value: pet.especie || '' },
               { label: 'Raça:', value: pet.raca || '' },
               { label: 'Sexo:', value: pet.sexo || '' },
-              {
-                label: 'Idade:',
-                value: pet.data_nascimento ? calcularIdade(pet.data_nascimento) : '',
-              },
+              { label: 'Idade:', value: obterIdadePet(pet) },
             ];
 
             return (
-              <div
+              <EntityCard
                 key={pet.id}
-                className={`bg-white rounded-lg shadow-sm border-2 transition-all hover:shadow-md h-full ${
-                  pet.ativo ? 'border-gray-200' : 'border-red-200 bg-gray-50'
-                }`}
-              >
-                <div className="p-5 h-full flex flex-col">
-                {/* Header do card */}
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-1">
-                      <h3 className="text-lg font-bold text-gray-900">
-                        {pet.nome}
-                      </h3>
-                      {pet.ativo ? (
-                        <FiCheckCircle className="text-green-500" size={16} />
-                      ) : (
-                        <FiXCircle className="text-red-500" size={16} />
-                      )}
-                    </div>
-                    <p className="text-sm text-gray-500">{pet.codigo}</p>
-                  </div>
-                  {pet.foto_url && (
+                title={pet.nome}
+                subtitle={pet.codigo}
+                inactive={!pet.ativo}
+                statusIcon={
+                  pet.ativo ? (
+                    <CheckCircle2 className="text-emerald-500" size={16} />
+                  ) : (
+                    <XCircle className="text-red-500" size={16} />
+                  )
+                }
+                media={
+                  pet.foto_url ? (
                     <img
                       src={pet.foto_url}
                       alt={pet.nome}
-                      className="w-16 h-16 rounded-full object-cover border-2 border-gray-200"
+                      className="h-16 w-16 rounded-full border-2 border-slate-200 object-cover"
                     />
-                  )}
-                </div>
-
-                {/* Informações principais */}
-                <div className="space-y-2 mb-4">
+                  ) : null
+                }
+                actions={
+                  <>
+                    <ActionButton
+                      onClick={() => navigate(`/pets/${pet.id}`)}
+                      className="flex-1"
+                      intent="edit"
+                      icon={Eye}
+                      size="sm"
+                    >
+                      Ver Detalhes
+                    </ActionButton>
+                    <IconActionButton
+                      onClick={() => navigate(`/pets/${pet.id}/editar`)}
+                      intent="edit"
+                      icon={Pencil}
+                      size="sm"
+                      title="Editar"
+                      aria-label={`Editar ${pet.nome}`}
+                    />
+                    <IconActionButton
+                      onClick={() => toggleAtivacao(pet)}
+                      intent={pet.ativo ? 'delete' : 'create'}
+                      icon={pet.ativo ? XCircle : CheckCircle2}
+                      size="sm"
+                      title={pet.ativo ? 'Desativar' : 'Reativar'}
+                      aria-label={pet.ativo ? `Desativar ${pet.nome}` : `Reativar ${pet.nome}`}
+                    />
+                  </>
+                }
+              >
+                <div className="space-y-1.5">
                   {infoRows.map((row) => (
-                    <div key={row.label} className="flex items-center gap-2 text-sm min-h-[20px]">
-                      <span className="font-medium text-gray-700 min-w-[58px]">{row.label}</span>
-                      <span className="text-gray-900">{row.value}</span>
-                    </div>
+                    <EntityInfoRow key={row.label} label={row.label} value={row.value} />
                   ))}
-                  <div className="flex items-center gap-2 text-sm pt-2 border-t border-gray-100">
-                    <span className="font-medium text-gray-700">Tutor:</span>
-                    <span className="text-blue-600">{pet.cliente_nome || ''}</span>
-                  </div>
                 </div>
-
-                {/* Ações */}
-                <div className="flex gap-2 mt-auto">
-                  <button
-                    onClick={() => navigate(`/pets/${pet.id}`)}
-                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg transition-colors text-sm font-medium"
-                  >
-                    <FiEye size={16} />
-                    Ver Detalhes
-                  </button>
-                  <button
-                    onClick={() => navigate(`/pets/${pet.id}/editar`)}
-                    className="px-3 py-2 border border-gray-300 hover:bg-gray-50 rounded-lg transition-colors"
-                    title="Editar"
-                  >
-                    <FiEdit2 size={16} className="text-gray-600" />
-                  </button>
-                  <button
-                    onClick={() => toggleAtivacao(pet)}
-                    className={`px-3 py-2 border rounded-lg transition-colors ${
-                      pet.ativo
-                        ? 'border-red-300 hover:bg-red-50 text-red-600'
-                        : 'border-green-300 hover:bg-green-50 text-green-600'
-                    }`}
-                    title={pet.ativo ? 'Desativar' : 'Reativar'}
-                  >
-                    {pet.ativo ? <FiXCircle size={16} /> : <FiCheckCircle size={16} />}
-                  </button>
+                <div className="mt-3 border-t border-slate-100 pt-3">
+                  <EntityInfoRow
+                    label="Tutor:"
+                    value={pet.cliente_nome || ''}
+                    valueClassName="text-blue-600"
+                  />
                 </div>
-                </div>
-              </div>
+              </EntityCard>
             );
           })}
         </div>

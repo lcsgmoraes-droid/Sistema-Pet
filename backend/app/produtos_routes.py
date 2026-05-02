@@ -2056,7 +2056,7 @@ def criar_produto(
 @router.get("/vendaveis", response_model=ProdutosPaginadosResponse)
 def listar_produtos_vendaveis(
     page: int = 1,
-    page_size: int = 1000,
+    page_size: int = 50,
     busca: Optional[str] = None,
     categoria_id: Optional[int] = None,
     marca_id: Optional[int] = None,
@@ -2075,6 +2075,8 @@ def listar_produtos_vendaveis(
     Produtos PAI nÃ£o aparecem pois nÃ£o sÃ£o vendÃ¡veis diretamente.
     """
     user, tenant_id = user_and_tenant
+    page = max(page, 1)
+    page_size = min(max(page_size, 1), 100)
 
     # QUERY BASE - Produtos vendÃ¡veis (incluindo KIT)
     query = db.query(Produto).filter(

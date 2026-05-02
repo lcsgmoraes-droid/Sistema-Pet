@@ -51,7 +51,7 @@ def get_current_user_and_tenant(
         tenant_id_str = payload.get("tenant_id")
         user_email = payload.get("sub")  # email do usuário
         
-        logger.warning(f"🔐 [AUTH] User: {user_email} | Tenant ID no JWT: {tenant_id_str}")
+        logger.debug(f"[AUTH] User: {user_email} | Tenant ID no JWT: {tenant_id_str}")
         logger.debug(f"[get_current_user_and_tenant] tenant_id no JWT: {tenant_id_str}")
         
         if not tenant_id_str:
