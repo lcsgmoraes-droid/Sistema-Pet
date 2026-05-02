@@ -71,14 +71,6 @@ const DRE = () => {
     return periodo || obterDataLocal();
   };
 
-  useEffect(() => {
-    carregarDRE();
-
-    return () => {
-      dreAbortRef.current?.abort?.();
-    };
-  }, []);
-
   const carregarDRE = async (periodoAlvo = periodo) => {
     const requestId = dreRequestIdRef.current + 1;
     dreRequestIdRef.current = requestId;
@@ -193,13 +185,17 @@ const DRE = () => {
     setCanaisSelecionados([]);
   };
 
-  // Recarregar DRE quando os canais selecionados mudarem
   useEffect(() => {
-    if (!dados) return undefined;
-
-    const timer = setTimeout(() => carregarDRE(), 350);
+    const timer = window.setTimeout(() => carregarDRE(periodo), 300);
     return () => clearTimeout(timer);
-  }, [canaisSelecionados]);
+  }, [periodo, canaisSelecionados]);
+
+  useEffect(
+    () => () => {
+      dreAbortRef.current?.abort?.();
+    },
+    [],
+  );
 
   const handlePeriodoPreset = (preset) => {
     const hoje = new Date();
@@ -221,7 +217,6 @@ const DRE = () => {
     }
 
     setPeriodo(novaData);
-    setTimeout(() => carregarDRE(novaData), 100);
   };
 
   const exportarPDF = async () => {
@@ -422,16 +417,6 @@ const DRE = () => {
                   onChange={(e) => setPeriodo(e.target.value)}
                   className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 />
-              </div>
-
-              <div className="flex items-end">
-                <button
-                  onClick={() => carregarDRE()}
-                  className={actionButtonClasses({ intent: "edit", tone: "solid", size: "sm", className: "min-w-[128px]" })}
-                >
-                  <RefreshCw size={18} />
-                  Atualizar
-                </button>
               </div>
             </div>
           </div>
@@ -695,7 +680,7 @@ const DRE = () => {
             <div className="bg-gray-50 rounded-lg p-12 text-center">
               <FileText className="mx-auto mb-4 text-gray-400" size={64} />
               <p className="text-gray-600 text-lg">
-                Selecione um período e clique em Atualizar para visualizar o DRE
+                Selecione um período para visualizar a DRE
               </p>
             </div>
           )}
