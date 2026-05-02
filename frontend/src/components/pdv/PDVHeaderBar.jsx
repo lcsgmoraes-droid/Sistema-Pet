@@ -13,6 +13,9 @@ import {
 } from "lucide-react";
 
 import MenuCaixa from "../MenuCaixa";
+import ActionButton from "../ui/ActionButton";
+import IconActionButton from "../ui/IconActionButton";
+import PageHeader from "../ui/PageHeader";
 
 export default function PDVHeaderBar({
   destaqueAbrirCaixa,
@@ -41,19 +44,15 @@ export default function PDVHeaderBar({
   onSalvarVenda,
   onAbrirModalPagamento,
 }) {
-  const actionBase =
-    "inline-flex h-14 items-center justify-center gap-2 rounded-2xl border border-transparent px-5 text-sm font-semibold shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:translate-y-0 disabled:hover:shadow-sm";
-  const iconActionBase =
-    "relative inline-flex h-14 w-14 items-center justify-center rounded-2xl border bg-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md";
-
-  const secondaryAction = `${actionBase} border-slate-200 bg-slate-50 text-slate-700 hover:border-slate-300 hover:bg-slate-100`;
-  const successAction = `${actionBase} bg-emerald-600 text-white hover:bg-emerald-700`;
-  const primaryAction = `${actionBase} bg-blue-600 text-white hover:bg-blue-700`;
-  const accentAction = `${actionBase} border-violet-200 bg-violet-50 text-violet-700 hover:border-violet-300 hover:bg-violet-100`;
-  const destructiveAction = `${actionBase} border-red-200 bg-red-50 text-red-700 hover:border-red-300 hover:bg-red-100`;
+  const dataAtual = new Date().toLocaleDateString("pt-BR", {
+    weekday: "long",
+    year: "numeric",
+    month: "long",
+    day: "numeric",
+  });
 
   return (
-    <div className="border-b bg-white px-6 py-5">
+    <div className="border-b bg-white px-5 py-3">
       {(destaqueAbrirCaixa || destaqueVenda) && (
         <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900">
           {destaqueAbrirCaixa
@@ -62,48 +61,17 @@ export default function PDVHeaderBar({
         </div>
       )}
 
-      <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-        <div className="flex min-w-0 flex-1 flex-col gap-4">
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-blue-50 text-blue-600 shadow-sm">
-              <ShoppingCart className="h-8 w-8" />
-            </div>
+      <div className="flex flex-col gap-3 xl:flex-row xl:items-end xl:justify-between">
+        <div className="flex min-w-0 flex-1 flex-col gap-3">
+          <PageHeader
+            icon={ShoppingCart}
+            title="Ponto de Venda"
+            subtitle={dataAtual}
+            onTour={iniciarTour}
+            tourTitle="Ver tour guiado do PDV"
+          />
 
-            <div>
-              <h1 className="text-2xl font-bold text-gray-900">Ponto de Venda</h1>
-              <p className="text-sm text-gray-500">
-                {new Date().toLocaleDateString("pt-BR", {
-                  weekday: "long",
-                  year: "numeric",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </p>
-            </div>
-
-            <button
-              onClick={iniciarTour}
-              title="Ver tour guiado do PDV"
-              className="inline-flex h-10 items-center gap-1 rounded-xl px-3 text-sm text-gray-400 transition-colors hover:bg-blue-50 hover:text-blue-600"
-            >
-              <svg
-                className="h-4 w-4"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-              <span className="hidden text-xs sm:inline">Tour</span>
-            </button>
-          </div>
-
-          <div className="flex w-full max-w-xl items-center gap-3">
+          <div className="flex w-full max-w-lg items-center gap-2">
             <div className="relative flex-1">
               <input
                 type="text"
@@ -115,122 +83,125 @@ export default function PDVHeaderBar({
                     onBuscarVenda();
                   }
                 }}
-                className="h-14 w-full rounded-2xl border border-slate-200 bg-slate-50 pl-11 pr-4 text-sm text-slate-700 shadow-sm transition-all placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100"
+                className="h-10 w-full rounded-lg border border-slate-200 bg-slate-50 pl-10 pr-3 text-sm text-slate-700 shadow-sm transition-all placeholder:text-slate-400 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-4 focus:ring-blue-100"
               />
-              <Search className="absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-slate-400" />
+              <Search className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
             </div>
-            <button
+            <ActionButton
               onClick={onBuscarVenda}
               disabled={!searchVendaQuery.trim() || loading}
-              className={`${primaryAction} min-w-[108px]`}
+              intent="edit"
+              size="lg"
+              className="min-w-[86px]"
             >
               Buscar
-            </button>
+            </ActionButton>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-end gap-3 xl:max-w-[54rem] xl:self-end">
+        <div className="flex flex-wrap items-center justify-end gap-2 xl:max-w-[54rem] xl:self-end">
           {vendaAtual.cliente && (
-            <button
+            <IconActionButton
               onClick={onAbrirPendenciasEstoque}
-              className={`${iconActionBase} border-orange-200 text-orange-500 hover:border-orange-300 hover:bg-orange-50`}
+              icon={Bell}
+              intent="warning"
+              size="lg"
+              badge={pendenciasCount > 0 ? pendenciasCount : null}
               title="Lista de espera - Produtos sem estoque"
-            >
-              <Bell className="h-5 w-5" />
-              {pendenciasCount > 0 && (
-                <span className="absolute -right-2 -top-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
-                  {pendenciasCount}
-                </span>
-              )}
-            </button>
+            />
           )}
 
           {vendaAtual.cliente && (
-            <button
+            <IconActionButton
               onClick={onAbrirOportunidades}
-              className={`${iconActionBase} border-yellow-200 text-yellow-500 hover:border-yellow-300 hover:bg-yellow-50`}
+              icon={Star}
+              intent="warning"
+              size="lg"
+              badge={
+                opportunitiesCount > 0 ? Math.min(opportunitiesCount, 6) : null
+              }
               title="Ver oportunidades de venda"
-            >
-              <Star className="h-5 w-5 fill-yellow-500" />
-              {opportunitiesCount > 0 && (
-                <span className="font-semibold text-yellow-600">
-                  {Math.min(opportunitiesCount, 6)}
-                </span>
-              )}
-            </button>
+            />
           )}
 
           {vendaAtual.cliente && (
-            <button
+            <IconActionButton
               onClick={onToggleAssistente}
-              className={`inline-flex h-14 min-w-[56px] items-center justify-center gap-2 rounded-2xl border shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${
-                painelAssistenteAberto
-                  ? "border-indigo-400 bg-indigo-100 text-indigo-700"
-                  : "border-indigo-200 bg-white text-indigo-600 hover:border-indigo-300 hover:bg-indigo-50"
-              }`}
+              active={painelAssistenteAberto}
+              icon={Bot}
+              intent="edit"
+              size="lg"
               title="Assistente IA do cliente"
-            >
-              <Bot className="h-5 w-5" />
-              {mensagensAssistenteLength > 1 && !painelAssistenteAberto && (
-                <span className="h-2 w-2 rounded-full bg-indigo-500" />
-              )}
-            </button>
+              badge={mensagensAssistenteLength > 1 && !painelAssistenteAberto ? "" : null}
+            />
           )}
 
           <div
             className={
-              destaqueAbrirCaixa ? `rounded-2xl ${caixaGuiaClasses.action}` : ""
+              destaqueAbrirCaixa ? `rounded-lg ${caixaGuiaClasses.action}` : ""
             }
           >
             <MenuCaixa key={menuCaixaKey} onAbrirCaixa={onAbrirCaixa} />
           </div>
 
-          <button
+          <ActionButton
             onClick={onNavigateMeusCaixas}
-            className={`${accentAction} min-w-[148px]`}
+            icon={Wallet}
+            intent="neutral"
+            tone="soft"
+            size="lg"
+            className="min-w-[120px]"
             title="Ver historico de caixas"
           >
-            <Wallet className="h-5 w-5" />
             <span>Meus Caixas</span>
-          </button>
+          </ActionButton>
 
           {!modoVisualizacao && vendaAtual.id && (
             <>
-              <button
+              <ActionButton
                 onClick={onCancelarEdicao}
                 disabled={loading}
-                className={`${secondaryAction} min-w-[170px]`}
+                icon={X}
+                intent="neutral"
+                tone="soft"
+                size="lg"
+                className="min-w-[138px]"
               >
-                <X className="h-5 w-5" />
                 <span>Cancelar Edicao</span>
-              </button>
-              <button
+              </ActionButton>
+              <ActionButton
                 onClick={onExcluirVenda}
                 disabled={loading}
-                className={`${destructiveAction} min-w-[118px]`}
+                icon={Trash2}
+                intent="delete"
+                tone="soft"
+                size="lg"
+                className="min-w-[96px]"
               >
-                <Trash2 className="h-5 w-5" />
                 <span>Excluir</span>
-              </button>
+              </ActionButton>
             </>
           )}
 
-          <button
+          <ActionButton
             onClick={onSalvarVenda}
             disabled={loading || modoVisualizacao || !temCaixaAberto}
-            className={`${secondaryAction} min-w-[136px]`}
+            icon={Save}
+            intent="edit"
+            tone="solid"
+            size="lg"
+            className="min-w-[96px]"
             title={
               !temCaixaAberto
                 ? "Caixa fechado - Abra o caixa para salvar vendas"
                 : "Salvar venda atual"
             }
           >
-            <Save className="h-5 w-5" />
             <span>Salvar</span>
             {!temCaixaAberto && <Lock className="h-4 w-4 opacity-80" />}
-          </button>
+          </ActionButton>
 
-          <button
+          <ActionButton
             onClick={onAbrirModalPagamento}
             disabled={
               loading ||
@@ -238,17 +209,19 @@ export default function PDVHeaderBar({
               vendaAtual.status === "pago_nf" ||
               !temCaixaAberto
             }
-            className={`${successAction} min-w-[260px]`}
+            icon={CreditCard}
+            intent="create"
+            size="lg"
+            className="min-w-[190px]"
             title={
               !temCaixaAberto
                 ? "Caixa fechado - Abra o caixa para registrar recebimentos"
                 : "Registrar pagamento da venda"
             }
           >
-            <CreditCard className="h-5 w-5" />
             <span>Registrar Recebimento</span>
             {!temCaixaAberto && <Lock className="h-4 w-4 opacity-80" />}
-          </button>
+          </ActionButton>
         </div>
       </div>
     </div>

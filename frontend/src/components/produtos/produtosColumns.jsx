@@ -2,6 +2,9 @@
 import { formatarMoeda } from "../../api/produtos";
 import { actionButtonClasses } from "../ui/actionStyles";
 import { formatPercent } from "../../utils/formatters";
+import { markdownToPlainText } from "../../utils/safeMarkdown";
+import ChannelBadges from "../ui/ChannelBadges";
+import MoneyCell from "../ui/MoneyCell";
 
 function calcularMargem(preco, custo) {
   if (!preco || preco <= 0) return 0;
@@ -237,7 +240,7 @@ export function createProdutosColunas() {
               </div>
               {produto.descricao && (
                 <div className="text-xs text-gray-500 truncate max-w-xs mt-1">
-                  {produto.descricao}
+                  {markdownToPlainText(produto.descricao)}
                 </div>
               )}
             </div>
@@ -342,9 +345,7 @@ export function createProdutosColunas() {
     ),
     renderCell: (produto, props) => (
       <td className="px-4 py-3 text-right">
-        <span className="text-sm text-gray-900">
-          {formatarMoeda(produto.preco_custo)}
-        </span>
+        <MoneyCell className="text-sm text-gray-900" value={produto.preco_custo} />
       </td>
     ),
   },
@@ -413,9 +414,7 @@ export function createProdutosColunas() {
           </div>
         ) : (
           <div className="flex items-center gap-2 justify-end">
-            <span className="text-sm font-semibold text-green-600">
-              {formatarMoeda(produto.preco_venda)}
-            </span>
+            <MoneyCell className="text-sm font-semibold text-green-600" value={produto.preco_venda} />
             <button
               onClick={(e) => {
                 e.stopPropagation();
@@ -617,22 +616,7 @@ export function createProdutosColunas() {
 
       return (
         <td className="px-4 py-3 text-center">
-          <div className="flex flex-col items-center gap-1.5">
-            {canaisAtivos.length > 0 ? (
-              canaisAtivos.map((canal) => (
-                <span
-                  key={canal.key}
-                  className="inline-flex items-center gap-1 rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-xs font-medium text-emerald-700"
-                  title={`Ativo no ${canal.label}`}
-                >
-                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
-                  {canal.label}
-                </span>
-              ))
-            ) : (
-              <span className="text-xs text-gray-400">-</span>
-            )}
-          </div>
+          <ChannelBadges channels={canaisAtivos} />
         </td>
       );
     },

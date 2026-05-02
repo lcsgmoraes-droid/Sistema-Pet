@@ -1,6 +1,8 @@
 import React from "react";
-import { formatarData, formatarMoeda } from "../../api/produtos";
-import { actionButtonClasses } from "../ui/actionStyles";
+import { formatarData } from "../../api/produtos";
+import ActionButton from "../ui/ActionButton";
+import ChannelBadges from "../ui/ChannelBadges";
+import MoneyCell from "../ui/MoneyCell";
 import { obterCanaisAtivosProduto, obterEstoqueVisualProduto } from "./produtosUtils";
 import ProdutosPaginationControls from "./ProdutosPaginationControls";
 
@@ -209,14 +211,7 @@ export default function ProdutosTabelaSection({
                                   Inativo
                                 </span>
                               )}
-                              {canaisAtivos.map((canal) => (
-                                <span
-                                  key={canal.key}
-                                  className="rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-emerald-700"
-                                >
-                                  {canal.label}
-                                </span>
-                              ))}
+                              <ChannelBadges channels={canaisAtivos} layout="row" empty="" />
                             </div>
                           </div>
                         </div>
@@ -253,57 +248,51 @@ export default function ProdutosTabelaSection({
                           Venda
                         </p>
                         <p className="mt-1 text-sm font-bold text-gray-900">
-                          {formatarMoeda(produto.preco_venda)}
+                          <MoneyCell value={produto.preco_venda} />
                         </p>
                       </div>
                     </div>
 
                     <div className="mt-3 flex gap-2">
-                      <button
+                      <ActionButton
                         type="button"
                         onClick={(event) => {
                           event.stopPropagation();
                           navigate(`/produtos/${produto.id}/editar`);
                         }}
-                        className={actionButtonClasses({
-                          intent: "edit",
-                          tone: "solid",
-                          size: "sm",
-                          className: "flex-1",
-                        })}
+                        intent="edit"
+                        tone="solid"
+                        size="sm"
+                        className="flex-1"
                       >
                         Editar
-                      </button>
+                      </ActionButton>
                       {codigo && (
-                        <button
+                        <ActionButton
                           type="button"
                           onClick={(event) => {
                             event.stopPropagation();
                             copiarTexto(codigo, "Codigo");
                           }}
-                          className={actionButtonClasses({
-                            intent: "neutral",
-                            tone: "soft",
-                            size: "sm",
-                          })}
+                          intent="neutral"
+                          tone="soft"
+                          size="sm"
                         >
                           Copiar
-                        </button>
+                        </ActionButton>
                       )}
-                      <button
+                      <ActionButton
                         type="button"
                         onClick={(event) => {
                           event.stopPropagation();
                           handleToggleAtivo(produto);
                         }}
-                        className={actionButtonClasses({
-                          intent: produto.ativo === false ? "create" : "warning",
-                          tone: "soft",
-                          size: "sm",
-                        })}
+                        intent={produto.ativo === false ? "create" : "warning"}
+                        tone="soft"
+                        size="sm"
                       >
                         {produto.ativo === false ? "Ativar" : "Inativar"}
-                      </button>
+                      </ActionButton>
                     </div>
                   </article>
                 );

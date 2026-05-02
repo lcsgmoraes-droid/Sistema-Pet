@@ -1,19 +1,21 @@
+import Panel from "../ui/Panel";
+
 export default function PDVObservacoesCard({
   modoVisualizacao,
   observacoes,
   onObservacoesChange,
 }) {
   return (
-    <div className="bg-white rounded-lg shadow-sm border p-6">
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">Observacoes</h2>
+    <Panel padding="lg">
+      <h2 className="mb-3 text-base font-semibold text-gray-900">Observacoes</h2>
       <textarea
         value={observacoes || ""}
         onChange={(e) => onObservacoesChange(e.target.value)}
         placeholder="Observacoes da venda (opcional)..."
         disabled={modoVisualizacao}
-        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
-        rows={3}
+        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-50"
+        rows={2}
       />
-    </div>
+    </Panel>
   );
 }

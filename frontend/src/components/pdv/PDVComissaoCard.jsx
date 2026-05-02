@@ -1,4 +1,5 @@
 import { X } from "lucide-react";
+import Panel from "../ui/Panel";
 
 export default function PDVComissaoCard({
   buscaFuncionario,
@@ -13,7 +14,7 @@ export default function PDVComissaoCard({
   vendaComissionada,
 }) {
   return (
-    <div className="bg-white rounded-lg shadow-sm border p-6">
+    <Panel padding="lg">
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-lg font-semibold text-gray-900">Comissão</h2>
         <label className="flex items-center gap-2 cursor-pointer">
@@ -100,6 +101,6 @@ export default function PDVComissaoCard({
           </p>
         </div>
       )}
-    </div>
+    </Panel>
   );
 }

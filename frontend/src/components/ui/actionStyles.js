@@ -27,9 +27,17 @@ const ACTION_INTENTS = {
 };
 
 const ACTION_SIZES = {
-  xs: "gap-1 rounded-lg px-3 py-1.5 text-xs",
-  sm: "gap-2 rounded-lg px-3 py-2 text-sm",
-  md: "gap-2 rounded-xl px-4 py-2.5 text-sm",
+  xs: "h-7 gap-1 rounded-md px-2.5 text-xs",
+  sm: "h-8 gap-1.5 rounded-md px-3 text-xs",
+  md: "h-9 gap-2 rounded-lg px-3.5 text-sm",
+  lg: "h-10 gap-2 rounded-lg px-3.5 text-sm shadow-sm",
+};
+
+const ICON_ACTION_SIZES = {
+  xs: "h-7 w-7 rounded-md",
+  sm: "h-8 w-8 rounded-md",
+  md: "h-9 w-9 rounded-lg",
+  lg: "h-10 w-10 rounded-lg shadow-sm",
 };
 
 export function actionButtonClasses({
@@ -43,7 +51,29 @@ export function actionButtonClasses({
   const sizeClasses = ACTION_SIZES[size] || ACTION_SIZES.sm;
 
   return [
-    "inline-flex items-center justify-center border font-medium transition-colors",
+    "inline-flex items-center justify-center whitespace-nowrap border font-medium transition-colors",
+    "disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-100 disabled:text-gray-400",
+    sizeClasses,
+    toneClasses,
+    className,
+  ]
+    .filter(Boolean)
+    .join(" ");
+}
+
+export function iconActionButtonClasses({
+  intent = "neutral",
+  tone = "soft",
+  size = "sm",
+  active = false,
+  className = "",
+} = {}) {
+  const intentClasses = ACTION_INTENTS[intent] || ACTION_INTENTS.neutral;
+  const toneClasses = intentClasses[active ? "solid" : tone] || intentClasses.soft;
+  const sizeClasses = ICON_ACTION_SIZES[size] || ICON_ACTION_SIZES.sm;
+
+  return [
+    "relative inline-flex items-center justify-center border font-medium transition-colors",
     "disabled:cursor-not-allowed disabled:border-gray-200 disabled:bg-gray-100 disabled:text-gray-400",
     sizeClasses,
     toneClasses,

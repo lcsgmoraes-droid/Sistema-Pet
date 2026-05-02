@@ -123,8 +123,8 @@ export default function MenuCaixa({ onAbrirCaixa }) {
 
   if (loading) {
     return (
-      <div className="flex h-14 min-w-[176px] items-center rounded-2xl bg-slate-100 px-4 shadow-sm">
-        <div className="h-6 w-full animate-pulse rounded-xl bg-slate-200"></div>
+      <div className="flex h-10 min-w-[138px] items-center rounded-lg bg-slate-100 px-3 shadow-sm">
+        <div className="h-5 w-full animate-pulse rounded-lg bg-slate-200"></div>
       </div>
     );
   }
@@ -133,9 +133,9 @@ export default function MenuCaixa({ onAbrirCaixa }) {
     return (
       <button
         onClick={handleCaixaAberto}
-        className="inline-flex h-14 min-w-[176px] items-center justify-center gap-2 rounded-2xl bg-emerald-600 px-5 text-sm font-semibold text-white shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:bg-emerald-700 hover:shadow-md"
+        className="inline-flex h-10 min-w-[138px] items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700"
       >
-        <DollarSign className="w-5 h-5" />
+        <DollarSign className="h-4 w-4" />
         <span>Abrir Caixa</span>
       </button>
     );
@@ -146,15 +146,15 @@ export default function MenuCaixa({ onAbrirCaixa }) {
       <div className="relative">
         <button
           onClick={() => setMenuAberto(!menuAberto)}
-          className="inline-flex h-14 min-w-[196px] items-center justify-between gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 text-sm font-semibold text-slate-800 shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-emerald-300 hover:bg-white hover:shadow-md"
+          className="inline-flex h-10 min-w-[150px] items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 text-sm font-semibold text-slate-800 shadow-sm transition-colors hover:border-emerald-300 hover:bg-white"
         >
           <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-green-500 rounded-full animate-pulse"></div>
+            <div className="h-2.5 w-2.5 rounded-full bg-green-500"></div>
             <span className="font-semibold text-gray-900">
               Caixa #{caixaAberto.numero_caixa}
             </span>
           </div>
-          <ChevronDown className={`w-5 h-5 text-gray-400 transition-transform ${menuAberto ? 'rotate-180' : ''}`} />
+          <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${menuAberto ? 'rotate-180' : ''}`} />
         </button>
 
         {menuAberto && (

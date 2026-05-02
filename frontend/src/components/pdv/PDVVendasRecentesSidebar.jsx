@@ -8,6 +8,8 @@ import {
   X,
 } from "lucide-react";
 import { formatMoneyBRL } from "../../utils/formatters";
+import IconActionButton from "../ui/IconActionButton";
+import StatusBadge from "../ui/StatusBadge";
 
 function getCanalInfo(canal) {
   return (
@@ -138,14 +140,14 @@ export default function PDVVendasRecentesSidebar({
                 <Clock className="w-4 h-4 mr-2 text-blue-600" />
                 Vendas Recentes
               </h2>
-              <button
+              <IconActionButton
                 onClick={() => setPainelVendasAberto(false)}
-                className="p-1 hover:bg-gray-100 rounded transition-colors"
+                icon={X}
+                intent="neutral"
+                tone="ghost"
+                size="xs"
                 title="Fechar painel"
-                type="button"
-              >
-                <X className="w-4 h-4 text-gray-500" />
-              </button>
+              />
             </div>
 
             <div className="flex space-x-1 mb-3">
@@ -153,7 +155,7 @@ export default function PDVVendasRecentesSidebar({
                 <button
                   key={periodo}
                   onClick={() => setFiltroVendas(periodo)}
-                  className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  className={`flex h-9 flex-1 items-center justify-center rounded-lg px-2 text-center text-xs font-medium leading-tight transition-colors ${
                     filtroVendas === periodo
                       ? "bg-blue-600 text-white"
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -176,7 +178,7 @@ export default function PDVVendasRecentesSidebar({
                 <button
                   key={status.id}
                   onClick={() => setFiltroStatus(status.id)}
-                  className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                  className={`flex h-9 flex-1 items-center justify-center rounded-lg px-2 text-center text-xs font-medium leading-tight transition-colors ${
                     filtroStatus === status.id
                       ? "bg-green-600 text-white"
                       : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -286,25 +288,11 @@ export default function PDVVendasRecentesSidebar({
                             {formatMoneyBRL(venda.total || 0)}
                           </div>
                         )}
-                        <div
-                          className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full mt-1 inline-block ${
-                            venda.status === "pago_nf"
-                              ? "bg-emerald-100 text-emerald-700"
-                              : venda.status === "finalizada"
-                                ? "bg-green-100 text-green-700"
-                                : venda.status === "baixa_parcial"
-                                  ? "bg-blue-100 text-blue-700"
-                                  : venda.status === "aberta"
-                                    ? "bg-yellow-100 text-yellow-700"
-                                    : "bg-red-100 text-red-700"
-                          }`}
-                        >
-                          {venda.status === "pago_nf" && "Pago NF"}
-                          {venda.status === "finalizada" && "Pago"}
-                          {venda.status === "baixa_parcial" && "Parcial"}
-                          {venda.status === "aberta" && "Aberta"}
-                          {venda.status === "cancelada" && "Cancelada"}
-                        </div>
+                        <StatusBadge
+                          status={venda.status}
+                          size="xs"
+                          className="mt-1"
+                        />
                       </div>
                     </div>
 
@@ -324,12 +312,13 @@ export default function PDVVendasRecentesSidebar({
                           </button>
                         )}
                       {entregaStatus && (
-                        <span
-                          className="text-[10px] text-green-600 font-medium"
+                        <StatusBadge
+                          intent="success"
+                          size="xs"
                           title={entregaStatus.title}
                         >
-                          {"\u2705"} {entregaStatus.label}
-                        </span>
+                          {entregaStatus.label}
+                        </StatusBadge>
                       )}
                     </div>
 

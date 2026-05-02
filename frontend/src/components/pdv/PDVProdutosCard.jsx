@@ -16,6 +16,7 @@ import SubtotalInput from "../SubtotalInput";
 import { formatMoneyBRL } from "../../utils/formatters";
 import { resolveMediaUrl } from "../../utils/mediaUrl";
 import { formatarVariacao } from "../../utils/variacoes";
+import Panel from "../ui/Panel";
 
 function obterImagemMiniaturaItem(item) {
   return (
@@ -60,12 +61,12 @@ export default function PDVProdutosCard({
   vendaAtual,
 }) {
   return (
-    <div
+    <Panel
       id="tour-pdv-carrinho"
-      className="bg-white rounded-lg shadow-sm border p-4"
+      padding="sm"
     >
-      <h2 className="text-base font-semibold text-gray-900 mb-3 flex items-center">
-        <Package className="w-5 h-5 mr-2 text-blue-600" />
+      <h2 className="mb-3 flex items-center text-base font-semibold text-gray-900">
+        <Package className="mr-2 h-4 w-4 text-blue-600" />
         Produtos e Servicos
       </h2>
 
@@ -84,7 +85,7 @@ export default function PDVProdutosCard({
             onKeyDown={onBuscarProdutoKeyDown}
             placeholder="Digite o nome do produto, codigo de barras ou servico..."
             disabled={modoVisualizacao}
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+            className="h-9 flex-1 rounded-lg border border-gray-300 px-3 text-sm focus:border-transparent focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-50"
             autoFocus={!modoVisualizacao}
           />
           <Search className="w-5 h-5 text-gray-400 absolute right-3" />
@@ -206,7 +207,7 @@ export default function PDVProdutosCard({
             return (
               <div
                 key={index}
-                className="p-4 bg-gray-50 rounded-lg border border-gray-200 hover:border-blue-400 space-y-3 transition-colors"
+                className="space-y-2.5 rounded-lg border border-gray-200 bg-gray-50 p-3 transition-colors hover:border-blue-400"
               >
                 <div
                   className="flex items-center justify-between cursor-pointer"
@@ -444,7 +445,7 @@ export default function PDVProdutosCard({
                         )
                       }
                       disabled={modoVisualizacao}
-                      className="flex-1 px-3 py-1.5 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent disabled:bg-gray-50 disabled:cursor-not-allowed"
+                      className="h-9 flex-1 rounded-lg border border-gray-300 px-3 text-sm focus:border-transparent focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-50"
                     >
                       <option value="">Nao especificado</option>
                       {vendaAtual.cliente.pets.map((pet) => (
@@ -460,6 +461,6 @@ export default function PDVProdutosCard({
           })}
         </div>
       )}
-    </div>
+    </Panel>
   );
 }

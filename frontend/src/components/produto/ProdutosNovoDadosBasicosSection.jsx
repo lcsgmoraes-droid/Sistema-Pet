@@ -1,3 +1,7 @@
+import { useMemo, useState } from 'react';
+import SafeMarkdown from '../ui/SafeMarkdown';
+import { normalizeMarkdownContent } from '../../utils/safeMarkdown';
+
 export default function ProdutosNovoDadosBasicosSection({
   categoriasHierarquicas,
   departamentos,
@@ -7,6 +11,18 @@ export default function ProdutosNovoDadosBasicosSection({
   handleGerarSKU,
   marcas,
 }) {
+  const [descricaoModo, setDescricaoModo] = useState('editar');
+  const descricaoNormalizada = useMemo(
+    () => normalizeMarkdownContent(formData.descricao),
+    [formData.descricao],
+  );
+
+  function handleDescricaoBlur() {
+    if (descricaoNormalizada !== (formData.descricao || '')) {
+      handleChange('descricao', descricaoNormalizada);
+    }
+  }
+
   return (
     <>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -116,14 +132,48 @@ export default function ProdutosNovoDadosBasicosSection({
         </div>
 
         <div className="md:col-span-3">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Descricao</label>
-          <textarea
-            value={formData.descricao}
-            onChange={(e) => handleChange('descricao', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            rows="2"
-            placeholder="Descricao detalhada do produto..."
-          />
+          <div className="mb-1 flex items-center justify-between gap-2">
+            <label className="block text-sm font-medium text-gray-700">Descricao</label>
+            <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5">
+              <button
+                type="button"
+                onClick={() => setDescricaoModo('editar')}
+                className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+                  descricaoModo === 'editar'
+                    ? 'bg-white text-blue-700 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Editar
+              </button>
+              <button
+                type="button"
+                onClick={() => setDescricaoModo('previa')}
+                className={`rounded-md px-3 py-1 text-xs font-medium transition ${
+                  descricaoModo === 'previa'
+                    ? 'bg-white text-blue-700 shadow-sm'
+                    : 'text-gray-500 hover:text-gray-700'
+                }`}
+              >
+                Previa
+              </button>
+            </div>
+          </div>
+
+          {descricaoModo === 'editar' ? (
+            <textarea
+              value={formData.descricao}
+              onChange={(e) => handleChange('descricao', e.target.value)}
+              onBlur={handleDescricaoBlur}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              rows="4"
+              placeholder="Descricao detalhada do produto..."
+            />
+          ) : (
+            <div className="min-h-[104px] rounded-lg border border-gray-200 bg-white px-3 py-2">
+              <SafeMarkdown value={descricaoNormalizada} empty="Sem descricao" />
+            </div>
+          )}
         </div>
       </div>
     </>

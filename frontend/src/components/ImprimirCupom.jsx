@@ -1,6 +1,7 @@
 import { Printer } from 'lucide-react';
 import PropTypes from 'prop-types';
 import { formatMoneyBRL } from '../utils/formatters';
+import ActionButton from './ui/ActionButton';
 
 const RECEIPT_WIDTH = 42;
 
@@ -186,7 +187,7 @@ function montarCupom(venda) {
   return linhas.join('\n');
 }
 
-export default function ImprimirCupom({ venda }) {
+export default function ImprimirCupom({ className = '', size = 'md', venda }) {
   const imprimir = () => {
     globalThis.print();
   };
@@ -196,13 +197,15 @@ export default function ImprimirCupom({ venda }) {
   return (
     <>
       {/* Bot\u00e3o Imprimir (vis\u00edvel na tela) */}
-      <button
+      <ActionButton
         onClick={imprimir}
-        className="flex items-center gap-2 px-4 py-2 bg-gray-700 hover:bg-gray-800 text-white rounded-lg transition-colors print:hidden"
+        icon={Printer}
+        intent="neutral"
+        size={size}
+        className={['print:hidden', className].filter(Boolean).join(' ')}
       >
-        <Printer className="w-5 h-5" />
         <span>Imprimir Cupom</span>
-      </button>
+      </ActionButton>
 
       {/* Estilos espec\u00edficos para impress\u00e3o */}
       <style>{`
@@ -258,6 +261,8 @@ export default function ImprimirCupom({ venda }) {
 }
 
 ImprimirCupom.propTypes = {
+  className: PropTypes.string,
+  size: PropTypes.oneOf(['xs', 'sm', 'md', 'lg']),
   venda: PropTypes.shape({
     id: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
     numero_venda: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),

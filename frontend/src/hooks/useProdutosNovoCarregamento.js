@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 import api from '../api';
+import { normalizeMarkdownContent } from '../utils/safeMarkdown';
 import {
   calcularMarkup,
   getCategorias,
@@ -158,7 +159,7 @@ export default function useProdutosNovoCarregamento({
         marca_id: produto.marca_id || '',
         departamento_id: produto.departamento_id || '',
         unidade: produto.unidade || 'UN',
-        descricao: produto.descricao_curta || '',
+        descricao: normalizeMarkdownContent(produto.descricao_curta || ''),
         tipo: produto.tipo || 'produto',
         preco_custo: produto.preco_custo || '',
         preco_venda: produto.preco_venda || '',

@@ -1,5 +1,6 @@
 import { createProduto, updateProduto } from '../api/produtos';
 import { debugLog } from '../utils/debug';
+import { normalizeMarkdownContent } from '../utils/safeMarkdown';
 
 export default function useProdutosNovoSubmit({
   id,
@@ -30,6 +31,7 @@ export default function useProdutosNovoSubmit({
     try {
       setSalvando(true);
       const skuNormalizado = (formData.sku || formData.codigo || '').trim().toUpperCase();
+      const descricaoNormalizada = normalizeMarkdownContent(formData.descricao);
 
       const composicaoKitNormalizada = (formData.composicao_kit || []).map((item) => ({
         produto_componente_id: item.produto_componente_id || item.produto_id,
@@ -42,7 +44,7 @@ export default function useProdutosNovoSubmit({
       const dados = {
         codigo: skuNormalizado,
         nome: formData.nome,
-        descricao_curta: formData.descricao || null,
+        descricao_curta: descricaoNormalizada || null,
         codigo_barras: formData.codigo_barras || null,
         unidade: formData.unidade || 'UN',
         preco_custo: formData.preco_custo ? parseFloat(formData.preco_custo) : 0,

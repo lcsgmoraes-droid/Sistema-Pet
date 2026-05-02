@@ -1,5 +1,6 @@
 import { Percent, Tag, X } from "lucide-react";
 import { formatMoneyBRL } from "../../utils/formatters";
+import Panel from "../ui/Panel";
 
 export default function PDVResumoFinanceiroCard({
   alertasCarrinho,
@@ -68,7 +69,7 @@ export default function PDVResumoFinanceiroCard({
         </div>
       )}
 
-      <div className="bg-white rounded-lg shadow-sm border p-6">
+      <Panel padding="lg">
         <div className="space-y-3">
           <div className="flex justify-between text-gray-600">
             <span>Total bruto:</span>
@@ -240,7 +241,7 @@ export default function PDVResumoFinanceiroCard({
             </div>
           )}
         </div>
-      </div>
+      </Panel>
     </>
   );
 }

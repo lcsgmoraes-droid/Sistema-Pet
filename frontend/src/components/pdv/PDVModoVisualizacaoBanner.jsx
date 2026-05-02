@@ -1,5 +1,6 @@
 import { AlertCircle, FileText, X } from "lucide-react";
 import ImprimirCupom from "../ImprimirCupom";
+import ActionButton from "../ui/ActionButton";
 
 export default function PDVModoVisualizacaoBanner({
   ativo,
@@ -14,11 +15,11 @@ export default function PDVModoVisualizacaoBanner({
   }
 
   return (
-    <div className="bg-yellow-50 border-b border-yellow-200 px-6 py-3">
-      <div className="flex items-center justify-between max-w-5xl mx-auto">
-        <div className="flex items-center space-x-2 text-yellow-800">
-          <AlertCircle className="w-5 h-5" />
-          <span className="font-medium">
+    <div className="border-b border-yellow-200 bg-yellow-50 px-5 py-2.5">
+      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-2.5">
+        <div className="flex items-center space-x-2 text-sm text-yellow-800">
+          <AlertCircle className="h-4 w-4" />
+          <span className="font-semibold">
             Modo Visualização - Venda{" "}
             {vendaAtual.status === "finalizada"
               ? "Finalizada"
@@ -26,52 +27,60 @@ export default function PDVModoVisualizacaoBanner({
                 ? "com Baixa Parcial"
                 : "Aberta"}
           </span>
-          <span className="text-sm">(Clique em Editar para modificar)</span>
+          <span className="text-xs">(Clique em Editar para modificar)</span>
         </div>
-        <div className="flex items-center gap-2">
-          <ImprimirCupom venda={vendaAtual} />
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <ImprimirCupom
+            venda={vendaAtual}
+            size="md"
+            className="min-w-[132px]"
+          />
 
-          <button
+          <ActionButton
             onClick={onVoltar}
-            className="h-11 min-w-[132px] px-4 inline-flex items-center justify-center gap-2 rounded-xl border border-slate-500 bg-slate-600 text-white font-semibold shadow-sm hover:bg-slate-700 hover:shadow-md transition-all duration-200"
-            type="button"
+            icon={X}
+            intent="neutral"
+            size="md"
+            className="min-w-[96px]"
           >
-            <X className="w-4 h-4" />
             Voltar
-          </button>
+          </ActionButton>
 
           {(vendaAtual.status === "finalizada" ||
             vendaAtual.status === "baixa_parcial") && (
-            <button
+            <ActionButton
               onClick={emitirNotaVendaFinalizada}
-              className="h-11 min-w-[132px] px-4 inline-flex items-center justify-center gap-2 rounded-xl border border-emerald-500 bg-emerald-600 text-white font-semibold shadow-sm hover:bg-emerald-700 hover:shadow-md transition-all duration-200"
-              type="button"
+              icon={FileText}
+              intent="create"
+              size="md"
+              className="min-w-[116px]"
             >
-              <FileText className="w-4 h-4" />
               Emitir NF
-            </button>
+            </ActionButton>
           )}
 
           {(vendaAtual.status === "finalizada" ||
             vendaAtual.status === "baixa_parcial") && (
-            <button
+            <ActionButton
               onClick={mudarStatusParaAberta}
-              className="h-11 min-w-[132px] px-4 inline-flex items-center justify-center gap-2 rounded-xl border border-orange-500 bg-orange-600 text-white font-semibold shadow-sm hover:bg-orange-700 hover:shadow-md transition-all duration-200"
-              type="button"
+              icon={AlertCircle}
+              intent="warning"
+              size="md"
+              className="min-w-[126px]"
             >
-              <AlertCircle className="w-4 h-4" />
               Reabrir Venda
-            </button>
+            </ActionButton>
           )}
 
           {vendaAtual.status === "aberta" && (
-            <button
+            <ActionButton
               onClick={habilitarEdicao}
-              className="h-11 min-w-[132px] px-4 inline-flex items-center justify-center rounded-xl border border-amber-500 bg-amber-600 text-white font-semibold shadow-sm hover:bg-amber-700 hover:shadow-md transition-all duration-200"
-              type="button"
+              intent="edit"
+              size="md"
+              className="min-w-[96px]"
             >
               Editar
-            </button>
+            </ActionButton>
           )}
         </div>
       </div>
