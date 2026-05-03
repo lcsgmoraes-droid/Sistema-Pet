@@ -3,6 +3,7 @@ import OperadoraCartaoCard from "../components/operadorasCartao/OperadoraCartaoC
 import OperadoraCartaoEmptyState from "../components/operadorasCartao/OperadoraCartaoEmptyState";
 import OperadoraCartaoModal from "../components/operadorasCartao/OperadoraCartaoModal";
 import OperadoraCartaoPadraoInfo from "../components/operadorasCartao/OperadoraCartaoPadraoInfo";
+import LoadingState from "../components/ui/LoadingState";
 import { useOperadorasCartaoPage } from "../hooks/useOperadorasCartaoPage";
 import { getGuiaClassNames } from "../utils/guiaHighlight";
 
@@ -29,11 +30,7 @@ function OperadorasCartao() {
   } = useOperadorasCartaoPage();
 
   if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-      </div>
-    );
+    return <LoadingState className="h-64" label="Carregando operadoras..." />;
   }
 
   return (

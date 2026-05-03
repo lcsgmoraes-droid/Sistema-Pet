@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { toast } from 'react-hot-toast';
 
 import api from '../api';
+import EmptyState from './ui/EmptyState';
 
 const HEAVY_REQUEST_TIMEOUT_MS = 60000;
 const SNAPSHOT_LIMIT = 200;
@@ -359,15 +360,6 @@ function TabButton({ active, label, count, onClick }) {
         {count}
       </span>
     </button>
-  );
-}
-
-function EmptyState({ title, description }) {
-  return (
-    <div className="rounded-2xl border border-dashed border-slate-300 bg-white px-6 py-12 text-center shadow-sm">
-      <div className="text-base font-semibold text-slate-900">{title}</div>
-      <div className="mx-auto mt-2 max-w-2xl text-sm text-slate-500">{description}</div>
-    </div>
   );
 }
 

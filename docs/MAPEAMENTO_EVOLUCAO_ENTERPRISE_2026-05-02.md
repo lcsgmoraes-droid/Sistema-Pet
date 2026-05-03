@@ -28,6 +28,7 @@ Componentes globais criados ou consolidados:
 - `MoneyCell`, `ChannelBadges` e `SafeMarkdown`, ja iniciados na fatia de produtos.
 - `FormField`, `TextField` e `SelectField` para campos de formulario com tons visuais reaproveitaveis sem quebrar telas existentes.
 - `PaginationControls` para paginacao, seletor de quantidade por pagina e navegacao com tamanho/cor padrao.
+- `EmptyState`, `LoadingState` e `ErrorState` para estados vazios, carregamento e falhas com visual unico.
 
 Separacao operacional iniciada:
 
@@ -52,6 +53,7 @@ Tela piloto:
 - Banho & Tosa: `FormField` ganhou acessorio de rotulo e os formularios com tooltip migraram para os campos globais, removendo os campos locais duplicados do modulo.
 - Banho & Tosa: checkboxes de servicos, recursos, portes e pacotes passaram a usar `CheckboxField` global com o mesmo tom visual.
 - Produtos e Pessoas: paginacoes locais foram substituidas por `PaginationControls` global, removendo controles duplicados.
+- Operadoras, internacoes veterinarias e Estoque Bling comecaram a usar estados globais de vazio/carregamento.
 
 Proxima varredura recomendada:
 
