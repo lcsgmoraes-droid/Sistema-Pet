@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { SelectField, TextField } from "../../../components/ui/FormField";
+import { CheckboxField, SelectField, TextField } from "../../../components/ui/FormField";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { getApiErrorMessage, toApiDecimal } from "../banhoTosaUtils";
 
@@ -111,7 +111,7 @@ export default function BanhoTosaPacoteForm({
           <TextField label="Preco" type="number" value={form.preco} onChange={(value) => updateField("preco", value)} tone="warm" />
         </div>
         {editingPacote && (
-          <CheckField label="Ativo" checked={form.ativo} onChange={(value) => updateField("ativo", value)} />
+          <CheckboxField label="Ativo" checked={form.ativo} onChange={(value) => updateField("ativo", value)} tone="warm" />
         )}
       </div>
 
@@ -134,19 +134,5 @@ export default function BanhoTosaPacoteForm({
         )}
       </div>
     </form>
-  );
-}
-
-function CheckField({ label, checked, onChange }) {
-  return (
-    <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-        className="h-4 w-4 rounded border-slate-300 text-orange-500"
-      />
-      {label}
-    </label>
   );
 }

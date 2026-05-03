@@ -49,6 +49,7 @@ Tela piloto:
 - Banho & Tosa: listas de servicos, recursos, parametros e pacotes passaram a usar `ActionButton` global para edicao/exclusao com cores por intencao.
 - Banho & Tosa: formularios de pacotes e campanhas de retorno tambem passaram a usar `TextField`/`SelectField` globais.
 - Banho & Tosa: `FormField` ganhou acessorio de rotulo e os formularios com tooltip migraram para os campos globais, removendo os campos locais duplicados do modulo.
+- Banho & Tosa: checkboxes de servicos, recursos, portes e pacotes passaram a usar `CheckboxField` global com o mesmo tom visual.
 
 Proxima varredura recomendada:
 

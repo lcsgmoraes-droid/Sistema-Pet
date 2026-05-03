@@ -1,4 +1,4 @@
-import { SelectField, TextField } from "../../../components/ui/FormField";
+import { CheckboxField, SelectField, TextField } from "../../../components/ui/FormField";
 import BanhoTosaHelpTooltip from "./BanhoTosaHelpTooltip";
 import { toApiDecimal } from "../banhoTosaUtils";
 
@@ -74,11 +74,11 @@ export default function BanhoTosaServicoForm({
         <TextField label="Descricao" value={form.descricao} onChange={(value) => onChangeField("descricao", value)} labelAccessory={<BanhoTosaHelpTooltip text="Explique o que esta incluso para padronizar a venda e o atendimento." />} tone="warm" />
 
         <div className="grid gap-2 sm:grid-cols-2">
-          <CheckField label="Requer banho" checked={form.requer_banho} onChange={(value) => onChangeField("requer_banho", value)} help="Marca se o servico consome agua, shampoo e etapa de banho." />
-          <CheckField label="Requer tosa" checked={form.requer_tosa} onChange={(value) => onChangeField("requer_tosa", value)} help="Marca se precisa de tosador, mesa ou etapa de tosa." />
-          <CheckField label="Requer secagem" checked={form.requer_secagem} onChange={(value) => onChangeField("requer_secagem", value)} help="Marca se deve considerar secador/soprador no tempo e energia." />
-          <CheckField label="Permite pacote" checked={form.permite_pacote} onChange={(value) => onChangeField("permite_pacote", value)} help="Permite vender creditos recorrentes desse servico." />
-          <CheckField label="Ativo" checked={form.ativo} onChange={(value) => onChangeField("ativo", value)} help="Servicos inativos ficam fora da operacao, mas preservam historico." />
+          <CheckboxField label="Requer banho" checked={form.requer_banho} onChange={(value) => onChangeField("requer_banho", value)} labelAccessory={<BanhoTosaHelpTooltip text="Marca se o servico consome agua, shampoo e etapa de banho." />} tone="warm" />
+          <CheckboxField label="Requer tosa" checked={form.requer_tosa} onChange={(value) => onChangeField("requer_tosa", value)} labelAccessory={<BanhoTosaHelpTooltip text="Marca se precisa de tosador, mesa ou etapa de tosa." />} tone="warm" />
+          <CheckboxField label="Requer secagem" checked={form.requer_secagem} onChange={(value) => onChangeField("requer_secagem", value)} labelAccessory={<BanhoTosaHelpTooltip text="Marca se deve considerar secador/soprador no tempo e energia." />} tone="warm" />
+          <CheckboxField label="Permite pacote" checked={form.permite_pacote} onChange={(value) => onChangeField("permite_pacote", value)} labelAccessory={<BanhoTosaHelpTooltip text="Permite vender creditos recorrentes desse servico." />} tone="warm" />
+          <CheckboxField label="Ativo" checked={form.ativo} onChange={(value) => onChangeField("ativo", value)} labelAccessory={<BanhoTosaHelpTooltip text="Servicos inativos ficam fora da operacao, mas preservam historico." />} tone="warm" />
         </div>
       </div>
 
@@ -101,20 +101,5 @@ export default function BanhoTosaServicoForm({
         )}
       </div>
     </form>
-  );
-}
-
-function CheckField({ label, checked, onChange, help }) {
-  return (
-    <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-        className="h-4 w-4 rounded border-slate-300 text-orange-500"
-      />
-      {label}
-      <BanhoTosaHelpTooltip text={help} />
-    </label>
   );
 }

@@ -1,4 +1,4 @@
-import { SelectField, TextField } from "../../../components/ui/FormField";
+import { CheckboxField, SelectField, TextField } from "../../../components/ui/FormField";
 import { toApiDecimal } from "../banhoTosaUtils";
 import BanhoTosaHelpTooltip from "./BanhoTosaHelpTooltip";
 
@@ -70,7 +70,7 @@ export default function BanhoTosaRecursoForm({
         <TextField label="Potencia watts" type="number" value={form.potencia_watts} onChange={(value) => onChangeField("potencia_watts", value)} labelAccessory={<BanhoTosaHelpTooltip text="Potencia do equipamento para calcular energia por tempo de uso." />} tone="warm" />
         <TextField label="Manutencao por hora" type="number" value={form.custo_manutencao_hora} onChange={(value) => onChangeField("custo_manutencao_hora", value)} labelAccessory={<BanhoTosaHelpTooltip text="Rateio de troca de escova, limpeza, depreciacao ou manutencao do recurso." />} tone="warm" />
         {editing && (
-          <CheckField label="Ativo" checked={form.ativo} onChange={(value) => onChangeField("ativo", value)} />
+          <CheckboxField label="Ativo" checked={form.ativo} onChange={(value) => onChangeField("ativo", value)} tone="warm" />
         )}
       </div>
 
@@ -93,19 +93,5 @@ export default function BanhoTosaRecursoForm({
         )}
       </div>
     </form>
-  );
-}
-
-function CheckField({ label, checked, onChange }) {
-  return (
-    <label className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700">
-      <input
-        type="checkbox"
-        checked={checked}
-        onChange={(event) => onChange(event.target.checked)}
-        className="h-4 w-4 rounded border-slate-300 text-orange-500"
-      />
-      {label}
-    </label>
   );
 }

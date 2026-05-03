@@ -1,10 +1,14 @@
 const toneClasses = {
   default: {
+    checkbox:
+      "inline-flex items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700",
     label: "text-xs font-medium text-slate-600",
     control:
       "mt-1 h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-slate-50 disabled:text-slate-400",
   },
   warm: {
+    checkbox:
+      "flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-700",
     label: "text-xs font-bold uppercase tracking-[0.12em] text-slate-500",
     control:
       "mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100 disabled:cursor-not-allowed disabled:text-slate-400",
@@ -123,6 +127,37 @@ export function SelectField({
         {children}
       </select>
     </FormField>
+  );
+}
+
+export function CheckboxField({
+  checked = false,
+  className = "",
+  disabled = false,
+  inputClassName = "",
+  label,
+  labelAccessory = null,
+  onChange,
+  tone = "default",
+}) {
+  const styles = toneClasses[tone] || toneClasses.default;
+
+  return (
+    <label className={cx(styles.checkbox, disabled && "opacity-60", className)}>
+      <input
+        type="checkbox"
+        checked={checked}
+        disabled={disabled}
+        onChange={(event) => onChange?.(event.target.checked)}
+        className={cx(
+          "h-4 w-4 rounded border-slate-300",
+          tone === "warm" ? "accent-orange-500 text-orange-500" : "accent-blue-600 text-blue-600",
+          inputClassName,
+        )}
+      />
+      <span>{label}</span>
+      {labelAccessory}
+    </label>
   );
 }
 
