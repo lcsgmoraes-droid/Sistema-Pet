@@ -18,6 +18,7 @@ import IconActionButton from '../components/ui/IconActionButton';
 import Panel from '../components/ui/Panel';
 import EntityCard, { EntityInfoRow } from '../components/ui/EntityCard';
 import FilterBar, { FilterAdvanced, FilterRow } from '../components/ui/FilterBar';
+import PessoaSelector from '../components/clientes/PessoaSelector';
 import { formatarIdadeMeses } from '../helpers/idadeHelper';
 
 const GerenciamentoPets = () => {
@@ -214,38 +215,21 @@ const GerenciamentoPets = () => {
           {/* Busca principal */}
           <FilterRow className="items-stretch">
             <div className="flex-1 relative">
-              <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
-              <input
-                type="text"
-                placeholder="Buscar tutor por nome, telefone ou CPF..."
-                value={buscaTutor}
-                onChange={(e) => {
-                  setBuscaTutor(e.target.value);
+              <PessoaSelector
+                minChars={0}
+                onChange={(value) => {
+                  setBuscaTutor(value);
                   setSugestaoCongelada(false);
-                  if (!e.target.value.trim()) {
+                  if (!value.trim()) {
                     setClienteFiltro('');
                   }
                 }}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
+                onSelect={selecionarTutor}
+                placeholder="Buscar tutor por nome, telefone ou CPF..."
+                showSuggestions={Boolean(clientesSugeridos.length > 0 && buscaTutor.trim())}
+                suggestions={clientesSugeridos}
+                value={buscaTutor}
               />
-
-              {clientesSugeridos.length > 0 && buscaTutor.trim() && (
-                <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-                  {clientesSugeridos.map((cliente) => (
-                    <button
-                      key={cliente.id}
-                      type="button"
-                      onClick={() => selecionarTutor(cliente)}
-                      className="w-full text-left px-3 py-2 hover:bg-gray-50 border-b last:border-b-0"
-                    >
-                      <div className="text-sm font-medium text-gray-800">{cliente.nome}</div>
-                      <div className="text-xs text-gray-500">
-                        {[cliente.telefone, cliente.celular, cliente.cpf].filter(Boolean).join(' • ') || 'Sem telefone/CPF'}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
             </div>
 
             <div className="flex-1 relative">

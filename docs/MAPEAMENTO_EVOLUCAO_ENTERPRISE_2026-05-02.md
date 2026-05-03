@@ -697,6 +697,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-03: `PDVClienteCard` foi quebrado em blocos internos de busca, resumo, fidelidade, credito, acoes e seletor de pet, preparando o card de cliente para virar componente reutilizavel sem mudar o fluxo do PDV.
 - 2026-05-03: criado `ProdutoSelector` reutilizavel e aplicado na busca de produtos/servicos do PDV, mantendo a renderizacao customizada das sugestoes do carrinho.
 - 2026-05-03: criado `PessoaSelector` reutilizavel e aplicado na busca de cliente do PDV, preservando a busca externa atual e preparando o reaproveitamento em pets, financeiro, campanhas e banho/tosa.
+- 2026-05-03: `/pets` passou a usar `PessoaSelector` na busca de tutor, removendo o dropdown manual duplicado e consolidando o segundo uso real do selector de pessoa.
 
 ### Nao fazer nesta onda
 
