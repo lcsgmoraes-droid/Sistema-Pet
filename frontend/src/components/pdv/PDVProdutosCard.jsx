@@ -8,7 +8,6 @@ import {
   Minus,
   Package,
   Plus,
-  Search,
   Trash2,
 } from "lucide-react";
 import QuantidadeInput from "../QuantidadeInput";
@@ -16,6 +15,7 @@ import SubtotalInput from "../SubtotalInput";
 import { formatMoneyBRL } from "../../utils/formatters";
 import { resolveMediaUrl } from "../../utils/mediaUrl";
 import { formatarVariacao } from "../../utils/variacoes";
+import ProdutoSelector from "../produtos/ProdutoSelector";
 import Panel from "../ui/Panel";
 
 function obterImagemMiniaturaItem(item) {
@@ -33,6 +33,84 @@ function obterImagemSugestaoProduto(produto) {
     produto?.imagem_principal_thumbnail ||
     produto?.imagem_principal ||
     null
+  );
+}
+
+function ProdutoSugestaoPDV({
+  onAdicionarNaListaEsperaRapido,
+  onSelecionarProdutoSugerido,
+  produto,
+  vendaAtual,
+}) {
+  const estoqueZerado =
+    produto.tipo_produto === "KIT" && produto.tipo_kit === "VIRTUAL"
+      ? produto.estoque_virtual !== undefined &&
+        Math.floor(produto.estoque_virtual) <= 0
+      : produto.estoque_atual !== undefined &&
+        Math.floor(produto.estoque_atual) <= 0;
+  const imagemSugestao = resolveMediaUrl(obterImagemSugestaoProduto(produto));
+
+  return (
+    <button
+      key={produto.id}
+      type="button"
+      onMouseDown={(e) => e.preventDefault()}
+      onClick={() => onSelecionarProdutoSugerido(produto)}
+      className="w-full border-b px-4 py-3 text-left last:border-b-0 hover:bg-gray-50"
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          {imagemSugestao ? (
+            <img
+              src={imagemSugestao}
+              alt={produto.nome || "Produto"}
+              className="h-12 w-12 flex-shrink-0 rounded-lg border border-gray-200 bg-white object-cover"
+              loading="lazy"
+              onError={(e) => {
+                e.currentTarget.style.display = "none";
+              }}
+            />
+          ) : (
+            <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50 text-gray-300">
+              <Package className="h-5 w-5" />
+            </div>
+          )}
+          <div className="min-w-0">
+            <div className="flex items-center gap-1.5 font-medium text-gray-900">
+              <span className="truncate">{produto.nome}</span>
+              {estoqueZerado && vendaAtual.cliente && (
+                <span
+                  onClick={(e) => onAdicionarNaListaEsperaRapido(produto, e)}
+                  className="inline-flex cursor-pointer items-center gap-0.5 rounded bg-orange-100 px-1.5 py-0.5 text-xs font-medium text-orange-600 transition-colors hover:bg-orange-200 hover:text-orange-800"
+                  title="Sem estoque, clique para adicionar a lista de espera"
+                >
+                  <BookmarkPlus className="h-3 w-3" />
+                  <span>Lista de espera</span>
+                </span>
+              )}
+            </div>
+            {produto.tipo_produto === "VARIACAO" &&
+              formatarVariacao(produto) && (
+                <div className="mt-0.5 text-xs font-medium text-blue-600">
+                  Variacao: {formatarVariacao(produto)}
+                </div>
+              )}
+            <div className="text-sm text-gray-500">
+              {produto.codigo && `Cod: ${produto.codigo}`}
+              {produto.tipo_produto === "KIT" &&
+              produto.tipo_kit === "VIRTUAL"
+                ? produto.estoque_virtual !== undefined &&
+                  ` | Estoque: ${Math.floor(produto.estoque_virtual)}`
+                : produto.estoque_atual !== undefined &&
+                  ` | Estoque: ${Math.floor(produto.estoque_atual)}`}
+            </div>
+          </div>
+        </div>
+        <div className="text-lg font-semibold text-green-600">
+          {formatMoneyBRL(produto.preco_venda)}
+        </div>
+      </div>
+    </button>
   );
 }
 
@@ -70,111 +148,31 @@ export default function PDVProdutosCard({
         Produtos e Servicos
       </h2>
 
-      <div
+      <ProdutoSelector
         id="tour-pdv-busca"
-        ref={buscaProdutoContainerRef}
-        className="relative mb-4"
-      >
-        <div className="flex items-center">
-          <input
-            ref={inputProdutoRef}
-            type="text"
-            value={buscaProduto}
-            onChange={(e) => onBuscarProdutoChange(e.target.value)}
-            onFocus={onBuscarProdutoFocus}
-            onKeyDown={onBuscarProdutoKeyDown}
-            placeholder="Digite o nome do produto, codigo de barras ou servico..."
-            disabled={modoVisualizacao}
-            className="h-9 flex-1 rounded-lg border border-gray-300 px-3 text-sm focus:border-transparent focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-50"
-            autoFocus={!modoVisualizacao}
+        autoFocus={!modoVisualizacao}
+        className="mb-4"
+        containerRef={buscaProdutoContainerRef}
+        disabled={modoVisualizacao}
+        inputRef={inputProdutoRef}
+        onChange={onBuscarProdutoChange}
+        onFocus={onBuscarProdutoFocus}
+        onKeyDown={onBuscarProdutoKeyDown}
+        onSelect={onSelecionarProdutoSugerido}
+        placeholder="Digite o nome do produto, codigo de barras ou servico..."
+        renderSuggestion={(produto) => (
+          <ProdutoSugestaoPDV
+            key={produto.id}
+            onAdicionarNaListaEsperaRapido={onAdicionarNaListaEsperaRapido}
+            onSelecionarProdutoSugerido={onSelecionarProdutoSugerido}
+            produto={produto}
+            vendaAtual={vendaAtual}
           />
-          <Search className="w-5 h-5 text-gray-400 absolute right-3" />
-        </div>
-
-        {mostrarSugestoesProduto &&
-          String(buscaProduto || "").trim().length >= 2 &&
-          produtosSugeridos.length > 0 && (
-            <div className="absolute z-10 w-full mt-2 bg-white border border-gray-200 rounded-lg shadow-lg max-h-60 overflow-y-auto">
-              {produtosSugeridos.map((produto) => {
-                const estoqueZerado =
-                  produto.tipo_produto === "KIT" &&
-                  produto.tipo_kit === "VIRTUAL"
-                    ? produto.estoque_virtual !== undefined &&
-                      Math.floor(produto.estoque_virtual) <= 0
-                    : produto.estoque_atual !== undefined &&
-                      Math.floor(produto.estoque_atual) <= 0;
-                const imagemSugestao = resolveMediaUrl(
-                  obterImagemSugestaoProduto(produto),
-                );
-
-                return (
-                  <button
-                    key={produto.id}
-                    type="button"
-                    onMouseDown={(e) => e.preventDefault()}
-                    onClick={() => onSelecionarProdutoSugerido(produto)}
-                    className="w-full px-4 py-3 text-left hover:bg-gray-50 border-b last:border-b-0"
-                  >
-                    <div className="flex items-center justify-between gap-3">
-                      <div className="flex min-w-0 items-start gap-3">
-                        {imagemSugestao ? (
-                          <img
-                            src={imagemSugestao}
-                            alt={produto.nome || "Produto"}
-                            className="h-12 w-12 flex-shrink-0 rounded-lg border border-gray-200 bg-white object-cover"
-                            loading="lazy"
-                            onError={(e) => {
-                              e.currentTarget.style.display = "none";
-                            }}
-                          />
-                        ) : (
-                          <div className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg border border-dashed border-gray-200 bg-gray-50 text-gray-300">
-                            <Package className="h-5 w-5" />
-                          </div>
-                        )}
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-1.5 font-medium text-gray-900">
-                            <span className="truncate">{produto.nome}</span>
-                            {estoqueZerado && vendaAtual.cliente && (
-                              <span
-                                onClick={(e) =>
-                                  onAdicionarNaListaEsperaRapido(produto, e)
-                                }
-                                className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-xs font-medium text-orange-600 transition-colors cursor-pointer bg-orange-100 hover:bg-orange-200 hover:text-orange-800"
-                                title="Sem estoque, clique para adicionar a lista de espera"
-                              >
-                                <BookmarkPlus className="w-3 h-3" />
-                                <span>Lista de espera</span>
-                              </span>
-                            )}
-                          </div>
-                          {produto.tipo_produto === "VARIACAO" &&
-                            formatarVariacao(produto) && (
-                              <div className="text-xs text-blue-600 font-medium mt-0.5">
-                                Variacao: {formatarVariacao(produto)}
-                              </div>
-                            )}
-                          <div className="text-sm text-gray-500">
-                            {produto.codigo && `Cod: ${produto.codigo}`}
-                            {produto.tipo_produto === "KIT" &&
-                            produto.tipo_kit === "VIRTUAL"
-                              ? produto.estoque_virtual !== undefined &&
-                                ` | Estoque: ${Math.floor(produto.estoque_virtual)}`
-                              : produto.estoque_atual !== undefined &&
-                                ` | Estoque: ${Math.floor(produto.estoque_atual)}`}
-                          </div>
-                        </div>
-                      </div>
-                      <div className="text-lg font-semibold text-green-600">
-                        {formatMoneyBRL(produto.preco_venda)}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-      </div>
+        )}
+        showSuggestions={mostrarSugestoesProduto}
+        suggestions={produtosSugeridos}
+        value={buscaProduto}
+      />
 
       {vendaAtual.itens.length === 0 ? (
         <div className="text-center py-12 text-gray-400">
