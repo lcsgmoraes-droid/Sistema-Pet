@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { CalendarDays, Clock3, Plus, RefreshCw, UsersRound } from "lucide-react";
 import { useLocation, useSearchParams } from "react-router-dom";
@@ -38,7 +38,6 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
   const [petsDoTutor, setPetsDoTutor] = useState([]);
   const [loadingPets, setLoadingPets] = useState(false);
   const [form, setForm] = useState(criarFormularioInicial);
-  const formRef = useRef(null);
   const novoPetIdQuery = searchParams.get("novo_pet_id") || "";
   const tutorIdQuery = searchParams.get("tutor_id") || "";
   const tutorNomeQuery = searchParams.get("tutor_nome") || "";
@@ -174,9 +173,6 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
 
   function abrirNovoAgendamento() {
     setFormOpen(true);
-    window.setTimeout(() => {
-      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-    }, 0);
   }
 
   async function carregarSugestoes() {
@@ -186,7 +182,7 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
         data_referencia: dataRef,
         duracao_minutos: duracaoSelecionada(),
         recurso_id: form.recurso_id || undefined,
-        limit: 18,
+        limit: 50,
       });
       setSugestoes(Array.isArray(response.data) ? response.data : []);
     } catch {
@@ -290,7 +286,7 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
               Atualizar
             </ActionButton>
             <ActionButton icon={Plus} intent="create" onClick={abrirNovoAgendamento}>
-              Novo agendamento
+              Agendar
             </ActionButton>
           </>
         }
@@ -339,30 +335,30 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
         </MetricGrid>
       </Panel>
 
-      {formOpen && (
-        <div ref={formRef}>
-          <BanhoTosaAgendaCriacaoPanel
-            dataRef={dataRef}
-            form={form}
-            loadingPets={loadingPets}
-            loadingSugestoes={loadingSugestoes}
-            petsDoTutor={petsDoTutor}
-            recursos={recursos}
-            retornoNovoPet={retornoNovoPet}
-            saving={saving}
-            servicos={servicos}
-            sugestoes={sugestoes}
-            tutorSelecionado={tutorSelecionado}
-            onChangeData={setDataRef}
-            onChangeField={updateField}
-            onChangeServico={onServicoChange}
-            onClose={() => setFormOpen(false)}
-            onSelectTutor={selecionarTutorAgenda}
-            onSubmit={criarAgendamento}
-            onUseSlot={usarSlot}
-          />
-        </div>
-      )}
+      <BanhoTosaAgendaCriacaoPanel
+        agendamentos={agendamentos}
+        capacidade={capacidade}
+        dataRef={dataRef}
+        form={form}
+        isOpen={formOpen}
+        loadingAgenda={loadingAgenda}
+        loadingPets={loadingPets}
+        loadingSugestoes={loadingSugestoes}
+        petsDoTutor={petsDoTutor}
+        recursos={recursos}
+        retornoNovoPet={retornoNovoPet}
+        saving={saving}
+        servicos={servicos}
+        sugestoes={sugestoes}
+        tutorSelecionado={tutorSelecionado}
+        onChangeData={setDataRef}
+        onChangeField={updateField}
+        onChangeServico={onServicoChange}
+        onClose={() => setFormOpen(false)}
+        onSelectTutor={selecionarTutorAgenda}
+        onSubmit={criarAgendamento}
+        onUseSlot={usarSlot}
+      />
 
       <div className="grid gap-4 xl:grid-cols-[1fr_0.9fr]">
         <BanhoTosaAgendaList

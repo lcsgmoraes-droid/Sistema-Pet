@@ -33,7 +33,7 @@ export default function BanhoTosaAgendaList({
         {!loading && agendamentos.length === 0 && (
           <EmptyState
             compact
-            description="Use Novo agendamento para incluir o primeiro atendimento deste dia."
+            description="Use Agendar para incluir o primeiro atendimento deste dia."
             icon={CalendarDays}
             title="Nenhum agendamento para esta data"
           />

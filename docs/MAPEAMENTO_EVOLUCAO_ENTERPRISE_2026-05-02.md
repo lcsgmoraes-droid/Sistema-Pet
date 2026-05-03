@@ -710,6 +710,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-03: criado `PessoaSelector` reutilizavel e aplicado na busca de cliente do PDV, preservando a busca externa atual e preparando o reaproveitamento em pets, financeiro, campanhas e banho/tosa.
 - 2026-05-03: `/pets` passou a usar `PessoaSelector` na busca de tutor, removendo o dropdown manual duplicado e consolidando o segundo uso real do selector de pessoa.
 - 2026-05-03: `Banho & Tosa` iniciou a reorganizacao visual: parametros, painel, servicos e agenda passaram a abrir formularios sob demanda e usar `Panel`, `MetricGrid`, `MetricCard`, `StatusBadge`, `ActionButton`, `EmptyState` e `TutorPetSelector` em vez de cards grandes sempre expostos.
+- 2026-05-03: agenda de `Banho & Tosa` alinhada ao padrao da agenda veterinaria: o botao `Agendar` abre modal com tutor/pet/servico, horarios livres/ocupados e compromissos do dia selecionado.
 
 ### Nao fazer nesta onda
 

@@ -6,6 +6,7 @@ import TutorPetSelector from "../../../components/veterinario/TutorPetSelector";
 export default function BanhoTosaAgendaForm({
   dataRef,
   form,
+  formId,
   loadingPets,
   petsDoTutor,
   saving,
@@ -13,6 +14,7 @@ export default function BanhoTosaAgendaForm({
   servicos,
   tutorSelecionado,
   retornoNovoPet,
+  showActions = true,
   onChangeData,
   onChangeField,
   onChangeServico,
@@ -20,7 +22,7 @@ export default function BanhoTosaAgendaForm({
   onSubmit,
 }) {
   return (
-    <form onSubmit={onSubmit} className="space-y-4">
+    <form id={formId} onSubmit={onSubmit} className="space-y-4">
       <div className="space-y-4">
         <TutorPetSelector
           tutorSelecionado={tutorSelecionado}
@@ -62,11 +64,13 @@ export default function BanhoTosaAgendaForm({
         </div>
       </div>
 
-      <div className="flex justify-end">
-        <ActionButton icon={Plus} intent="create" loading={saving} size="md" type="submit">
-          Criar agendamento
-        </ActionButton>
-      </div>
+      {showActions && (
+        <div className="flex justify-end">
+          <ActionButton icon={Plus} intent="create" loading={saving} size="md" type="submit">
+            Criar agendamento
+          </ActionButton>
+        </div>
+      )}
     </form>
   );
 }
