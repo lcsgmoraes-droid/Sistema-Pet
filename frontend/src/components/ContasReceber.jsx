@@ -5,6 +5,7 @@ import { toast } from 'react-hot-toast';
 import { safeArray } from '../utils/safeArray';
 import ActionButton from './ui/ActionButton';
 import DataTable from './ui/DataTable';
+import FilterBar from './ui/FilterBar';
 import MoneyCell, { formatMoneyCellValue } from './ui/MoneyCell';
 import StatusBadge from './ui/StatusBadge';
 
@@ -389,6 +390,10 @@ const ContasReceber = () => {
     },
   ];
 
+  const handleFiltrosSubmit = (event) => {
+    event.preventDefault();
+  };
+
   if (loading) {
     return <div className="text-center p-8">Carregando contas a receber...</div>;
   }
@@ -414,7 +419,7 @@ const ContasReceber = () => {
       </div>
 
       {/* Filtros */}
-      <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+      <FilterBar className="mb-6" onSubmit={handleFiltrosSubmit}>
         <h5 className="text-lg font-semibold mb-4">Filtros</h5>
         
         {/* Campo de busca por numero de venda */}
@@ -517,7 +522,7 @@ const ContasReceber = () => {
             </ActionButton>
           </div>
         </div>
-      </div>
+      </FilterBar>
 
       {/* Tabela de Contas */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">

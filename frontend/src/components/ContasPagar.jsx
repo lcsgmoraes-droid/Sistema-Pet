@@ -6,6 +6,7 @@ import ModalNovaContaPagar from './ModalNovaContaPagar';
 import { safeArray } from '../utils/safeArray';
 import ActionButton from './ui/ActionButton';
 import DataTable from './ui/DataTable';
+import FilterBar from './ui/FilterBar';
 import MoneyCell, { formatMoneyCellValue } from './ui/MoneyCell';
 import StatusBadge from './ui/StatusBadge';
 
@@ -500,6 +501,10 @@ const ContasPagar = () => {
     },
   ];
 
+  const handleFiltrosSubmit = (event) => {
+    event.preventDefault();
+  };
+
   if (loading) {
     return <div className="text-center p-8">Carregando contas a pagar...</div>;
   }
@@ -518,7 +523,7 @@ const ContasPagar = () => {
       </div>
 
       {/* Filtros */}
-      <div className="bg-white rounded-lg shadow-md p-4 mb-6">
+      <FilterBar className="mb-6" onSubmit={handleFiltrosSubmit}>
         <h5 className="text-lg font-semibold mb-4">🔍 Filtros</h5>
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
           <div className="md:col-span-3">
@@ -694,7 +699,7 @@ const ContasPagar = () => {
             </ActionButton>
           </div>
         </div>
-      </div>
+      </FilterBar>
 
       {/* Tabela de Contas */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
