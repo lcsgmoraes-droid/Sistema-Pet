@@ -204,6 +204,7 @@ def _serializar_taxi(taxi: BanhoTosaTaxiDog) -> dict:
         "cliente_nome": taxi.cliente.nome if taxi.cliente else None,
         "pet_id": taxi.pet_id,
         "pet_nome": taxi.pet.nome if taxi.pet else None,
+        "pet_foto_url": taxi.pet.foto_url if taxi.pet else None,
         "agendamento_id": taxi.agendamento_id,
         "agendamento_inicio": agendamento.data_hora_inicio if agendamento else None,
         "tipo": taxi.tipo,

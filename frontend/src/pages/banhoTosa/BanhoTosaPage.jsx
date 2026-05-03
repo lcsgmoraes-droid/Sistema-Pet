@@ -5,7 +5,6 @@ import { banhoTosaApi } from "./banhoTosaApi";
 import { getApiErrorMessage } from "./banhoTosaUtils";
 import BanhoTosaAgendaView from "./components/BanhoTosaAgendaView";
 import BanhoTosaDashboardView from "./components/BanhoTosaDashboardView";
-import BanhoTosaFechamentosView from "./components/BanhoTosaFechamentosView";
 import BanhoTosaFilaView from "./components/BanhoTosaFilaView";
 import BanhoTosaPacotesView from "./components/BanhoTosaPacotesView";
 import BanhoTosaParametrosView from "./components/BanhoTosaParametrosView";
@@ -22,7 +21,6 @@ const navItems = [
   { view: "recursos", path: "/banho-tosa/recursos", label: "Recursos" },
   { view: "agenda", path: "/banho-tosa/agenda", label: "Agenda" },
   { view: "fila", path: "/banho-tosa/fila", label: "Fila do dia" },
-  { view: "fechamentos", path: "/banho-tosa/fechamentos", label: "Fechamentos" },
   { view: "pacotes", path: "/banho-tosa/pacotes", label: "Pacotes" },
   { view: "retornos", path: "/banho-tosa/retornos", label: "Retornos" },
   { view: "taxi-dog", path: "/banho-tosa/taxi-dog", label: "Taxi dog" },
@@ -143,10 +141,6 @@ export default function BanhoTosaPage({ view = "dashboard" }) {
       );
     }
 
-    if (view === "fechamentos") {
-      return <BanhoTosaFechamentosView />;
-    }
-
     if (view === "pacotes") {
       return <BanhoTosaPacotesView servicos={servicos} onChanged={carregarDados} />;
     }
@@ -183,7 +177,7 @@ export default function BanhoTosaPage({ view = "dashboard" }) {
                 Banho & Tosa
               </h1>
               <p className="mt-1 max-w-3xl text-sm text-slate-600">
-                Agenda, operacao, servicos, custos e fechamentos em uma rotina mais organizada.
+                Agenda, operacao, servicos e custos em uma rotina mais organizada.
               </p>
             </div>
 

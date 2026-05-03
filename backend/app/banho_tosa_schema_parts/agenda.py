@@ -55,6 +55,7 @@ class BanhoTosaAgendamentoResponse(BaseModel):
     cliente_nome: Optional[str] = None
     pet_id: int
     pet_nome: Optional[str] = None
+    pet_foto_url: Optional[str] = None
     pet_especie: Optional[str] = None
     pet_porte: Optional[str] = None
     profissional_principal_id: Optional[int] = None

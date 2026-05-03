@@ -482,38 +482,33 @@ const Layout = () => {
           label: "Agenda",
           permission: null,
         },
-          {
-            path: "/banho-tosa/fila",
-            label: "Fila do dia",
-            permission: null,
-          },
-          {
-            path: "/banho-tosa/fechamentos",
-            label: "Fechamentos",
-            permission: null,
-          },
-          {
-            path: "/banho-tosa/pacotes",
-            label: "Pacotes",
-            permission: null,
-          },
-          {
-            path: "/banho-tosa/retornos",
-            label: "Retornos",
-            permission: null,
-          },
-          {
-            path: "/banho-tosa/taxi-dog",
-            label: "Taxi dog",
-            permission: null,
-          },
-          {
-            path: "/banho-tosa/relatorios",
-            label: "Relatorios",
-            permission: null,
-          },
-        ],
-      },
+        {
+          path: "/banho-tosa/fila",
+          label: "Fila do dia",
+          permission: null,
+        },
+        {
+          path: "/banho-tosa/pacotes",
+          label: "Pacotes",
+          permission: null,
+        },
+        {
+          path: "/banho-tosa/retornos",
+          label: "Retornos",
+          permission: null,
+        },
+        {
+          path: "/banho-tosa/taxi-dog",
+          label: "Taxi dog",
+          permission: null,
+        },
+        {
+          path: "/banho-tosa/relatorios",
+          label: "Relatorios",
+          permission: null,
+        },
+      ],
+    },
     {
       path: "/produtos",
       icon: FiPackage,

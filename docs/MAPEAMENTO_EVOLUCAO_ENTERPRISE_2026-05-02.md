@@ -53,6 +53,9 @@ Tela piloto:
 - Banho & Tosa: `FormField` ganhou acessorio de rotulo e os formularios com tooltip migraram para os campos globais, removendo os campos locais duplicados do modulo.
 - Banho & Tosa: checkboxes de servicos, recursos, portes e pacotes passaram a usar `CheckboxField` global com o mesmo tom visual.
 - Banho & Tosa: tela de parametros foi reorganizada para abrir com resumo e lista compacta; configuracoes gerais e cadastro/edicao de porte agora aparecem apenas por acao explicita.
+- Banho & Tosa: agenda deixou de exibir a grade "Horarios x recursos"; agenda, sugestoes de horarios e fila passaram a exibir foto do pet quando disponivel.
+- Banho & Tosa: fila do dia foi redesenhada em kanban compacto com cards arrastaveis, etapas reordenaveis por drag and drop e acoes reduzidas para avancar ou escolher etapa.
+- Banho & Tosa: ao marcar atendimento como entregue, o frontend tenta gerar a venda no PDV pelo endpoint existente, reduzindo dependencia da tela de fechamentos.
 - Produtos e Pessoas: paginacoes locais foram substituidas por `PaginationControls` global, removendo controles duplicados.
 - Operadoras, internacoes veterinarias e Estoque Bling comecaram a usar estados globais de vazio/carregamento.
 

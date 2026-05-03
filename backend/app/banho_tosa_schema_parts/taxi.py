@@ -52,6 +52,7 @@ class BanhoTosaTaxiDogResponse(BaseModel):
     cliente_nome: Optional[str] = None
     pet_id: int
     pet_nome: Optional[str] = None
+    pet_foto_url: Optional[str] = None
     agendamento_id: Optional[int] = None
     agendamento_inicio: Optional[datetime] = None
     tipo: str

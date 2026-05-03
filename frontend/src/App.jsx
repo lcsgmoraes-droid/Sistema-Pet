@@ -392,7 +392,7 @@ function App() {
                   <Route path="banho-tosa/recursos" element={<BanhoTosaPage view="recursos" />} />
                   <Route path="banho-tosa/agenda" element={<BanhoTosaPage view="agenda" />} />
                   <Route path="banho-tosa/fila" element={<BanhoTosaPage view="fila" />} />
-                  <Route path="banho-tosa/fechamentos" element={<BanhoTosaPage view="fechamentos" />} />
+                  <Route path="banho-tosa/fechamentos" element={<Navigate to="/banho-tosa/fila" replace />} />
                   <Route path="banho-tosa/pacotes" element={<BanhoTosaPage view="pacotes" />} />
                   <Route path="banho-tosa/retornos" element={<BanhoTosaPage view="retornos" />} />
                   <Route path="banho-tosa/taxi-dog" element={<BanhoTosaPage view="taxi-dog" />} />

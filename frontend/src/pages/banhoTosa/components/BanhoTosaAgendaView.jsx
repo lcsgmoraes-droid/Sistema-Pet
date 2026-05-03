@@ -11,7 +11,6 @@ import { buildReturnTo } from "../../../utils/petReturnFlow";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { getApiErrorMessage, toApiDecimal } from "../banhoTosaUtils";
 import BanhoTosaAgendaCriacaoPanel from "./BanhoTosaAgendaCriacaoPanel";
-import BanhoTosaAgendaGrade from "./BanhoTosaAgendaGrade";
 import BanhoTosaAgendaList from "./BanhoTosaAgendaList";
 import BanhoTosaCapacidadePanel from "./BanhoTosaCapacidadePanel";
 const todayIso = () => new Date().toISOString().slice(0, 10);
@@ -372,14 +371,6 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
 
         <BanhoTosaCapacidadePanel capacidade={capacidade} />
       </div>
-
-      <BanhoTosaAgendaGrade
-        agendamentos={agendamentos}
-        capacidade={capacidade}
-        recursos={recursos}
-        sugestoes={sugestoes}
-        onUseSlot={usarSlot}
-      />
     </div>
   );
 }

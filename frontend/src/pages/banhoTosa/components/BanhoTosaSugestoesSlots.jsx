@@ -1,4 +1,5 @@
 import StatusBadge from "../../../components/ui/StatusBadge";
+import PetAvatar from "../../../components/ui/PetAvatar";
 import { formatCurrency } from "../banhoTosaUtils";
 
 const SLOT_MINUTOS = 30;
@@ -136,23 +137,33 @@ function CompromissoCard({ agendamento }) {
 
   return (
     <article className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
-      <div className="flex flex-wrap items-center gap-2">
-        <span className="text-sm font-semibold text-slate-900">
-          {inicio || "--:--"}{fim ? ` - ${fim}` : ""}
-        </span>
-        <StatusBadge status={agendamento.status} />
-      </div>
-      <div className="mt-1 text-sm font-medium text-slate-700">
-        {agendamento.pet_nome || `Pet #${agendamento.pet_id}`}
-      </div>
-      <div className="text-xs text-slate-500">
-        Tutor: {agendamento.cliente_nome || `#${agendamento.cliente_id}`}
-      </div>
-      <div className="text-xs text-slate-500">
-        {[servico, agendamento.recurso_nome].filter(Boolean).join(" - ")}
-      </div>
-      <div className="mt-1 text-xs font-semibold text-emerald-700">
-        {formatCurrency(agendamento.valor_previsto)}
+      <div className="flex gap-3">
+        <PetAvatar
+          alt={agendamento.pet_nome || "Pet"}
+          name={agendamento.pet_nome}
+          size="sm"
+          url={agendamento.pet_foto_url}
+        />
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="text-sm font-semibold text-slate-900">
+              {inicio || "--:--"}{fim ? ` - ${fim}` : ""}
+            </span>
+            <StatusBadge status={agendamento.status} />
+          </div>
+          <div className="mt-1 truncate text-sm font-medium text-slate-700">
+            {agendamento.pet_nome || `Pet #${agendamento.pet_id}`}
+          </div>
+          <div className="truncate text-xs text-slate-500">
+            Tutor: {agendamento.cliente_nome || `#${agendamento.cliente_id}`}
+          </div>
+          <div className="truncate text-xs text-slate-500">
+            {[servico, agendamento.recurso_nome].filter(Boolean).join(" - ")}
+          </div>
+          <div className="mt-1 text-xs font-semibold text-emerald-700">
+            {formatCurrency(agendamento.valor_previsto)}
+          </div>
+        </div>
       </div>
     </article>
   );
