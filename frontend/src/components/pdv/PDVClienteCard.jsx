@@ -4,11 +4,11 @@ import {
   Copy,
   History,
   Plus,
-  Search,
   User,
   Wallet,
 } from "lucide-react";
 import { formatBRL, formatMoneyBRL } from "../../utils/formatters";
+import PessoaSelector from "../clientes/PessoaSelector";
 import ActionButton from "../ui/ActionButton";
 import Panel from "../ui/Panel";
 
@@ -58,73 +58,38 @@ function ClienteLookup({
 }) {
   return (
     <div className="space-y-3">
-      <div className="relative">
-        <div className="flex items-center gap-2">
-          <div className="relative flex-1">
-            <input
-              type="text"
-              value={buscarCliente}
-              onChange={(e) => onBuscarClienteChange(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key !== "Enter") return;
+      <div className="flex items-center gap-2">
+        <PessoaSelector
+          className="flex-1"
+          disabled={modoVisualizacao}
+          minChars={0}
+          onChange={onBuscarClienteChange}
+          onKeyDown={(e) => {
+            if (e.key !== "Enter") return;
 
-                const clientePorCodigo =
-                  buscarClientePorCodigoExato(buscarCliente);
-                if (clientePorCodigo) {
-                  e.preventDefault();
-                  onSelecionarCliente(clientePorCodigo);
-                }
-              }}
-              placeholder="Digite nome, CPF ou telefone do cliente..."
-              className="h-9 w-full rounded-lg border border-gray-300 px-3 pr-9 text-sm focus:border-transparent focus:ring-2 focus:ring-blue-500"
-              disabled={modoVisualizacao}
-            />
-            <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          </div>
-          <ActionButton
-            onClick={onAbrirCadastroCliente}
-            disabled={modoVisualizacao}
-            icon={Plus}
-            intent="create"
-            size="md"
-            className="whitespace-nowrap"
-          >
-            <span>Novo</span>
-          </ActionButton>
-        </div>
-
-        {clientesSugeridos.length > 0 && (
-          <div className="absolute z-10 mt-2 max-h-60 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-            {clientesSugeridos.map((item) => (
-              <button
-                key={item.id}
-                type="button"
-                onClick={() => onSelecionarCliente(item)}
-                className="w-full border-b px-4 py-3 text-left last:border-b-0 hover:bg-gray-50"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex-1 font-medium text-gray-900">
-                    {item.nome}
-                  </div>
-                  {item.codigo && (
-                    <div className="flex-shrink-0 rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-600">
-                      #{item.codigo}
-                    </div>
-                  )}
-                </div>
-                <div className="text-sm text-gray-500">
-                  {item.cpf && `CPF: ${item.cpf}`}
-                  {item.telefone && ` - ${item.telefone}`}
-                </div>
-                {item.pets && item.pets.length > 0 && (
-                  <div className="mt-1 text-xs text-blue-600">
-                    {item.pets.length} pet(s)
-                  </div>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
+            const clientePorCodigo =
+              buscarClientePorCodigoExato(buscarCliente);
+            if (clientePorCodigo) {
+              e.preventDefault();
+              onSelecionarCliente(clientePorCodigo);
+            }
+          }}
+          onSelect={onSelecionarCliente}
+          placeholder="Digite nome, CPF ou telefone do cliente..."
+          showSuggestions={clientesSugeridos.length > 0}
+          suggestions={clientesSugeridos}
+          value={buscarCliente}
+        />
+        <ActionButton
+          onClick={onAbrirCadastroCliente}
+          disabled={modoVisualizacao}
+          icon={Plus}
+          intent="create"
+          size="md"
+          className="whitespace-nowrap"
+        >
+          <span>Novo</span>
+        </ActionButton>
       </div>
 
       {buscarCliente.length >= 2 && clientesSugeridos.length === 0 && (
