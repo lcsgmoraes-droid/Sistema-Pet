@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
-import { CalendarDays, Clock3, Plus, RefreshCw, UsersRound } from "lucide-react";
+import { AlertTriangle, CalendarDays, Clock3, Plus, RefreshCw, UsersRound } from "lucide-react";
 import { useLocation, useSearchParams } from "react-router-dom";
 import ActionButton from "../../../components/ui/ActionButton";
 import { api } from "../../../services/api";
@@ -12,7 +12,6 @@ import { banhoTosaApi } from "../banhoTosaApi";
 import { getApiErrorMessage, toApiDecimal } from "../banhoTosaUtils";
 import BanhoTosaAgendaCriacaoPanel from "./BanhoTosaAgendaCriacaoPanel";
 import BanhoTosaAgendaList from "./BanhoTosaAgendaList";
-import BanhoTosaCapacidadePanel from "./BanhoTosaCapacidadePanel";
 const todayIso = () => new Date().toISOString().slice(0, 10);
 const criarFormularioInicial = () => ({
   pet_id: "",
@@ -359,19 +358,35 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
         onUseSlot={usarSlot}
       />
 
-      <div className="grid gap-4 xl:grid-cols-[1fr_0.9fr]">
-        <BanhoTosaAgendaList
-          agendamentos={agendamentos}
-          dataRef={dataRef}
-          loading={loadingAgenda}
-          onAtualizar={carregarAgenda}
-          onCancelar={cancelar}
-          onCheckIn={checkIn}
-        />
+      <CapacidadeAlertas capacidade={capacidade} />
 
-        <BanhoTosaCapacidadePanel capacidade={capacidade} />
-      </div>
+      <BanhoTosaAgendaList
+        agendamentos={agendamentos}
+        dataRef={dataRef}
+        loading={loadingAgenda}
+        onAtualizar={carregarAgenda}
+        onCancelar={cancelar}
+        onCheckIn={checkIn}
+      />
     </div>
+  );
+}
+
+function CapacidadeAlertas({ capacidade }) {
+  const alertas = capacidade?.alertas || [];
+  if (!alertas.length) return null;
+
+  return (
+    <Panel className="border-amber-200 bg-amber-50" padding="sm">
+      <div className="flex items-start gap-2 text-sm font-medium text-amber-800">
+        <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+        <div className="space-y-1">
+          {alertas.map((alerta) => (
+            <p key={alerta}>{alerta}</p>
+          ))}
+        </div>
+      </div>
+    </Panel>
   );
 }
 
