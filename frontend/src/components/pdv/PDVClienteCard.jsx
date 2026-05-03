@@ -10,6 +10,7 @@ import {
 import { formatBRL, formatMoneyBRL } from "../../utils/formatters";
 import PessoaSelector from "../clientes/PessoaSelector";
 import ActionButton from "../ui/ActionButton";
+import EntityCard from "../ui/EntityCard";
 import Panel from "../ui/Panel";
 
 function CopyButton({ active, onClick, title }) {
@@ -30,18 +31,20 @@ function CopyButton({ active, onClick, title }) {
 }
 
 function ClienteInfoLine({ label, value, copyKey, copiedKey, onCopy }) {
-  if (!value) return null;
-
   return (
-    <div className="inline-flex min-w-0 items-center gap-1">
+    <div className="grid min-h-[20px] grid-cols-[48px_minmax(0,1fr)_18px] items-center gap-1">
       <span className="text-blue-700">{label}:</span>
-      <span className="truncate text-blue-800">{value}</span>
-      {copyKey && (
+      <span className="truncate text-blue-800">
+        {value || <span aria-hidden="true" className="invisible">-</span>}
+      </span>
+      {copyKey && value ? (
         <CopyButton
           active={copiedKey === copyKey}
           onClick={() => onCopy(value, copyKey)}
           title={`Copiar ${label.toLowerCase()}`}
         />
+      ) : (
+        <span aria-hidden="true" />
       )}
     </div>
   );
@@ -223,8 +226,12 @@ function ClienteResumoSelecionado({
   telefoneCliente,
 }) {
   return (
-    <div className="grid grid-cols-1 overflow-hidden rounded-lg border border-blue-200 bg-blue-50 text-sm md:grid-cols-3">
-      <div className="min-w-0 border-b border-blue-200 px-3 py-3 md:border-b-0">
+    <EntityCard
+      compact
+      className="overflow-hidden border-blue-200 bg-blue-50 text-sm shadow-none"
+      bodyClassName="grid grid-cols-1 md:grid-cols-[1fr_1.05fr_1fr]"
+    >
+      <div className="min-w-0 border-b border-blue-200 px-3 py-3 md:border-b-0 md:border-r">
         <div className="truncate font-semibold text-blue-950">
           {cliente.nome}
         </div>
@@ -262,7 +269,7 @@ function ClienteResumoSelecionado({
       <div className="flex min-w-0 flex-col gap-2 bg-blue-50 px-3 py-3">
         <ClienteCreditoResumo creditoCliente={creditoCliente} />
       </div>
-    </div>
+    </EntityCard>
   );
 }
 
