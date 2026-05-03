@@ -680,13 +680,15 @@ const ContasPagar = () => {
           </div>
 
           <div className="md:col-span-5 flex flex-wrap items-end justify-end gap-2">
-            <button
-              className="bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 px-4 py-2 rounded text-sm font-semibold"
+            <ActionButton
+              intent="warning"
+              tone="soft"
+              size="sm"
               onClick={filtrarDespesasCaixa}
               type="button"
             >
               Despesas do caixa
-            </button>
+            </ActionButton>
             <ActionButton
               intent="neutral"
               tone="soft"
