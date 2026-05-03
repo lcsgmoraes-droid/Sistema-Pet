@@ -1,4 +1,4 @@
-import { ArrowRight, Route } from "lucide-react";
+import { ArrowRight, Route, Save } from "lucide-react";
 import ActionButton from "../../../components/ui/ActionButton";
 import EmptyState from "../../../components/ui/EmptyState";
 import { TextField } from "../../../components/ui/FormField";
@@ -65,21 +65,23 @@ function TaxiCard({ item, saving, onAtualizarMedicao, onSalvarMedicao, onStatus 
           </div>
         </div>
         {proximo && (
-          <ActionButton disabled={saving} icon={ArrowRight} intent="edit" onClick={() => onStatus(item, proximo)}>
-            Avancar status
+          <ActionButton disabled={saving} icon={ArrowRight} intent="edit" onClick={() => onStatus(item, proximo)} tone="soft">
+            {labelAcao(proximo)}
           </ActionButton>
         )}
       </div>
-      <div className="mt-4 grid gap-3 sm:grid-cols-3">
+      <div className="mt-4 grid gap-3 sm:grid-cols-3 xl:grid-cols-5">
         <MiniMetric label="Motorista" value={item.motorista_nome || "Nao definido"} />
         <MiniMetric label="Valor" value={formatCurrency(item.valor_cobrado)} />
         <MiniMetric label="Custo" value={formatCurrency(item.custo_real || item.custo_estimado)} />
+        <MiniMetric label="Origem" value={item.endereco_origem || "-"} />
+        <MiniMetric label="Destino" value={item.endereco_destino || "-"} />
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
         <TextField label="Km real" type="number" value={String(item.km_real ?? "0")} onChange={(value) => atualizarItem(item.id, "km_real", value, onAtualizarMedicao)} />
         <TextField label="Custo real" type="number" value={String(item.custo_real ?? "0")} onChange={(value) => atualizarItem(item.id, "custo_real", value, onAtualizarMedicao)} />
-        <ActionButton className="self-end" disabled={saving} intent="neutral" onClick={() => onSalvarMedicao(item)} tone="soft">
-          Salvar
+        <ActionButton className="self-end" disabled={saving} icon={Save} intent="neutral" onClick={() => onSalvarMedicao(item)} tone="soft">
+          Salvar medicao
         </ActionButton>
       </div>
     </div>
@@ -120,6 +122,18 @@ function labelStatus(status) {
     entregue_ao_tutor: "Entregue",
   };
   return labels[status] || status;
+}
+
+function labelAcao(status) {
+  const labels = {
+    motorista_a_caminho: "Enviar motorista",
+    pet_coletado: "Marcar coleta",
+    entregue_na_clinica: "Chegou na loja",
+    aguardando_retorno: "Aguardar retorno",
+    retornando: "Iniciar retorno",
+    entregue_ao_tutor: "Entregar tutor",
+  };
+  return labels[status] || "Avancar";
 }
 
 function labelTipo(tipo) {

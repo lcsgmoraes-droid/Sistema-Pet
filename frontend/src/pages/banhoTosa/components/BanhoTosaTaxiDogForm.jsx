@@ -1,23 +1,21 @@
-import { Plus } from "lucide-react";
+import { Plus, X } from "lucide-react";
 import ActionButton from "../../../components/ui/ActionButton";
 import { SelectField, TextField } from "../../../components/ui/FormField";
 import Panel from "../../../components/ui/Panel";
 
 export default function BanhoTosaTaxiDogForm({
   agendamentos,
-  dataRef,
   form,
   funcionarios,
   saving,
-  onChangeData,
+  onCancel,
   onChangeField,
   onSubmit,
 }) {
   return (
-    <Panel title="Taxi dog" subtitle="Transporte vinculado a agenda do dia.">
+    <Panel title="Novo transporte" subtitle="Vincule o taxi dog a um agendamento do dia e informe janela, motorista e valores.">
       <form onSubmit={onSubmit}>
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <TextField label="Data" type="date" value={dataRef} onChange={onChangeData} />
+        <div className="grid gap-3 lg:grid-cols-3">
           <SelectField label="Tipo" value={form.tipo} onChange={(value) => onChangeField("tipo", value)}>
             <option value="ida">Somente ida</option>
             <option value="volta">Somente volta</option>
@@ -37,20 +35,30 @@ export default function BanhoTosaTaxiDogForm({
               <option key={pessoa.id} value={pessoa.id}>{pessoa.nome}</option>
             ))}
           </SelectField>
+        </div>
+
+        <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <TextField label="Janela inicio" type="datetime-local" value={form.janela_inicio} onChange={(value) => onChangeField("janela_inicio", value)} />
           <TextField label="Janela fim" type="datetime-local" value={form.janela_fim} onChange={(value) => onChangeField("janela_fim", value)} />
           <TextField label="Km estimado" type="number" value={form.km_estimado} onChange={(value) => onChangeField("km_estimado", value)} />
           <TextField label="Valor cobrado" type="number" value={form.valor_cobrado} onChange={(value) => onChangeField("valor_cobrado", value)} />
+        </div>
+
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
           <TextField label="Custo estimado" type="number" value={form.custo_estimado} onChange={(value) => onChangeField("custo_estimado", value)} />
           <TextField label="Custo real" type="number" value={form.custo_real} onChange={(value) => onChangeField("custo_real", value)} />
-        </div>
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <TextField label="Origem" value={form.endereco_origem} onChange={(value) => onChangeField("endereco_origem", value)} />
           <TextField label="Destino" value={form.endereco_destino} onChange={(value) => onChangeField("endereco_destino", value)} />
         </div>
-        <ActionButton className="mt-5 w-full" icon={Plus} intent="create" loading={saving} size="md" type="submit">
-          Criar taxi dog
-        </ActionButton>
+
+        <div className="mt-4 flex justify-end gap-2">
+          <ActionButton icon={X} intent="neutral" onClick={onCancel} tone="soft">
+            Cancelar
+          </ActionButton>
+          <ActionButton icon={Plus} intent="create" loading={saving} type="submit">
+            Criar taxi dog
+          </ActionButton>
+        </div>
       </form>
     </Panel>
   );

@@ -1,8 +1,13 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { banhoTosaApi } from "../banhoTosaApi";
-import { getApiErrorMessage, toApiDecimal } from "../banhoTosaUtils";
+import { CalendarDays, CircleDollarSign, Plus, RefreshCw, Route, Truck } from "lucide-react";
+import ActionButton from "../../../components/ui/ActionButton";
+import { TextField } from "../../../components/ui/FormField";
+import MetricCard from "../../../components/ui/MetricCard";
+import MetricGrid from "../../../components/ui/MetricGrid";
 import Panel from "../../../components/ui/Panel";
+import { banhoTosaApi } from "../banhoTosaApi";
+import { formatCurrency, getApiErrorMessage, toApiDecimal } from "../banhoTosaUtils";
 import BanhoTosaTaxiDogForm from "./BanhoTosaTaxiDogForm";
 import BanhoTosaTaxiDogList from "./BanhoTosaTaxiDogList";
 
@@ -30,6 +35,7 @@ export default function BanhoTosaTaxiDogView({ funcionarios = [], onChanged }) {
   const [form, setForm] = useState(initialForm);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [showForm, setShowForm] = useState(false);
 
   async function carregarDados() {
     setLoading(true);
@@ -79,6 +85,7 @@ export default function BanhoTosaTaxiDogView({ funcionarios = [], onChanged }) {
       await banhoTosaApi.criarTaxiDog(montarPayload());
       toast.success("Taxi dog criado.");
       setForm(initialForm);
+      setShowForm(false);
       await carregarDados();
       await onChanged?.(true);
     } catch (error) {
@@ -137,19 +144,59 @@ export default function BanhoTosaTaxiDogView({ funcionarios = [], onChanged }) {
   }
 
   const agendamentosDisponiveis = agendamentos.filter((item) => !item.taxi_dog_id);
+  const resumo = montarResumo(taxiDog);
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
-      <BanhoTosaTaxiDogForm
-        agendamentos={agendamentosDisponiveis}
-        dataRef={dataRef}
-        form={form}
-        funcionarios={funcionarios}
-        saving={saving}
-        onChangeData={setDataRef}
-        onChangeField={updateField}
-        onSubmit={criarTaxiDog}
-      />
+    <div className="space-y-4">
+      <Panel
+        actions={
+          <>
+            <ActionButton
+              icon={Plus}
+              intent="create"
+              onClick={() => {
+                setForm(initialForm);
+                setShowForm((value) => !value);
+              }}
+            >
+              Novo transporte
+            </ActionButton>
+            <ActionButton icon={RefreshCw} intent="neutral" loading={loading} onClick={carregarDados} tone="soft">
+              Atualizar
+            </ActionButton>
+          </>
+        }
+        subtitle="Controle coletas, entregas, motorista, janela de rota e custo do transporte."
+        title="Taxi dog"
+      >
+        <div className="max-w-xs">
+          <TextField label="Data da rota" type="date" value={dataRef} onChange={setDataRef} />
+        </div>
+      </Panel>
+
+      <MetricGrid>
+        <MetricCard icon={<Route size={18} />} intent="blue" label="Rotas" value={taxiDog.length} />
+        <MetricCard icon={<CalendarDays size={18} />} intent="slate" label="Agendamentos" subtitle={`${agendamentosDisponiveis.length} sem transporte`} value={agendamentos.length} />
+        <MetricCard icon={<Truck size={18} />} intent="cyan" label="Em rota" value={resumo.emRota} />
+        <MetricCard intent="emerald" label="Concluidas" value={resumo.concluidas} />
+        <MetricCard icon={<CircleDollarSign size={18} />} intent="violet" label="Receita" subtitle={`Custo ${formatCurrency(resumo.custo)}`} value={formatCurrency(resumo.receita)} />
+      </MetricGrid>
+
+      {showForm && (
+        <BanhoTosaTaxiDogForm
+          agendamentos={agendamentosDisponiveis}
+          form={form}
+          funcionarios={funcionarios}
+          saving={saving}
+          onCancel={() => {
+            setForm(initialForm);
+            setShowForm(false);
+          }}
+          onChangeField={updateField}
+          onSubmit={criarTaxiDog}
+        />
+      )}
+
       <Panel
         subtitle={`${agendamentos.length} agendamento(s) no dia, ${agendamentosDisponiveis.length} sem transporte.`}
         title="Rotas do dia"
@@ -164,6 +211,22 @@ export default function BanhoTosaTaxiDogView({ funcionarios = [], onChanged }) {
         />
       </Panel>
     </div>
+  );
+}
+
+function montarResumo(items = []) {
+  return items.reduce(
+    (acc, item) => {
+      if (item.status === "entregue_ao_tutor") {
+        acc.concluidas += 1;
+      } else if (item.status !== "agendado") {
+        acc.emRota += 1;
+      }
+      acc.receita += Number(item.valor_cobrado || 0);
+      acc.custo += Number(item.custo_real || item.custo_estimado || 0);
+      return acc;
+    },
+    { emRota: 0, concluidas: 0, receita: 0, custo: 0 },
   );
 }
 
