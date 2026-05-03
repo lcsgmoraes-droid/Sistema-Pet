@@ -1,5 +1,5 @@
 import TutorAutocomplete from "../../../components/TutorAutocomplete";
-import NovoPetButton from "../../../components/veterinario/NovoPetButton";
+import PetSelector from "../../../components/pets/PetSelector";
 import { assistenteIaCss, formatarLabelConsulta } from "./assistenteIAUtils";
 
 export default function AssistenteIASelecaoContexto({
@@ -29,10 +29,14 @@ export default function AssistenteIASelecaoContexto({
       </div>
 
       <PetSelector
-        onSelecionarPet={onSelecionarPet}
+        allowEmpty
+        emptyOptionLabel="Sem pet"
+        onSelectPet={(pet) => onSelecionarPet(pet ? String(pet.id) : "")}
         petId={petId}
-        petsDoTutor={petsDoTutor}
-        retornoNovoPet={retornoNovoPet}
+        pets={petsDoTutor}
+        petLabel="Pet (opcional)"
+        placeholder="Selecione o pet..."
+        returnTo={retornoNovoPet}
         tutorSelecionado={tutorSelecionado}
       />
 
@@ -41,41 +45,6 @@ export default function AssistenteIASelecaoContexto({
           <ConsultaSelector consultaId={consultaId} consultas={consultas} setConsultaId={setConsultaId} />
           <ExameSelector exameId={exameId} exames={exames} setExameId={setExameId} />
         </>
-      )}
-    </div>
-  );
-}
-
-function PetSelector({ onSelecionarPet, petId, petsDoTutor, retornoNovoPet, tutorSelecionado }) {
-  return (
-    <div>
-      <div className="mb-1 flex items-center justify-between gap-2">
-        <label htmlFor="vet-ia-pet" className="block text-xs font-medium text-gray-600">
-          Pet (opcional)
-        </label>
-        <NovoPetButton
-          tutorId={tutorSelecionado?.id}
-          tutorNome={tutorSelecionado?.nome}
-          returnTo={retornoNovoPet}
-        />
-      </div>
-      <select
-        id="vet-ia-pet"
-        value={petId}
-        onChange={(event) => onSelecionarPet(event.target.value)}
-        className={assistenteIaCss.select}
-        disabled={!tutorSelecionado?.id}
-      >
-        <option value="">{tutorSelecionado?.id ? "Selecione o pet..." : "Selecione o tutor primeiro..."}</option>
-        {petsDoTutor.map((pet) => (
-          <option key={pet.id} value={pet.id}>
-            {pet.nome}
-            {pet.especie ? ` (${pet.especie})` : ""}
-          </option>
-        ))}
-      </select>
-      {tutorSelecionado?.id && petsDoTutor.length === 0 && (
-        <p className="mt-2 text-xs text-amber-600">Nenhum pet ativo encontrado para este tutor.</p>
       )}
     </div>
   );

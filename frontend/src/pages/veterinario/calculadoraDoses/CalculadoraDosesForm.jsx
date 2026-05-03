@@ -1,5 +1,5 @@
 import TutorAutocomplete from "../../../components/TutorAutocomplete";
-import NovoPetButton from "../../../components/veterinario/NovoPetButton";
+import PetSelector from "../../../components/pets/PetSelector";
 
 export default function CalculadoraDosesForm({
   form,
@@ -25,31 +25,21 @@ export default function CalculadoraDosesForm({
           />
         </div>
 
-        <div>
-          <div className="mb-1 flex items-center justify-between gap-2">
-            <label htmlFor="calc-dose-pet" className="block text-sm font-medium text-gray-700">Pet</label>
-            <NovoPetButton
-              tutorId={tutorSelecionado?.id || form.pessoa_id}
-              tutorNome={tutorSelecionado?.nome}
-              returnTo={retornoNovoPet}
-            />
-          </div>
-          <select
-            id="calc-dose-pet"
-            value={form.pet_id}
-            disabled={!form.pessoa_id}
-            onChange={(event) => selecionarPet(event.target.value)}
-            className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm disabled:bg-gray-100"
-          >
-            <option value="">{form.pessoa_id ? "Selecione o pet..." : "Selecione o tutor primeiro..."}</option>
-            {petsDaPessoa.map((pet) => (
-              <option key={pet.id} value={pet.id}>{pet.nome} {pet.especie ? `- ${pet.especie}` : ""}</option>
-            ))}
-          </select>
-          {form.pessoa_id && petsDaPessoa.length === 0 && (
-            <p className="mt-2 text-xs text-amber-600">Nenhum pet ativo encontrado para esta pessoa.</p>
-          )}
-        </div>
+        <PetSelector
+          allowEmpty
+          disabled={!form.pessoa_id}
+          emptyOptionLabel="Selecione o pet..."
+          emptyStateLabel="Nenhum pet ativo encontrado para esta pessoa."
+          onSelectPet={(pet) => selecionarPet(pet ? String(pet.id) : "")}
+          petId={form.pet_id}
+          petLabel="Pet"
+          pets={petsDaPessoa}
+          placeholder="Selecione o pet..."
+          returnTo={retornoNovoPet}
+          tutorId={tutorSelecionado?.id || form.pessoa_id}
+          tutorNome={tutorSelecionado?.nome}
+          tutorSelecionado={tutorSelecionado}
+        />
 
         <CampoNumero
           id="calc-dose-peso"

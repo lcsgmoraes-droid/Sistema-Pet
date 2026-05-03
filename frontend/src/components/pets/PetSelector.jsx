@@ -24,6 +24,7 @@ export function describePet(pet) {
 export default function PetSelector({
   tutorSelecionado,
   tutorId: tutorIdProp,
+  tutorNome,
   petId,
   pets,
   expanded: expandedProp,
@@ -110,7 +111,7 @@ export default function PetSelector({
           {showNovoPetButton ? (
             <NovoPetButton
               tutorId={tutorId}
-              tutorNome={tutorSelecionado?.nome}
+              tutorNome={tutorNome || tutorSelecionado?.nome}
               returnTo={returnTo}
               onBeforeNavigate={onBeforeNovoPet}
               onClick={onNovoPetClick}
@@ -179,6 +180,7 @@ PetSelector.propTypes = {
     nome: PropTypes.string,
   }),
   tutorId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
+  tutorNome: PropTypes.string,
   petId: PropTypes.oneOfType([PropTypes.string, PropTypes.number]),
   pets: PropTypes.arrayOf(PropTypes.object),
   expanded: PropTypes.bool,
