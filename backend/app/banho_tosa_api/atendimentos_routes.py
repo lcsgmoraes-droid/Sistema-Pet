@@ -29,6 +29,7 @@ from app.banho_tosa_api.utils import (
 )
 from app.banho_tosa_custos import validar_transicao_status
 from app.banho_tosa_cancelamento import cancelar_processo_atendimento
+from app.banho_tosa_vendas import gerar_venda_atendimento
 from app.banho_tosa_models import (
     BanhoTosaAtendimento,
     BanhoTosaEtapa,
@@ -133,7 +134,7 @@ def mover_etapa_atendimento(
     db: Session = Depends(get_session),
     current=Depends(get_current_user_and_tenant),
 ):
-    _, tenant_id = _get_tenant(current)
+    current_user, tenant_id = _get_tenant(current)
     atendimento = obter_atendimento_ou_404(db, tenant_id, atendimento_id)
     if atendimento.status in STATUS_ATENDIMENTO_FINAIS:
         raise HTTPException(status_code=422, detail="Atendimento finalizado nao aceita mudanca de etapa")
@@ -189,6 +190,8 @@ def mover_etapa_atendimento(
         db.add(etapa)
 
     aplicar_status_atendimento(db, tenant_id, atendimento, status_por_etapa(tipo))
+    if tipo == "entregue" and not atendimento.pacote_credito_id:
+        gerar_venda_atendimento(db, tenant_id, current_user.id, atendimento.id)
     db.commit()
     atendimento = obter_atendimento_ou_404(db, tenant_id, atendimento.id)
     return serializar_atendimento(atendimento, config)

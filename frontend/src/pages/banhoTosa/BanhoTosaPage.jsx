@@ -22,7 +22,7 @@ const navItems = [
   { view: "agenda", path: "/banho-tosa/agenda", label: "Agenda" },
   { view: "fila", path: "/banho-tosa/fila", label: "Fila do dia" },
   { view: "pacotes", path: "/banho-tosa/pacotes", label: "Pacotes" },
-  { view: "retornos", path: "/banho-tosa/retornos", label: "Retornos" },
+  { view: "retornos", path: "/banho-tosa/retornos", label: "Reagendar" },
   { view: "taxi-dog", path: "/banho-tosa/taxi-dog", label: "Taxi dog" },
   { view: "relatorios", path: "/banho-tosa/relatorios", label: "Relatorios" },
 ];

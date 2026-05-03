@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
+import { Save, Send } from "lucide-react";
+import ActionButton from "../../../components/ui/ActionButton";
 import { SelectField, TextField } from "../../../components/ui/FormField";
+import Panel from "../../../components/ui/Panel";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { getApiErrorMessage } from "../banhoTosaUtils";
 
@@ -96,19 +99,12 @@ export default function BanhoTosaRetornoCampanhaPanel({ diasAntecedencia }) {
 
   return (
     <section className="grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
-      <div className="rounded-3xl border border-white/80 bg-white p-5 shadow-sm">
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-orange-500">
-          Campanhas
-        </p>
-        <h3 className="mt-2 text-lg font-black text-slate-900">
-          Disparo de retorno
-        </h3>
-        <p className="mt-1 text-sm text-slate-500">
-          Use template padrao ou selecione uma mensagem segmentada por tipo de retorno.
-        </p>
-
+      <Panel
+        subtitle="Use template padrao ou selecione uma mensagem segmentada por tipo de retorno."
+        title="Disparo de retorno"
+      >
         <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_auto]">
-          <SelectField label="Template" value={templateId} onChange={selecionarTemplate} tone="warm">
+          <SelectField label="Template" value={templateId} onChange={selecionarTemplate}>
             <option value="">Padrao automatico</option>
             {templates.map((item) => (
               <option key={item.id} value={item.id}>
@@ -116,55 +112,58 @@ export default function BanhoTosaRetornoCampanhaPanel({ diasAntecedencia }) {
               </option>
             ))}
           </SelectField>
-          <SelectField label="Canal" value={canal} onChange={setCanal} disabled={Boolean(templateId)} tone="warm">
+          <SelectField label="Canal" value={canal} onChange={setCanal} disabled={Boolean(templateId)}>
             {canais.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </SelectField>
-          <button
+          <ActionButton
             type="button"
-            disabled={enfileirando}
+            className="self-end"
+            icon={Send}
+            intent="edit"
+            loading={enfileirando}
             onClick={enfileirarCampanha}
-            className="self-end rounded-2xl bg-slate-900 px-4 py-3 text-sm font-bold text-white disabled:opacity-60"
           >
-            {enfileirando ? "Enfileirando..." : "Enfileirar"}
-          </button>
+            Enfileirar
+          </ActionButton>
         </div>
-      </div>
+      </Panel>
 
-      <form onSubmit={criarTemplate} className="rounded-3xl border border-white/80 bg-white p-5 shadow-sm">
-        <p className="text-xs font-bold uppercase tracking-[0.18em] text-slate-400">
-          Novo template
-        </p>
-        <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <TextField label="Nome" value={form.nome} onChange={(value) => updateForm("nome", value)} required tone="warm" />
-          <SelectField label="Tipo" value={form.tipo_retorno} onChange={(value) => updateForm("tipo_retorno", value)} tone="warm">
-            {tipos.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </SelectField>
-          <SelectField label="Canal" value={form.canal} onChange={(value) => updateForm("canal", value)} tone="warm">
-            {canais.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
-          </SelectField>
-          <TextField label="Assunto" value={form.assunto} onChange={(value) => updateForm("assunto", value)} required tone="warm" />
-        </div>
-        <label className="mt-3 block">
-          <span className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Mensagem</span>
-          <textarea
-            required
-            rows={3}
-            value={form.mensagem}
-            onChange={(event) => updateForm("mensagem", event.target.value)}
-            className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100"
-          />
-        </label>
-        <p className="mt-2 text-xs text-slate-400">
-          Variaveis: {"{cliente_nome}"}, {"{pet_nome}"}, {"{servico_nome}"}, {"{pacote_nome}"}, {"{data_referencia}"}, {"{dias_para_acao}"}.
-        </p>
-        <button
-          type="submit"
-          disabled={salvando}
-          className="mt-4 rounded-2xl bg-orange-500 px-4 py-2 text-sm font-bold text-white disabled:opacity-60"
-        >
-          {salvando ? "Salvando..." : "Salvar template"}
-        </button>
-      </form>
+      <Panel title="Novo template">
+        <form onSubmit={criarTemplate}>
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <TextField label="Nome" value={form.nome} onChange={(value) => updateForm("nome", value)} required />
+            <SelectField label="Tipo" value={form.tipo_retorno} onChange={(value) => updateForm("tipo_retorno", value)}>
+              {tipos.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </SelectField>
+            <SelectField label="Canal" value={form.canal} onChange={(value) => updateForm("canal", value)}>
+              {canais.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+            </SelectField>
+            <TextField label="Assunto" value={form.assunto} onChange={(value) => updateForm("assunto", value)} required />
+          </div>
+          <label className="mt-3 block">
+            <span className="text-xs font-medium text-slate-600">Mensagem</span>
+            <textarea
+              required
+              rows={3}
+              value={form.mensagem}
+              onChange={(event) => updateForm("mensagem", event.target.value)}
+              className="mt-1 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm text-slate-900 outline-none focus:border-transparent focus:ring-2 focus:ring-blue-500"
+            />
+          </label>
+          <p className="mt-2 text-xs text-slate-400">
+            Variaveis: {"{cliente_nome}"}, {"{pet_nome}"}, {"{servico_nome}"}, {"{pacote_nome}"}, {"{data_referencia}"}, {"{dias_para_acao}"}.
+          </p>
+          <ActionButton
+            type="submit"
+            className="mt-4"
+            icon={Save}
+            intent="create"
+            loading={salvando}
+          >
+            Salvar template
+          </ActionButton>
+        </form>
+      </Panel>
     </section>
   );
 }

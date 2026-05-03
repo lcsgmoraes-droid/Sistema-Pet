@@ -156,6 +156,7 @@ def _base_sugestao(**kwargs) -> dict:
         "cliente_nome": cliente.nome,
         "pet_id": pet.id if pet else None,
         "pet_nome": pet.nome if pet else None,
+        "pet_foto_url": pet.foto_url if pet else None,
         "servico_id": kwargs.get("servico_id"),
         "servico_nome": kwargs.get("servico_nome"),
         "pacote_credito_id": kwargs.get("pacote_credito_id"),

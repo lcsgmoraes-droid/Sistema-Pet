@@ -1,17 +1,27 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
+import { CalendarPlus, RefreshCw, Repeat2, StepForward } from "lucide-react";
+import ActionButton from "../../../components/ui/ActionButton";
+import EmptyState from "../../../components/ui/EmptyState";
+import { TextField } from "../../../components/ui/FormField";
+import MetricCard from "../../../components/ui/MetricCard";
+import MetricGrid from "../../../components/ui/MetricGrid";
+import Panel from "../../../components/ui/Panel";
+import PetAvatar from "../../../components/ui/PetAvatar";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { getApiErrorMessage } from "../banhoTosaUtils";
 import BanhoTosaRetornoCampanhaPanel from "./BanhoTosaRetornoCampanhaPanel";
 
 const prioridadeClasses = {
-  critica: "bg-rose-100 text-rose-700",
-  alta: "bg-orange-100 text-orange-700",
-  media: "bg-sky-100 text-sky-700",
-  baixa: "bg-slate-100 text-slate-600",
+  critica: "border-red-200 bg-red-50 text-red-700",
+  alta: "border-amber-200 bg-amber-50 text-amber-700",
+  media: "border-blue-200 bg-blue-50 text-blue-700",
+  baixa: "border-slate-200 bg-slate-50 text-slate-600",
 };
 
 export default function BanhoTosaRetornosView() {
+  const navigate = useNavigate();
   const [itens, setItens] = useState([]);
   const [loading, setLoading] = useState(false);
   const [processando, setProcessando] = useState(false);
@@ -32,7 +42,7 @@ export default function BanhoTosaRetornosView() {
       });
       setItens(Array.isArray(response.data?.itens) ? response.data.itens : []);
     } catch (error) {
-      toast.error(getApiErrorMessage(error, "Nao foi possivel carregar retornos."));
+      toast.error(getApiErrorMessage(error, "Nao foi possivel carregar reagendamentos."));
       setItens([]);
     } finally {
       setLoading(false);
@@ -64,116 +74,125 @@ export default function BanhoTosaRetornosView() {
   const resumo = montarResumo(itens);
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-3xl border border-white/80 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-500">
-              Retencao
-            </p>
-            <h2 className="mt-2 text-2xl font-black text-slate-900">
-              Central de retornos
-            </h2>
-            <p className="mt-1 max-w-3xl text-sm text-slate-500">
-              Sugestoes geradas por recorrencia, pacote vencendo/saldo baixo e pets sem banho recente.
-            </p>
-          </div>
-
-          <div className="grid gap-3 sm:grid-cols-[1fr_1fr_1fr_auto]">
-            <NumberField label="Recorrencias ate" value={filtros.dias} onChange={(value) => updateFiltro("dias", value)} />
-            <NumberField label="Sem banho ha" value={filtros.sem_banho_dias} onChange={(value) => updateFiltro("sem_banho_dias", value)} />
-            <NumberField label="Pacote vence em" value={filtros.pacote_vencendo_dias} onChange={(value) => updateFiltro("pacote_vencendo_dias", value)} />
-            <button type="button" onClick={carregar} className="self-end rounded-2xl border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700">
-              {loading ? "Carregando..." : "Atualizar"}
-            </button>
-          </div>
+    <div className="space-y-4">
+      <Panel
+        actions={
+          <ActionButton icon={RefreshCw} intent="neutral" loading={loading} onClick={carregar} tone="soft">
+            Atualizar
+          </ActionButton>
+        }
+        subtitle="Oportunidades para abrir um novo agendamento a partir de recorrencias, pacotes e pets sem banho recente."
+        title="Reagendar clientes"
+      >
+        <div className="grid gap-3 md:grid-cols-3">
+          <TextField
+            label="Recorrencias ate"
+            type="number"
+            value={filtros.dias}
+            onChange={(value) => updateFiltro("dias", value)}
+          />
+          <TextField
+            label="Sem banho ha"
+            type="number"
+            value={filtros.sem_banho_dias}
+            onChange={(value) => updateFiltro("sem_banho_dias", value)}
+          />
+          <TextField
+            label="Pacote vence em"
+            type="number"
+            value={filtros.pacote_vencendo_dias}
+            onChange={(value) => updateFiltro("pacote_vencendo_dias", value)}
+          />
         </div>
-      </section>
+      </Panel>
+
+      <MetricGrid>
+        <MetricCard icon={<Repeat2 size={18} />} intent="blue" label="Sugestoes" value={itens.length} />
+        <MetricCard intent="red" label="Criticas" value={resumo.critica} />
+        <MetricCard intent="amber" label="Alta prioridade" value={resumo.alta} />
+        <MetricCard intent="emerald" label="Pacotes" value={resumo.pacotes} />
+      </MetricGrid>
 
       <BanhoTosaRetornoCampanhaPanel diasAntecedencia={Number(filtros.dias || 30)} />
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Metric label="Total" value={itens.length} />
-        <Metric label="Criticos" value={resumo.critica} />
-        <Metric label="Alta prioridade" value={resumo.alta} />
-        <Metric label="Pacotes" value={resumo.pacotes} />
-      </div>
-
-      <section className="grid gap-4 xl:grid-cols-2">
+      <section className="grid gap-3 xl:grid-cols-2">
         {itens.map((item) => (
           <RetornoCard
             key={item.id}
-            item={item}
             disabled={processando}
+            item={item}
+            onAgendar={() => navigate("/banho-tosa/agenda")}
             onAvancar={avancarRecorrencia}
           />
         ))}
-        {!itens.length && (
-          <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center text-sm text-slate-500 xl:col-span-2">
-            Nenhum retorno sugerido com os filtros atuais.
-          </div>
-        )}
+        {!itens.length && !loading ? (
+          <EmptyState
+            className="xl:col-span-2"
+            description="Ajuste os filtros ou aguarde novos atendimentos concluirem para gerar oportunidades."
+            icon={CalendarPlus}
+            title="Nenhuma sugestao para reagendar"
+          />
+        ) : null}
       </section>
     </div>
   );
 }
 
-function RetornoCard({ item, disabled, onAvancar }) {
+function RetornoCard({ disabled, item, onAgendar, onAvancar }) {
   return (
-    <article className="rounded-3xl border border-white/80 bg-white p-5 shadow-sm">
+    <article className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <span className={`rounded-full px-3 py-1 text-xs font-black uppercase ${prioridadeClasses[item.prioridade] || prioridadeClasses.baixa}`}>
-            {item.prioridade}
-          </span>
-          <h3 className="mt-3 text-lg font-black text-slate-900">{item.titulo}</h3>
-          <p className="mt-1 text-sm font-semibold text-slate-500">
-            {item.cliente_nome || `Tutor #${item.cliente_id}`} {item.pet_nome ? `| ${item.pet_nome}` : ""}
-          </p>
+        <div className="flex min-w-0 items-start gap-3">
+          <PetAvatar
+            alt={item.pet_nome || "Pet"}
+            name={item.pet_nome || item.cliente_nome}
+            size="md"
+            url={item.pet_foto_url}
+          />
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="truncate text-sm font-semibold text-slate-900">{item.titulo}</h3>
+              <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${prioridadeClasses[item.prioridade] || prioridadeClasses.baixa}`}>
+                {labelPrioridade(item.prioridade)}
+              </span>
+            </div>
+            <p className="mt-1 text-sm text-slate-600">
+              {item.cliente_nome || `Tutor #${item.cliente_id}`}
+              {item.pet_nome ? ` / ${item.pet_nome}` : ""}
+            </p>
+            <p className="mt-1 line-clamp-2 text-sm text-slate-500">{item.mensagem}</p>
+          </div>
         </div>
-        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-bold text-slate-600">
+        <span className="shrink-0 rounded-full bg-slate-100 px-2 py-1 text-xs font-medium text-slate-600">
           {labelTipo(item.tipo)}
         </span>
       </div>
-      <p className="mt-4 text-sm text-slate-600">{item.mensagem}</p>
-      <p className="mt-2 text-sm font-bold text-slate-900">{item.acao_sugerida}</p>
-      <p className="mt-2 text-xs font-semibold text-slate-400">
-        Ref.: {formatDate(item.data_referencia)} | {formatDias(item.dias_para_acao)}
-      </p>
-      {item.recorrencia_id && (
-        <button
-          type="button"
-          disabled={disabled}
-          onClick={() => onAvancar(item)}
-          className="mt-4 rounded-2xl bg-orange-500 px-4 py-2 text-sm font-bold text-white transition hover:bg-orange-600 disabled:opacity-60"
-        >
-          Avancar recorrencia
-        </button>
-      )}
+
+      <div className="mt-3 grid gap-2 rounded-lg border border-slate-200 bg-slate-50 p-3 sm:grid-cols-[1fr_auto] sm:items-center">
+        <div>
+          <p className="text-sm font-medium text-slate-900">{item.acao_sugerida}</p>
+          <p className="mt-1 text-xs text-slate-500">
+            Ref.: {formatDate(item.data_referencia)} | {formatDias(item.dias_para_acao)}
+          </p>
+        </div>
+        <div className="flex flex-wrap justify-end gap-2">
+          {item.recorrencia_id ? (
+            <ActionButton
+              disabled={disabled}
+              icon={StepForward}
+              intent="edit"
+              onClick={() => onAvancar(item)}
+              tone="soft"
+            >
+              Avancar ciclo
+            </ActionButton>
+          ) : null}
+          <ActionButton icon={CalendarPlus} intent="create" onClick={onAgendar}>
+            Agendar
+          </ActionButton>
+        </div>
+      </div>
     </article>
-  );
-}
-
-function Metric({ label, value }) {
-  return (
-    <div className="rounded-3xl border border-white/80 bg-white p-5 shadow-sm">
-      <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">{label}</p>
-      <p className="mt-2 text-2xl font-black text-slate-900">{value || 0}</p>
-    </div>
-  );
-}
-
-function NumberField({ label, value, onChange }) {
-  return (
-    <label className="block">
-      <span className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{label}</span>
-      <input
-        type="number"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100"
-      />
-    </label>
   );
 }
 
@@ -193,6 +212,16 @@ function labelTipo(tipo) {
     sem_banho: "Sem banho",
   };
   return labels[tipo] || tipo;
+}
+
+function labelPrioridade(prioridade) {
+  const labels = {
+    critica: "Critica",
+    alta: "Alta",
+    media: "Media",
+    baixa: "Baixa",
+  };
+  return labels[prioridade] || prioridade;
 }
 
 function formatDate(value) {

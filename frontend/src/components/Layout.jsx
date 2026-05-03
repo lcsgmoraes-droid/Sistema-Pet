@@ -494,7 +494,7 @@ const Layout = () => {
         },
         {
           path: "/banho-tosa/retornos",
-          label: "Retornos",
+          label: "Reagendar",
           permission: null,
         },
         {

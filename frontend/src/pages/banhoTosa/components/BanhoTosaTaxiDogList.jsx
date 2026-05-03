@@ -1,4 +1,8 @@
+import { ArrowRight, Route } from "lucide-react";
+import ActionButton from "../../../components/ui/ActionButton";
+import EmptyState from "../../../components/ui/EmptyState";
 import { TextField } from "../../../components/ui/FormField";
+import PetAvatar from "../../../components/ui/PetAvatar";
 import { formatCurrency } from "../banhoTosaUtils";
 
 const statusFlow = [
@@ -21,7 +25,7 @@ export default function BanhoTosaTaxiDogList({
 }) {
   if (loading) {
     return (
-      <div className="rounded-3xl bg-white p-8 text-center text-sm font-semibold text-slate-500">
+      <div className="rounded-lg border border-slate-200 bg-white p-8 text-center text-sm font-medium text-slate-500 shadow-sm">
         Carregando taxi dog...
       </div>
     );
@@ -39,9 +43,7 @@ export default function BanhoTosaTaxiDogList({
         />
       ))}
       {items.length === 0 && (
-        <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-8 text-center text-slate-500">
-          Nenhum taxi dog para esta data.
-        </div>
+        <EmptyState compact description="Cadastre um transporte vinculado a um agendamento." icon={Route} title="Nenhum taxi dog para esta data" />
       )}
     </div>
   );
@@ -50,17 +52,22 @@ export default function BanhoTosaTaxiDogList({
 function TaxiCard({ item, saving, onAtualizarMedicao, onSalvarMedicao, onStatus }) {
   const proximo = proximoStatus(item.status);
   return (
-    <div className="rounded-3xl border border-white/80 bg-white p-5 shadow-sm">
+    <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.16em] text-orange-500">{item.status}</p>
-          <h3 className="mt-1 text-lg font-black text-slate-900">{item.pet_nome} / {item.cliente_nome}</h3>
-          <p className="text-sm text-slate-500">{item.tipo} | {hora(item.janela_inicio)} - {hora(item.janela_fim)}</p>
+        <div className="flex min-w-0 items-start gap-3">
+          <PetAvatar alt={item.pet_nome || "Pet"} name={item.pet_nome} size="md" url={item.pet_foto_url} />
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="truncate text-sm font-semibold text-slate-900">{item.pet_nome} / {item.cliente_nome}</h3>
+              <span className="rounded-full bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700">{labelStatus(item.status)}</span>
+            </div>
+            <p className="mt-1 text-sm text-slate-500">{labelTipo(item.tipo)} | {hora(item.janela_inicio)} - {hora(item.janela_fim)}</p>
+          </div>
         </div>
         {proximo && (
-          <button type="button" disabled={saving} onClick={() => onStatus(item, proximo)} className="rounded-2xl bg-orange-500 px-4 py-2 text-xs font-bold text-white disabled:opacity-50">
+          <ActionButton disabled={saving} icon={ArrowRight} intent="edit" onClick={() => onStatus(item, proximo)}>
             Avancar status
-          </button>
+          </ActionButton>
         )}
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -69,11 +76,11 @@ function TaxiCard({ item, saving, onAtualizarMedicao, onSalvarMedicao, onStatus 
         <MiniMetric label="Custo" value={formatCurrency(item.custo_real || item.custo_estimado)} />
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
-        <TextField label="Km real" type="number" value={String(item.km_real ?? "0")} onChange={(value) => atualizarItem(item.id, "km_real", value, onAtualizarMedicao)} tone="warm" />
-        <TextField label="Custo real" type="number" value={String(item.custo_real ?? "0")} onChange={(value) => atualizarItem(item.id, "custo_real", value, onAtualizarMedicao)} tone="warm" />
-        <button type="button" disabled={saving} onClick={() => onSalvarMedicao(item)} className="self-end rounded-2xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 disabled:opacity-50">
+        <TextField label="Km real" type="number" value={String(item.km_real ?? "0")} onChange={(value) => atualizarItem(item.id, "km_real", value, onAtualizarMedicao)} />
+        <TextField label="Custo real" type="number" value={String(item.custo_real ?? "0")} onChange={(value) => atualizarItem(item.id, "custo_real", value, onAtualizarMedicao)} />
+        <ActionButton className="self-end" disabled={saving} intent="neutral" onClick={() => onSalvarMedicao(item)} tone="soft">
           Salvar
-        </button>
+        </ActionButton>
       </div>
     </div>
   );
@@ -95,9 +102,31 @@ function hora(value) {
 
 function MiniMetric({ label, value }) {
   return (
-    <div className="rounded-2xl bg-slate-50 px-3 py-2">
-      <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">{label}</p>
-      <p className="font-black text-slate-900">{value}</p>
+    <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+      <p className="text-xs font-medium text-slate-500">{label}</p>
+      <p className="font-semibold text-slate-900">{value}</p>
     </div>
   );
+}
+
+function labelStatus(status) {
+  const labels = {
+    agendado: "Agendado",
+    motorista_a_caminho: "A caminho",
+    pet_coletado: "Pet coletado",
+    entregue_na_clinica: "Na loja",
+    aguardando_retorno: "Aguardando retorno",
+    retornando: "Retornando",
+    entregue_ao_tutor: "Entregue",
+  };
+  return labels[status] || status;
+}
+
+function labelTipo(tipo) {
+  const labels = {
+    ida: "Somente ida",
+    volta: "Somente volta",
+    ida_volta: "Ida e volta",
+  };
+  return labels[tipo] || tipo;
 }

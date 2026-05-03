@@ -1,5 +1,12 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
+import { AlertTriangle, RefreshCw } from "lucide-react";
+import ActionButton from "../../../components/ui/ActionButton";
+import EmptyState from "../../../components/ui/EmptyState";
+import { TextField } from "../../../components/ui/FormField";
+import MetricCard from "../../../components/ui/MetricCard";
+import MetricGrid from "../../../components/ui/MetricGrid";
+import Panel from "../../../components/ui/Panel";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { formatCurrency, formatNumber, getApiErrorMessage } from "../banhoTosaUtils";
 
@@ -38,52 +45,44 @@ export default function BanhoTosaRelatoriosView() {
   const resumo = relatorio?.resumo || {};
 
   return (
-    <div className="space-y-6">
-      <section className="rounded-3xl border border-white/80 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-500">
-              Relatorios
-            </p>
-            <h2 className="mt-2 text-2xl font-black text-slate-900">
-              Performance operacional
-            </h2>
-            <p className="mt-1 text-sm text-slate-500">
-              Margem, ocupacao, produtividade e desperdicio do Banho & Tosa.
-            </p>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
-            <DateField label="Inicio" value={dataInicio} onChange={setDataInicio} />
-            <DateField label="Fim" value={dataFim} onChange={setDataFim} />
-            <button
-              type="button"
-              disabled={loading}
-              onClick={carregarRelatorio}
-              className="self-end rounded-2xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-700 disabled:opacity-60"
-            >
-              {loading ? "Carregando..." : "Atualizar"}
-            </button>
-          </div>
+    <div className="space-y-4">
+      <Panel
+        actions={
+          <ActionButton icon={RefreshCw} intent="neutral" loading={loading} onClick={carregarRelatorio} tone="soft">
+            Atualizar
+          </ActionButton>
+        }
+        subtitle="Margem, ocupacao, produtividade e desperdicio do Banho & Tosa."
+        title="Relatorios operacionais"
+      >
+        <div className="grid gap-3 sm:grid-cols-2">
+          <TextField label="Inicio" type="date" value={dataInicio} onChange={setDataInicio} />
+          <TextField label="Fim" type="date" value={dataFim} onChange={setDataFim} />
         </div>
-      </section>
+      </Panel>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
-        <MetricCard label="Receita" value={formatCurrency(resumo.receita)} />
-        <MetricCard label="Margem" value={formatCurrency(resumo.margem_valor)} detail={`${formatNumber(resumo.margem_percentual, 1)}%`} />
-        <MetricCard label="Ticket medio" value={formatCurrency(resumo.ticket_medio)} detail={`${resumo.atendimentos || 0} atendimentos`} />
-        <MetricCard label="Ocupacao media" value={`${formatNumber(resumo.ocupacao_media_percentual, 1)}%`} detail={`${resumo.agendamentos || 0} agendamentos`} />
-        <MetricCard label="NPS" value={formatNumber(resumo.nps, 0)} detail={`${resumo.avaliacoes || 0} avaliacoes`} />
-      </div>
+      <MetricGrid className="xl:grid-cols-5">
+        <MetricCard intent="emerald" label="Receita" value={formatCurrency(resumo.receita)} />
+        <MetricCard intent="blue" label="Margem" subtitle={`${formatNumber(resumo.margem_percentual, 1)}%`} value={formatCurrency(resumo.margem_valor)} />
+        <MetricCard intent="slate" label="Ticket medio" subtitle={`${resumo.atendimentos || 0} atendimentos`} value={formatCurrency(resumo.ticket_medio)} />
+        <MetricCard intent="cyan" label="Ocupacao media" subtitle={`${resumo.agendamentos || 0} agendamentos`} value={`${formatNumber(resumo.ocupacao_media_percentual, 1)}%`} />
+        <MetricCard intent="violet" label="NPS" subtitle={`${resumo.avaliacoes || 0} avaliacoes`} value={formatNumber(resumo.nps, 0)} />
+      </MetricGrid>
 
-      {relatorio?.alertas?.length > 0 && (
-        <div className="rounded-3xl border border-amber-200 bg-amber-50 p-4 text-sm font-semibold text-amber-800">
-          {relatorio.alertas.map((alerta) => (
-            <p key={alerta}>{alerta}</p>
-          ))}
-        </div>
-      )}
+      {relatorio?.alertas?.length > 0 ? (
+        <Panel className="border-amber-200 bg-amber-50" padding="sm">
+          <div className="flex items-start gap-2 text-sm font-medium text-amber-800">
+            <AlertTriangle size={18} className="mt-0.5 shrink-0" />
+            <div className="space-y-1">
+              {relatorio.alertas.map((alerta) => (
+                <p key={alerta}>{alerta}</p>
+              ))}
+            </div>
+          </div>
+        </Panel>
+      ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid gap-4 xl:grid-cols-2">
         <TableCard title="Margem por servico">
           <MarginRows items={relatorio?.margem_por_servico || []} />
         </TableCard>
@@ -148,22 +147,11 @@ function DesperdicioRows({ items }) {
   ));
 }
 
-function MetricCard({ label, value, detail }) {
-  return (
-    <div className="rounded-3xl border border-white/80 bg-white p-5 shadow-sm">
-      <p className="text-xs font-bold uppercase tracking-[0.14em] text-slate-400">{label}</p>
-      <p className="mt-2 text-2xl font-black text-slate-900">{value}</p>
-      {detail && <p className="mt-1 text-sm font-semibold text-slate-500">{detail}</p>}
-    </div>
-  );
-}
-
 function TableCard({ title, children, wide = false }) {
   return (
-    <section className={`rounded-3xl border border-white/80 bg-white p-5 shadow-sm ${wide ? "xl:col-span-2" : ""}`}>
-      <h3 className="text-lg font-black text-slate-900">{title}</h3>
-      <div className="mt-4 divide-y divide-slate-100">{children}</div>
-    </section>
+    <Panel className={wide ? "xl:col-span-2" : ""} title={title}>
+      <div className="divide-y divide-slate-100">{children}</div>
+    </Panel>
   );
 }
 
@@ -175,30 +163,19 @@ function Cell({ title, subtitle, align = "left" }) {
   const classes = align === "right" ? "text-right" : "text-left";
   return (
     <div className={classes}>
-      <p className="truncate text-sm font-black text-slate-900">{title}</p>
-      <p className="truncate text-xs font-semibold text-slate-400">{subtitle}</p>
+      <p className="truncate text-sm font-semibold text-slate-900">{title}</p>
+      <p className="truncate text-xs text-slate-500">{subtitle}</p>
     </div>
   );
 }
 
 function EmptyRows() {
   return (
-    <p className="rounded-2xl border border-dashed border-slate-300 p-4 text-sm text-slate-500">
-      Sem dados no periodo.
-    </p>
-  );
-}
-
-function DateField({ label, value, onChange }) {
-  return (
-    <label className="block">
-      <span className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{label}</span>
-      <input
-        type="date"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100"
-      />
-    </label>
+    <EmptyState
+      compact
+      className="my-2"
+      description="Ajuste o periodo ou aguarde novos atendimentos."
+      title="Sem dados no periodo"
+    />
   );
 }

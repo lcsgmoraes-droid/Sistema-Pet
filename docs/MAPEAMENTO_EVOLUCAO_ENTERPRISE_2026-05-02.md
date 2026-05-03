@@ -714,6 +714,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-03: `/pets` passou a usar `PessoaSelector` na busca de tutor, removendo o dropdown manual duplicado e consolidando o segundo uso real do selector de pessoa.
 - 2026-05-03: `Banho & Tosa` iniciou a reorganizacao visual: parametros, painel, servicos e agenda passaram a abrir formularios sob demanda e usar `Panel`, `MetricGrid`, `MetricCard`, `StatusBadge`, `ActionButton`, `EmptyState` e `TutorPetSelector` em vez de cards grandes sempre expostos.
 - 2026-05-03: agenda de `Banho & Tosa` alinhada ao padrao da agenda veterinaria: o botao `Agendar` abre modal com tutor/pet/servico, horarios livres/ocupados e compromissos do dia selecionado.
+- 2026-05-03: fluxo operacional de `Banho & Tosa` simplificado: a etapa `entregue` agora centraliza a geracao da venda no backend, `Retornos` virou `Reagendar`, taxi dog/relatorios foram alinhados aos componentes globais e fotos de pets passaram a aparecer tambem nas sugestoes de reagendamento.
 
 ### Nao fazer nesta onda
 

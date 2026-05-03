@@ -14,6 +14,7 @@ class BanhoTosaRetornoSugestaoResponse(BaseModel):
     cliente_nome: Optional[str] = None
     pet_id: Optional[int] = None
     pet_nome: Optional[str] = None
+    pet_foto_url: Optional[str] = None
     servico_id: Optional[int] = None
     servico_nome: Optional[str] = None
     pacote_credito_id: Optional[int] = None

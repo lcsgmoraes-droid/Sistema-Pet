@@ -108,10 +108,6 @@ export default function BanhoTosaFilaView({ config, onChanged }) {
         resetar_fluxo: Boolean(options.resetarFluxo),
       });
 
-      if (etapa === "entregue") {
-        await gerarVendaAoEntregar(atendimento);
-      }
-
       await carregarFila();
       await onChanged(true);
     } catch (error) {
@@ -119,16 +115,6 @@ export default function BanhoTosaFilaView({ config, onChanged }) {
     } finally {
       setProcessingId(null);
       setDraggedAtendimentoId(null);
-    }
-  }
-
-  async function gerarVendaAoEntregar(atendimento) {
-    if (atendimento.venda_id || atendimento.pacote_credito_id) return;
-    try {
-      const response = await banhoTosaApi.gerarVendaAtendimento(atendimento.id);
-      toast.success(response.data?.mensagem || "Venda gerada no PDV.");
-    } catch (error) {
-      toast.error(getApiErrorMessage(error, "Atendimento entregue, mas nao foi possivel gerar a venda no PDV."));
     }
   }
 

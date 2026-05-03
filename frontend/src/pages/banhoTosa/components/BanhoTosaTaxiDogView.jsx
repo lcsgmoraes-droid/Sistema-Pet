@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { getApiErrorMessage, toApiDecimal } from "../banhoTosaUtils";
+import Panel from "../../../components/ui/Panel";
 import BanhoTosaTaxiDogForm from "./BanhoTosaTaxiDogForm";
 import BanhoTosaTaxiDogList from "./BanhoTosaTaxiDogList";
 
@@ -149,14 +150,19 @@ export default function BanhoTosaTaxiDogView({ funcionarios = [], onChanged }) {
         onChangeField={updateField}
         onSubmit={criarTaxiDog}
       />
-      <BanhoTosaTaxiDogList
-        items={taxiDog}
-        loading={loading}
-        saving={saving}
-        onAtualizarMedicao={setTaxiDog}
-        onSalvarMedicao={salvarMedicao}
-        onStatus={atualizarStatus}
-      />
+      <Panel
+        subtitle={`${agendamentos.length} agendamento(s) no dia, ${agendamentosDisponiveis.length} sem transporte.`}
+        title="Rotas do dia"
+      >
+        <BanhoTosaTaxiDogList
+          items={taxiDog}
+          loading={loading}
+          saving={saving}
+          onAtualizarMedicao={setTaxiDog}
+          onSalvarMedicao={salvarMedicao}
+          onStatus={atualizarStatus}
+        />
+      </Panel>
     </div>
   );
 }
