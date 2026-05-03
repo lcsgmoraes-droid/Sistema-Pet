@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
+import { SelectField, TextField } from "../../../components/ui/FormField";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { getApiErrorMessage } from "../banhoTosaUtils";
 
@@ -107,7 +108,7 @@ export default function BanhoTosaRetornoCampanhaPanel({ diasAntecedencia }) {
         </p>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_auto_auto]">
-          <SelectField label="Template" value={templateId} onChange={selecionarTemplate}>
+          <SelectField label="Template" value={templateId} onChange={selecionarTemplate} tone="warm">
             <option value="">Padrao automatico</option>
             {templates.map((item) => (
               <option key={item.id} value={item.id}>
@@ -115,7 +116,7 @@ export default function BanhoTosaRetornoCampanhaPanel({ diasAntecedencia }) {
               </option>
             ))}
           </SelectField>
-          <SelectField label="Canal" value={canal} onChange={setCanal} disabled={Boolean(templateId)}>
+          <SelectField label="Canal" value={canal} onChange={setCanal} disabled={Boolean(templateId)} tone="warm">
             {canais.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </SelectField>
           <button
@@ -134,14 +135,14 @@ export default function BanhoTosaRetornoCampanhaPanel({ diasAntecedencia }) {
           Novo template
         </p>
         <div className="mt-4 grid gap-3 md:grid-cols-2">
-          <InputField label="Nome" value={form.nome} onChange={(value) => updateForm("nome", value)} required />
-          <SelectField label="Tipo" value={form.tipo_retorno} onChange={(value) => updateForm("tipo_retorno", value)}>
+          <TextField label="Nome" value={form.nome} onChange={(value) => updateForm("nome", value)} required tone="warm" />
+          <SelectField label="Tipo" value={form.tipo_retorno} onChange={(value) => updateForm("tipo_retorno", value)} tone="warm">
             {tipos.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </SelectField>
-          <SelectField label="Canal" value={form.canal} onChange={(value) => updateForm("canal", value)}>
+          <SelectField label="Canal" value={form.canal} onChange={(value) => updateForm("canal", value)} tone="warm">
             {canais.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </SelectField>
-          <InputField label="Assunto" value={form.assunto} onChange={(value) => updateForm("assunto", value)} required />
+          <TextField label="Assunto" value={form.assunto} onChange={(value) => updateForm("assunto", value)} required tone="warm" />
         </div>
         <label className="mt-3 block">
           <span className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">Mensagem</span>
@@ -165,36 +166,6 @@ export default function BanhoTosaRetornoCampanhaPanel({ diasAntecedencia }) {
         </button>
       </form>
     </section>
-  );
-}
-
-function InputField({ label, value, onChange, required = false }) {
-  return (
-    <label className="block">
-      <span className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{label}</span>
-      <input
-        required={required}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100"
-      />
-    </label>
-  );
-}
-
-function SelectField({ label, value, onChange, children, disabled = false }) {
-  return (
-    <label className="block">
-      <span className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{label}</span>
-      <select
-        disabled={disabled}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100 disabled:opacity-60"
-      >
-        {children}
-      </select>
-    </label>
   );
 }
 
