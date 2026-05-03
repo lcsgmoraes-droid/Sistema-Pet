@@ -1,5 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { ArrowDownUp, Plus, Receipt } from 'lucide-react';
 import api from '../api';
 import { toast } from 'react-hot-toast';
 import { safeArray } from '../utils/safeArray';
@@ -7,6 +8,7 @@ import ActionButton from './ui/ActionButton';
 import DataTable from './ui/DataTable';
 import FilterBar from './ui/FilterBar';
 import MoneyCell, { formatMoneyCellValue } from './ui/MoneyCell';
+import PageHeader from './ui/PageHeader';
 import StatusBadge from './ui/StatusBadge';
 
 const ContasReceber = () => {
@@ -400,23 +402,29 @@ const ContasReceber = () => {
 
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">Contas a Receber</h2>
-        <div className="flex gap-2">
-          <ActionButton
-            onClick={alternarOrdenacao}
-            intent="neutral"
-            tone="soft"
-            size="md"
-            title={ordenacao === 'desc' ? 'Clique para ver mais antigas primeiro' : 'Clique para ver mais recentes primeiro'}
-          >
-            {ordenacao === 'desc' ? 'Mais recentes' : 'Mais antigas'}
-          </ActionButton>
-          <ActionButton intent="create" size="md">
-            Nova Conta
-          </ActionButton>
-        </div>
-      </div>
+      <PageHeader
+        actions={
+          <>
+            <ActionButton
+              onClick={alternarOrdenacao}
+              intent="neutral"
+              tone="soft"
+              size="md"
+              icon={ArrowDownUp}
+              title={ordenacao === 'desc' ? 'Clique para ver mais antigas primeiro' : 'Clique para ver mais recentes primeiro'}
+            >
+              {ordenacao === 'desc' ? 'Mais recentes' : 'Mais antigas'}
+            </ActionButton>
+            <ActionButton intent="create" size="md" icon={Plus}>
+              Nova Conta
+            </ActionButton>
+          </>
+        }
+        className="mb-6"
+        icon={Receipt}
+        subtitle="Acompanhe recebimentos, vencimentos e saldos"
+        title="Contas a Receber"
+      />
 
       {/* Filtros */}
       <FilterBar className="mb-6" onSubmit={handleFiltrosSubmit}>

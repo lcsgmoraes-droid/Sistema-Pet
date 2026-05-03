@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Plus, Wallet } from 'lucide-react';
 import api from '../api';
 import { toast } from 'react-hot-toast';
 import ModalNovaContaPagar from './ModalNovaContaPagar';
@@ -8,6 +9,7 @@ import ActionButton from './ui/ActionButton';
 import DataTable from './ui/DataTable';
 import FilterBar from './ui/FilterBar';
 import MoneyCell, { formatMoneyCellValue } from './ui/MoneyCell';
+import PageHeader from './ui/PageHeader';
 import StatusBadge from './ui/StatusBadge';
 
 const ContasPagar = () => {
@@ -511,16 +513,22 @@ const ContasPagar = () => {
 
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold">💰 Contas a Pagar</h2>
-        <ActionButton
-          onClick={() => setMostrarModalNovaConta(true)}
-          intent="create"
-          size="md"
-        >
-          ➕ Nova Conta
-        </ActionButton>
-      </div>
+      <PageHeader
+        actions={
+          <ActionButton
+            onClick={() => setMostrarModalNovaConta(true)}
+            intent="create"
+            size="md"
+            icon={Plus}
+          >
+            Nova Conta
+          </ActionButton>
+        }
+        className="mb-6"
+        icon={Wallet}
+        subtitle="Gerencie vencimentos, despesas e pagamentos"
+        title="Contas a Pagar"
+      />
 
       {/* Filtros */}
       <FilterBar className="mb-6" onSubmit={handleFiltrosSubmit}>
