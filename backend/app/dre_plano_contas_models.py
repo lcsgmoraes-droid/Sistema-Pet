@@ -71,9 +71,9 @@ class DRESubcategoria(BaseTenantModel):
     nome = Column(String(150), nullable=False)
 
     # Comportamento
-    tipo_custo = Column(Enum(TipoCusto, values_callable=lambda x: [e.value for e in x]), nullable=False)
-    base_rateio = Column(Enum(BaseRateio, values_callable=lambda x: [e.value for e in x]), nullable=True)
-    escopo_rateio = Column(Enum(EscopoRateio, values_callable=lambda x: [e.value for e in x]), nullable=False)
+    tipo_custo = Column(Enum(TipoCusto, name="tipocusto"), nullable=False)
+    base_rateio = Column(Enum(BaseRateio, name="baserateio"), nullable=True)
+    escopo_rateio = Column(Enum(EscopoRateio, name="escopo_rateio"), nullable=False)
 
     ativo = Column(Boolean, default=True)
     custo_pe = Column(String(10), nullable=True)  # 'fixo' | 'variavel' | null (para Ponto de Equilíbrio)

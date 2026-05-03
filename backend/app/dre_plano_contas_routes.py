@@ -65,9 +65,6 @@ class DRESubcategoriaCreate(BaseModel):
             raise ValueError('base_rateio é obrigatório quando tipo_custo = INDIRETO_RATEAVEL')
         return v
     
-    class Config:
-        use_enum_values = True
-
 class DRESubcategoriaUpdate(BaseModel):
     nome: str | None = Field(None, min_length=1, max_length=150)
     tipo_custo: TipoCusto | None = None
@@ -76,9 +73,6 @@ class DRESubcategoriaUpdate(BaseModel):
     ativo: bool | None = None
     custo_pe: str | None = None  # 'fixo' | 'variavel' | null
     
-    class Config:
-        use_enum_values = True
-
 class DRESubcategoriaResponse(BaseModel):
     id: int
     tenant_id: UUID | str  # Aceita UUID ou string
