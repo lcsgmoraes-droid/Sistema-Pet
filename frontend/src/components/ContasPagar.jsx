@@ -5,6 +5,7 @@ import { toast } from 'react-hot-toast';
 import ModalNovaContaPagar from './ModalNovaContaPagar';
 import { safeArray } from '../utils/safeArray';
 import ActionButton from './ui/ActionButton';
+import DataTable from './ui/DataTable';
 import MoneyCell, { formatMoneyCellValue } from './ui/MoneyCell';
 import StatusBadge from './ui/StatusBadge';
 
@@ -379,6 +380,126 @@ const ContasPagar = () => {
     String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR', { sensitivity: 'base' })
   );
 
+  const contasPagarColumns = [
+    {
+      key: 'id',
+      header: 'ID',
+      render: (conta) => conta.id,
+    },
+    {
+      key: 'descricao',
+      header: 'Descricao',
+      className: 'min-w-[220px]',
+      render: (conta) => (
+        <div>
+          {conta.descricao}
+          {conta.eh_parcelado && (
+            <span className="ml-2 px-2 py-1 text-xs rounded bg-gray-100 text-gray-700">
+              {conta.numero_parcela}/{conta.total_parcelas}
+            </span>
+          )}
+          {conta.e_custo_fixo === true && (
+            <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-orange-100 text-orange-700 font-semibold">Fixo</span>
+          )}
+          {conta.e_custo_fixo === false && (
+            <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 font-semibold">Variavel</span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'fornecedor',
+      header: 'Fornecedor',
+      className: 'min-w-[150px]',
+      render: (conta) => conta.fornecedor_nome || '-',
+    },
+    {
+      key: 'origem',
+      header: 'Origem',
+      render: getOrigemBadge,
+    },
+    {
+      key: 'tipo',
+      header: 'Tipo',
+      render: (conta) => (
+        conta.tipo_despesa_nome ? (
+          <span className="inline-flex px-2 py-1 text-xs rounded-full bg-slate-100 text-slate-700">
+            {conta.tipo_despesa_nome}
+          </span>
+        ) : (
+          <span className="text-gray-400">-</span>
+        )
+      ),
+    },
+    {
+      key: 'vencimento',
+      header: 'Vencimento',
+      render: (conta) => formatarData(conta.data_vencimento),
+    },
+    {
+      key: 'valor_original',
+      header: 'Valor Original',
+      align: 'right',
+      render: (conta) => <MoneyCell value={conta.valor_original} />,
+    },
+    {
+      key: 'valor_pago',
+      header: 'Valor Pago',
+      align: 'right',
+      render: (conta) => <MoneyCell value={conta.valor_pago} zeroAsDash />,
+    },
+    {
+      key: 'saldo',
+      header: 'Saldo',
+      align: 'right',
+      className: 'font-bold',
+      render: (conta) => <MoneyCell value={conta.valor_final - conta.valor_pago} zeroAsDash />,
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: getStatusBadge,
+    },
+    {
+      key: 'acoes',
+      header: 'Acoes',
+      className: 'min-w-[190px]',
+      render: (conta) => (
+        <div className="flex flex-wrap items-center gap-2">
+          {conta.status !== 'pago' && (
+            <ActionButton
+              intent="create"
+              size="xs"
+              onClick={() => abrirModalPagamento(conta)}
+              title="Registrar Pagamento"
+            >
+              Pagar
+            </ActionButton>
+          )}
+          {precisaClassificacao(conta) && (
+            <ActionButton
+              intent="warning"
+              size="xs"
+              onClick={() => abrirModalClassificacao(conta)}
+              title="Classificar categoria, DRE e tipo da despesa"
+            >
+              Classificar
+            </ActionButton>
+          )}
+          <ActionButton
+            intent="neutral"
+            tone="soft"
+            size="xs"
+            onClick={() => abrirDetalhes(conta)}
+            title="Ver Detalhes"
+          >
+            Ver
+          </ActionButton>
+        </div>
+      ),
+    },
+  ];
+
   if (loading) {
     return <div className="text-center p-8">Carregando contas a pagar...</div>;
   }
@@ -577,104 +698,16 @@ const ContasPagar = () => {
 
       {/* Tabela de Contas */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">ID</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Descrição</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Fornecedor</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Origem</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Tipo</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Vencimento</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase">Valor Original</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase">Valor Pago</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase">Saldo</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {contas.length === 0 ? (
-                <tr>
-                  <td colSpan="11" className="px-4 py-8 text-center text-gray-500">
-                    Nenhuma conta encontrada
-                  </td>
-                </tr>
-              ) : (
-                safeArray(contas).map(conta => (
-                  <tr key={conta.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm">{conta.id}</td>
-                    <td className="px-4 py-3 text-sm">
-                      {conta.descricao}
-                      {conta.eh_parcelado && (
-                        <span className="ml-2 px-2 py-1 text-xs rounded bg-gray-100 text-gray-700">
-                          {conta.numero_parcela}/{conta.total_parcelas}
-                        </span>
-                      )}
-                      {conta.e_custo_fixo === true && (
-                        <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-orange-100 text-orange-700 font-semibold">🔒 Fixo</span>
-                      )}
-                      {conta.e_custo_fixo === false && (
-                        <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 font-semibold">📈 Variável</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm">{conta.fornecedor_nome || '-'}</td>
-                    <td className="px-4 py-3 text-sm">{getOrigemBadge(conta)}</td>
-                    <td className="px-4 py-3 text-sm">
-                      {conta.tipo_despesa_nome ? (
-                        <span className="inline-flex px-2 py-1 text-xs rounded-full bg-slate-100 text-slate-700">
-                          {conta.tipo_despesa_nome}
-                        </span>
-                      ) : (
-                        <span className="text-gray-400">-</span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm">{formatarData(conta.data_vencimento)}</td>
-                    <td className="px-4 py-3 text-right text-sm"><MoneyCell value={conta.valor_original} /></td>
-                    <td className="px-4 py-3 text-right text-sm"><MoneyCell value={conta.valor_pago} zeroAsDash /></td>
-                    <td className="px-4 py-3 text-right text-sm font-bold"><MoneyCell value={conta.valor_final - conta.valor_pago} zeroAsDash /></td>
-                    <td className="px-4 py-3 text-sm">{getStatusBadge(conta)}</td>
-                    <td className="px-4 py-3 text-sm">
-                      {conta.status !== 'pago' && (
-                        <ActionButton
-                          intent="create"
-                          size="xs"
-                          className="mr-2"
-                          onClick={() => abrirModalPagamento(conta)}
-                          title="Registrar Pagamento"
-                        >
-                          💰 Pagar
-                        </ActionButton>
-                      )}
-                      {precisaClassificacao(conta) && (
-                        <ActionButton
-                          intent="warning"
-                          size="xs"
-                          className="mr-2"
-                          onClick={() => abrirModalClassificacao(conta)}
-                          title="Classificar categoria, DRE e tipo da despesa"
-                        >
-                          🏷 Classificar
-                        </ActionButton>
-                      )}
-                      <ActionButton
-                        intent="neutral"
-                        tone="soft"
-                        size="xs"
-                        onClick={() => abrirDetalhes(conta)}
-                        title="Ver Detalhes"
-                      >
-                        👁️
-                      </ActionButton>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        
+        <DataTable
+          columns={contasPagarColumns}
+          data={safeArray(contas)}
+          emptyMessage="Nenhuma conta encontrada"
+          getRowKey={(conta) => conta.id}
+          tableClassName="min-w-[1120px]"
+          theadClassName="bg-gray-50"
+          tbodyClassName="divide-y divide-gray-200"
+        />
+
         {contas.length > 0 && (
           <div className="bg-green-50 border-t border-green-200 px-4 py-3">
             <strong>Total:</strong> {contas.length} conta(s) | 

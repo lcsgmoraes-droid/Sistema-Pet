@@ -4,6 +4,7 @@ import api from '../api';
 import { toast } from 'react-hot-toast';
 import { safeArray } from '../utils/safeArray';
 import ActionButton from './ui/ActionButton';
+import DataTable from './ui/DataTable';
 import MoneyCell, { formatMoneyCellValue } from './ui/MoneyCell';
 import StatusBadge from './ui/StatusBadge';
 
@@ -238,6 +239,156 @@ const ContasReceber = () => {
     return <StatusBadge status="pendente" />;
   };
 
+  const contasReceberExibidas = safeArray(contas).filter((conta) => {
+    if (!buscaNumeroVenda) return true;
+
+    const numeroVenda = String(conta.numero_venda || '');
+    const descricao = String(conta.descricao || '');
+    const busca = buscaNumeroVenda.toLowerCase();
+
+    return numeroVenda.toLowerCase().includes(busca)
+      || descricao.toLowerCase().includes(busca);
+  });
+
+  const contasReceberColumns = [
+    {
+      key: 'id',
+      header: 'ID',
+      render: (conta) => conta.id,
+    },
+    {
+      key: 'descricao',
+      header: 'Descricao',
+      className: 'min-w-[220px]',
+      render: (conta) => (
+        <div>
+          {conta.descricao}
+          {conta.eh_parcelado && (
+            <span className="ml-2 px-2 py-1 text-xs rounded bg-gray-100 text-gray-700">
+              {conta.numero_parcela}/{conta.total_parcelas}
+            </span>
+          )}
+        </div>
+      ),
+    },
+    {
+      key: 'cliente',
+      header: 'Cliente',
+      className: 'min-w-[160px]',
+      render: (conta) => conta.cliente_nome || '-',
+    },
+    {
+      key: 'vencimento',
+      header: 'Vencimento',
+      render: (conta) => formatarData(conta.data_vencimento),
+    },
+    {
+      key: 'valor_original',
+      header: 'Valor Original',
+      align: 'right',
+      render: (conta) => <MoneyCell value={conta.valor_original} />,
+    },
+    {
+      key: 'valor_recebido',
+      header: 'Valor Recebido',
+      align: 'right',
+      render: (conta) => <MoneyCell value={conta.valor_recebido} zeroAsDash />,
+    },
+    {
+      key: 'saldo',
+      header: 'Saldo',
+      align: 'right',
+      className: 'font-bold',
+      render: (conta) => <MoneyCell value={conta.valor_final - conta.valor_recebido} zeroAsDash />,
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: getStatusBadge,
+    },
+    {
+      key: 'acoes',
+      header: 'Acoes',
+      className: 'min-w-[230px]',
+      render: (conta) => (
+        <div className="flex flex-wrap items-center gap-2">
+          {conta.status !== 'recebido' && (
+            <>
+              {conta.nsu && !conta.conciliado ? (
+                <>
+                  <ActionButton
+                    intent="warning"
+                    size="xs"
+                    onClick={() => navigate(`/conciliacao-cartao?nsu=${conta.nsu}`)}
+                    title={`Conciliar NSU ${conta.nsu} com extrato da operadora`}
+                  >
+                    Conciliar
+                  </ActionButton>
+                  <ActionButton
+                    intent="create"
+                    size="xs"
+                    onClick={() => abrirModalRecebimento(conta)}
+                    title="Receber manual (caso nao consiga conciliar)"
+                  >
+                    Manual
+                  </ActionButton>
+                </>
+              ) : conta.venda_id && !conta.nsu ? (
+                <>
+                  <ActionButton
+                    intent="neutral"
+                    size="xs"
+                    onClick={() => {
+                      if (conta.venda_id) {
+                        abrirVendaNoPDV(conta.venda_id);
+                      } else {
+                        abrirModalRecebimento(conta);
+                      }
+                    }}
+                    title="Receber no PDV (movimenta caixa)"
+                  >
+                    PDV
+                  </ActionButton>
+                  <ActionButton
+                    intent="create"
+                    size="xs"
+                    onClick={() => abrirModalRecebimento(conta)}
+                    title="Receber manual (sem PDV)"
+                  >
+                    Manual
+                  </ActionButton>
+                </>
+              ) : (
+                <ActionButton
+                  intent="create"
+                  size="xs"
+                  onClick={() => abrirModalRecebimento(conta)}
+                  title="Registrar recebimento manual"
+                >
+                  Receber Manual
+                </ActionButton>
+              )}
+            </>
+          )}
+          {conta.conciliado && (
+            <span className="text-xs text-green-600 font-semibold" title={`Conciliado em ${conta.data_conciliacao}`}>
+              Conciliado
+            </span>
+          )}
+          <ActionButton
+            intent="neutral"
+            tone="soft"
+            size="xs"
+            title="Ver Detalhes"
+            onClick={() => abrirDetalhes(conta)}
+          >
+            Ver
+          </ActionButton>
+        </div>
+      ),
+    },
+  ];
+
   if (loading) {
     return <div className="text-center p-8">Carregando contas a receber...</div>;
   }
@@ -370,156 +521,21 @@ const ContasReceber = () => {
 
       {/* Tabela de Contas */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">ID</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Descricao</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Cliente</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Vencimento</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase">Valor Original</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase">Valor Recebido</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase">Saldo</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Acoes</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
-              {safeArray(contas).length === 0 ? (
-                <tr>
-                  <td colSpan="9" className="px-4 py-8 text-center text-gray-500">
-                    Nenhuma conta encontrada
-                  </td>
-                </tr>
-              ) : (
-                safeArray(contas)
-                  .filter(conta => {
-                    // Filtro local por numero de venda
-                    if (!buscaNumeroVenda) return true;
-                    
-                    // Busca no numero da venda se existir - converter para string
-                    const numeroVenda = String(conta.numero_venda || '');
-                    const descricao = String(conta.descricao || '');
-                    const busca = buscaNumeroVenda.toLowerCase();
-                    
-                    return numeroVenda.toLowerCase().includes(busca) || 
-                           descricao.toLowerCase().includes(busca);
-                  })
-                  .map(conta => (
-                  <tr key={conta.id} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 text-sm">{conta.id}</td>
-                    <td className="px-4 py-3 text-sm">
-                      {conta.descricao}
-                      {conta.eh_parcelado && (
-                        <span className="ml-2 px-2 py-1 text-xs rounded bg-gray-100 text-gray-700">
-                          {conta.numero_parcela}/{conta.total_parcelas}
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-sm">{conta.cliente_nome || '-'}</td>
-                    <td className="px-4 py-3 text-sm">{formatarData(conta.data_vencimento)}</td>
-                    <td className="px-4 py-3 text-right text-sm"><MoneyCell value={conta.valor_original} /></td>
-                    <td className="px-4 py-3 text-right text-sm"><MoneyCell value={conta.valor_recebido} zeroAsDash /></td>
-                    <td className="px-4 py-3 text-right text-sm font-bold"><MoneyCell value={conta.valor_final - conta.valor_recebido} zeroAsDash /></td>
-                    <td className="px-4 py-3 text-sm">{getStatusBadge(conta)}</td>
-                    <td className="px-4 py-3 text-sm">
-                      {conta.status !== 'recebido' && (
-                        <>
-                          {/* NSU informado - E transacao de cartao */}
-                          {conta.nsu && !conta.conciliado ? (
-                            <>
-                              {/* Link para conciliacao */}
-                              <ActionButton
-                                intent="warning"
-                                size="xs"
-                                className="mr-2"
-                                onClick={() => navigate(`/conciliacao-cartao?nsu=${conta.nsu}`)}
-                                title={`Conciliar NSU ${conta.nsu} com extrato da operadora`}
-                              >
-                                Conciliar
-                              </ActionButton>
-                              {/* Recebimento manual para cartao */}
-                              <ActionButton
-                                intent="create"
-                                size="xs"
-                                className="mr-2"
-                                onClick={() => abrirModalRecebimento(conta)}
-                                title="Receber manual (caso nao consiga conciliar)"
-                              >
-                                Manual
-                              </ActionButton>
-                            </>
-                          ) : conta.venda_id && !conta.nsu ? (
-                            /* Venda sem NSU - pode receber no PDV OU manual */
-                            <>
-                              <ActionButton
-                                intent="neutral"
-                                size="xs"
-                                className="mr-2"
-                                onClick={() => {
-                                  console.log('Conta:', conta); // DEBUG
-                                  if (conta.venda_id) {
-                                    abrirVendaNoPDV(conta.venda_id);
-                                  } else {
-                                    abrirModalRecebimento(conta);
-                                  }
-                                }}
-                                title="Receber no PDV (movimenta caixa)"
-                              >
-                                PDV
-                              </ActionButton>
-                              <ActionButton
-                                intent="create"
-                                size="xs"
-                                className="mr-2"
-                                onClick={() => abrirModalRecebimento(conta)}
-                                title="Receber manual (sem PDV)"
-                              >
-                                Manual
-                              </ActionButton>
-                            </>
-                          ) : (
-                            /* Lancamento manual ou outros - recebimento manual */
-                            <ActionButton
-                              intent="create"
-                              size="xs"
-                              className="mr-2"
-                              onClick={() => abrirModalRecebimento(conta)}
-                              title="Registrar recebimento manual"
-                            >
-                              Receber Manual
-                            </ActionButton>
-                          )}
-                        </>
-                      )}
-                      {conta.conciliado && (
-                        <span className="text-xs text-green-600 font-semibold mr-2" title={`Conciliado em ${conta.data_conciliacao}`}>
-                          Conciliado
-                        </span>
-                      )}
-                      <ActionButton
-                        intent="neutral"
-                        tone="soft"
-                        size="xs"
-                        title="Ver Detalhes"
-                        onClick={() => abrirDetalhes(conta)}
-                      >
-                        Ver
-                      </ActionButton>
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+        <DataTable
+          columns={contasReceberColumns}
+          data={contasReceberExibidas}
+          emptyMessage="Nenhuma conta encontrada"
+          getRowKey={(conta) => conta.id}
+          tableClassName="min-w-[960px]"
+          theadClassName="bg-gray-50"
+          tbodyClassName="divide-y divide-gray-200"
+        />
         
-        {contas.length > 0 && (
+        {contasReceberExibidas.length > 0 && (
           <div className="bg-green-50 border-t border-green-200 px-4 py-3">
-            <strong>Total:</strong> {contas.length} conta(s) | 
+            <strong>Total:</strong> {contasReceberExibidas.length} conta(s) |
             <strong className="ml-3">Saldo a Receber:</strong>{" "}
-            <MoneyCell value={contas.reduce((sum, c) => sum + (c.valor_final - c.valor_recebido), 0)} zeroAsDash />
+            <MoneyCell value={contasReceberExibidas.reduce((sum, c) => sum + (c.valor_final - c.valor_recebido), 0)} zeroAsDash />
           </div>
         )}
       </div>
