@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
+import { SelectField, TextField } from "../../../components/ui/FormField";
 import { resolveMediaUrl } from "../../../utils/mediaUrl";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { getApiErrorMessage } from "../banhoTosaUtils";
@@ -124,7 +125,7 @@ export default function BanhoTosaFotosPanel({ atendimentoId, onChanged }) {
       </form>
 
       <form onSubmit={salvarUrl} className="mt-4 space-y-3 rounded-2xl bg-slate-50 p-3">
-        <TextField label="URL externa opcional" value={fotoForm.url} onChange={(value) => updateFoto("url", value)} />
+        <TextField label="URL externa opcional" value={fotoForm.url} onChange={(value) => updateFoto("url", value)} tone="warm" />
         <button
           type="submit"
           disabled={saving}
@@ -142,13 +143,13 @@ export default function BanhoTosaFotosPanel({ atendimentoId, onChanged }) {
 function FotoCampos({ form, onChange }) {
   return (
     <div className="grid gap-3 sm:grid-cols-[0.6fr_1.4fr]">
-      <SelectField label="Tipo" value={form.tipo} onChange={(value) => onChange("tipo", value)}>
+      <SelectField label="Tipo" value={form.tipo} onChange={(value) => onChange("tipo", value)} tone="warm">
         <option value="entrada">Entrada</option>
         <option value="antes">Antes</option>
         <option value="depois">Depois</option>
         <option value="ocorrencia">Ocorrencia</option>
       </SelectField>
-      <TextField label="Descricao" value={form.descricao} onChange={(value) => onChange("descricao", value)} />
+      <TextField label="Descricao" value={form.descricao} onChange={(value) => onChange("descricao", value)} tone="warm" />
     </div>
   );
 }
@@ -197,25 +198,5 @@ function Header({ eyebrow, title }) {
       <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-500">{eyebrow}</p>
       <h3 className="mt-2 text-lg font-black text-slate-900">{title}</h3>
     </div>
-  );
-}
-
-function SelectField({ label, value, onChange, children }) {
-  return (
-    <label className="block">
-      <span className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{label}</span>
-      <select value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100">
-        {children}
-      </select>
-    </label>
-  );
-}
-
-function TextField({ label, value, onChange }) {
-  return (
-    <label className="block">
-      <span className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{label}</span>
-      <input type="text" value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100" />
-    </label>
   );
 }

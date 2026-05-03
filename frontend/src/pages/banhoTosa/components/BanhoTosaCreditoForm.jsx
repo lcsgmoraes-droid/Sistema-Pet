@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
 import TutorAutocomplete from "../../../components/TutorAutocomplete";
+import { SelectField, TextField } from "../../../components/ui/FormField";
 import { api } from "../../../services/api";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { getApiErrorMessage } from "../banhoTosaUtils";
@@ -84,7 +85,7 @@ export default function BanhoTosaCreditoForm({ pacotes = [], onChanged }) {
       <h2 className="mt-2 text-xl font-black text-slate-900">Liberar pacote para cliente</h2>
 
       <div className="mt-5 space-y-4">
-        <SelectField label="Pacote" value={form.pacote_id} onChange={(value) => updateField("pacote_id", value)}>
+        <SelectField label="Pacote" value={form.pacote_id} onChange={(value) => updateField("pacote_id", value)} tone="warm">
           <option value="">Selecione</option>
           {pacotes.filter((item) => item.ativo).map((pacote) => (
             <option key={pacote.id} value={pacote.id}>
@@ -105,6 +106,7 @@ export default function BanhoTosaCreditoForm({ pacotes = [], onChanged }) {
           value={form.pet_id}
           disabled={!tutor?.id || loadingPets}
           onChange={(value) => updateField("pet_id", value)}
+          tone="warm"
         >
           <option value="">
             {!tutor?.id ? "Selecione o tutor primeiro" : "Todos os pets do tutor"}
@@ -117,10 +119,10 @@ export default function BanhoTosaCreditoForm({ pacotes = [], onChanged }) {
         </SelectField>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <TextField label="Inicio" type="date" value={form.data_inicio} onChange={(value) => updateField("data_inicio", value)} />
-          <TextField label="Validade manual" type="date" value={form.data_validade} onChange={(value) => updateField("data_validade", value)} />
+          <TextField label="Inicio" type="date" value={form.data_inicio} onChange={(value) => updateField("data_inicio", value)} tone="warm" />
+          <TextField label="Validade manual" type="date" value={form.data_validade} onChange={(value) => updateField("data_validade", value)} tone="warm" />
         </div>
-        <TextField label="Observacoes" value={form.observacoes} onChange={(value) => updateField("observacoes", value)} />
+        <TextField label="Observacoes" value={form.observacoes} onChange={(value) => updateField("observacoes", value)} tone="warm" />
       </div>
 
       <button
@@ -131,35 +133,5 @@ export default function BanhoTosaCreditoForm({ pacotes = [], onChanged }) {
         {saving ? "Liberando..." : "Liberar credito"}
       </button>
     </form>
-  );
-}
-
-function SelectField({ label, value, onChange, children, disabled = false }) {
-  return (
-    <label className="block">
-      <span className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{label}</span>
-      <select
-        value={value}
-        disabled={disabled}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100 disabled:text-slate-400"
-      >
-        {children}
-      </select>
-    </label>
-  );
-}
-
-function TextField({ label, value, onChange, type = "text" }) {
-  return (
-    <label className="block">
-      <span className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{label}</span>
-      <input
-        type={type}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100"
-      />
-    </label>
   );
 }

@@ -1,3 +1,4 @@
+import { TextField } from "../../../components/ui/FormField";
 import { formatCurrency } from "../banhoTosaUtils";
 
 const statusFlow = [
@@ -68,8 +69,8 @@ function TaxiCard({ item, saving, onAtualizarMedicao, onSalvarMedicao, onStatus 
         <MiniMetric label="Custo" value={formatCurrency(item.custo_real || item.custo_estimado)} />
       </div>
       <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_1fr_auto]">
-        <TextField label="Km real" type="number" value={String(item.km_real ?? "0")} onChange={(value) => atualizarItem(item.id, "km_real", value, onAtualizarMedicao)} />
-        <TextField label="Custo real" type="number" value={String(item.custo_real ?? "0")} onChange={(value) => atualizarItem(item.id, "custo_real", value, onAtualizarMedicao)} />
+        <TextField label="Km real" type="number" value={String(item.km_real ?? "0")} onChange={(value) => atualizarItem(item.id, "km_real", value, onAtualizarMedicao)} tone="warm" />
+        <TextField label="Custo real" type="number" value={String(item.custo_real ?? "0")} onChange={(value) => atualizarItem(item.id, "custo_real", value, onAtualizarMedicao)} tone="warm" />
         <button type="button" disabled={saving} onClick={() => onSalvarMedicao(item)} className="self-end rounded-2xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-700 disabled:opacity-50">
           Salvar
         </button>
@@ -98,14 +99,5 @@ function MiniMetric({ label, value }) {
       <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">{label}</p>
       <p className="font-black text-slate-900">{value}</p>
     </div>
-  );
-}
-
-function TextField({ label, value, onChange, type = "text" }) {
-  return (
-    <label className="block">
-      <span className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{label}</span>
-      <input type={type} step={type === "number" ? "0.01" : undefined} value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100" />
-    </label>
   );
 }

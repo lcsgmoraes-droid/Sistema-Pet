@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
+import { SelectField, TextField } from "../../../components/ui/FormField";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { getApiErrorMessage } from "../banhoTosaUtils";
 import BanhoTosaCustoPanel from "./BanhoTosaCustoPanel";
@@ -123,14 +124,14 @@ export default function BanhoTosaAtendimentoPanel({ atendimentoId, funcionarios,
       <BanhoTosaFechamentoPanel atendimento={atendimento} onChanged={carregarAtendimento} />
 
       <form onSubmit={iniciarEtapa} className="mt-6 grid gap-3 lg:grid-cols-[1fr_1fr_1fr_1.2fr_auto]">
-        <SelectField label="Etapa" value={form.tipo} onChange={(value) => updateField("tipo", value)}>
+        <SelectField label="Etapa" value={form.tipo} onChange={(value) => updateField("tipo", value)} tone="warm">
           <option value="banho">Banho</option>
           <option value="secagem">Secagem</option>
           <option value="tosa">Tosa</option>
           <option value="higiene">Higiene</option>
           <option value="preparo">Preparo</option>
         </SelectField>
-        <SelectField label="Responsavel" value={form.responsavel_id} onChange={(value) => updateField("responsavel_id", value)}>
+        <SelectField label="Responsavel" value={form.responsavel_id} onChange={(value) => updateField("responsavel_id", value)} tone="warm">
           <option value="">Sem responsavel</option>
           {funcionarios.map((pessoa) => (
             <option key={pessoa.id} value={pessoa.id}>
@@ -138,7 +139,7 @@ export default function BanhoTosaAtendimentoPanel({ atendimentoId, funcionarios,
             </option>
           ))}
         </SelectField>
-        <SelectField label="Recurso" value={form.recurso_id} onChange={(value) => updateField("recurso_id", value)}>
+        <SelectField label="Recurso" value={form.recurso_id} onChange={(value) => updateField("recurso_id", value)} tone="warm">
           <option value="">Sem recurso</option>
           {recursos.filter((item) => item.ativo).map((recurso) => (
             <option key={recurso.id} value={recurso.id}>
@@ -146,7 +147,7 @@ export default function BanhoTosaAtendimentoPanel({ atendimentoId, funcionarios,
             </option>
           ))}
         </SelectField>
-        <TextField label="Observacoes" value={form.observacoes} onChange={(value) => updateField("observacoes", value)} />
+        <TextField label="Observacoes" value={form.observacoes} onChange={(value) => updateField("observacoes", value)} tone="warm" />
         <button
           type="submit"
           disabled={saving}
@@ -217,39 +218,6 @@ export default function BanhoTosaAtendimentoPanel({ atendimentoId, funcionarios,
 
       <BanhoTosaCustoPanel atendimentoId={atendimentoId} refreshSignal={custoRefreshSignal} />
     </div>
-  );
-}
-
-function SelectField({ label, value, onChange, children }) {
-  return (
-    <label className="block">
-      <span className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-        {label}
-      </span>
-      <select
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100"
-      >
-        {children}
-      </select>
-    </label>
-  );
-}
-
-function TextField({ label, value, onChange }) {
-  return (
-    <label className="block">
-      <span className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-        {label}
-      </span>
-      <input
-        type="text"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100"
-      />
-    </label>
   );
 }
 

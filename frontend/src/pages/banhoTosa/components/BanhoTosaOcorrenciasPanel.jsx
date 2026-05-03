@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
+import { SelectField } from "../../../components/ui/FormField";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { getApiErrorMessage } from "../banhoTosaUtils";
 import BanhoTosaFotosPanel from "./BanhoTosaFotosPanel";
@@ -67,18 +68,18 @@ export default function BanhoTosaOcorrenciasPanel({
         <Header eyebrow="Ocorrencias" title="Registro do atendimento" />
         <form onSubmit={salvarOcorrencia} className="mt-4 space-y-3">
           <div className="grid gap-3 sm:grid-cols-3">
-            <SelectField label="Tipo" value={ocorrenciaForm.tipo} onChange={(value) => updateOcorrencia("tipo", value)}>
+            <SelectField label="Tipo" value={ocorrenciaForm.tipo} onChange={(value) => updateOcorrencia("tipo", value)} tone="warm">
               <option value="observacao">Observacao</option>
               <option value="comportamento">Comportamento</option>
               <option value="saude">Saude</option>
               <option value="acidente">Acidente</option>
             </SelectField>
-            <SelectField label="Gravidade" value={ocorrenciaForm.gravidade} onChange={(value) => updateOcorrencia("gravidade", value)}>
+            <SelectField label="Gravidade" value={ocorrenciaForm.gravidade} onChange={(value) => updateOcorrencia("gravidade", value)} tone="warm">
               <option value="baixa">Baixa</option>
               <option value="media">Media</option>
               <option value="alta">Alta</option>
             </SelectField>
-            <SelectField label="Responsavel" value={ocorrenciaForm.responsavel_id} onChange={(value) => updateOcorrencia("responsavel_id", value)}>
+            <SelectField label="Responsavel" value={ocorrenciaForm.responsavel_id} onChange={(value) => updateOcorrencia("responsavel_id", value)} tone="warm">
               <option value="">Nao informado</option>
               {funcionarios.map((pessoa) => (
                 <option key={pessoa.id} value={pessoa.id}>{pessoa.nome}</option>
@@ -133,25 +134,5 @@ function ListaOcorrencias({ ocorrencias }) {
         </div>
       ))}
     </div>
-  );
-}
-
-function SelectField({ label, value, onChange, children }) {
-  return (
-    <label className="block">
-      <span className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{label}</span>
-      <select value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100">
-        {children}
-      </select>
-    </label>
-  );
-}
-
-function TextField({ label, value, onChange }) {
-  return (
-    <label className="block">
-      <span className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">{label}</span>
-      <input type="text" value={value} onChange={(event) => onChange(event.target.value)} className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100" />
-    </label>
   );
 }

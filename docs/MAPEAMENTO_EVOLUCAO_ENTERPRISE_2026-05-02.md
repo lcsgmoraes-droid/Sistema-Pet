@@ -45,7 +45,7 @@ Separacao operacional iniciada:
 Tela piloto:
 
 - PDV: cabecalho, botoes principais, botoes de modo visualizacao, sidebar de vendas recentes e cards principais comecaram a consumir a fundacao global.
-- Banho & Tosa / Taxi dog: formulario passou a usar os campos reutilizaveis mantendo o tom visual atual.
+- Banho & Tosa: agenda, ficha operacional, creditos, fotos, ocorrencias e taxi dog passaram a usar os campos reutilizaveis mantendo o tom visual atual.
 
 Proxima varredura recomendada:
 

@@ -1,3 +1,4 @@
+import { SelectField, TextField } from "../../../components/ui/FormField";
 import TutorPetSelector from "../../../components/veterinario/TutorPetSelector";
 
 export default function BanhoTosaAgendaForm({
@@ -41,48 +42,30 @@ export default function BanhoTosaAgendaForm({
         />
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <TextField label="Data" type="date" value={dataRef} onChange={onChangeData} />
-          <TextField label="Hora" type="time" value={form.hora} onChange={(value) => onChangeField("hora", value)} />
+          <TextField label="Data" type="date" value={dataRef} onChange={onChangeData} tone="warm" />
+          <TextField label="Hora" type="time" value={form.hora} onChange={(value) => onChangeField("hora", value)} tone="warm" />
         </div>
 
-        <label className="block">
-          <span className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-            Recurso / box
-          </span>
-          <select
-            value={form.recurso_id}
-            onChange={(event) => onChangeField("recurso_id", event.target.value)}
-            className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100"
-          >
-            <option value="">Sem recurso definido</option>
-            {recursos.filter((item) => item.ativo).map((recurso) => (
-              <option key={recurso.id} value={recurso.id}>
-                {recurso.nome} - cap. {recurso.capacidade_simultanea}
-              </option>
-            ))}
-          </select>
-        </label>
+        <SelectField label="Recurso / box" value={form.recurso_id} onChange={(value) => onChangeField("recurso_id", value)} tone="warm">
+          <option value="">Sem recurso definido</option>
+          {recursos.filter((item) => item.ativo).map((recurso) => (
+            <option key={recurso.id} value={recurso.id}>
+              {recurso.nome} - cap. {recurso.capacidade_simultanea}
+            </option>
+          ))}
+        </SelectField>
 
-        <label className="block">
-          <span className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-            Servico
-          </span>
-          <select
-            value={form.servico_id}
-            onChange={(event) => onChangeServico(event.target.value)}
-            className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100"
-          >
-            <option value="">Banho & Tosa avulso</option>
-            {servicos.filter((item) => item.ativo).map((servico) => (
-              <option key={servico.id} value={servico.id}>
-                {servico.nome} - {servico.duracao_padrao_minutos} min
-              </option>
-            ))}
-          </select>
-        </label>
+        <SelectField label="Servico" value={form.servico_id} onChange={onChangeServico} tone="warm">
+          <option value="">Banho & Tosa avulso</option>
+          {servicos.filter((item) => item.ativo).map((servico) => (
+            <option key={servico.id} value={servico.id}>
+              {servico.nome} - {servico.duracao_padrao_minutos} min
+            </option>
+          ))}
+        </SelectField>
 
-        <TextField label="Valor previsto" type="number" value={form.valor_unitario} onChange={(value) => onChangeField("valor_unitario", value)} />
-        <TextField label="Observacoes" value={form.observacoes} onChange={(value) => onChangeField("observacoes", value)} />
+        <TextField label="Valor previsto" type="number" value={form.valor_unitario} onChange={(value) => onChangeField("valor_unitario", value)} tone="warm" />
+        <TextField label="Observacoes" value={form.observacoes} onChange={(value) => onChangeField("observacoes", value)} tone="warm" />
       </div>
 
       <button
@@ -93,22 +76,5 @@ export default function BanhoTosaAgendaForm({
         {saving ? "Agendando..." : "Criar agendamento"}
       </button>
     </form>
-  );
-}
-
-function TextField({ label, value, onChange, type = "text" }) {
-  return (
-    <label className="block">
-      <span className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-        {label}
-      </span>
-      <input
-        type={type}
-        step={type === "number" ? "0.01" : undefined}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100"
-      />
-    </label>
   );
 }
