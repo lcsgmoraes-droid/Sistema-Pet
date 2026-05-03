@@ -27,6 +27,7 @@ Componentes globais criados ou consolidados:
 - `MetricCard` e `MetricGrid` para padronizar dashboards e cards de indicadores.
 - `MoneyCell`, `ChannelBadges` e `SafeMarkdown`, ja iniciados na fatia de produtos.
 - `FormField`, `TextField` e `SelectField` para campos de formulario com tons visuais reaproveitaveis sem quebrar telas existentes.
+- `PaginationControls` para paginacao, seletor de quantidade por pagina e navegacao com tamanho/cor padrao.
 
 Separacao operacional iniciada:
 
@@ -50,6 +51,7 @@ Tela piloto:
 - Banho & Tosa: formularios de pacotes e campanhas de retorno tambem passaram a usar `TextField`/`SelectField` globais.
 - Banho & Tosa: `FormField` ganhou acessorio de rotulo e os formularios com tooltip migraram para os campos globais, removendo os campos locais duplicados do modulo.
 - Banho & Tosa: checkboxes de servicos, recursos, portes e pacotes passaram a usar `CheckboxField` global com o mesmo tom visual.
+- Produtos e Pessoas: paginacoes locais foram substituidas por `PaginationControls` global, removendo controles duplicados.
 
 Proxima varredura recomendada:
 

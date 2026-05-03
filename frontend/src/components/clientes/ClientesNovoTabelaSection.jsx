@@ -8,7 +8,7 @@ import {
   FiUser,
 } from "react-icons/fi";
 import { PawPrint } from "lucide-react";
-import ClientesNovoPaginationControls from "./ClientesNovoPaginationControls";
+import PaginationControls from "../ui/PaginationControls";
 
 const ClientesNovoTabelaSection = ({
   loading,
@@ -29,13 +29,17 @@ const ClientesNovoTabelaSection = ({
 }) => {
   return (
     <>
-      <ClientesNovoPaginationControls
+      <PaginationControls
+        currentPage={paginaAtual}
+        itemName="pessoas"
+        itemsPerPage={registrosPorPagina}
         loading={loading}
-        totalRegistros={totalRegistros}
-        paginaAtual={paginaAtual}
-        registrosPorPagina={registrosPorPagina}
-        setRegistrosPorPagina={setRegistrosPorPagina}
-        setPaginaAtual={setPaginaAtual}
+        onItemsPerPageChange={(value) => {
+          setRegistrosPorPagina(Number(value));
+          setPaginaAtual(1);
+        }}
+        onPageChange={setPaginaAtual}
+        totalItems={totalRegistros}
         variant="top"
       />
 
@@ -289,13 +293,17 @@ const ClientesNovoTabelaSection = ({
           </div>
         )}
 
-        <ClientesNovoPaginationControls
+        <PaginationControls
+          currentPage={paginaAtual}
+          itemName="pessoas"
+          itemsPerPage={registrosPorPagina}
           loading={loading}
-          totalRegistros={totalRegistros}
-          paginaAtual={paginaAtual}
-          registrosPorPagina={registrosPorPagina}
-          setRegistrosPorPagina={setRegistrosPorPagina}
-          setPaginaAtual={setPaginaAtual}
+          onItemsPerPageChange={(value) => {
+            setRegistrosPorPagina(Number(value));
+            setPaginaAtual(1);
+          }}
+          onPageChange={setPaginaAtual}
+          totalItems={totalRegistros}
           variant="bottom"
         />
       </div>

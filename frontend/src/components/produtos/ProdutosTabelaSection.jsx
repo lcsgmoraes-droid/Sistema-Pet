@@ -3,8 +3,8 @@ import ActionButton from "../ui/ActionButton";
 import ChannelBadges from "../ui/ChannelBadges";
 import DataTable from "../ui/DataTable";
 import MoneyCell from "../ui/MoneyCell";
+import PaginationControls from "../ui/PaginationControls";
 import { obterCanaisAtivosProduto, obterEstoqueVisualProduto } from "./produtosUtils";
-import ProdutosPaginationControls from "./ProdutosPaginationControls";
 
 function obterValidadeResumoProduto(produto) {
   const lotes = (produto?.lotes || [])
@@ -93,10 +93,6 @@ export default function ProdutosTabelaSection({
   novoPreco,
   onChangeItensPorPagina,
   onIrParaPagina,
-  onIrParaPrimeiraPagina,
-  onIrParaUltimaPagina,
-  onPaginaAnterior,
-  onProximaPagina,
   paginaAtual,
   paisExpandidos,
   produtos,
@@ -218,22 +214,17 @@ export default function ProdutosTabelaSection({
 
   return (
     <>
-      {!loading && totalItens > 0 && (
-        <div className="px-4 py-3 bg-gray-50 border border-gray-200 rounded-t-lg flex items-center justify-between mt-6 mb-0">
-          <ProdutosPaginationControls
-            itensPorPagina={itensPorPagina}
-            onChangeItensPorPagina={onChangeItensPorPagina}
-            onIrParaPagina={onIrParaPagina}
-            onIrParaPrimeiraPagina={onIrParaPrimeiraPagina}
-            onIrParaUltimaPagina={onIrParaUltimaPagina}
-            onPaginaAnterior={onPaginaAnterior}
-            onProximaPagina={onProximaPagina}
-            paginaAtual={paginaAtual}
-            totalItens={totalItens}
-            totalPaginas={totalPaginas}
-          />
-        </div>
-      )}
+      <PaginationControls
+        currentPage={paginaAtual}
+        itemName="produtos"
+        itemsPerPage={itensPorPagina}
+        loading={loading}
+        onItemsPerPageChange={onChangeItensPorPagina}
+        onPageChange={onIrParaPagina}
+        totalItems={totalItens}
+        totalPages={totalPaginas}
+        variant="top"
+      />
 
       <div id="tour-produtos-lista" className="bg-white rounded-lg shadow-sm overflow-hidden">
         <div className="md:hidden">
@@ -438,22 +429,17 @@ export default function ProdutosTabelaSection({
           />
         </div>
 
-        {!loading && totalItens > 0 && (
-          <div className="px-4 py-3 bg-gray-50 border-t border-gray-200 flex items-center justify-between">
-            <ProdutosPaginationControls
-              itensPorPagina={itensPorPagina}
-              onChangeItensPorPagina={onChangeItensPorPagina}
-              onIrParaPagina={onIrParaPagina}
-              onIrParaPrimeiraPagina={onIrParaPrimeiraPagina}
-              onIrParaUltimaPagina={onIrParaUltimaPagina}
-              onPaginaAnterior={onPaginaAnterior}
-              onProximaPagina={onProximaPagina}
-              paginaAtual={paginaAtual}
-              totalItens={totalItens}
-              totalPaginas={totalPaginas}
-            />
-          </div>
-        )}
+        <PaginationControls
+          currentPage={paginaAtual}
+          itemName="produtos"
+          itemsPerPage={itensPorPagina}
+          loading={loading}
+          onItemsPerPageChange={onChangeItensPorPagina}
+          onPageChange={onIrParaPagina}
+          totalItems={totalItens}
+          totalPages={totalPaginas}
+          variant="bottom"
+        />
 
         {!loading && selecionadosCount > 0 && (
           <div className="px-4 py-3 bg-gray-50 border-t border-gray-200">
