@@ -52,6 +52,7 @@ Tela piloto:
 - Banho & Tosa: formularios de pacotes e campanhas de retorno tambem passaram a usar `TextField`/`SelectField` globais.
 - Banho & Tosa: `FormField` ganhou acessorio de rotulo e os formularios com tooltip migraram para os campos globais, removendo os campos locais duplicados do modulo.
 - Banho & Tosa: checkboxes de servicos, recursos, portes e pacotes passaram a usar `CheckboxField` global com o mesmo tom visual.
+- Banho & Tosa: tela de parametros foi reorganizada para abrir com resumo e lista compacta; configuracoes gerais e cadastro/edicao de porte agora aparecem apenas por acao explicita.
 - Produtos e Pessoas: paginacoes locais foram substituidas por `PaginationControls` global, removendo controles duplicados.
 - Operadoras, internacoes veterinarias e Estoque Bling comecaram a usar estados globais de vazio/carregamento.
 

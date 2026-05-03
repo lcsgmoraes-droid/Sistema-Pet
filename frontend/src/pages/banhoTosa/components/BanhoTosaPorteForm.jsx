@@ -1,4 +1,7 @@
+import { Plus, Save, X } from "lucide-react";
+import ActionButton from "../../../components/ui/ActionButton";
 import { CheckboxField, TextField } from "../../../components/ui/FormField";
+import Panel from "../../../components/ui/Panel";
 import { toApiDecimal } from "../banhoTosaUtils";
 import BanhoTosaHelpTooltip from "./BanhoTosaHelpTooltip";
 
@@ -63,67 +66,69 @@ export default function BanhoTosaPorteForm({
   onSubmit,
 }) {
   return (
-    <form
-      onSubmit={onSubmit}
-      className="rounded-3xl border border-white/80 bg-white p-6 shadow-sm"
+    <Panel
+      actions={
+        <ActionButton icon={X} intent="neutral" onClick={onCancelEdit} tone="ghost">
+          Fechar
+        </ActionButton>
+      }
+      subtitle="Defina consumo, tempo esperado e ajustes por pelagem para este tamanho."
+      title={editing ? "Editar parametro por porte" : "Novo parametro por porte"}
     >
-      <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-500">
-        Portes
-      </p>
-      <h2 className="mt-2 text-xl font-black text-slate-900">
-        {editing ? "Editar parametro por porte" : "Novo parametro por porte"}
-      </h2>
-
-      <div className="mt-5 grid gap-4 sm:grid-cols-2">
-        <TextField label="Porte" value={form.porte} onChange={(value) => onChangeField("porte", value)} tone="warm" />
-        <TextField label="Multiplicador preco" type="number" value={form.multiplicador_preco} onChange={(value) => onChangeField("multiplicador_preco", value)} labelAccessory={<BanhoTosaHelpTooltip text="Ajuste relativo do preco por porte. Exemplo: gigante 2.0 custa o dobro do porte base." />} tone="warm" />
-        <TextField label="Peso min kg" type="number" value={form.peso_min_kg} onChange={(value) => onChangeField("peso_min_kg", value)} tone="warm" />
-        <TextField label="Peso max kg" type="number" value={form.peso_max_kg} onChange={(value) => onChangeField("peso_max_kg", value)} tone="warm" />
-        <TextField label="Agua padrao L" type="number" value={form.agua_padrao_litros} onChange={(value) => onChangeField("agua_padrao_litros", value)} labelAccessory={<BanhoTosaHelpTooltip text="Estimativa usada quando nao houver medicao real do banho." />} tone="warm" />
-        <TextField label="Energia padrao kWh" type="number" value={form.energia_padrao_kwh} onChange={(value) => onChangeField("energia_padrao_kwh", value)} labelAccessory={<BanhoTosaHelpTooltip text="Energia media esperada para secagem/equipamentos deste porte." />} tone="warm" />
-        <TextField label="Tempo banho min" type="number" value={form.tempo_banho_min} onChange={(value) => onChangeField("tempo_banho_min", value)} labelAccessory={<BanhoTosaHelpTooltip text="Tempo medio de banho para calcular agenda, mao de obra e agua." />} tone="warm" />
-        <TextField label="Tempo secagem min" type="number" value={form.tempo_secagem_min} onChange={(value) => onChangeField("tempo_secagem_min", value)} labelAccessory={<BanhoTosaHelpTooltip text="Tempo medio de secagem para energia e ocupacao de recurso." />} tone="warm" />
-        <TextField label="Tempo tosa min" type="number" value={form.tempo_tosa_min} onChange={(value) => onChangeField("tempo_tosa_min", value)} labelAccessory={<BanhoTosaHelpTooltip text="Tempo medio de tosa para agenda e mao de obra." />} tone="warm" />
-      </div>
-
-      <div className="mt-5 rounded-2xl border border-orange-100 bg-orange-50/70 p-4">
-        <p className="text-xs font-black uppercase tracking-[0.16em] text-orange-600">
-          Pelagem dentro deste porte
-        </p>
-        <p className="mt-1 text-xs text-slate-500">
-          Use pelo curto como base e ajuste pelo longo com multiplicador e tempo extra.
-        </p>
-        <div className="mt-4 grid gap-4 sm:grid-cols-3">
-          <TextField label="Mult. pelo curto" type="number" value={form.multiplicador_pelo_curto} onChange={(value) => onChangeField("multiplicador_pelo_curto", value)} labelAccessory={<BanhoTosaHelpTooltip text="Multiplicador de preco quando o pet for classificado como pelo curto." />} tone="warm" />
-          <TextField label="Mult. pelo longo" type="number" value={form.multiplicador_pelo_longo} onChange={(value) => onChangeField("multiplicador_pelo_longo", value)} labelAccessory={<BanhoTosaHelpTooltip text="Multiplicador de preco quando o pet for classificado como pelo longo." />} tone="warm" />
-          <TextField label="Extra longo min" type="number" value={form.tempo_extra_pelo_longo_min} onChange={(value) => onChangeField("tempo_extra_pelo_longo_min", value)} labelAccessory={<BanhoTosaHelpTooltip text="Minutos somados ao banho, secagem e tosa quando a pelagem for longa." />} tone="warm" />
+      <form onSubmit={onSubmit} className="space-y-5">
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <TextField label="Porte" onChange={(value) => onChangeField("porte", value)} value={form.porte} />
+          <TextField label="Multiplicador preco" labelAccessory={<BanhoTosaHelpTooltip text="Ajuste relativo do preco por porte. Exemplo: gigante 2.0 custa o dobro do porte base." />} onChange={(value) => onChangeField("multiplicador_preco", value)} type="number" value={form.multiplicador_preco} />
+          <TextField label="Peso min kg" onChange={(value) => onChangeField("peso_min_kg", value)} type="number" value={form.peso_min_kg} />
+          <TextField label="Peso max kg" onChange={(value) => onChangeField("peso_max_kg", value)} type="number" value={form.peso_max_kg} />
         </div>
-      </div>
 
-      {editing && (
-        <div className="mt-4">
-          <CheckboxField label="Ativo" checked={form.ativo} onChange={(value) => onChangeField("ativo", value)} tone="warm" />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <TextField label="Agua padrao L" labelAccessory={<BanhoTosaHelpTooltip text="Estimativa usada quando nao houver medicao real do banho." />} onChange={(value) => onChangeField("agua_padrao_litros", value)} type="number" value={form.agua_padrao_litros} />
+          <TextField label="Energia padrao kWh" labelAccessory={<BanhoTosaHelpTooltip text="Energia media esperada para secagem/equipamentos deste porte." />} onChange={(value) => onChangeField("energia_padrao_kwh", value)} type="number" value={form.energia_padrao_kwh} />
+          <TextField label="Tempo banho min" labelAccessory={<BanhoTosaHelpTooltip text="Tempo medio de banho para calcular agenda, mao de obra e agua." />} onChange={(value) => onChangeField("tempo_banho_min", value)} type="number" value={form.tempo_banho_min} />
+          <TextField label="Tempo secagem min" labelAccessory={<BanhoTosaHelpTooltip text="Tempo medio de secagem para energia e ocupacao de recurso." />} onChange={(value) => onChangeField("tempo_secagem_min", value)} type="number" value={form.tempo_secagem_min} />
+          <TextField label="Tempo tosa min" labelAccessory={<BanhoTosaHelpTooltip text="Tempo medio de tosa para agenda e mao de obra." />} onChange={(value) => onChangeField("tempo_tosa_min", value)} type="number" value={form.tempo_tosa_min} />
         </div>
-      )}
 
-      <div className="mt-6 grid gap-2 sm:grid-cols-2">
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-2xl bg-orange-500 px-5 py-3 text-sm font-bold text-white transition hover:bg-orange-600 disabled:opacity-60"
-        >
-          {saving ? "Salvando..." : editing ? "Salvar alteracoes" : "Cadastrar porte"}
-        </button>
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+          <div>
+            <h3 className="text-sm font-semibold text-slate-900">
+              Pelagem dentro deste porte
+            </h3>
+            <p className="mt-1 text-sm text-slate-500">
+              Use pelo curto como base e ajuste pelo longo com multiplicador e tempo extra.
+            </p>
+          </div>
+          <div className="mt-4 grid gap-4 sm:grid-cols-3">
+            <TextField label="Mult. pelo curto" labelAccessory={<BanhoTosaHelpTooltip text="Multiplicador de preco quando o pet for classificado como pelo curto." />} onChange={(value) => onChangeField("multiplicador_pelo_curto", value)} type="number" value={form.multiplicador_pelo_curto} />
+            <TextField label="Mult. pelo longo" labelAccessory={<BanhoTosaHelpTooltip text="Multiplicador de preco quando o pet for classificado como pelo longo." />} onChange={(value) => onChangeField("multiplicador_pelo_longo", value)} type="number" value={form.multiplicador_pelo_longo} />
+            <TextField label="Extra longo min" labelAccessory={<BanhoTosaHelpTooltip text="Minutos somados ao banho, secagem e tosa quando a pelagem for longa." />} onChange={(value) => onChangeField("tempo_extra_pelo_longo_min", value)} type="number" value={form.tempo_extra_pelo_longo_min} />
+          </div>
+        </div>
+
         {editing && (
-          <button
-            type="button"
-            onClick={onCancelEdit}
-            className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-orange-300 hover:text-orange-700"
-          >
-            Cancelar edicao
-          </button>
+          <CheckboxField
+            checked={form.ativo}
+            label="Ativo"
+            onChange={(value) => onChangeField("ativo", value)}
+          />
         )}
-      </div>
-    </form>
+
+        <div className="flex flex-wrap justify-end gap-2">
+          <ActionButton intent="neutral" onClick={onCancelEdit} tone="soft">
+            Cancelar
+          </ActionButton>
+          <ActionButton
+            icon={editing ? Save : Plus}
+            intent={editing ? "edit" : "create"}
+            loading={saving}
+            type="submit"
+          >
+            {editing ? "Salvar alteracoes" : "Cadastrar porte"}
+          </ActionButton>
+        </div>
+      </form>
+    </Panel>
   );
 }

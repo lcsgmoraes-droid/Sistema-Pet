@@ -1,3 +1,5 @@
+import { forwardRef } from "react";
+
 const PADDING = {
   none: "",
   sm: "p-3",
@@ -5,18 +7,22 @@ const PADDING = {
   lg: "p-4",
 };
 
-export default function Panel({
-  actions,
-  children,
-  className = "",
-  headerClassName = "",
-  padding = "md",
-  subtitle,
-  title,
-  ...props
-}) {
+const Panel = forwardRef(function Panel(
+  {
+    actions,
+    children,
+    className = "",
+    headerClassName = "",
+    padding = "md",
+    subtitle,
+    title,
+    ...props
+  },
+  ref,
+) {
   return (
     <section
+      ref={ref}
       {...props}
       className={[
         "rounded-lg border border-slate-200 bg-white shadow-sm",
@@ -49,4 +55,6 @@ export default function Panel({
       {children}
     </section>
   );
-}
+});
+
+export default Panel;
