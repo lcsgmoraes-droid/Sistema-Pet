@@ -32,6 +32,11 @@ export function usePDVProdutoBusca({
   const adicionandoProdutoPorEnterRef = useRef(false);
   const buscaProdutoAtualRef = useRef("");
   const focoProdutoTimeoutRef = useRef(null);
+  const adicionarProdutoAoCarrinhoRef = useRef(adicionarProdutoAoCarrinho);
+
+  useEffect(() => {
+    adicionarProdutoAoCarrinhoRef.current = adicionarProdutoAoCarrinho;
+  }, [adicionarProdutoAoCarrinho]);
 
   const buscarProdutosAtualizados = async (termo) => {
     const response = await getProdutosVendaveis({
@@ -74,10 +79,14 @@ export function usePDVProdutoBusca({
     sequenciaRapidaProdutoRef.current = 0;
   };
 
+  const limparSugestoesProduto = () => {
+    setProdutosSugeridos((prev) => (prev.length > 0 ? [] : prev));
+    setMostrarSugestoesProduto((prev) => (prev ? false : prev));
+  };
+
   const limparBuscaProduto = ({ focarInput = false } = {}) => {
     setBuscarProduto("");
-    setProdutosSugeridos([]);
-    setMostrarSugestoesProduto(false);
+    limparSugestoesProduto();
     resetScannerState();
 
     if (focarInput) {
@@ -86,7 +95,7 @@ export function usePDVProdutoBusca({
   };
 
   const adicionarProduto = (produto, options) => {
-    const adicionou = adicionarProdutoAoCarrinho(produto);
+    const adicionou = adicionarProdutoAoCarrinhoRef.current?.(produto);
 
     if (adicionou === false) {
       return false;
@@ -98,8 +107,7 @@ export function usePDVProdutoBusca({
 
   useEffect(() => {
     setBuscarProduto("");
-    setProdutosSugeridos([]);
-    setMostrarSugestoesProduto(false);
+    limparSugestoesProduto();
     resetScannerState();
   }, [vendaContextKey]);
 
@@ -140,11 +148,10 @@ export function usePDVProdutoBusca({
       return () => clearTimeout(timer);
     }
 
-    setProdutosSugeridos([]);
-    setMostrarSugestoesProduto(false);
+    limparSugestoesProduto();
     resetScannerState();
     return undefined;
-  }, [adicionarProdutoAoCarrinho, buscarProduto, modoVisualizacao]);
+  }, [buscarProduto, modoVisualizacao]);
 
   useEffect(() => {
     const handleCliqueFora = (event) => {
@@ -217,8 +224,7 @@ export function usePDVProdutoBusca({
   const handleBuscarProdutoChange = (valor) => {
     setBuscarProduto(valor);
     if (!String(valor || "").trim()) {
-      setProdutosSugeridos([]);
-      setMostrarSugestoesProduto(false);
+      limparSugestoesProduto();
     }
   };
 
