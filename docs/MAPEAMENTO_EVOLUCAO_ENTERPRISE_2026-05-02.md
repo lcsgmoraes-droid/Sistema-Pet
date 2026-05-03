@@ -691,6 +691,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-03: `ContasPagar` e `ContasReceber` migraram a listagem principal para `DataTable`, mantendo `MoneyCell`, `StatusBadge` e `ActionButton` como padrao financeiro.
 - 2026-05-03: `DataTable` ganhou compatibilidade com colunas legadas que renderizam `<th>`/`<td>`, permitindo migrar a listagem desktop de `ProdutosTabelaSection` sem reescrever as colunas existentes.
 - 2026-05-03: `ProdutosFiltrosPanel` passou a usar `FilterBar`, preservando a grade atual de filtros e alinhando o container ao padrao global.
+- 2026-05-03: `ProdutosHeaderActions` passou a usar `PageHeader`, padronizando titulo, subtitulo, tour e acoes principais da tela de Produtos.
 
 ### Nao fazer nesta onda
 
