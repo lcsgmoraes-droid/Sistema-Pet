@@ -689,6 +689,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-03: `VendasFinanceiro` recebeu primeira fatia da fundacao, com filtros avancados em `FilterBar`, status da lista via `StatusBadge` e totalizadores compactos em `MetricGrid`/`MetricCard`.
 - 2026-05-03: criado `DataTable` base para migrar listagens com cabecalho, alinhamento, loading, vazio, clique de linha e linha expandida sem reescrever cada tela.
 - 2026-05-03: `ContasPagar` e `ContasReceber` migraram a listagem principal para `DataTable`, mantendo `MoneyCell`, `StatusBadge` e `ActionButton` como padrao financeiro.
+- 2026-05-03: `DataTable` ganhou compatibilidade com colunas legadas que renderizam `<th>`/`<td>`, permitindo migrar a listagem desktop de `ProdutosTabelaSection` sem reescrever as colunas existentes.
 
 ### Nao fazer nesta onda
 

@@ -1,4 +1,4 @@
-import { Fragment } from "react";
+import { cloneElement, Fragment, isValidElement } from "react";
 
 const ALIGN_CLASSES = {
   center: "text-center",
@@ -10,9 +10,48 @@ function resolveClassName(value, ...args) {
   return typeof value === "function" ? value(...args) : value;
 }
 
-function renderCell(column, row, rowIndex) {
+function isTableElement(element, type) {
+  return isValidElement(element) && element.type === type;
+}
+
+function renderHeaderCell(column, headerContext) {
+  if (typeof column.renderHeader === "function") {
+    const rendered = column.renderHeader(headerContext);
+    if (isTableElement(rendered, "th")) {
+      return cloneElement(rendered, { key: column.key });
+    }
+    return renderDefaultHeaderCell(column, rendered);
+  }
+
+  return renderDefaultHeaderCell(column, column.header);
+}
+
+function renderDefaultHeaderCell(column, content) {
+  return (
+    <th
+      key={column.key}
+      className={[
+        "px-2 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600",
+        ALIGN_CLASSES[column.align || "left"],
+        column.headerClassName,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      title={column.title}
+      style={column.headerStyle}
+    >
+      {content}
+    </th>
+  );
+}
+
+function renderCell(column, row, rowIndex, cellContext) {
   if (typeof column.render === "function") {
     return column.render(row, rowIndex);
+  }
+
+  if (typeof column.renderCell === "function") {
+    return column.renderCell(row, cellContext, rowIndex);
   }
 
   if (column.accessor) {
@@ -34,6 +73,9 @@ export default function DataTable({
   loadingMessage = "Carregando...",
   onRowClick,
   renderExpandedRow,
+  getCellContext,
+  getRowRef,
+  headerContext,
   tableClassName = "",
   tbodyClassName = "",
   theadClassName = "",
@@ -53,22 +95,7 @@ export default function DataTable({
       >
         <thead className={["bg-slate-100", theadClassName].filter(Boolean).join(" ")}>
           <tr>
-            {columns.map((column) => (
-              <th
-                key={column.key}
-                className={[
-                  "px-2 py-2 text-xs font-semibold uppercase tracking-wide text-slate-600",
-                  ALIGN_CLASSES[column.align || "left"],
-                  column.headerClassName,
-                ]
-                  .filter(Boolean)
-                  .join(" ")}
-                title={column.title}
-                style={column.headerStyle}
-              >
-                {column.header}
-              </th>
-            ))}
+            {columns.map((column) => renderHeaderCell(column, headerContext))}
           </tr>
         </thead>
         <tbody className={tbodyClassName}>
@@ -89,11 +116,13 @@ export default function DataTable({
               const rowKey = getRowKey ? getRowKey(row, rowIndex) : row?.id ?? rowIndex;
               const expanded = isRowExpanded?.(row, rowIndex);
               const clickable = typeof onRowClick === "function";
+              const cellContext = getCellContext?.(row, rowIndex);
 
               return (
                 <Fragment key={rowKey}>
                   <tr
-                    onClick={clickable ? () => onRowClick(row, rowIndex) : undefined}
+                    ref={getRowRef ? (element) => getRowRef(row, rowIndex, element) : undefined}
+                    onClick={clickable ? (event) => onRowClick(row, rowIndex, event) : undefined}
                     className={[
                       "border-b border-slate-100 transition hover:bg-slate-50",
                       clickable ? "cursor-pointer" : "",
@@ -102,22 +131,30 @@ export default function DataTable({
                       .filter(Boolean)
                       .join(" ")}
                   >
-                    {columns.map((column) => (
-                      <td
-                        key={column.key}
-                        className={[
-                          "px-2 py-2 align-middle",
-                          ALIGN_CLASSES[column.align || "left"],
-                          resolveClassName(column.className, row, rowIndex),
-                        ]
-                          .filter(Boolean)
-                          .join(" ")}
-                        title={resolveClassName(column.cellTitle, row, rowIndex)}
-                        style={resolveClassName(column.cellStyle, row, rowIndex)}
-                      >
-                        {renderCell(column, row, rowIndex)}
-                      </td>
-                    ))}
+                    {columns.map((column) => {
+                      const rendered = renderCell(column, row, rowIndex, cellContext);
+
+                      if (isTableElement(rendered, "td")) {
+                        return cloneElement(rendered, { key: column.key });
+                      }
+
+                      return (
+                        <td
+                          key={column.key}
+                          className={[
+                            "px-2 py-2 align-middle",
+                            ALIGN_CLASSES[column.align || "left"],
+                            resolveClassName(column.className, row, rowIndex),
+                          ]
+                            .filter(Boolean)
+                            .join(" ")}
+                          title={resolveClassName(column.cellTitle, row, rowIndex)}
+                          style={resolveClassName(column.cellStyle, row, rowIndex)}
+                        >
+                          {rendered}
+                        </td>
+                      );
+                    })}
                   </tr>
                   {expanded && renderExpandedRow ? renderExpandedRow(row, rowIndex, colSpan) : null}
                 </Fragment>
