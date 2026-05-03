@@ -1,3 +1,4 @@
+import { TextField } from "../../../components/ui/FormField";
 import { toApiDecimal } from "../banhoTosaUtils";
 import BanhoTosaHelpTooltip from "./BanhoTosaHelpTooltip";
 
@@ -74,15 +75,15 @@ export default function BanhoTosaPorteForm({
       </h2>
 
       <div className="mt-5 grid gap-4 sm:grid-cols-2">
-        <TextField label="Porte" value={form.porte} onChange={(value) => onChangeField("porte", value)} />
-        <TextField label="Multiplicador preco" type="number" value={form.multiplicador_preco} onChange={(value) => onChangeField("multiplicador_preco", value)} help="Ajuste relativo do preco por porte. Exemplo: gigante 2.0 custa o dobro do porte base." />
-        <TextField label="Peso min kg" type="number" value={form.peso_min_kg} onChange={(value) => onChangeField("peso_min_kg", value)} />
-        <TextField label="Peso max kg" type="number" value={form.peso_max_kg} onChange={(value) => onChangeField("peso_max_kg", value)} />
-        <TextField label="Agua padrao L" type="number" value={form.agua_padrao_litros} onChange={(value) => onChangeField("agua_padrao_litros", value)} help="Estimativa usada quando nao houver medicao real do banho." />
-        <TextField label="Energia padrao kWh" type="number" value={form.energia_padrao_kwh} onChange={(value) => onChangeField("energia_padrao_kwh", value)} help="Energia media esperada para secagem/equipamentos deste porte." />
-        <TextField label="Tempo banho min" type="number" value={form.tempo_banho_min} onChange={(value) => onChangeField("tempo_banho_min", value)} help="Tempo medio de banho para calcular agenda, mao de obra e agua." />
-        <TextField label="Tempo secagem min" type="number" value={form.tempo_secagem_min} onChange={(value) => onChangeField("tempo_secagem_min", value)} help="Tempo medio de secagem para energia e ocupacao de recurso." />
-        <TextField label="Tempo tosa min" type="number" value={form.tempo_tosa_min} onChange={(value) => onChangeField("tempo_tosa_min", value)} help="Tempo medio de tosa para agenda e mao de obra." />
+        <TextField label="Porte" value={form.porte} onChange={(value) => onChangeField("porte", value)} tone="warm" />
+        <TextField label="Multiplicador preco" type="number" value={form.multiplicador_preco} onChange={(value) => onChangeField("multiplicador_preco", value)} labelAccessory={<BanhoTosaHelpTooltip text="Ajuste relativo do preco por porte. Exemplo: gigante 2.0 custa o dobro do porte base." />} tone="warm" />
+        <TextField label="Peso min kg" type="number" value={form.peso_min_kg} onChange={(value) => onChangeField("peso_min_kg", value)} tone="warm" />
+        <TextField label="Peso max kg" type="number" value={form.peso_max_kg} onChange={(value) => onChangeField("peso_max_kg", value)} tone="warm" />
+        <TextField label="Agua padrao L" type="number" value={form.agua_padrao_litros} onChange={(value) => onChangeField("agua_padrao_litros", value)} labelAccessory={<BanhoTosaHelpTooltip text="Estimativa usada quando nao houver medicao real do banho." />} tone="warm" />
+        <TextField label="Energia padrao kWh" type="number" value={form.energia_padrao_kwh} onChange={(value) => onChangeField("energia_padrao_kwh", value)} labelAccessory={<BanhoTosaHelpTooltip text="Energia media esperada para secagem/equipamentos deste porte." />} tone="warm" />
+        <TextField label="Tempo banho min" type="number" value={form.tempo_banho_min} onChange={(value) => onChangeField("tempo_banho_min", value)} labelAccessory={<BanhoTosaHelpTooltip text="Tempo medio de banho para calcular agenda, mao de obra e agua." />} tone="warm" />
+        <TextField label="Tempo secagem min" type="number" value={form.tempo_secagem_min} onChange={(value) => onChangeField("tempo_secagem_min", value)} labelAccessory={<BanhoTosaHelpTooltip text="Tempo medio de secagem para energia e ocupacao de recurso." />} tone="warm" />
+        <TextField label="Tempo tosa min" type="number" value={form.tempo_tosa_min} onChange={(value) => onChangeField("tempo_tosa_min", value)} labelAccessory={<BanhoTosaHelpTooltip text="Tempo medio de tosa para agenda e mao de obra." />} tone="warm" />
       </div>
 
       <div className="mt-5 rounded-2xl border border-orange-100 bg-orange-50/70 p-4">
@@ -93,9 +94,9 @@ export default function BanhoTosaPorteForm({
           Use pelo curto como base e ajuste pelo longo com multiplicador e tempo extra.
         </p>
         <div className="mt-4 grid gap-4 sm:grid-cols-3">
-          <TextField label="Mult. pelo curto" type="number" value={form.multiplicador_pelo_curto} onChange={(value) => onChangeField("multiplicador_pelo_curto", value)} help="Multiplicador de preco quando o pet for classificado como pelo curto." />
-          <TextField label="Mult. pelo longo" type="number" value={form.multiplicador_pelo_longo} onChange={(value) => onChangeField("multiplicador_pelo_longo", value)} help="Multiplicador de preco quando o pet for classificado como pelo longo." />
-          <TextField label="Extra longo min" type="number" value={form.tempo_extra_pelo_longo_min} onChange={(value) => onChangeField("tempo_extra_pelo_longo_min", value)} help="Minutos somados ao banho, secagem e tosa quando a pelagem for longa." />
+          <TextField label="Mult. pelo curto" type="number" value={form.multiplicador_pelo_curto} onChange={(value) => onChangeField("multiplicador_pelo_curto", value)} labelAccessory={<BanhoTosaHelpTooltip text="Multiplicador de preco quando o pet for classificado como pelo curto." />} tone="warm" />
+          <TextField label="Mult. pelo longo" type="number" value={form.multiplicador_pelo_longo} onChange={(value) => onChangeField("multiplicador_pelo_longo", value)} labelAccessory={<BanhoTosaHelpTooltip text="Multiplicador de preco quando o pet for classificado como pelo longo." />} tone="warm" />
+          <TextField label="Extra longo min" type="number" value={form.tempo_extra_pelo_longo_min} onChange={(value) => onChangeField("tempo_extra_pelo_longo_min", value)} labelAccessory={<BanhoTosaHelpTooltip text="Minutos somados ao banho, secagem e tosa quando a pelagem for longa." />} tone="warm" />
         </div>
       </div>
 
@@ -124,24 +125,6 @@ export default function BanhoTosaPorteForm({
         )}
       </div>
     </form>
-  );
-}
-
-function TextField({ label, value, onChange, type = "text", help }) {
-  return (
-    <label className="block">
-      <span className="inline-flex items-center text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-        {label}
-        <BanhoTosaHelpTooltip text={help} />
-      </span>
-      <input
-        type={type}
-        step={type === "number" ? "0.01" : undefined}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100"
-      />
-    </label>
   );
 }
 

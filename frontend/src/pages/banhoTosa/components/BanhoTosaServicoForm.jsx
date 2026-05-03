@@ -1,3 +1,4 @@
+import { SelectField, TextField } from "../../../components/ui/FormField";
 import BanhoTosaHelpTooltip from "./BanhoTosaHelpTooltip";
 import { toApiDecimal } from "../banhoTosaUtils";
 
@@ -60,27 +61,17 @@ export default function BanhoTosaServicoForm({
       </h2>
 
       <div className="mt-5 space-y-4">
-        <TextField label="Nome" value={form.nome} onChange={(value) => onChangeField("nome", value)} help="Nome que aparece na agenda, na fila e no fechamento para o PDV." />
-        <label className="block">
-          <span className="inline-flex items-center text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-            Categoria
-            <BanhoTosaHelpTooltip text="Agrupa servicos para relatorios e filtros: banho, tosa, combo, higiene ou outro." />
-          </span>
-          <select
-            value={form.categoria}
-            onChange={(event) => onChangeField("categoria", event.target.value)}
-            className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100"
-          >
-            <option value="banho">Banho</option>
-            <option value="tosa">Tosa</option>
-            <option value="combo">Combo</option>
-            <option value="higiene">Higiene</option>
-            <option value="outro">Outro</option>
-          </select>
-        </label>
-        <TextField label="Duracao padrao (min)" type="number" value={form.duracao_padrao_minutos} onChange={(value) => onChangeField("duracao_padrao_minutos", value)} help="Tempo usado para prever fim do agendamento e ocupacao da equipe." />
-        <TextField label="Preco base" type="number" value={form.preco_base} onChange={(value) => onChangeField("preco_base", value)} help="Valor sugerido no agendamento e no fechamento. Pode ser alterado na venda final." />
-        <TextField label="Descricao" value={form.descricao} onChange={(value) => onChangeField("descricao", value)} help="Explique o que esta incluso para padronizar a venda e o atendimento." />
+        <TextField label="Nome" value={form.nome} onChange={(value) => onChangeField("nome", value)} labelAccessory={<BanhoTosaHelpTooltip text="Nome que aparece na agenda, na fila e no fechamento para o PDV." />} tone="warm" />
+        <SelectField label="Categoria" value={form.categoria} onChange={(value) => onChangeField("categoria", value)} labelAccessory={<BanhoTosaHelpTooltip text="Agrupa servicos para relatorios e filtros: banho, tosa, combo, higiene ou outro." />} tone="warm">
+          <option value="banho">Banho</option>
+          <option value="tosa">Tosa</option>
+          <option value="combo">Combo</option>
+          <option value="higiene">Higiene</option>
+          <option value="outro">Outro</option>
+        </SelectField>
+        <TextField label="Duracao padrao (min)" type="number" value={form.duracao_padrao_minutos} onChange={(value) => onChangeField("duracao_padrao_minutos", value)} labelAccessory={<BanhoTosaHelpTooltip text="Tempo usado para prever fim do agendamento e ocupacao da equipe." />} tone="warm" />
+        <TextField label="Preco base" type="number" value={form.preco_base} onChange={(value) => onChangeField("preco_base", value)} labelAccessory={<BanhoTosaHelpTooltip text="Valor sugerido no agendamento e no fechamento. Pode ser alterado na venda final." />} tone="warm" />
+        <TextField label="Descricao" value={form.descricao} onChange={(value) => onChangeField("descricao", value)} labelAccessory={<BanhoTosaHelpTooltip text="Explique o que esta incluso para padronizar a venda e o atendimento." />} tone="warm" />
 
         <div className="grid gap-2 sm:grid-cols-2">
           <CheckField label="Requer banho" checked={form.requer_banho} onChange={(value) => onChangeField("requer_banho", value)} help="Marca se o servico consome agua, shampoo e etapa de banho." />
@@ -110,24 +101,6 @@ export default function BanhoTosaServicoForm({
         )}
       </div>
     </form>
-  );
-}
-
-function TextField({ label, value, onChange, type = "text", help }) {
-  return (
-    <label className="block">
-      <span className="inline-flex items-center text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-        {label}
-        <BanhoTosaHelpTooltip text={help} />
-      </span>
-      <input
-        type={type}
-        step={type === "number" ? "0.01" : undefined}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100"
-      />
-    </label>
   );
 }
 

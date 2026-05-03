@@ -48,6 +48,7 @@ Tela piloto:
 - Banho & Tosa: agenda, ficha operacional, creditos, fotos, ocorrencias e taxi dog passaram a usar os campos reutilizaveis mantendo o tom visual atual.
 - Banho & Tosa: listas de servicos, recursos, parametros e pacotes passaram a usar `ActionButton` global para edicao/exclusao com cores por intencao.
 - Banho & Tosa: formularios de pacotes e campanhas de retorno tambem passaram a usar `TextField`/`SelectField` globais.
+- Banho & Tosa: `FormField` ganhou acessorio de rotulo e os formularios com tooltip migraram para os campos globais, removendo os campos locais duplicados do modulo.
 
 Proxima varredura recomendada:
 

@@ -21,6 +21,7 @@ export function FormField({
   error = "",
   help = "",
   label,
+  labelAccessory = null,
   labelClassName = "",
   required = false,
   tone = "default",
@@ -30,9 +31,10 @@ export function FormField({
   return (
     <label className={cx("block", className)}>
       {label && (
-        <span className={cx(styles.label, labelClassName)}>
+        <span className={cx(styles.label, labelAccessory && "inline-flex items-center gap-1", labelClassName)}>
           {label}
           {required && <span className="ml-0.5 text-red-500">*</span>}
+          {labelAccessory}
         </span>
       )}
       {children}
@@ -52,6 +54,7 @@ export function TextField({
   help = "",
   inputClassName = "",
   label,
+  labelAccessory = null,
   onChange,
   placeholder,
   required = false,
@@ -68,6 +71,7 @@ export function TextField({
       error={error}
       help={help}
       label={label}
+      labelAccessory={labelAccessory}
       required={required}
       tone={tone}
     >
@@ -91,6 +95,7 @@ export function SelectField({
   error = "",
   help = "",
   label,
+  labelAccessory = null,
   onChange,
   required = false,
   selectClassName = "",
@@ -105,6 +110,7 @@ export function SelectField({
       error={error}
       help={help}
       label={label}
+      labelAccessory={labelAccessory}
       required={required}
       tone={tone}
     >

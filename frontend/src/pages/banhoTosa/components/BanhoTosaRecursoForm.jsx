@@ -1,3 +1,4 @@
+import { SelectField, TextField } from "../../../components/ui/FormField";
 import { toApiDecimal } from "../banhoTosaUtils";
 import BanhoTosaHelpTooltip from "./BanhoTosaHelpTooltip";
 
@@ -56,28 +57,18 @@ export default function BanhoTosaRecursoForm({
       </p>
 
       <div className="mt-5 space-y-4">
-        <TextField label="Nome" value={form.nome} onChange={(value) => onChangeField("nome", value)} help="Identificacao do recurso na agenda e nos relatorios de ocupacao." />
-        <label className="block">
-          <span className="inline-flex items-center text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-            Tipo
-            <BanhoTosaHelpTooltip text="Define como o recurso entra na capacidade: banheira, mesa, secador, box ou veiculo." />
-          </span>
-          <select
-            value={form.tipo}
-            onChange={(event) => onChangeField("tipo", event.target.value)}
-            className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100"
-          >
-            <option value="banheira">Banheira</option>
-            <option value="mesa_tosa">Mesa de tosa</option>
-            <option value="secador">Secador / soprador</option>
-            <option value="box">Sala / box</option>
-            <option value="veiculo">Taxi dog / veiculo</option>
-            <option value="outro">Outro</option>
-          </select>
-        </label>
-        <TextField label="Capacidade simultanea" type="number" value={form.capacidade_simultanea} onChange={(value) => onChangeField("capacidade_simultanea", value)} help="Quantidade de pets/atendimentos que o recurso comporta ao mesmo tempo." />
-        <TextField label="Potencia watts" type="number" value={form.potencia_watts} onChange={(value) => onChangeField("potencia_watts", value)} help="Potencia do equipamento para calcular energia por tempo de uso." />
-        <TextField label="Manutencao por hora" type="number" value={form.custo_manutencao_hora} onChange={(value) => onChangeField("custo_manutencao_hora", value)} help="Rateio de troca de escova, limpeza, depreciacao ou manutencao do recurso." />
+        <TextField label="Nome" value={form.nome} onChange={(value) => onChangeField("nome", value)} labelAccessory={<BanhoTosaHelpTooltip text="Identificacao do recurso na agenda e nos relatorios de ocupacao." />} tone="warm" />
+        <SelectField label="Tipo" value={form.tipo} onChange={(value) => onChangeField("tipo", value)} labelAccessory={<BanhoTosaHelpTooltip text="Define como o recurso entra na capacidade: banheira, mesa, secador, box ou veiculo." />} tone="warm">
+          <option value="banheira">Banheira</option>
+          <option value="mesa_tosa">Mesa de tosa</option>
+          <option value="secador">Secador / soprador</option>
+          <option value="box">Sala / box</option>
+          <option value="veiculo">Taxi dog / veiculo</option>
+          <option value="outro">Outro</option>
+        </SelectField>
+        <TextField label="Capacidade simultanea" type="number" value={form.capacidade_simultanea} onChange={(value) => onChangeField("capacidade_simultanea", value)} labelAccessory={<BanhoTosaHelpTooltip text="Quantidade de pets/atendimentos que o recurso comporta ao mesmo tempo." />} tone="warm" />
+        <TextField label="Potencia watts" type="number" value={form.potencia_watts} onChange={(value) => onChangeField("potencia_watts", value)} labelAccessory={<BanhoTosaHelpTooltip text="Potencia do equipamento para calcular energia por tempo de uso." />} tone="warm" />
+        <TextField label="Manutencao por hora" type="number" value={form.custo_manutencao_hora} onChange={(value) => onChangeField("custo_manutencao_hora", value)} labelAccessory={<BanhoTosaHelpTooltip text="Rateio de troca de escova, limpeza, depreciacao ou manutencao do recurso." />} tone="warm" />
         {editing && (
           <CheckField label="Ativo" checked={form.ativo} onChange={(value) => onChangeField("ativo", value)} />
         )}
@@ -102,24 +93,6 @@ export default function BanhoTosaRecursoForm({
         )}
       </div>
     </form>
-  );
-}
-
-function TextField({ label, value, onChange, type = "text", help }) {
-  return (
-    <label className="block">
-      <span className="inline-flex items-center text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-        {label}
-        <BanhoTosaHelpTooltip text={help} />
-      </span>
-      <input
-        type={type}
-        step={type === "number" ? "0.01" : undefined}
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100"
-      />
-    </label>
   );
 }
 
