@@ -715,6 +715,8 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-03: `Banho & Tosa` iniciou a reorganizacao visual: parametros, painel, servicos e agenda passaram a abrir formularios sob demanda e usar `Panel`, `MetricGrid`, `MetricCard`, `StatusBadge`, `ActionButton`, `EmptyState` e `TutorPetSelector` em vez de cards grandes sempre expostos.
 - 2026-05-03: agenda de `Banho & Tosa` alinhada ao padrao da agenda veterinaria: o botao `Agendar` abre modal com tutor/pet/servico, horarios livres/ocupados e compromissos do dia selecionado.
 - 2026-05-03: fluxo operacional de `Banho & Tosa` simplificado: a etapa `entregue` agora centraliza a geracao da venda no backend, `Retornos` virou `Reagendar`, taxi dog/relatorios foram alinhados aos componentes globais e fotos de pets passaram a aparecer tambem nas sugestoes de reagendamento.
+- 2026-05-03: `Banho & Tosa` teve a grade antiga de capacidade removida da agenda, o taxi dog recebeu painel compacto com metricas e a limpeza de componentes antigos/orfaos reduziu o risco de retorno do visual anterior.
+- 2026-05-03: indicadores restantes do `Banho & Tosa` foram suavizados para o padrao visual atual, removendo tons laranja decorativos e pesos de fonte excessivos onde nao havia alerta real.
 
 ### Nao fazer nesta onda
 
@@ -748,7 +750,11 @@ Na pratica:
 
 ## Proximo passo recomendado
 
-Continuar a **Onda 1 / Passo 2: Financeiro/Vendas**.
+Continuar a **Onda 1** com uma destas frentes, conforme prioridade operacional:
+
+- **Financeiro/Vendas**: seguir a padronizacao de tabelas, filtros e status.
+- **Pessoas/Pets/PDV**: transformar os blocos de cliente/pet/produto em `EntityCard` reutilizavel.
+- **Banho & Tosa**: proxima etapa deve ser funcional, nao visual: validar regra de entrega -> venda PDV, pacotes/creditos, reagendamento e relatorios com dados reais.
 
 Entrega esperada:
 
