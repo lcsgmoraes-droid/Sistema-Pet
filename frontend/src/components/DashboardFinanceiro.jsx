@@ -1,6 +1,6 @@
 ﻿/**
  * DASHBOARD FINANCEIRO - Resumo Geral
- * VisÃ£o consolidada de contas a pagar e a receber
+ * Visão consolidada de contas a pagar e a receber
  * Atualizado: 2025-01-10
  */
 
@@ -8,7 +8,23 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import toast from 'react-hot-toast';
-import { Building2, Wallet, CreditCard, Plus } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowRight,
+  BarChart3,
+  Bell,
+  Building2,
+  CalendarDays,
+  CheckCircle,
+  CreditCard,
+  FileText,
+  Inbox,
+  Landmark,
+  Plus,
+  Send,
+  ShoppingCart,
+  Wallet
+} from 'lucide-react';
 
 export default function DashboardFinanceiro() {
   const navigate = useNavigate();
@@ -73,7 +89,10 @@ export default function DashboardFinanceiro() {
     <div className="p-6 space-y-6">
       {/* HEADER */}
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-gray-800">ï¿½ Financeiro/ContÃ¡bil</h1>
+        <h1 className="text-3xl font-bold text-gray-800 flex items-center gap-2">
+          <FileText className="w-7 h-7 text-blue-600" />
+          Financeiro/Contábil
+        </h1>
         <div className="flex gap-3">
           <button className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
             + Nova Conta a Pagar
@@ -83,7 +102,7 @@ export default function DashboardFinanceiro() {
           </button>
         </div>
       </div>
-      {/* MENU DE NAVEGAÃ‡ÃƒO RÃPIDA */}
+      {/* MENU DE NAVEGAÇÃO RÁPIDA */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-4">
         <div className="grid grid-cols-6 gap-3">
           <button
@@ -91,7 +110,7 @@ export default function DashboardFinanceiro() {
             className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-blue-50 transition group"
           >
             <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center group-hover:bg-blue-200">
-              <span className="text-xl">ðŸ›’</span>
+              <ShoppingCart className="w-5 h-5 text-blue-700" />
             </div>
             <span className="text-xs font-medium text-gray-700">Vendas</span>
           </button>
@@ -101,7 +120,7 @@ export default function DashboardFinanceiro() {
             className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-green-50 transition group"
           >
             <div className="w-10 h-10 bg-green-100 rounded-full flex items-center justify-center group-hover:bg-green-200">
-              <span className="text-xl">ðŸ“¥</span>
+              <Inbox className="w-5 h-5 text-green-700" />
             </div>
             <span className="text-xs font-medium text-gray-700">Contas a Receber</span>
           </button>
@@ -111,7 +130,7 @@ export default function DashboardFinanceiro() {
             className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-red-50 transition group"
           >
             <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center group-hover:bg-red-200">
-              <span className="text-xl">ðŸ“¤</span>
+              <Send className="w-5 h-5 text-red-700" />
             </div>
             <span className="text-xs font-medium text-gray-700">Contas a Pagar</span>
           </button>
@@ -121,9 +140,9 @@ export default function DashboardFinanceiro() {
             className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-indigo-50 transition group"
           >
             <div className="w-10 h-10 bg-indigo-100 rounded-full flex items-center justify-center group-hover:bg-indigo-200">
-              <span className="text-xl">ðŸ¦</span>
+              <Landmark className="w-5 h-5 text-indigo-700" />
             </div>
-            <span className="text-xs font-medium text-gray-700">Contas BancÃ¡rias</span>
+            <span className="text-xs font-medium text-gray-700">Contas Bancárias</span>
           </button>
 
           <button
@@ -131,7 +150,7 @@ export default function DashboardFinanceiro() {
             className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-purple-50 transition group"
           >
             <div className="w-10 h-10 bg-purple-100 rounded-full flex items-center justify-center group-hover:bg-purple-200">
-              <span className="text-xl">ðŸ’³</span>
+              <CreditCard className="w-5 h-5 text-purple-700" />
             </div>
             <span className="text-xs font-medium text-gray-700">Formas Pagamento</span>
           </button>
@@ -141,16 +160,19 @@ export default function DashboardFinanceiro() {
             className="flex flex-col items-center gap-2 p-3 rounded-lg hover:bg-yellow-50 transition group"
           >
             <div className="w-10 h-10 bg-yellow-100 rounded-full flex items-center justify-center group-hover:bg-yellow-200">
-              <span className="text-xl">ðŸ“Š</span>
+              <BarChart3 className="w-5 h-5 text-yellow-700" />
             </div>
             <span className="text-xs font-medium text-gray-700">Fluxo de Caixa</span>
           </button>
         </div>
       </div>
-      {/* CONTAS BANCÃRIAS */}
+      {/* CONTAS BANCÁRIAS */}
       <div className="bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl p-6 border border-blue-200">
         <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl font-bold text-gray-800">ðŸ¦ Contas BancÃ¡rias</h2>
+          <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+            <Landmark className="w-5 h-5 text-blue-600" />
+            Contas Bancárias
+          </h2>
           <button
             onClick={() => navigate('/financeiro/contas')}
             className="text-sm text-blue-600 hover:text-blue-700 font-medium flex items-center gap-1"
@@ -218,10 +240,10 @@ export default function DashboardFinanceiro() {
         )}
       </div>
 
-      {/* SALDO LÃQUIDO */}
+      {/* SALDO LÍQUIDO */}
       <div className={`p-6 rounded-xl ${saldoLiquido >= 0 ? 'bg-green-50 border-2 border-green-300' : 'bg-red-50 border-2 border-red-300'}`}>
         <div className="text-center">
-          <p className="text-sm font-medium text-gray-600 mb-2">Saldo LÃ­quido Previsto</p>
+          <p className="text-sm font-medium text-gray-600 mb-2">Saldo Líquido Previsto</p>
           <p className={`text-4xl font-bold ${saldoLiquido >= 0 ? 'text-green-600' : 'text-red-600'}`}>
             {formatarMoeda(saldoLiquido)}
           </p>
@@ -237,8 +259,11 @@ export default function DashboardFinanceiro() {
         <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-red-500">
           <div className="flex justify-between items-start mb-4">
             <div>
-              <h2 className="text-xl font-bold text-gray-800">ðŸ“¤ Contas a Pagar</h2>
-              <p className="text-sm text-gray-500">Despesas e obrigaÃ§Ãµes</p>
+              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <Send className="w-5 h-5 text-red-600" />
+                Contas a Pagar
+              </h2>
+              <p className="text-sm text-gray-500">Despesas e obrigações</p>
             </div>
             <div className="text-right">
               <p className="text-2xl font-bold text-red-600">
@@ -252,7 +277,10 @@ export default function DashboardFinanceiro() {
             {/* Vencidas */}
             <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
               <div>
-                <p className="font-semibold text-red-700">âš ï¸ Vencidas</p>
+                <p className="font-semibold text-red-700 flex items-center gap-1">
+                  <AlertTriangle className="w-4 h-4" />
+                  Vencidas
+                </p>
                 <p className="text-xs text-gray-600">{resumoPagar?.vencidas?.quantidade || 0} contas</p>
               </div>
               <p className="font-bold text-red-700">
@@ -262,31 +290,43 @@ export default function DashboardFinanceiro() {
 
             {/* Vence Hoje */}
             <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
-              <p className="font-semibold text-orange-700">ðŸ”” Vence Hoje</p>
+              <p className="font-semibold text-orange-700 flex items-center gap-1">
+                <Bell className="w-4 h-4" />
+                Vence Hoje
+              </p>
               <p className="font-bold text-orange-700">
                 {formatarMoeda(resumoPagar?.vence_hoje)}
               </p>
             </div>
 
-            {/* PrÃ³ximos 7 dias */}
+            {/* Próximos 7 dias */}
             <div className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">
-              <p className="font-semibold text-yellow-700">ðŸ“… PrÃ³ximos 7 dias</p>
+              <p className="font-semibold text-yellow-700 flex items-center gap-1">
+                <CalendarDays className="w-4 h-4" />
+                Próximos 7 dias
+              </p>
               <p className="font-bold text-yellow-700">
                 {formatarMoeda(resumoPagar?.proximos_7_dias)}
               </p>
             </div>
 
-            {/* PrÃ³ximos 30 dias */}
+            {/* Próximos 30 dias */}
             <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-              <p className="font-semibold text-blue-700">ðŸ“Š PrÃ³ximos 30 dias</p>
+              <p className="font-semibold text-blue-700 flex items-center gap-1">
+                <BarChart3 className="w-4 h-4" />
+                Próximos 30 dias
+              </p>
               <p className="font-bold text-blue-700">
                 {formatarMoeda(resumoPagar?.proximos_30_dias)}
               </p>
             </div>
 
-            {/* Pago no MÃªs */}
+            {/* Pago no Mês */}
             <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border-t-2">
-              <p className="font-semibold text-gray-700">âœ… Pago no MÃªs</p>
+              <p className="font-semibold text-gray-700 flex items-center gap-1">
+                <CheckCircle className="w-4 h-4" />
+                Pago no Mês
+              </p>
               <p className="font-bold text-green-600">
                 {formatarMoeda(resumoPagar?.pago_mes_atual)}
               </p>
@@ -297,7 +337,10 @@ export default function DashboardFinanceiro() {
             onClick={() => navigate('/financeiro/contas-pagar')}
             className="w-full mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
           >
-            Ver Todas as Contas a Pagar â†’
+            <span className="inline-flex items-center justify-center gap-1">
+              Ver Todas as Contas a Pagar
+              <ArrowRight className="w-4 h-4" />
+            </span>
           </button>
         </div>
 
@@ -305,7 +348,10 @@ export default function DashboardFinanceiro() {
         <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 border-green-500">
           <div className="flex justify-between items-start mb-4">
             <div>
-              <h2 className="text-xl font-bold text-gray-800">ðŸ“¥ Contas a Receber</h2>
+              <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                <Inbox className="w-5 h-5 text-green-600" />
+                Contas a Receber
+              </h2>
               <p className="text-sm text-gray-500">Receitas e valores a receber</p>
             </div>
             <div className="text-right">
@@ -317,10 +363,13 @@ export default function DashboardFinanceiro() {
           </div>
 
           <div className="space-y-3">
-            {/* NÃ£o Recebidas */}
+            {/* Não Recebidas */}
             <div className="flex justify-between items-center p-3 bg-red-50 rounded-lg">
               <div>
-                <p className="font-semibold text-red-700">âš ï¸ NÃ£o Recebidas (Vencidas)</p>
+                <p className="font-semibold text-red-700 flex items-center gap-1">
+                  <AlertTriangle className="w-4 h-4" />
+                  Não Recebidas (Vencidas)
+                </p>
                 <p className="text-xs text-gray-600">{resumoReceber?.vencidas?.quantidade || 0} contas</p>
               </div>
               <p className="font-bold text-red-700">
@@ -330,7 +379,10 @@ export default function DashboardFinanceiro() {
 
             {/* Receber Hoje */}
             <div className="flex justify-between items-center p-3 bg-orange-50 rounded-lg">
-              <p className="font-semibold text-orange-700">ðŸ”” Receber Hoje</p>
+              <p className="font-semibold text-orange-700 flex items-center gap-1">
+                <Bell className="w-4 h-4" />
+                Receber Hoje
+              </p>
               <p className="font-bold text-orange-700">
                 {formatarMoeda(resumoReceber?.vence_hoje)}
               </p>
@@ -338,7 +390,10 @@ export default function DashboardFinanceiro() {
 
             {/* A Receber - 7 dias */}
             <div className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">
-              <p className="font-semibold text-yellow-700">ðŸ“… A Receber (7 dias)</p>
+              <p className="font-semibold text-yellow-700 flex items-center gap-1">
+                <CalendarDays className="w-4 h-4" />
+                A Receber (7 dias)
+              </p>
               <p className="font-bold text-yellow-700">
                 {formatarMoeda(resumoReceber?.proximos_7_dias)}
               </p>
@@ -346,15 +401,21 @@ export default function DashboardFinanceiro() {
 
             {/* A Receber - 30 dias */}
             <div className="flex justify-between items-center p-3 bg-blue-50 rounded-lg">
-              <p className="font-semibold text-blue-700">ðŸ“Š A Receber (30 dias)</p>
+              <p className="font-semibold text-blue-700 flex items-center gap-1">
+                <BarChart3 className="w-4 h-4" />
+                A Receber (30 dias)
+              </p>
               <p className="font-bold text-blue-700">
                 {formatarMoeda(resumoReceber?.proximos_30_dias)}
               </p>
             </div>
 
-            {/* Recebido no MÃªs */}
+            {/* Recebido no Mês */}
             <div className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border-t-2">
-              <p className="font-semibold text-gray-700">âœ… Recebido no MÃªs</p>
+              <p className="font-semibold text-gray-700 flex items-center gap-1">
+                <CheckCircle className="w-4 h-4" />
+                Recebido no Mês
+              </p>
               <p className="font-bold text-green-600">
                 {formatarMoeda(resumoReceber?.recebido_mes_atual)}
               </p>
@@ -365,7 +426,10 @@ export default function DashboardFinanceiro() {
             onClick={() => navigate('/financeiro/contas-receber')}
             className="w-full mt-4 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
           >
-            Ver Todas as Contas a Receber â†’
+            <span className="inline-flex items-center justify-center gap-1">
+              Ver Todas as Contas a Receber
+              <ArrowRight className="w-4 h-4" />
+            </span>
           </button>
         </div>
       </div>
