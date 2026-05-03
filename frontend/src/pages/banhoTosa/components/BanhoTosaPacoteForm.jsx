@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
+import { Save, X } from "lucide-react";
 import toast from "react-hot-toast";
+import ActionButton from "../../../components/ui/ActionButton";
 import { CheckboxField, SelectField, TextField } from "../../../components/ui/FormField";
+import Panel from "../../../components/ui/Panel";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { getApiErrorMessage, toApiDecimal } from "../banhoTosaUtils";
 
@@ -86,18 +89,14 @@ export default function BanhoTosaPacoteForm({
   );
 
   return (
-    <form onSubmit={salvar} className="rounded-3xl border border-white/80 bg-white p-6 shadow-sm">
-      <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-500">
-        Pacotes
-      </p>
-      <h2 className="mt-2 text-xl font-black text-slate-900">
-        {editingPacote ? "Editar pacote" : "Novo pacote"}
-      </h2>
-
-      <div className="mt-5 space-y-4">
-        <TextField label="Nome" value={form.nome} onChange={(value) => updateField("nome", value)} tone="warm" />
-        <TextField label="Descricao" value={form.descricao} onChange={(value) => updateField("descricao", value)} tone="warm" />
-        <SelectField label="Servico coberto" value={form.servico_id} onChange={(value) => updateField("servico_id", value)} tone="warm">
+    <Panel
+      title={editingPacote ? "Editar pacote" : "Novo pacote"}
+      subtitle="Defina creditos, validade e servico coberto."
+    >
+      <form onSubmit={salvar} className="space-y-4">
+        <TextField label="Nome" value={form.nome} onChange={(value) => updateField("nome", value)} />
+        <TextField label="Descricao" value={form.descricao} onChange={(value) => updateField("descricao", value)} />
+        <SelectField label="Servico coberto" value={form.servico_id} onChange={(value) => updateField("servico_id", value)}>
           <option value="">Qualquer servico do atendimento</option>
           {servicosDisponiveis.map((servico) => (
             <option key={servico.id} value={servico.id}>
@@ -106,33 +105,23 @@ export default function BanhoTosaPacoteForm({
           ))}
         </SelectField>
         <div className="grid gap-3 sm:grid-cols-3">
-          <TextField label="Creditos" type="number" value={form.quantidade_creditos} onChange={(value) => updateField("quantidade_creditos", value)} tone="warm" />
-          <TextField label="Validade dias" type="number" value={form.validade_dias} onChange={(value) => updateField("validade_dias", value)} tone="warm" />
-          <TextField label="Preco" type="number" value={form.preco} onChange={(value) => updateField("preco", value)} tone="warm" />
+          <TextField label="Creditos" type="number" value={form.quantidade_creditos} onChange={(value) => updateField("quantidade_creditos", value)} />
+          <TextField label="Validade dias" type="number" value={form.validade_dias} onChange={(value) => updateField("validade_dias", value)} />
+          <TextField label="Preco" type="number" value={form.preco} onChange={(value) => updateField("preco", value)} />
         </div>
         {editingPacote && (
-          <CheckboxField label="Ativo" checked={form.ativo} onChange={(value) => updateField("ativo", value)} tone="warm" />
+          <CheckboxField label="Ativo" checked={form.ativo} onChange={(value) => updateField("ativo", value)} />
         )}
-      </div>
 
-      <div className="mt-6 grid gap-2 sm:grid-cols-2">
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-700 disabled:opacity-60"
-        >
-          {saving ? "Salvando..." : editingPacote ? "Salvar alteracoes" : "Cadastrar pacote"}
-        </button>
-        {editingPacote && (
-          <button
-            type="button"
-            onClick={onCancelEdit}
-            className="rounded-2xl border border-slate-200 bg-white px-5 py-3 text-sm font-bold text-slate-700 transition hover:border-orange-300 hover:text-orange-700"
-          >
-            Cancelar edicao
-          </button>
-        )}
-      </div>
-    </form>
+        <div className="flex flex-wrap justify-end gap-2">
+          <ActionButton icon={X} intent="neutral" onClick={onCancelEdit} tone="soft">
+            Cancelar
+          </ActionButton>
+          <ActionButton icon={Save} intent={editingPacote ? "edit" : "create"} loading={saving} type="submit">
+            {editingPacote ? "Salvar alteracoes" : "Cadastrar pacote"}
+          </ActionButton>
+        </div>
+      </form>
+    </Panel>
   );
 }

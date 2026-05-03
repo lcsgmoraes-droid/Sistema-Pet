@@ -1,5 +1,8 @@
 import toast from "react-hot-toast";
+import { Pencil, Power, Trash2 } from "lucide-react";
 import ActionButton from "../../../components/ui/ActionButton";
+import EmptyState from "../../../components/ui/EmptyState";
+import Panel from "../../../components/ui/Panel";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { formatCurrency, formatNumber, getApiErrorMessage } from "../banhoTosaUtils";
 
@@ -19,46 +22,51 @@ export default function BanhoTosaPacotesList({
   }
 
   return (
-    <section className="rounded-3xl border border-white/80 bg-white p-6 shadow-sm">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-500">Catalogo</p>
-          <h2 className="mt-2 text-xl font-black text-slate-900">Pacotes ativos e inativos</h2>
-        </div>
-        <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-bold text-orange-700">
+    <Panel
+      actions={
+        <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-medium text-slate-600">
           {pacotes.length} itens
         </span>
-      </div>
-
-      <div className="mt-5 divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200">
+      }
+      subtitle="Planos disponiveis para venda recorrente no banho e tosa."
+      title="Catalogo de pacotes"
+    >
+      <div className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200">
         {pacotes.map((pacote) => (
-          <div key={pacote.id} className="grid gap-3 p-4 md:grid-cols-[1.2fr_0.8fr_0.8fr_auto] md:items-center">
+          <div key={pacote.id} className="grid gap-3 p-3 md:grid-cols-[1.3fr_0.7fr_0.7fr_auto] md:items-center">
             <div>
-              <p className="font-black text-slate-900">{pacote.nome}</p>
-              <p className="text-sm text-slate-500">{pacote.servico_nome || "Qualquer servico"} | {pacote.validade_dias} dias</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-semibold text-slate-900">{pacote.nome}</p>
+                <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${
+                  pacote.ativo ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
+                }`}>
+                  {pacote.ativo ? "Ativo" : "Inativo"}
+                </span>
+              </div>
+              <p className="mt-1 text-sm text-slate-500">
+                {pacote.servico_nome || "Qualquer servico"} | {pacote.validade_dias} dias
+              </p>
             </div>
             <Info label="Creditos" value={formatNumber(pacote.quantidade_creditos, 0)} />
             <Info label="Preco" value={formatCurrency(pacote.preco)} />
             <div className="flex flex-wrap justify-start gap-2 md:justify-end">
-              <button
-                type="button"
-                onClick={() => toggleAtivo(pacote)}
-                className={`rounded-full px-3 py-2 text-xs font-bold ${
-                  pacote.ativo ? "bg-emerald-100 text-emerald-700" : "bg-slate-100 text-slate-500"
-                }`}
-              >
-                {pacote.ativo ? "Ativo" : "Inativo"}
-              </button>
-              <ActionButton intent="edit" tone="soft" size="xs" onClick={() => onEdit?.(pacote)}>Editar</ActionButton>
-              <ActionButton intent="delete" tone="soft" size="xs" onClick={() => onDelete?.(pacote)}>Excluir</ActionButton>
+              <ActionButton icon={Power} intent={pacote.ativo ? "neutral" : "create"} tone="soft" size="xs" onClick={() => toggleAtivo(pacote)}>
+                {pacote.ativo ? "Desativar" : "Ativar"}
+              </ActionButton>
+              <ActionButton icon={Pencil} intent="edit" tone="soft" size="xs" onClick={() => onEdit?.(pacote)}>Editar</ActionButton>
+              <ActionButton icon={Trash2} intent="delete" tone="soft" size="xs" onClick={() => onDelete?.(pacote)}>Excluir</ActionButton>
             </div>
           </div>
         ))}
         {pacotes.length === 0 && (
-          <p className="p-6 text-center text-sm text-slate-500">Nenhum pacote cadastrado ainda.</p>
+          <EmptyState
+            compact
+            description="Crie o primeiro pacote para liberar creditos recorrentes aos clientes."
+            title="Nenhum pacote cadastrado"
+          />
         )}
       </div>
-    </section>
+    </Panel>
   );
 }
 

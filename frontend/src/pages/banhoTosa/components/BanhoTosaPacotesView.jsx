@@ -1,7 +1,12 @@
 import { useEffect, useState } from "react";
+import { Coins, PackageCheck, Plus, RefreshCw, WalletCards } from "lucide-react";
 import toast from "react-hot-toast";
+import ActionButton from "../../../components/ui/ActionButton";
+import MetricCard from "../../../components/ui/MetricCard";
+import MetricGrid from "../../../components/ui/MetricGrid";
+import Panel from "../../../components/ui/Panel";
 import { banhoTosaApi } from "../banhoTosaApi";
-import { getApiErrorMessage } from "../banhoTosaUtils";
+import { formatCurrency, formatNumber, getApiErrorMessage } from "../banhoTosaUtils";
 import BanhoTosaCreditoForm from "./BanhoTosaCreditoForm";
 import BanhoTosaCreditosList from "./BanhoTosaCreditosList";
 import BanhoTosaPacoteForm from "./BanhoTosaPacoteForm";
@@ -11,6 +16,8 @@ export default function BanhoTosaPacotesView({ servicos = [], onChanged }) {
   const [pacotes, setPacotes] = useState([]);
   const [creditos, setCreditos] = useState([]);
   const [editingPacote, setEditingPacote] = useState(null);
+  const [showPacoteForm, setShowPacoteForm] = useState(false);
+  const [showCreditoForm, setShowCreditoForm] = useState(false);
   const [loading, setLoading] = useState(false);
 
   async function carregar() {
@@ -38,6 +45,7 @@ export default function BanhoTosaPacotesView({ servicos = [], onChanged }) {
 
   function editarPacote(pacote) {
     setEditingPacote(pacote);
+    setShowPacoteForm(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
@@ -63,43 +71,82 @@ export default function BanhoTosaPacotesView({ servicos = [], onChanged }) {
     carregar();
   }, []);
 
-  return (
-    <div className="space-y-6">
-      <section className="rounded-3xl border border-white/80 bg-white p-6 shadow-sm">
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-          <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-500">
-              Recorrencia e fidelizacao
-            </p>
-            <h2 className="mt-2 text-2xl font-black text-slate-900">
-              Pacotes de Banho & Tosa
-            </h2>
-            <p className="mt-1 max-w-3xl text-sm text-slate-500">
-              Cadastre pacotes, libere creditos por tutor/pet e consuma o saldo na ficha do atendimento sem gerar cobranca duplicada.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={carregar}
-            className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600 transition hover:border-orange-300 hover:text-orange-700"
-          >
-            {loading ? "Carregando..." : "Atualizar"}
-          </button>
-        </div>
-      </section>
+  const resumo = montarResumo(pacotes, creditos);
 
-      <div className="grid gap-6 xl:grid-cols-2">
-        <BanhoTosaPacoteForm
-          servicos={servicos}
-          editingPacote={editingPacote}
-          onCancelEdit={() => setEditingPacote(null)}
-          onChanged={async () => {
-            setEditingPacote(null);
-            await recarregarTudo();
-          }}
-        />
-        <BanhoTosaCreditoForm pacotes={pacotes} onChanged={recarregarTudo} />
-      </div>
+  return (
+    <div className="space-y-4">
+      <Panel
+        actions={
+          <>
+            <ActionButton
+              icon={Plus}
+              intent="create"
+              onClick={() => {
+                setEditingPacote(null);
+                setShowPacoteForm((value) => !value);
+              }}
+            >
+              Novo pacote
+            </ActionButton>
+            <ActionButton
+              icon={WalletCards}
+              intent="create"
+              tone="soft"
+              onClick={() => setShowCreditoForm((value) => !value)}
+            >
+              Liberar credito
+            </ActionButton>
+            <ActionButton
+              icon={RefreshCw}
+              intent="neutral"
+              loading={loading}
+              onClick={carregar}
+              tone="soft"
+            >
+              Atualizar
+            </ActionButton>
+          </>
+        }
+        subtitle="Cadastre planos, libere creditos para clientes e acompanhe saldos sem abrir formularios desnecessarios."
+        title="Pacotes e creditos"
+      />
+
+      <MetricGrid>
+        <MetricCard icon={<PackageCheck size={18} />} intent="blue" label="Pacotes" value={pacotes.length} />
+        <MetricCard intent="emerald" label="Ativos" value={resumo.ativos} />
+        <MetricCard icon={<Coins size={18} />} intent="cyan" label="Creditos em aberto" value={formatNumber(resumo.creditosDisponiveis, 0)} />
+        <MetricCard intent="violet" label="Receita cadastrada" value={formatCurrency(resumo.valorPacotes)} />
+      </MetricGrid>
+
+      {(showPacoteForm || editingPacote || showCreditoForm) && (
+        <div className="grid gap-4 xl:grid-cols-2">
+          {(showPacoteForm || editingPacote) && (
+            <BanhoTosaPacoteForm
+              servicos={servicos}
+              editingPacote={editingPacote}
+              onCancelEdit={() => {
+                setEditingPacote(null);
+                setShowPacoteForm(false);
+              }}
+              onChanged={async () => {
+                setEditingPacote(null);
+                setShowPacoteForm(false);
+                await recarregarTudo();
+              }}
+            />
+          )}
+          {showCreditoForm && (
+            <BanhoTosaCreditoForm
+              pacotes={pacotes}
+              onCancel={() => setShowCreditoForm(false)}
+              onChanged={async () => {
+                setShowCreditoForm(false);
+                await recarregarTudo();
+              }}
+            />
+          )}
+        </div>
+      )}
 
       <BanhoTosaPacotesList
         pacotes={pacotes}
@@ -110,4 +157,18 @@ export default function BanhoTosaPacotesView({ servicos = [], onChanged }) {
       <BanhoTosaCreditosList creditos={creditos} />
     </div>
   );
+}
+
+function montarResumo(pacotes, creditos) {
+  return {
+    ativos: pacotes.filter((pacote) => pacote.ativo).length,
+    creditosDisponiveis: creditos.reduce(
+      (total, credito) => total + Number(credito.saldo_creditos || 0),
+      0,
+    ),
+    valorPacotes: pacotes.reduce(
+      (total, pacote) => total + Number(pacote.preco || 0),
+      0,
+    ),
+  };
 }

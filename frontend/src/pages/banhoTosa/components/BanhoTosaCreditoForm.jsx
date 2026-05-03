@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
+import { Save, X } from "lucide-react";
 import toast from "react-hot-toast";
 import TutorAutocomplete from "../../../components/TutorAutocomplete";
+import ActionButton from "../../../components/ui/ActionButton";
 import { SelectField, TextField } from "../../../components/ui/FormField";
+import Panel from "../../../components/ui/Panel";
 import { api } from "../../../services/api";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { getApiErrorMessage } from "../banhoTosaUtils";
@@ -15,7 +18,7 @@ const initialForm = {
   observacoes: "",
 };
 
-export default function BanhoTosaCreditoForm({ pacotes = [], onChanged }) {
+export default function BanhoTosaCreditoForm({ pacotes = [], onCancel, onChanged }) {
   const [form, setForm] = useState(initialForm);
   const [tutor, setTutor] = useState(null);
   const [pets, setPets] = useState([]);
@@ -78,14 +81,12 @@ export default function BanhoTosaCreditoForm({ pacotes = [], onChanged }) {
   }
 
   return (
-    <form onSubmit={liberarCredito} className="rounded-3xl border border-white/80 bg-white p-6 shadow-sm">
-      <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-500">
-        Creditos
-      </p>
-      <h2 className="mt-2 text-xl font-black text-slate-900">Liberar pacote para cliente</h2>
-
-      <div className="mt-5 space-y-4">
-        <SelectField label="Pacote" value={form.pacote_id} onChange={(value) => updateField("pacote_id", value)} tone="warm">
+    <Panel
+      title="Liberar pacote para cliente"
+      subtitle="Vincule um pacote ativo ao tutor e, se precisar, a um pet especifico."
+    >
+      <form onSubmit={liberarCredito} className="space-y-4">
+        <SelectField label="Pacote" value={form.pacote_id} onChange={(value) => updateField("pacote_id", value)}>
           <option value="">Selecione</option>
           {pacotes.filter((item) => item.ativo).map((pacote) => (
             <option key={pacote.id} value={pacote.id}>
@@ -106,7 +107,6 @@ export default function BanhoTosaCreditoForm({ pacotes = [], onChanged }) {
           value={form.pet_id}
           disabled={!tutor?.id || loadingPets}
           onChange={(value) => updateField("pet_id", value)}
-          tone="warm"
         >
           <option value="">
             {!tutor?.id ? "Selecione o tutor primeiro" : "Todos os pets do tutor"}
@@ -119,19 +119,20 @@ export default function BanhoTosaCreditoForm({ pacotes = [], onChanged }) {
         </SelectField>
 
         <div className="grid gap-3 sm:grid-cols-2">
-          <TextField label="Inicio" type="date" value={form.data_inicio} onChange={(value) => updateField("data_inicio", value)} tone="warm" />
-          <TextField label="Validade manual" type="date" value={form.data_validade} onChange={(value) => updateField("data_validade", value)} tone="warm" />
+          <TextField label="Inicio" type="date" value={form.data_inicio} onChange={(value) => updateField("data_inicio", value)} />
+          <TextField label="Validade manual" type="date" value={form.data_validade} onChange={(value) => updateField("data_validade", value)} />
         </div>
-        <TextField label="Observacoes" value={form.observacoes} onChange={(value) => updateField("observacoes", value)} tone="warm" />
-      </div>
+        <TextField label="Observacoes" value={form.observacoes} onChange={(value) => updateField("observacoes", value)} />
 
-      <button
-        type="submit"
-        disabled={saving}
-        className="mt-6 w-full rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white transition hover:bg-emerald-700 disabled:opacity-60"
-      >
-        {saving ? "Liberando..." : "Liberar credito"}
-      </button>
-    </form>
+        <div className="flex flex-wrap justify-end gap-2">
+          <ActionButton icon={X} intent="neutral" onClick={onCancel} tone="soft">
+            Cancelar
+          </ActionButton>
+          <ActionButton icon={Save} intent="create" loading={saving} type="submit">
+            Liberar credito
+          </ActionButton>
+        </div>
+      </form>
+    </Panel>
   );
 }

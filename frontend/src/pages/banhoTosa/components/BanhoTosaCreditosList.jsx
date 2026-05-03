@@ -1,23 +1,23 @@
+import EmptyState from "../../../components/ui/EmptyState";
+import Panel from "../../../components/ui/Panel";
 import { formatNumber } from "../banhoTosaUtils";
 
 export default function BanhoTosaCreditosList({ creditos = [] }) {
   return (
-    <section className="rounded-3xl border border-white/80 bg-white p-6 shadow-sm">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-emerald-600">Saldos</p>
-          <h2 className="mt-2 text-xl font-black text-slate-900">Creditos dos clientes</h2>
-        </div>
-        <span className="rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold text-emerald-700">
+    <Panel
+      actions={
+        <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-medium text-emerald-700">
           {creditos.length} saldos
         </span>
-      </div>
-
-      <div className="mt-5 divide-y divide-slate-100 overflow-hidden rounded-2xl border border-slate-200">
+      }
+      subtitle="Saldos liberados por pacote, tutor e pet vinculado."
+      title="Creditos dos clientes"
+    >
+      <div className="divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200">
         {creditos.map((credito) => (
-          <div key={credito.id} className="grid gap-3 p-4 md:grid-cols-[1.2fr_0.8fr_0.7fr_0.7fr] md:items-center">
+          <div key={credito.id} className="grid gap-3 p-3 md:grid-cols-[1.2fr_0.8fr_0.7fr_0.7fr] md:items-center">
             <div>
-              <p className="font-black text-slate-900">{credito.pacote_nome}</p>
+              <p className="font-semibold text-slate-900">{credito.pacote_nome}</p>
               <p className="text-sm text-slate-500">
                 {credito.cliente_nome || `Tutor #${credito.cliente_id}`} | {credito.pet_nome || "todos os pets"}
               </p>
@@ -30,10 +30,14 @@ export default function BanhoTosaCreditosList({ creditos = [] }) {
           </div>
         ))}
         {creditos.length === 0 && (
-          <p className="p-6 text-center text-sm text-slate-500">Nenhum credito liberado ainda.</p>
+          <EmptyState
+            compact
+            description="Libere um pacote para o cliente e o saldo aparecera aqui."
+            title="Nenhum credito liberado"
+          />
         )}
       </div>
-    </section>
+    </Panel>
   );
 }
 
