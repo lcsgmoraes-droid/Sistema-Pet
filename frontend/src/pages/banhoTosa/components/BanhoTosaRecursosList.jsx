@@ -1,3 +1,5 @@
+import ActionButton from "../../../components/ui/ActionButton";
+
 export default function BanhoTosaRecursosList({
   recursos,
   onEdit,
@@ -46,8 +48,8 @@ export default function BanhoTosaRecursosList({
               <MiniMetric label="Manut." value={recurso.custo_manutencao_hora || "0"} />
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
-              <ActionButton onClick={() => onEdit(recurso)}>Editar</ActionButton>
-              <ActionButton danger onClick={() => onDelete(recurso)}>Excluir</ActionButton>
+              <ActionButton intent="edit" tone="soft" size="xs" onClick={() => onEdit(recurso)}>Editar</ActionButton>
+              <ActionButton intent="delete" tone="soft" size="xs" onClick={() => onDelete(recurso)}>Excluir</ActionButton>
             </div>
           </div>
         ))}
@@ -69,21 +71,5 @@ function MiniMetric({ label, value }) {
       </p>
       <p className="font-black text-slate-900">{value}</p>
     </div>
-  );
-}
-
-function ActionButton({ children, danger = false, onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full px-3 py-1 text-xs font-black transition ${
-        danger
-          ? "bg-red-50 text-red-700 hover:bg-red-100"
-          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-      }`}
-    >
-      {children}
-    </button>
   );
 }

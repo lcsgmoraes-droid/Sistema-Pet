@@ -1,3 +1,4 @@
+import ActionButton from "../../../components/ui/ActionButton";
 import { formatCurrency } from "../banhoTosaUtils";
 
 export default function BanhoTosaServicosTable({
@@ -56,8 +57,8 @@ export default function BanhoTosaServicosTable({
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex justify-end gap-2">
-                    <ActionButton onClick={() => onEdit(servico)}>Editar</ActionButton>
-                    <ActionButton danger onClick={() => onDelete(servico)}>Excluir</ActionButton>
+                    <ActionButton intent="edit" tone="soft" size="xs" onClick={() => onEdit(servico)}>Editar</ActionButton>
+                    <ActionButton intent="delete" tone="soft" size="xs" onClick={() => onDelete(servico)}>Excluir</ActionButton>
                   </div>
                 </td>
               </tr>
@@ -73,21 +74,5 @@ export default function BanhoTosaServicosTable({
         </table>
       </div>
     </div>
-  );
-}
-
-function ActionButton({ children, danger = false, onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full px-3 py-1 text-xs font-black transition ${
-        danger
-          ? "bg-red-50 text-red-700 hover:bg-red-100"
-          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-      }`}
-    >
-      {children}
-    </button>
   );
 }

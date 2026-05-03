@@ -1,3 +1,5 @@
+import ActionButton from "../../../components/ui/ActionButton";
+
 export default function BanhoTosaParametrosLista({
   parametros,
   onEdit,
@@ -78,26 +80,10 @@ function ParametroPorteCard({ item, onEdit, onDelete, onToggleAtivo }) {
         <MiniMetric label="Extra longo" value={`${item.tempo_extra_pelo_longo_min || 0} min`} />
       </div>
       <div className="mt-4 flex flex-wrap gap-2">
-        <ActionButton onClick={() => onEdit?.(item)}>Editar</ActionButton>
-        <ActionButton danger onClick={() => onDelete?.(item)}>Excluir</ActionButton>
+        <ActionButton intent="edit" tone="soft" size="xs" onClick={() => onEdit?.(item)}>Editar</ActionButton>
+        <ActionButton intent="delete" tone="soft" size="xs" onClick={() => onDelete?.(item)}>Excluir</ActionButton>
       </div>
     </div>
-  );
-}
-
-function ActionButton({ children, danger = false, onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full px-3 py-1 text-xs font-black transition ${
-        danger
-          ? "bg-red-50 text-red-700 hover:bg-red-100"
-          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-      }`}
-    >
-      {children}
-    </button>
   );
 }
 

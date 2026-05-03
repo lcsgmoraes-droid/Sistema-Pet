@@ -1,4 +1,5 @@
 import toast from "react-hot-toast";
+import ActionButton from "../../../components/ui/ActionButton";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { formatCurrency, formatNumber, getApiErrorMessage } from "../banhoTosaUtils";
 
@@ -48,8 +49,8 @@ export default function BanhoTosaPacotesList({
               >
                 {pacote.ativo ? "Ativo" : "Inativo"}
               </button>
-              <ActionButton onClick={() => onEdit?.(pacote)}>Editar</ActionButton>
-              <ActionButton danger onClick={() => onDelete?.(pacote)}>Excluir</ActionButton>
+              <ActionButton intent="edit" tone="soft" size="xs" onClick={() => onEdit?.(pacote)}>Editar</ActionButton>
+              <ActionButton intent="delete" tone="soft" size="xs" onClick={() => onDelete?.(pacote)}>Excluir</ActionButton>
             </div>
           </div>
         ))}
@@ -58,22 +59,6 @@ export default function BanhoTosaPacotesList({
         )}
       </div>
     </section>
-  );
-}
-
-function ActionButton({ children, danger = false, onClick }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={`rounded-full px-3 py-2 text-xs font-black transition ${
-        danger
-          ? "bg-red-50 text-red-700 hover:bg-red-100"
-          : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-      }`}
-    >
-      {children}
-    </button>
   );
 }
 
