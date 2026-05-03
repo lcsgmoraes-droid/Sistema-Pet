@@ -687,6 +687,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-03: iniciada a fatia Financeiro/DRE, com `MetricGrid`/`MetricCard` na DRE e `MoneyCell`/`NumberCell`/`StatusBadge`/`ActionButton` aplicados em DRE, contas a pagar e contas a receber.
 - 2026-05-03: `FluxoCaixa` entrou na mesma fundacao visual, com cards de resumo via `MetricGrid`/`MetricCard`, valores via `MoneyCell`, botoes via `ActionButton` e status de movimentacao via `StatusBadge`.
 - 2026-05-03: `VendasFinanceiro` recebeu primeira fatia da fundacao, com filtros avancados em `FilterBar`, status da lista via `StatusBadge` e totalizadores compactos em `MetricGrid`/`MetricCard`.
+- 2026-05-03: criado `DataTable` base para migrar listagens com cabecalho, alinhamento, loading, vazio, clique de linha e linha expandida sem reescrever cada tela.
 
 ### Nao fazer nesta onda
 
