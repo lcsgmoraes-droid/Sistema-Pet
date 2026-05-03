@@ -1,4 +1,4 @@
-import React from "react";
+import FilterBar from "../ui/FilterBar";
 
 export default function ProdutosFiltrosPanel({
   categorias,
@@ -9,8 +9,16 @@ export default function ProdutosFiltrosPanel({
   persistirBusca,
   setPersistirBusca,
 }) {
+  const handleSubmit = (event) => {
+    event.preventDefault();
+  };
+
   return (
-    <div id="tour-produtos-filtros" className="mb-4 rounded-lg bg-white p-3 shadow-sm md:mb-6 md:p-4">
+    <FilterBar
+      id="tour-produtos-filtros"
+      className="mb-4 md:mb-6"
+      onSubmit={handleSubmit}
+    >
       <div className="grid grid-cols-1 gap-3 md:grid-cols-7 md:gap-4">
         <div id="tour-produtos-busca" className="md:col-span-2">
           <input
@@ -127,6 +135,6 @@ export default function ProdutosFiltrosPanel({
           </label>
         </div>
       </div>
-    </div>
+    </FilterBar>
   );
 }
