@@ -21,12 +21,12 @@ export default function BanhoTosaVetAlertas({
     return (
       <div className="mt-2 flex flex-wrap gap-1">
         {alertas.slice(0, 3).map((alerta) => (
-          <span key={alerta.key} className="rounded-full bg-red-100 px-2 py-1 text-[11px] font-black text-red-700">
+          <span key={alerta.key} className="rounded-full bg-red-100 px-2 py-1 text-[11px] font-semibold text-red-700">
             {alerta.label}
           </span>
         ))}
         {perfilTexto && (
-          <span className="rounded-full bg-orange-100 px-2 py-1 text-[11px] font-black text-orange-700">
+          <span className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-medium text-blue-700">
             {perfilTexto}
           </span>
         )}
@@ -36,7 +36,7 @@ export default function BanhoTosaVetAlertas({
 
   return (
     <section className="mt-4 rounded-2xl border border-red-100 bg-red-50 p-4">
-      <p className="text-xs font-black uppercase tracking-[0.16em] text-red-600">
+      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-red-600">
         Alertas veterinarios para o banho
       </p>
       {alertas.length === 0 ? (
@@ -47,7 +47,7 @@ export default function BanhoTosaVetAlertas({
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
           {alertas.map((alerta) => (
             <div key={alerta.key} className="rounded-xl bg-white px-3 py-2">
-              <p className="text-xs font-black uppercase tracking-[0.12em] text-red-500">
+              <p className="text-xs font-semibold uppercase tracking-[0.12em] text-red-500">
                 {alerta.label}
               </p>
               <p className="mt-1 text-sm font-semibold text-slate-700">
@@ -58,7 +58,7 @@ export default function BanhoTosaVetAlertas({
         </div>
       )}
       {perfilTexto && alertas.length > 0 && (
-        <p className="mt-3 text-xs font-bold uppercase tracking-[0.12em] text-orange-600">
+        <p className="mt-3 text-xs font-semibold uppercase tracking-[0.12em] text-blue-700">
           Perfil: {perfilTexto}
         </p>
       )}

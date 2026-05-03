@@ -5,7 +5,7 @@ export default function BanhoTosaHelpTooltip({ text }) {
     <span className="group relative inline-flex align-middle">
       <span
         tabIndex={0}
-        className="ml-1 inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-orange-100 text-[10px] font-black text-orange-700 outline-none ring-orange-200 transition group-hover:bg-orange-200 focus:ring-2"
+        className="ml-1 inline-flex h-4 w-4 cursor-help items-center justify-center rounded-full bg-blue-50 text-[10px] font-semibold text-blue-700 outline-none ring-blue-200 transition group-hover:bg-blue-100 focus:ring-2"
       >
         ?
       </span>

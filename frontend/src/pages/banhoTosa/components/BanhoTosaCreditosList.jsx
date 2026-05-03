@@ -45,7 +45,7 @@ function Info({ label, value }) {
   return (
     <div>
       <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-400">{label}</p>
-      <p className="text-sm font-black text-slate-900">{value}</p>
+      <p className="text-sm font-semibold text-slate-900">{value}</p>
     </div>
   );
 }

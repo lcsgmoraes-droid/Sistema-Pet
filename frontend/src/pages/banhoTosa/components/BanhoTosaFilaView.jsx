@@ -303,7 +303,7 @@ function AtendimentoCard({
           <div className="mt-2 flex flex-wrap gap-1.5">
             <StatusBadge status={atendimento.status} />
             {atendimento.porte_snapshot && (
-              <span className="rounded-full bg-orange-50 px-2 py-1 text-[11px] font-semibold text-orange-700">
+              <span className="rounded-full bg-slate-100 px-2 py-1 text-[11px] font-medium text-slate-600">
                 {atendimento.porte_snapshot}
                 {atendimento.pelagem_snapshot ? ` / ${atendimento.pelagem_snapshot}` : ""}
               </span>
