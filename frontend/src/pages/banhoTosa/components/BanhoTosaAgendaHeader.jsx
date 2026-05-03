@@ -1,21 +1,20 @@
+import { RefreshCw } from "lucide-react";
+import ActionButton from "../../../components/ui/ActionButton";
+
 export default function BanhoTosaAgendaHeader({ dataRef, onAtualizar }) {
   return (
     <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
       <div>
-        <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-500">
-          Dia selecionado
-        </p>
-        <h2 className="mt-2 text-xl font-black text-slate-900">
+        <h2 className="text-base font-semibold text-slate-900">
           Agendamentos de {dataRef}
         </h2>
+        <p className="mt-1 text-sm text-slate-500">
+          Status do atendimento no dia selecionado.
+        </p>
       </div>
-      <button
-        type="button"
-        onClick={onAtualizar}
-        className="rounded-2xl border border-slate-200 px-4 py-2 text-sm font-bold text-slate-600 transition hover:border-orange-300 hover:text-orange-700"
-      >
+      <ActionButton icon={RefreshCw} intent="neutral" onClick={onAtualizar} tone="soft">
         Atualizar
-      </button>
+      </ActionButton>
     </div>
   );
 }

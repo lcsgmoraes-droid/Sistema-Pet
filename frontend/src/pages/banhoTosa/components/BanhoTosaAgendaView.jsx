@@ -1,7 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
+import { CalendarDays, Clock3, Plus, RefreshCw, UsersRound } from "lucide-react";
 import { useLocation, useSearchParams } from "react-router-dom";
+import ActionButton from "../../../components/ui/ActionButton";
 import { api } from "../../../services/api";
+import MetricCard from "../../../components/ui/MetricCard";
+import MetricGrid from "../../../components/ui/MetricGrid";
+import Panel from "../../../components/ui/Panel";
 import { buildReturnTo } from "../../../utils/petReturnFlow";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { getApiErrorMessage, toApiDecimal } from "../banhoTosaUtils";
@@ -28,10 +33,12 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
   const [loadingAgenda, setLoadingAgenda] = useState(false);
   const [loadingSugestoes, setLoadingSugestoes] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [formOpen, setFormOpen] = useState(false);
   const [tutorSelecionado, setTutorSelecionado] = useState(null);
   const [petsDoTutor, setPetsDoTutor] = useState([]);
   const [loadingPets, setLoadingPets] = useState(false);
   const [form, setForm] = useState(criarFormularioInicial);
+  const formRef = useRef(null);
   const novoPetIdQuery = searchParams.get("novo_pet_id") || "";
   const tutorIdQuery = searchParams.get("tutor_id") || "";
   const tutorNomeQuery = searchParams.get("tutor_nome") || "";
@@ -44,6 +51,10 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
         tutor_nome: tutorSelecionado?.nome || null,
       }),
     [location.pathname, location.search, tutorSelecionado?.id, tutorSelecionado?.nome]
+  );
+  const agendaResumo = useMemo(
+    () => resumirAgenda(agendamentos, capacidade, recursos),
+    [agendamentos, capacidade, recursos],
   );
 
   async function carregarAgenda() {
@@ -161,6 +172,13 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
     setForm(criarFormularioInicial());
   }
 
+  function abrirNovoAgendamento() {
+    setFormOpen(true);
+    window.setTimeout(() => {
+      formRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 0);
+  }
+
   async function carregarSugestoes() {
     setLoadingSugestoes(true);
     try {
@@ -201,6 +219,7 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
 
       toast.success("Agendamento criado.");
       resetarFormularioAgendamento();
+      setFormOpen(false);
       await carregarAgenda();
       await carregarSugestoes();
       await onChanged(true);
@@ -263,49 +282,131 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
   }
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[0.85fr_1.15fr]">
-      <BanhoTosaAgendaCriacaoPanel
-        dataRef={dataRef}
-        form={form}
-        loadingPets={loadingPets}
-        loadingSugestoes={loadingSugestoes}
-        petsDoTutor={petsDoTutor}
-        recursos={recursos}
-        retornoNovoPet={retornoNovoPet}
-        saving={saving}
-        servicos={servicos}
-        sugestoes={sugestoes}
-        tutorSelecionado={tutorSelecionado}
-        onChangeData={setDataRef}
-        onChangeField={updateField}
-        onChangeServico={onServicoChange}
-        onSelectTutor={selecionarTutorAgenda}
-        onSubmit={criarAgendamento}
-        onUseSlot={usarSlot}
-      />
+    <div className="space-y-4">
+      <Panel
+        actions={
+          <>
+            <ActionButton icon={RefreshCw} intent="neutral" onClick={carregarAgenda} tone="soft">
+              Atualizar
+            </ActionButton>
+            <ActionButton icon={Plus} intent="create" onClick={abrirNovoAgendamento}>
+              Novo agendamento
+            </ActionButton>
+          </>
+        }
+        subtitle="Acompanhe o dia antes de abrir um novo cadastro."
+        title="Agenda de Banho & Tosa"
+      >
+        <div className="mb-3 max-w-xs">
+          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Data da agenda
+          </label>
+          <input
+            className="h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            onChange={(event) => setDataRef(event.target.value)}
+            type="date"
+            value={dataRef}
+          />
+        </div>
+        <MetricGrid>
+          <MetricCard
+            icon={<CalendarDays size={18} />}
+            intent="blue"
+            label="Agendamentos"
+            subtitle="Dia selecionado"
+            value={agendaResumo.total}
+          />
+          <MetricCard
+            icon={<Clock3 size={18} />}
+            intent="amber"
+            label="Em andamento"
+            subtitle="Check-in ou atendimento"
+            value={agendaResumo.emAndamento}
+          />
+          <MetricCard
+            icon={<UsersRound size={18} />}
+            intent="emerald"
+            label="Recursos ativos"
+            subtitle="Boxes/equipe disponiveis"
+            value={agendaResumo.recursosAtivos}
+          />
+          <MetricCard
+            intent="slate"
+            label="Capacidade"
+            subtitle={`${capacidade?.janela_inicio || "08:00"} as ${capacidade?.janela_fim || "18:00"}`}
+            value={`${agendaResumo.ocupacao}%`}
+          />
+        </MetricGrid>
+      </Panel>
 
-      <BanhoTosaAgendaList
-        agendamentos={agendamentos}
-        dataRef={dataRef}
-        loading={loadingAgenda}
-        onAtualizar={carregarAgenda}
-        onCancelar={cancelar}
-        onCheckIn={checkIn}
-      />
+      {formOpen && (
+        <div ref={formRef}>
+          <BanhoTosaAgendaCriacaoPanel
+            dataRef={dataRef}
+            form={form}
+            loadingPets={loadingPets}
+            loadingSugestoes={loadingSugestoes}
+            petsDoTutor={petsDoTutor}
+            recursos={recursos}
+            retornoNovoPet={retornoNovoPet}
+            saving={saving}
+            servicos={servicos}
+            sugestoes={sugestoes}
+            tutorSelecionado={tutorSelecionado}
+            onChangeData={setDataRef}
+            onChangeField={updateField}
+            onChangeServico={onServicoChange}
+            onClose={() => setFormOpen(false)}
+            onSelectTutor={selecionarTutorAgenda}
+            onSubmit={criarAgendamento}
+            onUseSlot={usarSlot}
+          />
+        </div>
+      )}
 
-      <div className="xl:col-span-2">
-        <BanhoTosaAgendaGrade
+      <div className="grid gap-4 xl:grid-cols-[1fr_0.9fr]">
+        <BanhoTosaAgendaList
           agendamentos={agendamentos}
-          capacidade={capacidade}
-          recursos={recursos}
-          sugestoes={sugestoes}
-          onUseSlot={usarSlot}
+          dataRef={dataRef}
+          loading={loadingAgenda}
+          onAtualizar={carregarAgenda}
+          onCancelar={cancelar}
+          onCheckIn={checkIn}
         />
-      </div>
 
-      <div className="xl:col-span-2">
         <BanhoTosaCapacidadePanel capacidade={capacidade} />
       </div>
+
+      <BanhoTosaAgendaGrade
+        agendamentos={agendamentos}
+        capacidade={capacidade}
+        recursos={recursos}
+        sugestoes={sugestoes}
+        onUseSlot={usarSlot}
+      />
     </div>
   );
+}
+
+function resumirAgenda(agendamentos, capacidade, recursos) {
+  const emAndamento = agendamentos.filter((agendamento) =>
+    ["check_in", "em_atendimento", "em_execucao"].includes(String(agendamento.status || "").toLowerCase()),
+  ).length;
+  const recursosAtivos = recursos.filter((recurso) => recurso.ativo).length;
+  const recursosCapacidade = capacidade?.recursos || [];
+  const ocupacao = recursosCapacidade.length
+    ? Math.round(
+        recursosCapacidade.reduce(
+          (acc, recurso) => acc + Number(recurso.ocupacao_percentual || 0),
+          0,
+        ) / recursosCapacidade.length,
+      )
+    : 0;
+
+  return {
+    emAndamento,
+    ocupacao,
+    recursosAtivos,
+    total: agendamentos.length,
+  };
 }

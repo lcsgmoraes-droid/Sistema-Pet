@@ -24,6 +24,11 @@ const ACTION_INTENTS = {
     soft: "border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100",
     ghost: "border-transparent bg-transparent text-amber-700 hover:bg-amber-50",
   },
+  info: {
+    solid: "border-cyan-600 bg-cyan-600 text-white hover:bg-cyan-700",
+    soft: "border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100",
+    ghost: "border-transparent bg-transparent text-cyan-700 hover:bg-cyan-50",
+  },
 };
 
 const ACTION_SIZES = {

@@ -1,3 +1,6 @@
+import { X } from "lucide-react";
+import ActionButton from "../../../components/ui/ActionButton";
+import Panel from "../../../components/ui/Panel";
 import BanhoTosaAgendaForm from "./BanhoTosaAgendaForm";
 import BanhoTosaSugestoesSlots from "./BanhoTosaSugestoesSlots";
 
@@ -16,12 +19,21 @@ export default function BanhoTosaAgendaCriacaoPanel({
   onChangeData,
   onChangeField,
   onChangeServico,
+  onClose,
   onSelectTutor,
   onSubmit,
   onUseSlot,
 }) {
   return (
-    <div>
+    <Panel
+      actions={
+        <ActionButton icon={X} intent="neutral" onClick={onClose} tone="ghost">
+          Fechar
+        </ActionButton>
+      }
+      subtitle="Selecione tutor e pet, depois use uma sugestao de horario se quiser acelerar."
+      title="Novo agendamento"
+    >
       <BanhoTosaAgendaForm
         dataRef={dataRef}
         form={form}
@@ -43,6 +55,6 @@ export default function BanhoTosaAgendaCriacaoPanel({
         sugestoes={sugestoes}
         onUseSlot={onUseSlot}
       />
-    </div>
+    </Panel>
   );
 }

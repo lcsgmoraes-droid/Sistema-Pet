@@ -1,3 +1,5 @@
+import { Plus } from "lucide-react";
+import ActionButton from "../../../components/ui/ActionButton";
 import { SelectField, TextField } from "../../../components/ui/FormField";
 import TutorPetSelector from "../../../components/veterinario/TutorPetSelector";
 
@@ -18,18 +20,8 @@ export default function BanhoTosaAgendaForm({
   onSubmit,
 }) {
   return (
-    <form
-      onSubmit={onSubmit}
-      className="rounded-3xl border border-white/80 bg-white p-6 shadow-sm"
-    >
-      <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-500">
-        Agenda
-      </p>
-      <h2 className="mt-2 text-xl font-black text-slate-900">
-        Novo agendamento
-      </h2>
-
-      <div className="mt-5 space-y-4">
+    <form onSubmit={onSubmit} className="space-y-4">
+      <div className="space-y-4">
         <TutorPetSelector
           tutorSelecionado={tutorSelecionado}
           petId={form.pet_id}
@@ -42,11 +34,11 @@ export default function BanhoTosaAgendaForm({
         />
 
         <div className="grid gap-4 sm:grid-cols-2">
-          <TextField label="Data" type="date" value={dataRef} onChange={onChangeData} tone="warm" />
-          <TextField label="Hora" type="time" value={form.hora} onChange={(value) => onChangeField("hora", value)} tone="warm" />
+          <TextField label="Data" type="date" value={dataRef} onChange={onChangeData} />
+          <TextField label="Hora" type="time" value={form.hora} onChange={(value) => onChangeField("hora", value)} />
         </div>
 
-        <SelectField label="Recurso / box" value={form.recurso_id} onChange={(value) => onChangeField("recurso_id", value)} tone="warm">
+        <SelectField label="Recurso / box" value={form.recurso_id} onChange={(value) => onChangeField("recurso_id", value)}>
           <option value="">Sem recurso definido</option>
           {recursos.filter((item) => item.ativo).map((recurso) => (
             <option key={recurso.id} value={recurso.id}>
@@ -55,7 +47,7 @@ export default function BanhoTosaAgendaForm({
           ))}
         </SelectField>
 
-        <SelectField label="Servico" value={form.servico_id} onChange={onChangeServico} tone="warm">
+        <SelectField label="Servico" value={form.servico_id} onChange={onChangeServico}>
           <option value="">Banho & Tosa avulso</option>
           {servicos.filter((item) => item.ativo).map((servico) => (
             <option key={servico.id} value={servico.id}>
@@ -64,17 +56,17 @@ export default function BanhoTosaAgendaForm({
           ))}
         </SelectField>
 
-        <TextField label="Valor previsto" type="number" value={form.valor_unitario} onChange={(value) => onChangeField("valor_unitario", value)} tone="warm" />
-        <TextField label="Observacoes" value={form.observacoes} onChange={(value) => onChangeField("observacoes", value)} tone="warm" />
+        <div className="grid gap-4 sm:grid-cols-2">
+          <TextField label="Valor previsto" type="number" value={form.valor_unitario} onChange={(value) => onChangeField("valor_unitario", value)} />
+          <TextField label="Observacoes" value={form.observacoes} onChange={(value) => onChangeField("observacoes", value)} />
+        </div>
       </div>
 
-      <button
-        type="submit"
-        disabled={saving}
-        className="mt-6 w-full rounded-2xl bg-slate-900 px-5 py-3 text-sm font-bold text-white transition hover:bg-slate-700 disabled:opacity-60"
-      >
-        {saving ? "Agendando..." : "Criar agendamento"}
-      </button>
+      <div className="flex justify-end">
+        <ActionButton icon={Plus} intent="create" loading={saving} size="md" type="submit">
+          Criar agendamento
+        </ActionButton>
+      </div>
     </form>
   );
 }

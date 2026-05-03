@@ -1,3 +1,7 @@
+import { CalendarDays } from "lucide-react";
+import EmptyState from "../../../components/ui/EmptyState";
+import LoadingState from "../../../components/ui/LoadingState";
+import Panel from "../../../components/ui/Panel";
 import BanhoTosaAgendaCard from "./BanhoTosaAgendaCard";
 import BanhoTosaAgendaHeader from "./BanhoTosaAgendaHeader";
 
@@ -10,13 +14,11 @@ export default function BanhoTosaAgendaList({
   onCheckIn,
 }) {
   return (
-    <div className="rounded-3xl border border-white/80 bg-white p-6 shadow-sm">
+    <Panel>
       <BanhoTosaAgendaHeader dataRef={dataRef} onAtualizar={onAtualizar} />
-      <div className="mt-5 space-y-3">
+      <div className="mt-3 space-y-3">
         {loading && (
-          <div className="rounded-2xl bg-slate-50 p-5 text-center text-sm font-semibold text-slate-500">
-            Carregando agenda...
-          </div>
+          <LoadingState compact label="Carregando agenda..." />
         )}
 
         {!loading && agendamentos.map((agendamento) => (
@@ -29,11 +31,14 @@ export default function BanhoTosaAgendaList({
         ))}
 
         {!loading && agendamentos.length === 0 && (
-          <div className="rounded-2xl border border-dashed border-slate-300 p-8 text-center text-slate-500">
-            Nenhum agendamento para esta data.
-          </div>
+          <EmptyState
+            compact
+            description="Use Novo agendamento para incluir o primeiro atendimento deste dia."
+            icon={CalendarDays}
+            title="Nenhum agendamento para esta data"
+          />
         )}
       </div>
-    </div>
+    </Panel>
   );
 }

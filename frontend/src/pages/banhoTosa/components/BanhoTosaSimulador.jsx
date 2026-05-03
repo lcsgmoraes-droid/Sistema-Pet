@@ -1,5 +1,8 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
+import ActionButton from "../../../components/ui/ActionButton";
+import { TextField } from "../../../components/ui/FormField";
+import Panel from "../../../components/ui/Panel";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { formatCurrency, formatNumber, getApiErrorMessage, toApiDecimal } from "../banhoTosaUtils";
 
@@ -115,97 +118,78 @@ export default function BanhoTosaSimulador({ config }) {
   }
 
   return (
-    <form
-      onSubmit={simular}
-      className="rounded-3xl border border-orange-100 bg-white p-6 shadow-sm"
+    <Panel
+      actions={
+        <ActionButton intent="edit" loading={simulando} type="submit" form="bt-simulador-custo">
+          Simular margem
+        </ActionButton>
+      }
+      subtitle="Use valores reais ou estimados para validar preco, tempo e margem."
+      title="Simulador de custo"
     >
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-500">
-            Simulador de custo
-          </p>
-          <h2 className="mt-2 text-xl font-black text-slate-900">
-            Margem por banho antes de vender
-          </h2>
-          <p className="mt-1 text-sm text-slate-500">
-            Use valores reais ou estimados para validar preco, tempo e margem.
-          </p>
+      <form id="bt-simulador-custo" onSubmit={simular} className="space-y-5">
+        <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <NumberField label="Valor cobrado" value={form.valor_cobrado} onChange={(value) => updateField("valor_cobrado", value)} />
+          <NumberField label="Insumos totais" value={form.custo_insumos} onChange={(value) => updateField("custo_insumos", value)} />
+          <NumberField label="Minutos de banho" value={form.minutos_banho} onChange={(value) => updateField("minutos_banho", value)} />
+          <NumberField label="Vazao L/min" value={form.vazao_chuveiro_litros_min} onChange={(value) => updateField("vazao_chuveiro_litros_min", value)} />
+          <NumberField label="Custo litro agua" value={form.custo_litro_agua} onChange={(value) => updateField("custo_litro_agua", value)} />
+          <NumberField label="Potencia secador W" value={form.potencia_watts} onChange={(value) => updateField("potencia_watts", value)} />
+          <NumberField label="Minutos energia" value={form.minutos_energia} onChange={(value) => updateField("minutos_energia", value)} />
+          <NumberField label="Custo kWh" value={form.custo_kwh} onChange={(value) => updateField("custo_kwh", value)} />
+          <NumberField label="Salario/custo mensal" value={form.custo_mensal_funcionario} onChange={(value) => updateField("custo_mensal_funcionario", value)} />
+          <NumberField label="Horas produtivas mes" value={form.horas_produtivas_mes} onChange={(value) => updateField("horas_produtivas_mes", value)} />
+          <NumberField label="Minutos mao de obra" value={form.minutos_trabalhados} onChange={(value) => updateField("minutos_trabalhados", value)} />
+          <NumberField label="% taxas pagamento" value={form.percentual_taxas_pagamento} onChange={(value) => updateField("percentual_taxas_pagamento", value)} />
         </div>
-        <button
-          type="submit"
-          disabled={simulando}
-          className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-bold text-white shadow-sm transition hover:bg-slate-700 disabled:opacity-60"
-        >
-          {simulando ? "Simulando..." : "Simular margem"}
-        </button>
-      </div>
 
-      <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <NumberField label="Valor cobrado" value={form.valor_cobrado} onChange={(value) => updateField("valor_cobrado", value)} />
-        <NumberField label="Insumos totais" value={form.custo_insumos} onChange={(value) => updateField("custo_insumos", value)} />
-        <NumberField label="Minutos de banho" value={form.minutos_banho} onChange={(value) => updateField("minutos_banho", value)} />
-        <NumberField label="Vazao L/min" value={form.vazao_chuveiro_litros_min} onChange={(value) => updateField("vazao_chuveiro_litros_min", value)} />
-        <NumberField label="Custo litro agua" value={form.custo_litro_agua} onChange={(value) => updateField("custo_litro_agua", value)} />
-        <NumberField label="Potencia secador W" value={form.potencia_watts} onChange={(value) => updateField("potencia_watts", value)} />
-        <NumberField label="Minutos energia" value={form.minutos_energia} onChange={(value) => updateField("minutos_energia", value)} />
-        <NumberField label="Custo kWh" value={form.custo_kwh} onChange={(value) => updateField("custo_kwh", value)} />
-        <NumberField label="Salario/custo mensal" value={form.custo_mensal_funcionario} onChange={(value) => updateField("custo_mensal_funcionario", value)} />
-        <NumberField label="Horas produtivas mes" value={form.horas_produtivas_mes} onChange={(value) => updateField("horas_produtivas_mes", value)} />
-        <NumberField label="Minutos mao de obra" value={form.minutos_trabalhados} onChange={(value) => updateField("minutos_trabalhados", value)} />
-        <NumberField label="% taxas pagamento" value={form.percentual_taxas_pagamento} onChange={(value) => updateField("percentual_taxas_pagamento", value)} />
-      </div>
+        {resultado && (
+          <div className="grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-5 text-blue-900">
+              <p className="text-sm text-blue-700">Custo total estimado</p>
+              <p className="mt-2 text-3xl font-bold text-slate-950">
+                {formatCurrency(resultado.custo_total)}
+              </p>
+              <p className="mt-4 text-sm text-blue-700">Margem</p>
+              <p className="text-2xl font-bold text-slate-950">
+                {formatCurrency(resultado.margem_valor)} ({formatNumber(resultado.margem_percentual, 2)}%)
+              </p>
+            </div>
 
-      {resultado && (
-        <div className="mt-6 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-          <div className="rounded-3xl bg-slate-900 p-5 text-white">
-            <p className="text-sm text-slate-300">Custo total estimado</p>
-            <p className="mt-2 text-4xl font-black">
-              {formatCurrency(resultado.custo_total)}
-            </p>
-            <p className="mt-4 text-sm text-slate-300">Margem</p>
-            <p className="text-2xl font-black">
-              {formatCurrency(resultado.margem_valor)} ({formatNumber(resultado.margem_percentual, 2)}%)
-            </p>
+            <div className="grid gap-2 sm:grid-cols-2">
+              <Breakdown label="Insumos" value={resultado.custo_insumos} />
+              <Breakdown label="Agua" value={resultado.custo_agua} />
+              <Breakdown label="Energia" value={resultado.custo_energia} />
+              <Breakdown label="Mao de obra" value={resultado.custo_mao_obra} />
+              <Breakdown label="Comissao" value={resultado.custo_comissao} />
+              <Breakdown label="Taxas" value={resultado.custo_taxas_pagamento} />
+            </div>
           </div>
-
-          <div className="grid gap-2 sm:grid-cols-2">
-            <Breakdown label="Insumos" value={resultado.custo_insumos} />
-            <Breakdown label="Agua" value={resultado.custo_agua} />
-            <Breakdown label="Energia" value={resultado.custo_energia} />
-            <Breakdown label="Mao de obra" value={resultado.custo_mao_obra} />
-            <Breakdown label="Comissao" value={resultado.custo_comissao} />
-            <Breakdown label="Taxas" value={resultado.custo_taxas_pagamento} />
-          </div>
-        </div>
-      )}
-    </form>
+        )}
+      </form>
+    </Panel>
   );
 }
 
 function NumberField({ label, value, onChange }) {
   return (
-    <label className="block">
-      <span className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
-        {label}
-      </span>
-      <input
-        type="number"
-        step="0.01"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-        className="mt-1 w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-sm font-semibold text-slate-900 outline-none transition focus:border-orange-400 focus:bg-white focus:ring-2 focus:ring-orange-100"
-      />
-    </label>
+    <TextField
+      label={label}
+      onChange={onChange}
+      step="0.01"
+      type="number"
+      value={value}
+    />
   );
 }
 
 function Breakdown({ label, value }) {
   return (
-    <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-      <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-500">
+    <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">
         {label}
       </p>
-      <p className="mt-1 text-lg font-black text-slate-900">
+      <p className="mt-1 text-lg font-semibold text-slate-900">
         {formatCurrency(value)}
       </p>
     </div>

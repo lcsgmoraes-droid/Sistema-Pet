@@ -1,3 +1,5 @@
+import Panel from "../../../components/ui/Panel";
+
 const SLOT_MINUTOS = 30;
 
 export default function BanhoTosaAgendaGrade({
@@ -12,22 +14,17 @@ export default function BanhoTosaAgendaGrade({
   const sugestoesPorCelula = mapearSugestoes(sugestoes);
 
   return (
-    <section className="rounded-3xl border border-white/80 bg-white p-5 shadow-sm">
-      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <p className="text-xs font-bold uppercase tracking-[0.2em] text-orange-500">
-            Grade operacional
-          </p>
-          <h3 className="mt-2 text-lg font-black text-slate-900">
-            Horarios x recursos
-          </h3>
-        </div>
-        <span className="rounded-full bg-orange-100 px-3 py-1 text-xs font-bold text-orange-700">
+    <Panel
+      actions={
+        <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
           slots de {SLOT_MINUTOS} min
         </span>
-      </div>
+      }
+      subtitle="Mapa rapido de ocupacao por recurso."
+      title="Horarios x recursos"
+    >
 
-      <div className="mt-4 overflow-x-auto">
+      <div className="overflow-x-auto">
         <div
           className="grid min-w-[780px] gap-2"
           style={{ gridTemplateColumns: `90px repeat(${Math.max(recursosAtivos.length, 1)}, minmax(140px, 1fr))` }}
@@ -51,18 +48,18 @@ export default function BanhoTosaAgendaGrade({
       </div>
 
       {recursosAtivos.length === 0 && (
-        <p className="mt-4 rounded-2xl border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500">
+        <p className="mt-4 rounded-lg border border-dashed border-slate-300 p-5 text-center text-sm text-slate-500">
           Cadastre recursos para visualizar a grade.
         </p>
       )}
-    </section>
+    </Panel>
   );
 }
 
 function SlotRow({ agendamentos, recursos, slot, sugestoesPorCelula, onUseSlot }) {
   return (
     <>
-      <div className="rounded-2xl bg-slate-100 px-3 py-3 text-xs font-black text-slate-600">
+      <div className="rounded-lg bg-slate-100 px-3 py-3 text-xs font-semibold text-slate-600">
         {slot.label}
       </div>
       {recursos.map((recurso) => {
@@ -84,9 +81,9 @@ function SlotRow({ agendamentos, recursos, slot, sugestoesPorCelula, onUseSlot }
 
 function HeaderRecurso({ recurso }) {
   return (
-    <div className="rounded-2xl bg-slate-900 px-3 py-3 text-white">
-      <p className="text-sm font-black">{recurso.nome}</p>
-      <p className="text-xs font-bold uppercase tracking-[0.12em] text-slate-300">
+    <div className="rounded-lg border border-blue-200 bg-blue-50 px-3 py-3 text-blue-900">
+      <p className="text-sm font-semibold">{recurso.nome}</p>
+      <p className="text-xs font-semibold uppercase tracking-wide text-blue-500">
         {recurso.tipo} | cap. {recurso.capacidade_simultanea}
       </p>
     </div>
@@ -100,9 +97,9 @@ function GradeCell({ itens, recurso, sugestao, onUseSlot }) {
       type="button"
       disabled={!sugestao}
       onClick={() => sugestao && onUseSlot(sugestao)}
-      className={`min-h-[74px] rounded-2xl border p-3 text-left transition ${
+      className={`min-h-[74px] rounded-lg border p-3 text-left transition ${
         ocupado
-          ? "border-orange-200 bg-orange-50"
+          ? "border-amber-200 bg-amber-50"
           : sugestao
           ? "border-emerald-200 bg-emerald-50 hover:border-emerald-400"
           : "border-slate-200 bg-slate-50"
@@ -110,7 +107,7 @@ function GradeCell({ itens, recurso, sugestao, onUseSlot }) {
     >
       {ocupado ? (
         itens.slice(0, 2).map((item) => (
-          <p key={item.id} className="truncate text-xs font-black text-slate-800">
+          <p key={item.id} className="truncate text-xs font-semibold text-slate-800">
             {item.pet_nome || `Pet #${item.pet_id}`}
           </p>
         ))
@@ -120,12 +117,12 @@ function GradeCell({ itens, recurso, sugestao, onUseSlot }) {
         </p>
       )}
       {itens.length > 2 && (
-        <p className="mt-1 text-xs font-bold text-orange-700">
+        <p className="mt-1 text-xs font-semibold text-amber-700">
           +{itens.length - 2} agenda(s)
         </p>
       )}
       {sugestao && (
-        <p className="mt-2 text-[11px] font-black uppercase tracking-[0.12em] text-emerald-700">
+        <p className="mt-2 text-[11px] font-semibold uppercase tracking-wide text-emerald-700">
           usar {recurso.nome}
         </p>
       )}
