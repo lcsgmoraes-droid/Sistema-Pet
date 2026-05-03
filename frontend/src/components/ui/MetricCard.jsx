@@ -8,18 +8,35 @@ const INTENTS = {
   amber: "border-amber-200 bg-amber-50 text-amber-700",
 };
 
+const SIZES = {
+  compact: {
+    card: "min-h-[58px] p-3",
+    value: "mt-1 text-sm",
+    subtitle: "mt-0.5",
+  },
+  md: {
+    card: "min-h-[92px] p-4",
+    value: "mt-2 text-2xl",
+    subtitle: "mt-1",
+  },
+};
+
 export default function MetricCard({
   className = "",
   icon,
   intent = "slate",
   label,
+  size = "md",
   subtitle,
   value,
 }) {
+  const sizeClasses = SIZES[size] || SIZES.md;
+
   return (
     <article
       className={[
-        "flex min-h-[92px] flex-col justify-between rounded-lg border p-4",
+        "flex flex-col justify-between rounded-lg border",
+        sizeClasses.card,
         INTENTS[intent] || INTENTS.slate,
         className,
       ]
@@ -31,11 +48,23 @@ export default function MetricCard({
         {icon ? <div className="shrink-0 opacity-80">{icon}</div> : null}
       </div>
       <div>
-        <div className="mt-2 text-2xl font-bold leading-tight text-slate-950">
+        <div
+          className={[
+            "font-bold leading-tight text-slate-950",
+            sizeClasses.value,
+          ].join(" ")}
+        >
           {value ?? "-"}
         </div>
         {subtitle ? (
-          <p className="mt-1 text-xs leading-snug opacity-80">{subtitle}</p>
+          <p
+            className={[
+              "text-xs leading-snug opacity-80",
+              sizeClasses.subtitle,
+            ].join(" ")}
+          >
+            {subtitle}
+          </p>
         ) : null}
       </div>
     </article>

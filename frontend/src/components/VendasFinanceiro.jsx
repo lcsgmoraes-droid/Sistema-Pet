@@ -32,9 +32,14 @@ import writeExcelFile from "write-excel-file/browser";
 import api from "../api";
 import { useAuth } from "../contexts/AuthContext";
 import HistoricoVendasClienteTab from "../pages/Financeiro/HistoricoVendasClienteTab";
+import ActionButton from "./ui/ActionButton";
 import { actionButtonClasses } from "./ui/actionStyles";
+import FilterBar, { FilterRow } from "./ui/FilterBar";
+import MetricCard from "./ui/MetricCard";
+import MetricGrid from "./ui/MetricGrid";
 import MoneyCell, { formatMoneyCellValue, isZeroMoneyValue } from "./ui/MoneyCell";
 import NumberCell from "./ui/NumberCell";
+import StatusBadge from "./ui/StatusBadge";
 
 const COLUNAS_RELATORIO_VENDAS = [
   { key: "data_venda", label: "Data", value: (v) => v.data_venda || "" },
@@ -306,18 +311,18 @@ function vendaEstaEmAberto(venda) {
 function getStatusVendaMeta(status) {
   const statusNormalizado = String(status || "").toLowerCase();
   if (statusNormalizado === "finalizada") {
-    return { label: "Baixada", className: "bg-green-100 text-green-800" };
+    return { label: "Baixada", intent: "success" };
   }
   if (statusNormalizado === "pago_nf") {
-    return { label: "Pago NF", className: "bg-emerald-100 text-emerald-800" };
+    return { label: "Pago NF", intent: "success" };
   }
   if (statusNormalizado === "baixa_parcial") {
-    return { label: "Parcial", className: "bg-blue-100 text-blue-800" };
+    return { label: "Parcial", intent: "info" };
   }
   if (statusNormalizado === "cancelada") {
-    return { label: "Cancelada", className: "bg-slate-200 text-slate-700" };
+    return { label: "Cancelada", intent: "danger" };
   }
-  return { label: "Aberta", className: "bg-yellow-100 text-yellow-800" };
+  return { label: "Aberta", intent: "warning" };
 }
 
 function arredondarMoeda(valor) {
@@ -1208,22 +1213,26 @@ export default function VendasFinanceiro() {
     formatarMoedaComSinalOuTraco(valor, "-");
 
   const cardsTotalizadoresLista = [
-    { label: "Vendas", value: totalizadoresListaVendas.quantidade.toLocaleString("pt-BR") },
-    { label: "Com NF", value: totalizadoresListaVendas.com_nf.toLocaleString("pt-BR") },
-    { label: "Venda Bruta", value: formatarMoedaOuTraco(totalizadoresListaVendas.venda_bruta) },
-    { label: "Tx Loja", value: formatarMoedaComSinalOuTraco(totalizadoresListaVendas.taxa_loja, "+") },
-    { label: "Desconto", value: formatarDeducaoTotalizador(totalizadoresListaVendas.desconto) },
-    { label: "Tx. Entrega", value: formatarDeducaoTotalizador(totalizadoresListaVendas.taxa_entrega) },
-    { label: "Tx. Operac.", value: formatarDeducaoTotalizador(totalizadoresListaVendas.taxa_operacional) },
-    { label: "Tx. Cartao", value: formatarDeducaoTotalizador(totalizadoresListaVendas.taxa_cartao) },
-    { label: "Comissao", value: formatarDeducaoTotalizador(totalizadoresListaVendas.comissao) },
-    { label: "Imposto", value: formatarDeducaoTotalizador(totalizadoresListaVendas.imposto) },
-    { label: "Custo Camp.", value: formatarDeducaoTotalizador(totalizadoresListaVendas.custo_campanha) },
-    { label: "Liquida", value: formatarMoedaOuTraco(totalizadoresListaVendas.venda_liquida) },
-    { label: "Custo", value: formatarDeducaoTotalizador(totalizadoresListaVendas.custo_produtos) },
-    { label: "Lucro", value: formatarMoedaOuTraco(totalizadoresListaVendas.lucro) },
-    { label: "MG Venda", value: formatarPercentualOuTraco(totalizadoresListaVendas.margem_sobre_venda) },
-    { label: "MG Custo", value: formatarPercentualOuTraco(totalizadoresListaVendas.margem_sobre_custo) },
+    { label: "Vendas", value: totalizadoresListaVendas.quantidade.toLocaleString("pt-BR"), intent: "slate" },
+    { label: "Com NF", value: totalizadoresListaVendas.com_nf.toLocaleString("pt-BR"), intent: "blue" },
+    { label: "Venda Bruta", value: formatarMoedaOuTraco(totalizadoresListaVendas.venda_bruta), intent: "emerald" },
+    { label: "Tx Loja", value: formatarMoedaComSinalOuTraco(totalizadoresListaVendas.taxa_loja, "+"), intent: "emerald" },
+    { label: "Desconto", value: formatarDeducaoTotalizador(totalizadoresListaVendas.desconto), intent: "amber" },
+    { label: "Tx. Entrega", value: formatarDeducaoTotalizador(totalizadoresListaVendas.taxa_entrega), intent: "blue" },
+    { label: "Tx. Operac.", value: formatarDeducaoTotalizador(totalizadoresListaVendas.taxa_operacional), intent: "amber" },
+    { label: "Tx. Cartao", value: formatarDeducaoTotalizador(totalizadoresListaVendas.taxa_cartao), intent: "violet" },
+    { label: "Comissao", value: formatarDeducaoTotalizador(totalizadoresListaVendas.comissao), intent: "blue" },
+    { label: "Imposto", value: formatarDeducaoTotalizador(totalizadoresListaVendas.imposto), intent: "red" },
+    { label: "Custo Camp.", value: formatarDeducaoTotalizador(totalizadoresListaVendas.custo_campanha), intent: "cyan" },
+    { label: "Liquida", value: formatarMoedaOuTraco(totalizadoresListaVendas.venda_liquida), intent: "blue" },
+    { label: "Custo", value: formatarDeducaoTotalizador(totalizadoresListaVendas.custo_produtos), intent: "amber" },
+    {
+      label: "Lucro",
+      value: formatarMoedaOuTraco(totalizadoresListaVendas.lucro),
+      intent: Number(totalizadoresListaVendas.lucro || 0) >= 0 ? "emerald" : "red",
+    },
+    { label: "MG Venda", value: formatarPercentualOuTraco(totalizadoresListaVendas.margem_sobre_venda), intent: "slate" },
+    { label: "MG Custo", value: formatarPercentualOuTraco(totalizadoresListaVendas.margem_sobre_custo), intent: "slate" },
   ];
 
   const getTextoComparacao = () => {
@@ -1793,14 +1802,15 @@ export default function VendasFinanceiro() {
             />
             Sábado conta como dia útil
           </label>
-          <button
-            type="button"
+          <ActionButton
+            icon={Calendar}
+            intent="edit"
             onClick={() => setMostrarConfigFeriados((prev) => !prev)}
-            className={actionButtonClasses({ intent: "edit", tone: "soft", size: "sm" })}
+            size="sm"
+            tone="soft"
           >
-            <Calendar className="h-4 w-4" />
             Configurar feriados
-          </button>
+          </ActionButton>
         </div>
       </div>
 
@@ -2098,70 +2108,80 @@ export default function VendasFinanceiro() {
 
         {/* Filtros Avançados */}
         {podeVerFinanceiroCompleto && (
-          <div className="flex gap-2 items-center mb-4 p-3 bg-blue-50 rounded border border-blue-200">
-          <Filter className="w-5 h-5 text-blue-600" />
-          <span className="text-sm font-medium text-gray-700">
-            Filtros Avançados:
-          </span>
-
-          <select
-            value={filtroFuncionario}
-            onChange={(e) => setFiltroFuncionario(e.target.value)}
-            className="border rounded px-3 py-2 text-sm"
+          <FilterBar
+            className="mb-4 border-blue-200 bg-blue-50/70"
+            onSubmit={(event) => event.preventDefault()}
+            padding="sm"
           >
-            <option value="">Todos os funcionários</option>
-            {vendasPorFuncionario.map((f) => (
-              <option key={`func-${f.funcionario || "sem-nome"}`} value={f.funcionario}>
-                {f.funcionario}
-              </option>
-            ))}
-          </select>
+            <FilterRow className="items-center">
+              <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+                <Filter className="h-5 w-5 text-blue-600" />
+                <span>Filtros Avançados:</span>
+              </div>
 
-          <select
-            value={filtroFormaPagamento}
-            onChange={(e) => setFiltroFormaPagamento(e.target.value)}
-            className="border rounded px-3 py-2 text-sm"
-          >
-            <option value="">Todas as formas</option>
-            {formasRecebimentoConsolidadas.map((f) => (
-              <option key={`forma-${f.forma_pagamento || "sem-forma"}`} value={f.forma_pagamento}>
-                {f.forma_pagamento}
-              </option>
-            ))}
-          </select>
+              <select
+                value={filtroFuncionario}
+                onChange={(e) => setFiltroFuncionario(e.target.value)}
+                className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm"
+              >
+                <option value="">Todos os funcionários</option>
+                {vendasPorFuncionario.map((f) => (
+                  <option key={`func-${f.funcionario || "sem-nome"}`} value={f.funcionario}>
+                    {f.funcionario}
+                  </option>
+                ))}
+              </select>
 
-          <select
-            value={filtroCategoria}
-            onChange={(e) => setFiltroCategoria(e.target.value)}
-            className="border rounded px-3 py-2 text-sm"
-          >
-            <option value="">Todas as categorias</option>
-            {produtosDetalhados.map((cat) => (
-              <option key={`cat-${cat.categoria || "sem-categoria"}`} value={cat.categoria}>
-                {cat.categoria}
-              </option>
-            ))}
-          </select>
+              <select
+                value={filtroFormaPagamento}
+                onChange={(e) => setFiltroFormaPagamento(e.target.value)}
+                className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm"
+              >
+                <option value="">Todas as formas</option>
+                {formasRecebimentoConsolidadas.map((f) => (
+                  <option key={`forma-${f.forma_pagamento || "sem-forma"}`} value={f.forma_pagamento}>
+                    {f.forma_pagamento}
+                  </option>
+                ))}
+              </select>
 
-          <button
-            onClick={() => {
-              setFiltroFuncionario("");
-              setFiltroFormaPagamento("");
-              setFiltroCategoria("");
-            }}
-            className="px-3 py-2 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300 transition-colors"
-          >
-            Limpar Filtros
-          </button>
+              <select
+                value={filtroCategoria}
+                onChange={(e) => setFiltroCategoria(e.target.value)}
+                className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm"
+              >
+                <option value="">Todas as categorias</option>
+                {produtosDetalhados.map((cat) => (
+                  <option key={`cat-${cat.categoria || "sem-categoria"}`} value={cat.categoria}>
+                    {cat.categoria}
+                  </option>
+                ))}
+              </select>
 
-          <button
-            onClick={() => setMostrarGraficos(!mostrarGraficos)}
-            className="ml-auto px-3 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors flex items-center gap-2"
-          >
-            <BarChart3 className="w-4 h-4" />
-            {mostrarGraficos ? "Ocultar" : "Mostrar"} Gráficos
-          </button>
-          </div>
+              <ActionButton
+                intent="neutral"
+                tone="soft"
+                size="md"
+                onClick={() => {
+                  setFiltroFuncionario("");
+                  setFiltroFormaPagamento("");
+                  setFiltroCategoria("");
+                }}
+              >
+                Limpar Filtros
+              </ActionButton>
+
+              <ActionButton
+                onClick={() => setMostrarGraficos(!mostrarGraficos)}
+                intent="edit"
+                size="md"
+                icon={BarChart3}
+                className="ml-auto"
+              >
+                {mostrarGraficos ? "Ocultar" : "Mostrar"} Gráficos
+              </ActionButton>
+            </FilterRow>
+          </FilterBar>
         )}
 
         {/* Abas */}
@@ -3426,21 +3446,17 @@ export default function VendasFinanceiro() {
               Mostrando {listaVendasFiltrada.length} de {listaVendasVisiveis.length} venda(s)
             </div>
           </div>
-          <div className="grid gap-2 border-b border-gray-100 bg-slate-50 px-4 py-3 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-8">
+          <MetricGrid className="border-b border-gray-100 bg-slate-50 px-4 py-3 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-8">
             {cardsTotalizadoresLista.map((card) => (
-              <div
+              <MetricCard
                 key={card.label}
-                className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-sm"
-              >
-                <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500">
-                  {card.label}
-                </p>
-                <p className="mt-1 text-sm font-bold text-slate-900">
-                  {card.value}
-                </p>
-              </div>
+                intent={card.intent}
+                label={card.label}
+                size="compact"
+                value={card.value}
+              />
             ))}
-          </div>
+          </MetricGrid>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-100">
@@ -3577,11 +3593,14 @@ export default function VendasFinanceiro() {
                         <NumberCell value={venda.margem_sobre_custo} decimals={1} suffix="%" zeroAsDash />
                       </td>
                       <td className="px-2 py-2 text-center">
-                        <span
-                          className={`px-2 py-1 rounded text-xs ${getStatusVendaMeta(venda.status).className}`}
-                        >
-                          {getStatusVendaMeta(venda.status).label}
-                        </span>
+                        {(() => {
+                          const statusMeta = getStatusVendaMeta(venda.status);
+                          return (
+                            <StatusBadge intent={statusMeta.intent} size="xs">
+                              {statusMeta.label}
+                            </StatusBadge>
+                          );
+                        })()}
                       </td>
                     </tr>
 
