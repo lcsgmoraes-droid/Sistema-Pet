@@ -14,6 +14,12 @@ from app.services.error_event_reporter import (
     get_error_events,
     summarize_error_events,
 )
+from app.services.ops_persistence_service import (
+    list_ops_alerts,
+    query_recovery_actions,
+    summarize_ops_alerts,
+    upsert_ops_alerts,
+)
 from app.services.watchdog_event_reporter import (
     get_watchdog_events,
     summarize_watchdog_events,
@@ -375,7 +381,8 @@ def _self_healing_status() -> dict[str, Any]:
         "capabilities": [
             "Reinicia o servidor se o health operacional falhar repetidamente",
             "Mantem o container em pe com restart policy do Docker",
-            "Registra eventos de recuperacao para auditoria operacional",
+            "Registra eventos de recuperacao em banco para auditoria operacional",
+            "Aciona guarda contra loop de restart quando falhas se repetem em janela curta",
         ],
     }
 
@@ -501,13 +508,13 @@ def build_ops_dashboard(db: Session, *, since: datetime | None = None, until: da
     period_since = since or (now - timedelta(hours=24))
     period_until = until
 
-    error_events = get_error_events(since=period_since, until=period_until)
+    error_events = get_error_events(since=period_since, until=period_until, db=db)
     deploy_events = get_deploy_events(since=period_since, until=period_until)
-    watchdog_events = get_watchdog_events(since=period_since, until=period_until)
+    watchdog_events = get_watchdog_events(since=period_since, until=period_until, db=db)
 
-    error_summary = summarize_error_events(since=period_since, until=period_until)
+    error_summary = summarize_error_events(since=period_since, until=period_until, db=db)
     deploy_summary = summarize_deploy_events(since=period_since, until=period_until)
-    watchdog_summary = summarize_watchdog_events(since=period_since, until=period_until)
+    watchdog_summary = summarize_watchdog_events(since=period_since, until=period_until, db=db)
     watchdog = _watchdog_now(db)
     tenant_incidents = _build_tenant_incidents(db, error_events)
     route_incidents = _build_route_incidents(error_events)
@@ -518,6 +525,10 @@ def build_ops_dashboard(db: Session, *, since: datetime | None = None, until: da
         watchdog_summary,
         deploy_events,
     )
+    persisted_actionable_alerts = upsert_ops_alerts(db, actionable_alerts)
+    ops_notifications = summarize_ops_alerts(db, since=period_since)
+    active_ops_alerts = list_ops_alerts(db, status="open", since=period_since, limit=20)
+    recovery_actions = query_recovery_actions(db, since=period_since, until=period_until, limit=20)
     alerts = _build_alerts(
         watchdog=watchdog,
         error_summary=error_summary,
@@ -540,7 +551,12 @@ def build_ops_dashboard(db: Session, *, since: datetime | None = None, until: da
         "errors": error_summary,
         "deploys": deploy_summary,
         "watchdog_events": watchdog_summary,
-        "actionable_alerts": actionable_alerts,
+        "actionable_alerts": persisted_actionable_alerts or actionable_alerts,
+        "ops_notifications": {
+            **ops_notifications,
+            "active": active_ops_alerts,
+        },
+        "recovery_actions": recovery_actions,
         "tenant_incidents": tenant_incidents,
         "route_incidents": route_incidents,
         "latest": {

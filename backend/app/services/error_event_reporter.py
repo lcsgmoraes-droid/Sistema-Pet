@@ -116,6 +116,19 @@ def record_request_event(
                 file.write(line + "\n")
     except Exception:
         # Telemetry must never break a customer request.
+        pass
+
+    try:
+        from app.db import SessionLocal
+        from app.services.ops_persistence_service import persist_error_event
+
+        db = SessionLocal()
+        try:
+            persist_error_event(db, event, commit=True)
+        finally:
+            db.close()
+    except Exception:
+        # Database telemetry must never break a customer request.
         return
 
 
@@ -207,6 +220,7 @@ def list_error_events(
     slow_only: bool = False,
     since: datetime | None = None,
     until: datetime | None = None,
+    db=None,
 ) -> dict[str, Any]:
     events = get_error_events(
         tenant_id=tenant_id,
@@ -215,6 +229,7 @@ def list_error_events(
         slow_only=slow_only,
         since=since,
         until=until,
+        db=db,
     )
     events.reverse()
 
@@ -241,11 +256,13 @@ def summarize_error_events(
     tenant_id: str | None = None,
     since: datetime | None = None,
     until: datetime | None = None,
+    db=None,
 ) -> dict[str, Any]:
     events = get_error_events(
         tenant_id=tenant_id,
         since=since,
         until=until,
+        db=db,
     )
 
     by_tenant = Counter(str(event.get("tenant_id") or "sem_tenant") for event in events)
@@ -282,7 +299,29 @@ def get_error_events(
     slow_only: bool = False,
     since: datetime | None = None,
     until: datetime | None = None,
+    db=None,
 ) -> list[dict[str, Any]]:
+    if db is not None:
+        try:
+            from app.services.ops_persistence_service import query_error_events, sync_error_events_to_db
+
+            sync_error_events_to_db(db, _read_recent_events())
+            return query_error_events(
+                db,
+                tenant_id=tenant_id,
+                path_contains=path_contains,
+                status_min=status_min,
+                slow_only=slow_only,
+                slow_request_ms=SLOW_REQUEST_EVENT_MS,
+                since=since,
+                until=until,
+            )
+        except Exception:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+
     return _filter_events(
         _read_recent_events(),
         tenant_id=tenant_id,

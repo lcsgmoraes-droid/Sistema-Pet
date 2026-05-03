@@ -37,6 +37,9 @@ Separacao operacional iniciada:
 - Watchdog passou a registrar eventos em `logs/watchdog_events.jsonl`, permitindo auditar quando o sistema tentou se recuperar sozinho.
 - Painel de suporte em `/ops/incidentes`, com drilldown por tenant, rota e request_id para investigar producao sem depender apenas de relato do cliente.
 - Alertas acionaveis por tenant/rota em `/ops/incidentes`, com severidade, filtro em um clique e sugestao de correcao para erro repetido, lentidao recorrente e recuperacao automatica.
+- Incidentes operacionais passaram a ter persistencia em banco (`ops_error_events`, `ops_alerts`, `ops_recovery_actions`), mantendo os `.jsonl` apenas como fallback/backfill.
+- Deploy seguro agora aplica Alembic automaticamente antes das validacoes finais, para evitar producao com codigo novo e banco antigo.
+- Watchdog ganhou registro de recuperacao de health e guarda contra loop de restart em janela curta.
 
 Tela piloto:
 

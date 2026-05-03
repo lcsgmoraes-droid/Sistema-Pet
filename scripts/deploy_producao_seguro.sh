@@ -183,6 +183,10 @@ mark_step "subir_servicos"
 log "Subindo servicos principais"
 docker compose -f "$COMPOSE_FILE" up -d postgres backend nginx
 
+mark_step "migrar_banco"
+log "Aplicando migrations Alembic"
+docker compose -f "$COMPOSE_FILE" exec -T backend alembic upgrade head
+
 mark_step "validar_watchdog"
 log "Aguardando watchdog interno"
 wait_for \

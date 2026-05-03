@@ -148,8 +148,11 @@ function RouteCard({ item, selected, onSelect }) {
   );
 }
 
-function ActionableAlertsPanel({ alerts, onApply }) {
+function ActionableAlertsPanel({ alerts, notifications, recoveryActions, onApply }) {
   const items = alerts || [];
+  const activeAlerts = notifications?.open ?? 0;
+  const criticalAlerts = notifications?.critical_open ?? 0;
+  const recoveries = recoveryActions?.length ?? 0;
 
   return (
     <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
@@ -164,6 +167,21 @@ function ActionableAlertsPanel({ alerts, onApply }) {
           </p>
         </div>
         <Badge className="border-blue-200 bg-blue-50 text-blue-700">{items.length} alerta(s)</Badge>
+      </div>
+
+      <div className="mt-4 grid gap-3 md:grid-cols-3">
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Notificacoes ativas</div>
+          <div className="mt-1 text-xl font-bold text-slate-900">{activeAlerts}</div>
+        </div>
+        <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-rose-600">Criticas abertas</div>
+          <div className="mt-1 text-xl font-bold text-rose-700">{criticalAlerts}</div>
+        </div>
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-3">
+          <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Acoes recuperacao</div>
+          <div className="mt-1 text-xl font-bold text-emerald-800">{recoveries}</div>
+        </div>
       </div>
 
       {items.length === 0 ? (
@@ -477,6 +495,8 @@ export default function OpsIncidentes() {
 
         <ActionableAlertsPanel
           alerts={summary?.actionable_alerts || []}
+          notifications={summary?.ops_notifications}
+          recoveryActions={summary?.recovery_actions || []}
           onApply={applyAlertFilter}
         />
 

@@ -7,6 +7,7 @@ from app.auth.dependencies import require_admin
 from app.services.deploy_event_reporter import list_deploy_events, summarize_deploy_events
 from app.services.error_event_reporter import list_error_events, summarize_error_events
 from app.services.ops_dashboard_service import build_ops_dashboard
+from app.services.ops_persistence_service import list_ops_alerts, query_recovery_actions, summarize_ops_alerts
 from app.services.watchdog_event_reporter import list_watchdog_events, summarize_watchdog_events
 from app.db import get_session
 from sqlalchemy.orm import Session
@@ -38,6 +39,7 @@ def listar_eventos_erro(
     slow_only: bool = Query(False),
     since: datetime | None = Query(None),
     until: datetime | None = Query(None),
+    db: Session = Depends(get_session),
 ) -> dict[str, Any]:
     return list_error_events(
         page=page,
@@ -48,6 +50,7 @@ def listar_eventos_erro(
         slow_only=slow_only,
         since=since,
         until=until,
+        db=db,
     )
 
 
@@ -56,12 +59,56 @@ def resumo_eventos_erro(
     tenant_id: str | None = Query(None),
     since: datetime | None = Query(None),
     until: datetime | None = Query(None),
+    db: Session = Depends(get_session),
 ) -> dict[str, Any]:
     return summarize_error_events(
         tenant_id=tenant_id,
         since=since,
         until=until,
+        db=db,
     )
+
+
+@router.get("/ops-alerts")
+def listar_alertas_ops(
+    status: str | None = Query("open"),
+    severity: str | None = Query(None),
+    tenant_id: str | None = Query(None),
+    since: datetime | None = Query(None),
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_session),
+) -> dict[str, Any]:
+    return {
+        "items": list_ops_alerts(
+            db,
+            status=status,
+            severity=severity,
+            tenant_id=tenant_id,
+            since=since,
+            limit=limit,
+        ),
+        "summary": summarize_ops_alerts(db, since=since),
+    }
+
+
+@router.get("/recovery-actions")
+def listar_acoes_recuperacao(
+    action_type: str | None = Query(None),
+    status: str | None = Query(None),
+    since: datetime | None = Query(None),
+    until: datetime | None = Query(None),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_session),
+) -> dict[str, Any]:
+    items = query_recovery_actions(
+        db,
+        action_type=action_type,
+        status=status,
+        since=since,
+        until=until,
+        limit=limit,
+    )
+    return {"items": items, "total": len(items)}
 
 
 @router.get("/deploy-events")
@@ -100,6 +147,7 @@ def listar_eventos_watchdog(
     status: str | None = Query(None),
     since: datetime | None = Query(None),
     until: datetime | None = Query(None),
+    db: Session = Depends(get_session),
 ) -> dict[str, Any]:
     return list_watchdog_events(
         page=page,
@@ -108,6 +156,7 @@ def listar_eventos_watchdog(
         status=status,
         since=since,
         until=until,
+        db=db,
     )
 
 
@@ -115,8 +164,10 @@ def listar_eventos_watchdog(
 def resumo_eventos_watchdog(
     since: datetime | None = Query(None),
     until: datetime | None = Query(None),
+    db: Session = Depends(get_session),
 ) -> dict[str, Any]:
     return summarize_watchdog_events(
         since=since,
         until=until,
+        db=db,
     )

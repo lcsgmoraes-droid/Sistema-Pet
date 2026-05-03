@@ -96,7 +96,40 @@ def get_watchdog_events(
     status: str | None = None,
     since: datetime | None = None,
     until: datetime | None = None,
+    db=None,
 ) -> list[dict[str, Any]]:
+    if db is not None:
+        events = _read_recent_watchdog_events()
+        try:
+            from app.services.ops_persistence_service import query_recovery_actions, sync_watchdog_events_to_db
+
+            sync_watchdog_events_to_db(db, events)
+            action_type = None
+            if event_type:
+                action_type_map = {
+                    "restart_triggered": "restart_backend",
+                    "restart_loop_guard": "restart_loop_guard",
+                    "health_failure": "health_failure",
+                    "health_recovered": "health_recovered",
+                    "uvicorn_start": "server_start",
+                    "uvicorn_stop": "server_stop",
+                    "uvicorn_exit": "server_exit",
+                }
+                action_type = action_type_map.get(event_type, event_type)
+            return query_recovery_actions(
+                db,
+                action_type=action_type,
+                status=status,
+                since=since,
+                until=until,
+                limit=WATCHDOG_EVENT_MAX_READ_LINES,
+            )
+        except Exception:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+
     return _filter_watchdog_events(
         _read_recent_watchdog_events(),
         event_type=event_type,
@@ -114,12 +147,14 @@ def list_watchdog_events(
     status: str | None = None,
     since: datetime | None = None,
     until: datetime | None = None,
+    db=None,
 ) -> dict[str, Any]:
     events = get_watchdog_events(
         event_type=event_type,
         status=status,
         since=since,
         until=until,
+        db=db,
     )
     events.reverse()
 
@@ -144,8 +179,9 @@ def summarize_watchdog_events(
     *,
     since: datetime | None = None,
     until: datetime | None = None,
+    db=None,
 ) -> dict[str, Any]:
-    events = get_watchdog_events(since=since, until=until)
+    events = get_watchdog_events(since=since, until=until, db=db)
 
     by_type = Counter(str(event.get("event_type") or "unknown") for event in events)
     by_status = Counter(str(event.get("status") or "unknown") for event in events)

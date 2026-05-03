@@ -5,6 +5,7 @@ import subprocess
 import sys
 import time
 from datetime import datetime, timezone
+from collections import deque
 from urllib.error import URLError
 from urllib.request import Request, urlopen
 
@@ -108,9 +109,13 @@ def main() -> int:
     failure_threshold = _env_int("WATCHDOG_FAILURE_THRESHOLD", 4)
     startup_grace_seconds = _env_int("WATCHDOG_STARTUP_GRACE_SECONDS", 90)
     restart_delay_seconds = _env_int("WATCHDOG_RESTART_DELAY_SECONDS", 10)
+    restart_window_seconds = _env_int("WATCHDOG_RESTART_WINDOW_SECONDS", 900)
+    max_restarts_per_window = _env_int("WATCHDOG_MAX_RESTARTS_PER_WINDOW", 4)
+    exit_on_restart_loop = _env_bool("WATCHDOG_EXIT_ON_RESTART_LOOP", True)
 
     should_stop = False
     process: subprocess.Popen | None = None
+    restart_times: deque[float] = deque()
 
     def _handle_signal(signum, _frame):
         nonlocal should_stop, process
@@ -161,6 +166,14 @@ def main() -> int:
 
             ok, detail = _health_ok(health_url, timeout_seconds)
             if ok:
+                if consecutive_failures:
+                    _record_event(
+                        "health_recovered",
+                        "info",
+                        "Health voltou ao normal apos falha temporaria",
+                        previous_failures=consecutive_failures,
+                        uptime_seconds=round(uptime_seconds, 2),
+                    )
                 consecutive_failures = 0
             else:
                 consecutive_failures += 1
@@ -178,14 +191,32 @@ def main() -> int:
                 )
 
             if consecutive_failures >= failure_threshold:
+                now = time.monotonic()
+                restart_times.append(now)
+                while restart_times and now - restart_times[0] > restart_window_seconds:
+                    restart_times.popleft()
+
                 _record_event(
                     "restart_triggered",
                     "critical",
                     "Watchdog vai reiniciar o servidor por falhas consecutivas de health",
                     consecutive_failures=consecutive_failures,
                     failure_threshold=failure_threshold,
+                    restarts_in_window=len(restart_times),
+                    restart_window_seconds=restart_window_seconds,
                 )
                 _stop_process(process, "watchdog health failures")
+
+                if exit_on_restart_loop and len(restart_times) >= max_restarts_per_window:
+                    _record_event(
+                        "restart_loop_guard",
+                        "critical",
+                        "Watchdog detectou loop de reinicios e vai encerrar o container para recuperacao externa",
+                        restarts_in_window=len(restart_times),
+                        max_restarts_per_window=max_restarts_per_window,
+                        restart_window_seconds=restart_window_seconds,
+                    )
+                    return 75
                 break
 
             time.sleep(interval_seconds)
