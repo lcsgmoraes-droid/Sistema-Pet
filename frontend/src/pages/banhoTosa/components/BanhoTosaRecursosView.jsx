@@ -1,7 +1,12 @@
 import { useState } from "react";
+import { Boxes, PlugZap, Plus, RefreshCw, Wrench } from "lucide-react";
 import toast from "react-hot-toast";
+import ActionButton from "../../../components/ui/ActionButton";
+import MetricCard from "../../../components/ui/MetricCard";
+import MetricGrid from "../../../components/ui/MetricGrid";
+import Panel from "../../../components/ui/Panel";
 import { banhoTosaApi } from "../banhoTosaApi";
-import { getApiErrorMessage } from "../banhoTosaUtils";
+import { formatCurrency, formatNumber, getApiErrorMessage } from "../banhoTosaUtils";
 import BanhoTosaRecursoForm, {
   formFromRecurso,
   initialRecursoForm,
@@ -12,6 +17,7 @@ import BanhoTosaRecursosList from "./BanhoTosaRecursosList";
 export default function BanhoTosaRecursosView({ recursos, onChanged }) {
   const [form, setForm] = useState(initialRecursoForm);
   const [editingRecurso, setEditingRecurso] = useState(null);
+  const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false);
 
   function updateField(field, value) {
@@ -21,12 +27,14 @@ export default function BanhoTosaRecursosView({ recursos, onChanged }) {
   function editarRecurso(recurso) {
     setEditingRecurso(recurso);
     setForm(formFromRecurso(recurso));
+    setShowForm(true);
     window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   function cancelarEdicao() {
     setEditingRecurso(null);
     setForm(initialRecursoForm);
+    setShowForm(false);
   }
 
   async function salvarRecurso(event) {
@@ -82,16 +90,56 @@ export default function BanhoTosaRecursosView({ recursos, onChanged }) {
     }
   }
 
+  const resumo = montarResumo(recursos);
+
   return (
-    <div className="grid gap-6 xl:grid-cols-[0.8fr_1.2fr]">
-      <BanhoTosaRecursoForm
-        form={form}
-        editing={Boolean(editingRecurso)}
-        saving={saving}
-        onChangeField={updateField}
-        onCancelEdit={cancelarEdicao}
-        onSubmit={salvarRecurso}
+    <div className="space-y-4">
+      <Panel
+        actions={
+          <>
+            <ActionButton
+              icon={Plus}
+              intent="create"
+              onClick={() => {
+                setEditingRecurso(null);
+                setForm(initialRecursoForm);
+                setShowForm((value) => !value);
+              }}
+            >
+              Novo recurso
+            </ActionButton>
+            <ActionButton
+              icon={RefreshCw}
+              intent="neutral"
+              onClick={() => onChanged(true)}
+              tone="soft"
+            >
+              Atualizar
+            </ActionButton>
+          </>
+        }
+        subtitle="Cadastre banheiras, mesas, secadores, boxes e veiculos para agenda, capacidade e custos."
+        title="Recursos operacionais"
       />
+
+      <MetricGrid>
+        <MetricCard icon={<Boxes size={18} />} intent="blue" label="Recursos" value={recursos.length} />
+        <MetricCard intent="emerald" label="Ativos" value={resumo.ativos} />
+        <MetricCard icon={<PlugZap size={18} />} intent="cyan" label="Capacidade total" value={formatNumber(resumo.capacidade, 0)} />
+        <MetricCard icon={<Wrench size={18} />} intent="violet" label="Manutencao/h" value={formatCurrency(resumo.manutencaoHora)} />
+      </MetricGrid>
+
+      {(showForm || editingRecurso) && (
+        <BanhoTosaRecursoForm
+          form={form}
+          editing={Boolean(editingRecurso)}
+          saving={saving}
+          onChangeField={updateField}
+          onCancelEdit={cancelarEdicao}
+          onSubmit={salvarRecurso}
+        />
+      )}
+
       <BanhoTosaRecursosList
         recursos={recursos}
         onEdit={editarRecurso}
@@ -99,5 +147,19 @@ export default function BanhoTosaRecursosView({ recursos, onChanged }) {
         onToggleAtivo={toggleAtivo}
       />
     </div>
+  );
+}
+
+function montarResumo(recursos = []) {
+  return recursos.reduce(
+    (acc, recurso) => {
+      if (recurso.ativo) {
+        acc.ativos += 1;
+        acc.capacidade += Number(recurso.capacidade_simultanea || 0);
+      }
+      acc.manutencaoHora += Number(recurso.custo_manutencao_hora || 0);
+      return acc;
+    },
+    { ativos: 0, capacidade: 0, manutencaoHora: 0 },
   );
 }
