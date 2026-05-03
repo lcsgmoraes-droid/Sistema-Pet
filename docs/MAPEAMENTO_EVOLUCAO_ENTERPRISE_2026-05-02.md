@@ -694,6 +694,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-03: `ProdutosHeaderActions` passou a usar `PageHeader`, padronizando titulo, subtitulo, tour e acoes principais da tela de Produtos.
 - 2026-05-03: filtros de `ContasPagar` e `ContasReceber` passaram a usar `FilterBar`, mantendo os campos e handlers atuais.
 - 2026-05-03: cabecalhos de `ContasPagar` e `ContasReceber` passaram a usar `PageHeader`, com acoes em `ActionButton` e icones padronizados.
+- 2026-05-03: `PDVClienteCard` foi quebrado em blocos internos de busca, resumo, fidelidade, credito, acoes e seletor de pet, preparando o card de cliente para virar componente reutilizavel sem mudar o fluxo do PDV.
 
 ### Nao fazer nesta onda
 
