@@ -58,6 +58,8 @@ Tela piloto:
 - Banho & Tosa: ao marcar atendimento como entregue, o frontend tenta gerar a venda no PDV pelo endpoint existente, reduzindo dependencia da tela de fechamentos.
 - Produtos e Pessoas: paginacoes locais foram substituidas por `PaginationControls` global, removendo controles duplicados.
 - Operadoras, internacoes veterinarias e Estoque Bling comecaram a usar estados globais de vazio/carregamento.
+- Pets: `PetSelector` e `NovoPetButton` passaram para `components/pets`; o seletor do veterinario e o pet opcional do PDV agora usam a mesma base visual e de comportamento.
+- PDV: resumo de cliente selecionado passou a usar `EntityCard` em modo compacto, mantendo o alinhamento de CPF, codigo, telefone, fidelidade, cupons e credito.
 
 Proxima varredura recomendada:
 

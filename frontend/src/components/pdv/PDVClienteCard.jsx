@@ -12,6 +12,7 @@ import PessoaSelector from "../clientes/PessoaSelector";
 import ActionButton from "../ui/ActionButton";
 import EntityCard from "../ui/EntityCard";
 import Panel from "../ui/Panel";
+import PetSelector from "../pets/PetSelector";
 
 function CopyButton({ active, onClick, title }) {
   return (
@@ -343,30 +344,18 @@ function ClienteAcoesResumo({
 
 function ClientePetSelector({ cliente, modoVisualizacao, onSelecionarPet, vendaAtual }) {
   return (
-    <div>
-      <label className="mb-1 block text-xs font-semibold text-slate-700">
-        Pet (opcional)
-      </label>
-      <select
-        value={vendaAtual.pet?.id || ""}
-        onChange={(e) => {
-          const pet = cliente.pets?.find(
-            (item) => item.id === parseInt(e.target.value, 10),
-          );
-          onSelecionarPet(pet || null);
-        }}
-        disabled={modoVisualizacao}
-        className="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm focus:border-transparent focus:ring-2 focus:ring-blue-500 disabled:cursor-not-allowed disabled:bg-gray-50"
-      >
-        <option value="">Sem pet especifico</option>
-        {cliente.pets?.map((pet) => (
-          <option key={pet.id} value={pet.id}>
-            {pet.codigo} - {pet.nome} ({pet.especie}
-            {pet.raca && ` - ${pet.raca}`})
-          </option>
-        ))}
-      </select>
-    </div>
+    <PetSelector
+      tutorSelecionado={cliente}
+      petId={vendaAtual.pet?.id || ""}
+      pets={cliente.pets}
+      disabled={modoVisualizacao}
+      allowEmpty
+      showNovoPetButton={false}
+      petLabel="Pet (opcional)"
+      placeholder="Sem pet especifico"
+      emptyOptionLabel="Sem pet especifico"
+      onSelectPet={onSelecionarPet}
+    />
   );
 }
 
