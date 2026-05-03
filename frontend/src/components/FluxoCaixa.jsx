@@ -10,6 +10,11 @@ import ChatIAModal from './ChatIAModal';
 import ProjecoesIA from './ProjecoesIA';
 import AlertasIA from './AlertasIA';
 import { safeArray } from '../utils/safeArray';
+import ActionButton from './ui/ActionButton';
+import MetricCard from './ui/MetricCard';
+import MetricGrid from './ui/MetricGrid';
+import MoneyCell, { formatMoneyCellValue } from './ui/MoneyCell';
+import StatusBadge from './ui/StatusBadge';
 
 const FluxoCaixa = () => {
   const navigate = useNavigate();
@@ -135,10 +140,15 @@ const FluxoCaixa = () => {
   };
 
   const formatarMoeda = (valor) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(valor || 0);
+    return formatMoneyCellValue(valor);
+  };
+
+  const movimentoEhEntrada = (tipo) => {
+    return ['entrada', 'credito', 'crédito'].includes(String(tipo || '').toLowerCase());
+  };
+
+  const movimentoEhSaida = (tipo) => {
+    return ['saida', 'saída', 'debito', 'débito'].includes(String(tipo || '').toLowerCase());
   };
 
   const getMovimentacoesDoPeriodo = (periodo) => {
@@ -153,8 +163,8 @@ const FluxoCaixa = () => {
       if (!dentroDataPeriodo) return false;
       
       // Filtro por tipo (entrada/saída)
-      if (filtroTipo === 'entradas' && mov.tipo !== 'credito') return false;
-      if (filtroTipo === 'saidas' && mov.tipo !== 'debito') return false;
+      if (filtroTipo === 'entradas' && !movimentoEhEntrada(mov.tipo)) return false;
+      if (filtroTipo === 'saidas' && !movimentoEhSaida(mov.tipo)) return false;
       
       // Filtro por status (realizado/previsto)
       if (filtroStatus === 'realizado' && mov.status !== 'realizado') return false;
@@ -304,13 +314,14 @@ const FluxoCaixa = () => {
           </div>
 
           <div className="flex items-end gap-2">
-            <button
+            <ActionButton
               onClick={carregarFluxoCaixa}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center gap-2"
+              intent="neutral"
+              icon={RefreshCw}
+              size="md"
             >
-              <RefreshCw size={18} />
               Atualizar
-            </button>
+            </ActionButton>
           </div>
         </div>
         
@@ -330,44 +341,54 @@ const FluxoCaixa = () => {
                 </span>
               )}
             </div>
-            <button
+            <ActionButton
               onClick={() => {
                 setFiltroTipo('todos');
                 setFiltroStatus('todos');
               }}
-              className="text-blue-600 hover:text-blue-800 text-sm font-medium"
+              intent="neutral"
+              tone="ghost"
+              size="sm"
             >
               Limpar filtros
-            </button>
+            </ActionButton>
           </div>
         )}
 
         {/* Presets rápidos */}
         <div className="flex gap-2 mt-3 flex-wrap items-center">
-          <button
+          <ActionButton
             onClick={() => handlePeriodoPreset('7dias')}
-            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded"
+            intent="neutral"
+            tone="soft"
+            size="xs"
           >
             Últimos 7 dias
-          </button>
-          <button
+          </ActionButton>
+          <ActionButton
             onClick={() => handlePeriodoPreset('30dias')}
-            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded"
+            intent="neutral"
+            tone="soft"
+            size="xs"
           >
             Últimos 30 dias
-          </button>
-          <button
+          </ActionButton>
+          <ActionButton
             onClick={() => handlePeriodoPreset('mes_atual')}
-            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded"
+            intent="neutral"
+            tone="soft"
+            size="xs"
           >
             Mês Atual
-          </button>
-          <button
+          </ActionButton>
+          <ActionButton
             onClick={() => handlePeriodoPreset('proximo_mes')}
-            className="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 rounded"
+            intent="neutral"
+            tone="soft"
+            size="xs"
           >
             Próximo Mês
-          </button>
+          </ActionButton>
           
           <div className="ml-auto flex items-center gap-2 bg-blue-50 px-3 py-2 rounded border border-blue-200">
             <input
@@ -435,56 +456,38 @@ const FluxoCaixa = () => {
       {tabAtiva === 'movimentacoes' && dados && (
         <>
           {/* Cards de Resumo */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-            <div className="bg-blue-50 rounded-lg p-4 border-l-4 border-blue-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-blue-600 font-medium">Saldo Inicial</p>
-                  <p className="text-2xl font-bold text-blue-700">{formatarMoeda(dados.saldo_inicial)}</p>
-                </div>
-                <DollarSign className="text-blue-500" size={32} />
-              </div>
-            </div>
+          <MetricGrid>
+            <MetricCard
+              intent="blue"
+              icon={<DollarSign className="h-5 w-5" />}
+              label="Saldo Inicial"
+              value={<MoneyCell value={dados.saldo_inicial} zeroAsDash />}
+            />
 
-            <div className="bg-green-50 rounded-lg p-4 border-l-4 border-green-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-green-600 font-medium">Total Realizado (Entradas)</p>
-                  <p className="text-2xl font-bold text-green-700">{formatarMoeda(dados.total_realizado_entradas)}</p>
-                  <p className="text-xs text-green-600 mt-1">Previsto: {formatarMoeda(dados.total_previsto_entradas)}</p>
-                </div>
-                <TrendingUp className="text-green-500" size={32} />
-              </div>
-            </div>
+            <MetricCard
+              intent="emerald"
+              icon={<TrendingUp className="h-5 w-5" />}
+              label="Total Realizado (Entradas)"
+              value={<MoneyCell value={dados.total_realizado_entradas} zeroAsDash />}
+              subtitle={`Previsto: ${formatarMoeda(dados.total_previsto_entradas)}`}
+            />
 
-            <div className="bg-red-50 rounded-lg p-4 border-l-4 border-red-500">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-red-600 font-medium">Total Realizado (Saídas)</p>
-                  <p className="text-2xl font-bold text-red-700">{formatarMoeda(dados.total_realizado_saidas)}</p>
-                  <p className="text-xs text-red-600 mt-1">Previsto: {formatarMoeda(dados.total_previsto_saidas)}</p>
-                </div>
-                <TrendingDown className="text-red-500" size={32} />
-              </div>
-            </div>
+            <MetricCard
+              intent="red"
+              icon={<TrendingDown className="h-5 w-5" />}
+              label="Total Realizado (Saidas)"
+              value={<MoneyCell value={dados.total_realizado_saidas} zeroAsDash />}
+              subtitle={`Previsto: ${formatarMoeda(dados.total_previsto_saidas)}`}
+            />
 
-            <div className={`rounded-lg p-4 border-l-4 ${dados.saldo_final >= 0 ? 'bg-blue-50 border-blue-500' : 'bg-red-50 border-red-500'}`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium" style={{ color: dados.saldo_final >= 0 ? '#2563eb' : '#dc2626' }}>
-                    Saldo Final Realizado
-                  </p>
-                  <p className="text-2xl font-bold" style={{ color: dados.saldo_final >= 0 ? '#1d4ed8' : '#b91c1c' }}>
-                    {formatarMoeda(dados.saldo_final)}
-                  </p>
-                  <p className="text-xs mt-1" style={{ color: dados.saldo_final >= 0 ? '#2563eb' : '#dc2626' }}>
-                    Previsto: {formatarMoeda(dados.saldo_previsto_final)}
-                  </p>
-                </div>
-                <DollarSign className={dados.saldo_final >= 0 ? 'text-blue-500' : 'text-red-500'} size={32} />
-              </div>
-            </div>
-          </div>
+            <MetricCard
+              intent={dados.saldo_final >= 0 ? "blue" : "red"}
+              icon={<DollarSign className="h-5 w-5" />}
+              label="Saldo Final Realizado"
+              value={<MoneyCell value={dados.saldo_final} zeroAsDash />}
+              subtitle={`Previsto: ${formatarMoeda(dados.saldo_previsto_final)}`}
+            />
+          </MetricGrid>
 
           {/* Tabela Estilo Flua: Previsto vs Realizado */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
@@ -539,23 +542,23 @@ const FluxoCaixa = () => {
                               {periodo.data}
                             </td>
                             <td className="px-4 py-4 text-sm text-gray-600 text-right bg-green-50">
-                              {formatarMoeda(periodo.previsto_entradas)}
+                              <MoneyCell value={periodo.previsto_entradas} zeroAsDash />
                             </td>
                             <td className="px-4 py-4 text-sm font-bold text-green-700 text-right bg-green-100">
-                              {formatarMoeda(periodo.realizado_entradas)}
+                              <MoneyCell value={periodo.realizado_entradas} zeroAsDash />
                             </td>
                             <td className="px-4 py-4 text-sm text-gray-600 text-right bg-red-50">
-                              {formatarMoeda(periodo.previsto_saidas)}
+                              <MoneyCell value={periodo.previsto_saidas} zeroAsDash />
                             </td>
                             <td className="px-4 py-4 text-sm font-bold text-red-700 text-right bg-red-100">
-                              {formatarMoeda(periodo.realizado_saidas)}
+                              <MoneyCell value={periodo.realizado_saidas} zeroAsDash />
                             </td>
                             <td className="px-4 py-4 text-sm text-center bg-blue-50">
                               <div className={`font-bold ${periodo.realizado_saldo >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                                {formatarMoeda(periodo.realizado_saldo)}
+                                <MoneyCell value={periodo.realizado_saldo} zeroAsDash />
                               </div>
                               <div className={`text-xs ${periodo.previsto_saldo >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                Prev: {formatarMoeda(periodo.previsto_saldo)}
+                                Prev: <MoneyCell value={periodo.previsto_saldo} zeroAsDash />
                               </div>
                             </td>
                             <td className="px-4 py-4 text-center">
@@ -589,13 +592,18 @@ const FluxoCaixa = () => {
                                         <span className="text-xs text-gray-500 ml-2">({mov.categoria})</span>
                                       </div>
                                       <div className="flex items-center gap-3">
-                                        <span className={`text-xs px-2 py-1 rounded ${
-                                          mov.status === 'previsto' ? 'bg-yellow-200 text-yellow-800' : 'bg-blue-200 text-blue-800'
-                                        }`}>
-                                          {mov.status === 'previsto' ? '📅 Previsto' : '✅ Realizado'}
-                                        </span>
-                                        <span className={`font-bold ${mov.tipo === 'entrada' ? 'text-green-600' : 'text-red-600'}`}>
-                                          {mov.tipo === 'entrada' ? '+' : '-'} {formatarMoeda(mov.valor)}
+                                        <StatusBadge
+                                          status={mov.status === 'previsto' ? 'pendente' : 'recebido'}
+                                          size="xs"
+                                        >
+                                          {mov.status === 'previsto' ? 'Previsto' : 'Realizado'}
+                                        </StatusBadge>
+                                        <span className={`font-bold ${movimentoEhEntrada(mov.tipo) ? 'text-green-600' : 'text-red-600'}`}>
+                                          <MoneyCell
+                                            value={mov.valor}
+                                            sign={movimentoEhEntrada(mov.tipo) ? '+' : '-'}
+                                            absolute
+                                          />
                                         </span>
                                       </div>
                                     </div>

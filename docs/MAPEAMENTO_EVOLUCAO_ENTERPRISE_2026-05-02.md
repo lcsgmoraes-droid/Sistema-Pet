@@ -685,6 +685,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-02: ampliado `MoneyCell` com sinal/zero como traco, criado `NumberCell` e aplicado na consulta de vendas em resumo por data, lista de vendas e itens expandidos.
 - 2026-05-02: criado `FilterBar`/`FilterRow`/`FilterAdvanced` e aplicado em `/pets` como primeiro padrao de filtros reutilizaveis.
 - 2026-05-03: iniciada a fatia Financeiro/DRE, com `MetricGrid`/`MetricCard` na DRE e `MoneyCell`/`NumberCell`/`StatusBadge`/`ActionButton` aplicados em DRE, contas a pagar e contas a receber.
+- 2026-05-03: `FluxoCaixa` entrou na mesma fundacao visual, com cards de resumo via `MetricGrid`/`MetricCard`, valores via `MoneyCell`, botoes via `ActionButton` e status de movimentacao via `StatusBadge`.
 
 ### Nao fazer nesta onda
 
