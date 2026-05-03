@@ -26,6 +26,7 @@ Componentes globais criados ou consolidados:
 - `StatusBadge` para status como pago, aberto, cancelado, ativo e entregue.
 - `MetricCard` e `MetricGrid` para padronizar dashboards e cards de indicadores.
 - `MoneyCell`, `ChannelBadges` e `SafeMarkdown`, ja iniciados na fatia de produtos.
+- `FormField`, `TextField` e `SelectField` para campos de formulario com tons visuais reaproveitaveis sem quebrar telas existentes.
 
 Separacao operacional iniciada:
 
@@ -44,6 +45,7 @@ Separacao operacional iniciada:
 Tela piloto:
 
 - PDV: cabecalho, botoes principais, botoes de modo visualizacao, sidebar de vendas recentes e cards principais comecaram a consumir a fundacao global.
+- Banho & Tosa / Taxi dog: formulario passou a usar os campos reutilizaveis mantendo o tom visual atual.
 
 Proxima varredura recomendada:
 
