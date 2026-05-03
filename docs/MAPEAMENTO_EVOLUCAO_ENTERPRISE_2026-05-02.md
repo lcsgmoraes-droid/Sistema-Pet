@@ -684,6 +684,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-02: criado `EntityCard`/`EntityInfoRow` e aplicado em `/pets`, com campos fixos mesmo vazios, botoes padronizados e card preparado para reuso em pessoas/produtos.
 - 2026-05-02: ampliado `MoneyCell` com sinal/zero como traco, criado `NumberCell` e aplicado na consulta de vendas em resumo por data, lista de vendas e itens expandidos.
 - 2026-05-02: criado `FilterBar`/`FilterRow`/`FilterAdvanced` e aplicado em `/pets` como primeiro padrao de filtros reutilizaveis.
+- 2026-05-03: iniciada a fatia Financeiro/DRE, com `MetricGrid`/`MetricCard` na DRE e `MoneyCell`/`NumberCell`/`StatusBadge`/`ActionButton` aplicados em DRE, contas a pagar e contas a receber.
 
 ### Nao fazer nesta onda
 

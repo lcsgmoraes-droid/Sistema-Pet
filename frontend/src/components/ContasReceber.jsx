@@ -3,6 +3,9 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import { toast } from 'react-hot-toast';
 import { safeArray } from '../utils/safeArray';
+import ActionButton from './ui/ActionButton';
+import MoneyCell, { formatMoneyCellValue } from './ui/MoneyCell';
+import StatusBadge from './ui/StatusBadge';
 
 const ContasReceber = () => {
   const navigate = useNavigate();
@@ -223,29 +226,16 @@ const ContasReceber = () => {
   };
 
   const formatarMoeda = (valor) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(valor);
+    return formatMoneyCellValue(valor);
   };
 
   const getStatusBadge = (conta) => {
     const hoje = new Date();
     const vencimento = new Date(conta.data_vencimento);
-    
-    if (conta.status === 'recebido') {
-      return <span className="px-2 py-1 text-xs rounded bg-green-100 text-green-800">Recebido</span>;
-    }
-    
-    if (vencimento < hoje) {
-      return <span className="px-2 py-1 text-xs rounded bg-red-100 text-red-800">Vencida</span>;
-    }
-    
-    if (conta.status === 'parcial') {
-      return <span className="px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-800">Parcial</span>;
-    }
-    
-    return <span className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-800">Pendente</span>;
+    if (conta.status === 'recebido') return <StatusBadge status="recebido" />;
+    if (vencimento < hoje) return <StatusBadge status="vencida" />;
+    if (conta.status === 'parcial') return <StatusBadge status="parcial" />;
+    return <StatusBadge status="pendente" />;
   };
 
   if (loading) {
@@ -257,16 +247,18 @@ const ContasReceber = () => {
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">Contas a Receber</h2>
         <div className="flex gap-2">
-          <button 
+          <ActionButton
             onClick={alternarOrdenacao}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg flex items-center gap-2"
+            intent="neutral"
+            tone="soft"
+            size="md"
             title={ordenacao === 'desc' ? 'Clique para ver mais antigas primeiro' : 'Clique para ver mais recentes primeiro'}
           >
             {ordenacao === 'desc' ? 'Mais recentes' : 'Mais antigas'}
-          </button>
-          <button className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg">
+          </ActionButton>
+          <ActionButton intent="create" size="md">
             Nova Conta
-          </button>
+          </ActionButton>
         </div>
       </div>
 
@@ -364,12 +356,14 @@ const ContasReceber = () => {
               />
               <span className="text-sm">A Vencer</span>
             </label>
-            <button 
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm"
+            <ActionButton
+              intent="neutral"
+              tone="solid"
+              size="sm"
               onClick={aplicarFiltros}
             >
               Filtrar
-            </button>
+            </ActionButton>
           </div>
         </div>
       </div>
@@ -384,9 +378,9 @@ const ContasReceber = () => {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Descricao</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Cliente</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Vencimento</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Valor Original</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Valor Recebido</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Saldo</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase">Valor Original</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase">Valor Recebido</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase">Saldo</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Status</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Acoes</th>
               </tr>
@@ -425,9 +419,9 @@ const ContasReceber = () => {
                     </td>
                     <td className="px-4 py-3 text-sm">{conta.cliente_nome || '-'}</td>
                     <td className="px-4 py-3 text-sm">{formatarData(conta.data_vencimento)}</td>
-                    <td className="px-4 py-3 text-sm">{formatarMoeda(conta.valor_original)}</td>
-                    <td className="px-4 py-3 text-sm">{formatarMoeda(conta.valor_recebido)}</td>
-                    <td className="px-4 py-3 text-sm font-bold">{formatarMoeda(conta.valor_final - conta.valor_recebido)}</td>
+                    <td className="px-4 py-3 text-right text-sm"><MoneyCell value={conta.valor_original} /></td>
+                    <td className="px-4 py-3 text-right text-sm"><MoneyCell value={conta.valor_recebido} zeroAsDash /></td>
+                    <td className="px-4 py-3 text-right text-sm font-bold"><MoneyCell value={conta.valor_final - conta.valor_recebido} zeroAsDash /></td>
                     <td className="px-4 py-3 text-sm">{getStatusBadge(conta)}</td>
                     <td className="px-4 py-3 text-sm">
                       {conta.status !== 'recebido' && (
@@ -436,27 +430,33 @@ const ContasReceber = () => {
                           {conta.nsu && !conta.conciliado ? (
                             <>
                               {/* Link para conciliacao */}
-                              <button
-                                className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1 rounded text-xs mr-2"
+                              <ActionButton
+                                intent="warning"
+                                size="xs"
+                                className="mr-2"
                                 onClick={() => navigate(`/conciliacao-cartao?nsu=${conta.nsu}`)}
                                 title={`Conciliar NSU ${conta.nsu} com extrato da operadora`}
                               >
                                 Conciliar
-                              </button>
+                              </ActionButton>
                               {/* Recebimento manual para cartao */}
-                              <button
-                                className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-1 rounded text-xs mr-2"
+                              <ActionButton
+                                intent="create"
+                                size="xs"
+                                className="mr-2"
                                 onClick={() => abrirModalRecebimento(conta)}
                                 title="Receber manual (caso nao consiga conciliar)"
                               >
                                 Manual
-                              </button>
+                              </ActionButton>
                             </>
                           ) : conta.venda_id && !conta.nsu ? (
                             /* Venda sem NSU - pode receber no PDV OU manual */
                             <>
-                              <button
-                                className="bg-blue-600 hover:bg-blue-700 text-white px-3 py-1 rounded text-xs mr-2"
+                              <ActionButton
+                                intent="neutral"
+                                size="xs"
+                                className="mr-2"
                                 onClick={() => {
                                   console.log('Conta:', conta); // DEBUG
                                   if (conta.venda_id) {
@@ -468,24 +468,28 @@ const ContasReceber = () => {
                                 title="Receber no PDV (movimenta caixa)"
                               >
                                 PDV
-                              </button>
-                              <button
-                                className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs mr-2"
+                              </ActionButton>
+                              <ActionButton
+                                intent="create"
+                                size="xs"
+                                className="mr-2"
                                 onClick={() => abrirModalRecebimento(conta)}
                                 title="Receber manual (sem PDV)"
                               >
                                 Manual
-                              </button>
+                              </ActionButton>
                             </>
                           ) : (
                             /* Lancamento manual ou outros - recebimento manual */
-                            <button
-                              className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs mr-2"
+                            <ActionButton
+                              intent="create"
+                              size="xs"
+                              className="mr-2"
                               onClick={() => abrirModalRecebimento(conta)}
                               title="Registrar recebimento manual"
                             >
                               Receber Manual
-                            </button>
+                            </ActionButton>
                           )}
                         </>
                       )}
@@ -494,13 +498,15 @@ const ContasReceber = () => {
                           Conciliado
                         </span>
                       )}
-                      <button
-                        className="bg-blue-50 hover:bg-blue-100 text-blue-600 px-3 py-1 rounded text-xs"
+                      <ActionButton
+                        intent="neutral"
+                        tone="soft"
+                        size="xs"
                         title="Ver Detalhes"
                         onClick={() => abrirDetalhes(conta)}
                       >
                         Ver
-                      </button>
+                      </ActionButton>
                     </td>
                   </tr>
                 ))
@@ -512,9 +518,8 @@ const ContasReceber = () => {
         {contas.length > 0 && (
           <div className="bg-green-50 border-t border-green-200 px-4 py-3">
             <strong>Total:</strong> {contas.length} conta(s) | 
-            <strong className="ml-3">Saldo a Receber:</strong> {formatarMoeda(
-              contas.reduce((sum, c) => sum + (c.valor_final - c.valor_recebido), 0)
-            )}
+            <strong className="ml-3">Saldo a Receber:</strong>{" "}
+            <MoneyCell value={contas.reduce((sum, c) => sum + (c.valor_final - c.valor_recebido), 0)} zeroAsDash />
           </div>
         )}
       </div>
@@ -759,14 +764,7 @@ const ContasReceber = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Status</label>
                   <p className="mt-1">
-                    <span className={`px-2 py-1 rounded text-sm ${
-                      detalhesCompletos.status === 'recebido' ? 'bg-green-100 text-green-800' :
-                      detalhesCompletos.status === 'parcial' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
-                      {detalhesCompletos.status === 'recebido' ? 'Recebido' :
-                       detalhesCompletos.status === 'parcial' ? 'Parcial' : 'Pendente'}
-                    </span>
+                    <StatusBadge status={detalhesCompletos.status} />
                   </p>
                 </div>
               </div>
@@ -788,7 +786,7 @@ const ContasReceber = () => {
                         {safeArray(detalhesCompletos?.recebimentos).map((recebimento, index) => (
                           <tr key={index}>
                             <td className="px-3 py-2 text-sm">{formatarData(recebimento.data)}</td>
-                            <td className="px-3 py-2 text-sm font-semibold text-green-600">{formatarMoeda(recebimento.valor)}</td>
+                            <td className="px-3 py-2 text-sm font-semibold text-green-600"><MoneyCell value={recebimento.valor} zeroAsDash /></td>
                             <td className="px-3 py-2 text-sm">
                               {recebimento.conta_bancaria_nome ? (
                                 <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs">

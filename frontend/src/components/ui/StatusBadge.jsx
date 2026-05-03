@@ -18,9 +18,14 @@ const STATUS_MAP = {
   entregue: ["Entregue", "success"],
   finalizada: ["Pago", "success"],
   inativo: ["Inativo", "neutral"],
+  parcial: ["Parcial", "info"],
   pago: ["Pago", "success"],
   pago_nf: ["Pago NF", "success"],
   pendente: ["Pendente", "warning"],
+  recebida: ["Recebida", "success"],
+  recebido: ["Recebido", "success"],
+  vencida: ["Vencida", "danger"],
+  vencido: ["Vencido", "danger"],
 };
 
 const SIZES = {

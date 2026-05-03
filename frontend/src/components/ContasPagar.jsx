@@ -4,6 +4,9 @@ import api from '../api';
 import { toast } from 'react-hot-toast';
 import ModalNovaContaPagar from './ModalNovaContaPagar';
 import { safeArray } from '../utils/safeArray';
+import ActionButton from './ui/ActionButton';
+import MoneyCell, { formatMoneyCellValue } from './ui/MoneyCell';
+import StatusBadge from './ui/StatusBadge';
 
 const ContasPagar = () => {
   const navigate = useNavigate();
@@ -329,29 +332,16 @@ const ContasPagar = () => {
   };
 
   const formatarMoeda = (valor) => {
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(valor);
+    return formatMoneyCellValue(valor);
   };
 
   const getStatusBadge = (conta) => {
     const hoje = new Date();
     const vencimento = new Date(conta.data_vencimento);
-    
-    if (conta.status === 'pago') {
-      return <span className="px-2 py-1 text-xs rounded bg-green-100 text-green-800">✓ Pago</span>;
-    }
-    
-    if (vencimento < hoje) {
-      return <span className="px-2 py-1 text-xs rounded bg-red-100 text-red-800">⚠ Vencida</span>;
-    }
-    
-    if (conta.status === 'parcial') {
-      return <span className="px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-800">⚡ Parcial</span>;
-    }
-    
-    return <span className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-800">⏱ Pendente</span>;
+    if (conta.status === 'pago') return <StatusBadge status="pago" />;
+    if (vencimento < hoje) return <StatusBadge status="vencida" />;
+    if (conta.status === 'parcial') return <StatusBadge status="parcial" />;
+    return <StatusBadge status="pendente" />;
   };
 
   const getOrigemBadge = (conta) => {
@@ -397,12 +387,13 @@ const ContasPagar = () => {
     <div className="p-6">
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-2xl font-bold">💰 Contas a Pagar</h2>
-        <button 
+        <ActionButton
           onClick={() => setMostrarModalNovaConta(true)}
-          className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-lg"
+          intent="create"
+          size="md"
         >
           ➕ Nova Conta
-        </button>
+        </ActionButton>
       </div>
 
       {/* Filtros */}
@@ -562,20 +553,24 @@ const ContasPagar = () => {
             >
               Despesas do caixa
             </button>
-            <button
-              className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded text-sm"
+            <ActionButton
+              intent="neutral"
+              tone="soft"
+              size="sm"
               onClick={limparFiltros}
               type="button"
             >
               Limpar
-            </button>
-            <button 
-              className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded text-sm"
+            </ActionButton>
+            <ActionButton
+              intent="neutral"
+              tone="solid"
+              size="sm"
               onClick={() => aplicarFiltros()}
               type="button"
             >
               Filtrar
-            </button>
+            </ActionButton>
           </div>
         </div>
       </div>
@@ -592,9 +587,9 @@ const ContasPagar = () => {
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Origem</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Tipo</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Vencimento</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Valor Original</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Valor Pago</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Saldo</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase">Valor Original</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase">Valor Pago</th>
+                <th className="px-4 py-3 text-right text-xs font-medium text-gray-700 uppercase">Saldo</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Status</th>
                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-700 uppercase">Ações</th>
               </tr>
@@ -636,36 +631,42 @@ const ContasPagar = () => {
                       )}
                     </td>
                     <td className="px-4 py-3 text-sm">{formatarData(conta.data_vencimento)}</td>
-                    <td className="px-4 py-3 text-sm">{formatarMoeda(conta.valor_original)}</td>
-                    <td className="px-4 py-3 text-sm">{formatarMoeda(conta.valor_pago)}</td>
-                    <td className="px-4 py-3 text-sm font-bold">{formatarMoeda(conta.valor_final - conta.valor_pago)}</td>
+                    <td className="px-4 py-3 text-right text-sm"><MoneyCell value={conta.valor_original} /></td>
+                    <td className="px-4 py-3 text-right text-sm"><MoneyCell value={conta.valor_pago} zeroAsDash /></td>
+                    <td className="px-4 py-3 text-right text-sm font-bold"><MoneyCell value={conta.valor_final - conta.valor_pago} zeroAsDash /></td>
                     <td className="px-4 py-3 text-sm">{getStatusBadge(conta)}</td>
                     <td className="px-4 py-3 text-sm">
                       {conta.status !== 'pago' && (
-                        <button
-                          className="bg-green-600 hover:bg-green-700 text-white px-3 py-1 rounded text-xs mr-2"
+                        <ActionButton
+                          intent="create"
+                          size="xs"
+                          className="mr-2"
                           onClick={() => abrirModalPagamento(conta)}
                           title="Registrar Pagamento"
                         >
                           💰 Pagar
-                        </button>
+                        </ActionButton>
                       )}
                       {precisaClassificacao(conta) && (
-                        <button
-                          className="bg-amber-500 hover:bg-amber-600 text-white px-3 py-1 rounded text-xs mr-2"
+                        <ActionButton
+                          intent="warning"
+                          size="xs"
+                          className="mr-2"
                           onClick={() => abrirModalClassificacao(conta)}
                           title="Classificar categoria, DRE e tipo da despesa"
                         >
                           🏷 Classificar
-                        </button>
+                        </ActionButton>
                       )}
-                      <button
-                        className="bg-blue-50 hover:bg-blue-100 text-blue-600 px-3 py-1 rounded text-xs"
+                      <ActionButton
+                        intent="neutral"
+                        tone="soft"
+                        size="xs"
                         onClick={() => abrirDetalhes(conta)}
                         title="Ver Detalhes"
                       >
                         👁️
-                      </button>
+                      </ActionButton>
                     </td>
                   </tr>
                 ))
@@ -677,9 +678,8 @@ const ContasPagar = () => {
         {contas.length > 0 && (
           <div className="bg-green-50 border-t border-green-200 px-4 py-3">
             <strong>Total:</strong> {contas.length} conta(s) | 
-            <strong className="ml-3">Saldo a Pagar:</strong> {formatarMoeda(
-              contas.reduce((sum, c) => sum + (c.valor_final - c.valor_pago), 0)
-            )}
+            <strong className="ml-3">Saldo a Pagar:</strong>{" "}
+            <MoneyCell value={contas.reduce((sum, c) => sum + (c.valor_final - c.valor_pago), 0)} zeroAsDash />
           </div>
         )}
       </div>
@@ -953,14 +953,7 @@ const ContasPagar = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Status</label>
                   <p className="mt-1">
-                    <span className={`px-2 py-1 rounded text-sm ${
-                      contaSelecionada.status === 'pago' ? 'bg-green-100 text-green-800' :
-                      contaSelecionada.status === 'parcial' ? 'bg-yellow-100 text-yellow-800' :
-                      'bg-red-100 text-red-800'
-                    }`}>
-                      {contaSelecionada.status === 'pago' ? 'Pago' :
-                       contaSelecionada.status === 'parcial' ? 'Parcial' : 'Pendente'}
-                    </span>
+                    <StatusBadge status={contaSelecionada.status === 'pago' ? 'pago' : contaSelecionada.status || 'pendente'} />
                   </p>
                 </div>
               </div>

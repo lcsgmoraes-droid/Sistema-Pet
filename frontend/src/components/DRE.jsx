@@ -22,6 +22,10 @@ import ChatIAModal from "./ChatIAModal";
 import ClassificarLancamentosModal from "./ClassificarLancamentosModal";
 import ExtratoBancario from "./ExtratoBancario";
 import { actionButtonClasses } from "./ui/actionStyles";
+import MetricCard from "./ui/MetricCard";
+import MetricGrid from "./ui/MetricGrid";
+import MoneyCell, { formatMoneyCellValue } from "./ui/MoneyCell";
+import NumberCell from "./ui/NumberCell";
 
 const DRE_REQUEST_TIMEOUT_MS = 120000;
 
@@ -112,10 +116,7 @@ const DRE = () => {
   };
 
   const formatarMoeda = (valor) => {
-    return new Intl.NumberFormat("pt-BR", {
-      style: "currency",
-      currency: "BRL",
-    }).format(valor || 0);
+    return formatMoneyCellValue(valor);
   };
 
   const formatarPercentual = (valor) => {
@@ -425,59 +426,41 @@ const DRE = () => {
           {dados && (
             <div className="space-y-6">
               {/* Cards de Resumo */}
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-                <div className="bg-green-500 text-white p-4 rounded-lg shadow md:p-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm opacity-90">Receita Bruta</span>
-                    <TrendingUp className="w-5 h-5" />
-                  </div>
-                  <div className="text-2xl font-bold md:text-3xl">
-                    {formatarMoeda(dados.totais?.receita_bruta || 0)}
-                  </div>
-                  <div className="text-xs mt-1 opacity-80">Base de cálculo</div>
-                </div>
-
-                <div className="bg-red-500 text-white p-4 rounded-lg shadow md:p-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm opacity-90">CMV</span>
-                    <TrendingDown className="w-5 h-5" />
-                  </div>
-                  <div className="text-2xl font-bold md:text-3xl">
-                    {formatarMoeda(dados.totais?.cmv || 0)}
-                  </div>
-                  <div className="text-xs mt-1 opacity-80">
-                    {formatarPercentual(
-                      calcularPercentual(
-                        dados.totais?.cmv,
-                        dados.totais?.receita_bruta,
-                      ),
-                    )}{" "}
-                    da receita
-                  </div>
-                </div>
-
-                <div className="bg-blue-500 text-white p-4 rounded-lg shadow md:p-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm opacity-90">Lucro Bruto</span>
-                    <DollarSign className="w-5 h-5" />
-                  </div>
-                  <div className="text-2xl font-bold md:text-3xl">
-                    {formatarMoeda(dados.totais?.lucro_bruto || 0)}
-                  </div>
-                  <div className="text-xs mt-1 opacity-80">Após custos</div>
-                </div>
-
-                <div className="bg-purple-500 text-white p-4 rounded-lg shadow md:p-6">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm opacity-90">Margem Bruta</span>
-                    <Percent className="w-5 h-5" />
-                  </div>
-                  <div className="text-2xl font-bold md:text-3xl">
-                    {formatarPercentual(dados.totais?.margem_bruta || 0)}
-                  </div>
-                  <div className="text-xs mt-1 opacity-80">Rentabilidade</div>
-                </div>
-              </div>
+              <MetricGrid>
+                <MetricCard
+                  intent="emerald"
+                  icon={<TrendingUp className="h-5 w-5" />}
+                  label="Receita Bruta"
+                  value={<MoneyCell value={dados.totais?.receita_bruta || 0} />}
+                  subtitle="Base de cálculo"
+                />
+                <MetricCard
+                  intent="red"
+                  icon={<TrendingDown className="h-5 w-5" />}
+                  label="CMV"
+                  value={<MoneyCell value={dados.totais?.cmv || 0} />}
+                  subtitle={`${formatarPercentual(
+                    calcularPercentual(
+                      dados.totais?.cmv,
+                      dados.totais?.receita_bruta,
+                    ),
+                  )} da receita`}
+                />
+                <MetricCard
+                  intent="blue"
+                  icon={<DollarSign className="h-5 w-5" />}
+                  label="Lucro Bruto"
+                  value={<MoneyCell value={dados.totais?.lucro_bruto || 0} />}
+                  subtitle="Após custos"
+                />
+                <MetricCard
+                  intent="violet"
+                  icon={<Percent className="h-5 w-5" />}
+                  label="Margem Bruta"
+                  value={<NumberCell value={dados.totais?.margem_bruta || 0} decimals={2} suffix="%" />}
+                  subtitle="Rentabilidade"
+                />
+              </MetricGrid>
 
               {/* Seletor de Canais - ABA 7 */}
               <div className="bg-white rounded-lg shadow p-4 md:p-6">
@@ -648,13 +631,13 @@ const DRE = () => {
                             className={`px-6 py-3 text-right ${ehTotal ? "font-bold" : ""}`}
                             style={textStyle}
                           >
-                            {formatarMoeda(linha.valor)}
+                            <MoneyCell value={linha.valor} zeroAsDash />
                           </td>
                           <td
                             className={`px-6 py-3 text-right ${ehTotal ? "font-bold" : ""}`}
                             style={textStyle}
                           >
-                            {formatarPercentual(linha.percentual)}
+                            <NumberCell value={linha.percentual} decimals={2} suffix="%" zeroAsDash />
                           </td>
                         </tr>
                       );
@@ -755,7 +738,7 @@ const DRE = () => {
                       Total da linha
                     </p>
                     <p className="mt-1 text-lg font-bold text-gray-900">
-                      {formatarMoeda(detalhesLinha?.total ?? linhaDetalhe.valor)}
+                      <MoneyCell value={detalhesLinha?.total ?? linhaDetalhe.valor} />
                     </p>
                   </div>
                   <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
@@ -763,7 +746,7 @@ const DRE = () => {
                       Lancamentos
                     </p>
                     <p className="mt-1 text-lg font-bold text-gray-900">
-                      {detalhesLinha?.total_itens ?? "-"}
+                      <NumberCell value={detalhesLinha?.total_itens} zeroAsDash />
                     </p>
                   </div>
                   <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
@@ -831,7 +814,7 @@ const DRE = () => {
                                 {item.origem_label}
                               </td>
                               <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
-                                {formatarMoeda(item.valor)}
+                                <MoneyCell value={item.valor} zeroAsDash />
                               </td>
                             </tr>
                           ))}
@@ -860,7 +843,7 @@ const DRE = () => {
                               )}
                             </div>
                             <p className="shrink-0 text-sm font-bold text-gray-900">
-                              {formatarMoeda(item.valor)}
+                              <MoneyCell value={item.valor} zeroAsDash />
                             </p>
                           </div>
                         </div>
