@@ -16,7 +16,7 @@ services:
   # POSTGRESQL - Banco de dados de DESENVOLVIMENTO
   # ==========================================================================
   postgres:
-    image: postgres:16-alpine
+    image: postgres:16
     container_name: petshop-dev-postgres
     environment:
       - POSTGRES_USER=postgres
@@ -72,6 +72,8 @@ services:
     volumes:
       # Volume para código (hot reload)
       - ./backend:/app
+      # Pasta temporária dos documentos do caso para extração no DEV
+      - ./Bradesco Will:/app/Bradesco Will:ro
       - /app/__pycache__
     networks:
       - dev-network
