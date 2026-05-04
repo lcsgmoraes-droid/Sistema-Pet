@@ -5,6 +5,8 @@ Documentação: https://developer.bling.com.br/
 
 import os
 import requests
+import threading
+import time
 from datetime import datetime, timedelta
 from typing import Dict, Optional
 from sqlalchemy.orm import Session
@@ -20,6 +22,9 @@ BLING_API_BASE_URL = "https://api.bling.com.br/Api/v3"
 
 # Arquivo para controle de expiração do token
 TOKEN_CONTROL_FILE = Path("bling_token_control.json")
+_BLING_RATE_LOCK = threading.Lock()
+_BLING_LAST_REQUEST_AT = 0.0
+_BLING_MIN_INTERVAL_SECONDS = 0.42
 
 ENV_PATHS = [
     Path("/opt/petshop/.env"),
@@ -75,6 +80,45 @@ def _primeiro_texto_fiscal(*values) -> Optional[str]:
         if text is not None:
             return text
     return None
+
+
+def _aguardar_slot_bling() -> None:
+    global _BLING_LAST_REQUEST_AT
+
+    with _BLING_RATE_LOCK:
+        now = time.monotonic()
+        wait_for = _BLING_MIN_INTERVAL_SECONDS - (now - _BLING_LAST_REQUEST_AT)
+        if wait_for > 0:
+            time.sleep(wait_for)
+            now = time.monotonic()
+        _BLING_LAST_REQUEST_AT = now
+
+
+def _tempo_espera_rate_limit_bling(response, tentativa: int) -> float:
+    retry_after = None
+    if response is not None:
+        retry_after = response.headers.get("Retry-After")
+
+    try:
+        if retry_after:
+            return min(max(float(retry_after), 1.0), 8.0)
+    except (TypeError, ValueError):
+        pass
+
+    return min(1.2 + tentativa * 0.8, 5.0)
+
+
+def _erro_rate_limit_bling(error: requests.exceptions.HTTPError) -> bool:
+    response = getattr(error, "response", None)
+    if response is not None and response.status_code == 429:
+        return True
+
+    mensagem = str(error)
+    if response is not None:
+        mensagem = f"{mensagem} {getattr(response, 'text', '')}"
+
+    mensagem = mensagem.upper()
+    return "TOO_MANY_REQUESTS" in mensagem or "429" in mensagem
 
 
 def _sku_produto(produto) -> str:
@@ -273,11 +317,14 @@ class BlingAPI:
     def _request(self, method: str, endpoint: str, data: Optional[Dict] = None) -> Dict:
         """Faz requisição para API do Bling"""
         url = f"{self.base_url}{endpoint}"
+        token_renovado = False
 
-        for tentativa in range(2):
+        for tentativa in range(5):
             headers = self._get_headers()
 
             try:
+                _aguardar_slot_bling()
+
                 if method == "GET":
                     response = requests.get(url, headers=headers, params=data, timeout=30)
                 elif method == "POST":
@@ -293,10 +340,28 @@ class BlingAPI:
                 return response.json()
 
             except requests.exceptions.HTTPError as e:
-                if tentativa == 0 and self._deve_renovar_token_apos_erro(e):
+                if _erro_rate_limit_bling(e) and tentativa < 4:
+                    espera = _tempo_espera_rate_limit_bling(getattr(e, "response", None), tentativa)
+                    logger.warning(
+                        "Bling rate limit em %s. Aguardando %.1fs antes de repetir (%s/5).",
+                        endpoint,
+                        espera,
+                        tentativa + 1,
+                    )
+                    time.sleep(espera)
+                    continue
+
+                if not token_renovado and self._deve_renovar_token_apos_erro(e):
                     logger.warning("Bling retornou token invalido ao consultar %s. Tentando renovar e repetir.", endpoint)
+                    token_renovado = True
                     if self._renovar_token_automatico():
                         continue
+
+                if _erro_rate_limit_bling(e):
+                    raise Exception(
+                        "Limite temporario de requisicoes do Bling atingido. "
+                        "Aguarde alguns segundos e tente emitir novamente."
+                    )
 
                 error_msg = f"Erro na API Bling: {e}"
                 try:
