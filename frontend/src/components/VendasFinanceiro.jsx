@@ -29,6 +29,7 @@ import api from "../api";
 import { useAuth } from "../contexts/AuthContext";
 import HistoricoVendasClienteTab from "../pages/Financeiro/HistoricoVendasClienteTab";
 import FormasRecebimentoTable from "./financeiro/FormasRecebimentoTable";
+import VendasComparativoPeriodoTable from "./financeiro/VendasComparativoPeriodoTable";
 import VendasFinanceiroListaTable from "./financeiro/VendasFinanceiroListaTable";
 import VendasPorDataTable from "./financeiro/VendasPorDataTable";
 import VendasPorFuncionarioTable from "./financeiro/VendasPorFuncionarioTable";
@@ -3331,61 +3332,15 @@ export default function VendasFinanceiro() {
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">
                   Comparação por Forma de Pagamento
                 </h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-100">
-                      <tr>
-                        <th className="px-4 py-3 text-left">
-                          Forma de Pagamento
-                        </th>
-                        <th className="px-4 py-3 text-right">Anterior</th>
-                        <th className="px-4 py-3 text-right">Atual</th>
-                        <th className="px-4 py-3 text-right">Diferença</th>
-                        <th className="px-4 py-3 text-center">Variação %</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {formasRecebimentoConsolidadas.map((formaAtual, idx) => {
-                        const formaAnt = formasRecebimentoComparacaoConsolidadas.find(
-                          (f) =>
-                            f.forma_pagamento === formaAtual.forma_pagamento,
-                        ) || { valor_total: 0 };
-                        const variacao = calcularVariacao(
-                          formaAtual.valor_total,
-                          formaAnt.valor_total,
-                        );
-                        return (
-                          <tr key={`comp-forma-${formaAtual.forma_pagamento || idx}`} className="border-b hover:bg-gray-50">
-                            <td className="px-4 py-3 font-medium">
-                              {formaAtual.forma_pagamento}
-                            </td>
-                            <td className="px-4 py-3 text-right text-gray-600">
-                              {formatarMoeda(formaAnt.valor_total)}
-                            </td>
-                            <td className="px-4 py-3 text-right font-medium">
-                              {formatarMoeda(formaAtual.valor_total)}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              {formatarMoeda(variacao.valor)}
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <span
-                                className={`inline-flex items-center gap-1 px-2 py-1 rounded font-medium ${variacao.percentual >= 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}
-                              >
-                                {variacao.percentual >= 0 ? (
-                                  <ArrowUp className="w-4 h-4" />
-                                ) : (
-                                  <ArrowDown className="w-4 h-4" />
-                                )}
-                                {Math.abs(variacao.percentual)}%
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                <VendasComparativoPeriodoTable
+                  emptyMessage="Nenhuma forma de pagamento encontrada"
+                  labelHeader="Forma de pagamento"
+                  labelKey="forma_pagamento"
+                  linhasAnteriores={formasRecebimentoComparacaoConsolidadas}
+                  linhasAtuais={formasRecebimentoConsolidadas}
+                  rowKeyPrefix="comp-forma"
+                  valueKey="valor_total"
+                />
               </div>
 
               {/* Gráfico de Barras por Forma de Pagamento */}
@@ -3435,58 +3390,15 @@ export default function VendasFinanceiro() {
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">
                   Comparação por Grupo de Produtos
                 </h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-100">
-                      <tr>
-                        <th className="px-4 py-3 text-left">Grupo</th>
-                        <th className="px-4 py-3 text-right">Anterior</th>
-                        <th className="px-4 py-3 text-right">Atual</th>
-                        <th className="px-4 py-3 text-right">Diferença</th>
-                        <th className="px-4 py-3 text-center">Variação %</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {vendasPorGrupo.map((grupoAtual, idx) => {
-                        const grupoAnt = vendasPorGrupoComparacao.find(
-                          (g) => g.grupo === grupoAtual.grupo,
-                        ) || { valor_liquido: 0 };
-                        const variacao = calcularVariacao(
-                          grupoAtual.valor_liquido,
-                          grupoAnt.valor_liquido,
-                        );
-                        return (
-                          <tr key={`comp-grupo-${grupoAtual.grupo || idx}`} className="border-b hover:bg-gray-50">
-                            <td className="px-4 py-3 font-medium">
-                              {grupoAtual.grupo}
-                            </td>
-                            <td className="px-4 py-3 text-right text-gray-600">
-                              {formatarMoeda(grupoAnt.valor_liquido)}
-                            </td>
-                            <td className="px-4 py-3 text-right font-medium">
-                              {formatarMoeda(grupoAtual.valor_liquido)}
-                            </td>
-                            <td className="px-4 py-3 text-right">
-                              {formatarMoeda(variacao.valor)}
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <span
-                                className={`inline-flex items-center gap-1 px-2 py-1 rounded font-medium ${variacao.percentual >= 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}
-                              >
-                                {variacao.percentual >= 0 ? (
-                                  <ArrowUp className="w-4 h-4" />
-                                ) : (
-                                  <ArrowDown className="w-4 h-4" />
-                                )}
-                                {Math.abs(variacao.percentual)}%
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                <VendasComparativoPeriodoTable
+                  emptyMessage="Nenhum grupo encontrado"
+                  labelHeader="Grupo"
+                  labelKey="grupo"
+                  linhasAnteriores={vendasPorGrupoComparacao}
+                  linhasAtuais={vendasPorGrupo}
+                  rowKeyPrefix="comp-grupo"
+                  valueKey="valor_liquido"
+                />
               </div>
 
               {/* Gráfico de Pizza Duplo */}
@@ -3577,62 +3489,16 @@ export default function VendasFinanceiro() {
                 <h3 className="text-lg font-semibold text-gray-800 mb-4">
                   Comparação por Funcionário
                 </h3>
-                <div className="overflow-x-auto">
-                  <table className="w-full">
-                    <thead className="bg-gray-100">
-                      <tr>
-                        <th className="px-4 py-3 text-left">Funcionário</th>
-                        <th className="px-4 py-3 text-right">Qtd Ant.</th>
-                        <th className="px-4 py-3 text-right">Qtd Atual</th>
-                        <th className="px-4 py-3 text-right">Vl. Ant.</th>
-                        <th className="px-4 py-3 text-right">Vl. Atual</th>
-                        <th className="px-4 py-3 text-center">Variação</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {vendasPorFuncionario.map((funcAtual, idx) => {
-                        const funcAnt = vendasPorFuncionarioComparacao.find(
-                          (f) => f.funcionario === funcAtual.funcionario,
-                        ) || { quantidade: 0, valor_liquido: 0 };
-                        const variacao = calcularVariacao(
-                          funcAtual.valor_liquido,
-                          funcAnt.valor_liquido,
-                        );
-                        return (
-                          <tr key={`comp-func-${funcAtual.funcionario || idx}`} className="border-b hover:bg-gray-50">
-                            <td className="px-4 py-3 font-medium">
-                              {funcAtual.funcionario}
-                            </td>
-                            <td className="px-4 py-3 text-right text-gray-600">
-                              {funcAnt.quantidade}
-                            </td>
-                            <td className="px-4 py-3 text-right font-medium">
-                              {funcAtual.quantidade}
-                            </td>
-                            <td className="px-4 py-3 text-right text-gray-600">
-                              {formatarMoeda(funcAnt.valor_liquido)}
-                            </td>
-                            <td className="px-4 py-3 text-right font-medium">
-                              {formatarMoeda(funcAtual.valor_liquido)}
-                            </td>
-                            <td className="px-4 py-3 text-center">
-                              <span
-                                className={`inline-flex items-center gap-1 px-2 py-1 rounded font-medium ${variacao.percentual >= 0 ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"}`}
-                              >
-                                {variacao.percentual >= 0 ? (
-                                  <ArrowUp className="w-4 h-4" />
-                                ) : (
-                                  <ArrowDown className="w-4 h-4" />
-                                )}
-                                {Math.abs(variacao.percentual)}%
-                              </span>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                <VendasComparativoPeriodoTable
+                  emptyMessage="Nenhum funcionário encontrado"
+                  includeQuantidade
+                  labelHeader="Funcionário"
+                  labelKey="funcionario"
+                  linhasAnteriores={vendasPorFuncionarioComparacao}
+                  linhasAtuais={vendasPorFuncionario}
+                  rowKeyPrefix="comp-func"
+                  valueKey="valor_liquido"
+                />
               </div>
 
               {/* Gráfico de Barras por Funcionário */}

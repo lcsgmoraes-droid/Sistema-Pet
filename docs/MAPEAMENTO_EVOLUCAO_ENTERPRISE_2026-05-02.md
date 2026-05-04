@@ -64,6 +64,7 @@ Tela piloto:
 - Financeiro/Vendas: a tabela "Vendas por data" do resumo foi extraida para `VendasPorDataTable`, mantendo badges de dia, valores zerados como traco e totalizacao no componente.
 - Financeiro/Vendas: as tabelas "Formas de recebimento" e "Funcionario" foram extraidas para componentes dedicados com `DataTable`, mantendo totalizacao local e celulas monetarias padronizadas.
 - Financeiro/Vendas: as tabelas agregadas de "Tipo" e "Grupo de produto" passaram a usar `VendasResumoAgregadoTable`, preparando o mesmo padrao para outros resumos.
+- Financeiro/Vendas: as comparacoes de periodo por forma de pagamento, grupo de produto e funcionario passaram para `VendasComparativoPeriodoTable`, padronizando variacao, valores e estados vazios.
 
 Proxima varredura recomendada:
 
