@@ -720,6 +720,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-03: fluxo operacional de `Banho & Tosa` simplificado: a etapa `entregue` agora centraliza a geracao da venda no backend, `Retornos` virou `Reagendar`, taxi dog/relatorios foram alinhados aos componentes globais e fotos de pets passaram a aparecer tambem nas sugestoes de reagendamento.
 - 2026-05-03: `Banho & Tosa` teve a grade antiga de capacidade removida da agenda, o taxi dog recebeu painel compacto com metricas e a limpeza de componentes antigos/orfaos reduziu o risco de retorno do visual anterior.
 - 2026-05-03: indicadores restantes do `Banho & Tosa` foram suavizados para o padrao visual atual, removendo tons laranja decorativos e pesos de fonte excessivos onde nao havia alerta real.
+- 2026-05-03: criado `ModuleTabs` e aplicado em Financeiro/Vendas, DRE, Fluxo de Caixa, Campanhas e Pessoas, removendo abas manuais duplicadas e aproximando a navegacao interna dos modulos ao mesmo padrao visual.
 
 ### Nao fazer nesta onda
 

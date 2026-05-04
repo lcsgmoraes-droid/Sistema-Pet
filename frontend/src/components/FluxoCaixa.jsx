@@ -14,7 +14,40 @@ import ActionButton from './ui/ActionButton';
 import MetricCard from './ui/MetricCard';
 import MetricGrid from './ui/MetricGrid';
 import MoneyCell, { formatMoneyCellValue } from './ui/MoneyCell';
+import ModuleTabs from './ui/ModuleTabs';
 import StatusBadge from './ui/StatusBadge';
+
+const FLUXO_CAIXA_TABS = [
+  {
+    id: 'movimentacoes',
+    label: (
+      <span className="inline-flex items-center gap-2">
+        <DollarSign className="h-5 w-5" />
+        Movimentações
+      </span>
+    ),
+  },
+  {
+    id: 'projecoes',
+    label: (
+      <span className="inline-flex items-center gap-2">
+        <Brain className="h-5 w-5" />
+        Projeções IA
+        <Sparkles className="h-4 w-4" />
+      </span>
+    ),
+  },
+  {
+    id: 'alertas',
+    label: (
+      <span className="inline-flex items-center gap-2">
+        <AlertTriangle className="h-5 w-5" />
+        Alertas IA
+        <Sparkles className="h-4 w-4" />
+      </span>
+    ),
+  },
+];
 
 const FluxoCaixa = () => {
   const navigate = useNavigate();
@@ -406,46 +439,14 @@ const FluxoCaixa = () => {
       </div>
 
       {/* Tabs de Navegação */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="border-b border-gray-200">
-          <nav className="flex -mb-px">
-            <button
-              onClick={() => setTabAtiva('movimentacoes')}
-              className={`flex items-center gap-2 px-6 py-4 border-b-2 font-medium transition-colors ${
-                tabAtiva === 'movimentacoes'
-                  ? 'border-blue-600 text-blue-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300'
-              }`}
-            >
-              <DollarSign className="w-5 h-5" />
-              Movimentações
-            </button>
-            <button
-              onClick={() => setTabAtiva('projecoes')}
-              className={`flex items-center gap-2 px-6 py-4 border-b-2 font-medium transition-colors ${
-                tabAtiva === 'projecoes'
-                  ? 'border-purple-600 text-purple-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300'
-              }`}
-            >
-              <Brain className="w-5 h-5" />
-              Projeções IA
-              <Sparkles className="w-4 h-4" />
-            </button>
-            <button
-              onClick={() => setTabAtiva('alertas')}
-              className={`flex items-center gap-2 px-6 py-4 border-b-2 font-medium transition-colors ${
-                tabAtiva === 'alertas'
-                  ? 'border-orange-600 text-orange-600'
-                  : 'border-transparent text-gray-600 hover:text-gray-800 hover:border-gray-300'
-              }`}
-            >
-              <AlertTriangle className="w-5 h-5" />
-              Alertas IA
-              <Sparkles className="w-4 h-4" />
-            </button>
-          </nav>
-        </div>
+      <div className="bg-white rounded-lg border border-gray-200 shadow-sm">
+        <ModuleTabs
+          active={tabAtiva}
+          ariaLabel="Abas do fluxo de caixa"
+          className="px-4 pt-2"
+          onChange={setTabAtiva}
+          tabs={FLUXO_CAIXA_TABS}
+        />
       </div>
 
       {/* Conteúdo das Tabs */}

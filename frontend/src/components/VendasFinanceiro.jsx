@@ -38,6 +38,7 @@ import FilterBar, { FilterRow } from "./ui/FilterBar";
 import MetricCard from "./ui/MetricCard";
 import MetricGrid from "./ui/MetricGrid";
 import MoneyCell, { formatMoneyCellValue, isZeroMoneyValue } from "./ui/MoneyCell";
+import ModuleTabs from "./ui/ModuleTabs";
 import NumberCell from "./ui/NumberCell";
 import StatusBadge from "./ui/StatusBadge";
 
@@ -484,6 +485,21 @@ export default function VendasFinanceiro() {
     "lucro",
     "status",
   ]);
+
+  const abasVendasFinanceiro = useMemo(() => {
+    const tabsRestritas = [{ id: "historico-cliente", label: "Historico por Cliente" }];
+
+    if (!podeVerFinanceiroCompleto) return tabsRestritas;
+
+    return [
+      { id: "resumo", label: "Resumo" },
+      ...tabsRestritas,
+      { id: "produtos", label: "Totais por produto/servico" },
+      { id: "lista", label: "Lista de Vendas" },
+      { id: "comparacao", label: "Comparacao de Periodos" },
+      { id: "analise", label: "Analise Inteligente" },
+    ];
+  }, [podeVerFinanceiroCompleto]);
 
   const toggleVendaExpandida = (vendaId) => {
     const novoSet = new Set(vendasExpandidas);
@@ -2185,74 +2201,12 @@ export default function VendasFinanceiro() {
         )}
 
         {/* Abas */}
-        <div className="flex gap-2 border-b">
-          {podeVerFinanceiroCompleto && (
-            <button
-              onClick={() => setAbaAtiva("resumo")}
-              className={`px-4 py-2 font-medium ${
-                abaAtiva === "resumo"
-                  ? "border-b-2 border-blue-500 text-blue-600"
-                  : "text-gray-600 hover:text-gray-800"
-              }`}
-            >
-              Resumo
-            </button>
-          )}
-          <button
-            onClick={() => setAbaAtiva("historico-cliente")}
-            className={`px-4 py-2 font-medium ${
-              abaAtiva === "historico-cliente"
-                ? "border-b-2 border-purple-500 text-purple-600"
-                : "text-gray-600 hover:text-gray-800"
-            }`}
-          >
-            Histórico por Cliente
-          </button>
-          {podeVerFinanceiroCompleto && (
-            <>
-              <button
-                onClick={() => setAbaAtiva("produtos")}
-                className={`px-4 py-2 font-medium ${
-                  abaAtiva === "produtos"
-                    ? "border-b-2 border-blue-500 text-blue-600"
-                    : "text-gray-600 hover:text-gray-800"
-                }`}
-              >
-                Totais por produto/serviço
-              </button>
-              <button
-                onClick={() => setAbaAtiva("lista")}
-                className={`px-4 py-2 font-medium ${
-                  abaAtiva === "lista"
-                    ? "border-b-2 border-blue-500 text-blue-600"
-                    : "text-gray-600 hover:text-gray-800"
-                }`}
-              >
-                Lista de Vendas
-              </button>
-              <button
-                onClick={() => setAbaAtiva("comparacao")}
-                className={`px-4 py-2 font-medium ${
-                  abaAtiva === "comparacao"
-                    ? "border-b-2 border-blue-500 text-blue-600"
-                    : "text-gray-600 hover:text-gray-800"
-                }`}
-              >
-                Comparação de Períodos
-              </button>
-              <button
-                onClick={() => setAbaAtiva("analise")}
-                className={`px-4 py-2 font-medium ${
-                  abaAtiva === "analise"
-                    ? "border-b-2 border-blue-500 text-blue-600"
-                    : "text-gray-600 hover:text-gray-800"
-                }`}
-              >
-                Análise Inteligente
-              </button>
-            </>
-          )}
-        </div>
+        <ModuleTabs
+          active={abaAtiva}
+          ariaLabel="Abas do financeiro de vendas"
+          onChange={setAbaAtiva}
+          tabs={abasVendasFinanceiro}
+        />
       </div>
 
       {/* Conteúdo das Abas */}

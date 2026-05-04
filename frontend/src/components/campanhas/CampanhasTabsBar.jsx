@@ -1,3 +1,5 @@
+import ModuleTabs from "../ui/ModuleTabs";
+
 const CAMPANHAS_TABS = [
   { id: "dashboard", label: "\u{1F4CA} Dashboard" },
   { id: "campanhas", label: "\u{1F4CB} Campanhas" },
@@ -16,20 +18,11 @@ const CAMPANHAS_TABS = [
 
 export default function CampanhasTabsBar({ aba, onChange }) {
   return (
-    <div className="flex gap-1 border-b overflow-x-auto">
-      {CAMPANHAS_TABS.map((tab) => (
-        <button
-          key={tab.id}
-          onClick={() => onChange(tab.id)}
-          className={`px-5 py-2.5 text-sm font-medium rounded-t-lg border-b-2 transition-colors whitespace-nowrap ${
-            aba === tab.id
-              ? "border-blue-600 text-blue-700 bg-blue-50"
-              : "border-transparent text-gray-500 hover:text-gray-700"
-          }`}
-        >
-          {tab.label}
-        </button>
-      ))}
-    </div>
+    <ModuleTabs
+      active={aba}
+      ariaLabel="Abas de campanhas"
+      onChange={onChange}
+      tabs={CAMPANHAS_TABS}
+    />
   );
 }

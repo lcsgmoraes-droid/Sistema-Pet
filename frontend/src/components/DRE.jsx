@@ -25,9 +25,46 @@ import { actionButtonClasses } from "./ui/actionStyles";
 import MetricCard from "./ui/MetricCard";
 import MetricGrid from "./ui/MetricGrid";
 import MoneyCell, { formatMoneyCellValue } from "./ui/MoneyCell";
+import ModuleTabs from "./ui/ModuleTabs";
 import NumberCell from "./ui/NumberCell";
 
 const DRE_REQUEST_TIMEOUT_MS = 120000;
+
+const DRE_TABS = [
+  {
+    id: "demonstrativo",
+    label: (
+      <span className="inline-flex items-center gap-2">
+        <FileText size={18} />
+        Demonstrativo
+      </span>
+    ),
+  },
+  {
+    id: "extrato",
+    label: (
+      <span className="inline-flex items-center gap-2">
+        <Upload size={18} />
+        Extrato Bancário
+        <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-bold text-green-700">
+          IA
+        </span>
+      </span>
+    ),
+  },
+  {
+    id: "analise",
+    label: (
+      <span className="inline-flex items-center gap-2">
+        <Brain size={18} />
+        Análise Inteligente
+        <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-bold text-purple-700">
+          EM BREVE
+        </span>
+      </span>
+    ),
+  },
+];
 
 const DRE = () => {
   // Controle de tabs
@@ -334,51 +371,12 @@ const DRE = () => {
       </div>
 
       {/* Tabs de Navegação */}
-      <div className="overflow-x-auto border-b border-gray-200">
-        <nav className="-mb-px flex space-x-8">
-          <button
-            onClick={() => setTabAtiva("demonstrativo")}
-            className={`${
-              tabAtiva === "demonstrativo"
-                ? "border-blue-500 text-blue-600"
-                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors`}
-          >
-            <FileText size={18} />
-            Demonstrativo
-          </button>
-
-          <button
-            onClick={() => setTabAtiva("extrato")}
-            className={`${
-              tabAtiva === "extrato"
-                ? "border-green-500 text-green-600"
-                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors`}
-          >
-            <Upload size={18} />
-            Extrato Bancário
-            <span className="ml-1 px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded-full font-bold">
-              IA
-            </span>
-          </button>
-
-          <button
-            onClick={() => setTabAtiva("analise")}
-            className={`${
-              tabAtiva === "analise"
-                ? "border-purple-500 text-purple-600"
-                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-            } whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-2 transition-colors`}
-          >
-            <Brain size={18} />
-            Análise Inteligente
-            <span className="ml-1 px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full font-bold">
-              EM BREVE
-            </span>
-          </button>
-        </nav>
-      </div>
+      <ModuleTabs
+        active={tabAtiva}
+        ariaLabel="Abas da DRE"
+        onChange={setTabAtiva}
+        tabs={DRE_TABS}
+      />
 
       {/* Conteúdo da Tab Demonstrativo */}
       {tabAtiva === "demonstrativo" && (

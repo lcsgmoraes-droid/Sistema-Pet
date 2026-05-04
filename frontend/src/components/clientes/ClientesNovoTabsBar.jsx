@@ -1,33 +1,27 @@
+import ModuleTabs from "../ui/ModuleTabs";
+
 const ClientesNovoTabsBar = ({ tipoFiltro, setTipoFiltro, setPaginaAtual }) => {
   const tabs = [
-    { value: "todos", label: "Todos" },
-    { value: "cliente", label: "Clientes" },
-    { value: "fornecedor", label: "Fornecedores" },
-    { value: "veterinario", label: "Veterinarios" },
-    { value: "funcionario", label: "Funcionarios" },
+    { id: "todos", label: "Todos" },
+    { id: "cliente", label: "Clientes" },
+    { id: "fornecedor", label: "Fornecedores" },
+    { id: "veterinario", label: "Veterinarios" },
+    { id: "funcionario", label: "Funcionarios" },
   ];
 
+  const handleChange = (tabId) => {
+    setTipoFiltro(tabId);
+    setPaginaAtual(1);
+  };
+
   return (
-    <div className="mb-6 border-b border-gray-200">
-      <div className="flex gap-2">
-        {tabs.map((tab) => (
-          <button
-            key={tab.value}
-            onClick={() => {
-              setTipoFiltro(tab.value);
-              setPaginaAtual(1);
-            }}
-            className={`px-4 py-2 font-medium border-b-2 transition-colors ${
-              tipoFiltro === tab.value
-                ? "border-purple-600 text-purple-600"
-                : "border-transparent text-gray-600 hover:text-gray-900"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
-      </div>
-    </div>
+    <ModuleTabs
+      active={tipoFiltro}
+      ariaLabel="Filtros de pessoas"
+      className="mb-6"
+      onChange={handleChange}
+      tabs={tabs}
+    />
   );
 };
 
