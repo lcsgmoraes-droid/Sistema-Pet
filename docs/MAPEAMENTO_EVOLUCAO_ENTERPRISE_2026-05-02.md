@@ -60,6 +60,7 @@ Tela piloto:
 - Operadoras, internacoes veterinarias e Estoque Bling comecaram a usar estados globais de vazio/carregamento.
 - Pets: `PetSelector` e `NovoPetButton` passaram para `components/pets`; PDV, seletor tutor/pet do veterinario e fluxos de agenda, IA, calculadora de doses, exames, internacoes e vacinas agora usam a mesma base visual e de comportamento.
 - PDV: resumo de cliente selecionado passou a usar `EntityCard` em modo compacto, mantendo o alinhamento de CPF, codigo, telefone, fidelidade, cupons e credito.
+- Financeiro/Vendas: a tabela principal da lista de vendas foi extraida para `VendasFinanceiroListaTable` e passou a consumir `DataTable`, `MoneyCell`, `NumberCell` e `StatusBadge`.
 
 Proxima varredura recomendada:
 

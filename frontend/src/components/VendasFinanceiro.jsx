@@ -3,11 +3,7 @@ import {
   ArrowUp,
   BarChart3,
   Calendar,
-  ChevronDown,
-  ChevronRight,
-  Copy,
   Download,
-  ExternalLink,
   FileText,
   Filter,
 } from "lucide-react";
@@ -32,6 +28,7 @@ import writeExcelFile from "write-excel-file/browser";
 import api from "../api";
 import { useAuth } from "../contexts/AuthContext";
 import HistoricoVendasClienteTab from "../pages/Financeiro/HistoricoVendasClienteTab";
+import VendasFinanceiroListaTable from "./financeiro/VendasFinanceiroListaTable";
 import ActionButton from "./ui/ActionButton";
 import { actionButtonClasses } from "./ui/actionStyles";
 import FilterBar, { FilterRow } from "./ui/FilterBar";
@@ -40,7 +37,6 @@ import MetricGrid from "./ui/MetricGrid";
 import MoneyCell, { formatMoneyCellValue, isZeroMoneyValue } from "./ui/MoneyCell";
 import ModuleTabs from "./ui/ModuleTabs";
 import NumberCell from "./ui/NumberCell";
-import StatusBadge from "./ui/StatusBadge";
 
 const COLUNAS_RELATORIO_VENDAS = [
   { key: "data_venda", label: "Data", value: (v) => v.data_venda || "" },
@@ -3411,324 +3407,16 @@ export default function VendasFinanceiro() {
               />
             ))}
           </MetricGrid>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="px-1 py-2 text-left w-8"></th>
-                  <th className="px-1 py-2 text-left">Data</th>
-                  <th className="px-1 py-2 text-left">Código</th>
-                  <th className="px-1 py-2 text-left">Cliente</th>
-                  <th className="px-1 py-2 text-right">Venda Bruta</th>
-                  <th className="px-1 py-2 text-right">Tx Loja</th>
-                  <th className="px-1 py-2 text-right">Desconto</th>
-                  <th className="px-1 py-2 text-right">Tx. Entrega</th>
-                  <th className="px-1 py-2 text-right">Tx. Operac.</th>
-                  <th className="px-1 py-2 text-right">Tx. Cartão</th>
-                  <th className="px-1 py-2 text-right">Comissão</th>
-                  <th className="px-1 py-2 text-right">Imposto</th>
-                  <th
-                    className="px-1 py-2 text-right"
-                    title="Cashback / cupons resgatados nesta venda"
-                  >
-                    Custo Camp.
-                  </th>
-                  <th className="px-1 py-2 text-right">Líquida</th>
-                  <th className="px-1 py-2 text-right">Custo</th>
-                  <th className="px-1 py-2 text-right">Lucro</th>
-                  <th className="px-1 py-2 text-right">MG Venda</th>
-                  <th className="px-1 py-2 text-right">MG Custo</th>
-                  <th className="px-1 py-2 text-center">Status</th>
-                </tr>
-              </thead>
-              <tbody>
-                {listaVendasFiltrada.map((venda) => (
-                  <React.Fragment key={venda.id}>
-                    <tr
-                      className="border-b hover:bg-gray-50 cursor-pointer"
-                      onClick={() => toggleVendaExpandida(venda.id)}
-                    >
-                      <td className="px-1 py-2">
-                        {vendasExpandidas.has(venda.id) ? (
-                          <ChevronDown className="w-4 h-4 text-gray-600" />
-                        ) : (
-                          <ChevronRight className="w-4 h-4 text-gray-600" />
-                        )}
-                      </td>
-                      <td className="px-1 py-2 whitespace-nowrap">
-                        {formatarData(venda.data_venda)}
-                      </td>
-                      <td className="px-1 py-2 whitespace-nowrap">
-                        <div className="inline-flex items-center gap-1.5">
-                          <a
-                            href={criarUrlPdvVenda(venda)}
-                            target="_blank"
-                            rel="noreferrer"
-                            onClick={(event) => event.stopPropagation()}
-                            className="inline-flex items-center gap-1 font-medium text-blue-700 hover:text-blue-900 hover:underline"
-                            title="Abrir venda no PDV em nova aba"
-                          >
-                            {venda.numero_venda}
-                            <ExternalLink className="h-3.5 w-3.5" />
-                          </a>
-                          <button
-                            type="button"
-                            onClick={(event) => copiarNumeroVenda(event, venda.numero_venda)}
-                            className="inline-flex h-6 w-6 items-center justify-center rounded border border-slate-200 text-slate-500 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
-                            title="Copiar numero da venda"
-                            aria-label={`Copiar numero da venda ${venda.numero_venda}`}
-                          >
-                            <Copy className="h-3.5 w-3.5" />
-                          </button>
-                        </div>
-                      </td>
-                      <td className="px-1 py-2">{venda.cliente_nome}</td>
-                      <td className="px-1 py-2 text-right font-medium whitespace-nowrap">
-                        <MoneyCell value={venda.venda_bruta} zeroAsDash />
-                      </td>
-                      <td
-                        className="px-1 py-2 text-right text-green-700 whitespace-nowrap"
-                        title="Taxa de entrega total cobrada do cliente"
-                      >
-                        <MoneyCell value={venda.taxa_loja || 0} sign="+" zeroAsDash />
-                      </td>
-                      <td className="px-1 py-2 text-right text-red-600 whitespace-nowrap">
-                        <MoneyCell value={venda.desconto} sign="-" zeroAsDash />
-                      </td>
-                      <td
-                        className="px-1 py-2 text-right text-blue-600 whitespace-nowrap"
-                        title="Comissão repassada ao entregador"
-                      >
-                        <MoneyCell value={venda.taxa_entrega} sign="-" zeroAsDash />
-                      </td>
-                      <td
-                        className="px-1 py-2 text-right text-orange-500 whitespace-nowrap"
-                        title="Custo operacional da entrega (empresa)"
-                      >
-                        <MoneyCell value={venda.taxa_operacional || 0} sign="-" zeroAsDash />
-                      </td>
-                      <td className="px-1 py-2 text-right text-purple-600 whitespace-nowrap">
-                        <MoneyCell value={venda.taxa_cartao} sign="-" zeroAsDash />
-                      </td>
-                      <td className="px-1 py-2 text-right text-blue-600 whitespace-nowrap">
-                        <MoneyCell value={venda.comissao} sign="-" zeroAsDash />
-                      </td>
-                      <td
-                        className="px-1 py-2 text-right text-pink-600 whitespace-nowrap"
-                        title={
-                          venda.imposto_aplicado
-                            ? "Impostos sobre faturamento"
-                            : "Imposto oculto porque a venda nao tem NF/NFC-e emitida"
-                        }
-                      >
-                        <MoneyCell value={venda.imposto || 0} sign="-" zeroAsDash />
-                      </td>
-                      <td
-                        className="px-1 py-2 text-right text-teal-600 whitespace-nowrap"
-                        title="Custo com campanhas (cashback/cupom resgatado)"
-                      >
-                        <MoneyCell value={venda.custo_campanha} sign="-" zeroAsDash />
-                      </td>
-                      <td className="px-1 py-2 text-right font-medium whitespace-nowrap">
-                        <MoneyCell value={venda.venda_liquida} zeroAsDash />
-                      </td>
-                      <td className="px-1 py-2 text-right text-orange-600 whitespace-nowrap">
-                        <MoneyCell value={venda.custo_produtos} sign="-" zeroAsDash />
-                      </td>
-                      <td
-                        className={`px-1 py-2 text-right font-bold whitespace-nowrap ${venda.lucro >= 0 ? "text-green-600" : "text-red-600"}`}
-                      >
-                        <MoneyCell value={venda.lucro} zeroAsDash />
-                      </td>
-                      <td className="px-1 py-2 text-right whitespace-nowrap">
-                        <NumberCell value={venda.margem_sobre_venda} decimals={1} suffix="%" zeroAsDash />
-                      </td>
-                      <td className="px-1 py-2 text-right whitespace-nowrap">
-                        <NumberCell value={venda.margem_sobre_custo} decimals={1} suffix="%" zeroAsDash />
-                      </td>
-                      <td className="px-2 py-2 text-center">
-                        {(() => {
-                          const statusMeta = getStatusVendaMeta(venda.status);
-                          return (
-                            <StatusBadge intent={statusMeta.intent} size="xs">
-                              {statusMeta.label}
-                            </StatusBadge>
-                          );
-                        })()}
-                      </td>
-                    </tr>
-
-                    {/* Linha expandida com detalhes dos produtos */}
-                    {vendasExpandidas.has(venda.id) &&
-                      venda.itens &&
-                      venda.itens.length > 0 && (
-                        <tr key={`${venda.id}-detalhes`} className="bg-blue-50">
-                          <td colSpan="19" className="px-4 py-3">
-                            <div className="pl-8">
-                              <div className="font-semibold text-gray-700 mb-2">
-                                Produtos desta venda:
-                              </div>
-                              <table className="w-full text-xs">
-                                <thead className="bg-blue-100">
-                                  <tr>
-                                    <th className="px-1 py-1 text-left">
-                                      Produto
-                                    </th>
-                                    <th className="px-1 py-1 text-center">
-                                      Qtd
-                                    </th>
-                                    <th className="px-1 py-1 text-right">
-                                      Preço Unit.
-                                    </th>
-                                    <th className="px-1 py-1 text-right">
-                                      Venda Bruta
-                                    </th>
-                                    <th className="px-1 py-1 text-right">
-                                      Tx Loja
-                                    </th>
-                                    <th className="px-1 py-1 text-right">
-                                      Desconto
-                                    </th>
-                                    <th className="px-1 py-1 text-right">
-                                      Tx. Entr.
-                                    </th>
-                                    <th className="px-1 py-1 text-right">
-                                      Tx. Oper.
-                                    </th>
-                                    <th className="px-1 py-1 text-right">
-                                      Tx. Cartão
-                                    </th>
-                                    <th className="px-1 py-1 text-right">
-                                      Comissão
-                                    </th>
-                                    <th className="px-1 py-1 text-right">
-                                      Imposto
-                                    </th>
-                                    <th
-                                      className="px-1 py-1 text-right"
-                                      title="Cashback/cupom rateado neste item"
-                                    >
-                                      Campanha
-                                    </th>
-                                    <th className="px-1 py-1 text-right">
-                                      Líquido
-                                    </th>
-                                    <th className="px-1 py-1 text-right">
-                                      Custo Unit.
-                                    </th>
-                                    <th className="px-1 py-1 text-right">
-                                      Custo Total
-                                    </th>
-                                    <th className="px-1 py-1 text-right">
-                                      Lucro
-                                    </th>
-                                    <th className="px-1 py-1 text-right">
-                                      MG Venda
-                                    </th>
-                                    <th className="px-1 py-1 text-right">
-                                      MG Custo
-                                    </th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {venda.itens.map((item, idx) => (
-                                    <tr
-                                      key={`${venda.id}-item-${item.produto_id || item.produto_nome || idx}`}
-                                      className="border-b border-blue-200 hover:bg-blue-100"
-                                    >
-                                      <td className="px-1 py-1">
-                                        <div className="flex flex-wrap items-center gap-1">
-                                          <span>{item.produto_nome}</span>
-                                          {item.em_promocao && (
-                                            <span
-                                              className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-bold uppercase text-cyan-700"
-                                              title={item.promocao_origem || "Item vendido por preco promocional ativo"}
-                                            >
-                                              Promo
-                                            </span>
-                                          )}
-                                        </div>
-                                      </td>
-                                      <td className="px-1 py-1 text-center">
-                                        <NumberCell value={item.quantidade} zeroAsDash />
-                                      </td>
-                                      <td className="px-1 py-1 text-right whitespace-nowrap">
-                                        <MoneyCell value={item.preco_unitario} zeroAsDash />
-                                      </td>
-                                      <td className="px-1 py-1 text-right font-medium whitespace-nowrap">
-                                        <MoneyCell value={item.venda_bruta} zeroAsDash />
-                                      </td>
-                                      <td className="px-1 py-1 text-right text-green-700 whitespace-nowrap">
-                                        <MoneyCell value={item.taxa_loja || 0} sign="+" zeroAsDash />
-                                      </td>
-                                      <td className="px-1 py-1 text-right text-red-600 whitespace-nowrap">
-                                        <MoneyCell value={item.desconto} sign="-" zeroAsDash />
-                                      </td>
-                                      <td className="px-1 py-1 text-right text-blue-600 whitespace-nowrap">
-                                        <MoneyCell value={item.taxa_entrega} sign="-" zeroAsDash />
-                                      </td>
-                                      <td className="px-1 py-1 text-right text-orange-500 whitespace-nowrap">
-                                        <MoneyCell value={item.taxa_operacional || 0} sign="-" zeroAsDash />
-                                      </td>
-                                      <td className="px-1 py-1 text-right text-purple-600 whitespace-nowrap">
-                                        <MoneyCell value={item.taxa_cartao} sign="-" zeroAsDash />
-                                      </td>
-                                      <td className="px-1 py-1 text-right text-blue-600 whitespace-nowrap">
-                                        <MoneyCell value={item.comissao} sign="-" zeroAsDash />
-                                      </td>
-                                      <td
-                                        className="px-1 py-1 text-right text-pink-600 whitespace-nowrap"
-                                        title={
-                                          venda.imposto_aplicado
-                                            ? "Impostos rateados neste item"
-                                            : "Imposto oculto porque a venda nao tem NF/NFC-e emitida"
-                                        }
-                                      >
-                                        <MoneyCell value={item.imposto || 0} sign="-" zeroAsDash />
-                                      </td>
-                                      <td className="px-1 py-1 text-right text-teal-600 whitespace-nowrap">
-                                        <MoneyCell value={item.campanha} sign="-" zeroAsDash />
-                                      </td>
-                                      <td className="px-1 py-1 text-right font-medium whitespace-nowrap">
-                                        <MoneyCell value={item.valor_liquido} zeroAsDash />
-                                      </td>
-                                      <td className="px-1 py-1 text-right text-orange-600 whitespace-nowrap">
-                                        <MoneyCell value={item.custo_unitario} zeroAsDash />
-                                      </td>
-                                      <td className="px-1 py-1 text-right text-orange-600 font-medium whitespace-nowrap">
-                                        <MoneyCell value={item.custo_total} sign="-" zeroAsDash />
-                                      </td>
-                                      <td
-                                        className={`px-1 py-1 text-right font-bold whitespace-nowrap ${item.lucro >= 0 ? "text-green-600" : "text-red-600"} cursor-help`}
-                                        title={`Lucro unitário: ${formatarMoeda(item.lucro_unitario)}`}
-                                      >
-                                        <MoneyCell value={item.lucro} zeroAsDash />
-                                      </td>
-                                      <td
-                                        className="px-1 py-1 text-right whitespace-nowrap cursor-help"
-                                        title={`Margem: ${item.margem_sobre_venda}%`}
-                                      >
-                                        <NumberCell value={item.margem_sobre_venda} decimals={1} suffix="%" zeroAsDash />
-                                      </td>
-                                      <td
-                                        className="px-1 py-1 text-right whitespace-nowrap cursor-help"
-                                        title={`Markup: ${item.margem_sobre_custo}%`}
-                                      >
-                                        <NumberCell value={item.margem_sobre_custo} decimals={1} suffix="%" zeroAsDash />
-                                      </td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
-                          </td>
-                        </tr>
-                      )}
-                  </React.Fragment>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <VendasFinanceiroListaTable
+            copiarNumeroVenda={copiarNumeroVenda}
+            criarUrlPdvVenda={criarUrlPdvVenda}
+            formatarData={formatarData}
+            formatarMoeda={formatarMoeda}
+            getStatusVendaMeta={getStatusVendaMeta}
+            onToggleVenda={toggleVendaExpandida}
+            vendas={listaVendasFiltrada}
+            vendasExpandidas={vendasExpandidas}
+          />
         </div>
       )}
 
