@@ -65,6 +65,7 @@ Tela piloto:
 - Financeiro/Vendas: as tabelas "Formas de recebimento" e "Funcionario" foram extraidas para componentes dedicados com `DataTable`, mantendo totalizacao local e celulas monetarias padronizadas.
 - Financeiro/Vendas: as tabelas agregadas de "Tipo" e "Grupo de produto" passaram a usar `VendasResumoAgregadoTable`, preparando o mesmo padrao para outros resumos.
 - Financeiro/Vendas: as comparacoes de periodo por forma de pagamento, grupo de produto e funcionario passaram para `VendasComparativoPeriodoTable`, padronizando variacao, valores e estados vazios.
+- Financeiro/Vendas: a aba de produtos/servicos detalhados passou a usar `ProdutosServicosDetalhadosTable`, mantendo hierarquia de categoria, subcategoria, produto e total geral.
 
 Proxima varredura recomendada:
 

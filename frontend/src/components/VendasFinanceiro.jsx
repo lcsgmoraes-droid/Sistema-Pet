@@ -29,6 +29,7 @@ import api from "../api";
 import { useAuth } from "../contexts/AuthContext";
 import HistoricoVendasClienteTab from "../pages/Financeiro/HistoricoVendasClienteTab";
 import FormasRecebimentoTable from "./financeiro/FormasRecebimentoTable";
+import ProdutosServicosDetalhadosTable from "./financeiro/ProdutosServicosDetalhadosTable";
 import VendasComparativoPeriodoTable from "./financeiro/VendasComparativoPeriodoTable";
 import VendasFinanceiroListaTable from "./financeiro/VendasFinanceiroListaTable";
 import VendasPorDataTable from "./financeiro/VendasPorDataTable";
@@ -2799,165 +2800,10 @@ export default function VendasFinanceiro() {
           <div className="bg-gray-600 text-white px-4 py-2 rounded-t-lg font-semibold">
             Produtos/Serviços
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="px-4 py-2 text-left">Produtos/Serviços</th>
-                  <th className="px-4 py-2 text-right">Itens</th>
-                  <th className="px-4 py-2 text-right">Bruto</th>
-                  <th className="px-4 py-2 text-right">Desconto</th>
-                  <th className="px-4 py-2 text-right">Líquido</th>
-                </tr>
-              </thead>
-              <tbody>
-                {produtosDetalhadosFiltrados.map((categoria, catIdx) => (
-                  <React.Fragment key={`cat-group-${catIdx}`}>
-                    {/* Linha da Categoria */}
-                    <tr
-                      key={`cat-${catIdx}`}
-                      className="bg-blue-50 font-semibold"
-                    >
-                      <td className="px-4 py-2">{categoria.categoria}</td>
-                      <td className="px-4 py-2 text-right">
-                        {categoria.total_quantidade}
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        {formatarMoeda(categoria.total_bruto)}
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        {formatarMoeda(categoria.total_desconto)}
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        {formatarMoeda(categoria.total_liquido)}
-                      </td>
-                    </tr>
-
-                    {/* Subcategorias */}
-                    {categoria.subcategorias &&
-                      categoria.subcategorias.map((sub, subIdx) => (
-                        <React.Fragment key={`sub-group-${catIdx}-${subIdx}`}>
-                          {/* Linha da Subcategoria */}
-                          <tr
-                            key={`sub-${catIdx}-${subIdx}`}
-                            className="bg-gray-50 font-medium"
-                          >
-                            <td className="px-4 py-2 pl-8">
-                              {sub.subcategoria}
-                            </td>
-                            <td className="px-4 py-2 text-right">
-                              {sub.total_quantidade}
-                            </td>
-                            <td className="px-4 py-2 text-right">
-                              {formatarMoeda(sub.total_bruto)}
-                            </td>
-                            <td className="px-4 py-2 text-right">
-                              {formatarMoeda(sub.total_desconto)}
-                            </td>
-                            <td className="px-4 py-2 text-right">
-                              {formatarMoeda(sub.total_liquido)}
-                            </td>
-                          </tr>
-
-                          {/* Produtos da Subcategoria */}
-                          {sub.produtos &&
-                            sub.produtos.map((produto, prodIdx) => (
-                              <tr
-                                key={`prod-${catIdx}-${subIdx}-${prodIdx}`}
-                                className="border-b hover:bg-gray-50"
-                              >
-                                <td className="px-4 py-2 pl-12 text-gray-700">
-                                  {produto.produto}
-                                </td>
-                                <td className="px-4 py-2 text-right text-gray-700">
-                                  {produto.quantidade}
-                                </td>
-                                <td className="px-4 py-2 text-right text-gray-700">
-                                  {formatarMoeda(produto.valor_bruto)}
-                                </td>
-                                <td className="px-4 py-2 text-right text-gray-700">
-                                  {formatarMoeda(produto.desconto)}
-                                </td>
-                                <td className="px-4 py-2 text-right text-gray-700">
-                                  {formatarMoeda(produto.valor_liquido)}
-                                </td>
-                              </tr>
-                            ))}
-                        </React.Fragment>
-                      ))}
-
-                    {/* Produtos sem subcategoria */}
-                    {categoria.produtos &&
-                      categoria.produtos.map((produto, prodIdx) => (
-                        <tr
-                          key={`prod-${catIdx}-${prodIdx}`}
-                          className="border-b hover:bg-gray-50"
-                        >
-                          <td className="px-4 py-2 pl-8 text-gray-700">
-                            {produto.produto}
-                          </td>
-                          <td className="px-4 py-2 text-right text-gray-700">
-                            {produto.quantidade}
-                          </td>
-                          <td className="px-4 py-2 text-right text-gray-700">
-                            {formatarMoeda(produto.valor_bruto)}
-                          </td>
-                          <td className="px-4 py-2 text-right text-gray-700">
-                            {formatarMoeda(produto.desconto)}
-                          </td>
-                          <td className="px-4 py-2 text-right text-gray-700">
-                            {formatarMoeda(produto.valor_liquido)}
-                          </td>
-                        </tr>
-                      ))}
-                  </React.Fragment>
-                ))}
-
-                {/* TOTAL GERAL */}
-                {produtosDetalhados.length > 0 && (
-                  <tr
-                    style={{
-                      backgroundColor: "#E5E7EB",
-                      color: "#1F2937",
-                      fontWeight: "bold",
-                    }}
-                  >
-                    <td className="px-4 py-3">TOTAL GERAL</td>
-                    <td className="px-4 py-3 text-right">
-                      {produtosDetalhados.reduce(
-                        (sum, cat) => sum + cat.total_quantidade,
-                        0,
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {formatarMoeda(
-                        produtosDetalhados.reduce(
-                          (sum, cat) => sum + cat.total_bruto,
-                          0,
-                        ),
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {formatarMoeda(
-                        produtosDetalhados.reduce(
-                          (sum, cat) => sum + cat.total_desconto,
-                          0,
-                        ),
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-right">
-                      {formatarMoeda(
-                        produtosDetalhados.reduce(
-                          (sum, cat) => sum + cat.total_liquido,
-                          0,
-                        ),
-                      )}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+          <ProdutosServicosDetalhadosTable
+            linhas={produtosDetalhadosFiltrados}
+            linhasTotal={produtosDetalhados}
+          />
         </div>
       )}
 
