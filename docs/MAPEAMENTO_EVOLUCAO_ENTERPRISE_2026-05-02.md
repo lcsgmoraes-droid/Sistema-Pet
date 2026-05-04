@@ -63,6 +63,7 @@ Tela piloto:
 - Financeiro/Vendas: a tabela principal da lista de vendas foi extraida para `VendasFinanceiroListaTable` e passou a consumir `DataTable`, `MoneyCell`, `NumberCell` e `StatusBadge`.
 - Financeiro/Vendas: a tabela "Vendas por data" do resumo foi extraida para `VendasPorDataTable`, mantendo badges de dia, valores zerados como traco e totalizacao no componente.
 - Financeiro/Vendas: as tabelas "Formas de recebimento" e "Funcionario" foram extraidas para componentes dedicados com `DataTable`, mantendo totalizacao local e celulas monetarias padronizadas.
+- Financeiro/Vendas: as tabelas agregadas de "Tipo" e "Grupo de produto" passaram a usar `VendasResumoAgregadoTable`, preparando o mesmo padrao para outros resumos.
 
 Proxima varredura recomendada:
 

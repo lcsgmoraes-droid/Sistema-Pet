@@ -32,6 +32,7 @@ import FormasRecebimentoTable from "./financeiro/FormasRecebimentoTable";
 import VendasFinanceiroListaTable from "./financeiro/VendasFinanceiroListaTable";
 import VendasPorDataTable from "./financeiro/VendasPorDataTable";
 import VendasPorFuncionarioTable from "./financeiro/VendasPorFuncionarioTable";
+import VendasResumoAgregadoTable from "./financeiro/VendasResumoAgregadoTable";
 import ActionButton from "./ui/ActionButton";
 import { actionButtonClasses } from "./ui/actionStyles";
 import FilterBar, { FilterRow } from "./ui/FilterBar";
@@ -2683,77 +2684,14 @@ export default function VendasFinanceiro() {
               <div className="bg-gray-600 text-white px-4 py-2 rounded-t-lg font-semibold">
                 Tipo
               </div>
-              <table className="w-full">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="px-4 py-2 text-left">Tipo</th>
-                    <th className="px-4 py-2 text-right">Qtd</th>
-                    <th className="px-4 py-2 text-right">Vl. bruto</th>
-                    <th className="px-4 py-2 text-right">Desconto</th>
-                    <th className="px-4 py-2 text-right">Vl. líquido</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {vendasPorTipo.map((item, idx) => (
-                    <tr key={`tipo-row-${item.tipo || idx}`} className="border-b">
-                      <td className="px-4 py-2">{item.tipo}</td>
-                      <td className="px-4 py-2 text-right">
-                        {item.quantidade}
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        {formatarMoeda(item.valor_bruto)}
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        {formatarMoeda(item.desconto)}
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        {formatarMoeda(item.valor_liquido)}
-                      </td>
-                    </tr>
-                  ))}
-                  {vendasPorTipo.length > 0 && (
-                    <tr
-                      style={{
-                        backgroundColor: "#E5E7EB",
-                        color: "#1F2937",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      <td className="px-4 py-3">TOTAL</td>
-                      <td className="px-4 py-3 text-right">
-                        {vendasPorTipo.reduce(
-                          (sum, item) => sum + item.quantidade,
-                          0,
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {formatarMoeda(
-                          vendasPorTipo.reduce(
-                            (sum, item) => sum + item.valor_bruto,
-                            0,
-                          ),
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {formatarMoeda(
-                          vendasPorTipo.reduce(
-                            (sum, item) => sum + item.desconto,
-                            0,
-                          ),
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {formatarMoeda(
-                          vendasPorTipo.reduce(
-                            (sum, item) => sum + item.valor_liquido,
-                            0,
-                          ),
-                        )}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+              <VendasResumoAgregadoTable
+                emptyMessage="Nenhum tipo encontrado"
+                includeQuantidade
+                labelHeader="Tipo"
+                labelKey="tipo"
+                linhas={vendasPorTipo}
+                rowKeyPrefix="tipo-row"
+              />
             </div>
 
             {/* Grupo de Produto */}
@@ -2761,72 +2699,14 @@ export default function VendasFinanceiro() {
               <div className="bg-gray-600 text-white px-4 py-2 rounded-t-lg font-semibold">
                 Grupo de produto
               </div>
-              <table className="w-full">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="px-4 py-2 text-left">Nome</th>
-                    <th className="px-4 py-2 text-right">Percentual</th>
-                    <th className="px-4 py-2 text-right">Vl. bruto</th>
-                    <th className="px-4 py-2 text-right">Desconto</th>
-                    <th className="px-4 py-2 text-right">Vl. líquido</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {vendasPorGrupo.map((item, idx) => (
-                    <tr key={`grupo-row-${item.grupo || idx}`} className="border-b">
-                      <td className="px-4 py-2">{item.grupo}</td>
-                      <td className="px-4 py-2 text-right">
-                        {item.percentual}%
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        {formatarMoeda(item.valor_bruto)}
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        {formatarMoeda(item.desconto)}
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        {formatarMoeda(item.valor_liquido)}
-                      </td>
-                    </tr>
-                  ))}
-                  {vendasPorGrupo.length > 0 && (
-                    <tr
-                      style={{
-                        backgroundColor: "#E5E7EB",
-                        color: "#1F2937",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      <td className="px-4 py-3">TOTAL</td>
-                      <td className="px-4 py-3 text-right">-</td>
-                      <td className="px-4 py-3 text-right">
-                        {formatarMoeda(
-                          vendasPorGrupo.reduce(
-                            (sum, item) => sum + item.valor_bruto,
-                            0,
-                          ),
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {formatarMoeda(
-                          vendasPorGrupo.reduce(
-                            (sum, item) => sum + item.desconto,
-                            0,
-                          ),
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {formatarMoeda(
-                          vendasPorGrupo.reduce(
-                            (sum, item) => sum + item.valor_liquido,
-                            0,
-                          ),
-                        )}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+              <VendasResumoAgregadoTable
+                emptyMessage="Nenhum grupo encontrado"
+                includePercentual
+                labelHeader="Nome"
+                labelKey="grupo"
+                linhas={vendasPorGrupo}
+                rowKeyPrefix="grupo-row"
+              />
             </div>
           </div>
         </div>
