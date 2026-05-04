@@ -67,6 +67,7 @@ Tela piloto:
 - Financeiro/Vendas: as comparacoes de periodo por forma de pagamento, grupo de produto e funcionario passaram para `VendasComparativoPeriodoTable`, padronizando variacao, valores e estados vazios.
 - Financeiro/Vendas: a aba de produtos/servicos detalhados passou a usar `ProdutosServicosDetalhadosTable`, mantendo hierarquia de categoria, subcategoria, produto e total geral.
 - Financeiro/Vendas: a tabela de itens promocionais foi extraida para `ProdutosPromocionaisTable`, reaproveitando celulas numericas e monetarias globais.
+- Financeiro/Vendas: o ranking de top produtos por lucro foi extraido para `TopProdutosLucroTable`, padronizando ranking, margem e valores.
 
 Proxima varredura recomendada:
 

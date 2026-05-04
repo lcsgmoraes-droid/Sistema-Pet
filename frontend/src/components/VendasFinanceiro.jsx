@@ -31,6 +31,7 @@ import HistoricoVendasClienteTab from "../pages/Financeiro/HistoricoVendasClient
 import FormasRecebimentoTable from "./financeiro/FormasRecebimentoTable";
 import ProdutosPromocionaisTable from "./financeiro/ProdutosPromocionaisTable";
 import ProdutosServicosDetalhadosTable from "./financeiro/ProdutosServicosDetalhadosTable";
+import TopProdutosLucroTable from "./financeiro/TopProdutosLucroTable";
 import VendasComparativoPeriodoTable from "./financeiro/VendasComparativoPeriodoTable";
 import VendasFinanceiroListaTable from "./financeiro/VendasFinanceiroListaTable";
 import VendasPorDataTable from "./financeiro/VendasPorDataTable";
@@ -3474,76 +3475,7 @@ export default function VendasFinanceiro() {
                     🏆 Top Produtos por Lucro
                   </h3>
                 </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b-2">
-                        <th className="text-left py-2 px-2">#</th>
-                        <th className="text-left py-2 px-2">Produto</th>
-                        <th className="text-left py-2 px-2">Marca</th>
-                        <th className="text-right py-2 px-2">Qtd</th>
-                        <th className="text-right py-2 px-2">Custo Unit.</th>
-                        <th className="text-right py-2 px-2">Preço Venda</th>
-                        <th className="text-right py-2 px-2">Margem %</th>
-                        <th className="text-right py-2 px-2">Lucro Total</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {produtosMaisLucrativos.map((produto, index) => (
-                        <tr key={`rank-${produto.nome}-${produto.marca || "sem-marca"}`} className="border-b hover:bg-gray-50">
-                          <td className="py-3 px-2">
-                            <span
-                              className={`inline-flex items-center justify-center w-7 h-7 rounded-full text-xs font-bold ${
-                                index === 0
-                                  ? "bg-yellow-100 text-yellow-800"
-                                  : index === 1
-                                    ? "bg-gray-100 text-gray-800"
-                                    : index === 2
-                                      ? "bg-orange-100 text-orange-800"
-                                      : "bg-blue-50 text-blue-800"
-                              }`}
-                            >
-                              {index + 1}
-                            </span>
-                          </td>
-                          <td className="py-3 px-2 font-medium">
-                            {produto.nome}
-                          </td>
-                          <td className="py-3 px-2 text-gray-600">
-                            {produto.marca || "-"}
-                          </td>
-                          <td className="py-3 px-2 text-right">
-                            {sanitizarNumero(produto.quantidade)}
-                          </td>
-                          <td className="py-3 px-2 text-right text-red-600">
-                            {formatarMoeda(sanitizarNumero(produto.custo))}
-                          </td>
-                          <td className="py-3 px-2 text-right text-green-600">
-                            {formatarMoeda(sanitizarNumero(produto.preco))}
-                          </td>
-                          <td className="py-3 px-2 text-right">
-                            <span
-                              className={`inline-block px-2 py-1 rounded text-xs font-semibold ${
-                                sanitizarNumero(produto.margem) >= 50
-                                  ? "bg-green-100 text-green-800"
-                                  : sanitizarNumero(produto.margem) >= 30
-                                    ? "bg-yellow-100 text-yellow-800"
-                                    : "bg-red-100 text-red-800"
-                              }`}
-                            >
-                              {sanitizarNumero(produto.margem).toFixed(1)}%
-                            </span>
-                          </td>
-                          <td className="py-3 px-2 text-right font-bold text-green-600">
-                            {formatarMoeda(
-                              sanitizarNumero(produto.lucro_total),
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                <TopProdutosLucroTable produtos={produtosMaisLucrativos} />
               </div>
 
               {/* Análise por Categoria */}
