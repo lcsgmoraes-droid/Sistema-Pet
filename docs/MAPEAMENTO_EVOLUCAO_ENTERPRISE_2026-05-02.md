@@ -61,6 +61,7 @@ Tela piloto:
 - Pets: `PetSelector` e `NovoPetButton` passaram para `components/pets`; PDV, seletor tutor/pet do veterinario e fluxos de agenda, IA, calculadora de doses, exames, internacoes e vacinas agora usam a mesma base visual e de comportamento.
 - PDV: resumo de cliente selecionado passou a usar `EntityCard` em modo compacto, mantendo o alinhamento de CPF, codigo, telefone, fidelidade, cupons e credito.
 - Financeiro/Vendas: a tabela principal da lista de vendas foi extraida para `VendasFinanceiroListaTable` e passou a consumir `DataTable`, `MoneyCell`, `NumberCell` e `StatusBadge`.
+- Financeiro/Vendas: a tabela "Vendas por data" do resumo foi extraida para `VendasPorDataTable`, mantendo badges de dia, valores zerados como traco e totalizacao no componente.
 
 Proxima varredura recomendada:
 

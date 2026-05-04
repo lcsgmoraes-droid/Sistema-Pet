@@ -29,6 +29,7 @@ import api from "../api";
 import { useAuth } from "../contexts/AuthContext";
 import HistoricoVendasClienteTab from "../pages/Financeiro/HistoricoVendasClienteTab";
 import VendasFinanceiroListaTable from "./financeiro/VendasFinanceiroListaTable";
+import VendasPorDataTable from "./financeiro/VendasPorDataTable";
 import ActionButton from "./ui/ActionButton";
 import { actionButtonClasses } from "./ui/actionStyles";
 import FilterBar, { FilterRow } from "./ui/FilterBar";
@@ -2647,180 +2648,14 @@ export default function VendasFinanceiro() {
           {renderDiasUteisResumo()}
 
           {/* Vendas por Data */}
-          <div className="bg-white rounded-lg shadow mb-6">
-            <div className="bg-gray-600 text-white px-4 py-2 rounded-t-lg font-semibold">
+          <div className="mb-6 rounded-lg bg-white shadow">
+            <div className="rounded-t-lg bg-gray-600 px-4 py-2 font-semibold text-white">
               Vendas por data
             </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="px-4 py-2 text-left">Data</th>
-                    <th className="px-4 py-2 text-left">Dia</th>
-                    <th className="px-4 py-2 text-right">Qtd</th>
-                    <th className="px-4 py-2 text-right">Tkt. Médio</th>
-                    <th className="px-4 py-2 text-right">Vl. bruto</th>
-                    <th className="px-4 py-2 text-right">Taxa entrega</th>
-                    <th className="px-4 py-2 text-right">Desconto</th>
-                    <th className="px-4 py-2 text-right">(%)</th>
-                    <th className="px-4 py-2 text-right">Vl. líquido</th>
-                    <th className="px-4 py-2 text-right">Vl. recebido</th>
-                    <th className="px-4 py-2 text-right">Saldo aberto</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {vendasPorDataCalendario.map((item, idx) => (
-                    <tr
-                      key={`dia-${item.data || idx}`}
-                      className={`border-b hover:bg-gray-50 ${
-                        item.sem_movimento ? "bg-slate-50/60 text-slate-500" : ""
-                      }`}
-                    >
-                      <td className="px-4 py-2">{formatarData(item.data)}</td>
-                      <td className="px-4 py-2">
-                        <div className="flex flex-wrap gap-1">
-                          <span
-                            className={`rounded-full px-2 py-0.5 text-xs font-semibold ${
-                              item.feriado_aberto
-                                ? "bg-emerald-100 text-emerald-700"
-                                : item.fim_de_semana
-                                ? "bg-purple-100 text-purple-700"
-                                : item.feriado_nome
-                                  ? "bg-amber-100 text-amber-700"
-                                  : "bg-emerald-100 text-emerald-700"
-                            }`}
-                          >
-                            {item.feriado_nome || item.dia_semana}
-                          </span>
-                          {item.sem_movimento && item.dia_util && (
-                            <span className="rounded-full bg-rose-100 px-2 py-0.5 text-xs font-semibold text-rose-700">
-                              Sem venda
-                            </span>
-                          )}
-                          {item.feriado_aberto && (
-                            <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                              Aberto
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        <NumberCell value={item.quantidade} zeroAsDash />
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        <MoneyCell value={item.ticket_medio} zeroAsDash />
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        <MoneyCell value={item.valor_bruto} zeroAsDash />
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        <MoneyCell value={item.taxa_entrega} zeroAsDash />
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        <MoneyCell value={item.desconto} zeroAsDash />
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        <NumberCell value={item.percentual_desconto} decimals={1} suffix="%" zeroAsDash />
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        <MoneyCell value={item.valor_liquido} zeroAsDash />
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        <MoneyCell value={item.valor_recebido} zeroAsDash />
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        <MoneyCell value={item.saldo_aberto} zeroAsDash />
-                      </td>
-                    </tr>
-                  ))}
-                  {/* TOTAL */}
-                  {vendasPorDataCalendario.length > 0 &&
-                    (() => {
-                      const totalQtd = vendasPorDataCalendario.reduce(
-                        (sum, item) => sum + item.quantidade,
-                        0,
-                      );
-                      const totalBruto = vendasPorDataCalendario.reduce(
-                        (sum, item) => sum + item.valor_bruto,
-                        0,
-                      );
-                      const totalDesconto = vendasPorDataCalendario.reduce(
-                        (sum, item) => sum + item.desconto,
-                        0,
-                      );
-                      const ticketMedio =
-                        totalQtd > 0 ? totalBruto / totalQtd : 0;
-                      const percentualDesconto =
-                        totalBruto > 0
-                          ? ((totalDesconto / totalBruto) * 100).toFixed(1)
-                          : 0;
-
-                      return (
-                        <tr
-                          style={{
-                            backgroundColor: "#E5E7EB",
-                            color: "#1F2937",
-                            fontWeight: "bold",
-                          }}
-                        >
-                          <td className="px-4 py-3" colSpan="2">TOTAL</td>
-                          <td className="px-4 py-3 text-right">
-                            <NumberCell value={totalQtd} zeroAsDash />
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <MoneyCell value={ticketMedio} zeroAsDash />
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <MoneyCell value={totalBruto} zeroAsDash />
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <MoneyCell
-                              value={vendasPorDataCalendario.reduce(
-                                (sum, item) => sum + item.taxa_entrega,
-                                0,
-                              )}
-                              zeroAsDash
-                            />
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <MoneyCell value={totalDesconto} zeroAsDash />
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <NumberCell value={percentualDesconto} decimals={1} suffix="%" zeroAsDash />
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <MoneyCell
-                              value={vendasPorDataCalendario.reduce(
-                                (sum, item) => sum + item.valor_liquido,
-                                0,
-                              )}
-                              zeroAsDash
-                            />
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <MoneyCell
-                              value={vendasPorDataCalendario.reduce(
-                                (sum, item) => sum + item.valor_recebido,
-                                0,
-                              )}
-                              zeroAsDash
-                            />
-                          </td>
-                          <td className="px-4 py-3 text-right">
-                            <MoneyCell
-                              value={vendasPorDataCalendario.reduce(
-                                (sum, item) => sum + item.saldo_aberto,
-                                0,
-                              )}
-                              zeroAsDash
-                            />
-                          </td>
-                        </tr>
-                      );
-                    })()}
-                </tbody>
-              </table>
-            </div>
+            <VendasPorDataTable
+              formatarData={formatarData}
+              linhas={vendasPorDataCalendario}
+            />
           </div>
 
           {/* Grid com outras tabelas */}
