@@ -37,6 +37,10 @@ import api from '../api';
 import CurrencyInput from './CurrencyInput';
 import ModalAdicionarCredito from './ModalAdicionarCredito';
 import { formatBRL, formatMoneyBRL } from '../utils/formatters';
+import {
+  emitirNotaFiscalAssistida,
+  extrairMensagemNFe,
+} from '../utils/nfeFiscalAssistida';
 import { montarPayloadVenda } from '../utils/pdvVendaPayload';
 import {
   campaignAllowsSaleChannel,
@@ -898,18 +902,25 @@ export default function ModalPagamento({
     setErro('');
 
     try {
-      await api.post('/nfe/emitir', {
-        venda_id: vendaFinalizadaId,
-        tipo_nota: tipoNota // 'nfe' ou 'nfce'
+      const resultado = await emitirNotaFiscalAssistida({
+        vendaId: vendaFinalizadaId,
+        tipoNota,
       });
 
-      alert(`${tipoNota === 'nfe' ? 'NF-e' : 'NFC-e'} emitida com sucesso!`);
+      if (resultado?.cancelado) return;
+
+      const transmissao = resultado?.data?.transmissao;
+      if (transmissao?.success === false) {
+        alert(
+          `${tipoNota === 'nfe' ? 'NF-e' : 'NFC-e'} criada no Bling, mas a transmissao nao foi concluida automaticamente.\n\n${transmissao.erro || ''}`.trim(),
+        );
+      } else {
+        alert(`${tipoNota === 'nfe' ? 'NF-e' : 'NFC-e'} enviada para emissao/transmissao com sucesso!`);
+      }
       onConfirmar();
     } catch (error) {
       console.error('Erro ao emitir nota:', error);
-      const mensagem =
-        error.response?.data?.detail ||
-        'Erro ao emitir nota fiscal. Corrija as pendencias ou emita depois na tela de vendas.';
+      const mensagem = extrairMensagemNFe(error);
       setErro(mensagem);
       alert(mensagem);
       return;

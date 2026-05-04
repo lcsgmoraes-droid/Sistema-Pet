@@ -33,7 +33,11 @@ from app.services.nfe_cache_service import (
 )
 from app.services.nfe_pending_reconciliation_service import reconciliar_nfes_pendentes_recentes
 from app.vendas_models import Venda
-from app.bling_integration import BlingAPI
+from app.bling_integration import (
+    BlingAPI,
+    aplicar_correcoes_fiscais_venda,
+    prevalidar_fiscal_venda,
+)
 from app.utils.logger import logger
 
 router = APIRouter(prefix="/nfe", tags=["NF-e"])
@@ -1737,6 +1741,13 @@ def _sincronizar_cache_nfes_com_bling(
 class EmitirNFeRequest(BaseModel):
     venda_id: int
     tipo_nota: str = "nfce"  # 'nfe' ou 'nfce'
+    transmitir: bool = True
+    autorizar_correcoes_fiscais: bool = False
+
+
+class PrevalidarNFeRequest(BaseModel):
+    venda_id: int
+    tipo_nota: str = "nfce"  # 'nfe' ou 'nfce'
 
 
 class CancelarNFeRequest(BaseModel):
@@ -1745,6 +1756,40 @@ class CancelarNFeRequest(BaseModel):
 
 class CartaCorrecaoRequest(BaseModel):
     correcao: str
+
+
+def _normalizar_tipo_nota(tipo_nota: str | None) -> str:
+    tipo = str(tipo_nota or "nfce").strip().lower()
+    return "nfe" if tipo == "nfe" else "nfce"
+
+
+def _buscar_venda_para_nfe(db: Session, venda_id: int, tenant_id):
+    return (
+        db.query(Venda)
+        .filter(Venda.id == venda_id, Venda.tenant_id == tenant_id)
+        .first()
+    )
+
+
+@router.post("/prevalidar")
+async def prevalidar_nfe(
+    request: PrevalidarNFeRequest,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Valida pendencias fiscais antes de criar a nota no Bling."""
+    current_user, tenant_id = user_and_tenant
+    tipo_nota = _normalizar_tipo_nota(request.tipo_nota)
+    venda = _buscar_venda_para_nfe(db, request.venda_id, tenant_id)
+    if not venda:
+        raise HTTPException(status_code=404, detail="Venda nao encontrada")
+
+    validacao = prevalidar_fiscal_venda(venda, tipo_nota, db)
+    validacao["tipo_nota"] = tipo_nota
+    validacao["venda_id"] = venda.id
+    validacao["tenant_id"] = str(tenant_id)
+    validacao["usuario_id"] = getattr(current_user, "id", None)
+    return validacao
 
 
 @router.post("/emitir")
@@ -1756,7 +1801,9 @@ async def emitir_nfe(
     """Emite NF-e ou NFC-e para uma venda"""
     import traceback
     try:
-        venda = db.query(Venda).filter(Venda.id == request.venda_id).first()
+        current_user, tenant_id = user_and_tenant
+        tipo_nota = _normalizar_tipo_nota(request.tipo_nota)
+        venda = _buscar_venda_para_nfe(db, request.venda_id, tenant_id)
         if not venda:
             raise HTTPException(status_code=404, detail="Venda não encontrada")
         
@@ -1769,10 +1816,40 @@ async def emitir_nfe(
         
         logger.info("emitir_nfe", f"\n=== EMITINDO NF-e ===")
         logger.info("emitir_nfe", f"Venda ID: {venda.id}")
-        logger.info("emitir_nfe", f"Tipo: {request.tipo_nota}")
+        logger.info("emitir_nfe", f"Tipo: {tipo_nota}")
+
+        validacao_fiscal = prevalidar_fiscal_venda(venda, tipo_nota, db)
+        pendencias_fiscais = validacao_fiscal.get("bloqueios") or validacao_fiscal.get("correcoes")
+        if pendencias_fiscais:
+            if request.autorizar_correcoes_fiscais and not validacao_fiscal.get("bloqueios"):
+                aplicar_correcoes_fiscais_venda(
+                    venda,
+                    tipo_nota,
+                    db,
+                    user_id=getattr(current_user, "id", None),
+                )
+                db.flush()
+                logger.info(
+                    "emitir_nfe",
+                    f"Correcoes fiscais autorizadas antes da emissao da venda {venda.id}",
+                )
+            else:
+                raise HTTPException(
+                    status_code=422,
+                    detail={
+                        "erro": "pendencias_fiscais",
+                        "mensagem": "Existem dados fiscais para conferir antes de emitir a nota.",
+                        "validacao": validacao_fiscal,
+                    },
+                )
         
         bling = BlingAPI()
-        resultado = bling.emitir_nota_fiscal(venda, request.tipo_nota, db)
+        resultado = bling.emitir_nota_fiscal(
+            venda,
+            tipo_nota,
+            db,
+            transmitir=request.transmitir,
+        )
         
         logger.info("emitir_nfe", f"DEBUG: Resultado Bling: {resultado}")
         
@@ -1781,8 +1858,8 @@ async def emitir_nfe(
         
         # Atualizar venda com dados da nota
         # IMPORTANTE: tipo deve ser INTEGER (0=NF-e, 1=NFC-e) para consultas funcionarem
-        venda.nfe_tipo = request.tipo_nota
-        venda.nfe_modelo = "55" if request.tipo_nota == "nfe" else "65"
+        venda.nfe_tipo = tipo_nota
+        venda.nfe_modelo = "55" if tipo_nota == "nfe" else "65"
         venda.nfe_numero = dados_nota.get("numero")
         venda.nfe_serie = dados_nota.get("serie")
         venda.nfe_chave = dados_nota.get("chaveAcesso")
@@ -1807,14 +1884,17 @@ async def emitir_nfe(
         
         return {
             "success": True,
-            "message": f"{'NF-e' if request.tipo_nota == 'nfe' else 'NFC-e'} emitida com sucesso",
+            "message": f"{'NF-e' if tipo_nota == 'nfe' else 'NFC-e'} emitida com sucesso",
             "nfe_id": dados_nota.get("id"),
             "numero": dados_nota.get("numero"),
             "serie": dados_nota.get("serie"),
             "chave_acesso": dados_nota.get("chaveAcesso"),
-            "situacao": dados_nota.get("situacao", "Pendente")
+            "situacao": dados_nota.get("situacao", "Pendente"),
+            "transmissao": resultado.get("transmissao") if isinstance(resultado, dict) else None,
         }
         
+    except HTTPException:
+        raise
     except ValueError as e:
         logger.error("emitir_nfe_error", f"❌ ValueError: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))

@@ -4,6 +4,10 @@ import api from "../api";
 import { buscarClientePorId } from "../api/clientes";
 import { buscarVenda } from "../api/vendas";
 import { debugLog } from "../utils/debug";
+import {
+  emitirNotaFiscalAssistida,
+  extrairMensagemNFe,
+} from "../utils/nfeFiscalAssistida";
 
 async function carregarPagamentosDaVenda(vendaId) {
   try {
@@ -216,18 +220,25 @@ export function usePDVVendaFinalizacao({
 
     try {
       setLoading(true);
-      await api.post("/nfe/emitir", {
-        venda_id: vendaAtual.id,
-        tipo_nota: tipoNota,
+      const resultado = await emitirNotaFiscalAssistida({
+        vendaId: vendaAtual.id,
+        tipoNota,
       });
+      if (resultado?.cancelado) return;
 
       await carregarVendaEspecifica(vendaAtual.id);
-      toast.success(
-        `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} emitida com sucesso!`,
-      );
+      if (resultado?.data?.transmissao?.success === false) {
+        toast.error(
+          `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} criada, mas a transmissao ficou pendente.`,
+        );
+      } else {
+        toast.success(
+          `${tipoNota === "nfe" ? "NF-e" : "NFC-e"} enviada para emissao/transmissao!`,
+        );
+      }
     } catch (error) {
       console.error("Erro ao emitir nota da venda finalizada:", error);
-      alert(error.response?.data?.detail || "Erro ao emitir nota fiscal");
+      alert(extrairMensagemNFe(error));
     } finally {
       setLoading(false);
     }
