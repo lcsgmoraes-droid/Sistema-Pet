@@ -29,6 +29,7 @@ import api from "../api";
 import { useAuth } from "../contexts/AuthContext";
 import HistoricoVendasClienteTab from "../pages/Financeiro/HistoricoVendasClienteTab";
 import FormasRecebimentoTable from "./financeiro/FormasRecebimentoTable";
+import ProdutosPromocionaisTable from "./financeiro/ProdutosPromocionaisTable";
 import ProdutosServicosDetalhadosTable from "./financeiro/ProdutosServicosDetalhadosTable";
 import VendasComparativoPeriodoTable from "./financeiro/VendasComparativoPeriodoTable";
 import VendasFinanceiroListaTable from "./financeiro/VendasFinanceiroListaTable";
@@ -2605,47 +2606,8 @@ export default function VendasFinanceiro() {
                 </ResponsiveContainer>
               </div>
 
-              <div className="overflow-x-auto rounded-lg border border-slate-100">
-                <table className="w-full text-sm">
-                  <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-                    <tr>
-                      <th className="px-3 py-2 text-left">Produto</th>
-                      <th className="px-3 py-2 text-right">Qtd</th>
-                      <th className="px-3 py-2 text-right">Valor</th>
-                      <th className="px-3 py-2 text-right">Desconto</th>
-                      <th className="px-3 py-2 text-left">Origem</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {analisePromocoes.topProdutos.length === 0 ? (
-                      <tr>
-                        <td colSpan="5" className="px-3 py-6 text-center text-sm text-slate-500">
-                          Nenhum item promocional identificado no periodo.
-                        </td>
-                      </tr>
-                    ) : (
-                      analisePromocoes.topProdutos.map((produto) => (
-                        <tr key={produto.produto_nome} className="border-t border-slate-100">
-                          <td className="px-3 py-2 font-medium text-slate-800">
-                            {produto.produto_nome}
-                          </td>
-                          <td className="px-3 py-2 text-right">
-                            {produto.quantidade}
-                          </td>
-                          <td className="px-3 py-2 text-right font-semibold">
-                            {formatarMoeda(produto.valor)}
-                          </td>
-                          <td className="px-3 py-2 text-right text-amber-700">
-                            {formatarMoeda(produto.desconto)}
-                          </td>
-                          <td className="px-3 py-2 text-slate-600">
-                            {produto.origens.join(", ") || "-"}
-                          </td>
-                        </tr>
-                      ))
-                    )}
-                  </tbody>
-                </table>
+              <div className="rounded-lg border border-slate-100">
+                <ProdutosPromocionaisTable produtos={analisePromocoes.topProdutos} />
               </div>
             </div>
           </div>
