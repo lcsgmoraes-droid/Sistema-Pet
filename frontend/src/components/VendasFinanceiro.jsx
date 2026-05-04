@@ -1942,21 +1942,24 @@ export default function VendasFinanceiro() {
     <div className="p-6 bg-gray-50 min-h-screen">
       {/* Cabeçalho com Filtros */}
       <div className="mb-6 bg-white p-4 rounded-lg shadow">
-        <div className="flex justify-between items-center mb-4">
+        <div className="mb-4 flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
           <h1 className="text-2xl font-bold text-gray-800">
             Consulta de Vendas
           </h1>
 
           {podeVerFinanceiroCompleto ? (
-            <div className="flex items-center gap-4">
-            <div className="relative" ref={menuRelatoriosRef}>
-              <button
-                onClick={() => setMenuRelatoriosAberto((prev) => !prev)}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors"
-              >
-                <FileText className="w-4 h-4" />
-                <span className="font-medium">Relatorios</span>
-              </button>
+            <div className="flex flex-wrap items-center gap-3 xl:justify-end">
+              <div className="relative" ref={menuRelatoriosRef}>
+                <ActionButton
+                  onClick={() => setMenuRelatoriosAberto((prev) => !prev)}
+                  intent="edit"
+                  tone="solid"
+                  size="xs"
+                  icon={FileText}
+                  className="min-w-[92px]"
+                >
+                  Relatorios
+                </ActionButton>
 
               {menuRelatoriosAberto && (
                 <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 z-40">
@@ -1991,7 +1994,7 @@ export default function VendasFinanceiro() {
               )}
             </div>
             {/* Botão Exportar PDF */}
-            <button
+            <ActionButton
               onClick={exportarParaPDF}
               disabled={!dataInicio || !dataFim}
               title={
@@ -1999,21 +2002,17 @@ export default function VendasFinanceiro() {
                   ? `Exportar PDF de ${formatarData(dataInicio)} até ${formatarData(dataFim)}`
                   : "Selecione um período"
               }
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+              intent="delete"
+              tone="solid"
+              size="xs"
+              icon={FileText}
+              className="min-w-[92px]"
             >
-              <FileText className="w-4 h-4" />
-              <div className="flex flex-col items-start">
-                <span className="font-medium">Exportar PDF</span>
-                {dataInicio && dataFim && (
-                  <span className="text-xs opacity-90">
-                    ({formatarData(dataInicio)} - {formatarData(dataFim)})
-                  </span>
-                )}
-              </div>
-            </button>
+              PDF
+            </ActionButton>
 
             {/* Botão Exportar Excel */}
-            <button
+            <ActionButton
               onClick={exportarParaExcel}
               disabled={!dataInicio || !dataFim}
               title={
@@ -2021,18 +2020,14 @@ export default function VendasFinanceiro() {
                   ? `Exportar dados de ${formatarData(dataInicio)} até ${formatarData(dataFim)}`
                   : "Selecione um período"
               }
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-300 disabled:cursor-not-allowed transition-colors"
+              intent="create"
+              tone="solid"
+              size="xs"
+              icon={Download}
+              className="min-w-[92px]"
             >
-              <Download className="w-4 h-4" />
-              <div className="flex flex-col items-start">
-                <span className="font-medium">Exportar Excel</span>
-                {dataInicio && dataFim && (
-                  <span className="text-xs opacity-90">
-                    ({formatarData(dataInicio)} - {formatarData(dataFim)})
-                  </span>
-                )}
-              </div>
-            </button>
+              Excel
+            </ActionButton>
 
             <label className="flex items-center gap-2 cursor-pointer">
               <input

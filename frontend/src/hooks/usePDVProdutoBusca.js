@@ -13,6 +13,14 @@ function encontrarProdutoPorCodigo(produtos, termo) {
   );
 }
 
+function isBuscaCancelada(error) {
+  return (
+    error?.code === "ERR_CANCELED" ||
+    error?.name === "CanceledError" ||
+    error?.name === "AbortError"
+  );
+}
+
 export function usePDVProdutoBusca({
   modoVisualizacao,
   adicionarProdutoAoCarrinho,
@@ -33,19 +41,39 @@ export function usePDVProdutoBusca({
   const buscaProdutoAtualRef = useRef("");
   const focoProdutoTimeoutRef = useRef(null);
   const adicionarProdutoAoCarrinhoRef = useRef(adicionarProdutoAoCarrinho);
+  const buscaProdutoAbortControllerRef = useRef(null);
 
   useEffect(() => {
     adicionarProdutoAoCarrinhoRef.current = adicionarProdutoAoCarrinho;
   }, [adicionarProdutoAoCarrinho]);
 
-  const buscarProdutosAtualizados = async (termo) => {
-    const response = await getProdutosVendaveis({
-      busca: termo,
-      page_size: 20,
-      _ts: Date.now(),
-    });
+  const cancelarBuscaProdutoPendente = () => {
+    if (buscaProdutoAbortControllerRef.current) {
+      buscaProdutoAbortControllerRef.current.abort();
+      buscaProdutoAbortControllerRef.current = null;
+    }
+  };
 
-    return response.data.items || [];
+  const buscarProdutosAtualizados = async (termo) => {
+    cancelarBuscaProdutoPendente();
+    const controller = new AbortController();
+    buscaProdutoAbortControllerRef.current = controller;
+
+    try {
+      const response = await getProdutosVendaveis({
+        busca: termo,
+        page_size: 12,
+        _ts: Date.now(),
+      }, {
+        signal: controller.signal,
+      });
+
+      return response.data.items || [];
+    } finally {
+      if (buscaProdutoAbortControllerRef.current === controller) {
+        buscaProdutoAbortControllerRef.current = null;
+      }
+    }
   };
 
   const focarInputProduto = () => {
@@ -140,12 +168,18 @@ export function usePDVProdutoBusca({
 
           setProdutosSugeridos(produtos);
         } catch (error) {
+          if (isBuscaCancelada(error)) {
+            return;
+          }
           console.error("Erro ao buscar produtos:", error);
           setProdutosSugeridos([]);
         }
       }, 300);
 
-      return () => clearTimeout(timer);
+      return () => {
+        clearTimeout(timer);
+        cancelarBuscaProdutoPendente();
+      };
     }
 
     limparSugestoesProduto();
@@ -170,6 +204,7 @@ export function usePDVProdutoBusca({
       if (focoProdutoTimeoutRef.current) {
         clearTimeout(focoProdutoTimeoutRef.current);
       }
+      cancelarBuscaProdutoPendente();
     },
     [],
   );
@@ -213,6 +248,9 @@ export function usePDVProdutoBusca({
         adicionarProduto(produtoSelecionado, { focarInput: true });
       }
     } catch (error) {
+      if (isBuscaCancelada(error)) {
+        return;
+      }
       console.error("Erro ao adicionar produto via Enter:", error);
     } finally {
       leituraScannerDetectadaRef.current = false;
@@ -248,6 +286,9 @@ export function usePDVProdutoBusca({
 
         setProdutosSugeridos(produtos);
       } catch (error) {
+        if (isBuscaCancelada(error)) {
+          return;
+        }
         console.error("Erro ao atualizar sugestoes de produtos:", error);
       }
     })();

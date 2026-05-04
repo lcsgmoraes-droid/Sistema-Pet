@@ -23,6 +23,7 @@ import ClassificarLancamentosModal from "./ClassificarLancamentosModal";
 import ExtratoBancario from "./ExtratoBancario";
 import ActionButton from "./ui/ActionButton";
 import DataTable from "./ui/DataTable";
+import LoadingState from "./ui/LoadingState";
 import MetricCard from "./ui/MetricCard";
 import MetricGrid from "./ui/MetricGrid";
 import MoneyCell, { formatMoneyCellValue } from "./ui/MoneyCell";
@@ -381,14 +382,7 @@ const DRE = () => {
   };
 
   if (loading && !dados) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <RefreshCw className="animate-spin mx-auto mb-4" size={48} />
-          <p className="text-gray-600">Carregando DRE...</p>
-        </div>
-      </div>
-    );
+    return <LoadingState className="min-h-screen" label="Carregando DRE..." />;
   }
 
   return (
@@ -429,21 +423,23 @@ const DRE = () => {
           </ActionButton>
           <ActionButton
             onClick={exportarPDF}
-            intent="neutral"
+            intent="delete"
             tone="soft"
-            size="sm"
+            size="xs"
             icon={FileText}
             title="Exportar para PDF"
+            className="min-w-[76px]"
           >
             PDF
           </ActionButton>
           <ActionButton
             onClick={exportarExcel}
-            intent="neutral"
+            intent="create"
             tone="soft"
-            size="sm"
+            size="xs"
             icon={Download}
             title="Exportar para Excel"
+            className="min-w-[76px]"
           >
             Excel
           </ActionButton>

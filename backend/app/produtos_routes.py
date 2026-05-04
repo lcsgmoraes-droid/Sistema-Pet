@@ -11,7 +11,7 @@ Inclui: Categorias, Marcas, Departamentos, Produtos, Lotes, FIFO, CÃ³digo de B
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session, joinedload, noload
 from sqlalchemy import func, text, or_, and_, case
 from typing import Any, List, Optional
 from datetime import datetime, timedelta
@@ -301,6 +301,7 @@ def _enriquecer_produto_listagem(
     produto: Produto,
     tenant_id,
     reservas_por_produto: dict[int, float] | None = None,
+    incluir_detalhes_composto: bool = True,
 ):
     """Padroniza dados de listagem para produtos simples, kits e variaÃ§Ãµes-kit."""
     reservas_por_produto = reservas_por_produto or {}
@@ -313,7 +314,9 @@ def _enriquecer_produto_listagem(
     if produto.categoria:
         produto.categoria_nome = produto.categoria.nome
 
-    if produto.tipo_produto in ("KIT", "VARIACAO") and produto.tipo_kit:
+    produto_composto = produto.tipo_produto in ("KIT", "VARIACAO") and produto.tipo_kit
+
+    if produto_composto and incluir_detalhes_composto:
         try:
             from app.services.kit_estoque_service import KitEstoqueService
             from app.services.kit_custo_service import KitCustoService
@@ -2140,7 +2143,7 @@ def listar_produtos_vendaveis(
             joinedload(Produto.categoria),
             joinedload(Produto.marca),
             joinedload(Produto.imagens),
-            joinedload(Produto.lotes)
+            noload(Produto.lotes),
         )
         .order_by(*order_clause)
         .offset(offset)
@@ -2150,8 +2153,16 @@ def listar_produtos_vendaveis(
 
     produtos = [p for p in produtos if p is not None]
 
+    # PDV usa esta rota como busca rápida enquanto o operador digita/bipa.
+    # Evitar cálculo detalhado de composição/custo aqui impede N+1 pesado por tecla.
     for produto in produtos:
-        _enriquecer_produto_listagem(db, produto, tenant_id, {})
+        _enriquecer_produto_listagem(
+            db,
+            produto,
+            tenant_id,
+            {},
+            incluir_detalhes_composto=False,
+        )
 
     pages = (total + page_size - 1) // page_size
 

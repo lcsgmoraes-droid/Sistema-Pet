@@ -7,6 +7,7 @@ import { safeArray } from '../utils/safeArray';
 import ActionButton from './ui/ActionButton';
 import DataTable from './ui/DataTable';
 import FilterBar from './ui/FilterBar';
+import LoadingState from './ui/LoadingState';
 import MoneyCell, { formatMoneyCellValue } from './ui/MoneyCell';
 import PageHeader from './ui/PageHeader';
 import StatusBadge from './ui/StatusBadge';
@@ -397,7 +398,7 @@ const ContasReceber = () => {
   };
 
   if (loading) {
-    return <div className="text-center p-8">Carregando contas a receber...</div>;
+    return <LoadingState label="Carregando contas a receber..." />;
   }
 
   return (

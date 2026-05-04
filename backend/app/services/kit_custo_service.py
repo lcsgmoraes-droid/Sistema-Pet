@@ -85,7 +85,7 @@ class KitCustoService:
                     f"(tipo: {kit.tipo_produto}, tipo_kit: {kit.tipo_kit})."
                 )
             
-            logger.info(
+            logger.debug(
                 f"📦 Calculando custo do produto composto: {kit.nome} "
                 f"(ID: {kit_id}, tipo_kit: {kit.tipo_kit or 'VIRTUAL'})"
             )
@@ -102,7 +102,7 @@ class KitCustoService:
                 )
                 return Decimal('0')
             
-            logger.info(
+            logger.debug(
                 f"🔍 Encontrados {len(componentes)} componente(s) no KIT"
             )
             
@@ -138,13 +138,13 @@ class KitCustoService:
                 custo_item = custo_componente * quantidade
                 custo_total += custo_item
                 
-                logger.info(
+                logger.debug(
                     f"   • {produto_comp.nome}: "
                     f"R$ {custo_componente:.2f} × {quantidade} = "
                     f"R$ {custo_item:.2f}"
                 )
             
-            logger.info(
+            logger.debug(
                 f"✅ Custo total do produto composto: R$ {custo_total:.2f}"
             )
             

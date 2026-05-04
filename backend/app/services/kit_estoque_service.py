@@ -154,7 +154,7 @@ class KitEstoqueService:
         # O estoque virtual do kit é o MENOR valor (gargalo)
         estoque_virtual = min(kits_possiveis_por_componente) if kits_possiveis_por_componente else 0
         
-        logger.info(
+        logger.debug(
             f"Kit #{kit_id} '{kit.nome}': "
             f"estoque_virtual={estoque_virtual} "
             f"(componentes: {kits_possiveis_por_componente})"

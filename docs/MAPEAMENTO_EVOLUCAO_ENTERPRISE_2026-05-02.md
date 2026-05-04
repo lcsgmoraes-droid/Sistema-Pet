@@ -43,6 +43,9 @@ Separacao operacional iniciada:
 - Incidentes operacionais passaram a ter persistencia em banco (`ops_error_events`, `ops_alerts`, `ops_recovery_actions`), mantendo os `.jsonl` apenas como fallback/backfill.
 - Deploy seguro agora aplica Alembic automaticamente antes das validacoes finais, para evitar producao com codigo novo e banco antigo.
 - Watchdog ganhou registro de recuperacao de health e guarda contra loop de restart em janela curta.
+- Incidente de lentidao de 2026-05-04: Ops apontou degradacao sem 5xx, concentrada em requisicoes lentas no tenant principal. A rota mais critica foi `/produtos/vendaveis`, usada pelo PDV durante digitacao/bipagem.
+- Hotfix local preparado: `/produtos/vendaveis` passou a usar enriquecimento leve, sem calcular composicao/custo/estoque virtual detalhado por sugestao; logs de kit/custo foram rebaixados para debug; o frontend do PDV passou a cancelar buscas antigas e limitar sugestoes.
+- Proxima evolucao de performance: criar endpoint dedicado de sugestao de produtos para PDV, cachear estoque virtual/custo de kits por evento de estoque, auditar dados de `tipo_kit` inconsistentes e adicionar indices/EXPLAIN nas rotas mais lentas do Ops.
 
 Tela piloto:
 
@@ -68,6 +71,10 @@ Tela piloto:
 - Financeiro/Vendas: a aba de produtos/servicos detalhados passou a usar `ProdutosServicosDetalhadosTable`, mantendo hierarquia de categoria, subcategoria, produto e total geral.
 - Financeiro/Vendas: a tabela de itens promocionais foi extraida para `ProdutosPromocionaisTable`, reaproveitando celulas numericas e monetarias globais.
 - Financeiro/Vendas: o ranking de top produtos por lucro foi extraido para `TopProdutosLucroTable`, padronizando ranking, margem e valores.
+- Financeiro/Vendas: acoes superiores de relatorios/exportacoes foram alinhadas em altura e densidade, mantendo cor compacta por referencia sem competir com a tela.
+- Financeiro/Fluxo de Caixa: cabecalho passou para `PageHeader` e o Chat IA existente foi conectado ao modal padrao.
+- Financeiro/Contas: estados de carregamento de contas a pagar/receber passaram para `LoadingState` global.
+- Financeiro/DRE e Fluxo de Caixa: carregamentos iniciais passaram para `LoadingState`; botoes PDF/Excel da DRE ganharam referencia visual compacta no padrao de acoes.
 
 Proxima varredura recomendada:
 
@@ -111,6 +118,58 @@ O trabalho vale para todos os modulos:
 6. Toda regra financeira/campanha/comissao/estoque/cupom deve ser rastreavel por extrato, log, ledger ou evento.
 7. Refatorar em fatias pequenas, com comportamento externo preservado.
 8. Nao misturar melhoria visual, regra de negocio e reorganizacao grande no mesmo pacote quando isso aumentar risco.
+
+## Refatoracao de arquivos grandes
+
+Arquivos grandes devem virar uma frente explicita do roadmap. A regra pratica:
+
+- Acima de 700 linhas: arquivo em atencao, mapear responsabilidades internas.
+- Acima de 1000 linhas: prioridade de refatoracao por fatias.
+- Acima de 1500 linhas: critico, separar em componentes/servicos/hooks antes de novas funcionalidades grandes.
+
+Regras para refatorar sem quebrar producao:
+
+- Nao misturar mudanca visual, regra de negocio e extracao grande no mesmo pacote.
+- Primeiro extrair componentes/servicos puros mantendo comportamento igual.
+- Depois mover regras repetidas para helpers/servicos centrais.
+- Cada extracao deve ter build/teste e, quando possivel, validacao visual da tela afetada.
+- Arquivos de rota backend devem ser quebrados por dominio, schema, service e router.
+- Arquivos frontend devem ser quebrados por `Page`, `Header`, `Filters`, `Table`, `Modal`, `Card`, `hooks` e `utils`.
+
+Maiores arquivos mapeados em 2026-05-04:
+
+| Linhas | Arquivo | Prioridade |
+| --- | --- | --- |
+| 4844 | `backend/app/produtos_routes.py` | Critico |
+| 4640 | `frontend/src/components/EntradaXML.jsx` | Critico |
+| 4064 | `backend/app/estoque_routes.py` | Critico |
+| 3473 | `frontend/src/components/VendasFinanceiro.jsx` | Critico |
+| 3411 | `backend/app/notas_entrada_routes.py` | Critico |
+| 3295 | `backend/app/campaigns/routes.py` | Critico |
+| 3225 | `frontend/src/components/PedidosCompra.jsx` | Critico |
+| 3036 | `backend/app/vendas/service.py` | Critico |
+| 2724 | `backend/app/clientes_routes.py` | Critico |
+| 2599 | `backend/app/bling_sync_routes.py` | Critico |
+| 2550 | `backend/app/pedidos_compra_routes.py` | Critico |
+| 2533 | `frontend/src/pages/ecommerce/EcommerceMVP.jsx` | Critico |
+| 2418 | `frontend/src/pages/EstoqueTransferenciaParceiro.jsx` | Critico |
+| 2280 | `backend/app/nfe_routes.py` | Critico |
+| 2181 | `backend/app/vendas_routes.py` | Critico |
+| 1760 | `frontend/src/components/ModalPagamento.jsx` | Critico |
+| 1729 | `backend/app/services/bling_flow_monitor_service.py` | Critico |
+| 1721 | `backend/app/integracao_bling_pedido_routes.py` | Critico |
+| 1670 | `frontend/src/pages/ProdutosForm.jsx` | Critico |
+| 1654 | `frontend/src/pages/entregas/RotasEntrega.jsx` | Critico |
+| 1641 | `backend/app/dre_canais_routes.py` | Critico |
+| 1560 | `backend/app/conciliacao_services.py` | Critico |
+| 1490 | `backend/app/api/endpoints/rotas_entrega.py` | Prioridade |
+| 1452 | `frontend/src/components/EstoqueBling.jsx` | Prioridade |
+| 1424 | `frontend/src/pages/CalculadoraRacao.jsx` | Prioridade |
+| 1413 | `frontend/src/components/DashboardAnaliseRacoes.jsx` | Prioridade |
+| 1361 | `frontend/src/components/MovimentacoesProduto.jsx` | Prioridade |
+| 1330 | `backend/app/financeiro_routes.py` | Prioridade |
+| 1329 | `frontend/src/pages/comissoes/ComissoesListagem.jsx` | Prioridade |
+| 1325 | `frontend/src/components/Layout.jsx` | Prioridade |
 
 ## Regra visual base
 

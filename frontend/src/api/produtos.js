@@ -144,8 +144,8 @@ export const getProdutos = (params = {}) => {
  * Usado no PDV e carrinho de vendas
  * @param {Object} params - Filtros: busca, categoria_id, marca_id, etc
  */
-export const getProdutosVendaveis = (params = {}) => {
-  return api.get('/produtos/vendaveis', { params });
+export const getProdutosVendaveis = (params = {}, config = {}) => {
+  return api.get('/produtos/vendaveis', { ...config, params });
 };
 
 /**

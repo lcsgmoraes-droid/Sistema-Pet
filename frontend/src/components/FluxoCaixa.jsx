@@ -12,10 +12,12 @@ import AlertasIA from './AlertasIA';
 import { safeArray } from '../utils/safeArray';
 import ActionButton from './ui/ActionButton';
 import DataTable from './ui/DataTable';
+import LoadingState from './ui/LoadingState';
 import MetricCard from './ui/MetricCard';
 import MetricGrid from './ui/MetricGrid';
 import MoneyCell, { formatMoneyCellValue } from './ui/MoneyCell';
 import ModuleTabs from './ui/ModuleTabs';
+import PageHeader from './ui/PageHeader';
 import StatusBadge from './ui/StatusBadge';
 
 const FLUXO_CAIXA_TABS = [
@@ -299,26 +301,27 @@ const FluxoCaixa = () => {
   ];
 
   if (loading && !dados) {
-    return (
-      <div className="flex items-center justify-center h-screen">
-        <div className="text-center">
-          <RefreshCw className="animate-spin mx-auto mb-4" size={48} />
-          <p className="text-gray-600">Carregando fluxo de caixa...</p>
-        </div>
-      </div>
-    );
+    return <LoadingState className="min-h-screen" label="Carregando fluxo de caixa..." />;
   }
 
   return (
     <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-800">💹 Fluxo de Caixa</h1>
-          <p className="text-gray-600 mt-1">Visão completa: Previsto vs Realizado</p>
-          <p className="text-sm text-blue-600 mt-1">✨ Os lançamentos são criados automaticamente a partir de Contas a Pagar e Contas a Receber</p>
-        </div>
-      </div>
+      <PageHeader
+        actions={
+          <ActionButton
+            onClick={() => setChatIAAberto(true)}
+            intent="neutral"
+            tone="soft"
+            size="md"
+            icon={Brain}
+          >
+            Chat IA
+          </ActionButton>
+        }
+        icon={DollarSign}
+        subtitle="Previsto vs realizado, com lançamentos automáticos de contas a pagar e receber"
+        title="Fluxo de Caixa"
+      />
 
       {/* Filtros */}
       <div className="bg-white rounded-lg shadow p-4">
@@ -631,6 +634,16 @@ const FluxoCaixa = () => {
           </div>
         </>
       )}
+
+      <ChatIAModal
+        isOpen={chatIAAberto}
+        onClose={() => setChatIAAberto(false)}
+        contexto={{
+          tipo: 'Fluxo de Caixa',
+          filtros,
+          dados,
+        }}
+      />
 
       {/* Fluxo de Caixa é apenas visualização - lançamentos vêm de Contas a Pagar/Receber */}
     </div>
