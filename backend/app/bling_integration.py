@@ -482,47 +482,42 @@ class BlingAPI:
         modelo = 55 if tipo_nota == "nfe" else 65
         serie = 1 if tipo_nota == "nfe" else 2
         
-        # Contato (opcional para NFC-e, obrigatório para NF-e)
+        # Contato: NF-e exige documento; NFC-e pode identificar apenas pelo nome.
         contato = None
-        if cliente and (cliente.cpf or cliente.cnpj):
-            cpf_cnpj = cliente.cnpj or cliente.cpf
+        if cliente and _limpar_texto_fiscal(getattr(cliente, "nome", None)):
+            cpf_cnpj = cliente.cnpj or cliente.cpf or ""
             cpf_cnpj = ''.join(filter(str.isdigit, cpf_cnpj))
-            
-            # Só adicionar contato se tiver CPF/CNPJ válido (11 ou 14 dígitos)
-            if len(cpf_cnpj) >= 11:
-                tipo_pessoa = "J" if len(cpf_cnpj) == 14 else "F"
-                
-                # Para NFC-e, só enviar contato se tiver endereço completo
-                # Para NF-e, contato é obrigatório
-                tem_endereco_completo = (
-                    cliente.endereco and 
-                    cliente.cidade and 
-                    cliente.estado and 
-                    cliente.cep
-                )
-                
-                # Sempre criar contato com CPF/CNPJ
-                contato = {
-                    "nome": cliente.nome,
-                    "numeroDocumento": cpf_cnpj,
-                    "tipoPessoa": tipo_pessoa,
-                    "email": cliente.email or "",
-                    "telefone": cliente.telefone or "",
+            tem_documento_valido = len(cpf_cnpj) in (11, 14)
+            tipo_pessoa = "J" if len(cpf_cnpj) == 14 else "F"
+
+            tem_endereco_completo = (
+                cliente.endereco and
+                cliente.cidade and
+                cliente.estado and
+                cliente.cep
+            )
+
+            contato = {
+                "nome": cliente.nome,
+                "tipoPessoa": tipo_pessoa,
+                "email": cliente.email or "",
+                "telefone": cliente.telefone or "",
+            }
+
+            if tem_documento_valido:
+                contato["numeroDocumento"] = cpf_cnpj
+
+            if tipo_nota == "nfe" or tem_endereco_completo:
+                contato["endereco"] = {
+                    "logradouro": cliente.endereco or "",
+                    "numero": cliente.numero or "S/N",
+                    "complemento": cliente.complemento or "",
+                    "bairro": cliente.bairro or "",
+                    "cep": ''.join(filter(str.isdigit, cliente.cep or '')),
+                    "municipio": cliente.cidade or "",
+                    "uf": cliente.estado or "",
+                    "pais": "Brasil"
                 }
-                
-                # Para NFC-e: endereço é opcional
-                # Para NF-e: endereço é obrigatório
-                if tipo_nota == "nfe" or tem_endereco_completo:
-                    contato["endereco"] = {
-                        "logradouro": cliente.endereco or "",
-                        "numero": cliente.numero or "S/N",
-                        "complemento": cliente.complemento or "",
-                        "bairro": cliente.bairro or "",
-                        "cep": ''.join(filter(str.isdigit, cliente.cep or '')),
-                        "municipio": cliente.cidade or "",
-                        "uf": cliente.estado or "",
-                        "pais": "Brasil"
-                    }
         
         # Itens
         itens = []
