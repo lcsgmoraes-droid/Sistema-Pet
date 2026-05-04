@@ -7,7 +7,9 @@ import {
   User,
   Wallet,
 } from "lucide-react";
+import { useLocation } from "react-router-dom";
 import { formatBRL, formatMoneyBRL } from "../../utils/formatters";
+import { buildReturnTo } from "../../utils/petReturnFlow";
 import PessoaSelector from "../clientes/PessoaSelector";
 import ActionButton from "../ui/ActionButton";
 import EntityCard from "../ui/EntityCard";
@@ -343,6 +345,14 @@ function ClienteAcoesResumo({
 }
 
 function ClientePetSelector({ cliente, modoVisualizacao, onSelecionarPet, vendaAtual }) {
+  const location = useLocation();
+  const retornoNovoPet = buildReturnTo(location.pathname, location.search, {
+    novo_pet_id: null,
+    novo_pet_nome: null,
+    tutor_id: cliente?.id,
+    tutor_nome: cliente?.nome,
+  });
+
   return (
     <PetSelector
       tutorSelecionado={cliente}
@@ -350,7 +360,8 @@ function ClientePetSelector({ cliente, modoVisualizacao, onSelecionarPet, vendaA
       pets={cliente.pets}
       disabled={modoVisualizacao}
       allowEmpty
-      showNovoPetButton={false}
+      showNovoPetButton={!modoVisualizacao}
+      returnTo={retornoNovoPet}
       petLabel="Pet (opcional)"
       placeholder="Sem pet especifico"
       emptyOptionLabel="Sem pet especifico"

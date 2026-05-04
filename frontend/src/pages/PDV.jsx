@@ -5,8 +5,9 @@
 // 2. Testar cenÃ¡rio real
 // 3. Validar impacto financeiro
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
+import { buscarClientePorId } from "../api/clientes";
 import PDVDriveAlertBanner from "../components/pdv/PDVDriveAlertBanner";
 import PDVMainArea from "../components/pdv/PDVMainArea";
 import PDVOverlays from "../components/pdv/PDVOverlays";
@@ -35,7 +36,11 @@ import { getGuiaClassNames } from "../utils/guiaHighlight";
 export default function PDV() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
+  const searchParamsString = searchParams.toString();
   const guiaAtiva = searchParams.get("guia");
+  const novoPetIdRetorno = searchParams.get("novo_pet_id");
+  const tutorIdRetorno = searchParams.get("tutor_id");
+  const novoPetRetornoProcessadoRef = useRef("");
   const destaqueAbrirCaixa = guiaAtiva === "abrir-caixa";
   const destaqueVenda =
     guiaAtiva === "venda-sem-entrega" ||
@@ -118,6 +123,71 @@ export default function PDV() {
     vendaAtual,
     setVendaAtual,
   });
+
+  useEffect(() => {
+    if (!novoPetIdRetorno) return;
+
+    const chaveRetorno = `${tutorIdRetorno || ""}:${novoPetIdRetorno}`;
+    if (novoPetRetornoProcessadoRef.current === chaveRetorno) return;
+    novoPetRetornoProcessadoRef.current = chaveRetorno;
+
+    let cancelado = false;
+
+    function limparParametrosRetorno() {
+      const params = new URLSearchParams(searchParamsString);
+      params.delete("novo_pet_id");
+      params.delete("novo_pet_nome");
+      params.delete("tutor_id");
+      params.delete("tutor_nome");
+
+      const query = params.toString();
+      navigate(`${window.location.pathname}${query ? `?${query}` : ""}`, {
+        replace: true,
+      });
+    }
+
+    async function carregarPetCriado() {
+      try {
+        const clienteId = tutorIdRetorno || vendaAtual.cliente?.id;
+        if (!clienteId) return;
+
+        const clienteCompleto = await buscarClientePorId(clienteId);
+        if (cancelado || !clienteCompleto) return;
+
+        const petCriado =
+          (clienteCompleto.pets || []).find(
+            (pet) => String(pet.id) === String(novoPetIdRetorno),
+          ) || null;
+
+        setVendaAtual((prev) => ({
+          ...prev,
+          cliente: {
+            ...(prev.cliente || {}),
+            ...clienteCompleto,
+          },
+          pet: petCriado || prev.pet,
+        }));
+
+        void recarregarContextoClientePorId(clienteCompleto.id || clienteId);
+      } catch (error) {
+        console.error("Erro ao carregar pet criado no PDV:", error);
+      } finally {
+        if (!cancelado) limparParametrosRetorno();
+      }
+    }
+
+    void carregarPetCriado();
+
+    return () => {
+      cancelado = true;
+    };
+  }, [
+    navigate,
+    novoPetIdRetorno,
+    searchParamsString,
+    tutorIdRetorno,
+    vendaAtual.cliente?.id,
+  ]);
 
   const {
     vendasRecentes,
