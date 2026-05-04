@@ -907,8 +907,12 @@ export default function ModalPagamento({
       onConfirmar();
     } catch (error) {
       console.error('Erro ao emitir nota:', error);
-      alert(error.response?.data?.detail || 'Erro ao emitir nota fiscal. Você pode emiti-la depois na tela de vendas.');
-      onConfirmar(); // Continuar mesmo com erro na NF-e
+      const mensagem =
+        error.response?.data?.detail ||
+        'Erro ao emitir nota fiscal. Corrija as pendencias ou emita depois na tela de vendas.';
+      setErro(mensagem);
+      alert(mensagem);
+      return;
     } finally {
       setLoading(false);
     }
@@ -929,6 +933,12 @@ export default function ModalPagamento({
                 <p className="text-sm text-gray-500">Deseja emitir nota fiscal?</p>
               </div>
             </div>
+
+            {erro && (
+              <div className="mb-4 whitespace-pre-line rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                {erro}
+              </div>
+            )}
 
             <div className="space-y-3">
               {/* Cliente tem CNPJ? Oferecer NF-e, senão só NFC-e */}

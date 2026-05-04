@@ -16,6 +16,7 @@ import { formatMoneyBRL } from "../../utils/formatters";
 import { resolveMediaUrl } from "../../utils/mediaUrl";
 import { formatarVariacao } from "../../utils/variacoes";
 import ProdutoSelector from "../produtos/ProdutoSelector";
+import CopyableCode from "../ui/CopyableCode";
 import Panel from "../ui/Panel";
 
 function obterImagemMiniaturaItem(item) {
@@ -186,7 +187,14 @@ export default function PDVProdutosCard({
             const isKit = item.tipo_produto === "KIT";
             const isExpanded = itensKitExpandidos[index];
             const codigoProdutoExibicao =
-              item.produto_codigo || item.codigo || item.sku || "";
+              item.produto_codigo ||
+              item.codigo ||
+              item.sku ||
+              item.produto?.codigo ||
+              item.produto?.sku ||
+              item.produto?.codigo_barras ||
+              item.produto_codigo_barras ||
+              "";
             const imagemProduto = resolveMediaUrl(
               obterImagemMiniaturaItem(item),
             );
@@ -271,29 +279,18 @@ export default function PDVProdutosCard({
                             )}
                           </div>
                         </div>
-                        {codigoProdutoExibicao && (
-                          <div className="inline-flex items-center gap-1 text-xs text-gray-500">
-                            <span>Cod: {codigoProdutoExibicao}</span>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                onCopiarCodigoProdutoCarrinho(
-                                  codigoProdutoExibicao,
-                                  chaveCodigoItem,
-                                );
-                              }}
-                              className="text-gray-400 hover:text-gray-700"
-                              title="Copiar codigo do produto"
-                            >
-                              {copiadoCodigoItem === chaveCodigoItem ? (
-                                <Check className="w-3.5 h-3.5 text-green-600" />
-                              ) : (
-                                <Copy className="w-3.5 h-3.5" />
-                              )}
-                            </button>
-                          </div>
-                        )}
+                        <CopyableCode
+                          copied={copiadoCodigoItem === chaveCodigoItem}
+                          label="SKU"
+                          onCopy={() =>
+                            onCopiarCodigoProdutoCarrinho(
+                              codigoProdutoExibicao,
+                              chaveCodigoItem,
+                            )
+                          }
+                          title="Copiar SKU do produto"
+                          value={codigoProdutoExibicao}
+                        />
                         {vendaAtual.cliente && itemSemEstoque && (
                           <button
                             type="button"

@@ -12,6 +12,8 @@ import json
 from pathlib import Path
 from dotenv import dotenv_values
 from app.utils.logger import logger
+from app.kit_config_fiscal_models import KitConfigFiscal
+from app.produto_config_fiscal_models import ProdutoConfigFiscal
 
 # Configurações da API Bling
 BLING_API_BASE_URL = "https://api.bling.com.br/Api/v3"
@@ -57,6 +59,94 @@ def _load_bling_runtime_config() -> Dict[str, str]:
         "client_secret": pick("BLING_CLIENT_SECRET"),
         "enable_jwt": pick("BLING_ENABLE_JWT", "1"),
         "ambiente": pick("BLING_NFE_AMBIENTE", "rascunho"),
+    }
+
+
+def _limpar_texto_fiscal(value) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _primeiro_texto_fiscal(*values) -> Optional[str]:
+    for value in values:
+        text = _limpar_texto_fiscal(value)
+        if text is not None:
+            return text
+    return None
+
+
+def _sku_produto(produto) -> str:
+    return (
+        _limpar_texto_fiscal(getattr(produto, "codigo", None))
+        or _limpar_texto_fiscal(getattr(produto, "codigo_barras", None))
+        or f"ID {getattr(produto, 'id', 'sem-id')}"
+    )
+
+
+def _resolver_fiscal_item_nfe(db: Session, venda, item_venda) -> Dict[str, Optional[str]]:
+    produto = getattr(item_venda, "produto", None)
+    if not produto:
+        return {
+            "ncm": None,
+            "cest": None,
+            "origem_mercadoria": None,
+            "cfop": None,
+            "cst_icms": None,
+        }
+
+    tenant_id = getattr(venda, "tenant_id", None) or getattr(produto, "tenant_id", None)
+    kit_fiscal = None
+    produto_fiscal = None
+
+    if db is not None and tenant_id is not None:
+        if getattr(produto, "tipo_produto", None) == "KIT":
+            kit_fiscal = (
+                db.query(KitConfigFiscal)
+                .filter(
+                    KitConfigFiscal.tenant_id == tenant_id,
+                    KitConfigFiscal.produto_kit_id == produto.id,
+                )
+                .first()
+            )
+
+        produto_fiscal = (
+            db.query(ProdutoConfigFiscal)
+            .filter(
+                ProdutoConfigFiscal.tenant_id == tenant_id,
+                ProdutoConfigFiscal.produto_id == produto.id,
+            )
+            .first()
+        )
+
+    return {
+        "ncm": _primeiro_texto_fiscal(
+            getattr(kit_fiscal, "ncm", None),
+            getattr(produto_fiscal, "ncm", None),
+            getattr(produto, "ncm", None),
+        ),
+        "cest": _primeiro_texto_fiscal(
+            getattr(kit_fiscal, "cest", None),
+            getattr(produto_fiscal, "cest", None),
+            getattr(produto, "cest", None),
+        ),
+        "origem_mercadoria": _primeiro_texto_fiscal(
+            getattr(kit_fiscal, "origem_mercadoria", None),
+            getattr(produto_fiscal, "origem_mercadoria", None),
+            getattr(produto, "origem", None),
+        ),
+        "cfop": _primeiro_texto_fiscal(
+            getattr(kit_fiscal, "cfop", None),
+            getattr(produto_fiscal, "cfop_venda", None),
+            getattr(produto, "cfop", None),
+            "5102",
+        ),
+        "cst_icms": _primeiro_texto_fiscal(
+            getattr(kit_fiscal, "cst_icms", None),
+            getattr(produto_fiscal, "cst_icms", None),
+            "102",
+        ),
     }
 
 
@@ -250,15 +340,21 @@ class BlingAPI:
         erros_produtos = []
         for item in venda.itens:
             produto = item.produto
-            logger.info(f"Produto: {produto.nome}")
-            logger.info(f"  - NCM: {produto.ncm or 'NÃO CADASTRADO'}")
-            logger.info(f"  - CEST: {produto.cest or 'NÃO CADASTRADO'}")
-            logger.info(f"  - Origem: {produto.origem or 'NÃO CADASTRADO'}")
+            if not produto:
+                erros_produtos.append(f"Item {item.id or ''}: produto nao vinculado")
+                continue
+
+            fiscal_item = _resolver_fiscal_item_nfe(db, venda, item)
+            sku = _sku_produto(produto)
+            logger.info(f"Produto: {produto.nome} (SKU {sku})")
+            logger.info(f"  - NCM: {fiscal_item.get('ncm') or 'NAO CADASTRADO'}")
+            logger.info(f"  - CEST: {fiscal_item.get('cest') or 'NAO CADASTRADO'}")
+            logger.info(f"  - Origem: {fiscal_item.get('origem_mercadoria') or 'NAO CADASTRADO'}")
             
-            if not produto.ncm:
-                erros_produtos.append(f"{produto.nome}: NCM não cadastrado")
-            if not produto.origem:
-                erros_produtos.append(f"{produto.nome}: Origem da mercadoria não cadastrada")
+            if not fiscal_item.get("ncm"):
+                erros_produtos.append(f"{produto.nome} (SKU {sku}): NCM nao cadastrado")
+            if not fiscal_item.get("origem_mercadoria"):
+                erros_produtos.append(f"{produto.nome} (SKU {sku}): Origem da mercadoria nao cadastrada")
         
         if erros_produtos:
             raise ValueError(
@@ -277,7 +373,7 @@ class BlingAPI:
                 raise ValueError("NF-e requer CNPJ (empresa). Para pessoa física use NFC-e")
         
         # Montar payload
-        payload = self._montar_payload(venda, tipo_nota)
+        payload = self._montar_payload(venda, tipo_nota, db)
         
         # DEBUG: Mostrar payload completo
         logger.info("\n=== PAYLOAD ENVIADO PARA BLING ===")
@@ -313,7 +409,7 @@ class BlingAPI:
         
         return response
     
-    def _montar_payload(self, venda, tipo_nota: str) -> Dict:
+    def _montar_payload(self, venda, tipo_nota: str, db: Session = None) -> Dict:
         """Monta payload para emissão de nota"""
         cliente = venda.cliente
         
@@ -367,6 +463,7 @@ class BlingAPI:
         itens = []
         for idx, item_venda in enumerate(venda.itens, start=1):
             produto = item_venda.produto
+            fiscal_item = _resolver_fiscal_item_nfe(db, venda, item_venda)
             
             valor_unitario = float(item_venda.preco_unitario or 0)
             desconto = float(item_venda.desconto_item or 0)
@@ -382,11 +479,11 @@ class BlingAPI:
                 "valor": valor_unitario,
                 "desconto": desconto * quantidade,
                 "total": valor_total,
-                "ncm": produto.ncm or "00000000",
-                "cfop": "5102",
+                "ncm": fiscal_item.get("ncm") or "00000000",
+                "cfop": fiscal_item.get("cfop") or "5102",
                 "icms": {
-                    "situacaoTributaria": "102",
-                    "origem": "0"
+                    "situacaoTributaria": fiscal_item.get("cst_icms") or "102",
+                    "origem": fiscal_item.get("origem_mercadoria") or "0"
                 }
             }
             itens.append(item)
