@@ -47,7 +47,7 @@ function renderDefaultHeaderCell(column, content) {
 
 function renderCell(column, row, rowIndex, cellContext) {
   if (typeof column.render === "function") {
-    return column.render(row, rowIndex);
+    return column.render(row, rowIndex, cellContext);
   }
 
   if (typeof column.renderCell === "function") {

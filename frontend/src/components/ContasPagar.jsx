@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Wallet } from 'lucide-react';
+import { Plus, Wallet, X } from 'lucide-react';
 import api from '../api';
 import { toast } from 'react-hot-toast';
 import ModalNovaContaPagar from './ModalNovaContaPagar';
@@ -738,12 +738,14 @@ const ContasPagar = () => {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4">
             <div className="flex justify-between items-center border-b p-4">
               <h5 className="text-xl font-bold">💰 Registrar Pagamento</h5>
-              <button
-                className="text-gray-500 hover:text-gray-700 text-2xl"
+              <ActionButton
+                intent="neutral"
+                tone="ghost"
+                size="sm"
+                icon={X}
+                aria-label="Fechar modal de pagamento"
                 onClick={() => setMostrarModalPagamento(false)}
-              >
-                ×
-              </button>
+              />
             </div>
             
             <div className="p-6">
@@ -789,14 +791,16 @@ const ContasPagar = () => {
                         <option key={f.id} value={f.id}>{f.icone || '💳'} {f.nome}</option>
                       ))}
                     </select>
-                    <button
+                    <ActionButton
                       type="button"
-                      className="px-3 py-2 bg-green-600 text-white rounded hover:bg-green-700"
                       onClick={() => setMostrarModalNovaForma(true)}
                       title="Adicionar nova forma de pagamento"
+                      intent="create"
+                      size="sm"
+                      icon={Plus}
                     >
-                      +
-                    </button>
+                      Nova
+                    </ActionButton>
                   </div>
                 </div>
 
@@ -876,18 +880,21 @@ const ContasPagar = () => {
             </div>
             
             <div className="flex justify-end gap-3 border-t p-4">
-              <button
-                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+              <ActionButton
+                intent="neutral"
+                tone="soft"
+                size="md"
                 onClick={() => setMostrarModalPagamento(false)}
               >
                 Cancelar
-              </button>
-              <button
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+              </ActionButton>
+              <ActionButton
+                intent="create"
+                size="md"
                 onClick={registrarPagamento}
               >
-                ✓ Confirmar Pagamento
-              </button>
+                Confirmar Pagamento
+              </ActionButton>
             </div>
           </div>
         </div>
@@ -899,12 +906,15 @@ const ContasPagar = () => {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="bg-blue-600 text-white px-6 py-4 flex justify-between items-center sticky top-0">
               <h3 className="text-xl font-semibold">Detalhes da Conta</h3>
-              <button
+              <ActionButton
                 onClick={() => setMostrarDetalhes(false)}
-                className="text-white hover:bg-blue-700 px-3 py-1 rounded"
-              >
-                ✕
-              </button>
+                intent="neutral"
+                tone="ghost"
+                size="sm"
+                icon={X}
+                className="text-white hover:bg-blue-700"
+                aria-label="Fechar detalhes"
+              />
             </div>
             
             <div className="p-6 space-y-4">
@@ -938,34 +948,42 @@ const ContasPagar = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Nota Fiscal</label>
                   <div className="flex gap-2">
-                    <button
+                    <ActionButton
                       onClick={() => abrirNotaFiscal(contaSelecionada)}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg border border-blue-200 transition-colors"
+                      intent="edit"
+                      tone="soft"
+                      size="md"
+                      className="flex-1"
                     >
                       <span className="text-xl">📄</span>
                       <span className="font-medium">{contaSelecionada.nfe_numero}</span>
-                    </button>
-                    <button
+                    </ActionButton>
+                    <ActionButton
                       onClick={() => abrirFluxoDeCaixa(contaSelecionada)}
-                      className="flex items-center gap-2 px-4 py-2 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg border border-green-200 transition-colors"
+                      intent="create"
+                      tone="soft"
+                      size="md"
                       title="Ver no Fluxo de Caixa"
                     >
                       <span className="text-xl">📈</span>
                       <span className="text-sm">Fluxo</span>
-                    </button>
+                    </ActionButton>
                   </div>
                 </div>
               )}
 
               {!contaSelecionada.nfe_numero && (
                 <div>
-                  <button
+                  <ActionButton
                     onClick={() => abrirFluxoDeCaixa(contaSelecionada)}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg border border-green-200 transition-colors"
+                    intent="create"
+                    tone="soft"
+                    size="md"
+                    className="w-full"
                   >
                     <span className="text-xl">📈</span>
                     <span className="font-medium">Ver no Fluxo de Caixa</span>
-                  </button>
+                  </ActionButton>
                 </div>
               )}
 
@@ -1023,12 +1041,15 @@ const ContasPagar = () => {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md">
             <div className="bg-green-600 text-white px-6 py-4 flex justify-between items-center">
               <h3 className="text-xl font-semibold">Nova Forma de Pagamento</h3>
-              <button
+              <ActionButton
                 onClick={() => setMostrarModalNovaForma(false)}
-                className="text-white hover:bg-green-700 px-3 py-1 rounded"
-              >
-                ✕
-              </button>
+                intent="neutral"
+                tone="ghost"
+                size="sm"
+                icon={X}
+                className="text-white hover:bg-green-700"
+                aria-label="Fechar nova forma de pagamento"
+              />
             </div>
             
             <div className="p-6 space-y-4">
@@ -1078,18 +1099,21 @@ const ContasPagar = () => {
             </div>
             
             <div className="flex justify-end gap-3 border-t p-4">
-              <button
-                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+              <ActionButton
+                intent="neutral"
+                tone="soft"
+                size="md"
                 onClick={() => setMostrarModalNovaForma(false)}
               >
                 Cancelar
-              </button>
-              <button
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+              </ActionButton>
+              <ActionButton
+                intent="create"
+                size="md"
                 onClick={salvarNovaForma}
               >
-                ✓ Criar
-              </button>
+                Criar
+              </ActionButton>
             </div>
           </div>
         </div>
@@ -1101,12 +1125,14 @@ const ContasPagar = () => {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4">
             <div className="flex justify-between items-center border-b p-4">
               <h5 className="text-xl font-bold">🏷 Classificar Conta #{contaSelecionada.id}</h5>
-              <button
-                className="text-gray-500 hover:text-gray-700 text-2xl"
+              <ActionButton
+                intent="neutral"
+                tone="ghost"
+                size="sm"
+                icon={X}
+                aria-label="Fechar classificação"
                 onClick={() => setMostrarModalClassificacao(false)}
-              >
-                ×
-              </button>
+              />
             </div>
 
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1168,18 +1194,21 @@ const ContasPagar = () => {
             </div>
 
             <div className="flex justify-end gap-3 border-t p-4">
-              <button
-                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+              <ActionButton
+                intent="neutral"
+                tone="soft"
+                size="md"
                 onClick={() => setMostrarModalClassificacao(false)}
               >
                 Cancelar
-              </button>
-              <button
-                className="px-4 py-2 bg-amber-600 text-white rounded hover:bg-amber-700"
+              </ActionButton>
+              <ActionButton
+                intent="warning"
+                size="md"
                 onClick={salvarClassificacao}
               >
                 Salvar Classificação
-              </button>
+              </ActionButton>
             </div>
           </div>
         </div>

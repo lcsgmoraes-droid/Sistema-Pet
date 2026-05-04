@@ -729,6 +729,9 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-03: `Banho & Tosa` teve a grade antiga de capacidade removida da agenda, o taxi dog recebeu painel compacto com metricas e a limpeza de componentes antigos/orfaos reduziu o risco de retorno do visual anterior.
 - 2026-05-03: indicadores restantes do `Banho & Tosa` foram suavizados para o padrao visual atual, removendo tons laranja decorativos e pesos de fonte excessivos onde nao havia alerta real.
 - 2026-05-03: criado `ModuleTabs` e aplicado em Financeiro/Vendas, DRE, Fluxo de Caixa, Campanhas e Pessoas, removendo abas manuais duplicadas e aproximando a navegacao interna dos modulos ao mesmo padrao visual.
+- 2026-05-03: DRE avancou na padronizacao financeira com acoes principais, presets, paginacao e detalhes usando `ActionButton`, alem da tabela principal e da tabela de lancamentos migradas para `DataTable`.
+- 2026-05-03: Fluxo de Caixa substituiu a tabela manual de previsto/realizado por `DataTable` com linhas expansivas, valores por `MoneyCell`, status por `StatusBadge` e erro via toast em vez de alerta bloqueante.
+- 2026-05-03: modais de `ContasPagar` e `ContasReceber` tiveram acoes de confirmar/cancelar/fechar e atalhos de fluxo/venda alinhados ao padrao `ActionButton`, mantendo intencao de cor e tamanho consistente.
 
 ### Nao fazer nesta onda
 

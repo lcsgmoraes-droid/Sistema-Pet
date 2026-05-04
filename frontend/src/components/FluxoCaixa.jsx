@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import toast from 'react-hot-toast';
 import api from '../api';
 import { 
-  TrendingUp, TrendingDown, DollarSign, Calendar, 
-  Filter, RefreshCw, Plus, Settings, ChevronRight,
+  TrendingUp, TrendingDown, DollarSign,
+  RefreshCw,
   Brain, AlertTriangle, Sparkles
 } from 'lucide-react';
 import ChatIAModal from './ChatIAModal';
@@ -11,6 +11,7 @@ import ProjecoesIA from './ProjecoesIA';
 import AlertasIA from './AlertasIA';
 import { safeArray } from '../utils/safeArray';
 import ActionButton from './ui/ActionButton';
+import DataTable from './ui/DataTable';
 import MetricCard from './ui/MetricCard';
 import MetricGrid from './ui/MetricGrid';
 import MoneyCell, { formatMoneyCellValue } from './ui/MoneyCell';
@@ -50,7 +51,6 @@ const FLUXO_CAIXA_TABS = [
 ];
 
 const FluxoCaixa = () => {
-  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [dados, setDados] = useState(null);
   
@@ -129,7 +129,7 @@ const FluxoCaixa = () => {
       setDados(response.data);
     } catch (error) {
       console.error('Erro ao carregar fluxo de caixa:', error);
-      alert('Erro ao carregar fluxo de caixa: ' + (error.response?.data?.detail || error.message));
+      toast.error(`Erro ao carregar fluxo de caixa: ${error.response?.data?.detail || error.message}`);
     } finally {
       setLoading(false);
     }
@@ -216,6 +216,87 @@ const FluxoCaixa = () => {
       return true;
     });
   };
+
+  const periodosFluxo = safeArray(dados?.periodos).filter(periodo => {
+    if (!apenasComLancamentos) return true;
+    return periodo.realizado_entradas > 0 ||
+      periodo.realizado_saidas > 0 ||
+      periodo.previsto_entradas > 0 ||
+      periodo.previsto_saidas > 0;
+  });
+
+  const fluxoColumns = [
+    {
+      key: 'periodo',
+      header: 'Periodo',
+      className: 'font-medium text-gray-900',
+      render: (periodo) => periodo.data,
+    },
+    {
+      key: 'previsto_entradas',
+      header: 'Entradas previstas',
+      align: 'right',
+      className: 'bg-green-50 text-gray-700',
+      render: (periodo) => <MoneyCell value={periodo.previsto_entradas} zeroAsDash />,
+    },
+    {
+      key: 'realizado_entradas',
+      header: 'Entradas realizadas',
+      align: 'right',
+      className: 'bg-green-100 font-bold text-green-700',
+      render: (periodo) => <MoneyCell value={periodo.realizado_entradas} zeroAsDash />,
+    },
+    {
+      key: 'previsto_saidas',
+      header: 'Saidas previstas',
+      align: 'right',
+      className: 'bg-red-50 text-gray-700',
+      render: (periodo) => <MoneyCell value={periodo.previsto_saidas} zeroAsDash />,
+    },
+    {
+      key: 'realizado_saidas',
+      header: 'Saidas realizadas',
+      align: 'right',
+      className: 'bg-red-100 font-bold text-red-700',
+      render: (periodo) => <MoneyCell value={periodo.realizado_saidas} zeroAsDash />,
+    },
+    {
+      key: 'saldo_realizado',
+      header: 'Saldo realizado',
+      align: 'right',
+      className: (periodo) => `bg-blue-50 font-bold ${periodo.realizado_saldo >= 0 ? 'text-green-700' : 'text-red-700'}`,
+      render: (periodo) => <MoneyCell value={periodo.realizado_saldo} zeroAsDash />,
+    },
+    {
+      key: 'saldo_previsto',
+      header: 'Saldo previsto',
+      align: 'right',
+      className: (periodo) => `bg-blue-50 ${periodo.previsto_saldo >= 0 ? 'text-green-600' : 'text-red-600'}`,
+      render: (periodo) => <MoneyCell value={periodo.previsto_saldo} zeroAsDash />,
+    },
+    {
+      key: 'acoes',
+      header: '',
+      align: 'right',
+      render: (periodo) => {
+        const periodoId = periodo.data;
+        const isExpandido = periodoExpandido === periodoId;
+        const movimentacoes = getMovimentacoesDoPeriodo(periodo);
+
+        return (
+          <ActionButton
+            intent="neutral"
+            tone="ghost"
+            size="xs"
+            disabled={movimentacoes.length === 0}
+            onClick={() => setPeriodoExpandido(isExpandido ? null : periodoId)}
+          >
+            {isExpandido ? 'Ocultar' : 'Detalhes'}
+          </ActionButton>
+        );
+      },
+    },
+  ];
 
   if (loading && !dados) {
     return (
@@ -490,142 +571,63 @@ const FluxoCaixa = () => {
             />
           </MetricGrid>
 
-          {/* Tabela Estilo Flua: Previsto vs Realizado */}
+          {/* Tabela de fluxo */}
           <div className="bg-white rounded-lg shadow overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Período
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-green-50" colSpan="2">
-                      💰 Entradas
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-red-50" colSpan="2">
-                      💸 Saídas
-                    </th>
-                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider bg-blue-50">
-                      💵 Saldo Final
-                    </th>
-                    <th className="px-6 py-3"></th>
-                  </tr>
-                  <tr className="bg-gray-100">
-                    <th className="px-6 py-2"></th>
-                    <th className="px-4 py-2 text-xs text-gray-600 bg-green-50">Previsto</th>
-                    <th className="px-4 py-2 text-xs text-gray-600 bg-green-100">Realizado</th>
-                    <th className="px-4 py-2 text-xs text-gray-600 bg-red-50">Previsto</th>
-                    <th className="px-4 py-2 text-xs text-gray-600 bg-red-100">Realizado</th>
-                    <th className="px-4 py-2 text-xs text-gray-600 bg-blue-50">Real / Previsto</th>
-                    <th className="px-4 py-2"></th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {safeArray(dados?.periodos).length > 0 ? (
-                    safeArray(dados?.periodos)
-                      .filter(periodo => {
-                        // Se o filtro estiver ativo, mostra apenas períodos com movimentações
-                        if (!apenasComLancamentos) return true;
-                        return periodo.realizado_entradas > 0 || 
-                               periodo.realizado_saidas > 0 || 
-                               periodo.previsto_entradas > 0 || 
-                               periodo.previsto_saidas > 0;
-                      })
-                      .map((periodo, idx) => {
-                      const movimentacoes = getMovimentacoesDoPeriodo(periodo);
-                      const periodoId = periodo.data; // Usa data como ID único
-                      const isExpandido = periodoExpandido === periodoId;
-                      
-                      return (
-                        <React.Fragment key={periodoId}>
-                          <tr className="hover:bg-gray-50">
-                            <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                              {periodo.data}
-                            </td>
-                            <td className="px-4 py-4 text-sm text-gray-600 text-right bg-green-50">
-                              <MoneyCell value={periodo.previsto_entradas} zeroAsDash />
-                            </td>
-                            <td className="px-4 py-4 text-sm font-bold text-green-700 text-right bg-green-100">
-                              <MoneyCell value={periodo.realizado_entradas} zeroAsDash />
-                            </td>
-                            <td className="px-4 py-4 text-sm text-gray-600 text-right bg-red-50">
-                              <MoneyCell value={periodo.previsto_saidas} zeroAsDash />
-                            </td>
-                            <td className="px-4 py-4 text-sm font-bold text-red-700 text-right bg-red-100">
-                              <MoneyCell value={periodo.realizado_saidas} zeroAsDash />
-                            </td>
-                            <td className="px-4 py-4 text-sm text-center bg-blue-50">
-                              <div className={`font-bold ${periodo.realizado_saldo >= 0 ? 'text-green-700' : 'text-red-700'}`}>
-                                <MoneyCell value={periodo.realizado_saldo} zeroAsDash />
-                              </div>
-                              <div className={`text-xs ${periodo.previsto_saldo >= 0 ? 'text-green-600' : 'text-red-600'}`}>
-                                Prev: <MoneyCell value={periodo.previsto_saldo} zeroAsDash />
-                              </div>
-                            </td>
-                            <td className="px-4 py-4 text-center">
-                              <button
-                                onClick={() => setPeriodoExpandido(isExpandido ? null : periodoId)}
-                                className="text-blue-600 hover:text-blue-800"
+            <DataTable
+              columns={fluxoColumns}
+              data={periodosFluxo}
+              emptyMessage="Nenhuma movimentação encontrada para o período selecionado"
+              getRowKey={(periodo) => periodo.data}
+              isRowExpanded={(periodo) =>
+                periodoExpandido === periodo.data &&
+                getMovimentacoesDoPeriodo(periodo).length > 0
+              }
+              renderExpandedRow={(periodo, _rowIndex, colSpan) => {
+                const movimentacoes = getMovimentacoesDoPeriodo(periodo);
+                return (
+                  <tr className="bg-gray-50">
+                    <td colSpan={colSpan} className="px-4 py-4">
+                      <div className="space-y-2">
+                        <h4 className="font-bold text-gray-700">Movimentações detalhadas</h4>
+                        {safeArray(movimentacoes).map((mov, movIdx) => (
+                          <div
+                            key={`${mov.id || mov.descricao || 'mov'}-${movIdx}`}
+                            className={`flex items-center justify-between gap-3 rounded border-l-2 p-2 ${
+                              mov.status === 'previsto'
+                                ? 'border-yellow-400 bg-yellow-50'
+                                : 'border-blue-400 bg-white'
+                            }`}
+                          >
+                            <div className="min-w-0 flex-1">
+                              <span className="font-medium">{mov.descricao}</span>
+                              <span className="ml-2 text-xs text-gray-500">({mov.categoria})</span>
+                            </div>
+                            <div className="flex items-center gap-3">
+                              <StatusBadge
+                                status={mov.status === 'previsto' ? 'pendente' : 'recebido'}
+                                size="xs"
                               >
-                                <ChevronRight 
-                                  size={20} 
-                                  className={`transform transition-transform ${isExpandido ? 'rotate-90' : ''}`}
+                                {mov.status === 'previsto' ? 'Previsto' : 'Realizado'}
+                              </StatusBadge>
+                              <span className={`font-bold ${movimentoEhEntrada(mov.tipo) ? 'text-green-600' : 'text-red-600'}`}>
+                                <MoneyCell
+                                  value={mov.valor}
+                                  sign={movimentoEhEntrada(mov.tipo) ? '+' : '-'}
+                                  absolute
                                 />
-                              </button>
-                            </td>
-                          </tr>
-                          
-                          {/* Detalhes expandidos */}
-                          {isExpandido && movimentacoes.length > 0 && (
-                            <tr className="bg-gray-50">
-                              <td colSpan="7" className="px-6 py-4">
-                                <div className="space-y-2">
-                                  <h4 className="font-bold text-gray-700 mb-3">📋 Movimentações Detalhadas</h4>
-                                  {safeArray(movimentacoes).map((mov, movIdx) => (
-                                    <div
-                                      key={movIdx}
-                                      className={`flex justify-between items-center p-2 rounded ${
-                                        mov.status === 'previsto' ? 'bg-yellow-50 border-l-2 border-yellow-400' : 'bg-white border-l-2 border-blue-400'
-                                      }`}
-                                    >
-                                      <div className="flex-1">
-                                        <span className="font-medium">{mov.descricao}</span>
-                                        <span className="text-xs text-gray-500 ml-2">({mov.categoria})</span>
-                                      </div>
-                                      <div className="flex items-center gap-3">
-                                        <StatusBadge
-                                          status={mov.status === 'previsto' ? 'pendente' : 'recebido'}
-                                          size="xs"
-                                        >
-                                          {mov.status === 'previsto' ? 'Previsto' : 'Realizado'}
-                                        </StatusBadge>
-                                        <span className={`font-bold ${movimentoEhEntrada(mov.tipo) ? 'text-green-600' : 'text-red-600'}`}>
-                                          <MoneyCell
-                                            value={mov.valor}
-                                            sign={movimentoEhEntrada(mov.tipo) ? '+' : '-'}
-                                            absolute
-                                          />
-                                        </span>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              </td>
-                            </tr>
-                          )}
-                        </React.Fragment>
-                      );
-                    })
-                  ) : (
-                    <tr>
-                      <td colSpan="7" className="px-6 py-8 text-center text-gray-500">
-                        Nenhuma movimentação encontrada para o período selecionado
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
-            </div>
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              }}
+              tableClassName="min-w-[1080px]"
+              theadClassName="bg-gray-50"
+              tbodyClassName="divide-y divide-gray-200 bg-white"
+            />
           </div>
         </>
       )}

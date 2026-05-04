@@ -21,7 +21,8 @@ import AnaliseInteligente from "./AnaliseInteligente";
 import ChatIAModal from "./ChatIAModal";
 import ClassificarLancamentosModal from "./ClassificarLancamentosModal";
 import ExtratoBancario from "./ExtratoBancario";
-import { actionButtonClasses } from "./ui/actionStyles";
+import ActionButton from "./ui/ActionButton";
+import DataTable from "./ui/DataTable";
 import MetricCard from "./ui/MetricCard";
 import MetricGrid from "./ui/MetricGrid";
 import MoneyCell, { formatMoneyCellValue } from "./ui/MoneyCell";
@@ -29,6 +30,76 @@ import ModuleTabs from "./ui/ModuleTabs";
 import NumberCell from "./ui/NumberCell";
 
 const DRE_REQUEST_TIMEOUT_MS = 120000;
+
+const DRE_TABLE_COLUMNS = [
+  {
+    key: "descricao",
+    header: "Descrição",
+    render: (linha) => (
+      <span className="inline-flex items-center gap-2">
+        <span>{linha.descricao}</span>
+        {linha.origem && (
+          <Info
+            size={14}
+            className="text-gray-400"
+            title={linha.origem}
+          />
+        )}
+        {linha.detalhavel && (
+          <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500">
+            detalhes
+          </span>
+        )}
+      </span>
+    ),
+  },
+  {
+    key: "valor",
+    header: "Valor",
+    align: "right",
+    render: (linha) => <MoneyCell value={linha.valor} zeroAsDash />,
+  },
+  {
+    key: "percentual",
+    header: "% Receita",
+    align: "right",
+    render: (linha) => (
+      <NumberCell value={linha.percentual} decimals={2} suffix="%" zeroAsDash />
+    ),
+  },
+];
+
+const DRE_DETAIL_COLUMNS = [
+  {
+    key: "data",
+    header: "Data",
+    render: (item, _rowIndex, { formatarData }) => formatarData(item.data),
+  },
+  {
+    key: "descricao",
+    header: "Descrição",
+    render: (item) => (
+      <div>
+        <div className="text-sm font-medium text-gray-900">{item.descricao}</div>
+        <div className="text-xs text-gray-500">
+          {item.contraparte || item.documento || "-"}
+        </div>
+      </div>
+    ),
+  },
+  {
+    key: "origem",
+    header: "Origem",
+    render: (item) => item.origem_label,
+  },
+  {
+    key: "valor",
+    header: "Valor",
+    align: "right",
+    className: "font-semibold",
+    render: (item) => <MoneyCell value={item.valor} zeroAsDash />,
+  },
+];
 
 const DRE_TABS = [
   {
@@ -334,39 +405,48 @@ const DRE = () => {
         </div>
 
         <div className="flex flex-wrap gap-2">
-          <button
+          <ActionButton
             onClick={() => setModalClassificarOpen(true)}
-            className={actionButtonClasses({ intent: "edit", tone: "solid", size: "sm", className: "shadow-sm" })}
+            intent="edit"
+            size="sm"
+            className="shadow-sm"
             title="Classificar lançamentos no DRE"
           >
             <span className="text-base">🏷️</span>
             <span className="font-medium">Classificar</span>
-          </button>
-          <button
+          </ActionButton>
+          <ActionButton
             onClick={() => setChatIAAberto(true)}
-            className={actionButtonClasses({ intent: "neutral", tone: "soft", size: "sm", className: "shadow-sm" })}
+            intent="neutral"
+            tone="soft"
+            size="sm"
+            className="shadow-sm"
             title="Consultar Especialista IA"
           >
             <MessageCircle size={20} />
             <span className="font-medium">Chat IA</span>
             <Sparkles size={16} className="animate-pulse" />
-          </button>
-          <button
+          </ActionButton>
+          <ActionButton
             onClick={exportarPDF}
-            className={actionButtonClasses({ intent: "neutral", tone: "soft", size: "sm" })}
+            intent="neutral"
+            tone="soft"
+            size="sm"
+            icon={FileText}
             title="Exportar para PDF"
           >
-            <FileText size={18} />
             PDF
-          </button>
-          <button
+          </ActionButton>
+          <ActionButton
             onClick={exportarExcel}
-            className={actionButtonClasses({ intent: "neutral", tone: "soft", size: "sm" })}
+            intent="neutral"
+            tone="soft"
+            size="sm"
+            icon={Download}
             title="Exportar para Excel"
           >
-            <Download size={18} />
             Excel
-          </button>
+          </ActionButton>
         </div>
       </div>
 
@@ -386,24 +466,30 @@ const DRE = () => {
             <div className="flex flex-wrap items-end gap-3 md:gap-4">
               {/* Botões de período rápido */}
               <div className="flex flex-wrap gap-2">
-                <button
+                <ActionButton
                   onClick={() => handlePeriodoPreset("mes_atual")}
-                  className={actionButtonClasses({ intent: "neutral", tone: "soft", size: "sm" })}
+                  intent="neutral"
+                  tone="soft"
+                  size="sm"
                 >
                   Mês Atual
-                </button>
-                <button
+                </ActionButton>
+                <ActionButton
                   onClick={() => handlePeriodoPreset("mes_anterior")}
-                  className={actionButtonClasses({ intent: "neutral", tone: "soft", size: "sm" })}
+                  intent="neutral"
+                  tone="soft"
+                  size="sm"
                 >
                   Mês Anterior
-                </button>
-                <button
+                </ActionButton>
+                <ActionButton
                   onClick={() => handlePeriodoPreset("ano_atual")}
-                  className={actionButtonClasses({ intent: "neutral", tone: "soft", size: "sm" })}
+                  intent="neutral"
+                  tone="soft"
+                  size="sm"
                 >
                   Ano Atual
-                </button>
+                </ActionButton>
               </div>
 
               <div className="min-w-[260px] flex-1">
@@ -474,12 +560,14 @@ const DRE = () => {
                     </p>
                   </div>
                   {canaisSelecionados.length > 0 && (
-                    <button
+                    <ActionButton
                       onClick={limparSelecaoCanais}
-                      className={actionButtonClasses({ intent: "neutral", tone: "ghost", size: "xs" })}
+                      intent="neutral"
+                      tone="ghost"
+                      size="xs"
                     >
                       Limpar Seleção
-                    </button>
+                    </ActionButton>
                   )}
                 </div>
 
@@ -555,94 +643,47 @@ const DRE = () => {
 
               {/* Tabela DRE Detalhada */}
               <div className="overflow-hidden rounded-lg bg-white shadow">
-                <div className="overflow-x-auto">
-                <table className="min-w-[760px] w-full">
-                  <thead className="bg-gray-50">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Descrição
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Valor
-                      </th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        % Receita
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-white divide-y divide-gray-200">
-                    {/* Renderizar linhas vindas da API */}
-                    {dados?.linhas?.map((linha, idx) => {
-                      // Classes de estilo baseadas no nÃ­vel e tipo
-                      const ehTotal = linha.nivel === 0;
-                      const ehSubitem = linha.nivel === 1;
-                      const podeDetalhar = Boolean(linha.detalhavel);
-
-                      // Background baseado na cor do canal
-                      const bgStyle =
-                        linha.cor_bg !== "#ffffff"
-                          ? { backgroundColor: linha.cor_bg }
-                          : {};
-
-                      // Cor do texto
-                      const textStyle = { color: linha.cor };
-
-                      return (
-                        <tr
-                          key={idx}
-                          style={bgStyle}
-                          title={
-                            podeDetalhar
-                              ? "Clique para ver os lancamentos desta linha"
-                              : linha.origem || undefined
-                          }
-                          onClick={() => abrirDetalhesLinha(linha)}
-                          className={`${ehTotal ? "font-bold" : ""} ${
-                            podeDetalhar
-                              ? "cursor-pointer hover:brightness-[0.98]"
-                              : linha.origem
-                                ? "cursor-help hover:brightness-[0.98]"
-                                : ""
-                          }`}
-                        >
-                          <td
-                            className={`px-6 py-3 ${ehSubitem ? "pl-12" : ""} ${ehTotal ? "font-bold" : ""}`}
-                            style={textStyle}
-                          >
-                            <span className="inline-flex items-center gap-2">
-                              <span>{linha.descricao}</span>
-                              {linha.origem && (
-                                <Info
-                                  size={14}
-                                  className="text-gray-400"
-                                  title={linha.origem}
-                                />
-                              )}
-                              {podeDetalhar && (
-                                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[11px] font-medium text-gray-500">
-                                  detalhes
-                                </span>
-                              )}
-                            </span>
-                          </td>
-                          <td
-                            className={`px-6 py-3 text-right ${ehTotal ? "font-bold" : ""}`}
-                            style={textStyle}
-                          >
-                            <MoneyCell value={linha.valor} zeroAsDash />
-                          </td>
-                          <td
-                            className={`px-6 py-3 text-right ${ehTotal ? "font-bold" : ""}`}
-                            style={textStyle}
-                          >
-                            <NumberCell value={linha.percentual} decimals={2} suffix="%" zeroAsDash />
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                </div>
+                <DataTable
+                  data={dados?.linhas || []}
+                  emptyMessage="Nenhuma linha encontrada para o período selecionado"
+                  getRowKey={(linha, idx) => `${linha.descricao}-${idx}`}
+                  onRowClick={(linha) => abrirDetalhesLinha(linha)}
+                  rowClassName={(linha) => {
+                    const podeDetalhar = Boolean(linha.detalhavel);
+                    const ehTotal = linha.nivel === 0;
+                    return [
+                      ehTotal ? "font-bold" : "",
+                      podeDetalhar
+                        ? "cursor-pointer hover:brightness-[0.98]"
+                        : linha.origem
+                          ? "cursor-help hover:brightness-[0.98]"
+                          : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" ");
+                  }}
+                  tableClassName="min-w-[760px]"
+                  theadClassName="bg-gray-50"
+                  tbodyClassName="divide-y divide-gray-200"
+                  columns={DRE_TABLE_COLUMNS.map((column) => ({
+                    ...column,
+                    className: (linha) => [
+                      column.className,
+                      linha.nivel === 1 && column.key === "descricao" ? "pl-12" : "",
+                      linha.nivel === 0 ? "font-bold" : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" "),
+                    cellStyle: (linha) =>
+                      linha.cor_bg && linha.cor_bg !== "#ffffff"
+                        ? { backgroundColor: linha.cor_bg, color: linha.cor }
+                        : { color: linha.cor },
+                    cellTitle: (linha) =>
+                      linha.detalhavel
+                        ? "Clique para ver os lançamentos desta linha"
+                        : linha.origem || undefined,
+                  }))}
+                />
               </div>
 
               {/* Seletor de Canais (removido - nÃ£o necessÃ¡rio com novo endpoint) */}
@@ -720,14 +761,16 @@ const DRE = () => {
                       {detalhesLinha?.periodo || periodo} • {linhaDetalhe.canal_nome}
                     </p>
                   </div>
-                  <button
+                  <ActionButton
                     type="button"
                     onClick={fecharDetalhesLinha}
-                    className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-700"
+                    intent="neutral"
+                    tone="ghost"
+                    size="sm"
                     aria-label="Fechar detalhes"
                   >
                     <X size={20} />
-                  </button>
+                  </ActionButton>
                 </div>
 
                 <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -777,47 +820,15 @@ const DRE = () => {
                 ) : (
                   <>
                     <div className="hidden overflow-hidden rounded-lg border border-gray-200 md:block">
-                      <table className="min-w-full divide-y divide-gray-200">
-                        <thead className="bg-gray-50">
-                          <tr>
-                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">
-                              Data
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">
-                              Descricao
-                            </th>
-                            <th className="px-4 py-3 text-left text-xs font-semibold uppercase text-gray-500">
-                              Origem
-                            </th>
-                            <th className="px-4 py-3 text-right text-xs font-semibold uppercase text-gray-500">
-                              Valor
-                            </th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-gray-100 bg-white">
-                          {detalhesLinha.items.map((item) => (
-                            <tr key={item.id} className="hover:bg-gray-50">
-                              <td className="px-4 py-3 text-sm text-gray-700">
-                                {formatarData(item.data)}
-                              </td>
-                              <td className="px-4 py-3">
-                                <div className="text-sm font-medium text-gray-900">
-                                  {item.descricao}
-                                </div>
-                                <div className="text-xs text-gray-500">
-                                  {item.contraparte || item.documento || "-"}
-                                </div>
-                              </td>
-                              <td className="px-4 py-3 text-sm text-gray-600">
-                                {item.origem_label}
-                              </td>
-                              <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
-                                <MoneyCell value={item.valor} zeroAsDash />
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
+                      <DataTable
+                        columns={DRE_DETAIL_COLUMNS}
+                        data={detalhesLinha.items}
+                        getCellContext={() => ({ formatarData })}
+                        getRowKey={(item, index) => item.id || index}
+                        tableClassName="min-w-full"
+                        theadClassName="bg-gray-50"
+                        tbodyClassName="divide-y divide-gray-100 bg-white"
+                      />
                     </div>
 
                     <div className="space-y-3 md:hidden">
@@ -853,25 +864,29 @@ const DRE = () => {
 
               {detalhesLinha && detalhesLinha.pages > 1 && (
                 <div className="flex items-center justify-between border-t border-gray-200 p-4 text-sm">
-                  <button
+                  <ActionButton
                     type="button"
                     disabled={loadingDetalhes || detalhesLinha.page <= 1}
                     onClick={() => abrirDetalhesLinha(linhaDetalhe, detalhesLinha.page - 1)}
-                    className="rounded-lg border border-gray-300 px-3 py-2 text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    intent="neutral"
+                    tone="soft"
+                    size="sm"
                   >
                     Anterior
-                  </button>
+                  </ActionButton>
                   <span className="text-gray-600">
                     Pagina {detalhesLinha.page} de {detalhesLinha.pages}
                   </span>
-                  <button
+                  <ActionButton
                     type="button"
                     disabled={loadingDetalhes || detalhesLinha.page >= detalhesLinha.pages}
                     onClick={() => abrirDetalhesLinha(linhaDetalhe, detalhesLinha.page + 1)}
-                    className="rounded-lg border border-gray-300 px-3 py-2 text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                    intent="neutral"
+                    tone="soft"
+                    size="sm"
                   >
                     Proxima
-                  </button>
+                  </ActionButton>
                 </div>
               )}
             </div>

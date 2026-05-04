@@ -1,6 +1,6 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowDownUp, Plus, Receipt } from 'lucide-react';
+import { ArrowDownUp, Plus, Receipt, X } from 'lucide-react';
 import api from '../api';
 import { toast } from 'react-hot-toast';
 import { safeArray } from '../utils/safeArray';
@@ -559,12 +559,14 @@ const ContasReceber = () => {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl mx-4">
             <div className="flex justify-between items-center border-b p-4">
               <h5 className="text-xl font-bold">Registrar Recebimento</h5>
-              <button
-                className="text-gray-500 hover:text-gray-700 text-2xl"
+              <ActionButton
+                intent="neutral"
+                tone="ghost"
+                size="sm"
+                icon={X}
+                aria-label="Fechar recebimento"
                 onClick={() => setMostrarModalRecebimento(false)}
-              >
-                X
-              </button>
+              />
             </div>
             
             <div className="p-6">
@@ -682,18 +684,21 @@ const ContasReceber = () => {
             </div>
             
             <div className="flex justify-end gap-3 border-t p-4">
-              <button
-                className="px-4 py-2 border border-gray-300 rounded hover:bg-gray-50"
+              <ActionButton
+                intent="neutral"
+                tone="soft"
+                size="md"
                 onClick={() => setMostrarModalRecebimento(false)}
               >
                 Cancelar
-              </button>
-              <button
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+              </ActionButton>
+              <ActionButton
+                intent="create"
+                size="md"
                 onClick={registrarRecebimento}
               >
                 Confirmar Recebimento
-              </button>
+              </ActionButton>
             </div>
           </div>
         </div>
@@ -705,12 +710,15 @@ const ContasReceber = () => {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
             <div className="bg-blue-600 text-white px-6 py-4 flex justify-between items-center sticky top-0">
               <h3 className="text-xl font-semibold">Detalhes da Conta</h3>
-              <button
+              <ActionButton
                 onClick={() => setMostrarDetalhes(false)}
-                className="text-white hover:bg-blue-700 px-3 py-1 rounded"
-              >
-                X
-              </button>
+                intent="neutral"
+                tone="ghost"
+                size="sm"
+                icon={X}
+                className="text-white hover:bg-blue-700"
+                aria-label="Fechar detalhes"
+              />
             </div>
             
             <div className="p-6 space-y-4">
@@ -730,34 +738,42 @@ const ContasReceber = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Pedido/Venda</label>
                   <div className="flex gap-2">
-                    <button
+                    <ActionButton
                       onClick={() => abrirVenda(detalhesCompletos.venda.id)}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-blue-50 hover:bg-blue-100 text-blue-700 rounded-lg border border-blue-200 transition-colors"
+                      intent="edit"
+                      tone="soft"
+                      size="md"
+                      className="flex-1"
                     >
                       <span className="text-xl">Venda</span>
                       <span className="font-semibold">{detalhesCompletos.venda.numero_venda}</span>
-                    </button>
-                    <button
+                    </ActionButton>
+                    <ActionButton
                       onClick={() => abrirFluxoDeCaixa(contaSelecionada)}
-                      className="flex items-center gap-2 px-4 py-2 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg border border-green-200 transition-colors"
+                      intent="create"
+                      tone="soft"
+                      size="md"
                       title="Ver no Fluxo de Caixa"
                     >
                       <span className="text-xl">Fluxo</span>
                       <span className="text-sm">Fluxo</span>
-                    </button>
+                    </ActionButton>
                   </div>
                 </div>
               )}
 
               {!detalhesCompletos.venda && (
                 <div>
-                  <button
+                  <ActionButton
                     onClick={() => abrirFluxoDeCaixa(contaSelecionada)}
-                    className="w-full flex items-center justify-center gap-2 px-4 py-2 bg-green-50 hover:bg-green-100 text-green-700 rounded-lg border border-green-200 transition-colors"
+                    intent="create"
+                    tone="soft"
+                    size="md"
+                    className="w-full"
                   >
                     <span className="text-xl">Fluxo</span>
                     <span className="font-medium">Ver no Fluxo de Caixa</span>
-                  </button>
+                  </ActionButton>
                 </div>
               )}
 
@@ -803,32 +819,40 @@ const ContasReceber = () => {
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">Historico de Recebimentos</label>
                   <div className="border border-gray-200 rounded-lg overflow-hidden">
-                    <table className="w-full">
-                      <thead className="bg-gray-50">
-                        <tr>
-                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Data</th>
-                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Valor</th>
-                          <th className="px-3 py-2 text-left text-xs font-medium text-gray-700">Conta Bancaria</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-gray-200">
-                        {safeArray(detalhesCompletos?.recebimentos).map((recebimento, index) => (
-                          <tr key={index}>
-                            <td className="px-3 py-2 text-sm">{formatarData(recebimento.data)}</td>
-                            <td className="px-3 py-2 text-sm font-semibold text-green-600"><MoneyCell value={recebimento.valor} zeroAsDash /></td>
-                            <td className="px-3 py-2 text-sm">
-                              {recebimento.conta_bancaria_nome ? (
-                                <span className="px-2 py-1 bg-blue-50 text-blue-700 rounded text-xs">
-                                  {recebimento.conta_bancaria_nome}
-                                </span>
-                              ) : (
-                                <span className="text-gray-400 text-xs">Nao informada</span>
-                              )}
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                    <DataTable
+                      columns={[
+                        {
+                          key: 'data',
+                          header: 'Data',
+                          render: (recebimento) => formatarData(recebimento.data),
+                        },
+                        {
+                          key: 'valor',
+                          header: 'Valor',
+                          align: 'right',
+                          className: 'font-semibold text-green-600',
+                          render: (recebimento) => <MoneyCell value={recebimento.valor} zeroAsDash />,
+                        },
+                        {
+                          key: 'conta',
+                          header: 'Conta Bancaria',
+                          render: (recebimento) => (
+                            recebimento.conta_bancaria_nome ? (
+                              <span className="rounded bg-blue-50 px-2 py-1 text-xs text-blue-700">
+                                {recebimento.conta_bancaria_nome}
+                              </span>
+                            ) : (
+                              <span className="text-xs text-gray-400">Nao informada</span>
+                            )
+                          ),
+                        },
+                      ]}
+                      data={safeArray(detalhesCompletos?.recebimentos)}
+                      getRowKey={(recebimento, index) => recebimento.id || index}
+                      tableClassName="w-full"
+                      theadClassName="bg-gray-50"
+                      tbodyClassName="divide-y divide-gray-200"
+                    />
                   </div>
                 </div>
               )}
