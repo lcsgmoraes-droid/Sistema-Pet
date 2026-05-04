@@ -24,6 +24,7 @@ function montarMensagemErro(erro) {
 export default function NovoPetModal({
   isOpen,
   tutor,
+  descricao = "Crie o pet aqui mesmo e ele ja entra selecionado no fluxo atual.",
   sugestoesEspecies,
   onClose,
   onCreated,
@@ -136,7 +137,7 @@ export default function NovoPetModal({
             <div>
               <h2 className="text-lg font-semibold text-gray-900">Cadastro rapido de pet</h2>
               <p className="text-sm text-gray-500">
-                Crie o pet aqui mesmo e ele ja entra selecionado na consulta.
+                {descricao}
               </p>
             </div>
           </div>
@@ -313,6 +314,7 @@ NovoPetModal.propTypes = {
     telefone: PropTypes.string,
     celular: PropTypes.string,
   }),
+  descricao: PropTypes.string,
   sugestoesEspecies: PropTypes.arrayOf(PropTypes.string),
   onClose: PropTypes.func,
   onCreated: PropTypes.func,
@@ -321,6 +323,7 @@ NovoPetModal.propTypes = {
 NovoPetModal.defaultProps = {
   isOpen: false,
   tutor: null,
+  descricao: "Crie o pet aqui mesmo e ele ja entra selecionado no fluxo atual.",
   sugestoesEspecies: [],
   onClose: undefined,
   onCreated: undefined,

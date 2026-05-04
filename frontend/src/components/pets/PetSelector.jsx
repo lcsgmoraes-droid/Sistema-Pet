@@ -1,6 +1,7 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import PropTypes from "prop-types";
 import NovoPetButton from "./NovoPetButton";
+import NovoPetModal from "./NovoPetModal";
 
 function normalizeText(value) {
   return String(value || "").trim();
@@ -38,17 +39,47 @@ export default function PetSelector({
   emptyOptionLabel = "Sem pet especifico",
   emptyStateLabel = "Nenhum pet ativo vinculado a esse tutor.",
   returnTo,
+  sugestoesEspecies = [],
   className = "",
   onSelectPet,
+  onPetCreated,
   onExpandedChange,
   onBeforeNovoPet,
   onNovoPetClick,
 }) {
   const [internalExpanded, setInternalExpanded] = useState(false);
-  const listaPets = Array.isArray(pets) ? pets : [];
+  const [modalNovoPetAberto, setModalNovoPetAberto] = useState(false);
+  const [petCriadoLocal, setPetCriadoLocal] = useState(null);
+  const listaPetsOriginal = Array.isArray(pets) ? pets : [];
   const tutorId = tutorIdProp || tutorSelecionado?.id;
   const isExpandedControlled = typeof expandedProp === "boolean";
   const expanded = isExpandedControlled ? expandedProp : internalExpanded;
+  const tutorParaModal = useMemo(
+    () => ({
+      ...(tutorSelecionado || {}),
+      id: tutorId,
+      nome: tutorNome || tutorSelecionado?.nome,
+    }),
+    [tutorId, tutorNome, tutorSelecionado],
+  );
+
+  useEffect(() => {
+    setPetCriadoLocal(null);
+  }, [tutorId]);
+
+  const listaPets = useMemo(() => {
+    if (!petCriadoLocal?.id) return listaPetsOriginal;
+
+    const petTutorId = petCriadoLocal.cliente_id || petCriadoLocal.tutor_id || tutorId;
+    if (String(petTutorId) !== String(tutorId)) return listaPetsOriginal;
+
+    const jaExiste = listaPetsOriginal.some(
+      (pet) => String(pet.id) === String(petCriadoLocal.id),
+    );
+    if (jaExiste) return listaPetsOriginal;
+
+    return [petCriadoLocal, ...listaPetsOriginal];
+  }, [listaPetsOriginal, petCriadoLocal, tutorId]);
 
   const petSelecionado = useMemo(
     () => listaPets.find((pet) => String(pet.id) === String(petId)) || null,
@@ -74,6 +105,21 @@ export default function PetSelector({
   function handleSelectPet(pet) {
     onSelectPet?.(pet);
     setExpandedValue(false);
+  }
+
+  function handleNovoPetClick() {
+    if (typeof onNovoPetClick === "function") {
+      onNovoPetClick();
+      return;
+    }
+    setModalNovoPetAberto(true);
+  }
+
+  function handlePetCreated(pet) {
+    setPetCriadoLocal(pet);
+    onPetCreated?.(pet);
+    handleSelectPet(pet);
+    setModalNovoPetAberto(false);
   }
 
   function resolvePetLabel() {
@@ -114,7 +160,7 @@ export default function PetSelector({
               tutorNome={tutorNome || tutorSelecionado?.nome}
               returnTo={returnTo}
               onBeforeNavigate={onBeforeNovoPet}
-              onClick={onNovoPetClick}
+              onClick={handleNovoPetClick}
             />
           ) : null}
 
@@ -170,6 +216,14 @@ export default function PetSelector({
           </div>
         ) : null}
       </div>
+
+      <NovoPetModal
+        isOpen={modalNovoPetAberto}
+        tutor={tutorParaModal}
+        sugestoesEspecies={sugestoesEspecies}
+        onClose={() => setModalNovoPetAberto(false)}
+        onCreated={handlePetCreated}
+      />
     </div>
   );
 }
@@ -194,8 +248,10 @@ PetSelector.propTypes = {
   emptyOptionLabel: PropTypes.string,
   emptyStateLabel: PropTypes.string,
   returnTo: PropTypes.string,
+  sugestoesEspecies: PropTypes.arrayOf(PropTypes.string),
   className: PropTypes.string,
   onSelectPet: PropTypes.func,
+  onPetCreated: PropTypes.func,
   onExpandedChange: PropTypes.func,
   onBeforeNovoPet: PropTypes.func,
   onNovoPetClick: PropTypes.func,
