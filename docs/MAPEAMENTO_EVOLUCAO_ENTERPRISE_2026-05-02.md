@@ -62,6 +62,7 @@ Tela piloto:
 - PDV: resumo de cliente selecionado passou a usar `EntityCard` em modo compacto, mantendo o alinhamento de CPF, codigo, telefone, fidelidade, cupons e credito.
 - Financeiro/Vendas: a tabela principal da lista de vendas foi extraida para `VendasFinanceiroListaTable` e passou a consumir `DataTable`, `MoneyCell`, `NumberCell` e `StatusBadge`.
 - Financeiro/Vendas: a tabela "Vendas por data" do resumo foi extraida para `VendasPorDataTable`, mantendo badges de dia, valores zerados como traco e totalizacao no componente.
+- Financeiro/Vendas: as tabelas "Formas de recebimento" e "Funcionario" foram extraidas para componentes dedicados com `DataTable`, mantendo totalizacao local e celulas monetarias padronizadas.
 
 Proxima varredura recomendada:
 

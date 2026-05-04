@@ -28,8 +28,10 @@ import writeExcelFile from "write-excel-file/browser";
 import api from "../api";
 import { useAuth } from "../contexts/AuthContext";
 import HistoricoVendasClienteTab from "../pages/Financeiro/HistoricoVendasClienteTab";
+import FormasRecebimentoTable from "./financeiro/FormasRecebimentoTable";
 import VendasFinanceiroListaTable from "./financeiro/VendasFinanceiroListaTable";
 import VendasPorDataTable from "./financeiro/VendasPorDataTable";
+import VendasPorFuncionarioTable from "./financeiro/VendasPorFuncionarioTable";
 import ActionButton from "./ui/ActionButton";
 import { actionButtonClasses } from "./ui/actionStyles";
 import FilterBar, { FilterRow } from "./ui/FilterBar";
@@ -2665,43 +2667,7 @@ export default function VendasFinanceiro() {
               <div className="bg-gray-600 text-white px-4 py-2 rounded-t-lg font-semibold">
                 Formas de recebimento
               </div>
-              <table className="w-full">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="px-4 py-2 text-left">Forma</th>
-                    <th className="px-4 py-2 text-right">Valor pago</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {formasRecebimentoConsolidadas.map((item, idx) => (
-                    <tr key={`forma-row-${item.forma_pagamento || idx}`} className="border-b">
-                      <td className="px-4 py-2">{item.forma_pagamento}</td>
-                      <td className="px-4 py-2 text-right">
-                        {formatarMoeda(item.valor_total)}
-                      </td>
-                    </tr>
-                  ))}
-                  {formasRecebimentoConsolidadas.length > 0 && (
-                    <tr
-                      style={{
-                        backgroundColor: "#E5E7EB",
-                        color: "#1F2937",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      <td className="px-4 py-3">TOTAL</td>
-                      <td className="px-4 py-3 text-right">
-                        {formatarMoeda(
-                          formasRecebimentoConsolidadas.reduce(
-                            (sum, item) => sum + item.valor_total,
-                            0,
-                          ),
-                        )}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+              <FormasRecebimentoTable linhas={formasRecebimentoConsolidadas} />
             </div>
 
             {/* Funcionário */}
@@ -2709,77 +2675,7 @@ export default function VendasFinanceiro() {
               <div className="bg-gray-600 text-white px-4 py-2 rounded-t-lg font-semibold">
                 Funcionário
               </div>
-              <table className="w-full">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="px-4 py-2 text-left">Nome</th>
-                    <th className="px-4 py-2 text-right">Qtd</th>
-                    <th className="px-4 py-2 text-right">Vl. bruto</th>
-                    <th className="px-4 py-2 text-right">Desconto</th>
-                    <th className="px-4 py-2 text-right">Vl. líquido</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {vendasPorFuncionarioFiltradas.map((item, idx) => (
-                    <tr key={`func-row-${item.funcionario || idx}`} className="border-b">
-                      <td className="px-4 py-2">{item.funcionario}</td>
-                      <td className="px-4 py-2 text-right">
-                        {item.quantidade}
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        {formatarMoeda(item.valor_bruto)}
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        {formatarMoeda(item.desconto)}
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        {formatarMoeda(item.valor_liquido)}
-                      </td>
-                    </tr>
-                  ))}
-                  {vendasPorFuncionarioFiltradas.length > 0 && (
-                    <tr
-                      style={{
-                        backgroundColor: "#E5E7EB",
-                        color: "#1F2937",
-                        fontWeight: "bold",
-                      }}
-                    >
-                      <td className="px-4 py-3">TOTAL</td>
-                      <td className="px-4 py-3 text-right">
-                        {vendasPorFuncionarioFiltradas.reduce(
-                          (sum, item) => sum + item.quantidade,
-                          0,
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {formatarMoeda(
-                          vendasPorFuncionarioFiltradas.reduce(
-                            (sum, item) => sum + item.valor_bruto,
-                            0,
-                          ),
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {formatarMoeda(
-                          vendasPorFuncionarioFiltradas.reduce(
-                            (sum, item) => sum + item.desconto,
-                            0,
-                          ),
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        {formatarMoeda(
-                          vendasPorFuncionarioFiltradas.reduce(
-                            (sum, item) => sum + item.valor_liquido,
-                            0,
-                          ),
-                        )}
-                      </td>
-                    </tr>
-                  )}
-                </tbody>
-              </table>
+              <VendasPorFuncionarioTable linhas={vendasPorFuncionarioFiltradas} />
             </div>
 
             {/* Tipo */}
