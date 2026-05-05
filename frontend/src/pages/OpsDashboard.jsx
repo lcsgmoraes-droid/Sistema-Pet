@@ -309,6 +309,8 @@ export default function OpsDashboard() {
   const watchdogEvents = dashboard?.watchdog_events;
   const selfHealing = dashboard?.self_healing;
   const lastDeploy = deploys?.latest?.[0];
+  const currentStatus = dashboard?.current_status;
+  const periodStatus = dashboard?.period_status || dashboard?.status;
 
   return (
     <div className="p-6">
@@ -321,7 +323,7 @@ export default function OpsDashboard() {
             </div>
             <h1 className="mt-1 text-2xl font-bold text-slate-950">Saude da plataforma</h1>
             <p className="mt-1 text-sm text-slate-500">
-              Ultimas 24h de erros, lentidao, watchdog, deploys e resposta automatica.
+              Estado atual do servidor separado do historico das ultimas 24h.
             </p>
           </div>
           <div className="flex gap-2">
@@ -355,13 +357,20 @@ export default function OpsDashboard() {
           </div>
         ) : null}
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
           <MetricCard
             icon={FiCheckCircle}
-            label="Estado geral"
-            value={statusLabel(dashboard?.status)}
-            detail={dashboard?.generated_at ? `Gerado em ${formatDate(dashboard.generated_at)}` : "Cockpit operacional"}
-            tone={statusTone(dashboard?.status)}
+            label="Estado atual"
+            value={statusLabel(currentStatus?.status || watchdog?.status)}
+            detail={currentStatus?.detail || "Health em tempo real"}
+            tone={statusTone(currentStatus?.status || watchdog?.status)}
+          />
+          <MetricCard
+            icon={FiActivity}
+            label="Historico 24h"
+            value={statusLabel(periodStatus)}
+            detail="Erros, lentidao e recuperacoes do periodo"
+            tone={statusTone(periodStatus)}
           />
           <MetricCard
             icon={FiDatabase}

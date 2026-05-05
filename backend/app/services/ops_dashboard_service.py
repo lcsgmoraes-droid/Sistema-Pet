@@ -503,19 +503,83 @@ def _overall_status(alerts: list[dict[str, Any]]) -> str:
     return "healthy"
 
 
+def _current_health_status(
+    *,
+    watchdog: dict[str, Any],
+    error_summary: dict[str, Any],
+    since: datetime,
+    until: datetime,
+) -> dict[str, Any]:
+    watchdog_status = str(watchdog.get("status") or "unknown")
+    errors_5xx = int(error_summary.get("errors_5xx") or 0)
+    slow_requests = int(error_summary.get("slow_requests") or 0)
+    window_minutes = max(1, round((until - since).total_seconds() / 60))
+    latency_ms = watchdog.get("latency_ms")
+
+    status = "healthy"
+    title = "Servidor saudavel agora"
+    detail = f"Sem 5xx ou lentidao nos ultimos {window_minutes} min."
+    action = "Manter monitoramento."
+
+    if watchdog_status == "unhealthy":
+        status = "critical"
+        title = "Servidor indisponivel agora"
+        detail = "O watchdog nao conseguiu consultar o banco neste momento."
+        action = "Verificar container, conexao com banco e pool imediatamente."
+    elif watchdog_status == "degraded":
+        status = "degraded"
+        title = "Servidor degradado agora"
+        detail = f"O banco respondeu acima do limite ({latency_ms or '-'} ms)."
+        action = "Acompanhar pool, banco e rotas lentas antes de novo deploy."
+    elif errors_5xx:
+        status = "degraded"
+        title = "Instabilidade recente"
+        detail = f"{errors_5xx} erro(s) 5xx nos ultimos {window_minutes} min."
+        action = "Abrir incidentes recentes e corrigir a rota com falha."
+    elif slow_requests:
+        status = "degraded"
+        title = "Lentidao recente"
+        detail = f"{slow_requests} requisicao(oes) lenta(s) nos ultimos {window_minutes} min."
+        action = "Verificar rotas lentas e tenants afetados agora."
+
+    return {
+        "status": status,
+        "title": title,
+        "detail": detail,
+        "action": action,
+        "since": _iso(since),
+        "until": _iso(until),
+        "window_minutes": window_minutes,
+        "errors_5xx": errors_5xx,
+        "slow_requests": slow_requests,
+        "watchdog_status": watchdog_status,
+        "database": watchdog.get("database"),
+        "latency_ms": latency_ms,
+    }
+
+
 def build_ops_dashboard(db: Session, *, since: datetime | None = None, until: datetime | None = None) -> dict[str, Any]:
     now = _utcnow()
     period_since = since or (now - timedelta(hours=24))
     period_until = until
+    current_window_minutes = max(1, _env_int("OPS_CURRENT_WINDOW_MINUTES", 5))
+    current_since = now - timedelta(minutes=current_window_minutes)
 
     error_events = get_error_events(since=period_since, until=period_until, db=db)
     deploy_events = get_deploy_events(since=period_since, until=period_until)
     watchdog_events = get_watchdog_events(since=period_since, until=period_until, db=db)
 
     error_summary = summarize_error_events(since=period_since, until=period_until, db=db)
+    current_error_summary = summarize_error_events(since=current_since, until=now, db=db)
     deploy_summary = summarize_deploy_events(since=period_since, until=period_until)
     watchdog_summary = summarize_watchdog_events(since=period_since, until=period_until, db=db)
     watchdog = _watchdog_now(db)
+    current_status = _current_health_status(
+        watchdog=watchdog,
+        error_summary=current_error_summary,
+        since=current_since,
+        until=now,
+    )
     tenant_incidents = _build_tenant_incidents(db, error_events)
     route_incidents = _build_route_incidents(error_events)
     actionable_alerts = _build_actionable_alerts(
@@ -537,6 +601,7 @@ def build_ops_dashboard(db: Session, *, since: datetime | None = None, until: da
         tenant_incidents=tenant_incidents,
         route_incidents=route_incidents,
     )
+    period_status = _overall_status(alerts)
 
     return {
         "generated_at": _iso(now),
@@ -544,7 +609,9 @@ def build_ops_dashboard(db: Session, *, since: datetime | None = None, until: da
             "since": _iso(period_since),
             "until": _iso(period_until) if period_until else None,
         },
-        "status": _overall_status(alerts),
+        "status": period_status,
+        "period_status": period_status,
+        "current_status": current_status,
         "alerts": alerts,
         "watchdog": watchdog,
         "self_healing": _self_healing_status(),
