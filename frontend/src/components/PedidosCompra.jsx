@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import api from '../api';
 import { toast } from 'react-hot-toast';
 import ModalConfronto from './compras/ModalConfronto';
+import ExportActionButton from './ui/ExportActionButton';
 
 const FORM_DATA_INICIAL = {
   fornecedor_id: '',
@@ -2091,20 +2092,20 @@ const PedidosCompra = () => {
                     </button>
 
                     {/* Botões de exportação - sempre disponíveis */}
-                    <button
+                    <ExportActionButton
+                      type="pdf"
                       onClick={() => exportarPDF(pedido.id)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 border border-red-200 bg-white text-red-700 rounded-md hover:bg-red-50 text-xs font-semibold"
                       title="Exportar PDF"
                     >
-                      📄 PDF
-                    </button>
-                    <button
+                      PDF
+                    </ExportActionButton>
+                    <ExportActionButton
+                      type="excel"
                       onClick={() => exportarExcel(pedido.id)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 border border-emerald-200 bg-white text-emerald-700 rounded-md hover:bg-emerald-50 text-xs font-semibold"
                       title="Exportar Excel"
                     >
-                      📊 Excel
-                    </button>
+                      Excel
+                    </ExportActionButton>
                     
                     {/* Ações por status */}
                     {pedido.status === 'rascunho' && (

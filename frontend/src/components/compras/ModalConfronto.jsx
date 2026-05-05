@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import api from '../../api';
 import { toast } from 'react-hot-toast';
+import ExportActionButton from '../ui/ExportActionButton';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -286,7 +287,7 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
               {!confrontoFinalizado && (
                 <button
                   onClick={() => setEtapa('selecionar')}
-                  className="ml-2 text-blue-600 hover:underline text-xs"
+                  className="ml-2 inline-flex items-center rounded-full border border-blue-200 bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700 transition-colors hover:bg-blue-100"
                 >adicionar/remover NFs</button>
               )}
             </p>
@@ -309,18 +310,20 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
                 🔒 Finalizar Conferência
               </button>
             )}
-            <button
+            <ExportActionButton
+              type="csv"
               onClick={baixarCSV}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-green-600 text-white text-sm rounded-lg hover:bg-green-700"
+              title="Exportar confronto em CSV"
             >
-              📊 CSV
-            </button>
-            <button
+              CSV
+            </ExportActionButton>
+            <ExportActionButton
+              type="pdf"
               onClick={baixarPDF}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700"
+              title="Exportar confronto em PDF"
             >
-              📄 PDF
-            </button>
+              PDF
+            </ExportActionButton>
             {temDivergencia && (
               <button
                 onClick={gerarEmail}

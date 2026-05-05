@@ -3,8 +3,6 @@ import {
   ArrowUp,
   BarChart3,
   Calendar,
-  Download,
-  FileText,
   Filter,
 } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
@@ -38,6 +36,7 @@ import VendasPorDataTable from "./financeiro/VendasPorDataTable";
 import VendasPorFuncionarioTable from "./financeiro/VendasPorFuncionarioTable";
 import VendasResumoAgregadoTable from "./financeiro/VendasResumoAgregadoTable";
 import ActionButton from "./ui/ActionButton";
+import ExportActionButton from "./ui/ExportActionButton";
 import { actionButtonClasses } from "./ui/actionStyles";
 import FilterBar, { FilterRow } from "./ui/FilterBar";
 import MetricCard from "./ui/MetricCard";
@@ -1950,16 +1949,13 @@ export default function VendasFinanceiro() {
           {podeVerFinanceiroCompleto ? (
             <div className="flex flex-wrap items-center gap-3 xl:justify-end">
               <div className="relative" ref={menuRelatoriosRef}>
-                <ActionButton
+                <ExportActionButton
+                  type="report"
                   onClick={() => setMenuRelatoriosAberto((prev) => !prev)}
-                  intent="edit"
-                  tone="solid"
-                  size="xs"
-                  icon={FileText}
-                  className="min-w-[92px]"
+                  title="Abrir relatorios do periodo"
                 >
                   Relatorios
-                </ActionButton>
+                </ExportActionButton>
 
               {menuRelatoriosAberto && (
                 <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 z-40">
@@ -1994,7 +1990,8 @@ export default function VendasFinanceiro() {
               )}
             </div>
             {/* Botão Exportar PDF */}
-            <ActionButton
+            <ExportActionButton
+              type="pdf"
               onClick={exportarParaPDF}
               disabled={!dataInicio || !dataFim}
               title={
@@ -2002,17 +1999,13 @@ export default function VendasFinanceiro() {
                   ? `Exportar PDF de ${formatarData(dataInicio)} até ${formatarData(dataFim)}`
                   : "Selecione um período"
               }
-              intent="delete"
-              tone="solid"
-              size="xs"
-              icon={FileText}
-              className="min-w-[92px]"
             >
               PDF
-            </ActionButton>
+            </ExportActionButton>
 
             {/* Botão Exportar Excel */}
-            <ActionButton
+            <ExportActionButton
+              type="excel"
               onClick={exportarParaExcel}
               disabled={!dataInicio || !dataFim}
               title={
@@ -2020,14 +2013,9 @@ export default function VendasFinanceiro() {
                   ? `Exportar dados de ${formatarData(dataInicio)} até ${formatarData(dataFim)}`
                   : "Selecione um período"
               }
-              intent="create"
-              tone="solid"
-              size="xs"
-              icon={Download}
-              className="min-w-[92px]"
             >
               Excel
-            </ActionButton>
+            </ExportActionButton>
 
             <label className="flex items-center gap-2 cursor-pointer">
               <input

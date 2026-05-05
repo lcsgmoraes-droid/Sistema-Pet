@@ -5,6 +5,7 @@ import api from '../api';
 import { toast } from 'react-hot-toast';
 import { formatBRL, formatMoneyBRL, formatPercent } from '../utils/formatters';
 import CardFiscal from './CardFiscal';
+import ExportActionButton from './ui/ExportActionButton';
 import TooltipComposicao from './TooltipComposicao';
 
 function formatarChaveAcesso(valor) {
@@ -597,8 +598,10 @@ const EntradaXML = () => {
   const gerarRascunhoDevolucao = async () => {
     if (!notaSelecionada) return;
 
-    const conferenciaSalva = await salvarConferenciaAtual({ silencioso: true });
-    if (!conferenciaSalva) return;
+    if (notaSelecionada.status === 'pendente') {
+      const conferenciaSalva = await salvarConferenciaAtual({ silencioso: true });
+      if (!conferenciaSalva) return;
+    }
 
     setGerandoRascunhoDevolucao(true);
     try {
@@ -2736,6 +2739,14 @@ const EntradaXML = () => {
                 return notas.map((nota) => {
                   const conferenciaMeta = CONFERENCIA_STATUS_META[nota.conferencia_status || 'nao_iniciada'];
                   const exibirBotaoConferir = nota.status === 'pendente' && (nota.conferencia_status || 'nao_iniciada') === 'nao_iniciada';
+                  const divergenciasCount = Number(nota.divergencias_count || 0);
+                  const podeAbrirDivergencia = divergenciasCount > 0 || nota.conferencia_status === 'com_divergencia';
+                  const conferenciaLabel = (
+                    <>
+                      {conferenciaMeta?.label || 'Nao conferida'}
+                      {divergenciasCount > 0 ? ` • ${divergenciasCount} divergencia(s)` : ''}
+                    </>
+                  );
                   return (
                     <tr
                       key={nota.id}
@@ -2760,10 +2771,23 @@ const EntradaXML = () => {
                       <td className="px-4 py-3 text-center">
                         <div className="space-y-2">
                           <div>{getStatusBadge(nota.status)}</div>
-                          <div className={`inline-flex items-center rounded-full border px-2 py-1 text-[11px] font-semibold ${conferenciaMeta?.cls || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
-                            {conferenciaMeta?.label || 'Nao conferida'}
-                            {nota.divergencias_count > 0 ? ` • ${nota.divergencias_count} divergencia(s)` : ''}
-                          </div>
+                          {podeAbrirDivergencia ? (
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                abrirDetalhes(nota.id, { abrirConferencia: true });
+                              }}
+                              className={`inline-flex items-center rounded-full border px-2 py-1 text-[11px] font-semibold transition-colors hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-orange-300 ${conferenciaMeta?.cls || 'bg-gray-100 text-gray-700 border-gray-200'}`}
+                              title="Abrir conferencia e tratar divergencias"
+                            >
+                              {conferenciaLabel}
+                            </button>
+                          ) : (
+                            <div className={`inline-flex items-center rounded-full border px-2 py-1 text-[11px] font-semibold ${conferenciaMeta?.cls || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
+                              {conferenciaLabel}
+                            </div>
+                          )}
                         </div>
                       </td>
                       <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
@@ -2874,7 +2898,7 @@ const EntradaXML = () => {
               </div>
             )}
 
-            {notaSelecionada.status === 'pendente' && resumoConferenciaAtual && (
+            {resumoConferenciaAtual && (
               <div className="px-6 py-4 border-b bg-emerald-50/40">
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div className="space-y-3">
@@ -2903,27 +2927,37 @@ const EntradaXML = () => {
                       </div>
                     </div>
                     <p className="text-sm text-gray-700 max-w-3xl">
-                      A conferência nasce assumindo tudo certo. Se a carga estiver perfeita, basta clicar em <strong>Conferido</strong>. Só mexa nos itens com falta ou avaria.
+                      {notaSelecionada.status === 'pendente'
+                        ? (
+                          <>
+                            A conferência nasce assumindo tudo certo. Se a carga estiver perfeita, basta clicar em <strong>Conferido</strong>. Só mexa nos itens com falta ou avaria.
+                          </>
+                        )
+                        : 'Conferencia ja salva. Use as acoes de divergencia para gerar a tratativa sem precisar reverter a entrada.'}
                     </p>
                   </div>
 
                   <div className="flex flex-wrap gap-2">
-                    <button
-                      onClick={() => setMostrarCamposConferencia((prev) => !prev)}
-                      className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg font-semibold hover:bg-slate-100"
-                    >
-                      {mostrarCamposConferencia ? 'Ocultar ajuste manual' : 'Editar quantidades e avarias'}
-                    </button>
-                    <button
-                      onClick={() => salvarConferenciaAtual()}
-                      disabled={salvandoConferencia || desfazendoConferencia}
-                      className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 disabled:opacity-60"
-                    >
-                      {salvandoConferencia
-                        ? 'Salvando...'
-                        : (resumoConferenciaAtual.status === 'nao_iniciada' ? 'Conferido' : 'Atualizar conferencia')}
-                    </button>
-                    {resumoConferenciaAtual.status !== 'nao_iniciada' && (
+                    {notaSelecionada.status === 'pendente' && (
+                      <>
+                        <button
+                          onClick={() => setMostrarCamposConferencia((prev) => !prev)}
+                          className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg font-semibold hover:bg-slate-100"
+                        >
+                          {mostrarCamposConferencia ? 'Ocultar ajuste manual' : 'Editar quantidades e avarias'}
+                        </button>
+                        <button
+                          onClick={() => salvarConferenciaAtual()}
+                          disabled={salvandoConferencia || desfazendoConferencia}
+                          className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 disabled:opacity-60"
+                        >
+                          {salvandoConferencia
+                            ? 'Salvando...'
+                            : (resumoConferenciaAtual.status === 'nao_iniciada' ? 'Conferido' : 'Atualizar conferencia')}
+                        </button>
+                      </>
+                    )}
+                    {notaSelecionada.status === 'pendente' && resumoConferenciaAtual.status !== 'nao_iniciada' && (
                       <button
                         onClick={desfazerConferenciaAtual}
                         disabled={desfazendoConferencia || salvandoConferencia || Boolean(notaSelecionada?.entrada_estoque_realizada)}
@@ -2932,13 +2966,15 @@ const EntradaXML = () => {
                         {desfazendoConferencia ? 'Desfazendo...' : 'Desfazer conferencia'}
                       </button>
                     )}
-                    <button
-                      onClick={gerarRascunhoDevolucao}
-                      disabled={gerandoRascunhoDevolucao || salvandoConferencia || desfazendoConferencia}
-                      className="px-4 py-2 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 disabled:opacity-60"
-                    >
-                      {gerandoRascunhoDevolucao ? 'Gerando...' : 'NF Devolucao das Divergencias'}
-                    </button>
+                    {resumoConferenciaAtual.itens_com_divergencia > 0 && (
+                      <button
+                        onClick={gerarRascunhoDevolucao}
+                        disabled={gerandoRascunhoDevolucao || salvandoConferencia || desfazendoConferencia}
+                        className="px-4 py-2 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 disabled:opacity-60"
+                      >
+                        {gerandoRascunhoDevolucao ? 'Gerando...' : 'NF Devolucao das Divergencias'}
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -4389,20 +4425,22 @@ const EntradaXML = () => {
                       )}
 
                       <div className="ml-auto flex items-center gap-2">
-                        <button
+                        <ExportActionButton
+                          type="csv"
                           onClick={exportarRelatorioCustosMaioresCSV}
                           disabled={gerandoRelatorioCustos || aumentos === 0}
-                          className="px-3 py-1 rounded text-sm font-semibold bg-slate-700 text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Exportar CSV dos custos maiores"
                         >
                           {gerandoRelatorioCustos ? 'Gerando...' : 'Exportar CSV custos maiores'}
-                        </button>
-                        <button
+                        </ExportActionButton>
+                        <ExportActionButton
+                          type="pdf"
                           onClick={exportarRelatorioCustosMaioresPDF}
                           disabled={gerandoRelatorioCustos || aumentos === 0}
-                          className="px-3 py-1 rounded text-sm font-semibold bg-slate-700 text-white hover:bg-slate-800 disabled:opacity-50 disabled:cursor-not-allowed"
+                          title="Exportar PDF dos custos maiores"
                         >
                           {gerandoRelatorioCustos ? 'Gerando...' : 'Exportar PDF custos maiores'}
-                        </button>
+                        </ExportActionButton>
                       </div>
                     </>
                   );

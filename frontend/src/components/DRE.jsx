@@ -2,7 +2,6 @@
   Brain,
   CheckCircle,
   DollarSign,
-  Download,
   FileText,
   Info,
   MessageCircle,
@@ -23,6 +22,7 @@ import ClassificarLancamentosModal from "./ClassificarLancamentosModal";
 import ExtratoBancario from "./ExtratoBancario";
 import ActionButton from "./ui/ActionButton";
 import DataTable from "./ui/DataTable";
+import ExportActionButton from "./ui/ExportActionButton";
 import LoadingState from "./ui/LoadingState";
 import MetricCard from "./ui/MetricCard";
 import MetricGrid from "./ui/MetricGrid";
@@ -421,28 +421,20 @@ const DRE = () => {
             <span className="font-medium">Chat IA</span>
             <Sparkles size={16} className="animate-pulse" />
           </ActionButton>
-          <ActionButton
+          <ExportActionButton
+            type="pdf"
             onClick={exportarPDF}
-            intent="delete"
-            tone="soft"
-            size="xs"
-            icon={FileText}
             title="Exportar para PDF"
-            className="min-w-[76px]"
           >
             PDF
-          </ActionButton>
-          <ActionButton
+          </ExportActionButton>
+          <ExportActionButton
+            type="excel"
             onClick={exportarExcel}
-            intent="create"
-            tone="soft"
-            size="xs"
-            icon={Download}
             title="Exportar para Excel"
-            className="min-w-[76px]"
           >
             Excel
-          </ActionButton>
+          </ExportActionButton>
         </div>
       </div>
 
