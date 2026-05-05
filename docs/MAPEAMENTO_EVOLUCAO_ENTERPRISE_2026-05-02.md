@@ -446,7 +446,7 @@ Padronizar:
 | PDV | `PessoaSelector`, `ProdutoSelector`, `PetSelector`, `ActionButton`, `MetricGrid`, `Drawer`, `StatusBadge` |
 | Campanhas | `PessoaSelector`, `DataTable`, `MetricGrid`, `StatusBadge`, `Statement/Extrato` |
 | E-commerce/App | `SafeMarkdown`, `ChannelBadges`, `ProdutoSelector`, `StatusBadge` |
-| Compras/NF Entrada | `FornecedorSelector`, `ProdutoSelector`, `DataTable`, `UploadArea`, `ConfirmDialog` |
+| Compras/NF Entrada | `FornecedorSelector`, `ProdutoSelector`, `DataTable`, `UploadArea`, `ConfirmDialog`, `PendenciaFornecedorPanel`, `ExportActionButton` |
 | NF Saida | `DataTable`, `StatusBadge`, `ActionButton`, `FilterBar` |
 | Financeiro | `DateRangeFilter`, `MetricGrid`, `MoneyCell`, `DataTable`, `PaymentStatusBadge` |
 | Comissoes | `FuncionarioSelector`, `MoneyCell`, `StatusBadge`, `DataTable`, `Statement/Extrato` |
@@ -480,6 +480,24 @@ Primeiros usos:
 - Mensagens de campanhas.
 - Central de ajuda.
 - Observacoes padronizadas quando fizer sentido.
+
+## Pendencias rastreaveis
+
+### Compras e NF de entrada
+
+Quando a conferencia de uma NF identifica falta, avaria ou divergencia que depende do fornecedor, o sistema deve transformar isso em uma pendencia operacional rastreavel.
+
+Padrao esperado:
+
+- origem vinculada a NF de entrada, pedido de compra e fornecedor;
+- itens divergentes congelados no momento da criacao da pendencia;
+- PDF informativo com resumo, itens, quantidades e valores estimados;
+- mensagem sugerida para fornecedor, editavel antes do envio;
+- registro de envio ou envio automatico com anexo quando SMTP estiver configurado;
+- historico com data, usuario, observacao, mudanca de status e resolucao;
+- tela propria em Compras > Pendencias para acompanhar prazo, retorno e fechamento.
+
+Esse mesmo modelo pode ser reaproveitado depois para outras pendencias operacionais: estoque, entrega, comissao, financeiro e integracoes.
 
 ## Regras de negocio centrais auditaveis
 

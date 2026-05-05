@@ -53,6 +53,7 @@ import app.opportunity_events_models
 import app.dre_plano_contas_models
 import app.banho_tosa_models
 import app.ops_models
+import app.compras_pendencias_models
 
 # Stone (pagamentos)
 import app.stone_models

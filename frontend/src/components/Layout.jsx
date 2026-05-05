@@ -646,6 +646,11 @@ const Layout = () => {
           label: "Central NF-e Entradas",
           permission: "compras.entrada_xml",
         },
+        {
+          path: "/compras/pendencias",
+          label: "Pendencias",
+          permission: "compras.gerenciar",
+        },
       ],
     },
     {

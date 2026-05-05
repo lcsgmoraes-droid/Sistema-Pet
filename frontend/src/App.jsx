@@ -87,6 +87,7 @@ const PedidosBling = lazy(() => import("./pages/PedidosBling"));
 const BlingFlowMonitor = lazy(() => import("./pages/BlingFlowMonitor"));
 const PedidosCompra = lazy(() => import("./components/PedidosCompra"));
 const EntradaXML = lazy(() => import("./components/EntradaXML"));
+const ComprasPendencias = lazy(() => import("./components/ComprasPendencias"));
 
 // Componentes Financeiros
 const preloadDashboardFinanceiro = () => import("./pages/DashboardFinanceiro");
@@ -565,6 +566,14 @@ function App() {
                     element={
                       <ProtectedRoute permission="compras.gerenciar">
                         <EntradaXML />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="compras/pendencias"
+                    element={
+                      <ProtectedRoute permission="compras.gerenciar">
+                        <ComprasPendencias />
                       </ProtectedRoute>
                     }
                   />

@@ -382,6 +382,7 @@ const EntradaXML = () => {
   const [salvandoConferencia, setSalvandoConferencia] = useState(false);
   const [desfazendoConferencia, setDesfazendoConferencia] = useState(false);
   const [gerandoRascunhoDevolucao, setGerandoRascunhoDevolucao] = useState(false);
+  const [criandoPendenciaFornecedor, setCriandoPendenciaFornecedor] = useState(false);
   const [rascunhoDevolucao, setRascunhoDevolucao] = useState(null);
   const [mostrarRascunhoDevolucao, setMostrarRascunhoDevolucao] = useState(false);
   
@@ -619,6 +620,39 @@ const EntradaXML = () => {
       toast.error(error.response?.data?.detail || 'Erro ao gerar rascunho da NF de devolucao');
     } finally {
       setGerandoRascunhoDevolucao(false);
+    }
+  };
+
+  const gerarPendenciaFornecedor = async () => {
+    if (!notaSelecionada) return;
+
+    if ((resumoConferenciaAtual?.itens_com_divergencia || 0) <= 0) {
+      toast.error('Nao ha divergencias para acompanhar com o fornecedor');
+      return;
+    }
+
+    if (notaSelecionada.status === 'pendente') {
+      const conferenciaSalva = await salvarConferenciaAtual({ silencioso: true });
+      if (!conferenciaSalva) return;
+    }
+
+    setCriandoPendenciaFornecedor(true);
+    try {
+      const { data } = await api.post(`/compras-pendencias/notas/${notaSelecionada.id}`, {});
+      toast.success(`Pendencia ${data?.codigo || ''} criada para acompanhamento`);
+
+      const abrirPendencias = window.confirm(
+        'Pendencia criada com relatorio e texto de e-mail sugerido. Deseja abrir a tela de pendencias agora?'
+      );
+
+      if (abrirPendencias) {
+        setMostrarDetalhes(false);
+        navigate('/compras/pendencias');
+      }
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao criar pendencia do fornecedor');
+    } finally {
+      setCriandoPendenciaFornecedor(false);
     }
   };
 
@@ -2997,13 +3031,22 @@ const EntradaXML = () => {
                       </>
                     )}
                     {resumoConferenciaAtual.itens_com_divergencia > 0 && (
-                      <button
-                        onClick={gerarRascunhoDevolucao}
-                        disabled={gerandoRascunhoDevolucao || salvandoConferencia || desfazendoConferencia}
-                        className="px-4 py-2 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 disabled:opacity-60"
-                      >
-                        {gerandoRascunhoDevolucao ? 'Gerando...' : 'NF Devolucao das Divergencias'}
-                      </button>
+                      <>
+                        <button
+                          onClick={gerarPendenciaFornecedor}
+                          disabled={criandoPendenciaFornecedor || salvandoConferencia || desfazendoConferencia}
+                          className="px-4 py-2 border border-blue-200 bg-blue-50 text-blue-700 rounded-lg font-semibold hover:bg-blue-100 disabled:opacity-60"
+                        >
+                          {criandoPendenciaFornecedor ? 'Gerando...' : 'Gerar pendencia fornecedor'}
+                        </button>
+                        <button
+                          onClick={gerarRascunhoDevolucao}
+                          disabled={gerandoRascunhoDevolucao || salvandoConferencia || desfazendoConferencia}
+                          className="px-4 py-2 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 disabled:opacity-60"
+                        >
+                          {gerandoRascunhoDevolucao ? 'Gerando...' : 'NF Devolucao das Divergencias'}
+                        </button>
+                      </>
                     )}
                   </div>
                 </div>
