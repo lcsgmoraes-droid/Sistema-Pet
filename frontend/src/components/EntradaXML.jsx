@@ -376,6 +376,7 @@ const EntradaXML = () => {
   const [mostrarDetalhes, setMostrarDetalhes] = useState(false);
   const [mostrarVisualizacao, setMostrarVisualizacao] = useState(false);
   const [mostrarCamposConferencia, setMostrarCamposConferencia] = useState(false);
+  const [filtroItensNota, setFiltroItensNota] = useState('todos');
   const [conferenciaItens, setConferenciaItens] = useState({});
   const [conferenciaObservacaoGeral, setConferenciaObservacaoGeral] = useState('');
   const [salvandoConferencia, setSalvandoConferencia] = useState(false);
@@ -939,8 +940,10 @@ const EntradaXML = () => {
     try {
       const response = await api.get(`/notas-entrada/${notaId}`);
       const nota = aplicarNotaSelecionada(response.data);
+      const temDivergenciaConferencia = (nota?.conferencia?.itens_com_divergencia || 0) > 0;
       setMostrarDetalhes(true);
-      setMostrarCamposConferencia(abrirConferencia || (nota?.conferencia?.itens_com_divergencia || 0) > 0);
+      setMostrarCamposConferencia(abrirConferencia || temDivergenciaConferencia);
+      setFiltroItensNota((abrirConferencia || temDivergenciaConferencia) ? 'divergencias' : 'todos');
       setMultiplicadoresPack({}); // limpar overrides manuais ao abrir nova nota
     } catch (error) {
       toast.error('Erro ao carregar detalhes da nota');
@@ -952,6 +955,7 @@ const EntradaXML = () => {
       const response = await api.get(`/notas-entrada/${notaId}`);
       aplicarNotaSelecionada(response.data);
       setMostrarCamposConferencia(false);
+      setFiltroItensNota('todos');
       setMostrarVisualizacao(true);
     } catch (error) {
       toast.error('Erro ao carregar nota');
@@ -2480,6 +2484,15 @@ const EntradaXML = () => {
     ? calcularResumoConferencia(notaSelecionada, conferenciaItens)
     : null;
   const metaConferenciaAtual = CONFERENCIA_STATUS_META[resumoConferenciaAtual?.status || 'nao_iniciada'];
+  const itensNotaDetalhe = notaSelecionada?.itens || [];
+  const itensComDivergenciaDetalhe = itensNotaDetalhe.filter((item) => {
+    const conferenciaItem = calcularConferenciaItem(item, conferenciaItens[item.id]);
+    const divergenciasCadastro = detectarDivergencias(item);
+    return Boolean(item.tem_divergencia) || conferenciaItem.temDivergencia || divergenciasCadastro.length > 0;
+  });
+  const itensExibidosNota = filtroItensNota === 'divergencias'
+    ? itensComDivergenciaDetalhe
+    : itensNotaDetalhe;
 
   return (
     <div className="p-6">
@@ -2966,6 +2979,23 @@ const EntradaXML = () => {
                         {desfazendoConferencia ? 'Desfazendo...' : 'Desfazer conferencia'}
                       </button>
                     )}
+                    {notaSelecionada.status !== 'pendente' && resumoConferenciaAtual.itens_com_divergencia > 0 && (
+                      <>
+                        <button
+                          onClick={() => setMostrarCamposConferencia((prev) => !prev)}
+                          className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg font-semibold hover:bg-slate-100"
+                        >
+                          {mostrarCamposConferencia ? 'Ocultar tratativas' : 'Abrir tratativas'}
+                        </button>
+                        <button
+                          onClick={() => salvarConferenciaAtual()}
+                          disabled={salvandoConferencia || desfazendoConferencia}
+                          className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 disabled:opacity-60"
+                        >
+                          {salvandoConferencia ? 'Salvando...' : 'Salvar tratativas'}
+                        </button>
+                      </>
+                    )}
                     {resumoConferenciaAtual.itens_com_divergencia > 0 && (
                       <button
                         onClick={gerarRascunhoDevolucao}
@@ -2995,34 +3025,77 @@ const EntradaXML = () => {
 
             {/* Itens da Nota */}
             <div className="px-6 py-4">
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="font-bold text-xl text-gray-800">
-                  Produtos da Nota ({notaSelecionada.itens.length})
-                </h3>
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="font-bold text-xl text-gray-800">
+                    Produtos da Nota ({itensExibidosNota.length}
+                    {filtroItensNota === 'divergencias' ? ` de ${itensNotaDetalhe.length}` : ''})
+                  </h3>
+                  {itensComDivergenciaDetalhe.length > 0 && (
+                    <p className="mt-1 text-xs text-orange-700">
+                      {itensComDivergenciaDetalhe.length} item(ns) com divergencia ou tratativa pendente.
+                    </p>
+                  )}
+                </div>
                 
-                {notaSelecionada.status === 'pendente' && 
-                 notaSelecionada.itens.some(item => !item.produto_id) && (
-                  <button
-                    onClick={criarTodosProdutosNaoVinculados}
-                    disabled={loading}
-                    className="px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 disabled:bg-gray-400 flex items-center gap-2 text-sm"
-                    title="Cria automaticamente todos os produtos nao vinculados com os padrões: Estoque mín: 10, máx: 100, Margem: 50%"
-                  >
-                    <span>Criar Todos Nao Vinculados</span>
-                    <span className="text-xs bg-purple-800 px-2 py-0.5 rounded">
-                      {notaSelecionada.itens.filter(i => !i.produto_id).length}
-                    </span>
-                  </button>
-                )}
+                <div className="flex flex-wrap items-center gap-2">
+                  {itensComDivergenciaDetalhe.length > 0 && (
+                    <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 text-xs font-semibold">
+                      <button
+                        type="button"
+                        onClick={() => setFiltroItensNota('todos')}
+                        className={`rounded-md px-3 py-1.5 transition-colors ${filtroItensNota === 'todos' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:bg-white/80'}`}
+                      >
+                        Todos
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFiltroItensNota('divergencias');
+                          setMostrarCamposConferencia(true);
+                        }}
+                        className={`rounded-md px-3 py-1.5 transition-colors ${filtroItensNota === 'divergencias' ? 'bg-orange-100 text-orange-800 shadow-sm' : 'text-slate-600 hover:bg-white/80'}`}
+                      >
+                        Com divergencia ({itensComDivergenciaDetalhe.length})
+                      </button>
+                    </div>
+                  )}
+
+                  {notaSelecionada.status === 'pendente' &&
+                   notaSelecionada.itens.some(item => !item.produto_id) && (
+                    <button
+                      onClick={criarTodosProdutosNaoVinculados}
+                      disabled={loading}
+                      className="px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 disabled:bg-gray-400 flex items-center gap-2 text-sm"
+                      title="Cria automaticamente todos os produtos nao vinculados com os padrões: Estoque mín: 10, máx: 100, Margem: 50%"
+                    >
+                      <span>Criar Todos Nao Vinculados</span>
+                      <span className="text-xs bg-purple-800 px-2 py-0.5 rounded">
+                        {notaSelecionada.itens.filter(i => !i.produto_id).length}
+                      </span>
+                    </button>
+                  )}
+                </div>
               </div>
               
               <div className="space-y-3">
-                {notaSelecionada.itens.map(item => {
+                {itensExibidosNota.length === 0 && (
+                  <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
+                    Nenhum produto encontrado para este filtro.
+                  </div>
+                )}
+                {itensExibidosNota.map(item => {
                   const divergencias = detectarDivergencias(item);
                   const temDivergencia = divergencias.length > 0;
                   const itemAjustado = aplicarMultiplicadorPackAoItem(item, multiplicadoresPack);
                   const packConfig = obterConfiguracaoPackItem(item, multiplicadoresPack);
                   const conferenciaItem = calcularConferenciaItem(item, conferenciaItens[item.id]);
+                  const mostrarTratativaItem = mostrarCamposConferencia && (
+                    notaSelecionada.status === 'pendente' ||
+                    conferenciaItem.temDivergencia ||
+                    Boolean(item.tem_divergencia)
+                  );
+                  const podeEditarQuantidadesItem = notaSelecionada.status === 'pendente';
                   
                   return (
                     <div key={item.id} className="border-2 border-gray-400 rounded-lg overflow-hidden bg-white shadow-sm">
@@ -3446,13 +3519,15 @@ const EntradaXML = () => {
                         </div>
                       )}
 
-                      {notaSelecionada.status === 'pendente' && mostrarCamposConferencia && (
+                      {mostrarTratativaItem && (
                         <div className="border-t border-emerald-200 bg-emerald-50/60 p-4">
                           <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
                             <div>
                               <h4 className="font-semibold text-emerald-900">Conferencia fisica</h4>
                               <p className="text-xs text-emerald-800">
-                                Ajuste apenas o que realmente entrou, o que faltou e o que veio avariado.
+                                {podeEditarQuantidadesItem
+                                  ? 'Ajuste apenas o que realmente entrou, o que faltou e o que veio avariado.'
+                                  : 'Quantidade ja lancada no estoque. Ajuste aqui a tratativa e a observacao da divergencia.'}
                               </p>
                             </div>
                             <span className={`inline-flex items-center rounded-full border px-2 py-1 text-xs font-semibold ${
@@ -3481,9 +3556,14 @@ const EntradaXML = () => {
                                 min="0"
                                 max={conferenciaItem.quantidadeNF}
                                 step="0.01"
+                                disabled={!podeEditarQuantidadesItem}
                                 value={conferenciaItens[item.id]?.quantidade_conferida ?? conferenciaItem.quantidadeConferida}
                                 onChange={(e) => atualizarCampoConferenciaItem(item, 'quantidade_conferida', e.target.value)}
-                                className="w-full rounded border border-emerald-300 px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-emerald-500"
+                                className={`w-full rounded border px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-emerald-500 ${
+                                  podeEditarQuantidadesItem
+                                    ? 'border-emerald-300'
+                                    : 'border-gray-300 bg-gray-100 text-gray-600'
+                                }`}
                               />
                               <div className="mt-1 text-[11px] text-emerald-700 font-medium">Entra no estoque</div>
                             </div>
@@ -3494,9 +3574,14 @@ const EntradaXML = () => {
                                 min="0"
                                 max={Math.max(0, conferenciaItem.quantidadeNF - conferenciaItem.quantidadeConferida)}
                                 step="0.01"
+                                disabled={!podeEditarQuantidadesItem}
                                 value={conferenciaItens[item.id]?.quantidade_avariada ?? conferenciaItem.quantidadeAvariada}
                                 onChange={(e) => atualizarCampoConferenciaItem(item, 'quantidade_avariada', e.target.value)}
-                                className="w-full rounded border border-orange-300 px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-orange-500"
+                                className={`w-full rounded border px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-orange-500 ${
+                                  podeEditarQuantidadesItem
+                                    ? 'border-orange-300'
+                                    : 'border-gray-300 bg-gray-100 text-gray-600'
+                                }`}
                               />
                             </div>
                             <div>
