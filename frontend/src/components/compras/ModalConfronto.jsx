@@ -37,18 +37,17 @@ function fmtSinal(v, decimals = 2) { const n = Number(v || 0); return (n >= 0 ? 
 const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
   const [etapa, setEtapa] = useState('selecionar'); // 'selecionar' | 'confronto'
   const [notas, setNotas] = useState([]);
-  const [notaVinculadaId, setNotaVinculadaId] = useState(null);
+  const [notasVinculadasIds, setNotasVinculadasIds] = useState([]);
   const [loadingNotas, setLoadingNotas] = useState(true);
   const [loadingConfronto, setLoadingConfronto] = useState(false);
   const [confronto, setConfronto] = useState(null);
-  const [notaSelecionada, setNotaSelecionada] = useState(null);
   const [loadingAcao, setLoadingAcao] = useState(false);
   const [emailTexto, setEmailTexto] = useState(null);
   const [mostrarEmail, setMostrarEmail] = useState(false);
   const [pedidoComplementarInfo, setPedidoComplementarInfo] = useState(null);
   const [confrontoFinalizado, setConfrontoFinalizado] = useState(false);
   const [loadingFinalizar, setLoadingFinalizar] = useState(false);
-  const [numeroNotaVinculada, setNumeroNotaVinculada] = useState(null);
+  const [numeroNotasVinculadas, setNumeroNotasVinculadas] = useState(null);
 
   const ALL_STATUS = ['ok', 'divergencia_quantidade', 'divergencia_preco', 'divergencia_mista', 'nao_encontrado', 'nao_pedido'];
   const [filtrosSelecionados, setFiltrosSelecionados] = useState(new Set(ALL_STATUS));
@@ -62,10 +61,11 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
       setLoadingNotas(true);
       const res = await api.get(`/pedidos-compra/${pedido.id}/notas-candidatas`);
       setNotas(res.data.notas || []);
-      setNotaVinculadaId(res.data.nota_vinculada_id);
+      const ids = res.data.nota_vinculada_ids || (res.data.nota_vinculada_id ? [res.data.nota_vinculada_id] : []);
+      setNotasVinculadasIds(ids);
 
       // Se já tem NF vinculada, ir direto pro confronto
-      if (res.data.nota_vinculada_id) {
+      if (ids.length > 0) {
         await carregarConfrontoSalvo();
         setEtapa('confronto');
       }
@@ -80,23 +80,30 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
     try {
       const res = await api.get(`/pedidos-compra/${pedido.id}/confronto`);
       setConfronto(res.data.confronto);
-      setNotaVinculadaId(res.data.nota_entrada_id);
-      setNumeroNotaVinculada(res.data.numero_nota || null);
+      setNotasVinculadasIds(res.data.nota_entrada_ids || (res.data.nota_entrada_id ? [res.data.nota_entrada_id] : []));
+      setNumeroNotasVinculadas(res.data.numero_nota || null);
       if (res.data.confronto_finalizado) setConfrontoFinalizado(true);
     } catch {
       // sem confronto salvo ainda
     }
   };
 
-  const selecionarNota = async (nota) => {
-    setNotaSelecionada(nota);
+  const alternarNota = async (nota) => {
     setLoadingConfronto(true);
     try {
-      const res = await api.post(`/pedidos-compra/${pedido.id}/vincular-nota/${nota.id}`);
+      const jaVinculada = notasVinculadasIds.includes(nota.id);
+      const res = jaVinculada
+        ? await api.delete(`/pedidos-compra/${pedido.id}/vincular-nota/${nota.id}`)
+        : await api.post(`/pedidos-compra/${pedido.id}/vincular-nota/${nota.id}`);
       setConfronto(res.data.confronto);
-      setNotaVinculadaId(nota.id);
-      setNumeroNotaVinculada(nota.numero_nota || null);
-      setEtapa('confronto');
+      setNotasVinculadasIds(res.data.nota_ids || []);
+      setNumeroNotasVinculadas((res.data.notas_entrada || []).map(n => n.numero_nota).filter(Boolean).join(', '));
+      setNotas(prev => prev.map(n => (
+        n.id === nota.id ? { ...n, ja_vinculada: !jaVinculada } : n
+      )));
+      if (res.data.confronto) {
+        setEtapa('confronto');
+      }
     } catch (e) {
       toast.error(e.response?.data?.detail || 'Erro ao realizar confronto');
     } finally {
@@ -115,7 +122,7 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
   };
 
   const finalizarConfronto = async () => {
-    if (!window.confirm('Finalizar a conferência? Isso cria um vínculo permanente entre este pedido e a NF. Não será possível revincular depois.')) return;
+    if (!window.confirm('Finalizar a conferencia? Isso cria um vinculo permanente entre este pedido e as NFs selecionadas. Nao sera possivel revincular depois.')) return;
     setLoadingFinalizar(true);
     try {
       await api.post(`/pedidos-compra/${pedido.id}/finalizar-confronto`);
@@ -213,10 +220,10 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
                 {notas.map(nota => (
                   <button
                     key={nota.id}
-                    onClick={() => selecionarNota(nota)}
+                    onClick={() => alternarNota(nota)}
                     disabled={loadingConfronto}
                     className={`w-full text-left p-4 rounded-lg border-2 transition-all hover:shadow-md ${
-                      nota.ja_vinculada
+                      (notasVinculadasIds.includes(nota.id) || nota.ja_vinculada)
                         ? 'border-blue-400 bg-blue-50'
                         : 'border-gray-200 hover:border-blue-300 hover:bg-blue-50/30'
                     }`}
@@ -225,8 +232,8 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
                       <div>
                         <span className="font-semibold text-gray-900">NF {nota.numero_nota}</span>
                         <span className="text-gray-500 text-sm ml-2">Série {nota.serie}</span>
-                        {nota.ja_vinculada && (
-                          <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">Já vinculada</span>
+                        {(notasVinculadasIds.includes(nota.id) || nota.ja_vinculada) && (
+                          <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full font-semibold">Selecionada</span>
                         )}
                       </div>
                       <span className="font-bold text-green-700">{fmtMoeda(nota.valor_total)}</span>
@@ -275,12 +282,12 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
               )}
             </div>
             <p className="text-sm text-gray-500 mt-0.5">
-              Pedido <b>{pedido.numero_pedido}</b> · NF <b>{numeroNotaVinculada || '—'}</b>
+              Pedido <b>{pedido.numero_pedido}</b> · NFs <b>{numeroNotasVinculadas || '—'}</b>
               {!confrontoFinalizado && (
                 <button
                   onClick={() => setEtapa('selecionar')}
                   className="ml-2 text-blue-600 hover:underline text-xs"
-                >trocar NF</button>
+                >adicionar/remover NFs</button>
               )}
             </p>
           </div>

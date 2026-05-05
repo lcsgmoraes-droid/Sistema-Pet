@@ -4,7 +4,7 @@ Models para o módulo de Produtos
 Sistema completo com categorias, marcas, lotes e FIFO
 """
 
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Date, Text, ForeignKey, Index, JSON
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Date, Text, ForeignKey, Index, JSON, UniqueConstraint
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -771,6 +771,27 @@ class PedidoCompra(BaseTenantModel):
     
     # Relationships
     itens = relationship("PedidoCompraItem", back_populates="pedido", cascade="all, delete-orphan")
+    notas_entrada_vinculos = relationship("PedidoCompraNotaEntrada", back_populates="pedido", cascade="all, delete-orphan")
+    user = relationship("User", foreign_keys=[user_id])
+
+
+class PedidoCompraNotaEntrada(BaseTenantModel):
+    """Vinculos entre um pedido de compra e uma ou mais notas fiscais de entrada."""
+    __tablename__ = "pedidos_compra_notas_entrada"
+    __table_args__ = (
+        UniqueConstraint("tenant_id", "pedido_compra_id", "nota_entrada_id", name="uq_pedido_compra_nota_entrada"),
+        {'extend_existing': True},
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    pedido_compra_id = Column(Integer, ForeignKey('pedidos_compra.id'), nullable=False, index=True)
+    nota_entrada_id = Column(Integer, ForeignKey('notas_entrada.id'), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    pedido = relationship("PedidoCompra", back_populates="notas_entrada_vinculos")
+    nota = relationship("NotaEntrada", back_populates="pedidos_compra_vinculos")
     user = relationship("User", foreign_keys=[user_id])
 
 
@@ -870,6 +891,7 @@ class NotaEntrada(BaseTenantModel):
     
     # Relationships
     itens = relationship("NotaEntradaItem", back_populates="nota", cascade="all, delete-orphan")
+    pedidos_compra_vinculos = relationship("PedidoCompraNotaEntrada", back_populates="nota", cascade="all, delete-orphan")
     user = relationship("User", foreign_keys=[user_id])
     conferencia_user = relationship("User", foreign_keys=[conferencia_user_id])
 

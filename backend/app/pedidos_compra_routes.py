@@ -45,7 +45,7 @@ from .auth.dependencies import get_current_user_and_tenant
 from .models import User, Cliente, FornecedorGrupo
 from .produtos_models import (
     Produto, ProdutoLote, EstoqueMovimentacao, 
-    PedidoCompra, PedidoCompraItem, ProdutoFornecedor, Marca
+    PedidoCompra, PedidoCompraItem, PedidoCompraNotaEntrada, ProdutoFornecedor, Marca
 )
 from .services.email_service import is_email_configured, send_email
 
@@ -2088,7 +2088,7 @@ def _gerar_observacao(prioridade: str, dias_estoque: float, tendencia: str, cons
 # CONFRONTO PEDIDO x NF-e
 # ============================================================================
 
-def _realizar_confronto(pedido: PedidoCompra, nota, db: Session, tenant_id: int) -> dict:
+def _realizar_confronto_legado(pedido: PedidoCompra, nota, db: Session, tenant_id: int) -> dict:
     """Gera o confronto completo entre pedido e NF-e."""
     from .produtos_models import NotaEntrada, NotaEntradaItem
 
@@ -2248,6 +2248,221 @@ def _realizar_confronto(pedido: PedidoCompra, nota, db: Session, tenant_id: int)
     }
 
 
+def _normalizar_notas_confronto(nota_ou_notas) -> List:
+    if not nota_ou_notas:
+        return []
+    if isinstance(nota_ou_notas, (list, tuple, set)):
+        return [n for n in nota_ou_notas if n]
+    return [nota_ou_notas]
+
+
+def _resumir_notas_confronto(notas: List) -> List[dict]:
+    return [
+        {
+            "id": n.id,
+            "numero_nota": n.numero_nota,
+            "serie": n.serie,
+            "chave_acesso": n.chave_acesso,
+            "fornecedor_nome": n.fornecedor_nome,
+            "data_emissao": n.data_emissao,
+            "valor_total": n.valor_total,
+        }
+        for n in notas
+    ]
+
+
+def _formatar_numeros_notas(notas: List) -> str:
+    numeros = [str(n.numero_nota) for n in notas if getattr(n, "numero_nota", None)]
+    return ", ".join(numeros) if numeros else "-"
+
+
+def _realizar_confronto(pedido: PedidoCompra, nota_ou_notas, db: Session, tenant_id: int) -> dict:
+    """Gera o confronto completo entre pedido e uma ou mais NF-e."""
+    notas = _normalizar_notas_confronto(nota_ou_notas)
+    itens_nf = [item for nota in notas for item in (nota.itens or [])]
+
+    itens_confronto = []
+    total_pedido = 0.0
+    total_nf = 0.0
+    tem_divergencia_qtd = False
+    tem_divergencia_preco = False
+    itens_nf_usados = set()
+
+    def _codigo_igual(valor_a, valor_b) -> bool:
+        if valor_a is None or valor_b is None:
+            return False
+        return str(valor_a).strip() == str(valor_b).strip()
+
+    def _itens_nf_para_pedido(item_pedido, codigo_produto, ean_produto):
+        candidatos = [
+            it for it in itens_nf
+            if it.id not in itens_nf_usados and it.produto_id == item_pedido.produto_id
+        ]
+        if candidatos:
+            return candidatos
+
+        if ean_produto:
+            candidatos = [
+                it for it in itens_nf
+                if it.id not in itens_nf_usados and it.ean and _codigo_igual(it.ean, ean_produto)
+            ]
+            if candidatos:
+                return candidatos
+
+        if codigo_produto:
+            candidatos = [
+                it for it in itens_nf
+                if it.id not in itens_nf_usados and it.codigo_produto and _codigo_igual(it.codigo_produto, codigo_produto)
+            ]
+            if candidatos:
+                return candidatos
+
+        return []
+
+    for item_pedido in pedido.itens:
+        produto = db.query(Produto).filter(
+            Produto.id == item_pedido.produto_id,
+            Produto.tenant_id == tenant_id
+        ).first()
+
+        nome_produto = produto.nome if produto else f"Produto {item_pedido.produto_id}"
+        codigo_produto = produto.codigo if produto else None
+        ean_produto = produto.codigo_barras if produto else None
+        itens_match = _itens_nf_para_pedido(item_pedido, codigo_produto, ean_produto)
+
+        qtd_pedida = item_pedido.quantidade_pedida
+        preco_pedido = item_pedido.preco_unitario - item_pedido.desconto_item
+        valor_pedido = qtd_pedida * preco_pedido
+        total_pedido += valor_pedido
+
+        if itens_match:
+            for it in itens_match:
+                itens_nf_usados.add(it.id)
+
+            qtd_nf = sum(float(it.quantidade or 0) for it in itens_match)
+            valor_nf = sum(float(it.valor_total or 0) for it in itens_match)
+            preco_nf = (valor_nf / qtd_nf) if qtd_nf else float(itens_match[0].valor_unitario or 0)
+            total_nf += valor_nf
+
+            dif_qtd = qtd_nf - qtd_pedida
+            dif_preco_unit = preco_nf - preco_pedido
+            dif_preco_pct = ((preco_nf - preco_pedido) / preco_pedido * 100) if preco_pedido else 0
+            dif_valor = valor_nf - valor_pedido
+
+            if abs(dif_qtd) > 0.001:
+                tem_divergencia_qtd = True
+            if abs(dif_preco_pct) > 0.5:
+                tem_divergencia_preco = True
+
+            status_item = "ok"
+            if abs(dif_qtd) > 0.001 and abs(dif_preco_pct) > 0.5:
+                status_item = "divergencia_mista"
+            elif abs(dif_qtd) > 0.001:
+                status_item = "divergencia_quantidade"
+            elif abs(dif_preco_pct) > 0.5:
+                status_item = "divergencia_preco"
+
+            itens_confronto.append({
+                "produto_id": item_pedido.produto_id,
+                "produto_nome": nome_produto,
+                "produto_codigo": codigo_produto,
+                "item_pedido_id": item_pedido.id,
+                "item_nf_id": itens_match[0].id,
+                "item_nf_ids": [it.id for it in itens_match],
+                "nota_entrada_ids": sorted({it.nota_entrada_id for it in itens_match if it.nota_entrada_id}),
+                "qtd_pedida": qtd_pedida,
+                "qtd_nf": qtd_nf,
+                "dif_qtd": round(dif_qtd, 3),
+                "preco_pedido": round(preco_pedido, 4),
+                "preco_nf": round(preco_nf, 4),
+                "dif_preco_unit": round(dif_preco_unit, 4),
+                "dif_preco_pct": round(dif_preco_pct, 2),
+                "valor_pedido": round(valor_pedido, 2),
+                "valor_nf": round(valor_nf, 2),
+                "dif_valor": round(dif_valor, 2),
+                "status": status_item,
+                "encontrado_na_nf": True,
+            })
+        else:
+            tem_divergencia_qtd = True
+            itens_confronto.append({
+                "produto_id": item_pedido.produto_id,
+                "produto_nome": nome_produto,
+                "produto_codigo": codigo_produto,
+                "item_pedido_id": item_pedido.id,
+                "item_nf_id": None,
+                "item_nf_ids": [],
+                "nota_entrada_ids": [],
+                "qtd_pedida": qtd_pedida,
+                "qtd_nf": 0,
+                "dif_qtd": -qtd_pedida,
+                "preco_pedido": round(preco_pedido, 4),
+                "preco_nf": 0,
+                "dif_preco_unit": None,
+                "dif_preco_pct": 0,
+                "valor_pedido": round(valor_pedido, 2),
+                "valor_nf": 0,
+                "dif_valor": -round(valor_pedido, 2),
+                "status": "nao_encontrado",
+                "encontrado_na_nf": False,
+            })
+
+    for it in itens_nf:
+        if it.id in itens_nf_usados:
+            continue
+        total_nf += float(it.valor_total or 0)
+        itens_confronto.append({
+            "produto_id": it.produto_id,
+            "produto_nome": it.descricao,
+            "produto_codigo": it.codigo_produto,
+            "item_pedido_id": None,
+            "item_nf_id": it.id,
+            "item_nf_ids": [it.id],
+            "nota_entrada_ids": [it.nota_entrada_id] if it.nota_entrada_id else [],
+            "qtd_pedida": 0,
+            "qtd_nf": it.quantidade,
+            "dif_qtd": it.quantidade,
+            "preco_pedido": 0,
+            "preco_nf": round(it.valor_unitario, 4),
+            "dif_preco_unit": None,
+            "dif_preco_pct": 0,
+            "valor_pedido": 0,
+            "valor_nf": round(it.valor_total, 2),
+            "dif_valor": round(it.valor_total, 2),
+            "status": "nao_pedido",
+            "encontrado_na_nf": True,
+        })
+
+    if tem_divergencia_qtd and tem_divergencia_preco:
+        status_confronto = "divergencia_mista"
+    elif tem_divergencia_qtd:
+        status_confronto = "divergencia_quantidade"
+    elif tem_divergencia_preco:
+        status_confronto = "divergencia_preco"
+    else:
+        status_confronto = "sem_divergencia"
+
+    return {
+        "status_confronto": status_confronto,
+        "itens": itens_confronto,
+        "resumo": {
+            "total_pedido": round(total_pedido, 2),
+            "total_nf": round(total_nf, 2),
+            "dif_total": round(total_nf - total_pedido, 2),
+            "frete_pedido": pedido.valor_frete,
+            "frete_nf": round(sum(float(n.valor_frete or 0) for n in notas), 2),
+            "desconto_pedido": pedido.valor_desconto,
+            "desconto_nf": round(sum(float(n.valor_desconto or 0) for n in notas), 2),
+            "itens_pedido": len(pedido.itens),
+            "itens_nf": len(itens_nf),
+            "notas_count": len(notas),
+            "nota_entrada_ids": [n.id for n in notas],
+            "numeros_nota": _formatar_numeros_notas(notas),
+            "notas_entrada": _resumir_notas_confronto(notas),
+        }
+    }
+
+
 def _aplicar_filtros_confronto(itens: List[dict], filtros: Optional[str]) -> List[dict]:
     if not filtros:
         return itens
@@ -2271,6 +2486,95 @@ def _resumo_por_itens(itens: List[dict], resumo_base: dict) -> dict:
         "itens_pedido": resumo_base.get("itens_pedido", 0),
         "itens_nf": resumo_base.get("itens_nf", 0),
     }
+
+
+def _ids_notas_vinculadas(db: Session, pedido: PedidoCompra, tenant_id: int) -> List[int]:
+    ids = [
+        row[0] for row in db.query(PedidoCompraNotaEntrada.nota_entrada_id)
+        .filter(
+            PedidoCompraNotaEntrada.pedido_compra_id == pedido.id,
+            PedidoCompraNotaEntrada.tenant_id == tenant_id,
+        )
+        .order_by(PedidoCompraNotaEntrada.id.asc())
+        .all()
+    ]
+    if not ids and pedido.nota_entrada_id:
+        ids = [pedido.nota_entrada_id]
+    return ids
+
+
+def _garantir_vinculo_legado(db: Session, pedido: PedidoCompra, tenant_id: int, user_id: int) -> None:
+    if not pedido.nota_entrada_id:
+        return
+    existe = db.query(PedidoCompraNotaEntrada.id).filter(
+        PedidoCompraNotaEntrada.pedido_compra_id == pedido.id,
+        PedidoCompraNotaEntrada.nota_entrada_id == pedido.nota_entrada_id,
+        PedidoCompraNotaEntrada.tenant_id == tenant_id,
+    ).first()
+    if existe:
+        return
+    db.add(PedidoCompraNotaEntrada(
+        pedido_compra_id=pedido.id,
+        nota_entrada_id=pedido.nota_entrada_id,
+        user_id=user_id,
+        tenant_id=tenant_id,
+    ))
+    db.flush()
+
+
+def _sincronizar_nota_legacy(pedido: PedidoCompra, nota_ids: List[int]) -> None:
+    pedido.nota_entrada_id = nota_ids[0] if nota_ids else None
+
+
+def _obter_notas_vinculadas(db: Session, pedido: PedidoCompra, tenant_id: int, com_itens: bool = False) -> List:
+    from .produtos_models import NotaEntrada
+
+    nota_ids = _ids_notas_vinculadas(db, pedido, tenant_id)
+    if not nota_ids:
+        return []
+
+    query = db.query(NotaEntrada)
+    if com_itens:
+        query = query.options(joinedload(NotaEntrada.itens))
+
+    notas = query.filter(
+        NotaEntrada.id.in_(nota_ids),
+        NotaEntrada.tenant_id == tenant_id,
+    ).all()
+    por_id = {n.id: n for n in notas}
+    return [por_id[nid] for nid in nota_ids if nid in por_id]
+
+
+def _buscar_pedido_finalizado_da_nota(db: Session, nota_id: int, pedido_id: int, tenant_id: int) -> Optional[PedidoCompra]:
+    pedido_por_vinculo = (
+        db.query(PedidoCompra)
+        .join(PedidoCompraNotaEntrada, PedidoCompraNotaEntrada.pedido_compra_id == PedidoCompra.id)
+        .filter(
+            PedidoCompraNotaEntrada.nota_entrada_id == nota_id,
+            PedidoCompraNotaEntrada.tenant_id == tenant_id,
+            PedidoCompra.confronto_finalizado == True,
+            PedidoCompra.id != pedido_id,
+            PedidoCompra.tenant_id == tenant_id,
+        )
+        .first()
+    )
+    if pedido_por_vinculo:
+        return pedido_por_vinculo
+
+    return db.query(PedidoCompra).filter(
+        PedidoCompra.nota_entrada_id == nota_id,
+        PedidoCompra.confronto_finalizado == True,
+        PedidoCompra.id != pedido_id,
+        PedidoCompra.tenant_id == tenant_id,
+    ).first()
+
+
+def _salvar_confronto_pedido(pedido: PedidoCompra, notas: List, confronto: dict) -> None:
+    pedido.data_confronto = datetime.utcnow()
+    pedido.status_confronto = confronto["status_confronto"]
+    pedido.resumo_confronto = json.dumps(confronto, ensure_ascii=False, default=str)
+    pedido.updated_at = datetime.utcnow()
+    _sincronizar_nota_legacy(pedido, [n.id for n in notas])
 
 
 @router.get("/{pedido_id}/notas-candidatas")
@@ -2310,6 +2614,7 @@ def listar_notas_candidatas(
         query = query.filter(NotaEntrada.fornecedor_id == pedido.fornecedor_id)
 
     notas = query.order_by(desc(NotaEntrada.data_emissao)).limit(20).all()
+    nota_ids_vinculadas = set(_ids_notas_vinculadas(db, pedido, tenant_id))
 
     result = []
     for n in notas:
@@ -2322,12 +2627,13 @@ def listar_notas_candidatas(
             "data_emissao": n.data_emissao,
             "valor_total": n.valor_total,
             "status": n.status,
-            "ja_vinculada": n.id == pedido.nota_entrada_id,
+            "ja_vinculada": n.id in nota_ids_vinculadas,
         })
 
     return {
         "notas": result,
         "nota_vinculada_id": pedido.nota_entrada_id,
+        "nota_vinculada_ids": list(nota_ids_vinculadas),
     }
 
 
@@ -2361,32 +2667,105 @@ def vincular_nota_e_confrontar(
         raise HTTPException(status_code=404, detail="Nota fiscal não encontrada")
 
     # Bloquear se NF já foi finalizada em outro pedido (vínculo permanente)
-    outro_finalizado = db.query(PedidoCompra).filter(
-        PedidoCompra.nota_entrada_id == nota_id,
-        PedidoCompra.confronto_finalizado == True,
-        PedidoCompra.id != pedido_id,
-        PedidoCompra.tenant_id == tenant_id
-    ).first()
+    if pedido.confronto_finalizado:
+        raise HTTPException(status_code=400, detail="Confronto ja foi finalizado")
+
+    outro_finalizado = _buscar_pedido_finalizado_da_nota(db, nota_id, pedido_id, tenant_id)
     if outro_finalizado:
         raise HTTPException(
             status_code=400,
             detail=f"Esta NF já está vinculada em definitivo ao pedido {outro_finalizado.numero_pedido}. Não é possível revinculá-la."
         )
 
-    confronto = _realizar_confronto(pedido, nota, db, tenant_id)
+    _garantir_vinculo_legado(db, pedido, tenant_id, current_user.id)
+
+    vinculo = db.query(PedidoCompraNotaEntrada).filter(
+        PedidoCompraNotaEntrada.pedido_compra_id == pedido.id,
+        PedidoCompraNotaEntrada.nota_entrada_id == nota_id,
+        PedidoCompraNotaEntrada.tenant_id == tenant_id,
+    ).first()
+    if not vinculo:
+        db.add(PedidoCompraNotaEntrada(
+            pedido_compra_id=pedido.id,
+            nota_entrada_id=nota_id,
+            user_id=current_user.id,
+            tenant_id=tenant_id,
+        ))
+        db.flush()
+
+    notas = _obter_notas_vinculadas(db, pedido, tenant_id, com_itens=True)
+    confronto = _realizar_confronto(pedido, notas, db, tenant_id)
 
     # Salvar vínculo e resumo
-    pedido.nota_entrada_id = nota_id
-    pedido.data_confronto = datetime.utcnow()
-    pedido.status_confronto = confronto["status_confronto"]
-    pedido.resumo_confronto = json.dumps(confronto, ensure_ascii=False, default=str)
-    pedido.updated_at = datetime.utcnow()
+    _salvar_confronto_pedido(pedido, notas, confronto)
     db.commit()
 
     return {
         "message": "Confronto realizado com sucesso",
         "pedido_id": pedido_id,
         "nota_id": nota_id,
+        "nota_ids": [n.id for n in notas],
+        "notas_entrada": _resumir_notas_confronto(notas),
+        "confronto": confronto,
+    }
+
+
+@router.delete("/{pedido_id}/vincular-nota/{nota_id}")
+def desvincular_nota_e_recalcular_confronto(
+    pedido_id: int,
+    nota_id: int,
+    db: Session = Depends(get_session),
+    current_user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Remove uma NF do confronto do pedido e recalcula com as restantes."""
+    current_user, tenant_id = current_user_and_tenant
+    pedido = db.query(PedidoCompra).options(
+        joinedload(PedidoCompra.itens)
+    ).filter(
+        PedidoCompra.id == pedido_id,
+        PedidoCompra.tenant_id == tenant_id
+    ).first()
+    if not pedido:
+        raise HTTPException(status_code=404, detail="Pedido nao encontrado")
+    if pedido.confronto_finalizado:
+        raise HTTPException(status_code=400, detail="Confronto ja foi finalizado")
+
+    _garantir_vinculo_legado(db, pedido, tenant_id, current_user.id)
+    vinculo = db.query(PedidoCompraNotaEntrada).filter(
+        PedidoCompraNotaEntrada.pedido_compra_id == pedido.id,
+        PedidoCompraNotaEntrada.nota_entrada_id == nota_id,
+        PedidoCompraNotaEntrada.tenant_id == tenant_id,
+    ).first()
+    if vinculo:
+        db.delete(vinculo)
+        db.flush()
+    if pedido.nota_entrada_id == nota_id:
+        pedido.nota_entrada_id = None
+
+    notas = _obter_notas_vinculadas(db, pedido, tenant_id, com_itens=True)
+    if not notas:
+        pedido.nota_entrada_id = None
+        pedido.data_confronto = None
+        pedido.status_confronto = None
+        pedido.resumo_confronto = None
+        pedido.updated_at = datetime.utcnow()
+        db.commit()
+        return {
+            "message": "NF removida. Pedido sem NF vinculada.",
+            "pedido_id": pedido_id,
+            "nota_ids": [],
+            "notas_entrada": [],
+            "confronto": None,
+        }
+
+    confronto = _realizar_confronto(pedido, notas, db, tenant_id)
+    _salvar_confronto_pedido(pedido, notas, confronto)
+    db.commit()
+    return {
+        "message": "NF removida e confronto recalculado",
+        "pedido_id": pedido_id,
+        "nota_ids": [n.id for n in notas],
+        "notas_entrada": _resumir_notas_confronto(notas),
         "confronto": confronto,
     }
 
@@ -2405,19 +2784,16 @@ def obter_confronto_salvo(
     ).first()
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
-    if not pedido.nota_entrada_id:
+    notas = _obter_notas_vinculadas(db, pedido, tenant_id)
+    if not notas:
         raise HTTPException(status_code=404, detail="Pedido não possui NF vinculada")
-
-    from .produtos_models import NotaEntrada as _NotaEntrada
-    nota = db.query(_NotaEntrada).filter(
-        _NotaEntrada.id == pedido.nota_entrada_id,
-        _NotaEntrada.tenant_id == tenant_id,
-    ).first() if pedido.nota_entrada_id else None
 
     return {
         "pedido_id": pedido_id,
         "nota_entrada_id": pedido.nota_entrada_id,
-        "numero_nota": nota.numero_nota if nota and nota.numero_nota else None,
+        "nota_entrada_ids": [n.id for n in notas],
+        "numero_nota": _formatar_numeros_notas(notas),
+        "notas_entrada": _resumir_notas_confronto(notas),
         "data_confronto": pedido.data_confronto,
         "status_confronto": pedido.status_confronto,
         "confronto_finalizado": pedido.confronto_finalizado or False,
@@ -2452,7 +2828,7 @@ def exportar_confronto_csv(
         _NotaEntrada.id == pedido.nota_entrada_id,
         _NotaEntrada.tenant_id == tenant_id,
     ).first() if pedido.nota_entrada_id else None
-    numero_nota = nota.numero_nota if nota and nota.numero_nota else "-"
+    numero_nota = _formatar_numeros_notas(_obter_notas_vinculadas(db, pedido, tenant_id)) or resumo.get("numeros_nota") or (nota.numero_nota if nota and nota.numero_nota else "-")
 
     def fmt(v):
         if v is None or v == "":
@@ -2519,7 +2895,7 @@ def exportar_confronto_pdf(
         _NotaEntrada.id == pedido.nota_entrada_id,
         _NotaEntrada.tenant_id == tenant_id,
     ).first() if pedido.nota_entrada_id else None
-    numero_nota = nota.numero_nota if nota and nota.numero_nota else "-"
+    numero_nota = _formatar_numeros_notas(_obter_notas_vinculadas(db, pedido, tenant_id)) or resumo.get("numeros_nota") or (nota.numero_nota if nota and nota.numero_nota else "-")
 
     fornecedor = db.query(Cliente).filter(
         Cliente.id == pedido.fornecedor_id,
@@ -2664,7 +3040,7 @@ def gerar_email_confronto(
         _NotaEntrada.id == pedido.nota_entrada_id,
         _NotaEntrada.tenant_id == tenant_id
     ).first() if pedido.nota_entrada_id else None
-    numero_nota = nota.numero_nota if nota and nota.numero_nota else str(pedido.nota_entrada_id or "")
+    numero_nota = _formatar_numeros_notas(_obter_notas_vinculadas(db, pedido, tenant_id)) or resumo.get("numeros_nota") or (nota.numero_nota if nota and nota.numero_nota else str(pedido.nota_entrada_id or ""))
 
     divergencias = [i for i in itens if i.get("status") != "ok"]
 
@@ -2721,11 +3097,21 @@ def finalizar_confronto(
     ).first()
     if not pedido:
         raise HTTPException(status_code=404, detail="Pedido não encontrado")
-    if not pedido.nota_entrada_id or not pedido.resumo_confronto:
+    _garantir_vinculo_legado(db, pedido, tenant_id, current_user.id)
+    notas = _obter_notas_vinculadas(db, pedido, tenant_id)
+    if not notas or not pedido.resumo_confronto:
         raise HTTPException(status_code=400, detail="Pedido não possui confronto realizado")
     if pedido.confronto_finalizado:
         raise HTTPException(status_code=400, detail="Confronto já foi finalizado")
     # Verificar se esta NF já está finalizada em outro pedido
+    for nota in notas:
+        outro_finalizado = _buscar_pedido_finalizado_da_nota(db, nota.id, pedido_id, tenant_id)
+        if outro_finalizado:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Esta NF ja esta vinculada ao pedido {outro_finalizado.numero_pedido}. Uma NF so pode ser finalizada em um pedido."
+            )
+
     outro = db.query(PedidoCompra).filter(
         PedidoCompra.nota_entrada_id == pedido.nota_entrada_id,
         PedidoCompra.confronto_finalizado == True,
@@ -2745,6 +3131,8 @@ def finalizar_confronto(
         "pedido_id": pedido_id,
         "numero_pedido": pedido.numero_pedido,
         "nota_entrada_id": pedido.nota_entrada_id,
+        "nota_entrada_ids": [n.id for n in notas],
+        "notas_entrada": _resumir_notas_confronto(notas),
     }
 
 
