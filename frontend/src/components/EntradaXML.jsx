@@ -2710,7 +2710,7 @@ const EntradaXML = () => {
           <table className="w-full">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Chave NF-e</th>
+                <th className="px-4 py-3 text-left text-sm font-semibold">NF / Chave</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Fornecedor</th>
                 <th className="px-4 py-3 text-left text-sm font-semibold">Data Emissao</th>
                 <th className="px-4 py-3 text-right text-sm font-semibold">Valor</th>
@@ -2743,7 +2743,8 @@ const EntradaXML = () => {
                       className="border-t hover:bg-blue-50 cursor-pointer transition-colors"
                     >
                       <td className="px-4 py-3">
-                        <div className="font-mono text-xs">{nota.chave_acesso.substring(0, 20)}...</div>
+                        <div className="font-semibold text-gray-900">NF {nota.numero_nota || '-'}</div>
+                        <div className="font-mono text-[11px] text-gray-500">{nota.chave_acesso.substring(0, 20)}...</div>
                       </td>
                       <td className="px-4 py-3">
                         <div className="font-semibold">{nota.fornecedor_nome}</div>
