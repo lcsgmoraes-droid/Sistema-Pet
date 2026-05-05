@@ -1899,6 +1899,30 @@ async def emitir_nfe(
         logger.error("emitir_nfe_error", f"❌ ValueError: {str(e)}")
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
+        erro_msg = str(e)
+        erro_upper = erro_msg.upper()
+        if (
+            "TOO_MANY_REQUESTS" in erro_upper
+            or "HTTP 429" in erro_upper
+            or "TOO MANY REQUESTS" in erro_upper
+            or "LIMITE TEMPORARIO DE REQUISICOES DO BLING" in erro_upper
+        ):
+            logger.warning(
+                "emitir_nfe_rate_limit",
+                f"Bling limitou a emissao da venda {getattr(request, 'venda_id', None)}: {erro_msg}",
+            )
+            raise HTTPException(
+                status_code=429,
+                detail={
+                    "erro": "bling_rate_limit",
+                    "mensagem": (
+                        "O Bling limitou temporariamente as emissoes. "
+                        "Aguarde alguns segundos e tente novamente."
+                    ),
+                    "retry_after_seconds": 30,
+                    "detalhe": erro_msg,
+                },
+            )
         logger.error("emitir_nfe_error", f"❌ ERRO AO EMITIR NF-e:")
         logger.error("emitir_nfe_error", f"Erro: {str(e)}")
         logger.error("emitir_nfe_error", f"Traceback completo:")

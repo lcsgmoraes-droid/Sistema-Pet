@@ -1319,20 +1319,27 @@ def receber_pedido(
             Produto.id == item.produto_id,
             Produto.tenant_id == tenant_id
         ).first()
+        if not produto:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Produto {item.produto_id} nao encontrado para o item {item.id}"
+            )
         
         # Criar lote
         numero_lote = f"PC{pedido.id}-{item.id}"
+        custo_unitario_lote = float(item.preco_unitario or 0) - float(item.desconto_item or 0)
         
         lote = ProdutoLote(
             produto_id=produto.id,
-            numero_lote=numero_lote,
+            nome_lote=numero_lote,
             quantidade_inicial=receb_item.quantidade_recebida,
-            quantidade_atual=receb_item.quantidade_recebida,
-            custo_unitario=item.preco_unitario - item.desconto_item,
+            quantidade_disponivel=receb_item.quantidade_recebida,
+            quantidade_reservada=0,
+            custo_unitario=custo_unitario_lote,
             data_fabricacao=None,
             data_validade=None,
-            fornecedor=f"Pedido {pedido.numero_pedido}",
-            user_id=current_user.id,
+            ordem_entrada=int(datetime.utcnow().timestamp()),
+            status="ativo",
             tenant_id=tenant_id
         )
         db.add(lote)

@@ -481,7 +481,6 @@ def _pdf_pendencia_bytes(pendencia: CompraPendenciaFornecedor) -> bytes:
 
     if pendencia.email_mensagem:
         elements.append(Spacer(1, 10))
-        elements.append(Paragraph("Mensagem sugerida ao fornecedor", styles["Heading3"]))
         for linha in pendencia.email_mensagem.splitlines():
             elements.append(Paragraph(escape(linha or " "), small_style))
 

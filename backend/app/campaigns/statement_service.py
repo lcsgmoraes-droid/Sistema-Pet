@@ -4,7 +4,7 @@ from datetime import date, datetime, time, timezone
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import or_ as sql_or
+from sqlalchemy import or_ as sql_or_
 from sqlalchemy.orm import Session
 
 from app.campaigns.loyalty_service import summarize_loyalty_balances_for_customer
