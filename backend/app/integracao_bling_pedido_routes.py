@@ -1423,9 +1423,30 @@ def _bling_pedido_webhook_async_enabled() -> bool:
     return str(raw).strip().lower() in {"1", "true", "yes", "on"}
 
 
+def _bling_webhook_tenant_uuid() -> UUID | None:
+    raw = os.getenv("BLING_WEBHOOK_TENANT_ID") or _BLING_WEBHOOK_TENANT_ID
+    if not raw:
+        return None
+    try:
+        return UUID(str(raw))
+    except (TypeError, ValueError):
+        return None
+
+
+def _set_bling_request_tenant(request: Request | None = None) -> UUID | None:
+    tenant_id = _bling_webhook_tenant_uuid()
+    if tenant_id:
+        set_current_tenant(tenant_id)
+        if request is not None:
+            request.state.tenant_id = str(tenant_id)
+            request.state.tenant_source = "bling_webhook_env"
+    return tenant_id
+
+
 @router.post("/pedido", status_code=status.HTTP_202_ACCEPTED)
 async def receber_pedido_bling(request: Request, db: Session = Depends(get_session)):
     """Recebe webhooks do Bling e enfileira o trabalho pesado fora da request."""
+    _set_bling_request_tenant(request)
     body = await request.json()
     body = body if isinstance(body, dict) else {}
 
@@ -1458,9 +1479,7 @@ def processar_pedido_bling_payload(body: dict, db: Session):
       { eventId, date, version, event: 'order.created'|'order.updated'|'order.deleted', data: {...} }
     """
     # Tenant fixo para webhooks (chamadas sem JWT)
-    _tenant_uuid = UUID(_BLING_WEBHOOK_TENANT_ID) if _BLING_WEBHOOK_TENANT_ID else None
-    if _tenant_uuid:
-        set_current_tenant(_tenant_uuid)
+    _tenant_uuid = _set_bling_request_tenant()
 
     # Desempacotar envelope Bling (v1)
     event = body.get("event", "")  # ex: "order.created"

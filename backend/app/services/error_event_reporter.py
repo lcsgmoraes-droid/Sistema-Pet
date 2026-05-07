@@ -5,6 +5,7 @@ import os
 import threading
 from datetime import datetime, timezone
 from typing import Any
+from uuid import UUID
 
 from fastapi import Request
 
@@ -54,20 +55,77 @@ def _decode_jwt_payload(token: str) -> dict[str, Any]:
         return {}
 
 
+def _uuid_text(value: Any) -> str | None:
+    if not value:
+        return None
+    try:
+        return str(UUID(str(value)))
+    except (TypeError, ValueError):
+        return None
+
+
+def _request_state_text(request: Request, name: str) -> str | None:
+    try:
+        value = getattr(request.state, name, None)
+    except Exception:
+        return None
+    return str(value) if value else None
+
+
+def _current_tenant_text() -> str | None:
+    try:
+        from app.tenancy.context import get_current_tenant
+
+        tenant_id = get_current_tenant()
+    except Exception:
+        return None
+    return str(tenant_id) if tenant_id else None
+
+
+def _path_tenant_fallback(path: str) -> tuple[str | None, str | None]:
+    if path.startswith("/integracoes/bling/"):
+        tenant_id = _uuid_text(os.getenv("BLING_WEBHOOK_TENANT_ID"))
+        if tenant_id:
+            return tenant_id, "bling_webhook_env"
+    return None, None
+
+
 def _extract_identity(request: Request) -> dict[str, Any]:
     authorization = request.headers.get("authorization", "")
-    tenant_id = request.headers.get("x-tenant-id")
+    tenant_source = None
+    tenant_id = _uuid_text(request.headers.get("x-tenant-id"))
+    if tenant_id:
+        tenant_source = "x_tenant_id"
     user_id = None
     user_email = None
 
     if authorization.lower().startswith("bearer "):
         payload = _decode_jwt_payload(authorization.split(" ", 1)[1].strip())
-        tenant_id = tenant_id or payload.get("tenant_id")
+        jwt_tenant_id = _uuid_text(payload.get("tenant_id"))
+        if not tenant_id and jwt_tenant_id:
+            tenant_id = jwt_tenant_id
+            tenant_source = "jwt"
         user_id = payload.get("user_id") or payload.get("id")
         user_email = payload.get("sub") or payload.get("email")
 
+    state_tenant_id = _uuid_text(_request_state_text(request, "tenant_id"))
+    if not tenant_id and state_tenant_id:
+        tenant_id = state_tenant_id
+        tenant_source = _request_state_text(request, "tenant_source") or "request_state"
+
+    context_tenant_id = _uuid_text(_current_tenant_text())
+    if not tenant_id and context_tenant_id:
+        tenant_id = context_tenant_id
+        tenant_source = "tenant_context"
+
+    fallback_tenant_id, fallback_source = _path_tenant_fallback(request.url.path)
+    if not tenant_id and fallback_tenant_id:
+        tenant_id = fallback_tenant_id
+        tenant_source = fallback_source
+
     return {
-        "tenant_id": str(tenant_id) if tenant_id else None,
+        "tenant_id": tenant_id,
+        "tenant_source": tenant_source,
         "user_id": str(user_id) if user_id else None,
         "user_email": str(user_email) if user_email else None,
     }
@@ -96,6 +154,7 @@ def record_request_event(
         "created_at": _utcnow_iso(),
         "request_id": request_id,
         "tenant_id": identity["tenant_id"],
+        "tenant_source": identity["tenant_source"],
         "user_id": identity["user_id"],
         "user_email": identity["user_email"],
         "method": method,

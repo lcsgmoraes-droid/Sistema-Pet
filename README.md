@@ -66,6 +66,10 @@ FLUXO_UNICO.bat release-check
 ```bash
 FLUXO_UNICO.bat prod-up
 ```
+Para producao real no servidor, usar SSH pelo IP e o script seguro:
+```bash
+ssh root@192.241.150.121 "cd /opt/petshop && bash scripts/deploy_producao_seguro.sh"
+```
 
 5. Verificar status:
 ```bash

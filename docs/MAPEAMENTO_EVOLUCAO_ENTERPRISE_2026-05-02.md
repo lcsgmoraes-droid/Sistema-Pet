@@ -48,6 +48,8 @@ Separacao operacional iniciada:
 - Proxima evolucao de performance: criar endpoint dedicado de sugestao de produtos para PDV, cachear estoque virtual/custo de kits por evento de estoque, auditar dados de `tipo_kit` inconsistentes e adicionar indices/EXPLAIN nas rotas mais lentas do Ops.
 - Incidente de lentidao de 2026-05-07: Ops apontou degradacao sem 5xx, concentrada em `/integracoes/bling/pedido`. Causa raiz: webhook fazia consulta externa ao Bling, retries e esperas dentro da request publica.
 - Melhoria de escala preparada: `/integracoes/bling/pedido` passou a enfileirar eventos em `bling_pedido_webhook_events` e responder rapidamente; o processamento pesado fica no `BlingSyncScheduler`, com idempotencia por `eventId`/payload, retry com backoff e indices por tenant/pedido/status.
+- Correcao de rastreabilidade Ops: webhooks Bling agora marcam `tenant_id` no contexto da request pelo `BLING_WEBHOOK_TENANT_ID`, evitando incidentes operacionais como `sem_tenant`; historico recente pode ser corrigido com `python -m app.scripts.backfill_ops_tenant_context --path-prefix /integracoes/bling/`.
+- Orientacao de producao registrada em `docs/PRODUCAO_DEPLOY_SSH.md`: deploy real por SSH no IP `192.241.150.121`, caminho `/opt/petshop`, script oficial `bash scripts/deploy_producao_seguro.sh`.
 - Proxima evolucao operacional: separar containers de `backend-api`, `worker-bling`, `worker-campanhas` e `worker-sefaz`, para impedir que integracoes externas concorram com PDV/admin pelo mesmo orcamento de workers e conexoes.
 
 Tela piloto:

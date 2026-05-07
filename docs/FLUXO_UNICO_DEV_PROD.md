@@ -54,6 +54,8 @@ Use para: ver se os servicos estao de pe e saudaveis.
    - O build de producao deve gerar os arquivos em `runtime/frontend/dist`
    - Sem esse passo no deploy, a producao continua mostrando o codigo antigo
 5. No servidor: `bash scripts/deploy_producao_seguro.sh`
+   - Producao real via SSH: `ssh root@192.241.150.121 "cd /opt/petshop && bash scripts/deploy_producao_seguro.sh"`
+   - Guia oficial com IP, health e validacoes: `docs/PRODUCAO_DEPLOY_SSH.md`
 6. `FLUXO_UNICO.bat status`
 
 ---
@@ -102,6 +104,12 @@ So o frontend e diferente: o nginx serve os arquivos estaticos gerados em `runti
 ---
 
 ## Deploy seguro no servidor
+
+Para producao real, acessar por SSH direto no IP:
+
+```
+ssh root@192.241.150.121
+```
 
 No servidor de producao, o caminho padrao agora e:
 

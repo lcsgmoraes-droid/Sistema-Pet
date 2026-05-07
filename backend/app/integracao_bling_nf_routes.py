@@ -38,6 +38,26 @@ from app.utils.logger import logger
 # Tenant fixo para webhooks do Bling (chamadas sem JWT)
 _BLING_WEBHOOK_TENANT_ID = os.getenv("BLING_WEBHOOK_TENANT_ID")
 
+
+def _bling_webhook_tenant_uuid() -> UUID | None:
+    raw = os.getenv("BLING_WEBHOOK_TENANT_ID") or _BLING_WEBHOOK_TENANT_ID
+    if not raw:
+        return None
+    try:
+        return UUID(str(raw))
+    except (TypeError, ValueError):
+        return None
+
+
+def _set_bling_request_tenant(request: Request | None = None) -> UUID | None:
+    tenant_id = _bling_webhook_tenant_uuid()
+    if tenant_id:
+        set_current_tenant(tenant_id)
+        if request is not None:
+            request.state.tenant_id = str(tenant_id)
+            request.state.tenant_source = "bling_webhook_env"
+    return tenant_id
+
 router = APIRouter(
     prefix="/integracoes/bling",
     tags=["Integração Bling - NF"]
@@ -638,12 +658,9 @@ async def receber_nf_bling(request: Request, db: Session = Depends(get_session))
     O campo data.situacao é um NÚMERO: 2=Emitida, 5/9=Autorizada, 4=Cancelada.
     O payload do webhook NÃO inclui o pedido vinculado — precisa chamar a API.
     """
-    body = await request.json()
-
     # Injetar tenant no contexto (webhook chega sem JWT)
-    tenant_id_monitor = UUID(_BLING_WEBHOOK_TENANT_ID) if _BLING_WEBHOOK_TENANT_ID else None
-    if _BLING_WEBHOOK_TENANT_ID:
-        set_current_tenant(UUID(_BLING_WEBHOOK_TENANT_ID))
+    tenant_id_monitor = _set_bling_request_tenant(request)
+    body = await request.json()
 
     # Desempacotar envelope Bling (v1)
     event = body.get("event", "invoice.updated")
