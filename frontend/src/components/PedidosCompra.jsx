@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import api from '../api';
 import { toast } from 'react-hot-toast';
+import { Filter, RefreshCw, Search, X } from 'lucide-react';
 import ModalConfronto from './compras/ModalConfronto';
 import ExportActionButton from './ui/ExportActionButton';
 
@@ -26,6 +27,24 @@ const GRUPO_FORNECEDOR_FORM_INICIAL = {
   fornecedor_principal_id: '',
   fornecedor_ids: []
 };
+
+const FILTROS_PEDIDOS_INICIAL = {
+  status: '',
+  fornecedor_id: '',
+  busca: '',
+  data_inicio: '',
+  data_fim: ''
+};
+
+const STATUS_PEDIDO_OPTIONS = [
+  { value: '', label: 'Todos' },
+  { value: 'rascunho', label: 'Rascunho' },
+  { value: 'enviado', label: 'Enviado' },
+  { value: 'confirmado', label: 'Confirmado' },
+  { value: 'recebido_parcial', label: 'Parcial' },
+  { value: 'recebido_total', label: 'Recebido' },
+  { value: 'cancelado', label: 'Cancelado' }
+];
 
 const COLUNAS_DOCUMENTO_PEDIDO = [
   { chave: 'codigo', label: 'Codigo / SKU' },
@@ -215,6 +234,8 @@ const baixarArquivoResposta = (response, fallback) => {
 
 const PedidosCompra = () => {
   const [pedidos, setPedidos] = useState([]);
+  const [filtrosPedidos, setFiltrosPedidos] = useState(FILTROS_PEDIDOS_INICIAL);
+  const [loadingListaPedidos, setLoadingListaPedidos] = useState(false);
   const [fornecedores, setFornecedores] = useState([]);
   const [gruposFornecedores, setGruposFornecedores] = useState([]);
   const [produtos, setProdutos] = useState([]);
@@ -305,6 +326,57 @@ const PedidosCompra = () => {
       .filter((p) => normalizarTexto(p.nome || '').includes(termo))
       .slice(0, 15);
   }, [produtos, produtoTexto]);
+
+  const fornecedoresOrdenados = useMemo(
+    () => [...fornecedores].sort((a, b) => String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR')),
+    [fornecedores],
+  );
+
+  const filtrosPedidosAtivos = useMemo(
+    () => Object.values(filtrosPedidos).filter((valor) => String(valor || '').trim()).length,
+    [filtrosPedidos],
+  );
+
+  const montarParametrosPedidos = (filtros = FILTROS_PEDIDOS_INICIAL) => {
+    const params = { limit: 100 };
+    Object.entries(filtros).forEach(([chave, valor]) => {
+      const texto = String(valor || '').trim();
+      if (texto) {
+        params[chave] = texto;
+      }
+    });
+    return params;
+  };
+
+  const extrairListaResposta = (data, chaves = []) => {
+    if (Array.isArray(data)) return data;
+    for (const chave of chaves) {
+      if (Array.isArray(data?.[chave])) {
+        return data[chave];
+      }
+    }
+    return data?.items || [];
+  };
+
+  const atualizarFiltroPedidos = (campo, valor) => {
+    setFiltrosPedidos((prev) => ({ ...prev, [campo]: valor }));
+  };
+
+  const aplicarFiltrosPedidos = (event) => {
+    event?.preventDefault();
+    carregarDados(filtrosPedidos, { apenasPedidos: true });
+  };
+
+  const limparFiltrosPedidos = () => {
+    setFiltrosPedidos(FILTROS_PEDIDOS_INICIAL);
+    carregarDados(FILTROS_PEDIDOS_INICIAL, { apenasPedidos: true });
+  };
+
+  const selecionarFiltroStatus = (statusPedido) => {
+    const proximosFiltros = { ...filtrosPedidos, status: statusPedido };
+    setFiltrosPedidos(proximosFiltros);
+    carregarDados(proximosFiltros, { apenasPedidos: true });
+  };
 
   const selecionarFornecedor = (fornecedor) => {
     setFornecedorTexto(fornecedor.nome || '');
@@ -609,30 +681,32 @@ const PedidosCompra = () => {
   };
 
   useEffect(() => {
-    carregarDados();
+    carregarDados(FILTROS_PEDIDOS_INICIAL);
   }, []);
 
-  const carregarDados = async () => {
+  const carregarDados = async (filtrosParaAplicar = filtrosPedidos, opcoes = {}) => {
+    const params = montarParametrosPedidos(filtrosParaAplicar);
+    setLoadingListaPedidos(true);
     try {
+      if (opcoes.apenasPedidos) {
+        const pedidosRes = await api.get('/pedidos-compra/', { params });
+        setPedidos(extrairListaResposta(pedidosRes.data, ['pedidos']));
+        return;
+      }
+
       const [pedidosRes, fornecedoresRes, gruposRes, envioStatusRes] = await Promise.all([
-        api.get('/pedidos-compra/'),
+        api.get('/pedidos-compra/', { params }),
         api.get('/clientes/?tipo_cadastro=fornecedor&apenas_ativos=true'),
         api.get('/fornecedor-grupos/'),
         api.get('/pedidos-compra/envio/status').catch(() => ({ data: { email_configurado: false } }))
       ]);
 
       // Tratar resposta dos pedidos (pode ser array direto ou objeto paginado)
-      const pedidosData = Array.isArray(pedidosRes.data) 
-        ? pedidosRes.data 
-        : (pedidosRes.data.items || pedidosRes.data.pedidos || []);
+      const pedidosData = extrairListaResposta(pedidosRes.data, ['pedidos']);
       
       // Tratar resposta dos fornecedores
-      const fornecedoresData = Array.isArray(fornecedoresRes.data) 
-        ? fornecedoresRes.data 
-        : (fornecedoresRes.data.items || fornecedoresRes.data.clientes || []);
-      const gruposData = Array.isArray(gruposRes.data)
-        ? gruposRes.data
-        : (gruposRes.data.items || gruposRes.data.grupos || []);
+      const fornecedoresData = extrairListaResposta(fornecedoresRes.data, ['clientes']);
+      const gruposData = extrairListaResposta(gruposRes.data, ['grupos']);
 
       setPedidos(pedidosData);
       setFornecedores(fornecedoresData);
@@ -642,6 +716,8 @@ const PedidosCompra = () => {
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       toast.error('Erro ao carregar dados');
+    } finally {
+      setLoadingListaPedidos(false);
     }
   };
 
@@ -2043,8 +2119,120 @@ const PedidosCompra = () => {
         </div>
       )}
 
+      <form
+        onSubmit={aplicarFiltrosPedidos}
+        className="mb-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
+      >
+        <div className="flex flex-col gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Filter className="h-5 w-5 text-blue-600" />
+              <div>
+                <h2 className="text-base font-bold text-slate-900">Filtros</h2>
+                <p className="text-sm text-slate-500">{pedidos.length} pedido(s) na lista</p>
+              </div>
+            </div>
+            {filtrosPedidosAtivos > 0 && (
+              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
+                {filtrosPedidosAtivos} filtro(s) ativo(s)
+              </span>
+            )}
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {STATUS_PEDIDO_OPTIONS.map((opcao) => (
+              <button
+                key={opcao.value || 'todos'}
+                type="button"
+                onClick={() => selecionarFiltroStatus(opcao.value)}
+                className={`h-9 rounded-lg border px-3 text-sm font-semibold transition-colors ${
+                  filtrosPedidos.status === opcao.value
+                    ? 'border-blue-500 bg-blue-600 text-white'
+                    : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-blue-50 hover:text-blue-700'
+                }`}
+              >
+                {opcao.label}
+              </button>
+            ))}
+          </div>
+
+          <div className="grid gap-3 lg:grid-cols-[1.1fr_1fr_0.7fr_0.7fr_auto]">
+            <label className="block">
+              <span className="mb-1 block text-xs font-bold uppercase text-slate-500">Buscar</span>
+              <div className="relative">
+                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="search"
+                  value={filtrosPedidos.busca}
+                  onChange={(event) => atualizarFiltroPedidos('busca', event.target.value)}
+                  placeholder="Numero, fornecedor ou observacao"
+                  className="h-10 w-full rounded-lg border border-slate-300 pl-9 pr-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+                />
+              </div>
+            </label>
+
+            <label className="block">
+              <span className="mb-1 block text-xs font-bold uppercase text-slate-500">Fornecedor</span>
+              <select
+                value={filtrosPedidos.fornecedor_id}
+                onChange={(event) => atualizarFiltroPedidos('fornecedor_id', event.target.value)}
+                className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              >
+                <option value="">Todos os fornecedores</option>
+                {fornecedoresOrdenados.map((fornecedor) => (
+                  <option key={fornecedor.id} value={fornecedor.id}>
+                    {fornecedor.nome}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            <label className="block">
+              <span className="mb-1 block text-xs font-bold uppercase text-slate-500">Inicio</span>
+              <input
+                type="date"
+                value={filtrosPedidos.data_inicio}
+                onChange={(event) => atualizarFiltroPedidos('data_inicio', event.target.value)}
+                className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              />
+            </label>
+
+            <label className="block">
+              <span className="mb-1 block text-xs font-bold uppercase text-slate-500">Fim</span>
+              <input
+                type="date"
+                value={filtrosPedidos.data_fim}
+                onChange={(event) => atualizarFiltroPedidos('data_fim', event.target.value)}
+                className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
+              />
+            </label>
+
+            <div className="flex items-end gap-2">
+              <button
+                type="submit"
+                disabled={loadingListaPedidos}
+                className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                <RefreshCw className={`h-4 w-4 ${loadingListaPedidos ? 'animate-spin' : ''}`} />
+                Aplicar
+              </button>
+              <button
+                type="button"
+                onClick={limparFiltrosPedidos}
+                className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                title="Limpar filtros"
+                aria-label="Limpar filtros"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+      </form>
+
       {/* Lista de Pedidos */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
+      <div className="overflow-hidden rounded-lg bg-white shadow-md">
+        <div className="overflow-x-auto">
         <table className="w-full">
           <thead className="bg-gray-50">
             <tr>
@@ -2057,7 +2245,13 @@ const PedidosCompra = () => {
             </tr>
           </thead>
           <tbody>
-            {pedidos.map(pedido => (
+            {pedidos.length === 0 ? (
+              <tr>
+                <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-500">
+                  Nenhum pedido encontrado.
+                </td>
+              </tr>
+            ) : pedidos.map(pedido => (
               <tr 
                 key={pedido.id} 
                 className={`border-t hover:bg-gray-50 ${
@@ -2171,6 +2365,7 @@ const PedidosCompra = () => {
             ))}
           </tbody>
         </table>
+        </div>
       </div>
 
       {/* Modal de Recebimento */}

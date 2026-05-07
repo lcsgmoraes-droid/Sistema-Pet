@@ -409,6 +409,7 @@ def _last_failed_deploy_after_success(deploy_events: list[dict[str, Any]]) -> di
 
 def _build_alerts(
     *,
+    db: Session,
     watchdog: dict[str, Any],
     error_summary: dict[str, Any],
     deploy_events: list[dict[str, Any]],
@@ -490,6 +491,15 @@ def _build_alerts(
         failed = int(queue_snapshot.get("failed") or 0)
         pending = int(queue_snapshot.get("pending") or 0)
         pending_warning = _env_int("OPS_BLING_PEDIDO_QUEUE_PENDING_WARNING", 50)
+        by_tenant = queue_snapshot.get("by_tenant") or []
+        tenant_names = _tenant_names(
+            db,
+            {
+                str(item.get("tenant_id") or item.get("tenant_key") or "")
+                for item in by_tenant
+                if item.get("tenant_id") or item.get("tenant_key")
+            },
+        )
 
         if dead:
             alerts.append(
@@ -522,6 +532,35 @@ def _build_alerts(
                     "detail": f"Fila acima do limite operacional de {pending_warning}.",
                     "action": "Aumentar workers/limite do worker Bling ou investigar gargalo externo.",
                     "source": "bling_pedido_queue",
+                }
+            )
+
+        for item in by_tenant[:5]:
+            tenant_key = str(item.get("tenant_id") or item.get("tenant_key") or "sem_tenant")
+            pending_tenant = int(item.get("pending") or 0)
+            processing_tenant = int(item.get("processing") or 0)
+            failed_tenant = int(item.get("failed") or 0)
+            dead_tenant = int(item.get("dead") or 0)
+            total_open = int(item.get("total_open") or 0)
+            if total_open <= 0:
+                continue
+            if not (dead_tenant or failed_tenant or pending_tenant >= pending_warning or tenant_key == "sem_tenant"):
+                continue
+
+            tenant_name = tenant_names.get(tenant_key) or (
+                "Sem tenant identificado" if tenant_key == "sem_tenant" else f"Tenant {tenant_key[:8]}"
+            )
+            severity = "critical" if dead_tenant or tenant_key == "sem_tenant" else "warning"
+            alerts.append(
+                {
+                    "severity": severity,
+                    "tone": "red" if severity == "critical" else "amber",
+                    "title": f"Fila Bling em {tenant_name}: {total_open} pendencia(s)",
+                    "detail": f"Pendentes {pending_tenant}, processando {processing_tenant}, retry {failed_tenant}, dead {dead_tenant}.",
+                    "action": "Filtrar por tenant e tratar os eventos da fila antes de escalar novos tenants.",
+                    "source": "bling_pedido_queue_tenant",
+                    "tenant_id": None if tenant_key == "sem_tenant" else tenant_key,
+                    "tenant_name": tenant_name,
                 }
             )
 
@@ -630,6 +669,20 @@ def build_ops_dashboard(db: Session, *, since: datetime | None = None, until: da
             except Exception:
                 pass
             queue_snapshot = {"status": "unavailable"}
+    if queue_snapshot.get("by_tenant"):
+        queue_tenant_names = _tenant_names(
+            db,
+            {
+                str(item.get("tenant_id") or item.get("tenant_key") or "")
+                for item in queue_snapshot.get("by_tenant", [])
+                if item.get("tenant_id") or item.get("tenant_key")
+            },
+        )
+        for item in queue_snapshot.get("by_tenant", []):
+            tenant_key = str(item.get("tenant_id") or item.get("tenant_key") or "sem_tenant")
+            item["tenant_name"] = queue_tenant_names.get(tenant_key) or (
+                "Sem tenant identificado" if tenant_key == "sem_tenant" else f"Tenant {tenant_key[:8]}"
+            )
     current_status = _current_health_status(
         watchdog=watchdog,
         error_summary=current_error_summary,
@@ -650,6 +703,7 @@ def build_ops_dashboard(db: Session, *, since: datetime | None = None, until: da
     active_ops_alerts = list_ops_alerts(db, status="open", since=period_since, limit=20)
     recovery_actions = query_recovery_actions(db, since=period_since, until=period_until, limit=20)
     alerts = _build_alerts(
+        db=db,
         watchdog=watchdog,
         error_summary=error_summary,
         deploy_events=deploy_events,

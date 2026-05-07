@@ -647,6 +647,7 @@ def listar_pedidos(
     fornecedor_id: Optional[int] = Query(None, description="Filtrar por fornecedor"),
     data_inicio: Optional[str] = Query(None, description="Data inicial (YYYY-MM-DD)"),
     data_fim: Optional[str] = Query(None, description="Data final (YYYY-MM-DD)"),
+    busca: Optional[str] = Query(None, description="Buscar por numero, fornecedor ou observacao"),
     limit: int = Query(50, le=100),
     offset: int = Query(0, ge=0),
     db: Session = Depends(get_session),
@@ -666,11 +667,40 @@ def listar_pedidos(
     if fornecedor_id:
         query = query.filter(PedidoCompra.fornecedor_id == fornecedor_id)
     if data_inicio:
-        data = datetime.strptime(data_inicio, "%Y-%m-%d")
+        try:
+            data = datetime.strptime(data_inicio, "%Y-%m-%d")
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="data_inicio invalida. Use YYYY-MM-DD") from exc
         query = query.filter(PedidoCompra.data_pedido >= data)
     if data_fim:
-        data = datetime.strptime(data_fim, "%Y-%m-%d")
-        query = query.filter(PedidoCompra.data_pedido <= data)
+        try:
+            data = datetime.strptime(data_fim, "%Y-%m-%d") + timedelta(days=1)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail="data_fim invalida. Use YYYY-MM-DD") from exc
+        query = query.filter(PedidoCompra.data_pedido < data)
+    if busca and busca.strip():
+        termo = f"%{busca.strip()}%"
+        fornecedor_ids = (
+            db.query(Cliente.id)
+            .filter(
+                Cliente.tenant_id == tenant_id,
+                Cliente.tipo_cadastro == "fornecedor",
+                or_(
+                    Cliente.nome.ilike(termo),
+                    Cliente.razao_social.ilike(termo),
+                    Cliente.nome_fantasia.ilike(termo),
+                    Cliente.cnpj.ilike(termo),
+                    Cliente.cpf.ilike(termo),
+                ),
+            )
+        )
+        query = query.filter(
+            or_(
+                PedidoCompra.numero_pedido.ilike(termo),
+                PedidoCompra.observacoes.ilike(termo),
+                PedidoCompra.fornecedor_id.in_(fornecedor_ids),
+            )
+        )
     
     # Ordenar por data decrescente
     query = query.order_by(desc(PedidoCompra.data_pedido))

@@ -63,6 +63,8 @@ export function usePDVProdutoBusca({
       const response = await getProdutosVendaveis({
         busca: termo,
         page_size: 12,
+        contar_total: false,
+        incluir_imagens: false,
         _ts: Date.now(),
       }, {
         signal: controller.signal,

@@ -4,6 +4,7 @@ FastAPI + SQLAlchemy + SQLite/PostgreSQL
 """
 import app.database.orm_guards  # ✅ ORM Guards: força IDs=None antes do flush
 
+import os
 from typing import Optional
 import threading
 import time
@@ -249,6 +250,13 @@ _SEFAZ_LOCK_FILE = "/tmp/sefaz_sync.lock"
 _BACKGROUND_JOBS_LOCK_FILE = "/tmp/petshop_background_jobs.lock"
 _background_jobs_lock_handle = None
 _is_background_jobs_leader = False
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None or raw == "":
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
 
 
 def _try_become_background_jobs_leader() -> bool:
@@ -1049,14 +1057,17 @@ def on_startup():
             logger.error(f"[ERROR] Erro ao iniciar Campaign Scheduler: {str(e)}")
 
         # Iniciar scheduler de sincronização do Bling
-        try:
-            from app.schedulers.bling_sync_scheduler import BlingSyncScheduler
-            global _bling_sync_scheduler
-            _bling_sync_scheduler = BlingSyncScheduler()
-            _bling_sync_scheduler.start()
-            logger.info("[OK] Bling Sync Scheduler iniciado!")
-        except Exception as e:
-            logger.error(f"[ERROR] Erro ao iniciar Bling Sync Scheduler: {str(e)}")
+        if _env_bool("BLING_SYNC_SCHEDULER_ENABLED", True):
+            try:
+                from app.schedulers.bling_sync_scheduler import BlingSyncScheduler
+                global _bling_sync_scheduler
+                _bling_sync_scheduler = BlingSyncScheduler()
+                _bling_sync_scheduler.start()
+                logger.info("[OK] Bling Sync Scheduler iniciado!")
+            except Exception as e:
+                logger.error(f"[ERROR] Erro ao iniciar Bling Sync Scheduler: {str(e)}")
+        else:
+            logger.info("[JOBS] Bling Sync Scheduler desativado neste processo.")
 
         # Iniciar renovação automática de token Bling (a cada 5h)
         global _bling_token_thread

@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 from uuid import UUID
 
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -269,20 +269,66 @@ def process_pending_bling_pedido_webhooks(db: Session, *, limit: int | None = No
 
 def get_bling_pedido_webhook_queue_snapshot(db: Session) -> dict[str, Any]:
     rows = (
-        db.query(BlingPedidoWebhookEvent.status, BlingPedidoWebhookEvent.id)
-        .order_by(BlingPedidoWebhookEvent.id.desc())
-        .limit(5000)
+        db.query(BlingPedidoWebhookEvent.status, func.count(BlingPedidoWebhookEvent.id))
+        .group_by(BlingPedidoWebhookEvent.status)
         .all()
     )
-    counts: dict[str, int] = {}
-    for status, _id in rows:
-        counts[str(status or "unknown")] = counts.get(str(status or "unknown"), 0) + 1
+    counts: dict[str, int] = {
+        str(status or "unknown"): int(total or 0)
+        for status, total in rows
+    }
+    open_statuses = [STATUS_PENDING, STATUS_PROCESSING, STATUS_FAILED, STATUS_DEAD]
+    tenant_rows = (
+        db.query(
+            BlingPedidoWebhookEvent.tenant_id,
+            BlingPedidoWebhookEvent.status,
+            func.count(BlingPedidoWebhookEvent.id),
+            func.min(BlingPedidoWebhookEvent.created_at),
+            func.max(BlingPedidoWebhookEvent.updated_at),
+        )
+        .filter(BlingPedidoWebhookEvent.status.in_(open_statuses))
+        .group_by(BlingPedidoWebhookEvent.tenant_id, BlingPedidoWebhookEvent.status)
+        .all()
+    )
+    tenants: dict[str, dict[str, Any]] = {}
+    for tenant_id, status, total, oldest_at, latest_at in tenant_rows:
+        tenant_key = str(tenant_id) if tenant_id else "sem_tenant"
+        item = tenants.setdefault(
+            tenant_key,
+            {
+                "tenant_id": None if tenant_key == "sem_tenant" else tenant_key,
+                "tenant_key": tenant_key,
+                "pending": 0,
+                "processing": 0,
+                "failed": 0,
+                "dead": 0,
+                "total_open": 0,
+                "oldest_open_at": None,
+                "latest_event_at": None,
+            },
+        )
+        status_key = str(status or "unknown")
+        if status_key in open_statuses:
+            item[status_key] = int(total or 0)
+        item["total_open"] += int(total or 0)
+        if oldest_at and (not item["oldest_open_at"] or oldest_at.isoformat() < item["oldest_open_at"]):
+            item["oldest_open_at"] = oldest_at.isoformat()
+        if latest_at and (not item["latest_event_at"] or latest_at.isoformat() > item["latest_event_at"]):
+            item["latest_event_at"] = latest_at.isoformat()
+
+    by_tenant = sorted(
+        tenants.values(),
+        key=lambda item: (int(item.get("dead") or 0), int(item.get("failed") or 0), int(item.get("total_open") or 0)),
+        reverse=True,
+    )
     return {
-        "total_sampled": len(rows),
+        "total": sum(counts.values()),
+        "total_sampled": sum(counts.values()),
         "pending": counts.get(STATUS_PENDING, 0),
         "processing": counts.get(STATUS_PROCESSING, 0),
         "failed": counts.get(STATUS_FAILED, 0),
         "dead": counts.get(STATUS_DEAD, 0),
         "processed": counts.get(STATUS_PROCESSED, 0),
         "counts": counts,
+        "by_tenant": by_tenant,
     }

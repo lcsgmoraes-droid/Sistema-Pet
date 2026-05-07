@@ -22,7 +22,7 @@ Rodar a partir da maquina local:
 ssh -o BatchMode=yes root@192.241.150.121 "cd /opt/petshop && bash scripts/deploy_producao_seguro.sh"
 ```
 
-O script `scripts/deploy_producao_seguro.sh` e o caminho oficial. Ele faz pull de `origin/main`, gera frontend, reconstrui backend, sobe containers, aplica Alembic e valida health.
+O script `scripts/deploy_producao_seguro.sh` e o caminho oficial. Ele faz pull de `origin/main`, gera frontend, reconstrui a imagem `petshop-backend:prod`, sobe `postgres`, `backend`, `worker-bling` e `nginx`, aplica Alembic e valida health.
 
 ## Validacao apos deploy
 
@@ -39,6 +39,7 @@ curl -fsS https://mlprohub.com.br/api/health/watchdog
 
 - Nunca considerar `git pull` sozinho como deploy de backend.
 - O backend Python roda dentro da imagem Docker; mudanca Python exige rebuild do backend.
+- Os jobs do Bling rodam no container `petshop-prod-worker-bling`; a API deve ficar com `BLING_SYNC_SCHEDULER_ENABLED=false` em producao.
 - Nao usar `docker restart` como deploy de codigo.
 - Nao subir producao se houver multiplas heads Alembic ou repositorio sujo no servidor.
 - Quando a mudanca envolve Ops/observabilidade, validar `/ops` e `/ops/incidentes` depois do health.

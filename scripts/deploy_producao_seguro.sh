@@ -176,12 +176,12 @@ log "Validando docker compose"
 docker compose -f "$COMPOSE_FILE" config --quiet
 
 mark_step "build_backend"
-log "Reconstruindo backend"
+log "Reconstruindo backend e imagem do worker"
 docker compose -f "$COMPOSE_FILE" build backend
 
 mark_step "subir_servicos"
 log "Subindo servicos principais"
-docker compose -f "$COMPOSE_FILE" up -d postgres backend nginx
+docker compose -f "$COMPOSE_FILE" up -d postgres backend worker-bling nginx
 
 mark_step "migrar_banco"
 log "Aplicando migrations Alembic"
@@ -193,6 +193,14 @@ wait_for \
   "backend watchdog" \
   "cd '$APP_DIR' && docker compose -f '$COMPOSE_FILE' exec -T backend curl -fsS --max-time 8 http://127.0.0.1:8000/health/watchdog" \
   30 \
+  5
+
+mark_step "validar_worker_bling"
+log "Aguardando worker Bling"
+wait_for \
+  "worker Bling" \
+  "cd '$APP_DIR' && docker compose -f '$COMPOSE_FILE' exec -T worker-bling test -f /tmp/bling_worker_heartbeat" \
+  24 \
   5
 
 mark_step "validar_health_publico"

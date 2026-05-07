@@ -33,6 +33,7 @@ services:
     build:
       context: ./backend
       dockerfile: Dockerfile.prod
+    image: petshop-backend:prod
     container_name: petshop-prod-backend
     restart: always
     environment:
@@ -76,6 +77,7 @@ services:
       REQUEST_CONTEXT_SLOW_MS: ${REQUEST_CONTEXT_SLOW_MS:-3000}
       REQUEST_LOGGING_SLOW_MS: ${REQUEST_LOGGING_SLOW_MS:-3000}
       ERROR_REPORT_SLOW_REQUEST_MS: ${ERROR_REPORT_SLOW_REQUEST_MS:-3000}
+      BLING_SYNC_SCHEDULER_ENABLED: ${BLING_SYNC_SCHEDULER_ENABLED:-false}
       BLING_PEDIDO_WEBHOOK_ASYNC: ${BLING_PEDIDO_WEBHOOK_ASYNC:-true}
       BLING_PEDIDO_WEBHOOK_QUEUE_INTERVAL_SECONDS: ${BLING_PEDIDO_WEBHOOK_QUEUE_INTERVAL_SECONDS:-5}
       BLING_PEDIDO_WEBHOOK_QUEUE_LIMIT: ${BLING_PEDIDO_WEBHOOK_QUEUE_LIMIT:-20}
@@ -136,6 +138,64 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    logging:
+      driver: json-file
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # ========================================
+  # WORKER BLING - JOBS E RECONCILIACOES
+  # ========================================
+  worker-bling:
+    image: petshop-backend:prod
+    container_name: petshop-prod-worker-bling
+    restart: always
+    command: ["python", "scripts/run_bling_worker.py"]
+    environment:
+      DATABASE_URL: postgresql://petshop_admin:${POSTGRES_PASSWORD}@postgres:5432/petshop_prod
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      JWT_ALGORITHM: HS256
+      ENVIRONMENT: production
+      DEBUG: "false"
+      SQL_AUDIT_ENFORCE: "true"
+      SQL_AUDIT_ENFORCE_LEVEL: error
+      SQLALCHEMY_POOL_SIZE: ${BLING_WORKER_SQLALCHEMY_POOL_SIZE:-3}
+      SQLALCHEMY_MAX_OVERFLOW: ${BLING_WORKER_SQLALCHEMY_MAX_OVERFLOW:-4}
+      SQLALCHEMY_POOL_TIMEOUT: ${SQLALCHEMY_POOL_TIMEOUT:-10}
+      SQLALCHEMY_POOL_RECYCLE: ${SQLALCHEMY_POOL_RECYCLE:-1800}
+      BLING_SYNC_SCHEDULER_ENABLED: "true"
+      BLING_PEDIDO_WEBHOOK_QUEUE_INTERVAL_SECONDS: ${BLING_PEDIDO_WEBHOOK_QUEUE_INTERVAL_SECONDS:-5}
+      BLING_PEDIDO_WEBHOOK_QUEUE_LIMIT: ${BLING_PEDIDO_WEBHOOK_QUEUE_LIMIT:-20}
+      BLING_PEDIDO_WEBHOOK_MAX_ATTEMPTS: ${BLING_PEDIDO_WEBHOOK_MAX_ATTEMPTS:-6}
+      BLING_CLIENT_ID: ${BLING_CLIENT_ID}
+      BLING_CLIENT_SECRET: ${BLING_CLIENT_SECRET}
+      BLING_ACCESS_TOKEN: ${BLING_ACCESS_TOKEN:-}
+      BLING_REFRESH_TOKEN: ${BLING_REFRESH_TOKEN:-}
+      BLING_DEPOSITO_ID: ${BLING_DEPOSITO_ID:-14887364871}
+      BLING_WEBHOOK_TENANT_ID: ${BLING_WEBHOOK_TENANT_ID:-180d9cbf-5dcb-4676-bf11-dcbd91ed444b}
+      WHATSAPP_ORCHESTRATOR_INTERNAL_TOKEN: ${WHATSAPP_ORCHESTRATOR_INTERNAL_TOKEN:-dev_whatsapp_internal_token}
+      WHATSAPP_DEFAULT_PROVIDER: ${WHATSAPP_DEFAULT_PROVIDER:-waha}
+      WAHA_BASE_URL: ${WAHA_BASE_URL:-http://waha:3000}
+      WAHA_API_KEY: ${WAHA_API_KEY:-}
+      TZ: America/Sao_Paulo
+    volumes:
+      - ./backend/uploads:/app/uploads
+      - ./backend/logs:/app/logs
+      - ./backend/data:/app/data
+      - ./backend/secrets:/app/secrets
+      - /opt/petshop/.env:/opt/petshop/.env:rw
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - petshop-network
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /tmp/bling_worker_heartbeat && find /tmp/bling_worker_heartbeat -mmin -2 | grep -q ."]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     logging:
       driver: json-file
       options:

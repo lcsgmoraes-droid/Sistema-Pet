@@ -116,6 +116,101 @@ function AlertPanel({ alerts }) {
   );
 }
 
+function CurrentStatusPanel({ currentStatus, watchdog }) {
+  const status = currentStatus?.status || watchdog?.status;
+  const tone = statusTone(status);
+
+  return (
+    <section className={`rounded-lg border p-4 shadow-sm ${toneClasses(tone)}`}>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-xs font-bold uppercase text-slate-500">
+            <FiCheckCircle className="h-4 w-4" />
+            Agora
+          </div>
+          <h2 className="mt-2 text-2xl font-black text-slate-950">{currentStatus?.title || "Status atual"}</h2>
+          <p className="mt-1 max-w-3xl text-sm text-slate-700">{currentStatus?.detail || "Health em tempo real."}</p>
+          {currentStatus?.action ? <p className="mt-2 text-sm font-semibold text-slate-900">{currentStatus.action}</p> : null}
+        </div>
+        <div className="grid min-w-[280px] grid-cols-3 gap-2 text-sm">
+          <div className="rounded-lg bg-white/70 px-3 py-2">
+            <div className="text-xs font-semibold uppercase text-slate-500">Status</div>
+            <div className="mt-1 font-bold">{statusLabel(status)}</div>
+          </div>
+          <div className="rounded-lg bg-white/70 px-3 py-2">
+            <div className="text-xs font-semibold uppercase text-slate-500">Janela</div>
+            <div className="mt-1 font-bold">{currentStatus?.window_minutes || "-"} min</div>
+          </div>
+          <div className="rounded-lg bg-white/70 px-3 py-2">
+            <div className="text-xs font-semibold uppercase text-slate-500">Banco</div>
+            <div className="mt-1 font-bold">{watchdog?.latency_ms ? formatMs(watchdog.latency_ms) : statusLabel(watchdog?.status)}</div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function BlingQueuePanel({ queue }) {
+  const tenants = queue?.by_tenant || [];
+  const hasBacklog = tenants.some((item) => Number(item.total_open || 0) > 0);
+
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h2 className="text-base font-bold text-slate-900">Fila Bling por tenant</h2>
+          <p className="text-sm text-slate-500">Pendencias abertas separadas por cliente.</p>
+        </div>
+        <FiDatabase className="h-5 w-5 text-slate-500" />
+      </div>
+      <div className="mt-4 grid gap-3 md:grid-cols-4">
+        <div className={`rounded-lg px-3 py-3 text-sm ${Number(queue?.pending || 0) ? "bg-amber-50 text-amber-900" : "bg-emerald-50 text-emerald-900"}`}>
+          <div className="text-xs font-semibold uppercase opacity-70">Pendentes</div>
+          <div className="mt-1 text-lg font-bold">{queue?.pending ?? 0}</div>
+        </div>
+        <div className="rounded-lg bg-blue-50 px-3 py-3 text-sm text-blue-900">
+          <div className="text-xs font-semibold uppercase opacity-70">Processando</div>
+          <div className="mt-1 text-lg font-bold">{queue?.processing ?? 0}</div>
+        </div>
+        <div className={`rounded-lg px-3 py-3 text-sm ${Number(queue?.failed || 0) ? "bg-amber-50 text-amber-900" : "bg-slate-50 text-slate-800"}`}>
+          <div className="text-xs font-semibold uppercase opacity-70">Retry</div>
+          <div className="mt-1 text-lg font-bold">{queue?.failed ?? 0}</div>
+        </div>
+        <div className={`rounded-lg px-3 py-3 text-sm ${Number(queue?.dead || 0) ? "bg-rose-50 text-rose-900" : "bg-slate-50 text-slate-800"}`}>
+          <div className="text-xs font-semibold uppercase opacity-70">Dead</div>
+          <div className="mt-1 text-lg font-bold">{queue?.dead ?? 0}</div>
+        </div>
+      </div>
+      <div className="mt-4 space-y-2">
+        {!hasBacklog ? (
+          <div className="rounded-lg bg-emerald-50 px-3 py-3 text-sm font-semibold text-emerald-800">Nenhuma pendencia aberta na fila.</div>
+        ) : (
+          tenants.slice(0, 8).map((item) => {
+            const tenantName = item.tenant_name || (item.tenant_id ? `Tenant ${String(item.tenant_id).slice(0, 8)}` : "Sem tenant identificado");
+            return (
+              <div key={item.tenant_key || item.tenant_id || tenantName} className="rounded-lg border border-slate-100 bg-slate-50 px-3 py-3">
+                <div className="flex items-center justify-between gap-3">
+                  <span className="truncate text-sm font-bold text-slate-800" title={tenantName}>{tenantName}</span>
+                  <span className={`rounded-full px-2 py-0.5 text-xs font-bold ${toneClasses(Number(item.dead || 0) ? "red" : Number(item.failed || 0) ? "amber" : "blue")}`}>
+                    {item.total_open || 0}
+                  </span>
+                </div>
+                <div className="mt-2 grid grid-cols-4 gap-2 text-xs text-slate-600">
+                  <span>Pend: <b>{item.pending || 0}</b></span>
+                  <span>Proc: <b>{item.processing || 0}</b></span>
+                  <span>Retry: <b>{item.failed || 0}</b></span>
+                  <span>Dead: <b>{item.dead || 0}</b></span>
+                </div>
+              </div>
+            );
+          })
+        )}
+      </div>
+    </section>
+  );
+}
+
 function DeployPanel({ deploys }) {
   const items = deploys?.latest || [];
 
@@ -311,6 +406,7 @@ export default function OpsDashboard() {
   const lastDeploy = deploys?.latest?.[0];
   const currentStatus = dashboard?.current_status;
   const periodStatus = dashboard?.period_status || dashboard?.status;
+  const blingQueue = dashboard?.queues?.bling_pedido_webhooks;
 
   return (
     <div className="p-6">
@@ -357,6 +453,8 @@ export default function OpsDashboard() {
           </div>
         ) : null}
 
+        <CurrentStatusPanel currentStatus={currentStatus} watchdog={watchdog} />
+
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-6">
           <MetricCard
             icon={FiCheckCircle}
@@ -369,7 +467,7 @@ export default function OpsDashboard() {
             icon={FiActivity}
             label="Historico 24h"
             value={statusLabel(periodStatus)}
-            detail="Erros, lentidao e recuperacoes do periodo"
+            detail="Memoria do periodo; nao muda o verde de agora"
             tone={statusTone(periodStatus)}
           />
           <MetricCard
@@ -408,6 +506,8 @@ export default function OpsDashboard() {
         </div>
 
         <SelfHealingPanel selfHealing={selfHealing} watchdogEvents={watchdogEvents} />
+
+        <BlingQueuePanel queue={blingQueue} />
 
         <div className="grid gap-4 xl:grid-cols-2">
           <TenantIncidentsPanel items={dashboard?.tenant_incidents || []} />

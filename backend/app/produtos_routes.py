@@ -2068,6 +2068,8 @@ def listar_produtos_vendaveis(
     estoque_baixo: Optional[bool] = False,
     em_promocao: Optional[bool] = False,
     ativo: Optional[bool] = True,
+    contar_total: bool = True,
+    incluir_imagens: bool = False,
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
@@ -2127,24 +2129,26 @@ def listar_produtos_vendaveis(
             Produto.promocao_fim >= datetime.utcnow()
         )
 
-    # TOTAL
-    total = query.count()
-
     # PAGINAÃ‡ÃƒO
     offset = (page - 1) * page_size
+    total = query.count() if contar_total else None
 
     # OrdenaÃ§Ã£o inteligente: prioriza match exato no cÃ³digo
     order_clause = _build_produto_search_order_clause(termo_busca)
+    load_options = [
+        joinedload(Produto.categoria),
+        joinedload(Produto.marca),
+        noload(Produto.lotes),
+    ]
+    if incluir_imagens:
+        load_options.append(joinedload(Produto.imagens))
+    else:
+        load_options.append(noload(Produto.imagens))
 
     # QUERY FINAL
     produtos = (
         query
-        .options(
-            joinedload(Produto.categoria),
-            joinedload(Produto.marca),
-            joinedload(Produto.imagens),
-            noload(Produto.lotes),
-        )
+        .options(*load_options)
         .order_by(*order_clause)
         .offset(offset)
         .limit(page_size)
@@ -2164,6 +2168,8 @@ def listar_produtos_vendaveis(
             incluir_detalhes_composto=False,
         )
 
+    if total is None:
+        total = offset + len(produtos)
     pages = (total + page_size - 1) // page_size
 
     return {
