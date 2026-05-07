@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import api from '../api';
 import { toast } from 'react-hot-toast';
-import { Filter, RefreshCw, Search, X } from 'lucide-react';
 import ModalConfronto from './compras/ModalConfronto';
-import ExportActionButton from './ui/ExportActionButton';
+import PedidosCompraFiltros from './compras/PedidosCompraFiltros';
+import PedidosCompraTabela from './compras/PedidosCompraTabela';
 
 const FORM_DATA_INICIAL = {
   fornecedor_id: '',
@@ -35,16 +35,6 @@ const FILTROS_PEDIDOS_INICIAL = {
   data_inicio: '',
   data_fim: ''
 };
-
-const STATUS_PEDIDO_OPTIONS = [
-  { value: '', label: 'Todos' },
-  { value: 'rascunho', label: 'Rascunho' },
-  { value: 'enviado', label: 'Enviado' },
-  { value: 'confirmado', label: 'Confirmado' },
-  { value: 'recebido_parcial', label: 'Parcial' },
-  { value: 'recebido_total', label: 'Recebido' },
-  { value: 'cancelado', label: 'Cancelado' }
-];
 
 const COLUNAS_DOCUMENTO_PEDIDO = [
   { chave: 'codigo', label: 'Codigo / SKU' },
@@ -1829,22 +1819,6 @@ const PedidosCompra = () => {
     }
   };
 
-  const getStatusBadge = (status) => {
-    const styles = {
-      rascunho: 'bg-gray-200 text-gray-800',
-      enviado: 'bg-blue-200 text-blue-800',
-      confirmado: 'bg-green-200 text-green-800',
-      recebido_parcial: 'bg-yellow-200 text-yellow-800',
-      recebido_total: 'bg-green-500 text-white',
-      cancelado: 'bg-red-200 text-red-800'
-    };
-    return (
-      <span className={`px-3 py-1 rounded-full text-sm font-semibold ${styles[status] || 'bg-gray-200'}`}>
-        {status.replace('_', ' ').toUpperCase()}
-      </span>
-    );
-  };
-
   return (
     <div className="p-6">
       <div className="mb-6 flex justify-between items-center">
@@ -2194,255 +2168,33 @@ const PedidosCompra = () => {
         </div>
       )}
 
-      <form
-        onSubmit={aplicarFiltrosPedidos}
-        className="mb-4 rounded-lg border border-slate-200 bg-white p-4 shadow-sm"
-      >
-        <div className="flex flex-col gap-4">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-2">
-              <Filter className="h-5 w-5 text-blue-600" />
-              <div>
-                <h2 className="text-base font-bold text-slate-900">Filtros</h2>
-                <p className="text-sm text-slate-500">{pedidos.length} pedido(s) na lista</p>
-              </div>
-            </div>
-            {filtrosPedidosAtivos > 0 && (
-              <span className="rounded-full bg-blue-50 px-3 py-1 text-xs font-bold text-blue-700">
-                {filtrosPedidosAtivos} filtro(s) ativo(s)
-              </span>
-            )}
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {STATUS_PEDIDO_OPTIONS.map((opcao) => (
-              <button
-                key={opcao.value || 'todos'}
-                type="button"
-                onClick={() => selecionarFiltroStatus(opcao.value)}
-                className={`h-9 rounded-lg border px-3 text-sm font-semibold transition-colors ${
-                  filtrosPedidos.status === opcao.value
-                    ? 'border-blue-500 bg-blue-600 text-white'
-                    : 'border-slate-200 bg-slate-50 text-slate-700 hover:bg-blue-50 hover:text-blue-700'
-                }`}
-              >
-                {opcao.label}
-              </button>
-            ))}
-          </div>
-
-          <div className="grid gap-3 lg:grid-cols-[1.1fr_1fr_0.7fr_0.7fr_auto]">
-            <label className="block">
-              <span className="mb-1 block text-xs font-bold uppercase text-slate-500">Buscar</span>
-              <div className="relative">
-                <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  type="search"
-                  value={filtrosPedidos.busca}
-                  onChange={(event) => atualizarFiltroPedidos('busca', event.target.value)}
-                  placeholder="Numero, fornecedor ou observacao"
-                  className="h-10 w-full rounded-lg border border-slate-300 pl-9 pr-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-                />
-              </div>
-            </label>
-
-            <label className="block">
-              <span className="mb-1 block text-xs font-bold uppercase text-slate-500">Fornecedor</span>
-              <select
-                value={filtrosPedidos.fornecedor_id}
-                onChange={(event) => atualizarFiltroPedidos('fornecedor_id', event.target.value)}
-                className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-              >
-                <option value="">Todos os fornecedores</option>
-                {fornecedoresOrdenados.map((fornecedor) => (
-                  <option key={fornecedor.id} value={fornecedor.id}>
-                    {fornecedor.nome}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <label className="block">
-              <span className="mb-1 block text-xs font-bold uppercase text-slate-500">Inicio</span>
-              <input
-                type="date"
-                value={filtrosPedidos.data_inicio}
-                onChange={(event) => atualizarFiltroPedidos('data_inicio', event.target.value)}
-                className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-              />
-            </label>
-
-            <label className="block">
-              <span className="mb-1 block text-xs font-bold uppercase text-slate-500">Fim</span>
-              <input
-                type="date"
-                value={filtrosPedidos.data_fim}
-                onChange={(event) => atualizarFiltroPedidos('data_fim', event.target.value)}
-                className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-              />
-            </label>
-
-            <div className="flex items-end gap-2">
-              <button
-                type="submit"
-                disabled={loadingListaPedidos}
-                className="inline-flex h-10 items-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                <RefreshCw className={`h-4 w-4 ${loadingListaPedidos ? 'animate-spin' : ''}`} />
-                Aplicar
-              </button>
-              <button
-                type="button"
-                onClick={limparFiltrosPedidos}
-                className="inline-flex h-10 items-center justify-center rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 hover:bg-slate-50"
-                title="Limpar filtros"
-                aria-label="Limpar filtros"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        </div>
-      </form>
+      <PedidosCompraFiltros
+        filtrosPedidos={filtrosPedidos}
+        filtrosPedidosAtivos={filtrosPedidosAtivos}
+        fornecedoresOrdenados={fornecedoresOrdenados}
+        loadingListaPedidos={loadingListaPedidos}
+        onAplicar={aplicarFiltrosPedidos}
+        onAtualizarFiltro={atualizarFiltroPedidos}
+        onLimpar={limparFiltrosPedidos}
+        onSelecionarStatus={selecionarFiltroStatus}
+        pedidosCount={pedidos.length}
+      />
 
       {/* Lista de Pedidos */}
-      <div className="overflow-hidden rounded-lg bg-white shadow-md">
-        <div className="overflow-x-auto">
-        <table className="w-full">
-          <thead className="bg-gray-50">
-            <tr>
-              <th className="px-4 py-3 text-left text-sm font-semibold">Número</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold">Fornecedor</th>
-              <th className="px-4 py-3 text-left text-sm font-semibold">Data</th>
-              <th className="px-4 py-3 text-right text-sm font-semibold">Valor</th>
-              <th className="px-4 py-3 text-center text-sm font-semibold">Status</th>
-              <th className="px-4 py-3 text-center text-sm font-semibold">Ações</th>
-            </tr>
-          </thead>
-          <tbody>
-            {pedidos.length === 0 ? (
-              <tr>
-                <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-500">
-                  Nenhum pedido encontrado.
-                </td>
-              </tr>
-            ) : pedidos.map(pedido => (
-              <tr 
-                key={pedido.id} 
-                className={`border-t hover:bg-gray-50 ${
-                  pedido.status === 'rascunho' ? 'cursor-pointer' : ''
-                }`}
-                onClick={() => pedido.status === 'rascunho' && abrirEdicao(pedido)}
-                title={pedido.status === 'rascunho' ? 'Clique para editar' : ''}
-              >
-                <td className="px-4 py-3">
-                  <div className="flex items-center gap-2">
-                    {pedido.numero_pedido}
-                    {pedido.foi_alterado_apos_envio && (
-                      <span className="px-2 py-1 text-xs bg-orange-100 text-orange-700 rounded font-semibold" title="Este pedido foi alterado após o envio">
-                        ⚠️ Alterado
-                      </span>
-                    )}
-                  </div>
-                </td>
-                <td className="px-4 py-3">{obterFornecedorPorId(pedido.fornecedor_id)?.nome || pedido.fornecedor_id}</td>
-                <td className="px-4 py-3">{new Date(pedido.data_pedido).toLocaleDateString()}</td>
-                <td className="px-4 py-3 text-right font-semibold">R$ {pedido.valor_final.toFixed(2)}</td>
-                <td className="px-4 py-3 text-center">{getStatusBadge(pedido.status)}</td>
-                <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                  <div className="flex justify-center gap-2">
-                    {/* Botão Ver Detalhes */}
-                    <button
-                      onClick={() => verDetalhes(pedido)}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 border border-gray-200 bg-white text-gray-700 rounded-md hover:bg-gray-50 text-xs font-semibold"
-                      title="Ver detalhes completos do pedido"
-                    >
-                      🔍 Ver
-                    </button>
-
-                    {/* Botões de exportação - sempre disponíveis */}
-                    <ExportActionButton
-                      type="pdf"
-                      onClick={() => exportarPDF(pedido.id)}
-                      title="Exportar PDF"
-                    >
-                      PDF
-                    </ExportActionButton>
-                    <ExportActionButton
-                      type="excel"
-                      onClick={() => exportarExcel(pedido.id)}
-                      title="Exportar Excel"
-                    >
-                      Excel
-                    </ExportActionButton>
-                    
-                    {/* Ações por status */}
-                    {pedido.status === 'rascunho' && (
-                      <button
-                        onClick={() => enviarPedido(pedido)}
-                        className="inline-flex items-center gap-1 px-3 py-1 border border-blue-200 bg-blue-50 text-blue-700 rounded-md hover:bg-blue-100 text-xs font-semibold"
-                        title="Enviar pedido ao fornecedor"
-                      >
-                        📤 Enviar
-                      </button>
-                    )}
-                    {pedido.status === 'enviado' && (
-                      <button
-                        onClick={() => confirmarPedido(pedido.id)}
-                        className="inline-flex items-center gap-1 px-3 py-1 border border-emerald-200 bg-emerald-50 text-emerald-700 rounded-md hover:bg-emerald-100 text-xs font-semibold"
-                        title="Confirmar recebimento do pedido pelo fornecedor"
-                      >
-                        ✅ Confirmar
-                      </button>
-                    )}
-                    {(pedido.status === 'confirmado' || pedido.status === 'recebido_parcial') && (
-                      <button
-                        onClick={() => abrirConfronto(pedido)}
-                        className="inline-flex items-center gap-1 px-3 py-1 border border-violet-200 bg-violet-50 text-violet-700 rounded-md hover:bg-violet-100 text-xs font-semibold"
-                        title="Confrontar pedido com NF fiscal"
-                      >
-                        🔍 Conferir NF
-                      </button>
-                    )}
-                    {(pedido.status === 'confirmado' || pedido.status === 'recebido_parcial') && (
-                      <button
-                        onClick={() => abrirRecebimento(pedido)}
-                        className="inline-flex items-center gap-1 px-3 py-1 border border-gray-200 bg-gray-50 text-gray-600 rounded-md hover:bg-gray-100 text-xs font-semibold"
-                        title="Registrar entrada de produtos no estoque (legado)"
-                      >
-                        📦 Receber
-                      </button>
-                    )}
-
-                    {/* Botão Reverter - exceto para rascunho */}
-                    {pedido.status !== 'rascunho' && pedido.status !== 'recebido_total' && (
-                      <button
-                        onClick={() => reverterStatus(pedido.id)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 border border-amber-200 bg-amber-50 text-amber-700 rounded-md hover:bg-amber-100 text-xs font-semibold"
-                        title="Reverter para status anterior"
-                      >
-                        ⏪ Reverter
-                      </button>
-                    )}
-
-                    {pedido.status !== 'recebido_total' && pedido.status !== 'cancelado' && (
-                      <button
-                        onClick={() => cancelarPedido(pedido)}
-                        className="inline-flex items-center gap-1 px-2.5 py-1 border border-rose-200 bg-rose-50 text-rose-700 rounded-md hover:bg-rose-100 text-xs font-semibold"
-                        title={pedido.status === 'rascunho' ? 'Cancelar/Excluir pedido em rascunho' : 'Cancelar pedido'}
-                      >
-                        🗑️ {pedido.status === 'rascunho' ? 'Excluir' : 'Cancelar'}
-                      </button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        </div>
-      </div>
-
+      <PedidosCompraTabela
+        abrirConfronto={abrirConfronto}
+        abrirEdicao={abrirEdicao}
+        abrirRecebimento={abrirRecebimento}
+        cancelarPedido={cancelarPedido}
+        confirmarPedido={confirmarPedido}
+        enviarPedido={enviarPedido}
+        exportarExcel={exportarExcel}
+        exportarPDF={exportarPDF}
+        obterFornecedorPorId={obterFornecedorPorId}
+        pedidos={pedidos}
+        reverterStatus={reverterStatus}
+        verDetalhes={verDetalhes}
+      />
       {/* Modal de Recebimento */}
       {mostrarRecebimento && pedidoSelecionado && (
         <ModalRecebimento

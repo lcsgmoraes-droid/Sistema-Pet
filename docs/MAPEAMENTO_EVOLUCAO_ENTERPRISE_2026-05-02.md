@@ -814,6 +814,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-03: DRE avancou na padronizacao financeira com acoes principais, presets, paginacao e detalhes usando `ActionButton`, alem da tabela principal e da tabela de lancamentos migradas para `DataTable`.
 - 2026-05-03: Fluxo de Caixa substituiu a tabela manual de previsto/realizado por `DataTable` com linhas expansivas, valores por `MoneyCell`, status por `StatusBadge` e erro via toast em vez de alerta bloqueante.
 - 2026-05-03: modais de `ContasPagar` e `ContasReceber` tiveram acoes de confirmar/cancelar/fechar e atalhos de fluxo/venda alinhados ao padrao `ActionButton`, mantendo intencao de cor e tamanho consistente.
+- 2026-05-07: `Compras/Pedidos` iniciou a fatia enterprise segura: filtros da listagem extraidos para `PedidosCompraFiltros`, tabela de pedidos extraida para `PedidosCompraTabela` e acoes/status/valor da lista passaram a consumir `ActionButton`, `StatusBadge` e `MoneyCell` sem alterar a regra de negocio.
 
 ### Nao fazer nesta onda
 
