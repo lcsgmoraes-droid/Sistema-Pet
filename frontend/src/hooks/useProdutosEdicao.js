@@ -111,7 +111,7 @@ export default function useProdutosEdicao({
     setModalEdicaoLote(true);
   };
 
-  const handleSalvarEdicaoLote = async () => {
+  const handleSalvarEdicaoLote = async (opcoes = {}) => {
     try {
       const camposPreenchidos = Object.values(dadosEdicaoLote).filter(
         (value) => value !== "",
@@ -214,9 +214,10 @@ export default function useProdutosEdicao({
       }
 
       if (dadosEnvio.fornecedor_operacao === "definir_principal") {
-        dadosEnvio.fornecedor_remover_outros = window.confirm(
-          "Adicionar este fornecedor como principal e remover os outros fornecedores vinculados? OK remove os outros. Cancelar mantem como alternativos.",
-        );
+        dadosEnvio.fornecedor_remover_outros =
+          typeof opcoes.fornecedorRemoverOutros === "boolean"
+            ? opcoes.fornecedorRemoverOutros
+            : false;
       }
 
       await api.patch("/produtos/atualizar-lote", {

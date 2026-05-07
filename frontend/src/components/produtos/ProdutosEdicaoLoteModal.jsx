@@ -66,6 +66,7 @@ export default function ProdutosEdicaoLoteModal({
   setDadosEdicaoLote,
 }) {
   const [loadingOpcoesRacao, setLoadingOpcoesRacao] = useState(false);
+  const [mostrarDecisaoFornecedor, setMostrarDecisaoFornecedor] = useState(false);
   const [opcoesRacao, setOpcoesRacao] = useState({
     linhas: [],
     portes: [],
@@ -119,6 +120,12 @@ export default function ProdutosEdicaoLoteModal({
     };
   }, [isOpen]);
 
+  useEffect(() => {
+    if (!isOpen || dadosEdicaoLote.fornecedor_operacao !== "definir_principal") {
+      setMostrarDecisaoFornecedor(false);
+    }
+  }, [dadosEdicaoLote.fornecedor_operacao, isOpen]);
+
   if (!isOpen) return null;
 
   const atualizarCampo = (campo, valor) => {
@@ -149,6 +156,28 @@ export default function ProdutosEdicaoLoteModal({
 
   const fornecedorExigeSelecao =
     dadosEdicaoLote.fornecedor_operacao && dadosEdicaoLote.fornecedor_operacao !== "remover";
+  const fornecedorSelecionado = fornecedores.find(
+    (fornecedor) => Number(fornecedor.id) === Number(dadosEdicaoLote.fornecedor_id),
+  );
+  const nomeFornecedorSelecionado =
+    fornecedorSelecionado?.nome
+    || fornecedorSelecionado?.razao_social
+    || fornecedorSelecionado?.nome_fantasia
+    || "Fornecedor selecionado";
+
+  const salvarComDecisaoFornecedor = () => {
+    if (dadosEdicaoLote.fornecedor_operacao === "definir_principal" && dadosEdicaoLote.fornecedor_id) {
+      setMostrarDecisaoFornecedor(true);
+      return;
+    }
+
+    onSalvar();
+  };
+
+  const confirmarDecisaoFornecedor = (fornecedorRemoverOutros) => {
+    setMostrarDecisaoFornecedor(false);
+    onSalvar({ fornecedorRemoverOutros });
+  };
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
@@ -514,13 +543,96 @@ export default function ProdutosEdicaoLoteModal({
             Cancelar
           </button>
           <button
-            onClick={onSalvar}
+            onClick={salvarComDecisaoFornecedor}
             className="flex-1 rounded-lg bg-blue-600 px-4 py-2 font-medium text-white transition-colors hover:bg-blue-700"
           >
             Salvar alteracoes
           </button>
         </div>
       </div>
+
+      {mostrarDecisaoFornecedor && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm">
+          <div className="w-full max-w-xl overflow-hidden rounded-2xl bg-white shadow-2xl">
+            <div className="border-b border-slate-100 px-6 py-5">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-700">
+                    Fornecedor principal
+                  </p>
+                  <h3 className="mt-1 text-xl font-bold text-slate-950">
+                    Como tratar os fornecedores atuais?
+                  </h3>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">
+                    Voce esta definindo <strong>{nomeFornecedorSelecionado}</strong> como principal em{" "}
+                    <strong>{selecionadosCount}</strong> produto(s). Escolha se os outros fornecedores
+                    continuam como alternativa ou se devem sair do cadastro destes produtos.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setMostrarDecisaoFornecedor(false)}
+                  className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
+                  aria-label="Fechar"
+                >
+                  <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              </div>
+            </div>
+
+            <div className="grid gap-3 px-6 py-5 md:grid-cols-2">
+              <button
+                type="button"
+                onClick={() => confirmarDecisaoFornecedor(false)}
+                className="group rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-blue-300 hover:bg-blue-50"
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+                  A
+                </span>
+                <span className="mt-4 block text-base font-semibold text-slate-950">
+                  Manter alternativos
+                </span>
+                <span className="mt-2 block text-sm leading-5 text-slate-600">
+                  O novo fornecedor vira principal, e os fornecedores atuais continuam vinculados para consulta,
+                  historico e futuras compras.
+                </span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => confirmarDecisaoFornecedor(true)}
+                className="group rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-left transition hover:border-emerald-400 hover:bg-emerald-100"
+              >
+                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">
+                  B
+                </span>
+                <span className="mt-4 block text-base font-semibold text-emerald-950">
+                  Remover os outros
+                </span>
+                <span className="mt-2 block text-sm leading-5 text-emerald-900">
+                  Mantem somente o fornecedor escolhido. Bom para limpar linhas antigas ou fornecedores que nao
+                  devem mais aparecer nas sugestoes.
+                </span>
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between gap-3 bg-slate-50 px-6 py-4">
+              <p className="text-xs text-slate-500">
+                Nenhuma alteracao sera aplicada ate voce escolher uma das opcoes.
+              </p>
+              <button
+                type="button"
+                onClick={() => setMostrarDecisaoFornecedor(false)}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-white"
+              >
+                Voltar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
