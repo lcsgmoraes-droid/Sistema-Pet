@@ -819,6 +819,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-07: `Compras/Pedidos` teve os modais restantes de rascunho, recebimento, exportacao e envio extraidos para `components/compras`, com o seletor de colunas do documento centralizado em `pedidoDocumentoColunas`, mantendo a regra de negocio na pagina principal.
 - 2026-05-07: `Compras/Pedidos` teve o formulario de novo/editar pedido extraido para `PedidoCompraFormulario`, mantendo carregamento, sugestao, submit e estado no componente pai.
 - 2026-05-07: `Compras/Pedidos` moveu helpers puros de normalizacao, consolidacao de itens e download de documento para `pedidoCompraUtils`, deixando a pagina focada em estado e orquestracao.
+- 2026-05-07: `Compras/Pedidos` agrupou a renderizacao dos modais em `PedidosCompraModalsLayer`, reduzindo o JSX da pagina principal sem mover regras de envio, recebimento, rascunho ou sugestao.
 
 ### Nao fazer nesta onda
 

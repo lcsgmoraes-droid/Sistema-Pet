@@ -1,16 +1,10 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import api from '../api';
 import { toast } from 'react-hot-toast';
-import ModalConfronto from './compras/ModalConfronto';
-import ModalGruposFornecedores from './compras/ModalGruposFornecedores';
 import PedidoCompraFormulario from './compras/PedidoCompraFormulario';
 import PedidosCompraFiltros from './compras/PedidosCompraFiltros';
-import PedidosCompraSugestaoModal from './compras/PedidosCompraSugestaoModal';
+import PedidosCompraModalsLayer from './compras/PedidosCompraModalsLayer';
 import PedidosCompraTabela from './compras/PedidosCompraTabela';
-import ModalDecisaoRascunho from './compras/ModalDecisaoRascunho';
-import ModalEnvioPedido from './compras/ModalEnvioPedido';
-import ModalExportacaoPedido from './compras/ModalExportacaoPedido';
-import ModalRecebimento from './compras/ModalRecebimento';
 import {
   COLUNAS_DOCUMENTO_COMPLETO,
   normalizarColunasDocumentoPedido,
@@ -684,6 +678,15 @@ const PedidosCompra = () => {
       console.error('Erro ao excluir grupo de fornecedor:', error);
       toast.error(error.response?.data?.detail || 'Erro ao excluir grupo de fornecedor');
     }
+  };
+
+  const fecharModalGruposFornecedores = () => {
+    setMostrarModalGruposFornecedores(false);
+    setGrupoFornecedorForm(GRUPO_FORNECEDOR_FORM_INICIAL);
+  };
+
+  const iniciarNovoGrupoFornecedor = () => {
+    setGrupoFornecedorForm(GRUPO_FORNECEDOR_FORM_INICIAL);
   };
 
   const preencherPreco = (produtoId) => {
@@ -1750,84 +1753,50 @@ const PedidosCompra = () => {
         reverterStatus={reverterStatus}
         verDetalhes={verDetalhes}
       />
-      {/* Modal de Recebimento */}
-      {mostrarRecebimento && pedidoSelecionado && (
-        <ModalRecebimento
-          pedido={pedidoSelecionado}
-          onClose={() => {
-            setMostrarRecebimento(false);
-            setPedidoSelecionado(null);
-          }}
-          onReceber={receberPedido}
-        />
-      )}
-
-      {/* Modal de Confronto Pedido x NF */}
-      {mostrarConfronto && pedidoConfronto && (
-        <ModalConfronto
-          pedido={pedidoConfronto}
-          onClose={() => { setMostrarConfronto(false); setPedidoConfronto(null); }}
-          onPedidoComplementarCriado={() => { carregarDados(); }}
-        />
-      )}
-      
-      {/* Modal de Envio */}
-      {mostrarModalEnvio && (
-        <ModalEnvioPedido
-          pedidoId={pedidoParaEnviar}
-          onClose={() => setMostrarModalEnvio(false)}
-          onEnviar={confirmarEnvioPedido}
-          onEnvioManual={marcarComoEnviadoManualmente}
-          emailEnvioDisponivel={emailEnvioDisponivel}
-          dadosEnvio={dadosEnvio}
-          setDadosEnvio={setDadosEnvio}
-          colunasSelecionadas={colunasDocumentoPedido}
-          onChangeColunas={atualizarColunasDocumento}
-        />
-      )}
-
-      {mostrarModalExportacao && pedidoParaExportar && (
-        <ModalExportacaoPedido
-          pedido={pedidoParaExportar}
-          onClose={fecharModalExportacao}
-          onConfirmar={confirmarExportacaoPedido}
-          loading={exportandoArquivo}
-          colunasSelecionadas={colunasDocumentoPedido}
-          onChangeColunas={atualizarColunasDocumento}
-        />
-      )}
-
-      {mostrarModalRascunhoSugestao && contextoRascunhoSugestao && (
-        <ModalDecisaoRascunho
-          contexto={contextoRascunhoSugestao}
-          estrategiaMesclaItens={estrategiaMesclaItens}
-          setEstrategiaMesclaItens={setEstrategiaMesclaItens}
-          onClose={fecharModalRascunho}
-          onSelecionar={decidirAcaoRascunhoSugestao}
-        />
-      )}
-
-      {/* 💡 MODAL DE SUGESTÃO INTELIGENTE */}
-      {mostrarModalGruposFornecedores && (
-        <ModalGruposFornecedores
-          grupos={gruposFornecedores}
-          fornecedores={fornecedores}
-          form={grupoFornecedorForm}
-          setForm={setGrupoFornecedorForm}
-          salvando={salvandoGrupoFornecedor}
-          onClose={() => {
-            setMostrarModalGruposFornecedores(false);
-            setGrupoFornecedorForm(GRUPO_FORNECEDOR_FORM_INICIAL);
-          }}
-          onSubmit={salvarGrupoFornecedor}
-          onNovo={() => setGrupoFornecedorForm(GRUPO_FORNECEDOR_FORM_INICIAL)}
-          onEditar={editarGrupoFornecedor}
-          onExcluir={excluirGrupoFornecedor}
-          onToggleFornecedor={alternarFornecedorNoGrupoForm}
-        />
-      )}
-
-      <PedidosCompraSugestaoModal
+      <PedidosCompraModalsLayer
+        mostrarRecebimento={mostrarRecebimento}
+        pedidoSelecionado={pedidoSelecionado}
+        setMostrarRecebimento={setMostrarRecebimento}
+        setPedidoSelecionado={setPedidoSelecionado}
+        receberPedido={receberPedido}
+        mostrarConfronto={mostrarConfronto}
+        pedidoConfronto={pedidoConfronto}
+        setMostrarConfronto={setMostrarConfronto}
+        setPedidoConfronto={setPedidoConfronto}
+        carregarDados={carregarDados}
+        mostrarModalEnvio={mostrarModalEnvio}
+        pedidoParaEnviar={pedidoParaEnviar}
+        setMostrarModalEnvio={setMostrarModalEnvio}
+        confirmarEnvioPedido={confirmarEnvioPedido}
+        marcarComoEnviadoManualmente={marcarComoEnviadoManualmente}
+        emailEnvioDisponivel={emailEnvioDisponivel}
+        dadosEnvio={dadosEnvio}
+        setDadosEnvio={setDadosEnvio}
+        colunasDocumentoPedido={colunasDocumentoPedido}
+        atualizarColunasDocumento={atualizarColunasDocumento}
+        mostrarModalExportacao={mostrarModalExportacao}
+        pedidoParaExportar={pedidoParaExportar}
+        fecharModalExportacao={fecharModalExportacao}
+        confirmarExportacaoPedido={confirmarExportacaoPedido}
+        exportandoArquivo={exportandoArquivo}
+        mostrarModalRascunhoSugestao={mostrarModalRascunhoSugestao}
+        contextoRascunhoSugestao={contextoRascunhoSugestao}
+        estrategiaMesclaItens={estrategiaMesclaItens}
+        setEstrategiaMesclaItens={setEstrategiaMesclaItens}
+        fecharModalRascunho={fecharModalRascunho}
+        decidirAcaoRascunhoSugestao={decidirAcaoRascunhoSugestao}
+        mostrarModalGruposFornecedores={mostrarModalGruposFornecedores}
+        gruposFornecedores={gruposFornecedores}
+        fornecedores={fornecedores}
+        grupoFornecedorForm={grupoFornecedorForm}
+        setGrupoFornecedorForm={setGrupoFornecedorForm}
+        salvandoGrupoFornecedor={salvandoGrupoFornecedor}
+        fecharModalGruposFornecedores={fecharModalGruposFornecedores}
+        salvarGrupoFornecedor={salvarGrupoFornecedor}
+        iniciarNovoGrupoFornecedor={iniciarNovoGrupoFornecedor}
+        editarGrupoFornecedor={editarGrupoFornecedor}
+        excluirGrupoFornecedor={excluirGrupoFornecedor}
+        alternarFornecedorNoGrupoForm={alternarFornecedorNoGrupoForm}
         mostrarSugestao={mostrarSugestao}
         fecharModalSugestao={fecharModalSugestao}
         filtroSugestao={filtroSugestao}
