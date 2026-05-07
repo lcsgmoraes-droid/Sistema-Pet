@@ -122,6 +122,7 @@ const PedidosCompra = () => {
   const [mostrarSugestoesFornecedor, setMostrarSugestoesFornecedor] = useState(false);
   const [mostrarSugestoesProduto, setMostrarSugestoesProduto] = useState(false);
   const [incluirGrupoFornecedor, setIncluirGrupoFornecedor] = useState(false);
+  const [apenasFornecedorPrincipal, setApenasFornecedorPrincipal] = useState(true);
   const [mostrarModalGruposFornecedores, setMostrarModalGruposFornecedores] = useState(false);
   const [grupoFornecedorForm, setGrupoFornecedorForm] = useState(GRUPO_FORNECEDOR_FORM_INICIAL);
   const [salvandoGrupoFornecedor, setSalvandoGrupoFornecedor] = useState(false);
@@ -886,6 +887,7 @@ const PedidosCompra = () => {
             dias_cobertura: diasCobertura,
             apenas_criticos: apenasCriticos,
             incluir_alerta: incluirAlerta,
+            apenas_fornecedor_principal: apenasFornecedorPrincipal,
             marca_ids: marcasSelecionadas,
             ...obterParametrosGrupoFornecedor(fornecedorId)
           },
@@ -1851,6 +1853,8 @@ const PedidosCompra = () => {
         grupoFornecedorAtual={grupoFornecedorAtual}
         incluirGrupoFornecedor={incluirGrupoFornecedor}
         setIncluirGrupoFornecedor={setIncluirGrupoFornecedor}
+        apenasFornecedorPrincipal={apenasFornecedorPrincipal}
+        setApenasFornecedorPrincipal={setApenasFornecedorPrincipal}
         limparEstadosSugestao={limparEstadosSugestao}
         sugestoes={sugestoes}
         produtosSelecionados={produtosSelecionados}

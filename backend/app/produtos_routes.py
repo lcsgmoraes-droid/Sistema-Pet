@@ -2986,16 +2986,67 @@ def _promover_fornecedor_principal_lote(
     return True
 
 
+def _remover_fornecedores_produto_lote(
+    db: Session,
+    produto: Produto,
+    tenant_id,
+    fornecedor_id: Optional[int] = None,
+) -> bool:
+    query = db.query(ProdutoFornecedor).filter(
+        ProdutoFornecedor.produto_id == produto.id,
+        ProdutoFornecedor.tenant_id == tenant_id,
+    )
+
+    if fornecedor_id is not None:
+        query = query.filter(ProdutoFornecedor.fornecedor_id == fornecedor_id)
+
+    vinculos = query.all()
+    alterado = bool(vinculos)
+
+    if fornecedor_id is None:
+        if produto.fornecedor_id is not None:
+            alterado = True
+        for vinculo in vinculos:
+            db.delete(vinculo)
+        produto.fornecedor_id = None
+        return alterado
+
+    era_principal = any(bool(vinculo.e_principal) for vinculo in vinculos) or produto.fornecedor_id == fornecedor_id
+
+    for vinculo in vinculos:
+        db.delete(vinculo)
+
+    if not alterado and not era_principal:
+        return False
+
+    if era_principal:
+        _promover_fornecedor_principal_lote(
+            db,
+            produto,
+            tenant_id,
+            fornecedor_id_ignorado=fornecedor_id,
+        )
+
+    return True
+
+
 def _aplicar_fornecedor_produto_lote(
     db: Session,
     produto: Produto,
-    fornecedor_id: int,
+    fornecedor_id: Optional[int],
     operacao: str,
     tenant_id,
+    remover_outros: bool = False,
 ) -> bool:
-    vinculo = _obter_vinculo_fornecedor_lote(db, produto.id, fornecedor_id, tenant_id)
+    vinculo = (
+        _obter_vinculo_fornecedor_lote(db, produto.id, fornecedor_id, tenant_id)
+        if fornecedor_id is not None
+        else None
+    )
 
     if operacao == "adicionar":
+        if fornecedor_id is None:
+            return False
         if vinculo:
             alterado = not bool(vinculo.ativo)
             if vinculo.e_principal and produto.fornecedor_id != fornecedor_id:
@@ -3015,11 +3066,23 @@ def _aplicar_fornecedor_produto_lote(
         return True
 
     if operacao == "definir_principal":
-        db.query(ProdutoFornecedor).filter(
-            ProdutoFornecedor.produto_id == produto.id,
-            ProdutoFornecedor.tenant_id == tenant_id,
-            ProdutoFornecedor.e_principal == True,
-        ).update({"e_principal": False})
+        if fornecedor_id is None:
+            return False
+
+        if remover_outros:
+            outros_vinculos = db.query(ProdutoFornecedor).filter(
+                ProdutoFornecedor.produto_id == produto.id,
+                ProdutoFornecedor.tenant_id == tenant_id,
+                ProdutoFornecedor.fornecedor_id != fornecedor_id,
+            ).all()
+            for outro_vinculo in outros_vinculos:
+                db.delete(outro_vinculo)
+        else:
+            db.query(ProdutoFornecedor).filter(
+                ProdutoFornecedor.produto_id == produto.id,
+                ProdutoFornecedor.tenant_id == tenant_id,
+                ProdutoFornecedor.e_principal == True,
+            ).update({"e_principal": False})
 
         if vinculo:
             vinculo.ativo = True
@@ -3038,22 +3101,12 @@ def _aplicar_fornecedor_produto_lote(
         return True
 
     if operacao == "remover":
-        era_principal = bool(vinculo and vinculo.e_principal) or produto.fornecedor_id == fornecedor_id
-
-        if vinculo:
-            db.delete(vinculo)
-        elif not era_principal:
-            return False
-
-        if era_principal:
-            _promover_fornecedor_principal_lote(
-                db,
-                produto,
-                tenant_id,
-                fornecedor_id_ignorado=fornecedor_id,
-            )
-
-        return True
+        return _remover_fornecedores_produto_lote(
+            db,
+            produto,
+            tenant_id,
+            fornecedor_id=fornecedor_id,
+        )
 
     return False
 
@@ -3068,6 +3121,7 @@ class AtualizacaoLoteRequest(BaseModel):
     departamento_id: Optional[int] = None
     fornecedor_id: Optional[int] = None
     fornecedor_operacao: Optional[str] = None
+    fornecedor_remover_outros: Optional[bool] = None
     linha_racao_id: Optional[int] = None
     porte_animal_id: Optional[int] = None
     fase_publico_id: Optional[int] = None
@@ -3116,12 +3170,13 @@ def atualizar_produtos_lote(
                 status_code=400,
                 detail="Operacao de fornecedor invalida",
             )
-        if dados.fornecedor_id is None:
+        if dados.fornecedor_operacao in {"adicionar", "definir_principal"} and dados.fornecedor_id is None:
             raise HTTPException(
                 status_code=400,
                 detail="Informe o fornecedor para aplicar a operacao em lote",
             )
-        _validar_fornecedor_produto_lote(db, dados.fornecedor_id, tenant_id)
+        if dados.fornecedor_id is not None:
+            _validar_fornecedor_produto_lote(db, dados.fornecedor_id, tenant_id)
     elif dados.fornecedor_id is not None:
         raise HTTPException(
             status_code=400,
@@ -3176,13 +3231,14 @@ def atualizar_produtos_lote(
         if dados.departamento_id is not None:
             produto.departamento_id = dados.departamento_id
             atualizado += 1
-        if dados.fornecedor_operacao and dados.fornecedor_id is not None:
+        if dados.fornecedor_operacao:
             if _aplicar_fornecedor_produto_lote(
                 db,
                 produto,
                 dados.fornecedor_id,
                 dados.fornecedor_operacao,
                 tenant_id,
+                remover_outros=bool(dados.fornecedor_remover_outros),
             ):
                 atualizado += 1
         if dados.linha_racao_id is not None:
@@ -3259,6 +3315,7 @@ def atualizar_produtos_lote(
         "departamento_id": dados.departamento_id,
         "fornecedor_id": dados.fornecedor_id,
         "fornecedor_operacao": dados.fornecedor_operacao,
+        "fornecedor_remover_outros": dados.fornecedor_remover_outros,
         "linha_racao_id": dados.linha_racao_id,
         "porte_animal_id": dados.porte_animal_id,
         "fase_publico_id": dados.fase_publico_id,

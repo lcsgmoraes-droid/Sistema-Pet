@@ -141,13 +141,19 @@ export default function useProdutosEdicao({
         toast.error("Escolha a acao do fornecedor em lote");
         return;
       }
-      if (dadosEdicaoLote.fornecedor_operacao && !dadosEdicaoLote.fornecedor_id) {
+      if (
+        dadosEdicaoLote.fornecedor_operacao
+        && dadosEdicaoLote.fornecedor_operacao !== "remover"
+        && !dadosEdicaoLote.fornecedor_id
+      ) {
         toast.error("Selecione o fornecedor para aplicar em lote");
         return;
       }
       if (dadosEdicaoLote.fornecedor_operacao) {
         dadosEnvio.fornecedor_operacao = dadosEdicaoLote.fornecedor_operacao;
-        dadosEnvio.fornecedor_id = parseInt(dadosEdicaoLote.fornecedor_id, 10);
+        if (dadosEdicaoLote.fornecedor_id) {
+          dadosEnvio.fornecedor_id = parseInt(dadosEdicaoLote.fornecedor_id, 10);
+        }
       }
       if (dadosEdicaoLote.linha_racao_id) {
         dadosEnvio.linha_racao_id = parseInt(dadosEdicaoLote.linha_racao_id, 10);
@@ -200,11 +206,17 @@ export default function useProdutosEdicao({
 
       if (dadosEnvio.fornecedor_operacao === "remover") {
         const confirmado = window.confirm(
-          `Remover este fornecedor de ${selecionados.length} produto(s) selecionado(s)? Se ele for principal, outro fornecedor ativo sera promovido quando existir.`,
+          `Remover os fornecedores vinculados de ${selecionados.length} produto(s) selecionado(s)? Os produtos ficarao sem fornecedor principal ate voce definir um novo.`,
         );
         if (!confirmado) {
           return;
         }
+      }
+
+      if (dadosEnvio.fornecedor_operacao === "definir_principal") {
+        dadosEnvio.fornecedor_remover_outros = window.confirm(
+          "Adicionar este fornecedor como principal e remover os outros fornecedores vinculados? OK remove os outros. Cancelar mantem como alternativos.",
+        );
       }
 
       await api.patch("/produtos/atualizar-lote", {

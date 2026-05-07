@@ -2276,6 +2276,7 @@ def sugerir_pedido_inteligente(
     apenas_criticos: bool = Query(default=False, description="Apenas produtos críticos (estoque < 7 dias)"),
     incluir_alerta: bool = Query(default=True, description="Incluir produtos em alerta"),
     incluir_grupo_fornecedor: bool = Query(default=False, description="Incluir todos os CNPJs do grupo comercial do fornecedor"),
+    apenas_fornecedor_principal: bool = Query(default=False, description="Considerar apenas produtos cujo fornecedor principal esta no fornecedor/grupo selecionado"),
     fornecedor_grupo_id: Optional[int] = Query(default=None, description="Grupo comercial de fornecedores para consolidar a sugestao"),
     marca_ids: Optional[List[int]] = Query(default=None, description="Filtrar por marcas específicas"),
     marca_ids_brackets: Optional[List[int]] = Query(default=None, alias="marca_ids[]"),
@@ -2350,6 +2351,15 @@ def sugerir_pedido_inteligente(
         ProdutoFornecedor.ativo == True
     )
 
+    if apenas_fornecedor_principal:
+        produtos_fornecedor_query = produtos_fornecedor_query.filter(
+            Produto.fornecedor_id.in_(fornecedor_ids),
+            or_(
+                ProdutoFornecedor.e_principal == True,
+                ProdutoFornecedor.fornecedor_id == Produto.fornecedor_id,
+            ),
+        )
+
     if marcas_filtro:
         produtos_fornecedor_query = produtos_fornecedor_query.filter(
             Produto.marca_id.in_(marcas_filtro)
@@ -2395,6 +2405,7 @@ def sugerir_pedido_inteligente(
                 } if fornecedor_grupo else None,
             },
             "periodo_dias": periodo_dias,
+            "apenas_fornecedor_principal": apenas_fornecedor_principal,
             "sugestoes": [],
             "resumo": {
                 "total_produtos": 0,
@@ -2647,6 +2658,7 @@ def sugerir_pedido_inteligente(
         },
         "periodo_dias": periodo_dias,
         "dias_cobertura": dias_cobertura,
+        "apenas_fornecedor_principal": apenas_fornecedor_principal,
         "data_analise_inicio": data_inicio.isoformat(),
         "data_analise_fim": data_fim.isoformat(),
         "sugestoes": sugestoes,

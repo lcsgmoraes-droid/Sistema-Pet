@@ -139,13 +139,16 @@ export default function ProdutosEdicaoLoteModal({
         proximoEstado.especies_indicadas = "";
       }
 
-      if (campo === "fornecedor_operacao" && valor === "") {
+      if (campo === "fornecedor_operacao" && (valor === "" || valor === "remover")) {
         proximoEstado.fornecedor_id = "";
       }
 
       return proximoEstado;
     });
   };
+
+  const fornecedorExigeSelecao =
+    dadosEdicaoLote.fornecedor_operacao && dadosEdicaoLote.fornecedor_operacao !== "remover";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
@@ -267,10 +270,14 @@ export default function ProdutosEdicaoLoteModal({
                 label="Fornecedor"
                 value={dadosEdicaoLote.fornecedor_id}
                 onChange={(event) => atualizarCampo("fornecedor_id", event.target.value)}
-                disabled={!dadosEdicaoLote.fornecedor_operacao}
+                disabled={!fornecedorExigeSelecao}
               >
                 <option value="">
-                  {dadosEdicaoLote.fornecedor_operacao ? "Selecione o fornecedor" : "Escolha uma acao primeiro"}
+                  {fornecedorExigeSelecao
+                    ? "Selecione o fornecedor"
+                    : dadosEdicaoLote.fornecedor_operacao === "remover"
+                      ? "Nao precisa selecionar"
+                      : "Escolha uma acao primeiro"}
                 </option>
                 {fornecedores.map((fornecedor) => (
                   <option key={fornecedor.id} value={fornecedor.id}>
@@ -282,7 +289,7 @@ export default function ProdutosEdicaoLoteModal({
 
             {dadosEdicaoLote.fornecedor_operacao === "definir_principal" && (
               <div className="rounded-lg border border-emerald-200 bg-white px-3 py-2 text-xs text-emerald-800">
-                O fornecedor selecionado sera vinculado, ativado e marcado como principal. O principal antigo sera mantido como fornecedor alternativo.
+                O fornecedor selecionado sera vinculado, ativado e marcado como principal. Ao salvar, voce escolhe se remove os outros fornecedores ou se mantem como alternativos.
               </div>
             )}
             {dadosEdicaoLote.fornecedor_operacao === "adicionar" && (
@@ -292,7 +299,7 @@ export default function ProdutosEdicaoLoteModal({
             )}
             {dadosEdicaoLote.fornecedor_operacao === "remover" && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                Remove o vinculo com o fornecedor selecionado. Se ele for principal, outro fornecedor ativo sera promovido quando existir.
+                Remove os fornecedores vinculados dos produtos selecionados. Para trocar por um novo principal, use "Definir como principal" e escolha remover os outros ao salvar.
               </div>
             )}
           </section>

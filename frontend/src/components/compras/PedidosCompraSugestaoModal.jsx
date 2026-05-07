@@ -26,6 +26,8 @@ export default function PedidosCompraSugestaoModal({
   grupoFornecedorAtual,
   incluirGrupoFornecedor,
   setIncluirGrupoFornecedor,
+  apenasFornecedorPrincipal,
+  setApenasFornecedorPrincipal,
   limparEstadosSugestao,
   sugestoes,
   produtosSelecionados,
@@ -208,6 +210,20 @@ export default function PedidosCompraSugestaoModal({
                             className="h-4 w-4 rounded"
                           />
                           <span>Incluir Alertas</span>
+                        </label>
+                        <label className="flex cursor-pointer items-center gap-2 rounded-full bg-white/10 px-3 py-1">
+                          <input
+                            type="checkbox"
+                            checked={apenasFornecedorPrincipal}
+                            onChange={(e) => {
+                              setApenasFornecedorPrincipal(e.target.checked);
+                              limparEstadosSugestao();
+                            }}
+                            className="h-4 w-4 rounded"
+                          />
+                          <span>
+                            {incluirGrupoFornecedor ? "Somente principais do grupo" : "Somente fornecedor principal"}
+                          </span>
                         </label>
                         {grupoFornecedorAtual && (
                           <label className="flex cursor-pointer items-center gap-2 rounded-full bg-white/10 px-3 py-1">
