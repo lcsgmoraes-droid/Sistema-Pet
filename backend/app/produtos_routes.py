@@ -296,6 +296,45 @@ def _produto_search_conditions(palavra: str):
     return or_(*conditions)
 
 
+def _produto_search_conditions_fast(palavra: str):
+    """Busca leve para PDV/autocomplete, sem unaccent nem joins por tecla."""
+    termo = (palavra or "").strip()
+    if not termo:
+        return True
+
+    prefix_pattern = f"{termo}%"
+    contains_pattern = f"%{termo}%"
+    conditions = [
+        Produto.codigo.ilike(prefix_pattern),
+        Produto.codigo_barras.ilike(prefix_pattern),
+        Produto.nome.ilike(contains_pattern),
+    ]
+
+    if PRODUTO_SKU_COLUMN is not None:
+        conditions.append(PRODUTO_SKU_COLUMN.ilike(prefix_pattern))
+
+    digitos = _only_digits(termo)
+    if len(digitos) >= 4:
+        digits_prefix = f"{digitos}%"
+        conditions.extend(
+            [
+                Produto.codigo == termo,
+                Produto.codigo_barras == termo,
+                _digits_expr(Produto.codigo).like(digits_prefix),
+                _digits_expr(Produto.codigo_barras).like(digits_prefix),
+            ]
+        )
+        if PRODUTO_SKU_COLUMN is not None:
+            conditions.extend(
+                [
+                    PRODUTO_SKU_COLUMN == termo,
+                    _digits_expr(PRODUTO_SKU_COLUMN).like(digits_prefix),
+                ]
+            )
+
+    return or_(*conditions)
+
+
 def _enriquecer_produto_listagem(
     db: Session,
     produto: Produto,
@@ -2096,9 +2135,10 @@ def listar_produtos_vendaveis(
     if termo_busca:
         # Busca por múltiplas palavras: todas as palavras precisam aparecer (qualquer ordem)
         # Ex: "golden castrado" acha "Ração Golden Gato Castrado Salmão"
+        search_conditions = _produto_search_conditions if contar_total else _produto_search_conditions_fast
         palavras = [p.strip() for p in termo_busca.split() if p.strip()]
         for palavra in palavras:
-            query = query.filter(_produto_search_conditions(palavra))
+            query = query.filter(search_conditions(palavra))
 
     if categoria_id:
         query = query.filter(Produto.categoria_id == categoria_id)
