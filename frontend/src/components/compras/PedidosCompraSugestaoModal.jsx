@@ -65,12 +65,12 @@ export default function PedidosCompraSugestaoModal({
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
                     <div className="text-[10px] font-semibold uppercase tracking-[0.24em] text-purple-100/90">
-                      SugestÃ£o Inteligente
+                      Sugestão Inteligente
                     </div>
                     <div className="mt-1 flex flex-wrap items-baseline gap-x-3 gap-y-1">
                       <h2 className="text-lg font-bold leading-tight">Pedido guiado por vendas e estoque</h2>
                       <p className="text-xs text-purple-100/85">
-                        Ajuste rÃ¡pido dos filtros sem perder Ã¡rea Ãºtil.
+                        Ajuste rápido dos filtros sem perder área útil.
                       </p>
                       </div>
                     </div>
@@ -78,7 +78,7 @@ export default function PedidosCompraSugestaoModal({
                     onClick={fecharModalSugestao}
                     className="shrink-0 rounded-lg p-2 text-white transition hover:bg-white/15"
                   >
-                    âœ•
+                    ✕
                   </button>
                 </div>
 
@@ -105,7 +105,7 @@ export default function PedidosCompraSugestaoModal({
                         {resumoMarcasSelecionadas}
                       </span>
                       <span className={`ml-3 text-sm transition-transform ${mostrarFiltroMarcas ? 'rotate-180' : ''}`}>
-                        â–¾
+                        ▾
                       </span>
                     </button>
 
@@ -150,16 +150,16 @@ export default function PedidosCompraSugestaoModal({
                     )}
                   </div>
                   <div className="sm:col-span-1 xl:col-span-2">
-                    <label className="mb-1 block text-[11px] font-medium uppercase tracking-[0.12em] text-purple-100">PerÃ­odo</label>
+                    <label className="mb-1 block text-[11px] font-medium uppercase tracking-[0.12em] text-purple-100">Período</label>
                     <select
                       value={periodoSugestao}
                       onChange={(e) => setPeriodoSugestao(parseInt(e.target.value))}
                       className="h-11 w-full rounded-lg border border-white/20 bg-white px-3 text-gray-800 shadow-sm focus:ring-2 focus:ring-purple-300"
                     >
-                      <option value={30}>Ãšltimos 30 dias</option>
-                      <option value={60}>Ãšltimos 60 dias</option>
-                      <option value={90}>Ãšltimos 90 dias</option>
-                      <option value={180}>Ãšltimos 180 dias</option>
+                      <option value={30}>Últimos 30 dias</option>
+                      <option value={60}>Últimos 60 dias</option>
+                      <option value={90}>Últimos 90 dias</option>
+                      <option value={180}>Últimos 180 dias</option>
                     </select>
                   </div>
                   <div className="sm:col-span-1 xl:col-span-2">
@@ -185,7 +185,7 @@ export default function PedidosCompraSugestaoModal({
                       disabled={loadingSugestao}
                       className="flex h-11 w-full items-center justify-center rounded-lg bg-white px-4 text-sm font-semibold text-purple-700 shadow-sm transition hover:bg-purple-50 disabled:opacity-50"
                     >
-                      {loadingSugestao ? 'ðŸ”„ Analisando...' : 'ðŸ” Atualizar'}
+                      {loadingSugestao ? '🔄 Analisando...' : '🔍 Atualizar'}
                     </button>
                   </div>
                   <div className="xl:col-span-12">
@@ -198,7 +198,7 @@ export default function PedidosCompraSugestaoModal({
                             onChange={(e) => setApenasCriticos(e.target.checked)}
                             className="h-4 w-4 rounded"
                           />
-                          <span>Apenas CrÃ­ticos</span>
+                          <span>Apenas Críticos</span>
                         </label>
                         <label className="flex cursor-pointer items-center gap-2">
                           <input
@@ -234,9 +234,9 @@ export default function PedidosCompraSugestaoModal({
                             const totalValor = selecionados.reduce((sum, s) => sum + (obterQuantidadeInteira(s) * s.preco_unitario), 0);
                             return (
                               <>
-                                <span className="rounded-full bg-white/10 px-2.5 py-1">ðŸ“¦ <strong className="text-white">{totalQtd}</strong> unidades</span>
-                                <span className="rounded-full bg-white/10 px-2.5 py-1">âš–ï¸ <strong className="text-white">{totalPeso.toFixed(1)} kg</strong></span>
-                                <span className="rounded-full bg-white/10 px-2.5 py-1">ðŸ’° <strong className="text-white">R$ {totalValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
+                                <span className="rounded-full bg-white/10 px-2.5 py-1">📦 <strong className="text-white">{totalQtd}</strong> unidades</span>
+                                <span className="rounded-full bg-white/10 px-2.5 py-1">⚖️ <strong className="text-white">{totalPeso.toFixed(1)} kg</strong></span>
+                                <span className="rounded-full bg-white/10 px-2.5 py-1">💰 <strong className="text-white">R$ {totalValor.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong></span>
                                 {selecionados.length === 0 && (
                                   <span className="italic opacity-80">(selecione produtos para ver o total)</span>
                                 )}
@@ -251,28 +251,28 @@ export default function PedidosCompraSugestaoModal({
               </div>
             </div>
 
-            {/* Tabela de SugestÃµes */}
+            {/* Tabela de Sugestões */}
             <div className="flex-1 overflow-auto p-5">
               {modoAplicacaoSugestao === 'replace' && (
                 <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                  A sugestÃ£o selecionada vai substituir os itens atuais do rascunho quando vocÃª confirmar.
+                  A sugestão selecionada vai substituir os itens atuais do rascunho quando você confirmar.
                 </div>
               )}
               {loadingSugestao ? (
                 <div className="flex items-center justify-center h-64">
                   <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-                    <p className="text-gray-600">Analisando produtos e calculando sugestÃµes...</p>
+                    <p className="text-gray-600">Analisando produtos e calculando sugestões...</p>
                   </div>
                 </div>
               ) : sugestoes.length === 0 ? (
                 <div className="text-center py-12">
-                  <p className="text-gray-500 text-lg">Nenhuma sugestÃ£o encontrada com os filtros aplicados</p>
+                  <p className="text-gray-500 text-lg">Nenhuma sugestão encontrada com os filtros aplicados</p>
                   <p className="text-gray-400 text-sm mt-2">Tente ajustar os filtros acima</p>
                 </div>
               ) : (
                 <>
-                  {/* AÃ§Ãµes RÃ¡pidas */}
+                  {/* Ações Rápidas */}
                   <div className="sticky top-0 z-30 -mx-5 mb-3 bg-white/95 shadow-[0_10px_20px_-18px_rgba(15,23,42,0.45)] backdrop-blur-sm">
                     <div className="border-b border-gray-200 px-5 py-3">
                       <div className="flex flex-col gap-3 xl:flex-row xl:items-center">
@@ -284,29 +284,29 @@ export default function PedidosCompraSugestaoModal({
                             onChange={(e) => setMostrarSoPreenchidos(e.target.checked)}
                             className="w-4 h-4 rounded"
                           />
-                          Mostrar sÃ³ preenchidos (qtd {`>`} 0)
+                          Mostrar só preenchidos (qtd {`>`} 0)
                         </label>
                         <button
                           onClick={selecionarTodosCriticos}
                           className="rounded-lg bg-red-100 px-4 py-2 text-sm font-semibold text-red-700 transition hover:bg-red-200"
                         >
-                          ðŸ”´ Selecionar Todos CrÃ­ticos
+                          🔴 Selecionar Todos Críticos
                         </button>
                         <button
                           onClick={selecionarPreenchidosVisiveis}
                           className="rounded-lg bg-green-100 px-4 py-2 text-sm font-semibold text-green-700 transition hover:bg-green-200"
                         >
-                          âœ… Selecionar Preenchidos
+                          ✅ Selecionar Preenchidos
                         </button>
                         <button
                           onClick={desmarcarVisiveis}
                           className="rounded-lg bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition hover:bg-gray-200"
                         >
-                          â›” Desmarcar VisÃ­veis
+                          ⛔ Desmarcar Visíveis
                         </button>
                       </div>
                       <span className="text-sm text-gray-500 xl:ml-auto">
-                        {`${produtosSelecionados.length} selecionados (${selecionadosComQuantidade.length} preenchidos) Â· ${sugestoesFiltradas.length} exibidos de ${sugestoes.length} total`}
+                        {`${produtosSelecionados.length} selecionados (${selecionadosComQuantidade.length} preenchidos) · ${sugestoesFiltradas.length} exibidos de ${sugestoes.length} total`}
                       </span>
                     </div>
                   </div>
@@ -340,9 +340,9 @@ export default function PedidosCompraSugestaoModal({
                             </th>
                             <th
                               className={`${classeCabecalhoTabelaSugestao} text-left`}
-                              title="CRÃTICO = menos de 7 dias. ALERTA = menos de 14 dias. ATENÃ‡ÃƒO = menos de 30 dias."
+                              title="CRÍTICO = menos de 7 dias. ALERTA = menos de 14 dias. ATENÇÃO = menos de 30 dias."
                             >
-                              Prioridade â„¹ï¸
+                              Prioridade ℹ️
                             </th>
                             <th className={`${classeCabecalhoTabelaSugestao} text-left`}>
                               Produto
@@ -351,43 +351,43 @@ export default function PedidosCompraSugestaoModal({
                               className={`${classeCabecalhoTabelaSugestao} text-right`}
                               title="Estoque atual. Valor negativo e tratado como ruptura para compra."
                             >
-                              Estoque â„¹ï¸
+                              Estoque ℹ️
                             </th>
                             <th
                               className={`${classeCabecalhoTabelaSugestao} text-right`}
                               title="Media diaria usada na compra. Se houve ruptura, o sistema ajusta pelos dias em que havia estoque."
                             >
-                              Consumo/dia â„¹ï¸
+                              Consumo/dia ℹ️
                             </th>
                             <th
                               className={`${classeCabecalhoTabelaSugestao} text-right`}
-                              title="Quantos dias o estoque atual dura ao ritmo de consumo atual. âˆž = sem venda recente."
+                              title="Quantos dias o estoque atual dura ao ritmo de consumo atual. ∞ = sem venda recente."
                             >
-                              Dias Restantes â„¹ï¸
+                              Dias Restantes ℹ️
                             </th>
                             <th
                               className={`${classeCabecalhoTabelaSugestao} text-right`}
-                              title="Quantidade para cobrir lead time + cobertura escolhida + margem de 7 dias. VocÃª pode editar."
+                              title="Quantidade para cobrir a cobertura escolhida. Prazo de entrega e margem entram quando o estoque atual não cobre a reposição. Você pode editar."
                             >
-                              Qtd Sugerida â„¹ï¸
+                              Qtd Sugerida ℹ️
                             </th>
                             <th
                               className={`${classeCabecalhoTabelaSugestao} text-right`}
-                              title="Ãšltimo preÃ§o de custo registrado para este produto."
+                              title="Último preço de custo registrado para este produto."
                             >
-                              PreÃ§o Unit. â„¹ï¸
+                              Preço Unit. ℹ️
                             </th>
                             <th
                               className={`${classeCabecalhoTabelaSugestao} text-right`}
-                              title="Qtd sugerida Ã— preÃ§o unitÃ¡rio."
+                              title="Qtd sugerida × preço unitário."
                             >
-                              Total â„¹ï¸
+                              Total ℹ️
                             </th>
                             <th
                               className={`${classeCabecalhoTabelaSugestao} text-left`}
-                              title="TendÃªncia de vendas: comparaÃ§Ã£o entre a primeira e segunda metade do perÃ­odo."
+                              title="Tendência de vendas: comparação entre a primeira e segunda metade do período."
                             >
-                              TendÃªncia â„¹ï¸
+                              Tendência ℹ️
                             </th>
                           </tr>
                         </thead>
@@ -417,9 +417,9 @@ export default function PedidosCompraSugestaoModal({
                             </td>
                             <td className="px-4 py-3">
                               <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
-                                sugestao.prioridade === 'CRÃTICO' ? 'bg-red-100 text-red-700' :
+                                sugestao.prioridade === 'CRÍTICO' ? 'bg-red-100 text-red-700' :
                                 sugestao.prioridade === 'ALERTA' ? 'bg-yellow-100 text-yellow-700' :
-                                sugestao.prioridade === 'ATENÃ‡ÃƒO' ? 'bg-orange-100 text-orange-700' :
+                                sugestao.prioridade === 'ATENÇÃO' ? 'bg-orange-100 text-orange-700' :
                                 'bg-green-100 text-green-700'
                               }`}>
                                 {sugestao.prioridade}
@@ -497,7 +497,7 @@ export default function PedidosCompraSugestaoModal({
                             </td>
                             <td className="px-4 py-3 text-right">
                               <div className="font-medium">{Number(sugestao.estoque_atual).toFixed(2).replace(/\.?0+$/, '') || '0'}</div>
-                              <div className="text-xs text-gray-500">MÃ­n: {sugestao.estoque_minimo}</div>
+                              <div className="text-xs text-gray-500">Mín: {sugestao.estoque_minimo}</div>
                             </td>
                             <td
                               className="px-4 py-3 text-right font-medium"
@@ -521,7 +521,7 @@ export default function PedidosCompraSugestaoModal({
                                   ? 'ruptura'
                                   : sugestao.dias_estoque !== null && sugestao.dias_estoque !== undefined
                                     ? `${sugestao.dias_estoque} dias`
-                                    : 'âˆž'}
+                                    : '∞'}
                               </span>
                             </td>
                             <td className="px-4 py-3 text-right">
@@ -554,9 +554,9 @@ export default function PedidosCompraSugestaoModal({
                                 sugestao.tendencia === 'QUEDA' ? 'text-red-600' :
                                 'text-gray-600'
                               }`}>
-                                {sugestao.tendencia === 'CRESCIMENTO' ? 'ðŸ“ˆ' :
-                                 sugestao.tendencia === 'QUEDA' ? 'ðŸ“‰' :
-                                 sugestao.tendencia === 'ESTÃVEL' ? 'âž¡ï¸' : 'â€”'}
+                                {sugestao.tendencia === 'CRESCIMENTO' ? '📈' :
+                                 sugestao.tendencia === 'QUEDA' ? '📉' :
+                                 sugestao.tendencia === 'ESTÁVEL' ? '➡️' : '—'}
                                 {sugestao.tendencia}
                               </span>
                             </td>
@@ -569,21 +569,21 @@ export default function PedidosCompraSugestaoModal({
               )}
             </div>
 
-            {/* Footer com AÃ§Ãµes */}
+            {/* Footer com Ações */}
             {!loadingSugestao && sugestoes.length > 0 && (
               <div className="border-t p-6 bg-gray-50">
                 <div className="flex justify-between items-center">
                   <div className="text-sm text-gray-600">
-                    <div className="font-semibold mb-1">Resumo da SugestÃ£o:</div>
+                    <div className="font-semibold mb-1">Resumo da Sugestão:</div>
                     <div className="grid grid-cols-3 gap-4">
                       <div>
-                        ðŸ”´ <strong>{sugestoes.filter(s => s.prioridade === 'CRÃTICO').length}</strong> crÃ­ticos
+                        🔴 <strong>{sugestoes.filter(s => s.prioridade === 'CRÍTICO').length}</strong> críticos
                       </div>
                       <div>
-                        âš ï¸ <strong>{sugestoes.filter(s => s.prioridade === 'ALERTA').length}</strong> em alerta
+                        ⚠️ <strong>{sugestoes.filter(s => s.prioridade === 'ALERTA').length}</strong> em alerta
                       </div>
                       <div>
-                        ðŸ’° Total: <strong>R$ {sugestoes
+                        💰 Total: <strong>R$ {sugestoes
                           .filter(s => produtosSelecionados.includes(s.produto_id))
                           .reduce((sum, s) => sum + (obterQuantidadeInteira(s) * s.preco_unitario), 0)
                           .toFixed(2)}</strong>

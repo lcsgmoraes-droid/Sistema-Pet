@@ -994,7 +994,7 @@ const PedidosCompra = () => {
     const sku = sugestao?.produto_sku || sugestao?.sku || sugestao?.codigo || '';
 
     if (!sku) {
-      toast.error('SKU nÃ£o disponÃ­vel para este produto');
+      toast.error('SKU não disponível para este produto');
       return;
     }
 
@@ -1002,7 +1002,7 @@ const PedidosCompra = () => {
       await navigator.clipboard.writeText(String(sku));
       toast.success(`SKU ${sku} copiado`);
     } catch (_error) {
-      toast.error('NÃ£o foi possÃ­vel copiar o SKU');
+      toast.error('Não foi possível copiar o SKU');
     }
   };
 
