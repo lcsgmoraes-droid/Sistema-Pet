@@ -5,8 +5,13 @@ from __future__ import annotations
 import logging
 import os
 import signal
+import sys
 import time
 from pathlib import Path
+
+ROOT_DIR = Path(__file__).resolve().parents[1]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
 
 from app.schedulers.bling_sync_scheduler import BlingSyncScheduler
 from app.utils.logger import configure_logging
