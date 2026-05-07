@@ -67,6 +67,7 @@ export default function ProdutosEdicaoLoteModal({
 }) {
   const [loadingOpcoesRacao, setLoadingOpcoesRacao] = useState(false);
   const [mostrarDecisaoFornecedor, setMostrarDecisaoFornecedor] = useState(false);
+  const [decisaoFornecedor, setDecisaoFornecedor] = useState("");
   const [opcoesRacao, setOpcoesRacao] = useState({
     linhas: [],
     portes: [],
@@ -123,6 +124,7 @@ export default function ProdutosEdicaoLoteModal({
   useEffect(() => {
     if (!isOpen || dadosEdicaoLote.fornecedor_operacao !== "definir_principal") {
       setMostrarDecisaoFornecedor(false);
+      setDecisaoFornecedor("");
     }
   }, [dadosEdicaoLote.fornecedor_operacao, isOpen]);
 
@@ -167,6 +169,7 @@ export default function ProdutosEdicaoLoteModal({
 
   const salvarComDecisaoFornecedor = () => {
     if (dadosEdicaoLote.fornecedor_operacao === "definir_principal" && dadosEdicaoLote.fornecedor_id) {
+      setDecisaoFornecedor("");
       setMostrarDecisaoFornecedor(true);
       return;
     }
@@ -174,9 +177,16 @@ export default function ProdutosEdicaoLoteModal({
     onSalvar();
   };
 
-  const confirmarDecisaoFornecedor = (fornecedorRemoverOutros) => {
+  const fecharDecisaoFornecedor = () => {
     setMostrarDecisaoFornecedor(false);
-    onSalvar({ fornecedorRemoverOutros });
+    setDecisaoFornecedor("");
+  };
+
+  const confirmarDecisaoFornecedor = () => {
+    if (!decisaoFornecedor) return;
+
+    setMostrarDecisaoFornecedor(false);
+    onSalvar({ fornecedorRemoverOutros: decisaoFornecedor === "remover" });
   };
 
   return (
@@ -571,7 +581,7 @@ export default function ProdutosEdicaoLoteModal({
                 </div>
                 <button
                   type="button"
-                  onClick={() => setMostrarDecisaoFornecedor(false)}
+                  onClick={fecharDecisaoFornecedor}
                   className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
                   aria-label="Fechar"
                 >
@@ -585,11 +595,22 @@ export default function ProdutosEdicaoLoteModal({
             <div className="grid gap-3 px-6 py-5 md:grid-cols-2">
               <button
                 type="button"
-                onClick={() => confirmarDecisaoFornecedor(false)}
-                className="group rounded-xl border border-slate-200 bg-white p-4 text-left transition hover:border-blue-300 hover:bg-blue-50"
+                onClick={() => setDecisaoFornecedor("manter")}
+                className={`group rounded-xl border p-4 text-left transition ${
+                  decisaoFornecedor === "manter"
+                    ? "border-blue-500 bg-blue-50 shadow-sm ring-2 ring-blue-100"
+                    : "border-slate-200 bg-white hover:border-blue-300 hover:bg-blue-50"
+                }`}
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
-                  A
+                <span className="flex items-center justify-between gap-3">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-blue-100 text-sm font-bold text-blue-700">
+                    A
+                  </span>
+                  {decisaoFornecedor === "manter" && (
+                    <span className="rounded-full bg-blue-600 px-2.5 py-1 text-xs font-semibold text-white">
+                      Selecionado
+                    </span>
+                  )}
                 </span>
                 <span className="mt-4 block text-base font-semibold text-slate-950">
                   Manter alternativos
@@ -602,11 +623,22 @@ export default function ProdutosEdicaoLoteModal({
 
               <button
                 type="button"
-                onClick={() => confirmarDecisaoFornecedor(true)}
-                className="group rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-left transition hover:border-emerald-400 hover:bg-emerald-100"
+                onClick={() => setDecisaoFornecedor("remover")}
+                className={`group rounded-xl border p-4 text-left transition ${
+                  decisaoFornecedor === "remover"
+                    ? "border-emerald-500 bg-emerald-50 shadow-sm ring-2 ring-emerald-100"
+                    : "border-emerald-200 bg-emerald-50 hover:border-emerald-400 hover:bg-emerald-100"
+                }`}
               >
-                <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">
-                  B
+                <span className="flex items-center justify-between gap-3">
+                  <span className="flex h-9 w-9 items-center justify-center rounded-full bg-emerald-600 text-sm font-bold text-white">
+                    B
+                  </span>
+                  {decisaoFornecedor === "remover" && (
+                    <span className="rounded-full bg-emerald-700 px-2.5 py-1 text-xs font-semibold text-white">
+                      Selecionado
+                    </span>
+                  )}
                 </span>
                 <span className="mt-4 block text-base font-semibold text-emerald-950">
                   Remover os outros
@@ -618,17 +650,27 @@ export default function ProdutosEdicaoLoteModal({
               </button>
             </div>
 
-            <div className="flex items-center justify-between gap-3 bg-slate-50 px-6 py-4">
+            <div className="flex flex-col gap-3 bg-slate-50 px-6 py-4 sm:flex-row sm:items-center sm:justify-between">
               <p className="text-xs text-slate-500">
-                Nenhuma alteracao sera aplicada ate voce escolher uma das opcoes.
+                Nenhuma alteracao sera aplicada ate voce escolher uma opcao e confirmar.
               </p>
-              <button
-                type="button"
-                onClick={() => setMostrarDecisaoFornecedor(false)}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-white"
-              >
-                Voltar
-              </button>
+              <div className="flex gap-2 sm:justify-end">
+                <button
+                  type="button"
+                  onClick={fecharDecisaoFornecedor}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-white"
+                >
+                  Voltar
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmarDecisaoFornecedor}
+                  disabled={!decisaoFornecedor}
+                  className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-slate-300 disabled:text-slate-500"
+                >
+                  Confirmar escolha
+                </button>
+              </div>
             </div>
           </div>
         </div>
