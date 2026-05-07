@@ -79,6 +79,14 @@ export default function MovimentacoesProduto() {
   const [showReservasModal, setShowReservasModal] = useState(false);
   const [loadingReservas, setLoadingReservas] = useState(false);
   const [reservasAtivas, setReservasAtivas] = useState([]);
+  const [showGranelModal, setShowGranelModal] = useState(false);
+  const [granelVinculos, setGranelVinculos] = useState([]);
+  const [granelProdutos, setGranelProdutos] = useState([]);
+  const [granelSelecionadoId, setGranelSelecionadoId] = useState('');
+  const [buscaGranel, setBuscaGranel] = useState('');
+  const [quantidadeGranel, setQuantidadeGranel] = useState('');
+  const [observacaoGranel, setObservacaoGranel] = useState('');
+  const [loadingGranel, setLoadingGranel] = useState(false);
   
   // Modal de lançamento
   const [tipoLancamento, setTipoLancamento] = useState('entrada'); // entrada, saida, balanco
@@ -91,14 +99,37 @@ export default function MovimentacoesProduto() {
     data_fabricacao: ''
   });
   const produtoEhGranel = Boolean(produto?.e_granel) || (produto?.nome || '').toLowerCase().includes('granel');
-  const componenteGranel = produtoEhGranel && Array.isArray(produto?.composicao_kit)
-    ? produto.composicao_kit[0]
-    : null;
-  const pesoPacoteGranel = Number(componenteGranel?.produto_peso_embalagem || 0);
+  const pesoPacoteOrigem = Number(produto?.peso_embalagem || 0);
+  const podeLancarGranel = Boolean(produto) && !produtoEhGranel && produto?.tipo_produto !== 'PAI' && pesoPacoteOrigem > 0;
+  const quantidadeGranelNumero = Number(quantidadeGranel || 0);
+  const kgGranelPrevisto = quantidadeGranelNumero > 0 ? quantidadeGranelNumero * pesoPacoteOrigem : 0;
+  const custoKgGranel = pesoPacoteOrigem > 0 ? Number(produto?.preco_custo || 0) / pesoPacoteOrigem : 0;
+  const vinculoGranelSelecionado = granelVinculos.find(
+    (vinculo) => String(vinculo.produto_granel_id) === String(granelSelecionadoId),
+  );
+  const produtoGranelSelecionado = granelProdutos.find(
+    (item) => String(item.id) === String(granelSelecionadoId),
+  );
+  const nomeGranelSelecionado =
+    vinculoGranelSelecionado?.produto_granel_nome || produtoGranelSelecionado?.nome || '';
 
   useEffect(() => {
     carregarDados();
   }, [id]);
+
+  useEffect(() => {
+    if (!showGranelModal) return undefined;
+
+    const timer = setTimeout(async () => {
+      try {
+        await buscarProdutosGranel(buscaGranel.trim());
+      } catch (error) {
+        console.error('Erro ao buscar produtos granel:', error);
+      }
+    }, buscaGranel.trim() ? 250 : 0);
+
+    return () => clearTimeout(timer);
+  }, [showGranelModal, buscaGranel]);
 
   const carregarDados = async () => {
     try {
@@ -129,6 +160,100 @@ export default function MovimentacoesProduto() {
       toast.error(error.response?.data?.detail || 'Erro ao carregar dados do produto');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const carregarVinculosGranel = async () => {
+    if (!id) return [];
+
+    const response = await api.get(`/estoque/granel/vinculos/origem/${id}`);
+    const vinculos = response.data || [];
+    setGranelVinculos(vinculos);
+    if (vinculos.length === 1) {
+      setGranelSelecionadoId(String(vinculos[0].produto_granel_id));
+    }
+    return vinculos;
+  };
+
+  const buscarProdutosGranel = async (termo = '') => {
+    const response = await api.get('/estoque/granel/produtos', {
+      params: {
+        busca: termo || undefined,
+        limite: 30,
+      },
+    });
+    setGranelProdutos(response.data || []);
+  };
+
+  const abrirModalGranel = async () => {
+    if (!podeLancarGranel) {
+      toast.error('Preencha o peso da embalagem na aba Racao antes de lancar granel.');
+      return;
+    }
+
+    setQuantidadeGranel('');
+    setObservacaoGranel('');
+    setBuscaGranel('');
+    setShowGranelModal(true);
+    setLoadingGranel(true);
+    try {
+      await Promise.all([
+        carregarVinculosGranel(),
+        buscarProdutosGranel(''),
+      ]);
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao carregar vinculos de granel');
+    } finally {
+      setLoadingGranel(false);
+    }
+  };
+
+  const handleSubmitGranel = async (e) => {
+    e.preventDefault();
+
+    if (!granelSelecionadoId) {
+      toast.error('Selecione o produto granel que vai receber os kg.');
+      return;
+    }
+
+    if (!quantidadeGranelNumero || quantidadeGranelNumero <= 0) {
+      toast.error('Informe a quantidade de pacotes abertos.');
+      return;
+    }
+
+    try {
+      setLoadingGranel(true);
+      const response = await api.post('/estoque/granel/converter', {
+        produto_origem_id: Number(id),
+        produto_granel_id: Number(granelSelecionadoId),
+        quantidade_pacotes: quantidadeGranelNumero,
+        observacao: observacaoGranel || null,
+      });
+
+      toast.success(
+        `Granel lancado: ${formatarQuantidade(response.data.quantidade_granel_kg)} kg a partir de ${formatarQuantidade(response.data.quantidade_pacotes)} pacote(s).`,
+        { duration: 5000 },
+      );
+      setShowGranelModal(false);
+      await carregarDados();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao lancar granel');
+    } finally {
+      setLoadingGranel(false);
+    }
+  };
+
+  const handleDesvincularGranel = async (vinculoId) => {
+    if (!confirm('Desvincular este produto granel da origem?')) {
+      return;
+    }
+
+    try {
+      await api.delete(`/estoque/granel/vinculos/${vinculoId}`);
+      toast.success('Vinculo removido.');
+      await carregarVinculosGranel();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || 'Erro ao desvincular granel');
     }
   };
 
@@ -298,6 +423,11 @@ export default function MovimentacoesProduto() {
       }
       
       // Criando novo lançamento
+      if (tipoLancamento === 'entrada' && produtoEhGranel) {
+        toast.error('Entrada de granel deve partir do produto fechado em "Lancar granel".');
+        return;
+      }
+
       let endpoint = '/estoque/';
       let payload = {
         produto_id: parseInt(id),
@@ -308,22 +438,12 @@ export default function MovimentacoesProduto() {
 
       // Configurar endpoint e payload conforme tipo
       if (tipoLancamento === 'entrada') {
-        if (produtoEhGranel) {
-          endpoint = '/estoque/granel/converter';
-          payload = {
-            produto_granel_id: parseInt(id),
-            quantidade_pacotes: parseFloat(formData.quantidade),
-            documento: formData.lote || null,
-            observacao: formData.observacao || null,
-          };
-        } else {
-          endpoint += 'entrada';
-          payload.tipo = 'entrada';
-          payload.motivo = 'compra';
-          payload.numero_lote = formData.lote || null;
-          payload.data_validade = formData.data_validade || null;
-          payload.data_fabricacao = formData.data_fabricacao || null;
-        }
+        endpoint += 'entrada';
+        payload.tipo = 'entrada';
+        payload.motivo = 'compra';
+        payload.numero_lote = formData.lote || null;
+        payload.data_validade = formData.data_validade || null;
+        payload.data_fabricacao = formData.data_fabricacao || null;
       } else if (tipoLancamento === 'saida') {
         endpoint += 'saida';
         payload.tipo = 'saida';
@@ -350,12 +470,7 @@ export default function MovimentacoesProduto() {
 
 
       // Mostrar indicador de variação de preço se for entrada
-      if (tipoLancamento === 'entrada' && produtoEhGranel && response.data) {
-        toast.success(
-          `Granel abastecido: ${formatarQuantidade(response.data.quantidade_granel_kg)} kg a partir de ${formatarQuantidade(response.data.quantidade_pacotes)} pacote(s).`,
-          { duration: 5000 }
-        );
-      } else if (tipoLancamento === 'entrada' && response.data) {
+      if (tipoLancamento === 'entrada' && response.data) {
         const { custo_anterior, custo_unitario, variacao_preco } = response.data;
         
         if (variacao_preco && custo_anterior !== null && custo_anterior !== undefined) {
@@ -726,6 +841,7 @@ export default function MovimentacoesProduto() {
                             { duration: 4000 }
                           );
                         } else {
+                          setTipoLancamento(produtoEhGranel ? 'saida' : 'entrada');
                           setShowModal(true);
                         }
                       }}
@@ -741,6 +857,19 @@ export default function MovimentacoesProduto() {
                       </svg>
                       Incluir lançamento
                     </button>
+
+                    {podeLancarGranel && (
+                      <button
+                        type="button"
+                        onClick={abrirModalGranel}
+                        className="inline-flex items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 py-2 text-xs font-semibold text-orange-700 shadow-sm transition hover:border-orange-300 hover:bg-orange-100"
+                      >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h16M6 7l1 12h10l1-12M9 7V5a3 3 0 016 0v2" />
+                        </svg>
+                        Lancar granel
+                      </button>
+                    )}
 
                     <button
                       onClick={handleForcarSyncProduto}
@@ -1252,9 +1381,16 @@ export default function MovimentacoesProduto() {
                   <div className="grid grid-cols-3 gap-2">
                     <button
                       type="button"
-                      onClick={() => setTipoLancamento('entrada')}
+                      onClick={() => {
+                        if (!produtoEhGranel) {
+                          setTipoLancamento('entrada');
+                        }
+                      }}
+                      disabled={produtoEhGranel}
                       className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        tipoLancamento === 'entrada'
+                        produtoEhGranel
+                          ? 'cursor-not-allowed bg-gray-100 text-gray-400'
+                          : tipoLancamento === 'entrada'
                           ? 'bg-green-600 text-white'
                           : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
                       }`}
@@ -1292,9 +1428,7 @@ export default function MovimentacoesProduto() {
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   {tipoLancamento === 'balanco'
                     ? 'Saldo Total *'
-                    : produtoEhGranel && tipoLancamento === 'entrada'
-                      ? 'Pacotes abertos *'
-                      : 'Quantidade *'}
+                    : 'Quantidade *'}
                 </label>
                 <input
                   type="number"
@@ -1309,14 +1443,9 @@ export default function MovimentacoesProduto() {
                     Estoque atual: {estoqueAtual}. Digite o novo saldo total.
                   </p>
                 )}
-                {produtoEhGranel && tipoLancamento === 'entrada' && (
+                {produtoEhGranel && (
                   <p className="mt-1 text-xs text-cyan-700">
-                    {componenteGranel?.produto_nome
-                      ? `Baixa pacote(s) de ${componenteGranel.produto_nome}`
-                      : 'Baixa pacote(s) do produto base configurado na composicao'}
-                    {pesoPacoteGranel > 0
-                      ? ` e entra ${formatarQuantidade(pesoPacoteGranel)} kg por pacote.`
-                      : ' usando o peso da embalagem cadastrado na aba Racao.'}
+                    Para abastecer granel, abra o produto fechado e use Lancar granel.
                   </p>
                 )}
               </div>
@@ -1467,6 +1596,179 @@ export default function MovimentacoesProduto() {
                   className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                 >
                   Incluir
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showGranelModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
+          <div className="w-full max-w-lg rounded-lg bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
+              <div>
+                <h3 className="text-lg font-semibold text-gray-900">Lancar granel</h3>
+                <p className="mt-1 text-xs text-gray-500">
+                  {produto?.nome} | {formatarQuantidade(pesoPacoteOrigem)} kg por pacote
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowGranelModal(false)}
+                className="text-gray-400 hover:text-gray-600"
+              >
+                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+
+            <form onSubmit={handleSubmitGranel} className="space-y-4 p-6">
+              {granelVinculos.length > 0 && (
+                <div>
+                  <label className="mb-2 block text-sm font-medium text-gray-700">
+                    Granel vinculado
+                  </label>
+                  <div className="space-y-2">
+                    {granelVinculos.map((vinculo) => (
+                      <label
+                        key={vinculo.id}
+                        className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg border p-3 text-sm ${
+                          String(granelSelecionadoId) === String(vinculo.produto_granel_id)
+                            ? 'border-orange-300 bg-orange-50'
+                            : 'border-gray-200 bg-white hover:bg-gray-50'
+                        }`}
+                      >
+                        <span className="flex min-w-0 items-center gap-2">
+                          <input
+                            type="radio"
+                            name="granel_vinculado"
+                            checked={String(granelSelecionadoId) === String(vinculo.produto_granel_id)}
+                            onChange={() => setGranelSelecionadoId(String(vinculo.produto_granel_id))}
+                            className="text-orange-600 focus:ring-orange-500"
+                          />
+                          <span className="min-w-0">
+                            <span className="block truncate font-semibold text-gray-900">
+                              {vinculo.produto_granel_nome}
+                            </span>
+                            <span className="block text-xs text-gray-500">
+                              Estoque granel: {formatarQuantidade(vinculo.produto_granel_estoque)} kg
+                            </span>
+                          </span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            handleDesvincularGranel(vinculo.id);
+                          }}
+                          className="shrink-0 rounded border border-gray-200 px-2 py-1 text-xs text-gray-500 hover:border-red-200 hover:text-red-600"
+                        >
+                          Desvincular
+                        </button>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Buscar outro produto granel
+                </label>
+                <input
+                  type="text"
+                  value={buscaGranel}
+                  onChange={(e) => setBuscaGranel(e.target.value)}
+                  placeholder="Ex: Special Dog Carne Granel"
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-orange-500"
+                />
+                <div className="mt-2 max-h-36 overflow-y-auto rounded-lg border border-gray-200">
+                  {granelProdutos.length === 0 ? (
+                    <div className="px-3 py-2 text-sm text-gray-500">
+                      {loadingGranel ? 'Buscando...' : 'Nenhum granel encontrado'}
+                    </div>
+                  ) : (
+                    granelProdutos.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => setGranelSelecionadoId(String(item.id))}
+                        className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-orange-50 ${
+                          String(granelSelecionadoId) === String(item.id) ? 'bg-orange-50 text-orange-800' : 'text-gray-700'
+                        }`}
+                      >
+                        <span className="min-w-0 truncate">
+                          <span className="font-semibold">{item.codigo}</span> - {item.nome}
+                        </span>
+                        <span className="ml-3 shrink-0 text-xs text-gray-500">
+                          {formatarQuantidade(item.estoque_atual)} kg
+                        </span>
+                      </button>
+                    ))
+                  )}
+                </div>
+                {nomeGranelSelecionado && (
+                  <p className="mt-1 text-xs text-orange-700">
+                    Selecionado: {nomeGranelSelecionado}
+                  </p>
+                )}
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Pacotes abertos *
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  value={quantidadeGranel}
+                  onChange={(e) => setQuantidadeGranel(e.target.value)}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-orange-500"
+                  required
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  Estoque atual da origem: {formatarQuantidade(produto?.estoque_atual)} pacote(s)
+                </p>
+              </div>
+
+              <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm text-orange-900">
+                <div className="font-semibold">Previsao do lancamento</div>
+                <div className="mt-1 text-xs leading-5">
+                  Baixa {formatarQuantidade(quantidadeGranelNumero)} pacote(s) da origem e entra {formatarQuantidade(kgGranelPrevisto)} kg no granel.
+                  Custo estimado: {formatBRL(custoKgGranel)} por kg.
+                </div>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-gray-700">
+                  Observacao
+                </label>
+                <textarea
+                  value={observacaoGranel}
+                  onChange={(e) => setObservacaoGranel(e.target.value)}
+                  rows={2}
+                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-orange-500"
+                  placeholder="Opcional"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowGranelModal(false)}
+                  className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  type="submit"
+                  disabled={loadingGranel}
+                  className="flex-1 rounded-lg bg-orange-600 px-4 py-2 text-white transition-colors hover:bg-orange-700 disabled:cursor-not-allowed disabled:bg-orange-300"
+                >
+                  {loadingGranel ? 'Lancando...' : 'Lancar granel'}
                 </button>
               </div>
             </form>

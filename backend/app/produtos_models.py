@@ -470,6 +470,35 @@ class ProdutoKitComponente(BaseTenantModel):
     produto_componente = relationship("Produto", foreign_keys=[produto_componente_id])
 
 
+class ProdutoGranelVinculo(BaseTenantModel):
+    """Vinculo entre produto fechado de origem e produto granel abastecido em kg."""
+    __tablename__ = "produto_granel_vinculos"
+    __table_args__ = (
+        Index('idx_produto_granel_vinculo_origem', 'tenant_id', 'produto_origem_id'),
+        Index('idx_produto_granel_vinculo_granel', 'tenant_id', 'produto_granel_id'),
+        UniqueConstraint(
+            'tenant_id',
+            'produto_origem_id',
+            'produto_granel_id',
+            name='uq_produto_granel_vinculo_origem_granel',
+        ),
+        {'extend_existing': True}
+    )
+
+    id = Column(Integer, primary_key=True)
+    produto_origem_id = Column(Integer, ForeignKey('produtos.id'), nullable=False)
+    produto_granel_id = Column(Integer, ForeignKey('produtos.id'), nullable=False)
+    ativo = Column(Boolean, default=True, nullable=False)
+    observacao = Column(Text, nullable=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    produto_origem = relationship("Produto", foreign_keys=[produto_origem_id])
+    produto_granel = relationship("Produto", foreign_keys=[produto_granel_id])
+    user = relationship("User")
+
+
 class GranelConversao(BaseTenantModel):
     """Conversoes rastreadas de pacote fechado para estoque granel em kg."""
     __tablename__ = "granel_conversoes"

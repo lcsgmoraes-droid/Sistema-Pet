@@ -40,7 +40,12 @@ from .estoque_reserva_service import EstoqueReservaService
 from .pedido_integrado_item_models import PedidoIntegradoItem
 from .nfe_cache_models import BlingNotaFiscalCache
 from .produtos_models import (
-    Produto, ProdutoLote, EstoqueMovimentacao, ProdutoKitComponente, GranelConversao
+    Produto,
+    ProdutoLote,
+    EstoqueMovimentacao,
+    ProdutoKitComponente,
+    GranelConversao,
+    ProdutoGranelVinculo,
 )
 from .financeiro_models import (
     CategoriaFinanceira,
@@ -834,9 +839,17 @@ class SaidaEstoqueRequest(BaseModel):
 
 class ConversaoGranelRequest(BaseModel):
     """Abre pacote(s) fisico(s) e abastece um produto granel em kg."""
+    produto_origem_id: Optional[int] = None
     produto_granel_id: int
     quantidade_pacotes: float = Field(gt=0)
     documento: Optional[str] = None
+    observacao: Optional[str] = None
+
+
+class GranelVinculoRequest(BaseModel):
+    """Vincula um produto fechado a um produto granel."""
+    produto_origem_id: int
+    produto_granel_id: int
     observacao: Optional[str] = None
 
 
@@ -2405,50 +2418,197 @@ def _produto_e_granel(produto: Produto | None) -> bool:
     return bool(getattr(produto, "e_granel", False)) or "granel" in str(produto.nome or "").lower()
 
 
-def _resolver_produto_base_granel(db: Session, produto_granel: Produto, tenant_id):
-    componentes = db.query(ProdutoKitComponente).filter(
-        ProdutoKitComponente.kit_id == produto_granel.id,
-        ProdutoKitComponente.tenant_id == tenant_id,
-    ).all()
+def _normalizar_produto_granel(produto_granel: Produto) -> None:
+    produto_granel.e_granel = True
+    produto_granel.unidade = "KG"
+    if produto_granel.tipo_produto == "KIT":
+        produto_granel.tipo_produto = "SIMPLES"
+    produto_granel.tipo_kit = None
 
-    if len(componentes) != 1:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                "Produto granel precisa ter exatamente 1 produto base na composicao "
-                "para converter pacote em kg."
-            ),
-        )
 
-    componente = componentes[0]
-    produto_base = db.query(Produto).filter(
-        Produto.id == componente.produto_componente_id,
-        Produto.tenant_id == tenant_id,
-    ).first()
-    if not produto_base:
-        raise HTTPException(status_code=404, detail="Produto base do granel nao encontrado")
+def _validar_produto_origem_granel(produto_origem: Produto | None) -> float:
+    if not produto_origem:
+        raise HTTPException(status_code=404, detail="Produto de origem nao encontrado")
+    if _produto_e_granel(produto_origem):
+        raise HTTPException(status_code=400, detail="Produto de origem nao pode ser outro granel")
+    if produto_origem.tipo_produto == "PAI":
+        raise HTTPException(status_code=400, detail="Produto pai/agrupador nao possui estoque para fracionar")
 
-    peso_pacote_kg = float(produto_base.peso_embalagem or 0)
+    peso_pacote_kg = float(produto_origem.peso_embalagem or 0)
     if peso_pacote_kg <= 0:
         raise HTTPException(
             status_code=400,
             detail=(
-                f"Produto base '{produto_base.nome}' nao tem peso_embalagem em kg. "
-                "Preencha a aba Racao antes de abastecer o granel."
+                f"Produto '{produto_origem.nome}' nao tem peso_embalagem em kg. "
+                "Preencha a aba Racao antes de lancar no granel."
             ),
         )
+    return peso_pacote_kg
 
-    return produto_base, componente, peso_pacote_kg
+
+def _serializar_vinculo_granel(vinculo: ProdutoGranelVinculo) -> dict:
+    origem = vinculo.produto_origem
+    granel = vinculo.produto_granel
+    peso = float(getattr(origem, "peso_embalagem", 0) or 0)
+    custo_pacote = float(getattr(origem, "preco_custo", 0) or 0)
+    return {
+        "id": vinculo.id,
+        "ativo": bool(vinculo.ativo),
+        "produto_origem_id": vinculo.produto_origem_id,
+        "produto_origem_nome": getattr(origem, "nome", None),
+        "produto_origem_codigo": getattr(origem, "codigo", None),
+        "produto_origem_estoque": float(getattr(origem, "estoque_atual", 0) or 0),
+        "peso_por_unidade_kg": peso,
+        "custo_por_unidade": custo_pacote,
+        "custo_por_kg": custo_pacote / peso if peso > 0 else 0,
+        "produto_granel_id": vinculo.produto_granel_id,
+        "produto_granel_nome": getattr(granel, "nome", None),
+        "produto_granel_codigo": getattr(granel, "codigo", None),
+        "produto_granel_estoque": float(getattr(granel, "estoque_atual", 0) or 0),
+        "observacao": vinculo.observacao,
+        "created_at": vinculo.created_at,
+        "updated_at": vinculo.updated_at,
+    }
 
 
-@router.post("/granel/converter", status_code=status.HTTP_201_CREATED)
-def converter_estoque_granel(
-    payload: ConversaoGranelRequest,
+def _obter_ou_criar_vinculo_granel(
+    db: Session,
+    tenant_id,
+    current_user,
+    produto_origem: Produto,
+    produto_granel: Produto,
+    observacao: str | None = None,
+) -> ProdutoGranelVinculo:
+    if produto_origem.id == produto_granel.id:
+        raise HTTPException(status_code=400, detail="Produto de origem e granel nao podem ser o mesmo")
+
+    vinculo = db.query(ProdutoGranelVinculo).filter(
+        ProdutoGranelVinculo.tenant_id == tenant_id,
+        ProdutoGranelVinculo.produto_origem_id == produto_origem.id,
+        ProdutoGranelVinculo.produto_granel_id == produto_granel.id,
+    ).first()
+
+    if vinculo:
+        vinculo.ativo = True
+        if observacao is not None:
+            vinculo.observacao = observacao
+        vinculo.updated_at = datetime.utcnow()
+        return vinculo
+
+    vinculo = ProdutoGranelVinculo(
+        produto_origem_id=produto_origem.id,
+        produto_granel_id=produto_granel.id,
+        ativo=True,
+        observacao=observacao,
+        user_id=getattr(current_user, "id", None),
+        tenant_id=tenant_id,
+    )
+    db.add(vinculo)
+    db.flush()
+    return vinculo
+
+
+def _resolver_origem_por_payload_granel(db: Session, tenant_id, payload: ConversaoGranelRequest) -> Produto:
+    if payload.produto_origem_id:
+        produto_origem = db.query(Produto).filter(
+            Produto.id == payload.produto_origem_id,
+            Produto.tenant_id == tenant_id,
+        ).first()
+        _validar_produto_origem_granel(produto_origem)
+        return produto_origem
+
+    vinculos = db.query(ProdutoGranelVinculo).filter(
+        ProdutoGranelVinculo.tenant_id == tenant_id,
+        ProdutoGranelVinculo.produto_granel_id == payload.produto_granel_id,
+        ProdutoGranelVinculo.ativo.is_(True),
+    ).all()
+    if len(vinculos) != 1:
+        raise HTTPException(
+            status_code=400,
+            detail="Informe o produto de origem para lancar no granel.",
+        )
+    produto_origem = vinculos[0].produto_origem
+    _validar_produto_origem_granel(produto_origem)
+    return produto_origem
+
+
+@router.get("/granel/produtos")
+def listar_produtos_granel(
+    busca: Optional[str] = None,
+    limite: int = 30,
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
-    """Converte pacote(s) fechados em estoque fisico granel medido em kg."""
+    """Lista produtos marcados como granel para vinculo/conversao."""
+    _current_user, tenant_id = user_and_tenant
+    limite = min(max(int(limite or 30), 1), 100)
+    query = db.query(Produto).filter(
+        Produto.tenant_id == tenant_id,
+        or_(Produto.ativo.is_(True), Produto.ativo.is_(None)),
+        or_(Produto.e_granel.is_(True), Produto.nome.ilike("%granel%")),
+    )
+    termo = (busca or "").strip()
+    if termo:
+        pattern = f"%{termo}%"
+        query = query.filter(or_(
+            Produto.nome.ilike(pattern),
+            Produto.codigo.ilike(pattern),
+            Produto.codigo_barras.ilike(pattern),
+        ))
+
+    produtos = query.order_by(Produto.nome.asc()).limit(limite).all()
+    return [
+        {
+            "id": produto.id,
+            "codigo": produto.codigo,
+            "nome": produto.nome,
+            "estoque_atual": float(produto.estoque_atual or 0),
+            "preco_custo": float(produto.preco_custo or 0),
+            "unidade": produto.unidade or "KG",
+            "e_granel": True,
+        }
+        for produto in produtos
+    ]
+
+
+@router.get("/granel/vinculos/origem/{produto_origem_id}")
+def listar_vinculos_granel_origem(
+    produto_origem_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Lista graneis vinculados a um produto fechado de origem."""
+    _current_user, tenant_id = user_and_tenant
+    vinculos = (
+        db.query(ProdutoGranelVinculo)
+        .options(
+            joinedload(ProdutoGranelVinculo.produto_origem),
+            joinedload(ProdutoGranelVinculo.produto_granel),
+        )
+        .filter(
+            ProdutoGranelVinculo.tenant_id == tenant_id,
+            ProdutoGranelVinculo.produto_origem_id == produto_origem_id,
+            ProdutoGranelVinculo.ativo.is_(True),
+        )
+        .order_by(ProdutoGranelVinculo.updated_at.desc())
+        .all()
+    )
+    return [_serializar_vinculo_granel(vinculo) for vinculo in vinculos]
+
+
+@router.post("/granel/vinculos", status_code=status.HTTP_201_CREATED)
+def criar_vinculo_granel(
+    payload: GranelVinculoRequest,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Cria ou reativa vinculo entre produto fechado e produto granel."""
     current_user, tenant_id = user_and_tenant
+    produto_origem = db.query(Produto).filter(
+        Produto.id == payload.produto_origem_id,
+        Produto.tenant_id == tenant_id,
+    ).first()
+    _validar_produto_origem_granel(produto_origem)
 
     produto_granel = db.query(Produto).filter(
         Produto.id == payload.produto_granel_id,
@@ -2458,11 +2618,69 @@ def converter_estoque_granel(
         raise HTTPException(status_code=404, detail="Produto granel nao encontrado")
     if not _produto_e_granel(produto_granel):
         raise HTTPException(status_code=400, detail="Produto informado nao esta marcado como granel")
+    _normalizar_produto_granel(produto_granel)
 
-    produto_base, _componente, peso_pacote_kg = _resolver_produto_base_granel(
+    vinculo = _obter_ou_criar_vinculo_granel(
         db,
-        produto_granel,
         tenant_id,
+        current_user,
+        produto_origem,
+        produto_granel,
+        payload.observacao,
+    )
+    db.commit()
+    db.refresh(vinculo)
+    return _serializar_vinculo_granel(vinculo)
+
+
+@router.delete("/granel/vinculos/{vinculo_id}")
+def desvincular_granel(
+    vinculo_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Desativa vinculo entre produto fechado e granel sem apagar historico."""
+    _current_user, tenant_id = user_and_tenant
+    vinculo = db.query(ProdutoGranelVinculo).filter(
+        ProdutoGranelVinculo.id == vinculo_id,
+        ProdutoGranelVinculo.tenant_id == tenant_id,
+    ).first()
+    if not vinculo:
+        raise HTTPException(status_code=404, detail="Vinculo granel nao encontrado")
+    vinculo.ativo = False
+    vinculo.updated_at = datetime.utcnow()
+    db.commit()
+    return {"ok": True, "id": vinculo_id}
+
+
+@router.post("/granel/converter", status_code=status.HTTP_201_CREATED)
+def converter_estoque_granel(
+    payload: ConversaoGranelRequest,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Converte pacote(s) fechados de origem em estoque fisico granel medido em kg."""
+    current_user, tenant_id = user_and_tenant
+
+    produto_base = _resolver_origem_por_payload_granel(db, tenant_id, payload)
+    produto_granel = db.query(Produto).filter(
+        Produto.id == payload.produto_granel_id,
+        Produto.tenant_id == tenant_id,
+    ).first()
+    if not produto_granel:
+        raise HTTPException(status_code=404, detail="Produto granel nao encontrado")
+    if not _produto_e_granel(produto_granel):
+        raise HTTPException(status_code=400, detail="Produto informado nao esta marcado como granel")
+
+    peso_pacote_kg = _validar_produto_origem_granel(produto_base)
+    _normalizar_produto_granel(produto_granel)
+    vinculo = _obter_ou_criar_vinculo_granel(
+        db,
+        tenant_id,
+        current_user,
+        produto_base,
+        produto_granel,
+        None,
     )
 
     quantidade_pacotes = float(payload.quantidade_pacotes or 0)
@@ -2480,13 +2698,14 @@ def converter_estoque_granel(
     estoque_granel_anterior = float(produto_granel.estoque_atual or 0)
     custo_pacote = float(produto_base.preco_custo or 0)
     custo_kg = custo_pacote / peso_pacote_kg if peso_pacote_kg > 0 else 0
+    custo_granel_anterior = float(produto_granel.preco_custo or 0)
 
     produto_base.estoque_atual = estoque_base_anterior - quantidade_pacotes
     produto_granel.estoque_atual = estoque_granel_anterior + quantidade_kg
-    produto_granel.unidade = "KG"
-    produto_granel.e_granel = True
-    produto_granel.tipo_produto = "KIT"
-    produto_granel.tipo_kit = "FISICO"
+    if produto_granel.estoque_atual > 0:
+        produto_granel.preco_custo = (
+            (estoque_granel_anterior * custo_granel_anterior) + (quantidade_kg * custo_kg)
+        ) / produto_granel.estoque_atual
 
     conversao = GranelConversao(
         produto_granel_id=produto_granel.id,
@@ -2554,9 +2773,11 @@ def converter_estoque_granel(
         "produto_granel_nome": produto_granel.nome,
         "produto_origem_id": produto_base.id,
         "produto_origem_nome": produto_base.nome,
+        "vinculo_id": vinculo.id,
         "quantidade_pacotes": quantidade_pacotes,
         "peso_por_unidade_kg": peso_pacote_kg,
         "quantidade_granel_kg": quantidade_kg,
+        "custo_por_kg": custo_kg,
         "estoque_origem_anterior": estoque_base_anterior,
         "estoque_origem_novo": float(produto_base.estoque_atual or 0),
         "estoque_granel_anterior": estoque_granel_anterior,

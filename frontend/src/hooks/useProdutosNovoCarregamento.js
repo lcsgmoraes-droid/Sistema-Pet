@@ -182,10 +182,19 @@ export default function useProdutosNovoCarregamento({
         estoque_maximo: produto.estoque_maximo || '',
         controle_lote: produto.controle_lote ?? true,
         markup,
-        tipo_produto: produto.tipo_produto || 'SIMPLES',
+        tipo_produto:
+          Boolean(produto.e_granel) || (produto.nome || '').toLowerCase().includes('granel')
+            ? 'SIMPLES'
+            : produto.tipo_produto || 'SIMPLES',
         produto_pai_id: produto.produto_pai_id || null,
-        tipo_kit: produto.tipo_kit || null,
-        e_kit_fisico: produto.e_kit_fisico || false,
+        tipo_kit:
+          Boolean(produto.e_granel) || (produto.nome || '').toLowerCase().includes('granel')
+            ? null
+            : produto.tipo_kit || null,
+        e_kit_fisico:
+          Boolean(produto.e_granel) || (produto.nome || '').toLowerCase().includes('granel')
+            ? false
+            : produto.e_kit_fisico || false,
         composicao_kit: produto.composicao_kit || [],
         origem: produto.origem || '0',
         ncm: produto.ncm || '',

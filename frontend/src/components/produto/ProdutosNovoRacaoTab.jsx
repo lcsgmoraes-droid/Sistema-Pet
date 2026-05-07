@@ -64,9 +64,6 @@ export default function ProdutosNovoRacaoTab({
                 handleChange("e_granel", marcado);
                 if (marcado) {
                   handleChange("eh_racao", true);
-                  handleChange("tipo_produto", "KIT");
-                  handleChange("tipo_kit", "FISICO");
-                  handleChange("e_kit_fisico", true);
                   handleChange("unidade", "KG");
                 }
               }}
@@ -75,7 +72,7 @@ export default function ProdutosNovoRacaoTab({
             <span>
               <span className="block text-sm font-semibold text-slate-800">Produto vendido a granel</span>
               <span className="mt-1 block text-xs text-slate-600">
-                O estoque fica em kg e deve ter 1 pacote base na aba Composicao.
+                O estoque fica em kg. O abastecimento parte do produto fechado em Movimentacoes.
               </span>
             </span>
           </label>
@@ -84,8 +81,8 @@ export default function ProdutosNovoRacaoTab({
 
       {formData.e_granel && (
         <div className="rounded-lg border border-cyan-200 bg-cyan-50 p-4 text-sm text-cyan-800">
-          Para abastecer o granel, lance uma entrada no produto granel em Movimentacoes.
-          O sistema vai baixar pacote(s) do produto base e entrar kg usando o peso da embalagem da racao.
+          Para abastecer este granel, abra o produto fechado de origem e use "Lancar granel".
+          O sistema baixa pacote(s) do produto fechado e entra kg aqui usando o peso da embalagem da racao.
         </div>
       )}
 

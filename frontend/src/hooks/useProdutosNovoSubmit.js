@@ -42,14 +42,8 @@ export default function useProdutosNovoSubmit({
       const lojaFisicaAtiva = formData.ativo !== false && formData.situacao !== false;
       const produtoEhGranel = Boolean(formData.e_granel) || (formData.nome || '').toLowerCase().includes('granel');
       const produtoComComposicao =
-        produtoEhGranel ||
         formData.tipo_produto === 'KIT' ||
         (formData.tipo_produto === 'VARIACAO' && formData.tipo_kit);
-
-      if (produtoEhGranel && composicaoKitNormalizada.length !== 1) {
-        alert('Produto granel precisa ter exatamente 1 produto base na composicao.');
-        return;
-      }
 
       const dados = {
         codigo: skuNormalizado,
@@ -80,17 +74,17 @@ export default function useProdutosNovoSubmit({
         categoria_id: formData.categoria_id ? parseInt(formData.categoria_id) : null,
         marca_id: formData.marca_id ? parseInt(formData.marca_id) : null,
         departamento_id: formData.departamento_id ? parseInt(formData.departamento_id) : null,
-        tipo_produto: produtoEhGranel ? 'KIT' : formData.tipo_produto || 'SIMPLES',
+        tipo_produto: produtoEhGranel ? 'SIMPLES' : formData.tipo_produto || 'SIMPLES',
         produto_pai_id: formData.produto_pai_id || null,
         tipo_kit:
           produtoComComposicao
-            ? (produtoEhGranel || formData.e_kit_fisico)
+            ? (formData.e_kit_fisico)
               ? 'FISICO'
               : 'VIRTUAL'
             : null,
         e_kit_fisico:
           produtoComComposicao
-            ? produtoEhGranel || formData.e_kit_fisico
+            ? formData.e_kit_fisico
             : null,
         composicao_kit:
           produtoComComposicao
