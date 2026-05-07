@@ -8,6 +8,7 @@ import os
 
 from app.db import SessionLocal
 from app.services.bling_flow_monitor_service import executar_auditoria_background
+from app.services.bling_pedido_webhook_queue_service import process_pending_bling_pedido_webhooks
 from app.services.bling_sync_service import BlingSyncService
 from app.services.nfe_authorized_reconciliation_service import (
     executar_reconciliacao_automatica_nfes_autorizadas,
@@ -37,6 +38,8 @@ BLING_DUPLICATES_RECONCILE_INTERVAL_MINUTES = int(os.getenv("BLING_DUPLICATES_RE
 BLING_DUPLICATES_RECONCILE_LIMIT = int(os.getenv("BLING_DUPLICATES_RECONCILE_LIMIT", "10"))
 BLING_FLOW_AUDIT_INTERVAL_MINUTES = int(os.getenv("BLING_FLOW_AUDIT_INTERVAL_MINUTES", "60"))
 BLING_FLOW_AUDIT_LIMIT = int(os.getenv("BLING_FLOW_AUDIT_LIMIT", "80"))
+BLING_PEDIDO_WEBHOOK_QUEUE_INTERVAL_SECONDS = int(os.getenv("BLING_PEDIDO_WEBHOOK_QUEUE_INTERVAL_SECONDS", "5"))
+BLING_PEDIDO_WEBHOOK_QUEUE_LIMIT = int(os.getenv("BLING_PEDIDO_WEBHOOK_QUEUE_LIMIT", "20"))
 
 
 class BlingSyncScheduler:
@@ -47,6 +50,15 @@ class BlingSyncScheduler:
         self._configure_jobs()
 
     def _configure_jobs(self) -> None:
+        self.scheduler.add_job(
+            func=self.processar_webhooks_pedidos,
+            trigger=IntervalTrigger(seconds=max(BLING_PEDIDO_WEBHOOK_QUEUE_INTERVAL_SECONDS, 2)),
+            id="bling_pedido_webhook_queue",
+            name="Bling Pedido Webhook Queue",
+            replace_existing=True,
+            max_instances=1,
+            coalesce=True,
+        )
         self.scheduler.add_job(
             func=self.processar_fila,
             trigger=IntervalTrigger(seconds=max(BLING_QUEUE_INTERVAL_SECONDS, 5)),
@@ -119,6 +131,7 @@ class BlingSyncScheduler:
         )
 
         logger.info("[BLING SYNC] Jobs configurados:")
+        logger.info("   - Webhooks de pedidos: a cada %ss", max(BLING_PEDIDO_WEBHOOK_QUEUE_INTERVAL_SECONDS, 2))
         logger.info("   - Fila pendente: a cada %ss", max(BLING_QUEUE_INTERVAL_SECONDS, 5))
         logger.info("   - Reconciliacao recente: a cada %s min", max(BLING_RECENT_RECONCILE_INTERVAL_MINUTES, 5))
         logger.info("   - NFs pendentes recentes: a cada %s min", max(BLING_NFE_PENDING_RECONCILE_INTERVAL_MINUTES, 5))
@@ -158,6 +171,18 @@ class BlingSyncScheduler:
         result = BlingSyncService.process_pending_queue(limit=10)
         if result.get("processados"):
             logger.info("[BLING SYNC] Fila processada: %s", result)
+
+    def processar_webhooks_pedidos(self) -> None:
+        db = SessionLocal()
+        try:
+            result = process_pending_bling_pedido_webhooks(
+                db,
+                limit=BLING_PEDIDO_WEBHOOK_QUEUE_LIMIT,
+            )
+            if result.get("processed") or result.get("failed") or result.get("dead"):
+                logger.info("[BLING PEDIDO QUEUE] Webhooks processados: %s", result)
+        finally:
+            db.close()
 
     def reconciliar_recentes(self) -> None:
         if self._should_defer_secondary_job("bling_sync_recent_reconcile"):

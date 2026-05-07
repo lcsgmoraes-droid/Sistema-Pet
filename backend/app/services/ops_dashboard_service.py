@@ -25,6 +25,11 @@ from app.services.watchdog_event_reporter import (
     summarize_watchdog_events,
 )
 
+try:
+    from app.services.bling_pedido_webhook_queue_service import get_bling_pedido_webhook_queue_snapshot
+except Exception:  # pragma: no cover - Ops must stay available during partial deploys
+    get_bling_pedido_webhook_queue_snapshot = None
+
 
 def _env_bool(name: str, default: bool) -> bool:
     raw = os.getenv(name)
@@ -410,6 +415,7 @@ def _build_alerts(
     watchdog_summary: dict[str, Any],
     tenant_incidents: list[dict[str, Any]],
     route_incidents: list[dict[str, Any]],
+    queue_snapshot: dict[str, Any] | None = None,
 ) -> list[dict[str, Any]]:
     alerts: list[dict[str, Any]] = []
     errors_5xx = int(error_summary.get("errors_5xx") or 0)
@@ -478,6 +484,46 @@ def _build_alerts(
                 "source": "watchdog_events",
             }
         )
+
+    if queue_snapshot:
+        dead = int(queue_snapshot.get("dead") or 0)
+        failed = int(queue_snapshot.get("failed") or 0)
+        pending = int(queue_snapshot.get("pending") or 0)
+        pending_warning = _env_int("OPS_BLING_PEDIDO_QUEUE_PENDING_WARNING", 50)
+
+        if dead:
+            alerts.append(
+                {
+                    "severity": "critical",
+                    "tone": "red",
+                    "title": f"{dead} webhook(s) Bling sem retry",
+                    "detail": "A fila de pedidos do Bling tem eventos em dead letter.",
+                    "action": "Abrir a fila bling_pedido_webhook_events, corrigir last_error e reenfileirar os eventos afetados.",
+                    "source": "bling_pedido_queue",
+                }
+            )
+        elif failed:
+            alerts.append(
+                {
+                    "severity": "warning",
+                    "tone": "amber",
+                    "title": f"{failed} webhook(s) Bling aguardando retry",
+                    "detail": "O worker vai tentar novamente com backoff.",
+                    "action": "Acompanhar last_error; se repetir, tratar API Bling, token ou regra local antes de escalar tenants.",
+                    "source": "bling_pedido_queue",
+                }
+            )
+        elif pending >= pending_warning:
+            alerts.append(
+                {
+                    "severity": "warning",
+                    "tone": "amber",
+                    "title": f"{pending} webhook(s) Bling pendente(s)",
+                    "detail": f"Fila acima do limite operacional de {pending_warning}.",
+                    "action": "Aumentar workers/limite do worker Bling ou investigar gargalo externo.",
+                    "source": "bling_pedido_queue",
+                }
+            )
 
     if not alerts:
         alerts.append(
@@ -574,6 +620,16 @@ def build_ops_dashboard(db: Session, *, since: datetime | None = None, until: da
     deploy_summary = summarize_deploy_events(since=period_since, until=period_until)
     watchdog_summary = summarize_watchdog_events(since=period_since, until=period_until, db=db)
     watchdog = _watchdog_now(db)
+    queue_snapshot: dict[str, Any] = {}
+    if get_bling_pedido_webhook_queue_snapshot is not None:
+        try:
+            queue_snapshot = get_bling_pedido_webhook_queue_snapshot(db)
+        except Exception:
+            try:
+                db.rollback()
+            except Exception:
+                pass
+            queue_snapshot = {"status": "unavailable"}
     current_status = _current_health_status(
         watchdog=watchdog,
         error_summary=current_error_summary,
@@ -600,6 +656,7 @@ def build_ops_dashboard(db: Session, *, since: datetime | None = None, until: da
         watchdog_summary=watchdog_summary,
         tenant_incidents=tenant_incidents,
         route_incidents=route_incidents,
+        queue_snapshot=queue_snapshot,
     )
     period_status = _overall_status(alerts)
 
@@ -618,6 +675,9 @@ def build_ops_dashboard(db: Session, *, since: datetime | None = None, until: da
         "errors": error_summary,
         "deploys": deploy_summary,
         "watchdog_events": watchdog_summary,
+        "queues": {
+            "bling_pedido_webhooks": queue_snapshot,
+        },
         "actionable_alerts": persisted_actionable_alerts or actionable_alerts,
         "ops_notifications": {
             **ops_notifications,

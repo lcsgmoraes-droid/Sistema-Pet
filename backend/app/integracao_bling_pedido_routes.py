@@ -4,7 +4,7 @@ import re
 import time
 from uuid import UUID
 
-from fastapi import APIRouter, Request, HTTPException, Depends, Query
+from fastapi import APIRouter, Request, HTTPException, Depends, Query, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone
@@ -1418,15 +1418,45 @@ _SITUACOES_PEDIDO_ATENDIDO = {
 }
 
 
-@router.post("/pedido")
+def _bling_pedido_webhook_async_enabled() -> bool:
+    raw = os.getenv("BLING_PEDIDO_WEBHOOK_ASYNC", "true")
+    return str(raw).strip().lower() in {"1", "true", "yes", "on"}
+
+
+@router.post("/pedido", status_code=status.HTTP_202_ACCEPTED)
 async def receber_pedido_bling(request: Request, db: Session = Depends(get_session)):
+    """Recebe webhooks do Bling e enfileira o trabalho pesado fora da request."""
+    body = await request.json()
+    body = body if isinstance(body, dict) else {}
+
+    if not _bling_pedido_webhook_async_enabled():
+        return processar_pedido_bling_payload(body, db)
+
+    try:
+        from app.services.bling_pedido_webhook_queue_service import enqueue_bling_pedido_webhook
+
+        result = enqueue_bling_pedido_webhook(db, body)
+        return {
+            **result,
+            "mode": "async_queue",
+        }
+    except Exception as exc:
+        logger.exception("[BLING WEBHOOK] Falha ao enfileirar webhook de pedido: %s", exc)
+        try:
+            db.rollback()
+        except Exception:
+            pass
+        if str(os.getenv("BLING_PEDIDO_WEBHOOK_FALLBACK_SYNC", "true")).strip().lower() in {"1", "true", "yes", "on"}:
+            return processar_pedido_bling_payload(body, db)
+        raise HTTPException(status_code=503, detail="Fila de webhooks do Bling indisponivel")
+
+
+def processar_pedido_bling_payload(body: dict, db: Session):
     """
-    Recebe webhooks de pedidos do Bling.
+    Processa webhooks de pedidos do Bling.
     Formato envelope v1:
       { eventId, date, version, event: 'order.created'|'order.updated'|'order.deleted', data: {...} }
     """
-    body = await request.json()
-
     # Tenant fixo para webhooks (chamadas sem JWT)
     _tenant_uuid = UUID(_BLING_WEBHOOK_TENANT_ID) if _BLING_WEBHOOK_TENANT_ID else None
     if _tenant_uuid:

@@ -46,6 +46,9 @@ Separacao operacional iniciada:
 - Incidente de lentidao de 2026-05-04: Ops apontou degradacao sem 5xx, concentrada em requisicoes lentas no tenant principal. A rota mais critica foi `/produtos/vendaveis`, usada pelo PDV durante digitacao/bipagem.
 - Hotfix local preparado: `/produtos/vendaveis` passou a usar enriquecimento leve, sem calcular composicao/custo/estoque virtual detalhado por sugestao; logs de kit/custo foram rebaixados para debug; o frontend do PDV passou a cancelar buscas antigas e limitar sugestoes.
 - Proxima evolucao de performance: criar endpoint dedicado de sugestao de produtos para PDV, cachear estoque virtual/custo de kits por evento de estoque, auditar dados de `tipo_kit` inconsistentes e adicionar indices/EXPLAIN nas rotas mais lentas do Ops.
+- Incidente de lentidao de 2026-05-07: Ops apontou degradacao sem 5xx, concentrada em `/integracoes/bling/pedido`. Causa raiz: webhook fazia consulta externa ao Bling, retries e esperas dentro da request publica.
+- Melhoria de escala preparada: `/integracoes/bling/pedido` passou a enfileirar eventos em `bling_pedido_webhook_events` e responder rapidamente; o processamento pesado fica no `BlingSyncScheduler`, com idempotencia por `eventId`/payload, retry com backoff e indices por tenant/pedido/status.
+- Proxima evolucao operacional: separar containers de `backend-api`, `worker-bling`, `worker-campanhas` e `worker-sefaz`, para impedir que integracoes externas concorram com PDV/admin pelo mesmo orcamento de workers e conexoes.
 
 Tela piloto:
 
