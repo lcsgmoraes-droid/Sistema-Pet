@@ -1,5 +1,21 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import api from '../api';
+
+const produtoPodeSerComponente = (produto, produtoAtualId) => {
+  const tipoProduto = produto?.tipo_produto || 'SIMPLES';
+  const produtoId = Number(produto?.id);
+  const atualId = Number(produtoAtualId);
+
+  if (atualId && produtoId === atualId) {
+    return false;
+  }
+
+  if (produto?.e_granel || String(produto?.nome || '').toLowerCase().includes('granel')) {
+    return false;
+  }
+
+  return ['SIMPLES', 'VARIACAO'].includes(tipoProduto);
+};
 
 export default function useProdutosNovoKit({ abaAtiva, formData, setFormData }) {
   const [produtosDisponiveis, setProdutosDisponiveis] = useState([]);
@@ -8,6 +24,7 @@ export default function useProdutosNovoKit({ abaAtiva, formData, setFormData }) 
   const [estoqueVirtualKit, setEstoqueVirtualKit] = useState(0);
   const [buscaComponente, setBuscaComponente] = useState('');
   const [dropdownComponenteVisivel, setDropdownComponenteVisivel] = useState(false);
+  const [loadingComponentes, setLoadingComponentes] = useState(false);
 
   const calcularEstoqueVirtualKit = (composicao) => {
     if (!composicao || composicao.length === 0) {
@@ -25,21 +42,30 @@ export default function useProdutosNovoKit({ abaAtiva, formData, setFormData }) 
     setEstoqueVirtualKit(estoqueMin >= 0 ? estoqueMin : 0);
   };
 
-  const carregarProdutosDisponiveis = async () => {
+  const carregarProdutosDisponiveis = useCallback(async (termo = '') => {
     try {
+      setLoadingComponentes(true);
       const response = await api.get('/produtos/', {
         params: {
-          apenas_ativos: true,
-          tipo_produto: 'SIMPLES',
-          page_size: 2000,
+          ativo: true,
+          busca: termo || undefined,
+          include_variations: true,
+          page: 1,
+          page_size: termo ? 80 : 100,
         },
       });
-      setProdutosDisponiveis(response.data.items || []);
+
+      const produtos = (response.data.items || [])
+        .filter((produto) => produtoPodeSerComponente(produto, formData.id));
+
+      setProdutosDisponiveis(produtos);
     } catch (error) {
       console.error('Erro ao carregar produtos:', error);
       setProdutosDisponiveis([]);
+    } finally {
+      setLoadingComponentes(false);
     }
-  };
+  }, [formData.id]);
 
   const adicionarProdutoKit = () => {
     if (!produtoKitSelecionado || !quantidadeKit || quantidadeKit <= 0) {
@@ -94,17 +120,38 @@ export default function useProdutosNovoKit({ abaAtiva, formData, setFormData }) 
   };
 
   useEffect(() => {
+    if (formData.composicao_kit && formData.composicao_kit.length > 0) {
+      calcularEstoqueVirtualKit(formData.composicao_kit);
+      return;
+    }
+
+    setEstoqueVirtualKit(0);
+  }, [formData.composicao_kit]);
+
+  useEffect(() => {
     const ehKit =
       formData.tipo_produto === 'KIT' ||
       (formData.tipo_produto === 'VARIACAO' && formData.tipo_kit);
 
-    if (abaAtiva === 9 && ehKit) {
-      carregarProdutosDisponiveis();
-      if (formData.composicao_kit && formData.composicao_kit.length > 0) {
-        calcularEstoqueVirtualKit(formData.composicao_kit);
-      }
+    if (abaAtiva !== 9 || !ehKit || produtoKitSelecionado) {
+      return undefined;
     }
-  }, [abaAtiva, formData.composicao_kit, formData.tipo_produto, formData.tipo_kit]);
+
+    const termo = buscaComponente.trim();
+    const termoApi = termo.length >= 2 ? termo : '';
+    const timer = setTimeout(() => {
+      carregarProdutosDisponiveis(termoApi);
+    }, termoApi ? 250 : 0);
+
+    return () => clearTimeout(timer);
+  }, [
+    abaAtiva,
+    buscaComponente,
+    carregarProdutosDisponiveis,
+    formData.tipo_kit,
+    formData.tipo_produto,
+    produtoKitSelecionado,
+  ]);
 
   return {
     produtosDisponiveis,
@@ -117,6 +164,7 @@ export default function useProdutosNovoKit({ abaAtiva, formData, setFormData }) 
     setBuscaComponente,
     dropdownComponenteVisivel,
     setDropdownComponenteVisivel,
+    loadingComponentes,
     adicionarProdutoKit,
     removerProdutoKit,
   };

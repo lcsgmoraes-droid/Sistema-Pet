@@ -1,3 +1,24 @@
+const normalizarBuscaProduto = (valor) =>
+  String(valor || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+
+const produtoCorrespondeAoTermo = (produto, termo) => {
+  const termos = normalizarBuscaProduto(termo).split(/\s+/).filter(Boolean);
+  if (termos.length === 0) return true;
+
+  const campos = [
+    produto.codigo,
+    produto.sku,
+    produto.codigo_barras,
+    produto.nome,
+  ].map(normalizarBuscaProduto);
+
+  return termos.every((parte) => campos.some((campo) => campo.includes(parte)));
+};
+
 export default function ProdutosNovoComposicaoTab({
   formData,
   handleChange,
@@ -11,6 +32,7 @@ export default function ProdutosNovoComposicaoTab({
   setBuscaComponente,
   dropdownComponenteVisivel,
   setDropdownComponenteVisivel,
+  loadingComponentes,
   adicionarProdutoKit,
   removerProdutoKit,
 }) {
@@ -161,14 +183,18 @@ export default function ProdutosNovoComposicaoTab({
               {dropdownComponenteVisivel &&
                 buscaComponente.length > 0 &&
                 (() => {
-                  const termo = buscaComponente.toLowerCase();
+                  const termo = buscaComponente;
                   const filtrados = produtosDisponiveis
-                    .filter(
-                      (produto) =>
-                        (produto.codigo && produto.codigo.toLowerCase().includes(termo)) ||
-                        (produto.nome && produto.nome.toLowerCase().includes(termo))
-                    )
+                    .filter((produto) => produtoCorrespondeAoTermo(produto, termo))
                     .slice(0, 30);
+                  if (loadingComponentes) {
+                    return (
+                      <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
+                        <div className="px-3 py-2 text-sm text-gray-500">Buscando produtos...</div>
+                      </div>
+                    );
+                  }
+
                   return filtrados.length > 0 ? (
                     <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg max-h-64 overflow-y-auto">
                       {filtrados.map((produto) => (
@@ -190,7 +216,11 @@ export default function ProdutosNovoComposicaoTab({
                         </div>
                       ))}
                     </div>
-                  ) : null;
+                  ) : (
+                    <div className="absolute z-50 w-full mt-1 bg-white border border-gray-300 rounded-lg shadow-lg">
+                      <div className="px-3 py-2 text-sm text-gray-500">Nenhum produto encontrado</div>
+                    </div>
+                  );
                 })()}
             </div>
           </div>
