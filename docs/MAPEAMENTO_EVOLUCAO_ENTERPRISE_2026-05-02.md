@@ -821,6 +821,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-07: `Compras/Pedidos` moveu helpers puros de normalizacao, consolidacao de itens e download de documento para `pedidoCompraUtils`, deixando a pagina focada em estado e orquestracao.
 - 2026-05-07: `Compras/Pedidos` agrupou a renderizacao dos modais em `PedidosCompraModalsLayer`, reduzindo o JSX da pagina principal sem mover regras de envio, recebimento, rascunho ou sugestao.
 - 2026-05-07: `Compras/Pedidos` extraiu o estado, filtros e calculos da sugestao inteligente para `usePedidosCompraSugestao`, mantendo a decisao de rascunho e aplicacao final orquestradas na pagina.
+- 2026-05-07: `Compras/Pedidos` extraiu o estado e operacoes de grupos de fornecedores para `usePedidosCompraGruposFornecedores`, mantendo a tela principal apenas como consumidora do fluxo.
 
 ### Nao fazer nesta onda
 
