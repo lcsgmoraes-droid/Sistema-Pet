@@ -12,6 +12,7 @@ export default function useProdutosEdicao({
   const [editandoMargem, setEditandoMargem] = useState(null);
   const [modalEdicaoLote, setModalEdicaoLote] = useState(false);
   const [dadosEdicaoLote, setDadosEdicaoLote] = useState({
+    ativo: "",
     eh_racao: "",
     marca_id: "",
     categoria_id: "",
@@ -84,6 +85,7 @@ export default function useProdutosEdicao({
     }
 
     setDadosEdicaoLote({
+      ativo: "",
       eh_racao: "",
       marca_id: "",
       categoria_id: "",
@@ -116,6 +118,9 @@ export default function useProdutosEdicao({
       }
 
       const dadosEnvio = {};
+      if (dadosEdicaoLote.ativo !== "") {
+        dadosEnvio.ativo = dadosEdicaoLote.ativo === "true";
+      }
       if (dadosEdicaoLote.eh_racao !== "") {
         dadosEnvio.eh_racao = dadosEdicaoLote.eh_racao === "true";
       }
@@ -166,6 +171,15 @@ export default function useProdutosEdicao({
       }
       if (dadosEdicaoLote.anunciar_app !== "") {
         dadosEnvio.anunciar_app = dadosEdicaoLote.anunciar_app === "true";
+      }
+
+      if (dadosEnvio.ativo === false) {
+        const confirmado = window.confirm(
+          `Desativar ${selecionados.length} produto(s) selecionado(s)? Eles deixam de aparecer como ativos e os canais e-commerce/app serao desligados automaticamente.`,
+        );
+        if (!confirmado) {
+          return;
+        }
       }
 
       await api.patch("/produtos/atualizar-lote", {

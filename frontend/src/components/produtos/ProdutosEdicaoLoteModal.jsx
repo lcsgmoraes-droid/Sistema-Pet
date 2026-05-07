@@ -216,7 +216,23 @@ export default function ProdutosEdicaoLoteModal({
                   </option>
                 ))}
               </CampoSelect>
+
+              <CampoSelect
+                label="Status do produto"
+                value={dadosEdicaoLote.ativo}
+                onChange={(event) => atualizarCampo("ativo", event.target.value)}
+              >
+                <option value="">Nao alterar</option>
+                <option value="true">Ativar</option>
+                <option value="false">Desativar</option>
+              </CampoSelect>
             </div>
+
+            {dadosEdicaoLote.ativo === "false" && (
+              <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">
+                Os produtos selecionados ficarao inativos e os canais e-commerce/app serao desligados automaticamente.
+              </div>
+            )}
           </section>
 
           <section className="space-y-4 rounded-2xl border border-blue-100 bg-blue-50/60 p-4">

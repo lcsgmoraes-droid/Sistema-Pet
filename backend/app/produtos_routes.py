@@ -2920,6 +2920,7 @@ def atualizar_produto(
 
 class AtualizacaoLoteRequest(BaseModel):
     produto_ids: List[int]
+    ativo: Optional[bool] = None
     eh_racao: Optional[bool] = None
     classificacao_racao: Optional[str] = None
     marca_id: Optional[int] = None
@@ -2979,6 +2980,12 @@ def atualizar_produtos_lote(
     # Atualizar campos fornecidos
     atualizado = 0
     for produto in produtos:
+        if dados.ativo is not None:
+            if not dados.ativo:
+                _validar_pode_inativar_produto(db, produto, tenant_id)
+            if bool(produto.ativo) != dados.ativo or bool(produto.situacao) != dados.ativo:
+                atualizado += 1
+            _aplicar_status_ativo_produto(produto, dados.ativo)
         if dados.marca_id is not None:
             produto.marca_id = dados.marca_id
             atualizado += 1
@@ -3075,6 +3082,7 @@ def atualizar_produtos_lote(
     return {
         "produtos_atualizados": len(produtos),
         "campos_atualizados": atualizado,
+        "ativo": dados.ativo,
         "eh_racao": dados.eh_racao,
         "classificacao_racao": dados.classificacao_racao,
         "marca_id": dados.marca_id,
