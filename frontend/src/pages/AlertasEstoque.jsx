@@ -10,9 +10,11 @@ import {
   getAlertasPendentes,
   getTodosAlertas,
   getDashboardAlertas,
+  getAlertasPrecoGranel,
   resolverAlerta
 } from '../api/alertasEstoque';
 import { getProdutos } from '../api/produtos';
+import { formatBRL, formatMoneyBRL } from '../utils/formatters';
 import ProdutosValidadeProxima from './ProdutosValidadeProxima';
 
 const ABAS_VALIDAS = ['pendentes', 'dashboard', 'historico', 'validade'];
@@ -32,6 +34,7 @@ export default function AlertasEstoque() {
   const [reloadValidade, setReloadValidade] = useState(0);
   const [abaAtiva, setAbaAtiva] = useState(() => obterAbaDaQuery(location.search)); // 'pendentes' | 'historico' | 'dashboard' | 'validade'
   const [produtosBrutos, setProdutosBrutos] = useState([]);
+  const [alertasPrecoGranel, setAlertasPrecoGranel] = useState([]);
 
   useEffect(() => {
     if (abaAtiva !== 'validade') {
@@ -101,6 +104,13 @@ export default function AlertasEstoque() {
 
     setLoading(true);
     try {
+      try {
+        const granelRes = await getAlertasPrecoGranel({ margem_minima_percentual: 20, limite: 20 });
+        setAlertasPrecoGranel(granelRes.data?.alertas || []);
+      } catch (granelError) {
+        console.warn('Erro ao carregar alertas de preco do granel:', granelError);
+      }
+
       if (abaAtiva === 'pendentes') {
         const response = await getAlertasPendentes();
         setAlertasPendentes(response.data);
@@ -189,7 +199,7 @@ export default function AlertasEstoque() {
       {abaAtiva !== 'validade' && produtosBrutos.length > 0 && (
         <div className="mb-4 rounded-lg border border-indigo-100 bg-white p-4 shadow-sm md:mb-6 md:p-5">
           <h2 className="text-base font-semibold text-gray-800 mb-4">Análises Inteligentes</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mb-5">
             <div className="p-3 rounded-lg bg-red-50 border border-red-200">
               <div className="text-xs text-red-700">Ruptura</div>
               <div className="text-2xl font-bold text-red-700">{insights.rupturas.length}</div>
@@ -202,12 +212,16 @@ export default function AlertasEstoque() {
               <div className="text-xs text-blue-700">Excesso de estoque</div>
               <div className="text-2xl font-bold text-blue-700">{insights.excessoEstoque.length}</div>
             </div>
+            <div className="p-3 rounded-lg bg-orange-50 border border-orange-200">
+              <div className="text-xs text-orange-700">Granel abaixo da meta</div>
+              <div className="text-2xl font-bold text-orange-700">{alertasPrecoGranel.length}</div>
+            </div>
             <div className="p-3 rounded-lg bg-purple-50 border border-purple-200">
               <div className="text-xs text-purple-700">Ativos monitorados</div>
               <div className="text-2xl font-bold text-purple-700">{insights.totalAtivos}</div>
             </div>
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div>
               <h3 className="text-sm font-semibold text-gray-700 mb-2">Sugestão de reposição imediata</h3>
               {insights.sugestoesReposicao.length === 0 ? (
@@ -225,6 +239,31 @@ export default function AlertasEstoque() {
                       <span className="text-gray-600 whitespace-nowrap">
                         estoque {Number(p.estoque_atual ?? p.estoque ?? 0)} — comprar <strong>{p.sugestao}</strong>
                       </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div>
+              <h3 className="text-sm font-semibold text-gray-700 mb-2">Granel abaixo da meta</h3>
+              {alertasPrecoGranel.length === 0 ? (
+                <p className="text-sm text-gray-500">Nenhum granel abaixo da margem minima de 20%.</p>
+              ) : (
+                <div className="space-y-2">
+                  {alertasPrecoGranel.slice(0, 5).map(alerta => (
+                    <div key={`${alerta.vinculo_id}-${alerta.produto_granel_id}`} className="text-sm p-2 rounded bg-orange-50 border border-orange-100">
+                      <button
+                        onClick={() => navigate(`/produtos/${alerta.produto_granel_id}/editar`)}
+                        className="font-medium text-orange-900 hover:underline text-left"
+                      >
+                        {alerta.produto_granel_nome}
+                      </button>
+                      <div className="mt-1 text-xs text-orange-800">
+                        Atual {formatMoneyBRL(alerta.preco_venda_granel)} | meta {formatMoneyBRL(alerta.preco_minimo_granel)}
+                      </div>
+                      <div className="mt-1 text-xs text-gray-600">
+                        Origem: {alerta.produto_origem_nome} | margem {formatBRL(alerta.margem_atual_sobre_venda_kg)}%
+                      </div>
                     </div>
                   ))}
                 </div>

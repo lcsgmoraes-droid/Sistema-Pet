@@ -789,6 +789,9 @@ def _resolver_fornecedores_compra(
 
 
 JANELAS_GIRO_SUGESTAO = (7, 15, 30, 60, 90)
+MIN_VENDAS_AJUSTE_RUPTURA = 3
+MIN_DIAS_COM_ESTOQUE_AJUSTE_RUPTURA = 7
+MAX_MULTIPLICADOR_AJUSTE_RUPTURA = 2.0
 
 
 def _formatar_origem_venda(canal: Optional[str]) -> str:
@@ -2451,19 +2454,40 @@ def sugerir_pedido_inteligente(
         teve_ruptura = bool(cobertura_estoque["teve_ruptura"])
 
         consumo_observado = vendas_periodo / periodo_dias if vendas_periodo > 0 else 0
+        consumo_recente = vendas_30 / 30 if vendas_30 > 0 else 0
+        consumo_base = max(consumo_observado, consumo_recente)
+        consumo_ajustado = consumo_observado
+        ajuste_ruptura_aplicado = False
+        motivo_ajuste_ruptura = None
         pode_ajustar_por_ruptura = (
             teve_ruptura
             and dias_com_estoque >= 1
             and dias_com_estoque < periodo_dias * 0.95
         )
-        dias_base_ajustada = max(dias_com_estoque, 1.0)
-        consumo_ajustado = (
-            vendas_periodo / dias_base_ajustada
-            if vendas_periodo > 0 and pode_ajustar_por_ruptura
-            else consumo_observado
-        )
-        consumo_recente = vendas_30 / 30 if vendas_30 > 0 else 0
-        consumo_diario = max(consumo_observado, consumo_ajustado, consumo_recente)
+        if pode_ajustar_por_ruptura and vendas_periodo > 0:
+            if vendas_periodo < MIN_VENDAS_AJUSTE_RUPTURA:
+                motivo_ajuste_ruptura = (
+                    f"Ruptura detectada, mas sem ajuste: apenas {vendas_periodo:g} venda(s) no periodo."
+                )
+            elif dias_com_estoque < MIN_DIAS_COM_ESTOQUE_AJUSTE_RUPTURA:
+                motivo_ajuste_ruptura = (
+                    f"Ruptura detectada, mas sem ajuste: somente {dias_com_estoque:.1f} dia(s) com estoque."
+                )
+            else:
+                consumo_ajustado_bruto = vendas_periodo / max(dias_com_estoque, 1.0)
+                limite_ajuste = consumo_base * MAX_MULTIPLICADOR_AJUSTE_RUPTURA if consumo_base > 0 else consumo_ajustado_bruto
+                consumo_ajustado = min(consumo_ajustado_bruto, limite_ajuste)
+                ajuste_ruptura_aplicado = consumo_ajustado > consumo_base * 1.05
+                if consumo_ajustado_bruto > consumo_ajustado:
+                    motivo_ajuste_ruptura = (
+                        f"Media ajustada por ruptura, limitada a {MAX_MULTIPLICADOR_AJUSTE_RUPTURA:g}x o giro observado."
+                    )
+                else:
+                    motivo_ajuste_ruptura = "Media ajustada pelos dias em que havia estoque."
+        elif teve_ruptura and vendas_periodo <= 0:
+            motivo_ajuste_ruptura = "Ruptura detectada, mas sem vendas no periodo para projetar demanda."
+
+        consumo_diario = max(consumo_base, consumo_ajustado)
 
         estoque_para_calculo = max(0.0, estoque_atual)
         dias_estoque = (
@@ -2539,6 +2563,7 @@ def sugerir_pedido_inteligente(
                 "consumo_diario": round(consumo_diario, 2),
                 "consumo_diario_observado": round(consumo_observado, 3),
                 "consumo_diario_ajustado": round(consumo_ajustado, 3),
+                "consumo_diario_base": round(consumo_base, 3),
                 "vendas_periodo": float(vendas_periodo),
                 "vendas_janelas": vendas_janelas,
                 "vendas_7d": float(vendas_janelas.get("7") or 0),
@@ -2554,6 +2579,8 @@ def sugerir_pedido_inteligente(
                 "dias_sem_estoque": dias_sem_estoque,
                 "teve_ruptura": teve_ruptura,
                 "ruptura_ativa": ruptura_ativa,
+                "ruptura_ajuste_aplicado": ajuste_ruptura_aplicado,
+                "ruptura_ajuste_motivo": motivo_ajuste_ruptura,
                 "lead_time": lead_time,
                 "dias_total_cobertura": dias_total_cobertura,
                 "estoque_para_calculo": round(estoque_para_calculo, 3),
@@ -2577,6 +2604,8 @@ def sugerir_pedido_inteligente(
                     dias_sem_estoque=dias_sem_estoque,
                     consumo_ajustado=consumo_ajustado,
                     consumo_observado=consumo_observado,
+                    ajuste_ruptura_aplicado=ajuste_ruptura_aplicado,
+                    motivo_ajuste_ruptura=motivo_ajuste_ruptura,
                 )
             }
             
@@ -2625,6 +2654,8 @@ def _gerar_observacao(
     dias_sem_estoque: float = 0,
     consumo_ajustado: float = 0,
     consumo_observado: float = 0,
+    ajuste_ruptura_aplicado: bool = False,
+    motivo_ajuste_ruptura: Optional[str] = None,
 ) -> str:
     """Gera observacao inteligente baseada nos dados de compra."""
     observacoes = []
@@ -2639,12 +2670,14 @@ def _gerar_observacao(
     elif prioridade == "ALERTA":
         observacoes.append("Estoque abaixo do minimo configurado")
 
-    if teve_ruptura and dias_sem_estoque > 0:
+    if ajuste_ruptura_aplicado and teve_ruptura and dias_sem_estoque > 0:
         observacoes.append(
             f"Media ajustada por {dias_sem_estoque:.1f} dia(s) sem estoque"
         )
+    elif teve_ruptura and motivo_ajuste_ruptura:
+        observacoes.append(motivo_ajuste_ruptura)
 
-    if consumo_ajustado > consumo_observado * 1.1 and consumo_observado > 0:
+    if ajuste_ruptura_aplicado and consumo_ajustado > consumo_observado * 1.1 and consumo_observado > 0:
         observacoes.append("Demanda recalculada pelos dias em que havia estoque")
 
     if tendencia == "CRESCIMENTO":

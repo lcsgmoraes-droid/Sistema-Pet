@@ -26,6 +26,13 @@ export const getDashboardAlertas = () => {
 };
 
 /**
+ * Alertas de preco do granel abaixo da margem minima esperada.
+ */
+export const getAlertasPrecoGranel = (params = {}) => {
+  return api.get('/estoque/granel/alertas-preco', { params });
+};
+
+/**
  * Resolver ou ignorar um alerta
  * @param {number} alertaId - ID do alerta
  * @param {string} acao - 'resolvido' ou 'ignorado'

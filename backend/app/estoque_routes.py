@@ -17,7 +17,7 @@ Funcionalidades:
 - Entrada por XML (NF-e fornecedor)
 - Alertas e relatórios
 """
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_, func, desc
@@ -2599,6 +2599,95 @@ def listar_vinculos_granel_origem(
         .all()
     )
     return [_serializar_vinculo_granel(vinculo) for vinculo in vinculos]
+
+
+@router.get("/granel/alertas-preco")
+def listar_alertas_preco_granel(
+    margem_minima_percentual: float = Query(default=20, ge=0, le=300),
+    limite: int = Query(default=50, ge=1, le=200),
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Lista graneis vinculados com preco abaixo da margem minima sobre venda/kg da origem."""
+    _current_user, tenant_id = user_and_tenant
+    fator_margem = 1 + (float(margem_minima_percentual or 0) / 100)
+
+    vinculos = (
+        db.query(ProdutoGranelVinculo)
+        .options(
+            joinedload(ProdutoGranelVinculo.produto_origem),
+            joinedload(ProdutoGranelVinculo.produto_granel),
+        )
+        .filter(
+            ProdutoGranelVinculo.tenant_id == tenant_id,
+            ProdutoGranelVinculo.ativo.is_(True),
+        )
+        .all()
+    )
+
+    alertas = []
+    for vinculo in vinculos:
+        origem = vinculo.produto_origem
+        granel = vinculo.produto_granel
+        if not origem or not granel:
+            continue
+        if getattr(origem, "ativo", True) is False or getattr(granel, "ativo", True) is False:
+            continue
+
+        peso_kg = float(getattr(origem, "peso_embalagem", 0) or 0)
+        preco_venda_origem = float(getattr(origem, "preco_venda", 0) or 0)
+        preco_venda_granel = float(getattr(granel, "preco_venda", 0) or 0)
+        custo_origem = float(getattr(origem, "preco_custo", 0) or 0)
+        if peso_kg <= 0 or preco_venda_origem <= 0:
+            continue
+
+        venda_kg_origem = preco_venda_origem / peso_kg
+        custo_kg_origem = custo_origem / peso_kg if custo_origem > 0 else 0
+        preco_minimo_granel = venda_kg_origem * fator_margem
+        if preco_venda_granel >= preco_minimo_granel:
+            continue
+
+        margem_atual_sobre_venda_kg = (
+            ((preco_venda_granel / venda_kg_origem) - 1) * 100
+            if venda_kg_origem > 0 and preco_venda_granel > 0
+            else -100
+        )
+        margem_atual_sobre_custo_kg = (
+            ((preco_venda_granel / custo_kg_origem) - 1) * 100
+            if custo_kg_origem > 0 and preco_venda_granel > 0
+            else None
+        )
+        diferenca = preco_minimo_granel - preco_venda_granel
+        alertas.append({
+            "vinculo_id": vinculo.id,
+            "produto_origem_id": origem.id,
+            "produto_origem_nome": origem.nome,
+            "produto_origem_codigo": getattr(origem, "codigo", None),
+            "produto_granel_id": granel.id,
+            "produto_granel_nome": granel.nome,
+            "produto_granel_codigo": getattr(granel, "codigo", None),
+            "peso_por_unidade_kg": round(peso_kg, 3),
+            "preco_venda_origem": round(preco_venda_origem, 2),
+            "preco_venda_kg_origem": round(venda_kg_origem, 2),
+            "custo_kg_origem": round(custo_kg_origem, 2),
+            "preco_venda_granel": round(preco_venda_granel, 2),
+            "preco_minimo_granel": round(preco_minimo_granel, 2),
+            "diferenca_valor": round(diferenca, 2),
+            "diferenca_percentual": round((diferenca / preco_minimo_granel) * 100, 2) if preco_minimo_granel > 0 else 0,
+            "margem_minima_percentual": round(float(margem_minima_percentual or 0), 2),
+            "margem_atual_sobre_venda_kg": round(margem_atual_sobre_venda_kg, 2),
+            "margem_atual_sobre_custo_kg": round(margem_atual_sobre_custo_kg, 2) if margem_atual_sobre_custo_kg is not None else None,
+            "criticidade": "CRITICO" if preco_venda_granel <= 0 or margem_atual_sobre_venda_kg < 0 else "ALERTA",
+        })
+
+    alertas.sort(key=lambda item: (0 if item["criticidade"] == "CRITICO" else 1, -item["diferenca_valor"]))
+    total_alertas = len(alertas)
+    alertas = alertas[:limite]
+    return {
+        "margem_minima_percentual": round(float(margem_minima_percentual or 0), 2),
+        "total": total_alertas,
+        "alertas": alertas,
+    }
 
 
 @router.post("/granel/vinculos", status_code=status.HTTP_201_CREATED)

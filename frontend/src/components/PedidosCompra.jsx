@@ -1172,6 +1172,7 @@ const PedidosCompra = () => {
       sugestao?.teve_ruptura
         ? `Ruptura no periodo: ${formatarQuantidadeCurta(sugestao.dias_sem_estoque || 0, 1)} dia(s) sem estoque`
         : '',
+      sugestao?.ruptura_ajuste_motivo || '',
       sugestao?.estoque_derivado
         ? 'Estoque derivado por KIT/variacao virtual'
         : '',
@@ -1181,10 +1182,13 @@ const PedidosCompra = () => {
     return linhas.filter(Boolean).join('\n');
   };
 
-  const consumoFoiAjustado = (sugestao) => (
-    Number(sugestao?.consumo_diario_ajustado || 0)
-    > Number(sugestao?.consumo_diario_observado || sugestao?.consumo_diario || 0) * 1.05
-  );
+  const consumoFoiAjustado = (sugestao) => {
+    if (sugestao?.ruptura_ajuste_aplicado !== undefined) {
+      return Boolean(sugestao.ruptura_ajuste_aplicado);
+    }
+    return Number(sugestao?.consumo_diario_ajustado || 0)
+      > Number(sugestao?.consumo_diario_observado || sugestao?.consumo_diario || 0) * 1.05;
+  };
 
   const sugestoesFiltradas = useMemo(() => {
     const q = filtroSugestao.trim().toLowerCase();
