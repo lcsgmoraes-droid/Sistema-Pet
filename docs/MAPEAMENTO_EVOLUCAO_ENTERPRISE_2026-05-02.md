@@ -816,6 +816,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-03: modais de `ContasPagar` e `ContasReceber` tiveram acoes de confirmar/cancelar/fechar e atalhos de fluxo/venda alinhados ao padrao `ActionButton`, mantendo intencao de cor e tamanho consistente.
 - 2026-05-07: `Compras/Pedidos` iniciou a fatia enterprise segura: filtros da listagem extraidos para `PedidosCompraFiltros`, tabela de pedidos extraida para `PedidosCompraTabela` e acoes/status/valor da lista passaram a consumir `ActionButton`, `StatusBadge` e `MoneyCell` sem alterar a regra de negocio.
 - 2026-05-07: `Compras/Pedidos` teve o modal de sugestao inteligente extraido para `PedidosCompraSugestaoModal` e o modal de grupos de fornecedor extraido para `ModalGruposFornecedores`, reduzindo o arquivo principal sem mover regra de negocio.
+- 2026-05-07: `Compras/Pedidos` teve os modais restantes de rascunho, recebimento, exportacao e envio extraidos para `components/compras`, com o seletor de colunas do documento centralizado em `pedidoDocumentoColunas`, mantendo a regra de negocio na pagina principal.
 
 ### Nao fazer nesta onda
 
