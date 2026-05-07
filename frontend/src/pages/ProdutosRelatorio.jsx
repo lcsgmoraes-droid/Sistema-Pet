@@ -816,12 +816,18 @@ export default function ProdutosRelatorio() {
               <ResumoCard
                 titulo="Cobertura estimada"
                 valor={
-                  dadosProduto?.resumo?.cobertura_estimada_dias != null
+                  dadosProduto?.resumo?.ruptura_ativa
+                    ? "Ruptura"
+                    : dadosProduto?.resumo?.cobertura_estimada_dias != null
                     ? `${formatarQuantidade(dadosProduto.resumo.cobertura_estimada_dias)} dias`
                     : "Sem base"
                 }
-                descricao="Calculado pela media diaria dos ultimos 30 dias."
-                destaque="amber"
+                descricao={
+                  dadosProduto?.resumo?.ruptura_ativa
+                    ? "Estoque zerado/negativo; cobertura tratada como 0."
+                    : "Calculado pela media diaria dos ultimos 30 dias."
+                }
+                destaque={dadosProduto?.resumo?.ruptura_ativa ? "rose" : "amber"}
               />
               <ResumoCard
                 titulo="Media diaria 30 dias"

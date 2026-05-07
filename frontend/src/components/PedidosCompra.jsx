@@ -1115,6 +1115,64 @@ const PedidosCompra = () => {
 
   const obterQuantidadeInteira = (sugestao) => Math.max(0, Math.ceil(obterQuantidadeFinal(sugestao)));
 
+  const formatarQuantidadeCurta = (valor, casas = 2) => {
+    const numero = Number(valor || 0);
+    return numero.toLocaleString('pt-BR', {
+      minimumFractionDigits: numero % 1 === 0 ? 0 : Math.min(casas, 1),
+      maximumFractionDigits: casas,
+    });
+  };
+
+  const obterVendaJanelaSugestao = (sugestao, dias) => {
+    const janelas = sugestao?.vendas_janelas || {};
+    return Number(
+      janelas[String(dias)]
+      ?? janelas[dias]
+      ?? sugestao?.[`vendas_${dias}d`]
+      ?? 0
+    );
+  };
+
+  const montarTooltipGiroSugestao = (sugestao) => {
+    const vendas = [7, 15, 30, 60, 90]
+      .map((dias) => `${dias}d: ${formatarQuantidadeCurta(obterVendaJanelaSugestao(sugestao, dias))}`)
+      .join(' | ');
+    const origens = Array.isArray(sugestao?.origens_venda)
+      ? sugestao.origens_venda
+        .filter((origem) => Number(origem?.quantidade || 0) > 0)
+        .map((origem) => `${origem.canal}: ${formatarQuantidadeCurta(origem.quantidade)}`)
+        .join(' | ')
+      : '';
+    const consumoObservado = Number(sugestao?.consumo_diario_observado ?? sugestao?.consumo_diario ?? 0);
+    const consumoAjustado = Number(sugestao?.consumo_diario_ajustado ?? sugestao?.consumo_diario ?? 0);
+    const coberturaAlvo = Number(sugestao?.dias_total_cobertura || 0);
+    const leadTime = Number(sugestao?.lead_time || 0);
+    const linhas = [
+      `Vendas por janela: ${vendas}`,
+      `Consumo observado: ${formatarQuantidadeCurta(consumoObservado, 3)}/dia`,
+      consumoAjustado > consumoObservado * 1.05
+        ? `Consumo ajustado: ${formatarQuantidadeCurta(consumoAjustado, 3)}/dia`
+        : '',
+      coberturaAlvo
+        ? `Cobertura alvo: ${coberturaAlvo} dias (lead ${leadTime} + cobertura ${diasCobertura} + margem 7)`
+        : '',
+      sugestao?.teve_ruptura
+        ? `Ruptura no periodo: ${formatarQuantidadeCurta(sugestao.dias_sem_estoque || 0, 1)} dia(s) sem estoque`
+        : '',
+      sugestao?.estoque_derivado
+        ? 'Estoque derivado por KIT/variacao virtual'
+        : '',
+      origens ? `Origens consideradas: ${origens}` : '',
+    ];
+
+    return linhas.filter(Boolean).join('\n');
+  };
+
+  const consumoFoiAjustado = (sugestao) => (
+    Number(sugestao?.consumo_diario_ajustado || 0)
+    > Number(sugestao?.consumo_diario_observado || sugestao?.consumo_diario || 0) * 1.05
+  );
+
   const sugestoesFiltradas = useMemo(() => {
     const q = filtroSugestao.trim().toLowerCase();
     return sugestoes.filter((s) => {
@@ -2738,13 +2796,13 @@ const PedidosCompra = () => {
                             </th>
                             <th
                               className={`${classeCabecalhoTabelaSugestao} text-right`}
-                              title="Quantity atual no estoque. Negativo indica divergência de ajuste."
+                              title="Estoque atual. Valor negativo e tratado como ruptura para compra."
                             >
                               Estoque ℹ️
                             </th>
                             <th
                               className={`${classeCabecalhoTabelaSugestao} text-right`}
-                              title="Média de unidades vendidas por dia no período selecionado."
+                              title="Media diaria usada na compra. Se houve ruptura, o sistema ajusta pelos dias em que havia estoque."
                             >
                               Consumo/dia ℹ️
                             </th>
@@ -2756,7 +2814,7 @@ const PedidosCompra = () => {
                             </th>
                             <th
                               className={`${classeCabecalhoTabelaSugestao} text-right`}
-                              title="Quantidade sugerida para cobrir o período de cobertura definido. Você pode editar."
+                              title="Quantidade para cobrir lead time + cobertura escolhida + margem de 7 dias. Você pode editar."
                             >
                               Qtd Sugerida ℹ️
                             </th>
@@ -2834,6 +2892,38 @@ const PedidosCompra = () => {
                                   <span>| Barras: {sugestao.produto_codigo_barras || 'N/A'}</span>
                                   {sugestao.marca_nome ? <span>| Marca: {sugestao.marca_nome}</span> : null}
                                 </div>
+                                <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px]">
+                                  <span
+                                    title={montarTooltipGiroSugestao(sugestao)}
+                                    className="inline-flex cursor-help items-center rounded-full border border-slate-200 bg-slate-50 px-2 py-0.5 font-semibold text-slate-600"
+                                  >
+                                    Giro 30d: {formatarQuantidadeCurta(obterVendaJanelaSugestao(sugestao, 30))}
+                                  </span>
+                                  {consumoFoiAjustado(sugestao) && (
+                                    <span
+                                      title={montarTooltipGiroSugestao(sugestao)}
+                                      className="inline-flex cursor-help items-center rounded-full border border-amber-200 bg-amber-50 px-2 py-0.5 font-semibold text-amber-700"
+                                    >
+                                      media ajustada
+                                    </span>
+                                  )}
+                                  {(sugestao.ruptura_ativa || sugestao.teve_ruptura) && (
+                                    <span
+                                      title={montarTooltipGiroSugestao(sugestao)}
+                                      className="inline-flex cursor-help items-center rounded-full border border-rose-200 bg-rose-50 px-2 py-0.5 font-semibold text-rose-700"
+                                    >
+                                      ruptura
+                                    </span>
+                                  )}
+                                  {sugestao.estoque_derivado && (
+                                    <span
+                                      title={montarTooltipGiroSugestao(sugestao)}
+                                      className="inline-flex cursor-help items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700"
+                                    >
+                                      derivado
+                                    </span>
+                                  )}
+                                </div>
                                 {sugestao.fornecedor_nome && incluirGrupoFornecedor && (
                                   <div className="mt-1 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
                                     Origem: {sugestao.fornecedor_nome}
@@ -2848,16 +2938,29 @@ const PedidosCompra = () => {
                               <div className="font-medium">{Number(sugestao.estoque_atual).toFixed(2).replace(/\.?0+$/, '') || '0'}</div>
                               <div className="text-xs text-gray-500">Mín: {sugestao.estoque_minimo}</div>
                             </td>
-                            <td className="px-4 py-3 text-right font-medium">
-                              {sugestao.consumo_diario.toFixed(2)}
+                            <td
+                              className="px-4 py-3 text-right font-medium"
+                              title={montarTooltipGiroSugestao(sugestao)}
+                            >
+                              <div>{Number(sugestao.consumo_diario || 0).toFixed(2)}</div>
+                              {consumoFoiAjustado(sugestao) && (
+                                <div className="text-[10px] font-semibold text-amber-600">ajustado</div>
+                              )}
                             </td>
                             <td className="px-4 py-3 text-right">
-                              <span className={`font-semibold ${
-                                sugestao.dias_estoque && sugestao.dias_estoque < 7 ? 'text-red-600' :
-                                sugestao.dias_estoque && sugestao.dias_estoque < 14 ? 'text-yellow-600' :
-                                'text-green-600'
-                              }`}>
-                                {sugestao.dias_estoque ? `${sugestao.dias_estoque} dias` : '∞'}
+                              <span
+                                title={montarTooltipGiroSugestao(sugestao)}
+                                className={`font-semibold ${
+                                  sugestao.ruptura_ativa || (sugestao.dias_estoque !== null && sugestao.dias_estoque < 7) ? 'text-red-600' :
+                                  sugestao.dias_estoque !== null && sugestao.dias_estoque < 14 ? 'text-yellow-600' :
+                                  'text-green-600'
+                                }`}
+                              >
+                                {sugestao.ruptura_ativa
+                                  ? 'ruptura'
+                                  : sugestao.dias_estoque !== null && sugestao.dias_estoque !== undefined
+                                    ? `${sugestao.dias_estoque} dias`
+                                    : '∞'}
                               </span>
                             </td>
                             <td className="px-4 py-3 text-right">
@@ -2866,6 +2969,7 @@ const PedidosCompra = () => {
                                 inputMode="numeric"
                                 pattern="[0-9]*"
                                 value={obterQuantidadeInteira(sugestao)}
+                                title={montarTooltipGiroSugestao(sugestao)}
                                 onChange={(e) => atualizarQuantidadeSugerida(sugestao.produto_id, e.target.value)}
                                 onFocus={() => setProdutoEditandoQuantidade(sugestao.produto_id)}
                                 onBlur={() => {

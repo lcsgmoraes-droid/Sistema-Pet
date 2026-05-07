@@ -4108,7 +4108,13 @@ def relatorio_vendas_produto(
 
     media_diaria_30 = float(janelas["30"]["media_diaria"] or 0)
     estoque_atual = float(produto.estoque_atual or 0)
-    cobertura_estimada_dias = round(estoque_atual / media_diaria_30, 1) if media_diaria_30 > 0 else None
+    ruptura_ativa = estoque_atual <= 0
+    estoque_para_cobertura = max(0.0, estoque_atual)
+    cobertura_estimada_dias = (
+        round(estoque_para_cobertura / media_diaria_30, 1)
+        if media_diaria_30 > 0
+        else None
+    )
 
     return {
         "produto": {
@@ -4127,6 +4133,8 @@ def relatorio_vendas_produto(
         "resumo": {
             "data_referencia": data_fim_dt.isoformat(),
             "cobertura_estimada_dias": cobertura_estimada_dias,
+            "ruptura_ativa": ruptura_ativa,
+            "estoque_para_cobertura": estoque_para_cobertura,
             "media_diaria_30": round(media_diaria_30, 2),
             "quantidade_vendida_30": float(janelas["30"]["quantidade_vendida"] or 0),
             "quantidade_vendida_90": float(janelas["90"]["quantidade_vendida"] or 0),
