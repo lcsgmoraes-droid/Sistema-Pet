@@ -10,6 +10,21 @@ from ..produtos_models import Produto, Categoria, Marca, ProdutoKitComponente
 logger = logging.getLogger(__name__)
 
 
+def _nome_indica_granel(nome: str | None) -> bool:
+    return "granel" in str(nome or "").strip().lower()
+
+
+def _aplicar_regras_granel(dados: Dict[str, Any]) -> bool:
+    if bool(dados.get("e_granel")) or _nome_indica_granel(dados.get("nome")):
+        dados["e_granel"] = True
+        dados["tipo_produto"] = "KIT"
+        dados["tipo_kit"] = "FISICO"
+        dados["e_kit_fisico"] = True
+        dados["unidade"] = "KG"
+        return True
+    return False
+
+
 class ProdutoService:
     """
     Service para gerenciar regras de negócio de produtos
@@ -38,6 +53,7 @@ class ProdutoService:
             ValueError: Quando regras de negócio são violadas
         """
         
+        eh_granel = _aplicar_regras_granel(dados)
         tipo_produto = dados.get('tipo_produto', 'SIMPLES')
         
         # ========================================
@@ -100,6 +116,26 @@ class ProdutoService:
                     f"Produto do tipo {tipo_desc} deve ter pelo menos 1 componente na composição. "
                     "Adicione os produtos que fazem parte do kit antes de salvar."
                 )
+
+            if eh_granel:
+                if not composicao_kit or len(composicao_kit) != 1:
+                    raise ValueError(
+                        "Produto granel deve ter exatamente 1 produto base na composicao."
+                    )
+                componente_id = (
+                    composicao_kit[0].get("produto_componente_id")
+                    or composicao_kit[0].get("produto_id")
+                )
+                produto_base = db.query(Produto).filter(
+                    Produto.id == componente_id,
+                    Produto.tenant_id == tenant_id,
+                ).first()
+                if not produto_base:
+                    raise ValueError("Produto base do granel nao encontrado.")
+                if float(produto_base.peso_embalagem or 0) <= 0:
+                    raise ValueError(
+                        f"Produto base '{produto_base.nome}' precisa ter peso_embalagem em kg."
+                    )
         
         # ========================================
         # CRIAR PRODUTO

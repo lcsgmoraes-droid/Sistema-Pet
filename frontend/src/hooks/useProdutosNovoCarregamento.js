@@ -207,6 +207,7 @@ export default function useProdutosNovoCarregamento({
               produto.tipo === 'racao' ||
               Boolean(produto.linha_racao_id) ||
               Boolean(produto.classificacao_racao && produto.classificacao_racao !== 'nao'),
+        e_granel: Boolean(produto.e_granel) || (produto.nome || '').toLowerCase().includes('granel'),
         classificacao_racao:
           produto.classificacao_racao && produto.classificacao_racao !== 'sim'
             ? produto.classificacao_racao

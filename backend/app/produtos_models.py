@@ -167,6 +167,7 @@ class Produto(BaseTenantModel):
     # Unidade e Condição
     unidade = Column(String(10), default='UN')
     condicao = Column(String(20), default='novo')  # novo, usado, recondicionado
+    e_granel = Column(Boolean, default=False, nullable=False)  # Produto fisico em kg derivado de uma racao/pacote pai
     
     # Características Físicas
     peso_liquido = Column(Float, nullable=True)
@@ -467,6 +468,39 @@ class ProdutoKitComponente(BaseTenantModel):
     # Relationships
     kit = relationship("Produto", foreign_keys=[kit_id], backref="componentes_kit")
     produto_componente = relationship("Produto", foreign_keys=[produto_componente_id])
+
+
+class GranelConversao(BaseTenantModel):
+    """Conversoes rastreadas de pacote fechado para estoque granel em kg."""
+    __tablename__ = "granel_conversoes"
+    __table_args__ = (
+        Index('idx_granel_conversoes_tenant_created', 'tenant_id', 'created_at'),
+        Index('idx_granel_conversoes_granel', 'produto_granel_id'),
+        Index('idx_granel_conversoes_origem', 'produto_origem_id'),
+        {'extend_existing': True}
+    )
+
+    id = Column(Integer, primary_key=True)
+    produto_granel_id = Column(Integer, ForeignKey('produtos.id'), nullable=False)
+    produto_origem_id = Column(Integer, ForeignKey('produtos.id'), nullable=False)
+    quantidade_origem = Column(Float, nullable=False)
+    peso_por_unidade_kg = Column(Float, nullable=False)
+    quantidade_granel_kg = Column(Float, nullable=False)
+    estoque_origem_anterior = Column(Float, nullable=True)
+    estoque_origem_novo = Column(Float, nullable=True)
+    estoque_granel_anterior = Column(Float, nullable=True)
+    estoque_granel_novo = Column(Float, nullable=True)
+    documento = Column(String(50), nullable=True)
+    observacao = Column(Text, nullable=True)
+    status = Column(String(20), default='confirmado', nullable=False)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    produto_granel = relationship("Produto", foreign_keys=[produto_granel_id])
+    produto_origem = relationship("Produto", foreign_keys=[produto_origem_id])
+    user = relationship("User")
+
 
 class ProdutoLote(BaseTenantModel):
     """Lotes de produtos com controle FIFO"""

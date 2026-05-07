@@ -40,13 +40,23 @@ export default function useProdutosNovoSubmit({
         opcional: Boolean(item.opcional),
       }));
       const lojaFisicaAtiva = formData.ativo !== false && formData.situacao !== false;
+      const produtoEhGranel = Boolean(formData.e_granel) || (formData.nome || '').toLowerCase().includes('granel');
+      const produtoComComposicao =
+        produtoEhGranel ||
+        formData.tipo_produto === 'KIT' ||
+        (formData.tipo_produto === 'VARIACAO' && formData.tipo_kit);
+
+      if (produtoEhGranel && composicaoKitNormalizada.length !== 1) {
+        alert('Produto granel precisa ter exatamente 1 produto base na composicao.');
+        return;
+      }
 
       const dados = {
         codigo: skuNormalizado,
         nome: formData.nome,
         descricao_curta: descricaoNormalizada || null,
         codigo_barras: formData.codigo_barras || null,
-        unidade: formData.unidade || 'UN',
+        unidade: produtoEhGranel ? 'KG' : formData.unidade || 'UN',
         preco_custo: formData.preco_custo ? parseFloat(formData.preco_custo) : 0,
         preco_venda: parseFloat(formData.preco_venda),
         preco_promocional: formData.preco_promocional ? parseFloat(formData.preco_promocional) : null,
@@ -70,25 +80,23 @@ export default function useProdutosNovoSubmit({
         categoria_id: formData.categoria_id ? parseInt(formData.categoria_id) : null,
         marca_id: formData.marca_id ? parseInt(formData.marca_id) : null,
         departamento_id: formData.departamento_id ? parseInt(formData.departamento_id) : null,
-        tipo_produto: formData.tipo_produto || 'SIMPLES',
+        tipo_produto: produtoEhGranel ? 'KIT' : formData.tipo_produto || 'SIMPLES',
         produto_pai_id: formData.produto_pai_id || null,
         tipo_kit:
-          formData.tipo_produto === 'KIT' ||
-          (formData.tipo_produto === 'VARIACAO' && formData.tipo_kit)
-            ? formData.e_kit_fisico
+          produtoComComposicao
+            ? (produtoEhGranel || formData.e_kit_fisico)
               ? 'FISICO'
               : 'VIRTUAL'
             : null,
         e_kit_fisico:
-          formData.tipo_produto === 'KIT' ||
-          (formData.tipo_produto === 'VARIACAO' && formData.tipo_kit)
-            ? formData.e_kit_fisico
+          produtoComComposicao
+            ? produtoEhGranel || formData.e_kit_fisico
             : null,
         composicao_kit:
-          formData.tipo_produto === 'KIT' ||
-          (formData.tipo_produto === 'VARIACAO' && formData.tipo_kit)
+          produtoComComposicao
             ? composicaoKitNormalizada
             : null,
+        e_granel: produtoEhGranel,
         produto_predecessor_id: formData.produto_predecessor_id || null,
         motivo_descontinuacao: formData.motivo_descontinuacao || null,
         tem_recorrencia: formData.tem_recorrencia || false,

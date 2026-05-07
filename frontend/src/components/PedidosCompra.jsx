@@ -1137,6 +1137,15 @@ const PedidosCompra = () => {
     const vendas = [7, 15, 30, 60, 90]
       .map((dias) => `${dias}d: ${formatarQuantidadeCurta(obterVendaJanelaSugestao(sugestao, dias))}`)
       .join(' | ');
+    const granel = sugestao?.granel_consumo || {};
+    const granelKg = Number(granel?.kg_periodo || 0);
+    const granelPacotes = Number(granel?.pacotes_equivalentes_periodo || 0);
+    const granelItens = Array.isArray(granel?.itens)
+      ? granel.itens
+        .filter((item) => Number(item?.kg || 0) > 0)
+        .map((item) => `${item.produto_nome || 'Granel'}: ${formatarQuantidadeCurta(item.kg)} kg (${formatarQuantidadeCurta(item.pacotes_equivalentes, 3)} pacote eq.)`)
+        .join(' | ')
+      : '';
     const origens = Array.isArray(sugestao?.origens_venda)
       ? sugestao.origens_venda
         .filter((origem) => Number(origem?.quantidade || 0) > 0)
@@ -1156,6 +1165,10 @@ const PedidosCompra = () => {
       coberturaAlvo
         ? `Cobertura alvo: ${coberturaAlvo} dias (lead ${leadTime} + cobertura ${diasCobertura} + margem 7)`
         : '',
+      granelKg > 0
+        ? `Consumo granel: ${formatarQuantidadeCurta(granelKg)} kg (${formatarQuantidadeCurta(granelPacotes, 3)} pacote(s) equivalentes)`
+        : '',
+      granelItens ? `Itens granel: ${granelItens}` : '',
       sugestao?.teve_ruptura
         ? `Ruptura no periodo: ${formatarQuantidadeCurta(sugestao.dias_sem_estoque || 0, 1)} dia(s) sem estoque`
         : '',
@@ -2921,6 +2934,14 @@ const PedidosCompra = () => {
                                       className="inline-flex cursor-help items-center rounded-full border border-emerald-200 bg-emerald-50 px-2 py-0.5 font-semibold text-emerald-700"
                                     >
                                       derivado
+                                    </span>
+                                  )}
+                                  {Number(sugestao?.granel_consumo?.kg_periodo || 0) > 0 && (
+                                    <span
+                                      title={montarTooltipGiroSugestao(sugestao)}
+                                      className="inline-flex cursor-help items-center rounded-full border border-cyan-200 bg-cyan-50 px-2 py-0.5 font-semibold text-cyan-700"
+                                    >
+                                      granel
                                     </span>
                                   )}
                                 </div>

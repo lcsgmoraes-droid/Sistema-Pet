@@ -46,7 +46,8 @@ from .auth.dependencies import get_current_user_and_tenant
 from .models import User, Cliente, FornecedorGrupo
 from .produtos_models import (
     Produto, ProdutoLote, EstoqueMovimentacao, 
-    PedidoCompra, PedidoCompraItem, PedidoCompraNotaEntrada, ProdutoFornecedor, Marca
+    PedidoCompra, PedidoCompraItem, PedidoCompraNotaEntrada, ProdutoFornecedor, Marca,
+    ProdutoKitComponente
 )
 from .vendas_models import Venda, VendaItem
 from .services.email_service import is_email_configured, send_email
@@ -802,6 +803,7 @@ def _formatar_origem_venda(canal: Optional[str]) -> str:
         "instagram": "Instagram",
         "bling": "Bling/online",
         "venda_bling": "Bling/online",
+        "granel": "Granel",
         "granel_kit": "Granel/kit",
         "kit_virtual": "Granel/kit",
         "movimentacao": "Mov. estoque",
@@ -813,6 +815,11 @@ def _nova_stats_venda_sugestao() -> dict:
     return {
         "vendas_periodo": 0.0,
         "janelas": {str(dias): 0.0 for dias in JANELAS_GIRO_SUGESTAO},
+        "granel_kg_periodo": 0.0,
+        "granel_pacotes_periodo": 0.0,
+        "granel_janelas_kg": {str(dias): 0.0 for dias in JANELAS_GIRO_SUGESTAO},
+        "granel_janelas_pacotes": {str(dias): 0.0 for dias in JANELAS_GIRO_SUGESTAO},
+        "granel_itens": defaultdict(lambda: {"kg": 0.0, "pacotes": 0.0}),
         "origens": defaultdict(float),
         "fontes": set(),
         "pares_venda_produto": set(),
@@ -849,6 +856,99 @@ def _somar_venda_sugestao(
     stats["fontes"].add(fonte)
 
 
+def _carregar_mapa_granel_sugestao(db: Session, tenant_id, produto_ids: List[int]) -> tuple[dict[int, list], dict[int, list]]:
+    if not produto_ids:
+        return {}, {}
+
+    from sqlalchemy.orm import aliased
+
+    ProdutoGranel = aliased(Produto)
+    ProdutoBase = aliased(Produto)
+    rows = (
+        db.query(ProdutoKitComponente, ProdutoGranel, ProdutoBase)
+        .join(ProdutoGranel, ProdutoKitComponente.kit_id == ProdutoGranel.id)
+        .join(ProdutoBase, ProdutoKitComponente.produto_componente_id == ProdutoBase.id)
+        .filter(
+            ProdutoKitComponente.tenant_id == tenant_id,
+            ProdutoGranel.tenant_id == tenant_id,
+            ProdutoBase.tenant_id == tenant_id,
+            ProdutoBase.id.in_(produto_ids),
+            or_(ProdutoGranel.e_granel.is_(True), ProdutoGranel.nome.ilike("%granel%")),
+            ProdutoGranel.ativo.is_(True),
+        )
+        .all()
+    )
+
+    por_pai: dict[int, list] = defaultdict(list)
+    por_granel: dict[int, list] = defaultdict(list)
+    for componente, granel, base in rows:
+        peso_kg = float(base.peso_embalagem or 0)
+        if peso_kg <= 0:
+            continue
+        info = {
+            "produto_pai_id": int(base.id),
+            "produto_granel_id": int(granel.id),
+            "produto_granel_nome": granel.nome,
+            "peso_pacote_kg": peso_kg,
+            "quantidade_componente": float(componente.quantidade or 1),
+        }
+        por_pai[int(base.id)].append(info)
+        por_granel[int(granel.id)].append(info)
+
+    return dict(por_pai), dict(por_granel)
+
+
+def _somar_granel_sugestao(
+    stats_por_produto: dict,
+    info_granel: dict,
+    quantidade_kg: float,
+    data_ref: Optional[datetime],
+    data_inicio_periodo: datetime,
+    data_fim: datetime,
+    origem: str,
+    fonte: str,
+):
+    quantidade_kg = float(quantidade_kg or 0)
+    peso_pacote_kg = float(info_granel.get("peso_pacote_kg") or 0)
+    produto_pai_id = int(info_granel.get("produto_pai_id") or 0)
+    if quantidade_kg <= 0 or peso_pacote_kg <= 0 or not produto_pai_id:
+        return
+
+    pacotes_equivalentes = quantidade_kg / peso_pacote_kg
+    _somar_venda_sugestao(
+        stats_por_produto,
+        produto_pai_id,
+        pacotes_equivalentes,
+        data_ref,
+        data_inicio_periodo,
+        data_fim,
+        origem,
+        fonte,
+    )
+
+    if not data_ref:
+        return
+
+    stats = stats_por_produto[produto_pai_id]
+    if data_ref >= data_inicio_periodo:
+        stats["granel_kg_periodo"] += quantidade_kg
+        stats["granel_pacotes_periodo"] += pacotes_equivalentes
+
+    dias_decorridos = max(0.0, (data_fim - data_ref).total_seconds() / 86400)
+    for dias in JANELAS_GIRO_SUGESTAO:
+        if dias_decorridos <= dias:
+            stats["granel_janelas_kg"][str(dias)] += quantidade_kg
+            stats["granel_janelas_pacotes"][str(dias)] += pacotes_equivalentes
+
+    produto_granel_id = int(info_granel.get("produto_granel_id") or 0)
+    item = stats["granel_itens"][produto_granel_id]
+    item["produto_id"] = produto_granel_id
+    item["produto_nome"] = info_granel.get("produto_granel_nome")
+    item["peso_pacote_kg"] = peso_pacote_kg
+    item["kg"] += quantidade_kg
+    item["pacotes"] += pacotes_equivalentes
+
+
 def _carregar_vendas_sugestao(
     db: Session,
     tenant_id,
@@ -866,6 +966,14 @@ def _carregar_vendas_sugestao(
     if not produto_ids:
         return {}
 
+    _, graneis_por_produto = _carregar_mapa_granel_sugestao(
+        db,
+        tenant_id,
+        produto_ids,
+    )
+    granel_ids = sorted(graneis_por_produto.keys())
+    ids_busca = sorted(set(produto_ids) | set(granel_ids))
+
     dias_busca = max(periodo_dias, max(JANELAS_GIRO_SUGESTAO))
     data_inicio_busca = data_fim - timedelta(days=dias_busca)
     data_inicio_periodo = data_fim - timedelta(days=periodo_dias)
@@ -882,7 +990,7 @@ def _carregar_vendas_sugestao(
         .join(Venda, VendaItem.venda_id == Venda.id)
         .filter(
             Venda.tenant_id == tenant_id,
-            VendaItem.produto_id.in_(produto_ids),
+            VendaItem.produto_id.in_(ids_busca),
             VendaItem.tipo == "produto",
             Venda.status.notin_(["cancelada", "devolvida"]),
             venda_data >= data_inicio_busca,
@@ -897,18 +1005,32 @@ def _carregar_vendas_sugestao(
         if venda_id:
             par = (int(venda_id), produto_id)
             pares_venda_produto.add(par)
-            stats_por_produto[produto_id]["pares_venda_produto"].add(par)
+            if produto_id in produto_ids:
+                stats_por_produto[produto_id]["pares_venda_produto"].add(par)
 
-        _somar_venda_sugestao(
-            stats_por_produto,
-            produto_id,
-            quantidade,
-            data_ref,
-            data_inicio_periodo,
-            data_fim,
-            canal or "loja_fisica",
-            "vendas",
-        )
+        if produto_id in graneis_por_produto:
+            for info_granel in graneis_por_produto.get(produto_id, []):
+                _somar_granel_sugestao(
+                    stats_por_produto,
+                    info_granel,
+                    quantidade,
+                    data_ref,
+                    data_inicio_periodo,
+                    data_fim,
+                    "granel",
+                    "vendas_granel",
+                )
+        elif produto_id in produto_ids:
+            _somar_venda_sugestao(
+                stats_por_produto,
+                produto_id,
+                quantidade,
+                data_ref,
+                data_inicio_periodo,
+                data_fim,
+                canal or "loja_fisica",
+                "vendas",
+            )
 
     filtro_movimentacao_venda = or_(
         EstoqueMovimentacao.referencia_tipo.in_(["venda", "venda_bling"]),
@@ -924,7 +1046,7 @@ def _carregar_vendas_sugestao(
             EstoqueMovimentacao.quantidade,
         )
         .filter(
-            EstoqueMovimentacao.produto_id.in_(produto_ids),
+            EstoqueMovimentacao.produto_id.in_(ids_busca),
             EstoqueMovimentacao.tenant_id == tenant_id,
             EstoqueMovimentacao.tipo == "saida",
             EstoqueMovimentacao.status != "cancelado",
@@ -941,6 +1063,22 @@ def _carregar_vendas_sugestao(
         motivo = str(row.motivo or "").strip().lower()
         referencia_id = int(row.referencia_id) if row.referencia_id else None
         tem_item_direto = bool(referencia_id and (referencia_id, produto_id) in pares_venda_produto)
+        if produto_id in graneis_por_produto:
+            if tem_item_direto:
+                continue
+            for info_granel in graneis_por_produto.get(produto_id, []):
+                _somar_granel_sugestao(
+                    stats_por_produto,
+                    info_granel,
+                    row.quantidade,
+                    row.created_at,
+                    data_inicio_periodo,
+                    data_fim,
+                    "granel",
+                    "estoque_granel",
+                )
+            continue
+
         origem_externa = (
             referencia_tipo == "venda_bling"
             or "bling" in referencia_tipo
@@ -991,6 +1129,33 @@ def _carregar_vendas_sugestao(
             },
             "origens": origens,
             "fontes": sorted(stats["fontes"]),
+            "granel_consumo": {
+                "kg_periodo": round(float(stats["granel_kg_periodo"] or 0), 3),
+                "pacotes_equivalentes_periodo": round(float(stats["granel_pacotes_periodo"] or 0), 3),
+                "janelas_kg": {
+                    chave: round(float(valor or 0), 3)
+                    for chave, valor in stats["granel_janelas_kg"].items()
+                },
+                "janelas_pacotes": {
+                    chave: round(float(valor or 0), 3)
+                    for chave, valor in stats["granel_janelas_pacotes"].items()
+                },
+                "itens": [
+                    {
+                        "produto_id": item.get("produto_id"),
+                        "produto_nome": item.get("produto_nome"),
+                        "peso_pacote_kg": round(float(item.get("peso_pacote_kg") or 0), 3),
+                        "kg": round(float(item.get("kg") or 0), 3),
+                        "pacotes_equivalentes": round(float(item.get("pacotes") or 0), 3),
+                    }
+                    for item in sorted(
+                        stats["granel_itens"].values(),
+                        key=lambda valor: float(valor.get("kg") or 0),
+                        reverse=True,
+                    )
+                    if float(item.get("kg") or 0) > 0
+                ],
+            },
         }
 
     return resultado
@@ -2218,6 +2383,8 @@ def sugerir_pedido_inteligente(
     ).filter(
         Produto.tenant_id == tenant_id,
         Produto.ativo == True,
+        or_(Produto.e_granel.is_(False), Produto.e_granel.is_(None)),
+        ~Produto.nome.ilike("%granel%"),
         ProdutoFornecedor.fornecedor_id.in_(fornecedor_ids),
         ProdutoFornecedor.ativo == True
     )
@@ -2306,6 +2473,7 @@ def sugerir_pedido_inteligente(
             "janelas": {str(dias): 0.0 for dias in JANELAS_GIRO_SUGESTAO},
             "origens": [],
             "fontes": [],
+            "granel_consumo": {},
         }
         vendas_periodo = float(vendas_stats.get("vendas_periodo") or 0)
         vendas_janelas = vendas_stats.get("janelas") or {}
@@ -2424,6 +2592,7 @@ def sugerir_pedido_inteligente(
                 "vendas_90d": float(vendas_janelas.get("90") or 0),
                 "origens_venda": vendas_stats.get("origens") or [],
                 "fontes_calculo": vendas_stats.get("fontes") or [],
+                "granel_consumo": vendas_stats.get("granel_consumo") or {},
                 "dias_estoque": round(dias_estoque, 1) if dias_estoque < 999 else None,
                 "dias_com_estoque": dias_com_estoque,
                 "dias_sem_estoque": dias_sem_estoque,

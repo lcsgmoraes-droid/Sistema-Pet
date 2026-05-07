@@ -94,13 +94,28 @@ class KitCustoService:
             componentes = db.query(ProdutoKitComponente).filter(
                 ProdutoKitComponente.kit_id == kit_id
             ).all()
+            kit_e_granel = bool(getattr(kit, "e_granel", False)) or "granel" in str(kit.nome or "").lower()
             
             if not componentes:
+                if kit_e_granel:
+                    return Decimal(str(kit.preco_custo or 0))
                 logger.warning(
                     f"⚠️  KIT VIRTUAL '{kit.nome}' não possui componentes. "
                     f"Retornando custo = 0"
                 )
                 return Decimal('0')
+
+            if kit_e_granel:
+                componente = componentes[0]
+                produto_comp = db.query(Produto).filter(
+                    Produto.id == componente.produto_componente_id
+                ).first()
+                if not produto_comp:
+                    return Decimal(str(kit.preco_custo or 0))
+                peso_pacote = Decimal(str(produto_comp.peso_embalagem or 0))
+                if peso_pacote <= 0:
+                    return Decimal(str(kit.preco_custo or 0))
+                return Decimal(str(produto_comp.preco_custo or 0)) / peso_pacote
             
             logger.debug(
                 f"🔍 Encontrados {len(componentes)} componente(s) no KIT"

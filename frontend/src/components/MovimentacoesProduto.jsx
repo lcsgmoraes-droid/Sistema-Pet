@@ -90,6 +90,11 @@ export default function MovimentacoesProduto() {
     data_validade: '',
     data_fabricacao: ''
   });
+  const produtoEhGranel = Boolean(produto?.e_granel) || (produto?.nome || '').toLowerCase().includes('granel');
+  const componenteGranel = produtoEhGranel && Array.isArray(produto?.composicao_kit)
+    ? produto.composicao_kit[0]
+    : null;
+  const pesoPacoteGranel = Number(componenteGranel?.produto_peso_embalagem || 0);
 
   useEffect(() => {
     carregarDados();
@@ -303,12 +308,22 @@ export default function MovimentacoesProduto() {
 
       // Configurar endpoint e payload conforme tipo
       if (tipoLancamento === 'entrada') {
-        endpoint += 'entrada';
-        payload.tipo = 'entrada';
-        payload.motivo = 'compra';
-        payload.numero_lote = formData.lote || null;
-        payload.data_validade = formData.data_validade || null;
-        payload.data_fabricacao = formData.data_fabricacao || null;
+        if (produtoEhGranel) {
+          endpoint = '/estoque/granel/converter';
+          payload = {
+            produto_granel_id: parseInt(id),
+            quantidade_pacotes: parseFloat(formData.quantidade),
+            documento: formData.lote || null,
+            observacao: formData.observacao || null,
+          };
+        } else {
+          endpoint += 'entrada';
+          payload.tipo = 'entrada';
+          payload.motivo = 'compra';
+          payload.numero_lote = formData.lote || null;
+          payload.data_validade = formData.data_validade || null;
+          payload.data_fabricacao = formData.data_fabricacao || null;
+        }
       } else if (tipoLancamento === 'saida') {
         endpoint += 'saida';
         payload.tipo = 'saida';
@@ -333,10 +348,14 @@ export default function MovimentacoesProduto() {
 
       const response = await api.post(endpoint, payload);
 
-      console.log('Response da entrada:', response.data);
 
       // Mostrar indicador de variação de preço se for entrada
-      if (tipoLancamento === 'entrada' && response.data) {
+      if (tipoLancamento === 'entrada' && produtoEhGranel && response.data) {
+        toast.success(
+          `Granel abastecido: ${formatarQuantidade(response.data.quantidade_granel_kg)} kg a partir de ${formatarQuantidade(response.data.quantidade_pacotes)} pacote(s).`,
+          { duration: 5000 }
+        );
+      } else if (tipoLancamento === 'entrada' && response.data) {
         const { custo_anterior, custo_unitario, variacao_preco } = response.data;
         
         if (variacao_preco && custo_anterior !== null && custo_anterior !== undefined) {
@@ -1271,7 +1290,11 @@ export default function MovimentacoesProduto() {
               {/* Quantidade */}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {tipoLancamento === 'balanco' ? 'Saldo Total *' : 'Quantidade *'}
+                  {tipoLancamento === 'balanco'
+                    ? 'Saldo Total *'
+                    : produtoEhGranel && tipoLancamento === 'entrada'
+                      ? 'Pacotes abertos *'
+                      : 'Quantidade *'}
                 </label>
                 <input
                   type="number"
@@ -1286,10 +1309,20 @@ export default function MovimentacoesProduto() {
                     Estoque atual: {estoqueAtual}. Digite o novo saldo total.
                   </p>
                 )}
+                {produtoEhGranel && tipoLancamento === 'entrada' && (
+                  <p className="mt-1 text-xs text-cyan-700">
+                    {componenteGranel?.produto_nome
+                      ? `Baixa pacote(s) de ${componenteGranel.produto_nome}`
+                      : 'Baixa pacote(s) do produto base configurado na composicao'}
+                    {pesoPacoteGranel > 0
+                      ? ` e entra ${formatarQuantidade(pesoPacoteGranel)} kg por pacote.`
+                      : ' usando o peso da embalagem cadastrado na aba Racao.'}
+                  </p>
+                )}
               </div>
 
               {/* Preço de Compra (apenas para entrada) */}
-              {tipoLancamento === 'entrada' && (
+              {tipoLancamento === 'entrada' && !produtoEhGranel && (
                 <>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-1">

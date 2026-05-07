@@ -139,6 +139,62 @@ def _obter_produto_ou_404(db: Session, produto_id: int, tenant_id: int):
     return produto
 
 
+def _nome_indica_granel(nome: Optional[str]) -> bool:
+    return "granel" in str(nome or "").strip().lower()
+
+
+def _normalizar_payload_granel(dados: dict) -> dict:
+    """Aplica a regra estrutural: granel e sempre KIT FISICO em KG."""
+    if bool(dados.get("e_granel")) or _nome_indica_granel(dados.get("nome")):
+        dados["e_granel"] = True
+        dados["tipo_produto"] = "KIT"
+        dados["tipo_kit"] = "FISICO"
+        dados["e_kit_fisico"] = True
+        dados["unidade"] = "KG"
+    return dados
+
+
+def _validar_composicao_granel(db: Session, tenant_id, composicao_kit: Optional[list], produto_id: Optional[int] = None) -> None:
+    if composicao_kit is None and produto_id:
+        composicao_kit = db.query(ProdutoKitComponente).filter(
+            ProdutoKitComponente.kit_id == produto_id,
+            ProdutoKitComponente.tenant_id == tenant_id,
+        ).all()
+
+    total_componentes = len(composicao_kit or [])
+    if total_componentes != 1:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Produto granel deve ter exatamente 1 produto base na composicao. "
+                "Adicione o pacote fechado que sera aberto para gerar o estoque em kg."
+            ),
+        )
+
+    componente = composicao_kit[0]
+    produto_componente_id = (
+        componente.get("produto_componente_id")
+        if isinstance(componente, dict)
+        else getattr(componente, "produto_componente_id", None)
+    )
+    produto_base = db.query(Produto).filter(
+        Produto.id == produto_componente_id,
+        Produto.tenant_id == tenant_id,
+    ).first()
+    if not produto_base:
+        raise HTTPException(status_code=404, detail="Produto base do granel nao encontrado")
+
+    peso_pacote = float(produto_base.peso_embalagem or 0)
+    if peso_pacote <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Produto base '{produto_base.nome}' precisa ter peso da embalagem em kg "
+                "na aba Racao para abastecer o granel corretamente."
+            ),
+        )
+
+
 def _obter_categoria_ou_404(db: Session, categoria_id: int, tenant_id: int):
     """Busca categoria com validaÃ§Ã£o de tenant e retorna 404 se nÃ£o encontrada"""
     categoria = db.query(Categoria).filter(
@@ -760,6 +816,7 @@ class ProdutoBase(BaseModel):
     marca_id: Optional[int] = None
     departamento_id: Optional[int] = None
     unidade: str = "UN"
+    e_granel: Optional[bool] = False
     peso_bruto: Optional[float] = None
     peso_liquido: Optional[float] = None
     preco_custo: Optional[float] = 0
@@ -845,6 +902,7 @@ class ProdutoUpdate(BaseModel):
     marca_id: Optional[int] = None
     departamento_id: Optional[int] = None
     unidade: Optional[str] = None
+    e_granel: Optional[bool] = None
     peso_bruto: Optional[float] = None
     peso_liquido: Optional[float] = None
     preco_custo: Optional[float] = None
@@ -2064,7 +2122,15 @@ def criar_produto(
 
     try:
         # Preparar dados do produto
-        produto_data = _normalizar_payload_racao(produto.model_dump())
+        produto_data = _normalizar_payload_granel(
+            _normalizar_payload_racao(produto.model_dump())
+        )
+        if produto_data.get("e_granel"):
+            _validar_composicao_granel(
+                db,
+                tenant_id,
+                produto_data.get("composicao_kit"),
+            )
 
         # Adicionar user_id aos dados (necessÃ¡rio para o modelo)
         produto_data['user_id'] = current_user.id
@@ -2717,7 +2783,9 @@ def atualizar_produto(
     dados_recebidos = produto_update.model_dump(exclude_unset=True)
     composicao_kit = dados_recebidos.pop('composicao_kit', None)
 
-    dados_recebidos = _normalizar_payload_racao(dados_recebidos)
+    dados_recebidos = _normalizar_payload_granel(
+        _normalizar_payload_racao(dados_recebidos)
+    )
 
     # ========================================
     # ï¿½ðŸ”’ TRAVA 3 â€” VALIDAÃ‡ÃƒO: PRODUTO PAI NÃƒO TEM PREÃ‡O (ATUALIZAÃ‡ÃƒO)
@@ -2775,6 +2843,19 @@ def atualizar_produto(
 
     tipo_kit_final = dados_recebidos.get('tipo_kit', produto.tipo_kit)
     produto_sera_composto = tipo_produto_final in ('KIT', 'VARIACAO') and bool(tipo_kit_final)
+    produto_sera_granel = bool(dados_recebidos.get("e_granel", produto.e_granel)) or _nome_indica_granel(
+        dados_recebidos.get("nome", produto.nome)
+    )
+
+    if produto_sera_granel:
+        dados_recebidos["e_granel"] = True
+        dados_recebidos["tipo_produto"] = "KIT"
+        dados_recebidos["tipo_kit"] = "FISICO"
+        dados_recebidos["unidade"] = "KG"
+        tipo_produto_final = "KIT"
+        tipo_kit_final = "FISICO"
+        produto_sera_composto = True
+        _validar_composicao_granel(db, tenant_id, composicao_kit, produto_id=produto_id)
 
     # ========================================
     # ATUALIZAR COMPOSIÃ‡ÃƒO DO KIT (se enviado)

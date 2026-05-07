@@ -53,7 +53,41 @@ export default function ProdutosNovoRacaoTab({
             <option value="sim">Sim</option>
           </select>
         </div>
+
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+          <label className="flex cursor-pointer items-start gap-3">
+            <input
+              type="checkbox"
+              checked={Boolean(formData.e_granel)}
+              onChange={(e) => {
+                const marcado = e.target.checked;
+                handleChange("e_granel", marcado);
+                if (marcado) {
+                  handleChange("eh_racao", true);
+                  handleChange("tipo_produto", "KIT");
+                  handleChange("tipo_kit", "FISICO");
+                  handleChange("e_kit_fisico", true);
+                  handleChange("unidade", "KG");
+                }
+              }}
+              className="mt-1 h-4 w-4 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+            />
+            <span>
+              <span className="block text-sm font-semibold text-slate-800">Produto vendido a granel</span>
+              <span className="mt-1 block text-xs text-slate-600">
+                O estoque fica em kg e deve ter 1 pacote base na aba Composicao.
+              </span>
+            </span>
+          </label>
+        </div>
       </div>
+
+      {formData.e_granel && (
+        <div className="rounded-lg border border-cyan-200 bg-cyan-50 p-4 text-sm text-cyan-800">
+          Para abastecer o granel, lance uma entrada no produto granel em Movimentacoes.
+          O sistema vai baixar pacote(s) do produto base e entrar kg usando o peso da embalagem da racao.
+        </div>
+      )}
 
       {formData.eh_racao && (
         <div className="border-l-4 border-blue-500 bg-blue-50 p-4">

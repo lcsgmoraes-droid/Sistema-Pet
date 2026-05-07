@@ -40,7 +40,7 @@ from .estoque_reserva_service import EstoqueReservaService
 from .pedido_integrado_item_models import PedidoIntegradoItem
 from .nfe_cache_models import BlingNotaFiscalCache
 from .produtos_models import (
-    Produto, ProdutoLote, EstoqueMovimentacao, ProdutoKitComponente
+    Produto, ProdutoLote, EstoqueMovimentacao, ProdutoKitComponente, GranelConversao
 )
 from .financeiro_models import (
     CategoriaFinanceira,
@@ -830,6 +830,14 @@ class SaidaEstoqueRequest(BaseModel):
     observacao: Optional[str] = None
     # Para KIT FÍSICO: se True, desmontou o kit e volta os componentes ao estoque
     retornar_componentes: bool = False
+
+
+class ConversaoGranelRequest(BaseModel):
+    """Abre pacote(s) fisico(s) e abastece um produto granel em kg."""
+    produto_granel_id: int
+    quantidade_pacotes: float = Field(gt=0)
+    documento: Optional[str] = None
+    observacao: Optional[str] = None
 
 
 class TransferenciaParceiroItemRequest(BaseModel):
@@ -2390,6 +2398,175 @@ class MovimentacaoResponse(BaseModel):
     
     model_config = {"from_attributes": True}
 
+
+def _produto_e_granel(produto: Produto | None) -> bool:
+    if not produto:
+        return False
+    return bool(getattr(produto, "e_granel", False)) or "granel" in str(produto.nome or "").lower()
+
+
+def _resolver_produto_base_granel(db: Session, produto_granel: Produto, tenant_id):
+    componentes = db.query(ProdutoKitComponente).filter(
+        ProdutoKitComponente.kit_id == produto_granel.id,
+        ProdutoKitComponente.tenant_id == tenant_id,
+    ).all()
+
+    if len(componentes) != 1:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Produto granel precisa ter exatamente 1 produto base na composicao "
+                "para converter pacote em kg."
+            ),
+        )
+
+    componente = componentes[0]
+    produto_base = db.query(Produto).filter(
+        Produto.id == componente.produto_componente_id,
+        Produto.tenant_id == tenant_id,
+    ).first()
+    if not produto_base:
+        raise HTTPException(status_code=404, detail="Produto base do granel nao encontrado")
+
+    peso_pacote_kg = float(produto_base.peso_embalagem or 0)
+    if peso_pacote_kg <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Produto base '{produto_base.nome}' nao tem peso_embalagem em kg. "
+                "Preencha a aba Racao antes de abastecer o granel."
+            ),
+        )
+
+    return produto_base, componente, peso_pacote_kg
+
+
+@router.post("/granel/converter", status_code=status.HTTP_201_CREATED)
+def converter_estoque_granel(
+    payload: ConversaoGranelRequest,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Converte pacote(s) fechados em estoque fisico granel medido em kg."""
+    current_user, tenant_id = user_and_tenant
+
+    produto_granel = db.query(Produto).filter(
+        Produto.id == payload.produto_granel_id,
+        Produto.tenant_id == tenant_id,
+    ).first()
+    if not produto_granel:
+        raise HTTPException(status_code=404, detail="Produto granel nao encontrado")
+    if not _produto_e_granel(produto_granel):
+        raise HTTPException(status_code=400, detail="Produto informado nao esta marcado como granel")
+
+    produto_base, _componente, peso_pacote_kg = _resolver_produto_base_granel(
+        db,
+        produto_granel,
+        tenant_id,
+    )
+
+    quantidade_pacotes = float(payload.quantidade_pacotes or 0)
+    estoque_base_anterior = float(produto_base.estoque_atual or 0)
+    if estoque_base_anterior < quantidade_pacotes:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Estoque insuficiente do produto base '{produto_base.nome}'. "
+                f"Disponivel: {estoque_base_anterior}, solicitado: {quantidade_pacotes} pacote(s)."
+            ),
+        )
+
+    quantidade_kg = quantidade_pacotes * peso_pacote_kg
+    estoque_granel_anterior = float(produto_granel.estoque_atual or 0)
+    custo_pacote = float(produto_base.preco_custo or 0)
+    custo_kg = custo_pacote / peso_pacote_kg if peso_pacote_kg > 0 else 0
+
+    produto_base.estoque_atual = estoque_base_anterior - quantidade_pacotes
+    produto_granel.estoque_atual = estoque_granel_anterior + quantidade_kg
+    produto_granel.unidade = "KG"
+    produto_granel.e_granel = True
+    produto_granel.tipo_produto = "KIT"
+    produto_granel.tipo_kit = "FISICO"
+
+    conversao = GranelConversao(
+        produto_granel_id=produto_granel.id,
+        produto_origem_id=produto_base.id,
+        quantidade_origem=quantidade_pacotes,
+        peso_por_unidade_kg=peso_pacote_kg,
+        quantidade_granel_kg=quantidade_kg,
+        estoque_origem_anterior=estoque_base_anterior,
+        estoque_origem_novo=produto_base.estoque_atual,
+        estoque_granel_anterior=estoque_granel_anterior,
+        estoque_granel_novo=produto_granel.estoque_atual,
+        documento=payload.documento,
+        observacao=payload.observacao,
+        user_id=current_user.id,
+        tenant_id=tenant_id,
+    )
+    db.add(conversao)
+    db.flush()
+
+    mov_saida_base = EstoqueMovimentacao(
+        produto_id=produto_base.id,
+        tipo="saida",
+        motivo="conversao_granel",
+        quantidade=quantidade_pacotes,
+        quantidade_anterior=estoque_base_anterior,
+        quantidade_nova=produto_base.estoque_atual,
+        custo_unitario=custo_pacote,
+        valor_total=quantidade_pacotes * custo_pacote,
+        documento=payload.documento,
+        referencia_id=conversao.id,
+        referencia_tipo="conversao_granel",
+        observacao=f"Conversao para granel '{produto_granel.nome}' ({quantidade_kg:.3f} kg)",
+        user_id=current_user.id,
+        tenant_id=tenant_id,
+    )
+    mov_entrada_granel = EstoqueMovimentacao(
+        produto_id=produto_granel.id,
+        tipo="entrada",
+        motivo="conversao_granel",
+        quantidade=quantidade_kg,
+        quantidade_anterior=estoque_granel_anterior,
+        quantidade_nova=produto_granel.estoque_atual,
+        custo_unitario=custo_kg,
+        valor_total=quantidade_kg * custo_kg,
+        documento=payload.documento,
+        referencia_id=conversao.id,
+        referencia_tipo="conversao_granel",
+        observacao=payload.observacao or f"Entrada granel a partir de {quantidade_pacotes:g} pacote(s) de '{produto_base.nome}'",
+        user_id=current_user.id,
+        tenant_id=tenant_id,
+    )
+    db.add(mov_saida_base)
+    db.add(mov_entrada_granel)
+    db.commit()
+
+    try:
+        sincronizar_bling_background(produto_base.id, produto_base.estoque_atual, "conversao_granel_saida")
+        sincronizar_bling_background(produto_granel.id, produto_granel.estoque_atual, "conversao_granel_entrada")
+    except Exception as e_sync:
+        logger.warning(f"[BLING-SYNC] Erro ao agendar sync (conversao granel): {e_sync}")
+
+    return {
+        "id": conversao.id,
+        "produto_granel_id": produto_granel.id,
+        "produto_granel_nome": produto_granel.nome,
+        "produto_origem_id": produto_base.id,
+        "produto_origem_nome": produto_base.nome,
+        "quantidade_pacotes": quantidade_pacotes,
+        "peso_por_unidade_kg": peso_pacote_kg,
+        "quantidade_granel_kg": quantidade_kg,
+        "estoque_origem_anterior": estoque_base_anterior,
+        "estoque_origem_novo": float(produto_base.estoque_atual or 0),
+        "estoque_granel_anterior": estoque_granel_anterior,
+        "estoque_granel_novo": float(produto_granel.estoque_atual or 0),
+        "movimentacoes": {
+            "saida_origem_id": mov_saida_base.id,
+            "entrada_granel_id": mov_entrada_granel.id,
+        },
+    }
+
 # ============================================================================
 # ENTRADA DE ESTOQUE
 # ============================================================================
@@ -2438,6 +2615,15 @@ def entrada_estoque(
             )
         )
     
+    if _produto_e_granel(produto) and entrada.motivo != "conversao_granel":
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Produto granel deve receber estoque pela conversao de pacote para kg. "
+                "Use a entrada de granel para baixar o produto base e abastecer os kg corretamente."
+            ),
+        )
+
     estoque_anterior = produto.estoque_atual or 0
 
     # Controle de lotes: se informar lote ou validade, persiste no produto

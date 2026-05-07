@@ -128,6 +128,7 @@ export default function ProdutosNovo() {
     
     // Aba 7: Ração - Calculadora (Fase 2)
     eh_racao: false,
+    e_granel: false,
     classificacao_racao: '',
     peso_embalagem: '',
     tabela_nutricional: '',
