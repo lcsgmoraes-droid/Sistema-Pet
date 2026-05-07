@@ -792,6 +792,7 @@ JANELAS_GIRO_SUGESTAO = (7, 15, 30, 60, 90)
 MIN_VENDAS_AJUSTE_RUPTURA = 3
 MIN_DIAS_COM_ESTOQUE_AJUSTE_RUPTURA = 7
 MAX_MULTIPLICADOR_AJUSTE_RUPTURA = 2.0
+MARGEM_SEGURANCA_COMPRA_DIAS = 7
 
 
 def _formatar_origem_venda(canal: Optional[str]) -> str:
@@ -2291,7 +2292,8 @@ def sugerir_pedido_inteligente(
     1. Calcula consumo médio diário baseado em vendas do período
     2. Verifica estoque atual e dias de cobertura restantes
     3. Considera lead time do fornecedor (prazo de entrega)
-    4. Sugere quantidade para cobrir: lead_time + dias_cobertura + margem de segurança
+    4. Sugere quantidade para cobrir a cobertura escolhida, somando reposicao
+       apenas quando o estoque atual nao cobre lead time + margem de seguranca.
     5. Prioriza produtos críticos (estoque baixo) e em alerta
     
     Parâmetros:
@@ -2498,10 +2500,21 @@ def sugerir_pedido_inteligente(
 
         # Lead time do fornecedor (padrão 7 dias se não configurado)
         lead_time = produto_fornecedor.prazo_entrega or 7
+        margem_seguranca_dias = MARGEM_SEGURANCA_COMPRA_DIAS
+        dias_reposicao = float(lead_time or 0) + float(margem_seguranca_dias)
 
         # Calcular quantidade sugerida
-        # Cobrir: lead_time + dias_cobertura (escolhido pelo usuário) + margem de segurança (7 dias)
-        dias_total_cobertura = lead_time + dias_cobertura + 7
+        # A cobertura escolhida pelo usuario e o alvo principal do pedido.
+        # O lead time + margem so entram no alvo quando o estoque atual nao
+        # cobre a janela ate a reposicao.
+        lead_time_incluido_no_alvo = bool(
+            ruptura_ativa
+            or estoque_atual <= estoque_minimo
+            or dias_estoque < dias_reposicao
+        )
+        dias_total_cobertura = float(dias_cobertura) + (
+            dias_reposicao if lead_time_incluido_no_alvo else 0.0
+        )
         quantidade_ideal = consumo_diario * dias_total_cobertura
         quantidade_sugerida = max(0, quantidade_ideal - estoque_para_calculo)
 
@@ -2515,7 +2528,7 @@ def sugerir_pedido_inteligente(
         elif estoque_atual <= estoque_minimo:
             prioridade = "ALERTA"
             total_alerta += 1
-        elif dias_estoque < lead_time + 7:
+        elif dias_estoque < dias_reposicao:
             prioridade = "ATENÇÃO"
         else:
             prioridade = "NORMAL"
@@ -2582,6 +2595,10 @@ def sugerir_pedido_inteligente(
                 "ruptura_ajuste_aplicado": ajuste_ruptura_aplicado,
                 "ruptura_ajuste_motivo": motivo_ajuste_ruptura,
                 "lead_time": lead_time,
+                "dias_planejamento": float(dias_cobertura),
+                "dias_reposicao": round(dias_reposicao, 1),
+                "margem_seguranca_dias": margem_seguranca_dias,
+                "lead_time_incluido_no_alvo": lead_time_incluido_no_alvo,
                 "dias_total_cobertura": dias_total_cobertura,
                 "estoque_para_calculo": round(estoque_para_calculo, 3),
                 "quantidade_sugerida": round(quantidade_sugerida, 2),

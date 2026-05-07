@@ -159,6 +159,9 @@ export default function DetalheEntregaScreen() {
   const [paradaOrdemEmEdicao, setParadaOrdemEmEdicao] = useState<Parada | null>(null);
   const [novaOrdemTexto, setNovaOrdemTexto] = useState("");
   const [salvandoOrdemManual, setSalvandoOrdemManual] = useState(false);
+  const [modalNaoEntregueAberto, setModalNaoEntregueAberto] = useState(false);
+  const [paradaNaoEntregueId, setParadaNaoEntregueId] = useState<number | null>(null);
+  const [motivoNaoEntregue, setMotivoNaoEntregue] = useState("");
   const localizacaoSubscriptionRef = useRef<Location.LocationSubscription | null>(null);
   const enviandoLocalizacaoRef = useRef(false);
 
@@ -312,29 +315,45 @@ export default function DetalheEntregaScreen() {
     }
   }
 
-  async function marcarNaoEntregue(paradaId: number) {
-    Alert.prompt(
-      "Motivo",
-      "Descreva o motivo da não entrega (opcional):",
-      async (motivo) => {
-        setProcessando(paradaId);
-        try {
-          await api.post(
-            `/rotas-entrega/${rotaId}/paradas/${paradaId}/nao-entregue`,
-            {
-              motivo: motivo || "",
-            },
-          );
-          await carregar();
-        } catch {
-          Alert.alert("Erro", "Não foi possível registrar a ocorrência.");
-        } finally {
-          setProcessando(null);
-        }
-      },
-      "plain-text",
-      "",
-    );
+  function marcarNaoEntregue(paradaId: number) {
+    setParadaNaoEntregueId(paradaId);
+    setMotivoNaoEntregue("");
+    setModalNaoEntregueAberto(true);
+  }
+
+  function limparModalNaoEntregue() {
+    setModalNaoEntregueAberto(false);
+    setParadaNaoEntregueId(null);
+    setMotivoNaoEntregue("");
+  }
+
+  function fecharModalNaoEntregue() {
+    if (processando === paradaNaoEntregueId) return;
+    limparModalNaoEntregue();
+  }
+
+  async function confirmarNaoEntregue() {
+    if (!paradaNaoEntregueId) return;
+
+    const paradaId = paradaNaoEntregueId;
+    setProcessando(paradaId);
+    try {
+      await api.post(
+        `/ecommerce/entregador/rotas/${rotaId}/paradas/${paradaId}/nao-entregue`,
+        {},
+        {
+          params: {
+            motivo: motivoNaoEntregue.trim() || undefined,
+          },
+        },
+      );
+      limparModalNaoEntregue();
+      await carregar();
+    } catch {
+      Alert.alert("Erro", "Nao foi possivel registrar a ocorrencia.");
+    } finally {
+      setProcessando(null);
+    }
   }
 
   async function iniciarRota() {
@@ -826,6 +845,59 @@ export default function DetalheEntregaScreen() {
       </Modal>
 
       <Modal
+        visible={modalNaoEntregueAberto}
+        transparent
+        animationType="fade"
+        onRequestClose={fecharModalNaoEntregue}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <Text style={styles.modalTitulo}>Registrar nao entrega</Text>
+            <Text style={styles.modalSubtitulo}>
+              Informe o motivo para devolver a venda para entregas em aberto.
+            </Text>
+
+            <Text style={styles.modalCampoLabel}>Motivo (opcional)</Text>
+            <TextInput
+              style={[styles.modalInput, styles.modalTextarea]}
+              value={motivoNaoEntregue}
+              onChangeText={setMotivoNaoEntregue}
+              placeholder="Ex: cliente ausente, endereco incorreto..."
+              placeholderTextColor="#9ca3af"
+              multiline
+              textAlignVertical="top"
+              editable={processando !== paradaNaoEntregueId}
+            />
+
+            <View style={styles.modalAcoes}>
+              <TouchableOpacity
+                style={styles.modalCancelar}
+                onPress={fecharModalNaoEntregue}
+                disabled={processando === paradaNaoEntregueId}
+              >
+                <Text style={styles.modalCancelarText}>Cancelar</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.modalConfirmar,
+                  styles.modalConfirmarDanger,
+                  processando === paradaNaoEntregueId && { opacity: 0.6 },
+                ]}
+                disabled={processando === paradaNaoEntregueId}
+                onPress={() => {
+                  void confirmarNaoEntregue();
+                }}
+              >
+                <Text style={styles.modalConfirmarText}>
+                  {processando === paradaNaoEntregueId ? "Registrando..." : "Confirmar"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
         visible={modalRecebimentoAberto}
         transparent
         animationType="fade"
@@ -1283,6 +1355,9 @@ const styles = StyleSheet.create({
     color: "#111827",
     marginBottom: 16,
   },
+  modalTextarea: {
+    minHeight: 92,
+  },
   modalHeaderDetalhes: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -1352,6 +1427,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     borderRadius: 8,
     backgroundColor: "#2563eb",
+  },
+  modalConfirmarDanger: {
+    backgroundColor: "#dc2626",
   },
   modalConfirmarText: { color: "#fff", fontWeight: "700" },
 });

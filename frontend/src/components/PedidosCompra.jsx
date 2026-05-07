@@ -1124,7 +1124,8 @@ const PedidosCompra = () => {
     const consumoObservado = Number(sugestao?.consumo_diario_observado ?? sugestao?.consumo_diario ?? 0);
     const consumoAjustado = Number(sugestao?.consumo_diario_ajustado ?? sugestao?.consumo_diario ?? 0);
     const coberturaAlvo = Number(sugestao?.dias_total_cobertura || 0);
-    const leadTime = Number(sugestao?.lead_time || 0);
+    const reposicao = Number(sugestao?.dias_reposicao || 0);
+    const leadIncluido = Boolean(sugestao?.lead_time_incluido_no_alvo);
     const linhas = [
       `Vendas por janela: ${vendas}`,
       `Consumo observado: ${formatarQuantidadeCurta(consumoObservado, 3)}/dia`,
@@ -1132,7 +1133,9 @@ const PedidosCompra = () => {
         ? `Consumo ajustado: ${formatarQuantidadeCurta(consumoAjustado, 3)}/dia`
         : '',
       coberturaAlvo
-        ? `Cobertura alvo: ${coberturaAlvo} dias (lead ${leadTime} + cobertura ${diasCobertura} + margem 7)`
+        ? leadIncluido
+          ? `Cobertura alvo: ${formatarQuantidadeCurta(coberturaAlvo, 1)} dias (cobertura ${diasCobertura} + reposicao ${formatarQuantidadeCurta(reposicao, 1)})`
+          : `Cobertura alvo: ${formatarQuantidadeCurta(coberturaAlvo, 1)} dias (estoque ja cobre a reposicao; alvo = cobertura ${diasCobertura})`
         : '',
       granelKg > 0
         ? `Consumo granel: ${formatarQuantidadeCurta(granelKg)} kg (${formatarQuantidadeCurta(granelPacotes, 3)} pacote(s) equivalentes)`
