@@ -2918,6 +2918,146 @@ def atualizar_produto(
 # ATUALIZAÃ‡ÃƒO EM LOTE
 # ============================================================================
 
+OPERACOES_FORNECEDOR_LOTE = {"adicionar", "definir_principal", "remover"}
+
+
+def _validar_fornecedor_produto_lote(
+    db: Session,
+    fornecedor_id: Optional[int],
+    tenant_id,
+) -> Optional[Cliente]:
+    if fornecedor_id is None:
+        return None
+
+    fornecedor = db.query(Cliente).filter(
+        Cliente.id == fornecedor_id,
+        Cliente.tenant_id == tenant_id,
+        Cliente.tipo_cadastro == "fornecedor",
+    ).first()
+
+    if not fornecedor:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Fornecedor nao encontrado ou nao e do tipo fornecedor",
+        )
+
+    return fornecedor
+
+
+def _obter_vinculo_fornecedor_lote(
+    db: Session,
+    produto_id: int,
+    fornecedor_id: int,
+    tenant_id,
+) -> Optional[ProdutoFornecedor]:
+    return db.query(ProdutoFornecedor).filter(
+        ProdutoFornecedor.produto_id == produto_id,
+        ProdutoFornecedor.fornecedor_id == fornecedor_id,
+        ProdutoFornecedor.tenant_id == tenant_id,
+    ).first()
+
+
+def _promover_fornecedor_principal_lote(
+    db: Session,
+    produto: Produto,
+    tenant_id,
+    fornecedor_id_ignorado: Optional[int] = None,
+) -> bool:
+    query = db.query(ProdutoFornecedor).filter(
+        ProdutoFornecedor.produto_id == produto.id,
+        ProdutoFornecedor.tenant_id == tenant_id,
+        ProdutoFornecedor.ativo == True,
+    )
+
+    if fornecedor_id_ignorado is not None:
+        query = query.filter(ProdutoFornecedor.fornecedor_id != fornecedor_id_ignorado)
+
+    proximo_vinculo = query.order_by(
+        ProdutoFornecedor.e_principal.desc(),
+        ProdutoFornecedor.created_at.asc(),
+    ).first()
+
+    if proximo_vinculo:
+        proximo_vinculo.e_principal = True
+        produto.fornecedor_id = proximo_vinculo.fornecedor_id
+        return True
+
+    produto.fornecedor_id = None
+    return True
+
+
+def _aplicar_fornecedor_produto_lote(
+    db: Session,
+    produto: Produto,
+    fornecedor_id: int,
+    operacao: str,
+    tenant_id,
+) -> bool:
+    vinculo = _obter_vinculo_fornecedor_lote(db, produto.id, fornecedor_id, tenant_id)
+
+    if operacao == "adicionar":
+        if vinculo:
+            alterado = not bool(vinculo.ativo)
+            if vinculo.e_principal and produto.fornecedor_id != fornecedor_id:
+                vinculo.e_principal = False
+                alterado = True
+            vinculo.ativo = True
+            vinculo.updated_at = datetime.utcnow()
+            return alterado
+
+        db.add(ProdutoFornecedor(
+            produto_id=produto.id,
+            fornecedor_id=fornecedor_id,
+            e_principal=False,
+            ativo=True,
+            tenant_id=tenant_id,
+        ))
+        return True
+
+    if operacao == "definir_principal":
+        db.query(ProdutoFornecedor).filter(
+            ProdutoFornecedor.produto_id == produto.id,
+            ProdutoFornecedor.tenant_id == tenant_id,
+            ProdutoFornecedor.e_principal == True,
+        ).update({"e_principal": False})
+
+        if vinculo:
+            vinculo.ativo = True
+            vinculo.e_principal = True
+            vinculo.updated_at = datetime.utcnow()
+        else:
+            db.add(ProdutoFornecedor(
+                produto_id=produto.id,
+                fornecedor_id=fornecedor_id,
+                e_principal=True,
+                ativo=True,
+                tenant_id=tenant_id,
+            ))
+
+        produto.fornecedor_id = fornecedor_id
+        return True
+
+    if operacao == "remover":
+        era_principal = bool(vinculo and vinculo.e_principal) or produto.fornecedor_id == fornecedor_id
+
+        if vinculo:
+            db.delete(vinculo)
+        elif not era_principal:
+            return False
+
+        if era_principal:
+            _promover_fornecedor_principal_lote(
+                db,
+                produto,
+                tenant_id,
+                fornecedor_id_ignorado=fornecedor_id,
+            )
+
+        return True
+
+    return False
+
+
 class AtualizacaoLoteRequest(BaseModel):
     produto_ids: List[int]
     ativo: Optional[bool] = None
@@ -2926,6 +3066,8 @@ class AtualizacaoLoteRequest(BaseModel):
     marca_id: Optional[int] = None
     categoria_id: Optional[int] = None
     departamento_id: Optional[int] = None
+    fornecedor_id: Optional[int] = None
+    fornecedor_operacao: Optional[str] = None
     linha_racao_id: Optional[int] = None
     porte_animal_id: Optional[int] = None
     fase_publico_id: Optional[int] = None
@@ -2966,6 +3108,24 @@ def atualizar_produtos_lote(
         raise HTTPException(
             status_code=400,
             detail="Alguns produtos nÃ£o foram encontrados ou nÃ£o pertencem ao usuÃ¡rio"
+        )
+
+    if dados.fornecedor_operacao:
+        if dados.fornecedor_operacao not in OPERACOES_FORNECEDOR_LOTE:
+            raise HTTPException(
+                status_code=400,
+                detail="Operacao de fornecedor invalida",
+            )
+        if dados.fornecedor_id is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Informe o fornecedor para aplicar a operacao em lote",
+            )
+        _validar_fornecedor_produto_lote(db, dados.fornecedor_id, tenant_id)
+    elif dados.fornecedor_id is not None:
+        raise HTTPException(
+            status_code=400,
+            detail="Informe a operacao do fornecedor para atualizar em lote",
         )
 
     linha_racao_selecionada = None
@@ -3016,6 +3176,15 @@ def atualizar_produtos_lote(
         if dados.departamento_id is not None:
             produto.departamento_id = dados.departamento_id
             atualizado += 1
+        if dados.fornecedor_operacao and dados.fornecedor_id is not None:
+            if _aplicar_fornecedor_produto_lote(
+                db,
+                produto,
+                dados.fornecedor_id,
+                dados.fornecedor_operacao,
+                tenant_id,
+            ):
+                atualizado += 1
         if dados.linha_racao_id is not None:
             produto.linha_racao_id = dados.linha_racao_id
             if dados.eh_racao is not False and linha_racao_selecionada:
@@ -3088,6 +3257,8 @@ def atualizar_produtos_lote(
         "marca_id": dados.marca_id,
         "categoria_id": dados.categoria_id,
         "departamento_id": dados.departamento_id,
+        "fornecedor_id": dados.fornecedor_id,
+        "fornecedor_operacao": dados.fornecedor_operacao,
         "linha_racao_id": dados.linha_racao_id,
         "porte_animal_id": dados.porte_animal_id,
         "fase_publico_id": dados.fase_publico_id,

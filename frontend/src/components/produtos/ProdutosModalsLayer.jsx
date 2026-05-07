@@ -16,6 +16,7 @@ export default function ProdutosModalsLayer({
   corrigirTextoQuebrado,
   dadosEdicaoLote,
   departamentos,
+  fornecedores,
   marcas,
   modalColunas,
   modalConflitoExclusao,
@@ -69,6 +70,7 @@ export default function ProdutosModalsLayer({
         categorias={categorias}
         dadosEdicaoLote={dadosEdicaoLote}
         departamentos={departamentos}
+        fornecedores={fornecedores}
         isOpen={modalEdicaoLote}
         marcas={marcas}
         onClose={onCloseModalEdicaoLote}

@@ -17,6 +17,8 @@ export default function useProdutosEdicao({
     marca_id: "",
     categoria_id: "",
     departamento_id: "",
+    fornecedor_id: "",
+    fornecedor_operacao: "",
     linha_racao_id: "",
     porte_animal_id: "",
     fase_publico_id: "",
@@ -40,12 +42,12 @@ export default function useProdutosEdicao({
   const handleSalvarPreco = async (produtoId) => {
     try {
       await api.patch(`/produtos/${produtoId}?preco_venda=${novoPreco}`, {});
-      toast.success("PreÃ§o atualizado!");
+      toast.success("Preço atualizado!");
       setEditandoPreco(null);
       carregarDados();
     } catch (error) {
-      console.error("Erro ao atualizar preÃ§o:", error);
-      toast.error("Erro ao atualizar preÃ§o");
+      console.error("Erro ao atualizar preço:", error);
+      toast.error("Erro ao atualizar preço");
     }
   };
 
@@ -90,6 +92,8 @@ export default function useProdutosEdicao({
       marca_id: "",
       categoria_id: "",
       departamento_id: "",
+      fornecedor_id: "",
+      fornecedor_operacao: "",
       linha_racao_id: "",
       porte_animal_id: "",
       fase_publico_id: "",
@@ -132,6 +136,18 @@ export default function useProdutosEdicao({
       }
       if (dadosEdicaoLote.departamento_id) {
         dadosEnvio.departamento_id = parseInt(dadosEdicaoLote.departamento_id, 10);
+      }
+      if (dadosEdicaoLote.fornecedor_id && !dadosEdicaoLote.fornecedor_operacao) {
+        toast.error("Escolha a acao do fornecedor em lote");
+        return;
+      }
+      if (dadosEdicaoLote.fornecedor_operacao && !dadosEdicaoLote.fornecedor_id) {
+        toast.error("Selecione o fornecedor para aplicar em lote");
+        return;
+      }
+      if (dadosEdicaoLote.fornecedor_operacao) {
+        dadosEnvio.fornecedor_operacao = dadosEdicaoLote.fornecedor_operacao;
+        dadosEnvio.fornecedor_id = parseInt(dadosEdicaoLote.fornecedor_id, 10);
       }
       if (dadosEdicaoLote.linha_racao_id) {
         dadosEnvio.linha_racao_id = parseInt(dadosEdicaoLote.linha_racao_id, 10);
@@ -176,6 +192,15 @@ export default function useProdutosEdicao({
       if (dadosEnvio.ativo === false) {
         const confirmado = window.confirm(
           `Desativar ${selecionados.length} produto(s) selecionado(s)? Eles deixam de aparecer como ativos e os canais e-commerce/app serao desligados automaticamente.`,
+        );
+        if (!confirmado) {
+          return;
+        }
+      }
+
+      if (dadosEnvio.fornecedor_operacao === "remover") {
+        const confirmado = window.confirm(
+          `Remover este fornecedor de ${selecionados.length} produto(s) selecionado(s)? Se ele for principal, outro fornecedor ativo sera promovido quando existir.`,
         );
         if (!confirmado) {
           return;
