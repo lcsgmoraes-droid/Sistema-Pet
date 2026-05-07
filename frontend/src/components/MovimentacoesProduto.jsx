@@ -58,6 +58,18 @@ function formatarQuantidade(valor) {
   });
 }
 
+function parseNumeroInput(valor) {
+  if (valor === null || valor === undefined || valor === '') return 0;
+  if (typeof valor === 'number') return Number.isFinite(valor) ? valor : 0;
+
+  const texto = String(valor).trim();
+  const normalizado = texto.includes(',')
+    ? texto.replace(/\./g, '').replace(',', '.')
+    : texto;
+  const numero = Number(normalizado);
+  return Number.isFinite(numero) ? numero : 0;
+}
+
 function getSaldoAposLancamento(movimentacao) {
   const saldo = movimentacao?.saldo_apos_lancamento ?? movimentacao?.quantidade_nova;
   const saldoNumerico = Number(saldo);
@@ -87,6 +99,11 @@ export default function MovimentacoesProduto() {
   const [quantidadeGranel, setQuantidadeGranel] = useState('');
   const [observacaoGranel, setObservacaoGranel] = useState('');
   const [loadingGranel, setLoadingGranel] = useState(false);
+  const [modoPrecoGranel, setModoPrecoGranel] = useState('margem');
+  const [margemBaseGranel, setMargemBaseGranel] = useState('preco_venda_kg');
+  const [margemGranel, setMargemGranel] = useState('20');
+  const [precoVendaGranel, setPrecoVendaGranel] = useState('');
+  const [atualizarPrecoGranel, setAtualizarPrecoGranel] = useState(true);
   
   // Modal de lançamento
   const [tipoLancamento, setTipoLancamento] = useState('entrada'); // entrada, saida, balanco
@@ -104,6 +121,7 @@ export default function MovimentacoesProduto() {
   const quantidadeGranelNumero = Number(quantidadeGranel || 0);
   const kgGranelPrevisto = quantidadeGranelNumero > 0 ? quantidadeGranelNumero * pesoPacoteOrigem : 0;
   const custoKgGranel = pesoPacoteOrigem > 0 ? Number(produto?.preco_custo || 0) / pesoPacoteOrigem : 0;
+  const precoVendaKgOrigem = pesoPacoteOrigem > 0 ? Number(produto?.preco_venda || 0) / pesoPacoteOrigem : 0;
   const vinculoGranelSelecionado = granelVinculos.find(
     (vinculo) => String(vinculo.produto_granel_id) === String(granelSelecionadoId),
   );
@@ -112,6 +130,28 @@ export default function MovimentacoesProduto() {
   );
   const nomeGranelSelecionado =
     vinculoGranelSelecionado?.produto_granel_nome || produtoGranelSelecionado?.nome || '';
+  const precoVendaAtualGranel = Number(
+    vinculoGranelSelecionado?.produto_granel_preco_venda
+      ?? produtoGranelSelecionado?.preco_venda
+      ?? 0,
+  );
+  const baseMargemGranel = margemBaseGranel === 'preco_venda_kg' ? precoVendaKgOrigem : custoKgGranel;
+  const margemGranelNumero = parseNumeroInput(margemGranel);
+  const precoVendaInformadoGranel = parseNumeroInput(precoVendaGranel);
+  const precoVendaSugeridoGranel = modoPrecoGranel === 'margem'
+    ? baseMargemGranel * (1 + margemGranelNumero / 100)
+    : precoVendaInformadoGranel;
+  const margemCalculadaGranel = baseMargemGranel > 0 && precoVendaSugeridoGranel > 0
+    ? ((precoVendaSugeridoGranel / baseMargemGranel) - 1) * 100
+    : 0;
+  const precoMinimoEsperadoGranel = precoVendaKgOrigem > 0 ? precoVendaKgOrigem * 1.2 : 0;
+  const granelDentroMargemEsperada = precoMinimoEsperadoGranel > 0
+    ? precoVendaSugeridoGranel >= precoMinimoEsperadoGranel
+    : true;
+  const diferencaPrecoGranel = precoVendaSugeridoGranel - precoVendaAtualGranel;
+  const baseMargemTexto = margemBaseGranel === 'preco_venda_kg'
+    ? 'venda/kg do pacote pai'
+    : 'custo/kg do pacote pai';
 
   useEffect(() => {
     carregarDados();
@@ -194,6 +234,11 @@ export default function MovimentacoesProduto() {
     setQuantidadeGranel('');
     setObservacaoGranel('');
     setBuscaGranel('');
+    setModoPrecoGranel('margem');
+    setMargemBaseGranel('preco_venda_kg');
+    setMargemGranel('20');
+    setPrecoVendaGranel('');
+    setAtualizarPrecoGranel(true);
     setShowGranelModal(true);
     setLoadingGranel(true);
     try {
@@ -227,11 +272,18 @@ export default function MovimentacoesProduto() {
         produto_origem_id: Number(id),
         produto_granel_id: Number(granelSelecionadoId),
         quantidade_pacotes: quantidadeGranelNumero,
+        atualizar_preco_venda_granel: Boolean(atualizarPrecoGranel && precoVendaSugeridoGranel > 0),
+        preco_venda_granel: atualizarPrecoGranel && precoVendaSugeridoGranel > 0
+          ? Number(precoVendaSugeridoGranel.toFixed(2))
+          : null,
         observacao: observacaoGranel || null,
       });
 
+      const precoAtualizadoMsg = response.data.preco_venda_granel_atualizado
+        ? ` Preco do granel: ${formatMoneyBRL(response.data.preco_venda_granel_novo)}.`
+        : '';
       toast.success(
-        `Granel lancado: ${formatarQuantidade(response.data.quantidade_granel_kg)} kg a partir de ${formatarQuantidade(response.data.quantidade_pacotes)} pacote(s).`,
+        `Granel lancado: ${formatarQuantidade(response.data.quantidade_granel_kg)} kg a partir de ${formatarQuantidade(response.data.quantidade_pacotes)} pacote(s).${precoAtualizadoMsg}`,
         { duration: 5000 },
       );
       setShowGranelModal(false);
@@ -240,6 +292,24 @@ export default function MovimentacoesProduto() {
       toast.error(error.response?.data?.detail || 'Erro ao lancar granel');
     } finally {
       setLoadingGranel(false);
+    }
+  };
+
+  const handleAlterarModoPrecoGranel = (modo) => {
+    setModoPrecoGranel(modo);
+    if (modo === 'preco' && !precoVendaGranel) {
+      const precoBase = precoVendaAtualGranel > 0 ? precoVendaAtualGranel : precoVendaSugeridoGranel;
+      setPrecoVendaGranel(precoBase > 0 ? precoBase.toFixed(2) : '');
+    }
+    if (modo === 'margem' && !margemGranel) {
+      setMargemGranel('20');
+    }
+  };
+
+  const handleSelecionarGranel = (produtoGranelId, precoAtual = 0) => {
+    setGranelSelecionadoId(String(produtoGranelId));
+    if (modoPrecoGranel === 'preco' && Number(precoAtual || 0) > 0) {
+      setPrecoVendaGranel(Number(precoAtual).toFixed(2));
     }
   };
 
@@ -1605,7 +1675,7 @@ export default function MovimentacoesProduto() {
 
       {showGranelModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-          <div className="w-full max-w-lg rounded-lg bg-white shadow-xl">
+          <div className="w-full max-w-xl rounded-lg bg-white shadow-xl">
             <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
               <div>
                 <h3 className="text-lg font-semibold text-gray-900">Lancar granel</h3>
@@ -1624,7 +1694,7 @@ export default function MovimentacoesProduto() {
               </button>
             </div>
 
-            <form onSubmit={handleSubmitGranel} className="space-y-4 p-6">
+            <form onSubmit={handleSubmitGranel} className="max-h-[82vh] space-y-4 overflow-y-auto p-6">
               {granelVinculos.length > 0 && (
                 <div>
                   <label className="mb-2 block text-sm font-medium text-gray-700">
@@ -1645,7 +1715,10 @@ export default function MovimentacoesProduto() {
                             type="radio"
                             name="granel_vinculado"
                             checked={String(granelSelecionadoId) === String(vinculo.produto_granel_id)}
-                            onChange={() => setGranelSelecionadoId(String(vinculo.produto_granel_id))}
+                            onChange={() => handleSelecionarGranel(
+                              vinculo.produto_granel_id,
+                              vinculo.produto_granel_preco_venda,
+                            )}
                             className="text-orange-600 focus:ring-orange-500"
                           />
                           <span className="min-w-0">
@@ -1694,7 +1767,7 @@ export default function MovimentacoesProduto() {
                       <button
                         key={item.id}
                         type="button"
-                        onClick={() => setGranelSelecionadoId(String(item.id))}
+                        onClick={() => handleSelecionarGranel(item.id, item.preco_venda)}
                         className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-orange-50 ${
                           String(granelSelecionadoId) === String(item.id) ? 'bg-orange-50 text-orange-800' : 'text-gray-700'
                         }`}
@@ -1734,11 +1807,146 @@ export default function MovimentacoesProduto() {
                 </p>
               </div>
 
+              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
+                <div className="grid gap-2 sm:grid-cols-3">
+                  <div className="rounded-md bg-white p-2">
+                    <div className="text-[11px] font-medium uppercase text-gray-500">Custo/kg origem</div>
+                    <div className="mt-1 text-sm font-semibold text-gray-900">{formatMoneyBRL(custoKgGranel)}</div>
+                  </div>
+                  <div className="rounded-md bg-white p-2">
+                    <div className="text-[11px] font-medium uppercase text-gray-500">Venda/kg origem</div>
+                    <div className="mt-1 text-sm font-semibold text-gray-900">{formatMoneyBRL(precoVendaKgOrigem)}</div>
+                  </div>
+                  <div className="rounded-md bg-white p-2">
+                    <div className="text-[11px] font-medium uppercase text-gray-500">Preco atual granel</div>
+                    <div className="mt-1 text-sm font-semibold text-gray-900">{formatMoneyBRL(precoVendaAtualGranel)}</div>
+                  </div>
+                </div>
+
+                <div className="mt-3 rounded-lg border border-gray-200 bg-white p-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <div>
+                      <div className="text-sm font-semibold text-gray-900">Preco de venda do granel</div>
+                      <div className="text-xs text-gray-500">
+                        Base: {baseMargemTexto} ({formatMoneyBRL(baseMargemGranel)})
+                      </div>
+                    </div>
+                    <label className="flex items-center gap-2 text-xs text-gray-600">
+                      <input
+                        type="checkbox"
+                        checked={atualizarPrecoGranel}
+                        onChange={(e) => setAtualizarPrecoGranel(e.target.checked)}
+                        className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                      />
+                      Atualizar ao lancar
+                    </label>
+                  </div>
+
+                  <label className="mt-3 flex items-start gap-2 text-xs text-gray-600">
+                    <input
+                      type="checkbox"
+                      checked={margemBaseGranel === 'preco_venda_kg'}
+                      onChange={(e) => setMargemBaseGranel(e.target.checked ? 'preco_venda_kg' : 'custo_kg')}
+                      className="mt-0.5 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
+                    />
+                    <span>
+                      Calcular margem sobre venda/kg do pacote pai. Desmarcado usa o custo/kg.
+                    </span>
+                  </label>
+
+                  <div className="mt-3 grid grid-cols-2 rounded-lg border border-gray-200 bg-gray-100 p-1 text-xs">
+                    <button
+                      type="button"
+                      onClick={() => handleAlterarModoPrecoGranel('margem')}
+                      className={`rounded-md px-2 py-1.5 font-medium transition-colors ${
+                        modoPrecoGranel === 'margem'
+                          ? 'bg-white text-orange-700 shadow-sm'
+                          : 'text-gray-500 hover:text-gray-800'
+                      }`}
+                    >
+                      Margem -&gt; preco
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleAlterarModoPrecoGranel('preco')}
+                      className={`rounded-md px-2 py-1.5 font-medium transition-colors ${
+                        modoPrecoGranel === 'preco'
+                          ? 'bg-white text-orange-700 shadow-sm'
+                          : 'text-gray-500 hover:text-gray-800'
+                      }`}
+                    >
+                      Preco -&gt; margem
+                    </button>
+                  </div>
+
+                  {modoPrecoGranel === 'margem' ? (
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-gray-600">
+                          Margem desejada (%)
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={margemGranel}
+                          onChange={(e) => setMargemGranel(e.target.value)}
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-orange-500"
+                        />
+                      </div>
+                      <div className="rounded-lg bg-orange-50 p-3">
+                        <div className="text-xs font-medium text-orange-700">Preco sugerido</div>
+                        <div className="mt-1 text-lg font-semibold text-orange-900">
+                          {formatMoneyBRL(precoVendaSugeridoGranel)}
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                      <div>
+                        <label className="mb-1 block text-xs font-medium text-gray-600">
+                          Preco de venda por kg
+                        </label>
+                        <input
+                          type="number"
+                          step="0.01"
+                          min="0"
+                          value={precoVendaGranel}
+                          onChange={(e) => setPrecoVendaGranel(e.target.value)}
+                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-orange-500"
+                        />
+                      </div>
+                      <div className="rounded-lg bg-blue-50 p-3">
+                        <div className="text-xs font-medium text-blue-700">Margem calculada</div>
+                        <div className="mt-1 text-lg font-semibold text-blue-900">
+                          {formatBRL(margemCalculadaGranel)}%
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  <div className={`mt-3 rounded-md border px-3 py-2 text-xs ${
+                    granelDentroMargemEsperada
+                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                      : 'border-amber-200 bg-amber-50 text-amber-700'
+                  }`}>
+                    {granelDentroMargemEsperada ? 'Dentro da meta inicial' : 'Abaixo da meta inicial'}:
+                    {' '}minimo {formatMoneyBRL(precoMinimoEsperadoGranel)} por kg (20% acima da venda/kg do pai).
+                    {precoVendaAtualGranel > 0 && precoVendaSugeridoGranel > 0 && (
+                      <span className="ml-1 text-gray-600">
+                        Diferenca vs atual: {diferencaPrecoGranel >= 0 ? '+' : '-'}
+                        {formatMoneyBRL(Math.abs(diferencaPrecoGranel))}.
+                      </span>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm text-orange-900">
                 <div className="font-semibold">Previsao do lancamento</div>
                 <div className="mt-1 text-xs leading-5">
                   Baixa {formatarQuantidade(quantidadeGranelNumero)} pacote(s) da origem e entra {formatarQuantidade(kgGranelPrevisto)} kg no granel.
-                  Custo estimado: {formatBRL(custoKgGranel)} por kg.
+                  Custo estimado: {formatMoneyBRL(custoKgGranel)} por kg.
                 </div>
               </div>
 

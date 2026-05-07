@@ -842,6 +842,8 @@ class ConversaoGranelRequest(BaseModel):
     produto_origem_id: Optional[int] = None
     produto_granel_id: int
     quantidade_pacotes: float = Field(gt=0)
+    atualizar_preco_venda_granel: bool = False
+    preco_venda_granel: Optional[float] = Field(default=None, ge=0)
     documento: Optional[str] = None
     observacao: Optional[str] = None
 
@@ -2458,6 +2460,7 @@ def _serializar_vinculo_granel(vinculo: ProdutoGranelVinculo) -> dict:
         "produto_origem_nome": getattr(origem, "nome", None),
         "produto_origem_codigo": getattr(origem, "codigo", None),
         "produto_origem_estoque": float(getattr(origem, "estoque_atual", 0) or 0),
+        "produto_origem_preco_venda": float(getattr(origem, "preco_venda", 0) or 0),
         "peso_por_unidade_kg": peso,
         "custo_por_unidade": custo_pacote,
         "custo_por_kg": custo_pacote / peso if peso > 0 else 0,
@@ -2465,6 +2468,7 @@ def _serializar_vinculo_granel(vinculo: ProdutoGranelVinculo) -> dict:
         "produto_granel_nome": getattr(granel, "nome", None),
         "produto_granel_codigo": getattr(granel, "codigo", None),
         "produto_granel_estoque": float(getattr(granel, "estoque_atual", 0) or 0),
+        "produto_granel_preco_venda": float(getattr(granel, "preco_venda", 0) or 0),
         "observacao": vinculo.observacao,
         "created_at": vinculo.created_at,
         "updated_at": vinculo.updated_at,
@@ -2564,6 +2568,7 @@ def listar_produtos_granel(
             "nome": produto.nome,
             "estoque_atual": float(produto.estoque_atual or 0),
             "preco_custo": float(produto.preco_custo or 0),
+            "preco_venda": float(produto.preco_venda or 0),
             "unidade": produto.unidade or "KG",
             "e_granel": True,
         }
@@ -2699,6 +2704,11 @@ def converter_estoque_granel(
     custo_pacote = float(produto_base.preco_custo or 0)
     custo_kg = custo_pacote / peso_pacote_kg if peso_pacote_kg > 0 else 0
     custo_granel_anterior = float(produto_granel.preco_custo or 0)
+    preco_venda_granel_anterior = float(produto_granel.preco_venda or 0)
+    preco_venda_granel_atualizado = bool(
+        payload.atualizar_preco_venda_granel
+        and payload.preco_venda_granel is not None
+    )
 
     produto_base.estoque_atual = estoque_base_anterior - quantidade_pacotes
     produto_granel.estoque_atual = estoque_granel_anterior + quantidade_kg
@@ -2706,6 +2716,8 @@ def converter_estoque_granel(
         produto_granel.preco_custo = (
             (estoque_granel_anterior * custo_granel_anterior) + (quantidade_kg * custo_kg)
         ) / produto_granel.estoque_atual
+    if preco_venda_granel_atualizado:
+        produto_granel.preco_venda = float(payload.preco_venda_granel or 0)
 
     conversao = GranelConversao(
         produto_granel_id=produto_granel.id,
@@ -2778,6 +2790,9 @@ def converter_estoque_granel(
         "peso_por_unidade_kg": peso_pacote_kg,
         "quantidade_granel_kg": quantidade_kg,
         "custo_por_kg": custo_kg,
+        "preco_venda_granel_anterior": preco_venda_granel_anterior,
+        "preco_venda_granel_novo": float(produto_granel.preco_venda or 0),
+        "preco_venda_granel_atualizado": preco_venda_granel_atualizado,
         "estoque_origem_anterior": estoque_base_anterior,
         "estoque_origem_novo": float(produto_base.estoque_atual or 0),
         "estoque_granel_anterior": estoque_granel_anterior,
