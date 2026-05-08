@@ -130,6 +130,7 @@ export default function PDVOverlays(props) {
 
       <PDVAssistenteSidebar
         aberto={painelAssistenteAberto && !!vendaAtual.cliente}
+        cliente={vendaAtual.cliente}
         clienteNome={vendaAtual.cliente?.nome}
         onClose={() => setPainelAssistenteAberto(false)}
         mensagensAssistente={mensagensAssistente}

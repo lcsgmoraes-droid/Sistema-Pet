@@ -2,6 +2,7 @@
 import { X, ShoppingBag, TrendingUp, Calendar, Loader, DollarSign, ChevronDown, ChevronUp, Package, CreditCard, Copy, Check, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '../../api';
+import CustomerIdentity from '../ui/CustomerIdentity';
 import SaleReference from '../ui/SaleReference';
 
 // Formata numero como R$ 4.029,80
@@ -10,7 +11,7 @@ const formatBRL = (value) => {
   return num.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 };
 
-export default function HistoricoCliente({ clienteId, clienteNome, onClose }) {
+export default function HistoricoCliente({ cliente, clienteId, clienteNome, onClose }) {
   const [historico, setHistorico] = useState(null);
   const [loading, setLoading] = useState(true);
   const [filtroStatus, setFiltroStatus] = useState('todos');
@@ -198,7 +199,15 @@ export default function HistoricoCliente({ clienteId, clienteNome, onClose }) {
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Histórico de Compras</h2>
-              <p className="text-gray-600 mt-1">{clienteNome}</p>
+              <div className="mt-1">
+                <CustomerIdentity
+                  className="max-w-full"
+                  customer={cliente}
+                  fallback={clienteNome || `Cliente #${clienteId}`}
+                  nameClassName="text-sm font-medium text-gray-700"
+                  nameWrapperClassName="max-w-full"
+                />
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <button

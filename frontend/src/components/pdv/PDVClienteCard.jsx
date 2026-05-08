@@ -12,6 +12,7 @@ import { formatBRL, formatMoneyBRL } from "../../utils/formatters";
 import { buildReturnTo } from "../../utils/petReturnFlow";
 import PessoaSelector from "../clientes/PessoaSelector";
 import ActionButton from "../ui/ActionButton";
+import CustomerIdentity from "../ui/CustomerIdentity";
 import EntityCard from "../ui/EntityCard";
 import Panel from "../ui/Panel";
 import PetSelector from "../pets/PetSelector";
@@ -235,18 +236,18 @@ function ClienteResumoSelecionado({
       bodyClassName="grid grid-cols-1 md:grid-cols-[1fr_1.05fr_1fr]"
     >
       <div className="min-w-0 border-b border-blue-200 px-3 py-3 md:border-b-0 md:border-r">
-        <div className="truncate font-semibold text-blue-950">
-          {cliente.nome}
-        </div>
+        <CustomerIdentity
+          className="max-w-full"
+          code={codigoCliente}
+          codeClassName="border border-blue-200 bg-white/80 text-blue-800"
+          codeLabel="Codigo"
+          customer={cliente}
+          fallback={`Cliente #${codigoCliente || "-"}`}
+          nameClassName="font-semibold text-blue-950"
+          nameWrapperClassName="max-w-full"
+        />
         <div className="mt-1.5 flex flex-col gap-1 text-xs">
           <ClienteInfoLine label="CPF" value={cliente.cpf} />
-          <ClienteInfoLine
-            label="Codigo"
-            value={codigoCliente}
-            copyKey="codigo"
-            copiedKey={copiadoClienteCampo}
-            onCopy={onCopiarCampoCliente}
-          />
           <ClienteInfoLine
             label="Tel"
             value={telefoneCliente}

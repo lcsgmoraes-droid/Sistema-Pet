@@ -208,6 +208,7 @@ export default function PDVModalsLayer({
 
       {mostrarVendasEmAberto && clienteAtual && (
         <VendasEmAberto
+          cliente={clienteAtual}
           clienteId={clienteAtual.id}
           clienteNome={clienteAtual.nome}
           onClose={onCloseVendasEmAberto}
@@ -225,6 +226,7 @@ export default function PDVModalsLayer({
 
       {mostrarHistoricoCliente && clienteAtual && (
         <HistoricoCliente
+          cliente={clienteAtual}
           clienteId={clienteAtual.id}
           clienteNome={clienteAtual.nome}
           onClose={onCloseHistoricoCliente}

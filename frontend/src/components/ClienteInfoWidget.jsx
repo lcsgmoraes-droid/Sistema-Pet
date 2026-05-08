@@ -6,6 +6,7 @@ import {
   FiSend, FiBarChart2, FiLink, FiCopy, FiCheck
 } from 'react-icons/fi';
 import api from '../api';
+import CustomerIdentity from './ui/CustomerIdentity';
 import PetIdentity from './ui/PetIdentity';
 import ProductIdentity from './ui/ProductIdentity';
 import SaleReference from './ui/SaleReference';
@@ -167,25 +168,15 @@ export default function ClienteInfoWidget({ clienteId }) {
       <div className="bg-gradient-to-r from-indigo-100 to-purple-100 p-4 border-b">
         <div className="flex items-start justify-between">
           <div className="flex-1">
-            <h3 className="font-bold text-lg text-gray-800 mb-1">{cliente.nome}</h3>
+            <CustomerIdentity
+              className="mb-1 max-w-full"
+              codeClassName="bg-white/70"
+              customer={cliente}
+              fallback={`Cliente #${clienteId}`}
+              nameClassName="text-lg font-bold text-gray-800"
+              nameWrapperClassName="max-w-full"
+            />
             <div className="text-sm text-gray-600 space-y-1">
-              {cliente.codigo && (
-                <p className="flex items-center gap-2">
-                  <span className="text-xs font-medium text-gray-500">Código:</span>
-                  <span className="font-mono font-semibold">{cliente.codigo}</span>
-                  <button
-                    onClick={() => copiarDado(String(cliente.codigo), 'code')}
-                    className="text-gray-400 hover:text-gray-700 transition ml-1"
-                    title="Copiar código"
-                  >
-                    {copiado === 'code' ? (
-                      <FiCheck className="text-green-600 text-sm" />
-                    ) : (
-                      <FiCopy className="text-sm" />
-                    )}
-                  </button>
-                </p>
-              )}
               {cliente.cpf_cnpj && (
                 <p className="flex items-center gap-1">
                   <FiUser className="text-xs" />

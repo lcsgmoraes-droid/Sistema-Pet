@@ -849,6 +849,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-08: Modal de devolucao no PDV passou a usar `data_venda`, codigo do cliente e copia padronizada de cliente/codigo; producao ganhou `ops_disk_guard` preventivo para limpar cache Docker quando o disco entrar em faixa de risco.
 - 2026-05-08: criado `CustomerIdentity` para nome/codigo de cliente copiaveis e aplicado em devolucao PDV, vendas recentes, financeiro, contas a receber, relatorio de produto, NF, entregas e comissoes.
 - 2026-05-08: `CustomerIdentity` passou a reconhecer campos de tutor/pessoa e foi expandido para Banho & Tosa, Pets, campanhas, creditos, Pedido Bling e cards veterinarios.
+- 2026-05-08: PDV expandiu `CustomerIdentity` para card do cliente, assistente IA, widget lateral, historico de compras e vendas em aberto, mantendo nome/codigo copiaveis nos fluxos de atendimento.
 - 2026-05-08: criado `PetIdentity` para nome/codigo de pet copiaveis e aplicado em Banho & Tosa, veterinario, lembretes, relatorio de vendas, widget de cliente e alertas inteligentes do PDV.
 - 2026-05-08: criado `FornecedorIdentity` para nome/documento/codigo de fornecedor copiaveis e aplicado em compras, contas a pagar, conciliacao e relatorios de produtos/validade.
 

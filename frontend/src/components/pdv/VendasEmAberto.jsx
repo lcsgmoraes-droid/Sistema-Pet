@@ -7,9 +7,10 @@ import {
   campaignAllowsSaleChannel,
   getCashbackBonusParamKey,
 } from '../../utils/campaignChannelScope';
+import CustomerIdentity from '../ui/CustomerIdentity';
 import SaleReference from '../ui/SaleReference';
 
-export default function VendasEmAberto({ clienteId, clienteNome, onClose, onSucesso }) {
+export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClose, onSucesso }) {
   const [vendas, setVendas] = useState([]);
   const [vendasSelecionadas, setVendasSelecionadas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -332,7 +333,15 @@ export default function VendasEmAberto({ clienteId, clienteNome, onClose, onSuce
           <div className="flex items-center justify-between">
             <div>
               <h2 className="text-2xl font-bold text-gray-900">Vendas em Aberto</h2>
-              <p className="text-gray-600 mt-1">{clienteNome}</p>
+              <div className="mt-1">
+                <CustomerIdentity
+                  className="max-w-full"
+                  customer={cliente}
+                  fallback={clienteNome || `Cliente #${clienteId}`}
+                  nameClassName="text-sm font-medium text-gray-700"
+                  nameWrapperClassName="max-w-full"
+                />
+              </div>
             </div>
             <button
               onClick={onClose}

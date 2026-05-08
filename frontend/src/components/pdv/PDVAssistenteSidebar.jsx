@@ -1,13 +1,15 @@
 import { Bot, Loader2, Send, X } from "lucide-react";
+import CustomerIdentity from "../ui/CustomerIdentity";
 
 const SUGESTOES_INICIAIS = [
-  "O que ele comprou na última vez?",
-  "Quantas vezes comprou ração?",
+  "O que ele comprou na ultima vez?",
+  "Quantas vezes comprou racao?",
   "Tem alguma alergia?",
 ];
 
 export default function PDVAssistenteSidebar({
   aberto,
+  cliente,
   clienteNome,
   onClose,
   mensagensAssistente,
@@ -27,9 +29,16 @@ export default function PDVAssistenteSidebar({
         <div className="flex items-center justify-between px-4 py-3 border-b border-indigo-200 bg-indigo-600 text-white">
           <div className="flex items-center gap-2">
             <Bot className="w-5 h-5" />
-            <div>
+            <div className="min-w-0">
               <h2 className="text-sm font-semibold">Assistente IA</h2>
-              <p className="text-xs text-indigo-200">{clienteNome}</p>
+              <CustomerIdentity
+                className="max-w-full"
+                codeClassName="bg-indigo-500/60 text-indigo-50"
+                customer={cliente}
+                fallback={clienteNome || "Cliente nao informado"}
+                nameClassName="text-xs font-medium text-indigo-100"
+                nameWrapperClassName="max-w-[280px]"
+              />
             </div>
           </div>
           <button
@@ -46,7 +55,7 @@ export default function PDVAssistenteSidebar({
             <div className="flex items-center justify-center h-full">
               <div className="text-center text-gray-400">
                 <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2 text-indigo-400" />
-                <p className="text-xs">Carregando histórico...</p>
+                <p className="text-xs">Carregando historico...</p>
               </div>
             </div>
           )}
