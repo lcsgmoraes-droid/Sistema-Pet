@@ -8,6 +8,7 @@ import {
 } from 'react-icons/fi';
 import { PawPrint } from 'lucide-react';
 import { formatarIdadeMeses } from '../helpers/idadeHelper';
+import CustomerIdentity from '../components/ui/CustomerIdentity';
 
 const listaClinica = (lista = [], fallback = '') => {
   if (Array.isArray(lista) && lista.length > 0) {
@@ -438,7 +439,13 @@ const PetDetalhes = () => {
                   <div className="flex items-center gap-2 text-gray-700">
                     <FiUser size={16} />
                     <span className="font-medium">Tutor:</span>
-                    <span className="text-blue-600">{pet.cliente_nome}</span>
+                    <CustomerIdentity
+                      codeLabel="Cod. tutor"
+                      fallback={`Tutor #${pet.cliente_id || "-"}`}
+                      layout="inline"
+                      nameClassName="font-medium text-blue-600"
+                      record={pet}
+                    />
                   </div>
                   {pet.cliente_celular && (
                     <div className="flex items-center gap-2 text-gray-700">

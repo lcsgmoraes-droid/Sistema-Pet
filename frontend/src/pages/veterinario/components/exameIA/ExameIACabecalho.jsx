@@ -1,3 +1,4 @@
+import CustomerIdentity from "../../../../components/ui/CustomerIdentity";
 import { formatarDataExame } from "./exameIAUtils";
 
 export default function ExameIACabecalho({ exame, resumo, temAnaliseIA, temArquivo, temResultadoBase }) {
@@ -12,8 +13,16 @@ export default function ExameIACabecalho({ exame, resumo, temAnaliseIA, temArqui
           {exame.data_solicitacao ? ` - solicitado em ${formatarDataExame(exame.data_solicitacao)}` : ""}
         </p>
         {resumo && (
-          <p className="mt-1 text-indigo-600">
-            Tutor: {resumo.tutor_nome || "-"} | Pet: {resumo.pet_nome || "-"}
+          <p className="mt-1 flex flex-wrap items-center gap-1.5 text-indigo-600">
+            <span>Tutor:</span>
+            <CustomerIdentity
+              codeLabel="Cod. tutor"
+              fallback={resumo.tutor_id ? `Tutor #${resumo.tutor_id}` : ""}
+              layout="inline"
+              nameClassName="font-medium text-indigo-700"
+              record={resumo}
+            />
+            <span>| Pet: {resumo.pet_nome || "-"}</span>
           </p>
         )}
       </div>

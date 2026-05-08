@@ -846,6 +846,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-08: `Comissoes/Listagem` iniciou padronizacao visual com `MetricGrid`/`MetricCard`, `MoneyCell`, `NumberCell`, `StatusBadge`, `ActionButton` e estados globais de carregamento/erro/vazio, sem alterar a regra de fechamento.
 - 2026-05-08: Modal de devolucao no PDV passou a usar `data_venda`, codigo do cliente e copia padronizada de cliente/codigo; producao ganhou `ops_disk_guard` preventivo para limpar cache Docker quando o disco entrar em faixa de risco.
 - 2026-05-08: criado `CustomerIdentity` para nome/codigo de cliente copiaveis e aplicado em devolucao PDV, vendas recentes, financeiro, contas a receber, relatorio de produto, NF, entregas e comissoes.
+- 2026-05-08: `CustomerIdentity` passou a reconhecer campos de tutor/pessoa e foi expandido para Banho & Tosa, Pets, campanhas, creditos, Pedido Bling e cards veterinarios.
 
 ### Nao fazer nesta onda
 

@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { toast } from 'react-hot-toast';
 import api from '../../api';
+import CustomerIdentity from '../ui/CustomerIdentity';
 import PedidoBlingCampoInfo from './PedidoBlingCampoInfo';
 import PedidoBlingLinhaItem from './PedidoBlingLinhaItem';
 import PedidoBlingStatusBadge from './PedidoBlingStatusBadge';
@@ -20,7 +21,6 @@ export default function PedidoBlingCard({
   const podeCancelar = pedido.status === 'aberto' || pedido.status === 'expirado';
   const expirado = pedido.status === 'aberto' && new Date(pedido.expira_em) < new Date();
   const canalLabel = pedido.canal_label || pedido.canal_origem || pedido.canal || 'Bling';
-  const clienteNome = pedido.cliente?.nome || 'Cliente nao informado';
   const totalPedido = pedido.financeiro?.total;
   const notaFiscal = pedido.nota_fiscal || {};
   const situacaoBling = pedido.situacao_bling || {};
@@ -104,7 +104,12 @@ export default function PedidoBlingCard({
             )}
           </div>
           <div className="text-sm text-gray-700 mt-1 flex flex-wrap gap-x-3 gap-y-1">
-            <span>{clienteNome}</span>
+            <CustomerIdentity
+              customer={pedido.cliente}
+              fallback="Cliente nao informado"
+              layout="inline"
+              nameClassName="font-medium text-gray-700"
+            />
             <span className="text-gray-300">|</span>
             <span>{formatarMoeda(totalPedido)}</span>
           </div>
@@ -183,7 +188,17 @@ export default function PedidoBlingCard({
             <PedidoBlingCampoInfo label="Pedido no canal" valor={pedido.numero_pedido_canal} />
             <PedidoBlingCampoInfo label="Situacao Bling" valor={situacaoBling?.descricao || situacaoBling?.codigo} />
             <PedidoBlingCampoInfo label="Loja Bling" valor={pedido.loja?.nome} />
-            <PedidoBlingCampoInfo label="Cliente" valor={pedido.cliente?.nome} />
+            <PedidoBlingCampoInfo
+              label="Cliente"
+              valor={(
+                <CustomerIdentity
+                  customer={pedido.cliente}
+                  fallback="Cliente nao informado"
+                  layout="inline"
+                  nameClassName="font-medium text-gray-700"
+                />
+              )}
+            />
             <PedidoBlingCampoInfo label="Documento" valor={pedido.cliente?.documento} />
             <PedidoBlingCampoInfo label="Telefone" valor={pedido.cliente?.telefone} />
             <PedidoBlingCampoInfo label="Email" valor={pedido.cliente?.email} />

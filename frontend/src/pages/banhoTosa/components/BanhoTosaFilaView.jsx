@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { ArrowRight, GripVertical, RefreshCw, Route } from "lucide-react";
 import ActionButton from "../../../components/ui/ActionButton";
+import CustomerIdentity from "../../../components/ui/CustomerIdentity";
 import Panel from "../../../components/ui/Panel";
 import PetAvatar from "../../../components/ui/PetAvatar";
 import StatusBadge from "../../../components/ui/StatusBadge";
@@ -293,9 +294,15 @@ function AtendimentoCard({
               <p className="truncate text-sm font-semibold text-slate-900">
                 {atendimento.pet_nome || `Pet #${atendimento.pet_id}`}
               </p>
-              <p className="truncate text-xs text-slate-500">
-                Tutor: {atendimento.cliente_nome || `#${atendimento.cliente_id}`}
-              </p>
+              <CustomerIdentity
+                className="mt-0.5 text-xs text-slate-500"
+                codeLabel="Cod. tutor"
+                fallback={`Tutor #${atendimento.cliente_id || "-"}`}
+                label="Tutor"
+                nameClassName="font-medium text-slate-500"
+                record={atendimento}
+                showLabel
+              />
             </div>
             <GripVertical size={16} className="shrink-0 text-slate-300" aria-hidden="true" />
           </div>

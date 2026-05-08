@@ -1,3 +1,5 @@
+import CustomerIdentity from "../ui/CustomerIdentity";
+
 export default function CampanhasDashboardAlertasSection({
   dashboard,
   onAbrirEnvioInativos,
@@ -128,9 +130,13 @@ export default function CampanhasDashboardAlertasSection({
                 className="px-4 py-3 flex items-start justify-between gap-3"
               >
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium text-gray-900 truncate">
-                    {b.nome_cliente}
-                  </p>
+                  <CustomerIdentity
+                    code={b.customer_id}
+                    fallback="Cliente nao informado"
+                    name={b.nome_cliente}
+                    nameClassName="font-medium text-gray-900"
+                    record={b}
+                  />
                   <p className="text-xs text-gray-500">
                     {b.categoria === "maior_gasto"
                       ? "\u{1F4B0} Maior Gasto"

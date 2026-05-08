@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import { FiBell, FiCheckCircle, FiRefreshCw, FiTrash2 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import api from "../api";
+import CustomerIdentity from "../components/ui/CustomerIdentity";
 import "../styles/Lembretes.css";
 
 export default function Lembretes() {
@@ -468,7 +469,14 @@ export default function Lembretes() {
                           margin: "1px 0",
                         }}
                       >
-                        {b.nome_cliente}
+                        <CustomerIdentity
+                          code={b.customer_id}
+                          fallback="Cliente nao informado"
+                          layout="inline"
+                          name={b.nome_cliente}
+                          nameClassName="font-medium text-slate-700"
+                          record={b}
+                        />
                         {b.retirar_ate
                           ? ` • até ${new Date(b.retirar_ate).toLocaleDateString("pt-BR")}`
                           : ""}

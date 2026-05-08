@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import { CalendarPlus, RefreshCw, Repeat2, StepForward } from "lucide-react";
 import ActionButton from "../../../components/ui/ActionButton";
+import CustomerIdentity from "../../../components/ui/CustomerIdentity";
 import EmptyState from "../../../components/ui/EmptyState";
 import { TextField } from "../../../components/ui/FormField";
 import MetricCard from "../../../components/ui/MetricCard";
@@ -156,9 +157,15 @@ function RetornoCard({ disabled, item, onAgendar, onAvancar }) {
                 {labelPrioridade(item.prioridade)}
               </span>
             </div>
-            <p className="mt-1 text-sm text-slate-600">
-              {item.cliente_nome || `Tutor #${item.cliente_id}`}
-              {item.pet_nome ? ` / ${item.pet_nome}` : ""}
+            <p className="mt-1 flex flex-wrap items-center gap-1.5 text-sm text-slate-600">
+              <CustomerIdentity
+                codeLabel="Cod. tutor"
+                fallback={`Tutor #${item.cliente_id || "-"}`}
+                layout="inline"
+                nameClassName="font-medium text-slate-700"
+                record={item}
+              />
+              {item.pet_nome ? <span>/ {item.pet_nome}</span> : null}
             </p>
             <p className="mt-1 line-clamp-2 text-sm text-slate-500">{item.mensagem}</p>
           </div>

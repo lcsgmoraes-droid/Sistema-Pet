@@ -1,5 +1,6 @@
 import { CheckCircle2, XCircle } from "lucide-react";
 import ActionButton from "../../../components/ui/ActionButton";
+import CustomerIdentity from "../../../components/ui/CustomerIdentity";
 import PetAvatar from "../../../components/ui/PetAvatar";
 import StatusBadge from "../../../components/ui/StatusBadge";
 import { formatCurrency } from "../banhoTosaUtils";
@@ -24,9 +25,15 @@ export default function BanhoTosaAgendaCard({ agendamento, onCancelar, onCheckIn
             <p className="truncate text-sm font-semibold text-slate-900">
               {hora} - {agendamento.pet_nome || `Pet #${agendamento.pet_id}`}
             </p>
-            <p className="truncate text-xs text-slate-500">
-              Tutor: {agendamento.cliente_nome || `#${agendamento.cliente_id}`}
-            </p>
+            <CustomerIdentity
+              className="mt-0.5 text-xs text-slate-500"
+              codeLabel="Cod. tutor"
+              fallback={`Tutor #${agendamento.cliente_id || "-"}`}
+              nameClassName="font-medium text-slate-500"
+              record={agendamento}
+              showLabel
+              label="Tutor"
+            />
             <p className="mt-1 text-sm font-medium text-slate-700">
               {agendamento.servicos?.[0]?.nome_servico_snapshot || "Banho & Tosa"} - {formatCurrency(agendamento.valor_previsto)}
             </p>

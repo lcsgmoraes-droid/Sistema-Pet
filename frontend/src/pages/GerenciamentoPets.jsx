@@ -14,6 +14,7 @@ import {
   XCircle,
 } from 'lucide-react';
 import ActionButton from '../components/ui/ActionButton';
+import CustomerIdentity from '../components/ui/CustomerIdentity';
 import IconActionButton from '../components/ui/IconActionButton';
 import Panel from '../components/ui/Panel';
 import EntityCard, { EntityInfoRow } from '../components/ui/EntityCard';
@@ -442,8 +443,15 @@ const GerenciamentoPets = () => {
                 <div className="mt-3 border-t border-slate-100 pt-3">
                   <EntityInfoRow
                     label="Tutor:"
-                    value={pet.cliente_nome || ''}
-                    valueClassName="text-blue-600"
+                    value={(
+                      <CustomerIdentity
+                        codeLabel="Cod. tutor"
+                        fallback={`Tutor #${pet.cliente_id || "-"}`}
+                        layout="inline"
+                        nameClassName="font-medium text-blue-600"
+                        record={pet}
+                      />
+                    )}
                   />
                 </div>
               </EntityCard>

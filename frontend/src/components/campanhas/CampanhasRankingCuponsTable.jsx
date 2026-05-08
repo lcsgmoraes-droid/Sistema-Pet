@@ -1,4 +1,5 @@
 import { Fragment } from "react";
+import CustomerIdentity from "../ui/CustomerIdentity";
 
 function CampanhasRankingCupomDetalhesRow({ cupom }) {
   return (
@@ -203,15 +204,14 @@ export default function CampanhasRankingCuponsTable({
                     {formatarValorCupom(cupom)}
                   </td>
                   <td className="px-4 py-3 text-gray-600">
-                    {cupom.nome_cliente ? (
-                      <span title={`ID ${cupom.customer_id}`}>
-                        {cupom.nome_cliente}
-                      </span>
-                    ) : cupom.customer_id ? (
-                      <span className="text-gray-400">#{cupom.customer_id}</span>
-                    ) : (
-                      <span className="text-gray-300">-</span>
-                    )}
+                    <CustomerIdentity
+                      code={cupom.customer_id}
+                      empty={<span className="text-gray-300">-</span>}
+                      fallback={cupom.customer_id ? `Cliente #${cupom.customer_id}` : ""}
+                      name={cupom.nome_cliente}
+                      nameClassName="font-medium text-gray-700"
+                      record={cupom}
+                    />
                   </td>
                   <td className="px-4 py-3 text-gray-500 text-xs">
                     {cupom.created_at

@@ -1,4 +1,5 @@
 import { Pill, Scale } from "lucide-react";
+import CustomerIdentity from "../../../components/ui/CustomerIdentity";
 
 export default function CalculadoraDosesResultado({
   calculo,
@@ -26,7 +27,18 @@ export default function CalculadoraDosesResultado({
           <Pill size={16} />
           <span className="font-medium">Resumo</span>
         </div>
-        <p>Tutor: {tutorSelecionado?.nome || petSelecionado?.cliente_nome || "nao selecionado"}</p>
+        <p className="flex flex-wrap items-center gap-1.5">
+          <span>Tutor:</span>
+          <CustomerIdentity
+            codeLabel="Cod. tutor"
+            customer={tutorSelecionado}
+            fallback="nao selecionado"
+            layout="inline"
+            name={tutorSelecionado?.nome || petSelecionado?.cliente_nome}
+            nameClassName="font-medium text-slate-100"
+            record={petSelecionado}
+          />
+        </p>
         <p>Pet: {petSelecionado?.nome || "nao selecionado"}</p>
         <p>Medicamento: {medicamentoSelecionado?.nome || "nao selecionado"}</p>
         <p>Peso considerado: {form.peso_kg || "--"} kg</p>

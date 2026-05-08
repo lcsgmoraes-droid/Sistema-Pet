@@ -1,3 +1,4 @@
+import CustomerIdentity from "../../../components/ui/CustomerIdentity";
 import EmptyState from "../../../components/ui/EmptyState";
 import Panel from "../../../components/ui/Panel";
 import { formatNumber } from "../banhoTosaUtils";
@@ -18,8 +19,15 @@ export default function BanhoTosaCreditosList({ creditos = [] }) {
           <div key={credito.id} className="grid gap-3 p-3 md:grid-cols-[1.2fr_0.8fr_0.7fr_0.7fr] md:items-center">
             <div>
               <p className="font-semibold text-slate-900">{credito.pacote_nome}</p>
-              <p className="text-sm text-slate-500">
-                {credito.cliente_nome || `Tutor #${credito.cliente_id}`} | {credito.pet_nome || "todos os pets"}
+              <p className="flex flex-wrap items-center gap-1.5 text-sm text-slate-500">
+                <CustomerIdentity
+                  codeLabel="Cod. tutor"
+                  fallback={`Tutor #${credito.cliente_id || "-"}`}
+                  layout="inline"
+                  nameClassName="font-medium text-slate-600"
+                  record={credito}
+                />
+                <span>| {credito.pet_nome || "todos os pets"}</span>
               </p>
             </div>
             <Info label="Saldo" value={`${formatNumber(credito.saldo_creditos, 0)} de ${formatNumber(credito.creditos_total, 0)}`} />

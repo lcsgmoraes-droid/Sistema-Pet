@@ -17,6 +17,7 @@
 import { useState } from 'react';
 import { X, Wallet, AlertCircle, Info } from 'lucide-react';
 import CurrencyInput from './CurrencyInput';
+import CustomerIdentity from './ui/CustomerIdentity';
 import { formatBRL } from '../utils/formatters';
 import api from '../api';
 
@@ -75,7 +76,11 @@ export default function ModalAdicionarCredito({
             <Wallet className="w-6 h-6 flex-shrink-0" />
             <div>
               <h2 className="text-base font-bold leading-tight">Gerar Crédito</h2>
-              <p className="text-sm text-green-100 truncate max-w-[180px]">{cliente?.nome}</p>
+              <CustomerIdentity
+                className="max-w-[220px] text-sm text-green-100"
+                customer={cliente}
+                nameClassName="font-medium text-green-100"
+              />
             </div>
           </div>
           <button

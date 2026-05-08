@@ -1,4 +1,5 @@
 import { BedDouble } from "lucide-react";
+import CustomerIdentity from "../../../components/ui/CustomerIdentity";
 import InternacaoAcoes from "./InternacaoAcoes";
 import InternacaoDetalhe from "./InternacaoDetalhe";
 import { STATUS_CORES, formatData } from "./internacaoUtils";
@@ -56,7 +57,17 @@ function ResumoInternacao({ internacao }) {
       <p className="font-semibold text-gray-800">
         {internacao.pet_nome ?? `Pet #${String(internacao.pet_id ?? "").slice(0, 6)}`}
       </p>
-      {internacao.tutor_nome && <p className="text-xs text-gray-500">Tutor: {internacao.tutor_nome}</p>}
+      {internacao.tutor_nome && (
+        <CustomerIdentity
+          className="mt-0.5 text-xs text-gray-500"
+          codeLabel="Cod. tutor"
+          fallback={`Tutor #${internacao.tutor_id || "-"}`}
+          label="Tutor"
+          nameClassName="font-medium text-gray-600"
+          record={internacao}
+          showLabel
+        />
+      )}
       <p className="text-xs text-gray-400 truncate">{internacao.motivo ?? internacao.motivo_internacao}</p>
     </div>
   );

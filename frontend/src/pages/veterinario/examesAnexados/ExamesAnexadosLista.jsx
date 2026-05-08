@@ -6,6 +6,7 @@ import {
   FileText,
   Sparkles,
 } from "lucide-react";
+import CustomerIdentity from "../../../components/ui/CustomerIdentity";
 import ExameAnexadoPainelIA from "../components/ExameAnexadoPainelIA";
 import { formatarData } from "./examesAnexadosUtils";
 
@@ -66,8 +67,16 @@ function ExameAnexadoItem({
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="space-y-1">
           <p className="text-sm font-semibold text-gray-800">{item.nome_exame || "Exame"}</p>
-          <p className="text-xs text-gray-600">
-            Tutor: {item.tutor_nome || "-"} | Pet: {item.pet_nome || "-"}
+          <p className="flex flex-wrap items-center gap-1.5 text-xs text-gray-600">
+            <span>Tutor:</span>
+            <CustomerIdentity
+              codeLabel="Cod. tutor"
+              fallback={item.tutor_id ? `Tutor #${item.tutor_id}` : ""}
+              layout="inline"
+              nameClassName="font-medium text-gray-700"
+              record={item}
+            />
+            <span>| Pet: {item.pet_nome || "-"}</span>
           </p>
         </div>
 

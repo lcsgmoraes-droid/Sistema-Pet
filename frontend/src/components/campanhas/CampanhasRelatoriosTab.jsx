@@ -1,3 +1,5 @@
+import CustomerIdentity from "../ui/CustomerIdentity";
+
 export default function CampanhasRelatoriosTab({
   relDataInicio,
   setRelDataInicio,
@@ -143,7 +145,11 @@ export default function CampanhasRelatoriosTab({
                       {formatarData(transacao.data)}
                     </td>
                     <td className="px-4 py-3 font-medium text-gray-900">
-                      {transacao.cliente_nome}
+                      <CustomerIdentity
+                        fallback="Cliente nao informado"
+                        nameClassName="font-medium text-gray-900"
+                        record={transacao}
+                      />
                     </td>
                     <td className="px-4 py-3">
                       <span
