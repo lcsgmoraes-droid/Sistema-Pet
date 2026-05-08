@@ -1,3 +1,5 @@
+import FornecedorSelector from "../fornecedores/FornecedorSelector";
+
 export default function ProdutosNovoFornecedorModal({
   clientes,
   fornecedorData,
@@ -6,6 +8,10 @@ export default function ProdutosNovoFornecedorModal({
   onClose,
   onSubmit,
 }) {
+  const fornecedorSelecionado = clientes.find(
+    (cliente) => String(cliente.id) === String(fornecedorData.fornecedor_id),
+  );
+
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg p-6 max-w-md w-full mx-4">
@@ -15,20 +21,28 @@ export default function ProdutosNovoFornecedorModal({
 
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Fornecedor *</label>
-            <select
-              value={fornecedorData.fornecedor_id}
-              onChange={(e) => setFornecedorData({ ...fornecedorData, fornecedor_id: e.target.value })}
+            <FornecedorSelector
+              fornecedores={clientes}
+              fornecedorId={fornecedorData.fornecedor_id}
+              fornecedorSelecionado={fornecedorSelecionado}
+              onSelect={(fornecedor) =>
+                setFornecedorData({
+                  ...fornecedorData,
+                  fornecedor_id: fornecedor.id,
+                })
+              }
+              onClear={() =>
+                setFornecedorData({ ...fornecedorData, fornecedor_id: "" })
+              }
+              onFornecedorCriado={(fornecedor) =>
+                setFornecedorData({
+                  ...fornecedorData,
+                  fornecedor_id: fornecedor.id,
+                })
+              }
               disabled={Boolean(fornecedorEdit)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 disabled:bg-gray-100"
-            >
-              <option value="">Selecione...</option>
-              {clientes.map((cli) => (
-                <option key={cli.id} value={cli.id}>
-                  {cli.nome}
-                </option>
-              ))}
-            </select>
+              required
+            />
           </div>
 
           <div>

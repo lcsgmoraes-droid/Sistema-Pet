@@ -141,7 +141,11 @@ export default function PDVHeaderBar({
               destaqueAbrirCaixa ? `rounded-lg ${caixaGuiaClasses.action}` : ""
             }
           >
-            <MenuCaixa key={menuCaixaKey} onAbrirCaixa={onAbrirCaixa} />
+            <MenuCaixa
+              key={menuCaixaKey}
+              onAbrirCaixa={onAbrirCaixa}
+              vendaParaDevolucao={vendaAtual}
+            />
           </div>
 
           <ActionButton

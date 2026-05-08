@@ -1,8 +1,23 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { X, Search, RotateCcw, AlertCircle, Check, Filter, Package, Layers } from 'lucide-react';
 import api from '../api';
+import CopyableCode from './ui/CopyableCode';
+import CopyableValue from './ui/CopyableValue';
 
-export default function ModalDevolucao({ caixaId, onClose, onSucesso }) {
+function getCodigoItemDevolucao(item) {
+  return (
+    item?.produto_codigo ||
+    item?.codigo ||
+    item?.sku ||
+    item?.produto?.codigo ||
+    item?.produto?.sku ||
+    item?.produto?.codigo_barras ||
+    item?.produto_codigo_barras ||
+    ''
+  );
+}
+
+export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, onSucesso }) {
   const [passo, setPasso] = useState(1); // 1: listar vendas, 2: selecionar itens
   const [vendas, setVendas] = useState([]);
   const [vendaSelecionada, setVendaSelecionada] = useState(null);
@@ -12,6 +27,7 @@ export default function ModalDevolucao({ caixaId, onClose, onSucesso }) {
   const [gerarCredito, setGerarCredito] = useState(false);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState('');
+  const vendaInicialCarregadaRef = useRef(null);
   
   // 🆕 Estados para devolução de KIT
   const [modoDevolucaoKit, setModoDevolucaoKit] = useState({}); // {itemId: 'kit_inteiro' | 'componentes'}
@@ -29,6 +45,14 @@ export default function ModalDevolucao({ caixaId, onClose, onSucesso }) {
   useEffect(() => {
     buscarVendas();
   }, [filtros]);
+
+  useEffect(() => {
+    if (!vendaInicial?.id) return;
+    if (String(vendaInicialCarregadaRef.current) === String(vendaInicial.id)) return;
+
+    vendaInicialCarregadaRef.current = vendaInicial.id;
+    selecionarVenda(vendaInicial);
+  }, [vendaInicial?.id]);
 
   const buscarVendas = async () => {
     setLoading(true);
@@ -58,6 +82,12 @@ export default function ModalDevolucao({ caixaId, onClose, onSucesso }) {
       // Buscar detalhes completos da venda
       const response = await api.get(`/vendas/${venda.id}`);
       setVendaSelecionada(response.data);
+      setItensSelecionados({});
+      setModoDevolucaoKit({});
+      setComponentesSelecionados({});
+      setQuantidadesComponentes({});
+      setMotivo('');
+      setErro('');
       
       // Inicializar quantidades com o máximo disponível
       const qtds = {};
@@ -478,7 +508,16 @@ export default function ModalDevolucao({ caixaId, onClose, onSucesso }) {
             <div className="space-y-6">
               {/* Informações da Venda */}
               <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-900 mb-2">Venda #{vendaSelecionada.numero_venda || vendaSelecionada.id}</h3>
+                <h3 className="mb-2 flex items-center gap-2 font-semibold text-gray-900">
+                  <CopyableValue
+                    label="Venda"
+                    title="Copiar numero da venda"
+                    value={vendaSelecionada.numero_venda || vendaSelecionada.id}
+                    valueClassName="font-semibold text-gray-900"
+                  >
+                    #{vendaSelecionada.numero_venda || vendaSelecionada.id}
+                  </CopyableValue>
+                </h3>
                 <div className="grid grid-cols-3 gap-4 text-sm">
                   <div>
                     <span className="text-gray-600">Data:</span>
@@ -527,8 +566,17 @@ export default function ModalDevolucao({ caixaId, onClose, onSucesso }) {
                           />
                           
                           <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                              <div className="font-medium text-gray-900">{item.produto_nome}</div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <CopyableValue
+                                title="Copiar nome do produto"
+                                value={item.produto_nome}
+                                valueClassName="font-medium text-gray-900"
+                              />
+                              <CopyableCode
+                                label="SKU"
+                                title="Copiar SKU do produto"
+                                value={getCodigoItemDevolucao(item)}
+                              />
                               {isKit && (
                                 <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 text-xs font-semibold rounded">
                                   <Layers className="w-3 h-3" />

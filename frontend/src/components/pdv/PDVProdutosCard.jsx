@@ -1,9 +1,7 @@
 import {
   BookmarkPlus,
-  Check,
   ChevronDown,
   ChevronRight,
-  Copy,
   Layers,
   Minus,
   Package,
@@ -17,6 +15,7 @@ import { resolveMediaUrl } from "../../utils/mediaUrl";
 import { formatarVariacao } from "../../utils/variacoes";
 import ProdutoSelector from "../produtos/ProdutoSelector";
 import CopyableCode from "../ui/CopyableCode";
+import CopyableValue from "../ui/CopyableValue";
 import Panel from "../ui/Panel";
 
 function obterImagemMiniaturaItem(item) {
@@ -253,31 +252,18 @@ export default function PDVProdutosCard({
                               }}
                             />
                           )}
-                          <div className="inline-flex items-center gap-1.5 min-w-0">
-                            <div className="font-medium text-gray-900 break-words">
-                              {item.produto_nome}
-                            </div>
-                            {item.produto_nome && (
-                              <button
-                                type="button"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onCopiarCodigoProdutoCarrinho(
-                                    item.produto_nome,
-                                    `nome-${chaveCodigoItem}`,
-                                  );
-                                }}
-                                className="text-gray-400 hover:text-gray-700 transition-colors"
-                                title="Copiar nome do produto"
-                              >
-                                {copiadoCodigoItem === `nome-${chaveCodigoItem}` ? (
-                                  <Check className="w-3.5 h-3.5 text-green-600" />
-                                ) : (
-                                  <Copy className="w-3.5 h-3.5" />
-                                )}
-                              </button>
-                            )}
-                          </div>
+                          <CopyableValue
+                            copied={copiadoCodigoItem === `nome-${chaveCodigoItem}`}
+                            title="Copiar nome do produto"
+                            value={item.produto_nome}
+                            valueClassName="font-medium text-gray-900 break-words"
+                            onCopy={() =>
+                              onCopiarCodigoProdutoCarrinho(
+                                item.produto_nome,
+                                `nome-${chaveCodigoItem}`,
+                              )
+                            }
+                          />
                         </div>
                         <CopyableCode
                           copied={copiadoCodigoItem === chaveCodigoItem}

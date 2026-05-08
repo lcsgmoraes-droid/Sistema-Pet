@@ -1,4 +1,5 @@
 import React from "react";
+import FornecedorSelector from "../fornecedores/FornecedorSelector";
 
 function CampoSelect({ children, disabled = false, label, onChange, value }) {
   return (
@@ -23,6 +24,9 @@ export default function ProdutosFornecedoresLoteSection({
 }) {
   const fornecedorExigeSelecao =
     dadosEdicaoLote.fornecedor_operacao && dadosEdicaoLote.fornecedor_operacao !== "remover";
+  const fornecedorSelecionado = fornecedores.find(
+    (fornecedor) => String(fornecedor.id) === String(dadosEdicaoLote.fornecedor_id),
+  );
 
   return (
     <section className="space-y-4 rounded-2xl border border-emerald-100 bg-emerald-50/60 p-4">
@@ -39,7 +43,13 @@ export default function ProdutosFornecedoresLoteSection({
         <CampoSelect
           label="Acao em lote"
           value={dadosEdicaoLote.fornecedor_operacao}
-          onChange={(event) => onAtualizarCampo("fornecedor_operacao", event.target.value)}
+          onChange={(event) => {
+            const operacao = event.target.value;
+            onAtualizarCampo("fornecedor_operacao", operacao);
+            if (!operacao || operacao === "remover") {
+              onAtualizarCampo("fornecedor_id", "");
+            }
+          }}
         >
           <option value="">Nao alterar</option>
           <option value="definir_principal">Definir como principal</option>
@@ -47,28 +57,23 @@ export default function ProdutosFornecedoresLoteSection({
           <option value="remover">Remover fornecedor</option>
         </CampoSelect>
 
-        <CampoSelect
-          label="Fornecedor"
-          value={dadosEdicaoLote.fornecedor_id}
-          onChange={(event) => onAtualizarCampo("fornecedor_id", event.target.value)}
+        <FornecedorSelector
+          fornecedores={fornecedores}
+          fornecedorId={dadosEdicaoLote.fornecedor_id}
+          fornecedorSelecionado={fornecedorSelecionado}
           disabled={!fornecedorExigeSelecao}
-        >
-          <option value="">
-            {fornecedorExigeSelecao
-              ? "Selecione o fornecedor"
+          label="Fornecedor"
+          placeholder={
+            fornecedorExigeSelecao
+              ? "Digite o nome do fornecedor..."
               : dadosEdicaoLote.fornecedor_operacao === "remover"
                 ? "Nao precisa selecionar"
-                : "Escolha uma acao primeiro"}
-          </option>
-          {fornecedores.map((fornecedor) => (
-            <option key={fornecedor.id} value={fornecedor.id}>
-              {fornecedor.nome
-                || fornecedor.razao_social
-                || fornecedor.nome_fantasia
-                || `Fornecedor ${fornecedor.id}`}
-            </option>
-          ))}
-        </CampoSelect>
+                : "Escolha uma acao primeiro"
+          }
+          onSelect={(fornecedor) => onAtualizarCampo("fornecedor_id", String(fornecedor.id))}
+          onClear={() => onAtualizarCampo("fornecedor_id", "")}
+          onFornecedorCriado={(fornecedor) => onAtualizarCampo("fornecedor_id", String(fornecedor.id))}
+        />
       </div>
 
       {dadosEdicaoLote.fornecedor_operacao === "definir_principal" && (

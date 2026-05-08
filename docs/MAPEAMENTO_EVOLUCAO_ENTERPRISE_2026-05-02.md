@@ -26,6 +26,8 @@ Componentes globais criados ou consolidados:
 - `StatusBadge` para status como pago, aberto, cancelado, ativo e entregue.
 - `MetricCard` e `MetricGrid` para padronizar dashboards e cards de indicadores.
 - `MoneyCell`, `ChannelBadges` e `SafeMarkdown`, ja iniciados na fatia de produtos.
+- `CopyableValue` para valores copiaveis padronizados, como numero de venda, nome de produto, SKU e codigos operacionais.
+- `FornecedorSelector` para busca de fornecedor com autocomplete e cadastro rapido, evitando selects locais e campos livres inconsistentes.
 - `FormField`, `TextField` e `SelectField` para campos de formulario com tons visuais reaproveitaveis sem quebrar telas existentes.
 - `PaginationControls` para paginacao, seletor de quantidade por pagina e navegacao com tamanho/cor padrao.
 - `EmptyState`, `LoadingState` e `ErrorState` para estados vazios, carregamento e falhas com visual unico.
@@ -68,6 +70,9 @@ Tela piloto:
 - Operadoras, internacoes veterinarias e Estoque Bling comecaram a usar estados globais de vazio/carregamento.
 - Pets: `PetSelector` e `NovoPetButton` passaram para `components/pets`; PDV, seletor tutor/pet do veterinario e fluxos de agenda, IA, calculadora de doses, exames, internacoes e vacinas agora usam a mesma base visual e de comportamento.
 - PDV: resumo de cliente selecionado passou a usar `EntityCard` em modo compacto, mantendo o alinhamento de CPF, codigo, telefone, fidelidade, cupons e credito.
+- PDV/Caixa: devolucao aberta a partir de uma venda carregada passa a iniciar diretamente naquela venda, mantendo a busca manual como caminho alternativo.
+- PDV/Produtos: numero de venda, nomes de produtos e SKUs avancaram para o padrao copiavel reutilizavel.
+- Fornecedores: cadastro de fornecedor no produto, edicao em lote de fornecedores e despesa do caixa passaram a usar autocomplete/cadastro rapido via `FornecedorSelector`.
 - Financeiro/Vendas: a tabela principal da lista de vendas foi extraida para `VendasFinanceiroListaTable` e passou a consumir `DataTable`, `MoneyCell`, `NumberCell` e `StatusBadge`.
 - Financeiro/Vendas: a tabela "Vendas por data" do resumo foi extraida para `VendasPorDataTable`, mantendo badges de dia, valores zerados como traco e totalizacao no componente.
 - Financeiro/Vendas: as tabelas "Formas de recebimento" e "Funcionario" foram extraidas para componentes dedicados com `DataTable`, mantendo totalizacao local e celulas monetarias padronizadas.

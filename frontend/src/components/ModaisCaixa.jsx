@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { X, TrendingUp, TrendingDown, Receipt, ArrowRightLeft, RotateCcw, AlertCircle } from 'lucide-react';
 import { adicionarMovimentacao, obterCaixaAberto } from '../api/caixa';
 import api from '../api';
+import FornecedorSelector from './fornecedores/FornecedorSelector';
 
 const validarCaixaAtual = async (caixaIdEsperado) => {
   const caixaAtual = await obterCaixaAberto();
@@ -414,14 +415,26 @@ export function ModalDespesa({ caixaId, onClose, onSucesso }) {
 
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Fornecedor
-            </label>
-            <input
-              type="text"
+            <FornecedorSelector
               value={fornecedor}
-              onChange={(e) => setFornecedor(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
+              onInputChange={setFornecedor}
+              onSelect={(fornecedorSelecionado) =>
+                setFornecedor(
+                  fornecedorSelecionado.nome ||
+                    fornecedorSelecionado.razao_social ||
+                    fornecedorSelecionado.nome_fantasia ||
+                    '',
+                )
+              }
+              onClear={() => setFornecedor('')}
+              onFornecedorCriado={(fornecedorCriado) =>
+                setFornecedor(
+                  fornecedorCriado.nome ||
+                    fornecedorCriado.razao_social ||
+                    fornecedorCriado.nome_fantasia ||
+                    '',
+                )
+              }
             />
           </div>
 
