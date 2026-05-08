@@ -3,6 +3,20 @@ import DataTable from "../ui/DataTable";
 import MoneyCell from "../ui/MoneyCell";
 import NumberCell from "../ui/NumberCell";
 import StatusBadge from "../ui/StatusBadge";
+import CopyableCode from "../ui/CopyableCode";
+import CopyableValue from "../ui/CopyableValue";
+
+function getCodigoProdutoVendaItem(item) {
+  return (
+    item?.produto_codigo ||
+    item?.produto_sku ||
+    item?.sku ||
+    item?.codigo ||
+    item?.codigo_barras ||
+    item?.ean ||
+    ""
+  );
+}
 
 function CodigoVendaCell({ copiarNumeroVenda, criarUrlPdvVenda, venda }) {
   return (
@@ -84,8 +98,13 @@ function ItensVendaDetalhes({ colSpan, formatarMoeda, venda }) {
                   className="border-b border-blue-200 hover:bg-blue-100"
                 >
                   <td className="px-1 py-1">
-                    <div className="flex flex-wrap items-center gap-1">
-                      <span>{item.produto_nome}</span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <CopyableValue
+                        title="Copiar produto"
+                        value={item.produto_nome}
+                        valueClassName="text-slate-700"
+                      />
+                      <CopyableCode value={getCodigoProdutoVendaItem(item)} />
                       {item.em_promocao && (
                         <span
                           className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-bold uppercase text-cyan-700"

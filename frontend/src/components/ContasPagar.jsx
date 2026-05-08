@@ -12,6 +12,8 @@ import LoadingState from './ui/LoadingState';
 import MoneyCell, { formatMoneyCellValue } from './ui/MoneyCell';
 import PageHeader from './ui/PageHeader';
 import StatusBadge from './ui/StatusBadge';
+import FornecedorSelector from './fornecedores/FornecedorSelector';
+import CopyableValue from './ui/CopyableValue';
 
 const ContasPagar = () => {
   const navigate = useNavigate();
@@ -384,6 +386,13 @@ const ContasPagar = () => {
     String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR', { sensitivity: 'base' })
   );
 
+  const fornecedorFiltroSelecionado = safeArray(fornecedores).find(
+    (fornecedor) => String(fornecedor.id) === String(filtros.fornecedor_id)
+  );
+
+  const getFornecedorNome = (fornecedor) =>
+    fornecedor?.nome || fornecedor?.razao_social || fornecedor?.nome_fantasia || '';
+
   const contasPagarColumns = [
     {
       key: 'id',
@@ -415,7 +424,14 @@ const ContasPagar = () => {
       key: 'fornecedor',
       header: 'Fornecedor',
       className: 'min-w-[150px]',
-      render: (conta) => conta.fornecedor_nome || '-',
+      render: (conta) => (
+        <CopyableValue
+          value={conta.fornecedor_nome}
+          title="Copiar fornecedor"
+          empty={<span className="text-gray-400">-</span>}
+          valueClassName="text-slate-700"
+        />
+      ),
     },
     {
       key: 'origem',
@@ -578,13 +594,33 @@ const ContasPagar = () => {
 
           <div className="md:col-span-3">
             <label className="block text-sm font-medium mb-1">Fornecedor</label>
-            <input
-              type="text"
-              className="w-full border border-gray-300 rounded px-3 py-2"
-              placeholder="Digite nome, fantasia, CPF ou CNPJ..."
+            <FornecedorSelector
+              fornecedores={fornecedores}
+              fornecedorId={filtros.fornecedor_id}
+              fornecedorSelecionado={fornecedorFiltroSelecionado}
+              showLabel={false}
               value={filtros.fornecedor_busca || ''}
-              onChange={(e) => setFiltros({...filtros, fornecedor_busca: e.target.value, fornecedor_id: null})}
-              onKeyDown={(e) => e.key === 'Enter' && aplicarFiltros()}
+              placeholder="Digite nome, fantasia, CPF ou CNPJ..."
+              onInputChange={(termo) => setFiltros({
+                ...filtros,
+                fornecedor_busca: termo,
+                fornecedor_id: null,
+              })}
+              onSelect={(fornecedor) => setFiltros({
+                ...filtros,
+                fornecedor_id: fornecedor?.id || null,
+                fornecedor_busca: getFornecedorNome(fornecedor),
+              })}
+              onClear={() => setFiltros({
+                ...filtros,
+                fornecedor_id: null,
+                fornecedor_busca: '',
+              })}
+              onFornecedorCriado={(fornecedor) => setFiltros({
+                ...filtros,
+                fornecedor_id: fornecedor?.id || null,
+                fornecedor_busca: getFornecedorNome(fornecedor),
+              })}
             />
           </div>
 
@@ -927,12 +963,18 @@ const ContasPagar = () => {
                       ? `${contaSelecionada.numero_parcela}/${contaSelecionada.total_parcelas}`
                       : contaSelecionada.documento || 'Única'}
                   </p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Fornecedor</label>
+                    <p className="mt-1 text-lg">
+                      <CopyableValue
+                        value={contaSelecionada.fornecedor_nome}
+                        title="Copiar fornecedor"
+                        empty="N/A"
+                      />
+                    </p>
+                  </div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Fornecedor</label>
-                  <p className="mt-1 text-lg">{contaSelecionada.fornecedor_nome || 'N/A'}</p>
-                </div>
-              </div>
 
               <div className="grid grid-cols-2 gap-4">
                 <div>

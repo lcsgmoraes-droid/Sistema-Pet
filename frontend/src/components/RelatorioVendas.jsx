@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
 import { Calendar, DollarSign, TrendingUp, Package, Users, CreditCard, Filter } from 'lucide-react';
+import CopyableValue from './ui/CopyableValue';
 
 export default function RelatorioVendas() {
   const [loading, setLoading] = useState(true);
@@ -86,9 +87,6 @@ export default function RelatorioVendas() {
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
-      <div style={{backgroundColor: 'red', color: 'white', padding: '20px', fontSize: '24px', fontWeight: 'bold'}}>
-        🔴 TESTE: ARQUIVO ESTÁ SENDO CARREGADO CORRETAMENTE
-      </div>
       {/* Cabeçalho com Filtros */}
       <div className="mb-6 bg-white p-4 rounded-lg shadow">
         <div className="flex justify-between items-center mb-4">
@@ -419,7 +417,9 @@ export default function RelatorioVendas() {
                         {/* Produtos da Subcategoria */}
                         {subcategoria.produtos.map((produto, prodIdx) => (
                           <tr key={`prod-${catIdx}-${subIdx}-${prodIdx}`} className="border-b hover:bg-gray-50">
-                            <td className="px-4 py-2 pl-12 text-gray-700">{produto.produto}</td>
+                            <td className="px-4 py-2 pl-12 text-gray-700">
+                              <CopyableValue title="Copiar produto" value={produto.produto} />
+                            </td>
                             <td className="px-4 py-2 text-right text-gray-700">{produto.quantidade}</td>
                             <td className="px-4 py-2 text-right text-gray-700">{formatarMoeda(produto.valor_bruto)}</td>
                             <td className="px-4 py-2 text-right text-gray-700">{formatarMoeda(produto.desconto)}</td>
@@ -432,7 +432,9 @@ export default function RelatorioVendas() {
                     {/* Produtos diretos da Categoria (sem subcategoria) */}
                     {categoria.produtos && categoria.produtos.map((produto, prodIdx) => (
                       <tr key={`prod-${catIdx}-${prodIdx}`} className="border-b hover:bg-gray-50">
-                        <td className="px-4 py-2 pl-8 text-gray-700">{produto.produto}</td>
+                        <td className="px-4 py-2 pl-8 text-gray-700">
+                          <CopyableValue title="Copiar produto" value={produto.produto} />
+                        </td>
                         <td className="px-4 py-2 text-right text-gray-700">{produto.quantidade}</td>
                         <td className="px-4 py-2 text-right text-gray-700">{formatarMoeda(produto.valor_bruto)}</td>
                         <td className="px-4 py-2 text-right text-gray-700">{formatarMoeda(produto.desconto)}</td>
@@ -487,7 +489,9 @@ export default function RelatorioVendas() {
               <tbody>
                 {listaVendas.map((venda) => (
                   <tr key={venda.id} className="border-b hover:bg-gray-50">
-                    <td className="px-4 py-2">{venda.numero_venda || venda.id}</td>
+                    <td className="px-4 py-2">
+                      <CopyableValue title="Copiar venda" value={venda.numero_venda || venda.id} />
+                    </td>
                     <td className="px-4 py-2">{formatarData(venda.data_venda)}</td>
                     <td className="px-4 py-2">{venda.cliente_nome}</td>
                     <td className="px-4 py-2">{venda.pet_nome || '-'}</td>
