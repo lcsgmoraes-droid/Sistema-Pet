@@ -4,6 +4,7 @@ import {
   FileText, BarChart3, Settings, Download, RefreshCw, Eye, EyeOff
 } from 'lucide-react';
 import { api } from '../services/api';
+import FornecedorIdentity from '../components/ui/FornecedorIdentity';
 
 export default function ConciliacaoBancaria() {
   const [movimentacoes, setMovimentacoes] = useState([]);
@@ -516,7 +517,17 @@ export default function ConciliacaoBancaria() {
                         {getStatusBadge(mov.status_conciliacao, mov.confianca_sugestao)}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-600 max-w-xs truncate">
-                        {mov.fornecedor_nome || mov.tipo_vinculo || '-'}
+                        {mov.fornecedor_nome ? (
+                          <FornecedorIdentity
+                            fallback=""
+                            layout="inline"
+                            nameClassName="font-medium text-gray-700"
+                            record={mov}
+                            showDocument={false}
+                          />
+                        ) : (
+                          mov.tipo_vinculo || '-'
+                        )}
                       </td>
                       <td className="px-4 py-3 text-center">
                         {mov.status_conciliacao !== 'conciliado' && (
@@ -769,7 +780,14 @@ function ModalRegras({ regras, onClose, onAtualizar }) {
                       
                       {regra.fornecedor_nome && (
                         <p className="text-sm text-gray-600 mt-2">
-                          → {regra.fornecedor_nome}
+                          <span className="mr-1">→</span>
+                          <FornecedorIdentity
+                            fallback=""
+                            layout="inline"
+                            nameClassName="font-medium text-gray-700"
+                            record={regra}
+                            showDocument={false}
+                          />
                         </p>
                       )}
                     </div>

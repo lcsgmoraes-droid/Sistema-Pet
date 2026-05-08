@@ -8,6 +8,7 @@ import {
 import FornecedorSelector, {
   getFornecedorNome,
 } from "../components/fornecedores/FornecedorSelector";
+import FornecedorIdentity from "../components/ui/FornecedorIdentity";
 import useProdutosCatalogos from "../hooks/useProdutosCatalogos";
 
 const ITENS_POR_PAGINA_INICIAL = 50;
@@ -704,7 +705,12 @@ export default function ProdutosValorizacaoEstoque() {
                         )}
                       </td>
                       <td className="px-4 py-3 align-top text-sm text-gray-700">
-                        {item.fornecedor_nome || "-"}
+                        <FornecedorIdentity
+                          fallback=""
+                          nameClassName="font-medium text-gray-700"
+                          record={item}
+                          showDocument={false}
+                        />
                       </td>
                       <td className="px-4 py-3 align-top text-sm text-gray-700">
                         <div>{item.marca_nome || "Sem marca"}</div>

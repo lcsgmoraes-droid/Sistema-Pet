@@ -5,6 +5,7 @@ import api from "../api";
 import FornecedorSelector, { getFornecedorNome } from "./fornecedores/FornecedorSelector";
 import ActionButton from "./ui/ActionButton";
 import ExportActionButton from "./ui/ExportActionButton";
+import FornecedorIdentity from "./ui/FornecedorIdentity";
 
 const STATUS_META = {
   aberta: { label: "Aberta", cls: "bg-blue-50 text-blue-700 border-blue-200" },
@@ -321,8 +322,11 @@ export default function ComprasPendencias() {
                         <div className="mt-1 text-xs text-slate-400">Criada em {formatarData(item.created_at, true)}</div>
                       </td>
                       <td className="px-4 py-3">
-                        <div className="font-medium text-slate-900">{item.fornecedor_nome}</div>
-                        <div className="text-xs text-slate-500">{item.fornecedor_cnpj || "-"}</div>
+                        <FornecedorIdentity
+                          document={item.fornecedor_cnpj}
+                          nameClassName="font-medium text-slate-900"
+                          record={item}
+                        />
                       </td>
                       <td className="px-4 py-3">
                         <div>NF {item.numero_nota || "-"}</div>
@@ -373,7 +377,13 @@ export default function ComprasPendencias() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-blue-600">{detalhe.codigo}</p>
                 <h2 className="text-xl font-bold text-slate-900">{detalhe.titulo}</h2>
                 <p className="text-sm text-slate-600">
-                  NF {detalhe.numero_nota || "-"} | Pedido {detalhe.numero_pedido || "-"} | {detalhe.fornecedor_nome}
+                  NF {detalhe.numero_nota || "-"} | Pedido {detalhe.numero_pedido || "-"} |{" "}
+                  <FornecedorIdentity
+                    document={detalhe.fornecedor_cnpj}
+                    layout="inline"
+                    nameClassName="font-medium text-slate-700"
+                    record={detalhe}
+                  />
                 </p>
               </div>
               <button

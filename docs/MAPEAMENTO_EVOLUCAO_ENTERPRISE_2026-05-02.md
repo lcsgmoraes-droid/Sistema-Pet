@@ -27,7 +27,7 @@ Componentes globais criados ou consolidados:
 - `MetricCard` e `MetricGrid` para padronizar dashboards e cards de indicadores.
 - `MoneyCell`, `ChannelBadges` e `SafeMarkdown`, ja iniciados na fatia de produtos.
 - `CopyableValue` para valores copiaveis padronizados, como numero de venda, nome de produto, SKU e codigos operacionais.
-- `CustomerIdentity`, `PetIdentity`, `ProductIdentity` e `SaleReference` para cliente/codigo, pet/codigo, produto/SKU e venda sempre copiaveis.
+- `CustomerIdentity`, `PetIdentity`, `FornecedorIdentity`, `ProductIdentity` e `SaleReference` para cliente/codigo, pet/codigo, fornecedor/documento, produto/SKU e venda sempre copiaveis.
 - `FornecedorSelector` para busca de fornecedor com autocomplete e cadastro rapido, evitando selects locais e campos livres inconsistentes.
 - `FormField`, `TextField` e `SelectField` para campos de formulario com tons visuais reaproveitaveis sem quebrar telas existentes.
 - `PaginationControls` para paginacao, seletor de quantidade por pagina e navegacao com tamanho/cor padrao.
@@ -275,6 +275,7 @@ Padrao desejado:
 | `PetSelector` | Selecionar pet quando tutor ja esta definido | PDV item pet, campanhas pet, app/vet |
 | `ProdutoSelector` | Buscar produto/servico/SKU/codigo de barras | PDV, compras, NF, estoque, kits, campanhas |
 | `FornecedorSelector` | Buscar fornecedor | Produtos, compras, NF entrada |
+| `FornecedorIdentity` | Exibir fornecedor com nome/documento/codigo copiaveis | Produtos, compras, contas a pagar, conciliacao, NF entrada |
 | `FuncionarioSelector` | Buscar funcionario/vendedor/entregador/veterinario | PDV, comissoes, entregas, RH, veterinario |
 | `ContaBancariaSelector` | Selecionar conta | Financeiro, caixa, conciliacao |
 | `FormaPagamentoSelector` | Selecionar forma de pagamento | PDV, financeiro, contas, configuracoes |
@@ -849,6 +850,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-08: criado `CustomerIdentity` para nome/codigo de cliente copiaveis e aplicado em devolucao PDV, vendas recentes, financeiro, contas a receber, relatorio de produto, NF, entregas e comissoes.
 - 2026-05-08: `CustomerIdentity` passou a reconhecer campos de tutor/pessoa e foi expandido para Banho & Tosa, Pets, campanhas, creditos, Pedido Bling e cards veterinarios.
 - 2026-05-08: criado `PetIdentity` para nome/codigo de pet copiaveis e aplicado em Banho & Tosa, veterinario, lembretes, relatorio de vendas, widget de cliente e alertas inteligentes do PDV.
+- 2026-05-08: criado `FornecedorIdentity` para nome/documento/codigo de fornecedor copiaveis e aplicado em compras, contas a pagar, conciliacao e relatorios de produtos/validade.
 
 ### Nao fazer nesta onda
 

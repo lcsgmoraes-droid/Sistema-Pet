@@ -13,7 +13,7 @@ import MoneyCell, { formatMoneyCellValue } from './ui/MoneyCell';
 import PageHeader from './ui/PageHeader';
 import StatusBadge from './ui/StatusBadge';
 import FornecedorSelector from './fornecedores/FornecedorSelector';
-import CopyableValue from './ui/CopyableValue';
+import FornecedorIdentity from './ui/FornecedorIdentity';
 
 const ContasPagar = () => {
   const navigate = useNavigate();
@@ -425,11 +425,11 @@ const ContasPagar = () => {
       header: 'Fornecedor',
       className: 'min-w-[150px]',
       render: (conta) => (
-        <CopyableValue
-          value={conta.fornecedor_nome}
-          title="Copiar fornecedor"
-          empty={<span className="text-gray-400">-</span>}
-          valueClassName="text-slate-700"
+        <FornecedorIdentity
+          fallback=""
+          nameClassName="font-medium text-slate-700"
+          record={conta}
+          showDocument={false}
         />
       ),
     },
@@ -966,13 +966,14 @@ const ContasPagar = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Fornecedor</label>
-                    <p className="mt-1 text-lg">
-                      <CopyableValue
-                        value={contaSelecionada.fornecedor_nome}
-                        title="Copiar fornecedor"
-                        empty="N/A"
+                    <div className="mt-1 text-lg">
+                      <FornecedorIdentity
+                        fallback=""
+                        nameClassName="font-medium text-slate-900"
+                        record={contaSelecionada}
+                        showDocument={false}
                       />
-                    </p>
+                    </div>
                   </div>
                 </div>
 

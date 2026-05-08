@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../../api';
 import { toast } from 'react-hot-toast';
 import ExportActionButton from '../ui/ExportActionButton';
+import FornecedorIdentity from '../ui/FornecedorIdentity';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Helpers
@@ -240,7 +241,14 @@ const ModalConfronto = ({ pedido, onClose, onPedidoComplementarCriado }) => {
                       <span className="font-bold text-green-700">{fmtMoeda(nota.valor_total)}</span>
                     </div>
                     <div className="text-xs text-gray-500 mt-1">
-                      {nota.fornecedor_nome} · {nota.data_emissao ? new Date(nota.data_emissao).toLocaleDateString('pt-BR') : ''}
+                      <FornecedorIdentity
+                        copyable={false}
+                        fallback=""
+                        layout="inline"
+                        nameClassName="font-medium text-gray-600"
+                        record={nota}
+                        showDocument={false}
+                      /> · {nota.data_emissao ? new Date(nota.data_emissao).toLocaleDateString('pt-BR') : ''}
                     </div>
                   </button>
                 ))}

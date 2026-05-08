@@ -13,6 +13,7 @@ import {
 import FornecedorSelector, {
   getFornecedorNome,
 } from "../components/fornecedores/FornecedorSelector";
+import FornecedorIdentity from "../components/ui/FornecedorIdentity";
 import useProdutosCatalogos from "../hooks/useProdutosCatalogos";
 
 const ITENS_POR_PAGINA_INICIAL = 20;
@@ -948,9 +949,16 @@ export default function ProdutosValidadeProxima({
                       )}
                     </div>
                     {item.fornecedor_nome && (
-                      <p className="mt-2 text-xs text-gray-500">
-                        Fornecedor: {item.fornecedor_nome}
-                      </p>
+                      <div className="mt-2 text-xs text-gray-500">
+                        <FornecedorIdentity
+                          fallback=""
+                          layout="inline"
+                          nameClassName="font-medium text-gray-600"
+                          record={item}
+                          showDocument={false}
+                          showLabel
+                        />
+                      </div>
                     )}
                   </div>
 
@@ -1048,7 +1056,14 @@ export default function ProdutosValidadeProxima({
                         </div>
                         {item.fornecedor_nome && (
                           <div className="text-xs text-gray-500">
-                            Fornecedor: {item.fornecedor_nome}
+                            <FornecedorIdentity
+                              fallback=""
+                              layout="inline"
+                              nameClassName="font-medium text-gray-600"
+                              record={item}
+                              showDocument={false}
+                              showLabel
+                            />
                           </div>
                         )}
                       </div>

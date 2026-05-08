@@ -27,6 +27,7 @@ import {
 import api from '../api';
 import ResponsiveTabs, { TabContent } from '../components/ResponsiveTabs';
 import FornecedorSelector from '../components/fornecedores/FornecedorSelector';
+import FornecedorIdentity from '../components/ui/FornecedorIdentity';
 import { resolveMediaUrl } from '../utils/mediaUrl';
 
 const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
@@ -1133,10 +1134,11 @@ export default function ProdutosForm() {
                   {fornecedores.map(forn => (
                     <tr key={forn.id} className={!forn.ativo ? 'opacity-50' : ''}>
                       <td className="px-4 py-3">
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{forn.fornecedor_nome}</p>
-                          <p className="text-xs text-gray-500">{forn.fornecedor_cpf_cnpj}</p>
-                        </div>
+                        <FornecedorIdentity
+                          document={forn.fornecedor_cpf_cnpj}
+                          nameClassName="font-medium text-gray-900"
+                          record={forn}
+                        />
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900">{forn.codigo_fornecedor || '-'}</td>
                       <td className="px-4 py-3 text-sm text-gray-900 text-right">

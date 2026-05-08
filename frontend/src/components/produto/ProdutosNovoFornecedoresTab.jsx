@@ -1,3 +1,5 @@
+import FornecedorIdentity from "../ui/FornecedorIdentity";
+
 export default function ProdutosNovoFornecedoresTab({
   fornecedores,
   formatarMoeda,
@@ -51,10 +53,11 @@ export default function ProdutosNovoFornecedoresTab({
               {fornecedores.map((forn) => (
                 <tr key={forn.id} className={!forn.ativo ? 'opacity-50' : ''}>
                   <td className="px-4 py-3">
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{forn.fornecedor_nome}</p>
-                      <p className="text-xs text-gray-500">{forn.fornecedor_cpf_cnpj}</p>
-                    </div>
+                    <FornecedorIdentity
+                      document={forn.fornecedor_cpf_cnpj}
+                      nameClassName="font-medium text-gray-900"
+                      record={forn}
+                    />
                   </td>
                   <td className="px-4 py-3 text-sm text-gray-900">{forn.codigo_fornecedor || '-'}</td>
                   <td className="px-4 py-3 text-sm text-gray-900 text-right">

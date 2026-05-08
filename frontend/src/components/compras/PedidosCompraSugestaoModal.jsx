@@ -1,4 +1,5 @@
 import React from 'react';
+import FornecedorIdentity from '../ui/FornecedorIdentity';
 
 export default function PedidosCompraSugestaoModal({
   mostrarSugestao,
@@ -503,7 +504,15 @@ export default function PedidosCompraSugestaoModal({
                                 </div>
                                 {sugestao.fornecedor_nome && incluirGrupoFornecedor && (
                                   <div className="mt-1 inline-flex rounded-full bg-emerald-50 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                                    Origem: {sugestao.fornecedor_nome}
+                                    <FornecedorIdentity
+                                      fallback=""
+                                      label="Origem"
+                                      layout="inline"
+                                      nameClassName="font-semibold text-emerald-700"
+                                      record={sugestao}
+                                      showDocument={false}
+                                      showLabel
+                                    />
                                   </div>
                                 )}
                                 {sugestao.observacao && (
