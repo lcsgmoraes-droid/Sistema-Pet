@@ -1,5 +1,5 @@
 import { AlertCircle } from "lucide-react";
-import CopyableValue from "../ui/CopyableValue";
+import SaleReference from "../ui/SaleReference";
 
 function formatarDataVenda(dataVenda) {
   if (!dataVenda) {
@@ -42,14 +42,12 @@ export default function PDVInfoBanners({
             <div className="flex flex-wrap items-center gap-2">
               <span className="text-xs font-medium text-blue-800">Venda:</span>
               <div className="flex items-center gap-1.5 rounded border border-blue-300 bg-white px-2 py-0.5">
-                <CopyableValue
-                  title="Copiar numero da venda"
-                  value={vendaAtual.numero_venda}
-                  valueClassName="text-sm font-bold text-blue-700"
+                <SaleReference
                   buttonClassName="text-blue-600 hover:text-blue-800"
-                >
-                  #{vendaAtual.numero_venda}
-                </CopyableValue>
+                  sale={vendaAtual}
+                  showPrefix={false}
+                  valueClassName="text-sm font-bold text-blue-700"
+                />
               </div>
             </div>
             {vendaAtual.data_venda && (

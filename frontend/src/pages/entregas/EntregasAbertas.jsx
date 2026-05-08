@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState } from "react";
 import { api } from "../../services/api";
+import SaleReference from "../../components/ui/SaleReference";
 import "./Entregas.css";
 
 export default function EntregasAbertas() {
@@ -253,7 +254,9 @@ export default function EntregasAbertas() {
                       {venda.ordem_otimizada && " 🗺️"}
                     </strong>
                   </td>
-                  <td>{venda.numero_venda}</td>
+                  <td>
+                    <SaleReference sale={venda} showPrefix={false} />
+                  </td>
                   <td style={{ fontSize: "0.9em" }}>
                     {venda.data_venda ? new Date(venda.data_venda).toLocaleDateString('pt-BR') : 'N/A'}
                   </td>

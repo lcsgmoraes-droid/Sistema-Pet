@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { api } from "../../services/api";
+import SaleReference from "../../components/ui/SaleReference";
 import { DndContext, closestCenter, KeyboardSensor, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { arrayMove, SortableContext, sortableKeyboardCoordinates, verticalListSortingStrategy, useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
@@ -99,7 +100,9 @@ function ParadaItem({ parada, index, onMarcarEntregue, onMarcarTentativa, rotaEm
       
       <div className="parada-info">
         <div className="parada-header">
-          <strong>Venda #{parada.venda_id}</strong>
+          <strong>
+            <SaleReference value={parada.venda_id} />
+          </strong>
           {getStatusBadge(parada.status)}
         </div>
         

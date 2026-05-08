@@ -831,6 +831,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-07: `Compras/Pedidos` trocou o autocomplete proprio do formulario pelo `FornecedorSelector` compartilhado e os itens do pedido passaram a exibir produto/SKU com componentes copiaveis.
 - 2026-05-07: historicos financeiros de cliente e produtos promocionais passaram a usar `CopyableValue`/`CopyableCode` para numero de venda, produto e SKU, reforcando o padrao de consulta operacional.
 - 2026-05-07: criado `ProductIdentity` como padrao reutilizavel para nome de produto + SKU/codigo copiavel, aplicado em vendas financeiras, devolucao, compras, widget de cliente, campanhas e rotas de entrega.
+- 2026-05-07: criado `SaleReference` para padronizar referencias copiaveis de venda em PDV, devolucao, financeiro, campanhas, caixa e entregas.
 
 ### Nao fazer nesta onda
 

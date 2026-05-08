@@ -6,8 +6,8 @@ import {
   FiChevronLeft, FiChevronRight, FiUser, FiAlertCircle, FiChevronDown,
   FiChevronUp, FiShoppingCart, FiPackage, FiTrendingUp, FiPercent
 } from 'react-icons/fi';
-import CopyableValue from '../components/ui/CopyableValue';
 import ProductIdentity from '../components/ui/ProductIdentity';
+import SaleReference from '../components/ui/SaleReference';
 
 const ClienteFinanceiro = () => {
   const { clienteId } = useParams();
@@ -441,13 +441,10 @@ const ClienteFinanceiro = () => {
                               <div className="truncate">{transacao.descricao}</div>
                               {transacao.detalhes?.numero_venda && (
                                 <div className="text-xs text-blue-600 mt-1">
-                                  <CopyableValue
-                                    title="Copiar venda"
+                                  <SaleReference
+                                    showPrefix={false}
                                     value={transacao.detalhes.numero_venda}
-                                    valueClassName="font-medium"
-                                  >
-                                    #{transacao.detalhes.numero_venda}
-                                  </CopyableValue>
+                                  />
                                 </div>
                               )}
                             </td>
@@ -502,13 +499,11 @@ const ClienteFinanceiro = () => {
                                         <h4 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
                                           <FiShoppingCart className="text-blue-600" />
                                           Detalhes da Venda
-                                          <CopyableValue
-                                            title="Copiar venda"
+                                          <SaleReference
+                                            showPrefix={false}
                                             value={detalhes.numero_venda}
                                             valueClassName="font-semibold"
-                                          >
-                                            #{detalhes.numero_venda}
-                                          </CopyableValue>
+                                          />
                                         </h4>
                                         <div className="text-sm text-gray-600">
                                           {new Date(detalhes.data_venda).toLocaleString('pt-BR')}

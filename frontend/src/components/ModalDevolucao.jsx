@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { X, Search, RotateCcw, AlertCircle, Check, Filter, Package, Layers } from 'lucide-react';
 import api from '../api';
 import ProductIdentity from './ui/ProductIdentity';
+import SaleReference from './ui/SaleReference';
 
 export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, onSucesso }) {
   const [passo, setPasso] = useState(1); // 1: listar vendas, 2: selecionar itens
@@ -495,14 +496,12 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
               {/* Informações da Venda */}
               <div className="bg-gray-50 rounded-lg p-4">
                 <h3 className="mb-2 flex items-center gap-2 font-semibold text-gray-900">
-                  <CopyableValue
+                  <SaleReference
                     label="Venda"
-                    title="Copiar numero da venda"
-                    value={vendaSelecionada.numero_venda || vendaSelecionada.id}
+                    sale={vendaSelecionada}
+                    showPrefix={false}
                     valueClassName="font-semibold text-gray-900"
-                  >
-                    #{vendaSelecionada.numero_venda || vendaSelecionada.id}
-                  </CopyableValue>
+                  />
                 </h3>
                 <div className="grid grid-cols-3 gap-4 text-sm">
                   <div>

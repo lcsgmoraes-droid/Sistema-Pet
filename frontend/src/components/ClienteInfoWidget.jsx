@@ -6,8 +6,8 @@ import {
   FiSend, FiBarChart2, FiLink, FiCopy, FiCheck
 } from 'react-icons/fi';
 import api from '../api';
-import CopyableValue from './ui/CopyableValue';
 import ProductIdentity from './ui/ProductIdentity';
+import SaleReference from './ui/SaleReference';
 
 /**
  * Widget de informações do cliente para PDV
@@ -427,9 +427,7 @@ export default function ClienteInfoWidget({ clienteId }) {
                   <div>
                     <p className="text-xs text-gray-500">
                       {compra.data} •{" "}
-                      <CopyableValue title="Copiar venda" value={compra.numero_venda}>
-                        Venda #{compra.numero_venda}
-                      </CopyableValue>
+                      <SaleReference value={compra.numero_venda} />
                     </p>
                     <p className="font-bold text-indigo-600">
                       R$ {compra.valor_total.toFixed(2)}

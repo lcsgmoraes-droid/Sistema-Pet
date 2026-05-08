@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, RefreshCw, TrendingUp, TrendingDown } from 'lucide-react';
 import api from '../api';
 import toast from 'react-hot-toast';
+import SaleReference from './ui/SaleReference';
 
 export default function ModalMovimentacoesCaixa({ caixaId, onClose }) {
   const [movimentacoes, setMovimentacoes] = useState([]);
@@ -128,7 +129,13 @@ export default function ModalMovimentacoesCaixa({ caixaId, onClose }) {
                           <span>🕐 {formatarData(mov.data_movimento)}</span>
                           <span>👤 {mov.usuario_nome}</span>
                           {mov.venda_id && (
-                            <span>🧾 Venda #{mov.venda_numero || mov.venda_id}</span>
+                            <span>
+                              🧾{" "}
+                              <SaleReference
+                                sale={mov}
+                                value={mov.venda_numero || mov.venda_id}
+                              />
+                            </span>
                           )}
                           {mov.documento && (
                             <span>📄 {mov.documento}</span>

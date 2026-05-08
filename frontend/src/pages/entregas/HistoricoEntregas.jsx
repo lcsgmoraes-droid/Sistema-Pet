@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../../api";
+import SaleReference from "../../components/ui/SaleReference";
 
 export default function HistoricoEntregas() {
   const [rotas, setRotas] = useState([]);
@@ -226,7 +227,7 @@ export default function HistoricoEntregas() {
                               {parada.ordem}º
                             </span>
                             <span style={{ color: "#666", fontSize: 14 }}>
-                              Venda #{parada.venda_id}
+                              <SaleReference value={parada.venda_id} />
                             </span>
                             <span style={{
                               marginLeft: 10,

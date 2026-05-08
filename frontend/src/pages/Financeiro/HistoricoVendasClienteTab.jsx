@@ -7,8 +7,8 @@ import {
   FiChevronLeft, FiChevronRight, FiChevronDown, FiChevronUp,
   FiShoppingCart, FiPackage, FiAlertCircle
 } from 'react-icons/fi';
-import CopyableValue from '../../components/ui/CopyableValue';
 import ProductIdentity from '../../components/ui/ProductIdentity';
+import SaleReference from '../../components/ui/SaleReference';
 
 /* -----------------------------------------------------------------------
    Componente interno: histórico do cliente selecionado (sem wrapper de página)
@@ -252,13 +252,10 @@ const HistoricoInline = ({ clienteId, clienteInfo }) => {
                             <div className="truncate">{transacao.descricao}</div>
                             {transacao.detalhes?.numero_venda && (
                               <div className="mt-0.5 text-xs text-blue-600">
-                                <CopyableValue
-                                  title="Copiar venda"
+                                <SaleReference
+                                  showPrefix={false}
                                   value={transacao.detalhes.numero_venda}
-                                  valueClassName="font-medium"
-                                >
-                                  #{transacao.detalhes.numero_venda}
-                                </CopyableValue>
+                                />
                               </div>
                             )}
                           </td>

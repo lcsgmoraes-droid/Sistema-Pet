@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, DollarSign, TrendingUp, TrendingDown, Receipt, Calculator, AlertCircle, CheckCircle, AlertTriangle } from 'lucide-react';
 import { fecharCaixa, obterResumoCaixa, obterVendasCaixa, validarCaixaAtual } from '../api/caixa';
 import CurrencyInput from './CurrencyInput';
+import SaleReference from './ui/SaleReference';
 
 export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
   const [resumo, setResumo] = useState(null);
@@ -662,7 +663,11 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
                         (vendasDetalhe[formaExpandida] || []).map(v => (
                           <div key={v.id} className="flex justify-between items-center text-xs py-1.5 px-2 rounded bg-white border border-gray-100">
                             <div>
-                              <span className="font-semibold text-gray-700">{v.numero_venda}</span>
+                              <SaleReference
+                                sale={v}
+                                showPrefix={false}
+                                valueClassName="font-semibold text-gray-700"
+                              />
                               <span className="text-gray-500 ml-1.5">{v.cliente_nome || 'Consumidor'}</span>
                             </div>
                             <div className="text-right">
