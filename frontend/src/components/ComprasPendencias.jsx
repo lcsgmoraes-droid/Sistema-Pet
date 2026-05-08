@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
-import { CheckCircle2, Clock, Mail, RefreshCw, Search, Send, X } from "lucide-react";
+import { CheckCircle2, Clock, Mail, RefreshCw, Send, X } from "lucide-react";
 import { toast } from "react-hot-toast";
 import api from "../api";
+import FornecedorSelector, { getFornecedorNome } from "./fornecedores/FornecedorSelector";
 import ActionButton from "./ui/ActionButton";
 import ExportActionButton from "./ui/ExportActionButton";
 
@@ -275,18 +276,20 @@ export default function ComprasPendencias() {
               ))}
             </div>
             <div className="ml-auto flex min-w-[280px] flex-1 items-center gap-2 lg:max-w-md">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-                <input
-                  value={fornecedorFiltro}
-                  onChange={(event) => setFornecedorFiltro(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") carregarPendencias();
-                  }}
-                  className="w-full rounded-md border border-slate-300 py-2 pl-9 pr-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-                  placeholder="Buscar fornecedor..."
-                />
-              </div>
+              <FornecedorSelector
+                value={fornecedorFiltro}
+                showLabel={false}
+                placeholder="Buscar fornecedor..."
+                className="flex-1"
+                inputClassName="rounded-md border-slate-300"
+                onInputChange={setFornecedorFiltro}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") carregarPendencias();
+                }}
+                onSelect={(fornecedor) => setFornecedorFiltro(getFornecedorNome(fornecedor))}
+                onClear={() => setFornecedorFiltro("")}
+                onFornecedorCriado={(fornecedor) => setFornecedorFiltro(getFornecedorNome(fornecedor))}
+              />
               <ActionButton intent="edit" tone="soft" onClick={carregarPendencias}>
                 Filtrar
               </ActionButton>

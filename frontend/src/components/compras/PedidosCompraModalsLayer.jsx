@@ -50,6 +50,7 @@ export default function PedidosCompraModalsLayer({
   iniciarNovoGrupoFornecedor,
   editarGrupoFornecedor,
   excluirGrupoFornecedor,
+  registrarFornecedorCriado,
   alternarFornecedorNoGrupoForm,
   mostrarSugestao,
   fecharModalSugestao,
@@ -179,6 +180,7 @@ export default function PedidosCompraModalsLayer({
           onNovo={iniciarNovoGrupoFornecedor}
           onEditar={editarGrupoFornecedor}
           onExcluir={excluirGrupoFornecedor}
+          onFornecedorCriado={registrarFornecedorCriado}
           onToggleFornecedor={alternarFornecedorNoGrupoForm}
         />
       )}

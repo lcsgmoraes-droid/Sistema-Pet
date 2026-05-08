@@ -837,6 +837,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-07: filtros de fornecedor em Valorizacao de Estoque e Validade Proxima passaram a usar `FornecedorSelector`, mantendo autocomplete, limpar e cadastro rapido no mesmo padrao dos demais fluxos.
 - 2026-05-07: filtros de fornecedor em Balanco de Estoque e na listagem de Pedidos de Compra tambem passaram a usar `FornecedorSelector`, removendo selects duplicados.
 - 2026-05-07: filtro principal de fornecedor em Produtos e a modal de Nova Conta a Pagar passaram a usar `FornecedorSelector`, reforcando autocomplete/cadastro rapido no cadastro operacional.
+- 2026-05-07: Pendencias de fornecedor, Entrada de Estoque, modal legado de fornecedor do produto e Grupos de Fornecedores passaram a usar `FornecedorSelector`, incluindo cadastro rapido e selecao padronizada.
 
 ### Nao fazer nesta onda
 

@@ -210,9 +210,11 @@ export default function FornecedorSelector({
   onClear,
   onFornecedorCriado,
   onInputChange,
+  onKeyDown,
   onSelect,
   placeholder = "Digite o nome, CNPJ ou telefone...",
   required = false,
+  searchRemote = true,
   showLabel = true,
   value,
 }) {
@@ -255,7 +257,7 @@ export default function FornecedorSelector({
 
   useEffect(() => {
     const consulta = termo.trim();
-    if (disabled || consulta.length < minChars) {
+    if (disabled || !searchRemote || consulta.length < minChars) {
       setSugestoesRemotas([]);
       setBuscando(false);
       return undefined;
@@ -289,7 +291,7 @@ export default function FornecedorSelector({
       cancelado = true;
       clearTimeout(timer);
     };
-  }, [disabled, minChars, termo]);
+  }, [disabled, minChars, searchRemote, termo]);
 
   const sugestoesLocais = useMemo(() => {
     const consulta = termo.trim().toLocaleLowerCase("pt-BR");
@@ -371,6 +373,7 @@ export default function FornecedorSelector({
           value={termo}
           onChange={(event) => handleChange(event.target.value)}
           onFocus={() => setAberto(true)}
+          onKeyDown={onKeyDown}
           placeholder={placeholder}
           disabled={disabled}
           required={required}

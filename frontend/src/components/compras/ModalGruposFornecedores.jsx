@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import FornecedorSelector, { getFornecedorNome } from '../fornecedores/FornecedorSelector';
 
 const ModalGruposFornecedores = ({
   grupos,
@@ -11,9 +12,11 @@ const ModalGruposFornecedores = ({
   onNovo,
   onEditar,
   onExcluir,
+  onFornecedorCriado,
   onToggleFornecedor,
 }) => {
   const [buscaFornecedor, setBuscaFornecedor] = useState('');
+  const [fornecedorBuscaRapida, setFornecedorBuscaRapida] = useState('');
   const fornecedoresSelecionadosSet = useMemo(
     () => new Set((form.fornecedor_ids || []).map((id) => Number(id))),
     [form.fornecedor_ids],
@@ -22,6 +25,18 @@ const ModalGruposFornecedores = ({
     () => fornecedores.filter((fornecedor) => fornecedoresSelecionadosSet.has(Number(fornecedor.id))),
     [fornecedores, fornecedoresSelecionadosSet],
   );
+  const fornecedorPrincipalSelecionado = fornecedoresSelecionados.find(
+    (fornecedor) => Number(fornecedor.id) === Number(form.fornecedor_principal_id),
+  );
+  const adicionarFornecedorAoGrupo = (fornecedor) => {
+    if (!fornecedor?.id) return;
+
+    if (!fornecedoresSelecionadosSet.has(Number(fornecedor.id))) {
+      onToggleFornecedor(fornecedor.id);
+    }
+
+    setFornecedorBuscaRapida('');
+  };
   const normalizar = (texto = '') => texto
     .toLowerCase()
     .normalize('NFD')
@@ -32,7 +47,7 @@ const ModalGruposFornecedores = ({
       .filter((fornecedor) => {
         if (!termo) return true;
         return normalizar([
-          fornecedor.nome,
+          getFornecedorNome(fornecedor),
           fornecedor.cnpj,
           fornecedor.cpf,
           fornecedor.razao_social,
@@ -149,18 +164,25 @@ const ModalGruposFornecedores = ({
               </div>
               <div>
                 <label className="mb-1 block text-sm font-semibold text-slate-700">Fornecedor principal</label>
-                <select
-                  value={form.fornecedor_principal_id}
-                  onChange={(event) => setForm((prev) => ({ ...prev, fornecedor_principal_id: event.target.value }))}
-                  className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:ring-2 focus:ring-blue-400"
-                >
-                  <option value="">Selecione</option>
-                  {fornecedoresSelecionados.map((fornecedor) => (
-                    <option key={fornecedor.id} value={fornecedor.id}>
-                      {fornecedor.nome}
-                    </option>
-                  ))}
-                </select>
+                <FornecedorSelector
+                  fornecedores={fornecedoresSelecionados}
+                  fornecedorId={form.fornecedor_principal_id}
+                  fornecedorSelecionado={fornecedorPrincipalSelecionado}
+                  allowCreate={false}
+                  disabled={fornecedoresSelecionados.length === 0}
+                  searchRemote={false}
+                  showLabel={false}
+                  placeholder={
+                    fornecedoresSelecionados.length === 0
+                      ? 'Adicione fornecedores ao grupo'
+                      : 'Digite o fornecedor principal'
+                  }
+                  inputClassName="border-slate-300"
+                  onSelect={(fornecedor) =>
+                    setForm((prev) => ({ ...prev, fornecedor_principal_id: String(fornecedor.id) }))
+                  }
+                  onClear={() => setForm((prev) => ({ ...prev, fornecedor_principal_id: '' }))}
+                />
               </div>
             </div>
 
@@ -183,12 +205,27 @@ const ModalGruposFornecedores = ({
                       {fornecedoresSelecionados.length} fornecedor(es) selecionado(s)
                     </div>
                   </div>
-                  <input
-                    value={buscaFornecedor}
-                    onChange={(event) => setBuscaFornecedor(event.target.value)}
-                    placeholder="Buscar fornecedor, CNPJ ou razao social"
-                    className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm md:w-80"
-                  />
+                  <div className="grid w-full gap-2 md:w-[34rem] md:grid-cols-[1fr_13rem]">
+                    <FornecedorSelector
+                      value={fornecedorBuscaRapida}
+                      fornecedores={fornecedores}
+                      showLabel={false}
+                      placeholder="Adicionar fornecedor..."
+                      inputClassName="border-slate-300"
+                      onInputChange={setFornecedorBuscaRapida}
+                      onSelect={adicionarFornecedorAoGrupo}
+                      onClear={() => setFornecedorBuscaRapida('')}
+                      onFornecedorCriado={(fornecedor) => {
+                        onFornecedorCriado?.(fornecedor);
+                      }}
+                    />
+                    <input
+                      value={buscaFornecedor}
+                      onChange={(event) => setBuscaFornecedor(event.target.value)}
+                      placeholder="Filtrar lista"
+                      className="w-full rounded-lg border border-slate-300 px-4 py-2 text-sm"
+                    />
+                  </div>
                 </div>
               </div>
 
@@ -209,7 +246,7 @@ const ModalGruposFornecedores = ({
                         className="mt-1 h-4 w-4 rounded"
                       />
                       <span className="min-w-0 flex-1">
-                        <span className="block font-semibold text-slate-900">{fornecedor.nome}</span>
+                        <span className="block font-semibold text-slate-900">{getFornecedorNome(fornecedor)}</span>
                         <span className="block text-xs text-slate-500">
                           {fornecedor.cnpj || fornecedor.cpf || 'Sem CNPJ/CPF informado'}
                           {fornecedor.razao_social ? ` | ${fornecedor.razao_social}` : ''}

@@ -26,6 +26,7 @@ import {
 } from '../api/produtos';
 import api from '../api';
 import ResponsiveTabs, { TabContent } from '../components/ResponsiveTabs';
+import FornecedorSelector from '../components/fornecedores/FornecedorSelector';
 import { resolveMediaUrl } from '../utils/mediaUrl';
 
 const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
@@ -1397,6 +1398,9 @@ function ModalFornecedor({ fornecedor, clientes, onSave, onClose }) {
     estoque_fornecedor: fornecedor?.estoque_fornecedor || '',
     e_principal: fornecedor?.e_principal || false,
   });
+  const fornecedorSelecionado = clientes.find(
+    (cliente) => String(cliente.id) === String(dados.fornecedor_id),
+  );
   
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -1423,18 +1427,28 @@ function ModalFornecedor({ fornecedor, clientes, onSave, onClose }) {
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Fornecedor *
             </label>
-            <select
-              value={dados.fornecedor_id}
-              onChange={(e) => setDados({ ...dados, fornecedor_id: e.target.value })}
+            <FornecedorSelector
+              fornecedores={clientes}
+              fornecedorId={dados.fornecedor_id}
+              fornecedorSelecionado={fornecedorSelecionado}
+              showLabel={false}
               required
               disabled={Boolean(fornecedor)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-            >
-              <option value="">Selecione...</option>
-              {clientes.map(cli => (
-                <option key={cli.id} value={cli.id}>{cli.nome}</option>
-              ))}
-            </select>
+              placeholder="Digite o fornecedor..."
+              inputClassName="rounded-lg border-gray-300"
+              onInputChange={(termo) => {
+                if (!termo || dados.fornecedor_id) {
+                  setDados({ ...dados, fornecedor_id: '' });
+                }
+              }}
+              onSelect={(fornecedorSelecionado) =>
+                setDados({ ...dados, fornecedor_id: String(fornecedorSelecionado.id) })
+              }
+              onClear={() => setDados({ ...dados, fornecedor_id: '' })}
+              onFornecedorCriado={(fornecedorSelecionado) =>
+                setDados({ ...dados, fornecedor_id: String(fornecedorSelecionado.id) })
+              }
+            />
           </div>
           
           <div>

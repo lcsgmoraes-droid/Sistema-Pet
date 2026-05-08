@@ -106,6 +106,21 @@ const PedidosCompra = () => {
     [fornecedores],
   );
 
+  const registrarFornecedorCriado = (fornecedor) => {
+    if (!fornecedor?.id) return;
+
+    setFornecedores((prev) => {
+      const existe = prev.some((item) => Number(item.id) === Number(fornecedor.id));
+      const proximaLista = existe
+        ? prev.map((item) => (Number(item.id) === Number(fornecedor.id) ? fornecedor : item))
+        : [...prev, fornecedor];
+
+      return proximaLista.sort((a, b) =>
+        String(a.nome || '').localeCompare(String(b.nome || ''), 'pt-BR'),
+      );
+    });
+  };
+
   const filtrosPedidosAtivos = useMemo(
     () => Object.values(filtrosPedidos).filter((valor) => String(valor || '').trim()).length,
     [filtrosPedidos],
@@ -1287,6 +1302,7 @@ const PedidosCompra = () => {
         iniciarNovoGrupoFornecedor={iniciarNovoGrupoFornecedor}
         editarGrupoFornecedor={editarGrupoFornecedor}
         excluirGrupoFornecedor={excluirGrupoFornecedor}
+        registrarFornecedorCriado={registrarFornecedorCriado}
         alternarFornecedorNoGrupoForm={alternarFornecedorNoGrupoForm}
         mostrarSugestao={mostrarSugestao}
         fecharModalSugestao={fecharModalSugestao}
