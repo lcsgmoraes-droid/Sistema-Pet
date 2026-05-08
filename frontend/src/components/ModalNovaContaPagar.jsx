@@ -3,6 +3,7 @@ import api from '../api';
 import { toast } from 'react-hot-toast';
 import { X, Calendar, DollarSign, FileText, User, Tag, Repeat, Plus } from 'lucide-react';
 import { safeArray } from '../utils/safeArray';
+import FornecedorSelector from './fornecedores/FornecedorSelector';
 
 const ModalNovaContaPagar = ({ isOpen, onClose, onSave }) => {
   const [loading, setLoading] = useState(false);
@@ -45,6 +46,11 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave }) => {
     data_fim_recorrencia: null,
     numero_repeticoes: null
   });
+
+  const fornecedorSelecionado =
+    safeArray(fornecedores).find(
+      (fornecedor) => String(fornecedor.id) === String(dados.fornecedor_id),
+    ) || null;
 
   useEffect(() => {
     if (isOpen) {
@@ -316,16 +322,33 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave }) => {
                   <User size={16} className="inline mr-1" />
                   Fornecedor
                 </label>
-                <select
-                  value={dados.fornecedor_id || ''}
-                  onChange={(e) => setDados({...dados, fornecedor_id: e.target.value ? parseInt(e.target.value) : null})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">Selecione...</option>
-                  {safeArray(fornecedores).map(f => (
-                    <option key={f.id} value={f.id}>{f.nome}</option>
-                  ))}
-                </select>
+                <FornecedorSelector
+                  fornecedores={safeArray(fornecedores)}
+                  fornecedorId={dados.fornecedor_id}
+                  fornecedorSelecionado={fornecedorSelecionado}
+                  showLabel={false}
+                  placeholder="Digite o fornecedor..."
+                  inputClassName="rounded-md border-gray-300"
+                  onInputChange={(termo) => {
+                    if (!termo || dados.fornecedor_id) {
+                      setDados({ ...dados, fornecedor_id: null });
+                    }
+                  }}
+                  onSelect={(fornecedor) =>
+                    setDados({
+                      ...dados,
+                      fornecedor_id: fornecedor?.id ? parseInt(fornecedor.id, 10) : null,
+                    })
+                  }
+                  onClear={() => setDados({ ...dados, fornecedor_id: null })}
+                  onFornecedorCriado={(fornecedor) => {
+                    setFornecedores((prev) => [...safeArray(prev), fornecedor]);
+                    setDados({
+                      ...dados,
+                      fornecedor_id: fornecedor?.id ? parseInt(fornecedor.id, 10) : null,
+                    });
+                  }}
+                />
               </div>
 
               <div>

@@ -1,4 +1,5 @@
 import FilterBar from "../ui/FilterBar";
+import FornecedorSelector from "../fornecedores/FornecedorSelector";
 
 export default function ProdutosFiltrosPanel({
   categorias,
@@ -9,6 +10,11 @@ export default function ProdutosFiltrosPanel({
   persistirBusca,
   setPersistirBusca,
 }) {
+  const fornecedorSelecionado =
+    fornecedores.find(
+      (fornecedor) => String(fornecedor.id) === String(filtros.fornecedor_id),
+    ) || null;
+
   const handleSubmit = (event) => {
     event.preventDefault();
   };
@@ -62,18 +68,26 @@ export default function ProdutosFiltrosPanel({
         </div>
 
         <div>
-          <select
-            value={filtros.fornecedor_id}
-            onChange={(event) => handleFiltroChange("fornecedor_id", event.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="">Todos os Fornecedores</option>
-            {fornecedores.map((fornecedor) => (
-              <option key={fornecedor.id} value={fornecedor.id}>
-                {fornecedor.nome}
-              </option>
-            ))}
-          </select>
+          <FornecedorSelector
+            fornecedores={fornecedores}
+            fornecedorId={filtros.fornecedor_id}
+            fornecedorSelecionado={fornecedorSelecionado}
+            showLabel={false}
+            placeholder="Buscar fornecedor..."
+            inputClassName="rounded-lg border-gray-300"
+            onInputChange={(termo) => {
+              if (!termo || filtros.fornecedor_id) {
+                handleFiltroChange("fornecedor_id", "");
+              }
+            }}
+            onSelect={(fornecedor) =>
+              handleFiltroChange("fornecedor_id", fornecedor?.id ? String(fornecedor.id) : "")
+            }
+            onClear={() => handleFiltroChange("fornecedor_id", "")}
+            onFornecedorCriado={(fornecedor) =>
+              handleFiltroChange("fornecedor_id", fornecedor?.id ? String(fornecedor.id) : "")
+            }
+          />
         </div>
 
         <div>
