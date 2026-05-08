@@ -856,6 +856,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-08: Clientes do e-commerce/app tambem passaram a aceitar Termos/Privacidade e ficam bloqueados ate confirmar e-mail quando `EMAIL_VERIFICATION_REQUIRED=true`. Foram adicionadas `/verificar-email`, `/termos`, `/privacidade` e a migration `nv20260508a1_user_email_verification_lgpd.py`.
 - 2026-05-08: Login ERP/e-commerce recebeu trava configuravel por tentativas falhas, auditoria de eventos sensiveis, registro de ultimo login/IP, revogacao de sessoes apos troca de senha e hardening de headers/CORS para reduzir risco antes do go-live.
 - 2026-05-08: Endpoints LGPD legados do WhatsApp tiveram listagem/processamento de solicitacoes de exclusao e log de auditoria corrigidos para voltar a bater com os campos reais do banco.
+- 2026-05-08: Termos de Uso e Politica de Privacidade foram expandidos para cobrir ERP, app, e-commerce, tenant, cookies, integracoes, retencao, direitos dos titulares, incidentes, IA, comunicacoes e canal de privacidade sem aviso juridico para o cliente final.
 
 ### Nao fazer nesta onda
 
