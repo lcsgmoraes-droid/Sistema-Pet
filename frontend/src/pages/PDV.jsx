@@ -77,6 +77,8 @@ export default function PDV() {
       observacoes_entrega: "",
     },
   });
+  const [abrirDevolucaoSignal, setAbrirDevolucaoSignal] = useState(0);
+  const abrirDevolucaoVendaAtual = () => setAbrirDevolucaoSignal(Date.now());
 
   const {
     mostrarModalPagamento,
@@ -442,6 +444,7 @@ export default function PDV() {
       setMostrarPendenciasEstoque,
       abrirPainelOportunidades,
       alternarPainelAssistente,
+      abrirDevolucaoSignal,
       caixaKey,
       setMostrarModalAbrirCaixa,
       modoVisualizacao,
@@ -453,6 +456,7 @@ export default function PDV() {
       abrirModalPagamento,
       setModoVisualizacao,
       limparVenda,
+      abrirDevolucaoVendaAtual,
       emitirNotaVendaFinalizada,
       mudarStatusParaAberta,
       habilitarEdicao,

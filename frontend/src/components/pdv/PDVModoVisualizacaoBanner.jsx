@@ -1,10 +1,13 @@
-import { AlertCircle, FileText, X } from "lucide-react";
+import { AlertCircle, FileText, RotateCcw, X } from "lucide-react";
 import ImprimirCupom from "../ImprimirCupom";
 import ActionButton from "../ui/ActionButton";
+import { podeAbrirDevolucaoVenda } from "../../utils/pdvReturnEligibility";
 
 export default function PDVModoVisualizacaoBanner({
   ativo,
   vendaAtual,
+  temCaixaAberto,
+  onAbrirDevolucao,
   onVoltar,
   emitirNotaVendaFinalizada,
   mudarStatusParaAberta,
@@ -13,6 +16,8 @@ export default function PDVModoVisualizacaoBanner({
   if (!ativo) {
     return null;
   }
+
+  const podeAbrirDevolucao = podeAbrirDevolucaoVenda(vendaAtual);
 
   return (
     <div className="border-b border-yellow-200 bg-yellow-50 px-5 py-2.5">
@@ -35,6 +40,24 @@ export default function PDVModoVisualizacaoBanner({
             size="md"
             className="min-w-[132px]"
           />
+
+          {podeAbrirDevolucao && (
+            <ActionButton
+              onClick={onAbrirDevolucao}
+              disabled={!temCaixaAberto}
+              icon={RotateCcw}
+              intent="warning"
+              size="md"
+              className="min-w-[118px]"
+              title={
+                temCaixaAberto
+                  ? "Abrir devolucao desta venda"
+                  : "Abra o caixa para registrar devolucao"
+              }
+            >
+              Devolucao
+            </ActionButton>
+          )}
 
           <ActionButton
             onClick={onVoltar}

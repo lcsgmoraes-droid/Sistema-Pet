@@ -27,6 +27,7 @@ export default function PDVMainArea(props) {
     onAbrirPendenciasEstoque,
     onAbrirOportunidades,
     onToggleAssistente,
+    abrirDevolucaoSignal,
     caixaKey,
     onAbrirCaixa,
     onNavigateMeusCaixas,
@@ -41,6 +42,7 @@ export default function PDVMainArea(props) {
     emitirNotaVendaFinalizada,
     mudarStatusParaAberta,
     habilitarEdicao,
+    onAbrirDevolucaoVendaAtual,
     onAbrirCadastroCliente,
     onAbrirHistoricoCliente,
     onAbrirModalAdicionarCredito,
@@ -135,6 +137,7 @@ export default function PDVMainArea(props) {
         onAbrirPendenciasEstoque={onAbrirPendenciasEstoque}
         onAbrirOportunidades={onAbrirOportunidades}
         onToggleAssistente={onToggleAssistente}
+        abrirDevolucaoSignal={abrirDevolucaoSignal}
         menuCaixaKey={caixaKey}
         onAbrirCaixa={onAbrirCaixa}
         onNavigateMeusCaixas={onNavigateMeusCaixas}
@@ -160,6 +163,8 @@ export default function PDVMainArea(props) {
         emitirNotaVendaFinalizada={emitirNotaVendaFinalizada}
         mudarStatusParaAberta={mudarStatusParaAberta}
         habilitarEdicao={habilitarEdicao}
+        temCaixaAberto={temCaixaAberto}
+        onAbrirDevolucao={onAbrirDevolucaoVendaAtual}
       />
 
       <div className="flex-1 overflow-y-auto p-3">

@@ -16,6 +16,7 @@ export function usePDVPageComposition({
   setMostrarPendenciasEstoque,
   abrirPainelOportunidades,
   alternarPainelAssistente,
+  abrirDevolucaoSignal,
   caixaKey,
   setMostrarModalAbrirCaixa,
   modoVisualizacao,
@@ -27,6 +28,7 @@ export function usePDVPageComposition({
   abrirModalPagamento,
   setModoVisualizacao,
   limparVenda,
+  abrirDevolucaoVendaAtual,
   emitirNotaVendaFinalizada,
   mudarStatusParaAberta,
   habilitarEdicao,
@@ -209,6 +211,7 @@ export function usePDVPageComposition({
     onToggleAssistente: () => {
       void alternarPainelAssistente();
     },
+    abrirDevolucaoSignal,
     caixaKey,
     onAbrirCaixa: () => setMostrarModalAbrirCaixa(true),
     onNavigateMeusCaixas: () => navigate("/meus-caixas"),
@@ -223,6 +226,7 @@ export function usePDVPageComposition({
       setModoVisualizacao(false);
       limparVenda();
     },
+    onAbrirDevolucaoVendaAtual: abrirDevolucaoVendaAtual,
     emitirNotaVendaFinalizada,
     mudarStatusParaAberta,
     habilitarEdicao,

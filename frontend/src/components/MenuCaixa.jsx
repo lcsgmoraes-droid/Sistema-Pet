@@ -18,6 +18,10 @@ import { ModalSuprimento, ModalSangria, ModalDespesa } from './ModaisCaixa';
 import ModalFecharCaixa from './ModalFecharCaixa';
 import ModalDevolucao from './ModalDevolucao';
 import ModalMovimentacoesCaixa from './ModalMovimentacoesCaixa';
+import {
+  getNumeroVendaParaExibicao,
+  podeAbrirDevolucaoVenda,
+} from '../utils/pdvReturnEligibility';
 
 const CAIXA_SYNC_EVENT_KEY = 'petshop_caixa_sync_event';
 
@@ -32,14 +36,11 @@ const publicarEventoCaixa = (tipo) => {
   }
 };
 
-const STATUS_DEVOLUCAO_DIRETA = new Set([
-  'finalizada',
-  'baixa_parcial',
-  'pago_nf',
-  'finalizada_devolucao_parcial',
-]);
-
-export default function MenuCaixa({ onAbrirCaixa, vendaParaDevolucao = null }) {
+export default function MenuCaixa({
+  abrirDevolucaoSignal = 0,
+  onAbrirCaixa,
+  vendaParaDevolucao = null,
+}) {
   const [caixaAberto, setCaixaAberto] = useState(null);
   const [resumo, setResumo] = useState(null);
   const [menuAberto, setMenuAberto] = useState(false);
@@ -48,9 +49,22 @@ export default function MenuCaixa({ onAbrirCaixa, vendaParaDevolucao = null }) {
   const [mostrarSaldoTopo, setMostrarSaldoTopo] = useState(false); // Press-to-reveal (topo)
   const [mostrarValores, setMostrarValores] = useState(false); // Toggle normal (resumo)
   const carregandoCaixaRef = useRef(false);
-  const vendaAtualPodeAbrirDevolucao =
-    vendaParaDevolucao?.id &&
-    STATUS_DEVOLUCAO_DIRETA.has(vendaParaDevolucao.status);
+  const ultimoSignalDevolucaoRef = useRef(0);
+  const vendaAtualPodeAbrirDevolucao = podeAbrirDevolucaoVenda(vendaParaDevolucao);
+
+  useEffect(() => {
+    if (!abrirDevolucaoSignal || ultimoSignalDevolucaoRef.current === abrirDevolucaoSignal) {
+      return;
+    }
+
+    if (!caixaAberto) {
+      return;
+    }
+
+    ultimoSignalDevolucaoRef.current = abrirDevolucaoSignal;
+    setModalAtivo('devolucao');
+    setMenuAberto(false);
+  }, [abrirDevolucaoSignal, caixaAberto]);
 
   useEffect(() => {
     carregarCaixa({ force: true });
@@ -348,7 +362,7 @@ export default function MenuCaixa({ onAbrirCaixa, vendaParaDevolucao = null }) {
                     <div className="font-medium text-gray-900">Devolução</div>
                     <div className="text-xs text-gray-500">
                       {vendaAtualPodeAbrirDevolucao
-                        ? `Abrir venda #${vendaParaDevolucao.numero_venda || vendaParaDevolucao.id}`
+                        ? `Abrir venda #${getNumeroVendaParaExibicao(vendaParaDevolucao)}`
                         : 'Pesquisar venda e devolver ao estoque'}
                     </div>
                   </div>

@@ -695,9 +695,11 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                                           <div className="flex-1">
                                             <div className="flex items-center gap-2">
                                               <Package className="w-4 h-4 text-gray-500" />
-                                              <span className="font-medium text-gray-800">
-                                                {componente.produto_nome}
-                                              </span>
+                                              <ProductIdentity
+                                                name={componente.produto_nome}
+                                                nameClassName="font-medium text-gray-800"
+                                                product={componente}
+                                              />
                                             </div>
                                             <div className="text-xs text-gray-600 mt-1">
                                               Qtd no KIT: {componente.quantidade} | Qtd total disponível: {qtdMaxima}

@@ -33,6 +33,7 @@ export default function PDVHeaderBar({
   onAbrirPendenciasEstoque,
   onAbrirOportunidades,
   onToggleAssistente,
+  abrirDevolucaoSignal,
   menuCaixaKey,
   onAbrirCaixa,
   onNavigateMeusCaixas,
@@ -143,6 +144,7 @@ export default function PDVHeaderBar({
           >
             <MenuCaixa
               key={menuCaixaKey}
+              abrirDevolucaoSignal={abrirDevolucaoSignal}
               onAbrirCaixa={onAbrirCaixa}
               vendaParaDevolucao={vendaAtual}
             />
