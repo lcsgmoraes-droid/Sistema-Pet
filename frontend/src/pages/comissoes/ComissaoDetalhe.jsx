@@ -9,6 +9,8 @@
 
 import React, { useState, useEffect } from 'react';
 import api from '../../api';
+import CopyableCode from '../../components/ui/CopyableCode';
+import SaleReference from '../../components/ui/SaleReference';
 
 const ComissaoDetalhe = ({ comissaoId, onClose }) => {
   const [comissao, setComissao] = useState(null);
@@ -189,8 +191,14 @@ const ComissaoDetalhe = ({ comissaoId, onClose }) => {
               <Secao titulo="📋 Identificação" cor="blue">
                 <div className="grid grid-cols-2 gap-4">
                   <Campo label="ID da Comissão" valor={`#${comissao.id}`} />
-                  <Campo label="Venda" valor={comissao.numero_venda || `#${comissao.venda_id}`} />
-                  <Campo label="ID do Produto" valor={`#${comissao.produto_id}`} />
+                  <Campo
+                    label="Venda"
+                    valor={<SaleReference value={comissao.numero_venda || comissao.venda_id} />}
+                  />
+                  <Campo
+                    label="ID do Produto"
+                    valor={<CopyableCode label="Produto" value={comissao.produto_id} />}
+                  />
                   <Campo label="ID do Funcionário" valor={`#${comissao.funcionario_id}`} />
                   <Campo label="Data da Venda" valor={formatarData(comissao.data_venda)} />
                   <Campo label="Número da Parcela" valor={comissao.parcela_numero} />

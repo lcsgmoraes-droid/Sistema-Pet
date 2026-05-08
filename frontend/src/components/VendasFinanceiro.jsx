@@ -516,22 +516,6 @@ export default function VendasFinanceiro() {
 
   const criarUrlPdvVenda = (venda) => `/pdv?venda_id=${encodeURIComponent(venda.id)}`;
 
-  const copiarNumeroVenda = async (event, numeroVenda) => {
-    event.stopPropagation();
-
-    if (!numeroVenda) {
-      toast.error("Numero da venda nao disponivel.");
-      return;
-    }
-
-    try {
-      await navigator.clipboard.writeText(String(numeroVenda));
-      toast.success(`Venda ${numeroVenda} copiada.`);
-    } catch (_error) {
-      toast.error("Nao foi possivel copiar o numero da venda.");
-    }
-  };
-
   const formatarMoeda = (valor) => {
     return formatMoneyCellValue(valor);
   };
@@ -2812,7 +2796,6 @@ export default function VendasFinanceiro() {
             ))}
           </MetricGrid>
           <VendasFinanceiroListaTable
-            copiarNumeroVenda={copiarNumeroVenda}
             criarUrlPdvVenda={criarUrlPdvVenda}
             formatarData={formatarData}
             formatarMoeda={formatarMoeda}

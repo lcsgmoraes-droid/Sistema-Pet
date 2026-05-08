@@ -439,15 +439,23 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
               ) : (
                 <div className="space-y-2">
                   {vendas.map((venda) => (
-                    <button
+                    <div
                       key={venda.id}
+                      role="button"
+                      tabIndex={0}
                       onClick={() => selecionarVenda(venda)}
+                      onKeyDown={(event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                          event.preventDefault();
+                          selecionarVenda(venda);
+                        }
+                      }}
                       className="w-full text-left p-4 border border-gray-200 rounded-lg hover:border-blue-500 hover:bg-blue-50 transition-colors"
                     >
                       <div className="flex justify-between items-start">
                         <div>
                           <div className="font-semibold text-gray-900">
-                            Venda #{venda.numero_venda || venda.id}
+                            <SaleReference sale={venda} />
                           </div>
                           <div className="text-sm text-gray-600 mt-1">
                             Cliente: {venda.cliente?.nome || 'Consumidor Final'}
@@ -476,7 +484,7 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                           </div>
                         </div>
                       </div>
-                    </button>
+                    </div>
                   ))}
                 </div>
               )}

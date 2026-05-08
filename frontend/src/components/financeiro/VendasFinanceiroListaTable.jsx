@@ -1,13 +1,21 @@
-import { ChevronDown, ChevronRight, Copy, ExternalLink } from "lucide-react";
+import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
 import DataTable from "../ui/DataTable";
 import MoneyCell from "../ui/MoneyCell";
 import NumberCell from "../ui/NumberCell";
+import SaleReference from "../ui/SaleReference";
 import StatusBadge from "../ui/StatusBadge";
 import ProductIdentity from "../ui/ProductIdentity";
 
-function CodigoVendaCell({ copiarNumeroVenda, criarUrlPdvVenda, venda }) {
+function CodigoVendaCell({ criarUrlPdvVenda, venda }) {
+  const saleNumber = venda.numero_venda || venda.id;
+
   return (
-    <div className="inline-flex items-center gap-1.5">
+    <SaleReference
+      sale={venda}
+      showPrefix={false}
+      value={saleNumber}
+      valueClassName=""
+    >
       <a
         href={criarUrlPdvVenda(venda)}
         target="_blank"
@@ -16,19 +24,10 @@ function CodigoVendaCell({ copiarNumeroVenda, criarUrlPdvVenda, venda }) {
         className="inline-flex items-center gap-1 font-medium text-blue-700 hover:text-blue-900 hover:underline"
         title="Abrir venda no PDV em nova aba"
       >
-        {venda.numero_venda}
+        #{saleNumber}
         <ExternalLink className="h-3.5 w-3.5" />
       </a>
-      <button
-        type="button"
-        onClick={(event) => copiarNumeroVenda(event, venda.numero_venda)}
-        className="inline-flex h-6 w-6 items-center justify-center rounded border border-slate-200 text-slate-500 transition hover:border-blue-300 hover:bg-blue-50 hover:text-blue-700"
-        title="Copiar número da venda"
-        aria-label={`Copiar número da venda ${venda.numero_venda}`}
-      >
-        <Copy className="h-3.5 w-3.5" />
-      </button>
-    </div>
+    </SaleReference>
   );
 }
 
@@ -184,7 +183,6 @@ function ItensVendaDetalhes({ colSpan, formatarMoeda, venda }) {
 }
 
 export default function VendasFinanceiroListaTable({
-  copiarNumeroVenda,
   criarUrlPdvVenda,
   formatarData,
   formatarMoeda,
@@ -218,7 +216,6 @@ export default function VendasFinanceiroListaTable({
       className: "whitespace-nowrap",
       render: (venda) => (
         <CodigoVendaCell
-          copiarNumeroVenda={copiarNumeroVenda}
           criarUrlPdvVenda={criarUrlPdvVenda}
           venda={venda}
         />

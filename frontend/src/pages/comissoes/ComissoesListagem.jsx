@@ -11,6 +11,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api';
+import CopyableCode from '../../components/ui/CopyableCode';
+import SaleReference from '../../components/ui/SaleReference';
 import ComissaoDetalhe from './ComissaoDetalhe';
 
 const ComissoesListagem = () => {
@@ -1095,13 +1097,16 @@ const ComissoesListagem = () => {
                     onClick={() => abrirDetalhe(comissao.id)}
                     title={`ID interno: #${comissao.venda_id}`}
                   >
-                    {comissao.numero_venda || `#${comissao.venda_id}`}
+                    <SaleReference
+                      value={comissao.numero_venda || comissao.venda_id}
+                      showPrefix={false}
+                    />
                   </td>
                   <td 
                     className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 cursor-pointer"
                     onClick={() => abrirDetalhe(comissao.id)}
                   >
-                    #{comissao.produto_id}
+                    <CopyableCode label="Produto" value={comissao.produto_id} />
                   </td>
                   <td 
                     className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 cursor-pointer"

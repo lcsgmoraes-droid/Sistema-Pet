@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
+import SaleReference from '../components/ui/SaleReference';
 
 /**
  * ABA 1: CONCILIAÇÃO DE VENDAS (PDV vs Stone)
@@ -408,12 +409,14 @@ export default function Aba1ConciliacaoVendas({ onConcluida, status }) {
                               <div className="font-semibold text-red-600">NSU: {div.nsu}</div>
                               <div className="text-xs text-gray-500 mt-1">
                                 {div.vendas.map((v, i) => (
-                                  <div key={i}>Venda {v.numero_venda}</div>
+                                  <div key={i}>
+                                    <SaleReference sale={v} showPrefix={false} />
+                                  </div>
                                 ))}
                               </div>
                             </div>
                           ) : (
-                            <span>Venda {div.numero_venda || div.venda_id}</span>
+                            <SaleReference value={div.numero_venda || div.venda_id} />
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm">
@@ -455,7 +458,7 @@ export default function Aba1ConciliacaoVendas({ onConcluida, status }) {
                     <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded">
                       <div>
                         <span className="text-sm font-medium text-gray-900">
-                          Venda {venda.numero}
+                          <SaleReference value={venda.numero} />
                         </span>
                         <span className="ml-3 text-sm text-gray-600">
                           R$ {venda.valor.toFixed(2)}

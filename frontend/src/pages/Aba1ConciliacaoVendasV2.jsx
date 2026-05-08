@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
+import SaleReference from '../components/ui/SaleReference';
 
 /**
  * ABA 1 V2: CONCILIAÇÃO DE VENDAS (Duas Colunas)
@@ -441,7 +442,7 @@ export default function Aba1ConciliacaoVendasV2({ onConcluida, status }) {
         <div className="flex justify-between items-center">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="font-medium text-gray-900">
-              Venda {venda.numero_venda}
+              <SaleReference sale={venda} showPrefix={false} />
             </span>
             
             {/* Badge de Operadora ou Campo de Edição */}
@@ -649,7 +650,7 @@ export default function Aba1ConciliacaoVendasV2({ onConcluida, status }) {
             {match.venda_pdv ? (
               <>
                 <div className="text-sm font-semibold text-gray-800">
-                  Venda #{match.venda_pdv.numero}
+                  <SaleReference value={match.venda_pdv.numero} />
                 </div>
                 <div className="text-xs text-gray-600 mt-1">
                   NSU: {match.venda_pdv.nsu || <span className="text-orange-600">SEM NSU</span>}

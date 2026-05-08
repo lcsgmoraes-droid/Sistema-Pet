@@ -833,6 +833,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-07: criado `ProductIdentity` como padrao reutilizavel para nome de produto + SKU/codigo copiavel, aplicado em vendas financeiras, devolucao, compras, widget de cliente, campanhas e rotas de entrega.
 - 2026-05-07: criado `SaleReference` para padronizar referencias copiaveis de venda em PDV, devolucao, financeiro, campanhas, caixa e entregas.
 - 2026-05-07: PDV reforcou o padrao `SaleReference` em vendas em aberto, vendas recentes e historico do cliente, mantendo a venda copiavel no fluxo de atendimento.
+- 2026-05-07: `SaleReference` e codigos copiaveis foram aplicados em conciliacao de vendas, comissoes, devolucao e lista financeira, reduzindo exibicoes manuais de numero de venda/produto.
 
 ### Nao fazer nesta onda
 
