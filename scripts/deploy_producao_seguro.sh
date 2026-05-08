@@ -224,6 +224,12 @@ mark_step "checar_estado_final"
 log "Checando estado final"
 docker compose -f "$COMPOSE_FILE" ps
 
+mark_step "disk_guard_final"
+log "Rodando verificacao final de disco"
+if [[ -f "$APP_DIR/scripts/ops_disk_guard.sh" ]]; then
+  bash "$APP_DIR/scripts/ops_disk_guard.sh" || log "Aviso: disk guard final falhou"
+fi
+
 if [[ -n "$(git status --porcelain)" ]]; then
   git status --short
   fail "Deploy terminou com Git sujo. Investigue antes de considerar concluido."

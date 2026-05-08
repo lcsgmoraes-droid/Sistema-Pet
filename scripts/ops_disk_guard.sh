@@ -85,8 +85,8 @@ fi
 
 log "Disco em risco: ${before}%. Limpando cache Docker seguro."
 
-docker builder prune -af --filter "until=24h" || true
-actions+=("docker_builder_prune_24h")
+docker builder prune -af || true
+actions+=("docker_builder_prune")
 
 current="$(disk_percent)"
 if [[ "$current" -ge "$DISK_GUARD_CRITICAL_PERCENT" ]]; then
