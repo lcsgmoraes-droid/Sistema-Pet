@@ -16,7 +16,8 @@ def create_session(
     ip_address: Optional[str] = None,
     user_agent: Optional[str] = None,
     device_info: Optional[Dict[str, Any]] = None,
-    expires_in_days: int = 30
+    expires_in_days: int = 30,
+    tenant_id: Optional[str] = None,
 ) -> UserSession:
     """
     Cria uma nova sessão para o usuário.
@@ -37,6 +38,7 @@ def create_session(
     
     session = UserSession(
         user_id=user_id,
+        tenant_id=tenant_id,
         token_jti=token_jti,
         ip_address=ip_address,
         user_agent=user_agent,

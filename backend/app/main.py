@@ -638,6 +638,9 @@ app.add_middleware(RequestLoggingMiddleware)
 from app.middlewares.rate_limit import RateLimitMiddleware
 app.add_middleware(RateLimitMiddleware)
 
+from app.middlewares.security_headers import SecurityHeadersMiddleware
+app.add_middleware(SecurityHeadersMiddleware)
+
 # ====================
 # MIDDLEWARES DE TENANT - MULTI-CAMADA
 # ====================
@@ -699,12 +702,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
             "error": "validation_error",
             "message": "Dados inválidos",
             "details": exc.errors()
-        },
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Allow-Methods": "*",
-            "Access-Control-Allow-Headers": "*",
         }
     )
 
@@ -720,12 +717,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
         status_code=exc.status_code,
         content={"detail": exc.detail},
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Allow-Methods": "*",
-            "Access-Control-Allow-Headers": "*",
-        }
+        headers=exc.headers,
     )
 
 # Handler para erros internos 500
@@ -756,12 +748,6 @@ async def general_exception_handler(request: Request, exc: Exception):
             content={
                 "error": "internal_server_error",
                 "message": "Erro interno no servidor. Nossa equipe foi notificada.",
-            },
-            headers={
-                "Access-Control-Allow-Origin": "*",
-                "Access-Control-Allow-Credentials": "true",
-                "Access-Control-Allow-Methods": "*",
-                "Access-Control-Allow-Headers": "*",
             }
         )
     else:
@@ -774,13 +760,7 @@ async def general_exception_handler(request: Request, exc: Exception):
                 "detail": str(exc),  # Apenas em dev
                 "type": type(exc).__name__,  # Apenas em dev
             },
-        headers={
-            "Access-Control-Allow-Origin": "*",
-            "Access-Control-Allow-Credentials": "true",
-            "Access-Control-Allow-Methods": "*",
-            "Access-Control-Allow-Headers": "*",
-        }
-    )
+        )
 
 # ====================
 # ARQUIVOS ESTÁTICOS - ANTES DOS ROUTERS!

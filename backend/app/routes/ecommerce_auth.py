@@ -19,6 +19,16 @@ from app.config import JWT_SECRET_KEY
 from app.db import get_session
 from app.models import Cliente, Role, Tenant, User, UserTenant
 from app.services.email_service import send_email
+from app.session_manager import revoke_all_sessions
+from app.services.auth_security import (
+    is_user_locked,
+    register_account_created,
+    register_failed_login,
+    register_password_changed,
+    register_password_reset_requested,
+    register_successful_login,
+    remaining_lock_seconds,
+)
 
 
 router = APIRouter(prefix="/ecommerce/auth", tags=["ecommerce-auth"])
@@ -710,6 +720,7 @@ def registrar_cliente(payload: EcommerceRegisterRequest, request: Request, db: S
         cliente.cpf = cpf_normalizado
     cliente.telefone = telefone
     _ensure_active_store_access(db, user, str(tenant_id))
+    register_account_created(db, user, request, "ecommerce")
     db.commit()
     db.refresh(cliente)
 
@@ -772,7 +783,17 @@ def login_cliente(payload: EcommerceLoginRequest, request: Request, db: Session 
         .first()
     )
 
+    if user and is_user_locked(user):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Muitas tentativas de login. Aguarde {max(1, remaining_lock_seconds(user) // 60)} minuto(s) e tente novamente.",
+            headers={"Retry-After": str(remaining_lock_seconds(user))},
+        )
+
     if not user or not verify_password(payload.password, user.hashed_password or ""):
+        if user:
+            register_failed_login(db, user, request)
+            db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email ou senha inválidos",
@@ -789,6 +810,7 @@ def login_cliente(payload: EcommerceLoginRequest, request: Request, db: Session 
         )
 
     _ensure_active_store_access(db, user, str(tenant_id))
+    register_successful_login(db, user, request)
     db.commit()
 
     access_token = create_access_token(
@@ -846,6 +868,7 @@ def esqueci_senha(payload: EcommerceForgotPasswordRequest, request: Request, db:
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
                 detail="Não foi possível enviar o e-mail de recuperação agora. Tente novamente em instantes.",
             )
+        register_password_reset_requested(db, user, request)
         db.commit()
         return {
             "message": "Se o email existir, enviaremos instruções de recuperação.",
@@ -884,6 +907,8 @@ def resetar_senha(payload: EcommerceResetPasswordRequest, request: Request, db: 
     user.reset_token = None
     user.reset_token_expires = None
     _ensure_active_store_access(db, user, str(user.tenant_id))
+    register_password_changed(db, user, request, "password_reset")
+    revoke_all_sessions(db, user.id, reason="password_reset")
     db.commit()
 
     return {"message": "Senha atualizada com sucesso"}

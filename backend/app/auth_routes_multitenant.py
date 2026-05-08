@@ -27,9 +27,22 @@ from app.auth import (
 from app.auth.permission_dependencies import expand_permissions
 from app.config import JWT_SECRET_KEY as SECRET_KEY
 from app.auth.core import ALGORITHM, ACCESS_TOKEN_EXPIRE_DAYS
-from app.session_manager import create_session, validate_session, revoke_session, get_active_sessions, get_session_by_jti
+from app.session_manager import create_session, validate_session, revoke_session, revoke_all_sessions, get_active_sessions, get_session_by_jti
 from app.auth.dependencies import get_current_user_and_tenant
 from app.services.email_service import send_email
+from app.services.auth_security import (
+    get_request_ip,
+    is_user_locked,
+    register_account_created,
+    register_email_verification_resent,
+    register_email_verified,
+    register_failed_login,
+    register_logout,
+    register_password_changed,
+    register_password_reset_requested,
+    register_successful_login,
+    remaining_lock_seconds,
+)
 from app.tenancy.context import set_tenant_context
 # from app.audit import log_audit  # TODO: Fix audit import conflict
 
@@ -432,6 +445,7 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
                 detail="Nao foi possivel enviar o e-mail de confirmacao agora. Confira o SMTP e tente novamente.",
             )
 
+    register_account_created(db, user, request, "erp")
     db.commit()
 
     tenants_payload = [{
@@ -460,7 +474,7 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
     db_session = create_session(
         db=db,
         user_id=user.id,
-        ip_address=request.client.host if request.client else None,
+        ip_address=get_request_ip(request),
         user_agent=request.headers.get("user-agent"),
         expires_in_days=ACCESS_TOKEN_EXPIRE_DAYS
     )
@@ -498,17 +512,18 @@ def login_multitenant(request: Request, credentials: LoginRequest, db: Session =
     """
     email = credentials.email.strip().lower()
     user = db.query(User).filter(User.email == email).first()
-    
-    if not user or not verify_password(credentials.password, user.hashed_password):
-        # log_audit(
-        #     db=db,
-        #     user_id=user.id if user else None,
-        #     action="login_failed",
-        #     entity_type="user",
-        #     entity_id=user.id if user else None,
-        #     ip_address=request.client.host if request.client else None,
-        #     user_agent=request.headers.get("user-agent")
-        # )
+
+    if user and is_user_locked(user):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail=f"Muitas tentativas de login. Aguarde {max(1, remaining_lock_seconds(user) // 60)} minuto(s) e tente novamente.",
+            headers={"Retry-After": str(remaining_lock_seconds(user))},
+        )
+
+    if not user or not verify_password(credentials.password, user.hashed_password or ""):
+        if user:
+            register_failed_login(db, user, request)
+            db.commit()
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Email ou senha incorretos",
@@ -527,6 +542,8 @@ def login_multitenant(request: Request, credentials: LoginRequest, db: Session =
             detail="Email ainda nao confirmado. Verifique sua caixa de entrada ou solicite um novo link.",
         )
 
+    register_successful_login(db, user, request)
+
     user_tenants = db.query(UserTenant).filter(
         UserTenant.user_id == user.id
     ).all()
@@ -541,7 +558,7 @@ def login_multitenant(request: Request, credentials: LoginRequest, db: Session =
     db_session = create_session(
         db=db,
         user_id=user.id,
-        ip_address=request.client.host if request.client else None,
+        ip_address=get_request_ip(request),
         user_agent=request.headers.get("user-agent"),
         expires_in_days=ACCESS_TOKEN_EXPIRE_DAYS
     )
@@ -555,16 +572,6 @@ def login_multitenant(request: Request, credentials: LoginRequest, db: Session =
             "tenant_id": None
         }
     )
-    
-    # log_audit(
-    #     db=db,
-    #     user_id=user.id,
-    #     action="login_success",
-    #     entity_type="user",
-    #     entity_id=user.id,
-    #     ip_address=request.client.host if request.client else None,
-    #     user_agent=request.headers.get("user-agent")
-    # )
     
     tenants_list = []
     for ut in user_tenants:
@@ -591,7 +598,7 @@ def login_multitenant(request: Request, credentials: LoginRequest, db: Session =
 
 
 @router.post("/verify-email")
-def verify_email(payload: VerifyEmailRequest, db: Session = Depends(get_session)):
+def verify_email(payload: VerifyEmailRequest, request: Request, db: Session = Depends(get_session)):
     email = (payload.email or "").strip().lower()
     if not email:
         raise HTTPException(
@@ -614,6 +621,7 @@ def verify_email(payload: VerifyEmailRequest, db: Session = Depends(get_session)
     user.email_verification_token_hash = None
     user.email_verification_token_expires = None
     user.email_verification_sent_at = None
+    register_email_verified(db, user, request)
     db.commit()
 
     return {"message": "Email confirmado com sucesso. Voce ja pode entrar no sistema."}
@@ -639,6 +647,7 @@ def resend_verification(
             detail="Nao foi possivel enviar o e-mail de confirmacao agora. Tente novamente em instantes.",
         )
 
+    register_email_verification_resent(db, user, request)
     db.commit()
     return {**generic_response, "expires_in_hours": EMAIL_VERIFICATION_TOKEN_HOURS}
 
@@ -681,6 +690,7 @@ def forgot_password(
             detail="Nao foi possivel enviar o e-mail de recuperacao agora. Tente novamente em instantes.",
         )
 
+    register_password_reset_requested(db, user, request)
     db.commit()
 
     return {
@@ -692,6 +702,7 @@ def forgot_password(
 @router.post("/reset-password")
 def reset_password(
     payload: ResetPasswordRequest,
+    request: Request,
     db: Session = Depends(get_session),
 ):
     email = (payload.email or "").strip().lower()
@@ -719,6 +730,8 @@ def reset_password(
     user.hashed_password = hash_password(payload.nova_senha)
     user.reset_token = None
     user.reset_token_expires = None
+    register_password_changed(db, user, request, "password_reset")
+    revoke_all_sessions(db, user.id, reason="password_reset")
     db.commit()
 
     return {"message": "Senha atualizada com sucesso"}
@@ -895,6 +908,7 @@ def get_me_multitenant(
 
 @router.post("/logout-multitenant")
 def logout_multitenant(
+    request: Request,
     db: Session = Depends(get_session),
     current_user: User = Depends(get_current_user)
 ):
@@ -905,5 +919,8 @@ def logout_multitenant(
     
     for session in sessions:
         revoke_session(db, session.id, current_user.id, "user_logout")
-    
+
+    register_logout(db, current_user, request, len(sessions))
+    db.commit()
+
     return {"message": "Logout realizado com sucesso"}

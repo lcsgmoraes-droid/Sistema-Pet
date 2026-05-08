@@ -180,7 +180,7 @@ class DataAccessLog(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     def __repr__(self):
-        return f"<DataAccessLog(user={self.user_id}, action={self.action}, resource={self.resource_type})>"
+        return f"<DataAccessLog(user={self.accessed_by_user_id}, access={self.access_type}, resource={self.resource_type})>"
 
 
 class DataDeletionRequest(Base):
@@ -474,7 +474,7 @@ class SecurityAuditService:
             ip_address=ip_address,
             user_agent=user_agent,
             description=description,
-            metadata=json.dumps(metadata) if metadata else None
+            extra_data=json.dumps(metadata) if metadata else None
         )
         
         self.db.add(log)

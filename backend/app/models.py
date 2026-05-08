@@ -3,6 +3,7 @@ Modelos do Banco de Dados - Sistema Pet Shop Pro
 SQLAlchemy ORM Models
 """
 from sqlalchemy import Column, Integer, String, BigInteger, Boolean, Float, Text, DateTime, Date, ForeignKey, JSON, DECIMAL, Numeric, UniqueConstraint, Index
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship, deferred
 from app.db import Base
@@ -55,6 +56,13 @@ class User(BaseTenantModel):
     reset_token = Column(String(255), nullable=True, index=True)
     reset_token_expires = Column(DateTime(timezone=True), nullable=True)
 
+    # Login security
+    failed_login_attempts = Column(Integer, nullable=False, default=0)
+    locked_until = Column(DateTime(timezone=True), nullable=True)
+    last_login_at = Column(DateTime(timezone=True), nullable=True)
+    last_login_ip = Column(String(50), nullable=True)
+    password_changed_at = Column(DateTime(timezone=True), nullable=True)
+
     # OAuth (futuro: Google, etc)
     oauth_provider = Column(String(50), nullable=True)  # 'google', None
     oauth_id = Column(String(255), nullable=True)
@@ -97,6 +105,7 @@ class UserSession(Base):  # Não usar BaseTenantModel - sessões não são tenan
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    tenant_id = Column(UUID(as_uuid=True), nullable=True, index=True)
     token_jti = Column(String(36), unique=True, index=True, nullable=False)  # UUID
 
     # Informações do dispositivo
@@ -106,6 +115,7 @@ class UserSession(Base):  # Não usar BaseTenantModel - sessões não são tenan
 
     # Controle
     created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
     last_activity_at = Column(DateTime(timezone=True), server_default=func.now())
     expires_at = Column(DateTime(timezone=True), nullable=False)
     revoked = Column(Boolean, default=False)

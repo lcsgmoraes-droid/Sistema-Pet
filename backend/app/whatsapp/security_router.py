@@ -235,7 +235,7 @@ def list_deletion_requests(
     if status:
         query = query.filter(DataDeletionRequest.status == status)
     
-    requests = query.order_by(DataDeletionRequest.created_at.desc()).all()
+    requests = query.order_by(DataDeletionRequest.request_date.desc()).all()
     
     return {
         "requests": [
@@ -245,9 +245,10 @@ def list_deletion_requests(
                 "subject_id": req.subject_id,
                 "status": req.status,
                 "reason": req.reason,
-                "created_at": req.created_at.isoformat(),
-                "approved_at": req.approved_at.isoformat() if req.approved_at else None,
-                "completed_at": req.completed_at.isoformat() if req.completed_at else None
+                "created_at": req.request_date.isoformat() if req.request_date else None,
+                "processed_at": req.processed_at.isoformat() if req.processed_at else None,
+                "processed_by_user_id": req.processed_by_user_id,
+                "rejection_reason": req.rejection_reason,
             }
             for req in requests
         ]
@@ -276,7 +277,7 @@ def approve_deletion_request(
         lgpd_service.process_deletion_request(
             request_id=request_id,
             approved=approval.approved,
-            approved_by=str(current_user.id),
+            processed_by_user_id=current_user.id,
             rejection_reason=approval.rejection_reason
         )
         
