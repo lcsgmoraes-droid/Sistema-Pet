@@ -7,6 +7,20 @@ import {
   FiChevronLeft, FiChevronRight, FiChevronDown, FiChevronUp,
   FiShoppingCart, FiPackage, FiAlertCircle
 } from 'react-icons/fi';
+import CopyableCode from '../../components/ui/CopyableCode';
+import CopyableValue from '../../components/ui/CopyableValue';
+
+const getVendaItemSku = (item) => (
+  item?.produto_codigo ||
+  item?.produto_sku ||
+  item?.sku ||
+  item?.codigo ||
+  item?.produto?.codigo ||
+  item?.produto?.sku ||
+  item?.produto_codigo_barras ||
+  item?.codigo_barras ||
+  ''
+);
 
 /* -----------------------------------------------------------------------
    Componente interno: histórico do cliente selecionado (sem wrapper de página)
@@ -249,7 +263,15 @@ const HistoricoInline = ({ clienteId, clienteInfo }) => {
                           <td className="px-4 py-4 text-sm text-gray-900 max-w-xs">
                             <div className="truncate">{transacao.descricao}</div>
                             {transacao.detalhes?.numero_venda && (
-                              <div className="text-xs text-blue-600 mt-0.5">#{transacao.detalhes.numero_venda}</div>
+                              <div className="mt-0.5 text-xs text-blue-600">
+                                <CopyableValue
+                                  title="Copiar venda"
+                                  value={transacao.detalhes.numero_venda}
+                                  valueClassName="font-medium"
+                                >
+                                  #{transacao.detalhes.numero_venda}
+                                </CopyableValue>
+                              </div>
                             )}
                           </td>
                           <td className="px-4 py-4 text-sm text-right whitespace-nowrap">
@@ -300,7 +322,12 @@ const HistoricoInline = ({ clienteId, clienteInfo }) => {
                                           <tbody className="divide-y divide-gray-200">
                                             {detalhes.itens.map((item, i) => (
                                               <tr key={i} className="hover:bg-gray-50">
-                                                <td className="px-4 py-2 text-sm text-gray-900">{item.produto_nome}</td>
+                                                <td className="px-4 py-2 text-sm text-gray-900">
+                                                  <div className="flex flex-wrap items-center gap-1.5">
+                                                    <CopyableValue title="Copiar produto" value={item.produto_nome} />
+                                                    <CopyableCode value={getVendaItemSku(item)} />
+                                                  </div>
+                                                </td>
                                                 <td className="px-4 py-2 text-sm text-center font-semibold">{item.quantidade}</td>
                                                 <td className="px-4 py-2 text-sm text-right">R$ {item.preco_unitario?.toFixed(2).replace('.', ',')}</td>
                                                 <td className="px-4 py-2 text-sm text-right text-orange-600">R$ {(item.desconto || 0).toFixed(2).replace('.', ',')}</td>

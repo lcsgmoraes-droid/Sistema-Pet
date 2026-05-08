@@ -6,6 +6,20 @@ import {
   FiChevronLeft, FiChevronRight, FiUser, FiAlertCircle, FiChevronDown,
   FiChevronUp, FiShoppingCart, FiPackage, FiTrendingUp, FiPercent
 } from 'react-icons/fi';
+import CopyableCode from '../components/ui/CopyableCode';
+import CopyableValue from '../components/ui/CopyableValue';
+
+const getVendaItemSku = (item) => (
+  item?.produto_codigo ||
+  item?.produto_sku ||
+  item?.sku ||
+  item?.codigo ||
+  item?.produto?.codigo ||
+  item?.produto?.sku ||
+  item?.produto_codigo_barras ||
+  item?.codigo_barras ||
+  ''
+);
 
 const ClienteFinanceiro = () => {
   const { clienteId } = useParams();
@@ -439,7 +453,13 @@ const ClienteFinanceiro = () => {
                               <div className="truncate">{transacao.descricao}</div>
                               {transacao.detalhes?.numero_venda && (
                                 <div className="text-xs text-blue-600 mt-1">
-                                  #{transacao.detalhes.numero_venda}
+                                  <CopyableValue
+                                    title="Copiar venda"
+                                    value={transacao.detalhes.numero_venda}
+                                    valueClassName="font-medium"
+                                  >
+                                    #{transacao.detalhes.numero_venda}
+                                  </CopyableValue>
                                 </div>
                               )}
                             </td>
@@ -493,7 +513,14 @@ const ClienteFinanceiro = () => {
                                       <div className="flex items-center justify-between border-b border-gray-200 pb-3">
                                         <h4 className="text-lg font-semibold text-gray-800 flex items-center gap-2">
                                           <FiShoppingCart className="text-blue-600" />
-                                          Detalhes da Venda #{detalhes.numero_venda}
+                                          Detalhes da Venda
+                                          <CopyableValue
+                                            title="Copiar venda"
+                                            value={detalhes.numero_venda}
+                                            valueClassName="font-semibold"
+                                          >
+                                            #{detalhes.numero_venda}
+                                          </CopyableValue>
                                         </h4>
                                         <div className="text-sm text-gray-600">
                                           {new Date(detalhes.data_venda).toLocaleString('pt-BR')}
@@ -547,7 +574,10 @@ const ClienteFinanceiro = () => {
                                                 {detalhes.itens.map((item, idx) => (
                                                   <tr key={idx} className="hover:bg-gray-50">
                                                     <td className="px-4 py-3 text-sm text-gray-900">
-                                                      {item.produto_nome}
+                                                      <div className="flex flex-wrap items-center gap-1.5">
+                                                        <CopyableValue title="Copiar produto" value={item.produto_nome} />
+                                                        <CopyableCode value={getVendaItemSku(item)} />
+                                                      </div>
                                                     </td>
                                                     <td className="px-4 py-3 text-sm text-center font-semibold text-gray-700">
                                                       {item.quantidade}

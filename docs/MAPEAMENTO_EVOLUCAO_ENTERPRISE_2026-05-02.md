@@ -829,6 +829,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-07: `Compras/Pedidos` extraiu o estado e operacoes de grupos de fornecedores para `usePedidosCompraGruposFornecedores`, mantendo a tela principal apenas como consumidora do fluxo.
 - 2026-05-07: iniciado o padrao operacional de selecao/copia: `ContasPagar` passou a usar `FornecedorSelector` no filtro e nomes copiaveis, enquanto Financeiro/Vendas passou a mostrar produto/SKU com `CopyableValue`/`CopyableCode` nas listas detalhadas.
 - 2026-05-07: `Compras/Pedidos` trocou o autocomplete proprio do formulario pelo `FornecedorSelector` compartilhado e os itens do pedido passaram a exibir produto/SKU com componentes copiaveis.
+- 2026-05-07: historicos financeiros de cliente e produtos promocionais passaram a usar `CopyableValue`/`CopyableCode` para numero de venda, produto e SKU, reforcando o padrao de consulta operacional.
 
 ### Nao fazer nesta onda
 

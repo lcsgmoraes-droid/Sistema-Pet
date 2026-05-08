@@ -1,6 +1,20 @@
 import DataTable from "../ui/DataTable";
 import MoneyCell from "../ui/MoneyCell";
 import NumberCell from "../ui/NumberCell";
+import CopyableCode from "../ui/CopyableCode";
+import CopyableValue from "../ui/CopyableValue";
+
+function getCodigoProduto(produto) {
+  return (
+    produto?.produto_codigo ||
+    produto?.produto_sku ||
+    produto?.sku ||
+    produto?.codigo ||
+    produto?.codigo_barras ||
+    produto?.ean ||
+    ""
+  );
+}
 
 export default function ProdutosPromocionaisTable({ produtos = [] }) {
   return (
@@ -10,7 +24,12 @@ export default function ProdutosPromocionaisTable({ produtos = [] }) {
           key: "produto",
           header: "Produto",
           className: "font-medium text-slate-800",
-          accessor: "produto_nome",
+          render: (produto) => (
+            <span className="inline-flex flex-wrap items-center gap-1.5">
+              <CopyableValue title="Copiar produto" value={produto.produto_nome} />
+              <CopyableCode value={getCodigoProduto(produto)} />
+            </span>
+          ),
         },
         {
           key: "quantidade",
