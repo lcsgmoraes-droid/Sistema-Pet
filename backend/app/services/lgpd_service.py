@@ -10,6 +10,9 @@ from app.whatsapp.security import DataAccessLog, DataDeletionRequest, DataPrivac
 
 
 DEFAULT_REQUEST_DUE_DAYS = 15
+COMPLETED_DELETION_SCRUB_NOTE = (
+    "Solicitacao de exclusao concluida; dados pessoais do titular foram anonimizados."
+)
 
 PREFERENCE_TYPES = (
     "marketing_email",
@@ -480,18 +483,32 @@ class PrivacyOpsService:
         }
 
         previous_payload = _json_load(row.response_payload, {}) or {}
+        safe_previous_payload = {}
+        if previous_payload.get("legacy_deletion_request_id"):
+            safe_previous_payload["legacy_deletion_request_id"] = previous_payload["legacy_deletion_request_id"]
         row.status = "completed"
         row.processed_by_user_id = processed_by_user_id
         row.processed_at = now
         row.updated_at = now
-        row.resolution_notes = resolution_notes or "Cliente anonimizado por solicitacao LGPD de exclusao."
-        row.response_payload = _json_dump({**previous_payload, **operation})
+        row.requester_name = f"Titular anonimizado #{cliente.id}"
+        row.requester_email = None
+        row.requester_phone = None
+        row.details = COMPLETED_DELETION_SCRUB_NOTE
+        row.request_payload = None
+        row.resolution_notes = COMPLETED_DELETION_SCRUB_NOTE
+        row.response_payload = _json_dump({**safe_previous_payload, **operation})
 
         legacy = self._linked_legacy_deletion_request(row)
         if legacy:
             legacy.status = "completed"
             legacy.processed_by_user_id = processed_by_user_id
             legacy.processed_at = now
+            legacy.reason = COMPLETED_DELETION_SCRUB_NOTE
+            legacy.contact_phone = None
+            legacy.contact_email = None
+            legacy.extra_metadata = _json_dump(
+                {"data_subject_request_id": row.id, "scrubbed_after_completion": True}
+            )
 
         self.log_data_access(
             subject_type="customer",
