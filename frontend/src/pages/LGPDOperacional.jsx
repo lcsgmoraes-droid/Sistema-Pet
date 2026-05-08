@@ -170,6 +170,9 @@ export default function LGPDOperacional() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState(null);
+  const [requestModalOpen, setRequestModalOpen] = useState(false);
+  const [newRequestModalOpen, setNewRequestModalOpen] = useState(false);
+  const [privacyModalOpen, setPrivacyModalOpen] = useState(false);
   const [processForm, setProcessForm] = useState({
     status: "in_review",
     resolution_notes: "",
@@ -225,8 +228,8 @@ export default function LGPDOperacional() {
     const rows = getRequests(response.data);
     setRequests(rows);
     setSelectedRequest((current) => {
-      if (!current) return rows[0] || null;
-      return rows.find((item) => item.id === current.id) || rows[0] || null;
+      if (current && rows.some((item) => item.id === current.id)) return current;
+      return null;
     });
   }, [requestsFilter]);
 
@@ -246,7 +249,7 @@ export default function LGPDOperacional() {
     setClienteRequests(rows);
     setSelectedRequest((current) => {
       if (current && rows.some((item) => item.id === current.id)) return current;
-      return rows[0] || null;
+      return null;
     });
     return rows;
   }, []);
@@ -285,7 +288,6 @@ export default function LGPDOperacional() {
       try {
         const rows = await buscarClientes({
           search: termo,
-          tipo_cadastro: "cliente",
           incluir_inativos: true,
           limit: 10,
         });
@@ -312,9 +314,14 @@ export default function LGPDOperacional() {
     }
   };
 
+  const handleSelectRequest = (request) => {
+    setSelectedRequest(request);
+    setRequestModalOpen(true);
+  };
+
   const carregarClientePrivacidade = async (clienteId = selectedClienteId) => {
     if (!clienteId) {
-      toast.error("Selecione um cliente primeiro.");
+      toast.error("Selecione um titular primeiro.");
       return;
     }
 
@@ -331,7 +338,7 @@ export default function LGPDOperacional() {
       setClienteRequests(requestRows || []);
       toast.success("Dados de privacidade carregados.");
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Nao foi possivel carregar o cliente.");
+      toast.error(error.response?.data?.detail || "Nao foi possivel carregar o titular.");
     } finally {
       setLoadingCliente(false);
     }
@@ -353,6 +360,7 @@ export default function LGPDOperacional() {
         current.map((item) => (item.id === updated?.id ? updated : item)),
       );
       setSelectedRequest(updated);
+      setRequestModalOpen(false);
       await loadStatus();
       toast.success("Solicitacao atualizada.");
     } catch (error) {
@@ -397,10 +405,11 @@ export default function LGPDOperacional() {
         setPrefs(getPreferenceState());
       }
       setAnonymizeDialogOpen(false);
+      setRequestModalOpen(false);
       await Promise.all([loadStatus(), loadRequests(), loadClienteRequests(updated?.subject_id)]);
-      toast.success("Cliente anonimizado com trilha de auditoria.");
+      toast.success("Titular anonimizado com trilha de auditoria.");
     } catch (error) {
-      toast.error(error.response?.data?.detail || "Nao foi possivel anonimizar o cliente.");
+      toast.error(error.response?.data?.detail || "Nao foi possivel anonimizar o titular.");
     } finally {
       setSaving(false);
     }
@@ -408,7 +417,7 @@ export default function LGPDOperacional() {
 
   const criarSolicitacao = async () => {
     if (!selectedClienteId) {
-      toast.error("Selecione o cliente titular.");
+      toast.error("Selecione o titular.");
       return;
     }
 
@@ -428,6 +437,8 @@ export default function LGPDOperacional() {
       setRequests((current) => [created, ...current].filter(Boolean));
       setClienteRequests((current) => [created, ...current].filter(Boolean));
       setSelectedRequest(created);
+      setNewRequestModalOpen(false);
+      setRequestModalOpen(true);
       setNewRequest({
         request_type: "access",
         details: "",
@@ -466,6 +477,7 @@ export default function LGPDOperacional() {
       setRequests((current) => [created, ...current].filter(Boolean));
       setClienteRequests((current) => [created, ...current].filter(Boolean));
       setSelectedRequest(created);
+      setRequestModalOpen(true);
       await loadStatus();
       toast.success("Solicitacao de exclusao aberta. Revise e confirme a anonimizacao.");
     } catch (error) {
@@ -477,7 +489,7 @@ export default function LGPDOperacional() {
 
   const salvarPreferencias = async () => {
     if (!selectedClienteId) {
-      toast.error("Selecione um cliente primeiro.");
+      toast.error("Selecione um titular primeiro.");
       return;
     }
 
@@ -571,7 +583,7 @@ export default function LGPDOperacional() {
 
       <Panel
         title="1. Buscar titular"
-        subtitle="Comece pelo cliente. A busca inclui ativos e inativos para permitir atendimento LGPD completo."
+        subtitle="Pesquise a pessoa que fez o pedido LGPD. A busca inclui clientes, fornecedores, veterinarios, funcionarios, ativos e inativos."
       >
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(380px,0.8fr)]">
           <div className="space-y-3">
@@ -581,11 +593,13 @@ export default function LGPDOperacional() {
                 setClienteTermo(value);
                 setClienteSelecionado(null);
                 setClienteRequests([]);
+                setSelectedRequest(null);
+                setRequestModalOpen(false);
                 setDossie(null);
                 setConsentimentos(null);
               }}
               onSelect={handleSelectCliente}
-              placeholder="Digite nome, codigo, CPF, email ou telefone do cliente..."
+              placeholder="Digite nome, codigo, CPF, email ou telefone do titular..."
               showSuggestions={clientesSugeridos.length > 0}
               suggestions={clientesSugeridos}
               value={clienteTermo}
@@ -618,7 +632,7 @@ export default function LGPDOperacional() {
               >
                 Carregar dados LGPD
               </ActionButton>
-              {selectedClienteId ? <CopyableCode label="Cliente" value={selectedClienteId} /> : null}
+              {selectedClienteId ? <CopyableCode label="Titular" value={selectedClienteId} /> : null}
             </div>
           </div>
 
@@ -635,6 +649,7 @@ export default function LGPDOperacional() {
                   <span>Email: {selectedCustomer.email || "-"}</span>
                   <span>Telefone: {selectedCustomer.telefone || selectedCustomer.celular || "-"}</span>
                   <span>Codigo: {selectedCustomer.codigo || "-"}</span>
+                  <span>Tipo: {selectedCustomer.tipo_cadastro || "-"}</span>
                   <span>ID: {selectedCustomer.id || "-"}</span>
                 </div>
                 <div className="flex flex-wrap gap-2">
@@ -651,14 +666,23 @@ export default function LGPDOperacional() {
                     icon={FileText}
                     intent="neutral"
                     tone="soft"
-                    onClick={() =>
+                    onClick={() => {
                       setNewRequest((current) => ({
                         ...current,
                         request_type: "access",
-                      }))
-                    }
+                      }));
+                      setNewRequestModalOpen(true);
+                    }}
                   >
-                    Registrar outro pedido
+                    Registrar pedido LGPD
+                  </ActionButton>
+                  <ActionButton
+                    icon={ShieldCheck}
+                    intent="neutral"
+                    tone="soft"
+                    onClick={() => setPrivacyModalOpen(true)}
+                  >
+                    Dossie e preferencias
                   </ActionButton>
                 </div>
               </div>
@@ -667,158 +691,213 @@ export default function LGPDOperacional() {
                 compact
                 icon={UserSearch}
                 title="Nenhum titular selecionado"
-                description="Pesquise o cliente primeiro; depois aparecem dossie, solicitacoes e exclusao."
+                description="Pesquise a pessoa primeiro; depois aparecem as solicitacoes abertas e as acoes LGPD."
               />
             )}
           </div>
         </div>
       </Panel>
 
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(420px,0.9fr)]">
-        <Panel
-          title={selectedClienteId ? "2. Solicitacoes deste titular" : "2. Fila de solicitacoes"}
-          subtitle={selectedClienteId ? "Pedidos LGPD vinculados ao cliente selecionado." : "Fila operacional geral enquanto nenhum titular esta selecionado."}
-          actions={
-            selectedClienteId ? null : (
-              <select
-                value={requestsFilter}
-                onChange={(event) => setRequestsFilter(event.target.value)}
-                className="h-9 rounded-lg border border-slate-300 px-3 text-sm"
-              >
-                <option value="">Todos os status</option>
-                {REQUEST_STATUS.map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            )
-          }
-        >
-          {loading ? (
-            <LoadingState compact label="Carregando solicitacoes..." />
-          ) : visibleRequests.length === 0 ? (
-            <EmptyState
-              compact
-              title={selectedClienteId ? "Nenhuma solicitacao para este titular" : "Nenhuma solicitacao neste filtro"}
-              description={selectedClienteId ? "Use Abrir exclusao LGPD ou registre outro pedido para iniciar o atendimento." : "Quando um titular pedir acesso, exportacao, correcao ou exclusao, o acompanhamento aparece aqui."}
-            />
+      <Panel
+        title={selectedClienteId ? "2. Solicitacoes deste titular" : "2. Fila de solicitacoes"}
+        subtitle={selectedClienteId ? "Clique em uma solicitacao para tratar em uma janela separada." : "Fila operacional geral enquanto nenhum titular esta selecionado."}
+        actions={
+          selectedClienteId ? (
+            <ActionButton
+              icon={FileText}
+              intent="neutral"
+              tone="soft"
+              onClick={() => setNewRequestModalOpen(true)}
+            >
+              Registrar pedido LGPD
+            </ActionButton>
           ) : (
-            <div className="max-h-[540px] space-y-2 overflow-y-auto pr-1">
-              {visibleRequests.map((request) => (
-                <RequestCard
-                  key={request.id}
-                  request={request}
-                  selected={requestToProcess?.id === request.id}
-                  onSelect={setSelectedRequest}
-                />
+            <select
+              value={requestsFilter}
+              onChange={(event) => setRequestsFilter(event.target.value)}
+              className="h-9 rounded-lg border border-slate-300 px-3 text-sm"
+            >
+              <option value="">Todos os status</option>
+              {REQUEST_STATUS.map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
               ))}
-            </div>
-          )}
-        </Panel>
+            </select>
+          )
+        }
+      >
+        {loading ? (
+          <LoadingState compact label="Carregando solicitacoes..." />
+        ) : visibleRequests.length === 0 ? (
+          <EmptyState
+            compact
+            title={selectedClienteId ? "Nenhuma solicitacao para este titular" : "Nenhuma solicitacao neste filtro"}
+            description={selectedClienteId ? "Use Abrir exclusao LGPD para exclusao/anonimizacao ou Registrar pedido LGPD para outros direitos do titular." : "Quando um titular pedir acesso, exportacao, correcao ou exclusao, o acompanhamento aparece aqui."}
+          />
+        ) : (
+          <div className="max-h-[560px] space-y-2 overflow-y-auto pr-1">
+            {visibleRequests.map((request) => (
+              <RequestCard
+                key={request.id}
+                request={request}
+                selected={requestToProcess?.id === request.id}
+                onSelect={handleSelectRequest}
+              />
+            ))}
+          </div>
+        )}
+      </Panel>
 
-        <div className="space-y-4">
-          <Panel
-            title="3. Resolver solicitacao"
-            subtitle="Atualize status ou execute a anonimizacao quando o pedido for de exclusao."
-          >
-            {requestToProcess ? (
-              <div className="space-y-3">
-                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div className="font-semibold text-slate-950">
-                      {REQUEST_TYPE_LABEL[requestToProcess.request_type] || requestToProcess.request_type}
-                    </div>
-                    <CopyableCode label="ID" value={requestToProcess.id} />
-                  </div>
-                  <div className="mt-2 grid gap-2 text-xs text-slate-600 sm:grid-cols-2">
-                    <span>Criada: {formatDate(requestToProcess.created_at)}</span>
-                    <span>Prazo: {formatDate(requestToProcess.due_at)}</span>
-                    <span>Solicitante: {requestToProcess.requester_name || "-"}</span>
-                    <span>Email: {requestToProcess.requester_email || "-"}</span>
-                  </div>
-                </div>
-
-                {requestToProcess.request_type === "deletion" && requestToProcess.subject_type === "customer" ? (
-                  <div className="rounded-lg border border-red-200 bg-red-50 p-3">
-                    <div className="flex items-start gap-2">
-                      <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
-                      <div className="min-w-0 text-sm">
-                        <div className="font-semibold text-red-900">
-                          Exclusao LGPD: proximo passo e anonimizar
-                        </div>
-                        <p className="mt-1 text-xs leading-relaxed text-red-700">
-                          Remove dados pessoais do cliente e dos pets, revoga consentimentos
-                          e preserva historico financeiro/vendas sem identificadores.
-                        </p>
-                      </div>
-                    </div>
-                    <ActionButton
-                      icon={Trash2}
-                      intent="delete"
-                      tone="soft"
-                      onClick={abrirDialogAnonimizacao}
-                      disabled={!canAnonymizeSelected}
-                      className="mt-3 w-full"
-                    >
-                      Anonimizar cliente
-                    </ActionButton>
-                  </div>
-                ) : null}
-
-                <label className="block text-sm font-medium text-slate-700">
-                  Status
-                  <select
-                    value={processForm.status}
-                    onChange={(event) =>
-                      setProcessForm((current) => ({
-                        ...current,
-                        status: event.target.value,
-                      }))
-                    }
-                    className="mt-1 h-9 w-full rounded-lg border border-slate-300 px-3 text-sm"
-                  >
-                    {REQUEST_STATUS.map(([value, label]) => (
-                      <option key={value} value={value}>
-                        {label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-
-                <label className="block text-sm font-medium text-slate-700">
-                  Observacao / resposta
-                  <textarea
-                    value={processForm.resolution_notes}
-                    onChange={(event) =>
-                      setProcessForm((current) => ({
-                        ...current,
-                        resolution_notes: event.target.value,
-                      }))
-                    }
-                    rows={4}
-                    className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
-                    placeholder="Registre o que foi feito, resposta enviada ou motivo da rejeicao..."
-                  />
-                </label>
-
-                <ActionButton
-                  icon={Save}
-                  intent="edit"
-                  onClick={processarSolicitacao}
-                  loading={saving}
-                  className="w-full"
-                >
-                  Salvar processamento
-                </ActionButton>
+      {requestModalOpen && requestToProcess ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4">
+          <div className="flex max-h-[92vh] w-full max-w-3xl flex-col rounded-lg bg-white shadow-xl">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 p-4">
+              <div>
+                <h3 className="text-base font-semibold text-slate-950">
+                  Tratar solicitacao LGPD
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Atualize o status ou execute a anonimizacao quando o pedido for de exclusao.
+                </p>
               </div>
-            ) : (
-              <EmptyState compact title="Selecione ou abra uma solicitacao" description="Para excluir dados, selecione o titular e clique em Abrir exclusao LGPD." />
-            )}
-          </Panel>
+              <button
+                type="button"
+                onClick={() => setRequestModalOpen(false)}
+                className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Fechar"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="space-y-3 overflow-y-auto p-4">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="font-semibold text-slate-950">
+                    {REQUEST_TYPE_LABEL[requestToProcess.request_type] || requestToProcess.request_type}
+                  </div>
+                  <CopyableCode label="ID" value={requestToProcess.id} />
+                </div>
+                <div className="mt-2 grid gap-2 text-xs text-slate-600 sm:grid-cols-2">
+                  <span>Criada: {formatDate(requestToProcess.created_at)}</span>
+                  <span>Prazo: {formatDate(requestToProcess.due_at)}</span>
+                  <span>Solicitante: {requestToProcess.requester_name || "-"}</span>
+                  <span>Email: {requestToProcess.requester_email || "-"}</span>
+                </div>
+              </div>
 
-          <Panel title="Registrar nova solicitacao" subtitle="Use quando o pedido chegar por telefone, loja ou atendimento.">
-            <div className="grid gap-3">
+              {requestToProcess.request_type === "deletion" && requestToProcess.subject_type === "customer" ? (
+                <div className="rounded-lg border border-red-200 bg-red-50 p-3">
+                  <div className="flex items-start gap-2">
+                    <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
+                    <div className="min-w-0 text-sm">
+                      <div className="font-semibold text-red-900">
+                        Exclusao LGPD: proximo passo e anonimizar
+                      </div>
+                      <p className="mt-1 text-xs leading-relaxed text-red-700">
+                        Remove dados pessoais do titular e dos pets, revoga consentimentos
+                        e preserva historico financeiro/vendas sem identificadores.
+                      </p>
+                    </div>
+                  </div>
+                  <ActionButton
+                    icon={Trash2}
+                    intent="delete"
+                    tone="soft"
+                    onClick={abrirDialogAnonimizacao}
+                    disabled={!canAnonymizeSelected}
+                    className="mt-3 w-full"
+                  >
+                    Anonimizar titular
+                  </ActionButton>
+                </div>
+              ) : null}
+
+              <label className="block text-sm font-medium text-slate-700">
+                Status
+                <select
+                  value={processForm.status}
+                  onChange={(event) =>
+                    setProcessForm((current) => ({
+                      ...current,
+                      status: event.target.value,
+                    }))
+                  }
+                  className="mt-1 h-9 w-full rounded-lg border border-slate-300 px-3 text-sm"
+                >
+                  {REQUEST_STATUS.map(([value, label]) => (
+                    <option key={value} value={value}>
+                      {label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="block text-sm font-medium text-slate-700">
+                Observacao / resposta
+                <textarea
+                  value={processForm.resolution_notes}
+                  onChange={(event) =>
+                    setProcessForm((current) => ({
+                      ...current,
+                      resolution_notes: event.target.value,
+                    }))
+                  }
+                  rows={4}
+                  className="mt-1 w-full rounded-lg border border-slate-300 px-3 py-2 text-sm"
+                  placeholder="Registre o que foi feito, resposta enviada ou motivo da rejeicao..."
+                />
+              </label>
+            </div>
+            <div className="flex flex-col-reverse gap-2 border-t border-slate-200 p-4 sm:flex-row sm:justify-end">
+              <ActionButton
+                intent="neutral"
+                tone="soft"
+                onClick={() => setRequestModalOpen(false)}
+                disabled={saving}
+              >
+                Fechar
+              </ActionButton>
+              <ActionButton
+                icon={Save}
+                intent="edit"
+                onClick={processarSolicitacao}
+                loading={saving}
+              >
+                Salvar processamento
+              </ActionButton>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {newRequestModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4">
+          <div className="w-full max-w-2xl rounded-lg bg-white shadow-xl">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 p-4">
+              <div>
+                <h3 className="text-base font-semibold text-slate-950">
+                  Registrar pedido LGPD
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Use quando o titular pediu acesso, exportacao, correcao, exclusao ou revogacao por telefone, loja ou atendimento.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setNewRequestModalOpen(false)}
+                className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Fechar"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+            <div className="grid gap-3 p-4">
+              {selectedCustomer ? (
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                  <CustomerIdentity customer={selectedCustomer} />
+                </div>
+              ) : null}
               <select
                 value={newRequest.request_type}
                 onChange={(event) =>
@@ -882,6 +961,16 @@ export default function LGPDOperacional() {
                 className="rounded-lg border border-slate-300 px-3 py-2 text-sm"
                 placeholder="Detalhes do pedido do titular..."
               />
+            </div>
+            <div className="flex flex-col-reverse gap-2 border-t border-slate-200 p-4 sm:flex-row sm:justify-end">
+              <ActionButton
+                intent="neutral"
+                tone="soft"
+                onClick={() => setNewRequestModalOpen(false)}
+                disabled={saving}
+              >
+                Cancelar
+              </ActionButton>
               <ActionButton
                 icon={FileText}
                 intent="create"
@@ -889,153 +978,175 @@ export default function LGPDOperacional() {
                 loading={saving}
                 disabled={!selectedClienteId}
               >
-                Registrar para o cliente selecionado
+                Registrar para o titular selecionado
               </ActionButton>
             </div>
-          </Panel>
+          </div>
         </div>
-      </div>
+      ) : null}
 
-      <Panel
-        title="4. Dossie e preferencias"
-        subtitle="Depois de selecionar o titular, carregue o dossie para exportar dados e ajustar consentimentos."
-        actions={
-          <ActionButton
-            icon={Download}
-            intent="neutral"
-            tone="soft"
-            onClick={exportarJson}
-            disabled={!dossie}
-          >
-            Exportar JSON
-          </ActionButton>
-        }
-      >
-        {!selectedClienteId ? (
-          <EmptyState
-            compact
-            icon={UserSearch}
-            title="Busque um titular primeiro"
-            description="A pesquisa fica no passo 1. Depois disso esta area mostra dossie, preferencias e historico."
-          />
-        ) : (
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-            <div className="space-y-3">
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <div className="flex flex-wrap items-start justify-between gap-2">
-                  {selectedCustomer ? <CustomerIdentity customer={selectedCustomer} /> : null}
-                  <StatusBadge intent={selectedCustomer?.ativo === false ? "neutral" : "success"}>
-                    {selectedCustomer?.ativo === false ? "Inativo" : "Ativo"}
-                  </StatusBadge>
-                </div>
-                <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-slate-600 sm:grid-cols-2">
-                  <span>Email: {selectedCustomer?.email || "-"}</span>
-                  <span>Telefone: {selectedCustomer?.telefone || selectedCustomer?.celular || "-"}</span>
-                  <span>Codigo: {selectedCustomer?.codigo || "-"}</span>
-                  <span>Gerado em: {formatDate(dossie?.generated_at)}</span>
-                </div>
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <ActionButton
-                    icon={Search}
-                    intent="edit"
-                    onClick={() => carregarClientePrivacidade()}
-                    loading={loadingCliente}
-                  >
-                    Carregar dossie e consentimentos
-                  </ActionButton>
-                  <CopyableCode label="Cliente" value={selectedClienteId} />
-                </div>
+      {privacyModalOpen ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4">
+          <div className="flex max-h-[92vh] w-full max-w-5xl flex-col rounded-lg bg-white shadow-xl">
+            <div className="flex items-start justify-between gap-3 border-b border-slate-200 p-4">
+              <div>
+                <h3 className="text-base font-semibold text-slate-950">
+                  Dossie e preferencias
+                </h3>
+                <p className="mt-1 text-sm text-slate-500">
+                  Use para exportar dados do titular ou ajustar consentimentos de comunicacao.
+                </p>
               </div>
-
-              {resumoDossie.length ? (
-                <div className="grid grid-cols-2 gap-2">
-                  {resumoDossie.map(([label, value]) => (
-                    <div key={label} className="rounded-lg border border-slate-200 bg-white p-3">
-                      <div className="text-xs font-medium text-slate-500">{label}</div>
-                      <div className="mt-1 text-lg font-bold text-slate-950">{value}</div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
+              <div className="flex items-center gap-2">
+                <ActionButton
+                  icon={Download}
+                  intent="neutral"
+                  tone="soft"
+                  onClick={exportarJson}
+                  disabled={!dossie}
+                >
+                  Exportar JSON
+                </ActionButton>
+                <button
+                  type="button"
+                  onClick={() => setPrivacyModalOpen(false)}
+                  className="rounded-md p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                  aria-label="Fechar"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              </div>
+            </div>
+            <div className="overflow-y-auto p-4">
+              {!selectedClienteId ? (
                 <EmptyState
                   compact
                   icon={UserSearch}
-                  title="Dossie ainda nao carregado"
-                  description="Clique em Carregar dossie e consentimentos para consultar os dados exportaveis."
+                  title="Busque um titular primeiro"
+                  description="Feche esta janela, selecione a pessoa no passo 1 e volte aqui se precisar exportar ou ajustar preferencias."
                 />
-              )}
-            </div>
-
-            <div className="space-y-4">
-              {dossie ? (
-                <>
-                  <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                    {PREFERENCES.map(([key, label, description]) => (
-                      <PreferenceToggle
-                        key={key}
-                        name={key}
-                        label={label}
-                        description={description}
-                        value={prefs[key]}
-                        onChange={(name, value) =>
-                          setPrefs((current) => ({ ...current, [name]: value }))
-                        }
-                      />
-                    ))}
-                  </div>
-
-                  <ActionButton
-                    icon={Save}
-                    intent="edit"
-                    onClick={salvarPreferencias}
-                    loading={saving}
-                  >
-                    Salvar preferencias
-                  </ActionButton>
-
-                  <div className="rounded-lg border border-slate-200">
-                    <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-2 text-sm font-semibold text-slate-900">
-                      <History className="h-4 w-4 text-slate-500" />
-                      Historico recente
-                    </div>
-                    <div className="max-h-64 overflow-y-auto">
-                      {consentimentos?.historico?.length ? (
-                        consentimentos.historico.slice(0, 20).map((item) => (
-                          <div key={item.id} className="border-b border-slate-100 px-3 py-2 text-xs last:border-b-0">
-                            <div className="flex flex-wrap items-center justify-between gap-2">
-                              <span className="font-medium text-slate-800">
-                                {item.consent_type}
-                              </span>
-                              <StatusBadge intent={item.consent_given && !item.revoked_at ? "success" : "danger"} size="xs">
-                                {item.consent_given && !item.revoked_at ? "Autorizado" : "Revogado"}
-                              </StatusBadge>
-                            </div>
-                            <div className="mt-1 text-slate-500">{formatDate(item.created_at)}</div>
-                            {item.consent_text ? (
-                              <div className="mt-1 text-slate-500">{item.consent_text}</div>
-                            ) : null}
-                          </div>
-                        ))
-                      ) : (
-                        <div className="p-4">
-                          <EmptyState compact title="Sem historico de consentimento" />
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </>
               ) : (
-                <EmptyState
-                  compact
-                  icon={ShieldCheck}
-                  title="Preferencias aguardando dossie"
-                  description="Carregue os dados do titular para revisar consentimentos e exportar o JSON."
-                />
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+                  <div className="space-y-3">
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                      <div className="flex flex-wrap items-start justify-between gap-2">
+                        {selectedCustomer ? <CustomerIdentity customer={selectedCustomer} /> : null}
+                        <StatusBadge intent={selectedCustomer?.ativo === false ? "neutral" : "success"}>
+                          {selectedCustomer?.ativo === false ? "Inativo" : "Ativo"}
+                        </StatusBadge>
+                      </div>
+                      <div className="mt-3 grid grid-cols-1 gap-2 text-xs text-slate-600 sm:grid-cols-2">
+                        <span>Email: {selectedCustomer?.email || "-"}</span>
+                        <span>Telefone: {selectedCustomer?.telefone || selectedCustomer?.celular || "-"}</span>
+                        <span>Codigo: {selectedCustomer?.codigo || "-"}</span>
+                        <span>Tipo: {selectedCustomer?.tipo_cadastro || "-"}</span>
+                        <span>Gerado em: {formatDate(dossie?.generated_at)}</span>
+                      </div>
+                      <div className="mt-3 flex flex-wrap items-center gap-2">
+                        <ActionButton
+                          icon={Search}
+                          intent="edit"
+                          onClick={() => carregarClientePrivacidade()}
+                          loading={loadingCliente}
+                        >
+                          Carregar dossie e consentimentos
+                        </ActionButton>
+                        <CopyableCode label="Titular" value={selectedClienteId} />
+                      </div>
+                    </div>
+
+                    {resumoDossie.length ? (
+                      <div className="grid grid-cols-2 gap-2">
+                        {resumoDossie.map(([label, value]) => (
+                          <div key={label} className="rounded-lg border border-slate-200 bg-white p-3">
+                            <div className="text-xs font-medium text-slate-500">{label}</div>
+                            <div className="mt-1 text-lg font-bold text-slate-950">{value}</div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <EmptyState
+                        compact
+                        icon={UserSearch}
+                        title="Dossie ainda nao carregado"
+                        description="Clique em Carregar dossie e consentimentos para consultar os dados exportaveis."
+                      />
+                    )}
+                  </div>
+
+                  <div className="space-y-4">
+                    {dossie ? (
+                      <>
+                        <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+                          {PREFERENCES.map(([key, label, description]) => (
+                            <PreferenceToggle
+                              key={key}
+                              name={key}
+                              label={label}
+                              description={description}
+                              value={prefs[key]}
+                              onChange={(name, value) =>
+                                setPrefs((current) => ({ ...current, [name]: value }))
+                              }
+                            />
+                          ))}
+                        </div>
+
+                        <ActionButton
+                          icon={Save}
+                          intent="edit"
+                          onClick={salvarPreferencias}
+                          loading={saving}
+                        >
+                          Salvar preferencias
+                        </ActionButton>
+
+                        <div className="rounded-lg border border-slate-200">
+                          <div className="flex items-center gap-2 border-b border-slate-200 px-3 py-2 text-sm font-semibold text-slate-900">
+                            <History className="h-4 w-4 text-slate-500" />
+                            Historico recente
+                          </div>
+                          <div className="max-h-64 overflow-y-auto">
+                            {consentimentos?.historico?.length ? (
+                              consentimentos.historico.slice(0, 20).map((item) => (
+                                <div key={item.id} className="border-b border-slate-100 px-3 py-2 text-xs last:border-b-0">
+                                  <div className="flex flex-wrap items-center justify-between gap-2">
+                                    <span className="font-medium text-slate-800">
+                                      {item.consent_type}
+                                    </span>
+                                    <StatusBadge intent={item.consent_given && !item.revoked_at ? "success" : "danger"} size="xs">
+                                      {item.consent_given && !item.revoked_at ? "Autorizado" : "Revogado"}
+                                    </StatusBadge>
+                                  </div>
+                                  <div className="mt-1 text-slate-500">{formatDate(item.created_at)}</div>
+                                  {item.consent_text ? (
+                                    <div className="mt-1 text-slate-500">{item.consent_text}</div>
+                                  ) : null}
+                                </div>
+                              ))
+                            ) : (
+                              <div className="p-4">
+                                <EmptyState compact title="Sem historico de consentimento" />
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <EmptyState
+                        compact
+                        icon={ShieldCheck}
+                        title="Preferencias aguardando dossie"
+                        description="Carregue os dados do titular para revisar consentimentos e exportar o JSON."
+                      />
+                    )}
+                  </div>
+                </div>
               )}
             </div>
           </div>
-        )}
-      </Panel>
+        </div>
+      ) : null}
 
       {anonymizeDialogOpen ? (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4">
@@ -1047,7 +1158,7 @@ export default function LGPDOperacional() {
                 </div>
                 <div>
                   <h3 className="text-base font-semibold text-slate-950">
-                    Anonimizar dados do cliente
+                    Anonimizar dados do titular
                   </h3>
                   <p className="mt-1 text-sm text-slate-500">
                     Essa acao remove identificadores pessoais e conclui a solicitacao LGPD.

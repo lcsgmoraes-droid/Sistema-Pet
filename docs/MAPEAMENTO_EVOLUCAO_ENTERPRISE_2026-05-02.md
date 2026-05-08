@@ -863,6 +863,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-08: migration complementar garante a tabela `data_access_logs` usada pela trilha de auditoria LGPD mesmo em ambientes que ja tinham consentimentos/exclusoes legados parcialmente criados.
 - 2026-05-08: busca de titular na LGPD passou a usar `PessoaSelector` com `incluir_inativos=true`, permitindo localizar clientes ja inativados pelo cadastro antes da anonimizacao.
 - 2026-05-08: tela LGPD reorganizada em fluxo guiado: cards de status, busca unica do titular, solicitacoes daquele cliente, acao explicita de exclusao/anonimizacao e dossie/preferencias apenas depois da selecao. Migration `nz20260508a5_lgpd_consent_audit_columns.py` alinha `data_privacy_consents` com as colunas de auditoria usadas pelo servico para evitar erro 500 no dossie.
+- 2026-05-08: LGPD operacional foi simplificada para tela principal com apenas busca do titular e fila de solicitacoes; tratamento, registro manual de pedido, dossie/exportacao e preferencias passaram para modais. A busca de titular deixou de filtrar apenas `tipo_cadastro=cliente`, permitindo localizar titulares cadastrados como veterinario/funcionario/fornecedor, como `Lucas Guerra de Moraes`.
 
 ### Nao fazer nesta onda
 
