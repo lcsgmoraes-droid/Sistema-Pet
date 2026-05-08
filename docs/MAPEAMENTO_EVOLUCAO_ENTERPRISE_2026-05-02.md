@@ -835,6 +835,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-07: PDV reforcou o padrao `SaleReference` em vendas em aberto, vendas recentes e historico do cliente, mantendo a venda copiavel no fluxo de atendimento.
 - 2026-05-07: `SaleReference` e codigos copiaveis foram aplicados em conciliacao de vendas, comissoes, devolucao e lista financeira, reduzindo exibicoes manuais de numero de venda/produto.
 - 2026-05-07: filtros de fornecedor em Valorizacao de Estoque e Validade Proxima passaram a usar `FornecedorSelector`, mantendo autocomplete, limpar e cadastro rapido no mesmo padrao dos demais fluxos.
+- 2026-05-07: filtros de fornecedor em Balanco de Estoque e na listagem de Pedidos de Compra tambem passaram a usar `FornecedorSelector`, removendo selects duplicados.
 
 ### Nao fazer nesta onda
 

@@ -1,4 +1,5 @@
 import { Filter, RefreshCw, Search, X } from 'lucide-react';
+import FornecedorSelector from '../fornecedores/FornecedorSelector';
 
 const STATUS_PEDIDO_OPTIONS = [
   { value: '', label: 'Todos' },
@@ -21,6 +22,11 @@ export default function PedidosCompraFiltros({
   onSelecionarStatus,
   pedidosCount,
 }) {
+  const fornecedorSelecionado =
+    fornecedoresOrdenados.find(
+      (fornecedor) => String(fornecedor.id) === String(filtrosPedidos.fornecedor_id),
+    ) || null;
+
   return (
     <form
       onSubmit={onAplicar}
@@ -74,21 +80,29 @@ export default function PedidosCompraFiltros({
             </div>
           </label>
 
-          <label className="block">
+          <div className="block">
             <span className="mb-1 block text-xs font-bold uppercase text-slate-500">Fornecedor</span>
-            <select
-              value={filtrosPedidos.fornecedor_id}
-              onChange={(event) => onAtualizarFiltro('fornecedor_id', event.target.value)}
-              className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:ring-2 focus:ring-blue-200"
-            >
-              <option value="">Todos os fornecedores</option>
-              {fornecedoresOrdenados.map((fornecedor) => (
-                <option key={fornecedor.id} value={fornecedor.id}>
-                  {fornecedor.nome}
-                </option>
-              ))}
-            </select>
-          </label>
+            <FornecedorSelector
+              fornecedores={fornecedoresOrdenados}
+              fornecedorId={filtrosPedidos.fornecedor_id}
+              fornecedorSelecionado={fornecedorSelecionado}
+              showLabel={false}
+              placeholder="Buscar fornecedor..."
+              inputClassName="rounded-lg border-slate-300"
+              onInputChange={(termo) => {
+                if (!termo || filtrosPedidos.fornecedor_id) {
+                  onAtualizarFiltro('fornecedor_id', '');
+                }
+              }}
+              onSelect={(fornecedor) =>
+                onAtualizarFiltro('fornecedor_id', fornecedor?.id ? String(fornecedor.id) : '')
+              }
+              onClear={() => onAtualizarFiltro('fornecedor_id', '')}
+              onFornecedorCriado={(fornecedor) =>
+                onAtualizarFiltro('fornecedor_id', fornecedor?.id ? String(fornecedor.id) : '')
+              }
+            />
+          </div>
 
           <label className="block">
             <span className="mb-1 block text-xs font-bold uppercase text-slate-500">Inicio</span>

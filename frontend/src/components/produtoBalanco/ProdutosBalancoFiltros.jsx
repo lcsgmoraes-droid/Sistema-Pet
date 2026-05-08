@@ -1,3 +1,5 @@
+import FornecedorSelector from "../fornecedores/FornecedorSelector";
+
 function ProdutosBalancoFiltros({
   filtros,
   fornecedores,
@@ -5,6 +7,11 @@ function ProdutosBalancoFiltros({
   onAtualizarFiltro,
   onAplicarFiltros,
 }) {
+  const fornecedorSelecionado =
+    fornecedores.find(
+      (fornecedor) => String(fornecedor.id) === String(filtros.fornecedor_id),
+    ) || null;
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-4">
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -35,18 +42,26 @@ function ProdutosBalancoFiltros({
           ))}
         </select>
 
-        <select
-          value={filtros.fornecedor_id}
-          onChange={(e) => onAtualizarFiltro("fornecedor_id", e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
-        >
-          <option value="">Todos os fornecedores</option>
-          {fornecedores.map((fornecedor) => (
-            <option key={fornecedor.id} value={fornecedor.id}>
-              {fornecedor.nome}
-            </option>
-          ))}
-        </select>
+        <FornecedorSelector
+          fornecedores={fornecedores}
+          fornecedorId={filtros.fornecedor_id}
+          fornecedorSelecionado={fornecedorSelecionado}
+          showLabel={false}
+          placeholder="Buscar fornecedor..."
+          inputClassName="rounded-lg border-gray-300"
+          onInputChange={(termo) => {
+            if (!termo || filtros.fornecedor_id) {
+              onAtualizarFiltro("fornecedor_id", "");
+            }
+          }}
+          onSelect={(fornecedor) =>
+            onAtualizarFiltro("fornecedor_id", fornecedor?.id ? String(fornecedor.id) : "")
+          }
+          onClear={() => onAtualizarFiltro("fornecedor_id", "")}
+          onFornecedorCriado={(fornecedor) =>
+            onAtualizarFiltro("fornecedor_id", fornecedor?.id ? String(fornecedor.id) : "")
+          }
+        />
 
         <button
           type="button"
