@@ -857,6 +857,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-08: Login ERP/e-commerce recebeu trava configuravel por tentativas falhas, auditoria de eventos sensiveis, registro de ultimo login/IP, revogacao de sessoes apos troca de senha e hardening de headers/CORS para reduzir risco antes do go-live.
 - 2026-05-08: Endpoints LGPD legados do WhatsApp tiveram listagem/processamento de solicitacoes de exclusao e log de auditoria corrigidos para voltar a bater com os campos reais do banco.
 - 2026-05-08: Termos de Uso e Politica de Privacidade foram expandidos para cobrir ERP, app, e-commerce, tenant, cookies, integracoes, retencao, direitos dos titulares, incidentes, IA, comunicacoes e canal de privacidade sem aviso juridico para o cliente final.
+- 2026-05-08: LGPD operacional iniciada com dossie/exportacao de cliente, historico de consentimentos, preferencias de comunicacao, solicitacoes gerais de titulares e trilha de acesso tanto no ERP (`/lgpd`) quanto no app/e-commerce (`/app/privacidade`).
 
 ### Nao fazer nesta onda
 

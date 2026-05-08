@@ -147,6 +147,7 @@ from app.health_router import router as health_router  # Sprint 9: Health & Moni
 from app.admin_fix_routes import router as admin_fix_router  # Correções administrativas
 from app.routes.health_routes import router as health_check_router  # FASE 8: Healthcheck + Readiness
 from app.routes.error_events_routes import router as error_events_router  # Observabilidade operacional
+from app.lgpd_routes import router as lgpd_router  # LGPD operacional
 
 # ============================================================================
 # E-COMMERCE - Loja Pública
@@ -158,6 +159,7 @@ from app.routes.ecommerce_cart import router as ecommerce_cart_router
 from app.routes.ecommerce_checkout import router as ecommerce_checkout_router
 from app.routes.app_banho_tosa_routes import router as app_banho_tosa_router
 from app.routes.app_mobile_routes import router as app_mobile_router
+from app.routes.app_privacy_routes import router as app_privacy_router
 from app.routes.ecommerce_webhooks import router as ecommerce_webhooks_router
 from app.routes.ecommerce_aparencia_routes import router as ecommerce_aparencia_router
 from app.routes.ecommerce_config_routes import router as ecommerce_config_router
@@ -892,6 +894,7 @@ app.include_router(whatsapp_websocket_router)  # Sprint 5: WebSocket Real-time
 app.include_router(whatsapp_api_router)  # Sprint 6: Tools & Tests (com auth)
 app.include_router(whatsapp_analytics_router)  # Sprint 7: Analytics & Reports (com auth)
 app.include_router(whatsapp_security_router)  # Sprint 8: Security & LGPD (com auth)
+app.include_router(lgpd_router)  # LGPD operacional geral (com auth)
 app.include_router(health_router)  # Sprint 9: Health & Monitoring (sem auth)
 app.include_router(admin_fix_router)  # Correções administrativas
 
@@ -912,6 +915,7 @@ app.include_router(ecommerce_analytics_router)
 app.include_router(ecommerce_drive_router)     # Drive pickup — PDV + cliente
 app.include_router(sefaz_router)               # SEFAZ — consulta NF-e por chave
 app.include_router(app_mobile_router)  # App Mobile - Rotas dos clientes
+app.include_router(app_privacy_router)  # App Mobile - Privacidade/LGPD
 app.include_router(app_banho_tosa_router)  # App Mobile - Banho & Tosa
 app.include_router(campaigns_router)   # Motor de Campanhas
 app.include_router(canal_descontos_router)  # Descontos Globais por Canal (Ecommerce / App)
