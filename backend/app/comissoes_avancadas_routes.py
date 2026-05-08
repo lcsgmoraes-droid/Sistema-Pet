@@ -57,6 +57,7 @@ struct_logger = StructuredLogger()
             summary="Conferência avançada com filtros por produto e período")
 def conferencia_com_filtros_avancados(
     funcionario_id: int,
+    _user_and_tenant=Depends(get_current_user_and_tenant),
     grupo_produto: Optional[int] = Query(None, description="Filtro por grupo/categoria de produto"),
     produto_id: Optional[int] = Query(None, description="Filtro por produto específico"),
     data_inicio: Optional[date] = Query(None, description="Data inicial do período"),
@@ -295,7 +296,9 @@ def conferencia_com_filtros_avancados(
 
 
 @router.get("/formas-pagamento", summary="Lista de formas de pagamento disponíveis")
-def listar_formas_pagamento() -> ListaFormasPagamento:
+def listar_formas_pagamento(
+    _user_and_tenant=Depends(get_current_user_and_tenant),
+) -> ListaFormasPagamento:
     """
     Lista todas as formas de pagamento disponíveis para comissões.
     

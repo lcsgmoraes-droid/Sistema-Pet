@@ -410,7 +410,8 @@ def listar_comissoes_abertas(
 def listar_comissoes_funcionario_para_fechamento(
     funcionario_id: int,
     data_inicio: Optional[date] = Query(None, description="Data inicial do filtro"),
-    data_fim: Optional[date] = Query(None, description="Data final do filtro")
+    data_fim: Optional[date] = Query(None, description="Data final do filtro"),
+    _user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     SPRINT 6 - PASSO 2/5: CONFERÊNCIA POR FUNCIONÁRIO

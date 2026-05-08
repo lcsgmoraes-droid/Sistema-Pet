@@ -546,7 +546,10 @@ def exportar_dre_excel(
 # ==================== DRE POR CANAL ====================
 
 @router.get("/canais")
-def listar_canais_disponiveis():
+def listar_canais_disponiveis(
+    db: Session = Depends(get_db),
+    _user_and_tenant=Depends(get_current_user_and_tenant),
+):
     """
     Lista todos os canais de venda disponíveis
     

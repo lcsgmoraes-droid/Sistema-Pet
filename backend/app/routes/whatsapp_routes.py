@@ -312,7 +312,9 @@ async def test_tool(
 
 
 @router.get("/tools")
-async def list_tools():
+async def list_tools(
+    _user_and_tenant=Depends(get_current_user_and_tenant),
+):
     """Lista todas as tools disponíveis para a IA"""
     
     tools = []
@@ -321,7 +323,7 @@ async def list_tools():
         tools.append({
             "name": func["name"],
             "description": func["description"],
-            "parameters": func["parameters"]["properties"].keys()
+            "parameters": list(func["parameters"]["properties"].keys())
         })
     
     return {

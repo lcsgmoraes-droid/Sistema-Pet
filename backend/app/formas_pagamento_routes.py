@@ -138,7 +138,11 @@ def criar_taxa(
 
 
 @router.get("/taxas/{forma_pagamento_id}", response_model=List[FormaPagamentoTaxaResponse])
-def listar_taxas(forma_pagamento_id: int, db: Session = Depends(get_session)):
+def listar_taxas(
+    forma_pagamento_id: int,
+    db: Session = Depends(get_session),
+    _user_and_tenant=Depends(get_current_user_and_tenant),
+):
     """Listar todas as taxas de uma forma de pagamento"""
     
     taxas = db.query(FormaPagamentoTaxa).filter(

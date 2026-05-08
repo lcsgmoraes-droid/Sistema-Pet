@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 
 from app.db import get_session as get_db
+from app.auth.dependencies import get_current_user_and_tenant
 from app.services.fiscal_sugestao_service import sugerir_fiscal_por_descricao
 
 router = APIRouter(prefix="/fiscal/sugestao", tags=["Fiscal"])
@@ -10,6 +11,7 @@ router = APIRouter(prefix="/fiscal/sugestao", tags=["Fiscal"])
 @router.post("/produto")
 def sugestao_fiscal_produto(
     descricao: str,
+    _user_and_tenant=Depends(get_current_user_and_tenant),
     db: Session = Depends(get_db)
 ):
     """
