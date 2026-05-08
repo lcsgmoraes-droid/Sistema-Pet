@@ -10,6 +10,9 @@ import {
   criarExclusaoCampanhaValidade,
   removerExclusaoCampanhaValidade,
 } from "../api/campanhasValidade";
+import FornecedorSelector, {
+  getFornecedorNome,
+} from "../components/fornecedores/FornecedorSelector";
 import useProdutosCatalogos from "../hooks/useProdutosCatalogos";
 
 const ITENS_POR_PAGINA_INICIAL = 20;
@@ -22,6 +25,7 @@ const filtrosIniciais = {
   marca_id: "",
   departamento_id: "",
   fornecedor_id: "",
+  fornecedor_busca: "",
   apenas_com_estoque: true,
   ordenacao: "validade_asc",
   page_size: ITENS_POR_PAGINA_INICIAL,
@@ -276,6 +280,27 @@ export default function ProdutosValidadeProxima({
     setFiltrosForm((prev) => ({
       ...prev,
       [campo]: valor,
+    }));
+  };
+
+  const fornecedorFiltroSelecionado =
+    fornecedores.find(
+      (fornecedor) => String(fornecedor.id) === String(filtrosForm.fornecedor_id),
+    ) || null;
+
+  const selecionarFornecedorFiltro = (fornecedor) => {
+    setFiltrosForm((prev) => ({
+      ...prev,
+      fornecedor_id: fornecedor?.id ? String(fornecedor.id) : "",
+      fornecedor_busca: getFornecedorNome(fornecedor),
+    }));
+  };
+
+  const limparFornecedorFiltro = () => {
+    setFiltrosForm((prev) => ({
+      ...prev,
+      fornecedor_id: "",
+      fornecedor_busca: "",
     }));
   };
 
@@ -688,23 +713,24 @@ export default function ProdutosValidadeProxima({
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Fornecedor
-            </label>
-            <select
-              value={filtrosForm.fornecedor_id}
-              onChange={(event) =>
-                atualizarFiltro("fornecedor_id", event.target.value)
+            <FornecedorSelector
+              fornecedores={fornecedores}
+              fornecedorId={filtrosForm.fornecedor_id}
+              fornecedorSelecionado={fornecedorFiltroSelecionado}
+              value={filtrosForm.fornecedor_busca}
+              placeholder="Buscar fornecedor..."
+              inputClassName="rounded-xl border-gray-300 py-2.5"
+              onInputChange={(termo) =>
+                setFiltrosForm((prev) => ({
+                  ...prev,
+                  fornecedor_id: "",
+                  fornecedor_busca: termo,
+                }))
               }
-              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-            >
-              <option value="">Todos os fornecedores</option>
-              {fornecedores.map((fornecedor) => (
-                <option key={fornecedor.id} value={fornecedor.id}>
-                  {fornecedor.nome}
-                </option>
-              ))}
-            </select>
+              onSelect={selecionarFornecedorFiltro}
+              onClear={limparFornecedorFiltro}
+              onFornecedorCriado={selecionarFornecedorFiltro}
+            />
           </div>
         </div>
 

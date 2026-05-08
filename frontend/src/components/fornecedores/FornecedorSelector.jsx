@@ -3,7 +3,7 @@ import { Building2, Plus, Search, X } from "lucide-react";
 import { buscarClientes, criarCliente } from "../../api/clientes";
 import ActionButton from "../ui/ActionButton";
 
-function getFornecedorNome(fornecedor) {
+export function getFornecedorNome(fornecedor) {
   return (
     fornecedor?.nome ||
     fornecedor?.razao_social ||
