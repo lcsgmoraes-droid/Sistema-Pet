@@ -7,10 +7,30 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.models import Cliente
+from app.security.permissions_service import check_permission
 from app.services.lgpd_service import PREFERENCE_TYPES, PrivacyOpsService
 
 
-router = APIRouter(prefix="/lgpd", tags=["LGPD"])
+def _require_lgpd_ops_permission(
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    current_user, tenant_id = user_and_tenant
+    check_permission(
+        db,
+        current_user.id,
+        "usuarios.manage",
+        tenant_id,
+        current_user=current_user,
+    )
+    return user_and_tenant
+
+
+router = APIRouter(
+    prefix="/lgpd",
+    tags=["LGPD"],
+    dependencies=[Depends(_require_lgpd_ops_permission)],
+)
 
 REQUEST_TYPES = {"access", "export", "correction", "deletion", "revocation", "information"}
 
@@ -39,6 +59,11 @@ class SubjectRequestProcess(BaseModel):
     status: str
     resolution_notes: Optional[str] = None
     response_payload: Optional[dict] = None
+
+
+class SubjectRequestAnonymize(BaseModel):
+    confirmacao: str
+    resolution_notes: Optional[str] = None
 
 
 def _request_ip(request: Request) -> str | None:
@@ -173,6 +198,37 @@ def criar_solicitacao_lgpd(
     )
     db.commit()
     return {"request": service._serialize_request(row)}
+
+
+@router.post("/solicitacoes/{request_id}/anonimizar")
+def anonimizar_cliente_por_solicitacao_lgpd(
+    request_id: int,
+    payload: SubjectRequestAnonymize,
+    request: Request,
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
+    current_user, tenant_id = user_and_tenant
+    if (payload.confirmacao or "").strip().upper() != "ANONIMIZAR":
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Digite ANONIMIZAR para confirmar a operacao.",
+        )
+
+    service = _service(db, tenant_id)
+    try:
+        row, operation = service.anonymize_customer_from_request(
+            request_id=request_id,
+            processed_by_user_id=current_user.id,
+            resolution_notes=payload.resolution_notes,
+            ip_address=_request_ip(request),
+            user_agent=request.headers.get("user-agent"),
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+    db.commit()
+    return {"request": service._serialize_request(row), "operation": operation}
 
 
 @router.get("/solicitacoes")

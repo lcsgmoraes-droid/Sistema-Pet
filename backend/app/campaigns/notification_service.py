@@ -36,6 +36,8 @@ logger = logging.getLogger(__name__)
 _CONSENT_ALIASES = {
     "marketing_email": ("marketing_email", "marketing"),
     "marketing_push": ("marketing_push", "marketing"),
+    "marketing_whatsapp": ("marketing_whatsapp", "whatsapp", "marketing"),
+    "marketing_sms": ("marketing_sms", "sms", "marketing"),
 }
 
 
@@ -87,6 +89,24 @@ def can_send_marketing_push(db: Session, *, tenant_id, customer_id: int | None) 
         tenant_id=tenant_id,
         customer_id=customer_id,
         consent_type="marketing_push",
+    )
+
+
+def can_send_marketing_whatsapp(db: Session, *, tenant_id, customer_id: int | None) -> bool:
+    return _customer_allows_contact(
+        db,
+        tenant_id=tenant_id,
+        customer_id=customer_id,
+        consent_type="marketing_whatsapp",
+    )
+
+
+def can_send_marketing_sms(db: Session, *, tenant_id, customer_id: int | None) -> bool:
+    return _customer_allows_contact(
+        db,
+        tenant_id=tenant_id,
+        customer_id=customer_id,
+        consent_type="marketing_sms",
     )
 
 

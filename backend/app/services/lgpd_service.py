@@ -347,6 +347,166 @@ class PrivacyOpsService:
         )
         return row
 
+    def anonymize_customer_from_request(
+        self,
+        *,
+        request_id: int,
+        processed_by_user_id: int,
+        resolution_notes: str | None = None,
+        ip_address: str | None = None,
+        user_agent: str | None = None,
+    ) -> tuple[DataSubjectRequest, dict[str, Any]]:
+        from app.models import Cliente, Pet
+
+        row = (
+            self.db.query(DataSubjectRequest)
+            .filter(DataSubjectRequest.tenant_id == self.tenant_id, DataSubjectRequest.id == request_id)
+            .first()
+        )
+        if not row:
+            raise ValueError("Solicitacao LGPD nao encontrada")
+        if row.subject_type != "customer":
+            raise ValueError("Anonimizacao automatica disponivel apenas para clientes")
+        if row.request_type != "deletion":
+            raise ValueError("Anonimizacao exige uma solicitacao do tipo exclusao")
+        if row.status in {"completed", "cancelled", "rejected"}:
+            raise ValueError("Solicitacao ja foi encerrada")
+
+        try:
+            cliente_id = int(row.subject_id)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Titular da solicitacao nao aponta para um cliente valido") from exc
+
+        cliente = (
+            self.db.query(Cliente)
+            .filter(Cliente.tenant_id == self.tenant_id, Cliente.id == cliente_id)
+            .first()
+        )
+        if not cliente:
+            raise ValueError("Cliente nao encontrado para anonimizacao")
+
+        now = utcnow()
+        pets = (
+            self.db.query(Pet)
+            .filter(Pet.tenant_id == self.tenant_id, Pet.cliente_id == cliente.id)
+            .all()
+        )
+
+        cliente.nome = f"Cliente anonimizado #{cliente.id}"
+        cliente.ativo = False
+        cliente.updated_at = now
+        for field in (
+            "cpf",
+            "telefone",
+            "celular",
+            "email",
+            "data_nascimento",
+            "cnpj",
+            "inscricao_estadual",
+            "razao_social",
+            "nome_fantasia",
+            "responsavel",
+            "crmv",
+            "parceiro_observacoes",
+            "parceiro_email_principal",
+            "parceiro_emails_copia",
+            "cep",
+            "endereco",
+            "numero",
+            "complemento",
+            "bairro",
+            "cidade",
+            "estado",
+            "endereco_entrega",
+            "endereco_entrega_2",
+            "enderecos_adicionais",
+            "observacoes",
+        ):
+            if hasattr(cliente, field):
+                setattr(cliente, field, None)
+
+        for pet in pets:
+            pet.nome = f"Pet anonimizado #{pet.id}"
+            pet.ativo = False
+            pet.updated_at = now
+            for field in (
+                "data_nascimento",
+                "idade_aproximada",
+                "peso",
+                "cor",
+                "cor_pelagem",
+                "microchip",
+                "alergias",
+                "alergias_lista",
+                "doencas_cronicas",
+                "condicoes_cronicas_lista",
+                "medicamentos_continuos",
+                "medicamentos_continuos_lista",
+                "restricoes_alimentares_lista",
+                "historico_clinico",
+                "tipo_sanguineo",
+                "pedigree_registro",
+                "castrado_data",
+                "observacoes",
+                "foto_url",
+            ):
+                if hasattr(pet, field):
+                    setattr(pet, field, None)
+
+        revoked_consents = 0
+        active_consents = (
+            self.db.query(DataPrivacyConsent)
+            .filter(
+                DataPrivacyConsent.tenant_id == self.tenant_id,
+                DataPrivacyConsent.subject_type == "customer",
+                DataPrivacyConsent.subject_id == str(cliente.id),
+                DataPrivacyConsent.revoked_at.is_(None),
+            )
+            .all()
+        )
+        for consent in active_consents:
+            consent.revoked_at = now
+            consent.revoke_reason = "anonimizacao_lgpd"
+            consent.updated_at = now
+            revoked_consents += 1
+
+        operation = {
+            "operation": "customer_anonymization",
+            "cliente_id": cliente.id,
+            "cliente_codigo": cliente.codigo,
+            "pets_anonymized": len(pets),
+            "consents_revoked": revoked_consents,
+            "completed_at": now.isoformat(),
+        }
+
+        previous_payload = _json_load(row.response_payload, {}) or {}
+        row.status = "completed"
+        row.processed_by_user_id = processed_by_user_id
+        row.processed_at = now
+        row.updated_at = now
+        row.resolution_notes = resolution_notes or "Cliente anonimizado por solicitacao LGPD de exclusao."
+        row.response_payload = _json_dump({**previous_payload, **operation})
+
+        legacy = self._linked_legacy_deletion_request(row)
+        if legacy:
+            legacy.status = "completed"
+            legacy.processed_by_user_id = processed_by_user_id
+            legacy.processed_at = now
+
+        self.log_data_access(
+            subject_type="customer",
+            subject_id=str(cliente.id),
+            access_type="delete",
+            resource_type="customer_anonymization",
+            resource_id=str(cliente.id),
+            accessed_by_user_id=processed_by_user_id,
+            ip_address=ip_address,
+            user_agent=user_agent,
+            justification="Anonimizacao LGPD executada preservando historico operacional",
+            flush_only=True,
+        )
+        return row, operation
+
     def export_customer_data(
         self,
         *,
@@ -503,6 +663,24 @@ class PrivacyOpsService:
             }
             for row in rows
         ]
+
+    def _linked_legacy_deletion_request(self, row: DataSubjectRequest) -> DataDeletionRequest | None:
+        payload = _json_load(row.response_payload, {}) or {}
+        legacy_id = payload.get("legacy_deletion_request_id")
+        query = self.db.query(DataDeletionRequest).filter(
+            DataDeletionRequest.tenant_id == self.tenant_id,
+            DataDeletionRequest.subject_type == row.subject_type,
+            DataDeletionRequest.subject_id == str(row.subject_id),
+        )
+        if legacy_id:
+            return query.filter(DataDeletionRequest.id == legacy_id).first()
+
+        candidates = query.order_by(DataDeletionRequest.request_date.desc(), DataDeletionRequest.id.desc()).limit(50).all()
+        for candidate in candidates:
+            metadata = _json_load(candidate.extra_metadata, {}) or {}
+            if str(metadata.get("data_subject_request_id")) == str(row.id):
+                return candidate
+        return None
 
     def _access_logs(self, subject_type: str, subject_id: str) -> list[dict[str, Any]]:
         rows = (
