@@ -1033,12 +1033,38 @@ def _carregar_vendas_sugestao(
         .all()
     )
 
+    referencias_venda = {
+        int(row.referencia_id)
+        for row in movimentos_rows
+        if row.referencia_id
+        and str(row.referencia_tipo or "").strip().lower() == "venda"
+    }
+    vendas_referenciadas_validas = set()
+    if referencias_venda:
+        vendas_referenciadas_validas = {
+            int(venda_id)
+            for (venda_id,) in (
+                db.query(Venda.id)
+                .filter(
+                    Venda.tenant_id == tenant_id,
+                    Venda.id.in_(referencias_venda),
+                    Venda.status.notin_(["cancelada", "devolvida"]),
+                )
+                .all()
+            )
+        }
+
     for row in movimentos_rows:
         produto_id = int(row.produto_id)
         referencia_tipo = str(row.referencia_tipo or "").strip().lower()
         motivo = str(row.motivo or "").strip().lower()
         referencia_id = int(row.referencia_id) if row.referencia_id else None
         tem_item_direto = bool(referencia_id and (referencia_id, produto_id) in pares_venda_produto)
+        venda_referenciada_valida = bool(
+            referencia_id
+            and referencia_tipo == "venda"
+            and referencia_id in vendas_referenciadas_validas
+        )
         origem_externa = (
             referencia_tipo == "venda_bling"
             or "bling" in referencia_tipo
@@ -1046,16 +1072,15 @@ def _carregar_vendas_sugestao(
             or "online" in motivo
         )
         consumo_derivado = bool(
-            referencia_id
-            and referencia_tipo == "venda"
+            venda_referenciada_valida
             and not tem_item_direto
         )
 
         # Venda direta ja contabilizada pela tabela de vendas. Aqui entram apenas
         # consumos que nao aparecem como item desse produto na venda.
-        if tem_item_direto and not origem_externa:
+        if tem_item_direto:
             continue
-        if not (consumo_derivado or origem_externa or produto_id not in stats_por_produto):
+        if not (consumo_derivado or origem_externa):
             continue
 
         origem = "granel_kit" if consumo_derivado else "bling"
