@@ -163,6 +163,10 @@ def _hash_token(raw_token: str) -> str:
     return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
 
 
+def _issue_numeric_code() -> str:
+    return f"{secrets.randbelow(1_000_000):06d}"
+
+
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -176,7 +180,7 @@ def _mark_user_consent(user: User, request: Request, terms_version: str | None, 
 
 
 def _issue_email_verification_token(user: User) -> str:
-    raw_token = secrets.token_urlsafe(32)
+    raw_token = _issue_numeric_code()
     user.email_verification_token_hash = _hash_token(raw_token)
     user.email_verification_token_expires = _now_utc() + timedelta(hours=EMAIL_VERIFICATION_TOKEN_HOURS)
     user.email_verification_sent_at = _now_utc()
@@ -201,12 +205,12 @@ def _build_email_verification_email(user: User, raw_token: str, verification_lin
               Confirmar e-mail
             </a>
           </p>
-          <p>Se o botao nao abrir, copie este token na tela de confirmacao:</p>
+          <p>Se preferir, tambem pode digitar este codigo na tela de confirmacao:</p>
           <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 16px; margin: 18px 0;">
-            <div style="font-size: 13px; color: #1d4ed8; margin-bottom: 6px;">Token de confirmacao</div>
-            <div style="font-size: 20px; font-weight: 700; letter-spacing: 0.4px; word-break: break-all;">{raw_token}</div>
+            <div style="font-size: 13px; color: #1d4ed8; margin-bottom: 6px;">Codigo de confirmacao</div>
+            <div style="font-size: 28px; font-weight: 800; letter-spacing: 6px;">{raw_token}</div>
           </div>
-          <p>Esse token expira em <strong>{EMAIL_VERIFICATION_TOKEN_HOURS} horas</strong>.</p>
+          <p>Esse codigo expira em <strong>{EMAIL_VERIFICATION_TOKEN_HOURS} horas</strong>.</p>
           <p>Se voce nao criou esta conta, ignore este e-mail.</p>
         </div>
       </body>
@@ -216,7 +220,7 @@ def _build_email_verification_email(user: User, raw_token: str, verification_lin
         "Confirme seu e-mail - Pet Shop Pro\n\n"
         "Acesse o link abaixo para ativar sua conta:\n"
         f"{verification_link}\n\n"
-        "Ou use este token manualmente na tela de confirmacao:\n"
+        "Ou use este codigo manualmente na tela de confirmacao:\n"
         f"{raw_token}\n\n"
         f"Validade: {EMAIL_VERIFICATION_TOKEN_HOURS} horas.\n"
         "Se voce nao criou esta conta, ignore este e-mail."
@@ -271,12 +275,11 @@ def _build_password_reset_email(user: User, reset_token: str, reset_link: str) -
               Redefinir minha senha
             </a>
           </p>
-          <p>Se preferir, use este token manualmente na tela de recuperacao:</p>
-          <div style="background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 10px; padding: 16px; margin: 18px 0;">
-            <div style="font-size: 13px; color: #6d28d9; margin-bottom: 6px;">Token de recuperacao</div>
-            <div style="font-size: 20px; font-weight: 700; letter-spacing: 0.4px; word-break: break-all;">{reset_token}</div>
+          <p>Se o botao nao abrir, copie e cole este link no navegador:</p>
+          <div style="background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 10px; padding: 14px; margin: 18px 0; word-break: break-all; font-size: 13px; color: #5b21b6;">
+            {reset_link}
           </div>
-          <p>Esse token expira em <strong>{RESET_TOKEN_MINUTES} minutos</strong>.</p>
+          <p>Esse link expira em <strong>{RESET_TOKEN_MINUTES} minutos</strong>.</p>
           <p>Se voce nao pediu essa alteracao, pode ignorar este e-mail com seguranca.</p>
         </div>
       </body>
@@ -286,8 +289,6 @@ def _build_password_reset_email(user: User, reset_token: str, reset_link: str) -
         "Recuperacao de senha - Pet Shop Pro\n\n"
         "Acesse o link abaixo para redefinir sua senha:\n"
         f"{reset_link}\n\n"
-        "Ou use este token manualmente na tela de recuperacao:\n"
-        f"{reset_token}\n\n"
         f"Validade: {RESET_TOKEN_MINUTES} minutos.\n"
         "Se voce nao pediu essa alteracao, ignore este e-mail."
     )
@@ -561,14 +562,22 @@ def login_multitenant(request: Request, credentials: LoginRequest, db: Session =
 
 @router.post("/verify-email")
 def verify_email(payload: VerifyEmailRequest, db: Session = Depends(get_session)):
+    email = (payload.email or "").strip().lower()
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Informe o e-mail para confirmar a conta",
+        )
+
     token_hash = _hash_token(payload.token.strip())
-    query = db.query(User).filter(User.email_verification_token_hash == token_hash)
-    if payload.email:
-        query = query.filter(User.email == payload.email.strip().lower())
+    query = db.query(User).filter(
+        User.email == email,
+        User.email_verification_token_hash == token_hash,
+    )
     user = query.first()
 
     if not user or _is_token_expired(user.email_verification_token_expires):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token de confirmacao invalido ou expirado")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Codigo de confirmacao invalido ou expirado")
 
     user.email_verified = True
     user.email_verified_at = _now_utc()
@@ -618,7 +627,7 @@ def forgot_password(
     if not user or not user.is_active:
         return generic_response
 
-    reset_token = secrets.token_urlsafe(32)
+    reset_token = _issue_numeric_code()
     user.reset_token = reset_token
     user.reset_token_expires = datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_MINUTES)
 
@@ -655,9 +664,17 @@ def reset_password(
     payload: ResetPasswordRequest,
     db: Session = Depends(get_session),
 ):
-    query = db.query(User).filter(User.reset_token == payload.token)
-    if payload.email:
-        query = query.filter(User.email == payload.email.strip().lower())
+    email = (payload.email or "").strip().lower()
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Informe o e-mail para redefinir a senha",
+        )
+
+    query = db.query(User).filter(
+        User.email == email,
+        User.reset_token == payload.token.strip(),
+    )
     user = query.first()
 
     if not user or not user.reset_token_expires:

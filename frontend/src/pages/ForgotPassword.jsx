@@ -20,6 +20,7 @@ export default function ForgotPassword() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [tokenFromLink, setTokenFromLink] = useState(false);
 
   useEffect(() => {
     const email = (searchParams.get('email') || '').trim();
@@ -34,6 +35,7 @@ export default function ForgotPassword() {
       email: email || prev.email,
       token: token || prev.token,
     }));
+    setTokenFromLink(Boolean(token));
     setStep('reset');
   }, [searchParams]);
 
@@ -61,9 +63,10 @@ export default function ForgotPassword() {
         novaSenha: '',
         confirmarSenha: '',
       }));
+      setTokenFromLink(false);
       setSuccess(
         minutes
-          ? `Se o e-mail existir, enviamos as instruções. O token expira em ${minutes} minutos.`
+          ? `Se o e-mail existir, enviamos um link de recuperacao. Ele expira em ${minutes} minutos.`
           : 'Se o e-mail existir, enviamos as instruções de recuperação.'
       );
     } catch (err) {
@@ -79,7 +82,7 @@ export default function ForgotPassword() {
     const token = form.token.trim();
 
     if (!normalizedEmail || !token) {
-      setError('Preencha o e-mail e o token recebido.');
+      setError(tokenFromLink ? 'Link de recuperacao invalido. Solicite um novo link.' : 'Preencha o e-mail e o codigo recebido.');
       return;
     }
 
@@ -112,6 +115,7 @@ export default function ForgotPassword() {
         novaSenha: '',
         confirmarSenha: '',
       });
+      setTokenFromLink(false);
     } catch (err) {
       setError(err?.response?.data?.detail || 'Não foi possível redefinir a senha.');
     } finally {
@@ -130,7 +134,9 @@ export default function ForgotPassword() {
           <p className="text-gray-600 mt-2">
             {step === 'request'
               ? 'Vamos enviar as instruções para o e-mail da conta.'
-              : 'Cole o token recebido e defina sua nova senha.'}
+              : tokenFromLink
+                ? 'Link seguro carregado. Defina sua nova senha.'
+                : 'Digite o codigo recebido e defina sua nova senha.'}
           </p>
         </div>
 
@@ -168,17 +174,24 @@ export default function ForgotPassword() {
 
           {step === 'reset' && (
             <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Token</label>
-                <input
-                  type="text"
-                  value={form.token}
-                  onChange={(e) => setForm((prev) => ({ ...prev, token: e.target.value }))}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
-                  placeholder="Cole o token recebido por e-mail"
-                  required
-                />
-              </div>
+              {tokenFromLink ? (
+                <div className="rounded-lg border border-purple-200 bg-purple-50 px-4 py-3 text-sm text-purple-800">
+                  Link de recuperacao carregado. Basta cadastrar a nova senha.
+                </div>
+              ) : (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Codigo de recuperacao</label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={form.token}
+                    onChange={(e) => setForm((prev) => ({ ...prev, token: e.target.value }))}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
+                    placeholder="Digite o codigo recebido"
+                    required
+                  />
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Nova senha</label>
@@ -245,24 +258,26 @@ export default function ForgotPassword() {
               type="button"
               onClick={() => {
                 setStep('reset');
+                setTokenFromLink(false);
                 setError('');
                 setSuccess('');
               }}
               className="text-sm text-purple-600 hover:text-purple-700 font-semibold"
             >
-              Já tenho um token
+              Digitar codigo manualmente
             </button>
           ) : (
             <button
               type="button"
               onClick={() => {
                 setStep('request');
+                setTokenFromLink(false);
                 setError('');
                 setSuccess('');
               }}
               className="text-sm text-purple-600 hover:text-purple-700 font-semibold"
             >
-              Solicitar um novo token
+              Solicitar um novo link
             </button>
           )}
 

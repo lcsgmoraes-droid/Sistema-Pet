@@ -406,6 +406,7 @@ export default function EcommerceMVP() {
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [passwordRecoveryMode, setPasswordRecoveryMode] = useState(false);
   const [recoveryStep, setRecoveryStep] = useState('request');
+  const [recoveryTokenFromLink, setRecoveryTokenFromLink] = useState(false);
   const [recoveryForm, setRecoveryForm] = useState({
     email: '',
     token: '',
@@ -612,6 +613,7 @@ export default function EcommerceMVP() {
     setView('conta');
     setPasswordRecoveryMode(true);
     setRecoveryStep(tokenParam ? 'reset' : 'request');
+    setRecoveryTokenFromLink(Boolean(tokenParam));
     setRecoveryForm((prev) => ({
       ...prev,
       email: emailParam || prev.email,
@@ -937,6 +939,7 @@ export default function EcommerceMVP() {
     setView('conta');
     setPasswordRecoveryMode(true);
     setRecoveryStep(nextStep);
+    setRecoveryTokenFromLink(false);
     setError('');
     setSuccess('');
     setRecoveryForm((prev) => ({
@@ -951,6 +954,7 @@ export default function EcommerceMVP() {
   function closePasswordRecovery() {
     setPasswordRecoveryMode(false);
     setRecoveryStep('request');
+    setRecoveryTokenFromLink(false);
     setShowRecoveryPassword(false);
     setShowRecoveryConfirmPassword(false);
     setRecoveryForm((prev) => ({
@@ -993,9 +997,10 @@ export default function EcommerceMVP() {
         novaSenha: '',
         confirmarSenha: '',
       }));
+      setRecoveryTokenFromLink(false);
       setSuccess(
         minutes
-          ? `Se o e-mail existir, enviamos as instruções. O token expira em ${minutes} minutos.`
+          ? `Se o e-mail existir, enviamos um link de recuperacao. Ele expira em ${minutes} minutos.`
           : 'Se o e-mail existir, enviamos as instruções de recuperação.'
       );
     } catch (err) {
@@ -1016,7 +1021,7 @@ export default function EcommerceMVP() {
     const token = recoveryForm.token.trim();
 
     if (!normalizedEmail || !token) {
-      setError('Preencha o e-mail e o token recebido.');
+      setError(recoveryTokenFromLink ? 'Link de recuperacao invalido. Solicite um novo link.' : 'Preencha o e-mail e o codigo recebido.');
       return;
     }
 
@@ -1052,6 +1057,7 @@ export default function EcommerceMVP() {
       });
       setPasswordRecoveryMode(false);
       setRecoveryStep('request');
+      setRecoveryTokenFromLink(false);
       setShowRecoveryPassword(false);
       setShowRecoveryConfirmPassword(false);
       clearRecoveryParamsFromUrl();
@@ -2593,7 +2599,9 @@ export default function EcommerceMVP() {
                   {passwordRecoveryMode
                     ? (recoveryStep === 'request'
                         ? 'Informe o e-mail da conta e enviaremos as instruções.'
-                        : 'Cole o token recebido e escolha uma nova senha.')
+                        : recoveryTokenFromLink
+                          ? 'Link seguro carregado. Escolha uma nova senha.'
+                          : 'Digite o codigo recebido e escolha uma nova senha.')
                     : 'Acesse sua conta para acompanhar pedidos e finalizar a compra mais rápido.'}
                 </div>
 
@@ -2615,15 +2623,22 @@ export default function EcommerceMVP() {
 
                     {recoveryStep === 'reset' && (
                       <>
-                        <input
-                          name="ecommerce_recovery_token"
-                          autoComplete="off"
-                          value={recoveryForm.token}
-                          onChange={(e) => setRecoveryForm((prev) => ({ ...prev, token: e.target.value }))}
-                          placeholder="Token de recuperação"
-                          type="text"
-                          style={S.formInput}
-                        />
+                        {recoveryTokenFromLink ? (
+                          <div style={{ border: '1px solid #ddd6fe', background: '#f5f3ff', color: '#5b21b6', borderRadius: 10, padding: '10px 12px', fontSize: 13, fontWeight: 600 }}>
+                            Link de recuperacao carregado. Basta cadastrar a nova senha.
+                          </div>
+                        ) : (
+                          <input
+                            name="ecommerce_recovery_token"
+                            autoComplete="off"
+                            inputMode="numeric"
+                            value={recoveryForm.token}
+                            onChange={(e) => setRecoveryForm((prev) => ({ ...prev, token: e.target.value }))}
+                            placeholder="Codigo de recuperacao"
+                            type="text"
+                            style={S.formInput}
+                          />
+                        )}
                         <div style={{ position: 'relative' }}>
                           <input
                             name="ecommerce_recovery_password"
@@ -2675,22 +2690,26 @@ export default function EcommerceMVP() {
                       {recoveryStep === 'request' ? (
                         <button
                           type="button"
-                          onClick={() => setRecoveryStep('reset')}
+                          onClick={() => {
+                            setRecoveryStep('reset');
+                            setRecoveryTokenFromLink(false);
+                          }}
                           style={{ background: '#fff', border: '1.5px solid #d1d5db', color: '#374151', borderRadius: 10, padding: '10px 16px', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}
                         >
-                          Já tenho token
+                          Digitar codigo
                         </button>
                       ) : (
                         <button
                           type="button"
                           onClick={() => {
                             setRecoveryStep('request');
+                            setRecoveryTokenFromLink(false);
                             setError('');
                             setSuccess('');
                           }}
                           style={{ background: '#fff', border: '1.5px solid #d1d5db', color: '#374151', borderRadius: 10, padding: '10px 16px', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}
                         >
-                          Reenviar token
+                          Solicitar novo link
                         </button>
                       )}
 

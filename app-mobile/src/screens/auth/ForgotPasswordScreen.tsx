@@ -41,8 +41,8 @@ export default function ForgotPasswordScreen({ navigation }: any) {
       Alert.alert(
         'Confira seu e-mail',
         data?.expires_in_minutes
-          ? `Enviamos um token de recuperação. Ele expira em ${data.expires_in_minutes} minutos.`
-          : 'Enviamos um token de recuperação para o seu e-mail.',
+          ? `Enviamos um codigo de recuperacao. Ele expira em ${data.expires_in_minutes} minutos.`
+          : 'Enviamos um codigo de recuperacao para o seu e-mail.',
       );
     } catch (err: any) {
       const msg =
@@ -57,7 +57,7 @@ export default function ForgotPasswordScreen({ navigation }: any) {
   async function handleResetarSenha() {
     const emailNormalizado = email.trim().toLowerCase();
     if (!emailNormalizado || !token.trim()) {
-      Alert.alert('Campos obrigatórios', 'Preencha o e-mail e o token recebido.');
+      Alert.alert('Campos obrigatorios', 'Preencha o e-mail e o codigo recebido.');
       return;
     }
     if (novaSenha.length < 8) {
@@ -81,7 +81,7 @@ export default function ForgotPasswordScreen({ navigation }: any) {
     } catch (err: any) {
       const msg =
         err?.response?.data?.detail ||
-        'Não foi possível redefinir sua senha. Verifique o token e tente novamente.';
+        'Não foi possível redefinir sua senha. Verifique o codigo e tente novamente.';
       Alert.alert('Erro', msg);
     } finally {
       setCarregando(false);
@@ -97,8 +97,8 @@ export default function ForgotPasswordScreen({ navigation }: any) {
           <Text style={styles.titulo}>Recuperar senha</Text>
           <Text style={styles.subtitulo}>
             {step === 'request'
-              ? 'Vamos enviar um token para o e-mail da sua conta.'
-              : 'Digite o token recebido e escolha sua nova senha.'}
+              ? 'Vamos enviar um codigo para o e-mail da sua conta.'
+              : 'Digite o codigo recebido e escolha sua nova senha.'}
           </Text>
         </View>
 
@@ -120,11 +120,12 @@ export default function ForgotPasswordScreen({ navigation }: any) {
 
           {step === 'reset' && (
             <>
-              <Text style={styles.label}>Token de recuperação</Text>
+              <Text style={styles.label}>Codigo de recuperação</Text>
               <TextInput
                 style={styles.input}
-                placeholder="Cole o token recebido por e-mail"
+                placeholder="Codigo de 6 digitos"
                 placeholderTextColor={CORES.textoClaro}
+                keyboardType="number-pad"
                 autoCapitalize="none"
                 autoCorrect={false}
                 value={token}
@@ -189,7 +190,7 @@ export default function ForgotPasswordScreen({ navigation }: any) {
               <ActivityIndicator color="#fff" />
             ) : (
               <Text style={styles.botaoTexto}>
-                {step === 'request' ? 'Enviar token por e-mail' : 'Salvar nova senha'}
+                {step === 'request' ? 'Enviar codigo por e-mail' : 'Salvar nova senha'}
               </Text>
             )}
           </TouchableOpacity>
@@ -200,7 +201,7 @@ export default function ForgotPasswordScreen({ navigation }: any) {
               onPress={handleSolicitarToken}
               disabled={carregando}
             >
-              <Text style={styles.linkSecundarioTexto}>Reenviar token</Text>
+              <Text style={styles.linkSecundarioTexto}>Reenviar codigo</Text>
             </TouchableOpacity>
           )}
 

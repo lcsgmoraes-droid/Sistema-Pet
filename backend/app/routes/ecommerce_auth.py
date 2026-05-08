@@ -162,6 +162,10 @@ def _hash_token(raw_token: str) -> str:
     return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
 
 
+def _issue_numeric_code() -> str:
+    return f"{secrets.randbelow(1_000_000):06d}"
+
+
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -175,7 +179,7 @@ def _mark_user_consent(user: User, request: Request, terms_version: str | None, 
 
 
 def _issue_email_verification_token(user: User) -> str:
-    raw_token = secrets.token_urlsafe(32)
+    raw_token = _issue_numeric_code()
     user.email_verification_token_hash = _hash_token(raw_token)
     user.email_verification_token_expires = _now_utc() + timedelta(hours=EMAIL_VERIFICATION_TOKEN_HOURS)
     user.email_verification_sent_at = _now_utc()
@@ -206,8 +210,12 @@ def _send_email_verification(user: User) -> bool:
               Confirmar e-mail
             </a>
           </p>
-          <p>Token manual: <strong>{raw_token}</strong></p>
-          <p>Esse token expira em <strong>{EMAIL_VERIFICATION_TOKEN_HOURS} horas</strong>.</p>
+          <p>Se preferir, digite este codigo na tela de confirmacao:</p>
+          <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 16px; margin: 18px 0;">
+            <div style="font-size: 13px; color: #1d4ed8; margin-bottom: 6px;">Codigo de confirmacao</div>
+            <div style="font-size: 28px; font-weight: 800; letter-spacing: 6px;">{raw_token}</div>
+          </div>
+          <p>Esse codigo expira em <strong>{EMAIL_VERIFICATION_TOKEN_HOURS} horas</strong>.</p>
         </div>
       </body>
     </html>
@@ -215,7 +223,7 @@ def _send_email_verification(user: User) -> bool:
     text_body = (
         "Confirme seu e-mail - Pet Shop Pro\n\n"
         f"Acesse: {verification_link}\n\n"
-        f"Token manual: {raw_token}\n"
+        f"Codigo manual: {raw_token}\n"
         f"Validade: {EMAIL_VERIFICATION_TOKEN_HOURS} horas."
     )
     return send_email(
@@ -260,12 +268,12 @@ def _build_reset_password_email_for_app(user: User, reset_token: str) -> tuple[s
                 <div style="border: 1px solid #dbeafe; border-top: none; border-radius: 0 0 12px 12px; padding: 24px;">
                     <p>Ola{saudacao}.</p>
                     <p>Recebemos um pedido para redefinir a sua senha no aplicativo.</p>
-                    <p>Abra o app, entre na tela <strong>Recuperar senha</strong> e use o token abaixo:</p>
+                    <p>Abra o app, entre na tela <strong>Recuperar senha</strong> e use o codigo abaixo:</p>
                     <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 16px; margin: 18px 0;">
-                        <div style="font-size: 13px; color: #1d4ed8; margin-bottom: 6px;">Token de recuperacao</div>
-                        <div style="font-size: 20px; font-weight: 700; letter-spacing: 0.4px; word-break: break-all;">{reset_token}</div>
+                        <div style="font-size: 13px; color: #1d4ed8; margin-bottom: 6px;">Codigo de recuperacao</div>
+                        <div style="font-size: 28px; font-weight: 800; letter-spacing: 6px;">{reset_token}</div>
                     </div>
-                    <p>Esse token expira em <strong>{RESET_TOKEN_MINUTES} minutos</strong>.</p>
+                    <p>Esse codigo expira em <strong>{RESET_TOKEN_MINUTES} minutos</strong>.</p>
                     <p>Este e-mail e valido apenas para a recuperacao dentro do app.</p>
                     <p>Se voce nao pediu essa alteracao, pode ignorar este e-mail com seguranca.</p>
                 </div>
@@ -274,7 +282,7 @@ def _build_reset_password_email_for_app(user: User, reset_token: str) -> tuple[s
         """
         text_body = (
                 "Recuperacao de senha do app - Pet Shop Pro\n\n"
-                "Abra o app e use este token na tela Recuperar senha:\n"
+                "Abra o app e use este codigo na tela Recuperar senha:\n"
                 f"{reset_token}\n\n"
                 f"Validade: {RESET_TOKEN_MINUTES} minutos.\n"
                 "Se voce nao pediu essa alteracao, ignore este e-mail."
@@ -301,12 +309,11 @@ def _build_reset_password_email_for_site(user: User, reset_token: str, reset_lin
                             Recuperar senha agora
                         </a>
                     </p>
-                    <p>Se preferir, voce tambem pode usar este token na tela de recuperacao da propria loja online:</p>
-                    <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 16px; margin: 18px 0;">
-                        <div style="font-size: 13px; color: #1d4ed8; margin-bottom: 6px;">Token de recuperacao</div>
-                        <div style="font-size: 20px; font-weight: 700; letter-spacing: 0.4px; word-break: break-all;">{reset_token}</div>
+                    <p>Se o botao nao abrir, copie e cole este link no navegador:</p>
+                    <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 14px; margin: 18px 0; word-break: break-all; font-size: 13px; color: #1d4ed8;">
+                        {reset_link}
                     </div>
-                    <p>Esse token expira em <strong>{RESET_TOKEN_MINUTES} minutos</strong>.</p>
+                    <p>Esse link expira em <strong>{RESET_TOKEN_MINUTES} minutos</strong>.</p>
                     <p>Este e-mail e valido apenas para a recuperacao pela loja online.</p>
                     <p>Se voce nao pediu essa alteracao, pode ignorar este e-mail com seguranca.</p>
                 </div>
@@ -317,8 +324,6 @@ def _build_reset_password_email_for_site(user: User, reset_token: str, reset_lin
                 "Recuperacao de senha da loja - Pet Shop Pro\n\n"
                 "Abra a recuperacao no link abaixo:\n"
                 f"{reset_link}\n\n"
-                "Ou use este token na tela de recuperacao da loja online:\n"
-                f"{reset_token}\n\n"
                 f"Validade: {RESET_TOKEN_MINUTES} minutos.\n"
                 "Se voce nao pediu essa alteracao, ignore este e-mail."
         )
@@ -789,7 +794,7 @@ def esqueci_senha(payload: EcommerceForgotPasswordRequest, request: Request, db:
     )
 
     if user and user.is_active:
-        reset_token = secrets.token_urlsafe(32)
+        reset_token = _issue_numeric_code()
         user.reset_token = reset_token
         user.reset_token_expires = datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_MINUTES)
         reset_link = _build_storefront_reset_link(tenant, user.email, reset_token)
@@ -822,9 +827,17 @@ def esqueci_senha(payload: EcommerceForgotPasswordRequest, request: Request, db:
 
 @router.post("/resetar-senha")
 def resetar_senha(payload: EcommerceResetPasswordRequest, db: Session = Depends(get_session)):
-    query = db.query(User).filter(User.reset_token == payload.token)
-    if payload.email:
-        query = query.filter(User.email == payload.email.strip().lower())
+    email = (payload.email or "").strip().lower()
+    if not email:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Informe o e-mail para redefinir a senha",
+        )
+
+    query = db.query(User).filter(
+        User.email == email,
+        User.reset_token == payload.token.strip(),
+    )
     user = query.first()
 
     if not user or not user.reset_token_expires:
