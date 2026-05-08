@@ -7,6 +7,8 @@ import {
   getRelatorioMovimentacoes,
   getRelatorioProdutoVendas,
 } from "../api/produtos";
+import ProductIdentity from "../components/ui/ProductIdentity";
+import SaleReference from "../components/ui/SaleReference";
 
 const ITENS_POR_PAGINA_INICIAL = 20;
 const ITENS_HISTORICO_VENDAS = 10;
@@ -625,14 +627,12 @@ export default function ProdutosRelatorio() {
             {produtoSelecionado ? (
               <div className="flex min-h-[46px] items-center gap-3 rounded-xl border border-blue-300 bg-blue-50 px-3 py-2">
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold text-gray-900">
-                    {produtoSelecionado.nome}
-                  </p>
-                  <p className="truncate text-xs text-gray-600">
-                    {[produtoSelecionado.codigo, produtoSelecionado.sku, produtoSelecionado.codigo_barras]
-                      .filter(Boolean)
-                      .join(" | ")}
-                  </p>
+                  <ProductIdentity
+                    product={produtoSelecionado}
+                    className="max-w-full"
+                    nameClassName="text-sm font-semibold text-gray-900"
+                    codeClassName="text-xs text-gray-600"
+                  />
                 </div>
                 <button
                   type="button"
@@ -767,7 +767,12 @@ export default function ProdutosRelatorio() {
               <div>
                 <div className="flex flex-wrap items-center gap-2">
                   <h2 className="text-2xl font-bold text-gray-900">
-                    {dadosProduto?.produto?.nome || produtoSelecionado.nome}
+                    <ProductIdentity
+                      product={dadosProduto?.produto || produtoSelecionado}
+                      name={dadosProduto?.produto?.nome || produtoSelecionado.nome}
+                      nameClassName="text-gray-900"
+                      codeClassName="text-xs font-medium text-gray-500"
+                    />
                   </h2>
                   {dadosProduto?.produto?.categoria_nome && (
                     <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-700">
@@ -780,11 +785,6 @@ export default function ProdutosRelatorio() {
                     </span>
                   )}
                 </div>
-                <p className="mt-2 text-sm text-gray-600">
-                  {[dadosProduto?.produto?.codigo, dadosProduto?.produto?.sku, dadosProduto?.produto?.codigo_barras]
-                    .filter(Boolean)
-                    .join(" | ") || "Sem codigo complementar"}
-                </p>
               </div>
 
               <div className="flex flex-wrap gap-3">
@@ -922,7 +922,11 @@ export default function ProdutosRelatorio() {
                               </td>
                               <td className="px-5 py-3 text-sm font-medium text-gray-900">
                                 <div className="flex flex-wrap items-center gap-2">
-                                  <span>{item.numero_venda || "-"}</span>
+                                  <SaleReference
+                                    value={item.numero_venda || item.venda_id}
+                                    showPrefix={false}
+                                    empty={<span>-</span>}
+                                  />
                                   {item.em_promocao && (
                                     <span
                                       className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-cyan-700"
@@ -1117,9 +1121,11 @@ export default function ProdutosRelatorio() {
                         </td>
                         <td className="px-5 py-3 text-sm text-gray-700">
                           <div className="flex flex-wrap items-center gap-2">
-                            <p className="font-semibold text-gray-900">
-                              {mov.produto_nome || "-"}
-                            </p>
+                            <ProductIdentity
+                              product={mov}
+                              nameClassName="font-semibold text-gray-900"
+                              codeClassName="text-xs text-gray-500"
+                            />
                             {mov.em_promocao && (
                               <span
                                 className="rounded-full bg-cyan-100 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-cyan-700"
@@ -1129,9 +1135,6 @@ export default function ProdutosRelatorio() {
                               </span>
                             )}
                           </div>
-                          <p className="text-xs text-gray-500">
-                            {[mov.codigo, mov.sku, mov.codigo_barras].filter(Boolean).join(" | ") || "Sem codigo"}
-                          </p>
                           {mov.em_promocao && (
                             <p className="mt-1 text-xs font-medium text-cyan-700">
                               {mov.promocao_origem || "Preco promocional ativo"}
