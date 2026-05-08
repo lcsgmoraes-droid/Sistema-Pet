@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { formatMoneyBRL } from "../../utils/formatters";
 import IconActionButton from "../ui/IconActionButton";
+import SaleReference from "../ui/SaleReference";
 import StatusBadge from "../ui/StatusBadge";
 
 function getCanalInfo(canal) {
@@ -267,7 +268,7 @@ export default function PDVVendasRecentesSidebar({
                           {venda.cliente_nome || "Cliente nao informado"}
                         </div>
                         <div className="text-xs text-gray-500">
-                          #{venda.numero_venda}
+                          <SaleReference sale={venda} showPrefix={false} />
                         </div>
                       </div>
                       <div className="text-right ml-2 flex-shrink-0">

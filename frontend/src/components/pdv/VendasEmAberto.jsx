@@ -7,6 +7,7 @@ import {
   campaignAllowsSaleChannel,
   getCashbackBonusParamKey,
 } from '../../utils/campaignChannelScope';
+import SaleReference from '../ui/SaleReference';
 
 export default function VendasEmAberto({ clienteId, clienteNome, onClose, onSucesso }) {
   const [vendas, setVendas] = useState([]);
@@ -427,7 +428,7 @@ export default function VendasEmAberto({ clienteId, clienteNome, onClose, onSuce
                             />
                           </td>
                           <td className="px-4 py-3 font-medium text-gray-900">
-                            #{venda.numero_venda}
+                            <SaleReference sale={venda} showPrefix={false} />
                           </td>
                           <td className="px-4 py-3 text-gray-600 text-sm">
                             {new Date(venda.data_venda).toLocaleDateString('pt-BR')}

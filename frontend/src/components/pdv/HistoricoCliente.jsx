@@ -2,6 +2,7 @@
 import { X, ShoppingBag, TrendingUp, Calendar, Loader, DollarSign, ChevronDown, ChevronUp, Package, CreditCard, Copy, Check, Eye, EyeOff } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '../../api';
+import SaleReference from '../ui/SaleReference';
 
 // Formata numero como R$ 4.029,80
 const formatBRL = (value) => {
@@ -323,7 +324,7 @@ export default function HistoricoCliente({ clienteId, clienteNome, onClose }) {
                       <div className="flex-1">
                         <div className="flex items-center space-x-3 mb-3">
                           <h3 className="text-lg font-semibold text-gray-900">
-                            Venda #{venda.numero_venda}
+                            <SaleReference sale={venda} />
                           </h3>
                           {getStatusBadge(venda.status)}
                         </div>
