@@ -8,6 +8,7 @@ import {
   X,
 } from "lucide-react";
 import { formatMoneyBRL } from "../../utils/formatters";
+import CustomerIdentity from "../ui/CustomerIdentity";
 import IconActionButton from "../ui/IconActionButton";
 import SaleReference from "../ui/SaleReference";
 import StatusBadge from "../ui/StatusBadge";
@@ -264,9 +265,11 @@ export default function PDVVendasRecentesSidebar({
 
                     <div className="flex items-start justify-between mb-1.5">
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-gray-900 truncate">
-                          {venda.cliente_nome || "Cliente nao informado"}
-                        </div>
+                        <CustomerIdentity
+                          className="max-w-full"
+                          nameClassName="font-medium text-gray-900"
+                          venda={venda}
+                        />
                         <div className="text-xs text-gray-500">
                           <SaleReference sale={venda} showPrefix={false} />
                         </div>

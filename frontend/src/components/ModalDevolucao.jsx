@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Search, RotateCcw, AlertCircle, Check, Filter, Package, Layers } from 'lucide-react';
 import api from '../api';
-import CopyableCode from './ui/CopyableCode';
-import CopyableValue from './ui/CopyableValue';
+import CustomerIdentity from './ui/CustomerIdentity';
 import ProductIdentity from './ui/ProductIdentity';
 import SaleReference from './ui/SaleReference';
 
@@ -53,22 +52,6 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
       minute: '2-digit'
     });
   };
-
-  const obterNomeCliente = (venda) => (
-    venda?.cliente?.nome
-    || venda?.cliente_nome
-    || venda?.nome_cliente
-    || 'Consumidor Final'
-  );
-
-  const obterCodigoCliente = (venda) => (
-    venda?.cliente?.codigo
-    || venda?.cliente_codigo
-    || venda?.codigo_cliente
-    || venda?.cliente_id
-    || venda?.cliente?.id
-    || ''
-  );
 
   useEffect(() => {
     buscarVendas();
@@ -498,16 +481,11 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                           <div className="font-semibold text-gray-900">
                             <SaleReference sale={venda} />
                           </div>
-                          <div className="text-sm text-gray-600 mt-1">
-                            <CopyableValue
-                              label="Cliente"
-                              value={obterNomeCliente(venda)}
-                            />
-                          </div>
-                          <div className="text-xs text-gray-500 mt-1">
-                            <CopyableCode
-                              label="Cod. cliente"
-                              value={obterCodigoCliente(venda)}
+                          <div className="mt-1 text-sm text-gray-600">
+                            <CustomerIdentity
+                              fallback="Consumidor Final"
+                              showLabel
+                              venda={venda}
                             />
                           </div>
                           <div className="text-xs text-gray-500 mt-1">
@@ -555,7 +533,7 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                     valueClassName="font-semibold text-gray-900"
                   />
                 </h3>
-                <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-4">
+                <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-3">
                   <div>
                     <span className="text-gray-600">Data:</span>
                     <span className="ml-2 font-medium">
@@ -563,16 +541,11 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                     </span>
                   </div>
                   <div>
-                    <CopyableValue
-                      label="Cliente"
-                      value={obterNomeCliente(vendaSelecionada)}
-                      valueClassName="font-medium text-gray-900"
-                    />
-                  </div>
-                  <div>
-                    <CopyableCode
-                      label="Cod. cliente"
-                      value={obterCodigoCliente(vendaSelecionada)}
+                    <CustomerIdentity
+                      fallback="Consumidor Final"
+                      nameClassName="font-medium text-gray-900"
+                      showLabel
+                      venda={vendaSelecionada}
                     />
                   </div>
                   <div>
@@ -858,10 +831,11 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                     </span>
                     {gerarCredito && vendaSelecionada?.cliente && (
                       <p className="text-xs text-gray-600 mt-1">
-                        <CopyableValue
-                          label="Cliente"
-                          value={obterNomeCliente(vendaSelecionada)}
-                          valueClassName="font-semibold text-gray-800"
+                        <CustomerIdentity
+                          fallback="Consumidor Final"
+                          nameClassName="font-semibold text-gray-800"
+                          showLabel
+                          venda={vendaSelecionada}
                         />
                       </p>
                     )}

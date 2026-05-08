@@ -5,6 +5,7 @@ import api from '../api';
 import { toast } from 'react-hot-toast';
 import { safeArray } from '../utils/safeArray';
 import ActionButton from './ui/ActionButton';
+import CustomerIdentity from './ui/CustomerIdentity';
 import DataTable from './ui/DataTable';
 import FilterBar from './ui/FilterBar';
 import LoadingState from './ui/LoadingState';
@@ -279,7 +280,13 @@ const ContasReceber = () => {
       key: 'cliente',
       header: 'Cliente',
       className: 'min-w-[160px]',
-      render: (conta) => conta.cliente_nome || '-',
+      render: (conta) => (
+        <CustomerIdentity
+          fallback=""
+          nameClassName="font-medium text-slate-800"
+          record={conta}
+        />
+      ),
     },
     {
       key: 'vencimento',
@@ -730,7 +737,13 @@ const ContasReceber = () => {
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Cliente</label>
-                  <p className="mt-1 text-lg">{detalhesCompletos.cliente?.nome || 'N/A'}</p>
+                  <p className="mt-1 text-lg">
+                    <CustomerIdentity
+                      code={detalhesCompletos.cliente?.codigo || detalhesCompletos.cliente_id || detalhesCompletos.cliente?.id}
+                      customer={detalhesCompletos.cliente}
+                      fallback="N/A"
+                    />
+                  </p>
                 </div>
               </div>
 

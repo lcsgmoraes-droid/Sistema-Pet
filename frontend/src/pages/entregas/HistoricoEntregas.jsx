@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import api from "../../api";
+import CustomerIdentity from "../../components/ui/CustomerIdentity";
 import SaleReference from "../../components/ui/SaleReference";
 
 export default function HistoricoEntregas() {
@@ -244,7 +245,12 @@ export default function HistoricoEntregas() {
                           <div style={{ fontSize: 13, color: "#333", lineHeight: 1.6 }}>
                             {parada.cliente_nome && (
                               <div style={{ marginBottom: 4 }}>
-                                <strong style={{ color: "#1565C0" }}>👤 {parada.cliente_nome}</strong>
+                                <span style={{ color: "#1565C0" }}>
+                                  <CustomerIdentity
+                                    nameClassName="font-semibold text-blue-700"
+                                    record={parada}
+                                  />
+                                </span>
                                 {parada.cliente_telefone && (
                                   <span style={{ marginLeft: 12, color: "#555" }}>
                                     📞 {parada.cliente_telefone}

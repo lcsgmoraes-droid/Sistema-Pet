@@ -1,5 +1,6 @@
 ﻿import { useEffect, useState } from "react";
 import { api } from "../../services/api";
+import CustomerIdentity from "../../components/ui/CustomerIdentity";
 import SaleReference from "../../components/ui/SaleReference";
 import "./Entregas.css";
 
@@ -260,7 +261,12 @@ export default function EntregasAbertas() {
                   <td style={{ fontSize: "0.9em" }}>
                     {venda.data_venda ? new Date(venda.data_venda).toLocaleDateString('pt-BR') : 'N/A'}
                   </td>
-                  <td>{venda.cliente_nome}</td>
+                  <td>
+                    <CustomerIdentity
+                      nameClassName="font-medium text-slate-800"
+                      venda={venda}
+                    />
+                  </td>
                   <td>
                     <span style={{
                       color: venda.entregador_nome ? "#28a745" : "#999",

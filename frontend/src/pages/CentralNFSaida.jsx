@@ -20,6 +20,7 @@ import {
   Zap,
 } from 'lucide-react';
 import api from '../api';
+import CustomerIdentity from '../components/ui/CustomerIdentity';
 import { formatMoneyBRL } from '../utils/formatters';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -813,7 +814,11 @@ export default function CentralNFSaida() {
                     {formatarDataBR(nota.data_emissao)}
                   </td>
                   <td className="px-6 py-4">
-                    <div className="text-sm font-medium text-gray-900">{nota.cliente?.nome || 'Cliente não informado'}</div>
+                    <CustomerIdentity
+                      code={nota.cliente?.codigo || nota.cliente_id || nota.cliente?.id}
+                      customer={nota.cliente}
+                      nameClassName="font-medium text-gray-900"
+                    />
                     <div className="text-sm text-gray-500">{nota.cliente?.cpf_cnpj || ''}</div>
                   </td>
                   <td className="px-6 py-4">
@@ -941,7 +946,16 @@ export default function CentralNFSaida() {
                   <label className="text-sm font-medium text-gray-600">Chave de Acesso</label>
                   <p className="text-xs break-all font-mono">{notaSelecionada.chave || '-'}</p>
                 </div>
-                <div><label className="text-sm font-medium text-gray-600">Cliente</label><p>{notaSelecionada.cliente?.nome}</p></div>
+                <div>
+                  <label className="text-sm font-medium text-gray-600">Cliente</label>
+                  <p>
+                    <CustomerIdentity
+                      code={notaSelecionada.cliente?.codigo || notaSelecionada.cliente_id || notaSelecionada.cliente?.id}
+                      customer={notaSelecionada.cliente}
+                      fallback="N/A"
+                    />
+                  </p>
+                </div>
                 <div><label className="text-sm font-medium text-gray-600">CPF/CNPJ</label><p>{notaSelecionada.cliente?.cpf_cnpj}</p></div>
                 <div>
                   <label className="text-sm font-medium text-gray-600">Valor Total</label>
@@ -1170,7 +1184,15 @@ export default function CentralNFSaida() {
               </div>
               <div>
                 <p className="text-sm text-gray-600"><strong>Nota:</strong> #{modalCancelar.numero} — Série {modalCancelar.serie}</p>
-                <p className="text-sm text-gray-600"><strong>Cliente:</strong> {modalCancelar.cliente?.nome}</p>
+                <p className="text-sm text-gray-600">
+                  <strong>Cliente:</strong>{" "}
+                  <CustomerIdentity
+                    code={modalCancelar.cliente?.codigo || modalCancelar.cliente_id || modalCancelar.cliente?.id}
+                    customer={modalCancelar.cliente}
+                    fallback="N/A"
+                    layout="inline"
+                  />
+                </p>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">Justificativa *</label>

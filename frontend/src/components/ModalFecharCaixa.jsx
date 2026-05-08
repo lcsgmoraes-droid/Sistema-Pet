@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { X, DollarSign, TrendingUp, TrendingDown, Receipt, Calculator, AlertCircle, CheckCircle, AlertTriangle } from 'lucide-react';
 import { fecharCaixa, obterResumoCaixa, obterVendasCaixa, validarCaixaAtual } from '../api/caixa';
 import CurrencyInput from './CurrencyInput';
+import CustomerIdentity from './ui/CustomerIdentity';
 import SaleReference from './ui/SaleReference';
 
 export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
@@ -668,7 +669,13 @@ export default function ModalFecharCaixa({ caixaId, onClose, onSuccess }) {
                                 showPrefix={false}
                                 valueClassName="font-semibold text-gray-700"
                               />
-                              <span className="text-gray-500 ml-1.5">{v.cliente_nome || 'Consumidor'}</span>
+                              <CustomerIdentity
+                                className="ml-1.5"
+                                fallback="Consumidor"
+                                layout="inline"
+                                nameClassName="text-gray-500"
+                                venda={v}
+                              />
                             </div>
                             <div className="text-right">
                               <span className="text-gray-400 mr-2">{v.hora_venda}</span>

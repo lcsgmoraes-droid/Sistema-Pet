@@ -2,6 +2,7 @@
 import { useNavigate } from "react-router-dom";
 import api from "../../api";
 import { api as apiServices } from "../../services/api";
+import CustomerIdentity from "../../components/ui/CustomerIdentity";
 import ProductIdentity from "../../components/ui/ProductIdentity";
 
 export default function RotasEntrega() {
@@ -1173,9 +1174,12 @@ function RotaCard({
                     {/* Nome e Telefones */}
                     {parada.cliente_nome && (
                       <div style={{ marginBottom: 4 }}>
-                        <strong style={{ color: "#1565C0" }}>
-                          👤 {parada.cliente_nome}
-                        </strong>
+                        <span style={{ color: "#1565C0" }}>
+                          <CustomerIdentity
+                            nameClassName="font-semibold text-blue-700"
+                            record={parada}
+                          />
+                        </span>
                         {parada.cliente_telefone && (
                           <span style={{ marginLeft: 12, color: "#555" }}>
                             📞 {parada.cliente_telefone}
@@ -1456,9 +1460,15 @@ function RotaCard({
                         >
                           <div>
                             <strong>👤 Cliente:</strong>{" "}
-                            {vendaDetalhes.cliente?.nome ||
-                              vendaDetalhes.nome_cliente ||
-                              "N/A"}
+                            <CustomerIdentity
+                              code={vendaDetalhes.cliente?.codigo || vendaDetalhes.cliente_id || vendaDetalhes.cliente?.id}
+                              customer={vendaDetalhes.cliente}
+                              fallback="N/A"
+                              layout="inline"
+                              name={vendaDetalhes.nome_cliente}
+                              nameClassName="font-medium text-slate-800"
+                              record={vendaDetalhes}
+                            />
                           </div>
                           <div>
                             <strong>📅 Data:</strong>{" "}

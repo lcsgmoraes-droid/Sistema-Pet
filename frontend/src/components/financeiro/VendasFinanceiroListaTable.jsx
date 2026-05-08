@@ -1,4 +1,5 @@
 import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
+import CustomerIdentity from "../ui/CustomerIdentity";
 import DataTable from "../ui/DataTable";
 import MoneyCell from "../ui/MoneyCell";
 import NumberCell from "../ui/NumberCell";
@@ -221,7 +222,16 @@ export default function VendasFinanceiroListaTable({
         />
       ),
     },
-    { key: "cliente", header: "Cliente", accessor: "cliente_nome" },
+    {
+      key: "cliente",
+      header: "Cliente",
+      render: (venda) => (
+        <CustomerIdentity
+          nameClassName="font-medium text-slate-800"
+          venda={venda}
+        />
+      ),
+    },
     {
       key: "venda_bruta",
       header: "Venda Bruta",

@@ -27,6 +27,7 @@ Componentes globais criados ou consolidados:
 - `MetricCard` e `MetricGrid` para padronizar dashboards e cards de indicadores.
 - `MoneyCell`, `ChannelBadges` e `SafeMarkdown`, ja iniciados na fatia de produtos.
 - `CopyableValue` para valores copiaveis padronizados, como numero de venda, nome de produto, SKU e codigos operacionais.
+- `CustomerIdentity`, `ProductIdentity` e `SaleReference` para cliente/codigo, produto/SKU e venda sempre copiaveis.
 - `FornecedorSelector` para busca de fornecedor com autocomplete e cadastro rapido, evitando selects locais e campos livres inconsistentes.
 - `FormField`, `TextField` e `SelectField` para campos de formulario com tons visuais reaproveitaveis sem quebrar telas existentes.
 - `PaginationControls` para paginacao, seletor de quantidade por pagina e navegacao com tamanho/cor padrao.
@@ -268,6 +269,7 @@ Padrao desejado:
 | Componente | Objetivo | Onde usar |
 | --- | --- | --- |
 | `PessoaSelector` | Buscar/selecionar cliente/tutor/pessoa | PDV, financeiro, campanhas, veterinario, banho/tosa |
+| `CustomerIdentity` | Exibir cliente com nome/codigo copiaveis | PDV, vendas, financeiro, NF, entregas, comissoes |
 | `TutorPetSelector` | Selecionar tutor + pet + novo pet | Veterinario, banho/tosa, vacinas, internacoes, exames, calculadoras |
 | `PetSelector` | Selecionar pet quando tutor ja esta definido | PDV item pet, campanhas pet, app/vet |
 | `ProdutoSelector` | Buscar produto/servico/SKU/codigo de barras | PDV, compras, NF, estoque, kits, campanhas |
@@ -843,6 +845,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-08: Sugestao inteligente de compras deixou de somar movimentacoes de estoque com `referencia_tipo=venda` quando a venda referenciada nao existe, evitando que historico orfao infle o giro e gere compra exagerada.
 - 2026-05-08: `Comissoes/Listagem` iniciou padronizacao visual com `MetricGrid`/`MetricCard`, `MoneyCell`, `NumberCell`, `StatusBadge`, `ActionButton` e estados globais de carregamento/erro/vazio, sem alterar a regra de fechamento.
 - 2026-05-08: Modal de devolucao no PDV passou a usar `data_venda`, codigo do cliente e copia padronizada de cliente/codigo; producao ganhou `ops_disk_guard` preventivo para limpar cache Docker quando o disco entrar em faixa de risco.
+- 2026-05-08: criado `CustomerIdentity` para nome/codigo de cliente copiaveis e aplicado em devolucao PDV, vendas recentes, financeiro, contas a receber, relatorio de produto, NF, entregas e comissoes.
 
 ### Nao fazer nesta onda
 

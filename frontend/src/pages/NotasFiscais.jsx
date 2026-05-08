@@ -14,6 +14,7 @@ import {
   Trash2
 } from 'lucide-react';
 import api from '../api';
+import CustomerIdentity from '../components/ui/CustomerIdentity';
 
 export default function NotasFiscais() {
   const [notas, setNotas] = useState([]);
@@ -309,9 +310,11 @@ export default function NotasFiscais() {
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <div className="text-sm font-medium text-gray-900">
-                        {nota.cliente?.nome || 'Cliente não informado'}
-                      </div>
+                      <CustomerIdentity
+                        code={nota.cliente?.codigo || nota.cliente_id || nota.cliente?.id}
+                        customer={nota.cliente}
+                        nameClassName="font-medium text-gray-900"
+                      />
                       <div className="text-sm text-gray-500">
                         {nota.cliente?.cpf_cnpj || ''}
                       </div>
@@ -424,7 +427,13 @@ export default function NotasFiscais() {
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-600">Cliente</label>
-                    <p className="text-gray-900">{notaSelecionada.cliente?.nome}</p>
+                    <p className="text-gray-900">
+                      <CustomerIdentity
+                        code={notaSelecionada.cliente?.codigo || notaSelecionada.cliente_id || notaSelecionada.cliente?.id}
+                        customer={notaSelecionada.cliente}
+                        fallback="N/A"
+                      />
+                    </p>
                   </div>
                   <div>
                     <label className="text-sm font-medium text-gray-600">CPF/CNPJ</label>
@@ -487,7 +496,13 @@ export default function NotasFiscais() {
                   <strong>Nota:</strong> #{modalCancelar.numero} - Série {modalCancelar.serie}
                 </p>
                 <p className="text-sm text-gray-600">
-                  <strong>Cliente:</strong> {modalCancelar.cliente?.nome}
+                  <strong>Cliente:</strong>{" "}
+                  <CustomerIdentity
+                    code={modalCancelar.cliente?.codigo || modalCancelar.cliente_id || modalCancelar.cliente?.id}
+                    customer={modalCancelar.cliente}
+                    fallback="N/A"
+                    layout="inline"
+                  />
                 </p>
               </div>
 

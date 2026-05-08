@@ -11,6 +11,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../api';
+import CustomerIdentity from '../../components/ui/CustomerIdentity';
 
 const ConferenciaAvancada = () => {
   const { funcionario_id } = useParams();
@@ -394,7 +395,12 @@ const ConferenciaAvancada = () => {
                   </td>
                   <td className="px-4 py-3 text-sm">{new Date(comissao.data_venda).toLocaleDateString('pt-BR')}</td>
                   <td className="px-4 py-3 text-sm">{comissao.nome_produto}</td>
-                  <td className="px-4 py-3 text-sm text-gray-600">{comissao.cliente_nome}</td>
+                  <td className="px-4 py-3 text-sm text-gray-600">
+                    <CustomerIdentity
+                      nameClassName="font-medium text-gray-600"
+                      record={comissao}
+                    />
+                  </td>
                   <td className="px-4 py-3 text-sm text-right">{comissao.quantidade.toFixed(2)}</td>
                   <td className="px-4 py-3 text-sm text-right">R$ {comissao.valor_base_calculo.toFixed(2)}</td>
                   <td className="px-4 py-3 text-sm text-right">{comissao.percentual_comissao.toFixed(2)}%</td>

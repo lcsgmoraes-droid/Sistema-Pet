@@ -10,6 +10,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../../api';
+import CustomerIdentity from '../../components/ui/CustomerIdentity';
 
 const ComissoesFechamentoDetalhe = () => {
   const navigate = useNavigate();
@@ -259,7 +260,11 @@ const ComissoesFechamentoDetalhe = () => {
                   {comissoes.map((comissao, index) => (
                     <tr key={comissao.id || index} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 py-3 text-sm text-gray-900">
-                        {comissao.nome_cliente || 'Cliente não identificado'}
+                        <CustomerIdentity
+                          fallback="Cliente nao identificado"
+                          nameClassName="font-medium text-gray-900"
+                          record={comissao}
+                        />
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900">
                         {comissao.nome_produto || 'Produto não identificado'}

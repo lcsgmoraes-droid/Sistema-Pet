@@ -10,6 +10,7 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../../api';
+import CustomerIdentity from '../../components/ui/CustomerIdentity';
 
 const ComissoesFechamentoFuncionario = () => {
   const { funcionario_id } = useParams();
@@ -351,7 +352,10 @@ const ComissoesFechamentoFuncionario = () => {
                         {formatarData(comissao.data_venda)}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900">
-                        {comissao.cliente_nome}
+                        <CustomerIdentity
+                          nameClassName="font-medium text-gray-900"
+                          record={comissao}
+                        />
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-900">
                         <div className="max-w-xs truncate" title={comissao.nome_produto}>

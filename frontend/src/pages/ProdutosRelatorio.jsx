@@ -8,6 +8,7 @@ import {
   getRelatorioProdutoVendas,
 } from "../api/produtos";
 import ProductIdentity from "../components/ui/ProductIdentity";
+import CustomerIdentity from "../components/ui/CustomerIdentity";
 import SaleReference from "../components/ui/SaleReference";
 
 const ITENS_POR_PAGINA_INICIAL = 20;
@@ -943,7 +944,11 @@ export default function ProdutosRelatorio() {
                                 )}
                               </td>
                               <td className="px-5 py-3 text-sm text-gray-700">
-                                {item.cliente_nome || "Sem cliente"}
+                                <CustomerIdentity
+                                  fallback="Sem cliente"
+                                  nameClassName="font-medium text-gray-700"
+                                  record={item}
+                                />
                               </td>
                               <td className="px-5 py-3 text-right text-sm font-semibold text-gray-900">
                                 {formatarQuantidade(item.quantidade)}
