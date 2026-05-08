@@ -275,6 +275,11 @@ def _build_password_reset_email(user: User, reset_token: str, reset_link: str) -
               Redefinir minha senha
             </a>
           </p>
+          <p>Se quiser preencher manualmente, use este codigo na tela de recuperacao:</p>
+          <div style="background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 10px; padding: 16px; margin: 18px 0;">
+            <div style="font-size: 13px; color: #6d28d9; margin-bottom: 6px;">Codigo de recuperacao</div>
+            <div style="font-size: 28px; font-weight: 800; letter-spacing: 6px;">{reset_token}</div>
+          </div>
           <p>Se o botao nao abrir, copie e cole este link no navegador:</p>
           <div style="background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 10px; padding: 14px; margin: 18px 0; word-break: break-all; font-size: 13px; color: #5b21b6;">
             {reset_link}
@@ -289,6 +294,8 @@ def _build_password_reset_email(user: User, reset_token: str, reset_link: str) -
         "Recuperacao de senha - Pet Shop Pro\n\n"
         "Acesse o link abaixo para redefinir sua senha:\n"
         f"{reset_link}\n\n"
+        "Ou use este codigo na tela de recuperacao:\n"
+        f"{reset_token}\n\n"
         f"Validade: {RESET_TOKEN_MINUTES} minutos.\n"
         "Se voce nao pediu essa alteracao, ignore este e-mail."
     )
@@ -678,14 +685,14 @@ def reset_password(
     user = query.first()
 
     if not user or not user.reset_token_expires:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token invalido")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Codigo ou link de recuperacao invalido")
 
     expires_at = user.reset_token_expires
     if expires_at.tzinfo is None:
         expires_at = expires_at.replace(tzinfo=timezone.utc)
 
     if expires_at < datetime.now(timezone.utc):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token expirado")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Codigo ou link de recuperacao expirado")
 
     user.hashed_password = hash_password(payload.nova_senha)
     user.reset_token = None

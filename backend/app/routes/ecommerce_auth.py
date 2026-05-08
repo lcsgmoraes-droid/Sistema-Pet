@@ -309,6 +309,11 @@ def _build_reset_password_email_for_site(user: User, reset_token: str, reset_lin
                             Recuperar senha agora
                         </a>
                     </p>
+                    <p>Se quiser preencher manualmente, use este codigo na tela de recuperacao:</p>
+                    <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 16px; margin: 18px 0;">
+                        <div style="font-size: 13px; color: #1d4ed8; margin-bottom: 6px;">Codigo de recuperacao</div>
+                        <div style="font-size: 28px; font-weight: 800; letter-spacing: 6px;">{reset_token}</div>
+                    </div>
                     <p>Se o botao nao abrir, copie e cole este link no navegador:</p>
                     <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 14px; margin: 18px 0; word-break: break-all; font-size: 13px; color: #1d4ed8;">
                         {reset_link}
@@ -324,6 +329,8 @@ def _build_reset_password_email_for_site(user: User, reset_token: str, reset_lin
                 "Recuperacao de senha da loja - Pet Shop Pro\n\n"
                 "Abra a recuperacao no link abaixo:\n"
                 f"{reset_link}\n\n"
+                "Ou use este codigo na tela de recuperacao da loja online:\n"
+                f"{reset_token}\n\n"
                 f"Validade: {RESET_TOKEN_MINUTES} minutos.\n"
                 "Se voce nao pediu essa alteracao, ignore este e-mail."
         )
@@ -841,10 +848,10 @@ def resetar_senha(payload: EcommerceResetPasswordRequest, db: Session = Depends(
     user = query.first()
 
     if not user or not user.reset_token_expires:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token inválido")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Codigo ou link de recuperacao invalido")
 
     if _is_expired(user.reset_token_expires, datetime.now(timezone.utc)):
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token expirado")
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Codigo ou link de recuperacao expirado")
 
     user.hashed_password = hash_password(payload.nova_senha)
     user.reset_token = None

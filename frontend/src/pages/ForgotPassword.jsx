@@ -66,7 +66,7 @@ export default function ForgotPassword() {
       setTokenFromLink(false);
       setSuccess(
         minutes
-          ? `Se o e-mail existir, enviamos um link de recuperacao. Ele expira em ${minutes} minutos.`
+          ? `Se o e-mail existir, enviamos um link e um codigo de recuperacao. Eles expiram em ${minutes} minutos.`
           : 'Se o e-mail existir, enviamos as instruções de recuperação.'
       );
     } catch (err) {
