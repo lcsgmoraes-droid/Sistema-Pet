@@ -163,7 +163,34 @@ def _hash_token(raw_token: str) -> str:
 
 
 def _issue_numeric_code() -> str:
-    return f"{secrets.randbelow(1_000_000):06d}"
+    return str(secrets.randbelow(900_000) + 100_000)
+
+
+def _issue_password_reset_tokens() -> tuple[str, str, str]:
+    numeric_code = _issue_numeric_code()
+    link_token = secrets.token_urlsafe(32)
+    stored_token = f"v2:{_hash_token(numeric_code)}:{_hash_token(link_token)}"
+    return numeric_code, link_token, stored_token
+
+
+def _password_reset_token_matches(stored_token: str | None, received_token: str | None) -> bool:
+    if not stored_token or not received_token:
+        return False
+
+    token = received_token.strip()
+    if not token:
+        return False
+
+    if stored_token.startswith("v2:"):
+        parts = stored_token.split(":", 2)
+        if len(parts) != 3:
+            return False
+        received_hash = _hash_token(token)
+        return received_hash in {parts[1], parts[2]}
+
+    if token.isdigit() and len(token) < 6:
+        token = token.zfill(6)
+    return stored_token == token
 
 
 def _now_utc() -> datetime:
@@ -314,10 +341,7 @@ def _build_reset_password_email_for_site(user: User, reset_token: str, reset_lin
                         <div style="font-size: 13px; color: #1d4ed8; margin-bottom: 6px;">Codigo de recuperacao</div>
                         <div style="font-size: 28px; font-weight: 800; letter-spacing: 6px;">{reset_token}</div>
                     </div>
-                    <p>Se o botao nao abrir, copie e cole este link no navegador:</p>
-                    <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 14px; margin: 18px 0; word-break: break-all; font-size: 13px; color: #1d4ed8;">
-                        {reset_link}
-                    </div>
+                    <p>Se o botao nao abrir, acesse a recuperacao da loja e informe o codigo acima.</p>
                     <p>Esse link expira em <strong>{RESET_TOKEN_MINUTES} minutos</strong>.</p>
                     <p>Este e-mail e valido apenas para a recuperacao pela loja online.</p>
                     <p>Se voce nao pediu essa alteracao, pode ignorar este e-mail com seguranca.</p>
@@ -327,8 +351,7 @@ def _build_reset_password_email_for_site(user: User, reset_token: str, reset_lin
         """
         text_body = (
                 "Recuperacao de senha da loja - Pet Shop Pro\n\n"
-                "Abra a recuperacao no link abaixo:\n"
-                f"{reset_link}\n\n"
+                "Clique no botao do e-mail para redefinir sua senha.\n\n"
                 "Ou use este codigo na tela de recuperacao da loja online:\n"
                 f"{reset_token}\n\n"
                 f"Validade: {RESET_TOKEN_MINUTES} minutos.\n"
@@ -801,15 +824,15 @@ def esqueci_senha(payload: EcommerceForgotPasswordRequest, request: Request, db:
     )
 
     if user and user.is_active:
-        reset_token = _issue_numeric_code()
-        user.reset_token = reset_token
+        reset_code, reset_link_token, stored_reset_token = _issue_password_reset_tokens()
+        user.reset_token = stored_reset_token
         user.reset_token_expires = datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_MINUTES)
-        reset_link = _build_storefront_reset_link(tenant, user.email, reset_token)
+        reset_link = _build_storefront_reset_link(tenant, user.email, reset_link_token)
         canal = _resolve_password_recovery_channel(request, payload)
         if canal == "site":
-            subject, html_body, text_body = _build_reset_password_email_for_site(user, reset_token, reset_link)
+            subject, html_body, text_body = _build_reset_password_email_for_site(user, reset_code, reset_link)
         else:
-            subject, html_body, text_body = _build_reset_password_email_for_app(user, reset_token)
+            subject, html_body, text_body = _build_reset_password_email_for_app(user, reset_code)
         enviado = send_email(
             to=user.email,
             subject=subject,
@@ -833,7 +856,8 @@ def esqueci_senha(payload: EcommerceForgotPasswordRequest, request: Request, db:
 
 
 @router.post("/resetar-senha")
-def resetar_senha(payload: EcommerceResetPasswordRequest, db: Session = Depends(get_session)):
+def resetar_senha(payload: EcommerceResetPasswordRequest, request: Request, db: Session = Depends(get_session)):
+    tenant_id = _extract_tenant_id_from_request(request)
     email = (payload.email or "").strip().lower()
     if not email:
         raise HTTPException(
@@ -841,13 +865,16 @@ def resetar_senha(payload: EcommerceResetPasswordRequest, db: Session = Depends(
             detail="Informe o e-mail para redefinir a senha",
         )
 
-    query = db.query(User).filter(
-        User.email == email,
-        User.reset_token == payload.token.strip(),
+    user = (
+        db.query(User)
+        .filter(User.email == email, User.tenant_id == tenant_id)
+        .first()
     )
-    user = query.first()
 
     if not user or not user.reset_token_expires:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Codigo ou link de recuperacao invalido")
+
+    if not _password_reset_token_matches(user.reset_token, payload.token):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Codigo ou link de recuperacao invalido")
 
     if _is_expired(user.reset_token_expires, datetime.now(timezone.utc)):

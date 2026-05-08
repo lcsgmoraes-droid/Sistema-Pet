@@ -164,7 +164,34 @@ def _hash_token(raw_token: str) -> str:
 
 
 def _issue_numeric_code() -> str:
-    return f"{secrets.randbelow(1_000_000):06d}"
+    return str(secrets.randbelow(900_000) + 100_000)
+
+
+def _issue_password_reset_tokens() -> tuple[str, str, str]:
+    numeric_code = _issue_numeric_code()
+    link_token = secrets.token_urlsafe(32)
+    stored_token = f"v2:{_hash_token(numeric_code)}:{_hash_token(link_token)}"
+    return numeric_code, link_token, stored_token
+
+
+def _password_reset_token_matches(stored_token: str | None, received_token: str | None) -> bool:
+    if not stored_token or not received_token:
+        return False
+
+    token = received_token.strip()
+    if not token:
+        return False
+
+    if stored_token.startswith("v2:"):
+        parts = stored_token.split(":", 2)
+        if len(parts) != 3:
+            return False
+        received_hash = _hash_token(token)
+        return received_hash in {parts[1], parts[2]}
+
+    if token.isdigit() and len(token) < 6:
+        token = token.zfill(6)
+    return stored_token == token
 
 
 def _now_utc() -> datetime:
@@ -280,10 +307,7 @@ def _build_password_reset_email(user: User, reset_token: str, reset_link: str) -
             <div style="font-size: 13px; color: #6d28d9; margin-bottom: 6px;">Codigo de recuperacao</div>
             <div style="font-size: 28px; font-weight: 800; letter-spacing: 6px;">{reset_token}</div>
           </div>
-          <p>Se o botao nao abrir, copie e cole este link no navegador:</p>
-          <div style="background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 10px; padding: 14px; margin: 18px 0; word-break: break-all; font-size: 13px; color: #5b21b6;">
-            {reset_link}
-          </div>
+          <p>Se o botao nao abrir, acesse a tela de recuperacao e informe o codigo acima.</p>
           <p>Esse link expira em <strong>{RESET_TOKEN_MINUTES} minutos</strong>.</p>
           <p>Se voce nao pediu essa alteracao, pode ignorar este e-mail com seguranca.</p>
         </div>
@@ -292,8 +316,7 @@ def _build_password_reset_email(user: User, reset_token: str, reset_link: str) -
     """
     text_body = (
         "Recuperacao de senha - Pet Shop Pro\n\n"
-        "Acesse o link abaixo para redefinir sua senha:\n"
-        f"{reset_link}\n\n"
+        "Clique no botao do e-mail para redefinir sua senha.\n\n"
         "Ou use este codigo na tela de recuperacao:\n"
         f"{reset_token}\n\n"
         f"Validade: {RESET_TOKEN_MINUTES} minutos.\n"
@@ -634,15 +657,15 @@ def forgot_password(
     if not user or not user.is_active:
         return generic_response
 
-    reset_token = _issue_numeric_code()
-    user.reset_token = reset_token
+    reset_code, reset_link_token, stored_reset_token = _issue_password_reset_tokens()
+    user.reset_token = stored_reset_token
     user.reset_token_expires = datetime.now(timezone.utc) + timedelta(minutes=RESET_TOKEN_MINUTES)
 
     reset_link = (
         f"{_resolve_frontend_base_url(request)}/recuperar-senha"
-        f"?email={quote(user.email)}&token={quote(reset_token)}"
+        f"?email={quote(user.email)}&token={quote(reset_link_token)}"
     )
-    subject, html_body, text_body = _build_password_reset_email(user, reset_token, reset_link)
+    subject, html_body, text_body = _build_password_reset_email(user, reset_code, reset_link)
     enviado = send_email(
         to=user.email,
         subject=subject,
@@ -678,13 +701,12 @@ def reset_password(
             detail="Informe o e-mail para redefinir a senha",
         )
 
-    query = db.query(User).filter(
-        User.email == email,
-        User.reset_token == payload.token.strip(),
-    )
-    user = query.first()
+    user = db.query(User).filter(User.email == email).first()
 
     if not user or not user.reset_token_expires:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Codigo ou link de recuperacao invalido")
+
+    if not _password_reset_token_matches(user.reset_token, payload.token):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Codigo ou link de recuperacao invalido")
 
     expires_at = user.reset_token_expires

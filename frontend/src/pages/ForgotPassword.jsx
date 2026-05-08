@@ -55,7 +55,7 @@ export default function ForgotPassword() {
     try {
       const response = await api.post('/auth/forgot-password', { email: normalizedEmail });
       const minutes = response?.data?.expires_in_minutes;
-      setStep('reset');
+      setStep('request');
       setForm((prev) => ({
         ...prev,
         email: normalizedEmail,
@@ -66,7 +66,7 @@ export default function ForgotPassword() {
       setTokenFromLink(false);
       setSuccess(
         minutes
-          ? `Se o e-mail existir, enviamos um link e um codigo de recuperacao. Eles expiram em ${minutes} minutos.`
+          ? `Se o e-mail existir, enviamos um link e um codigo de recuperacao. Abra o ultimo e-mail recebido ou clique em "Ja tenho o codigo". Eles expiram em ${minutes} minutos.`
           : 'Se o e-mail existir, enviamos as instruções de recuperação.'
       );
     } catch (err) {
@@ -264,7 +264,7 @@ export default function ForgotPassword() {
               }}
               className="text-sm text-purple-600 hover:text-purple-700 font-semibold"
             >
-              Digitar codigo manualmente
+              Ja tenho o codigo
             </button>
           ) : (
             <button

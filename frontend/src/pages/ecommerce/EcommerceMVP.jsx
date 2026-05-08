@@ -989,7 +989,7 @@ export default function EcommerceMVP() {
         { headers: tenantHeaders }
       );
       const minutes = response?.data?.expires_in_minutes;
-      setRecoveryStep('reset');
+      setRecoveryStep('request');
       setRecoveryForm((prev) => ({
         ...prev,
         email: normalizedEmail,
@@ -1000,7 +1000,7 @@ export default function EcommerceMVP() {
       setRecoveryTokenFromLink(false);
       setSuccess(
         minutes
-          ? `Se o e-mail existir, enviamos um link e um codigo de recuperacao. Eles expiram em ${minutes} minutos.`
+          ? `Se o e-mail existir, enviamos um link e um codigo de recuperacao. Abra o ultimo e-mail recebido ou clique em "Ja tenho o codigo". Eles expiram em ${minutes} minutos.`
           : 'Se o e-mail existir, enviamos as instruções de recuperação.'
       );
     } catch (err) {
@@ -2696,7 +2696,7 @@ export default function EcommerceMVP() {
                           }}
                           style={{ background: '#fff', border: '1.5px solid #d1d5db', color: '#374151', borderRadius: 10, padding: '10px 16px', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}
                         >
-                          Digitar codigo
+                          Ja tenho o codigo
                         </button>
                       ) : (
                         <button
