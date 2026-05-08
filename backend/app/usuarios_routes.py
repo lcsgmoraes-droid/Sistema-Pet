@@ -1,3 +1,5 @@
+from datetime import datetime, timezone
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
@@ -71,7 +73,14 @@ def criar_usuario(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = user_and_tenant
-    existing = db.query(User).filter(User.email == payload.email).first()
+    email = payload.email.strip().lower()
+    if len(payload.password) < 8:
+        raise HTTPException(
+            status_code=400,
+            detail="Senha deve ter no minimo 8 caracteres",
+        )
+
+    existing = db.query(User).filter(User.email == email).first()
     if existing:
         raise HTTPException(
             status_code=400,
@@ -88,10 +97,12 @@ def criar_usuario(
 
     # Criar usuário
     user = User(
-        email=payload.email,
+        email=email,
         hashed_password=hash_password(payload.password),  # Hash com bcrypt
         is_active=True,
         tenant_id=tenant_id,
+        email_verified=True,
+        email_verified_at=datetime.now(timezone.utc),
     )
     db.add(user)
     db.flush()  # Garante que user.id seja gerado

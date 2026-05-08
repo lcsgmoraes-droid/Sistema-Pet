@@ -34,6 +34,17 @@ class User(BaseTenantModel):
 
     # LGPD Compliance
     consent_date = Column(DateTime(timezone=True), nullable=True)  # Data de aceite dos Termos
+    consent_version = Column(String(50), nullable=True)
+    privacy_version = Column(String(50), nullable=True)
+    consent_ip = Column(String(50), nullable=True)
+    consent_user_agent = Column(Text, nullable=True)
+
+    # Email verification
+    email_verified = Column(Boolean, default=False, nullable=False)
+    email_verified_at = Column(DateTime(timezone=True), nullable=True)
+    email_verification_token_hash = Column(String(128), nullable=True, index=True)
+    email_verification_token_expires = Column(DateTime(timezone=True), nullable=True)
+    email_verification_sent_at = Column(DateTime(timezone=True), nullable=True)
 
     # 2FA (Two-Factor Authentication)
     two_factor_enabled = Column(Boolean, default=False)

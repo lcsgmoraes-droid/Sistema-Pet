@@ -2,6 +2,7 @@
 Rotas de Autenticação Multi-Tenant
 """
 import logging
+import hashlib
 import os
 import secrets
 import uuid
@@ -36,6 +37,10 @@ logger = logging.getLogger(__name__)
 security = HTTPBearer()
 router = APIRouter(prefix="/auth", tags=["auth-multitenant"])
 RESET_TOKEN_MINUTES = 30
+EMAIL_VERIFICATION_TOKEN_HOURS = int(os.getenv("EMAIL_VERIFICATION_TOKEN_HOURS", "24"))
+EMAIL_VERIFICATION_REQUIRED = os.getenv("EMAIL_VERIFICATION_REQUIRED", "true").strip().lower() not in {"0", "false", "no"}
+TERMS_VERSION = os.getenv("TERMS_VERSION", "termos-2026-05-08")
+PRIVACY_VERSION = os.getenv("PRIVACY_VERSION", "privacidade-2026-05-08")
 
 
 # =============================================================================
@@ -103,13 +108,19 @@ class RegisterRequest(BaseModel):
     nome: Optional[str] = None
     nome_loja: Optional[str] = None
     organization_type: Optional[str] = "petshop"
+    accepted_terms: bool = False
+    accepted_privacy: bool = False
+    terms_version: Optional[str] = None
+    privacy_version: Optional[str] = None
 
 
 class LoginResponse(BaseModel):
-    access_token: str
+    access_token: Optional[str] = None
     token_type: str
     user: dict
     tenants: List[dict]
+    requires_email_verification: bool = False
+    email_verification_sent: bool = False
 
 
 class SelectTenantRequest(BaseModel):
@@ -129,7 +140,16 @@ class ForgotPasswordRequest(BaseModel):
 class ResetPasswordRequest(BaseModel):
     token: str
     email: EmailStr | None = None
-    nova_senha: str = Field(min_length=6)
+    nova_senha: str = Field(min_length=8)
+
+
+class VerifyEmailRequest(BaseModel):
+    token: str
+    email: EmailStr | None = None
+
+
+class ResendVerificationRequest(BaseModel):
+    email: EmailStr
 
 
 def _resolve_frontend_base_url(request: Request) -> str:
@@ -137,6 +157,99 @@ def _resolve_frontend_base_url(request: Request) -> str:
     if configured_url:
         return configured_url.rstrip("/")
     return str(request.base_url).rstrip("/")
+
+
+def _hash_token(raw_token: str) -> str:
+    return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+
+
+def _now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _mark_user_consent(user: User, request: Request, terms_version: str | None, privacy_version: str | None) -> None:
+    user.consent_date = _now_utc()
+    user.consent_version = terms_version or TERMS_VERSION
+    user.privacy_version = privacy_version or PRIVACY_VERSION
+    user.consent_ip = request.client.host if request.client else None
+    user.consent_user_agent = request.headers.get("user-agent")
+
+
+def _issue_email_verification_token(user: User) -> str:
+    raw_token = secrets.token_urlsafe(32)
+    user.email_verification_token_hash = _hash_token(raw_token)
+    user.email_verification_token_expires = _now_utc() + timedelta(hours=EMAIL_VERIFICATION_TOKEN_HOURS)
+    user.email_verification_sent_at = _now_utc()
+    return raw_token
+
+
+def _build_email_verification_email(user: User, raw_token: str, verification_link: str) -> tuple[str, str, str]:
+    saudacao = f", {user.nome}" if getattr(user, "nome", None) else ""
+    subject = "Confirme seu e-mail - Pet Shop Pro"
+    html_body = f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; color: #1f2937; max-width: 620px; margin: 0 auto;">
+        <div style="background: #2563eb; color: #ffffff; padding: 20px 24px; border-radius: 12px 12px 0 0;">
+          <h1 style="margin: 0; font-size: 22px;">Confirme seu e-mail</h1>
+        </div>
+        <div style="border: 1px solid #bfdbfe; border-top: none; border-radius: 0 0 12px 12px; padding: 24px;">
+          <p>Ola{saudacao}.</p>
+          <p>Para ativar sua conta no Pet Shop Pro, confirme que este e-mail pertence a voce.</p>
+          <p style="margin: 18px 0;">
+            <a href="{verification_link}"
+               style="display: inline-block; background: #2563eb; color: #ffffff; text-decoration: none; padding: 12px 18px; border-radius: 10px; font-weight: 700;">
+              Confirmar e-mail
+            </a>
+          </p>
+          <p>Se o botao nao abrir, copie este token na tela de confirmacao:</p>
+          <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 10px; padding: 16px; margin: 18px 0;">
+            <div style="font-size: 13px; color: #1d4ed8; margin-bottom: 6px;">Token de confirmacao</div>
+            <div style="font-size: 20px; font-weight: 700; letter-spacing: 0.4px; word-break: break-all;">{raw_token}</div>
+          </div>
+          <p>Esse token expira em <strong>{EMAIL_VERIFICATION_TOKEN_HOURS} horas</strong>.</p>
+          <p>Se voce nao criou esta conta, ignore este e-mail.</p>
+        </div>
+      </body>
+    </html>
+    """
+    text_body = (
+        "Confirme seu e-mail - Pet Shop Pro\n\n"
+        "Acesse o link abaixo para ativar sua conta:\n"
+        f"{verification_link}\n\n"
+        "Ou use este token manualmente na tela de confirmacao:\n"
+        f"{raw_token}\n\n"
+        f"Validade: {EMAIL_VERIFICATION_TOKEN_HOURS} horas.\n"
+        "Se voce nao criou esta conta, ignore este e-mail."
+    )
+    return subject, html_body, text_body
+
+
+def _send_email_verification(user: User, request: Request) -> bool:
+    raw_token = _issue_email_verification_token(user)
+    verification_link = (
+        f"{_resolve_frontend_base_url(request)}/verificar-email"
+        f"?email={quote(user.email)}&token={quote(raw_token)}"
+    )
+    subject, html_body, text_body = _build_email_verification_email(user, raw_token, verification_link)
+    return send_email(
+        to=user.email,
+        subject=subject,
+        html_body=html_body,
+        text_body=text_body,
+        simulate_if_unconfigured=not EMAIL_VERIFICATION_REQUIRED,
+    )
+
+
+def _email_verification_block(user: User) -> bool:
+    return EMAIL_VERIFICATION_REQUIRED and not bool(getattr(user, "email_verified", False))
+
+
+def _is_token_expired(expires_at: datetime | None) -> bool:
+    if not expires_at:
+        return True
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+    return expires_at < _now_utc()
 
 
 def _build_password_reset_email(user: User, reset_token: str, reset_link: str) -> tuple[str, str, str]:
@@ -187,27 +300,35 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
     Registra novo usuário e cria tenant automaticamente.
     
     - **email**: Email único
-    - **password**: Senha (min 6 caracteres)
+    - **password**: Senha (min 8 caracteres)
     - **nome**: Nome do usuário (opcional)
     - **nome_loja**: Nome da loja/empresa (opcional)
     """
     # Verificar se email já existe
-    existing = db.query(User).filter(User.email == payload.email).first()
+    email = payload.email.strip().lower()
+
+    if not payload.accepted_terms or not payload.accepted_privacy:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Aceite os Termos de Uso e a Politica de Privacidade para criar a conta.",
+        )
+
+    existing = db.query(User).filter(User.email == email).first()
     if existing:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email já cadastrado"
+            detail="Email ja cadastrado"
         )
     
     # Validar senha
-    if len(payload.password) < 6:
+    if len(payload.password) < 8:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Senha deve ter no mínimo 6 caracteres"
+            detail="Senha deve ter no minimo 8 caracteres"
         )
     
     # Criar tenant primeiro
-    tenant_name = payload.nome_loja or f"Loja de {payload.nome or payload.email}"
+    tenant_name = payload.nome_loja or f"Loja de {payload.nome or email}"
     tenant_id = uuid.uuid4()  # Gerar UUID
     tenant = Tenant(
         id=str(tenant_id),
@@ -224,15 +345,17 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
     
     # Criar usuário (definir tenant_id explicitamente)
     user = User(
-        email=payload.email,
+        email=email,
         hashed_password=hash_password(payload.password),
         nome=payload.nome,
         nome_loja=payload.nome_loja,
         is_active=True,
         is_admin=True,  # ✅ SUPER ADMIN - primeiro usuário do tenant
-        consent_date=datetime.now(timezone.utc),
+        email_verified=not EMAIL_VERIFICATION_REQUIRED,
+        email_verified_at=_now_utc() if not EMAIL_VERIFICATION_REQUIRED else None,
         tenant_id=tenant_id  # ✅ Definir tenant_id explicitamente
     )
+    _mark_user_consent(user, request, payload.terms_version, payload.privacy_version)
     db.add(user)
     db.flush()  # Para obter user.id
     
@@ -267,7 +390,40 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
         is_active=True
     )
     db.add(user_tenant)
+
+    email_verification_sent = False
+    if EMAIL_VERIFICATION_REQUIRED:
+        email_verification_sent = _send_email_verification(user, request)
+        if not email_verification_sent:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Nao foi possivel enviar o e-mail de confirmacao agora. Confira o SMTP e tente novamente.",
+            )
+
     db.commit()
+
+    tenants_payload = [{
+        "id": str(tenant_id),
+        "name": tenant.name,
+        "role_id": admin_role.id
+    }]
+
+    if EMAIL_VERIFICATION_REQUIRED:
+        return LoginResponse(
+            access_token=None,
+            token_type="bearer",
+            user={
+                "id": user.id,
+                "name": user.nome,
+                "email": user.email,
+                "is_active": user.is_active,
+                "email_verified": False,
+            },
+            tenants=tenants_payload,
+            requires_email_verification=True,
+            email_verification_sent=email_verification_sent,
+        )
     
     # Criar sessão
     db_session = create_session(
@@ -296,13 +452,10 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
             "id": user.id,
             "name": user.nome,
             "email": user.email,
-            "is_active": user.is_active
+            "is_active": user.is_active,
+            "email_verified": user.email_verified,
         },
-        tenants=[{
-            "id": str(tenant_id),
-            "name": tenant.name,
-            "role_id": admin_role.id
-        }]
+        tenants=tenants_payload,
     )
 
 
@@ -312,7 +465,8 @@ def login_multitenant(request: Request, credentials: LoginRequest, db: Session =
     Fase 1: Autentica usuário e retorna lista de tenants disponíveis.
     Token gerado SEM tenant_id.
     """
-    user = db.query(User).filter(User.email == credentials.email).first()
+    email = credentials.email.strip().lower()
+    user = db.query(User).filter(User.email == email).first()
     
     if not user or not verify_password(credentials.password, user.hashed_password):
         # log_audit(
@@ -336,6 +490,12 @@ def login_multitenant(request: Request, credentials: LoginRequest, db: Session =
             detail="Usuário inativo",
         )
     
+    if _email_verification_block(user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Email ainda nao confirmado. Verifique sua caixa de entrada ou solicite um novo link.",
+        )
+
     user_tenants = db.query(UserTenant).filter(
         UserTenant.user_id == user.id
     ).all()
@@ -392,10 +552,56 @@ def login_multitenant(request: Request, credentials: LoginRequest, db: Session =
             "id": user.id,
             "name": user.nome,
             "email": user.email,
-            "is_active": user.is_active
+            "is_active": user.is_active,
+            "email_verified": user.email_verified,
         },
         tenants=tenants_list
     )
+
+
+@router.post("/verify-email")
+def verify_email(payload: VerifyEmailRequest, db: Session = Depends(get_session)):
+    token_hash = _hash_token(payload.token.strip())
+    query = db.query(User).filter(User.email_verification_token_hash == token_hash)
+    if payload.email:
+        query = query.filter(User.email == payload.email.strip().lower())
+    user = query.first()
+
+    if not user or _is_token_expired(user.email_verification_token_expires):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token de confirmacao invalido ou expirado")
+
+    user.email_verified = True
+    user.email_verified_at = _now_utc()
+    user.email_verification_token_hash = None
+    user.email_verification_token_expires = None
+    user.email_verification_sent_at = None
+    db.commit()
+
+    return {"message": "Email confirmado com sucesso. Voce ja pode entrar no sistema."}
+
+
+@router.post("/resend-verification")
+def resend_verification(
+    payload: ResendVerificationRequest,
+    request: Request,
+    db: Session = Depends(get_session),
+):
+    generic_response = {"message": "Se o email precisar de confirmacao, enviaremos um novo link."}
+    user = db.query(User).filter(User.email == payload.email.strip().lower()).first()
+
+    if not user or not user.is_active or user.email_verified:
+        return generic_response
+
+    enviado = _send_email_verification(user, request)
+    if not enviado:
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Nao foi possivel enviar o e-mail de confirmacao agora. Tente novamente em instantes.",
+        )
+
+    db.commit()
+    return {**generic_response, "expires_in_hours": EMAIL_VERIFICATION_TOKEN_HOURS}
 
 
 @router.post("/forgot-password")
@@ -626,6 +832,9 @@ def get_me_multitenant(
         "name": current_user.nome,
         "email": current_user.email,
         "is_active": current_user.is_active,
+        "email_verified": current_user.email_verified,
+        "consent_version": current_user.consent_version,
+        "privacy_version": current_user.privacy_version,
         "tenant": {
             "id": str(tenant.id),
             "name": tenant.name

@@ -3,17 +3,20 @@
 // =====================
 
 export interface AuthTokens {
-  access_token: string;
+  access_token?: string | null;
   token_type: string;
 }
 
 export interface AuthResponse extends AuthTokens {
   user: EcommerceUser;
+  requires_email_verification?: boolean;
+  email_verification_sent?: boolean;
 }
 
 export interface EcommerceUser {
   id: number;
   email: string;
+  email_verified?: boolean;
   nome: string | null;
   telefone?: string | null;
   cpf?: string | null;

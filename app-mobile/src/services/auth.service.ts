@@ -9,7 +9,9 @@ import { AuthResponse, EcommerceUser } from '../types';
 
 export async function login(email: string, password: string): Promise<AuthResponse> {
   const { data } = await api.post<AuthResponse>('/ecommerce/auth/login', { email, password });
-  await SecureStore.setItemAsync('auth_token', data.access_token);
+  if (data.access_token) {
+    await SecureStore.setItemAsync('auth_token', data.access_token);
+  }
   return data;
 }
 
@@ -18,7 +20,9 @@ export async function register(
   password: string,
   nome?: string,
   cpf?: string,
-  telefone?: string
+  telefone?: string,
+  acceptedTerms = true,
+  acceptedPrivacy = true,
 ): Promise<AuthResponse> {
   const { data } = await api.post<AuthResponse>('/ecommerce/auth/registrar', {
     email,
@@ -26,8 +30,12 @@ export async function register(
     nome,
     cpf: cpf || undefined,
     telefone: telefone || undefined,
+    accepted_terms: acceptedTerms,
+    accepted_privacy: acceptedPrivacy,
   });
-  await SecureStore.setItemAsync('auth_token', data.access_token);
+  if (data.access_token) {
+    await SecureStore.setItemAsync('auth_token', data.access_token);
+  }
   return data;
 }
 

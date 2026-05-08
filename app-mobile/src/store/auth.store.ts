@@ -1,7 +1,7 @@
 import * as SecureStore from "expo-secure-store";
 import { create } from "zustand";
 import * as AuthService from "../services/auth.service";
-import { EcommerceUser } from "../types";
+import { AuthResponse, EcommerceUser } from "../types";
 
 const ROLE_CACHE_KEY_PREFIX = "ecommerce_role_cache_";
 
@@ -64,7 +64,9 @@ interface AuthState {
     nome?: string,
     cpf?: string,
     telefone?: string,
-  ) => Promise<void>;
+    acceptedTerms?: boolean,
+    acceptedPrivacy?: boolean,
+  ) => Promise<AuthResponse>;
   logout: () => Promise<void>;
   loadUser: () => Promise<void>;
   updateUser: (updates: Partial<EcommerceUser>) => void;
@@ -81,10 +83,16 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
     set({ isAuthenticated: true, user });
   },
 
-  register: async (email, password, nome, cpf, telefone) => {
-    const { user } = await AuthService.register(email, password, nome, cpf, telefone);
+  register: async (email, password, nome, cpf, telefone, acceptedTerms, acceptedPrivacy) => {
+    const response = await AuthService.register(email, password, nome, cpf, telefone, acceptedTerms, acceptedPrivacy);
+    const { user } = response;
+    if (response.requires_email_verification || !response.access_token) {
+      set({ isAuthenticated: false, user: null });
+      return response;
+    }
     await cacheEntregadorRole(user);
     set({ isAuthenticated: true, user });
+    return response;
   },
 
   logout: async () => {

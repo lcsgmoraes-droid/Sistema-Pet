@@ -394,7 +394,15 @@ export default function EcommerceMVP() {
     entrega_estado: '',
   });
 
-  const [registerForm, setRegisterForm] = useState({ email: '', password: '', nome: '', cpf: '', telefone: '' });
+  const [registerForm, setRegisterForm] = useState({
+    email: '',
+    password: '',
+    nome: '',
+    cpf: '',
+    telefone: '',
+    accepted_terms: false,
+    accepted_privacy: false,
+  });
   const [loginForm, setLoginForm] = useState({ email: '', password: '' });
   const [passwordRecoveryMode, setPasswordRecoveryMode] = useState(false);
   const [recoveryStep, setRecoveryStep] = useState('request');
@@ -1012,8 +1020,8 @@ export default function EcommerceMVP() {
       return;
     }
 
-    if ((recoveryForm.novaSenha || '').length < 6) {
-      setError('A nova senha deve ter pelo menos 6 caracteres.');
+    if ((recoveryForm.novaSenha || '').length < 8) {
+      setError('A nova senha deve ter pelo menos 8 caracteres.');
       return;
     }
 
@@ -1071,11 +1079,35 @@ export default function EcommerceMVP() {
       setError('Informe um telefone/celular valido.');
       return;
     }
+    if ((registerForm.password || '').length < 8) {
+      setError('A senha deve ter pelo menos 8 caracteres.');
+      return;
+    }
+    if (!registerForm.accepted_terms || !registerForm.accepted_privacy) {
+      setError('Aceite os Termos de Uso e a Politica de Privacidade para criar a conta.');
+      return;
+    }
     setAuthLoading(true);
     setError('');
     setSuccess('');
     try {
       const response = await ecommerceApi.post('/api/ecommerce/auth/registrar', registerForm, { headers: tenantHeaders });
+      if (response?.data?.requires_email_verification) {
+        setRegisterForm({
+          email: '',
+          password: '',
+          nome: '',
+          cpf: '',
+          telefone: '',
+          accepted_terms: false,
+          accepted_privacy: false,
+        });
+        setPasswordRecoveryMode(false);
+        setRecoveryStep('request');
+        clearRecoveryParamsFromUrl();
+        setSuccess('Cadastro realizado. Enviamos um link de confirmacao para o seu e-mail antes do primeiro acesso.');
+        return;
+      }
       const token = response?.data?.access_token;
       if (!token) throw new Error('Token não retornado');
       if (response?.data?.user) {
@@ -1084,7 +1116,15 @@ export default function EcommerceMVP() {
       localStorage.setItem(STORAGE_TOKEN_KEY, token);
       setCustomerToken(token);
       await syncGuestCartToServer(token);
-      setRegisterForm({ email: '', password: '', nome: '', cpf: '', telefone: '' });
+      setRegisterForm({
+        email: '',
+        password: '',
+        nome: '',
+        cpf: '',
+        telefone: '',
+        accepted_terms: false,
+        accepted_privacy: false,
+      });
       setPasswordRecoveryMode(false);
       setRecoveryStep('request');
       clearRecoveryParamsFromUrl();
@@ -2527,11 +2567,19 @@ export default function EcommerceMVP() {
                   <input name="ecommerce_register_telefone" autoComplete="off" value={registerForm.telefone} onChange={(e) => setRegisterForm((prev) => ({ ...prev, telefone: e.target.value }))} placeholder="Telefone/WhatsApp *" inputMode="tel" style={S.formInput} required />
                   <input name="ecommerce_register_email" autoComplete="off" value={registerForm.email} onChange={(e) => setRegisterForm((prev) => ({ ...prev, email: e.target.value }))} placeholder="Email" type="email" style={S.formInput} />
                   <div style={{ position: 'relative' }}>
-                    <input name="ecommerce_register_password" autoComplete="new-password" value={registerForm.password} onChange={(e) => setRegisterForm((prev) => ({ ...prev, password: e.target.value }))} placeholder="Senha" type={showRegisterPassword ? 'text' : 'password'} style={{ ...S.formInput, paddingRight: 80, width: '100%', boxSizing: 'border-box' }} />
+                    <input name="ecommerce_register_password" autoComplete="new-password" value={registerForm.password} onChange={(e) => setRegisterForm((prev) => ({ ...prev, password: e.target.value }))} placeholder="Senha (minimo 8 caracteres)" type={showRegisterPassword ? 'text' : 'password'} style={{ ...S.formInput, paddingRight: 80, width: '100%', boxSizing: 'border-box' }} />
                     <button type="button" onClick={() => setShowRegisterPassword((prev) => !prev)} style={{ position: 'absolute', right: 10, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', fontSize: 12, color: '#6b7280' }}>
                       {showRegisterPassword ? 'Ocultar' : '👁 Ver'}
                     </button>
                   </div>
+                  <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: '#57534e', lineHeight: 1.45 }}>
+                    <input type="checkbox" checked={registerForm.accepted_terms} onChange={(e) => setRegisterForm((prev) => ({ ...prev, accepted_terms: e.target.checked }))} style={{ marginTop: 2 }} />
+                    <span>Li e aceito os <a href="/termos" target="_blank" rel="noreferrer" style={{ color: '#7c3aed', fontWeight: 700 }}>Termos de Uso</a>.</span>
+                  </label>
+                  <label style={{ display: 'flex', gap: 8, alignItems: 'flex-start', fontSize: 12, color: '#57534e', lineHeight: 1.45 }}>
+                    <input type="checkbox" checked={registerForm.accepted_privacy} onChange={(e) => setRegisterForm((prev) => ({ ...prev, accepted_privacy: e.target.checked }))} style={{ marginTop: 2 }} />
+                    <span>Li e aceito a <a href="/privacidade" target="_blank" rel="noreferrer" style={{ color: '#7c3aed', fontWeight: 700 }}>Politica de Privacidade</a>.</span>
+                  </label>
                   <button type="submit" disabled={authLoading} style={S.saveBtn}>{authLoading ? 'Criando...' : 'Criar minha conta'}</button>
                 </form>
               </div>

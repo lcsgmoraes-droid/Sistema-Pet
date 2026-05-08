@@ -74,6 +74,11 @@ export default function useUsuariosPage() {
 
   async function criarUsuario(event) {
     event.preventDefault();
+    if ((novoUsuario.password || "").length < 8) {
+      alert("Senha deve ter no minimo 8 caracteres");
+      return;
+    }
+
     try {
       await api.post("/usuarios", novoUsuario);
       alert("Usuário criado com sucesso!");

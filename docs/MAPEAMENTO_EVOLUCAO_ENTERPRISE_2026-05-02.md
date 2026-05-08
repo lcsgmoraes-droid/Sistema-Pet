@@ -852,6 +852,8 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-08: PDV expandiu `CustomerIdentity` para card do cliente, assistente IA, widget lateral, historico de compras e vendas em aberto, mantendo nome/codigo copiaveis nos fluxos de atendimento.
 - 2026-05-08: criado `PetIdentity` para nome/codigo de pet copiaveis e aplicado em Banho & Tosa, veterinario, lembretes, relatorio de vendas, widget de cliente e alertas inteligentes do PDV.
 - 2026-05-08: criado `FornecedorIdentity` para nome/documento/codigo de fornecedor copiaveis e aplicado em compras, contas a pagar, conciliacao e relatorios de produtos/validade.
+- 2026-05-08: Go-live de autenticacao iniciado. Cadastro de novo tenant passou a exigir aceite explicito de Termos/Privacidade, salvar versoes/IP/user-agent, enviar confirmacao de e-mail e nao tentar carregar `/auth/me-multitenant` antes de selecionar tenant.
+- 2026-05-08: Clientes do e-commerce/app tambem passaram a aceitar Termos/Privacidade e ficam bloqueados ate confirmar e-mail quando `EMAIL_VERIFICATION_REQUIRED=true`. Foram adicionadas `/verificar-email`, `/termos`, `/privacidade` e a migration `nv20260508a1_user_email_verification_lgpd.py`.
 
 ### Nao fazer nesta onda
 

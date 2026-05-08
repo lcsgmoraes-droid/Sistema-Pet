@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, timezone
 from uuid import UUID
+import hashlib
 import os
 import secrets
 import re
@@ -24,13 +25,21 @@ router = APIRouter(prefix="/ecommerce/auth", tags=["ecommerce-auth"])
 security = HTTPBearer()
 
 RESET_TOKEN_MINUTES = 30
+EMAIL_VERIFICATION_TOKEN_HOURS = int(os.getenv("EMAIL_VERIFICATION_TOKEN_HOURS", "24"))
+EMAIL_VERIFICATION_REQUIRED = os.getenv("EMAIL_VERIFICATION_REQUIRED", "true").strip().lower() not in {"0", "false", "no"}
+TERMS_VERSION = os.getenv("TERMS_VERSION", "termos-2026-05-08")
+PRIVACY_VERSION = os.getenv("PRIVACY_VERSION", "privacidade-2026-05-08")
 
 
 class EcommerceRegisterRequest(BaseModel):
     email: EmailStr
-    password: str = Field(min_length=6)
+    password: str = Field(min_length=8)
     nome: str | None = None
     telefone: str = Field(min_length=8, max_length=20, description="Telefone obrigatorio")
+    accepted_terms: bool = False
+    accepted_privacy: bool = False
+    terms_version: str | None = None
+    privacy_version: str | None = None
     cpf: str = Field(min_length=11, max_length=14, description='CPF obrigatório (11 dígitos, com ou sem formatação)')
 
 
@@ -47,7 +56,7 @@ class EcommerceForgotPasswordRequest(BaseModel):
 class EcommerceResetPasswordRequest(BaseModel):
     token: str
     email: EmailStr | None = None
-    nova_senha: str = Field(min_length=6)
+    nova_senha: str = Field(min_length=8)
 
 
 class EcommerceProfileUpdateRequest(BaseModel):
@@ -147,6 +156,79 @@ def _build_storefront_reset_link(tenant: Tenant | None, user_email: str, reset_t
         f"{base_url}/ecommerce"
         f"?recovery=1&email={quote(user_email)}&token={quote(reset_token)}"
     )
+
+
+def _hash_token(raw_token: str) -> str:
+    return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
+
+
+def _now_utc() -> datetime:
+    return datetime.now(timezone.utc)
+
+
+def _mark_user_consent(user: User, request: Request, terms_version: str | None, privacy_version: str | None) -> None:
+    user.consent_date = _now_utc()
+    user.consent_version = terms_version or TERMS_VERSION
+    user.privacy_version = privacy_version or PRIVACY_VERSION
+    user.consent_ip = request.client.host if request.client else None
+    user.consent_user_agent = request.headers.get("user-agent")
+
+
+def _issue_email_verification_token(user: User) -> str:
+    raw_token = secrets.token_urlsafe(32)
+    user.email_verification_token_hash = _hash_token(raw_token)
+    user.email_verification_token_expires = _now_utc() + timedelta(hours=EMAIL_VERIFICATION_TOKEN_HOURS)
+    user.email_verification_sent_at = _now_utc()
+    return raw_token
+
+
+def _build_email_verification_link(user_email: str, raw_token: str) -> str:
+    base_url = (os.getenv("FRONTEND_URL") or os.getenv("ECOMMERCE_BASE_URL") or "https://mlprohub.com.br").rstrip("/")
+    return f"{base_url}/verificar-email?email={quote(user_email)}&token={quote(raw_token)}"
+
+
+def _send_email_verification(user: User) -> bool:
+    raw_token = _issue_email_verification_token(user)
+    verification_link = _build_email_verification_link(user.email, raw_token)
+    saudacao = f", {user.nome}" if getattr(user, "nome", None) else ""
+    subject = "Confirme seu e-mail - Pet Shop Pro"
+    html_body = f"""
+    <html>
+      <body style="font-family: Arial, sans-serif; color: #1f2937; max-width: 620px; margin: 0 auto;">
+        <div style="background: #2563eb; color: #ffffff; padding: 20px 24px; border-radius: 12px 12px 0 0;">
+          <h1 style="margin: 0; font-size: 22px;">Confirme seu e-mail</h1>
+        </div>
+        <div style="border: 1px solid #bfdbfe; border-top: none; border-radius: 0 0 12px 12px; padding: 24px;">
+          <p>Ola{saudacao}.</p>
+          <p>Confirme seu e-mail para ativar sua conta e acessar a loja.</p>
+          <p style="margin: 18px 0;">
+            <a href="{verification_link}" style="display: inline-block; background: #2563eb; color: #ffffff; text-decoration: none; padding: 12px 18px; border-radius: 10px; font-weight: 700;">
+              Confirmar e-mail
+            </a>
+          </p>
+          <p>Token manual: <strong>{raw_token}</strong></p>
+          <p>Esse token expira em <strong>{EMAIL_VERIFICATION_TOKEN_HOURS} horas</strong>.</p>
+        </div>
+      </body>
+    </html>
+    """
+    text_body = (
+        "Confirme seu e-mail - Pet Shop Pro\n\n"
+        f"Acesse: {verification_link}\n\n"
+        f"Token manual: {raw_token}\n"
+        f"Validade: {EMAIL_VERIFICATION_TOKEN_HOURS} horas."
+    )
+    return send_email(
+        to=user.email,
+        subject=subject,
+        html_body=html_body,
+        text_body=text_body,
+        simulate_if_unconfigured=not EMAIL_VERIFICATION_REQUIRED,
+    )
+
+
+def _email_verification_block(user: User) -> bool:
+    return EMAIL_VERIFICATION_REQUIRED and not bool(getattr(user, "email_verified", False))
 
 
 def _resolve_password_recovery_channel(request: Request, payload: EcommerceForgotPasswordRequest) -> str:
@@ -510,6 +592,7 @@ def _serialize_profile(user: User, cliente: Cliente | None) -> dict:
     return {
         "id": user.id,
         "email": user.email,
+        "email_verified": user.email_verified,
         "nome": user.nome,
         "telefone": (cliente.telefone if cliente else None) or user.telefone,
         "cpf": (cliente.cpf if cliente else None) or user.cpf_cnpj,
@@ -542,8 +625,15 @@ def _serialize_profile(user: User, cliente: Cliente | None) -> dict:
 @router.post("/registrar")
 def registrar_cliente(payload: EcommerceRegisterRequest, request: Request, db: Session = Depends(get_session)):
     tenant_id = _extract_tenant_id_from_request(request)
+    email = payload.email.strip().lower()
 
-    existing = db.query(User).filter(User.email == payload.email).first()
+    if not payload.accepted_terms or not payload.accepted_privacy:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Aceite os Termos de Uso e a Politica de Privacidade para criar a conta.",
+        )
+
+    existing = db.query(User).filter(User.email == email).first()
     if existing:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email já cadastrado")
 
@@ -554,17 +644,27 @@ def registrar_cliente(payload: EcommerceRegisterRequest, request: Request, db: S
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Telefone obrigatorio")
 
     user = User(
-        email=payload.email,
+        email=email,
         hashed_password=hash_password(payload.password),
         nome=payload.nome,
         telefone=telefone,
         is_active=True,
         is_admin=False,
-        consent_date=datetime.now(timezone.utc),
+        email_verified=not EMAIL_VERIFICATION_REQUIRED,
+        email_verified_at=_now_utc() if not EMAIL_VERIFICATION_REQUIRED else None,
         tenant_id=tenant_id,
         cpf_cnpj=cpf_normalizado,  # Salva o CPF antes para que _get_or_create_cliente_for_user possa encontrar o Cliente por CPF
     )
+    _mark_user_consent(user, request, payload.terms_version, payload.privacy_version)
     db.add(user)
+    if EMAIL_VERIFICATION_REQUIRED:
+        enviado = _send_email_verification(user)
+        if not enviado:
+            db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Nao foi possivel enviar o e-mail de confirmacao agora. Tente novamente em instantes.",
+            )
     db.commit()
     db.refresh(user)
 
@@ -599,6 +699,15 @@ def registrar_cliente(payload: EcommerceRegisterRequest, request: Request, db: S
     except Exception as e_camp:
         import logging
         logging.getLogger(__name__).error("[Campanhas] Erro ao publicar customer_registered: %s", e_camp)
+
+    if EMAIL_VERIFICATION_REQUIRED:
+        return {
+            "access_token": None,
+            "token_type": "bearer",
+            "requires_email_verification": True,
+            "email_verification_sent": True,
+            "user": _serialize_profile(user, cliente),
+        }
 
     access_token = create_access_token(
         data={
@@ -637,6 +746,12 @@ def login_cliente(payload: EcommerceLoginRequest, request: Request, db: Session 
 
     if not user.is_active:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Conta inativa")
+
+    if _email_verification_block(user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Email ainda nao confirmado. Verifique sua caixa de entrada ou solicite um novo link.",
+        )
 
     _ensure_active_store_access(db, user, str(tenant_id))
     db.commit()
@@ -715,7 +830,7 @@ def resetar_senha(payload: EcommerceResetPasswordRequest, db: Session = Depends(
     if not user or not user.reset_token_expires:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token inválido")
 
-    if user.reset_token_expires < datetime.now(timezone.utc):
+    if _is_expired(user.reset_token_expires, datetime.now(timezone.utc)):
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Token expirado")
 
     user.hashed_password = hash_password(payload.nova_senha)

@@ -83,8 +83,8 @@ export default function ForgotPassword() {
       return;
     }
 
-    if (form.novaSenha.length < 6) {
-      setError('A nova senha deve ter pelo menos 6 caracteres.');
+    if (form.novaSenha.length < 8) {
+      setError('A nova senha deve ter pelo menos 8 caracteres.');
       return;
     }
 
@@ -189,7 +189,7 @@ export default function ForgotPassword() {
                     value={form.novaSenha}
                     onChange={(e) => setForm((prev) => ({ ...prev, novaSenha: e.target.value }))}
                     className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
-                    placeholder="Mínimo de 6 caracteres"
+                    placeholder="Minimo de 8 caracteres"
                     required
                   />
                   <button

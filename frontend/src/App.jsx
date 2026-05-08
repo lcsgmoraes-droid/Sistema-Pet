@@ -13,6 +13,8 @@ import { isMobileViewport, isVeterinarioProfile } from "./utils/veterinarioPerfi
 const Login = lazy(() => import("./pages/Login"));
 const ForgotPassword = lazy(() => import("./pages/ForgotPassword"));
 const Register = lazy(() => import("./pages/Register"));
+const EmailVerification = lazy(() => import("./pages/EmailVerification"));
+const LegalPage = lazy(() => import("./pages/LegalPage"));
 const LandingPage = lazy(() => import("./pages/LandingPage"));
 const preloadPessoas = () => import("./pages/ClientesNovo");
 const Pessoas = lazy(preloadPessoas);
@@ -290,6 +292,9 @@ function App() {
                 <Route path="/login" element={<Login />} />
                 <Route path="/recuperar-senha" element={<ForgotPassword />} />
                 <Route path="/register" element={<Register />} />
+                <Route path="/verificar-email" element={<EmailVerification />} />
+                <Route path="/termos" element={<LegalPage type="termos" />} />
+                <Route path="/privacidade" element={<LegalPage type="privacidade" />} />
                 <Route path="/landing" element={<LandingPage />} />
                 <Route path="/rastreio/:token" element={<RastreioPublico />} />
                 <Route path="/ecommerce" element={<EcommerceMVP />} />

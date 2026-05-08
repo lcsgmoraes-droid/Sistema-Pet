@@ -64,6 +64,7 @@ export default function UsuarioModal({
                   id="novo-usuario-senha"
                   type={showPassword ? "text" : "password"}
                   required
+                  minLength={8}
                   value={novoUsuario.password}
                   onChange={(event) =>
                     setNovoUsuario({
@@ -72,7 +73,7 @@ export default function UsuarioModal({
                     })
                   }
                   className="w-full px-3 py-2 pr-10 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Mínimo 6 caracteres"
+                  placeholder="Minimo 8 caracteres"
                   autoComplete="new-password"
                 />
                 <button

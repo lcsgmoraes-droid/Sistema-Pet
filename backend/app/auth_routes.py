@@ -58,20 +58,26 @@ def register(payload: RegisterRequest, session: DBSession = Depends(db.get_sessi
     Criar nova conta de usuário.
     
     - **email**: Email único
-    - **password**: Senha (min 6 caracteres)
+    - **password**: Senha (min 8 caracteres)
     - **nome**: Nome do usuário (opcional)
     """
     # Verificar se email já existe
-    existing = session.query(models.User).filter(models.User.email == payload.email).first()
+    email = payload.email.strip().lower()
+    if len(payload.password) < 8:
+        raise HTTPException(status_code=400, detail="Senha deve ter no minimo 8 caracteres")
+
+    existing = session.query(models.User).filter(models.User.email == email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email já cadastrado")
     
     # Criar usuário
     user = models.User(
-        email=payload.email,
+        email=email,
         hashed_password=hash_password(payload.password),
         nome=payload.nome,
         is_active=True,
+        email_verified=True,
+        email_verified_at=datetime.now(timezone.utc),
         consent_date=datetime.now(timezone.utc)  # LGPD - aceite dos termos
     )
     session.add(user)

@@ -60,8 +60,8 @@ export default function ForgotPasswordScreen({ navigation }: any) {
       Alert.alert('Campos obrigatórios', 'Preencha o e-mail e o token recebido.');
       return;
     }
-    if (novaSenha.length < 6) {
-      Alert.alert('Senha curta', 'A nova senha deve ter pelo menos 6 caracteres.');
+    if (novaSenha.length < 8) {
+      Alert.alert('Senha curta', 'A nova senha deve ter pelo menos 8 caracteres.');
       return;
     }
     if (novaSenha !== confirmarSenha) {
@@ -136,7 +136,7 @@ export default function ForgotPasswordScreen({ navigation }: any) {
               <View style={styles.inputComIcone}>
                 <TextInput
                   style={[styles.input, styles.inputSemMargem]}
-                  placeholder="Mínimo 6 caracteres"
+                  placeholder="Minimo 8 caracteres"
                   placeholderTextColor={CORES.textoClaro}
                   secureTextEntry={!mostrarNovaSenha}
                   value={novaSenha}

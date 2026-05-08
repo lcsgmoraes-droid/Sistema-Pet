@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { useAuth } from '../contexts/AuthContext';
 import { PawPrint } from 'lucide-react';
-import { FiMail, FiLock, FiAlertCircle, FiEye, FiEyeOff } from 'react-icons/fi';
+import { FiAlertCircle, FiEye, FiEyeOff, FiLock, FiMail } from 'react-icons/fi';
+import { useAuth } from '../contexts/AuthContext';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -13,53 +13,38 @@ const Login = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const redirectAfterLogin = () => {
+    const savedUser = localStorage.getItem('user');
+    if (!savedUser) {
+      navigate('/lembretes');
+      return;
+    }
+
+    const user = JSON.parse(savedUser);
+    const roleName = user.role?.name?.toLowerCase();
+
+    if (roleName === 'caixa') {
+      navigate('/pdv');
+    } else if (roleName === 'admin' || roleName === 'gerente') {
+      navigate('/dashboard');
+    } else {
+      navigate('/lembretes');
+    }
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setError('');
     setLoading(true);
 
-    // console.log('📝 Submit do formulário - Email:', email);
-
     try {
       const result = await login(email, password);
-      
-      // console.log('📊 Resultado do login:', result);
-
       if (result.success) {
-        // console.log('✅ Login bem-sucedido!');
-        
-        // Redirecionar baseado na role do usuário
-        const savedUser = localStorage.getItem('user');
-        if (savedUser) {
-          const user = JSON.parse(savedUser);
-          const roleName = user.role?.name?.toLowerCase();
-          
-          console.log('👤 Role do usuário:', roleName);
-          console.log('👤 Permissões:', user.permissions);
-          
-          // Se for apenas caixa, vai direto pro PDV
-          if (roleName === 'caixa') {
-            console.log('🎯 Usuário caixa - Navegando para /pdv');
-            navigate('/pdv');
-          } else if (roleName === 'admin' || roleName === 'gerente') {
-            // Admin/Gerente vão para dashboard
-            console.log('🎯 Usuário gerencial - Navegando para /dashboard');
-            navigate('/dashboard');
-          } else {
-            // Outros vão para lembretes (página inicial padrão)
-            console.log('🎯 Redirecionando para /lembretes');
-            navigate('/lembretes');
-          }
-        } else {
-          // Fallback padrão
-          navigate('/lembretes');
-        }
+        redirectAfterLogin();
       } else {
-        console.error('❌ Login falhou:', result.error);
         setError(result.error || 'Erro desconhecido ao fazer login');
       }
-    } catch (err) {
-      console.error('❌ Erro inesperado:', err);
+    } catch {
       setError('Erro inesperado ao fazer login');
     } finally {
       setLoading(false);
@@ -69,35 +54,40 @@ const Login = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-600 via-purple-700 to-purple-900 flex items-center justify-center p-4">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 animate-fade-in">
-        {/* Logo */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 bg-purple-100 rounded-full mb-4">
             <PawPrint className="w-8 h-8 text-purple-600" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900">Pet Shop Pro</h1>
-          <p className="text-gray-600 mt-2">Sistema de Gestão Completo</p>
+          <p className="text-gray-600 mt-2">Sistema de Gestao Completo</p>
         </div>
 
-        {/* Error Message */}
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
-            <FiAlertCircle className="flex-shrink-0" />
-            <span className="text-sm">{error}</span>
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg flex items-start gap-2 text-red-700">
+            <FiAlertCircle className="flex-shrink-0 mt-0.5" />
+            <div className="text-sm">
+              <div>{error}</div>
+              {String(error).toLowerCase().includes('email') && String(error).toLowerCase().includes('confirm') && (
+                <Link
+                  to={`/verificar-email?email=${encodeURIComponent(email)}`}
+                  className="inline-block mt-2 font-semibold text-red-800 underline"
+                >
+                  Confirmar e-mail ou reenviar link
+                </Link>
+              )}
+            </div>
           </div>
         )}
 
-        {/* Form */}
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Email
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
             <div className="relative">
               <FiMail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
                 type="email"
                 value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                onChange={(event) => setEmail(event.target.value)}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
                 placeholder="seu@email.com"
                 required
@@ -106,25 +96,26 @@ const Login = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Senha
-            </label>
+            <label className="block text-sm font-medium text-gray-700 mb-2">Senha</label>
             <div className="relative">
               <FiLock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
-                type={showPassword ? "text" : "password"}
+                type={showPassword ? 'text' : 'password'}
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(event) => setPassword(event.target.value)}
                 className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
-                placeholder="••••••••"
+                placeholder="Sua senha"
                 required
-              />              <button
+              />
+              <button
                 type="button"
-                onClick={() => setShowPassword(!showPassword)}
+                onClick={() => setShowPassword((value) => !value)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 transition"
+                aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
               >
                 {showPassword ? <FiEyeOff /> : <FiEye />}
-              </button>            </div>
+              </button>
+            </div>
           </div>
 
           <button
@@ -142,10 +133,9 @@ const Login = () => {
           </Link>
         </div>
 
-        {/* Register Link */}
         <div className="mt-6 text-center">
           <p className="text-gray-600">
-            Não tem uma conta?{' '}
+            Nao tem uma conta?{' '}
             <Link to="/register" className="text-purple-600 hover:text-purple-700 font-semibold">
               Criar conta
             </Link>

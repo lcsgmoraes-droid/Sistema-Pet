@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import KeyboardSafeScrollView from '../../components/KeyboardSafeScrollView';
@@ -23,6 +24,8 @@ export default function RegisterScreen({ navigation }: any) {
   const [confirmarSenha, setConfirmarSenha] = useState('');
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [mostrarConfSenha, setMostrarConfSenha] = useState(false);
+  const [aceitouTermos, setAceitouTermos] = useState(false);
+  const [aceitouPrivacidade, setAceitouPrivacidade] = useState(false);
   const [carregando, setCarregando] = useState(false);
   const { register } = useAuthStore();
 
@@ -45,13 +48,32 @@ export default function RegisterScreen({ navigation }: any) {
       Alert.alert('Senhas diferentes', 'A confirmação de senha não confere.');
       return;
     }
-    if (senha.length < 6) {
-      Alert.alert('Senha curta', 'A senha deve ter pelo menos 6 caracteres.');
+    if (senha.length < 8) {
+      Alert.alert('Senha curta', 'A senha deve ter pelo menos 8 caracteres.');
+      return;
+    }
+    if (!aceitouTermos || !aceitouPrivacidade) {
+      Alert.alert('Aceite necessario', 'Aceite os Termos de Uso e a Politica de Privacidade para criar a conta.');
       return;
     }
     setCarregando(true);
     try {
-      await register(email.trim().toLowerCase(), senha, nome.trim() || undefined, cpf.trim(), telefone.trim());
+      const response = await register(
+        email.trim().toLowerCase(),
+        senha,
+        nome.trim() || undefined,
+        cpf.trim(),
+        telefone.trim(),
+        aceitouTermos,
+        aceitouPrivacidade,
+      );
+      if (response.requires_email_verification || !response.access_token) {
+        Alert.alert(
+          'Confirme seu e-mail',
+          'Enviamos um link de confirmacao para o seu e-mail. Depois de confirmar, entre pelo login.',
+          [{ text: 'Ir para login', onPress: () => navigation.navigate('Login') }],
+        );
+      }
       // Login automático após registro — AppNavigator redireciona sozinho
     } catch (err: any) {
       const detalhe = err?.response?.data?.detail;
@@ -135,7 +157,7 @@ export default function RegisterScreen({ navigation }: any) {
           <View style={styles.inputComIcone}>
             <TextInput
               style={[styles.input, { flex: 1, marginBottom: 0, borderWidth: 0 }]}
-              placeholder="Mínimo 6 caracteres"
+              placeholder="Minimo 8 caracteres"
               placeholderTextColor={CORES.textoClaro}
               secureTextEntry={!mostrarSenha}
               value={senha}
@@ -166,6 +188,50 @@ export default function RegisterScreen({ navigation }: any) {
           {confirmarSenha && senha !== confirmarSenha && (
             <Text style={styles.erroTexto}>As senhas não conferem</Text>
           )}
+
+          <TouchableOpacity
+            style={styles.checkboxLinha}
+            onPress={() => setAceitouTermos((valor) => !valor)}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name={aceitouTermos ? 'checkbox-outline' : 'square-outline'}
+              size={22}
+              color={CORES.primario}
+            />
+            <Text style={styles.checkboxTexto}>
+              Li e aceito os{' '}
+              <Text
+                style={styles.linkDestaque}
+                onPress={() => Linking.openURL('https://mlprohub.com.br/termos')}
+              >
+                Termos de Uso
+              </Text>
+              .
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={styles.checkboxLinha}
+            onPress={() => setAceitouPrivacidade((valor) => !valor)}
+            activeOpacity={0.8}
+          >
+            <Ionicons
+              name={aceitouPrivacidade ? 'checkbox-outline' : 'square-outline'}
+              size={22}
+              color={CORES.primario}
+            />
+            <Text style={styles.checkboxTexto}>
+              Li e aceito a{' '}
+              <Text
+                style={styles.linkDestaque}
+                onPress={() => Linking.openURL('https://mlprohub.com.br/privacidade')}
+              >
+                Politica de Privacidade
+              </Text>
+              .
+            </Text>
+          </TouchableOpacity>
 
           <TouchableOpacity
             style={[styles.botao, carregando && styles.botaoDesativado]}
@@ -256,6 +322,18 @@ const styles = StyleSheet.create({
   },
   botaoDesativado: { opacity: 0.7 },
   botaoTexto: { color: '#fff', fontSize: FONTE.media, fontWeight: 'bold' },
+  checkboxLinha: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: ESPACO.sm,
+    marginBottom: ESPACO.sm,
+  },
+  checkboxTexto: {
+    flex: 1,
+    fontSize: FONTE.pequena,
+    color: CORES.textoSecundario,
+    lineHeight: 18,
+  },
   linkLogin: { alignItems: 'center', marginTop: ESPACO.md },
   linkTexto: { fontSize: FONTE.normal, color: CORES.textoSecundario },
   linkDestaque: { color: CORES.primario, fontWeight: '600' },
