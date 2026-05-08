@@ -872,6 +872,11 @@ const Layout = () => {
           label: "Roles & Permissões",
           permission: "usuarios.manage",
         },
+        {
+          path: "/admin/lgpd",
+          label: "LGPD e Privacidade",
+          permission: "usuarios.manage",
+        },
       ],
     },
     {

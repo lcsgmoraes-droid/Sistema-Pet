@@ -156,6 +156,7 @@ const ClienteFinanceiro = lazy(() => import("./pages/ClienteFinanceiro"));
 const DashboardGerencial = lazy(() => import("./pages/DashboardGerencial"));
 const UsuariosPage = lazy(() => import("./pages/UsuariosPage.jsx"));
 const RolesPage = lazy(() => import("./pages/RolesPage.jsx"));
+const LGPDOperacional = lazy(() => import("./pages/LGPDOperacional.jsx"));
 const OpsDashboard = lazy(() => import("./pages/OpsDashboard.jsx"));
 const OpsIncidentes = lazy(() => import("./pages/OpsIncidentes.jsx"));
 const Observabilidade = lazy(() => import("./pages/Observabilidade.jsx"));
@@ -822,6 +823,18 @@ function App() {
                   />
                   <Route path="rh/funcionarios" element={<Funcionarios />} />
                   <Route path="admin/roles" element={<RolesPage />} />
+                  <Route
+                    path="admin/lgpd"
+                    element={
+                      <ProtectedRoute permission="usuarios.manage">
+                        <LGPDOperacional />
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="lgpd"
+                    element={<Navigate to="/admin/lgpd" replace />}
+                  />
                   <Route
                     path="admin/observabilidade"
                     element={<Navigate to="/ops/observabilidade" replace />}

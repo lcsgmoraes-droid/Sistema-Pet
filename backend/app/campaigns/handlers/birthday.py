@@ -196,6 +196,7 @@ class BirthdayHandler:
                     prefix="PETANIV",
                     notification_extra=f" (aniversário do {pet.nome})",
                     nome_pet=pet.nome,
+                    privacy_customer_id=dono.id,
                 )
             except Exception as exc:
                 errors += 1
@@ -232,6 +233,7 @@ class BirthdayHandler:
         prefix: str,
         notification_extra: str = "",
         nome_pet: str = "",
+        privacy_customer_id: int | None = None,
     ) -> int:
         """
         Concede recompensa a um cliente de forma idempotente.
@@ -329,6 +331,7 @@ class BirthdayHandler:
                 body=body,
                 idempotency_key=f"{notif_key}:push",
                 push_token=customer_push_token,
+                privacy_customer_id=privacy_customer_id,
             )
 
         if customer_email:
@@ -340,6 +343,7 @@ class BirthdayHandler:
                 body=body,
                 email_address=customer_email,
                 idempotency_key=f"{notif_key}:email",
+                privacy_customer_id=privacy_customer_id,
             )
 
         return 1

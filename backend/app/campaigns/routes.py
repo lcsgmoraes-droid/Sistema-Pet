@@ -3196,28 +3196,19 @@ def envio_em_lote(
             sem_email += 1
             continue
 
-        idempotency_key = f"lote:{tenant_id}:{periodo}:{body.nivel}:{r.customer_id}:{hash(body.assunto)}"
-        # Verifica duplicidade
-        exists = (
-            db.query(NotificationQueue.id)
-            .filter(NotificationQueue.idempotency_key == idempotency_key)
-            .first()
-        )
-        if exists:
-            continue
+        from app.campaigns.notification_service import enqueue_email
 
-        notif = NotificationQueue(
+        idempotency_key = f"lote:{tenant_id}:{periodo}:{body.nivel}:{r.customer_id}:{hash(body.assunto)}"
+        if enqueue_email(
+            db,
             tenant_id=tenant_id,
-            idempotency_key=idempotency_key,
             customer_id=r.customer_id,
-            channel=NotificationChannelEnum.email,
             subject=body.assunto,
             body=body.mensagem,
             email_address=cliente.email,
-            status=NotificationStatusEnum.pending,
-        )
-        db.add(notif)
-        enfileirados += 1
+            idempotency_key=idempotency_key,
+        ):
+            enfileirados += 1
 
     db.commit()
     return {
@@ -3698,26 +3689,18 @@ def envio_escalonado_inativos(
         idempotency_key = (
             f"inativos:{tenant_id}:{body.dias_sem_compra}:{cliente.id}:{date.today().isoformat()}"
         )
-        exists = (
-            db.query(NotificationQueue.id)
-            .filter(NotificationQueue.idempotency_key == idempotency_key)
-            .first()
-        )
-        if exists:
-            continue
+        from app.campaigns.notification_service import enqueue_email
 
-        notif = NotificationQueue(
+        if enqueue_email(
+            db,
             tenant_id=tenant_id,
-            idempotency_key=idempotency_key,
             customer_id=cliente.id,
-            channel=NotificationChannelEnum.email,
             subject=body.assunto,
             body=body.mensagem,
             email_address=cliente.email,
-            status=NotificationStatusEnum.pending,
-        )
-        db.add(notif)
-        enfileirados += 1
+            idempotency_key=idempotency_key,
+        ):
+            enfileirados += 1
 
     db.commit()
     return {
