@@ -258,6 +258,7 @@ export default function LGPDOperacional() {
         const rows = await buscarClientes({
           search: termo,
           tipo_cadastro: "cliente",
+          incluir_inativos: true,
           limit: 10,
         });
         setClientesSugeridos(rows);

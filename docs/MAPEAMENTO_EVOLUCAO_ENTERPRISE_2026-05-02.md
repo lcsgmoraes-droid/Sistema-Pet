@@ -861,6 +861,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-08: tela operacional de LGPD adicionada ao ERP em Administracao > LGPD e Privacidade, com busca de cliente, dossie exportavel, preferencias, abertura/processamento de solicitacoes e campanhas respeitando opt-out explicito de email/push.
 - 2026-05-08: API operacional de LGPD passou a exigir `usuarios.manage`, ganhou anonimizacao auditavel de cliente por solicitacao de exclusao e centralizou helpers de opt-out para WhatsApp/SMS quando esses disparos forem usados.
 - 2026-05-08: migration complementar garante a tabela `data_access_logs` usada pela trilha de auditoria LGPD mesmo em ambientes que ja tinham consentimentos/exclusoes legados parcialmente criados.
+- 2026-05-08: busca de titular na LGPD passou a usar `PessoaSelector` com `incluir_inativos=true`, permitindo localizar clientes ja inativados pelo cadastro antes da anonimizacao.
 
 ### Nao fazer nesta onda
 

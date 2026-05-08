@@ -687,6 +687,7 @@ def list_clientes(
     limit: int = 100,
     search: Optional[str] = None,
     ativo: Optional[bool] = None,
+    incluir_inativos: bool = False,
     tipo_cadastro: Optional[List[str]] = Query(None),  # Aceita lista de tipos
     is_entregador: Optional[bool] = None,  # Filtro para entregadores
     db: Session = Depends(get_session),
@@ -746,13 +747,16 @@ def list_clientes(
                     or_(*filtros)
                 )
         
-        # Filtro de ativo (padrÃ£o True - mostrar apenas ativos)
-        if ativo is None:
-            ativo = True
-        if ativo:
-            query = query.filter(or_(Cliente.ativo.is_(True), Cliente.ativo.is_(None)))
-        else:
-            query = query.filter(Cliente.ativo.is_(False))
+        # Filtro de ativo (padrao True - mostrar apenas ativos).
+        # Fluxos de privacidade/LGPD podem incluir inativos para localizar titulares
+        # ja removidos operacionalmente.
+        if not incluir_inativos:
+            if ativo is None:
+                ativo = True
+            if ativo:
+                query = query.filter(or_(Cliente.ativo.is_(True), Cliente.ativo.is_(None)))
+            else:
+                query = query.filter(Cliente.ativo.is_(False))
         
         # Contar total (ANTES do offset/limit)
         total = query.count()
