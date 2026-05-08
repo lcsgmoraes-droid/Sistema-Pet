@@ -1,20 +1,7 @@
 import DataTable from "../ui/DataTable";
 import MoneyCell from "../ui/MoneyCell";
 import NumberCell from "../ui/NumberCell";
-import CopyableCode from "../ui/CopyableCode";
-import CopyableValue from "../ui/CopyableValue";
-
-function getCodigoProduto(produto) {
-  return (
-    produto?.produto_codigo ||
-    produto?.produto_sku ||
-    produto?.sku ||
-    produto?.codigo ||
-    produto?.codigo_barras ||
-    produto?.ean ||
-    ""
-  );
-}
+import ProductIdentity, { getProductIdentityCode } from "../ui/ProductIdentity";
 
 function criarLinhas(linhas = []) {
   return linhas.flatMap((categoria, catIdx) => {
@@ -50,7 +37,7 @@ function criarLinhas(linhas = []) {
           key: `prod-${catIdx}-${subIdx}-${prodIdx}`,
           liquido: produto.valor_liquido,
           level: 2,
-          codigo: getCodigoProduto(produto),
+          codigo: getProductIdentityCode(produto),
           nome: produto.produto,
           quantidade: produto.quantidade,
           type: "produto",
@@ -65,7 +52,7 @@ function criarLinhas(linhas = []) {
         key: `prod-${catIdx}-${prodIdx}`,
         liquido: produto.valor_liquido,
         level: 1,
-        codigo: getCodigoProduto(produto),
+        codigo: getProductIdentityCode(produto),
         nome: produto.produto,
         quantidade: produto.quantidade,
         type: "produto",
@@ -125,10 +112,11 @@ export default function ProdutosServicosDetalhadosTable({
             }
 
             return (
-              <span className={`inline-flex flex-wrap items-center gap-1.5 ${nomeClassName(item)}`}>
-                <CopyableValue title="Copiar produto" value={item.nome} />
-                <CopyableCode value={item.codigo} />
-              </span>
+              <ProductIdentity
+                className={nomeClassName(item)}
+                code={item.codigo}
+                name={item.nome}
+              />
             );
           },
         },

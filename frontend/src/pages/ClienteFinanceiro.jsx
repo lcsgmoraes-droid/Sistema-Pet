@@ -6,20 +6,8 @@ import {
   FiChevronLeft, FiChevronRight, FiUser, FiAlertCircle, FiChevronDown,
   FiChevronUp, FiShoppingCart, FiPackage, FiTrendingUp, FiPercent
 } from 'react-icons/fi';
-import CopyableCode from '../components/ui/CopyableCode';
 import CopyableValue from '../components/ui/CopyableValue';
-
-const getVendaItemSku = (item) => (
-  item?.produto_codigo ||
-  item?.produto_sku ||
-  item?.sku ||
-  item?.codigo ||
-  item?.produto?.codigo ||
-  item?.produto?.sku ||
-  item?.produto_codigo_barras ||
-  item?.codigo_barras ||
-  ''
-);
+import ProductIdentity from '../components/ui/ProductIdentity';
 
 const ClienteFinanceiro = () => {
   const { clienteId } = useParams();
@@ -574,10 +562,7 @@ const ClienteFinanceiro = () => {
                                                 {detalhes.itens.map((item, idx) => (
                                                   <tr key={idx} className="hover:bg-gray-50">
                                                     <td className="px-4 py-3 text-sm text-gray-900">
-                                                      <div className="flex flex-wrap items-center gap-1.5">
-                                                        <CopyableValue title="Copiar produto" value={item.produto_nome} />
-                                                        <CopyableCode value={getVendaItemSku(item)} />
-                                                      </div>
+                                                      <ProductIdentity product={item} />
                                                     </td>
                                                     <td className="px-4 py-3 text-sm text-center font-semibold text-gray-700">
                                                       {item.quantidade}

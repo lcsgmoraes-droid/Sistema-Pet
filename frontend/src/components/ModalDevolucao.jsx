@@ -1,21 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Search, RotateCcw, AlertCircle, Check, Filter, Package, Layers } from 'lucide-react';
 import api from '../api';
-import CopyableCode from './ui/CopyableCode';
-import CopyableValue from './ui/CopyableValue';
-
-function getCodigoItemDevolucao(item) {
-  return (
-    item?.produto_codigo ||
-    item?.codigo ||
-    item?.sku ||
-    item?.produto?.codigo ||
-    item?.produto?.sku ||
-    item?.produto?.codigo_barras ||
-    item?.produto_codigo_barras ||
-    ''
-  );
-}
+import ProductIdentity from './ui/ProductIdentity';
 
 export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, onSucesso }) {
   const [passo, setPasso] = useState(1); // 1: listar vendas, 2: selecionar itens
@@ -566,24 +552,19 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                           />
                           
                           <div className="flex-1">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <CopyableValue
-                                title="Copiar nome do produto"
-                                value={item.produto_nome}
-                                valueClassName="font-medium text-gray-900"
-                              />
-                              <CopyableCode
-                                label="SKU"
-                                title="Copiar SKU do produto"
-                                value={getCodigoItemDevolucao(item)}
-                              />
+                            <ProductIdentity
+                              className="gap-2"
+                              name={item.produto_nome}
+                              nameClassName="font-medium text-gray-900"
+                              product={item}
+                            >
                               {isKit && (
                                 <span className="inline-flex items-center gap-1 px-2 py-1 bg-purple-100 text-purple-700 text-xs font-semibold rounded">
                                   <Layers className="w-3 h-3" />
                                   KIT
                                 </span>
                               )}
-                            </div>
+                            </ProductIdentity>
                             <div className="text-sm text-gray-600">
                               Preço unitário: R$ {item.preco_unitario.toFixed(2)} | 
                               Qtd vendida: {item.quantidade}

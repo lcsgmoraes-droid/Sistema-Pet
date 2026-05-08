@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { Download } from "lucide-react";
 import { actionButtonClasses } from "../ui/actionStyles";
+import CopyableValue from "../ui/CopyableValue";
 
 const TIPO_LABELS = {
   todos: "Todos",
@@ -237,7 +238,12 @@ export default function CampanhasGestorExtratoSection({
                             <div className="flex flex-col gap-1">
                               <span>{evento.campanha_nome || TIPO_LABELS[evento.categoria] || "-"}</span>
                               {evento.numero_venda || evento.venda_id ? (
-                                <span>Venda {evento.numero_venda || `#${evento.venda_id}`}</span>
+                                <CopyableValue
+                                  title="Copiar venda"
+                                  value={evento.numero_venda || evento.venda_id}
+                                >
+                                  Venda {evento.numero_venda || `#${evento.venda_id}`}
+                                </CopyableValue>
                               ) : null}
                               {evento.cupom_codigo ? <span>Cupom {evento.cupom_codigo}</span> : null}
                             </div>

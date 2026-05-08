@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import api from '../api';
 import { Calendar, DollarSign, TrendingUp, Package, Users, CreditCard, Filter } from 'lucide-react';
 import CopyableValue from './ui/CopyableValue';
+import ProductIdentity from './ui/ProductIdentity';
 
 export default function RelatorioVendas() {
   const [loading, setLoading] = useState(true);
@@ -418,7 +419,11 @@ export default function RelatorioVendas() {
                         {subcategoria.produtos.map((produto, prodIdx) => (
                           <tr key={`prod-${catIdx}-${subIdx}-${prodIdx}`} className="border-b hover:bg-gray-50">
                             <td className="px-4 py-2 pl-12 text-gray-700">
-                              <CopyableValue title="Copiar produto" value={produto.produto} />
+                              <ProductIdentity
+                                className="pl-0"
+                                name={produto.produto}
+                                product={produto}
+                              />
                             </td>
                             <td className="px-4 py-2 text-right text-gray-700">{produto.quantidade}</td>
                             <td className="px-4 py-2 text-right text-gray-700">{formatarMoeda(produto.valor_bruto)}</td>
@@ -433,7 +438,11 @@ export default function RelatorioVendas() {
                     {categoria.produtos && categoria.produtos.map((produto, prodIdx) => (
                       <tr key={`prod-${catIdx}-${prodIdx}`} className="border-b hover:bg-gray-50">
                         <td className="px-4 py-2 pl-8 text-gray-700">
-                          <CopyableValue title="Copiar produto" value={produto.produto} />
+                          <ProductIdentity
+                            className="pl-0"
+                            name={produto.produto}
+                            product={produto}
+                          />
                         </td>
                         <td className="px-4 py-2 text-right text-gray-700">{produto.quantidade}</td>
                         <td className="px-4 py-2 text-right text-gray-700">{formatarMoeda(produto.valor_bruto)}</td>

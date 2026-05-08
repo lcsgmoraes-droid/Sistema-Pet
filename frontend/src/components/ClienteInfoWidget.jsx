@@ -6,6 +6,8 @@ import {
   FiSend, FiBarChart2, FiLink, FiCopy, FiCheck
 } from 'react-icons/fi';
 import api from '../api';
+import CopyableValue from './ui/CopyableValue';
+import ProductIdentity from './ui/ProductIdentity';
 
 /**
  * Widget de informações do cliente para PDV
@@ -359,7 +361,11 @@ export default function ClienteInfoWidget({ clienteId }) {
               >
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
-                    <p className="font-medium text-gray-800 text-sm">{op.produto_nome}</p>
+                    <ProductIdentity
+                      name={op.produto_nome}
+                      product={op}
+                      nameClassName="font-medium text-gray-800 text-sm"
+                    />
                     <p className="text-xs text-gray-600 mt-1">{op.mensagem}</p>
                   </div>
                   {op.urgencia === 'alta' && (
@@ -420,7 +426,10 @@ export default function ClienteInfoWidget({ clienteId }) {
                 <div className="flex items-center justify-between mb-2">
                   <div>
                     <p className="text-xs text-gray-500">
-                      {compra.data} • Venda #{compra.numero_venda}
+                      {compra.data} •{" "}
+                      <CopyableValue title="Copiar venda" value={compra.numero_venda}>
+                        Venda #{compra.numero_venda}
+                      </CopyableValue>
                     </p>
                     <p className="font-bold text-indigo-600">
                       R$ {compra.valor_total.toFixed(2)}
@@ -431,9 +440,11 @@ export default function ClienteInfoWidget({ clienteId }) {
                 {compra.produtos && compra.produtos.length > 0 && (
                   <div className="space-y-1 mt-2">
                     {compra.produtos.map((prod, pidx) => (
-                      <p key={pidx} className="text-xs text-gray-600 flex items-center gap-1">
+                      <p key={pidx} className="text-xs text-gray-600 flex flex-wrap items-center gap-1">
                         <FiPackage className="text-xs" />
-                        {prod.quantidade}x {prod.nome} - R$ {prod.valor.toFixed(2)}
+                        <span>{prod.quantidade}x</span>
+                        <ProductIdentity name={prod.nome} product={prod} />
+                        <span>- R$ {prod.valor.toFixed(2)}</span>
                       </p>
                     ))}
                   </div>
@@ -464,11 +475,19 @@ export default function ClienteInfoWidget({ clienteId }) {
                 </div>
                 <div className="space-y-1">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-gray-800">{rel.produto1.nome}</span>
+                    <ProductIdentity
+                      name={rel.produto1.nome}
+                      product={rel.produto1}
+                      nameClassName="font-medium text-gray-800"
+                    />
                     <span className="text-purple-600 font-bold">R$ {rel.produto1.preco.toFixed(2)}</span>
                   </div>
                   <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-gray-800">{rel.produto2.nome}</span>
+                    <ProductIdentity
+                      name={rel.produto2.nome}
+                      product={rel.produto2}
+                      nameClassName="font-medium text-gray-800"
+                    />
                     <span className="text-purple-600 font-bold">R$ {rel.produto2.preco.toFixed(2)}</span>
                   </div>
                 </div>

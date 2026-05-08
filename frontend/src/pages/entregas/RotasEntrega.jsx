@@ -2,6 +2,7 @@
 import { useNavigate } from "react-router-dom";
 import api from "../../api";
 import { api as apiServices } from "../../services/api";
+import ProductIdentity from "../../components/ui/ProductIdentity";
 
 export default function RotasEntrega() {
   const navigate = useNavigate();
@@ -1664,29 +1665,18 @@ function RotaCard({
                                   }}
                                 >
                                   <div style={{ flex: 1 }}>
-                                    <div
-                                      style={{
-                                        fontWeight: "600",
-                                        marginBottom: 3,
-                                        color: "#333",
-                                      }}
-                                    >
-                                      {item.produto?.nome ||
+                                    <ProductIdentity
+                                      code={item.produto?.codigo || item.produto_codigo}
+                                      name={
+                                        item.produto?.nome ||
                                         item.servico?.nome ||
                                         item.produto_nome ||
                                         item.servico_descricao ||
-                                        "Item"}
-                                    </div>
-                                    {(item.produto?.codigo ||
-                                      item.produto_codigo) && (
-                                      <div
-                                        style={{ fontSize: 12, color: "#999" }}
-                                      >
-                                        Cód:{" "}
-                                        {item.produto?.codigo ||
-                                          item.produto_codigo}
-                                      </div>
-                                    )}
+                                        "Item"
+                                      }
+                                      product={item}
+                                      nameClassName="font-semibold text-slate-800"
+                                    />
                                   </div>
                                   <div
                                     style={{

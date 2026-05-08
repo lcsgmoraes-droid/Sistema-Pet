@@ -7,20 +7,8 @@ import {
   FiChevronLeft, FiChevronRight, FiChevronDown, FiChevronUp,
   FiShoppingCart, FiPackage, FiAlertCircle
 } from 'react-icons/fi';
-import CopyableCode from '../../components/ui/CopyableCode';
 import CopyableValue from '../../components/ui/CopyableValue';
-
-const getVendaItemSku = (item) => (
-  item?.produto_codigo ||
-  item?.produto_sku ||
-  item?.sku ||
-  item?.codigo ||
-  item?.produto?.codigo ||
-  item?.produto?.sku ||
-  item?.produto_codigo_barras ||
-  item?.codigo_barras ||
-  ''
-);
+import ProductIdentity from '../../components/ui/ProductIdentity';
 
 /* -----------------------------------------------------------------------
    Componente interno: histórico do cliente selecionado (sem wrapper de página)
@@ -323,10 +311,7 @@ const HistoricoInline = ({ clienteId, clienteInfo }) => {
                                             {detalhes.itens.map((item, i) => (
                                               <tr key={i} className="hover:bg-gray-50">
                                                 <td className="px-4 py-2 text-sm text-gray-900">
-                                                  <div className="flex flex-wrap items-center gap-1.5">
-                                                    <CopyableValue title="Copiar produto" value={item.produto_nome} />
-                                                    <CopyableCode value={getVendaItemSku(item)} />
-                                                  </div>
+                                                  <ProductIdentity product={item} />
                                                 </td>
                                                 <td className="px-4 py-2 text-sm text-center font-semibold">{item.quantidade}</td>
                                                 <td className="px-4 py-2 text-sm text-right">R$ {item.preco_unitario?.toFixed(2).replace('.', ',')}</td>

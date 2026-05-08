@@ -1,6 +1,5 @@
 import FornecedorSelector from '../fornecedores/FornecedorSelector';
-import CopyableCode from '../ui/CopyableCode';
-import CopyableValue from '../ui/CopyableValue';
+import ProductIdentity from '../ui/ProductIdentity';
 
 export default function PedidoCompraFormulario({
   mostrarForm,
@@ -252,14 +251,11 @@ export default function PedidoCompraFormulario({
                   {formData.itens.map((item, index) => (
                     <tr key={index} className="border-t">
                       <td className="px-4 py-2">
-                        <CopyableValue
-                          title="Copiar produto"
-                          value={item.produto_nome}
-                          valueClassName="font-medium text-gray-900"
+                        <ProductIdentity
+                          code={obterSkuItemPedido(item)}
+                          name={item.produto_nome}
+                          nameClassName="font-medium text-gray-900"
                         />
-                        <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
-                          <CopyableCode value={obterSkuItemPedido(item)} />
-                        </div>
                       </td>
                       <td className="px-4 py-2 text-right">
                         <input
