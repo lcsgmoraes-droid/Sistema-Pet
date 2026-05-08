@@ -9,10 +9,20 @@
  */
 
 import React, { useState, useEffect } from 'react';
+import { BarChart3, CheckCircle2, FileText, Filter, History, RotateCcw, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import api from '../../api';
+import ActionButton from '../../components/ui/ActionButton';
 import CopyableCode from '../../components/ui/CopyableCode';
+import EmptyState from '../../components/ui/EmptyState';
+import ErrorState from '../../components/ui/ErrorState';
+import LoadingState from '../../components/ui/LoadingState';
+import MetricCard from '../../components/ui/MetricCard';
+import MetricGrid from '../../components/ui/MetricGrid';
+import MoneyCell, { formatMoneyCellValue } from '../../components/ui/MoneyCell';
+import NumberCell from '../../components/ui/NumberCell';
 import SaleReference from '../../components/ui/SaleReference';
+import StatusBadge from '../../components/ui/StatusBadge';
 import ComissaoDetalhe from './ComissaoDetalhe';
 
 const ComissoesListagem = () => {
@@ -284,49 +294,25 @@ const ComissoesListagem = () => {
 
   // Formatar valor monetário
   const formatarMoeda = (valor) => {
-    if (valor === null || valor === undefined) return 'R$ 0,00';
-    return new Intl.NumberFormat('pt-BR', {
-      style: 'currency',
-      currency: 'BRL'
-    }).format(valor);
-  };
-
-  // Formatar percentual
-  const formatarPercentual = (valor) => {
-    if (valor === null || valor === undefined) return '0%';
-    return `${valor.toFixed(1)}%`;
+    return formatMoneyCellValue(valor);
   };
 
   // Badge de status com cores
   const renderizarStatus = (status) => {
-    const cores = {
-      'pendente': 'bg-yellow-100 text-yellow-800',
-      'pago': 'bg-green-100 text-green-800',
-      'estornado': 'bg-red-100 text-red-800'
-    };
-
-    const classe = cores[status] || 'bg-gray-100 text-gray-800';
-
-    return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${classe}`}>
-        {status.toUpperCase()}
-      </span>
-    );
+    return <StatusBadge status={status} />;
   };
 
   // Badge de tipo de cálculo
   const renderizarTipoCalculo = (tipo) => {
-    const cores = {
-      'percentual': 'bg-blue-100 text-blue-800',
-      'lucro': 'bg-purple-100 text-purple-800'
+    const labels = {
+      percentual: 'Percentual',
+      lucro: 'Lucro'
     };
 
-    const classe = cores[tipo] || 'bg-gray-100 text-gray-800';
-
     return (
-      <span className={`px-2 py-1 rounded-full text-xs font-medium ${classe}`}>
-        {tipo.toUpperCase()}
-      </span>
+      <StatusBadge intent={tipo === 'lucro' ? 'purple' : 'info'}>
+        {labels[tipo] || tipo || '-'}
+      </StatusBadge>
     );
   };
 
@@ -361,53 +347,36 @@ const ComissoesListagem = () => {
       {
         titulo: 'Total Gerado',
         valor: resumo.total_gerado,
-        cor: 'blue',
-        bgColor: 'bg-blue-50',
-        borderColor: 'border-blue-200',
-        textColor: 'text-blue-600'
+        intent: 'blue'
       },
       {
         titulo: 'Total Pago',
         valor: resumo.total_pago,
-        cor: 'green',
-        bgColor: 'bg-green-50',
-        borderColor: 'border-green-200',
-        textColor: 'text-green-600'
+        intent: 'emerald'
       },
       {
         titulo: 'Total Pendente',
         valor: resumo.total_pendente,
-        cor: 'yellow',
-        bgColor: 'bg-yellow-50',
-        borderColor: 'border-yellow-200',
-        textColor: 'text-yellow-600'
+        intent: 'amber'
       },
       {
         titulo: 'Saldo a Pagar',
         valor: resumo.saldo_a_pagar,
-        cor: 'purple',
-        bgColor: 'bg-purple-50',
-        borderColor: 'border-purple-200',
-        textColor: 'text-purple-600'
+        intent: 'violet'
       }
     ];
 
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <MetricGrid className="mb-6">
         {cards.map((card, index) => (
-          <div
+          <MetricCard
             key={index}
-            className={`${card.bgColor} border ${card.borderColor} rounded-lg shadow-sm p-6 transition hover:shadow-md`}
-          >
-            <h3 className="text-sm font-medium text-gray-600 mb-2">
-              {card.titulo}
-            </h3>
-            <p className={`text-2xl font-bold ${card.textColor}`}>
-              {formatarMoeda(card.valor)}
-            </p>
-          </div>
+            intent={card.intent}
+            label={card.titulo}
+            value={<MoneyCell value={card.valor} />}
+          />
         ))}
-      </div>
+      </MetricGrid>
     );
   };
 
@@ -865,27 +834,26 @@ const ComissoesListagem = () => {
 
         {/* Botões de Ação */}
         <div className="flex gap-3">
-          <button
+          <ActionButton
             onClick={aplicarFiltros}
             disabled={loading}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 flex items-center gap-2"
+            icon={Filter}
+            intent="edit"
+            size="md"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z" />
-            </svg>
             Filtrar
-          </button>
+          </ActionButton>
 
-          <button
+          <ActionButton
             onClick={limparFiltros}
             disabled={loading}
-            className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition disabled:opacity-50 flex items-center gap-2"
+            icon={X}
+            intent="neutral"
+            size="md"
+            tone="soft"
           >
-            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
             Limpar Filtros
-          </button>
+          </ActionButton>
         </div>
       </div>
     );
@@ -894,12 +862,10 @@ const ComissoesListagem = () => {
   // Renderização de loading
   if (loading) {
     return (
-      <div className="flex justify-center items-center min-h-screen">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando comissões...</p>
-        </div>
-      </div>
+      <LoadingState
+        className="min-h-screen"
+        label="Carregando comissões..."
+      />
     );
   }
 
@@ -907,16 +873,19 @@ const ComissoesListagem = () => {
   if (erro) {
     return (
       <div className="p-6">
-        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-          <h3 className="text-red-800 font-semibold mb-2">Erro ao carregar comissões</h3>
-          <p className="text-red-600">{erro}</p>
-          <button
-            onClick={carregarComissoes}
-            className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition"
-          >
-            Tentar Novamente
-          </button>
-        </div>
+        <ErrorState
+          title="Erro ao carregar comissões"
+          description={erro}
+          action={(
+            <ActionButton
+              icon={RotateCcw}
+              intent="delete"
+              onClick={carregarComissoes}
+            >
+              Tentar novamente
+            </ActionButton>
+          )}
+        />
       </div>
     );
   }
@@ -926,28 +895,12 @@ const ComissoesListagem = () => {
     return (
       <div className="p-6">
         <h1 className="text-2xl font-bold text-gray-800 mb-6">Demonstrativo de Comissões</h1>
-        
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-8 text-center">
-          <svg
-            className="mx-auto h-12 w-12 text-blue-400 mb-4"
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
-            />
-          </svg>
-          <h3 className="text-lg font-semibold text-gray-800 mb-2">
-            Nenhuma comissão encontrada
-          </h3>
-          <p className="text-gray-600">
-            Ainda não há registros de comissões no sistema.
-          </p>
-        </div>
+
+        <EmptyState
+          description="Ainda não há registros de comissões no sistema."
+          icon={FileText}
+          title="Nenhuma comissão encontrada"
+        />
       </div>
     );
   }
@@ -965,25 +918,25 @@ const ComissoesListagem = () => {
         </div>
         
         <div className="flex gap-3">
-          <button
+          <ActionButton
             onClick={() => navigate('/comissoes/relatorios')}
-            className="inline-flex items-center px-4 py-2 border border-purple-300 rounded-md shadow-sm text-sm font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors"
+            icon={BarChart3}
+            intent="info"
+            size="md"
+            tone="soft"
           >
-            <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-            📊 Relatórios
-          </button>
+            Relatórios
+          </ActionButton>
           
-          <button
+          <ActionButton
             onClick={() => navigate('/comissoes/fechamentos')}
-            className="inline-flex items-center px-4 py-2 border border-purple-300 rounded-md shadow-sm text-sm font-medium text-purple-700 bg-purple-50 hover:bg-purple-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors"
+            icon={History}
+            intent="neutral"
+            size="md"
+            tone="soft"
           >
-            <svg className="mr-2 h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
             Ver Histórico
-          </button>
+          </ActionButton>
         </div>
       </div>
 
@@ -997,30 +950,29 @@ const ComissoesListagem = () => {
       {comissoesSelecionadas.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <svg className="w-5 h-5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <CheckCircle2 className="h-5 w-5 text-blue-600" aria-hidden="true" />
             <span className="text-blue-800 font-medium">
               {comissoesSelecionadas.length} comissão(ões) selecionada(s)
             </span>
           </div>
           <div className="flex gap-2">
-            <button
+            <ActionButton
               onClick={() => setComissoesSelecionadas([])}
-              className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition"
+              icon={X}
+              intent="neutral"
+              tone="soft"
             >
               Limpar Seleção
-            </button>
-            <button
+            </ActionButton>
+            <ActionButton
               onClick={abrirModalFechamento}
               disabled={loadingFechamento}
-              className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition disabled:opacity-50 flex items-center gap-2"
+              icon={CheckCircle2}
+              intent="create"
+              loading={loadingFechamento}
             >
-              <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
               Fechar Comissões
-            </button>
+            </ActionButton>
           </div>
         </div>
       )}
@@ -1124,19 +1076,19 @@ const ComissoesListagem = () => {
                     className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-medium cursor-pointer"
                     onClick={() => abrirDetalhe(comissao.id)}
                   >
-                    {formatarMoeda(comissao.valor_base_calculo)}
+                    <MoneyCell value={comissao.valor_base_calculo} />
                   </td>
                   <td 
                     className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right cursor-pointer"
                     onClick={() => abrirDetalhe(comissao.id)}
                   >
-                    {formatarPercentual(comissao.percentual_comissao)}
+                    <NumberCell value={comissao.percentual_comissao} decimals={1} suffix="%" />
                   </td>
                   <td 
                     className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-bold cursor-pointer"
                     onClick={() => abrirDetalhe(comissao.id)}
                   >
-                    {formatarMoeda(comissao.valor_comissao_gerada)}
+                    <MoneyCell value={comissao.valor_comissao_gerada} />
                   </td>
                   <td 
                     className="px-6 py-4 whitespace-nowrap text-sm cursor-pointer"
@@ -1199,7 +1151,7 @@ const ComissoesListagem = () => {
               <div className="text-right">
                 <div className="text-[10px] font-semibold text-indigo-200 mb-0.5 tracking-wide uppercase">💰 Total Pendente (Filtrado)</div>
                 <div className="text-3xl font-bold text-white drop-shadow-sm">
-                  {formatarMoeda(calcularTotalFiltrado())}
+                  <MoneyCell value={calcularTotalFiltrado()} />
                 </div>
                 <div className="text-[11px] text-indigo-100 mt-0.5 font-medium">
                   {comissoes.filter(c => c.status === 'pendente').length} comissão(ões) pendente(s)
@@ -1248,7 +1200,7 @@ const ComissoesListagem = () => {
                 <div className="text-right">
                   <p className="text-xs text-gray-600">Valor Total</p>
                   <p className="text-2xl font-bold text-blue-600">
-                    {formatarMoeda(calcularTotalSelecionado())}
+                    <MoneyCell value={calcularTotalSelecionado()} />
                   </p>
                 </div>
               </div>
@@ -1331,7 +1283,7 @@ const ComissoesListagem = () => {
                     className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500"
                   />
                   <p className="text-xs text-gray-600 mt-1">
-                    Valor original: {formatarMoeda(calcularTotalSelecionado())}
+                    Valor original: <MoneyCell value={calcularTotalSelecionado()} />
                   </p>
                 </div>
 

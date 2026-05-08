@@ -24,6 +24,8 @@ ssh -o BatchMode=yes root@192.241.150.121 "cd /opt/petshop && bash scripts/deplo
 
 O script `scripts/deploy_producao_seguro.sh` e o caminho oficial. Ele faz pull de `origin/main`, gera frontend, reconstrui a imagem `petshop-backend:prod`, sobe `postgres`, `backend`, `worker-bling` e `nginx`, aplica Alembic e valida health.
 
+O deploy tambem instala o guardiao preventivo de disco (`scripts/ops_disk_guard.sh`) em `/etc/cron.d/petshop-ops-disk-guard`. Ele roda a cada 30 minutos, registra eventos em `backend/logs/disk_guard_events.jsonl` e, quando o uso do disco chega ao limite de risco, limpa apenas cache/imagens Docker nao usados. Ele nao remove volumes, banco, uploads nem dados operacionais.
+
 ## Validacao apos deploy
 
 ```bash

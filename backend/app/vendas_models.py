@@ -147,6 +147,7 @@ class Venda(BaseTenantModel):
             
             cliente_dict = {
                 'id': self.cliente.id,
+                'codigo': self.cliente.codigo,
                 'nome': self.cliente.nome,
                 'telefone': self.cliente.telefone,
                 'celular': self.cliente.celular,

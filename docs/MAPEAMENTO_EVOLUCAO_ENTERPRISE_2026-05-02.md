@@ -841,6 +841,8 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-07: PDV passou a expor `Devolucao` diretamente no modo de visualizacao da venda elegivel, reaproveitando o modal de devolucao com venda inicial e mantendo produtos/SKUs copiaveis tambem nos componentes de kits.
 - 2026-05-07: Relatorio de Movimentacoes passou a reutilizar `ProductIdentity` e `SaleReference` no produto selecionado, cabecalho, historico de vendas e tabela de movimentos, padronizando copia de produto/SKU/venda.
 - 2026-05-08: Sugestao inteligente de compras deixou de somar movimentacoes de estoque com `referencia_tipo=venda` quando a venda referenciada nao existe, evitando que historico orfao infle o giro e gere compra exagerada.
+- 2026-05-08: `Comissoes/Listagem` iniciou padronizacao visual com `MetricGrid`/`MetricCard`, `MoneyCell`, `NumberCell`, `StatusBadge`, `ActionButton` e estados globais de carregamento/erro/vazio, sem alterar a regra de fechamento.
+- 2026-05-08: Modal de devolucao no PDV passou a usar `data_venda`, codigo do cliente e copia padronizada de cliente/codigo; producao ganhou `ops_disk_guard` preventivo para limpar cache Docker quando o disco entrar em faixa de risco.
 
 ### Nao fazer nesta onda
 

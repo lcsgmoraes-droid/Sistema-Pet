@@ -160,6 +160,16 @@ if [[ "$tracked_dist_count" != "0" ]]; then
   fail "Artefatos gerados voltaram a aparecer no Git."
 fi
 
+mark_step "instalar_disk_guard"
+log "Instalando monitor preventivo de disco"
+if [[ -f "$APP_DIR/scripts/install_ops_disk_guard_cron.sh" ]]; then
+  bash "$APP_DIR/scripts/install_ops_disk_guard_cron.sh" || log "Aviso: nao foi possivel instalar o cron do disk guard"
+fi
+
+if [[ -f "$APP_DIR/scripts/ops_disk_guard.sh" ]]; then
+  bash "$APP_DIR/scripts/ops_disk_guard.sh" || log "Aviso: disk guard imediato falhou"
+fi
+
 mark_step "build_frontend"
 log "Gerando frontend em $RUNTIME_DIST"
 mkdir -p "$RUNTIME_DIST"

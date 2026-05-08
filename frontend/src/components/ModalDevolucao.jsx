@@ -1,6 +1,8 @@
 import { useState, useEffect, useRef } from 'react';
 import { X, Search, RotateCcw, AlertCircle, Check, Filter, Package, Layers } from 'lucide-react';
 import api from '../api';
+import CopyableCode from './ui/CopyableCode';
+import CopyableValue from './ui/CopyableValue';
 import ProductIdentity from './ui/ProductIdentity';
 import SaleReference from './ui/SaleReference';
 
@@ -28,6 +30,45 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
     data_fim: '',
     status: 'finalizada'
   });
+
+  const obterDataVenda = (venda) => (
+    venda?.data_venda
+    || venda?.data_criacao
+    || venda?.created_at
+    || venda?.data_finalizacao
+  );
+
+  const formatarDataVenda = (venda) => {
+    const data = obterDataVenda(venda);
+    if (!data) return 'Data não disponível';
+
+    const dataObj = new Date(data);
+    if (Number.isNaN(dataObj.getTime())) return 'Data não disponível';
+
+    return dataObj.toLocaleString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  };
+
+  const obterNomeCliente = (venda) => (
+    venda?.cliente?.nome
+    || venda?.cliente_nome
+    || venda?.nome_cliente
+    || 'Consumidor Final'
+  );
+
+  const obterCodigoCliente = (venda) => (
+    venda?.cliente?.codigo
+    || venda?.cliente_codigo
+    || venda?.codigo_cliente
+    || venda?.cliente_id
+    || venda?.cliente?.id
+    || ''
+  );
 
   useEffect(() => {
     buscarVendas();
@@ -458,16 +499,19 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                             <SaleReference sale={venda} />
                           </div>
                           <div className="text-sm text-gray-600 mt-1">
-                            Cliente: {venda.cliente?.nome || 'Consumidor Final'}
+                            <CopyableValue
+                              label="Cliente"
+                              value={obterNomeCliente(venda)}
+                            />
                           </div>
                           <div className="text-xs text-gray-500 mt-1">
-                            {venda.data_criacao ? new Date(venda.data_criacao).toLocaleString('pt-BR', {
-                              day: '2-digit',
-                              month: '2-digit',
-                              year: 'numeric',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            }) : 'Data não disponível'}
+                            <CopyableCode
+                              label="Cod. cliente"
+                              value={obterCodigoCliente(venda)}
+                            />
+                          </div>
+                          <div className="text-xs text-gray-500 mt-1">
+                            {formatarDataVenda(venda)}
                           </div>
                         </div>
                         <div className="text-right">
@@ -511,22 +555,25 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                     valueClassName="font-semibold text-gray-900"
                   />
                 </h3>
-                <div className="grid grid-cols-3 gap-4 text-sm">
+                <div className="grid grid-cols-1 gap-4 text-sm md:grid-cols-4">
                   <div>
                     <span className="text-gray-600">Data:</span>
                     <span className="ml-2 font-medium">
-                      {vendaSelecionada.data_criacao ? new Date(vendaSelecionada.data_criacao).toLocaleString('pt-BR', {
-                        day: '2-digit',
-                        month: '2-digit',
-                        year: 'numeric',
-                        hour: '2-digit',
-                        minute: '2-digit'
-                      }) : 'Data não disponível'}
+                      {formatarDataVenda(vendaSelecionada)}
                     </span>
                   </div>
                   <div>
-                    <span className="text-gray-600">Cliente:</span>
-                    <span className="ml-2 font-medium">{vendaSelecionada.cliente?.nome || 'Consumidor Final'}</span>
+                    <CopyableValue
+                      label="Cliente"
+                      value={obterNomeCliente(vendaSelecionada)}
+                      valueClassName="font-medium text-gray-900"
+                    />
+                  </div>
+                  <div>
+                    <CopyableCode
+                      label="Cod. cliente"
+                      value={obterCodigoCliente(vendaSelecionada)}
+                    />
                   </div>
                   <div>
                     <span className="text-gray-600">Total:</span>
@@ -811,7 +858,11 @@ export default function ModalDevolucao({ caixaId, vendaInicial = null, onClose, 
                     </span>
                     {gerarCredito && vendaSelecionada?.cliente && (
                       <p className="text-xs text-gray-600 mt-1">
-                        Cliente: <strong>{vendaSelecionada.cliente.nome}</strong>
+                        <CopyableValue
+                          label="Cliente"
+                          value={obterNomeCliente(vendaSelecionada)}
+                          valueClassName="font-semibold text-gray-800"
+                        />
                       </p>
                     )}
                   </div>
