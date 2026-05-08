@@ -1,3 +1,5 @@
+import PetIdentity from "../../../components/ui/PetIdentity";
+
 export default function NovaInternacaoBaiasSection({
   formNova,
   mapaInternacao,
@@ -67,7 +69,18 @@ function BaiaButton({ baia, formNova, setFormNova }) {
     >
       <p className="text-xs font-bold">Baia {numero}</p>
       <p className="text-[11px] truncate">
-        {ocupadaPorOutro ? (baia.internacao?.pet_nome ?? "Ocupada") : "Disponivel"}
+        {ocupadaPorOutro ? (
+          <PetIdentity
+            copyable={false}
+            fallback="Ocupada"
+            layout="inline"
+            nameClassName="font-medium"
+            record={baia.internacao}
+            showCode={false}
+          />
+        ) : (
+          "Disponivel"
+        )}
       </p>
     </button>
   );

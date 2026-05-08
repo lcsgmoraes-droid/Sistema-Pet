@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import api from '../api';
 import { Calendar, DollarSign, TrendingUp, Package, Users, CreditCard, Filter } from 'lucide-react';
 import CustomerIdentity from './ui/CustomerIdentity';
+import PetIdentity from './ui/PetIdentity';
 import ProductIdentity from './ui/ProductIdentity';
 import SaleReference from './ui/SaleReference';
 
@@ -509,7 +510,13 @@ export default function RelatorioVendas() {
                         venda={venda}
                       />
                     </td>
-                    <td className="px-4 py-2">{venda.pet_nome || '-'}</td>
+                    <td className="px-4 py-2">
+                      <PetIdentity
+                        fallback=""
+                        nameClassName="font-medium text-slate-800"
+                        record={venda}
+                      />
+                    </td>
                     <td className="px-4 py-2 text-right">{formatarMoeda(venda.total)}</td>
                     <td className="px-4 py-2 text-center">
                       <span className={`px-2 py-1 rounded text-xs ${

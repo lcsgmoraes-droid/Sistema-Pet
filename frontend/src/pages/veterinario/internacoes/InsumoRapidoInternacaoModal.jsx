@@ -1,4 +1,5 @@
 import ProdutoEstoqueAutocomplete from "../../../components/veterinario/ProdutoEstoqueAutocomplete";
+import PetIdentity from "../../../components/ui/PetIdentity";
 
 export default function InsumoRapidoInternacaoModal({
   isOpen,
@@ -13,6 +14,10 @@ export default function InsumoRapidoInternacaoModal({
   salvando,
 }) {
   if (!isOpen) return null;
+
+  const internacaoSelecionada = internacoesOrdenadas.find(
+    (internacao) => String(internacao.id) === String(formInsumoRapido.internacao_id),
+  );
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
@@ -49,6 +54,19 @@ export default function InsumoRapidoInternacaoModal({
                 </option>
               ))}
             </select>
+            {internacaoSelecionada ? (
+              <div className="mt-2 rounded-lg bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                <PetIdentity
+                  fallback={`Pet #${internacaoSelecionada.pet_id || "-"}`}
+                  layout="inline"
+                  nameClassName="font-medium text-gray-800"
+                  record={internacaoSelecionada}
+                />
+                {internacaoSelecionada.box ? (
+                  <span className="ml-2 text-gray-500">Baia {internacaoSelecionada.box}</span>
+                ) : null}
+              </div>
+            ) : null}
           </div>
           <div>
             <label className="mb-1 block text-xs font-medium text-gray-600">Responsável *</label>

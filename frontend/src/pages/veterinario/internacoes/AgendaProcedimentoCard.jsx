@@ -1,4 +1,5 @@
 import { Check, Trash2 } from "lucide-react";
+import PetIdentity from "../../../components/ui/PetIdentity";
 import ProcedimentoExecutadoResumo from "./ProcedimentoExecutadoResumo";
 import { formatDateTime, formatQuantity } from "./internacaoUtils";
 
@@ -28,7 +29,13 @@ export default function AgendaProcedimentoCard({
       <div className="flex-1">
         <p className="text-base font-semibold text-indigo-800 leading-tight">{item.medicamento}</p>
         <p className="text-sm text-slate-600 mt-0.5">
-          {item.pet_nome} - Baia {baiaExibicao}
+          <PetIdentity
+            fallback={item.pet_id ? `Pet #${item.pet_id}` : ""}
+            layout="inline"
+            nameClassName="font-medium text-slate-700"
+            record={item}
+          />{" "}
+          - Baia {baiaExibicao}
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
           <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 font-semibold">

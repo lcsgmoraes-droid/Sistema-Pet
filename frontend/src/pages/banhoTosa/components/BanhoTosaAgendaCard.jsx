@@ -2,6 +2,7 @@ import { CheckCircle2, XCircle } from "lucide-react";
 import ActionButton from "../../../components/ui/ActionButton";
 import CustomerIdentity from "../../../components/ui/CustomerIdentity";
 import PetAvatar from "../../../components/ui/PetAvatar";
+import PetIdentity from "../../../components/ui/PetIdentity";
 import StatusBadge from "../../../components/ui/StatusBadge";
 import { formatCurrency } from "../banhoTosaUtils";
 import BanhoTosaVetAlertas from "./BanhoTosaVetAlertas";
@@ -23,7 +24,14 @@ export default function BanhoTosaAgendaCard({ agendamento, onCancelar, onCheckIn
           />
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-slate-900">
-              {hora} - {agendamento.pet_nome || `Pet #${agendamento.pet_id}`}
+              {hora} -{" "}
+              <PetIdentity
+                className="align-middle"
+                fallback={`Pet #${agendamento.pet_id || "-"}`}
+                layout="inline"
+                nameClassName="font-semibold text-slate-900"
+                record={agendamento}
+              />
             </p>
             <CustomerIdentity
               className="mt-0.5 text-xs text-slate-500"

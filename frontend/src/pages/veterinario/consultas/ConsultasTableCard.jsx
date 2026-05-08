@@ -1,4 +1,5 @@
 import { AlertCircle, FileText } from "lucide-react";
+import PetIdentity from "../../../components/ui/PetIdentity";
 
 import {
   formatDataConsulta,
@@ -68,7 +69,13 @@ function ConsultaTableRow({ consulta, onAbrirConsulta }) {
         {" "}
         <span className="text-xs ml-1 text-gray-400">{formatHoraConsulta(consulta.created_at)}</span>
       </td>
-      <td className="px-4 py-3 font-medium text-gray-800">{consulta.pet_nome ?? "-"}</td>
+      <td className="px-4 py-3 font-medium text-gray-800">
+        <PetIdentity
+          fallback=""
+          nameClassName="font-medium text-gray-800"
+          record={consulta}
+        />
+      </td>
       <td className="px-4 py-3 text-gray-600">{consulta.veterinario_nome ?? "-"}</td>
       <td className="px-4 py-3 text-gray-600 max-w-[200px] truncate">{consulta.motivo_consulta ?? "-"}</td>
       <td className="px-4 py-3 text-gray-600 max-w-[200px] truncate">{consulta.diagnostico ?? "-"}</td>

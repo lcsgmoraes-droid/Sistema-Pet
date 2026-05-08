@@ -1,4 +1,5 @@
 import { Activity } from "lucide-react";
+import PetIdentity from "../../../components/ui/PetIdentity";
 
 import {
   STATUS_BADGE,
@@ -42,7 +43,13 @@ export default function AgendamentoDiaCard({ abrindoAgendamentoId, agendamento, 
         {agendamento.is_emergencia && <Activity size={12} className="ml-auto text-red-500" />}
       </div>
       <div className="mt-1 text-sm font-medium text-gray-700">
-        {agendamento.pet_nome ?? `Pet #${String(agendamento.pet_id ?? "").slice(0, 6)}`}
+        <PetIdentity
+          copyable={false}
+          fallback={`Pet #${String(agendamento.pet_id ?? "").slice(0, 6) || "-"}`}
+          layout="inline"
+          nameClassName="font-medium text-gray-700"
+          record={agendamento}
+        />
       </div>
       <div className="text-[11px] text-gray-500">
         {[agendamento.veterinario_nome, agendamento.consultorio_nome].filter(Boolean).join(" - ") ||

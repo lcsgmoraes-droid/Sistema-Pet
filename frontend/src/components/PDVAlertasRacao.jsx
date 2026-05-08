@@ -11,6 +11,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '../api';
+import PetIdentity from './ui/PetIdentity';
 
 /**
  * Componente de Alertas e Sugestões Inteligentes para PDV - Fase 5
@@ -184,7 +185,12 @@ const PDVAlertasRacao = ({
             {alerta.pets_afetados.map((pet, idx) => (
               <div key={idx} className="bg-white border border-red-200 rounded-lg p-3">
                 <div className="flex items-center justify-between mb-2">
-                  <span className="font-semibold text-gray-900">{pet.pet_nome}</span>
+                  <PetIdentity
+                    layout="inline"
+                    nameClassName="font-semibold text-gray-900"
+                    pet={pet}
+                    showCode={false}
+                  />
                   <span className="text-xs bg-red-100 text-red-700 px-2 py-1 rounded">
                     {pet.pet_especie}
                   </span>

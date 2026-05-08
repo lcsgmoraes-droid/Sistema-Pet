@@ -1,4 +1,5 @@
 import { CheckCircle } from "lucide-react";
+import PetIdentity from "../../../components/ui/PetIdentity";
 import { badgeProxDose, formatData } from "./vacinaUtils";
 
 export default function VacinasVencendoTab({ vacinasVencendo }) {
@@ -25,7 +26,13 @@ export default function VacinasVencendoTab({ vacinasVencendo }) {
 
               return (
                 <tr key={vacina.id} className="hover:bg-orange-50 transition-colors">
-                  <td className="px-4 py-3 font-medium text-gray-800">{vacina.pet_nome ?? "-"}</td>
+                  <td className="px-4 py-3 font-medium text-gray-800">
+                    <PetIdentity
+                      fallback=""
+                      nameClassName="font-medium text-gray-800"
+                      record={vacina}
+                    />
+                  </td>
                   <td className="px-4 py-3 text-gray-700">{vacina.nome_vacina}</td>
                   <td className="px-4 py-3 text-gray-600">{formatData(vacina.proxima_dose)}</td>
                   <td className="px-4 py-3">

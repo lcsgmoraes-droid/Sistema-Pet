@@ -1,3 +1,4 @@
+import PetIdentity from "../../../components/ui/PetIdentity";
 import { STATUS_CORES, formatData } from "./internacaoUtils";
 
 const INDICADORES = [
@@ -35,9 +36,14 @@ export default function InternacoesWidgetPanel({ indicadoresInternacao, internac
               className="flex items-center justify-between border border-gray-100 rounded-lg px-3 py-2"
             >
               <div>
-                <p className="text-sm font-medium text-gray-800">
-                  {internacao.pet_nome ?? `Pet #${internacao.pet_id}`}
-                </p>
+                <div className="text-sm font-medium text-gray-800">
+                  <PetIdentity
+                    fallback={`Pet #${internacao.pet_id || "-"}`}
+                    layout="inline"
+                    nameClassName="font-medium text-gray-800"
+                    record={internacao}
+                  />
+                </div>
                 <p className="text-xs text-gray-500">
                   {internacao.box || "Sem baia"} - {formatData(internacao.data_entrada)}
                 </p>

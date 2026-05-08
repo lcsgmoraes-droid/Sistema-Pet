@@ -27,7 +27,7 @@ Componentes globais criados ou consolidados:
 - `MetricCard` e `MetricGrid` para padronizar dashboards e cards de indicadores.
 - `MoneyCell`, `ChannelBadges` e `SafeMarkdown`, ja iniciados na fatia de produtos.
 - `CopyableValue` para valores copiaveis padronizados, como numero de venda, nome de produto, SKU e codigos operacionais.
-- `CustomerIdentity`, `ProductIdentity` e `SaleReference` para cliente/codigo, produto/SKU e venda sempre copiaveis.
+- `CustomerIdentity`, `PetIdentity`, `ProductIdentity` e `SaleReference` para cliente/codigo, pet/codigo, produto/SKU e venda sempre copiaveis.
 - `FornecedorSelector` para busca de fornecedor com autocomplete e cadastro rapido, evitando selects locais e campos livres inconsistentes.
 - `FormField`, `TextField` e `SelectField` para campos de formulario com tons visuais reaproveitaveis sem quebrar telas existentes.
 - `PaginationControls` para paginacao, seletor de quantidade por pagina e navegacao com tamanho/cor padrao.
@@ -270,6 +270,7 @@ Padrao desejado:
 | --- | --- | --- |
 | `PessoaSelector` | Buscar/selecionar cliente/tutor/pessoa | PDV, financeiro, campanhas, veterinario, banho/tosa |
 | `CustomerIdentity` | Exibir cliente com nome/codigo copiaveis | PDV, vendas, financeiro, NF, entregas, comissoes |
+| `PetIdentity` | Exibir pet com nome/codigo copiaveis | Banho & Tosa, veterinario, PDV, lembretes, relatorios |
 | `TutorPetSelector` | Selecionar tutor + pet + novo pet | Veterinario, banho/tosa, vacinas, internacoes, exames, calculadoras |
 | `PetSelector` | Selecionar pet quando tutor ja esta definido | PDV item pet, campanhas pet, app/vet |
 | `ProdutoSelector` | Buscar produto/servico/SKU/codigo de barras | PDV, compras, NF, estoque, kits, campanhas |
@@ -847,6 +848,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-08: Modal de devolucao no PDV passou a usar `data_venda`, codigo do cliente e copia padronizada de cliente/codigo; producao ganhou `ops_disk_guard` preventivo para limpar cache Docker quando o disco entrar em faixa de risco.
 - 2026-05-08: criado `CustomerIdentity` para nome/codigo de cliente copiaveis e aplicado em devolucao PDV, vendas recentes, financeiro, contas a receber, relatorio de produto, NF, entregas e comissoes.
 - 2026-05-08: `CustomerIdentity` passou a reconhecer campos de tutor/pessoa e foi expandido para Banho & Tosa, Pets, campanhas, creditos, Pedido Bling e cards veterinarios.
+- 2026-05-08: criado `PetIdentity` para nome/codigo de pet copiaveis e aplicado em Banho & Tosa, veterinario, lembretes, relatorio de vendas, widget de cliente e alertas inteligentes do PDV.
 
 ### Nao fazer nesta onda
 

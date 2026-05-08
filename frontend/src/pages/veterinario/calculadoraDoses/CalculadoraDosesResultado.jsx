@@ -1,5 +1,6 @@
 import { Pill, Scale } from "lucide-react";
 import CustomerIdentity from "../../../components/ui/CustomerIdentity";
+import PetIdentity from "../../../components/ui/PetIdentity";
 
 export default function CalculadoraDosesResultado({
   calculo,
@@ -39,7 +40,15 @@ export default function CalculadoraDosesResultado({
             record={petSelecionado}
           />
         </p>
-        <p>Pet: {petSelecionado?.nome || "nao selecionado"}</p>
+        <p className="flex flex-wrap items-center gap-1.5">
+          <span>Pet:</span>
+          <PetIdentity
+            fallback="nao selecionado"
+            layout="inline"
+            nameClassName="font-medium text-slate-100"
+            pet={petSelecionado}
+          />
+        </p>
         <p>Medicamento: {medicamentoSelecionado?.nome || "nao selecionado"}</p>
         <p>Peso considerado: {form.peso_kg || "--"} kg</p>
         <p>Dose usada: {form.dose_mg_kg || "--"} mg/kg</p>

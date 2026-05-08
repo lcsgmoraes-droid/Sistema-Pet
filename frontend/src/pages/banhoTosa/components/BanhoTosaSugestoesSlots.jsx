@@ -1,6 +1,7 @@
 import CustomerIdentity from "../../../components/ui/CustomerIdentity";
 import StatusBadge from "../../../components/ui/StatusBadge";
 import PetAvatar from "../../../components/ui/PetAvatar";
+import PetIdentity from "../../../components/ui/PetIdentity";
 import { formatCurrency } from "../banhoTosaUtils";
 
 const SLOT_MINUTOS = 30;
@@ -152,9 +153,13 @@ function CompromissoCard({ agendamento }) {
             </span>
             <StatusBadge status={agendamento.status} />
           </div>
-          <div className="mt-1 truncate text-sm font-medium text-slate-700">
-            {agendamento.pet_nome || `Pet #${agendamento.pet_id}`}
-          </div>
+          <PetIdentity
+            className="mt-1 text-sm"
+            fallback={`Pet #${agendamento.pet_id || "-"}`}
+            layout="inline"
+            nameClassName="font-medium text-slate-700"
+            record={agendamento}
+          />
           <CustomerIdentity
             className="mt-0.5 text-xs text-slate-500"
             codeLabel="Cod. tutor"

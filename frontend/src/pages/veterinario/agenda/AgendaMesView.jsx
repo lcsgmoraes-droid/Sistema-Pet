@@ -1,3 +1,4 @@
+import PetIdentity from "../../../components/ui/PetIdentity";
 import {
   STATUS_COLOR,
   TIPO_BADGE,
@@ -71,7 +72,13 @@ export default function AgendaMesView({
                     >
                       <p className="truncate">
                         {String(ag.data_hora || "").slice(11, 16)} -{" "}
-                        {ag.pet_nome ?? `Pet #${String(ag.pet_id ?? "").slice(0, 6)}`}
+                        <PetIdentity
+                          copyable={false}
+                          fallback={`Pet #${String(ag.pet_id ?? "").slice(0, 6) || "-"}`}
+                          layout="inline"
+                          nameClassName="font-medium text-gray-700"
+                          record={ag}
+                        />
                       </p>
                       <p className="mt-0.5 truncate text-[10px] text-gray-500">
                         {[ag.veterinario_nome, ag.consultorio_nome].filter(Boolean).join(" • ") ||

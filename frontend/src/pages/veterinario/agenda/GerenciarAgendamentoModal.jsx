@@ -1,5 +1,6 @@
 import { X } from "lucide-react";
 import CustomerIdentity from "../../../components/ui/CustomerIdentity";
+import PetIdentity from "../../../components/ui/PetIdentity";
 import { STATUS_BADGE, STATUS_LABEL, TIPO_BADGE, TIPO_LABEL } from "./agendaUtils";
 
 export default function GerenciarAgendamentoModal({
@@ -82,7 +83,13 @@ export default function GerenciarAgendamentoModal({
           </div>
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Pet</p>
-            <p className="mt-1 text-sm text-gray-800">{agendamento.pet_nome || "-"}</p>
+            <p className="mt-1 text-sm text-gray-800">
+              <PetIdentity
+                fallback={agendamento.pet_id ? `Pet #${agendamento.pet_id}` : ""}
+                nameClassName="font-medium text-gray-800"
+                record={agendamento}
+              />
+            </p>
           </div>
           <div>
             <p className="text-xs font-medium uppercase tracking-wide text-gray-500">Veterinario</p>

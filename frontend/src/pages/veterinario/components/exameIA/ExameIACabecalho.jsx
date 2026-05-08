@@ -1,4 +1,5 @@
 import CustomerIdentity from "../../../../components/ui/CustomerIdentity";
+import PetIdentity from "../../../../components/ui/PetIdentity";
 import { formatarDataExame } from "./exameIAUtils";
 
 export default function ExameIACabecalho({ exame, resumo, temAnaliseIA, temArquivo, temResultadoBase }) {
@@ -22,7 +23,13 @@ export default function ExameIACabecalho({ exame, resumo, temAnaliseIA, temArqui
               nameClassName="font-medium text-indigo-700"
               record={resumo}
             />
-            <span>| Pet: {resumo.pet_nome || "-"}</span>
+            <span>| Pet:</span>
+            <PetIdentity
+              fallback=""
+              layout="inline"
+              nameClassName="font-medium text-indigo-700"
+              record={resumo}
+            />
           </p>
         )}
       </div>

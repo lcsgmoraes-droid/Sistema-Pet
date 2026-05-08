@@ -1,4 +1,5 @@
 import { Activity, Clock } from "lucide-react";
+import PetIdentity from "../../../components/ui/PetIdentity";
 import {
   STATUS_BADGE,
   STATUS_COLOR,
@@ -86,7 +87,12 @@ export default function AgendaDiasView({
                       {ag.is_emergencia && <Activity size={10} className="ml-auto text-red-500" />}
                     </div>
                     <p className="truncate text-xs font-medium text-gray-700">
-                      {ag.pet_nome ?? `Pet #${String(ag.pet_id ?? "").slice(0, 6)}`}
+                      <PetIdentity
+                        fallback={`Pet #${String(ag.pet_id ?? "").slice(0, 6) || "-"}`}
+                        layout="inline"
+                        nameClassName="font-medium text-gray-700"
+                        record={ag}
+                      />
                     </p>
                     <p className="truncate text-[11px] text-gray-500">
                       {[ag.veterinario_nome, ag.consultorio_nome].filter(Boolean).join(" • ") ||

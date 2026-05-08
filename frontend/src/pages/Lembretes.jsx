@@ -4,6 +4,7 @@ import { FiBell, FiCheckCircle, FiRefreshCw, FiTrash2 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import api from "../api";
 import CustomerIdentity from "../components/ui/CustomerIdentity";
+import PetIdentity from "../components/ui/PetIdentity";
 import "../styles/Lembretes.css";
 
 export default function Lembretes() {
@@ -794,7 +795,14 @@ function LembretCard({ lembrete, onCompletar, onRenovar, onCancelar }) {
         <div className="card-details">
           <div className="detail-row">
             <span className="label">Pet:</span>
-            <span className="value">{lembrete.pet_nome}</span>
+            <span className="value">
+              <PetIdentity
+                fallback=""
+                layout="inline"
+                nameClassName="font-medium"
+                record={lembrete}
+              />
+            </span>
           </div>
           <div className="detail-row">
             <span className="label">Data:</span>

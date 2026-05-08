@@ -7,6 +7,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import CustomerIdentity from "../../../components/ui/CustomerIdentity";
+import PetIdentity from "../../../components/ui/PetIdentity";
 import ExameAnexadoPainelIA from "../components/ExameAnexadoPainelIA";
 import { formatarData } from "./examesAnexadosUtils";
 
@@ -76,7 +77,13 @@ function ExameAnexadoItem({
               nameClassName="font-medium text-gray-700"
               record={item}
             />
-            <span>| Pet: {item.pet_nome || "-"}</span>
+            <span>| Pet:</span>
+            <PetIdentity
+              fallback=""
+              layout="inline"
+              nameClassName="font-medium text-gray-700"
+              record={item}
+            />
           </p>
         </div>
 

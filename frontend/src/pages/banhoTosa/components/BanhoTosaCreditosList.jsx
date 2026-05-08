@@ -1,6 +1,7 @@
 import CustomerIdentity from "../../../components/ui/CustomerIdentity";
 import EmptyState from "../../../components/ui/EmptyState";
 import Panel from "../../../components/ui/Panel";
+import PetIdentity from "../../../components/ui/PetIdentity";
 import { formatNumber } from "../banhoTosaUtils";
 
 export default function BanhoTosaCreditosList({ creditos = [] }) {
@@ -27,7 +28,17 @@ export default function BanhoTosaCreditosList({ creditos = [] }) {
                   nameClassName="font-medium text-slate-600"
                   record={credito}
                 />
-                <span>| {credito.pet_nome || "todos os pets"}</span>
+                <span>|</span>
+                {credito.pet_nome || credito.pet_id ? (
+                  <PetIdentity
+                    fallback={`Pet #${credito.pet_id || "-"}`}
+                    layout="inline"
+                    nameClassName="font-medium text-slate-600"
+                    record={credito}
+                  />
+                ) : (
+                  <span>todos os pets</span>
+                )}
               </p>
             </div>
             <Info label="Saldo" value={`${formatNumber(credito.saldo_creditos, 0)} de ${formatNumber(credito.creditos_total, 0)}`} />

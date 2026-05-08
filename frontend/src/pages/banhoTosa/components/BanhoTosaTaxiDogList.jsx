@@ -4,6 +4,7 @@ import CustomerIdentity from "../../../components/ui/CustomerIdentity";
 import EmptyState from "../../../components/ui/EmptyState";
 import { TextField } from "../../../components/ui/FormField";
 import PetAvatar from "../../../components/ui/PetAvatar";
+import PetIdentity from "../../../components/ui/PetIdentity";
 import { formatCurrency } from "../banhoTosaUtils";
 
 const statusFlow = [
@@ -60,7 +61,12 @@ function TaxiCard({ item, saving, onAtualizarMedicao, onSalvarMedicao, onStatus 
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="flex min-w-0 flex-wrap items-center gap-1.5 text-sm font-semibold text-slate-900">
-                <span className="truncate">{item.pet_nome || `Pet #${item.pet_id}`}</span>
+                <PetIdentity
+                  fallback={`Pet #${item.pet_id || "-"}`}
+                  layout="inline"
+                  nameClassName="font-semibold text-slate-900"
+                  record={item}
+                />
                 <span>/</span>
                 <CustomerIdentity
                   codeLabel="Cod. tutor"

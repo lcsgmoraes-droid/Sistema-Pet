@@ -1,4 +1,5 @@
 import { AlertCircle, Calendar } from "lucide-react";
+import PetIdentity from "../../../components/ui/PetIdentity";
 
 import { STATUS_AGENDAMENTO_COLOR, STATUS_AGENDAMENTO_LABEL } from "./dashboardConfig";
 
@@ -33,7 +34,13 @@ export default function AgendaHojeCard({ agendamentos, onAbrirAgenda, onAbrirAge
               </span>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium text-gray-800 truncate">
-                  {agendamento.pet_nome ?? `Pet #${String(agendamento.pet_id ?? "").slice(0, 6)}`}
+                  <PetIdentity
+                    copyable={false}
+                    fallback={`Pet #${String(agendamento.pet_id ?? "").slice(0, 6) || "-"}`}
+                    layout="inline"
+                    nameClassName="font-medium text-gray-800"
+                    record={agendamento}
+                  />
                 </p>
                 <p className="text-xs text-gray-400 truncate">{agendamento.motivo ?? "—"}</p>
               </div>

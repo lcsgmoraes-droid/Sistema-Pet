@@ -1,3 +1,5 @@
+import PetIdentity from "../../../components/ui/PetIdentity";
+
 export default function MapaInternacaoPanel({
   mapaInternacao,
   totalBaias,
@@ -52,9 +54,14 @@ export default function MapaInternacaoPanel({
                 </p>
                 {ocupada ? (
                   <>
-                    <p className="text-xs font-semibold text-gray-800 mt-2 truncate">
-                      {internacao?.pet_nome ?? "Internado"}
-                    </p>
+                    <div className="mt-2 text-xs font-semibold text-gray-800">
+                      <PetIdentity
+                        fallback="Internado"
+                        layout="inline"
+                        nameClassName="font-semibold text-gray-800"
+                        record={internacao}
+                      />
+                    </div>
                     <p className="text-[11px] text-gray-600 truncate">{internacao?.motivo ?? "Sem motivo"}</p>
                   </>
                 ) : (

@@ -6,6 +6,7 @@ import {
   FiSend, FiBarChart2, FiLink, FiCopy, FiCheck
 } from 'react-icons/fi';
 import api from '../api';
+import PetIdentity from './ui/PetIdentity';
 import ProductIdentity from './ui/ProductIdentity';
 import SaleReference from './ui/SaleReference';
 
@@ -331,7 +332,10 @@ export default function ClienteInfoWidget({ clienteId }) {
           <div className="space-y-2">
             {alertas_veterinarios.map((alerta, idx) => (
               <div key={`${alerta.pet_id}_${idx}`} className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2">
-                <p className="text-sm font-medium text-amber-900">{alerta.pet_nome}</p>
+                <PetIdentity
+                  nameClassName="font-medium text-amber-900"
+                  record={alerta}
+                />
                 <p className="text-xs text-amber-800 mt-1">{alerta.mensagem}</p>
               </div>
             ))}

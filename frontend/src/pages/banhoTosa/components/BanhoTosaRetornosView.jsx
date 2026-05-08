@@ -10,6 +10,7 @@ import MetricCard from "../../../components/ui/MetricCard";
 import MetricGrid from "../../../components/ui/MetricGrid";
 import Panel from "../../../components/ui/Panel";
 import PetAvatar from "../../../components/ui/PetAvatar";
+import PetIdentity from "../../../components/ui/PetIdentity";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { getApiErrorMessage } from "../banhoTosaUtils";
 import BanhoTosaRetornoCampanhaPanel from "./BanhoTosaRetornoCampanhaPanel";
@@ -165,7 +166,17 @@ function RetornoCard({ disabled, item, onAgendar, onAvancar }) {
                 nameClassName="font-medium text-slate-700"
                 record={item}
               />
-              {item.pet_nome ? <span>/ {item.pet_nome}</span> : null}
+              {item.pet_nome || item.pet_id ? (
+                <>
+                  <span>/</span>
+                  <PetIdentity
+                    fallback={`Pet #${item.pet_id || "-"}`}
+                    layout="inline"
+                    nameClassName="font-medium text-slate-700"
+                    record={item}
+                  />
+                </>
+              ) : null}
             </p>
             <p className="mt-1 line-clamp-2 text-sm text-slate-500">{item.mensagem}</p>
           </div>

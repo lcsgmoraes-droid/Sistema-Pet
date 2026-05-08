@@ -5,6 +5,7 @@ import ActionButton from "../../../components/ui/ActionButton";
 import CustomerIdentity from "../../../components/ui/CustomerIdentity";
 import Panel from "../../../components/ui/Panel";
 import PetAvatar from "../../../components/ui/PetAvatar";
+import PetIdentity from "../../../components/ui/PetIdentity";
 import StatusBadge from "../../../components/ui/StatusBadge";
 import { banhoTosaApi } from "../banhoTosaApi";
 import { getApiErrorMessage } from "../banhoTosaUtils";
@@ -291,9 +292,12 @@ function AtendimentoCard({
         <div className="min-w-0 flex-1">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0">
-              <p className="truncate text-sm font-semibold text-slate-900">
-                {atendimento.pet_nome || `Pet #${atendimento.pet_id}`}
-              </p>
+              <PetIdentity
+                fallback={`Pet #${atendimento.pet_id || "-"}`}
+                layout="inline"
+                nameClassName="font-semibold text-slate-900"
+                record={atendimento}
+              />
               <CustomerIdentity
                 className="mt-0.5 text-xs text-slate-500"
                 codeLabel="Cod. tutor"

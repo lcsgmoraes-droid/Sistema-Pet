@@ -1,5 +1,6 @@
 import { BedDouble } from "lucide-react";
 import CustomerIdentity from "../../../components/ui/CustomerIdentity";
+import PetIdentity from "../../../components/ui/PetIdentity";
 import InternacaoAcoes from "./InternacaoAcoes";
 import InternacaoDetalhe from "./InternacaoDetalhe";
 import { STATUS_CORES, formatData } from "./internacaoUtils";
@@ -54,9 +55,12 @@ export default function InternacaoCard({
 function ResumoInternacao({ internacao }) {
   return (
     <div className="flex-1 min-w-0">
-      <p className="font-semibold text-gray-800">
-        {internacao.pet_nome ?? `Pet #${String(internacao.pet_id ?? "").slice(0, 6)}`}
-      </p>
+      <PetIdentity
+        fallback={`Pet #${String(internacao.pet_id ?? "").slice(0, 6) || "-"}`}
+        layout="inline"
+        nameClassName="font-semibold text-gray-800"
+        record={internacao}
+      />
       {internacao.tutor_nome && (
         <CustomerIdentity
           className="mt-0.5 text-xs text-gray-500"

@@ -1,3 +1,5 @@
+import PetIdentity from "../../../components/ui/PetIdentity";
+
 export default function ConcluirProcedimentoModal({
   procedimento,
   baiaExibicao,
@@ -15,7 +17,14 @@ export default function ConcluirProcedimentoModal({
       <div className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6 space-y-4">
         <h2 className="font-bold text-gray-800">Concluir procedimento</h2>
         <div className="bg-purple-50 border border-purple-200 rounded-lg px-3 py-2">
-          <p className="text-xs text-purple-700 font-semibold">{procedimento.pet_nome}</p>
+          <div className="text-xs text-purple-700 font-semibold">
+            <PetIdentity
+              fallback={procedimento.pet_id ? `Pet #${procedimento.pet_id}` : ""}
+              layout="inline"
+              nameClassName="font-semibold text-purple-700"
+              record={procedimento}
+            />
+          </div>
           <p className="text-sm font-bold text-purple-900">{procedimento.medicamento}</p>
           <p className="text-xs text-purple-700">Dose: {procedimento.dose || "—"} • Baia: {baiaExibicao}</p>
         </div>
