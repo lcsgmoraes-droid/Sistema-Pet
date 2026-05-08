@@ -8,7 +8,8 @@ import {
   X,
 } from "lucide-react";
 import { formatMoneyBRL } from "../../utils/formatters";
-import CustomerIdentity from "../ui/CustomerIdentity";
+import CopyableCode from "../ui/CopyableCode";
+import CustomerIdentity, { getCustomerIdentityCode } from "../ui/CustomerIdentity";
 import IconActionButton from "../ui/IconActionButton";
 import SaleReference from "../ui/SaleReference";
 import StatusBadge from "../ui/StatusBadge";
@@ -226,12 +227,13 @@ export default function PDVVendasRecentesSidebar({
                 const canalInfo = getCanalInfo(venda.canal);
                 const CanalIcon = canalInfo.Icon;
                 const entregaStatus = getEntregaStatusInfo(venda);
+                const customerCode = getCustomerIdentityCode(venda);
 
                 return (
                   <div
                     key={venda.id}
                     onClick={() => reabrirVenda(venda)}
-                    className={`rounded-lg p-2.5 border border-l-4 ${canalInfo.cor} ${canalInfo.border} cursor-pointer transition-colors ${canalInfo.bg}`}
+                    className={`overflow-hidden rounded-lg p-2.5 border border-l-4 ${canalInfo.cor} ${canalInfo.border} cursor-pointer transition-colors ${canalInfo.bg}`}
                   >
                     <div className="flex items-center justify-between mb-1">
                       <span
@@ -263,40 +265,53 @@ export default function PDVVendasRecentesSidebar({
                       )}
                     </div>
 
-                    <div className="flex items-start justify-between mb-1.5">
-                      <div className="flex-1 min-w-0">
+                    <div className="mb-1.5 min-w-0">
+                      <div className="min-w-0">
                         <CustomerIdentity
-                          className="max-w-full"
-                          nameClassName="font-medium text-gray-900"
+                          className="max-w-full min-w-0"
+                          nameClassName="text-[13px] font-semibold text-gray-900"
+                          nameWrapperClassName="max-w-full min-w-0"
+                          showCode={false}
                           venda={venda}
                         />
-                        <div className="text-xs text-gray-500">
+                        <div className="mt-0.5 flex min-w-0 flex-wrap items-center gap-1 text-xs text-gray-500">
                           <SaleReference sale={venda} showPrefix={false} />
+                          {customerCode ? (
+                            <CopyableCode
+                              className="max-w-full overflow-hidden bg-white/70 px-1 py-0 text-[10px]"
+                              label="Cliente"
+                              title="Copiar codigo do cliente"
+                              value={customerCode}
+                            />
+                          ) : null}
                         </div>
                       </div>
-                      <div className="text-right ml-2 flex-shrink-0">
-                        {venda.status === "baixa_parcial" ? (
-                          <>
-                            <div className="text-[10px] text-gray-500">
-                              Pago
+
+                      <div className="mt-1 flex justify-end">
+                        <div className="text-right">
+                          {venda.status === "baixa_parcial" ? (
+                            <>
+                              <div className="text-[10px] text-gray-500">
+                                Pago
+                              </div>
+                              <div className="text-xs font-semibold text-green-600">
+                                {formatMoneyBRL(venda.valor_pago || 0)}
+                              </div>
+                              <div className="text-[10px] text-gray-500 mt-0.5">
+                                de {formatMoneyBRL(venda.total || 0)}
+                              </div>
+                            </>
+                          ) : (
+                            <div className="text-sm font-semibold text-green-600">
+                              {formatMoneyBRL(venda.total || 0)}
                             </div>
-                            <div className="text-xs font-semibold text-green-600">
-                              {formatMoneyBRL(venda.valor_pago || 0)}
-                            </div>
-                            <div className="text-[10px] text-gray-500 mt-0.5">
-                              de {formatMoneyBRL(venda.total || 0)}
-                            </div>
-                          </>
-                        ) : (
-                          <div className="text-sm font-semibold text-green-600">
-                            {formatMoneyBRL(venda.total || 0)}
-                          </div>
-                        )}
-                        <StatusBadge
-                          status={venda.status}
-                          size="xs"
-                          className="mt-1"
-                        />
+                          )}
+                          <StatusBadge
+                            status={venda.status}
+                            size="xs"
+                            className="mt-1"
+                          />
+                        </div>
                       </div>
                     </div>
 

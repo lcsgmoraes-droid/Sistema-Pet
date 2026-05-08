@@ -74,6 +74,7 @@ export default function CustomerIdentity({
   layout = "stacked",
   name,
   nameClassName = "font-medium text-slate-900",
+  nameWrapperClassName = "",
   record,
   showCode = true,
   showLabel = false,
@@ -109,6 +110,7 @@ export default function CustomerIdentity({
     <span className={`${wrapperClass} ${className}`}>
       {customerName ? (
         <CopyableValue
+          className={nameWrapperClassName}
           label={showLabel ? label : undefined}
           title="Copiar cliente"
           value={customerName}
