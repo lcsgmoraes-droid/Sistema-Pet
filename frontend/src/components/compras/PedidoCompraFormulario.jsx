@@ -1,3 +1,7 @@
+import FornecedorSelector from '../fornecedores/FornecedorSelector';
+import CopyableCode from '../ui/CopyableCode';
+import CopyableValue from '../ui/CopyableValue';
+
 export default function PedidoCompraFormulario({
   mostrarForm,
   modoEdicao,
@@ -6,7 +10,6 @@ export default function PedidoCompraFormulario({
   handleSubmit,
   fornecedorTexto,
   setFornecedorTexto,
-  setMostrarSugestoesFornecedor,
   fornecedores,
   selecionarFornecedor,
   setFormData,
@@ -17,8 +20,6 @@ export default function PedidoCompraFormulario({
   setItemForm,
   itemFormInicial,
   limparEstadosSugestao,
-  mostrarSugestoesFornecedor,
-  fornecedoresFiltrados,
   obterGrupoDoFornecedor,
   abrirNovoGrupoFornecedor,
   formData,
@@ -34,7 +35,6 @@ export default function PedidoCompraFormulario({
   itemForm,
   adicionarItem,
   obterSkuItemPedido,
-  copiarSkuItemPedido,
   atualizarItemPedido,
   numeroSeguro,
   removerItem,
@@ -44,6 +44,20 @@ export default function PedidoCompraFormulario({
   if (!mostrarForm) {
     return null;
   }
+
+  const fornecedorSelecionado = fornecedores.find(
+    (fornecedor) => Number(fornecedor.id) === Number(formData.fornecedor_id),
+  );
+
+  const limparFornecedorSelecionado = () => {
+    setFormData((prev) => ({ ...prev, fornecedor_id: '', itens: [] }));
+    setProdutos([]);
+    setIncluirGrupoFornecedor(false);
+    setProdutoTexto('');
+    setMostrarSugestoesProduto(false);
+    setItemForm(itemFormInicial);
+    limparEstadosSugestao();
+  };
 
   return (
     <div className="bg-white rounded-lg shadow-md p-6 mb-6">
@@ -65,63 +79,26 @@ export default function PedidoCompraFormulario({
             <label className="block text-sm font-medium text-gray-700 mb-2">
               Fornecedor *
             </label>
-            <div className="relative">
-              <input
-                value={fornecedorTexto}
-                onChange={(e) => {
-                  const valor = e.target.value;
-                  setFornecedorTexto(valor);
-                  setMostrarSugestoesFornecedor(true);
-
-                  const fornecedorExato = fornecedores.find(
-                    (f) => (f.nome || '').toLowerCase() === valor.toLowerCase(),
-                  );
-                  if (fornecedorExato) {
-                    selecionarFornecedor(fornecedorExato);
-                  } else {
-                    setFormData((prev) => ({ ...prev, fornecedor_id: '', itens: [] }));
-                    setProdutos([]);
-                    setIncluirGrupoFornecedor(false);
-                    setProdutoTexto('');
-                    setMostrarSugestoesProduto(false);
-                    setItemForm(itemFormInicial);
-                    limparEstadosSugestao();
-                  }
-                }}
-                onFocus={() => setMostrarSugestoesFornecedor(true)}
-                onBlur={() => {
-                  setTimeout(() => setMostrarSugestoesFornecedor(false), 120);
-                }}
-                placeholder="Digite ou selecione o fornecedor"
-                required={!!formData.fornecedor_id}
-                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              />
-              {mostrarSugestoesFornecedor && fornecedoresFiltrados.length > 0 && (
-                <div className="absolute z-20 mt-1 w-full max-h-60 overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
-                  {fornecedoresFiltrados.map((f) => (
-                    <button
-                      type="button"
-                      key={f.id}
-                      onMouseDown={(ev) => ev.preventDefault()}
-                      onClick={() => selecionarFornecedor(f)}
-                      className="w-full px-4 py-2 text-left hover:bg-blue-50 border-b border-gray-100 last:border-b-0"
-                    >
-                      <div className="font-medium text-gray-800">{f.nome}</div>
-                      <div className="flex flex-wrap items-center gap-2 text-xs text-gray-500">
-                        {(f.cpf_cnpj || f.cnpj || f.cpf) && (
-                          <span>{f.cpf_cnpj || f.cnpj || f.cpf}</span>
-                        )}
-                        {obterGrupoDoFornecedor(f.id) && (
-                          <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-700">
-                            Grupo: {obterGrupoDoFornecedor(f.id).nome}
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
+            <FornecedorSelector
+              fornecedores={fornecedores}
+              fornecedorId={formData.fornecedor_id}
+              fornecedorSelecionado={fornecedorSelecionado}
+              showLabel={false}
+              required
+              value={fornecedorTexto}
+              placeholder="Digite ou selecione o fornecedor"
+              onInputChange={(valor) => {
+                setFornecedorTexto(valor);
+                if (formData.fornecedor_id) {
+                  limparFornecedorSelecionado();
+                }
+              }}
+              onSelect={selecionarFornecedor}
+              onClear={() => {
+                setFornecedorTexto('');
+                limparFornecedorSelecionado();
+              }}
+            />
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <p className="text-xs text-gray-500">Digite ou selecione um fornecedor para carregar seus produtos</p>
               <button
@@ -275,21 +252,13 @@ export default function PedidoCompraFormulario({
                   {formData.itens.map((item, index) => (
                     <tr key={index} className="border-t">
                       <td className="px-4 py-2">
-                        <div className="font-medium text-gray-900">{item.produto_nome}</div>
+                        <CopyableValue
+                          title="Copiar produto"
+                          value={item.produto_nome}
+                          valueClassName="font-medium text-gray-900"
+                        />
                         <div className="mt-1 flex items-center gap-2 text-xs text-gray-500">
-                          <span>SKU: {obterSkuItemPedido(item) || 'N/A'}</span>
-                          <button
-                            type="button"
-                            onClick={() => copiarSkuItemPedido(item)}
-                            className="inline-flex h-7 w-7 items-center justify-center rounded-md border border-slate-200 text-slate-500 transition hover:border-blue-300 hover:text-blue-600"
-                            title="Copiar SKU"
-                            aria-label={`Copiar SKU de ${item.produto_nome}`}
-                          >
-                            <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="1.8">
-                              <rect x="9" y="9" width="11" height="11" rx="2" />
-                              <path d="M6 15H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v1" />
-                            </svg>
-                          </button>
+                          <CopyableCode value={obterSkuItemPedido(item)} />
                         </div>
                       </td>
                       <td className="px-4 py-2 text-right">

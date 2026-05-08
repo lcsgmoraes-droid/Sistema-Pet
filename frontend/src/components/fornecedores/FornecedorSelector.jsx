@@ -373,6 +373,7 @@ export default function FornecedorSelector({
           onFocus={() => setAberto(true)}
           placeholder={placeholder}
           disabled={disabled}
+          required={required}
           className={[
             "h-10 w-full rounded-lg border border-slate-300 bg-white pl-9 pr-20 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500",
             inputClassName,

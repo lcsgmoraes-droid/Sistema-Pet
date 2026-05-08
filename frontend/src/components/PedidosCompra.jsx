@@ -83,7 +83,6 @@ const PedidosCompra = () => {
   // Estados para inputs digitáveis
   const [fornecedorTexto, setFornecedorTexto] = useState('');
   const [produtoTexto, setProdutoTexto] = useState('');
-  const [mostrarSugestoesFornecedor, setMostrarSugestoesFornecedor] = useState(false);
   const [mostrarSugestoesProduto, setMostrarSugestoesProduto] = useState(false);
   const [incluirGrupoFornecedor, setIncluirGrupoFornecedor] = useState(false);
 
@@ -92,15 +91,6 @@ const PedidosCompra = () => {
       .toLowerCase()
       .normalize('NFD')
       .replaceAll(/[\u0300-\u036f]/g, '');
-
-  const fornecedoresFiltrados = useMemo(() => {
-    const termo = normalizarTexto(fornecedorTexto.trim());
-    if (!termo) return fornecedores.slice(0, 12);
-
-    return fornecedores
-      .filter((f) => normalizarTexto(f.nome || '').includes(termo))
-      .slice(0, 12);
-  }, [fornecedores, fornecedorTexto]);
 
   const produtosFiltrados = useMemo(() => {
     const termo = normalizarTexto(produtoTexto.trim());
@@ -168,7 +158,6 @@ const PedidosCompra = () => {
     setIncluirGrupoFornecedor(Boolean(obterGrupoDoFornecedor(fornecedor.id)));
     setItemForm(ITEM_FORM_INICIAL);
     setProdutoTexto('');
-    setMostrarSugestoesFornecedor(false);
     // Limpar sugestões do fornecedor anterior
     limparEstadosSugestao();
     carregarProdutosFornecedor(fornecedor.id);
@@ -320,7 +309,6 @@ const PedidosCompra = () => {
     setProdutoTexto('');
     setProdutos([]);
     setIncluirGrupoFornecedor(false);
-    setMostrarSugestoesFornecedor(false);
     setMostrarSugestoesProduto(false);
     limparEstadosSugestao();
   };
@@ -371,7 +359,6 @@ const PedidosCompra = () => {
     setItemForm(ITEM_FORM_INICIAL);
     setProdutoTexto('');
     setMostrarSugestoesProduto(false);
-    setMostrarSugestoesFornecedor(false);
     setMostrarForm(true);
     limparEstadosSugestao();
 
@@ -1198,7 +1185,6 @@ const PedidosCompra = () => {
         handleSubmit={handleSubmit}
         fornecedorTexto={fornecedorTexto}
         setFornecedorTexto={setFornecedorTexto}
-        setMostrarSugestoesFornecedor={setMostrarSugestoesFornecedor}
         fornecedores={fornecedores}
         selecionarFornecedor={selecionarFornecedor}
         setFormData={setFormData}
@@ -1209,8 +1195,6 @@ const PedidosCompra = () => {
         setItemForm={setItemForm}
         itemFormInicial={ITEM_FORM_INICIAL}
         limparEstadosSugestao={limparEstadosSugestao}
-        mostrarSugestoesFornecedor={mostrarSugestoesFornecedor}
-        fornecedoresFiltrados={fornecedoresFiltrados}
         obterGrupoDoFornecedor={obterGrupoDoFornecedor}
         abrirNovoGrupoFornecedor={abrirNovoGrupoFornecedor}
         formData={formData}
@@ -1226,7 +1210,6 @@ const PedidosCompra = () => {
         itemForm={itemForm}
         adicionarItem={adicionarItem}
         obterSkuItemPedido={obterSkuItemPedido}
-        copiarSkuItemPedido={copiarSkuItemPedido}
         atualizarItemPedido={atualizarItemPedido}
         numeroSeguro={numeroSeguro}
         removerItem={removerItem}
