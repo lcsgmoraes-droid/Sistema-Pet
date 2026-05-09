@@ -126,7 +126,7 @@ def detectar_promocao_por_preco_vendido(
     canal = _canal_da_venda(venda)
     candidatos: list[dict[str, Any]] = []
 
-    if getattr(produto, "promocao_ativa", False) is True:
+    if getattr(produto, "preco_promocional", None) is not None:
         _adicionar_candidato(
             candidatos,
             origem="Promocao ERP",

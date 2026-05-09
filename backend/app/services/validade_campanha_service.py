@@ -67,7 +67,18 @@ def _normalizar_canal(canal: Optional[str]) -> str:
     return value if value in CANAIS_VALIDOS else "ecommerce"
 
 
+def _datetime_compat(value):
+    if not value:
+        return None
+    if getattr(value, "tzinfo", None) is not None:
+        return value.astimezone(timezone.utc).replace(tzinfo=None)
+    return value
+
+
 def _janela_ativa(inicio, fim, agora: datetime) -> bool:
+    inicio = _datetime_compat(inicio)
+    fim = _datetime_compat(fim)
+    agora = _datetime_compat(agora) or datetime.utcnow()
     if inicio and inicio > agora:
         return False
     if fim and fim < agora:
@@ -272,7 +283,7 @@ def resolver_preco_promocional_manual(
         ):
             candidatos.append(float(produto.preco_ecommerce_promo))
 
-    if produto.promocao_ativa and produto.preco_promocional is not None:
+    if produto.preco_promocional is not None:
         if _janela_ativa(produto.promocao_inicio, produto.promocao_fim, agora):
             candidatos.append(float(produto.preco_promocional))
 

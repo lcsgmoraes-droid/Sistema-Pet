@@ -36,6 +36,12 @@ function obterImagemSugestaoProduto(produto) {
   );
 }
 
+function obterPrecoPDV(produto) {
+  const preco = produto?.preco_venda_pdv ?? produto?.preco_venda_efetivo ?? produto?.preco_venda;
+  const numero = Number.parseFloat(preco);
+  return Number.isFinite(numero) ? numero : 0;
+}
+
 function ProdutoSugestaoPDV({
   onAdicionarNaListaEsperaRapido,
   onSelecionarProdutoSugerido,
@@ -49,6 +55,9 @@ function ProdutoSugestaoPDV({
       : produto.estoque_atual !== undefined &&
         Math.floor(produto.estoque_atual) <= 0;
   const imagemSugestao = resolveMediaUrl(obterImagemSugestaoProduto(produto));
+  const precoPDV = obterPrecoPDV(produto);
+  const precoOriginal = Number.parseFloat(produto.preco_venda_original ?? produto.preco_venda ?? 0);
+  const promocaoAtiva = Boolean(produto.promocao_pdv_ativa);
 
   return (
     <button
@@ -106,8 +115,20 @@ function ProdutoSugestaoPDV({
             </div>
           </div>
         </div>
-        <div className="text-lg font-semibold text-green-600">
-          {formatMoneyBRL(produto.preco_venda)}
+        <div className="flex flex-col items-end gap-1">
+          {promocaoAtiva && precoOriginal > precoPDV && (
+            <span className="text-xs text-gray-400 line-through">
+              {formatMoneyBRL(precoOriginal)}
+            </span>
+          )}
+          <div className="text-lg font-semibold text-green-600">
+            {formatMoneyBRL(precoPDV)}
+          </div>
+          {promocaoAtiva && (
+            <span className="rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-amber-700">
+              promocao
+            </span>
+          )}
         </div>
       </div>
     </button>
@@ -208,6 +229,7 @@ export default function PDVProdutosCard({
                   Math.floor(item.estoque_virtual) <= 0
                 : item.estoque_atual !== undefined &&
                   Math.floor(item.estoque_atual) <= 0;
+            const itemEmPromocao = Boolean(item.em_promocao);
 
             return (
               <div
@@ -277,6 +299,14 @@ export default function PDVProdutosCard({
                           title="Copiar SKU do produto"
                           value={codigoProdutoExibicao}
                         />
+                        {itemEmPromocao && (
+                          <span
+                            title={item.promocao_origem || "Promocao aplicada no PDV"}
+                            className="inline-flex items-center gap-1 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-amber-700"
+                          >
+                            promocao
+                          </span>
+                        )}
                         {vendaAtual.cliente && itemSemEstoque && (
                           <button
                             type="button"
@@ -320,6 +350,11 @@ export default function PDVProdutosCard({
                         {item.quantidade} Unidade
                         {item.quantidade !== 1 ? "s" : ""} x{" "}
                         {formatMoneyBRL(item.preco_unitario)}
+                        {itemEmPromocao && item.preco_venda_original > item.preco_unitario && (
+                          <span className="ml-1 text-xs text-gray-400 line-through">
+                            {formatMoneyBRL(item.preco_venda_original)}
+                          </span>
+                        )}
                         {item.desconto_valor > 0 && (
                           <span className="text-orange-600 ml-1">
                             com {formatMoneyBRL(item.desconto_valor)} de desconto

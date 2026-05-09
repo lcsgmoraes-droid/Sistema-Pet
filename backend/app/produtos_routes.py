@@ -70,6 +70,91 @@ def _normalizar_sku_produto(sku: Optional[str]) -> str:
     return sku_normalizado
 
 
+def _as_float_optional(valor: Any) -> Optional[float]:
+    if valor in (None, ""):
+        return None
+    try:
+        return float(valor)
+    except (TypeError, ValueError):
+        return None
+
+
+def _datetime_naive(valor: Any) -> Optional[datetime]:
+    if not valor:
+        return None
+    if isinstance(valor, datetime):
+        return valor.replace(tzinfo=None) if valor.tzinfo else valor
+    return None
+
+
+def _janela_promocao_ativa(inicio: Any, fim: Any, referencia: Optional[datetime] = None) -> bool:
+    agora = _datetime_naive(referencia) or datetime.now()
+    inicio_dt = _datetime_naive(inicio)
+    fim_dt = _datetime_naive(fim)
+
+    if inicio_dt and agora < inicio_dt:
+        return False
+    if fim_dt and agora > fim_dt:
+        return False
+    return True
+
+
+def _resolver_promocao_erp_produto(produto: Produto, referencia: Optional[datetime] = None) -> dict[str, Any]:
+    preco_regular = _as_float_optional(getattr(produto, "preco_venda", None)) or 0.0
+    preco_promocional = _as_float_optional(getattr(produto, "preco_promocional", None))
+
+    promocao_ativa = (
+        preco_promocional is not None
+        and preco_promocional > 0
+        and (preco_regular <= 0 or preco_promocional < preco_regular)
+        and _janela_promocao_ativa(
+            getattr(produto, "promocao_inicio", None),
+            getattr(produto, "promocao_fim", None),
+            referencia,
+        )
+    )
+
+    preco_pdv = preco_promocional if promocao_ativa else preco_regular
+    desconto = max(preco_regular - (preco_promocional or preco_regular), 0.0) if promocao_ativa else 0.0
+
+    return {
+        "promocao_ativa": bool(promocao_ativa),
+        "preco_pdv": round(float(preco_pdv or 0), 2),
+        "preco_regular": round(float(preco_regular or 0), 2),
+        "preco_promocional": round(float(preco_promocional), 2) if preco_promocional is not None else None,
+        "desconto": round(float(desconto or 0), 2),
+    }
+
+
+def _enriquecer_preco_pdv(produto: Produto, referencia: Optional[datetime] = None) -> Produto:
+    promocao = _resolver_promocao_erp_produto(produto, referencia)
+    produto.preco_venda_original = promocao["preco_regular"]
+    produto.preco_venda_pdv = promocao["preco_pdv"]
+    produto.preco_venda_efetivo = promocao["preco_pdv"]
+    produto.promocao_pdv_ativa = promocao["promocao_ativa"]
+    produto.promocao_origem_pdv = "Promocao ERP" if promocao["promocao_ativa"] else None
+    produto.desconto_promocional_pdv = promocao["desconto"]
+    return produto
+
+
+def _normalizar_promocao_erp_payload(
+    dados: dict[str, Any],
+    produto_atual: Optional[Produto] = None,
+) -> dict[str, Any]:
+    campos_promocao = {"preco_promocional", "promocao_inicio", "promocao_fim"}
+
+    if produto_atual is not None and not any(campo in dados for campo in campos_promocao):
+        return dados
+
+    preco_promocional = (
+        dados.get("preco_promocional")
+        if "preco_promocional" in dados
+        else getattr(produto_atual, "preco_promocional", None)
+    )
+    dados["promocao_ativa"] = bool((_as_float_optional(preco_promocional) or 0) > 0)
+    return dados
+
+
 def _mapa_reservas_ativas_multitenant(db: Session, tenant_ids: List[str]) -> dict[int, float]:
     """Consolida reservas ativas por produto para os tenants acessiveis."""
     try:
@@ -434,6 +519,7 @@ def _enriquecer_produto_listagem(
             0.0,
         )
     produto.de_parceiro = is_partner_owned(tenant_id, produto.tenant_id)
+    _enriquecer_preco_pdv(produto)
     return produto
 
 
@@ -1004,6 +1090,13 @@ class ProdutoResponse(ProdutoBase):
     sucessor_nome: Optional[str] = None  # Nome do sucessor (se existir)
     # Campo de parceria (True = pertence ao tenant parceiro)
     de_parceiro: bool = False
+    # Preco efetivo para PDV/loja fisica quando houver promocao ERP ativa
+    preco_venda_original: Optional[float] = None
+    preco_venda_pdv: Optional[float] = None
+    preco_venda_efetivo: Optional[float] = None
+    promocao_pdv_ativa: bool = False
+    promocao_origem_pdv: Optional[str] = None
+    desconto_promocional_pdv: Optional[float] = 0
 
     @field_validator('categoria_nome', mode='before')
     @classmethod
@@ -2078,8 +2171,10 @@ def criar_produto(
 
     try:
         # Preparar dados do produto
-        produto_data = _normalizar_payload_granel(
-            _normalizar_payload_racao(produto.model_dump())
+        produto_data = _normalizar_promocao_erp_payload(
+            _normalizar_payload_granel(
+                _normalizar_payload_racao(produto.model_dump())
+            )
         )
 
         # Adicionar user_id aos dados (necessÃ¡rio para o modelo)
@@ -2179,10 +2274,11 @@ def listar_produtos_vendaveis(
         query = query.filter(Produto.estoque_atual <= Produto.estoque_minimo)
 
     if em_promocao:
+        agora = datetime.now()
         query = query.filter(
             Produto.preco_promocional.isnot(None),
-            Produto.promocao_inicio <= datetime.utcnow(),
-            Produto.promocao_fim >= datetime.utcnow()
+            or_(Produto.promocao_inicio.is_(None), Produto.promocao_inicio <= agora),
+            or_(Produto.promocao_fim.is_(None), Produto.promocao_fim >= agora),
         )
 
     # PAGINAÃ‡ÃƒO
@@ -2340,10 +2436,11 @@ def listar_produtos(
         query = query.filter(Produto.estoque_atual <= Produto.estoque_minimo)
 
     if em_promocao:
+        agora = datetime.now()
         query = query.filter(
             Produto.preco_promocional.isnot(None),
-            Produto.promocao_inicio <= datetime.utcnow(),
-            Produto.promocao_fim >= datetime.utcnow()
+            or_(Produto.promocao_inicio.is_(None), Produto.promocao_inicio <= agora),
+            or_(Produto.promocao_fim.is_(None), Produto.promocao_fim >= agora),
         )
 
     # TOTAL
@@ -2673,6 +2770,14 @@ def obter_produto(
             0.0,
         )
 
+    promocao_pdv = _resolver_promocao_erp_produto(produto)
+    response_data['preco_venda_original'] = promocao_pdv['preco_regular']
+    response_data['preco_venda_pdv'] = promocao_pdv['preco_pdv']
+    response_data['preco_venda_efetivo'] = promocao_pdv['preco_pdv']
+    response_data['promocao_pdv_ativa'] = promocao_pdv['promocao_ativa']
+    response_data['promocao_origem_pdv'] = "Promocao ERP" if promocao_pdv['promocao_ativa'] else None
+    response_data['desconto_promocional_pdv'] = promocao_pdv['desconto']
+
     return response_data
 
 
@@ -2728,6 +2833,7 @@ def atualizar_produto(
     dados_recebidos = _normalizar_payload_granel(
         _normalizar_payload_racao(dados_recebidos)
     )
+    dados_recebidos = _normalizar_promocao_erp_payload(dados_recebidos, produto)
 
     # ========================================
     # ï¿½ðŸ”’ TRAVA 3 â€” VALIDAÃ‡ÃƒO: PRODUTO PAI NÃƒO TEM PREÃ‡O (ATUALIZAÃ‡ÃƒO)

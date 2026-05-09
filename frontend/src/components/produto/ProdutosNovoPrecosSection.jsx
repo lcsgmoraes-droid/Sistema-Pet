@@ -1,3 +1,5 @@
+import PromocaoFields from './PromocaoFields';
+
 function formatMoeda(value, parseNumber) {
   return value ? `R$ ${parseNumber(value).toFixed(2).replace('.', ',')}` : 'R$ 0,00';
 }
@@ -21,7 +23,7 @@ export default function ProdutosNovoPrecosSection({
 
   return (
     <>
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">Preco de Custo</label>
           <input
@@ -91,52 +93,42 @@ export default function ProdutosNovoPrecosSection({
             placeholder="R$ 0,00"
           />
         </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Preco Promocional</label>
-          <input
-            type="text"
-            value={camposEmEdicao.preco_promocional ? (formData.preco_promocional || '') : formatMoeda(formData.preco_promocional, parseNumber)}
-            onChange={(e) => {
-              const value = e.target.value.replace(/[^\d.,]/g, '').replace(',', '.');
-              handleChange('preco_promocional', value);
-            }}
-            onFocus={(e) => {
-              setCamposEmEdicao((prev) => ({ ...prev, preco_promocional: true }));
-              e.target.select();
-            }}
-            onBlur={(e) => {
-              setCamposEmEdicao((prev) => ({ ...prev, preco_promocional: false }));
-              const value = parseNumber(e.target.value);
-              handleChange('preco_promocional', value > 0 ? value.toFixed(2) : '');
-            }}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            placeholder="R$ 0,00"
-          />
-        </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Inicio da Promocao (ERP)</label>
-          <input
-            type="date"
-            value={formData.data_inicio_promocao}
-            onChange={(e) => handleChange('data_inicio_promocao', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Fim da Promocao (ERP)</label>
-          <input
-            type="date"
-            value={formData.data_fim_promocao}
-            onChange={(e) => handleChange('data_fim_promocao', e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          />
-        </div>
-      </div>
+      <PromocaoFields
+        title="Promocao ERP / Loja fisica"
+        description="Quando estiver dentro da janela, este preco entra automaticamente no PDV."
+        startLabel="Inicio da promocao"
+        endLabel="Fim da promocao"
+        startValue={formData.data_inicio_promocao}
+        endValue={formData.data_fim_promocao}
+        onStartChange={(value) => handleChange('data_inicio_promocao', value)}
+        onEndChange={(value) => handleChange('data_fim_promocao', value)}
+        priceControl={(
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Preco promocional</label>
+            <input
+              type="text"
+              value={camposEmEdicao.preco_promocional ? (formData.preco_promocional || '') : formatMoeda(formData.preco_promocional, parseNumber)}
+              onChange={(e) => {
+                const value = e.target.value.replace(/[^\d.,]/g, '').replace(',', '.');
+                handleChange('preco_promocional', value);
+              }}
+              onFocus={(e) => {
+                setCamposEmEdicao((prev) => ({ ...prev, preco_promocional: true }));
+                e.target.select();
+              }}
+              onBlur={(e) => {
+                setCamposEmEdicao((prev) => ({ ...prev, preco_promocional: false }));
+                const value = parseNumber(e.target.value);
+                handleChange('preco_promocional', value > 0 ? value.toFixed(2) : '');
+              }}
+              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+              placeholder="R$ 0,00"
+            />
+          </div>
+        )}
+      />
 
       <div className="border border-gray-200 rounded-lg p-4 bg-gray-50 space-y-4">
         <div>

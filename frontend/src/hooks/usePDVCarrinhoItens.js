@@ -20,6 +20,12 @@ function recalcularSubtotalItem(item, novaQuantidade) {
   };
 }
 
+function obterPrecoVendaPDV(produto) {
+  const preco = produto?.preco_venda_pdv ?? produto?.preco_venda_efetivo ?? produto?.preco_venda;
+  const numero = parseFloat(preco);
+  return Number.isFinite(numero) ? numero : 0;
+}
+
 export function usePDVCarrinhoItens({
   vendaAtual,
   setVendaAtual,
@@ -49,6 +55,9 @@ export function usePDVCarrinhoItens({
       (item) => item.produto_id === produto.id,
     );
 
+    const precoUnitario = obterPrecoVendaPDV(produto);
+    const promocaoAtiva = Boolean(produto.promocao_pdv_ativa);
+
     let novosItens;
     if (itemExistente) {
       novosItens = vendaAtual.itens.map((item) =>
@@ -71,9 +80,13 @@ export function usePDVCarrinhoItens({
           produto_imagem_principal: produto.imagem_principal || null,
           produto_imagem_thumbnail: produto.imagem_principal_thumbnail || null,
           quantidade: 1,
-          preco_unitario: parseFloat(produto.preco_venda),
+          preco_unitario: precoUnitario,
+          preco_venda_original: produto.preco_venda_original ?? produto.preco_venda ?? precoUnitario,
+          em_promocao: promocaoAtiva,
+          promocao_origem: produto.promocao_origem_pdv || (promocaoAtiva ? "Promocao ERP" : null),
+          desconto_promocional_unitario: produto.desconto_promocional_pdv || 0,
           desconto_item: 0,
-          subtotal: parseFloat(produto.preco_venda),
+          subtotal: precoUnitario,
           pet_id: vendaAtual.pet?.id || null,
           tipo_produto: produto.tipo_produto,
           tipo_kit: produto.tipo_kit,
