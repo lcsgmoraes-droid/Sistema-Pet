@@ -10,6 +10,7 @@ Uso:
 
 from sqlalchemy.orm import Session
 from app.db import SessionLocal
+from app.financeiro_models import CategoriaFinanceira  # noqa: F401 - carrega FK no metadata
 from app.dre_plano_contas_models import (
     DRECategoria,
     DRESubcategoria,
