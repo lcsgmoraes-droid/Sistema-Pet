@@ -1,11 +1,17 @@
 """HTTP security headers for browser-facing routes."""
 from starlette.middleware.base import BaseHTTPMiddleware
+from starlette.responses import Response
 from fastapi import Request
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
-        response = await call_next(request)
+        try:
+            response = await call_next(request)
+        except RuntimeError as exc:
+            if str(exc) == "No response returned." and await request.is_disconnected():
+                return Response(status_code=204)
+            raise
 
         response.headers.setdefault("X-Content-Type-Options", "nosniff")
         response.headers.setdefault("X-Frame-Options", "DENY")
