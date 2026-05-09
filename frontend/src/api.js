@@ -9,6 +9,17 @@ const configuredApiUrl = import.meta.env.VITE_API_URL;
 // Em desenvolvimento, sempre usa proxy do Vite para manter auth/cookies consistentes.
 const API_URL = isDevelopment ? '/api' : (configuredApiUrl || '/api');
 const apiDebugEnabled = isDevelopment && import.meta.env.VITE_DEBUG_API === 'true';
+const PUBLIC_PATH_PREFIXES = [
+  '/login',
+  '/register',
+  '/recuperar-senha',
+  '/verificar-email',
+  '/termos',
+  '/privacidade',
+  '/landing',
+  '/app',
+  '/ecommerce',
+];
 
 const debugLog = (...args) => {
   if (apiDebugEnabled) {
@@ -20,6 +31,13 @@ const debugWarn = (...args) => {
   if (apiDebugEnabled) {
     console.warn(...args);
   }
+};
+
+const isPublicBrowserPath = () => {
+  const path = globalThis.location?.pathname || '/';
+  return PUBLIC_PATH_PREFIXES.some(
+    (prefix) => path === prefix || path.startsWith(`${prefix}/`)
+  );
 };
 
 if (isProduction && API_URL !== '/api') {
@@ -77,10 +95,14 @@ api.interceptors.response.use(
     });
 
     if (status === 401) {
+      const isPublicPath = isPublicBrowserPath();
       localStorage.removeItem('access_token');
       localStorage.removeItem('token');
       localStorage.removeItem('tenants');
-      globalThis.location.href = '/login';
+      localStorage.removeItem('selectedTenant');
+      if (!isPublicPath) {
+        globalThis.location.href = '/login';
+      }
     }
 
     if (status === 403) {

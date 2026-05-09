@@ -899,6 +899,13 @@ Na pratica:
 
 ## Proximo passo recomendado
 
+Ao retomar, antes de abrir nova frente grande, fazer uma rodada curta de go-live autenticado:
+
+1. Testar permissoes por perfil real (`admin`, `vendedor`, `financeiro`, `entregador`) nas telas criticas.
+2. Validar webhooks publicos/externos com segredo, assinatura ou token quando o provedor permitir.
+3. Confirmar onboarding de novo tenant: cadastro, confirmacao de e-mail, aceite LGPD/termos, primeiro login e selecao de tenant.
+4. Depois disso, voltar para a refatoracao visual/padronizacao da Onda 1.
+
 Continuar a **Onda 1** com uma destas frentes, conforme prioridade operacional:
 
 - **Financeiro/Vendas**: seguir a padronizacao de tabelas, filtros e status.

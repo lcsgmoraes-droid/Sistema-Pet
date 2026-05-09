@@ -25,9 +25,13 @@ export const AuthProvider = ({ children }) => {
         const savedUser = localStorage.getItem('user');
 
         if (token && savedUser) {
-          setUser(JSON.parse(savedUser));
           await fetchUser();
         } else {
+          if (!token) {
+            localStorage.removeItem('user');
+            localStorage.removeItem('tenants');
+            localStorage.removeItem('selectedTenant');
+          }
           setLoading(false);
         }
       } catch (error) {
@@ -46,15 +50,16 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('user', JSON.stringify(response.data));
       setLoading(false);
     } catch (error) {
-      console.error('Erro ao buscar usuario:', error);
-
       const status = error.response?.status;
       if (status === 401 || status === 403) {
+        console.warn('Sessao expirada ou tenant invalido. Limpando autenticacao local.');
         localStorage.removeItem('access_token');
         localStorage.removeItem('tenants');
         localStorage.removeItem('user');
+        localStorage.removeItem('selectedTenant');
         setUser(null);
       } else {
+        console.error('Erro ao buscar usuario:', error);
         const savedUser = localStorage.getItem('user');
         if (savedUser) {
           try {

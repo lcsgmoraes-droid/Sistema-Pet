@@ -144,6 +144,13 @@ export const ModulosProvider = ({ children }) => {
       setModulosAtivos(MODULOS_PREMIUM);
       return;
     }
+    const token = localStorage.getItem("access_token") || localStorage.getItem("token");
+    const selectedTenant = localStorage.getItem("selectedTenant");
+    if (!token || !selectedTenant) {
+      setModulosAtivos(MODULOS_PREMIUM);
+      return;
+    }
+
     try {
       const response = await api.get("/modulos/status");
       const modulosApi = response.data?.modulos_ativos;
