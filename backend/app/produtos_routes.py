@@ -64,7 +64,7 @@ def _produto_sku_value(produto: Produto) -> Optional[str]:
 
 
 def _normalizar_sku_produto(sku: Optional[str]) -> str:
-    sku_normalizado = str(sku or "").strip()
+    sku_normalizado = str(sku or "").strip().upper()
     if not sku_normalizado:
         raise HTTPException(status_code=400, detail="SKU do produto e obrigatorio")
     return sku_normalizado

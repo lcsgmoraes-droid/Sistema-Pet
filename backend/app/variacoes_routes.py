@@ -138,7 +138,7 @@ def validate_variation_uniqueness(
 
 
 def normalizar_sku(sku: str) -> str:
-    sku_normalizado = str(sku or "").strip()
+    sku_normalizado = str(sku or "").strip().upper()
     if not sku_normalizado:
         raise HTTPException(status_code=400, detail="SKU da variacao e obrigatorio")
     return sku_normalizado

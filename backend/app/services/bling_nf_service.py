@@ -3,7 +3,7 @@ import json
 import re
 from collections import Counter
 
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from sqlalchemy.orm import Session
 
 from app.estoque_reserva_service import EstoqueReservaService
@@ -33,12 +33,17 @@ def _text(value) -> str | None:
 def buscar_produto_do_item(db: Session, tenant_id, sku: str):
     if not sku:
         return None
+    sku_normalizado = str(sku or "").strip()
+    sku_lower = sku_normalizado.lower()
 
     return (
         db.query(Produto)
         .filter(
             Produto.tenant_id == tenant_id,
-            or_(Produto.codigo == sku, Produto.codigo_barras == sku),
+            or_(
+                func.lower(func.trim(Produto.codigo)) == sku_lower,
+                Produto.codigo_barras == sku_normalizado,
+            ),
         )
         .first()
     )
@@ -598,7 +603,7 @@ def _texto(valor, default: str = "") -> str:
 
 
 def _montar_produto_local_do_bling(item_bling: dict, tenant_id, user_id: int, sku_padrao: str) -> Produto:
-    codigo = _texto(item_bling.get("sku") or item_bling.get("codigo"), sku_padrao)[:50]
+    codigo = (_texto(item_bling.get("sku") or item_bling.get("codigo"), sku_padrao) or "").upper()[:50]
     nome = _texto(item_bling.get("nome") or item_bling.get("descricao"), f"Produto {codigo}")[:200]
     codigo_barras = _texto(item_bling.get("codigoBarras") or item_bling.get("gtin"))[:20] or None
     gtin = _texto(item_bling.get("gtin"))[:13] or None

@@ -4,6 +4,7 @@ Permite criar/atualizar produtos em lote
 """
 from fastapi import APIRouter, UploadFile, File, Depends, HTTPException
 from fastapi.responses import StreamingResponse
+from sqlalchemy import func
 from sqlalchemy.orm import Session as DBSession
 from io import BytesIO
 import openpyxl
@@ -16,6 +17,7 @@ from app.db import get_session
 from app.auth import get_current_user, get_current_user_and_tenant
 from app.models import User
 from app.produtos_models import Produto, Categoria, Marca
+from app.services.produto_service import normalizar_sku_produto
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -394,13 +396,16 @@ async def importar_produtos(
                     fornecedor_id = fornecedor.id
                 
                 # Verificar se produto já existe (por SKU ou código)
+                sku_normalizado = normalizar_sku_produto(sku)
+
                 produto = session.query(Produto).filter(
                     Produto.tenant_id == tenant_id,
-                    Produto.codigo == str(sku)
+                    func.lower(func.trim(Produto.codigo)) == sku_normalizado.lower()
                 ).first()
                 
                 if produto:
                     # ATUALIZAR produto existente
+                    produto.codigo = sku_normalizado
                     produto.nome = nome
                     produto.descricao_curta = descricao
                     produto.categoria_id = categoria_id
@@ -446,7 +451,7 @@ async def importar_produtos(
                     # CRIAR novo produto
                     produto = Produto(
                         tenant_id=tenant_id,
-                        codigo=str(sku),
+                        codigo=sku_normalizado,
                         nome=nome,
                         descricao_curta=descricao,
                         categoria_id=categoria_id,

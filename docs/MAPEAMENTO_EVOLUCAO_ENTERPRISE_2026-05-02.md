@@ -867,6 +867,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-08: exclusoes LGPD concluidas continuam auditaveis por filtro/pesquisa, mas a solicitacao deixa de guardar nome, e-mail, telefone e texto livre do solicitante apos a anonimizacao. Migration `oa20260508a6_scrub_completed_lgpd_deletion_requests.py` limpa tambem os historicos ja concluidos.
 - 2026-05-08: auditoria pre-go-live de autenticacao encontrou rotas antigas sem dependencia explicita. Foram protegidas por auth/tenant as rotas legadas de comissoes, taxas de forma de pagamento, sugestao fiscal, canais DRE e lista de tools WhatsApp; o scanner local voltou a `0` rotas suspeitas fora da allowlist publica.
 - 2026-05-09: promocao ERP de produto passou a usar componente com preco + inicio/fim em data e hora, e o PDV passou a consumir `preco_venda_pdv` com selo de promocao quando a janela estiver ativa. A antiga fusao de produtos encontrada em sugestoes de racoes e limitada; proxima entrega recomendada e uma fusao operacional segura por pares, com decisao campo a campo e transferencia auditada de historico.
+- 2026-05-09: SKU de produto passou a ser normalizado em maiusculas no backend e validado por `lower(trim(codigo))` em cadastro, edicao, variacoes, importacao por planilha, criacao via XML e autocadastro Bling/NF. Isso bloqueia novos duplicados por diferenca de caixa, como `pet5136` versus `PET5136`; duplicados historicos devem ser resolvidos pela fusao segura.
 
 ### Nao fazer nesta onda
 

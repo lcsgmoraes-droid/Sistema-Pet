@@ -33,6 +33,7 @@ from .produtos_models import (
 )
 from .financeiro_models import ContaPagar, TipoDespesa
 from .fiscal_patterns import aplicar_inteligencia_fiscal, identificar_padrao_fiscal
+from .services.produto_service import normalizar_sku_produto
 
 import logging
 logger = logging.getLogger(__name__)
@@ -1945,7 +1946,7 @@ def _buscar_produto_por_codigo_global(
         return None
 
     return db.query(Produto).filter(
-        Produto.codigo == codigo_limpo,
+        func.lower(func.trim(Produto.codigo)) == codigo_limpo.lower(),
     ).first()
 
 
@@ -3287,9 +3288,10 @@ def criar_produto_from_item(
         )
         if not sugestao_recomendada:
             raise HTTPException(status_code=409, detail="NÃ£o foi possÃ­vel gerar um SKU para o novo produto")
-        sku_final = sugestao_recomendada["sku"]
+        sku_final = normalizar_sku_produto(sugestao_recomendada["sku"])
         sku_ajustado_automaticamente = True
 
+    sku_final = normalizar_sku_produto(sku_final)
     produto_existente = _buscar_produto_por_codigo_global(db, sku_final)
     if produto_existente:
         sugestao = _montar_sugestao_sku_produto(
@@ -3306,7 +3308,7 @@ def criar_produto_from_item(
         )
         if not sugestao_recomendada:
             raise HTTPException(status_code=409, detail="O SKU informado jÃ¡ existe e nÃ£o foi possÃ­vel gerar alternativa")
-        sku_final = sugestao_recomendada["sku"]
+        sku_final = normalizar_sku_produto(sugestao_recomendada["sku"])
         sku_ajustado_automaticamente = True
         logger.info(
             f"ðŸ”„ SKU ajustado automaticamente para criar novo produto: "

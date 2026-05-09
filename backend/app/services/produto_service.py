@@ -2,6 +2,7 @@
 Serviço de Produto - Centraliza regras de negócio
 """
 from typing import Dict, Any, List
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 import logging
 
@@ -23,6 +24,32 @@ def _aplicar_regras_granel(dados: Dict[str, Any]) -> bool:
         dados["unidade"] = "KG"
         return True
     return False
+
+
+def normalizar_sku_produto(sku: str | None) -> str:
+    sku_normalizado = str(sku or "").strip().upper()
+    if not sku_normalizado:
+        raise ValueError("SKU do produto e obrigatorio")
+    return sku_normalizado
+
+
+def validar_sku_unico_produto(
+    db: Session,
+    *,
+    sku: str,
+    tenant_id,
+    produto_id: int | None = None,
+) -> None:
+    sku_normalizado = normalizar_sku_produto(sku)
+    query = db.query(Produto).filter(
+        Produto.tenant_id == tenant_id,
+        func.lower(func.trim(Produto.codigo)) == sku_normalizado.lower(),
+    )
+    if produto_id:
+        query = query.filter(Produto.id != produto_id)
+    existente = query.first()
+    if existente:
+        raise ValueError(f"SKU '{sku_normalizado}' ja esta em uso no produto #{existente.id}")
 
 
 class ProdutoService:
@@ -53,6 +80,9 @@ class ProdutoService:
             ValueError: Quando regras de negócio são violadas
         """
         
+        dados["codigo"] = normalizar_sku_produto(dados.get("codigo"))
+        validar_sku_unico_produto(db, sku=dados["codigo"], tenant_id=tenant_id)
+
         _aplicar_regras_granel(dados)
         tipo_produto = dados.get('tipo_produto', 'SIMPLES')
         
