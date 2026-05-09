@@ -3,6 +3,7 @@ import ModalImportacaoProdutos from "../ModalImportacaoProdutos";
 import ProdutosColunasModal from "./ProdutosColunasModal";
 import ProdutosConflitoExclusaoModal from "./ProdutosConflitoExclusaoModal";
 import ProdutosEdicaoLoteModal from "./ProdutosEdicaoLoteModal";
+import ProdutosFusaoModal from "./ProdutosFusaoModal";
 import ProdutosRelatorioModal from "./ProdutosRelatorioModal";
 
 export default function ProdutosModalsLayer({
@@ -21,15 +22,18 @@ export default function ProdutosModalsLayer({
   modalColunas,
   modalConflitoExclusao,
   modalEdicaoLote,
+  modalFusao,
   modalImportacao,
   modalRelatorioPersonalizado,
   onCancelarConflito,
+  onCloseModalFusao,
   onCloseImportacao,
   onCloseModalColunas,
   onCloseModalConflito,
   onCloseModalEdicaoLote,
   onCloseModalRelatorio,
   onGerarRelatorioPersonalizado,
+  onFusaoSucesso,
   onImportacaoSucesso,
   onRestaurarColunasPadrao,
   onSalvarColunas,
@@ -44,6 +48,7 @@ export default function ProdutosModalsLayer({
   pularConfirmacaoConflito,
   resolvendoConflitoExclusao,
   selecionadosCount,
+  produtosFusao,
   setDadosEdicaoLote,
   setOrdenacaoRelatorio,
   variacoesSelecionadasConflito,
@@ -87,6 +92,13 @@ export default function ProdutosModalsLayer({
         onRestaurarColunasPadrao={onRestaurarColunasPadrao}
         onSalvarColunas={onSalvarColunas}
         onToggleColuna={onToggleColuna}
+      />
+
+      <ProdutosFusaoModal
+        isOpen={modalFusao}
+        onClose={onCloseModalFusao}
+        onSuccess={onFusaoSucesso}
+        produtosSelecionados={produtosFusao}
       />
 
       <ProdutosRelatorioModal

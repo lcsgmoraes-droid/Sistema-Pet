@@ -35,6 +35,7 @@ export default function Produtos() {
   const navigate = useNavigate();
   const { iniciarTour } = useTour("produtos", tourProdutos);
   const [modalImportacao, setModalImportacao] = useState(false);
+  const [modalFusao, setModalFusao] = useState(false);
   const [paisExpandidos, setPaisExpandidos] = useState([]);
   const produtosColunas = useMemo(() => createProdutosColunas(), []);
   const {
@@ -107,6 +108,10 @@ export default function Produtos() {
     navigator.clipboard.writeText(texto);
     toast.success(`${tipo} copiado!`);
   };
+  const produtosFusao = useMemo(
+    () => produtosBrutos.filter((produto) => selecionados.includes(produto.id)).slice(0, 2),
+    [produtosBrutos, selecionados],
+  );
   const { categorias, departamentos, fornecedores, marcas } =
     useProdutosCatalogos();
   const {
@@ -209,6 +214,7 @@ export default function Produtos() {
       onGerarRelatorioFiltrado,
       onGerarRelatorioGeral,
       onOpenEdicaoLote: handleAbrirEdicaoLote,
+      onOpenFusao: () => setModalFusao(true),
       onOpenImportacao: () => setModalImportacao(true),
       onToggleMenuRelatorios,
       selecionadosCount: selecionados.length,
@@ -224,8 +230,16 @@ export default function Produtos() {
     modalsState: {
       dadosEdicaoLote,
       modalEdicaoLote,
+      modalFusao,
+      onCloseModalFusao: () => setModalFusao(false),
+      onFusaoSucesso: () => {
+        carregarDados();
+        setSelecionados([]);
+        setModalFusao(false);
+      },
       onCloseModalEdicaoLote: () => setModalEdicaoLote(false),
       onSalvarEdicaoLote: handleSalvarEdicaoLote,
+      produtosFusao,
       setDadosEdicaoLote,
     },
     reportState: {

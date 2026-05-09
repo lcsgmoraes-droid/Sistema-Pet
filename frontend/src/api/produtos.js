@@ -212,6 +212,14 @@ export const toggleProdutoAtivo = (id, ativo) => {
   return api.patch(`/produtos/${id}/ativo`, { ativo });
 };
 
+export const previewFusaoProdutos = (data) => {
+  return api.post('/produtos/fusao/preview', data);
+};
+
+export const executarFusaoProdutos = (data) => {
+  return api.post('/produtos/fusao/executar', data);
+};
+
 /**
  * Gerar SKU automático
  * @param {string} prefixo - Prefixo opcional para o SKU
@@ -504,6 +512,8 @@ export default {
   createProduto,
   updateProduto,
   deleteProduto,
+  previewFusaoProdutos,
+  executarFusaoProdutos,
   gerarSKU,
   // Código de Barras
   gerarCodigoBarras,

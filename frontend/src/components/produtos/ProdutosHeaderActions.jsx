@@ -1,4 +1,4 @@
-import { FileText, Package, Pencil, Plus, Settings, Trash2, UploadCloud } from "lucide-react";
+import { FileText, GitMerge, Package, Pencil, Plus, Settings, Trash2, UploadCloud } from "lucide-react";
 import ActionButton from "../ui/ActionButton";
 import PageHeader from "../ui/PageHeader";
 
@@ -11,6 +11,7 @@ export default function ProdutosHeaderActions({
   onExcluirSelecionados,
   onGerarRelatorioFiltrado,
   onGerarRelatorioGeral,
+  onOpenFusao,
   onOpenEdicaoLote,
   onOpenImportacao,
   onOpenModalRelatorio,
@@ -31,6 +32,18 @@ export default function ProdutosHeaderActions({
           >
             Editar em Lote ({selecionadosCount})
           </ActionButton>
+          {selecionadosCount === 2 && (
+            <ActionButton
+              onClick={onOpenFusao}
+              intent="warning"
+              tone="solid"
+              size="md"
+              icon={GitMerge}
+              className="shadow-sm hover:shadow-md"
+            >
+              Fundir Produtos
+            </ActionButton>
+          )}
           <ActionButton
             onClick={onExcluirSelecionados}
             intent="delete"

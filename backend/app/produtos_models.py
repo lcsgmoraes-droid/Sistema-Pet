@@ -347,7 +347,13 @@ class Produto(BaseTenantModel):
     
     # Índices adicionais
     __table_args__ = (
-        Index('ux_produtos_tenant_codigo_lower', 'tenant_id', func.lower(codigo), unique=True),
+        Index(
+            'ux_produtos_tenant_codigo_lower',
+            'tenant_id',
+            func.lower(func.trim(codigo)),
+            unique=True,
+            postgresql_where=(codigo.isnot(None) & (func.trim(codigo) != '')),
+        ),
         Index('idx_produtos_categoria', 'categoria_id'),
         Index('idx_produtos_marca', 'marca_id'),
         Index('idx_produtos_user', 'user_id'),        Index('idx_produtos_variation_signature', 'tenant_id', 'variation_signature'),  # Sprint 2: Varia��es        {'extend_existing': True}

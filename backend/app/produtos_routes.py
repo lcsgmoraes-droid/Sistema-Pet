@@ -49,6 +49,10 @@ from .services.validade_campanha_service import (
     obter_configs_campanha_validade,
     obter_mapas_exclusao_validade,
 )
+from .services.produto_merge_service import (
+    executar_fusao_produtos,
+    montar_preview_fusao_produtos,
+)
 from .promocoes_venda_utils import detectar_promocao_por_preco_vendido
 
 # Configurar logger
@@ -1018,6 +1022,16 @@ class ProdutoUpdate(BaseModel):
 
 class ProdutoAtivoUpdate(BaseModel):
     ativo: bool
+
+
+class ProdutoFusaoPreviewRequest(BaseModel):
+    produto_principal_id: int = Field(..., gt=0)
+    produto_duplicado_id: int = Field(..., gt=0)
+
+
+class ProdutoFusaoExecutarRequest(ProdutoFusaoPreviewRequest):
+    decisoes_campos: dict[str, str] = Field(default_factory=dict)
+    observacao: Optional[str] = None
 
 
 # ==========================================
@@ -2641,6 +2655,54 @@ def restaurar_variacao(
     logger.info(f"â™»ï¸ VariaÃ§Ã£o #{produto_id} restaurada com sucesso")
 
     return produto
+
+
+@router.post("/fusao/preview")
+@require_permission("produtos.editar")
+def preview_fusao_produtos(
+    payload: ProdutoFusaoPreviewRequest,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Mostra conflitos de cadastro e impacto antes de fundir dois produtos."""
+    _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    try:
+        return montar_preview_fusao_produtos(
+            db,
+            tenant_id=tenant_id,
+            principal_id=payload.produto_principal_id,
+            duplicado_id=payload.produto_duplicado_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+
+@router.post("/fusao/executar")
+@require_permission("produtos.editar")
+def executar_fusao_produtos_endpoint(
+    payload: ProdutoFusaoExecutarRequest,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Funde dois produtos transferindo historico e inativando o duplicado."""
+    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    try:
+        return executar_fusao_produtos(
+            db,
+            tenant_id=tenant_id,
+            principal_id=payload.produto_principal_id,
+            duplicado_id=payload.produto_duplicado_id,
+            decisoes_campos=payload.decisoes_campos,
+            user_id=current_user.id,
+            observacao=payload.observacao,
+        )
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        db.rollback()
+        logger.error("Erro ao fundir produtos: %s", exc, exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Erro ao fundir produtos: {exc}")
 
 
 @router.delete("/{produto_id}/permanente", status_code=status.HTTP_204_NO_CONTENT)

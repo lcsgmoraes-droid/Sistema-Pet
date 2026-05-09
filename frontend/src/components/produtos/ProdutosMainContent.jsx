@@ -38,6 +38,7 @@ export default function ProdutosMainContent({
   onExcluirSelecionados,
   onGerarRelatorioFiltrado,
   onGerarRelatorioGeral,
+  onOpenFusao,
   onIrParaPagina,
   onIrParaPrimeiraPagina,
   onIrParaUltimaPagina,
@@ -75,6 +76,7 @@ export default function ProdutosMainContent({
         onExcluirSelecionados={onExcluirSelecionados}
         onGerarRelatorioFiltrado={onGerarRelatorioFiltrado}
         onGerarRelatorioGeral={onGerarRelatorioGeral}
+        onOpenFusao={onOpenFusao}
         onOpenEdicaoLote={onOpenEdicaoLote}
         onOpenImportacao={onOpenImportacao}
         onOpenModalRelatorio={onOpenModalRelatorio}
