@@ -2079,6 +2079,10 @@ def excluir_venda(
                 }
             )
 
+    except HTTPException:
+        db.rollback()
+        raise
+
     except Exception as e:
         # ❌ Capturar QUALQUER outra exceção que possa estar causando rollback
         db.rollback()

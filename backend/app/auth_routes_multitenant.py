@@ -427,6 +427,18 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
     )
     
     # Vincular usuário ao tenant com role de admin
+    try:
+        from app.scripts.seed_dre_plano_contas_petshop import seed_tenant_dre_plano_contas
+
+        seed_tenant_dre_plano_contas(db, tenant_id)
+        db.flush()
+    except Exception:
+        logger.warning(
+            "Nao foi possivel criar o plano de contas DRE padrao para o tenant %s",
+            tenant_id,
+            exc_info=True,
+        )
+
     user_tenant = UserTenant(
         user_id=user.id,
         tenant_id=tenant_id,  # ✅ Definir tenant_id explicitamente

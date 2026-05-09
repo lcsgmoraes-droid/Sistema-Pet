@@ -269,6 +269,59 @@ PLANO_CONTAS = [
 ]
 
 
+def seed_tenant_dre_plano_contas(db: Session, tenant_id):
+    """Cria o plano de contas DRE padrao para um tenant especifico."""
+    logger.info(f"Populando plano de contas DRE para tenant {tenant_id}")
+
+    for bloco in PLANO_CONTAS:
+        categoria = (
+            db.query(DRECategoria)
+            .filter(
+                DRECategoria.tenant_id == tenant_id,
+                DRECategoria.nome == bloco["categoria"],
+            )
+            .first()
+        )
+
+        if not categoria:
+            categoria = DRECategoria(
+                tenant_id=tenant_id,
+                nome=bloco["categoria"],
+                natureza=bloco["natureza"],
+                ordem=bloco["ordem"],
+                ativo=True,
+            )
+            db.add(categoria)
+            db.flush()
+            logger.info(f"  Categoria criada: {bloco['categoria']}")
+
+        for nome, tipo_custo, base_rateio in bloco["subcategorias"]:
+            existe = (
+                db.query(DRESubcategoria)
+                .filter(
+                    DRESubcategoria.tenant_id == tenant_id,
+                    DRESubcategoria.nome == nome,
+                )
+                .first()
+            )
+
+            if existe:
+                logger.info(f"  Subcategoria ja existe: {nome}")
+                continue
+
+            sub = DRESubcategoria(
+                tenant_id=tenant_id,
+                categoria_id=categoria.id,
+                nome=nome,
+                tipo_custo=tipo_custo,
+                base_rateio=base_rateio,
+                escopo_rateio=EscopoRateio.AMBOS,
+                ativo=True,
+            )
+            db.add(sub)
+            logger.info(f"  Subcategoria criada: {nome}")
+
+
 def seed():
     """Popula plano de contas DRE padrão para todos os tenants"""
     db: Session = SessionLocal()
