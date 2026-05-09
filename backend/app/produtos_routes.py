@@ -63,6 +63,13 @@ def _produto_sku_value(produto: Produto) -> Optional[str]:
     return getattr(produto, "sku", None)
 
 
+def _normalizar_sku_produto(sku: Optional[str]) -> str:
+    sku_normalizado = str(sku or "").strip()
+    if not sku_normalizado:
+        raise HTTPException(status_code=400, detail="SKU do produto e obrigatorio")
+    return sku_normalizado
+
+
 def _mapa_reservas_ativas_multitenant(db: Session, tenant_ids: List[str]) -> dict[int, float]:
     """Consolida reservas ativas por produto para os tenants acessiveis."""
     try:
@@ -180,13 +187,12 @@ def _obter_marca_ou_404(db: Session, marca_id: int, tenant_id: int):
     return marca
 
 
-def _validar_sku_unico(db: Session, sku: str, tenant_id: int, produto_id: Optional[int] = None):
-    """Valida se SKU Ã© Ãºnico no tenant (exceto para o prÃ³prio produto em ediÃ§Ã£o)"""
-    if PRODUTO_SKU_COLUMN is None:
-        return
+def _validar_sku_unico(db: Session, sku: str, tenant_id: str, produto_id: Optional[int] = None):
+    """Valida se SKU e unico no tenant, ignorando diferenca de caixa."""
+    sku_normalizado = _normalizar_sku_produto(sku)
 
     query = db.query(Produto).filter(
-        PRODUTO_SKU_COLUMN == sku,
+        func.lower(func.trim(Produto.codigo)) == sku_normalizado.lower(),
         Produto.tenant_id == tenant_id
     )
 
@@ -1965,22 +1971,13 @@ def criar_produto(
     # LOG: Dados recebidos
     logger.info(f"ðŸ” Criando produto - User: {current_user.email}")
     logger.info(f"ðŸ“¦ Dados recebidos: {produto.model_dump()}")
+    produto.codigo = _normalizar_sku_produto(produto.codigo)
 
     # ========================================
     # VALIDAÃ‡Ã•ES DE INFRAESTRUTURA (mantidas na rota)
     # ========================================
 
-    # Verificar se SKU jÃ¡ existe
-    existe_sku = db.query(Produto).filter(
-        Produto.codigo == produto.codigo,
-        Produto.tenant_id == tenant_id
-    ).first()
-
-    if existe_sku:
-        raise HTTPException(
-            status_code=400,
-            detail=f"SKU '{produto.codigo}' jÃ¡ cadastrado"
-        )
+    _validar_sku_unico(db, produto.codigo, tenant_id)
 
     # Verificar se cÃ³digo de barras jÃ¡ existe
     if produto.codigo_barras:
@@ -2705,18 +2702,10 @@ def atualizar_produto(
         raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
 
     # Verificar se novo SKU jÃ¡ existe
-    if produto_update.codigo and produto_update.codigo != produto.codigo:
-        existe_sku = db.query(Produto).filter(
-            Produto.codigo == produto_update.codigo,
-            Produto.tenant_id == tenant_id,
-            Produto.id != produto_id
-        ).first()
-
-        if existe_sku:
-            raise HTTPException(
-                status_code=400,
-                detail=f"SKU '{produto_update.codigo}' jÃ¡ cadastrado"
-            )
+    if produto_update.codigo is not None:
+        produto_update.codigo = _normalizar_sku_produto(produto_update.codigo)
+        if produto_update.codigo.lower() != str(produto.codigo or "").strip().lower():
+            _validar_sku_unico(db, produto_update.codigo, tenant_id, produto_id=produto_id)
 
     # Verificar se novo cÃ³digo de barras jÃ¡ existe
     if produto_update.codigo_barras and produto_update.codigo_barras != produto.codigo_barras:
@@ -3450,12 +3439,13 @@ def gerar_sku(
     Formato: {PREFIXO}-{NÃšMERO_SEQUENCIAL}
     Exemplo: PROD-00001
     """
-    current_user, tenant_id = user_and_tenant
+    _, tenant_id = user_and_tenant
+    prefixo = _normalizar_sku_produto(prefixo).upper()
 
-    # Buscar maior número já usado com esse prefixo em TODA a tabela
-    # (a constraint de unicidade em 'codigo' é global, não por tenant)
+    # Buscar maior numero ja usado com esse prefixo dentro do tenant atual.
     ultimo_produto = db.query(Produto).filter(
-        Produto.codigo.like(f"{prefixo}-%")
+        Produto.tenant_id == tenant_id,
+        Produto.codigo.ilike(f"{prefixo}-%")
     ).order_by(Produto.id.desc()).first()
 
     if ultimo_produto:
@@ -3471,9 +3461,9 @@ def gerar_sku(
     # Gerar novo SKU
     novo_sku = f"{prefixo}-{proximo_numero:05d}"
 
-    # Verificar se já existe globalmente (evita race condition)
     existe = db.query(Produto).filter(
-        Produto.codigo == novo_sku
+        Produto.tenant_id == tenant_id,
+        func.lower(Produto.codigo) == novo_sku.lower()
     ).first()
 
     if existe:

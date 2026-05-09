@@ -4,7 +4,7 @@ Models para o módulo de Produtos
 Sistema completo com categorias, marcas, lotes e FIFO
 """
 
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Date, Text, ForeignKey, Index, JSON, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Date, Text, ForeignKey, Index, JSON, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -91,7 +91,7 @@ class Produto(BaseTenantModel):
     id = Column(Integer, primary_key=True)
     
     # Informações Básicas
-    codigo = Column(String(50), unique=True, nullable=False)  # SKU
+    codigo = Column(String(50), nullable=False)  # SKU
     nome = Column(String(200), nullable=False)
     tipo = Column(String(20), default='produto')  # produto, servico, produto_servico
     situacao = Column(Boolean, default=True)  # ativo/inativo
@@ -347,6 +347,7 @@ class Produto(BaseTenantModel):
     
     # Índices adicionais
     __table_args__ = (
+        Index('ux_produtos_tenant_codigo_lower', 'tenant_id', func.lower(codigo), unique=True),
         Index('idx_produtos_categoria', 'categoria_id'),
         Index('idx_produtos_marca', 'marca_id'),
         Index('idx_produtos_user', 'user_id'),        Index('idx_produtos_variation_signature', 'tenant_id', 'variation_signature'),  # Sprint 2: Varia��es        {'extend_existing': True}

@@ -3,7 +3,7 @@
 Models para o módulo de Vendas (PDV)
 """
 
-from sqlalchemy import Column, Integer, BigInteger, String, Float, Boolean, DateTime, Text, ForeignKey, DECIMAL, Identity, Enum, JSON
+from sqlalchemy import Column, Integer, BigInteger, String, Float, Boolean, DateTime, Text, ForeignKey, DECIMAL, Identity, Enum, JSON, Index
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from datetime import datetime
@@ -22,8 +22,11 @@ class Venda(BaseTenantModel):
     - created_at, updated_at: DateTime, gerenciados automaticamente
     """
     __tablename__ = 'vendas'
+    __table_args__ = (
+        Index("ux_vendas_tenant_numero_venda", "tenant_id", "numero_venda", unique=True),
+    )
     
-    numero_venda = Column(String(20), unique=True, nullable=False, index=True)  # VEN-YYYYMMDD-XXXX
+    numero_venda = Column(String(20), nullable=False)  # VEN-YYYYMMDD-XXXX
     
     # Cliente e Vendedor
     cliente_id = Column(Integer, ForeignKey('clientes.id'), nullable=True)

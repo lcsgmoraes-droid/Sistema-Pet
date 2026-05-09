@@ -206,7 +206,11 @@ class VendaService:
             # ETAPA 2: GERAR NÚMERO DA VENDA
             # ============================================================
             
-            numero_venda = VendaService._gerar_numero_venda(db, user_id)
+            numero_venda = VendaService._gerar_numero_venda(
+                db,
+                tenant_id=payload.get('tenant_id'),
+                user_id=user_id,
+            )
             logger.debug(f"✅ Número gerado: {numero_venda}")
             
             # ============================================================
@@ -1148,7 +1152,7 @@ class VendaService:
         }
     
     @staticmethod
-    def _gerar_numero_venda(db: Session, user_id: int) -> str:
+    def _gerar_numero_venda(db: Session, tenant_id: str, user_id: int | None = None) -> str:
         """
         Gera um número sequencial para a venda no formato YYYYMMDDNNNN.
         
@@ -1164,10 +1168,10 @@ class VendaService:
         hoje = now_brasilia()
         prefixo = hoje.strftime('%Y%m%d')
         
-        # Buscar última venda do dia
+        # A numeracao pode repetir entre tenants, mas nunca dentro do mesmo tenant.
         ultima_venda = db.query(Venda).filter(
             Venda.numero_venda.like(f'{prefixo}%'),
-            Venda.user_id == user_id
+            Venda.tenant_id == tenant_id
         ).order_by(desc(Venda.numero_venda)).first()
         
         if ultima_venda:

@@ -4,6 +4,7 @@ Gerenciamento completo de variações de produtos
 """
 
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
 from sqlalchemy.orm import Session
 from typing import List, Dict, Any, Optional
 from pydantic import BaseModel, Field
@@ -136,6 +137,25 @@ def validate_variation_uniqueness(
         )
 
 
+def normalizar_sku(sku: str) -> str:
+    sku_normalizado = str(sku or "").strip()
+    if not sku_normalizado:
+        raise HTTPException(status_code=400, detail="SKU da variacao e obrigatorio")
+    return sku_normalizado
+
+
+def validate_sku_uniqueness(sku: str, tenant_id: str, db: Session, exclude_id: Optional[int] = None):
+    sku_normalizado = normalizar_sku(sku)
+    query = db.query(Produto).filter(
+        Produto.tenant_id == tenant_id,
+        func.lower(func.trim(Produto.codigo)) == sku_normalizado.lower(),
+    )
+    if exclude_id:
+        query = query.filter(Produto.id != exclude_id)
+    if query.first():
+        raise HTTPException(status_code=400, detail=f"SKU '{sku_normalizado}' ja cadastrado")
+
+
 # ========== ENDPOINTS ==========
 
 @router.post("/{parent_id}/variacoes", response_model=VariationResponseSchema, status_code=201)
@@ -166,6 +186,8 @@ def criar_variacao(
     
     # Validar unicidade
     validate_variation_uniqueness(parent_id, tenant_id, signature, db)
+    codigo_variacao = normalizar_sku(dados.codigo)
+    validate_sku_uniqueness(codigo_variacao, tenant_id, db)
     
     # Montar nome completo
     nome_variacao = produto_pai.nome
@@ -175,7 +197,7 @@ def criar_variacao(
     # Criar variação
     variacao = Produto(
         tenant_id=tenant_id,
-        codigo=dados.codigo,
+        codigo=codigo_variacao,
         nome=nome_variacao,
         tipo_produto='VARIACAO',
         is_parent=False,
