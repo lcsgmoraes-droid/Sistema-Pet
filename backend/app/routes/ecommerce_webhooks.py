@@ -22,11 +22,35 @@ PAYMENT_METHODS_ONLINE_ACEITOS = {
     "debit_card": "cartao_debito",
 }
 
+TRUE_ENV_VALUES = {"1", "true", "yes", "on"}
+PAGARME_SIGNATURE_HEADERS = (
+    "X-Hub-Signature",
+    "X-PagarMe-Signature",
+    "X-Pagarme-Signature",
+    "X-PagarMe-Hmac-SHA256",
+    "X-Pagarme-Hmac-SHA256",
+    "X-Signature",
+)
+
+
+def _env_flag_enabled(name: str) -> bool:
+    return (os.getenv(name, "") or "").strip().lower() in TRUE_ENV_VALUES
+
+
+def _payment_gateway_requires_signature() -> bool:
+    if not _env_flag_enabled("ECOMMERCE_PAYMENT_GATEWAY_ENABLED"):
+        return False
+
+    provider = (os.getenv("ECOMMERCE_PAYMENT_PROVIDER", "") or "").strip().lower()
+    return not provider or "pagar" in provider
+
 
 def _get_signature_config() -> tuple[str, bool]:
     secret = (os.getenv("PAGARME_WEBHOOK_SECRET", "") or "").strip()
-    validate_raw = (os.getenv("PAGARME_WEBHOOK_VALIDATE_SIGNATURE", "false") or "").strip().lower()
-    validate = validate_raw in {"1", "true", "yes", "on"}
+    validate = (
+        _env_flag_enabled("PAGARME_WEBHOOK_VALIDATE_SIGNATURE")
+        or _payment_gateway_requires_signature()
+    )
     return secret, validate
 
 
@@ -78,13 +102,16 @@ def _validate_optional_signature(raw_body: bytes, request: Request) -> str:
         return "skipped_by_config"
 
     if not secret:
-        return "skipped_not_configured"
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Webhook Pagar.me sem segredo configurado",
+        )
 
-    signature_header = (
-        request.headers.get("X-Hub-Signature")
-        or request.headers.get("X-PagarMe-Signature")
-        or ""
-    ).strip()
+    signature_header = ""
+    for header_name in PAGARME_SIGNATURE_HEADERS:
+        signature_header = (request.headers.get(header_name) or "").strip()
+        if signature_header:
+            break
 
     if not signature_header:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Assinatura do webhook ausente")
