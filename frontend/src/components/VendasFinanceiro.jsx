@@ -1,7 +1,6 @@
 import {
   ArrowDown,
   ArrowUp,
-  Calendar,
 } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
@@ -24,6 +23,7 @@ import writeExcelFile from "write-excel-file/browser";
 import api from "../api";
 import { useAuth } from "../contexts/AuthContext";
 import HistoricoVendasClienteTab from "../pages/Financeiro/HistoricoVendasClienteTab";
+import DiasUteisResumoPanel from "./financeiro/DiasUteisResumoPanel";
 import FormasRecebimentoTable from "./financeiro/FormasRecebimentoTable";
 import ProdutosServicosDetalhadosTable from "./financeiro/ProdutosServicosDetalhadosTable";
 import TopProdutosLucroTable from "./financeiro/TopProdutosLucroTable";
@@ -34,9 +34,8 @@ import VendasFinanceiroListaTable from "./financeiro/VendasFinanceiroListaTable"
 import VendasPorDataTable from "./financeiro/VendasPorDataTable";
 import VendasPorFuncionarioTable from "./financeiro/VendasPorFuncionarioTable";
 import VendasPromocoesResumoPanel from "./financeiro/VendasPromocoesResumoPanel";
+import VendasRelatorioPersonalizadoModal from "./financeiro/VendasRelatorioPersonalizadoModal";
 import VendasResumoAgregadoTable from "./financeiro/VendasResumoAgregadoTable";
-import ActionButton from "./ui/ActionButton";
-import { actionButtonClasses } from "./ui/actionStyles";
 import MetricCard from "./ui/MetricCard";
 import MetricGrid from "./ui/MetricGrid";
 import MoneyCell, { formatMoneyCellValue, isZeroMoneyValue } from "./ui/MoneyCell";
@@ -1776,140 +1775,6 @@ export default function VendasFinanceiro() {
     aplicarFiltroRapido("este_mes");
   }, []); // Roda apenas uma vez ao montar o componente
 
-  const renderDiasUteisResumo = () => (
-    <div className="mb-6 rounded-lg border border-blue-100 bg-white p-4 shadow-sm">
-      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <h3 className="text-lg font-semibold text-gray-800">
-            Dias úteis e média operacional
-          </h3>
-          <p className="text-sm text-gray-500">
-            Configure se sábado entra na média. Feriado com faturamento vira dia útil automaticamente.
-          </p>
-        </div>
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <label className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-700">
-            <input
-              type="checkbox"
-              checked={configDiasUteis.considerarSabadoDiaUtil}
-              onChange={(event) =>
-                setConfigDiasUteis((prev) => ({
-                  ...prev,
-                  considerarSabadoDiaUtil: event.target.checked,
-                }))
-              }
-              className="h-4 w-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500"
-            />
-            Sábado conta como dia útil
-          </label>
-          <ActionButton
-            icon={Calendar}
-            intent="edit"
-            onClick={() => setMostrarConfigFeriados((prev) => !prev)}
-            size="sm"
-            tone="soft"
-          >
-            Configurar feriados
-          </ActionButton>
-        </div>
-      </div>
-
-      <div className="mt-4 grid gap-3 md:grid-cols-4">
-        <div className="rounded-xl bg-slate-50 p-3">
-          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Dias úteis
-          </div>
-          <div className="mt-1 text-2xl font-bold text-slate-900">
-            {resumoDiasPeriodo.diasUteis}
-          </div>
-          <div className="text-xs text-slate-500">
-            {resumoDiasPeriodo.totalDias} dia(s) no período
-          </div>
-        </div>
-        <div className="rounded-xl bg-emerald-50 p-3">
-          <div className="text-xs font-semibold uppercase tracking-wide text-emerald-600">
-            Dias trabalhados
-          </div>
-          <div className="mt-1 text-2xl font-bold text-emerald-700">
-            {resumoDiasPeriodo.diasTrabalhados}
-          </div>
-          <div className="text-xs text-emerald-600">
-            Dia útil com venda registrada
-          </div>
-        </div>
-        <div className="rounded-xl bg-amber-50 p-3">
-          <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">
-            Dias úteis sem venda
-          </div>
-          <div className="mt-1 text-2xl font-bold text-amber-700">
-            {resumoDiasPeriodo.diasUteisSemVenda}
-          </div>
-          <div className="text-xs text-amber-700">
-            Fora fins de semana/feriados
-          </div>
-        </div>
-        <div className="rounded-xl bg-blue-50 p-3">
-          <div className="text-xs font-semibold uppercase tracking-wide text-blue-700">
-            Média por dia útil
-          </div>
-          <div className="mt-1 text-2xl font-bold text-blue-700">
-            {formatarMoeda(resumoDiasPeriodo.mediaDiaUtil)}
-          </div>
-          <div className="text-xs text-blue-700">
-            {resumoDiasPeriodo.feriados} feriado(s), {resumoDiasPeriodo.finsDeSemana} fim(ns) de semana
-          </div>
-        </div>
-      </div>
-
-      {mostrarConfigFeriados && (
-        <div className="mt-4 rounded-xl border border-slate-200 bg-slate-50 p-4">
-          <div className="grid gap-3 md:grid-cols-[180px_1fr_auto]">
-            <input
-              type="date"
-              value={novoFeriadoData}
-              onChange={(event) => setNovoFeriadoData(event.target.value)}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-            />
-            <input
-              type="text"
-              value={novoFeriadoNome}
-              onChange={(event) => setNovoFeriadoNome(event.target.value)}
-              placeholder="Nome do feriado local, municipal ou data sem expediente"
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-            />
-            <button
-              type="button"
-              onClick={adicionarFeriadoCustomizado}
-              className={actionButtonClasses({ intent: "create", tone: "solid", size: "sm" })}
-            >
-              Salvar feriado
-            </button>
-          </div>
-
-          {feriadosCustomizados.length > 0 && (
-            <div className="mt-3 flex flex-wrap gap-2">
-              {feriadosCustomizados.map((feriado) => (
-                <span
-                  key={feriado.data}
-                  className="inline-flex items-center gap-2 rounded-full bg-white px-3 py-1 text-xs font-medium text-slate-700 shadow-sm"
-                >
-                  {formatarData(feriado.data)} - {feriado.nome}
-                  <button
-                    type="button"
-                    onClick={() => removerFeriadoCustomizado(feriado.data)}
-                    className="text-rose-600 hover:text-rose-700"
-                  >
-                    remover
-                  </button>
-                </span>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
-  );
-
   if (loading) {
     return (
       <div className="flex justify-center items-center h-64">
@@ -2069,7 +1934,22 @@ export default function VendasFinanceiro() {
             formatarMoeda={formatarMoeda}
           />
 
-          {renderDiasUteisResumo()}
+          <DiasUteisResumoPanel
+            adicionarFeriadoCustomizado={adicionarFeriadoCustomizado}
+            configDiasUteis={configDiasUteis}
+            feriadosCustomizados={feriadosCustomizados}
+            formatarData={formatarData}
+            formatarMoeda={formatarMoeda}
+            mostrarConfigFeriados={mostrarConfigFeriados}
+            novoFeriadoData={novoFeriadoData}
+            novoFeriadoNome={novoFeriadoNome}
+            removerFeriadoCustomizado={removerFeriadoCustomizado}
+            resumoDiasPeriodo={resumoDiasPeriodo}
+            setConfigDiasUteis={setConfigDiasUteis}
+            setMostrarConfigFeriados={setMostrarConfigFeriados}
+            setNovoFeriadoData={setNovoFeriadoData}
+            setNovoFeriadoNome={setNovoFeriadoNome}
+          />
 
           {/* Vendas por Data */}
           <div className="mb-6 rounded-lg bg-white shadow">
@@ -2133,85 +2013,16 @@ export default function VendasFinanceiro() {
         </div>
       )}
 
-      {modalRelatorioAberto && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4">
-            <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-              <h3 className="text-lg font-semibold text-gray-900">
-                Relatorio Personalizado - Lista de Vendas
-              </h3>
-              <button
-                onClick={() => setModalRelatorioAberto(false)}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-              >
-                <span className="text-2xl leading-none">×</span>
-              </button>
-            </div>
-
-            <div className="px-6 py-4 max-h-[60vh] overflow-y-auto space-y-4">
-              <div>
-                <label
-                  htmlFor="ordenacao-relatorio-vendas"
-                  className="block text-sm font-medium text-gray-700 mb-1"
-                >
-                  Ordem
-                </label>
-                <select
-                  id="ordenacao-relatorio-vendas"
-                  value={ordenacaoRelatorio}
-                  onChange={(e) => setOrdenacaoRelatorio(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                >
-                  <option value="data_desc">Data (mais recente primeiro)</option>
-                  <option value="data_asc">Data (mais antiga primeiro)</option>
-                  <option value="bruta_desc">Venda bruta (maior para menor)</option>
-                  <option value="bruta_asc">Venda bruta (menor para maior)</option>
-                  <option value="lucro_desc">Lucro (maior para menor)</option>
-                  <option value="lucro_asc">Lucro (menor para maior)</option>
-                </select>
-              </div>
-
-              <div>
-                <p className="text-sm font-medium text-gray-700 mb-2">Colunas</p>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                  {COLUNAS_RELATORIO_VENDAS.map((coluna) => (
-                    <label
-                      key={coluna.key}
-                      className="flex items-center gap-2 p-2 rounded hover:bg-gray-50"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={colunasRelatorio.includes(coluna.key)}
-                        onChange={() => toggleColunaRelatorio(coluna.key)}
-                        className="w-4 h-4 text-indigo-600 rounded"
-                      />
-                      <span className="text-sm text-gray-700">{coluna.label}</span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3">
-              <button
-                onClick={() => setModalRelatorioAberto(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={() => {
-                  exportarRelatorioListaVendas({ escopo: "filtrado" });
-                  setModalRelatorioAberto(false);
-                }}
-                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 rounded-lg hover:bg-indigo-700"
-              >
-                Gerar relatorio
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <VendasRelatorioPersonalizadoModal
+        aberto={modalRelatorioAberto}
+        colunasDisponiveis={COLUNAS_RELATORIO_VENDAS}
+        colunasRelatorio={colunasRelatorio}
+        exportarRelatorioListaVendas={exportarRelatorioListaVendas}
+        ordenacaoRelatorio={ordenacaoRelatorio}
+        setModalRelatorioAberto={setModalRelatorioAberto}
+        setOrdenacaoRelatorio={setOrdenacaoRelatorio}
+        toggleColunaRelatorio={toggleColunaRelatorio}
+      />
 
       {/* Aba Produtos Detalhados */}
       {abaAtiva === "produtos" && (
