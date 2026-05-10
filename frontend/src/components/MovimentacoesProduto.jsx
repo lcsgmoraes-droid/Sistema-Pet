@@ -7,6 +7,10 @@ import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api';
 import toast from 'react-hot-toast';
 import { formatBRL, formatMoneyBRL } from '../utils/formatters';
+import EstoqueLancamentoModal from './estoque/EstoqueLancamentoModal';
+import GranelLancamentoModal from './estoque/GranelLancamentoModal';
+import ReservasAtivasModal from './estoque/ReservasAtivasModal';
+import VendasPorCanalPanel from './estoque/VendasPorCanalPanel';
 
 const CANAIS_DESTAQUE = ['loja_fisica', 'mercado_livre', 'shopee', 'amazon'];
 
@@ -1031,45 +1035,13 @@ export default function MovimentacoesProduto() {
         </div>
       </div>
 
-      {/* Painel: Vendas por Canal */}
-      {vendasPorCanal.length > 0 && (
-        <div className="rounded-2xl border border-slate-200 bg-white shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 flex items-center gap-2">
-            <svg className="h-5 w-5 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-            </svg>
-            <h2 className="text-base font-bold text-slate-800">Vendas por Canal</h2>
-            <span className="ml-auto text-xs text-slate-400">Saídas vinculadas a vendas e NFs confirmadas</span>
-          </div>
-          <div className="p-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {vendasPorCanal.map(({ canal, qtd, valor, count, pct }) => {
-              const labelCanal = LABELS_CANAIS[canal] || canal;
-              const corCanal = ESTILOS_CANAIS[canal]?.card || 'bg-slate-50 border-slate-200 text-slate-700';
-              const barColor = ESTILOS_CANAIS[canal]?.bar || 'bg-slate-400';
-              return (
-                <div key={canal} className={`rounded-xl border p-4 ${corCanal}`}>
-                  <div className="text-xs font-bold uppercase tracking-wide opacity-70">{labelCanal}</div>
-                  <div className="mt-2 flex items-end justify-between gap-2">
-                    <div>
-                      <div className="text-2xl font-black">{formatBRL(qtd)} un</div>
-                      <div className="mt-0.5 text-xs font-semibold opacity-80">
-                        {valor > 0 ? formatMoneyBRL(valor) : 'Sem vendas no histórico'}
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-lg font-bold">{pct.toFixed(0)}%</div>
-                      <div className="text-[11px] opacity-60">{count} venda{count !== 1 ? 's' : ''}</div>
-                    </div>
-                  </div>
-                  <div className="mt-3 h-1.5 rounded-full bg-black/10">
-                    <div className={`h-1.5 rounded-full ${barColor}`} style={{ width: `${pct}%` }} />
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      )}
+      <VendasPorCanalPanel
+        estilosCanais={ESTILOS_CANAIS}
+        formatMoney={formatMoneyBRL}
+        formatQuantidade={formatBRL}
+        labelsCanais={LABELS_CANAIS}
+        vendasPorCanal={vendasPorCanal}
+      />
 
       {/* Tabela de movimentações */}
       <div className="bg-white rounded-lg shadow-sm overflow-hidden">
@@ -1315,673 +1287,76 @@ export default function MovimentacoesProduto() {
       </div>
 
       {showReservasModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[85vh] w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-              <div>
-                <h3 className="text-lg font-bold text-slate-900">Pedidos com reserva ativa</h3>
-                <p className="mt-1 text-sm text-slate-500">
-                  {reservasAtivas.length} pedido{reservasAtivas.length !== 1 ? 's' : ''} segurando este produto.
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowReservasModal(false)}
-                className="rounded-full p-2 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700"
-              >
-                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <div className="max-h-[70vh] overflow-y-auto px-6 py-4">
-              {reservasAtivas.length === 0 ? (
-                <div className="rounded-xl border border-slate-200 bg-slate-50 px-4 py-6 text-center text-sm text-slate-500">
-                  Nenhum pedido com reserva ativa foi encontrado para este produto.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {reservasAtivas.map((pedido) => (
-                    <div key={pedido.pedido_integrado_id} className="rounded-xl border border-slate-200 bg-white px-4 py-4 shadow-sm">
-                      <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <button
-                            type="button"
-                            onClick={() => abrirPedidoReservado(pedido)}
-                            className="text-left text-base font-bold text-blue-600 hover:underline"
-                          >
-                            #{pedido.pedido_bling_numero || pedido.pedido_bling_id || pedido.pedido_integrado_id}
-                          </button>
-                          <div className="mt-1 flex flex-wrap gap-2 text-xs">
-                            {pedido.canal_label && (
-                              <span className="rounded-full bg-sky-100 px-2 py-0.5 font-semibold text-sky-700">
-                                {pedido.canal_label}
-                              </span>
-                            )}
-                            {pedido.status && (
-                              <span className="rounded-full bg-slate-100 px-2 py-0.5 font-semibold text-slate-600">
-                                {pedido.status}
-                              </span>
-                            )}
-                            {pedido.nf_numero && (
-                              <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-semibold text-emerald-700">
-                                NF {pedido.nf_numero}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="text-right">
-                          <div className="text-[11px] uppercase tracking-wide text-slate-400">Reservado neste produto</div>
-                          <div className="mt-1 text-lg font-black text-amber-700">
-                            {formatarQuantidade(pedido.quantidade_reservada)}
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="mt-3 grid gap-2 text-sm text-slate-600 md:grid-cols-3">
-                        <div>
-                          <span className="font-medium text-slate-800">Pedido na loja:</span>{' '}
-                          {pedido.numero_pedido_loja || '-'}
-                        </div>
-                        <div>
-                          <span className="font-medium text-slate-800">Criado em:</span>{' '}
-                          {pedido.criado_em ? new Date(pedido.criado_em).toLocaleString('pt-BR') : '-'}
-                        </div>
-                        <div>
-                          <span className="font-medium text-slate-800">Expira em:</span>{' '}
-                          {pedido.expira_em ? new Date(pedido.expira_em).toLocaleString('pt-BR') : '-'}
-                        </div>
-                      </div>
-
-                      <div className="mt-3 space-y-2">
-                        {Array.isArray(pedido.itens) && pedido.itens.map((item) => (
-                          <div key={`${pedido.pedido_integrado_id}-${item.item_id}-${item.sku}`} className="rounded-lg bg-slate-50 px-3 py-2 text-sm text-slate-700">
-                            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
-                              <span className="font-mono text-xs text-slate-500">{item.sku || 'SEM-SKU'}</span>
-                              <span>{item.descricao || '-'}</span>
-                            </div>
-                            <div className="mt-1 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
-                              <span>Qtd pedido: {formatarQuantidade(item.quantidade_item)}</span>
-                              <span>Reserva neste produto: {formatarQuantidade(item.quantidade_reservada_produto)}</span>
-                              {item.origem_reserva === 'componente_kit_virtual' && (
-                                <span>
-                                  Origem: componente do kit {item.kit_origem_sku || item.kit_origem_nome || '-'}
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <ReservasAtivasModal
+          abrirPedidoReservado={abrirPedidoReservado}
+          formatarQuantidade={formatarQuantidade}
+          onClose={() => setShowReservasModal(false)}
+          reservasAtivas={reservasAtivas}
+        />
       )}
 
-      {/* Modal de Lançamento */}
+
       {showModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-              <h3 className="text-lg font-semibold text-gray-900">
-                {editingMovimentacao ? 'Editar Lançamento' : 'Novo Lançamento'}
-              </h3>
-              <button
-                onClick={() => setShowModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmit} className="p-6 space-y-4">
-              {/* Tipo de Lançamento (apenas para novo) */}
-              {!editingMovimentacao && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Tipo *
-                  </label>
-                  <div className="grid grid-cols-3 gap-2">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (!produtoEhGranel) {
-                          setTipoLancamento('entrada');
-                        }
-                      }}
-                      disabled={produtoEhGranel}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        produtoEhGranel
-                          ? 'cursor-not-allowed bg-gray-100 text-gray-400'
-                          : tipoLancamento === 'entrada'
-                          ? 'bg-green-600 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      Entrada
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTipoLancamento('saida')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        tipoLancamento === 'saida'
-                          ? 'bg-red-600 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      Saída
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTipoLancamento('balanco')}
-                      className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                        tipoLancamento === 'balanco'
-                          ? 'bg-blue-600 text-white'
-                          : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                      }`}
-                    >
-                      Balanço
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* Quantidade */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  {tipoLancamento === 'balanco'
-                    ? 'Saldo Total *'
-                    : 'Quantidade *'}
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={formData.quantidade}
-                  onChange={(e) => setFormData({ ...formData, quantidade: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  required
-                />
-                {tipoLancamento === 'balanco' && (
-                  <p className="mt-1 text-xs text-gray-500">
-                    Estoque atual: {estoqueAtual}. Digite o novo saldo total.
-                  </p>
-                )}
-                {produtoEhGranel && (
-                  <p className="mt-1 text-xs text-cyan-700">
-                    Para abastecer granel, abra o produto fechado e use Lancar granel.
-                  </p>
-                )}
-              </div>
-
-              {/* Preço de Compra (apenas para entrada) */}
-              {tipoLancamento === 'entrada' && !produtoEhGranel && (
-                <>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Preço de Compra
-                    </label>
-                    <input
-                      type="number"
-                      step="0.01"
-                      value={formData.custo_unitario}
-                      onChange={(e) => setFormData({ ...formData, custo_unitario: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="0.00"
-                    />
-                  </div>
-
-                  {/* Número do Lote (opcional) */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Número do Lote <span className="text-gray-400">(opcional)</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.lote}
-                      onChange={(e) => setFormData({ ...formData, lote: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Ex: LOTE-001"
-                    />
-                  </div>
-
-                  {/* Data de Validade (opcional) */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Data de Validade <span className="text-gray-400">(opcional)</span>
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.data_validade}
-                      onChange={(e) => setFormData({ ...formData, data_validade: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-
-                  {/* Data de Fabricação (opcional) */}
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Data de Fabricação <span className="text-gray-400">(opcional)</span>
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.data_fabricacao}
-                      onChange={(e) => setFormData({ ...formData, data_fabricacao: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                </>
-              )}
-
-              {/* Campos de lote para saída (opcional) */}
-              {tipoLancamento === 'saida' && (
-                <>
-                  {/* Checkbox para KIT FÍSICO: retornar componentes */}
-                  {produto?.tipo_produto === 'KIT' && produto?.tipo_kit === 'FISICO' && (
-                    <div className="p-4 bg-yellow-50 border-2 border-yellow-300 rounded-lg">
-                      <div className="flex items-start gap-3">
-                        <input
-                          type="checkbox"
-                          id="retornar_componentes"
-                          checked={formData.retornar_componentes === true}
-                          onChange={(e) => setFormData({ ...formData, retornar_componentes: e.target.checked })}
-                          className="mt-1 h-5 w-5 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-                        />
-                        <div className="flex-1">
-                          <label htmlFor="retornar_componentes" className="block text-sm font-semibold text-gray-900 cursor-pointer">
-                            🔄 Desmontar kit e retornar componentes ao estoque
-                          </label>
-                          <p className="text-xs text-gray-700 mt-1">
-                            <strong>Marque esta opção</strong> se você desmontou o kit e quer devolver os produtos unitários ao estoque.
-                          </p>
-                          <p className="text-xs text-gray-600 mt-1">
-                            <strong>Deixe desmarcado</strong> se houve perda, roubo ou venda do kit montado.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-                  
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Número do Lote <span className="text-gray-400">(opcional)</span>
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.lote}
-                      onChange={(e) => setFormData({ ...formData, lote: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                      placeholder="Ex: LOTE-001"
-                    />
-                    <p className="mt-1 text-xs text-gray-500">
-                      Deixe vazio para usar FIFO automático
-                    </p>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-1">
-                      Data de Validade <span className="text-gray-400">(opcional)</span>
-                    </label>
-                    <input
-                      type="date"
-                      value={formData.data_validade}
-                      onChange={(e) => setFormData({ ...formData, data_validade: e.target.value })}
-                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                  </div>
-                </>
-              )}
-
-              {/* Observação */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Observação
-                </label>
-                <textarea
-                  value={formData.observacao}
-                  onChange={(e) => setFormData({ ...formData, observacao: e.target.value })}
-                  rows={3}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Observações sobre este lançamento..."
-                />
-              </div>
-
-              {/* Botões */}
-              <div className="flex gap-3 pt-4">
-                <button
-                  type="button"
-                  onClick={() => setShowModal(false)}
-                  className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                >
-                  Incluir
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <EstoqueLancamentoModal
+          editingMovimentacao={editingMovimentacao}
+          estoqueAtual={estoqueAtual}
+          formData={formData}
+          onClose={() => setShowModal(false)}
+          onSubmit={handleSubmit}
+          produto={produto}
+          produtoEhGranel={produtoEhGranel}
+          setFormData={setFormData}
+          setTipoLancamento={setTipoLancamento}
+          tipoLancamento={tipoLancamento}
+        />
       )}
+
 
       {showGranelModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
-          <div className="w-full max-w-xl rounded-lg bg-white shadow-xl">
-            <div className="flex items-center justify-between border-b border-gray-200 px-6 py-4">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900">Lancar granel</h3>
-                <p className="mt-1 text-xs text-gray-500">
-                  {produto?.nome} | {formatarQuantidade(pesoPacoteOrigem)} kg por pacote
-                </p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowGranelModal(false)}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-
-            <form onSubmit={handleSubmitGranel} className="max-h-[82vh] space-y-4 overflow-y-auto p-6">
-              {granelVinculos.length > 0 && (
-                <div>
-                  <label className="mb-2 block text-sm font-medium text-gray-700">
-                    Granel vinculado
-                  </label>
-                  <div className="space-y-2">
-                    {granelVinculos.map((vinculo) => (
-                      <label
-                        key={vinculo.id}
-                        className={`flex cursor-pointer items-center justify-between gap-3 rounded-lg border p-3 text-sm ${
-                          String(granelSelecionadoId) === String(vinculo.produto_granel_id)
-                            ? 'border-orange-300 bg-orange-50'
-                            : 'border-gray-200 bg-white hover:bg-gray-50'
-                        }`}
-                      >
-                        <span className="flex min-w-0 items-center gap-2">
-                          <input
-                            type="radio"
-                            name="granel_vinculado"
-                            checked={String(granelSelecionadoId) === String(vinculo.produto_granel_id)}
-                            onChange={() => handleSelecionarGranel(
-                              vinculo.produto_granel_id,
-                              vinculo.produto_granel_preco_venda,
-                            )}
-                            className="text-orange-600 focus:ring-orange-500"
-                          />
-                          <span className="min-w-0">
-                            <span className="block truncate font-semibold text-gray-900">
-                              {vinculo.produto_granel_nome}
-                            </span>
-                            <span className="block text-xs text-gray-500">
-                              Estoque granel: {formatarQuantidade(vinculo.produto_granel_estoque)} kg
-                            </span>
-                          </span>
-                        </span>
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault();
-                            handleDesvincularGranel(vinculo.id);
-                          }}
-                          className="shrink-0 rounded border border-gray-200 px-2 py-1 text-xs text-gray-500 hover:border-red-200 hover:text-red-600"
-                        >
-                          Desvincular
-                        </button>
-                      </label>
-                    ))}
-                  </div>
-                </div>
-              )}
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Buscar outro produto granel
-                </label>
-                <input
-                  type="text"
-                  value={buscaGranel}
-                  onChange={(e) => setBuscaGranel(e.target.value)}
-                  placeholder="Ex: Special Dog Carne Granel"
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-orange-500"
-                />
-                <div className="mt-2 max-h-36 overflow-y-auto rounded-lg border border-gray-200">
-                  {granelProdutos.length === 0 ? (
-                    <div className="px-3 py-2 text-sm text-gray-500">
-                      {loadingGranel ? 'Buscando...' : 'Nenhum granel encontrado'}
-                    </div>
-                  ) : (
-                    granelProdutos.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => handleSelecionarGranel(item.id, item.preco_venda)}
-                        className={`flex w-full items-center justify-between px-3 py-2 text-left text-sm hover:bg-orange-50 ${
-                          String(granelSelecionadoId) === String(item.id) ? 'bg-orange-50 text-orange-800' : 'text-gray-700'
-                        }`}
-                      >
-                        <span className="min-w-0 truncate">
-                          <span className="font-semibold">{item.codigo}</span> - {item.nome}
-                        </span>
-                        <span className="ml-3 shrink-0 text-xs text-gray-500">
-                          {formatarQuantidade(item.estoque_atual)} kg
-                        </span>
-                      </button>
-                    ))
-                  )}
-                </div>
-                {nomeGranelSelecionado && (
-                  <p className="mt-1 text-xs text-orange-700">
-                    Selecionado: {nomeGranelSelecionado}
-                  </p>
-                )}
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Pacotes abertos *
-                </label>
-                <input
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  value={quantidadeGranel}
-                  onChange={(e) => setQuantidadeGranel(e.target.value)}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-orange-500"
-                  required
-                />
-                <p className="mt-1 text-xs text-gray-500">
-                  Estoque atual da origem: {formatarQuantidade(produto?.estoque_atual)} pacote(s)
-                </p>
-              </div>
-
-              <div className="rounded-lg border border-gray-200 bg-gray-50 p-3">
-                <div className="grid gap-2 sm:grid-cols-3">
-                  <div className="rounded-md bg-white p-2">
-                    <div className="text-[11px] font-medium uppercase text-gray-500">Custo/kg origem</div>
-                    <div className="mt-1 text-sm font-semibold text-gray-900">{formatMoneyBRL(custoKgGranel)}</div>
-                  </div>
-                  <div className="rounded-md bg-white p-2">
-                    <div className="text-[11px] font-medium uppercase text-gray-500">Venda/kg origem</div>
-                    <div className="mt-1 text-sm font-semibold text-gray-900">{formatMoneyBRL(precoVendaKgOrigem)}</div>
-                  </div>
-                  <div className="rounded-md bg-white p-2">
-                    <div className="text-[11px] font-medium uppercase text-gray-500">Preco atual granel</div>
-                    <div className="mt-1 text-sm font-semibold text-gray-900">{formatMoneyBRL(precoVendaAtualGranel)}</div>
-                  </div>
-                </div>
-
-                <div className="mt-3 rounded-lg border border-gray-200 bg-white p-3">
-                  <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                      <div className="text-sm font-semibold text-gray-900">Preco de venda do granel</div>
-                      <div className="text-xs text-gray-500">
-                        Base: {baseMargemTexto} ({formatMoneyBRL(baseMargemGranel)})
-                      </div>
-                    </div>
-                    <label className="flex items-center gap-2 text-xs text-gray-600">
-                      <input
-                        type="checkbox"
-                        checked={atualizarPrecoGranel}
-                        onChange={(e) => setAtualizarPrecoGranel(e.target.checked)}
-                        className="rounded border-gray-300 text-orange-600 focus:ring-orange-500"
-                      />
-                      Atualizar ao lancar
-                    </label>
-                  </div>
-
-                  <label className="mt-3 flex items-start gap-2 text-xs text-gray-600">
-                    <input
-                      type="checkbox"
-                      checked={margemBaseGranel === 'preco_venda_kg'}
-                      onChange={(e) => setMargemBaseGranel(e.target.checked ? 'preco_venda_kg' : 'custo_kg')}
-                      className="mt-0.5 rounded border-gray-300 text-orange-600 focus:ring-orange-500"
-                    />
-                    <span>
-                      Calcular margem sobre venda/kg do pacote pai. Desmarcado usa o custo/kg.
-                    </span>
-                  </label>
-
-                  <div className="mt-3 grid grid-cols-2 rounded-lg border border-gray-200 bg-gray-100 p-1 text-xs">
-                    <button
-                      type="button"
-                      onClick={() => handleAlterarModoPrecoGranel('margem')}
-                      className={`rounded-md px-2 py-1.5 font-medium transition-colors ${
-                        modoPrecoGranel === 'margem'
-                          ? 'bg-white text-orange-700 shadow-sm'
-                          : 'text-gray-500 hover:text-gray-800'
-                      }`}
-                    >
-                      Margem -&gt; preco
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => handleAlterarModoPrecoGranel('preco')}
-                      className={`rounded-md px-2 py-1.5 font-medium transition-colors ${
-                        modoPrecoGranel === 'preco'
-                          ? 'bg-white text-orange-700 shadow-sm'
-                          : 'text-gray-500 hover:text-gray-800'
-                      }`}
-                    >
-                      Preco -&gt; margem
-                    </button>
-                  </div>
-
-                  {modoPrecoGranel === 'margem' ? (
-                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-gray-600">
-                          Margem desejada (%)
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={margemGranel}
-                          onChange={(e) => setMargemGranel(e.target.value)}
-                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-orange-500"
-                        />
-                      </div>
-                      <div className="rounded-lg bg-orange-50 p-3">
-                        <div className="text-xs font-medium text-orange-700">Preco sugerido</div>
-                        <div className="mt-1 text-lg font-semibold text-orange-900">
-                          {formatMoneyBRL(precoVendaSugeridoGranel)}
-                        </div>
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-gray-600">
-                          Preco de venda por kg
-                        </label>
-                        <input
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={precoVendaGranel}
-                          onChange={(e) => setPrecoVendaGranel(e.target.value)}
-                          className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-transparent focus:ring-2 focus:ring-orange-500"
-                        />
-                      </div>
-                      <div className="rounded-lg bg-blue-50 p-3">
-                        <div className="text-xs font-medium text-blue-700">Margem calculada</div>
-                        <div className="mt-1 text-lg font-semibold text-blue-900">
-                          {formatBRL(margemCalculadaGranel)}%
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  <div className={`mt-3 rounded-md border px-3 py-2 text-xs ${
-                    granelDentroMargemEsperada
-                      ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                      : 'border-amber-200 bg-amber-50 text-amber-700'
-                  }`}>
-                    {granelDentroMargemEsperada ? 'Dentro da meta inicial' : 'Abaixo da meta inicial'}:
-                    {' '}minimo {formatMoneyBRL(precoMinimoEsperadoGranel)} por kg (20% acima da venda/kg do pai).
-                    {precoVendaAtualGranel > 0 && precoVendaSugeridoGranel > 0 && (
-                      <span className="ml-1 text-gray-600">
-                        Diferenca vs atual: {diferencaPrecoGranel >= 0 ? '+' : '-'}
-                        {formatMoneyBRL(Math.abs(diferencaPrecoGranel))}.
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              <div className="rounded-lg border border-orange-200 bg-orange-50 p-3 text-sm text-orange-900">
-                <div className="font-semibold">Previsao do lancamento</div>
-                <div className="mt-1 text-xs leading-5">
-                  Baixa {formatarQuantidade(quantidadeGranelNumero)} pacote(s) da origem e entra {formatarQuantidade(kgGranelPrevisto)} kg no granel.
-                  Custo estimado: {formatMoneyBRL(custoKgGranel)} por kg.
-                </div>
-              </div>
-
-              <div>
-                <label className="mb-1 block text-sm font-medium text-gray-700">
-                  Observacao
-                </label>
-                <textarea
-                  value={observacaoGranel}
-                  onChange={(e) => setObservacaoGranel(e.target.value)}
-                  rows={2}
-                  className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-orange-500"
-                  placeholder="Opcional"
-                />
-              </div>
-
-              <div className="flex gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowGranelModal(false)}
-                  className="flex-1 rounded-lg border border-gray-300 px-4 py-2 text-gray-700 transition-colors hover:bg-gray-50"
-                >
-                  Cancelar
-                </button>
-                <button
-                  type="submit"
-                  disabled={loadingGranel}
-                  className="flex-1 rounded-lg bg-orange-600 px-4 py-2 text-white transition-colors hover:bg-orange-700 disabled:cursor-not-allowed disabled:bg-orange-300"
-                >
-                  {loadingGranel ? 'Lancando...' : 'Lancar granel'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
+        <GranelLancamentoModal
+          atualizarPrecoGranel={atualizarPrecoGranel}
+          baseMargemGranel={baseMargemGranel}
+          baseMargemTexto={baseMargemTexto}
+          buscaGranel={buscaGranel}
+          custoKgGranel={custoKgGranel}
+          diferencaPrecoGranel={diferencaPrecoGranel}
+          formatMoney={formatMoneyBRL}
+          formatPercentual={formatBRL}
+          formatarQuantidade={formatarQuantidade}
+          granelDentroMargemEsperada={granelDentroMargemEsperada}
+          granelProdutos={granelProdutos}
+          granelSelecionadoId={granelSelecionadoId}
+          granelVinculos={granelVinculos}
+          handleAlterarModoPrecoGranel={handleAlterarModoPrecoGranel}
+          handleDesvincularGranel={handleDesvincularGranel}
+          handleSelecionarGranel={handleSelecionarGranel}
+          kgGranelPrevisto={kgGranelPrevisto}
+          loadingGranel={loadingGranel}
+          margemBaseGranel={margemBaseGranel}
+          margemCalculadaGranel={margemCalculadaGranel}
+          margemGranel={margemGranel}
+          modoPrecoGranel={modoPrecoGranel}
+          nomeGranelSelecionado={nomeGranelSelecionado}
+          observacaoGranel={observacaoGranel}
+          onClose={() => setShowGranelModal(false)}
+          onSubmit={handleSubmitGranel}
+          precoMinimoEsperadoGranel={precoMinimoEsperadoGranel}
+          precoVendaAtualGranel={precoVendaAtualGranel}
+          precoVendaGranel={precoVendaGranel}
+          precoVendaKgOrigem={precoVendaKgOrigem}
+          precoVendaSugeridoGranel={precoVendaSugeridoGranel}
+          produto={produto}
+          quantidadeGranel={quantidadeGranel}
+          quantidadeGranelNumero={quantidadeGranelNumero}
+          setAtualizarPrecoGranel={setAtualizarPrecoGranel}
+          setBuscaGranel={setBuscaGranel}
+          setMargemBaseGranel={setMargemBaseGranel}
+          setMargemGranel={setMargemGranel}
+          setObservacaoGranel={setObservacaoGranel}
+          setPrecoVendaGranel={setPrecoVendaGranel}
+          setQuantidadeGranel={setQuantidadeGranel}
+          pesoPacoteOrigem={pesoPacoteOrigem}
+        />
       )}
     </div>
   );

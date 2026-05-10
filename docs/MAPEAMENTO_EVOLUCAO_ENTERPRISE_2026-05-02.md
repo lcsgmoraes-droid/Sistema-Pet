@@ -177,7 +177,7 @@ Maiores arquivos mapeados em 2026-05-04:
 | 1452 | `frontend/src/components/EstoqueBling.jsx` | Prioridade |
 | 1424 | `frontend/src/pages/CalculadoraRacao.jsx` | Prioridade |
 | 1413 | `frontend/src/components/DashboardAnaliseRacoes.jsx` | Prioridade |
-| 1361 | `frontend/src/components/MovimentacoesProduto.jsx` | Prioridade |
+| 1269 | `frontend/src/components/MovimentacoesProduto.jsx` | Prioridade |
 | 1330 | `backend/app/financeiro_routes.py` | Prioridade |
 | 1329 | `frontend/src/pages/comissoes/ComissoesListagem.jsx` | Prioridade |
 | 1325 | `frontend/src/components/Layout.jsx` | Prioridade |
@@ -871,6 +871,8 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-09: iniciado fluxo operacional de fusao segura de produtos na listagem: selecionar exatamente 2 produtos, escolher o principal, revisar conflitos campo a campo, somar estoque e transferir referencias historicas antes de inativar o duplicado. O indice unico de SKU tambem passa a usar `tenant_id + lower(trim(codigo))` no banco para impedir reincidencia.
 - 2026-05-09: criado `scripts/smoke_golive.py` para rodada curta de go-live autenticado sem escrita de dados: health/frontend legal, login ERP, selecao de tenant, usuario atual, produtos, produtos vendaveis PDV, clientes, caixa aberto, LGPD status e catalogo publico e-commerce/app.
 - 2026-05-09: webhook Pagar.me endurecido para exigir assinatura HMAC quando a validacao estiver ligada ou quando o gateway Pagar.me estiver ativo; se faltar segredo em producao, o endpoint falha explicitamente em vez de aceitar payload sem validacao.
+- 2026-05-09: Relatorio de Movimentacoes teve os modais de reservas, lancamento manual e lancamento de granel extraidos para `components/estoque`, reaproveitando `ActionButton`, `ProductIdentity`, `StatusBadge` e `EmptyState` sem alterar a regra da pagina.
+- 2026-05-09: Relatorio de Movimentacoes tambem extraiu o painel `VendasPorCanalPanel`, deixando a pagina principal com calculo/orquestracao e a apresentacao do resumo por canal em componente dedicado.
 
 ### Nao fazer nesta onda
 
