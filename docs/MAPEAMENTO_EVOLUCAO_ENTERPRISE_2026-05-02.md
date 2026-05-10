@@ -154,7 +154,7 @@ Maiores arquivos mapeados em 2026-05-04:
 | 4844 | `backend/app/produtos_routes.py` | Critico |
 | 4640 | `frontend/src/components/EntradaXML.jsx` | Critico |
 | 4064 | `backend/app/estoque_routes.py` | Critico |
-| 3473 | `frontend/src/components/VendasFinanceiro.jsx` | Critico |
+| 3177 | `frontend/src/components/VendasFinanceiro.jsx` | Critico |
 | 3411 | `backend/app/notas_entrada_routes.py` | Critico |
 | 3295 | `backend/app/campaigns/routes.py` | Critico |
 | 3225 | `frontend/src/components/PedidosCompra.jsx` | Critico |
@@ -561,7 +561,7 @@ Para cada dominio sensivel:
 | Arquivo | Linhas aprox. | Risco |
 | --- | ---: | --- |
 | `frontend/src/components/EntradaXML.jsx` | 4640 | Muito alto |
-| `frontend/src/components/VendasFinanceiro.jsx` | 4594 | Muito alto |
+| `frontend/src/components/VendasFinanceiro.jsx` | 3177 | Muito alto |
 | `frontend/src/components/PedidosCompra.jsx` | 3225 | Alto |
 | `frontend/src/pages/ecommerce/EcommerceMVP.jsx` | 2533 | Alto |
 | `frontend/src/pages/EstoqueTransferenciaParceiro.jsx` | 2418 | Alto |
@@ -875,6 +875,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-09: Relatorio de Movimentacoes tambem extraiu o painel `VendasPorCanalPanel`, deixando a pagina principal com calculo/orquestracao e a apresentacao do resumo por canal em componente dedicado.
 - 2026-05-09: Relatorio de Movimentacoes extraiu a tabela de lancamentos para `MovimentacoesLancamentosTable`, padronizando a acao de exclusao com `ActionButton` e badges com `StatusBadge` enquanto preserva selecao, navegacao por origem e edicao por clique.
 - 2026-05-09: Relatorio de Movimentacoes extraiu o cabecalho/resumo do produto para `MovimentacoesProdutoHeader`, incluindo avisos de kit, acoes rapidas e cards de estoque; o arquivo principal saiu da zona acima de 1000 linhas.
+- 2026-05-09: `VendasFinanceiro` extraiu cabecalho/filtros/abas para `VendasFinanceiroHeader`, graficos do resumo para `VendasFinanceiroGraficosResumo` e painel de promocoes para `VendasPromocoesResumoPanel`, reduzindo o arquivo principal para 3177 linhas com build validado.
 
 ### Nao fazer nesta onda
 

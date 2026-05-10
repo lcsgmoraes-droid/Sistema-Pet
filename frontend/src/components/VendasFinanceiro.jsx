@@ -1,9 +1,7 @@
 import {
   ArrowDown,
   ArrowUp,
-  BarChart3,
   Calendar,
-  Filter,
 } from "lucide-react";
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
@@ -27,22 +25,21 @@ import api from "../api";
 import { useAuth } from "../contexts/AuthContext";
 import HistoricoVendasClienteTab from "../pages/Financeiro/HistoricoVendasClienteTab";
 import FormasRecebimentoTable from "./financeiro/FormasRecebimentoTable";
-import ProdutosPromocionaisTable from "./financeiro/ProdutosPromocionaisTable";
 import ProdutosServicosDetalhadosTable from "./financeiro/ProdutosServicosDetalhadosTable";
 import TopProdutosLucroTable from "./financeiro/TopProdutosLucroTable";
 import VendasComparativoPeriodoTable from "./financeiro/VendasComparativoPeriodoTable";
+import VendasFinanceiroGraficosResumo from "./financeiro/VendasFinanceiroGraficosResumo";
+import VendasFinanceiroHeader from "./financeiro/VendasFinanceiroHeader";
 import VendasFinanceiroListaTable from "./financeiro/VendasFinanceiroListaTable";
 import VendasPorDataTable from "./financeiro/VendasPorDataTable";
 import VendasPorFuncionarioTable from "./financeiro/VendasPorFuncionarioTable";
+import VendasPromocoesResumoPanel from "./financeiro/VendasPromocoesResumoPanel";
 import VendasResumoAgregadoTable from "./financeiro/VendasResumoAgregadoTable";
 import ActionButton from "./ui/ActionButton";
-import ExportActionButton from "./ui/ExportActionButton";
 import { actionButtonClasses } from "./ui/actionStyles";
-import FilterBar, { FilterRow } from "./ui/FilterBar";
 import MetricCard from "./ui/MetricCard";
 import MetricGrid from "./ui/MetricGrid";
 import MoneyCell, { formatMoneyCellValue, isZeroMoneyValue } from "./ui/MoneyCell";
-import ModuleTabs from "./ui/ModuleTabs";
 import NumberCell from "./ui/NumberCell";
 
 const COLUNAS_RELATORIO_VENDAS = [
@@ -1923,262 +1920,42 @@ export default function VendasFinanceiro() {
 
   return (
     <div className="p-6 bg-gray-50 min-h-screen">
-      {/* Cabeçalho com Filtros */}
-      <div className="mb-6 bg-white p-4 rounded-lg shadow">
-        <div className="mb-4 flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-          <h1 className="text-2xl font-bold text-gray-800">
-            Consulta de Vendas
-          </h1>
-
-          {podeVerFinanceiroCompleto ? (
-            <div className="flex flex-wrap items-center gap-3 xl:justify-end">
-              <div className="relative" ref={menuRelatoriosRef}>
-                <ExportActionButton
-                  type="report"
-                  onClick={() => setMenuRelatoriosAberto((prev) => !prev)}
-                  title="Abrir relatorios do periodo"
-                >
-                  Relatorios
-                </ExportActionButton>
-
-              {menuRelatoriosAberto && (
-                <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 z-40">
-                  <button
-                    onClick={() => {
-                      setMenuRelatoriosAberto(false);
-                      exportarRelatorioListaVendas({ escopo: "geral" });
-                    }}
-                    className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50"
-                  >
-                    Relatorio geral da lista de vendas
-                  </button>
-                  <button
-                    onClick={() => {
-                      setMenuRelatoriosAberto(false);
-                      exportarRelatorioListaVendas({ escopo: "filtrado" });
-                    }}
-                    className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 border-t border-gray-100"
-                  >
-                    Relatorio do que filtrei
-                  </button>
-                  <button
-                    onClick={() => {
-                      setMenuRelatoriosAberto(false);
-                      setModalRelatorioAberto(true);
-                    }}
-                    className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 border-t border-gray-100"
-                  >
-                    Relatorio personalizado
-                  </button>
-                </div>
-              )}
-            </div>
-            {/* Botão Exportar PDF */}
-            <ExportActionButton
-              type="pdf"
-              onClick={exportarParaPDF}
-              disabled={!dataInicio || !dataFim}
-              title={
-                dataInicio && dataFim
-                  ? `Exportar PDF de ${formatarData(dataInicio)} até ${formatarData(dataFim)}`
-                  : "Selecione um período"
-              }
-            >
-              PDF
-            </ExportActionButton>
-
-            {/* Botão Exportar Excel */}
-            <ExportActionButton
-              type="excel"
-              onClick={exportarParaExcel}
-              disabled={!dataInicio || !dataFim}
-              title={
-                dataInicio && dataFim
-                  ? `Exportar dados de ${formatarData(dataInicio)} até ${formatarData(dataFim)}`
-                  : "Selecione um período"
-              }
-            >
-              Excel
-            </ExportActionButton>
-
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={modoComparacao}
-                onChange={(e) => setModoComparacao(e.target.checked)}
-                className="w-4 h-4 text-blue-600 rounded"
-              />
-              <span className="text-sm font-medium text-gray-700">
-                Comparar com:
-              </span>
-            </label>
-
-            {modoComparacao && (
-              <select
-                value={periodoComparacao}
-                onChange={(e) => setPeriodoComparacao(e.target.value)}
-                className="border rounded px-3 py-2 text-sm bg-blue-50 font-medium"
-              >
-                <option value="periodo_anterior">
-                  Período imediatamente anterior (mesmo nº de dias)
-                </option>
-                <option value="mes_anterior">
-                  Mesmo período do mês passado
-                </option>
-                <option value="ano_anterior">
-                  Mesmo período do ano passado
-                </option>
-              </select>
-            )}
-            </div>
-          ) : null}
-        </div>
-
-        {!podeVerFinanceiroCompleto && (
-          <div className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 p-3 text-sm text-indigo-700">
-            Acesso limitado: você pode consultar apenas a aba Histórico por Cliente.
-          </div>
-        )}
-
-        {podeVerFinanceiroCompleto && (
-          <div className="flex flex-wrap gap-2 mb-4">
-          {[
-            { id: "hoje", label: "Hoje" },
-            { id: "ontem", label: "Ontem" },
-            { id: "esta_semana", label: "Esta semana" },
-            { id: "este_mes", label: "Este mês" },
-            { id: "mes_anterior", label: "Mês anterior" },
-            { id: "ultimos_7_dias", label: "Últimos 7 dias" },
-            { id: "ultimos_30_dias", label: "Últimos 30 dias" },
-            { id: "este_ano", label: "Este ano" },
-            { id: "personalizado", label: "Personalizado" },
-          ].map((filtro) => (
-            <button
-              key={filtro.id}
-              onClick={() => {
-                if (filtro.id === "personalizado") {
-                  setFiltroSelecionado("personalizado");
-                } else {
-                  aplicarFiltroRapido(filtro.id);
-                }
-              }}
-              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
-                filtroSelecionado === filtro.id
-                  ? "bg-blue-600 text-white"
-                  : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-              }`}
-            >
-              {filtro.label}
-            </button>
-          ))}
-          </div>
-        )}
-
-        {podeVerFinanceiroCompleto && filtroSelecionado === "personalizado" && (
-          <div className="flex gap-2 items-center mb-4 p-3 bg-gray-50 rounded">
-            <Calendar className="w-5 h-5 text-gray-500" />
-            <input
-              type="date"
-              value={dataInicio}
-              onChange={(e) => setDataInicio(e.target.value)}
-              className="border rounded px-3 py-2"
-            />
-            <span className="text-gray-600">até</span>
-            <input
-              type="date"
-              value={dataFim}
-              onChange={(e) => setDataFim(e.target.value)}
-              className="border rounded px-3 py-2"
-            />
-          </div>
-        )}
-
-        {/* Filtros Avançados */}
-        {podeVerFinanceiroCompleto && (
-          <FilterBar
-            className="mb-4 border-blue-200 bg-blue-50/70"
-            onSubmit={(event) => event.preventDefault()}
-            padding="sm"
-          >
-            <FilterRow className="items-center">
-              <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
-                <Filter className="h-5 w-5 text-blue-600" />
-                <span>Filtros Avançados:</span>
-              </div>
-
-              <select
-                value={filtroFuncionario}
-                onChange={(e) => setFiltroFuncionario(e.target.value)}
-                className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm"
-              >
-                <option value="">Todos os funcionários</option>
-                {vendasPorFuncionario.map((f) => (
-                  <option key={`func-${f.funcionario || "sem-nome"}`} value={f.funcionario}>
-                    {f.funcionario}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={filtroFormaPagamento}
-                onChange={(e) => setFiltroFormaPagamento(e.target.value)}
-                className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm"
-              >
-                <option value="">Todas as formas</option>
-                {formasRecebimentoConsolidadas.map((f) => (
-                  <option key={`forma-${f.forma_pagamento || "sem-forma"}`} value={f.forma_pagamento}>
-                    {f.forma_pagamento}
-                  </option>
-                ))}
-              </select>
-
-              <select
-                value={filtroCategoria}
-                onChange={(e) => setFiltroCategoria(e.target.value)}
-                className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm"
-              >
-                <option value="">Todas as categorias</option>
-                {produtosDetalhados.map((cat) => (
-                  <option key={`cat-${cat.categoria || "sem-categoria"}`} value={cat.categoria}>
-                    {cat.categoria}
-                  </option>
-                ))}
-              </select>
-
-              <ActionButton
-                intent="neutral"
-                tone="soft"
-                size="md"
-                onClick={() => {
-                  setFiltroFuncionario("");
-                  setFiltroFormaPagamento("");
-                  setFiltroCategoria("");
-                }}
-              >
-                Limpar Filtros
-              </ActionButton>
-
-              <ActionButton
-                onClick={() => setMostrarGraficos(!mostrarGraficos)}
-                intent="edit"
-                size="md"
-                icon={BarChart3}
-                className="ml-auto"
-              >
-                {mostrarGraficos ? "Ocultar" : "Mostrar"} Gráficos
-              </ActionButton>
-            </FilterRow>
-          </FilterBar>
-        )}
-
-        {/* Abas */}
-        <ModuleTabs
-          active={abaAtiva}
-          ariaLabel="Abas do financeiro de vendas"
-          onChange={setAbaAtiva}
-          tabs={abasVendasFinanceiro}
-        />
-      </div>
+      <VendasFinanceiroHeader
+        abaAtiva={abaAtiva}
+        abasVendasFinanceiro={abasVendasFinanceiro}
+        aplicarFiltroRapido={aplicarFiltroRapido}
+        dataFim={dataFim}
+        dataInicio={dataInicio}
+        exportarParaExcel={exportarParaExcel}
+        exportarParaPDF={exportarParaPDF}
+        exportarRelatorioListaVendas={exportarRelatorioListaVendas}
+        filtroCategoria={filtroCategoria}
+        filtroFormaPagamento={filtroFormaPagamento}
+        filtroFuncionario={filtroFuncionario}
+        filtroSelecionado={filtroSelecionado}
+        formasRecebimentoConsolidadas={formasRecebimentoConsolidadas}
+        formatarData={formatarData}
+        menuRelatoriosAberto={menuRelatoriosAberto}
+        menuRelatoriosRef={menuRelatoriosRef}
+        modoComparacao={modoComparacao}
+        mostrarGraficos={mostrarGraficos}
+        periodoComparacao={periodoComparacao}
+        podeVerFinanceiroCompleto={podeVerFinanceiroCompleto}
+        produtosDetalhados={produtosDetalhados}
+        setAbaAtiva={setAbaAtiva}
+        setDataFim={setDataFim}
+        setDataInicio={setDataInicio}
+        setFiltroCategoria={setFiltroCategoria}
+        setFiltroFormaPagamento={setFiltroFormaPagamento}
+        setFiltroFuncionario={setFiltroFuncionario}
+        setFiltroSelecionado={setFiltroSelecionado}
+        setMenuRelatoriosAberto={setMenuRelatoriosAberto}
+        setModalRelatorioAberto={setModalRelatorioAberto}
+        setModoComparacao={setModoComparacao}
+        setMostrarGraficos={setMostrarGraficos}
+        setPeriodoComparacao={setPeriodoComparacao}
+        vendasPorFuncionario={vendasPorFuncionario}
+      />
 
       {/* Conteúdo das Abas */}
       {abaAtiva === "resumo" && (
@@ -2272,313 +2049,25 @@ export default function VendasFinanceiro() {
             </div>
           </div>
 
-          {/* Gráficos */}
-          {mostrarGraficos && (
-            <div className="grid grid-cols-2 gap-6 mb-6">
-              {/* Gráfico de Vendas por Período */}
-              <div className="bg-white rounded-lg shadow p-4">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                  Vendas no Período
-                </h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <LineChart data={vendasPorDataCalendario}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis
-                      dataKey="data"
-                      tickFormatter={(value) =>
-                        formatarDataLocal(value, { day: "2-digit", month: "2-digit" })
-                      }
-                    />
-                    <YAxis
-                      tickFormatter={(value) =>
-                        `R$ ${(value / 1000).toFixed(0)}k`
-                      }
-                    />
-                    <Tooltip
-                      formatter={(value) => formatarMoeda(value)}
-                      labelFormatter={(label) => formatarData(label)}
-                    />
-                    <Legend />
-                    <Line
-                      type="monotone"
-                      dataKey="valor_bruto"
-                      stroke="#3B82F6"
-                      strokeWidth={2}
-                      name="Venda Bruta"
-                    />
-                    <Line
-                      type="monotone"
-                      dataKey="valor_liquido"
-                      stroke="#10B981"
-                      strokeWidth={2}
-                      name="Venda Líquida"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
+          <VendasFinanceiroGraficosResumo
+            coresGraficos={CORES_GRAFICOS}
+            formasRecebimentoFiltradas={formasRecebimentoFiltradas}
+            formatarData={formatarData}
+            formatarDataLocal={formatarDataLocal}
+            formatarMoeda={formatarMoeda}
+            melhorDiaSemana={melhorDiaSemana}
+            melhorHorario={melhorHorario}
+            mostrarGraficos={mostrarGraficos}
+            produtosDetalhadosFiltrados={produtosDetalhadosFiltrados}
+            vendasPorDataCalendario={vendasPorDataCalendario}
+            vendasPorDiaSemanaResumo={vendasPorDiaSemanaResumo}
+            vendasPorHorarioComMovimento={vendasPorHorarioComMovimento}
+          />
 
-              {/* Gráfico de Formas de Pagamento - Barras Horizontais */}
-              <div className="bg-white rounded-lg shadow p-4">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                  Formas de Pagamento
-                </h3>
-                <ResponsiveContainer width="100%" height={350}>
-                  <BarChart
-                    data={formasRecebimentoFiltradas}
-                    layout="vertical"
-                    margin={{ top: 5, right: 30, left: 120, bottom: 5 }}
-                  >
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis
-                      type="number"
-                      tickFormatter={(value) => formatarMoeda(value)}
-                    />
-                    <YAxis
-                      type="category"
-                      dataKey="forma_pagamento"
-                      width={110}
-                      style={{ fontSize: "12px" }}
-                    />
-                    <Tooltip
-                      formatter={(value, name, props) => {
-                        const total = formasRecebimentoFiltradas.reduce(
-                          (sum, item) => sum + item.valor_total,
-                          0,
-                        );
-                        const percent = ((value / total) * 100).toFixed(1);
-                        return [
-                          `${formatarMoeda(value)} (${percent}%)`,
-                          "Valor",
-                        ];
-                      }}
-                      contentStyle={{
-                        backgroundColor: "white",
-                        border: "1px solid #ccc",
-                        borderRadius: "4px",
-                        padding: "8px",
-                      }}
-                    />
-                    <Bar
-                      dataKey="valor_total"
-                      fill="#3B82F6"
-                      radius={[0, 8, 8, 0]}
-                      label={{
-                        position: "right",
-                        formatter: (value) => {
-                          const total = formasRecebimentoFiltradas.reduce(
-                            (sum, item) => sum + item.valor_total,
-                            0,
-                          );
-                          const percent = ((value / total) * 100).toFixed(1);
-                          return `${percent}%`;
-                        },
-                        style: { fontSize: "11px", fontWeight: "bold" },
-                      }}
-                    >
-                      {formasRecebimentoFiltradas.map((entry, index) => (
-                        <Cell
-                          key={`cell-forma-${entry.forma_pagamento || entry.name || index}`}
-                          fill={CORES_GRAFICOS[index % CORES_GRAFICOS.length]}
-                        />
-                      ))}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              {/* Gráfico de Barras - Top 10 Produtos */}
-              <div className="bg-white rounded-lg shadow p-4 col-span-2">
-                <h3 className="text-lg font-semibold text-gray-800 mb-4">
-                  Top 10 Categorias de Produtos
-                </h3>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={produtosDetalhadosFiltrados.slice(0, 10)}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="categoria" />
-                    <YAxis
-                      tickFormatter={(value) =>
-                        `R$ ${(value / 1000).toFixed(0)}k`
-                      }
-                    />
-                    <Tooltip formatter={(value) => formatarMoeda(value)} />
-                    <Legend />
-                    <Bar
-                      dataKey="total_liquido"
-                      fill="#3B82F6"
-                      name="Valor Líquido"
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="bg-white rounded-lg shadow p-4">
-                <div className="mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-800">
-                      Vendas por dia da semana
-                    </h3>
-                    <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
-                      <span>
-                        Melhor dia: {melhorDiaSemana?.nome || "-"} com {formatarMoeda(melhorDiaSemana?.valor_liquido || 0)}.
-                      </span>
-                      <span className="rounded-full bg-blue-50 px-2.5 py-0.5 text-xs font-semibold text-blue-700">
-                        {melhorDiaSemana?.quantidade || 0} venda(s)
-                      </span>
-                    </p>
-                  </div>
-                </div>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={vendasPorDiaSemanaResumo}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="curto" />
-                    <YAxis tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`} />
-                    <Tooltip
-                      formatter={(value, name, props) => {
-                        const isQuantidade = props?.dataKey === "quantidade" || name === "Vendas";
-                        return [
-                          isQuantidade ? value : formatarMoeda(value),
-                          isQuantidade ? "Vendas" : "Valor liquido",
-                        ];
-                      }}
-                      labelFormatter={(label) => {
-                        const dia = vendasPorDiaSemanaResumo.find((item) => item.curto === label);
-                        return dia?.nome || label;
-                      }}
-                    />
-                    <Legend />
-                    <Bar dataKey="valor_liquido" fill="#14B8A6" name="Valor liquido" radius={[6, 6, 0, 0]} />
-                    <Bar dataKey="quantidade" fill="#94A3B8" name="Vendas" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="bg-white rounded-lg shadow p-4">
-                <div className="mb-4">
-                  <div>
-                    <h3 className="text-lg font-semibold text-gray-800">
-                      Vendas por horario
-                    </h3>
-                    <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
-                      <span>
-                        Pico: {melhorHorario?.faixa || "-"} com {formatarMoeda(melhorHorario?.valor_liquido || 0)}.
-                      </span>
-                      <span className="rounded-full bg-emerald-50 px-2.5 py-0.5 text-xs font-semibold text-emerald-700">
-                        {melhorHorario?.quantidade || 0} venda(s)
-                      </span>
-                    </p>
-                  </div>
-                </div>
-                <ResponsiveContainer width="100%" height={300}>
-                  <BarChart data={vendasPorHorarioComMovimento}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="faixa" />
-                    <YAxis tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`} />
-                    <Tooltip
-                      formatter={(value, name, props) => {
-                        const isQuantidade = props?.dataKey === "quantidade" || name === "Vendas";
-                        return [
-                          isQuantidade ? value : formatarMoeda(value),
-                          isQuantidade ? "Vendas" : "Valor liquido",
-                        ];
-                      }}
-                    />
-                    <Legend />
-                    <Bar dataKey="valor_liquido" fill="#3B82F6" name="Valor liquido" radius={[6, 6, 0, 0]} />
-                    <Bar dataKey="quantidade" fill="#F59E0B" name="Vendas" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          )}
-
-          <div className="mb-6 rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-            <div className="mb-4 flex flex-col gap-2 lg:flex-row lg:items-end lg:justify-between">
-              <div>
-                <h3 className="text-lg font-semibold text-gray-800">
-                  Vendas normais x preco promocional
-                </h3>
-                <p className="text-sm text-gray-500">
-                  Itens vendidos pelo preco promocional ativo no ERP, ecommerce ou app.
-                </p>
-              </div>
-              <div className="rounded-full bg-cyan-50 px-3 py-1 text-xs font-semibold text-cyan-700">
-                {analisePromocoes.percentualPromocao}% das vendas com promocao
-              </div>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-4">
-              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
-                <p className="text-xs font-semibold uppercase text-slate-500">
-                  Vendas normais
-                </p>
-                <p className="mt-1 text-2xl font-bold text-slate-900">
-                  {analisePromocoes.vendasNormais}
-                </p>
-                <p className="text-xs text-slate-500">
-                  {formatarMoeda(analisePromocoes.valorVendasNormais)}
-                </p>
-              </div>
-              <div className="rounded-lg border border-cyan-200 bg-cyan-50 p-3">
-                <p className="text-xs font-semibold uppercase text-cyan-700">
-                  Com preco promocional
-                </p>
-                <p className="mt-1 text-2xl font-bold text-cyan-800">
-                  {analisePromocoes.vendasPromocao}
-                </p>
-                <p className="text-xs text-cyan-700">
-                  {formatarMoeda(analisePromocoes.valorVendasPromocao)}
-                </p>
-              </div>
-              <div className="rounded-lg border border-blue-200 bg-blue-50 p-3">
-                <p className="text-xs font-semibold uppercase text-blue-700">
-                  Itens promocionais
-                </p>
-                <p className="mt-1 text-2xl font-bold text-blue-800">
-                  {formatarMoeda(analisePromocoes.valorItensPromocionais)}
-                </p>
-                <p className="text-xs text-blue-700">
-                  Valor dos itens identificados
-                </p>
-              </div>
-              <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
-                <p className="text-xs font-semibold uppercase text-amber-700">
-                  Economia promocional
-                </p>
-                <p className="mt-1 text-2xl font-bold text-amber-800">
-                  {formatarMoeda(analisePromocoes.descontoPromocional)}
-                </p>
-                <p className="text-xs text-amber-700">
-                  Soma estimada nos itens marcados
-                </p>
-              </div>
-            </div>
-
-            <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-              <div className="h-[260px] rounded-lg border border-slate-100 p-3">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={analisePromocoes.comparativo}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="tipo" />
-                    <YAxis tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`} />
-                    <Tooltip formatter={(value, name, props) => {
-                      const isQuantidade = props?.dataKey === "quantidade" || name === "Vendas";
-                      return [
-                        isQuantidade ? value : formatarMoeda(value),
-                        isQuantidade ? "Vendas" : "Valor",
-                      ];
-                    }} />
-                    <Legend />
-                    <Bar dataKey="valor" name="Valor" fill="#06B6D4" radius={[6, 6, 0, 0]} />
-                    <Bar dataKey="quantidade" name="Vendas" fill="#64748B" radius={[6, 6, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="rounded-lg border border-slate-100">
-                <ProdutosPromocionaisTable produtos={analisePromocoes.topProdutos} />
-              </div>
-            </div>
-          </div>
+          <VendasPromocoesResumoPanel
+            analisePromocoes={analisePromocoes}
+            formatarMoeda={formatarMoeda}
+          />
 
           {renderDiasUteisResumo()}
 
