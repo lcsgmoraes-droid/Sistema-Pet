@@ -154,7 +154,7 @@ Maiores arquivos mapeados em 2026-05-04:
 | 4844 | `backend/app/produtos_routes.py` | Critico |
 | 4640 | `frontend/src/components/EntradaXML.jsx` | Critico |
 | 4064 | `backend/app/estoque_routes.py` | Critico |
-| 2988 | `frontend/src/components/VendasFinanceiro.jsx` | Critico |
+| 1980 | `frontend/src/components/VendasFinanceiro.jsx` | Critico |
 | 3411 | `backend/app/notas_entrada_routes.py` | Critico |
 | 3295 | `backend/app/campaigns/routes.py` | Critico |
 | 3225 | `frontend/src/components/PedidosCompra.jsx` | Critico |
@@ -561,7 +561,7 @@ Para cada dominio sensivel:
 | Arquivo | Linhas aprox. | Risco |
 | --- | ---: | --- |
 | `frontend/src/components/EntradaXML.jsx` | 4640 | Muito alto |
-| `frontend/src/components/VendasFinanceiro.jsx` | 2988 | Muito alto |
+| `frontend/src/components/VendasFinanceiro.jsx` | 1980 | Alto |
 | `frontend/src/components/PedidosCompra.jsx` | 3225 | Alto |
 | `frontend/src/pages/ecommerce/EcommerceMVP.jsx` | 2533 | Alto |
 | `frontend/src/pages/EstoqueTransferenciaParceiro.jsx` | 2418 | Alto |
@@ -877,6 +877,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-09: Relatorio de Movimentacoes extraiu o cabecalho/resumo do produto para `MovimentacoesProdutoHeader`, incluindo avisos de kit, acoes rapidas e cards de estoque; o arquivo principal saiu da zona acima de 1000 linhas.
 - 2026-05-09: `VendasFinanceiro` extraiu cabecalho/filtros/abas para `VendasFinanceiroHeader`, graficos do resumo para `VendasFinanceiroGraficosResumo` e painel de promocoes para `VendasPromocoesResumoPanel`, reduzindo o arquivo principal para 3177 linhas com build validado.
 - 2026-05-10: `VendasFinanceiro` extraiu o painel de dias uteis para `DiasUteisResumoPanel` e o modal de relatorio personalizado para `VendasRelatorioPersonalizadoModal`, reduzindo o arquivo principal para 2988 linhas com build validado.
+- 2026-05-10: `VendasFinanceiro` extraiu blocos visuais de composicao, resumo, lista, comparacao e analise inteligente para componentes dedicados, reduzindo o arquivo principal para 1980 linhas com build validado.
 
 ### Nao fazer nesta onda
 
