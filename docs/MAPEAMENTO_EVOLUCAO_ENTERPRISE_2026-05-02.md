@@ -177,7 +177,7 @@ Maiores arquivos mapeados em 2026-05-04:
 | 1452 | `frontend/src/components/EstoqueBling.jsx` | Prioridade |
 | 1424 | `frontend/src/pages/CalculadoraRacao.jsx` | Prioridade |
 | 1413 | `frontend/src/components/DashboardAnaliseRacoes.jsx` | Prioridade |
-| 1045 | `frontend/src/components/MovimentacoesProduto.jsx` | Prioridade |
+| 844 | `frontend/src/components/MovimentacoesProduto.jsx` | Atencao |
 | 1330 | `backend/app/financeiro_routes.py` | Prioridade |
 | 1329 | `frontend/src/pages/comissoes/ComissoesListagem.jsx` | Prioridade |
 | 1325 | `frontend/src/components/Layout.jsx` | Prioridade |
@@ -874,6 +874,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-09: Relatorio de Movimentacoes teve os modais de reservas, lancamento manual e lancamento de granel extraidos para `components/estoque`, reaproveitando `ActionButton`, `ProductIdentity`, `StatusBadge` e `EmptyState` sem alterar a regra da pagina.
 - 2026-05-09: Relatorio de Movimentacoes tambem extraiu o painel `VendasPorCanalPanel`, deixando a pagina principal com calculo/orquestracao e a apresentacao do resumo por canal em componente dedicado.
 - 2026-05-09: Relatorio de Movimentacoes extraiu a tabela de lancamentos para `MovimentacoesLancamentosTable`, padronizando a acao de exclusao com `ActionButton` e badges com `StatusBadge` enquanto preserva selecao, navegacao por origem e edicao por clique.
+- 2026-05-09: Relatorio de Movimentacoes extraiu o cabecalho/resumo do produto para `MovimentacoesProdutoHeader`, incluindo avisos de kit, acoes rapidas e cards de estoque; o arquivo principal saiu da zona acima de 1000 linhas.
 
 ### Nao fazer nesta onda
 

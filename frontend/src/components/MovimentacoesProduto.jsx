@@ -10,6 +10,7 @@ import { formatBRL, formatMoneyBRL } from '../utils/formatters';
 import EstoqueLancamentoModal from './estoque/EstoqueLancamentoModal';
 import GranelLancamentoModal from './estoque/GranelLancamentoModal';
 import MovimentacoesLancamentosTable from './estoque/MovimentacoesLancamentosTable';
+import MovimentacoesProdutoHeader from './estoque/MovimentacoesProdutoHeader';
 import ReservasAtivasModal from './estoque/ReservasAtivasModal';
 import VendasPorCanalPanel from './estoque/VendasPorCanalPanel';
 
@@ -772,12 +773,6 @@ export default function MovimentacoesProduto() {
   const estoqueReservado = produto.estoque_reservado || 0;
   const saldoAposReserva = estoqueAtual - estoqueReservado;
   const unidade = produto.unidade || 'UN';
-  let corEstoque = 'text-yellow-600';
-  if (estoqueAtual > estoqueMinimo) {
-    corEstoque = 'text-green-600';
-  } else if (estoqueAtual === 0) {
-    corEstoque = 'text-red-600';
-  }
 
   const syncDisponivel = Boolean(syncProduto?.bling_produto_id);
   let syncStatusLabel = 'Sem vínculo com Bling';
@@ -788,253 +783,45 @@ export default function MovimentacoesProduto() {
     }
   }
 
-  let heroIconBg = 'bg-amber-100';
-  if (estoqueAtual > estoqueMinimo) {
-    heroIconBg = 'bg-emerald-100';
-  } else if (estoqueAtual === 0) {
-    heroIconBg = 'bg-red-100';
-  }
+  const handleIncluirLancamento = () => {
+    if (produto?.tipo_produto === 'KIT' && produto?.tipo_kit === 'VIRTUAL') {
+      toast.error(
+        'KIT VIRTUAL nao permite movimentacao manual.\n\nMovimente os componentes individualmente.',
+        { duration: 4000 }
+      );
+      return;
+    }
 
-  let saldoAtualCardClass = 'border-amber-200 bg-gradient-to-br from-amber-50 to-white';
-  let saldoAtualLabelClass = 'text-amber-600';
-  let saldoAtualValueClass = 'text-amber-700';
-  if (estoqueAtual > estoqueMinimo) {
-    saldoAtualCardClass = 'border-sky-200 bg-gradient-to-br from-sky-50 to-white';
-    saldoAtualLabelClass = 'text-sky-600';
-    saldoAtualValueClass = 'text-sky-700';
-  } else if (estoqueAtual === 0) {
-    saldoAtualCardClass = 'border-red-200 bg-gradient-to-br from-red-50 to-white';
-    saldoAtualLabelClass = 'text-red-600';
-    saldoAtualValueClass = 'text-red-700';
-  }
-
-  let saldoDisponivelCardClass = 'border-orange-200 bg-gradient-to-r from-orange-50 to-white';
-  let saldoDisponivelLabelClass = 'text-orange-600';
-  let saldoDisponivelValueClass = 'text-orange-700';
-  if (saldoAposReserva > estoqueMinimo) {
-    saldoDisponivelCardClass = 'border-teal-200 bg-gradient-to-r from-teal-50 to-white';
-    saldoDisponivelLabelClass = 'text-teal-600';
-    saldoDisponivelValueClass = 'text-teal-700';
-  } else if (saldoAposReserva <= 0) {
-    saldoDisponivelCardClass = 'border-red-200 bg-gradient-to-r from-red-50 to-white';
-    saldoDisponivelLabelClass = 'text-red-600';
-    saldoDisponivelValueClass = 'text-red-700';
-  }
+    setTipoLancamento(produtoEhGranel ? 'saida' : 'entrada');
+    setShowModal(true);
+  };
 
   return (
     <div className="mx-auto max-w-7xl space-y-4 p-4">
-      {/* Aviso para KIT VIRTUAL */}
-      {produto?.tipo_produto === 'KIT' && produto?.tipo_kit === 'VIRTUAL' && (
-        <div className="mb-4 rounded-lg border border-indigo-200 bg-indigo-50 p-3">
-          <div className="flex items-start gap-2.5">
-            <svg className="mt-0.5 h-5 w-5 shrink-0 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div>
-              <h3 className="mb-1 text-sm font-semibold text-indigo-900">
-                🧩 KIT VIRTUAL - Estoque Calculado Automaticamente
-              </h3>
-              <p className="text-xs leading-5 text-indigo-800">
-                Este é um produto do tipo <strong>KIT VIRTUAL</strong>. O estoque é calculado automaticamente com base nos componentes que o compõem.
-                <br />
-                <strong>Não é possível movimentar o estoque do kit diretamente.</strong> Para alterar o estoque, movimente os produtos componentes individualmente.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Aviso para KIT FÍSICO */}
-      {produto?.tipo_produto === 'KIT' && produto?.tipo_kit === 'FISICO' && (
-        <div className="mb-4 rounded-lg border border-green-200 bg-green-50 p-3">
-          <div className="flex items-start gap-2.5">
-            <svg className="mt-0.5 h-5 w-5 shrink-0 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            <div>
-              <h3 className="mb-1 text-sm font-semibold text-green-900">
-                📦 KIT FÍSICO - Estoque Próprio com Sensibilização
-              </h3>
-              <p className="text-xs leading-5 text-green-800">
-                Este é um produto do tipo <strong>KIT FÍSICO</strong>. Possui estoque próprio e independente.
-                <br />
-                <strong>Importante:</strong> Ao movimentar o estoque do kit, os estoques dos componentes também serão automaticamente sensibilizados na mesma proporção.
-              </p>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      {/* Header com informações do produto */}
-      <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <div className="grid gap-4 p-4 xl:grid-cols-[minmax(0,1.15fr)_minmax(0,1fr)]">
-          <div className="space-y-4">
-            <div className="flex items-start gap-3">
-              <button
-                onClick={() => navigate('/produtos')}
-                className="mt-0.5 rounded-full border border-slate-200 p-1.5 text-slate-500 transition hover:border-slate-300 hover:text-slate-700"
-              >
-                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                </svg>
-              </button>
+      <MovimentacoesProdutoHeader
+        abrirModalReservas={abrirModalReservas}
+        estoqueAtual={estoqueAtual}
+        estoqueMinimo={estoqueMinimo}
+        estoqueReservado={estoqueReservado}
+        forcandoSync={forcandoSync}
+        formatarQuantidade={formatarQuantidade}
+        loadingReservas={loadingReservas}
+        onAbrirPainelBling={() => navigate('/produtos/sinc-bling')}
+        onForcarSyncProduto={handleForcarSyncProduto}
+        onIncluirLancamento={handleIncluirLancamento}
+        onLancarGranel={abrirModalGranel}
+        onVoltarProdutos={() => navigate('/produtos')}
+        podeLancarGranel={podeLancarGranel}
+        produto={produto}
+        saldoAposReserva={saldoAposReserva}
+        syncDisponivel={syncDisponivel}
+        syncProduto={syncProduto}
+        syncStatusLabel={syncStatusLabel}
+        totalEntradas={totalEntradas}
+        totalSaidas={totalSaidas}
+        unidade={unidade}
+      />
 
-              <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-xl ${heroIconBg}`}>
-                <svg className={`h-6 w-6 ${corEstoque}`} fill="currentColor" viewBox="0 0 20 20">
-                  <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                </svg>
-              </div>
-
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-2xl font-black tracking-tight text-slate-900">{produto.nome}</h1>
-                  <span className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-                    syncDisponivel ? 'bg-sky-100 text-sky-700' : 'bg-slate-100 text-slate-600'
-                  }`}>
-                    {syncStatusLabel}
-                  </span>
-                </div>
-
-                <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-slate-600">
-                  <div>Código: <span className="font-mono font-medium text-slate-900">{produto.codigo || produto.sku}</span></div>
-                  {produto.codigo_barras && (
-                    <div>EAN: <span className="font-mono font-medium text-slate-900">{produto.codigo_barras}</span></div>
-                  )}
-                  {syncDisponivel && (
-                    <div>Bling ID: <span className="font-mono font-medium text-slate-900">{syncProduto.bling_produto_id}</span></div>
-                  )}
-                </div>
-
-                <div className="mt-3 rounded-xl border border-slate-200 bg-slate-50/80 p-3 text-xs text-slate-600">
-                  <div className="font-semibold text-slate-900">Operações rápidas</div>
-                  <div className="mt-2.5 flex flex-wrap gap-2">
-                    <button
-                      onClick={() => {
-                        if (produto?.tipo_produto === 'KIT' && produto?.tipo_kit === 'VIRTUAL') {
-                          toast.error(
-                            'KIT VIRTUAL não permite movimentação manual.\n\nMovimente os componentes individualmente.',
-                            { duration: 4000 }
-                          );
-                        } else {
-                          setTipoLancamento(produtoEhGranel ? 'saida' : 'entrada');
-                          setShowModal(true);
-                        }
-                      }}
-                      disabled={produto?.tipo_produto === 'KIT' && produto?.tipo_kit === 'VIRTUAL'}
-                      className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 text-xs font-semibold shadow-sm transition ${
-                        produto?.tipo_produto === 'KIT' && produto?.tipo_kit === 'VIRTUAL'
-                          ? 'cursor-not-allowed bg-slate-200 text-slate-500'
-                          : 'bg-emerald-600 text-white hover:bg-emerald-700'
-                      }`}
-                    >
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                      </svg>
-                      Incluir lançamento
-                    </button>
-
-                    {podeLancarGranel && (
-                      <button
-                        type="button"
-                        onClick={abrirModalGranel}
-                        className="inline-flex items-center gap-2 rounded-xl border border-orange-200 bg-orange-50 px-4 py-2 text-xs font-semibold text-orange-700 shadow-sm transition hover:border-orange-300 hover:bg-orange-100"
-                      >
-                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h16M6 7l1 12h10l1-12M9 7V5a3 3 0 016 0v2" />
-                        </svg>
-                        Lancar granel
-                      </button>
-                    )}
-
-                    <button
-                      onClick={handleForcarSyncProduto}
-                      disabled={!syncDisponivel || forcandoSync}
-                      className="inline-flex items-center gap-2 rounded-xl border border-sky-200 bg-sky-50 px-4 py-2 text-xs font-semibold text-sky-700 transition hover:border-sky-300 hover:bg-sky-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-400"
-                    >
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m14.836 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
-                      {forcandoSync ? 'Enviando sync...' : 'Forçar sync no Bling'}
-                    </button>
-
-                    <button
-                      onClick={() => navigate('/produtos/sinc-bling')}
-                      className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-4 py-2 text-xs font-semibold text-slate-700 transition hover:border-slate-300 hover:bg-slate-50"
-                    >
-                      <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      Abrir painel Bling
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-2">
-            <div className="rounded-xl border border-emerald-200 bg-gradient-to-br from-emerald-50 to-white p-3 shadow-sm">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-emerald-600">Total Entradas</div>
-              <div className="mt-2 text-2xl font-black text-emerald-700">{formatarQuantidade(totalEntradas)}</div>
-              <div className="mt-1 text-[11px] text-emerald-700/70">Histórico acumulado</div>
-            </div>
-
-            <div className="rounded-xl border border-rose-200 bg-gradient-to-br from-rose-50 to-white p-3 shadow-sm">
-              <div className="text-[10px] font-semibold uppercase tracking-[0.18em] text-rose-600">Total Saídas</div>
-              <div className="mt-2 text-2xl font-black text-rose-700">{formatarQuantidade(totalSaidas)}</div>
-              <div className="mt-1 text-[11px] text-rose-700/70">Histórico acumulado</div>
-            </div>
-
-            <div className={`rounded-xl border p-3 shadow-sm ${saldoAtualCardClass}`}>
-              <div className={`text-[10px] font-semibold uppercase tracking-[0.18em] ${saldoAtualLabelClass}`}>Saldo Atual</div>
-              <div className={`mt-2 text-2xl font-black ${saldoAtualValueClass}`}>
-                {formatarQuantidade(estoqueAtual)}
-              </div>
-              <div className="mt-1 text-[11px] text-slate-500">{unidade}</div>
-            </div>
-
-            <button
-              type="button"
-              onClick={abrirModalReservas}
-              disabled={estoqueReservado <= 0 || loadingReservas}
-              className={`rounded-xl border p-3 shadow-sm text-left ${
-                estoqueReservado > 0
-                  ? 'border-amber-200 bg-gradient-to-br from-amber-50 to-white transition hover:border-amber-300 hover:shadow-md'
-                  : 'border-slate-200 bg-gradient-to-br from-slate-50 to-white cursor-default'
-              } ${estoqueReservado > 0 ? 'cursor-pointer' : ''}`}
-            >
-              <div className={`text-[10px] font-semibold uppercase tracking-[0.18em] ${
-                estoqueReservado > 0 ? 'text-amber-600' : 'text-slate-500'
-              }`}>Reservado</div>
-              <div className={`mt-2 text-2xl font-black ${
-                estoqueReservado > 0 ? 'text-amber-700' : 'text-slate-400'
-              }`}>
-                {formatarQuantidade(estoqueReservado)}
-              </div>
-              <div className="mt-1 text-[11px] text-slate-500">
-                {estoqueReservado > 0
-                  ? (loadingReservas ? 'Carregando pedidos...' : 'Pedidos em aberto')
-                  : unidade}
-              </div>
-            </button>
-
-            <div className={`rounded-xl border p-3 shadow-sm sm:col-span-2 ${saldoDisponivelCardClass}`}>
-              <div className="flex items-start justify-between gap-4">
-                <div>
-                  <div className={`text-[10px] font-semibold uppercase tracking-[0.18em] ${saldoDisponivelLabelClass}`}>Saldo Disponível</div>
-                  <div className={`mt-2 text-3xl font-black ${saldoDisponivelValueClass}`}>
-                    {formatarQuantidade(saldoAposReserva)} <span className="text-lg font-bold">{unidade}</span>
-                  </div>
-                </div>
-                <div className="rounded-xl bg-white/80 px-3 py-2 text-right shadow-sm ring-1 ring-slate-200/70">
-                  <div className="text-[11px] font-medium text-slate-500">Após reservas</div>
-                  <div className="mt-1 text-xs font-semibold text-slate-700">Mínimo: {formatarQuantidade(estoqueMinimo)}</div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
 
       <VendasPorCanalPanel
         estilosCanais={ESTILOS_CANAIS}
