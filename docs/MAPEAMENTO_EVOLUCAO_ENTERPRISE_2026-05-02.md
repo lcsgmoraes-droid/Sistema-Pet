@@ -152,7 +152,7 @@ Maiores arquivos mapeados em 2026-05-04:
 | Linhas | Arquivo | Prioridade |
 | --- | --- | --- |
 | 4844 | `backend/app/produtos_routes.py` | Critico |
-| 4420 | `frontend/src/components/EntradaXML.jsx` | Critico |
+| 4169 | `frontend/src/components/EntradaXML.jsx` | Critico |
 | 4064 | `backend/app/estoque_routes.py` | Critico |
 | 1980 | `frontend/src/components/VendasFinanceiro.jsx` | Critico |
 | 3411 | `backend/app/notas_entrada_routes.py` | Critico |
@@ -560,7 +560,7 @@ Para cada dominio sensivel:
 
 | Arquivo | Linhas aprox. | Risco |
 | --- | ---: | --- |
-| `frontend/src/components/EntradaXML.jsx` | 4420 | Muito alto |
+| `frontend/src/components/EntradaXML.jsx` | 4169 | Muito alto |
 | `frontend/src/components/VendasFinanceiro.jsx` | 1980 | Alto |
 | `frontend/src/components/PedidosCompra.jsx` | 3225 | Alto |
 | `frontend/src/pages/ecommerce/EcommerceMVP.jsx` | 2533 | Alto |
@@ -879,6 +879,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-10: `VendasFinanceiro` extraiu o painel de dias uteis para `DiasUteisResumoPanel` e o modal de relatorio personalizado para `VendasRelatorioPersonalizadoModal`, reduzindo o arquivo principal para 2988 linhas com build validado.
 - 2026-05-10: `VendasFinanceiro` extraiu blocos visuais de composicao, resumo, lista, comparacao e analise inteligente para componentes dedicados, reduzindo o arquivo principal para 1980 linhas com build validado.
 - 2026-05-10: `EntradaXML` iniciou a quebra segura dos modais operacionais, extraindo historico de precos, revisao de precos, resultado de lote e rascunho de devolucao para `components/entrada-xml`, reduzindo o arquivo principal para 4420 linhas com build validado.
+- 2026-05-10: `EntradaXML` extraiu o modal de visualizacao da NF para `EntradaXmlVisualizacaoNotaModal`, preservando os callbacks da pagina e reduzindo o arquivo principal para 4169 linhas com build validado.
 
 ### Nao fazer nesta onda
 
