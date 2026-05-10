@@ -9,6 +9,7 @@ import toast from 'react-hot-toast';
 import { formatBRL, formatMoneyBRL } from '../utils/formatters';
 import EstoqueLancamentoModal from './estoque/EstoqueLancamentoModal';
 import GranelLancamentoModal from './estoque/GranelLancamentoModal';
+import MovimentacoesLancamentosTable from './estoque/MovimentacoesLancamentosTable';
 import ReservasAtivasModal from './estoque/ReservasAtivasModal';
 import VendasPorCanalPanel from './estoque/VendasPorCanalPanel';
 
@@ -1043,248 +1044,23 @@ export default function MovimentacoesProduto() {
         vendasPorCanal={vendasPorCanal}
       />
 
-      {/* Tabela de movimentações */}
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-          <h2 className="text-lg font-semibold text-gray-900">Lançamentos</h2>
-          
-          {selectedIds.length > 0 && (
-            <button
-              onClick={handleDelete}
-              className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2"
-            >
-              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-              </svg>
-              Excluir ({selectedIds.length})
-            </button>
-          )}
-        </div>
+      <MovimentacoesLancamentosTable
+        abrirModal={abrirModal}
+        formatarData={formatarData}
+        formatarQuantidade={formatarQuantidade}
+        getMotivoLabel={getMotivoLabel}
+        getOrigem={getOrigem}
+        getSaldoAposLancamento={getSaldoAposLancamento}
+        handleDelete={handleDelete}
+        handleSelectAll={handleSelectAll}
+        handleSelectOne={handleSelectOne}
+        labelsCanais={LABELS_CANAIS}
+        movimentacoes={movimentacoes}
+        navigate={navigate}
+        produto={produto}
+        selectedIds={selectedIds}
+      />
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 w-12">
-                  <input
-                    type="checkbox"
-                    checked={selectedIds.length === movimentacoes.length && movimentacoes.length > 0}
-                    onChange={handleSelectAll}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Data e Hora
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Entrada
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Saída
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Saldo após
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Preço Venda
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Preço Compra
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Lote
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Origem
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Canal
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Observação
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {movimentacoes.length === 0 ? (
-                <tr>
-                  <td colSpan="11" className="px-6 py-8 text-center text-gray-500">
-                    Nenhuma movimentação registrada
-                  </td>
-                </tr>
-              ) : (
-                movimentacoes.map((mov, index) => {
-                  const origem = getOrigem(mov);
-                  const movCancelado = mov.status === 'cancelado';
-                  const saldoAposLancamento = getSaldoAposLancamento(mov);
-                  const unidadeProduto = produto?.unidade || produto?.unidade_medida || 'UN';
-                  
-                  // Verificar se é o mesmo pedido/venda que o anterior
-                  const movAnterior = index > 0 ? movimentacoes[index - 1] : null;
-                  const mesmaVenda = movAnterior && 
-                    mov.referencia_tipo === 'venda' && 
-                    movAnterior.referencia_tipo === 'venda' &&
-                    mov.referencia_id === movAnterior.referencia_id;
-                  
-                  return (
-                    <tr 
-                      key={mov.id} 
-                      className={`cursor-pointer ${
-                        movCancelado ? 'bg-slate-50/80 opacity-70 hover:bg-slate-100' : 'hover:bg-gray-50'
-                      } ${
-                        mesmaVenda ? 'border-l-4 border-l-blue-500 bg-blue-50' : ''
-                      }`}
-                      onClick={() => abrirModal(mov.tipo, mov)}
-                    >
-                      <td className="px-4 py-3 w-12" onClick={(e) => e.stopPropagation()}>
-                        <input
-                          type="checkbox"
-                          checked={selectedIds.includes(mov.id)}
-                          onChange={() => handleSelectOne(mov.id)}
-                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                        />
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900">
-                        {formatarData(mov.created_at)}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-center">
-                        {mov.tipo === 'entrada' ? (
-                          <span className="text-green-600 font-semibold">{parseFloat(mov.quantidade).toFixed(2)}</span>
-                        ) : '-'}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-center">
-                        {mov.tipo === 'saida' ? (
-                          <span className="text-red-600 font-semibold">{parseFloat(mov.quantidade).toFixed(2)}</span>
-                        ) : '-'}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-center">
-                        {saldoAposLancamento !== null ? (
-                          <span className="inline-flex items-center rounded-full bg-slate-100 px-2.5 py-1 text-xs font-bold text-slate-700">
-                            {formatarQuantidade(saldoAposLancamento)} {unidadeProduto}
-                          </span>
-                        ) : (
-                          <span className="text-slate-400">-</span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-right text-gray-900">
-                        {mov.preco_venda_unitario !== null && mov.preco_venda_unitario !== undefined
-                          ? `R$ ${Number(mov.preco_venda_unitario).toFixed(2)}`
-                          : '-'}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-right">
-                        {mov.custo_unitario ? (
-                          mov.variacao_custo ? (
-                            <div
-                              className="relative group inline-block"
-                              title={`Custo anterior: R$ ${mov.variacao_custo.custo_anterior.toFixed(2)}\nCusto atual: R$ ${mov.variacao_custo.custo_atual.toFixed(2)}\nDiferença: R$ ${mov.variacao_custo.diferenca_valor.toFixed(2)} (${mov.variacao_custo.diferenca_percentual > 0 ? '+' : ''}${mov.variacao_custo.diferenca_percentual.toFixed(1)}%)`}
-                            >
-                              <span className={`font-semibold ${
-                                mov.variacao_custo.tipo === 'aumento' ? 'text-red-600' :
-                                mov.variacao_custo.tipo === 'reducao' ? 'text-green-600' :
-                                'text-gray-900'
-                              }`}>
-                                R$ {mov.custo_unitario.toFixed(2)}
-                              </span>
-                              {/* Tooltip */}
-                              <div className="absolute bottom-full left-1/2 transform -translate-x-1/2 mb-2 hidden group-hover:block z-50">
-                                <div className="bg-gray-900 text-white text-xs rounded-lg py-2 px-3 whitespace-nowrap shadow-lg">
-                                  <div className="font-semibold mb-1">Variação de Custo</div>
-                                  <div className="space-y-1">
-                                    <div>Anterior: R$ {mov.variacao_custo.custo_anterior.toFixed(2)}</div>
-                                    <div>Atual: R$ {mov.variacao_custo.custo_atual.toFixed(2)}</div>
-                                    <div className={mov.variacao_custo.tipo === 'aumento' ? 'text-red-400' : 'text-green-400'}>
-                                      {mov.variacao_custo.tipo === 'aumento' ? '▲' : '▼'} R$ {Math.abs(mov.variacao_custo.diferenca_valor).toFixed(2)} ({mov.variacao_custo.diferenca_percentual > 0 ? '+' : ''}{mov.variacao_custo.diferenca_percentual.toFixed(1)}%)
-                                    </div>
-                                  </div>
-                                  {/* Seta do tooltip */}
-                                  <div className="absolute top-full left-1/2 transform -translate-x-1/2">
-                                    <div className="border-4 border-transparent border-t-gray-900"></div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          ) : (
-                            <span className="text-gray-900">R$ {mov.custo_unitario.toFixed(2)}</span>
-                          )
-                        ) : '-'}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-600">
-                        {mov.lote_info ? (
-                          <div className="flex flex-col">
-                            <span className="font-medium">{mov.lote_info.nome}</span>
-                            {mov.lote_info.consumido_acumulado !== undefined && (
-                              <span className="text-xs text-gray-500">
-                                ({mov.lote_info.consumido_acumulado.toFixed(0)}/{mov.lote_info.total_lote.toFixed(0)})
-                              </span>
-                            )}
-                          </div>
-                        ) : mov.lote_nome ? (
-                          mov.lote_nome
-                        ) : '-'}
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex items-center gap-2">
-                          {mesmaVenda && (
-                            <span className="text-blue-600" title="Mesmo pedido/venda">↪</span>
-                          )}
-                          {origem.link ? (
-                            <a
-                              href={origem.link}
-                              onClick={(e) => {
-                                e.preventDefault();
-                                e.stopPropagation();
-                                navigate(origem.link);
-                              }}
-                              className={`${origem.cor} font-medium hover:underline cursor-pointer`}
-                            >
-                              {origem.texto}
-                            </a>
-                          ) : (
-                            <span className={`${origem.cor} font-medium`}>
-                              {origem.texto}
-                            </span>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 whitespace-nowrap text-sm">
-                        {mov.canal ? (
-                          <span className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${
-                            mov.canal === 'loja_fisica' ? 'bg-emerald-100 text-emerald-700' :
-                            mov.canal === 'mercado_livre' ? 'bg-yellow-100 text-yellow-700' :
-                            mov.canal === 'shopee' ? 'bg-orange-100 text-orange-700' :
-                            mov.canal === 'amazon' ? 'bg-sky-100 text-sky-700' :
-                            mov.canal === 'site' ? 'bg-indigo-100 text-indigo-700' :
-                            mov.canal === 'instagram' ? 'bg-pink-100 text-pink-700' :
-                            mov.canal === 'whatsapp' ? 'bg-green-100 text-green-700' :
-                            'bg-slate-100 text-slate-600'
-                          }`}>
-                            {mov.canal_label || LABELS_CANAIS[mov.canal] || mov.canal}
-                          </span>
-                        ) : '-'}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
-                        <div className="flex items-center gap-2">
-                          {movCancelado && (
-                            <span className="px-2 py-1 bg-slate-200 text-slate-700 rounded text-xs font-medium">
-                              Cancelado
-                            </span>
-                          )}
-                          {mov.motivo && mov.motivo !== 'compra' && !String(mov.motivo).startsWith('venda') && (
-                            <span className="px-2 py-1 bg-blue-100 text-blue-800 rounded text-xs">
-                              {getMotivoLabel(mov.motivo)}
-                            </span>
-                          )}
-                          {mov.observacao_exibicao || mov.observacao}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
-      </div>
 
       {showReservasModal && (
         <ReservasAtivasModal
