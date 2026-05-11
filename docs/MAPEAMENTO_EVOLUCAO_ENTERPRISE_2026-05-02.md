@@ -74,6 +74,10 @@ Tela piloto:
 - PDV/Caixa: devolucao aberta a partir de uma venda carregada passa a iniciar diretamente naquela venda, mantendo a busca manual como caminho alternativo.
 - PDV/Produtos: numero de venda, nomes de produtos e SKUs avancaram para o padrao copiavel reutilizavel.
 - Fornecedores: cadastro de fornecedor no produto, edicao em lote de fornecedores e despesa do caixa passaram a usar autocomplete/cadastro rapido via `FornecedorSelector`.
+- Produtos: filtros de categoria e marca migraram para `AutocompleteSelect`, mantendo seta de abertura e busca digitavel; o filtro de fornecedor segue com `FornecedorSelector`.
+- Produtos: opcao "Persistir filtros" agora salva busca, categoria, marca, fornecedor, status, estoque baixo, promocao, pais/variacoes, pagina e itens por pagina.
+- Produtos/Estoque: tela de movimentacoes voltou a exibir "Lancar granel" para produtos elegiveis e manteve balanco manual permitido em produto granel para ajuste de inventario.
+- Pessoas: listagem ganhou selecao em massa e fluxo de fusao de 2 cadastros, transferindo vinculos/historico para o principal e inativando o duplicado.
 - Financeiro/Vendas: a tabela principal da lista de vendas foi extraida para `VendasFinanceiroListaTable` e passou a consumir `DataTable`, `MoneyCell`, `NumberCell` e `StatusBadge`.
 - Financeiro/Vendas: a tabela "Vendas por data" do resumo foi extraida para `VendasPorDataTable`, mantendo badges de dia, valores zerados como traco e totalizacao no componente.
 - Financeiro/Vendas: as tabelas "Formas de recebimento" e "Funcionario" foram extraidas para componentes dedicados com `DataTable`, mantendo totalizacao local e celulas monetarias padronizadas.

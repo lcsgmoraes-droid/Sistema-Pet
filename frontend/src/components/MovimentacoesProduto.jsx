@@ -126,7 +126,7 @@ export default function MovimentacoesProduto() {
   const produtoBloqueiaGranel =
     produto?.tipo_produto === 'PAI' ||
     (produto?.tipo_produto === 'KIT' && produto?.tipo_kit === 'VIRTUAL');
-  const podeLancarGranel = Boolean(produto) && !produtoEhGranel && !produtoBloqueiaGranel && pesoPacoteOrigem > 0;
+  const podeLancarGranel = Boolean(produto) && !produtoEhGranel && !produtoBloqueiaGranel;
   const quantidadeGranelNumero = Number(quantidadeGranel || 0);
   const kgGranelPrevisto = quantidadeGranelNumero > 0 ? quantidadeGranelNumero * pesoPacoteOrigem : 0;
   const custoKgGranel = pesoPacoteOrigem > 0 ? Number(produto?.preco_custo || 0) / pesoPacoteOrigem : 0;
@@ -236,6 +236,11 @@ export default function MovimentacoesProduto() {
 
   const abrirModalGranel = async () => {
     if (!podeLancarGranel) {
+      toast.error('Este produto nao permite lancamento de granel.');
+      return;
+    }
+
+    if (pesoPacoteOrigem <= 0) {
       toast.error('Preencha o peso da embalagem na aba Racao antes de lancar granel.');
       return;
     }

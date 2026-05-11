@@ -1,5 +1,6 @@
 import FornecedorSelector from '../fornecedores/FornecedorSelector';
 import ProductIdentity from '../ui/ProductIdentity';
+import { normalizarTextoBusca } from './pedidoCompraUtils';
 
 export default function PedidoCompraFormulario({
   mostrarForm,
@@ -157,7 +158,7 @@ export default function PedidoCompraFormulario({
         </div>
 
         <div className="border-t pt-4">
-          <h3 className="font-semibold mb-4">Itens do Pedido</h3>
+          <h3 className="font-semibold mb-4">Itens do Pedido ({formData.itens.length})</h3>
           <div className="grid grid-cols-4 gap-4 mb-4">
             <div className="col-span-2 relative">
               <input
@@ -167,9 +168,13 @@ export default function PedidoCompraFormulario({
                   setProdutoTexto(valor);
                   setMostrarSugestoesProduto(true);
 
-                  const produtoExato = produtos.find(
-                    (p) => (p.nome || '').toLowerCase() === valor.toLowerCase(),
-                  );
+                  const valorNormalizado = normalizarTextoBusca(valor);
+                  const produtoExato = produtos.find((p) => [
+                    p.nome,
+                    p.codigo,
+                    p.sku,
+                    p.codigo_barras,
+                  ].some((campo) => normalizarTextoBusca(campo) === valorNormalizado));
 
                   if (produtoExato) {
                     selecionarProduto(produtoExato);
@@ -240,6 +245,7 @@ export default function PedidoCompraFormulario({
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
+                    <th className="w-12 px-4 py-2 text-left text-sm font-semibold">#</th>
                     <th className="px-4 py-2 text-left text-sm font-semibold">Produto</th>
                     <th className="px-4 py-2 text-right text-sm font-semibold">Qtd</th>
                     <th className="px-4 py-2 text-right text-sm font-semibold">Preço</th>
@@ -250,6 +256,7 @@ export default function PedidoCompraFormulario({
                 <tbody>
                   {formData.itens.map((item, index) => (
                     <tr key={index} className="border-t">
+                      <td className="px-4 py-2 text-sm font-semibold text-slate-500">{index + 1}</td>
                       <td className="px-4 py-2">
                         <ProductIdentity
                           code={obterSkuItemPedido(item)}

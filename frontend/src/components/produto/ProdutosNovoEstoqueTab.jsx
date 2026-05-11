@@ -70,6 +70,27 @@ export default function ProdutosNovoEstoqueTab({
             </div>
           </div>
 
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-4">
+            <label className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                checked={formData.e_granel ? false : formData.participa_sugestao_compra !== false}
+                disabled={formData.e_granel}
+                onChange={(e) => handleChange('participa_sugestao_compra', e.target.checked)}
+                className="mt-1 h-4 w-4 rounded border-emerald-300 text-emerald-600 focus:ring-emerald-500 disabled:opacity-50"
+              />
+              <span>
+                <span className="block text-sm font-semibold text-emerald-900">
+                  Entrar na sugestao inteligente de compra
+                </span>
+                <span className="mt-1 block text-sm text-emerald-800">
+                  Desmarque para manter o produto cadastrado, mas esconder das sugestoes de pedido.
+                  Produtos granel ficam fora automaticamente.
+                </span>
+              </span>
+            </label>
+          </div>
+
           {isEdicao && formData.controle_lote && (
             <>
               <div className="flex justify-between items-center">

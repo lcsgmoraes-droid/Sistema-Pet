@@ -1154,6 +1154,7 @@ export default function VendasFinanceiro() {
         acc.imposto += Number(venda.imposto || 0);
         acc.custo_campanha += Number(venda.custo_campanha || 0);
         acc.venda_liquida += Number(venda.venda_liquida || 0);
+        acc.valor_recebido += Number(venda.valor_recebido || 0);
         acc.custo_produtos += Number(venda.custo_produtos || 0);
         acc.lucro += Number(venda.lucro || 0);
         if (vendaTemNotaFiscal(venda)) acc.com_nf += 1;
@@ -1171,6 +1172,7 @@ export default function VendasFinanceiro() {
         imposto: 0,
         custo_campanha: 0,
         venda_liquida: 0,
+        valor_recebido: 0,
         custo_produtos: 0,
         lucro: 0,
         com_nf: 0,
@@ -1202,6 +1204,7 @@ export default function VendasFinanceiro() {
     { label: "Imposto", value: formatarDeducaoTotalizador(totalizadoresListaVendas.imposto), intent: "red" },
     { label: "Custo Camp.", value: formatarDeducaoTotalizador(totalizadoresListaVendas.custo_campanha), intent: "cyan" },
     { label: "Liquida", value: formatarMoedaOuTraco(totalizadoresListaVendas.venda_liquida), intent: "blue" },
+    { label: "Valor Recebido", value: formatarMoedaOuTraco(totalizadoresListaVendas.valor_recebido), intent: "emerald" },
     { label: "Custo", value: formatarDeducaoTotalizador(totalizadoresListaVendas.custo_produtos), intent: "amber" },
     {
       label: "Lucro",

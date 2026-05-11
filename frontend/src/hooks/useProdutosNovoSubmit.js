@@ -71,6 +71,9 @@ export default function useProdutosNovoSubmit({
         controle_lote: formData.controle_lote || false,
         estoque_minimo: formData.estoque_minimo ? parseInt(formData.estoque_minimo) : 0,
         estoque_maximo: formData.estoque_maximo ? parseInt(formData.estoque_maximo) : null,
+        participa_sugestao_compra: produtoEhGranel
+          ? false
+          : formData.participa_sugestao_compra !== false,
         categoria_id: formData.categoria_id ? parseInt(formData.categoria_id) : null,
         marca_id: formData.marca_id ? parseInt(formData.marca_id) : null,
         departamento_id: formData.departamento_id ? parseInt(formData.departamento_id) : null,

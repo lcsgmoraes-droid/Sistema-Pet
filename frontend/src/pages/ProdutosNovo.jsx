@@ -94,6 +94,7 @@ export default function ProdutosNovo() {
     controle_lote: true,
     estoque_minimo: '',
     estoque_maximo: '',
+    participa_sugestao_compra: true,
     
     // Aba 5: Tributação (Fiscal V2)
     tributacao: {

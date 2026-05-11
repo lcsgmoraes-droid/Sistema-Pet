@@ -4,6 +4,7 @@ import api from '../../api';
 import {
   clonarItensPedido,
   consolidarItensPedido,
+  textoContemTokens,
 } from './pedidoCompraUtils';
 
 export default function usePedidosCompraSugestao({
@@ -206,12 +207,15 @@ export default function usePedidosCompraSugestao({
   };
 
   const sugestoesFiltradas = useMemo(() => {
-    const q = filtroSugestao.trim().toLowerCase();
     return sugestoes.filter((s) => {
-      const passaBusca = !q
-        || (s.produto_nome || '').toLowerCase().includes(q)
-        || (s.produto_sku || '').toLowerCase().includes(q)
-        || (s.produto_codigo_barras || '').toLowerCase().includes(q);
+      const textoBusca = [
+        s.produto_nome,
+        s.produto_sku,
+        s.produto_codigo_barras,
+        s.marca_nome,
+        s.fornecedor_nome,
+      ].filter(Boolean).join(' ');
+      const passaBusca = textoContemTokens(textoBusca, filtroSugestao);
 
       if (!passaBusca) {
         return false;

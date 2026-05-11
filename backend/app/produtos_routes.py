@@ -247,6 +247,7 @@ def _normalizar_payload_granel(dados: dict) -> dict:
         dados["tipo_kit"] = None
         dados["e_kit_fisico"] = False
         dados["unidade"] = "KG"
+        dados["participa_sugestao_compra"] = False
     return dados
 
 
@@ -872,6 +873,7 @@ class ProdutoBase(BaseModel):
     departamento_id: Optional[int] = None
     unidade: str = "UN"
     e_granel: Optional[bool] = False
+    participa_sugestao_compra: Optional[bool] = True
     peso_bruto: Optional[float] = None
     peso_liquido: Optional[float] = None
     preco_custo: Optional[float] = 0
@@ -958,6 +960,7 @@ class ProdutoUpdate(BaseModel):
     departamento_id: Optional[int] = None
     unidade: Optional[str] = None
     e_granel: Optional[bool] = None
+    participa_sugestao_compra: Optional[bool] = None
     peso_bruto: Optional[float] = None
     peso_liquido: Optional[float] = None
     preco_custo: Optional[float] = None
@@ -2962,6 +2965,7 @@ def atualizar_produto(
         dados_recebidos["tipo_produto"] = "SIMPLES"
         dados_recebidos["tipo_kit"] = None
         dados_recebidos["unidade"] = "KG"
+        dados_recebidos["participa_sugestao_compra"] = False
         tipo_produto_final = "SIMPLES"
         tipo_kit_final = None
         produto_sera_composto = False

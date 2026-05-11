@@ -180,6 +180,7 @@ export default function useProdutosNovoCarregamento({
         situacao: produto.situacao ?? true,
         estoque_minimo: produto.estoque_minimo || '',
         estoque_maximo: produto.estoque_maximo || '',
+        participa_sugestao_compra: produto.participa_sugestao_compra ?? true,
         controle_lote: produto.controle_lote ?? true,
         markup,
         tipo_produto:

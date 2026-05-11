@@ -14,9 +14,9 @@ import {
 import {
   baixarArquivoResposta,
   clonarItensPedido,
-  consolidarItensPedido,
   converterPedidoParaFormData,
   numeroSeguro,
+  textoContemTokens,
   textoNumeroSeguro,
 } from './compras/pedidoCompraUtils';
 
@@ -86,18 +86,19 @@ const PedidosCompra = () => {
   const [mostrarSugestoesProduto, setMostrarSugestoesProduto] = useState(false);
   const [incluirGrupoFornecedor, setIncluirGrupoFornecedor] = useState(false);
 
-  const normalizarTexto = (texto = '') =>
-    texto
-      .toLowerCase()
-      .normalize('NFD')
-      .replaceAll(/[\u0300-\u036f]/g, '');
-
   const produtosFiltrados = useMemo(() => {
-    const termo = normalizarTexto(produtoTexto.trim());
+    const termo = produtoTexto.trim();
     if (!termo) return produtos.slice(0, 15);
 
     return produtos
-      .filter((p) => normalizarTexto(p.nome || '').includes(termo))
+      .filter((p) => textoContemTokens([
+        p.nome,
+        p.codigo,
+        p.sku,
+        p.codigo_barras,
+        p.marca_nome,
+        p.marca?.nome,
+      ].filter(Boolean).join(' '), termo))
       .slice(0, 15);
   }, [produtos, produtoTexto]);
 
@@ -386,6 +387,35 @@ const PedidosCompra = () => {
     }
   };
 
+  const iniciarPedidoSeparadoComSnapshot = async (snapshot, fornecedorId, abrirSugestao = true) => {
+    const fornecedorSelecionado = obterFornecedorPorId(fornecedorId);
+    const proximoFormData = {
+      ...FORM_DATA_INICIAL,
+      ...snapshot,
+      fornecedor_id: fornecedorId ? String(fornecedorId) : '',
+      itens: clonarItensPedido(snapshot?.itens || []),
+    };
+
+    setModoEdicao(false);
+    setPedidoEditando(null);
+    setFormData(proximoFormData);
+    setFornecedorTexto(fornecedorSelecionado?.nome || '');
+    setIncluirGrupoFornecedor(Boolean(obterGrupoDoFornecedor(fornecedorId)));
+    setItemForm(ITEM_FORM_INICIAL);
+    setProdutoTexto('');
+    setMostrarSugestoesProduto(false);
+    setMostrarForm(true);
+    limparEstadosSugestao();
+
+    if (fornecedorId) {
+      await carregarProdutosFornecedor(fornecedorId);
+    }
+
+    if (abrirSugestao) {
+      await abrirModalSugestao(fornecedorId, 'merge');
+    }
+  };
+
   const abrirFluxoSugestaoInteligente = async () => {
     if (!formData.fornecedor_id) {
       toast.error('Selecione um fornecedor primeiro');
@@ -458,55 +488,65 @@ const PedidosCompra = () => {
     setLoadingPrepararSugestao(true);
 
     try {
-      if (acao === 'manter') {
+      if (acao === 'carregar' || acao === 'manter') {
+        if (tipo === 'externo' && pedidoRascunho) {
+          await aplicarPedidoNoFormulario(
+            pedidoRascunho,
+            converterPedidoParaFormData(pedidoRascunho),
+            {
+              mostrarToast: true,
+              mensagemSucesso: 'Rascunho existente carregado.',
+            },
+          );
+        } else {
+          toast('O rascunho atual foi mantido sem aplicar nova sugestao.');
+        }
+        return;
+      }
+
+      if (acao === 'novo') {
+        await iniciarPedidoSeparadoComSnapshot(pedidoNovo, fornecedorId, true);
+        toast.success('Novo pedido iniciado para o mesmo fornecedor.');
+        return;
+      }
+
+      const preservarQuantidades = acao === 'analisar_preservar' || acao === 'mesclar';
+      const substituirItens = acao === 'analisar_substituir' || acao === 'substituir';
+      setEstrategiaMesclaItens(preservarQuantidades ? 'manter_existente' : 'somar');
+
       if (tipo === 'externo' && pedidoRascunho) {
+        const formRascunho = converterPedidoParaFormData(pedidoRascunho);
+        const itensConsolidados = clonarItensPedido(formRascunho.itens);
+        const cabecalhoConsolidado = combinarCabecalhoPedido(formRascunho, pedidoNovo);
+
         await aplicarPedidoNoFormulario(
           pedidoRascunho,
-          converterPedidoParaFormData(pedidoRascunho),
+          {
+            ...formRascunho,
+            ...cabecalhoConsolidado,
+            itens: itensConsolidados,
+          },
           {
             mostrarToast: true,
-            mensagemSucesso: 'Rascunho existente carregado e mantido como está.',
+            mensagemSucesso: preservarQuantidades
+              ? 'Rascunho carregado. A sugestao vai manter quantidades ja preenchidas.'
+              : 'Rascunho carregado. A sugestao vai substituir os itens ao confirmar.',
           },
         );
-      } else {
-        toast('O rascunho atual foi mantido sem aplicar nova sugestão.');
+
+        setEstrategiaMesclaItens(preservarQuantidades ? 'manter_existente' : 'somar');
+        await abrirModalSugestao(
+          fornecedorId,
+          substituirItens ? 'replace' : 'merge',
+        );
+        return;
       }
-      return;
-    }
 
-    if (tipo === 'externo' && pedidoRascunho) {
-      const formRascunho = converterPedidoParaFormData(pedidoRascunho);
-      const itensConsolidados = acao === 'mesclar'
-        ? consolidarItensPedido(formRascunho.itens, pedidoNovo.itens, estrategiaMesclaItens)
-        : clonarItensPedido(formRascunho.itens);
-      const cabecalhoConsolidado = combinarCabecalhoPedido(formRascunho, pedidoNovo);
-
-      await aplicarPedidoNoFormulario(
-        pedidoRascunho,
-        {
-          ...formRascunho,
-          ...cabecalhoConsolidado,
-          itens: itensConsolidados,
-        },
-        {
-          mostrarToast: true,
-          mensagemSucesso: acao === 'mesclar'
-            ? 'Rascunho existente carregado para mesclar com o pedido atual.'
-            : 'Rascunho existente mantido e pronto para receber só a nova sugestão.',
-        },
-      );
-
+      setEstrategiaMesclaItens(preservarQuantidades ? 'manter_existente' : 'somar');
       await abrirModalSugestao(
         fornecedorId,
-        acao === 'substituir' ? 'replace' : 'merge',
+        substituirItens ? 'replace' : 'merge',
       );
-      return;
-    }
-
-    await abrirModalSugestao(
-      fornecedorId,
-      acao === 'substituir' ? 'replace' : 'merge',
-    );
     } catch (error) {
       console.error('Erro ao preparar consolidação do rascunho:', error);
       toast.error(error.response?.data?.detail || 'Erro ao preparar a sugestão inteligente');

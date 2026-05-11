@@ -1,6 +1,69 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getProdutos } from "../api/produtos";
 
+const PRODUTOS_PERSISTIR_KEY = "produtos_persistir_busca";
+const PRODUTOS_FILTROS_KEY = "produtos_filtros_v2";
+const PRODUTOS_FILTRO_BUSCA_LEGADO_KEY = "produtos_filtro_busca";
+
+const FILTROS_PADRAO = {
+  busca: "",
+  ativo: "ativos",
+  categoria_id: "",
+  marca_id: "",
+  fornecedor_id: "",
+  estoque_baixo: false,
+  em_promocao: false,
+  mostrarPaisVariacoes: false,
+};
+
+function normalizarFiltrosSalvos(filtros = {}) {
+  return {
+    ...FILTROS_PADRAO,
+    ...filtros,
+    busca: filtros.busca || "",
+    ativo: filtros.ativo || "ativos",
+    categoria_id: filtros.categoria_id ? String(filtros.categoria_id) : "",
+    marca_id: filtros.marca_id ? String(filtros.marca_id) : "",
+    fornecedor_id: filtros.fornecedor_id ? String(filtros.fornecedor_id) : "",
+    estoque_baixo: Boolean(filtros.estoque_baixo),
+    em_promocao: Boolean(filtros.em_promocao),
+    mostrarPaisVariacoes: Boolean(filtros.mostrarPaisVariacoes),
+  };
+}
+
+function lerEstadoPersistido(persistirBusca) {
+  if (!persistirBusca) {
+    return {
+      filtros: { ...FILTROS_PADRAO },
+      paginaAtual: 1,
+      itensPorPagina: 20,
+    };
+  }
+
+  try {
+    const raw = localStorage.getItem(PRODUTOS_FILTROS_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      return {
+        filtros: normalizarFiltrosSalvos(parsed.filtros),
+        paginaAtual: Number(parsed.paginaAtual) > 0 ? Number(parsed.paginaAtual) : 1,
+        itensPorPagina: Number(parsed.itensPorPagina) > 0 ? Number(parsed.itensPorPagina) : 20,
+      };
+    }
+  } catch {
+    localStorage.removeItem(PRODUTOS_FILTROS_KEY);
+  }
+
+  return {
+    filtros: {
+      ...FILTROS_PADRAO,
+      busca: localStorage.getItem(PRODUTOS_FILTRO_BUSCA_LEGADO_KEY) || "",
+    },
+    paginaAtual: 1,
+    itensPorPagina: 20,
+  };
+}
+
 const normalizeExpandId = (value) => String(value ?? "");
 
 function ordenarProdutosAgrupados(produtos, paisExpandidos) {
@@ -63,31 +126,26 @@ export default function useProdutosListagem({
   paisExpandidos,
 }) {
   const [persistirBusca, setPersistirBusca] = useState(() => {
-    const salvo = localStorage.getItem("produtos_persistir_busca");
+    const salvo = localStorage.getItem(PRODUTOS_PERSISTIR_KEY);
     return salvo === null ? true : salvo === "true";
   });
+  const estadoPersistidoInicial = useMemo(
+    () => lerEstadoPersistido(persistirBusca),
+    [],
+  );
   const [produtosBrutos, setProdutosBrutos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selecionados, setSelecionados] = useState([]);
   const [ultimoSelecionado, setUltimoSelecionado] = useState(null);
-  const [filtros, setFiltros] = useState({
-    busca: (() => {
-      if (!persistirBusca) return "";
-      return localStorage.getItem("produtos_filtro_busca") || "";
-    })(),
-    ativo: "ativos",
-    categoria_id: "",
-    marca_id: "",
-    fornecedor_id: "",
-    estoque_baixo: false,
-    em_promocao: false,
-    mostrarPaisVariacoes: false,
-  });
-  const [paginaAtual, setPaginaAtual] = useState(1);
-  const [itensPorPagina, setItensPorPagina] = useState(20);
+  const [filtros, setFiltros] = useState(estadoPersistidoInicial.filtros);
+  const [paginaAtual, setPaginaAtual] = useState(estadoPersistidoInicial.paginaAtual);
+  const [itensPorPagina, setItensPorPagina] = useState(
+    estadoPersistidoInicial.itensPorPagina,
+  );
   const [totalItensServidor, setTotalItensServidor] = useState(0);
   const [totalPaginasServidor, setTotalPaginasServidor] = useState(1);
   const produtosVisiveisRef = useRef([]);
+  const filtrosMontadosRef = useRef(false);
 
   const produtosFiltrados = useMemo(() => {
     let produtosTemp = [...produtosBrutos];
@@ -173,6 +231,11 @@ export default function useProdutosListagem({
   const totalItens = totalItensServidor;
 
   useEffect(() => {
+    if (!filtrosMontadosRef.current) {
+      filtrosMontadosRef.current = true;
+      return;
+    }
+
     setPaginaAtual(1);
   }, [filtros]);
 
@@ -277,15 +340,24 @@ export default function useProdutosListagem({
   ]);
 
   useEffect(() => {
-    localStorage.setItem("produtos_persistir_busca", String(persistirBusca));
+    localStorage.setItem(PRODUTOS_PERSISTIR_KEY, String(persistirBusca));
 
     if (persistirBusca) {
-      localStorage.setItem("produtos_filtro_busca", filtros.busca || "");
+      localStorage.setItem(
+        PRODUTOS_FILTROS_KEY,
+        JSON.stringify({
+          filtros,
+          itensPorPagina,
+          paginaAtual,
+        }),
+      );
+      localStorage.setItem(PRODUTOS_FILTRO_BUSCA_LEGADO_KEY, filtros.busca || "");
       return;
     }
 
-    localStorage.removeItem("produtos_filtro_busca");
-  }, [persistirBusca, filtros.busca]);
+    localStorage.removeItem(PRODUTOS_FILTROS_KEY);
+    localStorage.removeItem(PRODUTOS_FILTRO_BUSCA_LEGADO_KEY);
+  }, [persistirBusca, filtros, itensPorPagina, paginaAtual]);
 
   const handleFiltroChange = (campo, valor) => {
     const proximoFiltro = { ...filtros, [campo]: valor };

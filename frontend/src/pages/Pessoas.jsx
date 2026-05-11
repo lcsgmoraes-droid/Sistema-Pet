@@ -1,12 +1,14 @@
 /**
  * Página de Gestão de Pessoas (Clientes, Fornecedores, Veterinários)
  */
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
 import { FiHelpCircle } from "react-icons/fi";
+import { GitMerge } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import api from "../api";
 import ModalImportacaoPessoas from "../components/ModalImportacaoPessoas";
+import PessoasFusaoModal from "../components/pessoas/PessoasFusaoModal";
 import { useTour } from "../hooks/useTour";
 import { tourPessoas } from "../tours/tourDefinitions";
 
@@ -18,11 +20,22 @@ export default function Pessoas() {
   const [tipoFiltro, setTipoFiltro] = useState("todos"); // todos, cliente, fornecedor, veterinario
   const [buscaTexto, setBuscaTexto] = useState("");
   const [modalImportacao, setModalImportacao] = useState(false);
+  const [modalFusao, setModalFusao] = useState(false);
+  const [selecionados, setSelecionados] = useState([]);
+
+  const pessoasSelecionadas = useMemo(
+    () => pessoas.filter((pessoa) => selecionados.includes(pessoa.id)).slice(0, 2),
+    [pessoas, selecionados],
+  );
 
   // Carregar dados iniciais
   useEffect(() => {
     carregarPessoas();
   }, [tipoFiltro, buscaTexto]);
+
+  useEffect(() => {
+    setSelecionados((prev) => prev.filter((id) => pessoas.some((pessoa) => pessoa.id === id)));
+  }, [pessoas]);
 
   const carregarPessoas = async () => {
     try {
@@ -33,12 +46,13 @@ export default function Pessoas() {
         params.tipo_cadastro = tipoFiltro;
       }
       if (buscaTexto) {
-        params.busca = buscaTexto;
+        params.search = buscaTexto;
       }
 
       const response = await api.get("/clientes/", { params });
+      const lista = response.data?.items || response.data?.clientes || response.data || [];
 
-      setPessoas(response.data || []);
+      setPessoas(Array.isArray(lista) ? lista : []);
     } catch (error) {
       console.error("Erro ao carregar pessoas:", error);
       toast.error("Erro ao carregar pessoas");
@@ -81,6 +95,26 @@ export default function Pessoas() {
     );
   };
 
+  const selecionarPessoa = (id) => {
+    setSelecionados((prev) =>
+      prev.includes(id) ? prev.filter((item) => item !== id) : [...prev, id],
+    );
+  };
+
+  const selecionarTodosVisiveis = () => {
+    const idsVisiveis = pessoas.map((pessoa) => pessoa.id);
+    const todosSelecionados = idsVisiveis.length > 0 && idsVisiveis.every((id) => selecionados.includes(id));
+
+    if (todosSelecionados) {
+      setSelecionados((prev) => prev.filter((id) => !idsVisiveis.includes(id)));
+      return;
+    }
+
+    setSelecionados((prev) => Array.from(new Set([...prev, ...idsVisiveis])));
+  };
+
+  const limparSelecao = () => setSelecionados([]);
+
   return (
     <div className="p-6">
       {/* Header */}
@@ -102,6 +136,21 @@ export default function Pessoas() {
           </button>
         </div>
         <div className="flex gap-2">
+          {selecionados.length > 0 && (
+            <button
+              onClick={() => setModalFusao(true)}
+              disabled={selecionados.length !== 2}
+              className={`px-4 py-2 rounded-lg transition-colors font-medium flex items-center gap-2 ${
+                selecionados.length === 2
+                  ? "bg-amber-500 text-white hover:bg-amber-600"
+                  : "bg-gray-100 text-gray-400 cursor-not-allowed"
+              }`}
+              title={selecionados.length === 2 ? "Fundir pessoas selecionadas" : "Selecione exatamente 2 pessoas"}
+            >
+              <GitMerge className="w-5 h-5" />
+              Fundir Pessoas ({selecionados.length})
+            </button>
+          )}
           <button
             id="tour-pessoas-importar"
             onClick={() => setModalImportacao(true)}
@@ -198,6 +247,15 @@ export default function Pessoas() {
           <table className="w-full">
             <thead className="bg-gray-100 border-b border-gray-200">
               <tr>
+                <th className="px-4 py-3 text-left">
+                  <input
+                    type="checkbox"
+                    checked={pessoas.length > 0 && pessoas.every((pessoa) => selecionados.includes(pessoa.id))}
+                    onChange={selecionarTodosVisiveis}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    title="Selecionar pessoas visiveis"
+                  />
+                </th>
                 <th className="px-6 py-3 text-left text-sm font-semibold text-gray-700">
                   Nome
                 </th>
@@ -223,6 +281,15 @@ export default function Pessoas() {
                 const tipoBadge = getTipoBadge(pessoa.tipo_cadastro);
                 return (
                   <tr key={pessoa.id} className="hover:bg-gray-50">
+                    <td className="px-4 py-4">
+                      <input
+                        type="checkbox"
+                        checked={selecionados.includes(pessoa.id)}
+                        onChange={() => selecionarPessoa(pessoa.id)}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        aria-label={`Selecionar ${pessoa.nome}`}
+                      />
+                    </td>
                     <td className="px-6 py-4">
                       <div>
                         <p className="font-medium text-gray-900">
@@ -278,6 +345,17 @@ export default function Pessoas() {
           </table>
         </div>
       )}
+
+      {/* Modal de fusao */}
+      <PessoasFusaoModal
+        isOpen={modalFusao}
+        onClose={() => setModalFusao(false)}
+        onSuccess={() => {
+          carregarPessoas();
+          limparSelecao();
+        }}
+        pessoasSelecionadas={pessoasSelecionadas}
+      />
 
       {/* Modal de Importação */}
       <ModalImportacaoPessoas

@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react';
 import SafeMarkdown from '../ui/SafeMarkdown';
+import AutocompleteSelect from '../ui/AutocompleteSelect';
 import { normalizeMarkdownContent } from '../../utils/safeMarkdown';
 
 export default function ProdutosNovoDadosBasicosSection({
@@ -96,23 +97,30 @@ export default function ProdutosNovoDadosBasicosSection({
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Categoria</label>
-          <select value={formData.categoria_id} onChange={(e) => handleChange('categoria_id', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-            <option value="">Selecione...</option>
-            {categoriasHierarquicas.map((cat) => (
-              <option key={cat.id} value={cat.id}>{cat.nomeFormatado}</option>
-            ))}
-          </select>
+          <AutocompleteSelect
+            label="Categoria"
+            options={categoriasHierarquicas}
+            value={formData.categoria_id}
+            onChange={(valor) => handleChange('categoria_id', valor)}
+            placeholder="Selecione..."
+            searchPlaceholder="Digite para buscar categoria..."
+            inputClassName="border-gray-300"
+            getOptionLabel={(cat) => cat.nomeFormatado || cat.nome || ''}
+            getOptionSearchText={(cat) => [cat.nome, cat.nomeFormatado].filter(Boolean).join(' ')}
+          />
         </div>
 
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-1">Marca</label>
-          <select value={formData.marca_id} onChange={(e) => handleChange('marca_id', e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-            <option value="">Selecione...</option>
-            {marcas.map((marca) => (
-              <option key={marca.id} value={marca.id}>{marca.nome}</option>
-            ))}
-          </select>
+          <AutocompleteSelect
+            label="Marca"
+            options={marcas}
+            value={formData.marca_id}
+            onChange={(valor) => handleChange('marca_id', valor)}
+            placeholder="Selecione..."
+            searchPlaceholder="Digite para buscar marca..."
+            inputClassName="border-gray-300"
+            getOptionLabel={(marca) => marca.nome || ''}
+          />
         </div>
       </div>
 

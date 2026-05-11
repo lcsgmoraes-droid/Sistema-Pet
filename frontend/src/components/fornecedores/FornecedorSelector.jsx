@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { Building2, Plus, Search, X } from "lucide-react";
+import { Building2, ChevronDown, Plus, Search, X } from "lucide-react";
 import { buscarClientes, criarCliente } from "../../api/clientes";
 import ActionButton from "../ui/ActionButton";
 
@@ -378,7 +378,7 @@ export default function FornecedorSelector({
           disabled={disabled}
           required={required}
           className={[
-            "h-10 w-full rounded-lg border border-slate-300 bg-white pl-9 pr-20 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500",
+            "h-10 w-full rounded-lg border border-slate-300 bg-white pl-9 pr-24 text-sm text-slate-800 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-500",
             inputClassName,
           ]
             .filter(Boolean)
@@ -409,6 +409,15 @@ export default function FornecedorSelector({
               <Plus className="h-4 w-4" />
             </button>
           ) : null}
+          <button
+            type="button"
+            onClick={() => setAberto((prev) => !prev)}
+            disabled={disabled}
+            className="rounded-md p-1 text-slate-400 transition hover:bg-slate-100 hover:text-slate-700 disabled:opacity-50"
+            title="Abrir lista de fornecedores"
+          >
+            <ChevronDown className={`h-4 w-4 transition ${aberto ? "rotate-180" : ""}`} />
+          </button>
         </div>
       </div>
 

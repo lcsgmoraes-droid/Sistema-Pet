@@ -2370,6 +2370,7 @@ def sugerir_pedido_inteligente(
     ).filter(
         Produto.tenant_id == tenant_id,
         Produto.ativo == True,
+        or_(Produto.participa_sugestao_compra == True, Produto.participa_sugestao_compra.is_(None)),
         or_(Produto.e_granel.is_(False), Produto.e_granel.is_(None)),
         ~Produto.nome.ilike("%granel%"),
         ProdutoFornecedor.fornecedor_id.in_(fornecedor_ids),

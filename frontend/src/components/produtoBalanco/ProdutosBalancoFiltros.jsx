@@ -1,4 +1,5 @@
 import FornecedorSelector from "../fornecedores/FornecedorSelector";
+import AutocompleteSelect from "../ui/AutocompleteSelect";
 
 function ProdutosBalancoFiltros({
   filtros,
@@ -29,18 +30,16 @@ function ProdutosBalancoFiltros({
           className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
         />
 
-        <select
+        <AutocompleteSelect
+          options={marcas}
           value={filtros.marca_id}
-          onChange={(e) => onAtualizarFiltro("marca_id", e.target.value)}
-          className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
-        >
-          <option value="">Todas as marcas</option>
-          {marcas.map((marca) => (
-            <option key={marca.id} value={marca.id}>
-              {marca.nome}
-            </option>
-          ))}
-        </select>
+          onChange={(valor) => onAtualizarFiltro("marca_id", valor)}
+          showLabel={false}
+          placeholder="Todas as marcas"
+          searchPlaceholder="Buscar marca..."
+          inputClassName="rounded-lg border-gray-300"
+          getOptionLabel={(marca) => marca.nome || ""}
+        />
 
         <FornecedorSelector
           fornecedores={fornecedores}

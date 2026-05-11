@@ -11,6 +11,24 @@ export const textoNumeroSeguro = (valor, fallback = '0') => {
   return String(valor);
 };
 
+export const normalizarTextoBusca = (texto = '') =>
+  String(texto || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+export const textoContemTokens = (texto, busca) => {
+  const tokens = normalizarTextoBusca(busca).split(' ').filter(Boolean);
+  if (tokens.length === 0) {
+    return true;
+  }
+
+  const base = normalizarTextoBusca(texto);
+  return tokens.every((token) => base.includes(token));
+};
+
 export const normalizarItemPedido = (item = {}) => {
   const quantidade = numeroSeguro(item.quantidade_pedida);
   const preco = numeroSeguro(item.preco_unitario);
@@ -47,6 +65,22 @@ export const consolidarItensPedido = (itensBase = [], itensAdicionais = [], estr
     const existente = mapa.get(chave);
     if (!existente) {
       mapa.set(chave, normalizado);
+      return;
+    }
+
+    if (estrategia === 'manter_existente') {
+      const preco = numeroSeguro(existente.preco_unitario);
+      const desconto = numeroSeguro(existente.desconto_item);
+      const quantidade = numeroSeguro(existente.quantidade_pedida);
+
+      mapa.set(chave, {
+        ...normalizado,
+        ...existente,
+        preco_unitario: preco,
+        desconto_item: desconto,
+        quantidade_pedida: quantidade,
+        total: (preco - desconto) * quantidade
+      });
       return;
     }
 

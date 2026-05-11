@@ -1,5 +1,6 @@
 import FilterBar from "../ui/FilterBar";
 import FornecedorSelector from "../fornecedores/FornecedorSelector";
+import AutocompleteSelect from "../ui/AutocompleteSelect";
 
 export default function ProdutosFiltrosPanel({
   categorias,
@@ -37,34 +38,30 @@ export default function ProdutosFiltrosPanel({
         </div>
 
         <div>
-          <select
+          <AutocompleteSelect
+            options={categorias}
             value={filtros.categoria_id}
-            onChange={(event) => handleFiltroChange("categoria_id", event.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="">Todas as Categorias</option>
-            {categorias.map((cat) => (
-              <option key={cat.id} value={cat.id}>
-                {cat.categoria_pai_id ? "  -> " : ""}
-                {cat.nome}
-              </option>
-            ))}
-          </select>
+            onChange={(valor) => handleFiltroChange("categoria_id", valor)}
+            showLabel={false}
+            placeholder="Todas as categorias"
+            searchPlaceholder="Buscar categoria..."
+            inputClassName="rounded-lg border-gray-300"
+            getOptionLabel={(cat) => `${cat.categoria_pai_id ? "-> " : ""}${cat.nome || ""}`}
+            getOptionSearchText={(cat) => [cat.nome, cat.nomeFormatado].filter(Boolean).join(" ")}
+          />
         </div>
 
         <div>
-          <select
+          <AutocompleteSelect
+            options={marcas}
             value={filtros.marca_id}
-            onChange={(event) => handleFiltroChange("marca_id", event.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-          >
-            <option value="">Todas as Marcas</option>
-            {marcas.map((marca) => (
-              <option key={marca.id} value={marca.id}>
-                {marca.nome}
-              </option>
-            ))}
-          </select>
+            onChange={(valor) => handleFiltroChange("marca_id", valor)}
+            showLabel={false}
+            placeholder="Todas as marcas"
+            searchPlaceholder="Buscar marca..."
+            inputClassName="rounded-lg border-gray-300"
+            getOptionLabel={(marca) => marca.nome || ""}
+          />
         </div>
 
         <div>
@@ -145,7 +142,7 @@ export default function ProdutosFiltrosPanel({
               onChange={(event) => setPersistirBusca(event.target.checked)}
               className="w-4 h-4 text-blue-600 rounded focus:ring-2 focus:ring-blue-500"
             />
-            <span className="text-xs text-gray-700">Persistir pesquisa</span>
+            <span className="text-xs text-gray-700">Persistir filtros</span>
           </label>
         </div>
       </div>

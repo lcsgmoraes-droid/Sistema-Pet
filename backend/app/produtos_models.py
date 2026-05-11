@@ -168,6 +168,7 @@ class Produto(BaseTenantModel):
     unidade = Column(String(10), default='UN')
     condicao = Column(String(20), default='novo')  # novo, usado, recondicionado
     e_granel = Column(Boolean, default=False, nullable=False)  # Produto fisico em kg derivado de uma racao/pacote pai
+    participa_sugestao_compra = Column(Boolean, default=True, nullable=False)
     
     # Características Físicas
     peso_liquido = Column(Float, nullable=True)

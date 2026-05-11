@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from "react";
 import api from "../../api";
+import AutocompleteSelect from "../ui/AutocompleteSelect";
 import FornecedorPrincipalDecisaoModal from "./FornecedorPrincipalDecisaoModal";
 import ProdutosFornecedoresLoteSection from "./ProdutosFornecedoresLoteSection";
 
@@ -225,32 +226,26 @@ export default function ProdutosEdicaoLoteModal({
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">
-              <CampoSelect
+              <AutocompleteSelect
                 label="Marca"
+                options={marcas}
                 value={dadosEdicaoLote.marca_id}
-                onChange={(event) => atualizarCampo("marca_id", event.target.value)}
-              >
-                <option value="">Nao alterar</option>
-                {marcas.map((marca) => (
-                  <option key={marca.id} value={marca.id}>
-                    {marca.nome}
-                  </option>
-                ))}
-              </CampoSelect>
+                onChange={(valor) => atualizarCampo("marca_id", valor)}
+                placeholder="Nao alterar"
+                searchPlaceholder="Buscar marca..."
+                getOptionLabel={(marca) => marca.nome || ""}
+              />
 
-              <CampoSelect
+              <AutocompleteSelect
                 label="Categoria"
+                options={categorias}
                 value={dadosEdicaoLote.categoria_id}
-                onChange={(event) => atualizarCampo("categoria_id", event.target.value)}
-              >
-                <option value="">Nao alterar</option>
-                {categorias.map((cat) => (
-                  <option key={cat.id} value={cat.id}>
-                    {cat.categoria_pai_id ? "-> " : ""}
-                    {cat.nome}
-                  </option>
-                ))}
-              </CampoSelect>
+                onChange={(valor) => atualizarCampo("categoria_id", valor)}
+                placeholder="Nao alterar"
+                searchPlaceholder="Buscar categoria..."
+                getOptionLabel={(cat) => `${cat.categoria_pai_id ? "-> " : ""}${cat.nome || ""}`}
+                getOptionSearchText={(cat) => [cat.nome, cat.nomeFormatado].filter(Boolean).join(" ")}
+              />
 
               <CampoSelect
                 label="Area / setor"

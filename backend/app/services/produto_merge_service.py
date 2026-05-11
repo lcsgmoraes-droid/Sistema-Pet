@@ -63,6 +63,7 @@ CAMPOS_CADASTRAIS_FUSAO: list[tuple[str, str]] = [
     ("unidade", "Unidade"),
     ("condicao", "Condicao"),
     ("e_granel", "Produto granel"),
+    ("participa_sugestao_compra", "Participa da sugestao de compra"),
     ("peso_liquido", "Peso liquido"),
     ("peso_bruto", "Peso bruto"),
     ("largura", "Largura"),

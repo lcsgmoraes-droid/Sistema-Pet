@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import case, or_, func, cast, String
 from sqlalchemy.exc import IntegrityError
-from typing import List, Optional
+from typing import Dict, List, Optional
 from datetime import datetime as dt, date, timedelta
 from decimal import Decimal
 from pydantic import BaseModel, EmailStr, Field, validator
@@ -27,6 +27,10 @@ from app.pet_clinical_utils import normalize_pet_clinical_payload
 from app.security.permissions_decorator import require_permission
 from app.partner_utils import get_all_accessible_tenant_ids
 from app.services.venda_rentabilidade_snapshot_service import get_or_build_venda_rentabilidade_snapshot
+from app.services.pessoa_merge_service import (
+    executar_fusao_pessoas,
+    montar_preview_fusao_pessoas,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -981,6 +985,67 @@ def verificar_duplicata(
             return resultado
     
     return resultado
+
+
+class PessoaFusaoPreviewRequest(BaseModel):
+    pessoa_principal_id: int
+    pessoa_duplicada_id: int
+
+
+class PessoaFusaoExecutarRequest(PessoaFusaoPreviewRequest):
+    decisoes_campos: Dict[str, str] = Field(default_factory=dict)
+    observacao: Optional[str] = None
+
+
+@router.post("/fusao/preview")
+@require_permission("clientes.editar")
+def preview_fusao_pessoas(
+    payload: PessoaFusaoPreviewRequest,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Prepara a fusao de duas pessoas sem alterar dados."""
+    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    try:
+        return montar_preview_fusao_pessoas(
+            db,
+            tenant_id=tenant_id,
+            principal_id=payload.pessoa_principal_id,
+            duplicado_id=payload.pessoa_duplicada_id,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+
+@router.post("/fusao/executar")
+@require_permission("clientes.editar")
+def executar_fusao_pessoas_route(
+    payload: PessoaFusaoExecutarRequest,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Funde duas pessoas, mantendo o principal e transferindo historico/vinculos."""
+    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    try:
+        return executar_fusao_pessoas(
+            db,
+            tenant_id=tenant_id,
+            principal_id=payload.pessoa_principal_id,
+            duplicado_id=payload.pessoa_duplicada_id,
+            decisoes_campos=payload.decisoes_campos,
+            user_id=current_user.id,
+            observacao=payload.observacao,
+        )
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+    except Exception as exc:
+        db.rollback()
+        logger.exception("Erro ao fundir pessoas")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao fundir pessoas: {str(exc)}",
+        )
 
 
 # ==================== RAÃ‡AS ====================

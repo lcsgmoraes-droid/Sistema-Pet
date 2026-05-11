@@ -62,3 +62,11 @@ export const verificarDuplicata = async (campo, valor) => {
   const response = await api.get(`/clientes/verificar-duplicata/campo?${params.toString()}`);
   return response.data;
 };
+
+export const previewFusaoPessoas = (data) => {
+  return api.post('/clientes/fusao/preview', data);
+};
+
+export const executarFusaoPessoas = (data) => {
+  return api.post('/clientes/fusao/executar', data);
+};
