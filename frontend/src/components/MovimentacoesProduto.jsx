@@ -122,8 +122,11 @@ export default function MovimentacoesProduto() {
     data_fabricacao: ''
   });
   const produtoEhGranel = Boolean(produto?.e_granel) || (produto?.nome || '').toLowerCase().includes('granel');
-  const pesoPacoteOrigem = Number(produto?.peso_embalagem || 0);
-  const podeLancarGranel = Boolean(produto) && !produtoEhGranel && produto?.tipo_produto !== 'PAI' && pesoPacoteOrigem > 0;
+  const pesoPacoteOrigem = parseNumeroInput(produto?.peso_embalagem);
+  const produtoBloqueiaGranel =
+    produto?.tipo_produto === 'PAI' ||
+    (produto?.tipo_produto === 'KIT' && produto?.tipo_kit === 'VIRTUAL');
+  const podeLancarGranel = Boolean(produto) && !produtoEhGranel && !produtoBloqueiaGranel && pesoPacoteOrigem > 0;
   const quantidadeGranelNumero = Number(quantidadeGranel || 0);
   const kgGranelPrevisto = quantidadeGranelNumero > 0 ? quantidadeGranelNumero * pesoPacoteOrigem : 0;
   const custoKgGranel = pesoPacoteOrigem > 0 ? Number(produto?.preco_custo || 0) / pesoPacoteOrigem : 0;
@@ -792,7 +795,7 @@ export default function MovimentacoesProduto() {
       return;
     }
 
-    setTipoLancamento(produtoEhGranel ? 'saida' : 'entrada');
+    setTipoLancamento(produtoEhGranel ? 'balanco' : 'entrada');
     setShowModal(true);
   };
 

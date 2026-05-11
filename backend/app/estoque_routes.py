@@ -2940,12 +2940,13 @@ def entrada_estoque(
             )
         )
     
-    if _produto_e_granel(produto) and entrada.motivo != "conversao_granel":
+    if _produto_e_granel(produto) and entrada.motivo not in {"conversao_granel", "balanco"}:
         raise HTTPException(
             status_code=400,
             detail=(
                 "Produto granel deve receber estoque pela conversao de pacote para kg. "
-                "Use a entrada de granel para baixar o produto base e abastecer os kg corretamente."
+                "Use a entrada de granel para baixar o produto base e abastecer os kg corretamente. "
+                "Para inventario, use o motivo balanco."
             ),
         )
 

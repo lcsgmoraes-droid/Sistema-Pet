@@ -120,9 +120,15 @@ export default function EstoqueLancamentoModal({
                 Estoque atual: {estoqueAtual}. Digite o novo saldo total.
               </p>
             ) : null}
-            {produtoEhGranel ? (
+            {produtoEhGranel && tipoLancamento === "entrada" ? (
               <p className="mt-1 text-xs text-cyan-700">
                 Para abastecer granel, abra o produto fechado e use Lancar granel.
+              </p>
+            ) : null}
+            {produtoEhGranel && tipoLancamento === "balanco" ? (
+              <p className="mt-1 text-xs text-cyan-700">
+                Balanco manual permitido para ajuste de inventario. Para abastecer por pacote aberto,
+                use Lancar granel no produto fechado.
               </p>
             ) : null}
           </div>
