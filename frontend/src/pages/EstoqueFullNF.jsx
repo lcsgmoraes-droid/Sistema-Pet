@@ -1,7 +1,28 @@
 import { useEffect, useMemo, useState } from "react";
 import toast from "react-hot-toast";
+import {
+  CheckCircle2,
+  Edit3,
+  ExternalLink,
+  FileText,
+  History,
+  Link as LinkIcon,
+  PackageMinus,
+  Plus,
+  RefreshCw,
+  Trash2,
+  X,
+} from "lucide-react";
 import api from "../api";
 import CurrencyInput from "../components/CurrencyInput";
+import ActionButton from "../components/ui/ActionButton";
+import { ChannelBadge, getChannelConfig } from "../components/ui/ChannelBadges";
+import DataTable from "../components/ui/DataTable";
+import EmptyState from "../components/ui/EmptyState";
+import IconActionButton from "../components/ui/IconActionButton";
+import ModuleTabs from "../components/ui/ModuleTabs";
+import PageHeader from "../components/ui/PageHeader";
+import Panel from "../components/ui/Panel";
 import { formatMoneyBRL } from "../utils/formatters";
 
 let linhaSeq = 1;
@@ -19,43 +40,20 @@ const CANAIS_FULL = [
   {
     value: "amazon",
     label: "Amazon",
-    badgeClass: "border-emerald-200 bg-emerald-50 text-emerald-700",
   },
   {
     value: "mercado_livre",
     label: "Mercado Livre",
-    badgeClass: "border-yellow-200 bg-yellow-50 text-yellow-800",
   },
   {
     value: "shopee",
     label: "Shopee",
-    badgeClass: "border-orange-200 bg-orange-50 text-orange-700",
   },
   {
     value: "full",
     label: "FULL (geral)",
-    badgeClass: "border-slate-200 bg-slate-50 text-slate-700",
   },
 ];
-
-const CANAIS_FULL_MAP = Object.fromEntries(CANAIS_FULL.map((canal) => [canal.value, canal]));
-
-function obterCanalConfig(canal, fallbackLabel) {
-  return CANAIS_FULL_MAP[canal] || {
-    value: canal || "",
-    label: fallbackLabel || canal || "Canal nao informado",
-    badgeClass: "border-slate-200 bg-slate-50 text-slate-700",
-  };
-}
-
-function CanalBadge({ canal, label }) {
-  const config = obterCanalConfig(canal, label);
-  return (
-    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${config.badgeClass}`}>
-      {config.label}
-    </span>
-  );
-}
 
 function contarBaixas(resultado) {
   if (!resultado) return 0;
@@ -551,41 +549,27 @@ export default function EstoqueFullNF() {
 
   return (
     <div className="max-w-6xl mx-auto p-4 md:p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900">Movimentacao Full por NF</h1>
-        <p className="text-gray-600 mt-1">
-          Esta tela baixa estoque por NF e, opcionalmente, gera somente a tarifa de envio no financeiro.
-        </p>
-      </div>
+      <PageHeader
+        icon={PackageMinus}
+        title="Movimentacao Full por NF"
+        subtitle="Baixa estoque por NF e, opcionalmente, gera somente a tarifa de envio no financeiro."
+      />
 
-      <div className="flex flex-wrap gap-2 border-b border-slate-200">
-        <button
-          type="button"
-          onClick={() => setAbaAtiva("lancamento")}
-          className={`px-4 py-2 text-sm font-semibold border-b-2 ${
-            abaAtiva === "lancamento"
-              ? "border-blue-600 text-blue-700"
-              : "border-transparent text-slate-500 hover:text-slate-800"
-          }`}
-        >
-          Novo lancamento
-        </button>
-        <button
-          type="button"
-          onClick={() => setAbaAtiva("historico")}
-          className={`px-4 py-2 text-sm font-semibold border-b-2 ${
-            abaAtiva === "historico"
-              ? "border-blue-600 text-blue-700"
-              : "border-transparent text-slate-500 hover:text-slate-800"
-          }`}
-        >
-          Historico de baixas {historico.length ? `(${historico.length})` : ""}
-        </button>
-      </div>
+      <ModuleTabs
+        active={abaAtiva}
+        onChange={setAbaAtiva}
+        tabs={[
+          { id: "lancamento", label: "Novo lancamento" },
+          {
+            id: "historico",
+            label: `Historico de baixas ${historico.length ? `(${historico.length})` : ""}`,
+          },
+        ]}
+      />
 
       {abaAtiva === "lancamento" && (
         <>
-      <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-5 space-y-4">
+      <Panel className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
             <div className="block text-sm font-medium text-gray-700 mb-1">Numero da NF (automatico via XML)</div>
@@ -603,7 +587,7 @@ export default function EstoqueFullNF() {
           <div>
             <div className="flex items-center justify-between gap-2 mb-1">
               <div className="block text-sm font-medium text-gray-700">Canal / origem *</div>
-              {plataforma && <CanalBadge canal={plataforma} />}
+              {plataforma && <ChannelBadge channel={plataforma} />}
             </div>
             <select
               id="plataforma-full"
@@ -649,19 +633,17 @@ export default function EstoqueFullNF() {
             className="w-full border border-gray-300 rounded-lg px-3 py-2"
           />
         </div>
-      </div>
+      </Panel>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-5 space-y-3">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-gray-900">Itens da NF (baixa de estoque)</h2>
-          <button
-            type="button"
-            onClick={adicionarLinha}
-            className="px-3 py-2 text-sm rounded-lg bg-blue-600 text-white hover:bg-blue-700"
-          >
-            + Adicionar item
-          </button>
-        </div>
+      <Panel
+        className="space-y-3"
+        title="Itens da NF (baixa de estoque)"
+        actions={(
+          <ActionButton icon={Plus} intent="create" onClick={adicionarLinha}>
+            Adicionar item
+          </ActionButton>
+        )}
+      >
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end bg-slate-50 border border-slate-200 rounded-xl p-3 md:p-4">
           <div className="md:col-span-8">
@@ -675,14 +657,16 @@ export default function EstoqueFullNF() {
             />
           </div>
           <div className="md:col-span-4">
-            <button
-              type="button"
+            <ActionButton
+              className="w-full"
+              icon={FileText}
+              intent="edit"
+              loading={lendoXml}
               onClick={importarItensDoXml}
-              disabled={lendoXml}
-              className="w-full px-3 py-2 text-sm rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60"
+              size="md"
             >
-              {lendoXml ? "Lendo XML..." : "Ler XML e preencher"}
-            </button>
+              Ler XML e preencher
+            </ActionButton>
           </div>
         </div>
 
@@ -695,14 +679,15 @@ export default function EstoqueFullNF() {
                   Corrija o estoque dos produtos marcados em uma nova aba e depois revalide sem perder esta NF.
                 </p>
               </div>
-              <button
-                type="button"
+              <ActionButton
+                icon={RefreshCw}
+                intent="warning"
+                loading={validandoEstoque}
                 onClick={revalidarEstoque}
-                disabled={validandoEstoque}
-                className="rounded-lg border border-red-300 bg-white px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:opacity-60"
+                tone="soft"
               >
-                {validandoEstoque ? "Revalidando..." : "Revalidar estoque"}
-              </button>
+                Revalidar estoque
+              </ActionButton>
             </div>
             <div className="mt-3 grid gap-2">
               {problemasEstoque.map((problema) => (
@@ -718,13 +703,14 @@ export default function EstoqueFullNF() {
                     </p>
                   </div>
                   {problema.url_correcao && (
-                    <button
-                      type="button"
+                    <ActionButton
+                      icon={ExternalLink}
+                      intent="delete"
                       onClick={() => abrirCorrecaoEstoque(problema)}
-                      className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-700"
+                      size="xs"
                     >
                       Corrigir estoque
-                    </button>
+                    </ActionButton>
                   )}
                 </div>
               ))}
@@ -771,13 +757,15 @@ export default function EstoqueFullNF() {
                   />
                 </div>
                 <div className="md:col-span-2">
-                  <button
-                    type="button"
+                  <ActionButton
+                    className="w-full"
+                    icon={Trash2}
+                    intent="delete"
                     onClick={() => removerLinha(item.id)}
-                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 bg-white hover:bg-gray-50"
+                    tone="soft"
                   >
                     Remover
-                  </button>
+                  </ActionButton>
                 </div>
                 {problema && (
                   <div className="md:col-span-12 flex flex-col gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs text-red-800 md:flex-row md:items-center md:justify-between">
@@ -786,13 +774,15 @@ export default function EstoqueFullNF() {
                       {formatarQuantidade(problema.solicitado)}, falta {formatarQuantidade(problema.faltante)}.
                     </span>
                     {problema.url_correcao && (
-                      <button
-                        type="button"
+                      <ActionButton
+                        icon={ExternalLink}
+                        intent="delete"
                         onClick={() => abrirCorrecaoEstoque(problema)}
-                        className="rounded-md border border-red-300 px-2 py-1 font-semibold text-red-700 hover:bg-red-50"
+                        size="xs"
+                        tone="soft"
                       >
                         Abrir ajuste de estoque
-                      </button>
+                      </ActionButton>
                     )}
                   </div>
                 )}
@@ -800,14 +790,13 @@ export default function EstoqueFullNF() {
             );
           })}
         </div>
-      </div>
+      </Panel>
 
-      <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-5 space-y-4">
-        <h2 className="text-lg font-semibold text-gray-900">Tarifa de envio (financeiro)</h2>
-        <p className="text-sm text-gray-600">
-          Se preencher esta parte, o sistema cria uma conta a pagar so da tarifa de envio. Se deixar zero, nao cria nada no financeiro.
-        </p>
-
+      <Panel
+        className="space-y-4"
+        title="Tarifa de envio (financeiro)"
+        subtitle="Se preencher esta parte, o sistema cria uma conta a pagar so da tarifa de envio. Se deixar zero, nao cria nada no financeiro."
+      >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <div className="block text-sm font-medium text-gray-700 mb-1">Valor da tarifa</div>
@@ -856,44 +845,41 @@ export default function EstoqueFullNF() {
             )}
           </div>
         </div>
-      </div>
+      </Panel>
 
       <div className="flex flex-wrap gap-3">
-        <button
-          type="button"
+        <ActionButton
+          icon={CheckCircle2}
+          intent="create"
+          loading={salvando}
           onClick={() => processar()}
-          disabled={salvando}
-          className="px-5 py-2.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
+          size="lg"
         >
-          {salvando ? "Processando..." : "Confirmar baixa por NF"}
-        </button>
+          Confirmar baixa por NF
+        </ActionButton>
       </div>
         </>
       )}
 
       {abaAtiva === "historico" && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-5 space-y-4">
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h3 className="text-lg font-semibold text-gray-900">Historico de baixas FULL</h3>
-              <p className="text-sm text-gray-600 mt-1">
-                Lancamentos processados por NF, com canal, estoque e tarifa financeira quando houver.
-              </p>
-            </div>
-            <button
-              type="button"
+        <Panel
+          className="space-y-4"
+          title="Historico de baixas FULL"
+          subtitle="Lancamentos processados por NF, com canal, estoque e tarifa financeira quando houver."
+          actions={(
+            <ActionButton
+              icon={RefreshCw}
+              loading={carregandoHistorico}
               onClick={carregarHistorico}
-              disabled={carregandoHistorico}
-              className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+              tone="soft"
             >
-              {carregandoHistorico ? "Atualizando..." : "Atualizar historico"}
-            </button>
-          </div>
+              Atualizar historico
+            </ActionButton>
+          )}
+        >
 
           {!carregandoHistorico && !historico.length && (
-            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center text-sm text-slate-600">
-              Nenhuma baixa FULL por NF encontrada ainda.
-            </div>
+            <EmptyState title="Nenhuma baixa FULL por NF encontrada ainda." />
           )}
 
           <div className="space-y-3">
@@ -903,14 +889,16 @@ export default function EstoqueFullNF() {
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <h4 className="text-base font-semibold text-slate-900">NF {lancamento.numero_nf}</h4>
-                      <CanalBadge canal={lancamento.plataforma} label={lancamento.plataforma_label} />
-                      <button
-                        type="button"
+                      <ChannelBadge channel={lancamento.plataforma} label={lancamento.plataforma_label} />
+                      <ActionButton
+                        icon={Edit3}
+                        intent="edit"
                         onClick={() => abrirModalEditarCanal(lancamento)}
-                        className="rounded-full border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                        size="xs"
+                        tone="soft"
                       >
                         Editar canal
-                      </button>
+                      </ActionButton>
                     </div>
                     <p className="mt-1 text-xs text-slate-500">Processado em {formatarDataHora(lancamento.processado_em)}</p>
                   </div>
@@ -938,35 +926,26 @@ export default function EstoqueFullNF() {
 
                 <details className="mt-3">
                   <summary className="cursor-pointer text-sm font-medium text-blue-700">Ver itens da baixa</summary>
-                  <div className="mt-3 overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b text-left text-slate-600">
-                          <th className="py-2">SKU</th>
-                          <th className="py-2">Produto</th>
-                          <th className="py-2">Qtd</th>
-                          <th className="py-2">Antes</th>
-                          <th className="py-2">Depois</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {(lancamento.itens || []).map((item) => (
-                          <tr key={`${lancamento.numero_nf}-${item.movimentacao_id || item.produto_id}`} className="border-b last:border-0">
-                            <td className="py-2">{item.sku || "-"}</td>
-                            <td className="py-2">{item.nome || "-"}</td>
-                            <td className="py-2">{item.quantidade}</td>
-                            <td className="py-2">{item.estoque_anterior}</td>
-                            <td className="py-2">{item.estoque_novo}</td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
+                  <div className="mt-3">
+                    <DataTable
+                      columns={[
+                        { key: "sku", header: "SKU", render: (item) => item.sku || "-" },
+                        { key: "produto", header: "Produto", render: (item) => item.nome || "-" },
+                        { key: "quantidade", header: "Qtd", align: "right", render: (item) => item.quantidade },
+                        { key: "antes", header: "Antes", align: "right", render: (item) => item.estoque_anterior },
+                        { key: "depois", header: "Depois", align: "right", render: (item) => item.estoque_novo },
+                      ]}
+                      data={lancamento.itens || []}
+                      emptyMessage="Nenhum item registrado nesta baixa."
+                      getRowKey={(item) => `${lancamento.numero_nf}-${item.movimentacao_id || item.produto_id || item.sku}`}
+                      theadClassName="bg-slate-50"
+                    />
                   </div>
                 </details>
               </div>
             ))}
           </div>
-        </div>
+        </Panel>
       )}
 
       {modalConclusao.aberto && (
@@ -983,8 +962,8 @@ export default function EstoqueFullNF() {
                   <p className="text-xs text-slate-500">NF</p>
                   <p className="text-base font-semibold text-slate-900">{modalConclusao.resultado?.numero_nf}</p>
                 </div>
-                <CanalBadge
-                  canal={modalConclusao.resultado?.plataforma}
+                <ChannelBadge
+                  channel={modalConclusao.resultado?.plataforma}
                   label={modalConclusao.resultado?.plataforma_label}
                 />
               </div>
@@ -993,7 +972,7 @@ export default function EstoqueFullNF() {
                 <p className="font-semibold">Confirme a loja/canal antes de seguir.</p>
                 <p className="mt-1">
                   Esta baixa ficou registrada em{" "}
-                  <strong>{obterCanalConfig(modalConclusao.resultado?.plataforma, modalConclusao.resultado?.plataforma_label).label}</strong>.
+                  <strong>{getChannelConfig(modalConclusao.resultado?.plataforma, modalConclusao.resultado?.plataforma_label).label}</strong>.
                   Se estiver errado, corrija agora para manter estoque, financeiro e DRE na origem certa.
                 </p>
               </div>
@@ -1029,27 +1008,28 @@ export default function EstoqueFullNF() {
             </div>
 
             <div className="flex flex-col-reverse gap-2 border-t border-slate-200 px-5 py-4 sm:flex-row sm:justify-end">
-              <button
-                type="button"
+              <ActionButton
+                icon={Edit3}
+                intent="warning"
                 onClick={corrigirCanalDoResultado}
-                className="rounded-lg border border-amber-300 px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-50"
+                tone="soft"
               >
                 Corrigir canal
-              </button>
-              <button
-                type="button"
+              </ActionButton>
+              <ActionButton
+                icon={History}
                 onClick={() => fecharModalConclusao(true)}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                tone="soft"
               >
                 Ver historico
-              </button>
-              <button
-                type="button"
+              </ActionButton>
+              <ActionButton
+                icon={CheckCircle2}
+                intent="create"
                 onClick={() => fecharModalConclusao(false)}
-                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
               >
                 OK, novo lancamento
-              </button>
+              </ActionButton>
             </div>
           </div>
         </div>
@@ -1065,23 +1045,22 @@ export default function EstoqueFullNF() {
                   Editar loja/canal da NF {modalEditarCanal.lancamento?.numero_nf}
                 </h3>
               </div>
-              <button
-                type="button"
+              <IconActionButton
+                aria-label="Fechar"
                 onClick={fecharModalEditarCanal}
                 disabled={salvandoCanal}
-                className="rounded-lg px-2 py-1 text-xl leading-none text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-60"
-                aria-label="Fechar"
-              >
-                x
-              </button>
+                icon={X}
+                intent="neutral"
+                tone="ghost"
+              />
             </div>
 
             <div className="space-y-4 px-5 py-4">
               <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
                 <p>
                   Canal atual:{" "}
-                  <CanalBadge
-                    canal={modalEditarCanal.lancamento?.plataforma}
+                  <ChannelBadge
+                    channel={modalEditarCanal.lancamento?.plataforma}
                     label={modalEditarCanal.lancamento?.plataforma_label}
                   />
                 </p>
@@ -1117,28 +1096,28 @@ export default function EstoqueFullNF() {
               {modalEditarCanal.canal && modalEditarCanal.canal !== modalEditarCanal.lancamento?.plataforma && (
                 <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
                   Vou mover esta NF para{" "}
-                  <strong>{obterCanalConfig(modalEditarCanal.canal).label}</strong>. Confira antes de salvar.
+                  <strong>{getChannelConfig(modalEditarCanal.canal).label}</strong>. Confira antes de salvar.
                 </div>
               )}
             </div>
 
             <div className="flex flex-col-reverse gap-2 border-t border-slate-200 px-5 py-4 sm:flex-row sm:justify-end">
-              <button
-                type="button"
+              <ActionButton
                 onClick={fecharModalEditarCanal}
                 disabled={salvandoCanal}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                tone="soft"
               >
                 Cancelar
-              </button>
-              <button
-                type="button"
+              </ActionButton>
+              <ActionButton
+                icon={CheckCircle2}
+                intent="edit"
                 onClick={salvarCanalLancamento}
-                disabled={salvandoCanal || !modalEditarCanal.canal}
-                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={!modalEditarCanal.canal}
+                loading={salvandoCanal}
               >
-                {salvandoCanal ? "Salvando..." : "Salvar canal"}
-              </button>
+                Salvar canal
+              </ActionButton>
             </div>
           </div>
         </div>
@@ -1152,14 +1131,13 @@ export default function EstoqueFullNF() {
                 <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Acao necessaria</p>
                 <h3 className="mt-1 text-lg font-semibold text-slate-900">Vincular categoria a DRE</h3>
               </div>
-              <button
-                type="button"
-                onClick={fecharModalDre}
-                className="rounded-lg px-2 py-1 text-xl leading-none text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+              <IconActionButton
                 aria-label="Fechar"
-              >
-                x
-              </button>
+                onClick={fecharModalDre}
+                icon={X}
+                intent="neutral"
+                tone="ghost"
+              />
             </div>
 
             <div className="space-y-4 px-5 py-4">
@@ -1202,22 +1180,22 @@ export default function EstoqueFullNF() {
             </div>
 
             <div className="flex flex-col-reverse gap-2 border-t border-slate-200 px-5 py-4 sm:flex-row sm:justify-end">
-              <button
-                type="button"
+              <ActionButton
                 onClick={fecharModalDre}
                 disabled={salvandoVinculoDre}
-                className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+                tone="soft"
               >
                 Resolver depois
-              </button>
-              <button
-                type="button"
+              </ActionButton>
+              <ActionButton
+                icon={LinkIcon}
+                intent="create"
                 onClick={vincularDreEContinuar}
-                disabled={salvandoVinculoDre || carregandoDre || !dreSubcategoriasDespesa.length}
-                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+                disabled={carregandoDre || !dreSubcategoriasDespesa.length}
+                loading={salvandoVinculoDre}
               >
-                {salvandoVinculoDre ? "Salvando..." : "Vincular e continuar"}
-              </button>
+                Vincular e continuar
+              </ActionButton>
             </div>
           </div>
         </div>
