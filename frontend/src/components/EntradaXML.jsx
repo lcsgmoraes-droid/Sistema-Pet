@@ -11,6 +11,7 @@ import EntradaXmlRascunhoDevolucaoModal from './entrada-xml/EntradaXmlRascunhoDe
 import EntradaXmlRevisaoPrecosModal from './entrada-xml/EntradaXmlRevisaoPrecosModal';
 import EntradaXmlResultadoLoteModal from './entrada-xml/EntradaXmlResultadoLoteModal';
 import EntradaXmlVisualizacaoNotaModal from './entrada-xml/EntradaXmlVisualizacaoNotaModal';
+import SegmentedControl from './ui/SegmentedControl';
 
 function formatarChaveAcesso(valor) {
   return String(valor).replaceAll(/\D/g, '').slice(0, 44);
@@ -3087,25 +3088,21 @@ const EntradaXML = () => {
                 
                 <div className="flex flex-wrap items-center gap-2">
                   {itensComDivergenciaDetalhe.length > 0 && (
-                    <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-1 text-xs font-semibold">
-                      <button
-                        type="button"
-                        onClick={() => setFiltroItensNota('todos')}
-                        className={`rounded-md px-3 py-1.5 transition-colors ${filtroItensNota === 'todos' ? 'bg-white text-blue-700 shadow-sm' : 'text-slate-600 hover:bg-white/80'}`}
-                      >
-                        Todos
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setFiltroItensNota('divergencias');
-                          setMostrarCamposConferencia(true);
-                        }}
-                        className={`rounded-md px-3 py-1.5 transition-colors ${filtroItensNota === 'divergencias' ? 'bg-orange-100 text-orange-800 shadow-sm' : 'text-slate-600 hover:bg-white/80'}`}
-                      >
-                        Com divergencia ({itensComDivergenciaDetalhe.length})
-                      </button>
-                    </div>
+                    <SegmentedControl
+                      ariaLabel="Filtrar itens da nota"
+                      size="md"
+                      value={filtroItensNota}
+                      onChange={setFiltroItensNota}
+                      options={[
+                        { value: 'todos', label: 'Todos' },
+                        {
+                          value: 'divergencias',
+                          label: `Com divergencia (${itensComDivergenciaDetalhe.length})`,
+                          activeClassName: 'bg-orange-100 text-orange-800 shadow-sm',
+                          onSelect: () => setMostrarCamposConferencia(true),
+                        },
+                      ]}
+                    />
                   )}
 
                   {notaSelecionada.status === 'pendente' &&

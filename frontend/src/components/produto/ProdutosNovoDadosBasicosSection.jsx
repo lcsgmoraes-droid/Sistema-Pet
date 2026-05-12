@@ -5,6 +5,7 @@ import {
   MarcaProdutoSelector,
 } from '../produtos/CatalogoProdutoSelectors';
 import ActionButton from '../ui/ActionButton';
+import SegmentedControl from '../ui/SegmentedControl';
 import { normalizeMarkdownContent } from '../../utils/safeMarkdown';
 
 export default function ProdutosNovoDadosBasicosSection({
@@ -143,30 +144,15 @@ export default function ProdutosNovoDadosBasicosSection({
         <div className="md:col-span-3">
           <div className="mb-1 flex items-center justify-between gap-2">
             <label className="block text-sm font-medium text-gray-700">Descricao</label>
-            <div className="inline-flex rounded-lg border border-gray-200 bg-gray-50 p-0.5">
-              <button
-                type="button"
-                onClick={() => setDescricaoModo('editar')}
-                className={`rounded-md px-3 py-1 text-xs font-medium transition ${
-                  descricaoModo === 'editar'
-                    ? 'bg-white text-blue-700 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Editar
-              </button>
-              <button
-                type="button"
-                onClick={() => setDescricaoModo('previa')}
-                className={`rounded-md px-3 py-1 text-xs font-medium transition ${
-                  descricaoModo === 'previa'
-                    ? 'bg-white text-blue-700 shadow-sm'
-                    : 'text-gray-500 hover:text-gray-700'
-                }`}
-              >
-                Previa
-              </button>
-            </div>
+            <SegmentedControl
+              ariaLabel="Modo da descricao do produto"
+              value={descricaoModo}
+              onChange={setDescricaoModo}
+              options={[
+                { value: 'editar', label: 'Editar' },
+                { value: 'previa', label: 'Previa' },
+              ]}
+            />
           </div>
 
           {descricaoModo === 'editar' ? (
