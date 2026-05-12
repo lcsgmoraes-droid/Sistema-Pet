@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
+import logging
 from typing import Any
 
 from sqlalchemy import text
@@ -9,6 +10,8 @@ from sqlalchemy.orm import Session
 
 from app.models import Cliente
 from app.produtos_models import ProdutoFornecedor
+
+logger = logging.getLogger(__name__)
 
 
 CAMPOS_CADASTRAIS_PESSOA: list[tuple[str, str]] = [
@@ -113,6 +116,14 @@ def _identificador(nome: str) -> str:
     return '"' + nome.replace('"', '""') + '"'
 
 
+def _tenant_where_clause(db: Session, table_name: str, params: dict[str, Any]) -> str:
+    if not _table_has_column(db, table_name, "tenant_id"):
+        return ""
+
+    params["tenant_id_text"] = str(params.pop("tenant_id"))
+    return f" and {_identificador('tenant_id')}::text = :tenant_id_text"
+
+
 def _pessoa_resumo(pessoa: Cliente) -> dict[str, Any]:
     return {
         "id": pessoa.id,
@@ -202,17 +213,26 @@ def _contar_referencias(db: Session, pessoa_id: int, tenant_id: Any) -> list[dic
         if table_name == "clientes" and column_name == "id":
             continue
 
-        where_tenant = ""
         params = {"pessoa_id": pessoa_id}
         if _table_has_column(db, table_name, "tenant_id"):
-            where_tenant = " and tenant_id = :tenant_id"
             params["tenant_id"] = tenant_id
+        where_tenant = _tenant_where_clause(db, table_name, params)
 
         sql = text(
             f"select count(*) from {_identificador(table_name)} "
             f"where {_identificador(column_name)} = :pessoa_id{where_tenant}"
         )
-        total = int(db.execute(sql, params).scalar() or 0)
+        try:
+            total = int(db.execute(sql, params).scalar() or 0)
+        except Exception as exc:
+            db.rollback()
+            logger.warning(
+                "Ignorando contagem de referencia da fusao de pessoas em %s.%s: %s",
+                table_name,
+                column_name,
+                exc,
+            )
+            continue
         if total:
             referencias.append({"tabela": table_name, "campo": column_name, "total": total})
     return referencias
@@ -311,11 +331,10 @@ def _transferir_referencias_genericas(
         if tabela in TABELAS_FK_ESPECIAIS:
             continue
 
-        where_tenant = ""
         params = {"principal_id": principal_id, "duplicado_id": duplicado_id}
         if _table_has_column(db, tabela, "tenant_id"):
-            where_tenant = " and tenant_id = :tenant_id"
             params["tenant_id"] = tenant_id
+        where_tenant = _tenant_where_clause(db, tabela, params)
 
         sql = text(
             f"update {_identificador(tabela)} set {_identificador(campo)} = :principal_id "
