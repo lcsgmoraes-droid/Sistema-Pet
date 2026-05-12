@@ -2432,10 +2432,10 @@ def sugerir_pedido_inteligente(
 
     if apenas_fornecedor_principal:
         produtos_fornecedor_query = produtos_fornecedor_query.filter(
-            Produto.fornecedor_id.in_(fornecedor_ids),
             or_(
                 ProdutoFornecedor.e_principal == True,
                 ProdutoFornecedor.fornecedor_id == Produto.fornecedor_id,
+                Produto.fornecedor_id.is_(None),
             ),
         )
 
@@ -2460,6 +2460,7 @@ def sugerir_pedido_inteligente(
         score = (
             0 if produto_fornecedor.fornecedor_id == fornecedor_id else 1,
             0 if produto_fornecedor.e_principal else 1,
+            0 if produto_fornecedor.fornecedor_id == produto.fornecedor_id else 1,
             _float_seguro_sugestao(produto_fornecedor.preco_custo, 999999999),
             produto_fornecedor.id,
         )
