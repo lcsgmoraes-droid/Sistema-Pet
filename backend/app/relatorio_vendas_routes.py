@@ -28,6 +28,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/relatorios")
 
+STATUS_VENDA_RECEBIDA_INTEGRAL = {"finalizada", "pago_nf", "baixada", "paga"}
+STATUS_VENDA_SEM_SALDO_ABERTO = STATUS_VENDA_RECEBIDA_INTEGRAL | {"cancelada"}
+
 
 def _texto_normalizado(valor) -> str:
     return str(valor or "").strip().lower()
@@ -77,6 +80,30 @@ def _as_float(valor) -> float:
         return float(valor)
     except (TypeError, ValueError):
         return 0.0
+
+
+def _total_recebido_venda(venda: Venda) -> float:
+    pagamentos = list(getattr(venda, "pagamentos", []) or [])
+    total_pagamentos = sum(_as_float(getattr(pagamento, "valor", 0)) for pagamento in pagamentos)
+    if total_pagamentos > 0:
+        return round(total_pagamentos, 2)
+
+    valor_recebido = _as_float(getattr(venda, "valor_recebido", 0))
+    if valor_recebido > 0:
+        return round(valor_recebido, 2)
+
+    if _texto_normalizado(getattr(venda, "status", None)) in STATUS_VENDA_RECEBIDA_INTEGRAL:
+        return round(_as_float(getattr(venda, "total", 0)), 2)
+
+    return 0.0
+
+
+def _saldo_aberto_venda(venda: Venda) -> float:
+    status = _texto_normalizado(getattr(venda, "status", None))
+    if status in STATUS_VENDA_SEM_SALDO_ABERTO:
+        return 0.0
+
+    return round(max(_as_float(getattr(venda, "total", 0)) - _total_recebido_venda(venda), 0), 2)
 
 
 def _valor_cupom_venda(venda: Venda, cupons_por_venda: dict[int, float]) -> float:
@@ -317,13 +344,8 @@ async def obter_relatorio_vendas(
     desconto = sum(float(v.desconto_valor or 0) for v in vendas)
     venda_liquida = sum(float(v.total) for v in vendas)
 
-    # Calcular em_aberto (vendas com status != finalizada)
-    em_aberto = 0
-    for v in vendas:
-        if v.status != 'finalizada':
-            # OTIMIZAÇÃO: usar pagamentos já carregados em vez de query ao BD
-            total_pago = sum(float(p.valor) for p in v.pagamentos) if v.pagamentos else 0
-            em_aberto += (float(v.total) - total_pago)
+    valor_recebido = sum(_total_recebido_venda(v) for v in vendas)
+    em_aberto = sum(_saldo_aberto_venda(v) for v in vendas)
 
     percentual_desconto = round((desconto / venda_bruta * 100) if venda_bruta > 0 else 0, 1)
 
@@ -333,6 +355,7 @@ async def obter_relatorio_vendas(
         "desconto": round(desconto, 2),
         "percentual_desconto": percentual_desconto,
         "venda_liquida": round(venda_liquida, 2),
+        "valor_recebido": round(valor_recebido, 2),
         "em_aberto": round(em_aberto, 2),
         "quantidade_vendas": len(vendas)
     }
@@ -362,9 +385,9 @@ async def obter_relatorio_vendas(
         vendas_por_data[data_str]["valor_liquido"] += venda.total
 
         # OTIMIZAÇÃO: usar pagamentos já carregados
-        total_pago = sum(p.valor for p in venda.pagamentos) if venda.pagamentos else 0
+        total_pago = _total_recebido_venda(venda)
         vendas_por_data[data_str]["valor_recebido"] += total_pago
-        vendas_por_data[data_str]["saldo_aberto"] += (venda.total - total_pago) if venda.status != 'finalizada' else 0
+        vendas_por_data[data_str]["saldo_aberto"] += _saldo_aberto_venda(venda)
 
     # Calcular ticket médio
     for data_str in vendas_por_data:
@@ -672,8 +695,11 @@ async def obter_relatorio_vendas(
     venda_liquida_geral = 0
     venda_bruta_snapshot_geral = 0
     desconto_snapshot_geral = 0
+    valor_recebido_geral = 0
 
     for venda in vendas:
+        valor_recebido_venda = _total_recebido_venda(venda)
+        valor_recebido_geral += valor_recebido_venda
         cupom_desconto = _valor_cupom_venda(venda, cupons_por_venda)
         custo_campanha_venda = round(
             float(cashback_por_venda.get(venda.id, 0.0) or 0.0) + cupom_desconto,
@@ -746,6 +772,7 @@ async def obter_relatorio_vendas(
             "custo_produtos": round(float(snapshot.get("custo_produtos", 0) or 0), 2),
             "custo_campanha": round(float(snapshot.get("custo_campanha", 0) or 0), 2),
             "venda_liquida": round(float(snapshot.get("venda_liquida", 0) or 0), 2),
+            "valor_recebido": round(valor_recebido_venda, 2),
             "lucro": round(float(snapshot.get("lucro", 0) or 0), 2),
             "margem_sobre_venda": round(float(snapshot.get("margem_sobre_venda", 0) or 0), 1),
             "margem_sobre_custo": round(float(snapshot.get("margem_sobre_custo", 0) or 0), 1),
@@ -781,6 +808,7 @@ async def obter_relatorio_vendas(
     resumo["custo_campanha_total"] = round(custo_campanha_total_geral, 2)
     resumo["lucro_total"] = round(lucro_total_geral, 2)
     resumo["venda_liquida"] = round(venda_liquida_geral, 2)
+    resumo["valor_recebido"] = round(valor_recebido_geral, 2)
     resumo["margem_media"] = round((lucro_total_geral / venda_liquida_geral * 100) if venda_liquida_geral > 0 else 0, 1)
 
     # ==============================================

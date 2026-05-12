@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { FiAlertCircle } from "react-icons/fi";
 import toast from "react-hot-toast";
 import api from "../api";
@@ -7,6 +7,7 @@ import ClientesNovoCadastroRecenteBanner from "../components/clientes/ClientesNo
 import ClientesNovoModalsLayer from "../components/clientes/ClientesNovoModalsLayer";
 import ClientesNovoTabelaSection from "../components/clientes/ClientesNovoTabelaSection";
 import ClientesNovoTabsBar from "../components/clientes/ClientesNovoTabsBar";
+import PessoasFusaoModal from "../components/pessoas/PessoasFusaoModal";
 import { useClientesNovoCadastro } from "../hooks/useClientesNovoCadastro";
 import { useClientesNovoListagem } from "../hooks/useClientesNovoListagem";
 import { debugLog } from "../utils/debug";
@@ -17,6 +18,8 @@ const Pessoas = () => {
   const [expandedPets, setExpandedPets] = useState({});
   const [clienteRecemCriado, setClienteRecemCriado] = useState(null);
   const [campoCopiadoRecente, setCampoCopiadoRecente] = useState("");
+  const [pessoasSelecionadasFusao, setPessoasSelecionadasFusao] = useState([]);
+  const [modalFusaoAberto, setModalFusaoAberto] = useState(false);
   const {
     clientes,
     loading,
@@ -33,9 +36,15 @@ const Pessoas = () => {
     getClientePorCodigoExato,
   } = useClientesNovoListagem({ tipoFiltro, setError });
 
+  const pessoasParaFusao = useMemo(
+    () => filteredClientes.filter((cliente) => pessoasSelecionadasFusao.includes(cliente.id)),
+    [filteredClientes, pessoasSelecionadasFusao],
+  );
+
   const handleSearchTermChange = (value) => {
     setPaginaAtual(1);
     setSearchTerm(value);
+    setPessoasSelecionadasFusao([]);
   };
 
   const handleClienteCriado = async (cliente) => {
@@ -75,6 +84,7 @@ const Pessoas = () => {
       debugLog("Excluindo cliente ID:", id);
       const response = await api.delete(`/clientes/${id}`);
       debugLog("Cliente excluído com sucesso:", response);
+      setPessoasSelecionadasFusao((prev) => prev.filter((pessoaId) => pessoaId !== id));
       await loadClientes();
     } catch (err) {
       console.error("Erro ao excluir cliente:", err);
@@ -123,6 +133,31 @@ const Pessoas = () => {
     }
   };
 
+  const togglePessoaFusao = (clienteId) => {
+    setPessoasSelecionadasFusao((prev) => {
+      if (prev.includes(clienteId)) {
+        return prev.filter((id) => id !== clienteId);
+      }
+
+      if (prev.length >= 2) {
+        toast("Selecione no maximo 2 pessoas para fundir.");
+        return prev;
+      }
+
+      return [...prev, clienteId];
+    });
+  };
+
+  const limparSelecaoFusao = () => setPessoasSelecionadasFusao([]);
+
+  const abrirModalFusao = () => {
+    if (pessoasSelecionadasFusao.length !== 2) {
+      toast.error("Selecione exatamente 2 pessoas para fundir.");
+      return;
+    }
+    setModalFusaoAberto(true);
+  };
+
   const handleCopiarCampoRecente = async (valor, campo) => {
     if (!valor) return;
 
@@ -156,6 +191,18 @@ const Pessoas = () => {
       window.clearTimeout(timeoutId);
     };
   }, [campoCopiadoRecente]);
+
+  useEffect(() => {
+    limparSelecaoFusao();
+  }, [tipoFiltro, paginaAtual, registrosPorPagina]);
+
+  useEffect(() => {
+    setPessoasSelecionadasFusao((prev) => {
+      const idsVisiveis = new Set(filteredClientes.map((cliente) => cliente.id));
+      const proximaSelecao = prev.filter((id) => idsVisiveis.has(id));
+      return proximaSelecao.length === prev.length ? prev : proximaSelecao;
+    });
+  }, [filteredClientes]);
 
   useEffect(() => {
     if (!clienteRecemCriado?.termoFiltro) return;
@@ -221,6 +268,9 @@ const Pessoas = () => {
         setShowModalImportacao={cadastro.setShowModalImportacao}
         openModal={cadastro.openModal}
         tipoFiltro={tipoFiltro}
+        pessoasSelecionadasFusao={pessoasSelecionadasFusao}
+        onAbrirFusao={abrirModalFusao}
+        onLimparSelecaoFusao={limparSelecaoFusao}
       />
       <ClientesNovoCadastroRecenteBanner
         cliente={clienteRecemCriado}
@@ -250,9 +300,21 @@ const Pessoas = () => {
         openModal={cadastro.openModal}
         handleDelete={handleDelete}
         handleDeletePet={handleDeletePet}
+        pessoasSelecionadasFusao={pessoasSelecionadasFusao}
+        togglePessoaFusao={togglePessoaFusao}
       />
 
       <ClientesNovoModalsLayer {...cadastro.modalsLayerProps} />
+      <PessoasFusaoModal
+        isOpen={modalFusaoAberto}
+        onClose={() => setModalFusaoAberto(false)}
+        onSuccess={async () => {
+          setModalFusaoAberto(false);
+          limparSelecaoFusao();
+          await loadClientes();
+        }}
+        pessoasSelecionadas={pessoasParaFusao}
+      />
 
       {/* Estilos para animação do badge de parceiro */}
       <style>{`

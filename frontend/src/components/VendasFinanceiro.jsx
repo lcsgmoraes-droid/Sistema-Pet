@@ -34,6 +34,7 @@ const COLUNAS_RELATORIO_VENDAS = [
   { key: "imposto", label: "Imposto", value: (v) => Number(v.imposto || 0) },
   { key: "custo_campanha", label: "Custo Campanha", value: (v) => Number(v.custo_campanha || 0) },
   { key: "venda_liquida", label: "Venda Liquida", value: (v) => Number(v.venda_liquida || 0) },
+  { key: "valor_recebido", label: "Valor Recebido", value: (v) => Number(v.valor_recebido || 0) },
   { key: "custo_produtos", label: "Custo Produtos", value: (v) => Number(v.custo_produtos || 0) },
   { key: "lucro", label: "Lucro", value: (v) => Number(v.lucro || 0) },
   {
@@ -283,7 +284,7 @@ function carregarConfigDiasUteis() {
 
 function vendaEstaEmAberto(venda) {
   const status = String(venda?.status || "").toLowerCase();
-  return !["finalizada", "pago_nf", "cancelada"].includes(status);
+  return !["finalizada", "pago_nf", "baixada", "paga", "cancelada"].includes(status);
 }
 
 function getStatusVendaMeta(status) {
@@ -403,6 +404,7 @@ export default function VendasFinanceiro() {
     taxa_entrega: 0,
     desconto: 0,
     venda_liquida: 0,
+    valor_recebido: 0,
     em_aberto: 0,
     quantidade_vendas: 0,
   });
@@ -412,6 +414,7 @@ export default function VendasFinanceiro() {
     taxa_entrega: 0,
     desconto: 0,
     venda_liquida: 0,
+    valor_recebido: 0,
     em_aberto: 0,
     quantidade_vendas: 0,
   });
@@ -459,6 +462,7 @@ export default function VendasFinanceiro() {
     "cliente_nome",
     "venda_bruta",
     "venda_liquida",
+    "valor_recebido",
     "lucro",
     "status",
   ]);
@@ -504,6 +508,18 @@ export default function VendasFinanceiro() {
 
   const formatarPercentualOuTraco = (valor) =>
     valorEhZeroVisual(valor) ? "-" : `${valor}%`;
+
+  const calcularValorRecebidoVenda = (venda) => {
+    const valorInformado = Number(venda?.valor_recebido || 0);
+    if (valorInformado > 0) return valorInformado;
+
+    const status = String(venda?.status || "").toLowerCase();
+    if (["finalizada", "pago_nf", "baixada", "paga"].includes(status)) {
+      return Number(venda?.venda_bruta || venda?.venda_liquida || 0);
+    }
+
+    return 0;
+  };
 
   // Helper para garantir números válidos
   const sanitizarNumero = (valor) => {
@@ -940,6 +956,13 @@ export default function VendasFinanceiro() {
         cor: "border-sky-200 bg-sky-50 text-sky-800",
       },
       {
+        sinal: "R$",
+        titulo: "Valor Recebido",
+        valor: Number(resumo.valor_recebido || 0),
+        detalhe: "Total efetivamente baixado/recebido no periodo.",
+        cor: "border-emerald-200 bg-emerald-50 text-emerald-800",
+      },
+      {
         sinal: "!",
         titulo: "Em Aberto",
         valor: Number(resumo.em_aberto || 0),
@@ -1154,7 +1177,7 @@ export default function VendasFinanceiro() {
         acc.imposto += Number(venda.imposto || 0);
         acc.custo_campanha += Number(venda.custo_campanha || 0);
         acc.venda_liquida += Number(venda.venda_liquida || 0);
-        acc.valor_recebido += Number(venda.valor_recebido || 0);
+        acc.valor_recebido += calcularValorRecebidoVenda(venda);
         acc.custo_produtos += Number(venda.custo_produtos || 0);
         acc.lucro += Number(venda.lucro || 0);
         if (vendaTemNotaFiscal(venda)) acc.com_nf += 1;
@@ -1544,6 +1567,7 @@ export default function VendasFinanceiro() {
           taxa_entrega: 0,
           desconto: 0,
           venda_liquida: 0,
+          valor_recebido: 0,
           em_aberto: 0,
           quantidade_vendas: 0,
         });

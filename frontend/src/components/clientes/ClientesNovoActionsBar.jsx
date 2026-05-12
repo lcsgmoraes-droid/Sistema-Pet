@@ -1,4 +1,5 @@
 import { FiPlus, FiSearch, FiUploadCloud } from "react-icons/fi";
+import { GitMerge, X } from "lucide-react";
 
 const ClientesNovoActionsBar = ({
   searchTerm,
@@ -7,6 +8,9 @@ const ClientesNovoActionsBar = ({
   setShowModalImportacao,
   openModal,
   tipoFiltro,
+  pessoasSelecionadasFusao = [],
+  onAbrirFusao,
+  onLimparSelecaoFusao,
 }) => {
   const labelNovo =
     tipoFiltro === "cliente"
@@ -39,6 +43,36 @@ const ClientesNovoActionsBar = ({
       </div>
 
       <div className="flex gap-2">
+        {pessoasSelecionadasFusao.length > 0 && (
+          <div className="flex items-center gap-2 rounded-lg border border-amber-200 bg-amber-50 px-2 py-1">
+            <button
+              type="button"
+              onClick={onAbrirFusao}
+              disabled={pessoasSelecionadasFusao.length !== 2}
+              className={`flex items-center gap-2 rounded-md px-3 py-1.5 text-sm font-semibold transition-colors ${
+                pessoasSelecionadasFusao.length === 2
+                  ? "bg-amber-500 text-white hover:bg-amber-600"
+                  : "bg-amber-100 text-amber-500 cursor-not-allowed"
+              }`}
+              title={
+                pessoasSelecionadasFusao.length === 2
+                  ? "Fundir pessoas selecionadas"
+                  : "Selecione exatamente 2 pessoas"
+              }
+            >
+              <GitMerge size={16} />
+              Fundir ({pessoasSelecionadasFusao.length})
+            </button>
+            <button
+              type="button"
+              onClick={onLimparSelecaoFusao}
+              className="rounded-md p-2 text-amber-700 hover:bg-amber-100"
+              title="Limpar selecao"
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
         <button
           onClick={() => setShowModalImportacao(true)}
           className="flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-lg transition-colors"

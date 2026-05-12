@@ -26,6 +26,8 @@ const ClientesNovoTabelaSection = ({
   openModal,
   handleDelete,
   handleDeletePet,
+  pessoasSelecionadasFusao = [],
+  togglePessoaFusao,
 }) => {
   return (
     <>
@@ -49,6 +51,9 @@ const ClientesNovoTabelaSection = ({
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="w-12 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Fusao
+                  </th>
                   <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     ID
                   </th>
@@ -75,6 +80,7 @@ const ClientesNovoTabelaSection = ({
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredClientes.map((cliente) => {
                   const clienteDestacado = highlightedClienteId === cliente.id;
+                  const clienteSelecionadoFusao = pessoasSelecionadasFusao.includes(cliente.id);
 
                   return (
                     <Fragment key={cliente.id}>
@@ -82,11 +88,25 @@ const ClientesNovoTabelaSection = ({
                         id={`cliente-${cliente.id}`}
                         onClick={() => openModal(cliente)}
                         className={`cursor-pointer transition-colors ${
-                          clienteDestacado
+                          clienteSelecionadoFusao
+                            ? "bg-amber-50 hover:bg-amber-100"
+                            : clienteDestacado
                             ? "bg-emerald-50 hover:bg-emerald-100"
                             : "hover:bg-gray-50"
                         }`}
                       >
+                        <td
+                          className="px-4 py-3"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={clienteSelecionadoFusao}
+                            onChange={() => togglePessoaFusao?.(cliente.id)}
+                            className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                            aria-label={`Selecionar ${cliente.nome} para fusao`}
+                          />
+                        </td>
                         <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-900 font-medium">
                           {cliente.codigo}
                         </td>
@@ -202,7 +222,7 @@ const ClientesNovoTabelaSection = ({
                         cliente.pets &&
                         cliente.pets.length > 0 && (
                           <tr>
-                            <td colSpan="7" className="px-4 py-3 bg-gray-50">
+                            <td colSpan="8" className="px-4 py-3 bg-gray-50">
                               <div className="space-y-2">
                                 <p className="text-xs font-semibold text-gray-700 mb-2">
                                   Pets de {cliente.nome}:
