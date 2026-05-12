@@ -348,11 +348,19 @@ def _resumir_ultima_nf_do_pedido_bling(pedido_payload: dict | None, *, enriquece
             pedido_payload.get("nfe"),
         )
     )
-    nf_id = _texto(_primeiro_preenchido(nota_ref.get("id"), nota_ref.get("nfe_id")))
-    if not nf_id:
-        return None
+    nf_id = _nf_id_valido(_primeiro_preenchido(nota_ref.get("id"), nota_ref.get("nfe_id")))
 
-    resumo_nf = _resumir_ultima_nf_webhook({**nota_ref, "id": nf_id})
+    resumo_payload = {**nota_ref}
+    if nf_id:
+        resumo_payload["id"] = nf_id
+    else:
+        resumo_payload.pop("id", None)
+        resumo_payload.pop("nfe_id", None)
+
+    resumo_nf = _normalizar_resumo_nf(_resumir_ultima_nf_webhook(resumo_payload))
+    if not nf_id:
+        return resumo_nf
+
     if resumo_nf.get("numero") and resumo_nf.get("valor_total") is not None:
         return resumo_nf
 

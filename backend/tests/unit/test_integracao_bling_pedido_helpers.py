@@ -84,6 +84,26 @@ def test_resumir_ultima_nf_do_pedido_bling_enriquece_detalhes_via_api(monkeypatc
     assert resumo["chave"] == "CHAVE-10985"
 
 
+def test_resumir_ultima_nf_do_pedido_bling_ignora_id_zero_sem_chamar_api(monkeypatch):
+    bling_factory = Mock(side_effect=AssertionError("nao deveria consultar Bling para NF 0"))
+    monkeypatch.setattr("app.bling_integration.BlingAPI", bling_factory)
+
+    resumo = _resumir_ultima_nf_do_pedido_bling(
+        {
+            "notaFiscal": {
+                "id": "0",
+                "numero": "010985",
+                "valorTotal": 15.5,
+            }
+        }
+    )
+
+    assert "id" not in resumo
+    assert resumo["numero"] == "010985"
+    assert resumo["valor_total"] == 15.5
+    bling_factory.assert_not_called()
+
+
 def test_resolver_canal_pedido_prioriza_loja_id_quando_canal_salvo_era_bling():
     canal, label, origem = _resolver_canal_pedido(
         {
