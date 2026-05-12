@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from "react";
 import api from "../../api";
-import AutocompleteSelect from "../ui/AutocompleteSelect";
+import {
+  CategoriaProdutoSelector,
+  MarcaProdutoSelector,
+} from "./CatalogoProdutoSelectors";
 import FornecedorPrincipalDecisaoModal from "./FornecedorPrincipalDecisaoModal";
 import ProdutosFornecedoresLoteSection from "./ProdutosFornecedoresLoteSection";
 
@@ -226,25 +229,20 @@ export default function ProdutosEdicaoLoteModal({
             </div>
 
             <div className="grid gap-4 md:grid-cols-3">
-              <AutocompleteSelect
+              <MarcaProdutoSelector
                 label="Marca"
-                options={marcas}
+                marcas={marcas}
                 value={dadosEdicaoLote.marca_id}
                 onChange={(valor) => atualizarCampo("marca_id", valor)}
                 placeholder="Nao alterar"
-                searchPlaceholder="Buscar marca..."
-                getOptionLabel={(marca) => marca.nome || ""}
               />
 
-              <AutocompleteSelect
+              <CategoriaProdutoSelector
                 label="Categoria"
-                options={categorias}
+                categorias={categorias}
                 value={dadosEdicaoLote.categoria_id}
                 onChange={(valor) => atualizarCampo("categoria_id", valor)}
                 placeholder="Nao alterar"
-                searchPlaceholder="Buscar categoria..."
-                getOptionLabel={(cat) => `${cat.categoria_pai_id ? "-> " : ""}${cat.nome || ""}`}
-                getOptionSearchText={(cat) => [cat.nome, cat.nomeFormatado].filter(Boolean).join(" ")}
               />
 
               <CampoSelect

@@ -1,6 +1,9 @@
 import { useMemo, useState } from 'react';
 import SafeMarkdown from '../ui/SafeMarkdown';
-import AutocompleteSelect from '../ui/AutocompleteSelect';
+import {
+  CategoriaProdutoSelector,
+  MarcaProdutoSelector,
+} from '../produtos/CatalogoProdutoSelectors';
 import { normalizeMarkdownContent } from '../../utils/safeMarkdown';
 
 export default function ProdutosNovoDadosBasicosSection({
@@ -97,29 +100,26 @@ export default function ProdutosNovoDadosBasicosSection({
         </div>
 
         <div>
-          <AutocompleteSelect
+          <CategoriaProdutoSelector
             label="Categoria"
-            options={categoriasHierarquicas}
+            categorias={categoriasHierarquicas}
             value={formData.categoria_id}
             onChange={(valor) => handleChange('categoria_id', valor)}
             placeholder="Selecione..."
             searchPlaceholder="Digite para buscar categoria..."
             inputClassName="border-gray-300"
-            getOptionLabel={(cat) => cat.nomeFormatado || cat.nome || ''}
-            getOptionSearchText={(cat) => [cat.nome, cat.nomeFormatado].filter(Boolean).join(' ')}
           />
         </div>
 
         <div>
-          <AutocompleteSelect
+          <MarcaProdutoSelector
             label="Marca"
-            options={marcas}
+            marcas={marcas}
             value={formData.marca_id}
             onChange={(valor) => handleChange('marca_id', valor)}
             placeholder="Selecione..."
             searchPlaceholder="Digite para buscar marca..."
             inputClassName="border-gray-300"
-            getOptionLabel={(marca) => marca.nome || ''}
           />
         </div>
       </div>

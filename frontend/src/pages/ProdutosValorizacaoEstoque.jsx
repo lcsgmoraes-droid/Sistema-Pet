@@ -8,6 +8,10 @@ import {
 import FornecedorSelector, {
   getFornecedorNome,
 } from "../components/fornecedores/FornecedorSelector";
+import {
+  CategoriaProdutoSelector,
+  MarcaProdutoSelector,
+} from "../components/produtos/CatalogoProdutoSelectors";
 import FornecedorIdentity from "../components/ui/FornecedorIdentity";
 import useProdutosCatalogos from "../hooks/useProdutosCatalogos";
 
@@ -297,23 +301,13 @@ export default function ProdutosValorizacaoEstoque() {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Categoria
-            </label>
-            <select
+            <CategoriaProdutoSelector
+              categorias={categorias}
+              label="Categoria"
               value={filtrosForm.categoria_id}
-              onChange={(event) =>
-                atualizarFiltro("categoria_id", event.target.value)
-              }
-              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-            >
-              <option value="">Todas as categorias</option>
-              {categorias.map((categoria) => (
-                <option key={categoria.id} value={categoria.id}>
-                  {categoria.nome}
-                </option>
-              ))}
-            </select>
+              onChange={(valor) => atualizarFiltro("categoria_id", valor)}
+              inputClassName="rounded-xl border-gray-300 py-2.5"
+            />
           </div>
 
           <div>
@@ -338,21 +332,13 @@ export default function ProdutosValorizacaoEstoque() {
           </div>
 
           <div>
-            <label className="mb-1 block text-sm font-medium text-gray-700">
-              Marca
-            </label>
-            <select
+            <MarcaProdutoSelector
+              marcas={marcas}
+              label="Marca"
               value={filtrosForm.marca_id}
-              onChange={(event) => atualizarFiltro("marca_id", event.target.value)}
-              className="w-full rounded-xl border border-gray-300 px-3 py-2.5 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
-            >
-              <option value="">Todas as marcas</option>
-              {marcas.map((marca) => (
-                <option key={marca.id} value={marca.id}>
-                  {marca.nome}
-                </option>
-              ))}
-            </select>
+              onChange={(valor) => atualizarFiltro("marca_id", valor)}
+              inputClassName="rounded-xl border-gray-300 py-2.5"
+            />
           </div>
 
           <div>

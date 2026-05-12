@@ -1,5 +1,6 @@
 import FornecedorSelector from "../fornecedores/FornecedorSelector";
-import AutocompleteSelect from "../ui/AutocompleteSelect";
+import { MarcaProdutoSelector } from "../produtos/CatalogoProdutoSelectors";
+import ActionButton from "../ui/ActionButton";
 
 function ProdutosBalancoFiltros({
   filtros,
@@ -30,15 +31,12 @@ function ProdutosBalancoFiltros({
           className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
         />
 
-        <AutocompleteSelect
-          options={marcas}
+        <MarcaProdutoSelector
+          marcas={marcas}
           value={filtros.marca_id}
           onChange={(valor) => onAtualizarFiltro("marca_id", valor)}
           showLabel={false}
-          placeholder="Todas as marcas"
-          searchPlaceholder="Buscar marca..."
           inputClassName="rounded-lg border-gray-300"
-          getOptionLabel={(marca) => marca.nome || ""}
         />
 
         <FornecedorSelector
@@ -62,13 +60,13 @@ function ProdutosBalancoFiltros({
           }
         />
 
-        <button
-          type="button"
+        <ActionButton
+          className="h-10"
+          intent="edit"
           onClick={onAplicarFiltros}
-          className="bg-blue-600 hover:bg-blue-700 text-white rounded-lg px-3 py-2 text-sm font-medium"
         >
           Atualizar lista
-        </button>
+        </ActionButton>
       </div>
     </div>
   );

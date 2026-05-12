@@ -1,6 +1,9 @@
 import FilterBar from "../ui/FilterBar";
 import FornecedorSelector from "../fornecedores/FornecedorSelector";
-import AutocompleteSelect from "../ui/AutocompleteSelect";
+import {
+  CategoriaProdutoSelector,
+  MarcaProdutoSelector,
+} from "./CatalogoProdutoSelectors";
 
 export default function ProdutosFiltrosPanel({
   categorias,
@@ -38,29 +41,22 @@ export default function ProdutosFiltrosPanel({
         </div>
 
         <div>
-          <AutocompleteSelect
-            options={categorias}
+          <CategoriaProdutoSelector
+            categorias={categorias}
             value={filtros.categoria_id}
             onChange={(valor) => handleFiltroChange("categoria_id", valor)}
             showLabel={false}
-            placeholder="Todas as categorias"
-            searchPlaceholder="Buscar categoria..."
             inputClassName="rounded-lg border-gray-300"
-            getOptionLabel={(cat) => `${cat.categoria_pai_id ? "-> " : ""}${cat.nome || ""}`}
-            getOptionSearchText={(cat) => [cat.nome, cat.nomeFormatado].filter(Boolean).join(" ")}
           />
         </div>
 
         <div>
-          <AutocompleteSelect
-            options={marcas}
+          <MarcaProdutoSelector
+            marcas={marcas}
             value={filtros.marca_id}
             onChange={(valor) => handleFiltroChange("marca_id", valor)}
             showLabel={false}
-            placeholder="Todas as marcas"
-            searchPlaceholder="Buscar marca..."
             inputClassName="rounded-lg border-gray-300"
-            getOptionLabel={(marca) => marca.nome || ""}
           />
         </div>
 
