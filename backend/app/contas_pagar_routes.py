@@ -46,7 +46,7 @@ class ContaPagarCreate(BaseModel):
     # ============================
     # DRE - CAMPOS OBRIGATORIOS (com padrões)
     # ============================
-    dre_subcategoria_id: Optional[int] = None  # Será atribuído padrão 2 se não fornecido
+    dre_subcategoria_id: Optional[int] = None  # Obrigatorio via categoria vinculada a DRE ou envio direto
     canal: str = 'loja_fisica'  # OBRIGATORIO - loja_fisica, mercado_livre, shopee, amazon
     tipo_despesa_id: Optional[int] = None  # FK para TipoDespesa (fixo/variável)
     
@@ -189,6 +189,61 @@ def _obter_tipo_produto_revenda_id(db: Session, tenant_id) -> Optional[int]:
     return tipo.id if tipo else None
 
 
+def _resolver_dre_subcategoria_conta_pagar(
+    db: Session,
+    tenant_id,
+    *,
+    dre_subcategoria_id: Optional[int],
+    categoria_id: Optional[int],
+) -> int:
+    if dre_subcategoria_id is not None:
+        subcategoria = db.query(DRESubcategoria).filter(
+            DRESubcategoria.id == dre_subcategoria_id,
+            DRESubcategoria.tenant_id == tenant_id,
+            DRESubcategoria.ativo.is_(True),
+        ).first()
+        if not subcategoria:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Subcategoria DRE {dre_subcategoria_id} invalida ou nao pertence a este tenant",
+            )
+        return subcategoria.id
+
+    if categoria_id is not None:
+        categoria = db.query(CategoriaFinanceira).filter(
+            CategoriaFinanceira.id == categoria_id,
+            CategoriaFinanceira.tenant_id == tenant_id,
+            CategoriaFinanceira.ativo.is_(True),
+        ).first()
+        if not categoria:
+            raise HTTPException(
+                status_code=400,
+                detail="Categoria financeira invalida ou nao pertence a este tenant",
+            )
+        if categoria and categoria.dre_subcategoria_id:
+            return _resolver_dre_subcategoria_conta_pagar(
+                db,
+                tenant_id,
+                dre_subcategoria_id=categoria.dre_subcategoria_id,
+                categoria_id=None,
+            )
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Categoria financeira '{categoria.nome}' nao possui vinculo com DRE. "
+                "Vincule a categoria a uma subcategoria DRE antes de criar a conta a pagar."
+            ),
+        )
+
+    raise HTTPException(
+        status_code=400,
+        detail=(
+            "Informe uma categoria financeira vinculada a DRE ou uma subcategoria DRE valida "
+            "para criar a conta a pagar."
+        ),
+    )
+
+
 # ============================================================================
 # FUNÇÃO HELPER: CALCULAR PRÓXIMA DATA DE RECORRÊNCIA
 # ============================================================================
@@ -242,30 +297,18 @@ async def criar_conta_pagar(
     
     try:
         # ============================
-        # ATRIBUIR VALOR PADRÃO SE NECESSÁRIO
+        # CLASSIFICACAO DRE
         # ============================
-        if conta.dre_subcategoria_id is None:
-            # Padrão: subcategoria 2 (Despesas Operacionais ou equivalente)
-            conta.dre_subcategoria_id = 2
+        conta.dre_subcategoria_id = _resolver_dre_subcategoria_conta_pagar(
+            db,
+            tenant_id,
+            dre_subcategoria_id=conta.dre_subcategoria_id,
+            categoria_id=conta.categoria_id,
+        )
 
         tipo_despesa_id = conta.tipo_despesa_id
         if conta.nota_entrada_id and not tipo_despesa_id:
             tipo_despesa_id = _obter_tipo_produto_revenda_id(db, tenant_id)
-        
-        # ============================
-        # VALIDAÇÃO DRE - CRÍTICA
-        # ============================
-        subcategoria = db.query(DRESubcategoria).filter(
-            DRESubcategoria.id == conta.dre_subcategoria_id,
-            DRESubcategoria.tenant_id == tenant_id,
-            DRESubcategoria.ativo.is_(True)
-        ).first()
-        
-        if not subcategoria:
-            raise HTTPException(
-                status_code=400,
-                detail=f"Subcategoria DRE {conta.dre_subcategoria_id} inválida ou não pertence a este tenant"
-            )
         
         # ============================
         # CRIAÇÃO DE CONTAS
@@ -530,7 +573,11 @@ async def criar_conta_pagar(
             "total_contas": len(contas_criadas),
             "ids": [c.id for c in contas_criadas]
         }
-        
+
+    except HTTPException as e:
+        logger.warning(f"Erro validado ao criar conta: {e.detail}")
+        db.rollback()
+        raise
     except Exception as e:
         logger.error(f"❌ Erro ao criar conta: {e}")
         db.rollback()

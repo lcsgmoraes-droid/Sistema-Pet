@@ -50,6 +50,11 @@ export default function EstoqueFullNF() {
     carregarCategorias();
   }, []);
 
+  const categoriaTarifaSelecionada = useMemo(
+    () => categoriasDespesa.find((cat) => String(cat.id) === String(categoriaTarifaId)),
+    [categoriasDespesa, categoriaTarifaId],
+  );
+
   const atualizarLinha = (linhaId, campo, valor) => {
     setItens((prev) =>
       prev.map((item) => (item.id === linhaId ? { ...item, [campo]: valor } : item)),
@@ -65,10 +70,12 @@ export default function EstoqueFullNF() {
   };
 
   const limparFormulario = () => {
+    setNumeroNF("");
     setItens([criarLinha()]);
     setObservacao("");
-    setResultado(null);
     setArquivoXml(null);
+    setTarifaEnvio(0);
+    setCategoriaTarifaId("");
   };
 
   const importarItensDoXml = async () => {
@@ -117,20 +124,22 @@ export default function EstoqueFullNF() {
     }
   };
 
-  const registrarTarifaEnvio = async () => {
-    if (!tarifaEnvio || tarifaEnvio <= 0) return;
+  const validarTarifaEnvio = () => {
+    if (!tarifaEnvio || tarifaEnvio <= 0) return true;
 
-    await api.post("/contas-pagar/", {
-      descricao: `Tarifa envio FULL NF ${numeroNF}`,
-      categoria_id: categoriaTarifaId ? Number(categoriaTarifaId) : null,
-      dre_subcategoria_id: 2,
-      canal: "loja_fisica",
-      valor_original: Number(tarifaEnvio),
-      data_emissao: hojeISO,
-      data_vencimento: dataVencimentoTarifa || hojeISO,
-      documento: numeroNF,
-      observacoes: `Tarifa da operacao FULL (${plataforma}). Gerado na baixa de estoque por NF.`,
-    });
+    if (!categoriaTarifaId) {
+      toast.error("Selecione uma categoria de despesa vinculada a DRE para lancar a tarifa.");
+      return false;
+    }
+
+    if (!categoriaTarifaSelecionada?.dre_subcategoria_id) {
+      toast.error(
+        `A categoria "${categoriaTarifaSelecionada?.nome || "selecionada"}" nao possui vinculo com DRE.`,
+      );
+      return false;
+    }
+
+    return true;
   };
 
   const processar = async () => {
@@ -151,6 +160,10 @@ export default function EstoqueFullNF() {
       return;
     }
 
+    if (!validarTarifaEnvio()) {
+      return;
+    }
+
     try {
       setSalvando(true);
       setResultado(null);
@@ -162,13 +175,19 @@ export default function EstoqueFullNF() {
         itens: itensValidos,
       };
 
-      const response = await api.post("/estoque/saida-full-nf", payload);
-
-      await registrarTarifaEnvio();
-
-      setResultado(response.data);
-      toast.success("Baixa de estoque por NF concluida");
       if (tarifaEnvio > 0) {
+        payload.tarifa_envio = Number(tarifaEnvio);
+        payload.categoria_tarifa_id = Number(categoriaTarifaId);
+        payload.dre_subcategoria_tarifa_id = Number(categoriaTarifaSelecionada.dre_subcategoria_id);
+        payload.data_vencimento_tarifa = dataVencimentoTarifa || hojeISO;
+      }
+
+      const response = await api.post("/estoque/saida-full-nf", payload);
+      const resultadoProcessado = response.data;
+      setResultado(resultadoProcessado);
+      toast.success("Baixa de estoque por NF concluida");
+
+      if (resultadoProcessado?.tarifa_envio?.conta_pagar_id) {
         toast.success("Tarifa de envio lancada em Contas a Pagar");
       }
 
@@ -344,7 +363,9 @@ export default function EstoqueFullNF() {
           </div>
 
           <div>
-            <div className="block text-sm font-medium text-gray-700 mb-1">Categoria de despesa (opcional)</div>
+            <div className="block text-sm font-medium text-gray-700 mb-1">
+              Categoria de despesa {tarifaEnvio > 0 ? "(obrigatoria)" : "(opcional)"}
+            </div>
             <select
               id="categoria-tarifa"
               aria-label="Categoria da tarifa"
@@ -359,6 +380,21 @@ export default function EstoqueFullNF() {
                 </option>
               ))}
             </select>
+            {tarifaEnvio > 0 && !categoriaTarifaId && (
+              <p className="mt-1 text-xs text-amber-700">
+                Para gerar o contas a pagar da tarifa, selecione uma categoria com DRE vinculada.
+              </p>
+            )}
+            {tarifaEnvio > 0 && categoriaTarifaId && !categoriaTarifaSelecionada?.dre_subcategoria_id && (
+              <p className="mt-1 text-xs text-red-700">
+                Esta categoria ainda nao tem vinculo DRE. Ajuste o cadastro da categoria antes de confirmar.
+              </p>
+            )}
+            {tarifaEnvio > 0 && categoriaTarifaSelecionada?.dre_subcategoria_id && (
+              <p className="mt-1 text-xs text-emerald-700">
+                A despesa sera lancada na DRE do canal selecionado em Plataforma.
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -406,9 +442,10 @@ export default function EstoqueFullNF() {
             </table>
           </div>
 
-          {tarifaEnvio > 0 && (
+          {resultado?.tarifa_envio && (
             <p className="text-sm text-gray-700 mt-3">
-              Tarifa registrada: <strong>{formatMoneyBRL(tarifaEnvio)}</strong>
+              Tarifa registrada: <strong>{formatMoneyBRL(resultado.tarifa_envio.valor)}</strong>
+              {resultado.tarifa_envio.conta_pagar_id ? ` | Conta a pagar #${resultado.tarifa_envio.conta_pagar_id}` : ""}
             </p>
           )}
         </div>
