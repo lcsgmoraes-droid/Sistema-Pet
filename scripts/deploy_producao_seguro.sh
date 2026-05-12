@@ -6,6 +6,8 @@ REMOTE="${REMOTE:-origin}"
 BRANCH="${BRANCH:-main}"
 COMPOSE_FILE="${COMPOSE_FILE:-docker-compose.prod.yml}"
 RUNTIME_DIST="${RUNTIME_DIST:-runtime/frontend/dist}"
+NEXT_RUNTIME_DIST="${NEXT_RUNTIME_DIST:-${RUNTIME_DIST}.next}"
+PREV_RUNTIME_DIST="${PREV_RUNTIME_DIST:-${RUNTIME_DIST}.prev}"
 PUBLIC_HEALTH_URL="${PUBLIC_HEALTH_URL:-https://mlprohub.com.br/api/health}"
 DEPLOY_EVENTS_PATH="${DEPLOY_EVENTS_PATH:-backend/logs/deploy_events.jsonl}"
 DEPLOY_STARTED_AT="$(date -u '+%Y-%m-%dT%H:%M:%SZ')"
@@ -171,15 +173,16 @@ if [[ -f "$APP_DIR/scripts/ops_disk_guard.sh" ]]; then
 fi
 
 mark_step "build_frontend"
-log "Gerando frontend em $RUNTIME_DIST"
-mkdir -p "$RUNTIME_DIST"
+log "Gerando frontend em $NEXT_RUNTIME_DIST"
+rm -rf "$NEXT_RUNTIME_DIST"
+mkdir -p "$NEXT_RUNTIME_DIST"
 (
   cd frontend
   npm ci
-  npm run build -- --outDir "../$RUNTIME_DIST" --emptyOutDir
+  npm run build -- --outDir "../$NEXT_RUNTIME_DIST" --emptyOutDir
 )
 
-[[ -s "$RUNTIME_DIST/index.html" ]] || fail "Build do frontend nao gerou index.html em $RUNTIME_DIST"
+[[ -s "$NEXT_RUNTIME_DIST/index.html" ]] || fail "Build do frontend nao gerou index.html em $NEXT_RUNTIME_DIST"
 
 mark_step "validar_compose"
 log "Validando docker compose"
@@ -189,16 +192,34 @@ mark_step "build_backend"
 log "Reconstruindo backend e imagem do worker"
 docker compose -f "$COMPOSE_FILE" build backend
 
-mark_step "subir_servicos"
-log "Subindo servicos principais"
-docker compose -f "$COMPOSE_FILE" up -d postgres backend worker-bling nginx
+mark_step "subir_postgres"
+log "Garantindo Postgres ativo"
+docker compose -f "$COMPOSE_FILE" up -d postgres
 
-log "Recriando nginx para renovar DNS interno do backend"
-docker compose -f "$COMPOSE_FILE" up -d --force-recreate --no-deps nginx
+wait_for \
+  "Postgres" \
+  "cd '$APP_DIR' && docker compose -f '$COMPOSE_FILE' exec -T postgres pg_isready -U petshop_admin -d petshop_prod" \
+  24 \
+  5
 
 mark_step "migrar_banco"
 log "Aplicando migrations Alembic"
-docker compose -f "$COMPOSE_FILE" exec -T backend alembic upgrade head
+docker compose -f "$COMPOSE_FILE" run --rm --no-deps backend alembic upgrade head
+
+mark_step "subir_servicos"
+log "Subindo backend e worker"
+docker compose -f "$COMPOSE_FILE" up -d backend worker-bling
+
+mark_step "publicar_frontend"
+log "Publicando frontend em $RUNTIME_DIST"
+rm -rf "$PREV_RUNTIME_DIST"
+if [[ -d "$RUNTIME_DIST" ]]; then
+  mv "$RUNTIME_DIST" "$PREV_RUNTIME_DIST"
+fi
+mv "$NEXT_RUNTIME_DIST" "$RUNTIME_DIST"
+
+log "Recriando nginx para renovar DNS interno do backend e servir o novo frontend"
+docker compose -f "$COMPOSE_FILE" up -d --force-recreate --no-deps nginx
 
 mark_step "validar_watchdog"
 log "Aguardando watchdog interno"

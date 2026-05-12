@@ -29,7 +29,7 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_, func, desc
 from typing import List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel, Field
 from collections import defaultdict
 import json
@@ -818,6 +818,16 @@ def _sanitizar_json_sugestao(valor):
     return valor
 
 
+def _datetime_naive_utc_sugestao(valor: Optional[datetime]) -> Optional[datetime]:
+    if not valor:
+        return None
+
+    if valor.tzinfo is not None and valor.utcoffset() is not None:
+        return valor.astimezone(timezone.utc).replace(tzinfo=None)
+
+    return valor
+
+
 def _formatar_origem_venda(canal: Optional[str]) -> str:
     canal_normalizado = str(canal or "loja_fisica").strip().lower()
     nomes = {
@@ -866,6 +876,12 @@ def _somar_venda_sugestao(
     if not produto_id or not data_ref:
         return
 
+    data_ref = _datetime_naive_utc_sugestao(data_ref)
+    data_inicio_periodo = _datetime_naive_utc_sugestao(data_inicio_periodo)
+    data_fim = _datetime_naive_utc_sugestao(data_fim)
+    if not data_ref or not data_inicio_periodo or not data_fim:
+        return
+
     quantidade = _float_seguro_sugestao(quantidade)
     if quantidade <= 0:
         return
@@ -895,6 +911,10 @@ def _somar_conversao_granel_sugestao(
     data_inicio_periodo: datetime,
     data_fim: datetime,
 ):
+    data_ref = _datetime_naive_utc_sugestao(data_ref)
+    data_inicio_periodo = _datetime_naive_utc_sugestao(data_inicio_periodo)
+    data_fim = _datetime_naive_utc_sugestao(data_fim)
+
     quantidade_kg = _float_seguro_sugestao(quantidade_kg)
     quantidade_pacotes = _float_seguro_sugestao(quantidade_pacotes)
     peso_pacote_kg = _float_seguro_sugestao(peso_pacote_kg)
@@ -913,7 +933,7 @@ def _somar_conversao_granel_sugestao(
         "conversao_granel",
     )
 
-    if not data_ref:
+    if not data_ref or not data_inicio_periodo or not data_fim:
         return
 
     stats = stats_por_produto[produto_pai_id]
@@ -956,6 +976,7 @@ def _carregar_vendas_sugestao(
     if not produto_ids:
         return {}
 
+    data_fim = _datetime_naive_utc_sugestao(data_fim) or datetime.utcnow()
     ids_busca = sorted(set(produto_ids))
 
     dias_busca = max(periodo_dias, max(JANELAS_GIRO_SUGESTAO))
@@ -1211,6 +1232,8 @@ def _calcular_dias_com_estoque(
     data_inicio: datetime,
     data_fim: datetime,
 ) -> dict:
+    data_inicio = _datetime_naive_utc_sugestao(data_inicio) or datetime.utcnow()
+    data_fim = _datetime_naive_utc_sugestao(data_fim) or data_inicio
     total_dias = max(0.0, (data_fim - data_inicio).total_seconds() / 86400)
     if total_dias <= 0:
         return {
@@ -1221,8 +1244,12 @@ def _calcular_dias_com_estoque(
         }
 
     movimentos = sorted(
-        [mov for mov in movimentacoes if mov.created_at],
-        key=lambda mov: mov.created_at,
+        [
+            (_datetime_naive_utc_sugestao(mov.created_at), mov)
+            for mov in movimentacoes
+            if mov.created_at
+        ],
+        key=lambda item: item[0],
     )
 
     if not movimentos:
@@ -1235,7 +1262,7 @@ def _calcular_dias_com_estoque(
             "ruptura_ativa": estoque_atual <= 0,
         }
 
-    primeiro = movimentos[0]
+    primeiro = movimentos[0][1]
     estoque_corrente = (
         _float_seguro_sugestao(primeiro.quantidade_anterior)
         if primeiro.quantidade_anterior is not None
@@ -1244,8 +1271,11 @@ def _calcular_dias_com_estoque(
     cursor = data_inicio
     dias_com_estoque = 0.0
 
-    for mov in movimentos:
-        momento = min(max(mov.created_at, data_inicio), data_fim)
+    for momento_mov, mov in movimentos:
+        if not momento_mov:
+            continue
+
+        momento = min(max(momento_mov, data_inicio), data_fim)
         if momento > cursor:
             if estoque_corrente > 0:
                 dias_com_estoque += (momento - cursor).total_seconds() / 86400
