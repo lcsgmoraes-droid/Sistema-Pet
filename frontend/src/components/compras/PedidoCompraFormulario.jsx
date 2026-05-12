@@ -165,21 +165,32 @@ export default function PedidoCompraFormulario({
                 value={produtoTexto}
                 onChange={(e) => {
                   const valor = e.target.value;
+                  const valorNormalizado = normalizarTextoBusca(valor);
+
                   setProdutoTexto(valor);
+
+                  if (!valorNormalizado) {
+                    setMostrarSugestoesProduto(false);
+                    setItemForm(itemFormInicial);
+                    return;
+                  }
+
                   setMostrarSugestoesProduto(true);
 
-                  const valorNormalizado = normalizarTextoBusca(valor);
                   const produtoExato = produtos.find((p) => [
                     p.nome,
                     p.codigo,
                     p.sku,
                     p.codigo_barras,
-                  ].some((campo) => normalizarTextoBusca(campo) === valorNormalizado));
+                  ].some((campo) => {
+                    const campoNormalizado = normalizarTextoBusca(campo);
+                    return campoNormalizado && campoNormalizado === valorNormalizado;
+                  }));
 
                   if (produtoExato) {
                     selecionarProduto(produtoExato);
                   } else {
-                    setItemForm((prev) => ({ ...prev, produto_id: '' }));
+                    setItemForm((prev) => ({ ...prev, produto_id: '', preco_unitario: '' }));
                   }
                 }}
                 onFocus={() => {
