@@ -73,6 +73,19 @@ function contarLancamentosFinanceiros(resultado) {
   return resultado?.tarifa_envio?.conta_pagar_id ? 1 : 0;
 }
 
+function formatarDataHora(valor) {
+  if (!valor) return "-";
+  const data = new Date(valor);
+  if (Number.isNaN(data.getTime())) return "-";
+  return data.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}
+
 export default function EstoqueFullNF() {
   const [numeroNF, setNumeroNF] = useState("");
   const [plataforma, setPlataforma] = useState("");
@@ -84,9 +97,10 @@ export default function EstoqueFullNF() {
   const [categoriaTarifaId, setCategoriaTarifaId] = useState("");
   const [categoriasDespesa, setCategoriasDespesa] = useState([]);
 
-  const [resultado, setResultado] = useState(null);
   const [abaAtiva, setAbaAtiva] = useState("lancamento");
   const [modalConclusao, setModalConclusao] = useState({ aberto: false, resultado: null });
+  const [historico, setHistorico] = useState([]);
+  const [carregandoHistorico, setCarregandoHistorico] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [arquivoXml, setArquivoXml] = useState(null);
   const [xmlInputKey, setXmlInputKey] = useState(0);
@@ -114,6 +128,23 @@ export default function EstoqueFullNF() {
     };
 
     carregarCategorias();
+  }, []);
+
+  const carregarHistorico = async () => {
+    try {
+      setCarregandoHistorico(true);
+      const response = await api.get("/estoque/saida-full-nf/historico?limit=200");
+      setHistorico(Array.isArray(response.data?.items) ? response.data.items : []);
+    } catch (error) {
+      console.error("Erro ao carregar historico FULL por NF:", error);
+      toast.error("Nao foi possivel carregar o historico de baixas FULL.");
+    } finally {
+      setCarregandoHistorico(false);
+    }
+  };
+
+  useEffect(() => {
+    carregarHistorico();
   }, []);
 
   const categoriaTarifaSelecionada = useMemo(
@@ -281,7 +312,6 @@ export default function EstoqueFullNF() {
 
     try {
       setSalvando(true);
-      setResultado(null);
       setAbaAtiva("lancamento");
 
       const payload = {
@@ -300,8 +330,8 @@ export default function EstoqueFullNF() {
 
       const response = await api.post("/estoque/saida-full-nf", payload);
       const resultadoProcessado = response.data;
-      setResultado(resultadoProcessado);
       setModalConclusao({ aberto: true, resultado: resultadoProcessado });
+      carregarHistorico();
       limparFormulario();
     } catch (error) {
       console.error("Erro ao processar FULL por NF:", error);
@@ -320,7 +350,7 @@ export default function EstoqueFullNF() {
 
   const fecharModalConclusao = (verResumo = false) => {
     setModalConclusao({ aberto: false, resultado: null });
-    setAbaAtiva(verResumo ? "resumo" : "lancamento");
+    setAbaAtiva(verResumo ? "historico" : "lancamento");
   };
 
   const vincularDreEContinuar = async () => {
@@ -376,19 +406,17 @@ export default function EstoqueFullNF() {
         >
           Novo lancamento
         </button>
-        {resultado && (
-          <button
-            type="button"
-            onClick={() => setAbaAtiva("resumo")}
-            className={`px-4 py-2 text-sm font-semibold border-b-2 ${
-              abaAtiva === "resumo"
-                ? "border-blue-600 text-blue-700"
-                : "border-transparent text-slate-500 hover:text-slate-800"
-            }`}
-          >
-            Ultimo resumo
-          </button>
-        )}
+        <button
+          type="button"
+          onClick={() => setAbaAtiva("historico")}
+          className={`px-4 py-2 text-sm font-semibold border-b-2 ${
+            abaAtiva === "historico"
+              ? "border-blue-600 text-blue-700"
+              : "border-transparent text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          Historico de baixas {historico.length ? `(${historico.length})` : ""}
+        </button>
       </div>
 
       {abaAtiva === "lancamento" && (
@@ -604,66 +632,94 @@ export default function EstoqueFullNF() {
         </>
       )}
 
-      {abaAtiva === "resumo" && resultado && (
-        <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-5">
-          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between mb-4">
+      {abaAtiva === "historico" && (
+        <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-5 space-y-4">
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Resumo processado</h3>
-              <p className="text-sm text-gray-700 mt-1">
-                NF {resultado.numero_nf} | Itens processados: {resultado.total_itens}
+              <h3 className="text-lg font-semibold text-gray-900">Historico de baixas FULL</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Lancamentos processados por NF, com canal, estoque e tarifa financeira quando houver.
               </p>
             </div>
-            <CanalBadge canal={resultado.plataforma} label={resultado.plataforma_label} />
+            <button
+              type="button"
+              onClick={carregarHistorico}
+              disabled={carregandoHistorico}
+              className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+            >
+              {carregandoHistorico ? "Atualizando..." : "Atualizar historico"}
+            </button>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 mb-4 sm:grid-cols-3">
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
-              <p className="text-xs font-semibold uppercase text-emerald-700">Baixas de estoque</p>
-              <p className="mt-1 text-2xl font-bold text-emerald-900">{contarBaixas(resultado)}</p>
+          {!carregandoHistorico && !historico.length && (
+            <div className="rounded-xl border border-dashed border-slate-300 bg-slate-50 px-4 py-10 text-center text-sm text-slate-600">
+              Nenhuma baixa FULL por NF encontrada ainda.
             </div>
-            <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
-              <p className="text-xs font-semibold uppercase text-blue-700">Lancamentos financeiros</p>
-              <p className="mt-1 text-2xl font-bold text-blue-900">{contarLancamentosFinanceiros(resultado)}</p>
-            </div>
-            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
-              <p className="text-xs font-semibold uppercase text-slate-600">Status</p>
-              <p className="mt-2 text-sm font-semibold text-slate-900">
-                {resultado.estoque_ja_baixado ? "Estoque ja estava baixado" : "Processado com sucesso"}
-              </p>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-gray-600 border-b">
-                  <th className="py-2">SKU</th>
-                  <th className="py-2">Produto</th>
-                  <th className="py-2">Qtd</th>
-                  <th className="py-2">Antes</th>
-                  <th className="py-2">Depois</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(resultado.itens || []).map((item) => (
-                  <tr key={`${item.produto_id}-${item.sku}`} className="border-b last:border-0">
-                    <td className="py-2">{item.sku || "-"}</td>
-                    <td className="py-2">{item.nome}</td>
-                    <td className="py-2">{item.quantidade}</td>
-                    <td className="py-2">{item.estoque_anterior}</td>
-                    <td className="py-2">{item.estoque_novo}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-
-          {resultado?.tarifa_envio && (
-            <p className="text-sm text-gray-700 mt-3">
-              Tarifa registrada: <strong>{formatMoneyBRL(resultado.tarifa_envio.valor)}</strong>
-              {resultado.tarifa_envio.conta_pagar_id ? ` | Conta a pagar #${resultado.tarifa_envio.conta_pagar_id}` : ""}
-            </p>
           )}
+
+          <div className="space-y-3">
+            {historico.map((lancamento) => (
+              <div key={lancamento.numero_nf} className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
+                <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h4 className="text-base font-semibold text-slate-900">NF {lancamento.numero_nf}</h4>
+                      <CanalBadge canal={lancamento.plataforma} label={lancamento.plataforma_label} />
+                    </div>
+                    <p className="mt-1 text-xs text-slate-500">Processado em {formatarDataHora(lancamento.processado_em)}</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 text-sm sm:grid-cols-4">
+                    <div className="rounded-lg bg-emerald-50 px-3 py-2">
+                      <p className="text-xs text-emerald-700">Baixas</p>
+                      <p className="font-semibold text-emerald-900">{contarBaixas(lancamento)}</p>
+                    </div>
+                    <div className="rounded-lg bg-blue-50 px-3 py-2">
+                      <p className="text-xs text-blue-700">Financeiro</p>
+                      <p className="font-semibold text-blue-900">{contarLancamentosFinanceiros(lancamento)}</p>
+                    </div>
+                    <div className="rounded-lg bg-slate-50 px-3 py-2">
+                      <p className="text-xs text-slate-600">Itens</p>
+                      <p className="font-semibold text-slate-900">{lancamento.total_itens || 0}</p>
+                    </div>
+                    <div className="rounded-lg bg-slate-50 px-3 py-2">
+                      <p className="text-xs text-slate-600">Tarifa</p>
+                      <p className="font-semibold text-slate-900">
+                        {lancamento.tarifa_envio ? formatMoneyBRL(lancamento.tarifa_envio.valor) : "-"}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+
+                <details className="mt-3">
+                  <summary className="cursor-pointer text-sm font-medium text-blue-700">Ver itens da baixa</summary>
+                  <div className="mt-3 overflow-x-auto">
+                    <table className="w-full text-sm">
+                      <thead>
+                        <tr className="border-b text-left text-slate-600">
+                          <th className="py-2">SKU</th>
+                          <th className="py-2">Produto</th>
+                          <th className="py-2">Qtd</th>
+                          <th className="py-2">Antes</th>
+                          <th className="py-2">Depois</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {(lancamento.itens || []).map((item) => (
+                          <tr key={`${lancamento.numero_nf}-${item.movimentacao_id || item.produto_id}`} className="border-b last:border-0">
+                            <td className="py-2">{item.sku || "-"}</td>
+                            <td className="py-2">{item.nome || "-"}</td>
+                            <td className="py-2">{item.quantidade}</td>
+                            <td className="py-2">{item.estoque_anterior}</td>
+                            <td className="py-2">{item.estoque_novo}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </details>
+              </div>
+            ))}
+          </div>
         </div>
       )}
 
@@ -723,7 +779,7 @@ export default function EstoqueFullNF() {
                 onClick={() => fecharModalConclusao(true)}
                 className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
               >
-                Ver resumo
+                Ver historico
               </button>
               <button
                 type="button"

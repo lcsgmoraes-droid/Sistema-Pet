@@ -2227,6 +2227,16 @@ def _observacao_full_nf(numero_nf: str, plataforma: Optional[str], observacao: O
     return base
 
 
+def _canal_saida_full_por_observacao(observacao: Optional[str]) -> Optional[str]:
+    texto = _texto_limpo(observacao)
+    if not texto:
+        return None
+    match = re.search(r"plataforma:\s*([^|]+)", texto, flags=re.IGNORECASE)
+    if not match:
+        return None
+    return match.group(1).strip().lower() or None
+
+
 def _sku_produto(produto: Produto) -> Optional[str]:
     return getattr(produto, "sku", None) or getattr(produto, "codigo", None)
 
@@ -2538,7 +2548,93 @@ def _buscar_baixas_full_nf(db: Session, tenant_id, numero_nf: str):
         EstoqueMovimentacao.tenant_id == tenant_id,
         EstoqueMovimentacao.documento == numero_nf,
         EstoqueMovimentacao.motivo == "full_nfe_saida",
+        EstoqueMovimentacao.status != "cancelado",
     ).order_by(EstoqueMovimentacao.created_at.desc(), EstoqueMovimentacao.id.desc()).all()
+
+
+@router.get("/saida-full-nf/historico")
+def historico_saida_full_por_nf(
+    limit: int = Query(50, ge=1, le=200),
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Lista baixas FULL por NF ja processadas, agrupadas por NF."""
+    _current_user, tenant_id = user_and_tenant
+
+    movimentacoes = db.query(EstoqueMovimentacao).options(
+        joinedload(EstoqueMovimentacao.produto)
+    ).filter(
+        EstoqueMovimentacao.tenant_id == tenant_id,
+        EstoqueMovimentacao.motivo == "full_nfe_saida",
+        EstoqueMovimentacao.status != "cancelado",
+    ).order_by(
+        desc(EstoqueMovimentacao.created_at),
+        desc(EstoqueMovimentacao.id),
+    ).limit(max(limit * 30, 300)).all()
+
+    grupos = {}
+    for mov in movimentacoes:
+        documento = _texto_limpo(mov.documento) or f"MOV-{mov.id}"
+        canal = _canal_saida_full_por_observacao(mov.observacao) or "full"
+        if documento not in grupos:
+            grupos[documento] = {
+                "numero_nf": documento,
+                "processado_em": mov.created_at.isoformat() if mov.created_at else None,
+                "plataforma": canal,
+                "plataforma_label": _CANAL_LABELS.get(canal, canal),
+                "observacao": mov.observacao,
+                "total_itens": 0,
+                "baixas_estoque": 0,
+                "lancamentos_financeiros": 0,
+                "valor_estoque": 0.0,
+                "itens": [],
+                "tarifa_envio": None,
+            }
+
+        grupo = grupos[documento]
+        grupo["total_itens"] += 1
+        grupo["baixas_estoque"] += 1
+        grupo["valor_estoque"] += float(mov.valor_total or 0)
+        grupo["itens"].append({
+            "movimentacao_id": mov.id,
+            "produto_id": mov.produto_id,
+            "sku": _sku_produto(mov.produto) if mov.produto else None,
+            "nome": mov.produto.nome if mov.produto else None,
+            "quantidade": float(mov.quantidade or 0),
+            "estoque_anterior": float(mov.quantidade_anterior or 0),
+            "estoque_novo": float(mov.quantidade_nova or 0),
+        })
+
+    documentos = list(grupos.keys())
+    if documentos:
+        contas_tarifa = db.query(ContaPagar).filter(
+            ContaPagar.tenant_id == tenant_id,
+            ContaPagar.documento.in_(documentos),
+            ContaPagar.descricao.ilike("Tarifa envio FULL NF%"),
+        ).all()
+
+        for conta in contas_tarifa:
+            documento = _texto_limpo(conta.documento)
+            if not documento or documento not in grupos:
+                continue
+            grupo = grupos[documento]
+            grupo["lancamentos_financeiros"] += 1
+            canal = _texto_limpo(conta.canal)
+            if canal:
+                grupo["plataforma"] = canal
+                grupo["plataforma_label"] = _CANAL_LABELS.get(canal, canal)
+            valor = float(conta.valor_final or conta.valor_original or 0)
+            if not grupo["tarifa_envio"]:
+                grupo["tarifa_envio"] = {
+                    "conta_pagar_id": conta.id,
+                    "valor": valor,
+                    "status": conta.status,
+                    "data_vencimento": conta.data_vencimento.isoformat() if conta.data_vencimento else None,
+                }
+
+    items = list(grupos.values())[:limit]
+    return {"items": items, "total": len(grupos)}
+
 
 class TransferenciaEstoqueRequest(BaseModel):
     """Transferência entre estoques"""
