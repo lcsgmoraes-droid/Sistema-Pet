@@ -34,6 +34,7 @@ from pydantic import BaseModel, Field
 from collections import defaultdict
 import json
 import io
+import math
 import re
 import unicodedata
 from io import BytesIO
@@ -795,6 +796,28 @@ MAX_MULTIPLICADOR_AJUSTE_RUPTURA = 2.0
 MARGEM_SEGURANCA_COMPRA_DIAS = 7
 
 
+def _float_seguro_sugestao(valor, padrao: float = 0.0) -> float:
+    try:
+        numero = float(valor)
+    except (TypeError, ValueError):
+        return padrao
+    return numero if math.isfinite(numero) else padrao
+
+
+def _round_seguro_sugestao(valor, casas: int = 2, padrao: float = 0.0) -> float:
+    return round(_float_seguro_sugestao(valor, padrao), casas)
+
+
+def _sanitizar_json_sugestao(valor):
+    if isinstance(valor, float):
+        return valor if math.isfinite(valor) else 0.0
+    if isinstance(valor, dict):
+        return {chave: _sanitizar_json_sugestao(item) for chave, item in valor.items()}
+    if isinstance(valor, list):
+        return [_sanitizar_json_sugestao(item) for item in valor]
+    return valor
+
+
 def _formatar_origem_venda(canal: Optional[str]) -> str:
     canal_normalizado = str(canal or "loja_fisica").strip().lower()
     nomes = {
@@ -843,7 +866,7 @@ def _somar_venda_sugestao(
     if not produto_id or not data_ref:
         return
 
-    quantidade = float(quantidade or 0)
+    quantidade = _float_seguro_sugestao(quantidade)
     if quantidade <= 0:
         return
 
@@ -872,9 +895,9 @@ def _somar_conversao_granel_sugestao(
     data_inicio_periodo: datetime,
     data_fim: datetime,
 ):
-    quantidade_kg = float(quantidade_kg or 0)
-    quantidade_pacotes = float(quantidade_pacotes or 0)
-    peso_pacote_kg = float(peso_pacote_kg or 0)
+    quantidade_kg = _float_seguro_sugestao(quantidade_kg)
+    quantidade_pacotes = _float_seguro_sugestao(quantidade_pacotes)
+    peso_pacote_kg = _float_seguro_sugestao(peso_pacote_kg)
     produto_pai_id = int(produto_pai_id or 0)
     if quantidade_kg <= 0 or quantidade_pacotes <= 0 or not produto_pai_id:
         return
@@ -1098,47 +1121,47 @@ def _carregar_vendas_sugestao(
     resultado = {}
     for produto_id, stats in stats_por_produto.items():
         origens = [
-            {"canal": canal, "quantidade": round(float(quantidade or 0), 3)}
+            {"canal": canal, "quantidade": _round_seguro_sugestao(quantidade, 3)}
             for canal, quantidade in sorted(
                 stats["origens"].items(),
                 key=lambda item: item[1],
                 reverse=True,
             )
-            if float(quantidade or 0) > 0
+            if _float_seguro_sugestao(quantidade) > 0
         ]
         resultado[produto_id] = {
-            "vendas_periodo": round(float(stats["vendas_periodo"] or 0), 3),
+            "vendas_periodo": _round_seguro_sugestao(stats["vendas_periodo"], 3),
             "janelas": {
-                chave: round(float(valor or 0), 3)
+                chave: _round_seguro_sugestao(valor, 3)
                 for chave, valor in stats["janelas"].items()
             },
             "origens": origens,
             "fontes": sorted(stats["fontes"]),
             "granel_consumo": {
-                "kg_periodo": round(float(stats["granel_kg_periodo"] or 0), 3),
-                "pacotes_equivalentes_periodo": round(float(stats["granel_pacotes_periodo"] or 0), 3),
+                "kg_periodo": _round_seguro_sugestao(stats["granel_kg_periodo"], 3),
+                "pacotes_equivalentes_periodo": _round_seguro_sugestao(stats["granel_pacotes_periodo"], 3),
                 "janelas_kg": {
-                    chave: round(float(valor or 0), 3)
+                    chave: _round_seguro_sugestao(valor, 3)
                     for chave, valor in stats["granel_janelas_kg"].items()
                 },
                 "janelas_pacotes": {
-                    chave: round(float(valor or 0), 3)
+                    chave: _round_seguro_sugestao(valor, 3)
                     for chave, valor in stats["granel_janelas_pacotes"].items()
                 },
                 "itens": [
                     {
                         "produto_id": item.get("produto_id"),
                         "produto_nome": item.get("produto_nome"),
-                        "peso_pacote_kg": round(float(item.get("peso_pacote_kg") or 0), 3),
-                        "kg": round(float(item.get("kg") or 0), 3),
-                        "pacotes_equivalentes": round(float(item.get("pacotes") or 0), 3),
+                        "peso_pacote_kg": _round_seguro_sugestao(item.get("peso_pacote_kg"), 3),
+                        "kg": _round_seguro_sugestao(item.get("kg"), 3),
+                        "pacotes_equivalentes": _round_seguro_sugestao(item.get("pacotes"), 3),
                     }
                     for item in sorted(
                         stats["granel_itens"].values(),
-                        key=lambda valor: float(valor.get("kg") or 0),
+                        key=lambda valor: _float_seguro_sugestao(valor.get("kg")),
                         reverse=True,
                     )
-                    if float(item.get("kg") or 0) > 0
+                    if _float_seguro_sugestao(item.get("kg")) > 0
                 ],
             },
         }
@@ -1214,9 +1237,9 @@ def _calcular_dias_com_estoque(
 
     primeiro = movimentos[0]
     estoque_corrente = (
-        float(primeiro.quantidade_anterior)
+        _float_seguro_sugestao(primeiro.quantidade_anterior)
         if primeiro.quantidade_anterior is not None
-        else float(estoque_atual or 0)
+        else _float_seguro_sugestao(estoque_atual)
     )
     cursor = data_inicio
     dias_com_estoque = 0.0
@@ -1229,9 +1252,9 @@ def _calcular_dias_com_estoque(
             cursor = momento
 
         if mov.quantidade_nova is not None:
-            estoque_corrente = float(mov.quantidade_nova or 0)
+            estoque_corrente = _float_seguro_sugestao(mov.quantidade_nova)
         else:
-            quantidade = float(mov.quantidade or 0)
+            quantidade = _float_seguro_sugestao(mov.quantidade)
             if mov.tipo == "entrada":
                 estoque_corrente += quantidade
             elif mov.tipo == "saida":
@@ -1252,7 +1275,7 @@ def _calcular_dias_com_estoque(
 
 
 def _obter_estoque_atual_sugestao(db: Session, produto: Produto, tenant_id) -> tuple[float, dict]:
-    estoque_atual = float(produto.estoque_atual or 0)
+    estoque_atual = _float_seguro_sugestao(produto.estoque_atual)
     info = {
         "estoque_derivado": False,
         "tipo_produto": produto.tipo_produto,
@@ -1263,12 +1286,12 @@ def _obter_estoque_atual_sugestao(db: Session, produto: Produto, tenant_id) -> t
         try:
             from .services.kit_estoque_service import KitEstoqueService
 
-            estoque_atual = float(
+            estoque_atual = _float_seguro_sugestao(
                 KitEstoqueService.calcular_estoque_virtual_kit(
                     db,
                     produto.id,
                     tenant_id=tenant_id,
-                ) or 0
+                )
             )
             info["estoque_derivado"] = True
         except Exception as exc:
@@ -2407,7 +2430,7 @@ def sugerir_pedido_inteligente(
         score = (
             0 if produto_fornecedor.fornecedor_id == fornecedor_id else 1,
             0 if produto_fornecedor.e_principal else 1,
-            float(produto_fornecedor.preco_custo or 999999999),
+            _float_seguro_sugestao(produto_fornecedor.preco_custo, 999999999),
             produto_fornecedor.id,
         )
         atual = produtos_por_id.get(produto.id)
@@ -2473,13 +2496,13 @@ def sugerir_pedido_inteligente(
             "fontes": [],
             "granel_consumo": {},
         }
-        vendas_periodo = float(vendas_stats.get("vendas_periodo") or 0)
+        vendas_periodo = _float_seguro_sugestao(vendas_stats.get("vendas_periodo"))
         vendas_janelas = vendas_stats.get("janelas") or {}
-        vendas_30 = float(vendas_janelas.get("30") or 0)
+        vendas_30 = _float_seguro_sugestao(vendas_janelas.get("30"))
 
         # Consumo médio diário
         estoque_atual, estoque_info = _obter_estoque_atual_sugestao(db, produto, tenant_id)
-        estoque_minimo = float(produto.estoque_minimo or 0)
+        estoque_minimo = _float_seguro_sugestao(produto.estoque_minimo)
         cobertura_estoque = _calcular_dias_com_estoque(
             movimentacoes_por_produto.get(produto.id, []),
             estoque_atual,
@@ -2487,8 +2510,8 @@ def sugerir_pedido_inteligente(
             data_fim,
         )
 
-        dias_com_estoque = float(cobertura_estoque["dias_com_estoque"] or 0)
-        dias_sem_estoque = float(cobertura_estoque["dias_sem_estoque"] or 0)
+        dias_com_estoque = _float_seguro_sugestao(cobertura_estoque["dias_com_estoque"])
+        dias_sem_estoque = _float_seguro_sugestao(cobertura_estoque["dias_sem_estoque"])
         ruptura_ativa = bool(cobertura_estoque["ruptura_ativa"])
         teve_ruptura = bool(cobertura_estoque["teve_ruptura"])
 
@@ -2538,7 +2561,7 @@ def sugerir_pedido_inteligente(
         # Lead time do fornecedor (padrão 7 dias se não configurado)
         lead_time = produto_fornecedor.prazo_entrega or 7
         margem_seguranca_dias = MARGEM_SEGURANCA_COMPRA_DIAS
-        dias_reposicao = float(lead_time or 0) + float(margem_seguranca_dias)
+        dias_reposicao = _float_seguro_sugestao(lead_time) + _float_seguro_sugestao(margem_seguranca_dias)
 
         # Calcular quantidade sugerida
         # A cobertura escolhida pelo usuario e o alvo principal do pedido.
@@ -2549,7 +2572,7 @@ def sugerir_pedido_inteligente(
             or estoque_atual <= estoque_minimo
             or dias_estoque < dias_reposicao
         )
-        dias_total_cobertura = float(dias_cobertura) + (
+        dias_total_cobertura = _float_seguro_sugestao(dias_cobertura) + (
             dias_reposicao if lead_time_incluido_no_alvo else 0.0
         )
         quantidade_ideal = consumo_diario * dias_total_cobertura
@@ -2583,7 +2606,11 @@ def sugerir_pedido_inteligente(
             tendencia = "N/A"
 
         # Preço unitário
-        preco_unitario = float(produto_fornecedor.preco_custo or produto.preco_custo or 0)
+        preco_unitario = _float_seguro_sugestao(
+            produto_fornecedor.preco_custo
+            if produto_fornecedor.preco_custo is not None
+            else produto.preco_custo
+        )
         valor_sugestao = quantidade_sugerida * preco_unitario
 
         # Aplicar filtros
@@ -2608,23 +2635,23 @@ def sugerir_pedido_inteligente(
                 "fornecedor_grupo_nome": fornecedor_grupo.nome if fornecedor_grupo else None,
                 "marca_id": produto.marca_id,
                 "marca_nome": marca.nome if marca else None,
-                "estoque_atual": float(estoque_atual),
-                "estoque_minimo": float(estoque_minimo),
-                "consumo_diario": round(consumo_diario, 2),
-                "consumo_diario_observado": round(consumo_observado, 3),
-                "consumo_diario_ajustado": round(consumo_ajustado, 3),
-                "consumo_diario_base": round(consumo_base, 3),
-                "vendas_periodo": float(vendas_periodo),
+                "estoque_atual": _float_seguro_sugestao(estoque_atual),
+                "estoque_minimo": _float_seguro_sugestao(estoque_minimo),
+                "consumo_diario": _round_seguro_sugestao(consumo_diario, 2),
+                "consumo_diario_observado": _round_seguro_sugestao(consumo_observado, 3),
+                "consumo_diario_ajustado": _round_seguro_sugestao(consumo_ajustado, 3),
+                "consumo_diario_base": _round_seguro_sugestao(consumo_base, 3),
+                "vendas_periodo": _float_seguro_sugestao(vendas_periodo),
                 "vendas_janelas": vendas_janelas,
-                "vendas_7d": float(vendas_janelas.get("7") or 0),
-                "vendas_15d": float(vendas_janelas.get("15") or 0),
-                "vendas_30d": float(vendas_janelas.get("30") or 0),
-                "vendas_60d": float(vendas_janelas.get("60") or 0),
-                "vendas_90d": float(vendas_janelas.get("90") or 0),
+                "vendas_7d": _float_seguro_sugestao(vendas_janelas.get("7")),
+                "vendas_15d": _float_seguro_sugestao(vendas_janelas.get("15")),
+                "vendas_30d": _float_seguro_sugestao(vendas_janelas.get("30")),
+                "vendas_60d": _float_seguro_sugestao(vendas_janelas.get("60")),
+                "vendas_90d": _float_seguro_sugestao(vendas_janelas.get("90")),
                 "origens_venda": vendas_stats.get("origens") or [],
                 "fontes_calculo": vendas_stats.get("fontes") or [],
                 "granel_consumo": vendas_stats.get("granel_consumo") or {},
-                "dias_estoque": round(dias_estoque, 1) if dias_estoque < 999 else None,
+                "dias_estoque": _round_seguro_sugestao(dias_estoque, 1) if dias_estoque < 999 else None,
                 "dias_com_estoque": dias_com_estoque,
                 "dias_sem_estoque": dias_sem_estoque,
                 "teve_ruptura": teve_ruptura,
@@ -2632,16 +2659,16 @@ def sugerir_pedido_inteligente(
                 "ruptura_ajuste_aplicado": ajuste_ruptura_aplicado,
                 "ruptura_ajuste_motivo": motivo_ajuste_ruptura,
                 "lead_time": lead_time,
-                "dias_planejamento": float(dias_cobertura),
-                "dias_reposicao": round(dias_reposicao, 1),
+                "dias_planejamento": _float_seguro_sugestao(dias_cobertura),
+                "dias_reposicao": _round_seguro_sugestao(dias_reposicao, 1),
                 "margem_seguranca_dias": margem_seguranca_dias,
                 "lead_time_incluido_no_alvo": lead_time_incluido_no_alvo,
                 "dias_total_cobertura": dias_total_cobertura,
-                "estoque_para_calculo": round(estoque_para_calculo, 3),
-                "quantidade_sugerida": round(quantidade_sugerida, 2),
-                "preco_unitario": float(preco_unitario),
-                "valor_total": round(valor_sugestao, 2),
-                "peso_bruto": float(produto.peso_embalagem or produto.peso_bruto or produto.peso_liquido or 0),
+                "estoque_para_calculo": _round_seguro_sugestao(estoque_para_calculo, 3),
+                "quantidade_sugerida": _round_seguro_sugestao(quantidade_sugerida, 2),
+                "preco_unitario": _float_seguro_sugestao(preco_unitario),
+                "valor_total": _round_seguro_sugestao(valor_sugestao, 2),
+                "peso_bruto": _float_seguro_sugestao(produto.peso_embalagem or produto.peso_bruto or produto.peso_liquido),
                 "estoque_derivado": bool(estoque_info.get("estoque_derivado")),
                 "tipo_produto": estoque_info.get("tipo_produto"),
                 "tipo_kit": estoque_info.get("tipo_kit"),
@@ -2672,7 +2699,7 @@ def sugerir_pedido_inteligente(
     
     logger.info(f"✅ Sugestão gerada: {len(sugestoes)} produtos | {total_criticos} críticos | {total_alerta} em alerta")
     
-    return {
+    return _sanitizar_json_sugestao({
         "fornecedor": {
             "id": fornecedor.id,
             "nome": fornecedor.nome,
@@ -2693,9 +2720,9 @@ def sugerir_pedido_inteligente(
             "produtos_criticos": total_criticos,
             "produtos_alerta": total_alerta,
             "produtos_atencao": len([s for s in sugestoes if s["prioridade"] == "ATENÇÃO"]),
-            "valor_total_estimado": round(valor_total, 2)
+            "valor_total_estimado": _round_seguro_sugestao(valor_total, 2)
         }
-    }
+    })
 
 
 def _gerar_observacao(
