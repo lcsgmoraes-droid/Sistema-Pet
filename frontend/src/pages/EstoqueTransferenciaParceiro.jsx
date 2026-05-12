@@ -73,6 +73,14 @@ function formatarData(valor) {
   return data.toLocaleDateString("pt-BR");
 }
 
+function extrairObservacaoManualTransferencia(valor) {
+  const texto = String(valor || "");
+  const marcador = "\n\nItens:";
+  const indice = texto.indexOf(marcador);
+  if (indice >= 0) return texto.slice(0, indice).trim();
+  return texto.trim();
+}
+
 function baixarArquivoBlob(blob, nomeArquivo) {
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -481,6 +489,7 @@ export default function EstoqueTransferenciaParceiro() {
 
   const [itens, setItens] = useState([]);
   const [salvando, setSalvando] = useState(false);
+  const [transferenciaEditando, setTransferenciaEditando] = useState(null);
   const [contaGerandoPdf, setContaGerandoPdf] = useState(null);
   const [gerandoPdfConsolidado, setGerandoPdfConsolidado] = useState(false);
   const [cupomTransferencia, setCupomTransferencia] = useState("");
@@ -586,6 +595,10 @@ export default function EstoqueTransferenciaParceiro() {
           page: 1,
           page_size: 8,
           include_variations: true,
+          busca_completa: false,
+          incluir_imagens: false,
+          incluir_lotes: false,
+          incluir_detalhes_composto: false,
         });
         setSugestoesProdutos(
           extrairListaProdutos(response?.data).filter(
@@ -956,6 +969,10 @@ export default function EstoqueTransferenciaParceiro() {
         page: 1,
         page_size: 12,
         include_variations: true,
+        busca_completa: false,
+        incluir_imagens: false,
+        incluir_lotes: false,
+        incluir_detalhes_composto: false,
       });
       const produtos = extrairListaProdutos(response?.data).filter(
         (produto) => !produto?.is_parent && produto?.tipo_produto !== "PAI",
@@ -1070,6 +1087,76 @@ export default function EstoqueTransferenciaParceiro() {
     }));
   };
 
+  const limparLancamentoAtual = () => {
+    setTransferenciaEditando(null);
+    setItens([]);
+    setBuscaProduto("");
+    setSugestoesProdutos([]);
+    setDropdownProdutoAberto(false);
+    setForm((prev) => ({
+      ...prev,
+      documento: "",
+      observacao: "",
+    }));
+  };
+
+  const iniciarEdicaoTransferencia = (registro) => {
+    if (!registro?.conta_receber_id) return;
+    if (Number(registro.valor_recebido || 0) > 0 || registro.status === "recebido") {
+      toast.error("Transferencia com baixa registrada nao pode ser editada.");
+      return;
+    }
+    if (registro.status === "cancelado") {
+      toast.error("Transferencia cancelada nao pode ser editada.");
+      return;
+    }
+
+    const parceiro = {
+      id: registro.parceiro_id,
+      nome: registro.parceiro_nome,
+      codigo: registro.parceiro_codigo,
+      email: registro.parceiro_email,
+      tipo_cadastro: "pessoa",
+    };
+
+    setTransferenciaEditando(registro);
+    setParceiroSelecionado(parceiro);
+    setBuscaParceiro("");
+    setSugestoesParceiros([]);
+    setDropdownParceiroAberto(false);
+    setForm({
+      parceiro_id: registro.parceiro_id ? String(registro.parceiro_id) : "",
+      data_vencimento: registro.data_vencimento || fimDoMesIso(),
+      documento: registro.documento || "",
+      observacao: extrairObservacaoManualTransferencia(registro.observacoes),
+    });
+    setItens(
+      (Array.isArray(registro.itens) ? registro.itens : []).map((item, index) => ({
+        uid: `edit-${registro.conta_receber_id}-${item.produto_id}-${index}-${Date.now()}`,
+        produto_id: item.produto_id,
+        produto_nome: item.produto_nome,
+        codigo: item.codigo,
+        codigo_barras: item.codigo_barras,
+        estoque_atual: Number(item.estoque_atual || 0),
+        custo_unitario: Number(item.custo_unitario || 0),
+        quantidade: Number(item.quantidade || 0),
+        total_item: Number(item.valor_total || 0),
+      })),
+    );
+    setBuscaProduto("");
+    setSugestoesProdutos([]);
+    setDropdownProdutoAberto(false);
+    window.setTimeout(() => {
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      produtoInputRef.current?.focus();
+    }, 80);
+  };
+
+  const cancelarEdicaoTransferencia = () => {
+    limparLancamentoAtual();
+    toast("Edicao cancelada. O lancamento original continua sem alteracoes.");
+  };
+
   const registrarTransferencia = async () => {
     if (!parceiroSelecionado?.id) {
       toast.error("Selecione uma pessoa para registrar a transferencia.");
@@ -1106,19 +1193,20 @@ export default function EstoqueTransferenciaParceiro() {
         })),
       };
 
-      const response = await api.post("/estoque/transferencia-parceiro", payload);
+      const response = transferenciaEditando?.conta_receber_id
+        ? await api.put(
+            `/estoque/transferencia-parceiro/${transferenciaEditando.conta_receber_id}`,
+            payload,
+          )
+        : await api.post("/estoque/transferencia-parceiro", payload);
       const documentoGerado = response?.data?.documento || "registrada";
-      toast.success(`Transferencia ${documentoGerado} registrada com sucesso.`);
+      toast.success(
+        transferenciaEditando?.conta_receber_id
+          ? `Transferencia ${documentoGerado} atualizada com sucesso.`
+          : `Transferencia ${documentoGerado} registrada com sucesso.`,
+      );
 
-      setItens([]);
-      setBuscaProduto("");
-      setSugestoesProdutos([]);
-      setDropdownProdutoAberto(false);
-      setForm((prev) => ({
-        ...prev,
-        documento: "",
-        observacao: "",
-      }));
+      limparLancamentoAtual();
       setPaginaHistorico(1);
       void carregarHistoricoTransferencias(filtrosHistoricoAplicados, 1);
     } catch (error) {
@@ -1420,6 +1508,9 @@ export default function EstoqueTransferenciaParceiro() {
       if (baixaAbertaId === registro.conta_receber_id) {
         fecharBaixaTransferencia();
       }
+      if (transferenciaEditando?.conta_receber_id === registro.conta_receber_id) {
+        limparLancamentoAtual();
+      }
       void carregarHistoricoTransferencias(filtrosHistoricoAplicados, paginaHistorico);
     } catch (error) {
       console.error("Erro ao excluir transferencia:", error);
@@ -1433,6 +1524,7 @@ export default function EstoqueTransferenciaParceiro() {
   };
 
   const totalPaginasHistorico = historico.pages || 0;
+  const modoEdicao = Boolean(transferenciaEditando?.conta_receber_id);
   const loadingDocumentoTransferencia =
     modalDocumentoTransferencia.tipo === "pdf_consolidado"
       ? gerandoPdfConsolidado
@@ -1518,39 +1610,32 @@ export default function EstoqueTransferenciaParceiro() {
         </div>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <ResumoTransferenciaCard
-          titulo="Itens na transferencia"
-          valor={String(itens.length)}
-          descricao="Linhas de produto montadas para a saida com ressarcimento."
-          destaque="slate"
-        />
-        <ResumoTransferenciaCard
-          titulo="Quantidade total"
-          valor={formatarQuantidade(totalQuantidade)}
-          descricao="Unidades que sairao do estoque neste lancamento."
-          destaque="blue"
-        />
-        <ResumoTransferenciaCard
-          titulo="Ressarcimento"
-          valor={formatarMoeda(totalRessarcimento)}
-          descricao="Total configurado para o acerto desta transferencia."
-          destaque="emerald"
-        />
-        <ResumoTransferenciaCard
-          titulo="Itens sem valor"
-          valor={String(itensSemValor)}
-          descricao="Itens com total zerado travam o registro para evitar distorcao."
-          destaque="amber"
-        />
-      </div>
+      {modoEdicao ? (
+        <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p className="font-semibold">
+              Editando {transferenciaEditando.documento || `transferencia #${transferenciaEditando.conta_receber_id}`}
+            </p>
+            <p className="mt-1">
+              Ao salvar, o sistema recalcula estoque e financeiro deste lancamento.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={cancelarEdicaoTransferencia}
+            className="rounded-xl border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100"
+          >
+            Cancelar edicao
+          </button>
+        </div>
+      ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
+      <div className="space-y-6">
         <section className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <div>
               <h2 className="text-lg font-semibold text-gray-900">
-                Pessoa responsavel e dados da transferencia
+                1. Pessoa responsavel e dados da transferencia
               </h2>
               <p className="mt-1 text-sm text-gray-600">
                 Primeiro selecione quem vai ressarcir o custo desta saida.
@@ -1685,7 +1770,7 @@ export default function EstoqueTransferenciaParceiro() {
         <section className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">
-              Adicionar produtos
+              2. Produtos
             </h2>
             <p className="mt-1 text-sm text-gray-600">
               Pesquise por nome, SKU, codigo ou codigo de barras e monte a
@@ -1759,7 +1844,7 @@ export default function EstoqueTransferenciaParceiro() {
         <div className="flex flex-col gap-3 border-b border-gray-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h2 className="text-lg font-semibold text-gray-900">
-              Itens da transferencia
+              3. Itens da transferencia
             </h2>
             <p className="mt-1 text-sm text-gray-600">
               Ajuste as quantidades e confira o total de ressarcimento antes de salvar.
@@ -1776,9 +1861,42 @@ export default function EstoqueTransferenciaParceiro() {
               disabled={salvando || itens.length === 0}
               className="inline-flex items-center justify-center rounded-2xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
             >
-              {salvando ? "Registrando..." : "Registrar transferencia"}
+              {salvando
+                ? modoEdicao
+                  ? "Salvando..."
+                  : "Registrando..."
+                : modoEdicao
+                  ? "Salvar edicao"
+                  : "Registrar transferencia"}
             </button>
           </div>
+        </div>
+
+        <div className="grid gap-3 border-b border-gray-100 px-6 py-4 md:grid-cols-2 xl:grid-cols-4">
+          <ResumoTransferenciaCard
+            titulo="Itens"
+            valor={String(itens.length)}
+            descricao="Linhas de produto conferidas."
+            destaque="slate"
+          />
+          <ResumoTransferenciaCard
+            titulo="Quantidade total"
+            valor={formatarQuantidade(totalQuantidade)}
+            descricao="Unidades que sairao do estoque."
+            destaque="blue"
+          />
+          <ResumoTransferenciaCard
+            titulo="Ressarcimento"
+            valor={formatarMoeda(totalRessarcimento)}
+            descricao="Total do acerto financeiro."
+            destaque="emerald"
+          />
+          <ResumoTransferenciaCard
+            titulo="Itens sem valor"
+            valor={String(itensSemValor)}
+            descricao="Precisam ser corrigidos antes de salvar."
+            destaque="amber"
+          />
         </div>
 
         {itens.length === 0 ? (
@@ -2171,6 +2289,18 @@ export default function EstoqueTransferenciaParceiro() {
                       Dar baixa
                     </button>
                   ) : null}
+                  <button
+                    type="button"
+                    onClick={() => iniciarEdicaoTransferencia(registro)}
+                    disabled={
+                      Number(registro.valor_recebido || 0) > 0 ||
+                      registro.status === "recebido" ||
+                      registro.status === "cancelado"
+                    }
+                    className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    Editar lancamento
+                  </button>
                   <button
                     type="button"
                     onClick={() => abrirModalDocumentoTransferencia(registro, "pdf")}

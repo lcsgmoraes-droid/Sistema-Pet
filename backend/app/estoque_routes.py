@@ -91,7 +91,9 @@ _CANAL_LABELS = {
 
 _MOTIVO_TRANSFERENCIA_PARCEIRO_ESTOQUE = "transf_parceiro"
 _MOTIVO_TRANSFERENCIA_PARCEIRO_EXCLUSAO = "transf_exc"
+_MOTIVO_TRANSFERENCIA_PARCEIRO_EDICAO = "transf_edit"
 _REFERENCIA_TRANSFERENCIA_PARCEIRO_EXCLUSAO = "transf_excl"
+_REFERENCIA_TRANSFERENCIA_PARCEIRO_EDICAO = "transf_edit"
 _MODO_BAIXA_TRANSFERENCIA_LABELS = {
     "recebimento": "Recebimento",
     "acerto": "Acerto / Compensacao",
@@ -905,6 +907,8 @@ class TransferenciaParceiroHistoricoMovItem(BaseModel):
     produto_id: int
     produto_nome: str
     codigo: Optional[str] = None
+    codigo_barras: Optional[str] = None
+    estoque_atual: float = 0
     quantidade: float = 0
     custo_unitario: float = 0
     valor_total: float = 0
@@ -1477,6 +1481,8 @@ def _listar_itens_transferencia_parceiro(
                 produto_id=mov.produto_id,
                 produto_nome=mov.produto.nome if mov.produto else f"Produto #{mov.produto_id}",
                 codigo=getattr(mov.produto, "codigo", None) if mov.produto else None,
+                codigo_barras=getattr(mov.produto, "codigo_barras", None) if mov.produto else None,
+                estoque_atual=float(getattr(mov.produto, "estoque_atual", 0) or 0) if mov.produto else 0,
                 quantidade=float(mov.quantidade or 0),
                 custo_unitario=float(mov.custo_unitario or 0),
                 valor_total=float(mov.valor_total or 0),
@@ -2145,6 +2151,108 @@ def _resolver_valores_item_transferencia(
         )
 
     return custo_unitario, total_item
+
+
+def _preparar_itens_transferencia_parceiro(
+    db: Session,
+    *,
+    tenant_id,
+    itens_validos: list[TransferenciaParceiroItemRequest],
+) -> tuple[list[dict], Decimal]:
+    quantidades_por_produto: dict[int, float] = defaultdict(float)
+    for item in itens_validos:
+        quantidades_por_produto[int(item.produto_id)] += float(item.quantidade or 0)
+
+    produto_ids = list(quantidades_por_produto.keys())
+    produtos = db.query(Produto).filter(
+        Produto.id.in_(produto_ids),
+        Produto.tenant_id == tenant_id,
+    ).all()
+    produtos_cache = {produto.id: produto for produto in produtos}
+
+    for produto_id, quantidade in quantidades_por_produto.items():
+        produto = produtos_cache.get(produto_id)
+        if not produto:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Produto ID {produto_id} nao encontrado",
+            )
+
+        if produto.is_parent:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Produto '{produto.nome}' possui variacoes. "
+                    "Selecione a variacao individual para transferir estoque."
+                ),
+            )
+
+        if produto.tipo_produto == "KIT" and produto.tipo_kit == "VIRTUAL":
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Produto '{produto.nome}' e um KIT VIRTUAL. "
+                    "Use os componentes individuais na transferencia."
+                ),
+            )
+
+        estoque_atual = float(produto.estoque_atual or 0)
+        if estoque_atual < quantidade:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Estoque insuficiente para '{produto.nome}'. "
+                    f"Disponivel: {estoque_atual}, solicitado: {quantidade}"
+                ),
+            )
+
+    itens_processados = []
+    total_transferencia = Decimal("0")
+    for item in itens_validos:
+        produto = produtos_cache.get(int(item.produto_id))
+        if not produto:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Produto ID {item.produto_id} nao encontrado",
+            )
+
+        custo_unitario, total_item = _resolver_valores_item_transferencia(produto, item)
+        total_transferencia += total_item
+
+        itens_processados.append(
+            {
+                "produto_id": produto.id,
+                "produto_nome": produto.nome,
+                "codigo": getattr(produto, "codigo", None),
+                "codigo_barras": getattr(produto, "codigo_barras", None),
+                "quantidade": float(item.quantidade or 0),
+                "custo_unitario": float(custo_unitario),
+                "total_item": float(total_item),
+                "estoque_anterior": float(produto.estoque_atual or 0),
+            }
+        )
+
+    if total_transferencia <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Informe ao menos um item com valor total maior que zero",
+        )
+
+    return itens_processados, total_transferencia
+
+
+def _montar_observacoes_transferencia_parceiro(
+    observacao: Optional[str],
+    itens_processados: list[dict],
+) -> str:
+    observacoes_itens = "; ".join(
+        f"{item['produto_nome']} x {item['quantidade']}"
+        for item in itens_processados
+    )
+    observacao_limpa = _texto_limpo(observacao)
+    if observacao_limpa:
+        return f"{observacao_limpa}\n\nItens: {observacoes_itens}"
+    return observacoes_itens
 
 
 def _registrar_lote_entrada(
@@ -3988,6 +4096,217 @@ def transferir_estoque_para_parceiro(
         )
 
 
+@router.put("/transferencia-parceiro/{conta_receber_id}")
+@require_permission("produtos.editar")
+def editar_transferencia_parceiro(
+    conta_receber_id: int,
+    payload: TransferenciaParceiroRequest,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    """Edita uma transferencia ainda sem baixa, preservando estoque e financeiro."""
+    current_user, tenant_id = user_and_tenant
+    conta = _buscar_conta_transferencia_parceiro(db, tenant_id, conta_receber_id)
+
+    if float(conta.valor_recebido or 0) > 0:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "Esta transferencia ja possui recebimento registrado. "
+                "Remova ou trate a baixa financeira antes de editar o lancamento."
+            ),
+        )
+
+    status_atual = str(getattr(conta, "status", "") or "").strip().lower()
+    if status_atual in {"cancelado", "cancelada"}:
+        raise HTTPException(
+            status_code=400,
+            detail="Transferencia cancelada nao pode ser editada.",
+        )
+
+    parceiro = db.query(Cliente).filter(
+        Cliente.id == payload.parceiro_id,
+        Cliente.tenant_id == tenant_id,
+        or_(Cliente.ativo.is_(True), Cliente.ativo.is_(None)),
+    ).first()
+    if not parceiro:
+        raise HTTPException(status_code=404, detail="Pessoa nao encontrada")
+
+    itens_validos = [item for item in payload.itens if float(item.quantidade or 0) > 0]
+    if not itens_validos:
+        raise HTTPException(
+            status_code=400,
+            detail="Informe ao menos um item com quantidade maior que zero",
+        )
+
+    codigo_transferencia = (
+        _texto_limpo(payload.documento)
+        or _texto_limpo(conta.documento)
+        or _gerar_codigo_transferencia_parceiro()
+    )
+    conta_existente = db.query(ContaReceber).filter(
+        ContaReceber.tenant_id == str(tenant_id),
+        ContaReceber.documento == codigo_transferencia,
+        ContaReceber.id != conta.id,
+    ).first()
+    if conta_existente:
+        raise HTTPException(
+            status_code=400,
+            detail="Ja existe um registro financeiro com este documento",
+        )
+
+    movimentacoes_anteriores = db.query(EstoqueMovimentacao).filter(
+        EstoqueMovimentacao.tenant_id == str(tenant_id),
+        EstoqueMovimentacao.referencia_id == conta.id,
+        EstoqueMovimentacao.tipo == "saida",
+        EstoqueMovimentacao.motivo.in_(
+            [_MOTIVO_TRANSFERENCIA_PARCEIRO_ESTOQUE, "transferencia_parceiro"]
+        ),
+    ).order_by(EstoqueMovimentacao.id.asc()).all()
+
+    try:
+        estoques_finais: dict[int, float] = {}
+        produtos_tocados: set[int] = set()
+        lotes_restaurados = 0
+
+        for movimentacao in movimentacoes_anteriores:
+            produtos_tocados.add(int(movimentacao.produto_id))
+            lotes_restaurados += _restaurar_lotes_consumidos_transferencia(db, movimentacao)
+            resultado_estorno = EstoqueService.estornar_estoque(
+                produto_id=movimentacao.produto_id,
+                quantidade=float(movimentacao.quantidade or 0),
+                motivo=_MOTIVO_TRANSFERENCIA_PARCEIRO_EDICAO,
+                referencia_id=conta.id,
+                referencia_tipo=_REFERENCIA_TRANSFERENCIA_PARCEIRO_EDICAO,
+                user_id=current_user.id,
+                db=db,
+                tenant_id=str(tenant_id),
+                documento=conta.documento,
+                observacao=(
+                    f"Estorno temporario para edicao da transferencia "
+                    f"{conta.documento or conta.id}"
+                ),
+                custo_unitario_override=float(movimentacao.custo_unitario or 0),
+                valor_total_override=float(movimentacao.valor_total or 0),
+            )
+            estoques_finais[int(movimentacao.produto_id)] = resultado_estorno["estoque_novo"]
+            db.delete(movimentacao)
+
+        db.flush()
+
+        itens_processados, total_transferencia = _preparar_itens_transferencia_parceiro(
+            db,
+            tenant_id=tenant_id,
+            itens_validos=itens_validos,
+        )
+
+        categoria_financeira = None
+        if not conta.categoria_id or not conta.dre_subcategoria_id:
+            categoria_financeira = _obter_ou_criar_categoria_financeira_transferencia(
+                db,
+                tenant_id=tenant_id,
+                user_id=current_user.id,
+            )
+
+        if not conta.categoria_id and categoria_financeira:
+            conta.categoria_id = categoria_financeira.id
+        if not conta.dre_subcategoria_id:
+            conta.dre_subcategoria_id = (
+                (categoria_financeira.dre_subcategoria_id if categoria_financeira else None)
+                or _obter_dre_subcategoria_receita_padrao(db, tenant_id)
+            )
+
+        conta.descricao = f"Transferencia para parceiro - {parceiro.nome}"
+        conta.cliente_id = parceiro.id
+        conta.canal = "transferencia_parceiro"
+        conta.valor_original = total_transferencia
+        conta.valor_final = total_transferencia
+        conta.valor_recebido = Decimal("0")
+        conta.data_vencimento = payload.data_vencimento or conta.data_vencimento or date.today()
+        conta.status = "pendente"
+        conta.documento = codigo_transferencia
+        conta.observacoes = _montar_observacoes_transferencia_parceiro(
+            payload.observacao,
+            itens_processados,
+        )
+        db.add(conta)
+        db.flush()
+
+        for item in itens_processados:
+            produtos_tocados.add(int(item["produto_id"]))
+            observacao_item = (
+                f"Transferencia para parceiro {parceiro.nome} pelo custo. "
+                f"Conta a receber #{conta.id}. Editada."
+            )
+            if payload.observacao:
+                observacao_item = f"{observacao_item} {payload.observacao}"
+
+            resultado_baixa = EstoqueService.baixar_estoque(
+                produto_id=item["produto_id"],
+                quantidade=item["quantidade"],
+                motivo=_MOTIVO_TRANSFERENCIA_PARCEIRO_ESTOQUE,
+                referencia_id=conta.id,
+                referencia_tipo=_MOTIVO_TRANSFERENCIA_PARCEIRO_ESTOQUE,
+                user_id=current_user.id,
+                db=db,
+                tenant_id=str(tenant_id),
+                documento=codigo_transferencia,
+                observacao=observacao_item,
+                custo_unitario_override=item["custo_unitario"],
+                valor_total_override=item["total_item"],
+            )
+            item["movimentacao_id"] = resultado_baixa["movimentacao_id"]
+            item["estoque_novo"] = resultado_baixa["estoque_novo"]
+            estoques_finais[int(item["produto_id"])] = resultado_baixa["estoque_novo"]
+
+        db.commit()
+
+        for produto_id in produtos_tocados:
+            estoque_novo = estoques_finais.get(produto_id)
+            if estoque_novo is None:
+                continue
+            try:
+                sincronizar_bling_background(
+                    produto_id,
+                    estoque_novo,
+                    "transferencia_parceiro_edicao",
+                )
+            except Exception as e_sync:
+                logger.warning(
+                    f"[BLING-SYNC] Erro ao agendar sync (edicao transferencia-parceiro): {e_sync}"
+                )
+
+        return {
+            "sucesso": True,
+            "editado": True,
+            "documento": codigo_transferencia,
+            "conta_receber_id": conta.id,
+            "parceiro": {
+                "id": parceiro.id,
+                "nome": parceiro.nome,
+                "codigo": getattr(parceiro, "codigo", None),
+                "email": getattr(parceiro, "email", None),
+            },
+            "data_vencimento": conta.data_vencimento.isoformat() if conta.data_vencimento else None,
+            "total_ressarcimento": float(total_transferencia),
+            "lotes_restaurados": lotes_restaurados,
+            "itens": itens_processados,
+        }
+    except HTTPException:
+        db.rollback()
+        raise
+    except ValueError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc))
+    except Exception as exc:
+        db.rollback()
+        logger.exception("Erro ao editar transferencia para parceiro: %s", exc)
+        raise HTTPException(
+            status_code=500,
+            detail="Nao foi possivel editar a transferencia para parceiro",
+        )
+
+
 @router.get(
     "/transferencia-parceiro/historico",
     response_model=TransferenciaParceiroHistoricoResponse,
@@ -4051,6 +4370,8 @@ def listar_transferencias_para_parceiro(
                 produto_id=mov.produto_id,
                 produto_nome=mov.produto.nome if mov.produto else f"Produto #{mov.produto_id}",
                 codigo=getattr(mov.produto, "codigo", None) if mov.produto else None,
+                codigo_barras=getattr(mov.produto, "codigo_barras", None) if mov.produto else None,
+                estoque_atual=float(getattr(mov.produto, "estoque_atual", 0) or 0) if mov.produto else 0,
                 quantidade=float(mov.quantidade or 0),
                 custo_unitario=float(mov.custo_unitario or 0),
                 valor_total=float(mov.valor_total or 0),
@@ -4229,6 +4550,8 @@ def gerar_pdf_transferencias_parceiro_consolidado(
                 produto_id=mov.produto_id,
                 produto_nome=mov.produto.nome if mov.produto else f"Produto #{mov.produto_id}",
                 codigo=getattr(mov.produto, "codigo", None) if mov.produto else None,
+                codigo_barras=getattr(mov.produto, "codigo_barras", None) if mov.produto else None,
+                estoque_atual=float(getattr(mov.produto, "estoque_atual", 0) or 0) if mov.produto else 0,
                 quantidade=float(mov.quantidade or 0),
                 custo_unitario=float(mov.custo_unitario or 0),
                 valor_total=float(mov.valor_total or 0),
