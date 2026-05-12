@@ -490,6 +490,7 @@ export default function EstoqueTransferenciaParceiro() {
   const [itens, setItens] = useState([]);
   const [salvando, setSalvando] = useState(false);
   const [transferenciaEditando, setTransferenciaEditando] = useState(null);
+  const [abaAtiva, setAbaAtiva] = useState("lancamento");
   const [contaGerandoPdf, setContaGerandoPdf] = useState(null);
   const [gerandoPdfConsolidado, setGerandoPdfConsolidado] = useState(false);
   const [cupomTransferencia, setCupomTransferencia] = useState("");
@@ -505,6 +506,7 @@ export default function EstoqueTransferenciaParceiro() {
   const [contaRecebendo, setContaRecebendo] = useState(null);
   const [contaExcluindo, setContaExcluindo] = useState(null);
   const [selecionadosHistorico, setSelecionadosHistorico] = useState([]);
+  const [historicoExpandidoIds, setHistoricoExpandidoIds] = useState([]);
   const [baixaAbertaId, setBaixaAbertaId] = useState(null);
   const [formBaixa, setFormBaixa] = useState({
     valor_recebido: "",
@@ -944,6 +946,7 @@ export default function EstoqueTransferenciaParceiro() {
     setBuscaProduto("");
     setSugestoesProdutos([]);
     setDropdownProdutoAberto(false);
+    setAbaAtiva("lancamento");
     window.setTimeout(() => {
       if (options.scroll !== false) {
         itensRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -1297,6 +1300,14 @@ export default function EstoqueTransferenciaParceiro() {
     setSelecionadosHistorico([]);
   };
 
+  const alternarExpansaoHistorico = (contaReceberId) => {
+    setHistoricoExpandidoIds((prev) =>
+      prev.includes(contaReceberId)
+        ? prev.filter((id) => id !== contaReceberId)
+        : [...prev, contaReceberId],
+    );
+  };
+
   const gerarPdfConsolidadoHistorico = async (
     colunasDocumento = COLUNAS_DOCUMENTO_TRANSFERENCIA_COMPLETO,
   ) => {
@@ -1403,6 +1414,11 @@ export default function EstoqueTransferenciaParceiro() {
 
   const abrirBaixaTransferencia = async (registro) => {
     setBaixaAbertaId(registro.conta_receber_id);
+    setHistoricoExpandidoIds((prev) =>
+      prev.includes(registro.conta_receber_id)
+        ? prev
+        : [...prev, registro.conta_receber_id],
+    );
     setFormBaixa({
       valor_recebido: Number(registro.saldo_aberto || 0).toFixed(2),
       data_recebimento: hojeIso(),
@@ -1481,6 +1497,7 @@ export default function EstoqueTransferenciaParceiro() {
       toast.success("Baixa registrada com sucesso.");
       fecharBaixaTransferencia();
       void carregarHistoricoTransferencias(filtrosHistoricoAplicados, paginaHistorico);
+      setAbaAtiva("historico");
     } catch (error) {
       console.error("Erro ao registrar baixa da transferencia:", error);
       toast.error(
@@ -1630,7 +1647,38 @@ export default function EstoqueTransferenciaParceiro() {
         </div>
       ) : null}
 
-      <div className="space-y-6">
+      <div className="flex flex-wrap gap-2 border-b border-gray-200">
+        <button
+          type="button"
+          onClick={() => setAbaAtiva("lancamento")}
+          className={`border-b-2 px-4 py-3 text-sm font-semibold transition ${
+            abaAtiva === "lancamento"
+              ? "border-blue-600 text-blue-700"
+              : "border-transparent text-gray-600 hover:text-gray-900"
+          }`}
+        >
+          Novo lancamento
+        </button>
+        <button
+          type="button"
+          onClick={() => setAbaAtiva("historico")}
+          className={`border-b-2 px-4 py-3 text-sm font-semibold transition ${
+            abaAtiva === "historico"
+              ? "border-blue-600 text-blue-700"
+              : "border-transparent text-gray-600 hover:text-gray-900"
+          }`}
+        >
+          Consultar historico
+          {historico.totais.total_registros ? (
+            <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
+              {historico.totais.total_registros}
+            </span>
+          ) : null}
+        </button>
+      </div>
+
+      {abaAtiva === "lancamento" ? (
+        <div className="space-y-6">
         <section className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
           <div className="flex items-center justify-between gap-3">
             <div>
@@ -1838,7 +1886,6 @@ export default function EstoqueTransferenciaParceiro() {
             lista abaixo. O botao de registrar fica junto da conferencia final.
           </div>
         </section>
-      </div>
 
       <section ref={itensRef} className="rounded-3xl border border-gray-200 bg-white shadow-sm">
         <div className="flex flex-col gap-3 border-b border-gray-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
@@ -1993,6 +2040,8 @@ export default function EstoqueTransferenciaParceiro() {
           </div>
         )}
       </section>
+        </div>
+      ) : (
 
       <section className="rounded-3xl border border-gray-200 bg-white shadow-sm">
         <div className="flex flex-col gap-4 border-b border-gray-100 px-6 py-5 xl:flex-row xl:items-start xl:justify-between">
@@ -2197,7 +2246,10 @@ export default function EstoqueTransferenciaParceiro() {
               </div>
             </div>
 
-            {historico.items.map((registro) => (
+            {historico.items.map((registro) => {
+              const expandido = historicoExpandidoIds.includes(registro.conta_receber_id);
+              const totalItensRegistro = registro.itens?.length || 0;
+              return (
               <article
                 key={registro.conta_receber_id}
                 className="rounded-2xl border border-slate-200 bg-slate-50 p-5"
@@ -2246,39 +2298,52 @@ export default function EstoqueTransferenciaParceiro() {
                         ) : null}
                       </div>
                     ) : null}
-                    {registro.observacoes ? (
+                    {expandido && registro.observacoes ? (
                       <p className="text-xs text-gray-500">{registro.observacoes}</p>
                     ) : null}
                   </div>
 
-                  <div className="grid gap-3 sm:grid-cols-3">
-                    <div className="rounded-2xl bg-white px-4 py-3 text-right shadow-sm">
-                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                        Valor
-                      </p>
-                      <p className="mt-1 text-base font-semibold text-gray-900">
-                        {formatarMoeda(registro.valor_original)}
-                      </p>
+                  <div className="min-w-0 space-y-3 xl:min-w-[460px]">
+                    <div className="grid min-w-0 gap-3 sm:grid-cols-3">
+                      <div className="min-w-0 rounded-2xl bg-white px-4 py-3 text-right shadow-sm">
+                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                          Valor
+                        </p>
+                        <p className="mt-1 break-words text-sm font-semibold text-gray-900 md:text-base">
+                          {formatarMoeda(registro.valor_original)}
+                        </p>
+                      </div>
+                      <div className="min-w-0 rounded-2xl bg-white px-4 py-3 text-right shadow-sm">
+                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                          Recebido
+                        </p>
+                        <p className="mt-1 break-words text-sm font-semibold text-emerald-700 md:text-base">
+                          {formatarMoeda(registro.valor_recebido)}
+                        </p>
+                      </div>
+                      <div className="min-w-0 rounded-2xl bg-white px-4 py-3 text-right shadow-sm">
+                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
+                          Saldo
+                        </p>
+                        <p className="mt-1 break-words text-sm font-semibold text-amber-700 md:text-base">
+                          {formatarMoeda(registro.saldo_aberto)}
+                        </p>
+                      </div>
                     </div>
-                    <div className="rounded-2xl bg-white px-4 py-3 text-right shadow-sm">
-                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                        Recebido
-                      </p>
-                      <p className="mt-1 text-base font-semibold text-emerald-700">
-                        {formatarMoeda(registro.valor_recebido)}
-                      </p>
-                    </div>
-                    <div className="rounded-2xl bg-white px-4 py-3 text-right shadow-sm">
-                      <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                        Saldo
-                      </p>
-                      <p className="mt-1 text-base font-semibold text-amber-700">
-                        {formatarMoeda(registro.saldo_aberto)}
-                      </p>
+                    <div className="flex justify-end">
+                      <button
+                        type="button"
+                        onClick={() => alternarExpansaoHistorico(registro.conta_receber_id)}
+                        className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
+                      >
+                        {expandido ? "Fechar detalhes" : `Ver detalhes (${totalItensRegistro} item(ns))`}
+                      </button>
                     </div>
                   </div>
                 </div>
 
+                {expandido ? (
+                  <>
                 <div className="mt-4 flex flex-wrap justify-end gap-2">
                   {registro.status !== "recebido" && registro.status !== "cancelado" ? (
                     <button
@@ -2673,7 +2738,7 @@ export default function EstoqueTransferenciaParceiro() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100 bg-white">
-                      {registro.itens.map((item, index) => (
+                      {(registro.itens || []).map((item, index) => (
                         <tr key={`${registro.conta_receber_id}-${item.produto_id}-${index}`}>
                           <td className="px-4 py-3">
                             <p className="text-sm font-medium text-gray-900">
@@ -2697,8 +2762,11 @@ export default function EstoqueTransferenciaParceiro() {
                     </tbody>
                   </table>
                 </div>
+                  </>
+                ) : null}
               </article>
-            ))}
+              );
+            })}
 
             {totalPaginasHistorico > 1 ? (
               <div className="flex items-center justify-end gap-2 pt-2">
@@ -2728,6 +2796,7 @@ export default function EstoqueTransferenciaParceiro() {
           </div>
         )}
       </section>
+      )}
     </div>
   );
 }
