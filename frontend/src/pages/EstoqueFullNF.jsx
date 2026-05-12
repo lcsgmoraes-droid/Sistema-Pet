@@ -30,6 +30,11 @@ export default function EstoqueFullNF() {
   const [salvando, setSalvando] = useState(false);
   const [arquivoXml, setArquivoXml] = useState(null);
   const [lendoXml, setLendoXml] = useState(false);
+  const [modalDre, setModalDre] = useState({ aberto: false, categoria: null });
+  const [dreSubcategoriasDespesa, setDreSubcategoriasDespesa] = useState([]);
+  const [dreSubcategoriaId, setDreSubcategoriaId] = useState("");
+  const [carregandoDre, setCarregandoDre] = useState(false);
+  const [salvandoVinculoDre, setSalvandoVinculoDre] = useState(false);
 
   const hojeISO = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
@@ -54,6 +59,49 @@ export default function EstoqueFullNF() {
     () => categoriasDespesa.find((cat) => String(cat.id) === String(categoriaTarifaId)),
     [categoriasDespesa, categoriaTarifaId],
   );
+
+  const carregarSubcategoriasDespesaDre = async () => {
+    if (dreSubcategoriasDespesa.length) return;
+
+    try {
+      setCarregandoDre(true);
+      const [categoriasResponse, subcategoriasResponse] = await Promise.all([
+        api.get("/dre/categorias"),
+        api.get("/dre/subcategorias"),
+      ]);
+
+      const categoriasDre = Array.isArray(categoriasResponse.data) ? categoriasResponse.data : [];
+      const subcategoriasDre = Array.isArray(subcategoriasResponse.data) ? subcategoriasResponse.data : [];
+      const categoriasDespesaMap = new Map(
+        categoriasDre
+          .filter((cat) => cat.ativo !== false && String(cat.natureza || "").toLowerCase() === "despesa")
+          .map((cat) => [Number(cat.id), cat]),
+      );
+
+      const opcoes = subcategoriasDre
+        .filter((sub) => sub.ativo !== false && categoriasDespesaMap.has(Number(sub.categoria_id)))
+        .map((sub) => ({
+          ...sub,
+          categoria_nome: categoriasDespesaMap.get(Number(sub.categoria_id))?.nome || "Despesa",
+        }))
+        .sort((a, b) =>
+          `${a.categoria_nome} ${a.nome}`.localeCompare(`${b.categoria_nome} ${b.nome}`, "pt-BR"),
+        );
+
+      setDreSubcategoriasDespesa(opcoes);
+    } catch (error) {
+      console.error("Erro ao carregar DRE de despesa:", error);
+      toast.error("Nao foi possivel carregar as subcategorias DRE de despesa.");
+    } finally {
+      setCarregandoDre(false);
+    }
+  };
+
+  const abrirModalVinculoDre = (categoria) => {
+    setModalDre({ aberto: true, categoria });
+    setDreSubcategoriaId("");
+    carregarSubcategoriasDespesaDre();
+  };
 
   const atualizarLinha = (linhaId, campo, valor) => {
     setItens((prev) =>
@@ -124,7 +172,7 @@ export default function EstoqueFullNF() {
     }
   };
 
-  const validarTarifaEnvio = () => {
+  const validarTarifaEnvio = (categoriaClassificada = categoriaTarifaSelecionada) => {
     if (!tarifaEnvio || tarifaEnvio <= 0) return true;
 
     if (!categoriaTarifaId) {
@@ -132,17 +180,15 @@ export default function EstoqueFullNF() {
       return false;
     }
 
-    if (!categoriaTarifaSelecionada?.dre_subcategoria_id) {
-      toast.error(
-        `A categoria "${categoriaTarifaSelecionada?.nome || "selecionada"}" nao possui vinculo com DRE.`,
-      );
+    if (!categoriaClassificada?.dre_subcategoria_id) {
+      abrirModalVinculoDre(categoriaClassificada);
       return false;
     }
 
     return true;
   };
 
-  const processar = async () => {
+  const processar = async (categoriaClassificada = categoriaTarifaSelecionada) => {
     if (!numeroNF.trim()) {
       toast.error("Informe o numero da NF");
       return;
@@ -160,7 +206,7 @@ export default function EstoqueFullNF() {
       return;
     }
 
-    if (!validarTarifaEnvio()) {
+    if (!validarTarifaEnvio(categoriaClassificada)) {
       return;
     }
 
@@ -178,7 +224,7 @@ export default function EstoqueFullNF() {
       if (tarifaEnvio > 0) {
         payload.tarifa_envio = Number(tarifaEnvio);
         payload.categoria_tarifa_id = Number(categoriaTarifaId);
-        payload.dre_subcategoria_tarifa_id = Number(categoriaTarifaSelecionada.dre_subcategoria_id);
+        payload.dre_subcategoria_tarifa_id = Number(categoriaClassificada.dre_subcategoria_id);
         payload.data_vencimento_tarifa = dataVencimentoTarifa || hojeISO;
       }
 
@@ -198,6 +244,44 @@ export default function EstoqueFullNF() {
       toast.error(detalhe);
     } finally {
       setSalvando(false);
+    }
+  };
+
+  const fecharModalDre = () => {
+    if (salvandoVinculoDre) return;
+    setModalDre({ aberto: false, categoria: null });
+    setDreSubcategoriaId("");
+  };
+
+  const vincularDreEContinuar = async () => {
+    const categoria = modalDre.categoria;
+    if (!categoria) return;
+    if (!dreSubcategoriaId) {
+      toast.error("Selecione a subcategoria DRE para vincular.");
+      return;
+    }
+
+    try {
+      setSalvandoVinculoDre(true);
+      const response = await api.put(`/categorias-financeiras/${categoria.id}`, {
+        dre_subcategoria_id: Number(dreSubcategoriaId),
+      });
+      const categoriaAtualizada = response.data;
+
+      setCategoriasDespesa((prev) =>
+        prev.map((cat) => (String(cat.id) === String(categoriaAtualizada.id) ? categoriaAtualizada : cat)),
+      );
+      setCategoriaTarifaId(String(categoriaAtualizada.id));
+      setModalDre({ aberto: false, categoria: null });
+      setDreSubcategoriaId("");
+      toast.success("Categoria vinculada a DRE. Continuando a operacao...");
+      await processar(categoriaAtualizada);
+    } catch (error) {
+      console.error("Erro ao vincular categoria a DRE:", error);
+      const detalhe = error?.response?.data?.detail || "Nao foi possivel vincular a categoria a DRE.";
+      toast.error(detalhe);
+    } finally {
+      setSalvandoVinculoDre(false);
     }
   };
 
@@ -402,7 +486,7 @@ export default function EstoqueFullNF() {
       <div className="flex flex-wrap gap-3">
         <button
           type="button"
-          onClick={processar}
+          onClick={() => processar()}
           disabled={salvando}
           className="px-5 py-2.5 rounded-lg bg-emerald-600 text-white hover:bg-emerald-700 disabled:opacity-60"
         >
@@ -448,6 +532,85 @@ export default function EstoqueFullNF() {
               {resultado.tarifa_envio.conta_pagar_id ? ` | Conta a pagar #${resultado.tarifa_envio.conta_pagar_id}` : ""}
             </p>
           )}
+        </div>
+      )}
+
+      {modalDre.aberto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
+          <div className="w-full max-w-xl rounded-xl bg-white shadow-2xl border border-slate-200">
+            <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Acao necessaria</p>
+                <h3 className="mt-1 text-lg font-semibold text-slate-900">Vincular categoria a DRE</h3>
+              </div>
+              <button
+                type="button"
+                onClick={fecharModalDre}
+                className="rounded-lg px-2 py-1 text-xl leading-none text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Fechar"
+              >
+                x
+              </button>
+            </div>
+
+            <div className="space-y-4 px-5 py-4">
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                A categoria <strong>{modalDre.categoria?.caminho_completo || modalDre.categoria?.nome}</strong> ainda
+                nao tem vinculo contabil. Para gerar a conta a pagar e jogar a despesa na DRE do canal selecionado, escolha
+                abaixo onde essa despesa deve entrar.
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-slate-700 mb-1">
+                  Subcategoria DRE de despesa
+                </label>
+                <select
+                  value={dreSubcategoriaId}
+                  onChange={(e) => setDreSubcategoriaId(e.target.value)}
+                  disabled={carregandoDre}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 disabled:bg-slate-100"
+                >
+                  <option value="">
+                    {carregandoDre ? "Carregando opcoes..." : "Selecione onde classificar esta despesa"}
+                  </option>
+                  {dreSubcategoriasDespesa.map((sub) => (
+                    <option key={sub.id} value={sub.id}>
+                      {sub.categoria_nome} &gt; {sub.nome}
+                    </option>
+                  ))}
+                </select>
+                {!carregandoDre && !dreSubcategoriasDespesa.length && (
+                  <p className="mt-2 text-xs text-red-700">
+                    Nenhuma subcategoria DRE de despesa ativa foi encontrada. Cadastre o plano DRE antes de continuar.
+                  </p>
+                )}
+              </div>
+
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-600">
+                Esse vinculo fica salvo na categoria financeira. Nas proximas baixas com a mesma categoria, o sistema ja
+                segue direto.
+              </div>
+            </div>
+
+            <div className="flex flex-col-reverse gap-2 border-t border-slate-200 px-5 py-4 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={fecharModalDre}
+                disabled={salvandoVinculoDre}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+              >
+                Resolver depois
+              </button>
+              <button
+                type="button"
+                onClick={vincularDreEContinuar}
+                disabled={salvandoVinculoDre || carregandoDre || !dreSubcategoriasDespesa.length}
+                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
+              >
+                {salvandoVinculoDre ? "Salvando..." : "Vincular e continuar"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
