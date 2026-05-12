@@ -19,6 +19,23 @@ function getFornecedorMeta(fornecedor) {
     .join(" - ");
 }
 
+function getGrupoFornecedorMeta(grupo) {
+  const total = Array.isArray(grupo?.fornecedor_ids)
+    ? grupo.fornecedor_ids.length
+    : (Array.isArray(grupo?.fornecedores) ? grupo.fornecedores.length : 0);
+  const partes = [];
+
+  if (grupo?.fornecedor_principal_nome) {
+    partes.push(`Principal: ${grupo.fornecedor_principal_nome}`);
+  }
+
+  if (total > 0) {
+    partes.push(`${total} fornecedor${total === 1 ? "" : "es"}`);
+  }
+
+  return partes.join(" - ");
+}
+
 function mergeFornecedores(...listas) {
   const porId = new Map();
   listas.flat().forEach((fornecedor) => {
@@ -202,6 +219,7 @@ export default function FornecedorSelector({
   className = "",
   disabled = false,
   fornecedores = [],
+  gruposFornecedores = [],
   fornecedorId,
   fornecedorSelecionado,
   inputClassName = "",
@@ -212,6 +230,7 @@ export default function FornecedorSelector({
   onInputChange,
   onKeyDown,
   onSelect,
+  onSelectGrupo,
   placeholder = "Digite o nome, CNPJ ou telefone...",
   required = false,
   searchRemote = true,
@@ -316,6 +335,42 @@ export default function FornecedorSelector({
       .slice(0, 20);
   }, [fornecedores, termo]);
 
+  const sugestoesGrupos = useMemo(() => {
+    if (!onSelectGrupo) return [];
+
+    const consulta = termo.trim().toLocaleLowerCase("pt-BR");
+    const base = gruposFornecedores
+      .filter((grupo) => grupo?.id && grupo?.ativo !== false)
+      .sort((a, b) => String(a.nome || "").localeCompare(String(b.nome || ""), "pt-BR"));
+
+    if (!consulta) {
+      return base.slice(0, 8);
+    }
+
+    return base
+      .filter((grupo) => {
+        const fornecedoresGrupo = Array.isArray(grupo?.fornecedores)
+          ? grupo.fornecedores
+          : [];
+        const haystack = [
+          grupo?.nome,
+          grupo?.descricao,
+          grupo?.fornecedor_principal_nome,
+          ...fornecedoresGrupo.flatMap((fornecedor) => [
+            getFornecedorNome(fornecedor),
+            fornecedor?.cnpj,
+            fornecedor?.cpf,
+          ]),
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLocaleLowerCase("pt-BR");
+
+        return haystack.includes(consulta);
+      })
+      .slice(0, 8);
+  }, [gruposFornecedores, onSelectGrupo, termo]);
+
   const sugestoes = useMemo(
     () => mergeFornecedores(sugestoesRemotas, sugestoesLocais),
     [sugestoesLocais, sugestoesRemotas],
@@ -325,9 +380,18 @@ export default function FornecedorSelector({
     (fornecedor) =>
       getFornecedorNome(fornecedor).toLocaleLowerCase("pt-BR") ===
       termoLimpo.toLocaleLowerCase("pt-BR"),
+  ) || sugestoesGrupos.some(
+    (grupo) =>
+      String(grupo?.nome || "").toLocaleLowerCase("pt-BR") ===
+      termoLimpo.toLocaleLowerCase("pt-BR"),
   );
   const mostrarNovo = allowCreate && termoLimpo.length >= minChars && !existeExato;
-  const mostrarSugestoes = aberto && !disabled && (sugestoes.length > 0 || mostrarNovo || buscando);
+  const mostrarSugestoes = aberto && !disabled && (
+    sugestoesGrupos.length > 0 ||
+    sugestoes.length > 0 ||
+    mostrarNovo ||
+    buscando
+  );
 
   const selecionarFornecedor = (fornecedor) => {
     const nome = getFornecedorNome(fornecedor);
@@ -335,6 +399,14 @@ export default function FornecedorSelector({
     setAberto(false);
     onInputChange?.(nome);
     onSelect?.(fornecedor);
+  };
+
+  const selecionarGrupo = (grupo) => {
+    const nome = grupo?.nome || "";
+    setTermo(nome);
+    setAberto(false);
+    onInputChange?.(nome);
+    onSelectGrupo?.(grupo);
   };
 
   const limparFornecedor = () => {
@@ -428,6 +500,29 @@ export default function FornecedorSelector({
               Buscando fornecedores...
             </div>
           ) : null}
+
+          {sugestoesGrupos.map((grupo) => (
+            <button
+              key={`grupo-${grupo.id}`}
+              type="button"
+              onClick={() => selecionarGrupo(grupo)}
+              className="w-full border-b border-emerald-100 bg-emerald-50/60 px-4 py-3 text-left last:border-b-0 hover:bg-emerald-50"
+            >
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0 flex-1 truncate font-medium text-emerald-950">
+                  Grupo: {grupo.nome}
+                </div>
+                <span className="shrink-0 rounded bg-emerald-100 px-1.5 py-0.5 text-xs font-semibold text-emerald-700">
+                  grupo
+                </span>
+              </div>
+              {getGrupoFornecedorMeta(grupo) ? (
+                <div className="mt-0.5 text-xs text-emerald-700">
+                  {getGrupoFornecedorMeta(grupo)}
+                </div>
+              ) : null}
+            </button>
+          ))}
 
           {sugestoes.map((fornecedor) => (
             <button

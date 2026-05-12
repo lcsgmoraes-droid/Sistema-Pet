@@ -169,14 +169,15 @@ const PedidosCompra = () => {
   };
 
   const selecionarFornecedor = (fornecedor) => {
+    const grupo = obterGrupoDoFornecedor(fornecedor.id);
     setFornecedorTexto(fornecedor.nome || '');
     setFormData((prev) => ({ ...prev, fornecedor_id: fornecedor.id.toString(), itens: [] }));
-    setIncluirGrupoFornecedor(Boolean(obterGrupoDoFornecedor(fornecedor.id)));
+    setIncluirGrupoFornecedor(Boolean(grupo));
     setItemForm(ITEM_FORM_INICIAL);
     setProdutoTexto('');
     // Limpar sugestões do fornecedor anterior
     limparEstadosSugestao();
-    carregarProdutosFornecedor(fornecedor.id);
+    carregarProdutosFornecedor(fornecedor.id, { fornecedorGrupoId: grupo?.id });
   };
 
   const selecionarProduto = (produto) => {
@@ -186,6 +187,46 @@ const PedidosCompra = () => {
 
   const obterFornecedorPorId = (fornecedorId) =>
     fornecedores.find((f) => Number(f.id) === Number(fornecedorId));
+
+  const obterFornecedorPreferencialDoGrupo = (grupo) => {
+    const fornecedoresGrupo = Array.isArray(grupo?.fornecedores) ? grupo.fornecedores : [];
+    const fornecedorId =
+      Number(grupo?.fornecedor_principal_id) ||
+      Number(grupo?.fornecedor_ids?.[0]) ||
+      Number(fornecedoresGrupo[0]?.id);
+
+    if (!Number.isFinite(fornecedorId) || fornecedorId <= 0) {
+      return null;
+    }
+
+    return obterFornecedorPorId(fornecedorId)
+      || fornecedoresGrupo.find((fornecedor) => Number(fornecedor.id) === fornecedorId)
+      || null;
+  };
+
+  const selecionarGrupoFornecedor = (grupo) => {
+    const fornecedorBase = obterFornecedorPreferencialDoGrupo(grupo);
+
+    if (!fornecedorBase?.id) {
+      toast.error('Grupo de fornecedor sem fornecedor vinculado');
+      return;
+    }
+
+    if (!obterFornecedorPorId(fornecedorBase.id)) {
+      registrarFornecedorCriado(fornecedorBase);
+    }
+    setFornecedorTexto(grupo.nome || fornecedorBase.nome || '');
+    setFormData((prev) => ({
+      ...prev,
+      fornecedor_id: fornecedorBase.id.toString(),
+      itens: [],
+    }));
+    setIncluirGrupoFornecedor(true);
+    setItemForm(ITEM_FORM_INICIAL);
+    setProdutoTexto('');
+    limparEstadosSugestao();
+    carregarProdutosFornecedor(fornecedorBase.id, { fornecedorGrupoId: grupo.id });
+  };
 
   const obterGrupoDoFornecedor = (fornecedorId) => {
     const id = Number(fornecedorId);
@@ -613,15 +654,18 @@ const PedidosCompra = () => {
     carregarDados,
   });
 
-  const carregarProdutosFornecedor = async (fornecedorId) => {
+  const carregarProdutosFornecedor = async (fornecedorId, opcoes = {}) => {
     if (!fornecedorId) {
       setProdutos([]);
       return;
     }
     try {
-      const response = await api.get(
-        `/produtos/?fornecedor_id=${fornecedorId}`
-      );
+      const params = new URLSearchParams({ fornecedor_id: fornecedorId });
+      if (opcoes.fornecedorGrupoId) {
+        params.set('fornecedor_grupo_id', opcoes.fornecedorGrupoId);
+      }
+
+      const response = await api.get(`/produtos/?${params.toString()}`);
       
       // API pode retornar array direto ou objeto paginado
       let produtosData;
@@ -1241,7 +1285,9 @@ const PedidosCompra = () => {
         fornecedorTexto={fornecedorTexto}
         setFornecedorTexto={setFornecedorTexto}
         fornecedores={fornecedores}
+        gruposFornecedores={gruposFornecedores}
         selecionarFornecedor={selecionarFornecedor}
+        selecionarGrupoFornecedor={selecionarGrupoFornecedor}
         setFormData={setFormData}
         setProdutos={setProdutos}
         setIncluirGrupoFornecedor={setIncluirGrupoFornecedor}

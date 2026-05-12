@@ -11,7 +11,9 @@ export default function PedidoCompraFormulario({
   fornecedorTexto,
   setFornecedorTexto,
   fornecedores,
+  gruposFornecedores,
   selecionarFornecedor,
+  selecionarGrupoFornecedor,
   setFormData,
   setProdutos,
   setIncluirGrupoFornecedor,
@@ -81,6 +83,7 @@ export default function PedidoCompraFormulario({
             </label>
             <FornecedorSelector
               fornecedores={fornecedores}
+              gruposFornecedores={gruposFornecedores}
               fornecedorId={formData.fornecedor_id}
               fornecedorSelecionado={fornecedorSelecionado}
               showLabel={false}
@@ -94,6 +97,7 @@ export default function PedidoCompraFormulario({
                 }
               }}
               onSelect={selecionarFornecedor}
+              onSelectGrupo={selecionarGrupoFornecedor}
               onClear={() => {
                 setFornecedorTexto('');
                 limparFornecedorSelecionado();

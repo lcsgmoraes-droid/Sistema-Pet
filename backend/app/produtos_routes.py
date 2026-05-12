@@ -24,7 +24,7 @@ from app.config import settings
 from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
 from .security.permissions_decorator import require_permission
-from .models import User, Cliente
+from .models import User, Cliente, FornecedorGrupo
 from app.partner_utils import get_all_accessible_tenant_ids, is_partner_owned
 from .vendas_models import Venda, VendaItem
 from .produtos_models import (
@@ -2232,6 +2232,7 @@ def listar_produtos_vendaveis(
     marca_id: Optional[int] = None,
     departamento_id: Optional[int] = None,
     fornecedor_id: Optional[int] = None,
+    fornecedor_grupo_id: Optional[int] = None,
     estoque_baixo: Optional[bool] = False,
     em_promocao: Optional[bool] = False,
     ativo: Optional[bool] = True,
@@ -2277,14 +2278,41 @@ def listar_produtos_vendaveis(
     if departamento_id:
         query = query.filter(Produto.departamento_id == departamento_id)
 
-    if fornecedor_id:
-        # JOIN com tabela produto_fornecedores (relacionamento muitos-para-muitos)
-        query = query.join(
-            ProdutoFornecedor,
-            Produto.id == ProdutoFornecedor.produto_id
-        ).filter(
-            ProdutoFornecedor.fornecedor_id == fornecedor_id,
-            ProdutoFornecedor.ativo == True
+    fornecedor_ids_filtro = []
+    if fornecedor_grupo_id:
+        grupo = db.query(FornecedorGrupo).filter(
+            FornecedorGrupo.id == fornecedor_grupo_id,
+            FornecedorGrupo.tenant_id == tenant_id,
+            FornecedorGrupo.ativo.is_(True),
+        ).first()
+        if not grupo:
+            raise HTTPException(status_code=404, detail="Grupo de fornecedor nao encontrado")
+
+        fornecedor_ids_filtro = [
+            fornecedor_id_grupo
+            for (fornecedor_id_grupo,) in db.query(Cliente.id).filter(
+                Cliente.tenant_id == tenant_id,
+                Cliente.tipo_cadastro == "fornecedor",
+                Cliente.fornecedor_grupo_id == grupo.id,
+                Cliente.ativo.is_(True),
+            ).all()
+        ]
+    elif fornecedor_id:
+        fornecedor_ids_filtro = [fornecedor_id]
+
+    if fornecedor_grupo_id and not fornecedor_ids_filtro:
+        query = query.filter(Produto.id == -1)
+    elif fornecedor_ids_filtro:
+        query = query.filter(
+            or_(
+                Produto.fornecedor_id.in_(fornecedor_ids_filtro),
+                Produto.fornecedores_alternativos.any(
+                    and_(
+                        ProdutoFornecedor.fornecedor_id.in_(fornecedor_ids_filtro),
+                        ProdutoFornecedor.ativo == True,
+                    )
+                ),
+            )
         )
 
     if estoque_baixo:
@@ -2360,6 +2388,7 @@ def listar_produtos(
     marca_id: Optional[int] = None,
     departamento_id: Optional[int] = None,
     fornecedor_id: Optional[int] = None,
+    fornecedor_grupo_id: Optional[int] = None,
     estoque_baixo: Optional[bool] = False,
     em_promocao: Optional[bool] = False,
     ativo: Optional[bool] = True,
@@ -2444,14 +2473,41 @@ def listar_produtos(
     if departamento_id:
         query = query.filter(Produto.departamento_id == departamento_id)
 
-    if fornecedor_id:
-        # JOIN com tabela produto_fornecedores (relacionamento muitos-para-muitos)
-        query = query.join(
-            ProdutoFornecedor,
-            Produto.id == ProdutoFornecedor.produto_id
-        ).filter(
-            ProdutoFornecedor.fornecedor_id == fornecedor_id,
-            ProdutoFornecedor.ativo == True
+    fornecedor_ids_filtro = []
+    if fornecedor_grupo_id:
+        grupo = db.query(FornecedorGrupo).filter(
+            FornecedorGrupo.id == fornecedor_grupo_id,
+            FornecedorGrupo.tenant_id == tenant_id,
+            FornecedorGrupo.ativo.is_(True),
+        ).first()
+        if not grupo:
+            raise HTTPException(status_code=404, detail="Grupo de fornecedor nao encontrado")
+
+        fornecedor_ids_filtro = [
+            fornecedor_id_grupo
+            for (fornecedor_id_grupo,) in db.query(Cliente.id).filter(
+                Cliente.tenant_id.in_(access_ids),
+                Cliente.tipo_cadastro == "fornecedor",
+                Cliente.fornecedor_grupo_id == grupo.id,
+                Cliente.ativo.is_(True),
+            ).all()
+        ]
+    elif fornecedor_id:
+        fornecedor_ids_filtro = [fornecedor_id]
+
+    if fornecedor_grupo_id and not fornecedor_ids_filtro:
+        query = query.filter(Produto.id == -1)
+    elif fornecedor_ids_filtro:
+        query = query.filter(
+            or_(
+                Produto.fornecedor_id.in_(fornecedor_ids_filtro),
+                Produto.fornecedores_alternativos.any(
+                    and_(
+                        ProdutoFornecedor.fornecedor_id.in_(fornecedor_ids_filtro),
+                        ProdutoFornecedor.ativo == True,
+                    )
+                ),
+            )
         )
 
     if estoque_baixo:
@@ -5513,6 +5569,26 @@ class FornecedorVinculoResponse(BaseModel):
     fornecedor_telefone: Optional[str] = None
 
 
+def _garantir_fornecedor_principal_quando_unico(db: Session, produto: Produto, tenant_id) -> None:
+    """Marca automaticamente como principal quando ha um unico fornecedor ativo."""
+    vinculos_ativos = db.query(ProdutoFornecedor).filter(
+        ProdutoFornecedor.produto_id == produto.id,
+        ProdutoFornecedor.tenant_id == tenant_id,
+        ProdutoFornecedor.ativo == True,
+    ).order_by(ProdutoFornecedor.id.asc()).all()
+
+    if not vinculos_ativos:
+        produto.fornecedor_id = None
+        return
+
+    if len(vinculos_ativos) != 1:
+        return
+
+    vinculo_unico = vinculos_ativos[0]
+    vinculo_unico.e_principal = True
+    produto.fornecedor_id = vinculo_unico.fornecedor_id
+
+
 @router.post("/{produto_id}/fornecedores", response_model=FornecedorVinculoResponse)
 def vincular_fornecedor(
     produto_id: int,
@@ -5577,8 +5653,15 @@ def vincular_fornecedor(
                 detail="Fornecedor jÃ¡ vinculado a este produto"
             )
 
+        vinculos_ativos_existentes = db.query(ProdutoFornecedor).filter(
+            ProdutoFornecedor.produto_id == produto_id,
+            ProdutoFornecedor.tenant_id == tenant_id,
+            ProdutoFornecedor.ativo == True,
+        ).count()
+        sera_principal = bool(dados.e_principal) or vinculos_ativos_existentes == 0
+
         # Se for marcar como principal, desmarcar outros
-        if dados.e_principal:
+        if sera_principal:
             logger.info(f"[FORNECEDOR] Desmarcando outros fornecedores principais")
             db.query(ProdutoFornecedor).filter(
                 ProdutoFornecedor.produto_id == produto_id,
@@ -5598,11 +5681,13 @@ def vincular_fornecedor(
             preco_custo=dados.preco_custo,
             prazo_entrega=dados.prazo_entrega,
             estoque_fornecedor=dados.estoque_fornecedor,
-            e_principal=dados.e_principal,
+            e_principal=sera_principal,
             tenant_id=tenant_id
         )
 
         db.add(novo_vinculo)
+        db.flush()
+        _garantir_fornecedor_principal_quando_unico(db, produto, tenant_id)
         db.commit()
         db.refresh(novo_vinculo)
 
@@ -5737,6 +5822,11 @@ def atualizar_vinculo_fornecedor(
             detail="VÃ­nculo nÃ£o encontrado"
         )
 
+    produto = db.query(Produto).filter(
+        Produto.id == vinculo.produto_id,
+        Produto.tenant_id == tenant_id,
+    ).first()
+
     # Se for marcar como principal, desmarcar outros
     if dados.e_principal and not vinculo.e_principal:
         db.query(ProdutoFornecedor).filter(
@@ -5745,8 +5835,6 @@ def atualizar_vinculo_fornecedor(
             ProdutoFornecedor.e_principal == True
         ).update({"e_principal": False})
 
-        # Atualizar fornecedor_id do produto
-        produto = db.query(Produto).filter(Produto.id == vinculo.produto_id).first()
         if produto:
             produto.fornecedor_id = vinculo.fornecedor_id
 
@@ -5763,6 +5851,9 @@ def atualizar_vinculo_fornecedor(
         vinculo.e_principal = dados.e_principal
     if dados.ativo is not None:
         vinculo.ativo = dados.ativo
+
+    if produto:
+        _garantir_fornecedor_principal_quando_unico(db, produto, tenant_id)
 
     vinculo.updated_at = datetime.now()
 
@@ -5821,6 +5912,10 @@ def desvincular_fornecedor(
 
     produto_id = vinculo.produto_id
     era_principal = vinculo.e_principal
+    produto = db.query(Produto).filter(
+        Produto.id == produto_id,
+        Produto.tenant_id == tenant_id,
+    ).first()
 
     # Deletar vÃ­nculo
     db.delete(vinculo)
@@ -5836,14 +5931,15 @@ def desvincular_fornecedor(
 
         if outro_vinculo:
             outro_vinculo.e_principal = True
-            produto = db.query(Produto).filter(Produto.id == produto_id).first()
             if produto:
                 produto.fornecedor_id = outro_vinculo.fornecedor_id
         else:
             # Nenhum fornecedor restante, remover do produto
-            produto = db.query(Produto).filter(Produto.id == produto_id).first()
             if produto:
                 produto.fornecedor_id = None
+
+    if produto:
+        _garantir_fornecedor_principal_quando_unico(db, produto, tenant_id)
 
     db.commit()
 
