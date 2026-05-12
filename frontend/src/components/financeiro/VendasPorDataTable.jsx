@@ -36,6 +36,7 @@ function criarLinhaTotal(linhas) {
   const quantidade = linhas.reduce((sum, item) => sum + item.quantidade, 0);
   const valorBruto = linhas.reduce((sum, item) => sum + item.valor_bruto, 0);
   const desconto = linhas.reduce((sum, item) => sum + item.desconto, 0);
+  const valorLiquido = linhas.reduce((sum, item) => sum + item.valor_liquido, 0);
 
   return {
     data: "total",
@@ -45,9 +46,9 @@ function criarLinhaTotal(linhas) {
     quantidade,
     saldo_aberto: linhas.reduce((sum, item) => sum + item.saldo_aberto, 0),
     taxa_entrega: linhas.reduce((sum, item) => sum + item.taxa_entrega, 0),
-    ticket_medio: quantidade > 0 ? valorBruto / quantidade : 0,
+    ticket_medio: quantidade > 0 ? valorLiquido / quantidade : 0,
     valor_bruto: valorBruto,
-    valor_liquido: linhas.reduce((sum, item) => sum + item.valor_liquido, 0),
+    valor_liquido: valorLiquido,
     valor_recebido: linhas.reduce((sum, item) => sum + item.valor_recebido, 0),
   };
 }

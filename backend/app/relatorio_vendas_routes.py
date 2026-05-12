@@ -86,10 +86,16 @@ def _total_recebido_venda(venda: Venda) -> float:
     pagamentos = list(getattr(venda, "pagamentos", []) or [])
     total_pagamentos = sum(_as_float(getattr(pagamento, "valor", 0)) for pagamento in pagamentos)
     if total_pagamentos > 0:
+        total_venda = _as_float(getattr(venda, "total", 0))
+        if total_venda > 0:
+            return round(min(total_pagamentos, total_venda), 2)
         return round(total_pagamentos, 2)
 
     valor_recebido = _as_float(getattr(venda, "valor_recebido", 0))
     if valor_recebido > 0:
+        total_venda = _as_float(getattr(venda, "total", 0))
+        if total_venda > 0:
+            return round(min(valor_recebido, total_venda), 2)
         return round(valor_recebido, 2)
 
     if _texto_normalizado(getattr(venda, "status", None)) in STATUS_VENDA_RECEBIDA_INTEGRAL:
@@ -104,6 +110,54 @@ def _saldo_aberto_venda(venda: Venda) -> float:
         return 0.0
 
     return round(max(_as_float(getattr(venda, "total", 0)) - _total_recebido_venda(venda), 0), 2)
+
+
+def _valores_operacionais_venda(venda: Venda) -> dict[str, float]:
+    """Valores comerciais da venda, antes de despesas de rentabilidade.
+
+    Historicamente o campo Venda.subtotal pode representar duas coisas:
+    - subtotal bruto, quando o desconto foi aplicado no fechamento;
+    - subtotal ja liquido, quando o PDV rateou desconto nos itens.
+
+    O relatorio operacional precisa separar: bruto real, desconto, liquido cobrado
+    do cliente, recebido e saldo aberto.
+    """
+    subtotal = _as_float(getattr(venda, "subtotal", 0))
+    desconto = _as_float(getattr(venda, "desconto_valor", 0))
+    taxa_entrega = _as_float(getattr(venda, "taxa_entrega", 0))
+    total = _as_float(getattr(venda, "total", 0))
+    tolerancia = 0.03
+
+    total_se_subtotal_liquido = subtotal + taxa_entrega
+    total_se_subtotal_bruto = subtotal - desconto + taxa_entrega
+
+    if desconto > 0 and abs(total - total_se_subtotal_liquido) <= tolerancia:
+        valor_bruto = subtotal + desconto
+    elif desconto > 0 and abs(total - total_se_subtotal_bruto) <= tolerancia:
+        valor_bruto = subtotal
+    else:
+        valor_bruto_itens = sum(
+            _as_float(getattr(item, "quantidade", 0)) * _as_float(getattr(item, "preco_unitario", 0))
+            for item in list(getattr(venda, "itens", []) or [])
+        )
+        if valor_bruto_itens > 0:
+            valor_bruto = valor_bruto_itens
+        elif desconto > 0:
+            valor_bruto = max(subtotal, total - taxa_entrega + desconto)
+        else:
+            valor_bruto = subtotal
+
+    valor_liquido = total
+    valor_recebido = _total_recebido_venda(venda)
+
+    return {
+        "valor_bruto": round(valor_bruto, 2),
+        "taxa_entrega": round(taxa_entrega, 2),
+        "desconto": round(desconto, 2),
+        "valor_liquido": round(valor_liquido, 2),
+        "valor_recebido": round(valor_recebido, 2),
+        "saldo_aberto": _saldo_aberto_venda(venda),
+    }
 
 
 def _valor_cupom_venda(venda: Venda, cupons_por_venda: dict[int, float]) -> float:
@@ -336,16 +390,21 @@ async def obter_relatorio_vendas(
         except Exception as e:
             logger.warning(f"Erro ao buscar movimentacoes de estoque para rentabilidade: {e}")
 
+    valores_operacionais_por_venda = {
+        venda.id: _valores_operacionais_venda(venda)
+        for venda in vendas
+    }
+
     # ==============================================
     # RESUMO (Cards no topo)
     # ==============================================
-    venda_bruta = sum(float(v.subtotal) for v in vendas)
-    taxa_entrega = sum(float(v.taxa_entrega or 0) for v in vendas)
-    desconto = sum(float(v.desconto_valor or 0) for v in vendas)
-    venda_liquida = sum(float(v.total) for v in vendas)
+    venda_bruta = sum(v["valor_bruto"] for v in valores_operacionais_por_venda.values())
+    taxa_entrega = sum(v["taxa_entrega"] for v in valores_operacionais_por_venda.values())
+    desconto = sum(v["desconto"] for v in valores_operacionais_por_venda.values())
+    venda_liquida = sum(v["valor_liquido"] for v in valores_operacionais_por_venda.values())
 
-    valor_recebido = sum(_total_recebido_venda(v) for v in vendas)
-    em_aberto = sum(_saldo_aberto_venda(v) for v in vendas)
+    valor_recebido = sum(v["valor_recebido"] for v in valores_operacionais_por_venda.values())
+    em_aberto = sum(v["saldo_aberto"] for v in valores_operacionais_por_venda.values())
 
     percentual_desconto = round((desconto / venda_bruta * 100) if venda_bruta > 0 else 0, 1)
 
@@ -378,21 +437,21 @@ async def obter_relatorio_vendas(
                 "saldo_aberto": 0
             }
 
+        valores_venda = valores_operacionais_por_venda.get(venda.id) or _valores_operacionais_venda(venda)
         vendas_por_data[data_str]["quantidade"] += 1
-        vendas_por_data[data_str]["valor_bruto"] += venda.subtotal
-        vendas_por_data[data_str]["taxa_entrega"] += venda.taxa_entrega or 0
-        vendas_por_data[data_str]["desconto"] += venda.desconto_valor or 0
-        vendas_por_data[data_str]["valor_liquido"] += venda.total
+        vendas_por_data[data_str]["valor_bruto"] += valores_venda["valor_bruto"]
+        vendas_por_data[data_str]["taxa_entrega"] += valores_venda["taxa_entrega"]
+        vendas_por_data[data_str]["desconto"] += valores_venda["desconto"]
+        vendas_por_data[data_str]["valor_liquido"] += valores_venda["valor_liquido"]
 
         # OTIMIZAÇÃO: usar pagamentos já carregados
-        total_pago = _total_recebido_venda(venda)
-        vendas_por_data[data_str]["valor_recebido"] += total_pago
-        vendas_por_data[data_str]["saldo_aberto"] += _saldo_aberto_venda(venda)
+        vendas_por_data[data_str]["valor_recebido"] += valores_venda["valor_recebido"]
+        vendas_por_data[data_str]["saldo_aberto"] += valores_venda["saldo_aberto"]
 
     # Calcular ticket médio
     for data_str in vendas_por_data:
         qtd = vendas_por_data[data_str]["quantidade"]
-        vendas_por_data[data_str]["ticket_medio"] = round(vendas_por_data[data_str]["valor_bruto"] / qtd if qtd > 0 else 0, 2)
+        vendas_por_data[data_str]["ticket_medio"] = round(vendas_por_data[data_str]["valor_liquido"] / qtd if qtd > 0 else 0, 2)
         vendas_por_data[data_str]["percentual_desconto"] = round(
             (vendas_por_data[data_str]["desconto"] / vendas_por_data[data_str]["valor_bruto"] * 100) if vendas_por_data[data_str]["valor_bruto"] > 0 else 0, 1
         )
@@ -474,10 +533,11 @@ async def obter_relatorio_vendas(
                 "valor_liquido": 0
             }
 
+        valores_venda = valores_operacionais_por_venda.get(venda.id) or _valores_operacionais_venda(venda)
         vendas_por_funcionario[nome_func]["quantidade"] += 1
-        vendas_por_funcionario[nome_func]["valor_bruto"] += venda.subtotal
-        vendas_por_funcionario[nome_func]["desconto"] += venda.desconto_valor or 0
-        vendas_por_funcionario[nome_func]["valor_liquido"] += venda.total
+        vendas_por_funcionario[nome_func]["valor_bruto"] += valores_venda["valor_bruto"]
+        vendas_por_funcionario[nome_func]["desconto"] += valores_venda["desconto"]
+        vendas_por_funcionario[nome_func]["valor_liquido"] += valores_venda["valor_liquido"]
 
     vendas_por_funcionario_lista = sorted(vendas_por_funcionario.values(), key=lambda x: x["valor_liquido"], reverse=True)
 
@@ -489,10 +549,11 @@ async def obter_relatorio_vendas(
     }
 
     for venda in vendas:
+        valores_venda = valores_operacionais_por_venda.get(venda.id) or _valores_operacionais_venda(venda)
         vendas_por_tipo["Produto"]["quantidade"] += 1
-        vendas_por_tipo["Produto"]["valor_bruto"] += venda.subtotal
-        vendas_por_tipo["Produto"]["desconto"] += venda.desconto_valor or 0
-        vendas_por_tipo["Produto"]["valor_liquido"] += venda.total
+        vendas_por_tipo["Produto"]["valor_bruto"] += valores_venda["valor_bruto"]
+        vendas_por_tipo["Produto"]["desconto"] += valores_venda["desconto"]
+        vendas_por_tipo["Produto"]["valor_liquido"] += valores_venda["valor_liquido"]
 
     vendas_por_tipo_lista = list(vendas_por_tipo.values())
 
@@ -500,9 +561,12 @@ async def obter_relatorio_vendas(
     # VENDAS POR GRUPO DE PRODUTO
     # ==============================================
     vendas_por_grupo = {}
-    total_geral = sum(v.total for v in vendas)
+    total_geral = sum(v["valor_liquido"] for v in valores_operacionais_por_venda.values())
 
     for venda in vendas:
+        valores_venda = valores_operacionais_por_venda.get(venda.id) or _valores_operacionais_venda(venda)
+        bruto_venda = valores_venda["valor_bruto"]
+        desconto_venda = valores_venda["desconto"]
         # OTIMIZAÇÃO: usar itens já carregados
         for item in venda.itens:
             # OTIMIZAÇÃO: usar relacionamento produto já carregado
@@ -522,7 +586,7 @@ async def obter_relatorio_vendas(
                 }
 
             valor_item = item.quantidade * item.preco_unitario
-            desconto_item = (item.quantidade * item.preco_unitario * (venda.desconto_valor or 0) / venda.subtotal) if venda.subtotal > 0 else 0
+            desconto_item = (valor_item * desconto_venda / bruto_venda) if bruto_venda > 0 else 0
 
             vendas_por_grupo[grupo]["valor_bruto"] += valor_item
             vendas_por_grupo[grupo]["desconto"] += desconto_item
@@ -542,6 +606,9 @@ async def obter_relatorio_vendas(
     produtos_por_categoria = {}
 
     for venda in vendas:
+        valores_venda = valores_operacionais_por_venda.get(venda.id) or _valores_operacionais_venda(venda)
+        bruto_venda = valores_venda["valor_bruto"]
+        desconto_venda = valores_venda["desconto"]
         # OTIMIZAÇÃO: usar itens já carregados
         for item in venda.itens:
             produto_id = item.produto_id
@@ -591,7 +658,7 @@ async def obter_relatorio_vendas(
                     }
 
                 valor_item = item.quantidade * item.preco_unitario
-                desconto_item = (item.quantidade * item.preco_unitario * (venda.desconto_valor or 0) / venda.subtotal) if venda.subtotal > 0 else 0
+                desconto_item = (valor_item * desconto_venda / bruto_venda) if bruto_venda > 0 else 0
 
                 # Atualizar produto
                 produtos_por_categoria[categoria_nome]["subcategorias"][subcategoria_nome]["produtos"][produto_nome]["quantidade"] += item.quantidade
@@ -616,7 +683,7 @@ async def obter_relatorio_vendas(
                     }
 
                 valor_item = item.quantidade * item.preco_unitario
-                desconto_item = (item.quantidade * item.preco_unitario * (venda.desconto_valor or 0) / venda.subtotal) if venda.subtotal > 0 else 0
+                desconto_item = (valor_item * desconto_venda / bruto_venda) if bruto_venda > 0 else 0
 
                 produtos_por_categoria[categoria_nome]["produtos"][produto_nome]["quantidade"] += item.quantidade
                 produtos_por_categoria[categoria_nome]["produtos"][produto_nome]["valor_bruto"] += valor_item
@@ -625,7 +692,7 @@ async def obter_relatorio_vendas(
 
             # Atualizar totais da categoria
             valor_item = item.quantidade * item.preco_unitario
-            desconto_item = (item.quantidade * item.preco_unitario * (venda.desconto_valor or 0) / venda.subtotal) if venda.subtotal > 0 else 0
+            desconto_item = (valor_item * desconto_venda / bruto_venda) if bruto_venda > 0 else 0
             produtos_por_categoria[categoria_nome]["total_quantidade"] += item.quantidade
             produtos_por_categoria[categoria_nome]["total_bruto"] += valor_item
             produtos_por_categoria[categoria_nome]["total_desconto"] += desconto_item
