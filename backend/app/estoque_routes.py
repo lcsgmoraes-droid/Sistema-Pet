@@ -2403,6 +2403,76 @@ def _processar_item_saida_full_nf(
     }
 
 
+def _problemas_estoque_saida_full_nf(
+    db: Session,
+    tenant_id: int,
+    itens: List[SaidaFullNFItemRequest],
+) -> List[dict]:
+    problemas = []
+
+    for item in itens:
+        produto = _resolver_produto_full_nf(db, tenant_id, item)
+        entrada_sku = _texto_limpo(item.sku)
+
+        if not produto:
+            problemas.append({
+                "tipo": "produto_nao_encontrado",
+                "produto_id": item.produto_id,
+                "entrada_sku": entrada_sku,
+                "sku": entrada_sku,
+                "nome": "Produto nao encontrado",
+                "disponivel": 0,
+                "solicitado": float(item.quantidade or 0),
+                "faltante": float(item.quantidade or 0),
+                "mensagem": f"Produto nao encontrado para SKU {entrada_sku or item.produto_id or '-'}",
+                "url_correcao": None,
+            })
+            continue
+
+        estoque_anterior = float(produto.estoque_atual or 0)
+        quantidade = float(item.quantidade or 0)
+        if estoque_anterior < quantidade:
+            sku_label = _sku_produto(produto) or entrada_sku or "sem-sku"
+            faltante = max(quantidade - estoque_anterior, 0)
+            problemas.append({
+                "tipo": "estoque_insuficiente",
+                "produto_id": produto.id,
+                "entrada_sku": entrada_sku,
+                "sku": sku_label,
+                "nome": produto.nome,
+                "disponivel": estoque_anterior,
+                "solicitado": quantidade,
+                "faltante": faltante,
+                "mensagem": (
+                    f"Estoque insuficiente para {produto.nome} (SKU {sku_label}). "
+                    f"Disponivel: {estoque_anterior}, solicitado: {quantidade}"
+                ),
+                "url_correcao": f"/produtos/{produto.id}/movimentacoes",
+            })
+
+    return problemas
+
+
+def _validar_estoque_saida_full_nf(
+    db: Session,
+    tenant_id: int,
+    itens: List[SaidaFullNFItemRequest],
+) -> None:
+    problemas = _problemas_estoque_saida_full_nf(db, tenant_id, itens)
+    if problemas:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "code": "estoque_insuficiente_full_nf",
+                "message": (
+                    "Alguns itens nao possuem estoque suficiente para baixa. "
+                    "Corrija o estoque dos produtos marcados e revalide antes de confirmar."
+                ),
+                "itens": problemas,
+            },
+        )
+
+
 def _resolver_classificacao_tarifa_full_nf(
     db: Session,
     tenant_id,
@@ -4442,6 +4512,26 @@ def excluir_transferencia_parceiro(
         )
 
 
+@router.post("/saida-full-nf/validar-estoque")
+def validar_estoque_saida_full_por_nf(
+    payload: SaidaFullNFRequest,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    """Valida se os itens da NF possuem estoque suficiente, sem gerar baixa."""
+    _current_user, tenant_id = user_and_tenant
+    itens_validos = [item for item in payload.itens if item.quantidade and item.quantidade > 0]
+    if not itens_validos:
+        raise HTTPException(status_code=400, detail="Informe ao menos um item com quantidade maior que zero")
+
+    problemas = _problemas_estoque_saida_full_nf(db, tenant_id, itens_validos)
+    return {
+        "ok": len(problemas) == 0,
+        "total_itens": len(itens_validos),
+        "problemas": problemas,
+    }
+
+
 @router.post("/saida-full-nf", status_code=status.HTTP_201_CREATED)
 def saida_full_por_nf(
     payload: SaidaFullNFRequest,
@@ -4539,6 +4629,8 @@ def saida_full_por_nf(
                     f"O sistema bloqueou o reprocessamento para evitar baixa duplicada.{detalhe_tarifa}"
                 ),
             )
+
+        _validar_estoque_saida_full_nf(db, tenant_id, itens_validos)
 
         for item in itens_validos:
             processados.append(

@@ -86,6 +86,29 @@ function formatarDataHora(valor) {
   });
 }
 
+function normalizarSku(valor) {
+  return String(valor || "").trim().toLowerCase();
+}
+
+function formatarQuantidade(valor) {
+  const numero = Number(valor || 0);
+  if (!Number.isFinite(numero)) return "0";
+  return numero.toLocaleString("pt-BR", { maximumFractionDigits: 3 });
+}
+
+function extrairDetalheErro(error) {
+  return error?.response?.data?.detail || error?.message || "Erro ao processar baixa por NF";
+}
+
+function ehErroEstoqueFull(detalhe) {
+  return Boolean(
+    detalhe &&
+      typeof detalhe === "object" &&
+      detalhe.code === "estoque_insuficiente_full_nf" &&
+      Array.isArray(detalhe.itens),
+  );
+}
+
 export default function EstoqueFullNF() {
   const [numeroNF, setNumeroNF] = useState("");
   const [plataforma, setPlataforma] = useState("");
@@ -110,6 +133,8 @@ export default function EstoqueFullNF() {
   const [dreSubcategoriaId, setDreSubcategoriaId] = useState("");
   const [carregandoDre, setCarregandoDre] = useState(false);
   const [salvandoVinculoDre, setSalvandoVinculoDre] = useState(false);
+  const [alertaEstoque, setAlertaEstoque] = useState(null);
+  const [validandoEstoque, setValidandoEstoque] = useState(false);
 
   const hojeISO = useMemo(() => new Date().toISOString().slice(0, 10), []);
 
@@ -151,6 +176,24 @@ export default function EstoqueFullNF() {
     () => categoriasDespesa.find((cat) => String(cat.id) === String(categoriaTarifaId)),
     [categoriasDespesa, categoriaTarifaId],
   );
+
+  const problemasEstoque = useMemo(
+    () => (Array.isArray(alertaEstoque?.itens) ? alertaEstoque.itens : []),
+    [alertaEstoque],
+  );
+
+  const problemasEstoquePorSku = useMemo(() => {
+    const mapa = new Map();
+    problemasEstoque.forEach((problema) => {
+      const skuEntrada = normalizarSku(problema.entrada_sku || problema.sku);
+      if (skuEntrada && !mapa.has(skuEntrada)) {
+        mapa.set(skuEntrada, problema);
+      }
+    });
+    return mapa;
+  }, [problemasEstoque]);
+
+  const problemaDaLinha = (item) => problemasEstoquePorSku.get(normalizarSku(item.sku));
 
   const carregarSubcategoriasDespesaDre = async () => {
     if (dreSubcategoriasDespesa.length) return;
@@ -196,20 +239,24 @@ export default function EstoqueFullNF() {
   };
 
   const atualizarLinha = (linhaId, campo, valor) => {
+    setAlertaEstoque(null);
     setItens((prev) =>
       prev.map((item) => (item.id === linhaId ? { ...item, [campo]: valor } : item)),
     );
   };
 
   const adicionarLinha = () => {
+    setAlertaEstoque(null);
     setItens((prev) => [...prev, criarLinha()]);
   };
 
   const removerLinha = (linhaId) => {
+    setAlertaEstoque(null);
     setItens((prev) => (prev.length > 1 ? prev.filter((item) => item.id !== linhaId) : prev));
   };
 
   const limparFormulario = () => {
+    setAlertaEstoque(null);
     setNumeroNF("");
     setPlataforma("");
     setItens([criarLinha()]);
@@ -257,6 +304,7 @@ export default function EstoqueFullNF() {
 
       setNumeroNF(numeroNfXml);
       setItens(linhas);
+      setAlertaEstoque(null);
       toast.success(`XML lido com sucesso: NF ${numeroNfXml} com ${linhas.length} item(ns)`);
     } catch (error) {
       console.error("Erro ao ler XML FULL NF:", error);
@@ -283,6 +331,63 @@ export default function EstoqueFullNF() {
     return true;
   };
 
+  const obterItensValidos = () =>
+    itens
+      .map((item) => ({
+        sku: item.sku.trim(),
+        quantidade: toNumber(item.quantidade),
+      }))
+      .filter((item) => item.sku && item.quantidade > 0);
+
+  const abrirCorrecaoEstoque = (problema) => {
+    if (!problema?.url_correcao) return;
+    window.open(problema.url_correcao, "_blank", "noopener,noreferrer");
+  };
+
+  const revalidarEstoque = async () => {
+    const itensValidos = obterItensValidos();
+    if (!itensValidos.length) {
+      toast.error("Informe ao menos um item com SKU e quantidade");
+      return;
+    }
+
+    try {
+      setValidandoEstoque(true);
+      const payload = {
+        numero_nf: numeroNF.trim() || "validacao",
+        plataforma: plataforma || "full",
+        observacao: observacao.trim() || null,
+        itens: itensValidos,
+      };
+      const response = await api.post("/estoque/saida-full-nf/validar-estoque", payload);
+      const problemas = Array.isArray(response.data?.problemas) ? response.data.problemas : [];
+      if (problemas.length) {
+        const detalhe = {
+          code: "estoque_insuficiente_full_nf",
+          message: "Ainda existem itens sem estoque suficiente.",
+          itens: problemas,
+        };
+        setAlertaEstoque(detalhe);
+        toast.error("Ainda existe produto sem estoque suficiente.");
+        return;
+      }
+
+      setAlertaEstoque(null);
+      toast.success("Estoque revalidado. Pode confirmar a baixa.");
+    } catch (error) {
+      console.error("Erro ao revalidar estoque FULL por NF:", error);
+      const detalhe = extrairDetalheErro(error);
+      if (ehErroEstoqueFull(detalhe)) {
+        setAlertaEstoque(detalhe);
+        toast.error(detalhe.message || "Ainda existe produto sem estoque suficiente.");
+        return;
+      }
+      toast.error(typeof detalhe === "string" ? detalhe : "Nao foi possivel revalidar o estoque.");
+    } finally {
+      setValidandoEstoque(false);
+    }
+  };
+
   const processar = async (categoriaClassificada = categoriaTarifaSelecionada) => {
     if (!numeroNF.trim()) {
       toast.error("Informe o numero da NF");
@@ -294,12 +399,7 @@ export default function EstoqueFullNF() {
       return;
     }
 
-    const itensValidos = itens
-      .map((item) => ({
-        sku: item.sku.trim(),
-        quantidade: toNumber(item.quantidade),
-      }))
-      .filter((item) => item.sku && item.quantidade > 0);
+    const itensValidos = obterItensValidos();
 
     if (!itensValidos.length) {
       toast.error("Informe ao menos um item com SKU e quantidade");
@@ -330,13 +430,19 @@ export default function EstoqueFullNF() {
 
       const response = await api.post("/estoque/saida-full-nf", payload);
       const resultadoProcessado = response.data;
+      setAlertaEstoque(null);
       setModalConclusao({ aberto: true, resultado: resultadoProcessado });
       carregarHistorico();
       limparFormulario();
     } catch (error) {
       console.error("Erro ao processar FULL por NF:", error);
-      const detalhe = error?.response?.data?.detail || "Erro ao processar baixa por NF";
-      toast.error(detalhe);
+      const detalhe = extrairDetalheErro(error);
+      if (ehErroEstoqueFull(detalhe)) {
+        setAlertaEstoque(detalhe);
+        toast.error(detalhe.message || "Corrija os produtos marcados e tente novamente.");
+        return;
+      }
+      toast.error(typeof detalhe === "string" ? detalhe : "Erro ao processar baixa por NF");
     } finally {
       setSalvando(false);
     }
@@ -522,44 +628,119 @@ export default function EstoqueFullNF() {
           </div>
         </div>
 
-        <div className="space-y-2">
-          {itens.map((item) => (
-            <div key={item.id} className="grid grid-cols-1 md:grid-cols-12 gap-2">
-              <div className="md:col-span-7">
-                <input
-                  id={`sku-${item.id}`}
-                  aria-label={`SKU ${item.id}`}
-                  type="text"
-                  value={item.sku}
-                  onChange={(e) => atualizarLinha(item.id, "sku", e.target.value)}
-                  placeholder="SKU do produto"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                />
+        {problemasEstoque.length > 0 && (
+          <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-900">
+            <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+              <div>
+                <h3 className="font-semibold">Estoque insuficiente em {problemasEstoque.length} item(ns)</h3>
+                <p className="mt-1 text-red-800">
+                  Corrija o estoque dos produtos marcados em uma nova aba e depois revalide sem perder esta NF.
+                </p>
               </div>
-              <div className="md:col-span-3">
-                <input
-                  id={`qtd-${item.id}`}
-                  aria-label={`Quantidade ${item.id}`}
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  value={item.quantidade}
-                  onChange={(e) => atualizarLinha(item.id, "quantidade", e.target.value)}
-                  placeholder="Quantidade"
-                  className="w-full border border-gray-300 rounded-lg px-3 py-2"
-                />
-              </div>
-              <div className="md:col-span-2">
-                <button
-                  type="button"
-                  onClick={() => removerLinha(item.id)}
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 hover:bg-gray-50"
-                >
-                  Remover
-                </button>
-              </div>
+              <button
+                type="button"
+                onClick={revalidarEstoque}
+                disabled={validandoEstoque}
+                className="rounded-lg border border-red-300 bg-white px-3 py-2 text-sm font-semibold text-red-700 hover:bg-red-100 disabled:opacity-60"
+              >
+                {validandoEstoque ? "Revalidando..." : "Revalidar estoque"}
+              </button>
             </div>
-          ))}
+            <div className="mt-3 grid gap-2">
+              {problemasEstoque.map((problema) => (
+                <div
+                  key={`${problema.entrada_sku || problema.sku}-${problema.produto_id || "sem-produto"}`}
+                  className="flex flex-col gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 md:flex-row md:items-center md:justify-between"
+                >
+                  <div>
+                    <p className="font-semibold">{problema.nome || "Produto nao identificado"}</p>
+                    <p className="text-xs text-red-700">
+                      SKU {problema.sku || problema.entrada_sku || "-"} | Disponivel: {formatarQuantidade(problema.disponivel)} | NF pede:{" "}
+                      {formatarQuantidade(problema.solicitado)} | Falta: {formatarQuantidade(problema.faltante)}
+                    </p>
+                  </div>
+                  {problema.url_correcao && (
+                    <button
+                      type="button"
+                      onClick={() => abrirCorrecaoEstoque(problema)}
+                      className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-700"
+                    >
+                      Corrigir estoque
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          {itens.map((item) => {
+            const problema = problemaDaLinha(item);
+            return (
+              <div
+                key={item.id}
+                className={`grid grid-cols-1 gap-2 rounded-xl md:grid-cols-12 ${
+                  problema ? "border border-red-300 bg-red-50 p-2" : ""
+                }`}
+              >
+                <div className="md:col-span-7">
+                  <input
+                    id={`sku-${item.id}`}
+                    aria-label={`SKU ${item.id}`}
+                    type="text"
+                    value={item.sku}
+                    onChange={(e) => atualizarLinha(item.id, "sku", e.target.value)}
+                    placeholder="SKU do produto"
+                    className={`w-full rounded-lg border px-3 py-2 ${
+                      problema ? "border-red-300 bg-white text-red-900" : "border-gray-300"
+                    }`}
+                  />
+                </div>
+                <div className="md:col-span-3">
+                  <input
+                    id={`qtd-${item.id}`}
+                    aria-label={`Quantidade ${item.id}`}
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={item.quantidade}
+                    onChange={(e) => atualizarLinha(item.id, "quantidade", e.target.value)}
+                    placeholder="Quantidade"
+                    className={`w-full rounded-lg border px-3 py-2 ${
+                      problema ? "border-red-300 bg-white text-red-900" : "border-gray-300"
+                    }`}
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <button
+                    type="button"
+                    onClick={() => removerLinha(item.id)}
+                    className="w-full px-3 py-2 text-sm rounded-lg border border-gray-300 bg-white hover:bg-gray-50"
+                  >
+                    Remover
+                  </button>
+                </div>
+                {problema && (
+                  <div className="md:col-span-12 flex flex-col gap-2 rounded-lg border border-red-200 bg-white px-3 py-2 text-xs text-red-800 md:flex-row md:items-center md:justify-between">
+                    <span>
+                      {problema.nome}: disponivel {formatarQuantidade(problema.disponivel)}, solicitado{" "}
+                      {formatarQuantidade(problema.solicitado)}, falta {formatarQuantidade(problema.faltante)}.
+                    </span>
+                    {problema.url_correcao && (
+                      <button
+                        type="button"
+                        onClick={() => abrirCorrecaoEstoque(problema)}
+                        className="rounded-md border border-red-300 px-2 py-1 font-semibold text-red-700 hover:bg-red-50"
+                      >
+                        Abrir ajuste de estoque
+                      </button>
+                    )}
+                  </div>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
