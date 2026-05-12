@@ -185,7 +185,7 @@ export default function EstoqueFullNF() {
       const response = await api.post("/estoque/saida-full-nf", payload);
       const resultadoProcessado = response.data;
       setResultado(resultadoProcessado);
-      toast.success("Baixa de estoque por NF concluida");
+      toast.success(resultadoProcessado?.message || "Baixa de estoque por NF concluida");
 
       if (resultadoProcessado?.tarifa_envio?.conta_pagar_id) {
         toast.success("Tarifa de envio lancada em Contas a Pagar");

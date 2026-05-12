@@ -2523,6 +2523,22 @@ def _criar_conta_pagar_tarifa_full_nf(
 
     return conta
 
+
+def _buscar_conta_tarifa_full_nf(db: Session, tenant_id, numero_nf: str):
+    return db.query(ContaPagar).filter(
+        ContaPagar.tenant_id == tenant_id,
+        ContaPagar.documento == numero_nf,
+        ContaPagar.descricao == f"Tarifa envio FULL NF {numero_nf}",
+    ).first()
+
+
+def _buscar_baixas_full_nf(db: Session, tenant_id, numero_nf: str):
+    return db.query(EstoqueMovimentacao).filter(
+        EstoqueMovimentacao.tenant_id == tenant_id,
+        EstoqueMovimentacao.documento == numero_nf,
+        EstoqueMovimentacao.motivo == "full_nfe_saida",
+    ).order_by(EstoqueMovimentacao.created_at.desc(), EstoqueMovimentacao.id.desc()).all()
+
 class TransferenciaEstoqueRequest(BaseModel):
     """Transferência entre estoques"""
     produto_id: int
@@ -4351,6 +4367,7 @@ def saida_full_por_nf(
     processados = []
     observacao_movimentacao = _observacao_full_nf(payload.numero_nf, payload.plataforma, payload.observacao)
     tarifa_valor = float(payload.tarifa_envio or 0)
+    baixas_existentes = _buscar_baixas_full_nf(db, tenant_id, payload.numero_nf)
     classificacao_tarifa = None
     if tarifa_valor > 0:
         classificacao_tarifa = _resolver_classificacao_tarifa_full_nf(
@@ -4361,6 +4378,60 @@ def saida_full_por_nf(
         )
 
     try:
+        if baixas_existentes:
+            conta_tarifa_existente = _buscar_conta_tarifa_full_nf(db, tenant_id, payload.numero_nf)
+
+            if tarifa_valor > 0 and classificacao_tarifa and not conta_tarifa_existente:
+                categoria_tarifa, subcategoria_tarifa = classificacao_tarifa
+                conta_tarifa = _criar_conta_pagar_tarifa_full_nf(
+                    db,
+                    tenant_id=tenant_id,
+                    current_user=current_user,
+                    payload=payload,
+                    categoria=categoria_tarifa,
+                    subcategoria=subcategoria_tarifa,
+                )
+                db.commit()
+                return {
+                    "success": True,
+                    "message": (
+                        f"NF {payload.numero_nf} ja tinha baixa de estoque. "
+                        "Apenas a tarifa pendente foi lancada no financeiro."
+                    ),
+                    "numero_nf": payload.numero_nf,
+                    "plataforma": payload.plataforma,
+                    "estoque_ja_baixado": True,
+                    "total_itens": len(baixas_existentes),
+                    "itens": [
+                        {
+                            "produto_id": mov.produto_id,
+                            "sku": None,
+                            "nome": None,
+                            "quantidade": float(mov.quantidade or 0),
+                            "estoque_anterior": float(mov.quantidade_anterior or 0),
+                            "estoque_novo": float(mov.quantidade_nova or 0),
+                        }
+                        for mov in baixas_existentes
+                    ],
+                    "tarifa_envio": {
+                        "conta_pagar_id": conta_tarifa.id,
+                        "valor": tarifa_valor,
+                    },
+                }
+
+            detalhe_tarifa = (
+                " A tarifa de envio ja esta lancada no financeiro."
+                if conta_tarifa_existente
+                else " Se ficou faltando tarifa, informe valor e categoria com DRE para lancar somente o financeiro."
+            )
+            raise HTTPException(
+                status_code=409,
+                detail=(
+                    f"NF {payload.numero_nf} ja possui baixa de estoque registrada. "
+                    f"O sistema bloqueou o reprocessamento para evitar baixa duplicada.{detalhe_tarifa}"
+                ),
+            )
+
         for item in itens_validos:
             processados.append(
                 _processar_item_saida_full_nf(
