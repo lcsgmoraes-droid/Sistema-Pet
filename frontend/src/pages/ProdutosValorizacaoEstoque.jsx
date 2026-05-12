@@ -13,6 +13,7 @@ import {
   MarcaProdutoSelector,
 } from "../components/produtos/CatalogoProdutoSelectors";
 import FornecedorIdentity from "../components/ui/FornecedorIdentity";
+import ActionButton from "../components/ui/ActionButton";
 import useProdutosCatalogos from "../hooks/useProdutosCatalogos";
 
 const ITENS_POR_PAGINA_INICIAL = 50;
@@ -274,12 +275,12 @@ export default function ProdutosValorizacaoEstoque() {
           </p>
         </div>
 
-        <button
+        <ActionButton
           onClick={() => navigate("/produtos")}
-          className="inline-flex items-center justify-center rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+          tone="soft"
         >
           Voltar para produtos
-        </button>
+        </ActionButton>
       </div>
 
       <form
@@ -408,19 +409,18 @@ export default function ProdutosValorizacaoEstoque() {
             </div>
 
             <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
+              <ActionButton
                 onClick={limparFiltros}
-                className="rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+                tone="soft"
               >
                 Limpar filtros
-              </button>
-              <button
+              </ActionButton>
+              <ActionButton
                 type="submit"
-                className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+                intent="edit"
               >
                 Atualizar relatorio
-              </button>
+              </ActionButton>
             </div>
           </div>
 

@@ -4,6 +4,7 @@ import {
   CategoriaProdutoSelector,
   MarcaProdutoSelector,
 } from '../produtos/CatalogoProdutoSelectors';
+import ActionButton from '../ui/ActionButton';
 import { normalizeMarkdownContent } from '../../utils/safeMarkdown';
 
 export default function ProdutosNovoDadosBasicosSection({
@@ -40,9 +41,9 @@ export default function ProdutosNovoDadosBasicosSection({
               className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="Ex: PROD0001"
             />
-            <button type="button" onClick={handleGerarSKU} className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm">
+            <ActionButton type="button" onClick={handleGerarSKU} intent="neutral">
               Gerar
-            </button>
+            </ActionButton>
           </div>
           <p className="mt-1 text-xs text-gray-500">
             Esse valor e salvo como o SKU oficial do produto.
@@ -60,9 +61,9 @@ export default function ProdutosNovoDadosBasicosSection({
               className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               placeholder="EAN-13"
             />
-            <button type="button" onClick={handleGerarCodigoBarras} className="px-4 py-2 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm">
+            <ActionButton type="button" onClick={handleGerarCodigoBarras} intent="neutral">
               Gerar
-            </button>
+            </ActionButton>
           </div>
         </div>
       </div>

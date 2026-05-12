@@ -18,6 +18,7 @@ import {
   MarcaProdutoSelector,
 } from "../components/produtos/CatalogoProdutoSelectors";
 import FornecedorIdentity from "../components/ui/FornecedorIdentity";
+import ActionButton from "../components/ui/ActionButton";
 import useProdutosCatalogos from "../hooks/useProdutosCatalogos";
 
 const ITENS_POR_PAGINA_INICIAL = 20;
@@ -517,25 +518,28 @@ export default function ProdutosValidadeProxima({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <button
+            <ActionButton
               onClick={() => navigate("/campanhas?aba=validade")}
-              className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
+              intent="create"
+              tone="soft"
             >
               Abrir campanhas
-            </button>
-            <button
+            </ActionButton>
+            <ActionButton
               onClick={exportarCsv}
               disabled={exportando}
-              className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+              intent="edit"
+              loading={exportando}
+              tone="soft"
             >
-              {exportando ? "Exportando..." : "Exportar CSV"}
-            </button>
-            <button
+              Exportar CSV
+            </ActionButton>
+            <ActionButton
               onClick={() => navigate("/produtos")}
-              className="rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              tone="soft"
             >
               Voltar para produtos
-            </button>
+            </ActionButton>
           </div>
         </div>
       )}
@@ -754,19 +758,18 @@ export default function ProdutosValidadeProxima({
           </div>
 
           <div className="flex flex-wrap gap-2">
-            <button
-              type="button"
+            <ActionButton
               onClick={limparFiltros}
-              className="rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
+              tone="soft"
             >
               Limpar filtros
-            </button>
-            <button
+            </ActionButton>
+            <ActionButton
               type="submit"
-              className="rounded-xl bg-blue-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-700"
+              intent="edit"
             >
               Atualizar painel
-            </button>
+            </ActionButton>
           </div>
         </div>
       </form>

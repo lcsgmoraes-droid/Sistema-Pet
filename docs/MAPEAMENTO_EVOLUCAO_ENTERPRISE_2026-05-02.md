@@ -885,6 +885,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-10: `EntradaXML` iniciou a quebra segura dos modais operacionais, extraindo historico de precos, revisao de precos, resultado de lote e rascunho de devolucao para `components/entrada-xml`, reduzindo o arquivo principal para 4420 linhas com build validado.
 - 2026-05-12: `EstoqueFullNF` passou a usar `PageHeader`, `ModuleTabs`, `Panel`, `ActionButton`, `IconActionButton`, `EmptyState` e `DataTable`; o badge de canal foi centralizado em `ChannelBadges` com suporte a Amazon, Mercado Livre, Shopee e FULL.
 - 2026-05-12: criado `CatalogoProdutoSelectors` para centralizar autocomplete de categoria e marca de produtos, aplicado em filtros de produtos, edicao em lote, cadastro/edicao de produto, balanco, valorizacao e validade proxima.
+- 2026-05-12: botoes de geracao no cadastro de produto e acoes principais de valorizacao/validade proxima passaram a usar `ActionButton`, mantendo o padrao visual sem alterar regras das telas.
 - 2026-05-10: `EntradaXML` extraiu o modal de visualizacao da NF para `EntradaXmlVisualizacaoNotaModal`, preservando os callbacks da pagina e reduzindo o arquivo principal para 4169 linhas com build validado.
 
 ### Nao fazer nesta onda
