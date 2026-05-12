@@ -585,7 +585,7 @@ async def obter_relatorio_vendas(
                     "percentual": 0
                 }
 
-            valor_item = item.quantidade * item.preco_unitario
+            valor_item = _as_float(getattr(item, "quantidade", 0)) * _as_float(getattr(item, "preco_unitario", 0))
             desconto_item = (valor_item * desconto_venda / bruto_venda) if bruto_venda > 0 else 0
 
             vendas_por_grupo[grupo]["valor_bruto"] += valor_item
@@ -657,7 +657,7 @@ async def obter_relatorio_vendas(
                         "valor_liquido": 0
                     }
 
-                valor_item = item.quantidade * item.preco_unitario
+                valor_item = _as_float(getattr(item, "quantidade", 0)) * _as_float(getattr(item, "preco_unitario", 0))
                 desconto_item = (valor_item * desconto_venda / bruto_venda) if bruto_venda > 0 else 0
 
                 # Atualizar produto
@@ -682,7 +682,7 @@ async def obter_relatorio_vendas(
                         "valor_liquido": 0
                     }
 
-                valor_item = item.quantidade * item.preco_unitario
+                valor_item = _as_float(getattr(item, "quantidade", 0)) * _as_float(getattr(item, "preco_unitario", 0))
                 desconto_item = (valor_item * desconto_venda / bruto_venda) if bruto_venda > 0 else 0
 
                 produtos_por_categoria[categoria_nome]["produtos"][produto_nome]["quantidade"] += item.quantidade
@@ -691,7 +691,7 @@ async def obter_relatorio_vendas(
                 produtos_por_categoria[categoria_nome]["produtos"][produto_nome]["valor_liquido"] += (valor_item - desconto_item)
 
             # Atualizar totais da categoria
-            valor_item = item.quantidade * item.preco_unitario
+            valor_item = _as_float(getattr(item, "quantidade", 0)) * _as_float(getattr(item, "preco_unitario", 0))
             desconto_item = (valor_item * desconto_venda / bruto_venda) if bruto_venda > 0 else 0
             produtos_por_categoria[categoria_nome]["total_quantidade"] += item.quantidade
             produtos_por_categoria[categoria_nome]["total_bruto"] += valor_item
