@@ -76,6 +76,7 @@ router = APIRouter(prefix="/estoque", tags=["Estoque"])
 _NF_STATUS_AUTORIZADA_CODES = {2, 5, 9}
 
 _CANAL_LABELS = {
+    "full": "FULL (geral)",
     "mercado_livre": "Mercado Livre",
     "shopee": "Shopee",
     "amazon": "Amazon",
@@ -997,7 +998,7 @@ class SaidaFullNFItemRequest(BaseModel):
 class SaidaFullNFRequest(BaseModel):
     """Baixa em lote de estoque vinculada a uma NF de saida."""
     numero_nf: str
-    plataforma: Optional[str] = "full"
+    plataforma: Optional[str] = None
     observacao: Optional[str] = None
     tarifa_envio: Optional[float] = 0
     categoria_tarifa_id: Optional[int] = None
@@ -4360,6 +4361,14 @@ def saida_full_por_nf(
     """
     current_user, tenant_id = user_and_tenant
 
+    canal = (payload.plataforma or "").strip().lower()
+    canais_validos = set(_CANAL_LABELS.keys())
+    if not canal:
+        raise HTTPException(status_code=400, detail="Selecione o canal/origem da movimentacao FULL.")
+    if canal not in canais_validos:
+        raise HTTPException(status_code=400, detail="Canal/origem da movimentacao FULL invalido.")
+    payload.plataforma = canal
+
     itens_validos = [item for item in payload.itens if item.quantidade and item.quantidade > 0]
     if not itens_validos:
         raise HTTPException(status_code=400, detail="Informe ao menos um item com quantidade maior que zero")
@@ -4400,7 +4409,10 @@ def saida_full_por_nf(
                     ),
                     "numero_nf": payload.numero_nf,
                     "plataforma": payload.plataforma,
+                    "plataforma_label": _CANAL_LABELS.get(payload.plataforma, payload.plataforma),
                     "estoque_ja_baixado": True,
+                    "baixas_estoque": 0,
+                    "lancamentos_financeiros": 1,
                     "total_itens": len(baixas_existentes),
                     "itens": [
                         {
@@ -4469,6 +4481,9 @@ def saida_full_por_nf(
             "message": "Baixa de estoque por NF concluida",
             "numero_nf": payload.numero_nf,
             "plataforma": payload.plataforma,
+            "plataforma_label": _CANAL_LABELS.get(payload.plataforma, payload.plataforma),
+            "baixas_estoque": len(processados),
+            "lancamentos_financeiros": 1 if conta_tarifa else 0,
             "total_itens": len(processados),
             "itens": processados,
             "tarifa_envio": (

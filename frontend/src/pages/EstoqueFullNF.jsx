@@ -15,9 +15,67 @@ function toNumber(value) {
   return Number.isFinite(n) ? n : 0;
 }
 
+const CANAIS_FULL = [
+  {
+    value: "amazon",
+    label: "Amazon",
+    badgeClass: "border-emerald-200 bg-emerald-50 text-emerald-700",
+  },
+  {
+    value: "mercado_livre",
+    label: "Mercado Livre",
+    badgeClass: "border-yellow-200 bg-yellow-50 text-yellow-800",
+  },
+  {
+    value: "shopee",
+    label: "Shopee",
+    badgeClass: "border-orange-200 bg-orange-50 text-orange-700",
+  },
+  {
+    value: "full",
+    label: "FULL (geral)",
+    badgeClass: "border-slate-200 bg-slate-50 text-slate-700",
+  },
+];
+
+const CANAIS_FULL_MAP = Object.fromEntries(CANAIS_FULL.map((canal) => [canal.value, canal]));
+
+function obterCanalConfig(canal, fallbackLabel) {
+  return CANAIS_FULL_MAP[canal] || {
+    value: canal || "",
+    label: fallbackLabel || canal || "Canal nao informado",
+    badgeClass: "border-slate-200 bg-slate-50 text-slate-700",
+  };
+}
+
+function CanalBadge({ canal, label }) {
+  const config = obterCanalConfig(canal, label);
+  return (
+    <span className={`inline-flex items-center rounded-full border px-2.5 py-1 text-xs font-semibold ${config.badgeClass}`}>
+      {config.label}
+    </span>
+  );
+}
+
+function contarBaixas(resultado) {
+  if (!resultado) return 0;
+  if (resultado.baixas_estoque !== undefined && resultado.baixas_estoque !== null) {
+    return Number(resultado.baixas_estoque) || 0;
+  }
+  return resultado.estoque_ja_baixado ? 0 : Number(resultado.total_itens || 0);
+}
+
+function contarLancamentosFinanceiros(resultado) {
+  if (!resultado) return 0;
+  if (resultado.lancamentos_financeiros !== undefined && resultado.lancamentos_financeiros !== null) {
+    return Number(resultado.lancamentos_financeiros) || 0;
+  }
+  return resultado?.tarifa_envio?.conta_pagar_id ? 1 : 0;
+}
+
 export default function EstoqueFullNF() {
   const [numeroNF, setNumeroNF] = useState("");
-  const [plataforma, setPlataforma] = useState("mercado_livre");
+  const [plataforma, setPlataforma] = useState("");
   const [observacao, setObservacao] = useState("");
   const [itens, setItens] = useState([criarLinha()]);
 
@@ -27,8 +85,11 @@ export default function EstoqueFullNF() {
   const [categoriasDespesa, setCategoriasDespesa] = useState([]);
 
   const [resultado, setResultado] = useState(null);
+  const [abaAtiva, setAbaAtiva] = useState("lancamento");
+  const [modalConclusao, setModalConclusao] = useState({ aberto: false, resultado: null });
   const [salvando, setSalvando] = useState(false);
   const [arquivoXml, setArquivoXml] = useState(null);
+  const [xmlInputKey, setXmlInputKey] = useState(0);
   const [lendoXml, setLendoXml] = useState(false);
   const [modalDre, setModalDre] = useState({ aberto: false, categoria: null });
   const [dreSubcategoriasDespesa, setDreSubcategoriasDespesa] = useState([]);
@@ -119,10 +180,13 @@ export default function EstoqueFullNF() {
 
   const limparFormulario = () => {
     setNumeroNF("");
+    setPlataforma("");
     setItens([criarLinha()]);
     setObservacao("");
     setArquivoXml(null);
+    setXmlInputKey((prev) => prev + 1);
     setTarifaEnvio(0);
+    setDataVencimentoTarifa(hojeISO);
     setCategoriaTarifaId("");
   };
 
@@ -194,6 +258,11 @@ export default function EstoqueFullNF() {
       return;
     }
 
+    if (!plataforma) {
+      toast.error("Selecione o canal/origem da movimentacao.");
+      return;
+    }
+
     const itensValidos = itens
       .map((item) => ({
         sku: item.sku.trim(),
@@ -213,6 +282,7 @@ export default function EstoqueFullNF() {
     try {
       setSalvando(true);
       setResultado(null);
+      setAbaAtiva("lancamento");
 
       const payload = {
         numero_nf: numeroNF.trim(),
@@ -231,12 +301,7 @@ export default function EstoqueFullNF() {
       const response = await api.post("/estoque/saida-full-nf", payload);
       const resultadoProcessado = response.data;
       setResultado(resultadoProcessado);
-      toast.success(resultadoProcessado?.message || "Baixa de estoque por NF concluida");
-
-      if (resultadoProcessado?.tarifa_envio?.conta_pagar_id) {
-        toast.success("Tarifa de envio lancada em Contas a Pagar");
-      }
-
+      setModalConclusao({ aberto: true, resultado: resultadoProcessado });
       limparFormulario();
     } catch (error) {
       console.error("Erro ao processar FULL por NF:", error);
@@ -251,6 +316,11 @@ export default function EstoqueFullNF() {
     if (salvandoVinculoDre) return;
     setModalDre({ aberto: false, categoria: null });
     setDreSubcategoriaId("");
+  };
+
+  const fecharModalConclusao = (verResumo = false) => {
+    setModalConclusao({ aberto: false, resultado: null });
+    setAbaAtiva(verResumo ? "resumo" : "lancamento");
   };
 
   const vincularDreEContinuar = async () => {
@@ -294,6 +364,35 @@ export default function EstoqueFullNF() {
         </p>
       </div>
 
+      <div className="flex flex-wrap gap-2 border-b border-slate-200">
+        <button
+          type="button"
+          onClick={() => setAbaAtiva("lancamento")}
+          className={`px-4 py-2 text-sm font-semibold border-b-2 ${
+            abaAtiva === "lancamento"
+              ? "border-blue-600 text-blue-700"
+              : "border-transparent text-slate-500 hover:text-slate-800"
+          }`}
+        >
+          Novo lancamento
+        </button>
+        {resultado && (
+          <button
+            type="button"
+            onClick={() => setAbaAtiva("resumo")}
+            className={`px-4 py-2 text-sm font-semibold border-b-2 ${
+              abaAtiva === "resumo"
+                ? "border-blue-600 text-blue-700"
+                : "border-transparent text-slate-500 hover:text-slate-800"
+            }`}
+          >
+            Ultimo resumo
+          </button>
+        )}
+      </div>
+
+      {abaAtiva === "lancamento" && (
+        <>
       <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-5 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div>
@@ -310,19 +409,27 @@ export default function EstoqueFullNF() {
           </div>
 
           <div>
-            <div className="block text-sm font-medium text-gray-700 mb-1">Plataforma</div>
+            <div className="flex items-center justify-between gap-2 mb-1">
+              <div className="block text-sm font-medium text-gray-700">Canal / origem *</div>
+              {plataforma && <CanalBadge canal={plataforma} />}
+            </div>
             <select
               id="plataforma-full"
-              aria-label="Plataforma"
+              aria-label="Canal ou origem"
               value={plataforma}
               onChange={(e) => setPlataforma(e.target.value)}
               className="w-full border border-gray-300 rounded-lg px-3 py-2"
             >
-              <option value="mercado_livre">Mercado Livre</option>
-              <option value="shopee">Shopee</option>
-              <option value="amazon">Amazon</option>
-              <option value="full">FULL (geral)</option>
+              <option value="">Selecione o canal</option>
+              {CANAIS_FULL.map((canal) => (
+                <option key={canal.value} value={canal.value}>
+                  {canal.label}
+                </option>
+              ))}
             </select>
+            {!plataforma && (
+              <p className="mt-1 text-xs text-amber-700">Obrigatorio para direcionar a despesa na DRE correta.</p>
+            )}
           </div>
 
           <div>
@@ -368,6 +475,7 @@ export default function EstoqueFullNF() {
           <div className="md:col-span-8">
             <div className="block text-sm font-medium text-slate-700 mb-1">Escolher XML da NF (preenche numero e itens)</div>
             <input
+              key={xmlInputKey}
               type="file"
               accept=".xml,text/xml,application/xml"
               onChange={(e) => setArquivoXml(e.target.files?.[0] || null)}
@@ -476,7 +584,7 @@ export default function EstoqueFullNF() {
             )}
             {tarifaEnvio > 0 && categoriaTarifaSelecionada?.dre_subcategoria_id && (
               <p className="mt-1 text-xs text-emerald-700">
-                A despesa sera lancada na DRE do canal selecionado em Plataforma.
+                A despesa sera lancada na DRE do canal/origem selecionado.
               </p>
             )}
           </div>
@@ -493,13 +601,37 @@ export default function EstoqueFullNF() {
           {salvando ? "Processando..." : "Confirmar baixa por NF"}
         </button>
       </div>
+        </>
+      )}
 
-      {resultado && (
+      {abaAtiva === "resumo" && resultado && (
         <div className="bg-white rounded-xl border border-gray-200 p-4 md:p-5">
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Resumo processado</h3>
-          <p className="text-sm text-gray-700 mb-3">
-            NF {resultado.numero_nf} | Itens processados: {resultado.total_itens}
-          </p>
+          <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between mb-4">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900">Resumo processado</h3>
+              <p className="text-sm text-gray-700 mt-1">
+                NF {resultado.numero_nf} | Itens processados: {resultado.total_itens}
+              </p>
+            </div>
+            <CanalBadge canal={resultado.plataforma} label={resultado.plataforma_label} />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 mb-4 sm:grid-cols-3">
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase text-emerald-700">Baixas de estoque</p>
+              <p className="mt-1 text-2xl font-bold text-emerald-900">{contarBaixas(resultado)}</p>
+            </div>
+            <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase text-blue-700">Lancamentos financeiros</p>
+              <p className="mt-1 text-2xl font-bold text-blue-900">{contarLancamentosFinanceiros(resultado)}</p>
+            </div>
+            <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+              <p className="text-xs font-semibold uppercase text-slate-600">Status</p>
+              <p className="mt-2 text-sm font-semibold text-slate-900">
+                {resultado.estoque_ja_baixado ? "Estoque ja estava baixado" : "Processado com sucesso"}
+              </p>
+            </div>
+          </div>
 
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
@@ -532,6 +664,76 @@ export default function EstoqueFullNF() {
               {resultado.tarifa_envio.conta_pagar_id ? ` | Conta a pagar #${resultado.tarifa_envio.conta_pagar_id}` : ""}
             </p>
           )}
+        </div>
+      )}
+
+      {modalConclusao.aberto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
+          <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-2xl">
+            <div className="border-b border-slate-200 px-5 py-4">
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Processamento concluido</p>
+              <h3 className="mt-1 text-lg font-semibold text-slate-900">Baixa por NF finalizada</h3>
+            </div>
+
+            <div className="space-y-4 px-5 py-4">
+              <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-slate-200 bg-slate-50 px-4 py-3">
+                <div>
+                  <p className="text-xs text-slate-500">NF</p>
+                  <p className="text-base font-semibold text-slate-900">{modalConclusao.resultado?.numero_nf}</p>
+                </div>
+                <CanalBadge
+                  canal={modalConclusao.resultado?.plataforma}
+                  label={modalConclusao.resultado?.plataforma_label}
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase text-emerald-700">Baixas feitas</p>
+                  <p className="mt-1 text-2xl font-bold text-emerald-900">
+                    {contarBaixas(modalConclusao.resultado)}
+                  </p>
+                </div>
+                <div className="rounded-lg border border-blue-200 bg-blue-50 px-4 py-3">
+                  <p className="text-xs font-semibold uppercase text-blue-700">Financeiro</p>
+                  <p className="mt-1 text-2xl font-bold text-blue-900">
+                    {contarLancamentosFinanceiros(modalConclusao.resultado)}
+                  </p>
+                </div>
+              </div>
+
+              {modalConclusao.resultado?.estoque_ja_baixado && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  O estoque desta NF ja estava baixado. O sistema nao baixou novamente e executou apenas o que ainda
+                  estava pendente.
+                </div>
+              )}
+
+              {modalConclusao.resultado?.tarifa_envio?.conta_pagar_id && (
+                <div className="rounded-lg border border-slate-200 bg-white px-4 py-3 text-sm text-slate-700">
+                  Conta a pagar gerada: <strong>#{modalConclusao.resultado.tarifa_envio.conta_pagar_id}</strong> no valor de{" "}
+                  <strong>{formatMoneyBRL(modalConclusao.resultado.tarifa_envio.valor)}</strong>.
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col-reverse gap-2 border-t border-slate-200 px-5 py-4 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => fecharModalConclusao(true)}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+              >
+                Ver resumo
+              </button>
+              <button
+                type="button"
+                onClick={() => fecharModalConclusao(false)}
+                className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+              >
+                OK, novo lancamento
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
