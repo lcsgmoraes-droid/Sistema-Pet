@@ -122,9 +122,11 @@ export default function EstoqueFullNF() {
 
   const [abaAtiva, setAbaAtiva] = useState("lancamento");
   const [modalConclusao, setModalConclusao] = useState({ aberto: false, resultado: null });
+  const [modalEditarCanal, setModalEditarCanal] = useState({ aberto: false, lancamento: null, canal: "" });
   const [historico, setHistorico] = useState([]);
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  const [salvandoCanal, setSalvandoCanal] = useState(false);
   const [arquivoXml, setArquivoXml] = useState(null);
   const [xmlInputKey, setXmlInputKey] = useState(0);
   const [lendoXml, setLendoXml] = useState(false);
@@ -457,6 +459,62 @@ export default function EstoqueFullNF() {
   const fecharModalConclusao = (verResumo = false) => {
     setModalConclusao({ aberto: false, resultado: null });
     setAbaAtiva(verResumo ? "historico" : "lancamento");
+  };
+
+  const abrirModalEditarCanal = (lancamento) => {
+    if (!lancamento?.numero_nf) {
+      toast.error("Nao foi possivel identificar a NF para corrigir o canal.");
+      return;
+    }
+    setModalEditarCanal({
+      aberto: true,
+      lancamento,
+      canal: lancamento.plataforma || "",
+    });
+  };
+
+  const fecharModalEditarCanal = () => {
+    if (salvandoCanal) return;
+    setModalEditarCanal({ aberto: false, lancamento: null, canal: "" });
+  };
+
+  const corrigirCanalDoResultado = () => {
+    const resultado = modalConclusao.resultado;
+    if (!resultado) return;
+    setModalConclusao({ aberto: false, resultado: null });
+    setAbaAtiva("historico");
+    abrirModalEditarCanal(resultado);
+  };
+
+  const salvarCanalLancamento = async () => {
+    const lancamento = modalEditarCanal.lancamento;
+    const canal = modalEditarCanal.canal;
+    if (!lancamento?.numero_nf) {
+      toast.error("Nao foi possivel identificar a NF para corrigir o canal.");
+      return;
+    }
+    if (!canal) {
+      toast.error("Selecione o canal correto.");
+      return;
+    }
+
+    try {
+      setSalvandoCanal(true);
+      const response = await api.put(
+        `/estoque/saida-full-nf/${encodeURIComponent(lancamento.numero_nf)}/canal`,
+        { plataforma: canal },
+      );
+      toast.success(response.data?.message || "Canal atualizado.");
+      setModalEditarCanal({ aberto: false, lancamento: null, canal: "" });
+      await carregarHistorico();
+      setAbaAtiva("historico");
+    } catch (error) {
+      console.error("Erro ao atualizar canal da baixa FULL:", error);
+      const detalhe = error?.response?.data?.detail || "Nao foi possivel atualizar o canal.";
+      toast.error(typeof detalhe === "string" ? detalhe : "Nao foi possivel atualizar o canal.");
+    } finally {
+      setSalvandoCanal(false);
+    }
   };
 
   const vincularDreEContinuar = async () => {
@@ -846,6 +904,13 @@ export default function EstoqueFullNF() {
                     <div className="flex flex-wrap items-center gap-2">
                       <h4 className="text-base font-semibold text-slate-900">NF {lancamento.numero_nf}</h4>
                       <CanalBadge canal={lancamento.plataforma} label={lancamento.plataforma_label} />
+                      <button
+                        type="button"
+                        onClick={() => abrirModalEditarCanal(lancamento)}
+                        className="rounded-full border border-slate-300 px-2.5 py-1 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                      >
+                        Editar canal
+                      </button>
                     </div>
                     <p className="mt-1 text-xs text-slate-500">Processado em {formatarDataHora(lancamento.processado_em)}</p>
                   </div>
@@ -924,6 +989,15 @@ export default function EstoqueFullNF() {
                 />
               </div>
 
+              <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                <p className="font-semibold">Confirme a loja/canal antes de seguir.</p>
+                <p className="mt-1">
+                  Esta baixa ficou registrada em{" "}
+                  <strong>{obterCanalConfig(modalConclusao.resultado?.plataforma, modalConclusao.resultado?.plataforma_label).label}</strong>.
+                  Se estiver errado, corrija agora para manter estoque, financeiro e DRE na origem certa.
+                </p>
+              </div>
+
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
                   <p className="text-xs font-semibold uppercase text-emerald-700">Baixas feitas</p>
@@ -957,6 +1031,13 @@ export default function EstoqueFullNF() {
             <div className="flex flex-col-reverse gap-2 border-t border-slate-200 px-5 py-4 sm:flex-row sm:justify-end">
               <button
                 type="button"
+                onClick={corrigirCanalDoResultado}
+                className="rounded-lg border border-amber-300 px-4 py-2 text-sm font-semibold text-amber-800 hover:bg-amber-50"
+              >
+                Corrigir canal
+              </button>
+              <button
+                type="button"
                 onClick={() => fecharModalConclusao(true)}
                 className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
               >
@@ -968,6 +1049,95 @@ export default function EstoqueFullNF() {
                 className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
               >
                 OK, novo lancamento
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalEditarCanal.aberto && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 px-4">
+          <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white shadow-2xl">
+            <div className="flex items-start justify-between border-b border-slate-200 px-5 py-4">
+              <div>
+                <p className="text-xs font-semibold uppercase tracking-wide text-amber-700">Correcao de canal</p>
+                <h3 className="mt-1 text-lg font-semibold text-slate-900">
+                  Editar loja/canal da NF {modalEditarCanal.lancamento?.numero_nf}
+                </h3>
+              </div>
+              <button
+                type="button"
+                onClick={fecharModalEditarCanal}
+                disabled={salvandoCanal}
+                className="rounded-lg px-2 py-1 text-xl leading-none text-slate-400 hover:bg-slate-100 hover:text-slate-700 disabled:opacity-60"
+                aria-label="Fechar"
+              >
+                x
+              </button>
+            </div>
+
+            <div className="space-y-4 px-5 py-4">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-700">
+                <p>
+                  Canal atual:{" "}
+                  <CanalBadge
+                    canal={modalEditarCanal.lancamento?.plataforma}
+                    label={modalEditarCanal.lancamento?.plataforma_label}
+                  />
+                </p>
+                <p className="mt-2 text-xs text-slate-500">
+                  A correcao atualiza a baixa de estoque e a conta a pagar da tarifa desta NF.
+                </p>
+              </div>
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700" htmlFor="editar-canal-full">
+                  Loja / canal correto
+                </label>
+                <select
+                  id="editar-canal-full"
+                  value={modalEditarCanal.canal}
+                  onChange={(event) =>
+                    setModalEditarCanal((prev) => ({
+                      ...prev,
+                      canal: event.target.value,
+                    }))
+                  }
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 text-sm focus:border-blue-500 focus:outline-none"
+                >
+                  <option value="">Selecione o canal</option>
+                  {CANAIS_FULL.map((canal) => (
+                    <option key={canal.value} value={canal.value}>
+                      {canal.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {modalEditarCanal.canal && modalEditarCanal.canal !== modalEditarCanal.lancamento?.plataforma && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
+                  Vou mover esta NF para{" "}
+                  <strong>{obterCanalConfig(modalEditarCanal.canal).label}</strong>. Confira antes de salvar.
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col-reverse gap-2 border-t border-slate-200 px-5 py-4 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={fecharModalEditarCanal}
+                disabled={salvandoCanal}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm text-slate-700 hover:bg-slate-50 disabled:opacity-60"
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={salvarCanalLancamento}
+                disabled={salvandoCanal || !modalEditarCanal.canal}
+                className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {salvandoCanal ? "Salvando..." : "Salvar canal"}
               </button>
             </div>
           </div>

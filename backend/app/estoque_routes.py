@@ -1007,6 +1007,11 @@ class SaidaFullNFRequest(BaseModel):
     itens: List[SaidaFullNFItemRequest]
 
 
+class SaidaFullNFCanalUpdateRequest(BaseModel):
+    """Atualizacao do canal/origem de uma baixa FULL ja processada."""
+    plataforma: str
+
+
 def _parse_data_lote(valor: Optional[str]) -> Optional[datetime]:
     texto = str(valor or "").strip()
     if not texto:
@@ -2227,6 +2232,25 @@ def _observacao_full_nf(numero_nf: str, plataforma: Optional[str], observacao: O
     return base
 
 
+def _observacao_full_nf_com_canal_atualizado(
+    numero_nf: str,
+    observacao: Optional[str],
+    plataforma: str,
+) -> str:
+    texto = _texto_limpo(observacao)
+    if texto:
+        if re.search(r"plataforma:\s*[^|]+", texto, flags=re.IGNORECASE):
+            return re.sub(
+                r"plataforma:\s*[^|]+",
+                f"plataforma: {plataforma}",
+                texto,
+                count=1,
+                flags=re.IGNORECASE,
+            )
+        return f"{texto} | plataforma: {plataforma}"
+    return _observacao_full_nf(numero_nf, plataforma, None)
+
+
 def _canal_saida_full_por_observacao(observacao: Optional[str]) -> Optional[str]:
     texto = _texto_limpo(observacao)
     if not texto:
@@ -2605,6 +2629,25 @@ def _criar_conta_pagar_tarifa_full_nf(
     return conta
 
 
+def _observacao_conta_tarifa_full_nf_com_canal(
+    observacoes: Optional[str],
+    plataforma_label: str,
+) -> str:
+    texto = _texto_limpo(observacoes)
+    novo_prefixo = f"Tarifa da operacao FULL ({plataforma_label})."
+    if not texto:
+        return f"{novo_prefixo} Gerado na baixa de estoque por NF."
+    if re.search(r"Tarifa da operacao FULL \([^)]+\)\.", texto, flags=re.IGNORECASE):
+        return re.sub(
+            r"Tarifa da operacao FULL \([^)]+\)\.",
+            novo_prefixo,
+            texto,
+            count=1,
+            flags=re.IGNORECASE,
+        )
+    return f"{novo_prefixo} {texto}"
+
+
 def _buscar_conta_tarifa_full_nf(db: Session, tenant_id, numero_nf: str):
     return db.query(ContaPagar).filter(
         ContaPagar.tenant_id == tenant_id,
@@ -2704,6 +2747,79 @@ def historico_saida_full_por_nf(
 
     items = list(grupos.values())[:limit]
     return {"items": items, "total": len(grupos)}
+
+
+@router.put("/saida-full-nf/{numero_nf}/canal")
+def atualizar_canal_saida_full_por_nf(
+    numero_nf: str,
+    payload: SaidaFullNFCanalUpdateRequest,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    """Corrige canal/origem de uma baixa FULL ja processada."""
+    _current_user, tenant_id = user_and_tenant
+    canal = (payload.plataforma or "").strip().lower()
+    if not canal:
+        raise HTTPException(status_code=400, detail="Selecione o novo canal/origem.")
+    if canal not in _CANAL_LABELS:
+        raise HTTPException(status_code=400, detail="Canal/origem invalido.")
+
+    baixas = _buscar_baixas_full_nf(db, tenant_id, numero_nf)
+    if not baixas:
+        raise HTTPException(status_code=404, detail=f"Nenhuma baixa encontrada para a NF {numero_nf}.")
+
+    canal_anterior = _canal_saida_full_por_observacao(baixas[0].observacao)
+    plataforma_label = _CANAL_LABELS.get(canal, canal)
+    for movimentacao in baixas:
+        movimentacao.observacao = _observacao_full_nf_com_canal_atualizado(
+            numero_nf,
+            movimentacao.observacao,
+            canal,
+        )
+
+    conta_tarifa = _buscar_conta_tarifa_full_nf(db, tenant_id, numero_nf)
+    lancamentos_financeiros = 0
+    if conta_tarifa:
+        conta_tarifa.canal = canal
+        conta_tarifa.observacoes = _observacao_conta_tarifa_full_nf_com_canal(
+            conta_tarifa.observacoes,
+            plataforma_label,
+        )
+        lancamentos_financeiros = 1
+
+        lancamentos_manuais = db.query(LancamentoManual).filter(
+            LancamentoManual.tenant_id == tenant_id,
+            LancamentoManual.documento == numero_nf,
+            LancamentoManual.descricao == f"Tarifa envio FULL NF {numero_nf}",
+        ).all()
+        for lancamento in lancamentos_manuais:
+            lancamento.observacoes = (
+                f"Gerado automaticamente da conta a pagar #{conta_tarifa.id}. "
+                f"Canal/origem corrigido para {plataforma_label}."
+            )
+
+    db.commit()
+
+    return {
+        "success": True,
+        "message": f"Canal da NF {numero_nf} atualizado para {plataforma_label}.",
+        "numero_nf": numero_nf,
+        "plataforma": canal,
+        "plataforma_label": plataforma_label,
+        "plataforma_anterior": canal_anterior,
+        "plataforma_anterior_label": _CANAL_LABELS.get(canal_anterior, canal_anterior) if canal_anterior else None,
+        "baixas_estoque": len(baixas),
+        "lancamentos_financeiros": lancamentos_financeiros,
+        "total_itens": len(baixas),
+        "tarifa_envio": (
+            {
+                "conta_pagar_id": conta_tarifa.id,
+                "valor": float(conta_tarifa.valor_final or conta_tarifa.valor_original or 0),
+            }
+            if conta_tarifa
+            else None
+        ),
+    }
 
 
 class TransferenciaEstoqueRequest(BaseModel):
