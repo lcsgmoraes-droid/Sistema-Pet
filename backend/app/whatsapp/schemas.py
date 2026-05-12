@@ -3,7 +3,7 @@ WhatsApp Schemas - Pydantic
 
 Schemas de request/response para API WhatsApp
 """
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from typing import Optional, List, Dict, Any, Union
 from datetime import datetime, time
 from enum import Enum
@@ -48,6 +48,8 @@ class ProviderType(str, Enum):
 
 class TenantWhatsAppConfigBase(BaseModel):
     """Base config"""
+    model_config = ConfigDict(protected_namespaces=())
+
     provider: ProviderType = ProviderType.DIALOG_360
     api_key: Optional[str] = None
     phone_number: Optional[str] = None
@@ -72,6 +74,8 @@ class TenantWhatsAppConfigCreate(TenantWhatsAppConfigBase):
 
 class TenantWhatsAppConfigUpdate(BaseModel):
     """Schema para atualizar config (campos opcionais)"""
+    model_config = ConfigDict(protected_namespaces=())
+
     provider: Optional[ProviderType] = None
     api_key: Optional[str] = None
     phone_number: Optional[str] = None
@@ -168,6 +172,8 @@ class WhatsAppSessionWithMessages(WhatsAppSessionResponse):
 
 class WhatsAppMessageBase(BaseModel):
     """Base message"""
+    model_config = ConfigDict(protected_namespaces=())
+
     tipo: MessageTipo
     conteudo: str
     whatsapp_message_id: Optional[str] = None
