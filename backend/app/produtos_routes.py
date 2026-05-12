@@ -2366,6 +2366,10 @@ def listar_produtos(
     tipo_produto: Optional[str] = None,  # Filtro por tipo de produto
     produto_predecessor_id: Optional[int] = None,  # Buscar sucessores de um produto
     include_variations: Optional[bool] = False,
+    busca_completa: bool = False,
+    incluir_imagens: bool = False,
+    incluir_lotes: bool = False,
+    incluir_detalhes_composto: bool = False,
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
@@ -2426,9 +2430,10 @@ def listar_produtos(
     if termo_busca:
         # Busca por múltiplas palavras: todas as palavras precisam aparecer (qualquer ordem)
         # Ex: "special dog senior" encontra "Racao Special Dog Ultralife Senior"
+        search_conditions = _produto_search_conditions if busca_completa else _produto_search_conditions_fast
         palavras = [p.strip() for p in termo_busca.split() if p.strip()]
         for palavra in palavras:
-            query = query.filter(_produto_search_conditions(palavra))
+            query = query.filter(search_conditions(palavra))
 
     if categoria_id:
         query = query.filter(Produto.categoria_id == categoria_id)
@@ -2470,15 +2475,17 @@ def listar_produtos(
 
     order_clause = _build_produto_search_order_clause(termo_busca)
 
+    load_options = [
+        joinedload(Produto.categoria),
+        joinedload(Produto.marca),
+        joinedload(Produto.imagens) if incluir_imagens else noload(Produto.imagens),
+        joinedload(Produto.lotes) if incluir_lotes else noload(Produto.lotes),
+    ]
+
     # QUERY FINAL COM RELACIONAMENTOS
     produtos = (
         query
-        .options(
-            joinedload(Produto.categoria),
-            joinedload(Produto.marca),
-            joinedload(Produto.imagens),
-            joinedload(Produto.lotes)
-        )
+        .options(*load_options)
         .order_by(*order_clause)
         .offset(offset)
         .limit(page_size)
@@ -2503,7 +2510,13 @@ def listar_produtos(
             ).scalar()
             produto.total_variacoes = total_variacoes or 0
 
-        _enriquecer_produto_listagem(db, produto, tenant_id, reservas_por_produto)
+        _enriquecer_produto_listagem(
+            db,
+            produto,
+            tenant_id,
+            reservas_por_produto,
+            incluir_detalhes_composto=incluir_detalhes_composto,
+        )
         produtos_expandidos.append(produto)
 
         # Se for PAI, buscar e incluir suas variaÃ§Ãµes logo apÃ³s
@@ -2513,13 +2526,16 @@ def listar_produtos(
                 Produto.produto_pai_id == produto.id,
                 Produto.tipo_produto == 'VARIACAO',
                 Produto.ativo == True
-            ).options(
-                joinedload(Produto.imagens),
-                joinedload(Produto.lotes)
-            ).order_by(Produto.nome).all()
+            ).options(*load_options).order_by(Produto.nome).all()
 
             for variacao in variacoes:
-                _enriquecer_produto_listagem(db, variacao, tenant_id, reservas_por_produto)
+                _enriquecer_produto_listagem(
+                    db,
+                    variacao,
+                    tenant_id,
+                    reservas_por_produto,
+                    incluir_detalhes_composto=incluir_detalhes_composto,
+                )
                 produtos_expandidos.append(variacao)
 
     pages = (total + page_size - 1) // page_size

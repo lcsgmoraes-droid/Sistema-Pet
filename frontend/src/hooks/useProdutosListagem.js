@@ -271,6 +271,10 @@ export default function useProdutosListagem({
       filtrosLimpos.page = paginaAtual;
       filtrosLimpos.page_size = itensPorPagina;
       filtrosLimpos.include_variations = filtrosAtuais.mostrarPaisVariacoes;
+      filtrosLimpos.busca_completa = false;
+      filtrosLimpos.incluir_imagens = false;
+      filtrosLimpos.incluir_lotes = false;
+      filtrosLimpos.incluir_detalhes_composto = false;
 
       const response = await getProdutos(filtrosLimpos);
 
