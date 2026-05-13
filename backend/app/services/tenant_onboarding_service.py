@@ -8,7 +8,12 @@ from sqlalchemy import inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
-from app.template_models import TemplateBundle, TemplateItem, TenantTemplateInstall
+from app.template_models import (
+    TemplateBundle,
+    TemplateItem,
+    TenantTemplateInstall,
+    TenantTemplateItemInstall,
+)
 from app.utils.tenant_safe_sql import (
     execute_tenant_safe,
     execute_tenant_safe_scalar,
@@ -20,6 +25,16 @@ DEFAULT_BUNDLE_VERSION = "v1"
 NAME_RECEITAS_VENDAS = "Receitas de Vendas"
 NAME_TAXAS_CARTAO = "Taxas de Cartao"
 PRODUCT_REFERENCE_DESCRIPTION = "Produto de referencia para importacao opcional."
+ITEM_INSTALL_TARGET_TABLES = {
+    "formas_pagamento",
+    "dre_categorias",
+    "dre_subcategorias",
+    "categorias_financeiras",
+    "tipo_despesas",
+    "departamentos",
+    "categorias",
+    "produtos",
+}
 
 TIPO_CUSTO_DB_LABELS = {
     "direto": "DIRETO",
@@ -625,6 +640,113 @@ def _execute_insert(db: Session, sql: str, params: dict[str, Any], tenant_id: st
     )
 
 
+def _item_install_tables_ready(db: Session) -> bool:
+    return _table_exists(db, "tenant_template_item_installs")
+
+
+def _ensure_known_target_table(target_table: str) -> None:
+    if target_table not in ITEM_INSTALL_TARGET_TABLES:
+        raise TenantOnboardingError(f"Tabela alvo de template nao permitida: {target_table}.")
+
+
+def _get_template_item_install(
+    db: Session,
+    tenant_id: str,
+    result: OnboardingResult,
+    item: dict[str, Any],
+) -> TenantTemplateItemInstall | None:
+    if not _item_install_tables_ready(db):
+        return None
+
+    tenant_uuid = uuid.UUID(tenant_id)
+    return (
+        db.query(TenantTemplateItemInstall)
+        .filter(
+            TenantTemplateItemInstall.tenant_id == tenant_uuid,
+            TenantTemplateItemInstall.bundle_code == result.bundle_code,
+            TenantTemplateItemInstall.bundle_version == result.bundle_version,
+            TenantTemplateItemInstall.item_type == item["item_type"],
+            TenantTemplateItemInstall.template_code == item["template_code"],
+        )
+        .first()
+    )
+
+
+def _mapped_template_row_id(
+    db: Session,
+    tenant_id: str,
+    result: OnboardingResult,
+    item: dict[str, Any],
+    target_table: str,
+) -> int | None:
+    _ensure_known_target_table(target_table)
+    install = _get_template_item_install(db, tenant_id, result, item)
+    if install is None or install.target_id is None:
+        return None
+    if install.target_table != target_table:
+        result.warnings.append(
+            f"Template {item['template_code']} aponta para tabela inesperada: {install.target_table}."
+        )
+        return None
+
+    existing_id = _scalar(
+        db,
+        f"""
+        SELECT id
+        FROM {target_table}
+        WHERE {{tenant_filter}}
+          AND id = :target_id
+        LIMIT 1
+        """,
+        {"target_id": install.target_id},
+        tenant_id,
+    )
+    if existing_id:
+        return int(existing_id)
+
+    result.warnings.append(
+        f"Template {item['template_code']} tinha vinculo sem registro alvo em {target_table}."
+    )
+    return None
+
+
+def _record_template_item_install(
+    db: Session,
+    tenant_id: str,
+    user_id: int | None,
+    result: OnboardingResult,
+    item: dict[str, Any],
+    target_table: str,
+    target_id: Any,
+) -> None:
+    if result.dry_run or not target_id or not _item_install_tables_ready(db):
+        return
+
+    _ensure_known_target_table(target_table)
+    tenant_uuid = uuid.UUID(tenant_id)
+    install = _get_template_item_install(db, tenant_id, result, item)
+    if install is None:
+        db.add(
+            TenantTemplateItemInstall(
+                tenant_id=tenant_uuid,
+                bundle_code=result.bundle_code,
+                bundle_version=result.bundle_version,
+                item_type=item["item_type"],
+                template_code=item["template_code"],
+                target_table=target_table,
+                target_id=int(target_id),
+                status="active",
+                created_by_user_id=user_id,
+            )
+        )
+    else:
+        install.target_table = target_table
+        install.target_id = int(target_id)
+        install.status = "active"
+        install.created_by_user_id = user_id
+    db.flush()
+
+
 def _copy_payment_methods(
     db: Session,
     items: list[dict[str, Any]],
@@ -634,6 +756,11 @@ def _copy_payment_methods(
 ) -> None:
     for item in items:
         payload = item["payload"]
+        mapped_id = _mapped_template_row_id(db, tenant_id, result, item, "formas_pagamento")
+        if mapped_id:
+            result.bump("skipped", "payment_methods")
+            continue
+
         existing_id = _scalar(
             db,
             """
@@ -648,6 +775,15 @@ def _copy_payment_methods(
             tenant_id,
         )
         if existing_id:
+            _record_template_item_install(
+                db,
+                tenant_id,
+                user_id,
+                result,
+                item,
+                "formas_pagamento",
+                existing_id,
+            )
             result.bump("skipped", "payment_methods")
             continue
         if result.dry_run:
@@ -695,6 +831,28 @@ def _copy_payment_methods(
             params,
             tenant_id,
         )
+        created_id = _scalar(
+            db,
+            """
+            SELECT id
+            FROM formas_pagamento
+            WHERE {tenant_filter}
+              AND lower(nome) = lower(:nome)
+              AND tipo = :tipo
+            LIMIT 1
+            """,
+            {"nome": payload["nome"], "tipo": payload["tipo"]},
+            tenant_id,
+        )
+        _record_template_item_install(
+            db,
+            tenant_id,
+            user_id,
+            result,
+            item,
+            "formas_pagamento",
+            created_id,
+        )
         result.bump("created", "payment_methods")
 
 
@@ -707,6 +865,12 @@ def _copy_dre_categories(
     category_ids: dict[str, int] = {}
     for item in items:
         payload = item["payload"]
+        mapped_id = _mapped_template_row_id(db, tenant_id, result, item, "dre_categorias")
+        if mapped_id:
+            category_ids[item["template_code"]] = mapped_id
+            result.bump("skipped", "dre_categories")
+            continue
+
         existing_id = _scalar(
             db,
             """
@@ -721,6 +885,15 @@ def _copy_dre_categories(
         )
         if existing_id:
             category_ids[item["template_code"]] = int(existing_id)
+            _record_template_item_install(
+                db,
+                tenant_id,
+                None,
+                result,
+                item,
+                "dre_categorias",
+                existing_id,
+            )
             result.bump("skipped", "dre_categories")
             continue
         if result.dry_run:
@@ -759,6 +932,15 @@ def _copy_dre_categories(
             tenant_id,
         )
         category_ids[item["template_code"]] = int(created_id)
+        _record_template_item_install(
+            db,
+            tenant_id,
+            None,
+            result,
+            item,
+            "dre_categorias",
+            created_id,
+        )
         result.bump("created", "dre_categories")
     return category_ids
 
@@ -779,6 +961,12 @@ def _copy_dre_subcategories(
             result.warnings.append(f"Categoria DRE ausente para subcategoria {item['template_code']}.")
             continue
 
+        mapped_id = _mapped_template_row_id(db, tenant_id, result, item, "dre_subcategorias")
+        if mapped_id:
+            subcategory_ids[item["template_code"]] = mapped_id
+            result.bump("skipped", "dre_subcategories")
+            continue
+
         existing_id = _scalar(
             db,
             """
@@ -794,6 +982,15 @@ def _copy_dre_subcategories(
         )
         if existing_id:
             subcategory_ids[item["template_code"]] = int(existing_id)
+            _record_template_item_install(
+                db,
+                tenant_id,
+                None,
+                result,
+                item,
+                "dre_subcategorias",
+                existing_id,
+            )
             result.bump("skipped", "dre_subcategories")
             continue
         if result.dry_run:
@@ -846,6 +1043,15 @@ def _copy_dre_subcategories(
             tenant_id,
         )
         subcategory_ids[item["template_code"]] = int(created_id)
+        _record_template_item_install(
+            db,
+            tenant_id,
+            None,
+            result,
+            item,
+            "dre_subcategorias",
+            created_id,
+        )
         result.bump("created", "dre_subcategories")
     return subcategory_ids
 
@@ -859,6 +1065,11 @@ def _copy_expense_types(
 ) -> None:
     for item in items:
         payload = item["payload"]
+        mapped_id = _mapped_template_row_id(db, tenant_id, result, item, "tipo_despesas")
+        if mapped_id:
+            result.bump("skipped", "expense_types")
+            continue
+
         existing_id = _scalar(
             db,
             """
@@ -872,6 +1083,15 @@ def _copy_expense_types(
             tenant_id,
         )
         if existing_id:
+            _record_template_item_install(
+                db,
+                tenant_id,
+                None,
+                result,
+                item,
+                "tipo_despesas",
+                existing_id,
+            )
             result.bump("skipped", "expense_types")
             continue
         if result.dry_run:
@@ -903,6 +1123,27 @@ def _copy_expense_types(
             },
             tenant_id,
         )
+        created_id = _scalar(
+            db,
+            """
+            SELECT id
+            FROM tipo_despesas
+            WHERE {tenant_filter}
+              AND lower(nome) = lower(:nome)
+            LIMIT 1
+            """,
+            {"nome": payload["nome"]},
+            tenant_id,
+        )
+        _record_template_item_install(
+            db,
+            tenant_id,
+            None,
+            result,
+            item,
+            "tipo_despesas",
+            created_id,
+        )
         result.bump("created", "expense_types")
 
 
@@ -916,6 +1157,11 @@ def _copy_financial_categories(
 ) -> None:
     for item in items:
         payload = item["payload"]
+        mapped_id = _mapped_template_row_id(db, tenant_id, result, item, "categorias_financeiras")
+        if mapped_id:
+            result.bump("skipped", "financial_categories")
+            continue
+
         existing_id = _scalar(
             db,
             """
@@ -930,6 +1176,15 @@ def _copy_financial_categories(
             tenant_id,
         )
         if existing_id:
+            _record_template_item_install(
+                db,
+                tenant_id,
+                user_id,
+                result,
+                item,
+                "categorias_financeiras",
+                existing_id,
+            )
             result.bump("skipped", "financial_categories")
             continue
         if result.dry_run:
@@ -961,6 +1216,28 @@ def _copy_financial_categories(
             },
             tenant_id,
         )
+        created_id = _scalar(
+            db,
+            """
+            SELECT id
+            FROM categorias_financeiras
+            WHERE {tenant_filter}
+              AND lower(nome) = lower(:nome)
+              AND tipo = :tipo
+            LIMIT 1
+            """,
+            {"nome": payload["nome"], "tipo": payload["tipo"]},
+            tenant_id,
+        )
+        _record_template_item_install(
+            db,
+            tenant_id,
+            user_id,
+            result,
+            item,
+            "categorias_financeiras",
+            created_id,
+        )
         result.bump("created", "financial_categories")
 
 
@@ -974,6 +1251,12 @@ def _copy_product_departments(
     department_ids: dict[str, int] = {}
     for item in items:
         payload = item["payload"]
+        mapped_id = _mapped_template_row_id(db, tenant_id, result, item, "departamentos")
+        if mapped_id:
+            department_ids[item["template_code"]] = mapped_id
+            result.bump("skipped", "product_departments")
+            continue
+
         existing_id = _scalar(
             db,
             """
@@ -988,6 +1271,15 @@ def _copy_product_departments(
         )
         if existing_id:
             department_ids[item["template_code"]] = int(existing_id)
+            _record_template_item_install(
+                db,
+                tenant_id,
+                user_id,
+                result,
+                item,
+                "departamentos",
+                existing_id,
+            )
             result.bump("skipped", "product_departments")
             continue
         if result.dry_run:
@@ -1026,6 +1318,15 @@ def _copy_product_departments(
             tenant_id,
         )
         department_ids[item["template_code"]] = int(created_id)
+        _record_template_item_install(
+            db,
+            tenant_id,
+            user_id,
+            result,
+            item,
+            "departamentos",
+            created_id,
+        )
         result.bump("created", "product_departments")
     return department_ids
 
@@ -1042,6 +1343,12 @@ def _copy_product_categories(
     for item in items:
         payload = item["payload"]
         department_id = department_ids.get(payload.get("departamento_code"))
+        mapped_id = _mapped_template_row_id(db, tenant_id, result, item, "categorias")
+        if mapped_id:
+            category_ids[item["template_code"]] = mapped_id
+            result.bump("skipped", "product_categories")
+            continue
+
         existing_id = _scalar(
             db,
             """
@@ -1056,6 +1363,15 @@ def _copy_product_categories(
         )
         if existing_id:
             category_ids[item["template_code"]] = int(existing_id)
+            _record_template_item_install(
+                db,
+                tenant_id,
+                user_id,
+                result,
+                item,
+                "categorias",
+                existing_id,
+            )
             result.bump("skipped", "product_categories")
             continue
         if result.dry_run:
@@ -1100,6 +1416,15 @@ def _copy_product_categories(
             tenant_id,
         )
         category_ids[item["template_code"]] = int(created_id)
+        _record_template_item_install(
+            db,
+            tenant_id,
+            user_id,
+            result,
+            item,
+            "categorias",
+            created_id,
+        )
         result.bump("created", "product_categories")
     return category_ids
 
@@ -1115,6 +1440,11 @@ def _copy_products(
 ) -> None:
     for item in items:
         payload = item["payload"]
+        mapped_id = _mapped_template_row_id(db, tenant_id, result, item, "produtos")
+        if mapped_id:
+            result.bump("skipped", "product_references")
+            continue
+
         existing_id = _scalar(
             db,
             """
@@ -1128,6 +1458,15 @@ def _copy_products(
             tenant_id,
         )
         if existing_id:
+            _record_template_item_install(
+                db,
+                tenant_id,
+                user_id,
+                result,
+                item,
+                "produtos",
+                existing_id,
+            )
             result.bump("skipped", "product_references")
             continue
         if result.dry_run:
@@ -1181,6 +1520,27 @@ def _copy_products(
                 "ativo": bool(payload.get("ativo", False)),
             },
             tenant_id,
+        )
+        created_id = _scalar(
+            db,
+            """
+            SELECT id
+            FROM produtos
+            WHERE {tenant_filter}
+              AND lower(trim(codigo)) = lower(trim(:codigo))
+            LIMIT 1
+            """,
+            {"codigo": payload["codigo"]},
+            tenant_id,
+        )
+        _record_template_item_install(
+            db,
+            tenant_id,
+            user_id,
+            result,
+            item,
+            "produtos",
+            created_id,
         )
         result.bump("created", "product_references")
 

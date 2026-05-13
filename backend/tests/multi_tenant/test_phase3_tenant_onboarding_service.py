@@ -95,6 +95,22 @@ def onboarding_session():
         )
         """,
         """
+        CREATE TABLE tenant_template_item_installs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id TEXT NOT NULL,
+            bundle_code TEXT NOT NULL,
+            bundle_version TEXT NOT NULL,
+            item_type TEXT NOT NULL,
+            template_code TEXT NOT NULL,
+            target_table TEXT NOT NULL,
+            target_id INTEGER NOT NULL,
+            status TEXT NOT NULL,
+            created_by_user_id INTEGER,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """,
+        """
         CREATE TABLE formas_pagamento (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             tenant_id TEXT NOT NULL,
@@ -252,6 +268,10 @@ def _count(session, table, tenant_id=None):
     ).scalar()
 
 
+def _tenant_params(tenant_id: str) -> dict[str, str]:
+    return {"tenant_id": tenant_id, "tenant_id_hex": tenant_id.replace("-", "")}
+
+
 def test_onboarding_dry_run_does_not_create_tenant_data(onboarding_session):
     result = onboard_tenant_defaults(
         onboarding_session,
@@ -323,6 +343,121 @@ def test_onboarding_is_idempotent_for_same_tenant(onboarding_session):
     assert _count(onboarding_session, "dre_categorias", TENANT_A) == 3
     assert _count(onboarding_session, "tipo_despesas", TENANT_A) == 2
     assert _count(onboarding_session, "tenant_template_installs") == 1
+
+
+def test_onboarding_item_mapping_survives_tenant_payment_edit(onboarding_session):
+    onboard_tenant_defaults(onboarding_session, tenant_id=TENANT_A, user_id=1, dry_run=False)
+    onboard_tenant_defaults(onboarding_session, tenant_id=TENANT_B, user_id=2, dry_run=False)
+    onboarding_session.commit()
+
+    pix_id = onboarding_session.execute(
+        text(
+            """
+            SELECT id
+            FROM formas_pagamento
+            WHERE tenant_id = :tenant_id AND tipo = 'pix'
+            """
+        ),
+        {"tenant_id": TENANT_A},
+    ).scalar_one()
+    onboarding_session.execute(
+        text("UPDATE formas_pagamento SET nome = 'PIX Loja Centro' WHERE id = :id"),
+        {"id": pix_id},
+    )
+    onboarding_session.commit()
+
+    second = onboard_tenant_defaults(onboarding_session, tenant_id=TENANT_A, user_id=1, dry_run=False)
+    onboarding_session.commit()
+
+    assert second["created"] == {}
+    assert second["skipped"]["payment_methods"] == 4
+    assert _count(onboarding_session, "formas_pagamento", TENANT_A) == 4
+    assert _count(onboarding_session, "formas_pagamento", TENANT_B) == 4
+    assert (
+        onboarding_session.execute(
+            text("SELECT COUNT(*) FROM formas_pagamento WHERE tenant_id = :tenant_id AND tipo = 'pix'"),
+            {"tenant_id": TENANT_A},
+        ).scalar()
+        == 1
+    )
+    assert (
+        onboarding_session.execute(
+            text("SELECT nome FROM formas_pagamento WHERE tenant_id = :tenant_id AND tipo = 'pix'"),
+            {"tenant_id": TENANT_A},
+        ).scalar()
+        == "PIX Loja Centro"
+    )
+    assert (
+        onboarding_session.execute(
+            text("SELECT nome FROM formas_pagamento WHERE tenant_id = :tenant_id AND tipo = 'pix'"),
+            {"tenant_id": TENANT_B},
+        ).scalar()
+        == "PIX"
+    )
+    assert (
+        onboarding_session.execute(
+            text("SELECT name FROM template_items WHERE template_code = 'payment_pix'")
+        ).scalar()
+        == "PIX"
+    )
+    assert (
+        onboarding_session.execute(
+            text(
+                """
+                SELECT target_table, target_id
+                FROM tenant_template_item_installs
+                WHERE tenant_id IN (:tenant_id, :tenant_id_hex)
+                  AND template_code = 'payment_pix'
+                """
+            ),
+            _tenant_params(TENANT_A),
+        ).one()
+        == ("formas_pagamento", pix_id)
+    )
+
+
+def test_onboarding_item_mapping_survives_tenant_dre_category_edit(onboarding_session):
+    onboard_tenant_defaults(onboarding_session, tenant_id=TENANT_A, user_id=1, dry_run=False)
+    onboarding_session.commit()
+
+    receitas_id = onboarding_session.execute(
+        text(
+            """
+            SELECT target_id
+            FROM tenant_template_item_installs
+            WHERE tenant_id IN (:tenant_id, :tenant_id_hex)
+              AND template_code = 'dre_receitas'
+            """
+        ),
+        _tenant_params(TENANT_A),
+    ).scalar_one()
+    onboarding_session.execute(
+        text("UPDATE dre_categorias SET nome = 'Receitas Loja Principal' WHERE id = :id"),
+        {"id": receitas_id},
+    )
+    onboarding_session.commit()
+
+    second = onboard_tenant_defaults(onboarding_session, tenant_id=TENANT_A, user_id=1, dry_run=False)
+    onboarding_session.commit()
+
+    assert second["created"] == {}
+    assert second["skipped"]["dre_categories"] == 3
+    assert second["skipped"]["dre_subcategories"] == 4
+    assert _count(onboarding_session, "dre_categorias", TENANT_A) == 3
+    assert _count(onboarding_session, "dre_subcategorias", TENANT_A) == 4
+    assert (
+        onboarding_session.execute(
+            text(
+                """
+                SELECT COUNT(*)
+                FROM dre_subcategorias
+                WHERE tenant_id = :tenant_id AND categoria_id = :categoria_id
+                """
+            ),
+            {"tenant_id": TENANT_A, "categoria_id": receitas_id},
+        ).scalar()
+        == 2
+    )
 
 
 def test_onboarding_creates_isolated_copies_for_each_tenant(onboarding_session):

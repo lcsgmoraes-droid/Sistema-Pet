@@ -77,3 +77,33 @@ class TenantTemplateInstall(Base):
     summary = Column(JSON, nullable=False, default=dict)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+
+
+class TenantTemplateItemInstall(Base):
+    """Item-level link between a global template item and a tenant-owned copy."""
+
+    __tablename__ = "tenant_template_item_installs"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "bundle_code",
+            "bundle_version",
+            "item_type",
+            "template_code",
+            name="uq_tenant_template_item_installs_template",
+        ),
+        {"extend_existing": True},
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    bundle_code = Column(String(80), nullable=False, index=True)
+    bundle_version = Column(String(40), nullable=False, index=True)
+    item_type = Column(String(80), nullable=False, index=True)
+    template_code = Column(String(120), nullable=False, index=True)
+    target_table = Column(String(120), nullable=False, index=True)
+    target_id = Column(Integer, nullable=False, index=True)
+    status = Column(String(40), nullable=False, default="active")
+    created_by_user_id = Column(Integer, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
