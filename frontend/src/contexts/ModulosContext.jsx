@@ -1,11 +1,12 @@
 /**
  * ModulosContext - Gerenciamento de módulos premium do sistema
  *
- * Módulos premium (precisam de assinatura):
- *   entregas, campanhas, whatsapp, ecommerce, app_mobile, marketplaces
+ * Módulos controlados por plano/assinatura:
+ *   compras, financeiro_erp, veterinario, banho_tosa, fiscal, campanhas etc.
  *
- * Módulos base (sempre ativos sem custo):
- *   pdv, clientes, produtos, financeiro, lembretes, comissoes, compras, rh, ia, cadastros, configuracoes
+ * Plano basico (sempre ativo):
+ *   pessoas, pets, produtos, estoque, PDV, vendas/financeiro de vendas,
+ *   usuarios, configuracoes essenciais e cadastros essenciais.
  */
 import {
   createContext,
@@ -22,6 +23,16 @@ const ModulosContext = createContext();
 const DEV_MODULOS_STORAGE_KEY = "dev_modulos_config";
 
 export const MODULOS_PREMIUM = [
+  "compras",
+  "financeiro_erp",
+  "comissoes",
+  "veterinario",
+  "banho_tosa",
+  "fiscal",
+  "bling",
+  "integracoes",
+  "rh",
+  "ia_avancada",
   "entregas",
   "campanhas",
   "whatsapp",
@@ -31,6 +42,123 @@ export const MODULOS_PREMIUM = [
 ];
 
 export const MODULOS_INFO = {
+  compras: {
+    nome: "Compras e Entrada XML",
+    descricao:
+      "Pedidos de compra, entrada por XML, pendencias de compra e conferencias avancadas de estoque.",
+    preco: 79,
+    recursos: [
+      "Pedidos de compra por fornecedor",
+      "Entrada de produtos via XML",
+      "Conferencia de pendencias",
+      "Sugestao de compras integrada ao estoque",
+    ],
+  },
+  financeiro_erp: {
+    nome: "Financeiro ERP",
+    descricao:
+      "Contas a pagar, contas a receber, fluxo de caixa, DRE e conciliacoes financeiras.",
+    preco: 99,
+    recursos: [
+      "Contas a pagar e receber",
+      "Fluxo de caixa",
+      "DRE operacional",
+      "Conciliacao bancaria e de cartoes",
+    ],
+  },
+  comissoes: {
+    nome: "Comissoes",
+    descricao:
+      "Configuracao, demonstrativos, provisoes e fechamento de comissoes por funcionario.",
+    preco: 49,
+    recursos: [
+      "Regras de comissao",
+      "Demonstrativo por funcionario",
+      "Fechamentos e historico",
+      "Integracao com vendas e financeiro",
+    ],
+  },
+  veterinario: {
+    nome: "Modulo Veterinario",
+    descricao:
+      "Agenda, consultas, prontuario, vacinas, exames, internacoes e catalogos clinicos.",
+    preco: 119,
+    recursos: [
+      "Prontuario e consultas",
+      "Agenda veterinaria",
+      "Vacinas e exames",
+      "Internacoes e repasses",
+    ],
+  },
+  banho_tosa: {
+    nome: "Banho & Tosa",
+    descricao:
+      "Agenda, fila do dia, servicos, pacotes, retornos, taxi dog e relatorios do banho e tosa.",
+    preco: 89,
+    recursos: [
+      "Agenda e fila operacional",
+      "Servicos e recursos",
+      "Pacotes e retornos",
+      "Fechamento integrado ao PDV",
+    ],
+  },
+  fiscal: {
+    nome: "Fiscal / NF",
+    descricao:
+      "Emissao e acompanhamento fiscal para notas de saida, preparado para integracao fiscal dedicada.",
+    preco: 0,
+    recursos: [
+      "Central de notas de saida",
+      "Configuracao fiscal",
+      "Historico fiscal por venda",
+      "Preparado para API fiscal",
+    ],
+  },
+  bling: {
+    nome: "Integracao Bling",
+    descricao:
+      "Sincronizacao e monitoramento de pedidos, produtos, estoque e notas via Bling.",
+    preco: 69,
+    recursos: [
+      "Pedidos Bling",
+      "Monitor de sincronizacao",
+      "Sincronizacao de produtos",
+      "Auditoria de integracao",
+    ],
+  },
+  integracoes: {
+    nome: "Integracoes",
+    descricao:
+      "Configuracoes e conectores externos para automacoes, canais e plataformas integradas.",
+    preco: 0,
+    recursos: [
+      "Configurar conectores",
+      "Monitorar integracoes",
+      "Preparar automacoes externas",
+    ],
+  },
+  rh: {
+    nome: "Recursos Humanos",
+    descricao:
+      "Cadastro operacional de funcionarios e estruturas internas alem dos usuarios do sistema.",
+    preco: 49,
+    recursos: [
+      "Funcionarios",
+      "Cargos e departamentos",
+      "Apoio a comissoes",
+    ],
+  },
+  ia_avancada: {
+    nome: "IA Avancada",
+    descricao:
+      "Recursos de IA alem do chat basico, como previsoes financeiras e assistentes especializados.",
+    preco: 79,
+    recursos: [
+      "Fluxo de caixa preditivo",
+      "Alertas inteligentes",
+      "Assistentes por modulo",
+    ],
+  },
   entregas: {
     nome: "Entregas",
     descricao:
@@ -154,13 +282,7 @@ export const ModulosProvider = ({ children }) => {
     try {
       const response = await api.get("/modulos/status");
       const modulosApi = response.data?.modulos_ativos;
-      // Temporário: até a política comercial de pacotes ficar pronta, não
-      // bloqueamos módulos premium para novos tenants.
-      setModulosAtivos(
-        Array.isArray(modulosApi) && modulosApi.length > 0
-          ? modulosApi
-          : MODULOS_PREMIUM,
-      );
+      setModulosAtivos(Array.isArray(modulosApi) ? modulosApi : MODULOS_PREMIUM);
     } catch {
       // Se o endpoint não existir ainda (deploy incremental), libera tudo
       setModulosAtivos(MODULOS_PREMIUM); // todos ativos = sem bloqueio

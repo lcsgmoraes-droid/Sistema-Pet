@@ -9,20 +9,32 @@ from app.routes.modulos_routes import (
 )
 
 
-def test_modulos_premium_ficam_liberados_enquanto_pacotes_nao_existem():
+def test_plano_legado_free_continua_liberado_para_nao_quebrar_tenants_existentes():
     ativos = _resolver_modulos_ativos(
         raw_modulos=None,
         assinaturas_ativas=[],
         agora=datetime(2026, 4, 24, tzinfo=timezone.utc),
+        plano="free",
     )
 
     assert set(ativos) >= set(MODULOS_PREMIUM)
 
 
-def test_modulos_preserva_assinaturas_ativas_e_ignora_expiradas():
+def test_plano_basico_nao_libera_extras_sem_assinatura_ou_modulo_expresso():
+    ativos = _resolver_modulos_ativos(
+        raw_modulos=None,
+        assinaturas_ativas=[],
+        agora=datetime(2026, 5, 13, tzinfo=timezone.utc),
+        plano="basico",
+    )
+
+    assert ativos == []
+
+
+def test_plano_basico_preserva_assinaturas_ativas_e_ignora_expiradas():
     agora = datetime(2026, 4, 24, tzinfo=timezone.utc)
     assinaturas = [
-        SimpleNamespace(modulo="modulo_futuro", data_fim=None),
+        SimpleNamespace(modulo="compras", data_fim=None),
         SimpleNamespace(modulo="expirado", data_fim=agora - timedelta(days=1)),
     ]
 
@@ -30,11 +42,23 @@ def test_modulos_preserva_assinaturas_ativas_e_ignora_expiradas():
         raw_modulos='["entregas"]',
         assinaturas_ativas=assinaturas,
         agora=agora,
+        plano="basico",
     )
 
     assert "entregas" in ativos
-    assert "modulo_futuro" in ativos
+    assert "compras" in ativos
     assert "expirado" not in ativos
+
+
+def test_plano_completo_libera_todos_modulos_controlados():
+    ativos = _resolver_modulos_ativos(
+        raw_modulos=None,
+        assinaturas_ativas=[],
+        agora=datetime(2026, 5, 13, tzinfo=timezone.utc),
+        plano="enterprise",
+    )
+
+    assert set(ativos) == set(MODULOS_PREMIUM)
 
 
 def test_modulos_ativos_json_vazio_e_valido():

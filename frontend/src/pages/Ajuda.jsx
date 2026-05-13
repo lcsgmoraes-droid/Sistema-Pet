@@ -27,6 +27,16 @@ const WHATSAPP_NUMERO = "5518997401641";
 
 /* Ícones por módulo */
 const ICONES_MODULO = {
+  compras: FiCreditCard,
+  financeiro_erp: FiCreditCard,
+  comissoes: FiCreditCard,
+  veterinario: FiZap,
+  banho_tosa: FiZap,
+  fiscal: FiCreditCard,
+  bling: FiZap,
+  integracoes: FiZap,
+  rh: FiZap,
+  ia_avancada: FiZap,
   entregas: FiTruck,
   campanhas: FiGift,
   whatsapp: FiMessageCircle,
@@ -76,10 +86,17 @@ const FAQS = [
 
 /* Ordem de exibição dos módulos */
 const ORDEM_MODULOS = [
+  "compras",
+  "financeiro_erp",
+  "veterinario",
+  "banho_tosa",
+  "fiscal",
   "campanhas",
   "entregas",
   "whatsapp",
   "ecommerce",
+  "bling",
+  "comissoes",
   "app_mobile",
   "marketplaces",
 ];
@@ -294,9 +311,10 @@ const Ajuda = () => {
                   Já inclusos no seu plano — sem custo extra
                 </p>
                 <p className="text-sm text-green-700 mt-1">
-                  PDV (vendas), Clientes, Pets, Produtos, Financeiro, Lembretes,
-                  Comissões, Compras, RH, Inteligência Artificial (Chat) e
-                  Configurações já estão liberados para você usar hoje.
+                  PDV completo, histórico de vendas, financeiro de vendas,
+                  Pessoas, Pets, Produtos, Estoque, Usuários, Cadastros
+                  essenciais, Lembretes, Calculadora de Ração e Configurações
+                  essenciais já estão liberados para você usar hoje.
                 </p>
               </div>
             </div>

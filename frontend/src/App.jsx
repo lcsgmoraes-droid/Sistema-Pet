@@ -276,6 +276,10 @@ function DefaultProtectedHomeRedirect() {
   return <Navigate to={destino} replace />;
 }
 
+function ModuleGate({ modulo, children }) {
+  return <ModuloBloqueado modulo={modulo}>{children}</ModuloBloqueado>;
+}
+
 function App() {
   return (
     <ErrorBoundary>
@@ -379,33 +383,33 @@ function App() {
                   {/* ========================================
                 🩺 MÓDULO VETERINÁRIO
                 ======================================== */}
-                  <Route path="veterinario" element={<VetDashboard />} />
-                  <Route path="veterinario/agenda" element={<VetAgenda />} />
-                  <Route path="veterinario/consultas" element={<VetConsultas />} />
-                  <Route path="veterinario/consultas/nova" element={<VetConsultaForm />} />
-                  <Route path="veterinario/consultas/:consultaId" element={<VetConsultaForm />} />
-                  <Route path="veterinario/exames" element={<VetExamesAnexados />} />
-                  <Route path="veterinario/ia" element={<VetAssistenteIA />} />
-                  <Route path="veterinario/assistente-ia" element={<VetAssistenteIA />} />
-                  <Route path="veterinario/calculadora-doses" element={<VetCalculadoraDoses />} />
-                  <Route path="veterinario/vacinas" element={<VetVacinas />} />
-                  <Route path="veterinario/internacoes" element={<VetInternacoes />} />
-                  <Route path="veterinario/catalogo" element={<VetCatalogo />} />
-                  <Route path="veterinario/configuracoes" element={<VetConfiguracoes />} />
-                  <Route path="veterinario/repasse" element={<VetRepasse />} />
+                  <Route path="veterinario" element={<ModuleGate modulo="veterinario"><VetDashboard /></ModuleGate>} />
+                  <Route path="veterinario/agenda" element={<ModuleGate modulo="veterinario"><VetAgenda /></ModuleGate>} />
+                  <Route path="veterinario/consultas" element={<ModuleGate modulo="veterinario"><VetConsultas /></ModuleGate>} />
+                  <Route path="veterinario/consultas/nova" element={<ModuleGate modulo="veterinario"><VetConsultaForm /></ModuleGate>} />
+                  <Route path="veterinario/consultas/:consultaId" element={<ModuleGate modulo="veterinario"><VetConsultaForm /></ModuleGate>} />
+                  <Route path="veterinario/exames" element={<ModuleGate modulo="veterinario"><VetExamesAnexados /></ModuleGate>} />
+                  <Route path="veterinario/ia" element={<ModuleGate modulo="veterinario"><VetAssistenteIA /></ModuleGate>} />
+                  <Route path="veterinario/assistente-ia" element={<ModuleGate modulo="veterinario"><VetAssistenteIA /></ModuleGate>} />
+                  <Route path="veterinario/calculadora-doses" element={<ModuleGate modulo="veterinario"><VetCalculadoraDoses /></ModuleGate>} />
+                  <Route path="veterinario/vacinas" element={<ModuleGate modulo="veterinario"><VetVacinas /></ModuleGate>} />
+                  <Route path="veterinario/internacoes" element={<ModuleGate modulo="veterinario"><VetInternacoes /></ModuleGate>} />
+                  <Route path="veterinario/catalogo" element={<ModuleGate modulo="veterinario"><VetCatalogo /></ModuleGate>} />
+                  <Route path="veterinario/configuracoes" element={<ModuleGate modulo="veterinario"><VetConfiguracoes /></ModuleGate>} />
+                  <Route path="veterinario/repasse" element={<ModuleGate modulo="veterinario"><VetRepasse /></ModuleGate>} />
 
                   {/* Modulo Banho & Tosa */}
-                  <Route path="banho-tosa" element={<BanhoTosaPage view="dashboard" />} />
-                  <Route path="banho-tosa/servicos" element={<BanhoTosaPage view="servicos" />} />
-                  <Route path="banho-tosa/parametros" element={<BanhoTosaPage view="parametros" />} />
-                  <Route path="banho-tosa/recursos" element={<BanhoTosaPage view="recursos" />} />
-                  <Route path="banho-tosa/agenda" element={<BanhoTosaPage view="agenda" />} />
-                  <Route path="banho-tosa/fila" element={<BanhoTosaPage view="fila" />} />
+                  <Route path="banho-tosa" element={<ModuleGate modulo="banho_tosa"><BanhoTosaPage view="dashboard" /></ModuleGate>} />
+                  <Route path="banho-tosa/servicos" element={<ModuleGate modulo="banho_tosa"><BanhoTosaPage view="servicos" /></ModuleGate>} />
+                  <Route path="banho-tosa/parametros" element={<ModuleGate modulo="banho_tosa"><BanhoTosaPage view="parametros" /></ModuleGate>} />
+                  <Route path="banho-tosa/recursos" element={<ModuleGate modulo="banho_tosa"><BanhoTosaPage view="recursos" /></ModuleGate>} />
+                  <Route path="banho-tosa/agenda" element={<ModuleGate modulo="banho_tosa"><BanhoTosaPage view="agenda" /></ModuleGate>} />
+                  <Route path="banho-tosa/fila" element={<ModuleGate modulo="banho_tosa"><BanhoTosaPage view="fila" /></ModuleGate>} />
                   <Route path="banho-tosa/fechamentos" element={<Navigate to="/banho-tosa/fila" replace />} />
-                  <Route path="banho-tosa/pacotes" element={<BanhoTosaPage view="pacotes" />} />
-                  <Route path="banho-tosa/retornos" element={<BanhoTosaPage view="retornos" />} />
-                  <Route path="banho-tosa/taxi-dog" element={<BanhoTosaPage view="taxi-dog" />} />
-                  <Route path="banho-tosa/relatorios" element={<BanhoTosaPage view="relatorios" />} />
+                  <Route path="banho-tosa/pacotes" element={<ModuleGate modulo="banho_tosa"><BanhoTosaPage view="pacotes" /></ModuleGate>} />
+                  <Route path="banho-tosa/retornos" element={<ModuleGate modulo="banho_tosa"><BanhoTosaPage view="retornos" /></ModuleGate>} />
+                  <Route path="banho-tosa/taxi-dog" element={<ModuleGate modulo="banho_tosa"><BanhoTosaPage view="taxi-dog" /></ModuleGate>} />
+                  <Route path="banho-tosa/relatorios" element={<ModuleGate modulo="banho_tosa"><BanhoTosaPage view="relatorios" /></ModuleGate>} />
 
                   {/* ========================================
                 📦 ROTAS OFICIAIS DE PRODUTOS (JSX) - ATIVAS
@@ -517,8 +521,8 @@ function App() {
                   <Route path="meus-caixas" element={<MeusCaixas />} />
                   <Route path="notas-fiscais" element={<Navigate to="/notas-fiscais/saida" replace />} />
                   <Route path="notas-fiscais/vendas" element={<Navigate to="/notas-fiscais/saida" replace />} />
-                  <Route path="notas-fiscais/saida" element={<CentralNFSaida />} />
-                  <Route path="notas-fiscais/entrada" element={<NFEntrada />} />
+                  <Route path="notas-fiscais/saida" element={<ModuleGate modulo="fiscal"><CentralNFSaida /></ModuleGate>} />
+                  <Route path="notas-fiscais/entrada" element={<ModuleGate modulo="compras"><NFEntrada /></ModuleGate>} />
                   <Route
                     path="campanhas"
                     element={
@@ -564,50 +568,62 @@ function App() {
                   <Route
                     path="compras/pedidos"
                     element={
-                      <ProtectedRoute permission="compras.gerenciar">
-                        <PedidosCompra />
-                      </ProtectedRoute>
+                      <ModuleGate modulo="compras">
+                        <ProtectedRoute permission="compras.gerenciar">
+                          <PedidosCompra />
+                        </ProtectedRoute>
+                      </ModuleGate>
                     }
                   />
                   <Route
                     path="compras/entrada-xml"
                     element={
-                      <ProtectedRoute permission="compras.gerenciar">
-                        <EntradaXML />
-                      </ProtectedRoute>
+                      <ModuleGate modulo="compras">
+                        <ProtectedRoute permission="compras.gerenciar">
+                          <EntradaXML />
+                        </ProtectedRoute>
+                      </ModuleGate>
                     }
                   />
                   <Route
                     path="compras/pendencias"
                     element={
-                      <ProtectedRoute permission="compras.gerenciar">
-                        <ComprasPendencias />
-                      </ProtectedRoute>
+                      <ModuleGate modulo="compras">
+                        <ProtectedRoute permission="compras.gerenciar">
+                          <ComprasPendencias />
+                        </ProtectedRoute>
+                      </ModuleGate>
                     }
                   />
                   <Route
                     path="produtos/sinc-bling"
                     element={
-                      <ProtectedRoute permission="compras.gerenciar">
-                        <EstoqueBling />
-                      </ProtectedRoute>
+                      <ModuleGate modulo="bling">
+                        <ProtectedRoute permission="compras.gerenciar">
+                          <EstoqueBling />
+                        </ProtectedRoute>
+                      </ModuleGate>
                     }
                   />
                   <Route path="compras/bling" element={<Navigate to="/produtos/sinc-bling" replace />} />
                   <Route
                     path="vendas/bling-pedidos"
                     element={
-                      <ProtectedRoute permission="compras.gerenciar">
-                        <PedidosBling />
-                      </ProtectedRoute>
+                      <ModuleGate modulo="bling">
+                        <ProtectedRoute permission="compras.gerenciar">
+                          <PedidosBling />
+                        </ProtectedRoute>
+                      </ModuleGate>
                     }
                   />
                   <Route
                     path="vendas/bling-monitor"
                     element={
-                      <ProtectedRoute permission="compras.gerenciar">
-                        <BlingFlowMonitor />
-                      </ProtectedRoute>
+                      <ModuleGate modulo="bling">
+                        <ProtectedRoute permission="compras.gerenciar">
+                          <BlingFlowMonitor />
+                        </ProtectedRoute>
+                      </ModuleGate>
                     }
                   />
 
@@ -615,9 +631,11 @@ function App() {
                   <Route
                     path="financeiro"
                     element={
-                      <ProtectedRoute permission="relatorios.financeiro">
-                        <DashboardFinanceiro />
-                      </ProtectedRoute>
+                      <ModuleGate modulo="financeiro_erp">
+                        <ProtectedRoute permission="relatorios.financeiro">
+                          <DashboardFinanceiro />
+                        </ProtectedRoute>
+                      </ModuleGate>
                     }
                   />
                   <Route
@@ -644,90 +662,104 @@ function App() {
                   <Route
                     path="financeiro/contas-pagar"
                     element={
-                      <ProtectedRoute permission="relatorios.financeiro">
-                        <ContasPagar />
-                      </ProtectedRoute>
+                      <ModuleGate modulo="financeiro_erp">
+                        <ProtectedRoute permission="relatorios.financeiro">
+                          <ContasPagar />
+                        </ProtectedRoute>
+                      </ModuleGate>
                     }
                   />
                   <Route
                     path="financeiro/contas-receber"
                     element={
-                      <ProtectedRoute permission="relatorios.financeiro">
-                        <ContasReceber />
-                      </ProtectedRoute>
+                      <ModuleGate modulo="financeiro_erp">
+                        <ProtectedRoute permission="relatorios.financeiro">
+                          <ContasReceber />
+                        </ProtectedRoute>
+                      </ModuleGate>
                     }
                   />
                   <Route
                     path="financeiro/conciliacao-3abas"
                     element={
-                      <ProtectedRoute permission="relatorios.financeiro">
-                        <ConciliacaoCartoesTabs />
-                      </ProtectedRoute>
+                      <ModuleGate modulo="financeiro_erp">
+                        <ProtectedRoute permission="relatorios.financeiro">
+                          <ConciliacaoCartoesTabs />
+                        </ProtectedRoute>
+                      </ModuleGate>
                     }
                   />
                   <Route
                     path="financeiro/historico-conciliacoes"
                     element={
-                      <ProtectedRoute permission="relatorios.financeiro">
-                        <HistoricoConciliacoes />
-                      </ProtectedRoute>
+                      <ModuleGate modulo="financeiro_erp">
+                        <ProtectedRoute permission="relatorios.financeiro">
+                          <HistoricoConciliacoes />
+                        </ProtectedRoute>
+                      </ModuleGate>
                     }
                   />
                   <Route
                     path="financeiro/conciliacao-bancaria"
                     element={
-                      <ProtectedRoute permission="relatorios.financeiro">
-                        <ConciliacaoBancaria />
-                      </ProtectedRoute>
+                      <ModuleGate modulo="financeiro_erp">
+                        <ProtectedRoute permission="relatorios.financeiro">
+                          <ConciliacaoBancaria />
+                        </ProtectedRoute>
+                      </ModuleGate>
                     }
                   />
                   <Route
                     path="financeiro/fluxo-caixa"
                     element={
-                      <ProtectedRoute permission="relatorios.financeiro">
-                        <FluxoCaixa />
-                      </ProtectedRoute>
+                      <ModuleGate modulo="financeiro_erp">
+                        <ProtectedRoute permission="relatorios.financeiro">
+                          <FluxoCaixa />
+                        </ProtectedRoute>
+                      </ModuleGate>
                     }
                   />
                   <Route
                     path="financeiro/dre"
                     element={
-                      <ProtectedRoute permission="relatorios.financeiro">
-                        <DRE />
-                      </ProtectedRoute>
+                      <ModuleGate modulo="financeiro_erp">
+                        <ProtectedRoute permission="relatorios.financeiro">
+                          <DRE />
+                        </ProtectedRoute>
+                      </ModuleGate>
                     }
                   />
 
                   {/* Rotas de Comissões */}
-                  <Route path="comissoes" element={<Comissoes />} />
+                  <Route path="comissoes" element={<ModuleGate modulo="comissoes"><Comissoes /></ModuleGate>} />
                   <Route
                     path="comissoes/demonstrativo"
-                    element={<ComissoesListagem />}
+                    element={<ModuleGate modulo="comissoes"><ComissoesListagem /></ModuleGate>}
                   />
                   <Route
                     path="comissoes/relatorios"
-                    element={<RelatoriosComissoes />}
+                    element={<ModuleGate modulo="comissoes"><RelatoriosComissoes /></ModuleGate>}
                   />
                   <Route
                     path="comissoes/abertas"
-                    element={<ComissoesAbertas />}
+                    element={<ModuleGate modulo="comissoes"><ComissoesAbertas /></ModuleGate>}
                   />
                   <Route
                     path="comissoes/fechamento/:funcionario_id"
-                    element={<ConferenciaAvancada />}
+                    element={<ModuleGate modulo="comissoes"><ConferenciaAvancada /></ModuleGate>}
                   />
                   <Route
                     path="comissoes/fechamentos"
-                    element={<ComissoesHistoricoFechamentos />}
+                    element={<ModuleGate modulo="comissoes"><ComissoesHistoricoFechamentos /></ModuleGate>}
                   />
                   <Route
                     path="comissoes/fechamentos/detalhe"
-                    element={<ComissoesFechamentoDetalhe />}
+                    element={<ModuleGate modulo="comissoes"><ComissoesFechamentoDetalhe /></ModuleGate>}
                   />
                   <Route path="subcategorias" element={<Subcategorias />} />
 
                   {/* Rotas de Cadastros */}
-                  <Route path="cadastros/departamentos" element={<Departamentos />} />
+                  <Route path="cadastros/departamentos" element={<ModuleGate modulo="rh"><Departamentos /></ModuleGate>} />
                   <Route path="cadastros/categorias" element={<Categorias />} />
                   <Route
                     path="cadastros/tipos-despesa"
@@ -739,19 +771,21 @@ function App() {
                   />
                   <Route
                     path="cadastros/categorias-financeiras"
-                    element={<CategoriasFinanceiras />}
+                    element={<ModuleGate modulo="financeiro_erp"><CategoriasFinanceiras /></ModuleGate>}
                   />
                   <Route
                     path="cadastros/especies-racas"
                     element={<EspeciesRacas />}
                   />
-                  <Route path="cadastros/cargos" element={<Cargos />} />
+                  <Route path="cadastros/cargos" element={<ModuleGate modulo="rh"><Cargos /></ModuleGate>} />
                   <Route
                     path="cadastros/financeiro/bancos"
                     element={
-                      <ProtectedRoute permission="configuracoes.editar">
-                        <ContasBancarias />
-                      </ProtectedRoute>
+                      <ModuleGate modulo="financeiro_erp">
+                        <ProtectedRoute permission="configuracoes.editar">
+                          <ContasBancarias />
+                        </ProtectedRoute>
+                      </ModuleGate>
                     }
                   />
                   <Route
@@ -799,11 +833,11 @@ function App() {
                   />
                   <Route
                     path="configuracoes/entregas"
-                    element={<EntregasConfig />}
+                    element={<ModuleGate modulo="entregas"><EntregasConfig /></ModuleGate>}
                   />
                   <Route
                     path="configuracoes/custos-moto"
-                    element={<CustosMoto />}
+                    element={<ModuleGate modulo="entregas"><CustosMoto /></ModuleGate>}
                   />
                   <Route
                     path="configuracoes/estoque"
@@ -811,19 +845,19 @@ function App() {
                   />
                   <Route
                     path="configuracoes/integracoes"
-                    element={<Integracoes />}
+                    element={<ModuleGate modulo="integracoes"><Integracoes /></ModuleGate>}
                   />
                   {/* <Route path="configuracoes/simples/fechamento" element={<FechamentoSimples />} /> */}
                   <Route
                     path="auditoria/provisoes"
-                    element={<AuditoriaMensal />}
+                    element={<ModuleGate modulo="financeiro_erp"><AuditoriaMensal /></ModuleGate>}
                   />
-                  <Route path="projecao-caixa" element={<ProjecaoCaixa />} />
+                  <Route path="projecao-caixa" element={<ModuleGate modulo="financeiro_erp"><ProjecaoCaixa /></ModuleGate>} />
                   <Route
                     path="simulacao-contratacao"
                     element={<SimulacaoContratacao />}
                   />
-                  <Route path="rh/funcionarios" element={<Funcionarios />} />
+                  <Route path="rh/funcionarios" element={<ModuleGate modulo="rh"><Funcionarios /></ModuleGate>} />
                   <Route path="admin/roles" element={<RolesPage />} />
                   <Route
                     path="admin/lgpd"
@@ -884,9 +918,11 @@ function App() {
                   <Route
                     path="ia/fluxo-caixa"
                     element={
-                      <ProtectedRoute permission="ia.fluxo_caixa">
-                        <IAFluxoCaixa />
-                      </ProtectedRoute>
+                      <ModuleGate modulo="financeiro_erp">
+                        <ProtectedRoute permission="ia.fluxo_caixa">
+                          <IAFluxoCaixa />
+                        </ProtectedRoute>
+                      </ModuleGate>
                     }
                   />
                   <Route path="ia/chat" element={<ChatIA />} />

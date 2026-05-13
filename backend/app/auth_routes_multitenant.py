@@ -379,7 +379,7 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
         id=str(tenant_id),
         name=tenant_name,
         status='active',
-        plan='free',
+        plan='basico',
         organization_type=payload.organization_type or 'petshop'
     )
     db.add(tenant)

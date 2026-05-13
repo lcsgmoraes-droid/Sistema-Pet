@@ -391,6 +391,7 @@ const Layout = () => {
       icon: Stethoscope,
       label: "Veterinário",
       highlight: true,
+      modulo: "veterinario",
       permission: null,
       submenu: [
         {
@@ -455,6 +456,7 @@ const Layout = () => {
       icon: Scissors,
       label: "Banho & Tosa",
       highlight: true,
+      modulo: "banho_tosa",
       permission: null,
       submenu: [
         {
@@ -553,6 +555,7 @@ const Layout = () => {
         {
           path: "/produtos/sinc-bling",
           label: "Sinc. Bling",
+          modulo: "bling",
           permission: "compras.sincronizacao_bling",
         },
       ],
@@ -616,24 +619,28 @@ const Layout = () => {
       path: "/vendas/bling-pedidos",
       icon: FiShoppingBag,
       label: "Pedidos Bling",
+      modulo: "bling",
       permission: "compras.sincronizacao_bling",
     },
     {
       path: "/vendas/bling-monitor",
       icon: FiActivity,
       label: "Monitor Bling",
+      modulo: "bling",
       permission: "compras.sincronizacao_bling",
     },
     {
       path: "/notas-fiscais/saida",
       icon: FiFileText,
       label: "NF de Saída",
+      modulo: "fiscal",
       permission: "vendas.visualizar",
     },
     {
       path: "/compras",
       icon: FiBox,
       label: "Compras",
+      modulo: "compras",
       permission: "compras.gerenciar",
       submenu: [
         {
@@ -656,12 +663,13 @@ const Layout = () => {
     {
       path: "/financeiro",
       icon: FiTrendingUp,
-      label: "Financeiro/Contábil",
+      label: "Financeiro",
       permission: "relatorios.financeiro",
       submenu: [
         {
           path: "/financeiro",
           label: "Dashboard",
+          modulo: "financeiro_erp",
           permission: "financeiro.dashboard",
         },
         {
@@ -672,28 +680,38 @@ const Layout = () => {
         {
           path: "/financeiro/fluxo-caixa",
           label: "Fluxo de Caixa",
+          modulo: "financeiro_erp",
           permission: "financeiro.fluxo_caixa",
         },
-        { path: "/financeiro/dre", label: "DRE", permission: "financeiro.dre" },
+        {
+          path: "/financeiro/dre",
+          label: "DRE",
+          modulo: "financeiro_erp",
+          permission: "financeiro.dre",
+        },
         {
           path: "/financeiro/contas-pagar",
           label: "Contas a Pagar",
+          modulo: "financeiro_erp",
           permission: "financeiro.contas_pagar",
         },
         {
           path: "/financeiro/contas-receber",
           label: "Contas a Receber",
+          modulo: "financeiro_erp",
           permission: "financeiro.contas_receber",
         },
         {
           path: "/financeiro/conciliacao-bancaria",
           label: "Conciliação Bancária",
+          modulo: "financeiro_erp",
           permission: "financeiro.conciliacao_bancaria",
         },
         {
           path: "/financeiro/conciliacao-3abas",
           label: "Conciliação 3 Abas",
           highlight: true,
+          modulo: "financeiro_erp",
           permission: "financeiro.conciliacao_cartao",
         },
       ],
@@ -702,6 +720,7 @@ const Layout = () => {
       path: "/comissoes",
       icon: FiDollarSign,
       label: "Comissões",
+      modulo: "comissoes",
       permission: "relatorios.financeiro", // Vinculado a relatórios financeiros
       submenu: [
         {
@@ -769,11 +788,13 @@ const Layout = () => {
         {
           path: "/cadastros/cargos",
           label: "Cargos",
+          modulo: "rh",
           permission: "cadastros.cargos",
         },
         {
           path: "/cadastros/departamentos",
           label: "Departamentos",
+          modulo: "rh",
           permission: "cadastros.categorias_produtos",
         },
         {
@@ -784,6 +805,7 @@ const Layout = () => {
         {
           path: "/cadastros/categorias-financeiras",
           label: "Categorias Financeiras",
+          modulo: "financeiro_erp",
           permission: "cadastros.categorias_financeiras",
         },
         {
@@ -804,6 +826,7 @@ const Layout = () => {
         {
           path: "/cadastros/financeiro/bancos",
           label: "Bancos",
+          modulo: "financeiro_erp",
           permission: "cadastros.bancos",
         },
         {
@@ -822,6 +845,7 @@ const Layout = () => {
       path: "/rh",
       icon: FiBriefcase,
       label: "Recursos Humanos",
+      modulo: "rh",
       permission: "usuarios.manage", // Vinculado a gerenciar usuários
       submenu: [
         {
@@ -841,6 +865,7 @@ const Layout = () => {
         {
           path: "/ia/fluxo-caixa",
           label: "Fluxo de Caixa Preditivo",
+          modulo: "financeiro_erp",
           permission: "ia.fluxo_caixa",
         },
         {
@@ -898,29 +923,33 @@ const Layout = () => {
         {
           path: "/configuracoes/entregas",
           label: "Entregas",
+          modulo: "entregas",
           permission: "configuracoes.entregas",
         },
         {
           path: "/configuracoes/custos-moto",
           label: "Custos da Moto",
+          modulo: "entregas",
           permission: "configuracoes.custos_moto",
         },
         { path: "/configuracoes/estoque", label: "Estoque" },
-        {
-          path: "/configuracoes/simples/fechamento",
-          label: "Fechamento Mensal",
-          permission: "configuracoes.fechamento_mensal",
-        },
-        { path: "/configuracoes/integracoes", label: "Integrações" },
+        { path: "/configuracoes/integracoes", label: "Integrações", modulo: "integracoes" },
       ],
     },
   ];
 
-  // Filtrar menus baseado nas permissões do usuário
+  const itemLiberadoPorModulo = (item) => !item.modulo || moduloAtivo(item.modulo);
+
+  // Filtrar menus baseado nas permissões do usuário e no plano do tenant
   const menuItems = allMenuItems.filter((item) => {
-    // Se tem submenu, filtrar os itens do submenu por permissão PRIMEIRO
+    if (!itemLiberadoPorModulo(item)) {
+      return false;
+    }
+
+    // Se tem submenu, filtrar os itens do submenu por permissão e módulo PRIMEIRO
     if (item.submenu && Array.isArray(item.submenu)) {
       const submenuFiltrado = item.submenu.filter((subitem) => {
+        if (!itemLiberadoPorModulo(subitem)) return false;
         // Se subitem não tem permissão, é sempre visível
         if (!subitem.permission) return true;
         // Verifica se usuário tem a permissão

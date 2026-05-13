@@ -20,10 +20,15 @@ Escopo:
 
 - cadastro de pessoas/clientes;
 - cadastro de pets;
-- cadastro de produtos;
-- estoque e movimentacoes essenciais;
+- cadastro de produtos e toda a rotina de produtos/estoque;
 - formas de pagamento padrao via onboarding;
-- PDV/vendas;
+- PDV/vendas completo;
+- historico de cliente, timeline e historico financeiro ligado a vendas;
+- financeiro aberto apenas na aba de vendas/recebimentos de venda;
+- usuarios, roles e LGPD operacional;
+- cadastros essenciais: categorias de produto, especies/racas, opcoes de racao,
+  formas de pagamento e operadoras de cartao;
+- configuracoes essenciais: empresa, parametros gerais e estoque;
 - relatorios gerenciais de vendas;
 - dashboards/resumos de resultado de venda, quando nao dependerem do financeiro operacional beta.
 
@@ -125,6 +130,35 @@ Status:
 - Campanhas/WhatsApp/IA: beta ou add-on futuro.
 - Fiscal/NFe: apenas quando checklist fiscal estiver fechado.
 - Conciliacao cartao/bancaria: beta financeiro.
+
+## Politica de Liberacao no Sistema
+
+Implementacao atual:
+
+- novos tenants criados pelo cadastro normal nascem com `plan = "basico"`;
+- tenants legados com `plan = "free"` continuam liberados para evitar corte
+  acidental de uso real ja existente;
+- modulos fora do Basico ficam controlados por `modulos_ativos` ou assinatura ativa;
+- o menu do Plano Basico esconde modulos extras e remove "Fechamento Mensal";
+- acesso direto por URL a modulo bloqueado cai na tela de venda/desbloqueio do modulo.
+
+Modulos controlados fora do Basico:
+
+- compras/entrada XML;
+- financeiro ERP;
+- comissoes;
+- veterinario;
+- banho e tosa;
+- fiscal/NF;
+- Bling/integracoes;
+- RH operacional;
+- IA avancada;
+- campanhas;
+- entregas;
+- WhatsApp;
+- e-commerce;
+- app mobile;
+- marketplaces.
 
 ## Checklist de Prontidao do Plano Basico
 

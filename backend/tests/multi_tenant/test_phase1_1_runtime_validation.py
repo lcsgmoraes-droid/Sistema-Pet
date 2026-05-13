@@ -207,12 +207,14 @@ def test_auth_multitenant_flow_nao_quebra_com_roles_fora_da_whitelist(monkeypatc
     tenant_id = UUID(register_response.tenants[0]["id"])
 
     user = auth_db_session.query(User).filter(User.email == "phase11@example.com").one()
+    tenant = auth_db_session.query(Tenant).filter(Tenant.id == str(tenant_id)).one()
     assert calls == [(tenant_id, user.id, False, True)]
     set_current_tenant(tenant_id)
     role = auth_db_session.query(Role).filter(Role.tenant_id == tenant_id).one()
     user_tenant = auth_db_session.query(UserTenant).filter(UserTenant.user_id == user.id).one()
 
     assert user.tenant_id == tenant_id
+    assert tenant.plan == "basico"
     assert role.tenant_id == tenant_id
     assert user_tenant.tenant_id == tenant_id
     assert auth_db_session.query(RolePermission).filter(RolePermission.tenant_id == tenant_id).count() == 2

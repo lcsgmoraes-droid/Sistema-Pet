@@ -18,13 +18,34 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/modulos", tags=["Módulos Premium"])
 
-# Módulos que serão controlados por assinatura quando a política comercial for ativada.
-MODULOS_PREMIUM = frozenset(["entregas", "campanhas", "whatsapp", "ecommerce", "app_mobile", "marketplaces"])
+# Modulos controlados por plano/assinatura. O plano basico deixa aberto o
+# nucleo operacional e libera estes extras apenas quando forem contratados.
+MODULOS_PREMIUM = frozenset(
+    [
+        "app_mobile",
+        "banho_tosa",
+        "bling",
+        "campanhas",
+        "comissoes",
+        "compras",
+        "ecommerce",
+        "entregas",
+        "financeiro_erp",
+        "fiscal",
+        "ia_avancada",
+        "integracoes",
+        "marketplaces",
+        "rh",
+        "veterinario",
+        "whatsapp",
+    ]
+)
 
-# Liberação temporária solicitada em 2026-04-24:
-# enquanto os pacotes comerciais/paywall não estiverem definidos, novos tenants
-# devem conseguir usar tudo sem tela bloqueada.
-LIBERAR_TODOS_MODULOS_TEMPORARIAMENTE = True
+# Tenants criados antes da politica comercial ficavam com plan=free. Mantemos
+# esse plano legado liberado para nao cortar fluxo real em uso.
+PLANOS_LEGADO_LIBERADOS = frozenset(["free", "legacy", "legado"])
+PLANOS_TODOS_MODULOS = frozenset(["premium", "enterprise", "full", "completo"])
+PLANOS_BASICOS = frozenset(["basico", "básico", "base", "basic"])
 
 
 def _normalizar_modulos_ativos(raw_modulos: str | None) -> list[str]:
@@ -56,8 +77,10 @@ def _resolver_modulos_ativos(
     raw_modulos: str | None,
     assinaturas_ativas: list[AssinaturaModulo],
     agora: datetime,
+    plano: str | None = None,
 ) -> list[str]:
     modulos_do_tenant = set(_normalizar_modulos_ativos(raw_modulos))
+    plano_normalizado = (plano or "").strip().lower()
 
     for assinatura in assinaturas_ativas:
         # Respeita data_fim se definida
@@ -65,10 +88,10 @@ def _resolver_modulos_ativos(
             continue
         modulos_do_tenant.add(assinatura.modulo)
 
-    if LIBERAR_TODOS_MODULOS_TEMPORARIAMENTE:
+    if plano_normalizado in PLANOS_LEGADO_LIBERADOS or plano_normalizado in PLANOS_TODOS_MODULOS:
         modulos_do_tenant.update(MODULOS_PREMIUM)
 
-    return sorted(modulos_do_tenant)
+    return sorted(modulo for modulo in modulos_do_tenant if modulo in MODULOS_PREMIUM)
 
 
 @router.get("/status")
@@ -109,13 +132,15 @@ def get_modulos_status(
         tenant.modulos_ativos,
         assinaturas_ativas,
         agora,
+        tenant.plan,
     )
 
     return {
         "modulos_ativos": modulos_do_tenant,
-        "plano": tenant.plan or "base",
+        "plano": tenant.plan or "basico",
         "tenant_id": tenant_id,
-        "liberacao_total_temporaria": LIBERAR_TODOS_MODULOS_TEMPORARIAMENTE,
+        "modulos_controlados": sorted(MODULOS_PREMIUM),
+        "plano_legado_liberado": (tenant.plan or "").strip().lower() in PLANOS_LEGADO_LIBERADOS,
     }
 
 
