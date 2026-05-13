@@ -123,6 +123,10 @@ limpeza/
 # Artefatos temporários de diagnóstico
 tmp_*
 .tmp_*
+docs/fases_multitenant/
+docs/fases_multitenant/dry_runs/
+docs/fases_multitenant/pacotes/
+docs/SAAS_MULTITENANT_DIAGNOSTICO.txt
 
 # Dados locais de importação
 simplesvet/

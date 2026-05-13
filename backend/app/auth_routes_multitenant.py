@@ -43,6 +43,7 @@ from app.services.auth_security import (
     register_successful_login,
     remaining_lock_seconds,
 )
+from app.services.tenant_onboarding_service import onboard_tenant_defaults
 from app.tenancy.context import set_tenant_context
 # from app.audit import log_audit  # TODO: Fix audit import conflict
 
@@ -60,7 +61,7 @@ PRIVACY_VERSION = os.getenv("PRIVACY_VERSION", "privacidade-2026-05-08")
 # HELPER FUNCTIONS
 # =============================================================================
 
-def grant_all_permissions_to_role(role_id: int, tenant_id: str, db: Session) -> int:
+def grant_all_permissions_to_role(role_id: int, tenant_id: uuid.UUID, db: Session) -> int:
     """
     Vincula TODAS as permissões existentes no sistema a uma role.
     
@@ -428,15 +429,24 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
     
     # Vincular usuário ao tenant com role de admin
     try:
-        from app.scripts.seed_dre_plano_contas_petshop import seed_tenant_dre_plano_contas
-
-        seed_tenant_dre_plano_contas(db, tenant_id)
+        onboarding_result = onboard_tenant_defaults(
+            db=db,
+            tenant_id=tenant_id,
+            user_id=user.id,
+            dry_run=False,
+        )
         db.flush()
+        logger.info("Onboarding inicial do tenant %s concluido: %s", tenant_id, onboarding_result)
     except Exception:
         logger.warning(
-            "Nao foi possivel criar o plano de contas DRE padrao para o tenant %s",
+            "Nao foi possivel criar os dados padrao de onboarding para o tenant %s",
             tenant_id,
             exc_info=True,
+        )
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Nao foi possivel criar os dados padrao da empresa. Tente novamente em instantes.",
         )
 
     user_tenant = UserTenant(
@@ -773,7 +783,7 @@ def select_tenant(
     
     user_tenant = db.query(UserTenant).filter(
         UserTenant.user_id == current_user.id,
-        UserTenant.tenant_id == str(tenant_uuid)
+        UserTenant.tenant_id == tenant_uuid
     ).first()
     
     if not user_tenant:
@@ -858,11 +868,9 @@ def get_me_multitenant(
     3. Endpoint usa current_user + tenant_id
     """
     current_user, tenant_id = user_and_tenant
-    tenant_id_str = str(tenant_id)
 
     user_tenant_info = (
-        db.query(UserTenant, Tenant, Role)
-        .join(Tenant, Tenant.id == UserTenant.tenant_id)
+        db.query(UserTenant, Role)
         .outerjoin(Role, Role.id == UserTenant.role_id)
         .filter(
             UserTenant.user_id == current_user.id,
@@ -878,7 +886,8 @@ def get_me_multitenant(
             detail="Usuário não tem acesso ao tenant selecionado"
         )
 
-    _user_tenant, tenant, role = user_tenant_info
+    _user_tenant, role = user_tenant_info
+    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
 
     permissions = []
     if role:

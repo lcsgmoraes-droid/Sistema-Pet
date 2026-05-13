@@ -7,14 +7,30 @@ from decimal import Decimal
 from typing import Optional, Dict, List
 from datetime import datetime
 from app.utils.logger import StructuredLogger
-from app.tenancy.context import set_tenant_context
+from app.tenancy.context import get_current_tenant_id, set_tenant_context
 from app.empresa_config_fiscal_models import EmpresaConfigFiscal
+from app.utils.tenant_safe_sql import TenantSafeSQLError, execute_tenant_safe
 
 logger = logging.getLogger(__name__)
 struct_logger = StructuredLogger(__name__)
 
 
-def buscar_configuracao_comissao(db, funcionario_id: int, produto_id: int) -> Optional[Dict]:
+def _require_tenant_id(tenant_id=None):
+    resolved_tenant_id = tenant_id if tenant_id is not None else get_current_tenant_id()
+    if resolved_tenant_id is None or resolved_tenant_id == "":
+        raise TenantSafeSQLError(
+            "tenant_id ausente em comissoes_service. Informe tenant_id ou configure "
+            "app.tenancy.context antes de calcular comissoes."
+        )
+    return resolved_tenant_id
+
+
+def buscar_configuracao_comissao(
+    db,
+    funcionario_id: int,
+    produto_id: int,
+    tenant_id=None,
+) -> Optional[Dict]:
     """
     Busca configuração de comissão seguindo hierarquia:
     1. Produto (mais específico - prioridade)
@@ -22,14 +38,18 @@ def buscar_configuracao_comissao(db, funcionario_id: int, produto_id: int) -> Op
     
     Retorna: dict com config ou None
     """
-    from sqlalchemy import text
-    
+    tenant_id = _require_tenant_id(tenant_id)
+
     try:
         # 1. Tentar buscar config de PRODUTO
-        result = db.execute(text("""
+        result = execute_tenant_safe(db, """
             SELECT * FROM comissoes_configuracao
-            WHERE funcionario_id = :func_id AND tipo = 'produto' AND referencia_id = :ref_id AND ativo = true
-        """), {'func_id': funcionario_id, 'ref_id': produto_id})
+            WHERE funcionario_id = :func_id
+              AND tipo = 'produto'
+              AND referencia_id = :ref_id
+              AND ativo = true
+              AND {tenant_filter}
+        """, {'func_id': funcionario_id, 'ref_id': produto_id}, tenant_id=tenant_id)
         
         config = result.fetchone()
         if config:
@@ -50,11 +70,12 @@ def buscar_configuracao_comissao(db, funcionario_id: int, produto_id: int) -> Op
             }
         
         # 2. Buscar categoria do produto
-        result = db.execute(text("""
+        result = execute_tenant_safe(db, """
             SELECT categoria_id
             FROM produtos
             WHERE id = :produto_id
-        """), {'produto_id': produto_id})
+              AND {tenant_filter}
+        """, {'produto_id': produto_id}, tenant_id=tenant_id)
         
         row = result.fetchone()
         if not row or not row[0]:
@@ -69,10 +90,14 @@ def buscar_configuracao_comissao(db, funcionario_id: int, produto_id: int) -> Op
         
         while categoria_atual_id and depth < max_depth:
             # Tentar buscar config para esta categoria
-            result = db.execute(text("""
+            result = execute_tenant_safe(db, """
                 SELECT * FROM comissoes_configuracao
-                WHERE funcionario_id = :func_id AND tipo = 'categoria' AND referencia_id = :ref_id AND ativo = true
-            """), {'func_id': funcionario_id, 'ref_id': categoria_atual_id})
+                WHERE funcionario_id = :func_id
+                  AND tipo = 'categoria'
+                  AND referencia_id = :ref_id
+                  AND ativo = true
+                  AND {tenant_filter}
+            """, {'func_id': funcionario_id, 'ref_id': categoria_atual_id}, tenant_id=tenant_id)
             
             config = result.fetchone()
             if config:
@@ -93,11 +118,12 @@ def buscar_configuracao_comissao(db, funcionario_id: int, produto_id: int) -> Op
                 }
             
             # Buscar categoria pai
-            result = db.execute(text("""
+            result = execute_tenant_safe(db, """
                 SELECT categoria_pai_id
                 FROM categorias
                 WHERE id = :cat_id
-            """), {'cat_id': categoria_atual_id})
+                  AND {tenant_filter}
+            """, {'cat_id': categoria_atual_id}, tenant_id=tenant_id)
             
             row = result.fetchone()
             categoria_atual_id = row[0] if row else None
@@ -106,6 +132,8 @@ def buscar_configuracao_comissao(db, funcionario_id: int, produto_id: int) -> Op
         logger.warning(f"⚠️ Nenhuma config encontrada para funcionário {funcionario_id} e produto {produto_id} (verificou {depth} níveis)")
         return None
         
+    except TenantSafeSQLError:
+        raise
     except Exception as e:
         logger.error(f"❌ Erro ao buscar config comissão: {e}")
         import traceback
@@ -203,7 +231,8 @@ def gerar_comissoes_venda(
     valor_pago: Optional[Decimal] = None,
     forma_pagamento: Optional[str] = None,  # ✅ Nova: Forma de pagamento específica
     parcela_numero: int = 1,
-    db = None
+    db = None,
+    tenant_id = None
 ):
     """
     Gera comissões para uma venda
@@ -226,18 +255,20 @@ def gerar_comissoes_venda(
         parcela_numero: Número da parcela de pagamento (para idempotência)
         db: Sessão do SQLAlchemy (OBRIGATÓRIO para PostgreSQL)
     """
-    from sqlalchemy import text
-    
     if db is None:
         logger.error("❌ Sessão db é obrigatória para gerar_comissoes_venda")
         return {'success': False, 'error': 'Sessão db não fornecida'}
     
     try:
         # 🔒 VALIDAÇÃO 1: Status da venda
-        result = db.execute(text("""
+        tenant_id = _require_tenant_id(tenant_id)
+
+        result = execute_tenant_safe(db, """
             SELECT id, total, status, desconto_valor, taxa_entrega, tem_entrega, data_venda, tenant_id, entregador_id 
-            FROM vendas WHERE id = :venda_id
-        """), {'venda_id': venda_id})
+            FROM vendas
+            WHERE id = :venda_id
+              AND {tenant_filter}
+        """, {'venda_id': venda_id}, tenant_id=tenant_id)
         
         venda_row = result.fetchone()
         if not venda_row:
@@ -253,7 +284,7 @@ def gerar_comissoes_venda(
             'taxa_entrega': venda_row[4],
             'tem_entrega': venda_row[5],
             'data_venda': venda_row[6],
-            'tenant_id': str(venda_row[7]) if venda_row[7] else None,
+            'tenant_id': venda_row[7] if venda_row[7] else tenant_id,
             'entregador_id': venda_row[8] if len(venda_row) > 8 else None
         }
         
@@ -267,11 +298,14 @@ def gerar_comissoes_venda(
         
         # 🔒 VALIDAÇÃO 2: IMUTABILIDADE - Comissões já existentes PARA ESTA PARCELA
         # PRINCÍPIO: Snapshot financeiro já criado = IMUTÁVEL
-        result = db.execute(text("""
+        result = execute_tenant_safe(db, """
             SELECT COUNT(*) as total 
             FROM comissoes_itens 
-            WHERE venda_id = :venda_id AND funcionario_id = :func_id AND parcela_numero = :parcela
-        """), {'venda_id': venda_id, 'func_id': funcionario_id, 'parcela': parcela_numero})
+            WHERE venda_id = :venda_id
+              AND funcionario_id = :func_id
+              AND parcela_numero = :parcela
+              AND {tenant_filter}
+        """, {'venda_id': venda_id, 'func_id': funcionario_id, 'parcela': parcela_numero}, tenant_id=tenant_id)
         
         count_row = result.fetchone()
         count = count_row[0] if count_row else 0
@@ -299,7 +333,7 @@ def gerar_comissoes_venda(
         # 🔒 SNAPSHOT FINANCEIRO - Capturar dados DO MOMENTO da venda
         # IMPORTANTE: Estes dados serão gravados em comissoes_itens e NUNCA mais consultados
         # Mudanças futuras em produto/custo NÃO afetarão esta comissão
-        result = db.execute(text("""
+        result = execute_tenant_safe(db, """
             SELECT 
                 vi.id,
                 vi.produto_id,
@@ -310,10 +344,11 @@ def gerar_comissoes_venda(
                 p.nome as produto_nome,
                 v.valor_taxa_entregador
             FROM venda_itens vi
-            JOIN produtos p ON vi.produto_id = p.id
-            JOIN vendas v ON v.id = vi.venda_id
+            JOIN produtos p ON vi.produto_id = p.id AND p.tenant_id = vi.tenant_id
+            JOIN vendas v ON v.id = vi.venda_id AND v.tenant_id = vi.tenant_id
             WHERE vi.venda_id = :venda_id
-        """), {'venda_id': venda_id})
+              AND vi.{tenant_filter}
+        """, {'venda_id': venda_id}, tenant_id=tenant_id)
         
         itens_rows = result.fetchall()
         if not itens_rows:
@@ -393,11 +428,12 @@ def gerar_comissoes_venda(
         
         # Se forma_pagamento foi fornecida, buscar taxa específica
         if forma_pagamento:
-            result = db.execute(text("""
+            result = execute_tenant_safe(db, """
                 SELECT taxa_percentual, nome
                 FROM formas_pagamento
                 WHERE nome = :forma_pagamento
-            """), {'forma_pagamento': forma_pagamento})
+                  AND {tenant_filter}
+            """, {'forma_pagamento': forma_pagamento}, tenant_id=tenant_id)
             pagamento = result.fetchone()
             
             if pagamento:
@@ -410,14 +446,17 @@ def gerar_comissoes_venda(
                 logger.warning(f"⚠️ Forma de pagamento '{forma_pagamento}' não encontrada")
         else:
             # Fallback: buscar último pagamento da venda
-            result = db.execute(text("""
+            result = execute_tenant_safe(db, """
                 SELECT fp.taxa_percentual, fp.nome, vp.numero_parcelas
                 FROM venda_pagamentos vp
-                JOIN formas_pagamento fp ON fp.nome = vp.forma_pagamento
+                JOIN formas_pagamento fp ON fp.nome = vp.forma_pagamento AND fp.tenant_id = vp.tenant_id
                 WHERE vp.venda_id = :venda_id
+                  AND vp.{tenant_filter}
                 ORDER BY vp.id DESC
                 LIMIT 1
-            """), {'venda_id': venda_id})
+            """, {'venda_id': venda_id}, tenant_id=tenant_id)
+            pagamento = result.fetchone()
+            num_parcelas = 1
                 
             if pagamento:
                 taxa_percentual = Decimal(str(pagamento[0] or 0))
@@ -426,11 +465,12 @@ def gerar_comissoes_venda(
             
             # Se for crédito parcelado, buscar taxa específica da parcela
             if num_parcelas > 1:
-                result_parcela = db.execute(text("""
+                result_parcela = execute_tenant_safe(db, """
                     SELECT taxas_por_parcela
                     FROM formas_pagamento
                     WHERE nome = :nome
-                """), {'nome': forma_nome})
+                      AND {tenant_filter}
+                """, {'nome': forma_nome}, tenant_id=tenant_id)
                 config_parcela = result_parcela.fetchone()
                 
                 if config_parcela and config_parcela[0]:
@@ -454,7 +494,7 @@ def gerar_comissoes_venda(
         impostos_percentual = Decimal('7.0')  # Fallback padrão
         try:
             config_fiscal = db.query(EmpresaConfigFiscal).filter(
-                EmpresaConfigFiscal.tenant_id == venda.get('tenant_id')
+                EmpresaConfigFiscal.tenant_id == tenant_id
             ).first()
             if config_fiscal and config_fiscal.aliquota_simples_vigente is not None:
                 impostos_percentual = Decimal(str(config_fiscal.aliquota_simples_vigente))
@@ -491,11 +531,12 @@ def gerar_comissoes_venda(
             try:
                 entregador_id = venda.get('entregador_id')
                 if entregador_id:
-                    result_entregador = db.execute(text("""
+                    result_entregador = execute_tenant_safe(db, """
                         SELECT taxa_fixa_entrega, nome
                         FROM clientes
                         WHERE id = :entregador_id
-                    """), {'entregador_id': entregador_id})
+                          AND {tenant_filter}
+                    """, {'entregador_id': entregador_id}, tenant_id=tenant_id)
                     
                     entregador_data = result_entregador.fetchone()
                     if entregador_data and entregador_data[0]:
@@ -542,7 +583,12 @@ def gerar_comissoes_venda(
         
         for item_norm in itens_normalizados:
             # Buscar configuração de comissão
-            config = buscar_configuracao_comissao(db, funcionario_id, item_norm['produto_id'])
+            config = buscar_configuracao_comissao(
+                db,
+                funcionario_id,
+                item_norm['produto_id'],
+                tenant_id=tenant_id,
+            )
             
             if not config:
                 logger.warning(f"⚠️ Sem config de comissão para produto {item_norm['produto_id']}")
@@ -605,7 +651,7 @@ def gerar_comissoes_venda(
                     logger.info(f"   Comissão proporcional: R$ {float(valor_base_comissionada):.2f}")
             
             # Registrar comissão do item
-            db.execute(text("""
+            execute_tenant_safe(db, """
                 INSERT INTO comissoes_itens (
                     venda_id, venda_item_id, funcionario_id, produto_id,
                     data_venda, quantidade, valor_venda, valor_custo,
@@ -621,11 +667,11 @@ def gerar_comissoes_venda(
                     :tipo_calculo, :valor_base_calculo, :percentual_comissao,
                     :valor_comissao, :valor_comissao_gerada, :percentual_pago, 'pendente',
                     :valor_base_original, :valor_base_comissionada, :percentual_aplicado,
-                    :valor_pago_referencia, :parcela_numero, CAST(:tenant_id AS UUID),
+                    :valor_pago_referencia, :parcela_numero, :tenant_id,
                     :taxa_cartao_item, :impostos_item, :taxa_entregador_item, :custo_operacional_item, 
                     :receita_taxa_entrega_item, :percentual_impostos, :forma_pagamento
                 )
-            """), {
+            """, {
                 'venda_id': venda_id,
                 'venda_item_id': item_norm['item_id'],
                 'funcionario_id': funcionario_id,
@@ -653,7 +699,7 @@ def gerar_comissoes_venda(
                 'receita_taxa_entrega_item': calculo.get('receita_taxa_entrega_item', 0),
                 'percentual_impostos': calculo.get('percentual_impostos', 0),
                 'forma_pagamento': forma_pagamento  # ✅ Gravar forma de pagamento da comissão
-            })
+            }, tenant_id=tenant_id, require_tenant=False)
             
             total_comissao += Decimal(str(calculo['valor_comissao']))
             comissoes_geradas.append({
@@ -716,15 +762,7 @@ def gerar_comissoes_venda(
         try:
             from app.comissoes_provisao import provisionar_comissoes_venda
             
-            # Buscar tenant_id da venda
-            result_tenant = db.execute(text("""
-                SELECT tenant_id FROM vendas WHERE id = :venda_id
-            """), {'venda_id': venda_id})
-            
-            tenant_row = result_tenant.fetchone()
-            if tenant_row:
-                tenant_id = tenant_row[0]
-                
+            if tenant_id:
                 logger.info(f"🎯 Iniciando provisão automática de comissões (PASSO 2)...")
                 
                 # Definir contexto de tenant antes de chamar provisionar_comissoes_venda

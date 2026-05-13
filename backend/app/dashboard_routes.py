@@ -20,10 +20,15 @@ from .vendas_models import Venda, VendaPagamento
 from .financeiro_models import ContaReceber, ContaPagar
 from .caixa_models import Caixa
 from .produtos_models import Produto
+from .utils.tenant_safe_sql import execute_tenant_safe
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
+
+
+def _dashboard_fetchone(db: Session, sql: str, tenant_id, params=None):
+    return execute_tenant_safe(db, sql, params or {}, tenant_id=tenant_id).fetchone()
 
 
 @router.get("/dashboard/resumo")
@@ -460,80 +465,78 @@ async def obter_metricas_gerencial(
     """
     current_user, tenant_id = user_and_tenant
     try:
-        from sqlalchemy import text
-
         # 1. VIPs inativos — segmento VIP com mais de 20 dias sem compra
-        vips_result = db.execute(text("""
+        vips_result = _dashboard_fetchone(db, """
             SELECT
                 COUNT(*) AS qtd,
                 COALESCE(SUM(CAST(cs.metricas->>'total_compras_90d' AS FLOAT)), 0) AS impacto
             FROM cliente_segmentos cs
-            JOIN clientes c ON c.id = cs.cliente_id
-            WHERE cs.tenant_id = :tenant_id
+            JOIN clientes c ON c.id = cs.cliente_id AND c.{tenant_filter}
+            WHERE cs.{tenant_filter}
               AND cs.segmento = 'VIP'
               AND CAST(cs.metricas->>'ultima_compra_dias' AS INTEGER) > 20
               AND c.ativo = true
-        """), {'tenant_id': str(tenant_id)}).fetchone()
+        """, tenant_id)
 
         # 2. Clientes inativos — sem compra há mais de 90 dias
-        inativos_result = db.execute(text("""
+        inativos_result = _dashboard_fetchone(db, """
             SELECT COUNT(DISTINCT c.id) AS qtd
             FROM clientes c
             LEFT JOIN (
                 SELECT cliente_id, MAX(data_venda) AS ultima_venda
                 FROM vendas
-                WHERE tenant_id = :tenant_id AND status = 'finalizada'
+                WHERE {tenant_filter} AND status = 'finalizada'
                 GROUP BY cliente_id
             ) v ON v.cliente_id = c.id
-            WHERE c.tenant_id = :tenant_id
+            WHERE c.{tenant_filter}
               AND c.tipo_cadastro = 'cliente'
               AND c.ativo = true
               AND (v.ultima_venda IS NULL OR v.ultima_venda < NOW() - INTERVAL '90 days')
-        """), {'tenant_id': str(tenant_id)}).fetchone()
+        """, tenant_id)
 
         # 3. Clientes endividados — contas a receber em aberto com saldo > 0
-        endividados_result = db.execute(text("""
+        endividados_result = _dashboard_fetchone(db, """
             SELECT
                 COUNT(DISTINCT cr.cliente_id) AS qtd,
                 COALESCE(SUM(cr.valor_final - COALESCE(cr.valor_recebido, 0)), 0) AS total_dividas
             FROM contas_receber cr
-            WHERE cr.tenant_id = :tenant_id
+            WHERE cr.{tenant_filter}
               AND cr.status IN ('pendente', 'vencido', 'parcial')
               AND cr.cliente_id IS NOT NULL
               AND (cr.valor_final - COALESCE(cr.valor_recebido, 0)) > 0
-        """), {'tenant_id': str(tenant_id)}).fetchone()
+        """, tenant_id)
 
         # 4. Novos promissores — segmento Novo com ticket médio > R$ 200
-        novos_result = db.execute(text("""
+        novos_result = _dashboard_fetchone(db, """
             SELECT
                 COUNT(*) AS qtd,
                 COALESCE(SUM(CAST(cs.metricas->>'ticket_medio' AS FLOAT)), 0) AS potencial
             FROM cliente_segmentos cs
-            JOIN clientes c ON c.id = cs.cliente_id
-            WHERE cs.tenant_id = :tenant_id
+            JOIN clientes c ON c.id = cs.cliente_id AND c.{tenant_filter}
+            WHERE cs.{tenant_filter}
               AND cs.segmento = 'Novo'
               AND CAST(cs.metricas->>'ticket_medio' AS FLOAT) > 200
               AND c.ativo = true
-        """), {'tenant_id': str(tenant_id)}).fetchone()
+        """, tenant_id)
 
         # 5. WhatsApp faltando — clientes sem celular cadastrado
-        sem_whatsapp_result = db.execute(text("""
+        sem_whatsapp_result = _dashboard_fetchone(db, """
             SELECT COUNT(*) AS qtd
             FROM clientes
-            WHERE tenant_id = :tenant_id
+            WHERE {tenant_filter}
               AND tipo_cadastro = 'cliente'
               AND ativo = true
               AND (celular IS NULL OR TRIM(celular) = '')
-        """), {'tenant_id': str(tenant_id)}).fetchone()
+        """, tenant_id)
 
         # 6. Total de clientes ativos (tipo cliente)
-        total_result = db.execute(text("""
+        total_result = _dashboard_fetchone(db, """
             SELECT COUNT(*) AS qtd
             FROM clientes
-            WHERE tenant_id = :tenant_id
+            WHERE {tenant_filter}
               AND tipo_cadastro = 'cliente'
               AND ativo = true
-        """), {'tenant_id': str(tenant_id)}).fetchone()
+        """, tenant_id)
 
         def fmt_brl(value: float) -> str:
             return f"R$ {value:_.2f}".replace('.', ',').replace('_', '.')

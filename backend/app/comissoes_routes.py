@@ -507,10 +507,18 @@ async def criar_configuracoes_batch(
                     raise ValueError(f"Percentual deve estar entre 0 e 100: {config.percentual}")
                 
                 # Buscar se já existe
-                result = db.execute(
-                    text("SELECT id FROM comissoes_configuracao WHERE funcionario_id = :f AND tipo = :t AND referencia_id = :r"),
-                    {"f": config.funcionario_id, "t": config.tipo, "r": config.referencia_id}
-                ).fetchone()
+                result = execute_tenant_safe(db, """
+                    SELECT id
+                    FROM comissoes_configuracao
+                    WHERE funcionario_id = :f
+                      AND tipo = :t
+                      AND referencia_id = :r
+                      AND {tenant_filter}
+                """, {
+                    "f": config.funcionario_id,
+                    "t": config.tipo,
+                    "r": config.referencia_id,
+                }, tenant_id=tenant_id).fetchone()
                 
                 if result:
                     # Atualizar
@@ -518,7 +526,7 @@ async def criar_configuracoes_batch(
                         UPDATE comissoes_configuracao SET
                             percentual = :p, ativo = true
                             WHERE id = :id AND {tenant_filter}
-                    """, {"p": config.percentual, "id": result[0]})
+                    """, {"p": config.percentual, "id": result[0]}, tenant_id=tenant_id)
                     config_ids.append(result[0])
                 else:
                     # Criar
@@ -532,7 +540,7 @@ async def criar_configuracoes_batch(
                         "r": config.referencia_id, 
                         "p": config.percentual,
                         "tenant_id": tenant_id
-                    }, require_tenant=False)
+                    }, tenant_id=tenant_id, require_tenant=False)
                     config_ids.append(result.fetchone()[0])
             
             db.commit()

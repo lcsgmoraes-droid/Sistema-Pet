@@ -187,6 +187,7 @@ from pathlib import Path
 
 # Importar modelos para registrar no SQLAlchemy (IMPORTANTE: antes de criar o app)
 from app.models import User, UserSession, AuditLog, AcertoParceiro, EmailTemplate, EmailEnvio  # Modelos principais (removido WhatsAppMessage antigo)
+import app.template_models  # noqa: F401 - templates globais e auditoria de onboarding
 from app.produtos_models import Lembrete  # Modelo de lembretes
 from app.idempotency_models import IdempotencyKey  # Modelo de idempotência
 from app.models_configuracao_custo_moto import ConfiguracaoCustoMoto  # ETAPA 8.2 - Custos da Moto

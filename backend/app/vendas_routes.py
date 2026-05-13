@@ -43,6 +43,7 @@ from .services.venda_rentabilidade_snapshot_service import (
     get_or_build_venda_rentabilidade_snapshot,
     invalidate_venda_rentabilidade_snapshot,
 )
+from .utils.tenant_safe_sql import execute_tenant_safe
 
 router = APIRouter(prefix="/vendas", tags=["vendas"])
 
@@ -85,6 +86,70 @@ def _obter_cliente_ou_404(db: Session, cliente_id: int, tenant_id: str):
         raise HTTPException(status_code=404, detail="Cliente não encontrado")
 
     return cliente
+
+
+def _listar_pagamentos_venda_para_comissao(db: Session, venda_id: int, tenant_id):
+    return execute_tenant_safe(db, """
+        SELECT vp.id, vp.forma_pagamento, vp.valor, vp.data_pagamento
+        FROM venda_pagamentos vp
+        WHERE vp.venda_id = :venda_id
+          AND vp.{tenant_filter}
+        ORDER BY vp.data_pagamento ASC
+    """, {"venda_id": venda_id}, tenant_id=tenant_id).fetchall()
+
+
+def _parcelas_com_comissao_funcionario(
+    db: Session,
+    venda_id: int,
+    funcionario_id: int,
+    tenant_id,
+) -> set:
+    rows = execute_tenant_safe(db, """
+        SELECT DISTINCT parcela_numero
+        FROM comissoes_itens
+        WHERE venda_id = :venda_id
+          AND funcionario_id = :funcionario_id
+          AND {tenant_filter}
+    """, {
+        "venda_id": venda_id,
+        "funcionario_id": funcionario_id,
+    }, tenant_id=tenant_id).fetchall()
+    return {row[0] for row in rows}
+
+
+def _total_pago_venda(db: Session, venda_id: int, tenant_id) -> Decimal:
+    row = execute_tenant_safe(db, """
+        SELECT COALESCE(SUM(valor), 0) as total_pago
+        FROM venda_pagamentos
+        WHERE venda_id = :venda_id
+          AND {tenant_filter}
+    """, {"venda_id": venda_id}, tenant_id=tenant_id).fetchone()
+    return Decimal(str(row[0])) if row else Decimal("0")
+
+
+def _contar_comissoes_venda(db: Session, venda_id: int, tenant_id) -> int:
+    return execute_tenant_safe(db, """
+        SELECT COUNT(*) FROM comissoes_itens
+        WHERE venda_id = :venda_id
+          AND {tenant_filter}
+    """, {"venda_id": venda_id}, tenant_id=tenant_id).scalar() or 0
+
+
+def _remover_comissoes_venda(db: Session, venda_id: int, tenant_id) -> None:
+    execute_tenant_safe(db, """
+        DELETE FROM comissoes_itens
+        WHERE venda_id = :venda_id
+          AND {tenant_filter}
+    """, {"venda_id": venda_id}, tenant_id=tenant_id)
+
+
+def _remover_provisoes_comissao_venda(db: Session, venda_id: int, tenant_id) -> None:
+    execute_tenant_safe(db, """
+        DELETE FROM contas_pagar
+        WHERE {tenant_filter}
+          AND descricao LIKE :descricao
+          AND status = 'pendente'
+    """, {"descricao": f"%Comissão - Venda #{venda_id}%"}, tenant_id=tenant_id)
 
 
 # ============================================================================
@@ -704,17 +769,8 @@ def atualizar_venda(
     # Neste caso, precisa verificar se venda está paga e gerar comissões
     if venda.funcionario_id and venda.status != 'finalizada':
         try:
-            from sqlalchemy import text
-
-            # Buscar total pago
-            result = db.execute(text("""
-                SELECT COALESCE(SUM(valor), 0) as total_pago
-                FROM venda_pagamentos
-                WHERE venda_id = :venda_id
-            """), {'venda_id': venda.id})
-
-            total_pago_row = result.fetchone()
-            total_pago = Decimal(str(total_pago_row[0])) if total_pago_row else Decimal('0')
+            # Buscar total pago com filtro tenant-safe em SQL bruto
+            total_pago = _total_pago_venda(db, venda.id, tenant_id)
             total_venda = Decimal(str(venda.total))
 
             logger.info(f"📊 Venda {venda.id}: Total={total_venda}, Pago={total_pago}")
@@ -740,21 +796,15 @@ def atualizar_venda(
                 # Gerar comissões para cada pagamento
                 from app.comissoes_service import gerar_comissoes_venda
 
-                todos_pagamentos = db.execute(text("""
-                    SELECT vp.id, vp.forma_pagamento, vp.valor, vp.data_pagamento
-                    FROM venda_pagamentos vp
-                    WHERE vp.venda_id = :venda_id
-                    ORDER BY vp.data_pagamento ASC
-                """), {'venda_id': venda.id}).fetchall()
+                todos_pagamentos = _listar_pagamentos_venda_para_comissao(db, venda.id, tenant_id)
 
                 # Verificar quais pagamentos já têm comissão
-                comissoes_existentes = db.execute(text("""
-                    SELECT DISTINCT parcela_numero
-                    FROM comissoes_itens
-                    WHERE venda_id = :venda_id AND funcionario_id = :funcionario_id
-                """), {'venda_id': venda.id, 'funcionario_id': venda.funcionario_id}).fetchall()
-
-                parcelas_com_comissao = {row[0] for row in comissoes_existentes}
+                parcelas_com_comissao = _parcelas_com_comissao_funcionario(
+                    db,
+                    venda.id,
+                    venda.funcionario_id,
+                    tenant_id,
+                )
 
                 comissoes_geradas = 0
                 total_comissoes = Decimal('0')
@@ -916,28 +966,21 @@ async def finalizar_venda(
     if venda.funcionario_id:
         try:
             from app.comissoes_service import gerar_comissoes_venda
-            from sqlalchemy import text
 
             # � BUSCAR TODOS OS PAGAMENTOS DA VENDA (não só os novos!)
             # Precisamos gerar comissões para TODOS os pagamentos que ainda não têm comissão
-            todos_pagamentos = db.execute(text("""
-                SELECT vp.id, vp.forma_pagamento, vp.valor, vp.data_pagamento
-                FROM venda_pagamentos vp
-                WHERE vp.venda_id = :venda_id
-                ORDER BY vp.data_pagamento ASC
-            """), {'venda_id': venda.id}).fetchall()
+            todos_pagamentos = _listar_pagamentos_venda_para_comissao(db, venda.id, tenant_id)
 
             if not todos_pagamentos:
                 logger.info("ℹ️  Nenhum pagamento encontrado na venda")
             else:
                 # 🔢 Verificar quais pagamentos já têm comissão
-                comissoes_existentes = db.execute(text("""
-                    SELECT DISTINCT parcela_numero
-                    FROM comissoes_itens
-                    WHERE venda_id = :venda_id AND funcionario_id = :funcionario_id
-                """), {'venda_id': venda.id, 'funcionario_id': venda.funcionario_id}).fetchall()
-
-                parcelas_com_comissao = {row[0] for row in comissoes_existentes}
+                parcelas_com_comissao = _parcelas_com_comissao_funcionario(
+                    db,
+                    venda.id,
+                    venda.funcionario_id,
+                    tenant_id,
+                )
                 logger.info(f"📊 Pagamentos: {len(todos_pagamentos)} total, {len(parcelas_com_comissao)} já com comissão")
 
                 # 🔄 GERAR UMA COMISSÃO PARA CADA PAGAMENTO SEM COMISSÃO
@@ -1315,14 +1358,8 @@ def reabrir_venda(
     comissoes_removidas = 0
     if venda.funcionario_id:
         try:
-            from sqlalchemy import text
-
             # Contar comissões antes de remover
-            result = db.execute(text("""
-                SELECT COUNT(*) FROM comissoes_itens
-                WHERE venda_id = :venda_id
-            """), {'venda_id': venda.id})
-            comissoes_removidas = result.scalar() or 0
+            comissoes_removidas = _contar_comissoes_venda(db, venda.id, tenant_id)
 
             if comissoes_removidas > 0:
                 struct_logger.info(
@@ -1334,16 +1371,10 @@ def reabrir_venda(
                 )
 
                 # Remover comissões
-                db.execute(text("""
-                    DELETE FROM comissoes_itens WHERE venda_id = :venda_id
-                """), {'venda_id': venda.id})
+                _remover_comissoes_venda(db, venda.id, tenant_id)
 
                 # Também remover provisões de comissão em contas_pagar
-                db.execute(text("""
-                    DELETE FROM contas_pagar
-                    WHERE descricao LIKE :descricao
-                    AND status = 'pendente'
-                """), {'descricao': f'%Comissão - Venda #{venda.id}%'})
+                _remover_provisoes_comissao_venda(db, venda.id, tenant_id)
 
                 struct_logger.info(
                     event="COMMISSION_CANCELLED",
@@ -1470,7 +1501,6 @@ def atualizar_status_venda(
     if novo_status == 'finalizada' and status_anterior != 'finalizada' and venda.funcionario_id:
         try:
             from app.comissoes_service import gerar_comissoes_venda
-            from sqlalchemy import text
 
             struct_logger.info(
                 event="COMMISSION_START",
@@ -1482,24 +1512,18 @@ def atualizar_status_venda(
 
             # 🔍 BUSCAR TODOS OS PAGAMENTOS DA VENDA
             # Precisamos gerar comissões para TODOS os pagamentos que ainda não têm comissão
-            todos_pagamentos = db.execute(text("""
-                SELECT vp.id, vp.forma_pagamento, vp.valor, vp.data_pagamento
-                FROM venda_pagamentos vp
-                WHERE vp.venda_id = :venda_id
-                ORDER BY vp.data_pagamento ASC
-            """), {'venda_id': venda.id}).fetchall()
+            todos_pagamentos = _listar_pagamentos_venda_para_comissao(db, venda.id, tenant_id)
 
             if not todos_pagamentos:
                 logger.info("ℹ️  Nenhum pagamento encontrado na venda")
             else:
                 # 🔢 Verificar quais pagamentos já têm comissão
-                comissoes_existentes = db.execute(text("""
-                    SELECT DISTINCT parcela_numero
-                    FROM comissoes_itens
-                    WHERE venda_id = :venda_id AND funcionario_id = :funcionario_id
-                """), {'venda_id': venda.id, 'funcionario_id': venda.funcionario_id}).fetchall()
-
-                parcelas_com_comissao = {row[0] for row in comissoes_existentes}
+                parcelas_com_comissao = _parcelas_com_comissao_funcionario(
+                    db,
+                    venda.id,
+                    venda.funcionario_id,
+                    tenant_id,
+                )
                 logger.info(f"📊 Pagamentos: {len(todos_pagamentos)} total, {len(parcelas_com_comissao)} já com comissão")
 
                 # 🔄 GERAR UMA COMISSÃO PARA CADA PAGAMENTO SEM COMISSÃO

@@ -181,10 +181,10 @@ def test_listagem_isolada_por_tenant(db_session):
     print("✅ Teste: Listagens isoladas por tenant")
 
 
-def test_query_sem_tenant_permite_acesso(db_session):
+def test_query_sem_tenant_bloqueia_tabela_multitenant(db_session):
     """
-    Testa que queries sem tenant definido são permitidas
-    (para rotas públicas como login).
+    Testa que queries sem tenant definido falham em tabelas multi-tenant.
+    Rotas publicas devem usar apenas tabelas explicitamente liberadas.
     """
     from uuid import uuid4
     tenant_id = uuid4()
@@ -200,14 +200,13 @@ def test_query_sem_tenant_permite_acesso(db_session):
     db_session.add(c)
     db_session.commit()
     
-    # Limpar tenant (simula rota pública)
+    # Limpar tenant simula chamada sem contexto multi-tenant.
     clear_current_tenant()
     
-    # Query deve funcionar sem filtro de tenant
-    clientes = db_session.query(Cliente).all()
-    assert len(clientes) >= 1
+    with pytest.raises(RuntimeError, match="multi-tenant"):
+        db_session.query(Cliente).all()
     
-    print("✅ Teste: Query sem tenant permite acesso (rotas públicas)")
+    print("Teste: Query sem tenant bloqueada em tabela multi-tenant")
 
 
 def test_produto_isolado_por_tenant(db_session):
