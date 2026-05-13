@@ -18,7 +18,7 @@ from app.auth.core import ALGORITHM
 security = HTTPBearer()
 
 
-def get_current_user_and_tenant(
+async def get_current_user_and_tenant(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     user: User = Depends(get_current_user),
 ) -> tuple[User, UUID]:

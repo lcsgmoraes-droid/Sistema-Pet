@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const configuredApiUrl = import.meta.env.VITE_API_URL;
-const baseURL = configuredApiUrl || "/api";
+const baseURL = import.meta.env.DEV ? "/api" : (configuredApiUrl || "/api");
 const PUBLIC_PATH_PREFIXES = [
   "/login",
   "/register",
@@ -10,6 +10,7 @@ const PUBLIC_PATH_PREFIXES = [
   "/termos",
   "/privacidade",
   "/landing",
+  "/planos",
   "/app",
   "/ecommerce",
 ];

@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
 import api from "../api";
+import { useModulos } from "../contexts/ModulosContext";
 
 export function usePDVClienteContexto({ vendaAtual, setVendaAtual }) {
+  const { moduloAtivo } = useModulos();
+  const moduloCampanhasAtivo = moduloAtivo("campanhas");
   const [copiadoClienteCampo, setCopiadoClienteCampo] = useState("");
   const [vendasEmAbertoInfo, setVendasEmAbertoInfo] = useState(null);
   const [saldoCampanhas, setSaldoCampanhas] = useState(null);
@@ -26,6 +29,11 @@ export function usePDVClienteContexto({ vendaAtual, setVendaAtual }) {
   };
 
   const carregarSaldoCampanhasCliente = async (clienteId) => {
+    if (!moduloCampanhasAtivo) {
+      setSaldoCampanhas(null);
+      return;
+    }
+
     if (!clienteId) {
       setSaldoCampanhas(null);
       return;
@@ -74,9 +82,12 @@ export function usePDVClienteContexto({ vendaAtual, setVendaAtual }) {
       setVendasEmAbertoInfo(null);
       return;
     }
+    if (!moduloCampanhasAtivo) {
+      setSaldoCampanhas(null);
+    }
     await Promise.all([
       carregarVendasEmAbertoCliente(clienteId),
-      carregarSaldoCampanhasCliente(clienteId),
+      moduloCampanhasAtivo ? carregarSaldoCampanhasCliente(clienteId) : Promise.resolve(),
     ]);
   };
 
@@ -93,7 +104,7 @@ export function usePDVClienteContexto({ vendaAtual, setVendaAtual }) {
     }
 
     void recarregarContextoClientePorId(clienteId);
-  }, [vendaAtual.cliente?.id]);
+  }, [moduloCampanhasAtivo, vendaAtual.cliente?.id]);
 
   return {
     copiadoClienteCampo,

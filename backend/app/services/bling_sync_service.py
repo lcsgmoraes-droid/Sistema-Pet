@@ -12,13 +12,16 @@ import tempfile
 import threading
 import time
 from typing import Any, Dict, List, Optional
+from uuid import UUID
 
 from sqlalchemy import desc, func
 from sqlalchemy.orm import Session, aliased
 
 from app.bling_integration import BlingAPI
 from app.db import SessionLocal
+from app.models import Tenant
 from app.produtos_models import Produto, ProdutoBlingSync, ProdutoBlingSyncQueue
+from app.tenancy.context import clear_current_tenant, set_current_tenant
 
 logger = logging.getLogger(__name__)
 
@@ -842,16 +845,6 @@ class BlingSyncService:
         db = SessionLocal()
         now = utc_now()
         try:
-            filas = db.query(ProdutoBlingSyncQueue).filter(
-                ProdutoBlingSyncQueue.status.in_(["pendente", "erro"]),
-                ProdutoBlingSyncQueue.proxima_tentativa_em.isnot(None),
-                ProdutoBlingSyncQueue.proxima_tentativa_em <= now,
-            ).order_by(
-                ProdutoBlingSyncQueue.forcar_sync.desc(),
-                ProdutoBlingSyncQueue.proxima_tentativa_em.asc(),
-                ProdutoBlingSyncQueue.updated_at.asc(),
-            ).limit(limit).all()
-
             processados = 0
             sucessos = 0
             erros = 0
@@ -860,21 +853,54 @@ class BlingSyncService:
             auth_invalid = False
             auth_detail = None
 
-            for fila in filas:
-                result = BlingSyncService.process_queue_item(db, fila)
-                processados += 1
-                if result.get("ok"):
-                    sucessos += 1
-                else:
-                    erros += 1
-                    if result.get("rate_limited"):
-                        rate_limited = True
-                        cooldown_seconds = float(result.get("cooldown_seconds") or 0.0)
-                        break
-                    if result.get("auth_invalid"):
-                        auth_invalid = True
-                        auth_detail = result.get("detail")
-                        break
+            tenant_rows = (
+                db.query(Tenant.id)
+                .filter(Tenant.status == "active")
+                .order_by(Tenant.created_at.asc())
+                .all()
+            )
+
+            for (tenant_id_raw,) in tenant_rows:
+                if processados >= limit:
+                    break
+
+                try:
+                    tenant_uuid = UUID(str(tenant_id_raw))
+                except (TypeError, ValueError):
+                    logger.warning("[BLING SYNC] Ignorando tenant_id invalido na fila: %s", tenant_id_raw)
+                    continue
+
+                set_current_tenant(tenant_uuid)
+                restante = max(0, limit - processados)
+                filas = db.query(ProdutoBlingSyncQueue).filter(
+                    ProdutoBlingSyncQueue.tenant_id == tenant_uuid,
+                    ProdutoBlingSyncQueue.status.in_(["pendente", "erro"]),
+                    ProdutoBlingSyncQueue.proxima_tentativa_em.isnot(None),
+                    ProdutoBlingSyncQueue.proxima_tentativa_em <= now,
+                ).order_by(
+                    ProdutoBlingSyncQueue.forcar_sync.desc(),
+                    ProdutoBlingSyncQueue.proxima_tentativa_em.asc(),
+                    ProdutoBlingSyncQueue.updated_at.asc(),
+                ).limit(restante).all()
+
+                for fila in filas:
+                    result = BlingSyncService.process_queue_item(db, fila)
+                    processados += 1
+                    if result.get("ok"):
+                        sucessos += 1
+                    else:
+                        erros += 1
+                        if result.get("rate_limited"):
+                            rate_limited = True
+                            cooldown_seconds = float(result.get("cooldown_seconds") or 0.0)
+                            break
+                        if result.get("auth_invalid"):
+                            auth_invalid = True
+                            auth_detail = result.get("detail")
+                            break
+
+                if rate_limited or auth_invalid:
+                    break
 
             db.commit()
             return {
@@ -891,6 +917,7 @@ class BlingSyncService:
             logger.exception("[BLING SYNC] Erro ao processar fila pendente")
             return {"processados": 0, "sucessos": 0, "erros": 1}
         finally:
+            clear_current_tenant()
             db.close()
 
     @staticmethod

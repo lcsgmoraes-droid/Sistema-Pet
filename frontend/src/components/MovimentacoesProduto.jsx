@@ -13,6 +13,7 @@ import MovimentacoesLancamentosTable from './estoque/MovimentacoesLancamentosTab
 import MovimentacoesProdutoHeader from './estoque/MovimentacoesProdutoHeader';
 import ReservasAtivasModal from './estoque/ReservasAtivasModal';
 import VendasPorCanalPanel from './estoque/VendasPorCanalPanel';
+import { useModulos } from '../contexts/ModulosContext';
 
 const CANAIS_DESTAQUE = ['loja_fisica', 'mercado_livre', 'shopee', 'amazon'];
 
@@ -76,6 +77,15 @@ function parseNumeroInput(valor) {
   return Number.isFinite(numero) ? numero : 0;
 }
 
+function extrairMensagemErroApi(error, fallback) {
+  const detalhe = error?.response?.data?.detail ?? error?.response?.data?.message;
+  if (typeof detalhe === 'string') return detalhe;
+  if (detalhe && typeof detalhe === 'object') {
+    return detalhe.message || detalhe.mensagem || fallback;
+  }
+  return error?.message || fallback;
+}
+
 function getSaldoAposLancamento(movimentacao) {
   const saldo = movimentacao?.saldo_apos_lancamento ?? movimentacao?.quantidade_nova;
   const saldoNumerico = Number(saldo);
@@ -85,6 +95,8 @@ function getSaldoAposLancamento(movimentacao) {
 export default function MovimentacoesProduto() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const { moduloAtivo } = useModulos();
+  const moduloBlingAtivo = moduloAtivo('bling');
   
   const [produto, setProduto] = useState(null);
   const [movimentacoes, setMovimentacoes] = useState([]);
@@ -164,7 +176,7 @@ export default function MovimentacoesProduto() {
 
   useEffect(() => {
     carregarDados();
-  }, [id]);
+  }, [id, moduloBlingAtivo]);
 
   useEffect(() => {
     if (!showGranelModal) return undefined;
@@ -194,19 +206,31 @@ export default function MovimentacoesProduto() {
       setMovimentacoes(movRes.data);
 
       const termoBuscaSync = produtoData?.codigo || produtoData?.sku;
+      if (!moduloBlingAtivo) {
+        setSyncProduto(null);
+        return;
+      }
+
       if (termoBuscaSync) {
-        const syncRes = await api.get('/estoque/sync/status', {
-          params: { busca: termoBuscaSync },
-        });
-        const itemSync = (syncRes.data || []).find((item) => item.produto_id === Number(id));
-        setSyncProduto(itemSync || null);
+        try {
+          const syncRes = await api.get('/estoque/sync/status', {
+            params: { busca: termoBuscaSync },
+          });
+          const itemSync = (syncRes.data || []).find((item) => item.produto_id === Number(id));
+          setSyncProduto(itemSync || null);
+        } catch (syncError) {
+          if (syncError?.response?.status !== 403) {
+            console.warn('Nao foi possivel carregar status de sincronizacao:', syncError);
+          }
+          setSyncProduto(null);
+        }
       } else {
         setSyncProduto(null);
       }
     } catch (error) {
       console.error('Erro ao carregar dados:', error);
       console.error('Detalhes do erro:', error.response?.data);
-      toast.error(error.response?.data?.detail || 'Erro ao carregar dados do produto');
+      toast.error(extrairMensagemErroApi(error, 'Erro ao carregar dados do produto'));
     } finally {
       setLoading(false);
     }
@@ -261,7 +285,7 @@ export default function MovimentacoesProduto() {
         buscarProdutosGranel(''),
       ]);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao carregar vinculos de granel');
+      toast.error(extrairMensagemErroApi(error, 'Erro ao carregar vinculos de granel'));
     } finally {
       setLoadingGranel(false);
     }
@@ -303,7 +327,7 @@ export default function MovimentacoesProduto() {
       setShowGranelModal(false);
       await carregarDados();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao lancar granel');
+      toast.error(extrairMensagemErroApi(error, 'Erro ao lancar granel'));
     } finally {
       setLoadingGranel(false);
     }
@@ -337,11 +361,16 @@ export default function MovimentacoesProduto() {
       toast.success('Vinculo removido.');
       await carregarVinculosGranel();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao desvincular granel');
+      toast.error(extrairMensagemErroApi(error, 'Erro ao desvincular granel'));
     }
   };
 
   const handleForcarSyncProduto = async () => {
+    if (!moduloBlingAtivo) {
+      toast.error('Integração Bling não está disponível neste plano.');
+      return;
+    }
+
     if (!syncProduto?.bling_produto_id) {
       toast.error('Este produto ainda não está vinculado ao Bling para sincronização manual.');
       return;
@@ -358,7 +387,7 @@ export default function MovimentacoesProduto() {
       }
       await carregarDados();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao forçar sincronização do produto.');
+      toast.error(extrairMensagemErroApi(error, 'Erro ao forçar sincronização do produto.'));
     } finally {
       setForcandoSync(false);
     }
@@ -375,7 +404,7 @@ export default function MovimentacoesProduto() {
       setReservasAtivas(res.data?.pedidos || []);
       setShowReservasModal(true);
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao carregar pedidos reservados');
+      toast.error(extrairMensagemErroApi(error, 'Erro ao carregar pedidos reservados'));
     } finally {
       setLoadingReservas(false);
     }
@@ -478,7 +507,7 @@ export default function MovimentacoesProduto() {
       carregarDados();
     } catch (error) {
       console.error('Erro ao excluir:', error);
-      toast.error(error.response?.data?.detail || 'Erro ao excluir lançamentos');
+      toast.error(extrairMensagemErroApi(error, 'Erro ao excluir lançamentos'));
     }
   };
 
@@ -593,7 +622,7 @@ export default function MovimentacoesProduto() {
       carregarDados();
     } catch (error) {
       console.error('Erro ao registrar lançamento:', error);
-      toast.error(error.response?.data?.detail || 'Erro ao registrar lançamento');
+      toast.error(extrairMensagemErroApi(error, 'Erro ao registrar lançamento'));
     }
   };
 
@@ -822,6 +851,7 @@ export default function MovimentacoesProduto() {
         podeLancarGranel={podeLancarGranel}
         produto={produto}
         saldoAposReserva={saldoAposReserva}
+        mostrarControlesBling={moduloBlingAtivo}
         syncDisponivel={syncDisponivel}
         syncProduto={syncProduto}
         syncStatusLabel={syncStatusLabel}

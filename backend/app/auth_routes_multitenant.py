@@ -55,11 +55,43 @@ EMAIL_VERIFICATION_TOKEN_HOURS = int(os.getenv("EMAIL_VERIFICATION_TOKEN_HOURS",
 EMAIL_VERIFICATION_REQUIRED = os.getenv("EMAIL_VERIFICATION_REQUIRED", "true").strip().lower() not in {"0", "false", "no"}
 TERMS_VERSION = os.getenv("TERMS_VERSION", "termos-2026-05-08")
 PRIVACY_VERSION = os.getenv("PRIVACY_VERSION", "privacidade-2026-05-08")
+STRICT_EMAIL_ENVS = {"production", "prod", "staging"}
+LOCAL_REQUEST_HOSTS = {"localhost", "127.0.0.1", "::1", "0.0.0.0"}
 
 
 # =============================================================================
 # HELPER FUNCTIONS
 # =============================================================================
+
+def _current_environment_name() -> str:
+    return (
+        os.getenv("ENVIRONMENT")
+        or os.getenv("APP_ENV")
+        or os.getenv("ENV")
+        or ""
+    ).strip().lower()
+
+
+def _is_local_signup_request(request: Request) -> bool:
+    hostname = (request.url.hostname or "").strip().lower()
+    if hostname in LOCAL_REQUEST_HOSTS:
+        return True
+
+    host_header = (request.headers.get("host") or "").split(":", 1)[0].strip().lower()
+    return host_header in LOCAL_REQUEST_HOSTS
+
+
+def _email_verification_required_for_request(request: Request) -> bool:
+    if not EMAIL_VERIFICATION_REQUIRED:
+        return False
+
+    if _is_local_signup_request(request):
+        return False
+
+    if _current_environment_name() in STRICT_EMAIL_ENVS:
+        return True
+
+    return True
 
 def grant_all_permissions_to_role(role_id: int, tenant_id: uuid.UUID, db: Session) -> int:
     """
@@ -371,6 +403,8 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Senha deve ter no minimo 8 caracteres"
         )
+
+    email_verification_required = _email_verification_required_for_request(request)
     
     # Criar tenant primeiro
     tenant_name = payload.nome_loja or f"Loja de {payload.nome or email}"
@@ -396,8 +430,8 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
         nome_loja=payload.nome_loja,
         is_active=True,
         is_admin=True,  # ✅ SUPER ADMIN - primeiro usuário do tenant
-        email_verified=not EMAIL_VERIFICATION_REQUIRED,
-        email_verified_at=_now_utc() if not EMAIL_VERIFICATION_REQUIRED else None,
+        email_verified=not email_verification_required,
+        email_verified_at=_now_utc() if not email_verification_required else None,
         tenant_id=tenant_id  # ✅ Definir tenant_id explicitamente
     )
     _mark_user_consent(user, request, payload.terms_version, payload.privacy_version)
@@ -460,7 +494,7 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
     db.add(user_tenant)
 
     email_verification_sent = False
-    if EMAIL_VERIFICATION_REQUIRED:
+    if email_verification_required:
         email_verification_sent = _send_email_verification(user, request)
         if not email_verification_sent:
             clear_tenant_context()
@@ -480,7 +514,7 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
         "role_id": admin_role.id
     }]
 
-    if EMAIL_VERIFICATION_REQUIRED:
+    if email_verification_required:
         return LoginResponse(
             access_token=None,
             token_type="bearer",

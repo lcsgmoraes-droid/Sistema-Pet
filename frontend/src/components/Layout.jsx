@@ -54,6 +54,7 @@ const Layout = () => {
   const getModoDevLabel = () => {
     if (devModoModulos === "all_unlocked") return "Todos liberados";
     if (devModoModulos === "all_locked") return "Premium bloqueado";
+    if (devModoModulos === "custom") return "Personalizado";
     return "Modo normal";
   };
 
@@ -333,12 +334,12 @@ const Layout = () => {
 
       lembretesPollingRef.current = true;
       try {
-        const [pendentesResp, autoResp] = await Promise.all([
-          api.get("/lembretes/pendentes"),
-          api.get("/integracoes/bling/nf/autocadastros-recentes", {
-            params: { horas: 24, resumo: true },
-          }),
-        ]);
+        const pendentesResp = await api.get("/lembretes/pendentes");
+        const autoResp = moduloAtivo("bling")
+          ? await api.get("/integracoes/bling/nf/autocadastros-recentes", {
+              params: { horas: 24, resumo: true },
+            })
+          : null;
 
         const pendentesPayload = pendentesResp?.data || {};
         const pendentes = Number(
@@ -357,7 +358,7 @@ const Layout = () => {
     fetchLembretesCount({ force: true });
     const interval = setInterval(fetchLembretesCount, 300000);
     return () => clearInterval(interval);
-  }, []);
+  }, [moduloAtivo]);
 
   const allMenuItems = [
     {

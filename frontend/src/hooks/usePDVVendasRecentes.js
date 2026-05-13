@@ -2,8 +2,11 @@ import { useEffect, useRef, useState } from "react";
 import api from "../api";
 import { listarVendas } from "../api/vendas";
 import { debugLog } from "../utils/debug";
+import { useModulos } from "../contexts/ModulosContext";
 
 export function usePDVVendasRecentes() {
+  const { moduloAtivo } = useModulos();
+  const moduloEcommerceAtivo = moduloAtivo("ecommerce");
   const [vendasRecentes, setVendasRecentes] = useState([]);
   const [filtroVendas, setFiltroVendas] = useState("24h");
   const [filtroStatus, setFiltroStatus] = useState("todas");
@@ -68,6 +71,8 @@ export function usePDVVendasRecentes() {
   };
 
   const confirmarDriveEntregue = async (pedidoId) => {
+    if (!moduloEcommerceAtivo) return;
+
     try {
       await api.post(`/ecommerce-drive/pedido/${pedidoId}/entregue`);
       const proximosPedidos = driveAguardando.filter(
@@ -113,6 +118,12 @@ export function usePDVVendasRecentes() {
   }, [filtroVendas, filtroStatus, filtroTemEntrega, buscaNumeroVenda]);
 
   useEffect(() => {
+    if (!moduloEcommerceAtivo) {
+      setDriveAguardando([]);
+      setDriveAlertVisible(false);
+      return undefined;
+    }
+
     const verificarDrive = async ({ force = false } = {}) => {
       if (drivePollingRef.current) return;
       if (!force && document.visibilityState === "hidden") return;
@@ -136,7 +147,7 @@ export function usePDVVendasRecentes() {
     }, 60000);
 
     return () => clearInterval(intervalo);
-  }, []);
+  }, [moduloEcommerceAtivo]);
 
   return {
     vendasRecentes,

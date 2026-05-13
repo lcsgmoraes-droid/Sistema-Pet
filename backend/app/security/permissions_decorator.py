@@ -8,6 +8,7 @@ from uuid import UUID
 from app.db import get_session as get_db
 from app.auth import get_current_user
 from app.security.permissions_service import check_permission
+from app.tenancy.context import set_current_tenant
 
 
 def require_permission(permission: str):
@@ -28,6 +29,8 @@ def require_permission(permission: str):
             if user_and_tenant and isinstance(user_and_tenant, tuple):
                 current_user = user_and_tenant[0]
                 tenant_id = user_and_tenant[1] if len(user_and_tenant) > 1 else None
+                if tenant_id is not None:
+                    set_current_tenant(tenant_id)
             
             # Verifica se temos os parâmetros necessários
             if db is None or current_user is None:
@@ -71,6 +74,8 @@ def require_permission(permission: str):
             if user_and_tenant and isinstance(user_and_tenant, tuple):
                 current_user = user_and_tenant[0]
                 tenant_id = user_and_tenant[1] if len(user_and_tenant) > 1 else None
+                if tenant_id is not None:
+                    set_current_tenant(tenant_id)
             
             # Verifica se temos os parâmetros necessários
             if db is None or current_user is None:

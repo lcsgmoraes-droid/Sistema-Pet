@@ -58,7 +58,10 @@ logger.setLevel(logging.INFO)
 
 def _validar_tenant_e_obter_usuario(user_and_tenant):
     """Desempacota e valida user_and_tenant (padrão repetido 13x)"""
+    from app.tenancy.context import set_current_tenant
+
     current_user, tenant_id = user_and_tenant
+    set_current_tenant(tenant_id)
     return current_user, tenant_id
 
 

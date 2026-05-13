@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { PawPrint } from 'lucide-react';
 import { FiAlertCircle, FiBriefcase, FiEye, FiEyeOff, FiLock, FiMail, FiUser } from 'react-icons/fi';
 import { useAuth } from '../contexts/AuthContext';
@@ -19,6 +19,9 @@ const Register = () => {
   const [loading, setLoading] = useState(false);
   const { register } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const selectedPlan = (searchParams.get('plan') || 'basico').trim().toLowerCase();
+  const selectedPlanLabel = selectedPlan === 'basico' ? 'Plano Básico' : 'Plano Básico';
 
   const handleSubmit = async (event) => {
     event.preventDefault();
@@ -78,6 +81,13 @@ const Register = () => {
             <span className="text-sm">{error}</span>
           </div>
         )}
+
+        <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
+          <p className="font-semibold">{selectedPlanLabel} selecionado</p>
+          <p className="mt-1">
+            Sua empresa sera criada com cadastro, produtos, estoque, PDV e vendas liberados.
+          </p>
+        </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>

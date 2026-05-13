@@ -7,10 +7,13 @@ import {
   campaignAllowsSaleChannel,
   getCashbackBonusParamKey,
 } from '../../utils/campaignChannelScope';
+import { useModulos } from '../../contexts/ModulosContext';
 import CustomerIdentity from '../ui/CustomerIdentity';
 import SaleReference from '../ui/SaleReference';
 
 export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClose, onSucesso }) {
+  const { moduloAtivo } = useModulos();
+  const moduloCampanhasAtivo = moduloAtivo('campanhas');
   const [vendas, setVendas] = useState([]);
   const [vendasSelecionadas, setVendasSelecionadas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -34,9 +37,16 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
     setCampanhasCompra([]);
     setRankCliente('bronze');
     setCampanhasCarregadas(false);
-  }, [clienteId]);
+  }, [clienteId, moduloCampanhasAtivo]);
 
   useEffect(() => {
+    if (!moduloCampanhasAtivo) {
+      setCampanhasCompra([]);
+      setRankCliente('bronze');
+      setCampanhasCarregadas(true);
+      setLoadingCampanhasCompra(false);
+      return;
+    }
     if (!clienteId || campanhasCarregadas || vendasSelecionadas.length === 0) return;
 
     const carregarCampanhasCompra = async () => {
@@ -66,7 +76,7 @@ export default function VendasEmAberto({ cliente, clienteId, clienteNome, onClos
     };
 
     carregarCampanhasCompra();
-  }, [clienteId, campanhasCarregadas, vendasSelecionadas.length]);
+  }, [clienteId, campanhasCarregadas, moduloCampanhasAtivo, vendasSelecionadas.length]);
 
   const carregarVendasEmAberto = async () => {
     try {

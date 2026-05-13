@@ -193,6 +193,12 @@ export default function LandingPage() {
             >
               Como funciona
             </a>
+            <Link
+              to="/planos"
+              className="hover:text-purple-600 transition-colors"
+            >
+              Planos
+            </Link>
             <a
               href="#depoimentos"
               className="hover:text-purple-600 transition-colors"

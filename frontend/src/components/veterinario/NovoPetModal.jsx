@@ -22,12 +22,12 @@ function montarMensagemErro(erro) {
 }
 
 export default function NovoPetModal({
-  isOpen,
-  tutor,
+  isOpen = false,
+  tutor = null,
   descricao = "Crie o pet aqui mesmo e ele ja entra selecionado no fluxo atual.",
-  sugestoesEspecies,
-  onClose,
-  onCreated,
+  sugestoesEspecies = [],
+  onClose = undefined,
+  onCreated = undefined,
 }) {
   const [form, setForm] = useState(formInicial);
   const [salvando, setSalvando] = useState(false);
@@ -318,13 +318,4 @@ NovoPetModal.propTypes = {
   sugestoesEspecies: PropTypes.arrayOf(PropTypes.string),
   onClose: PropTypes.func,
   onCreated: PropTypes.func,
-};
-
-NovoPetModal.defaultProps = {
-  isOpen: false,
-  tutor: null,
-  descricao: "Crie o pet aqui mesmo e ele ja entra selecionado no fluxo atual.",
-  sugestoesEspecies: [],
-  onClose: undefined,
-  onCreated: undefined,
 };

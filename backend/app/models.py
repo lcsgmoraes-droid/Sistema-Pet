@@ -326,6 +326,7 @@ class Raca(BaseTenantModel):
 
     id = Column(Integer, primary_key=True, index=True)
     nome = Column(String(100), nullable=False, index=True)
+    especie = Column(String(50), nullable=True, index=True)  # compatibilidade com schema legado
     especie_id = Column(Integer, ForeignKey("especies.id"), nullable=False, index=True)
     ativo = Column(Boolean, default=True)
 

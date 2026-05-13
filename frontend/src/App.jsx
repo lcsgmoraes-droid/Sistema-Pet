@@ -16,6 +16,7 @@ const Register = lazy(() => import("./pages/Register"));
 const EmailVerification = lazy(() => import("./pages/EmailVerification"));
 const LegalPage = lazy(() => import("./pages/LegalPage"));
 const LandingPage = lazy(() => import("./pages/LandingPage"));
+const Planos = lazy(() => import("./pages/Planos"));
 const AppPublicEntry = lazy(() => import("./pages/AppPublicEntry"));
 const preloadPessoas = () => import("./pages/ClientesNovo");
 const Pessoas = lazy(preloadPessoas);
@@ -302,6 +303,7 @@ function App() {
                 <Route path="/termos" element={<LegalPage type="termos" />} />
                 <Route path="/privacidade" element={<LegalPage type="privacidade" />} />
                 <Route path="/landing" element={<LandingPage />} />
+                <Route path="/planos" element={<Planos />} />
                 <Route path="/rastreio/:token" element={<RastreioPublico />} />
                 <Route path="/app" element={<AppPublicEntry />} />
                 <Route path="/ecommerce" element={<EcommerceMVP />} />

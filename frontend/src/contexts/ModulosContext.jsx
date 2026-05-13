@@ -21,6 +21,12 @@ import { useAuth } from "./AuthContext";
 
 const ModulosContext = createContext();
 const DEV_MODULOS_STORAGE_KEY = "dev_modulos_config";
+const DEV_MODULOS_MODOS_VALIDOS = [
+  "normal",
+  "custom",
+  "all_unlocked",
+  "all_locked",
+];
 
 export const MODULOS_PREMIUM = [
   "compras",
@@ -251,15 +257,17 @@ export const ModulosProvider = ({ children }) => {
       const raw = localStorage.getItem(DEV_MODULOS_STORAGE_KEY);
       if (!raw) return { modo: "normal", overrides: {} };
       const parsed = JSON.parse(raw);
+      const modo = DEV_MODULOS_MODOS_VALIDOS.includes(parsed?.modo)
+        ? parsed.modo
+        : "normal";
+      const overrides =
+        parsed?.overrides && typeof parsed.overrides === "object"
+          ? parsed.overrides
+          : {};
+
       return {
-        modo:
-          parsed?.modo === "all_unlocked" || parsed?.modo === "all_locked"
-            ? parsed.modo
-            : "normal",
-        overrides:
-          parsed?.overrides && typeof parsed.overrides === "object"
-            ? parsed.overrides
-            : {},
+        modo,
+        overrides: modo === "custom" ? overrides : {},
       };
     } catch {
       return { modo: "normal", overrides: {} };
@@ -275,23 +283,30 @@ export const ModulosProvider = ({ children }) => {
     const token = localStorage.getItem("access_token") || localStorage.getItem("token");
     const selectedTenant = localStorage.getItem("selectedTenant");
     if (!token || !selectedTenant) {
-      setModulosAtivos(MODULOS_PREMIUM);
+      setModulosAtivos([]);
       return;
     }
 
     try {
       const response = await api.get("/modulos/status");
       const modulosApi = response.data?.modulos_ativos;
-      setModulosAtivos(Array.isArray(modulosApi) ? modulosApi : MODULOS_PREMIUM);
+      setModulosAtivos(Array.isArray(modulosApi) ? modulosApi : []);
     } catch {
-      // Se o endpoint não existir ainda (deploy incremental), libera tudo
-      setModulosAtivos(MODULOS_PREMIUM); // todos ativos = sem bloqueio
+      // Fail-closed: se não conseguir confirmar o plano, não libera premium.
+      setModulosAtivos([]);
     }
   }, [user]);
 
   useEffect(() => {
     carregarModulos();
   }, [carregarModulos]);
+
+  useEffect(() => {
+    if (!devControlesAtivos) return;
+    if (devModulosConfig.modo !== "normal") return;
+    if (Object.keys(devModulosConfig.overrides || {}).length === 0) return;
+    setDevModulosConfig({ modo: "normal", overrides: {} });
+  }, [devControlesAtivos, devModulosConfig]);
 
   useEffect(() => {
     if (!devControlesAtivos) return;
@@ -303,11 +318,11 @@ export const ModulosProvider = ({ children }) => {
 
   const moduloAtivoBase = useCallback(
     (modulo) => {
-      if (modulosAtivos === null) return true;
+      if (modulosAtivos === null) return !user;
       if (!MODULOS_PREMIUM.includes(modulo)) return true;
       return modulosAtivos.includes(modulo);
     },
-    [modulosAtivos],
+    [modulosAtivos, user],
   );
 
   const moduloAtivo = useCallback(
@@ -319,6 +334,7 @@ export const ModulosProvider = ({ children }) => {
         if (devModulosConfig.modo === "all_locked") return false;
 
         if (
+          devModulosConfig.modo === "custom" &&
           Object.prototype.hasOwnProperty.call(
             devModulosConfig.overrides,
             modulo,
@@ -337,7 +353,7 @@ export const ModulosProvider = ({ children }) => {
     (modo) => {
       if (!devControlesAtivos) return;
       if (!["normal", "all_unlocked", "all_locked"].includes(modo)) return;
-      setDevModulosConfig((prev) => ({ ...prev, modo }));
+      setDevModulosConfig({ modo, overrides: {} });
     },
     [devControlesAtivos],
   );
@@ -365,7 +381,7 @@ export const ModulosProvider = ({ children }) => {
         }
 
         return {
-          modo: "normal",
+          modo: Object.keys(overrides).length > 0 ? "custom" : "normal",
           overrides,
         };
       });

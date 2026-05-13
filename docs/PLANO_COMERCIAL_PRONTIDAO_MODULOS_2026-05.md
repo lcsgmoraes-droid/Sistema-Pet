@@ -140,7 +140,11 @@ Implementacao atual:
   acidental de uso real ja existente;
 - modulos fora do Basico ficam controlados por `modulos_ativos` ou assinatura ativa;
 - o menu do Plano Basico esconde modulos extras e remove "Fechamento Mensal";
-- acesso direto por URL a modulo bloqueado cai na tela de venda/desbloqueio do modulo.
+- acesso direto por URL a modulo bloqueado cai na tela de venda/desbloqueio do modulo;
+- a API tambem bloqueia rotas de modulos adicionais com `require_active_module`,
+  evitando acesso direto por chamada manual ao backend.
+- a tela publica `/planos` permite simular a compra do Plano Basico e leva para
+  o cadastro com `plan=basico`, ainda sem pagamento online.
 
 Modulos controlados fora do Basico:
 

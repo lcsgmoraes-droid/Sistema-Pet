@@ -169,6 +169,7 @@ from app.routes.ecommerce_entregador import router as ecommerce_entregador_route
 from app.routes.ecommerce_drive_routes import router as ecommerce_drive_router
 from app.routes.sefaz_routes import router as sefaz_router
 from app.routes.modulos_routes import router as modulos_router
+from app.security.module_access import require_active_module
 from app.pedido_models import Pedido  # Modelo base ecommerce
 from app.veterinario_routes import router as veterinario_router  # Módulo Veterinário
 import app.veterinario_models  # noqa: F401 — garante registro no SQLAlchemy
@@ -219,6 +220,10 @@ configure_logging()  # Configura formato estruturado para produção
 # Configurar logging (legado)
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def _module_dependencies(modulo: str):
+    return [Depends(require_active_module(modulo))]
 
 
 BLING_TOKEN_RENOVACAO_INTERVALO_SEGUNDOS = 5 * 60 * 60  # 5 horas
@@ -518,42 +523,66 @@ def _loop_expirar_reservas():
     while not _expirar_reservas_stop_event.is_set():
         try:
             from app.db import SessionLocal
+            from app.models import Tenant
             from app.pedido_integrado_models import PedidoIntegrado
             from app.pedido_integrado_item_models import PedidoIntegradoItem
+            from app.tenancy.context import clear_current_tenant, set_current_tenant
+            from uuid import UUID
 
             db = SessionLocal()
             try:
                 agora = _dt.utcnow()
-                pedidos_vencidos = db.query(PedidoIntegrado).filter(
-                    PedidoIntegrado.status == "aberto",
-                    PedidoIntegrado.expira_em < agora
-                ).all()
+                tenants_ativos = db.query(Tenant.id).filter(Tenant.status == "active").all()
+                total_expirados = 0
 
-                if pedidos_vencidos:
-                    logger.info(f"[RESERVAS] {len(pedidos_vencidos)} pedido(s) vencido(s) para expirar")
+                for (tenant_id_raw,) in tenants_ativos:
+                    try:
+                        tenant_id = UUID(str(tenant_id_raw))
+                    except (TypeError, ValueError):
+                        logger.warning("[RESERVAS] Tenant com ID invalido ignorado no job de expiracao")
+                        continue
 
-                for pedido in pedidos_vencidos:
-                    # Libera apenas os itens ainda reservados (sem liberado_em nem vendido_em)
-                    itens = db.query(PedidoIntegradoItem).filter(
-                        PedidoIntegradoItem.pedido_integrado_id == pedido.id,
-                        PedidoIntegradoItem.liberado_em.is_(None),
-                        PedidoIntegradoItem.vendido_em.is_(None)
+                    set_current_tenant(tenant_id)
+                    pedidos_vencidos_tenant = db.query(PedidoIntegrado).filter(
+                        PedidoIntegrado.tenant_id == tenant_id,
+                        PedidoIntegrado.status == "aberto",
+                        PedidoIntegrado.expira_em < agora
                     ).all()
-                    for item in itens:
-                        item.liberado_em = agora
-                        db.add(item)
 
-                    pedido.status = "expirado"
-                    db.add(pedido)
+                    if pedidos_vencidos_tenant:
+                        logger.info(
+                            "[RESERVAS] %s pedido(s) vencido(s) para expirar no tenant %s",
+                            len(pedidos_vencidos_tenant),
+                            str(tenant_id)[:8],
+                        )
 
-                if pedidos_vencidos:
+                    for pedido in pedidos_vencidos_tenant:
+                        # Libera apenas os itens ainda reservados (sem liberado_em nem vendido_em)
+                        itens = db.query(PedidoIntegradoItem).filter(
+                            PedidoIntegradoItem.tenant_id == tenant_id,
+                            PedidoIntegradoItem.pedido_integrado_id == pedido.id,
+                            PedidoIntegradoItem.liberado_em.is_(None),
+                            PedidoIntegradoItem.vendido_em.is_(None)
+                        ).all()
+                        for item in itens:
+                            item.liberado_em = agora
+                            db.add(item)
+
+                        pedido.status = "expirado"
+                        db.add(pedido)
+
+                    total_expirados += len(pedidos_vencidos_tenant)
+
+                if total_expirados:
                     db.commit()
-                    logger.info(f"[RESERVAS] ✅ {len(pedidos_vencidos)} pedido(s) expirado(s), reservas liberadas")
+                    logger.info("[RESERVAS] %s pedido(s) expirado(s), reservas liberadas", total_expirados)
+
 
             except Exception as e:
                 db.rollback()
                 logger.warning(f"[RESERVAS] ⚠️ Erro ao expirar reservas: {e}")
             finally:
+                clear_current_tenant()
                 db.close()
 
         except Exception as e:
@@ -791,8 +820,8 @@ app.include_router(roles_router, tags=["Roles & RBAC"])
 app.include_router(permissions_router, tags=["Permissions & RBAC"])
 app.include_router(clientes_router, tags=["Clientes & Pets"])
 app.include_router(pets_router, tags=["Gestão de Pets"])  # Módulo dedicado separado
-app.include_router(veterinario_router, tags=["Veterinário"])  # Módulo Veterinário
-app.include_router(banho_tosa_router, tags=["Banho & Tosa"])  # Modulo Banho & Tosa
+app.include_router(veterinario_router, tags=["Veterinário"], dependencies=_module_dependencies("veterinario"))  # Módulo Veterinário
+app.include_router(banho_tosa_router, tags=["Banho & Tosa"], dependencies=_module_dependencies("banho_tosa"))  # Modulo Banho & Tosa
 app.include_router(cadastros_router, tags=["Cadastros - Espécies & Raças"])  # Cadastros básicos
 app.include_router(cliente_info_pdv_router, tags=["Clientes & Pets"])
 app.include_router(importacao_router, prefix="/produtos", tags=["Importação de Produtos"])  # ANTES de produtos_router!
@@ -809,92 +838,92 @@ app.include_router(lembretes_router, tags=["Lembretes de Recorrência"])
 app.include_router(relatorio_vendas_router, tags=["Relatório de Vendas"])  # ANTES de vendas_router!
 app.include_router(vendas_router, tags=["Vendas & PDV"])
 app.include_router(caixa_router, tags=["Controle de Caixa"])
-app.include_router(nfe_router, tags=["Nota Fiscal Eletrônica (NF-e)"])
+app.include_router(nfe_router, tags=["Nota Fiscal Eletrônica (NF-e)"], dependencies=_module_dependencies("fiscal"))
 app.include_router(estoque_router, tags=["Gestão de Estoque"])
 app.include_router(estoque_alertas_router, tags=["Estoque - Alertas Negativo"])
-app.include_router(bling_sync_router, tags=["Sincronização Bling"])
+app.include_router(bling_sync_router, tags=["Sincronização Bling"], dependencies=_module_dependencies("bling"))
 app.include_router(fornecedor_grupos_router, tags=["Grupos de Fornecedores"])
-app.include_router(pedidos_compra_router, tags=["Pedidos de Compra"])
-app.include_router(notas_entrada_router, tags=["Notas de Entrada (XML)"])
-app.include_router(compras_pendencias_router, tags=["Compras - Pendencias"])
-app.include_router(contas_pagar_router, tags=["Financeiro - Contas a Pagar"])
+app.include_router(pedidos_compra_router, tags=["Pedidos de Compra"], dependencies=_module_dependencies("compras"))
+app.include_router(notas_entrada_router, tags=["Notas de Entrada (XML)"], dependencies=_module_dependencies("compras"))
+app.include_router(compras_pendencias_router, tags=["Compras - Pendencias"], dependencies=_module_dependencies("compras"))
+app.include_router(contas_pagar_router, tags=["Financeiro - Contas a Pagar"], dependencies=_module_dependencies("financeiro_erp"))
 app.include_router(tipo_despesa_router, tags=["Cadastros - Tipo de Despesa"])
 app.include_router(contas_receber_router, tags=["Financeiro - Contas a Receber"])
-app.include_router(conciliacao_cartao_router, tags=["Financeiro - Conciliação de Cartão"])
-app.include_router(conciliacao_bancaria_router, tags=["Conciliação Bancária - OFX"])
-app.include_router(stone_router, tags=["Stone - Pagamentos & Conciliação"])
-app.include_router(conciliacao_router, tags=["Conciliação de Pagamentos"])
-app.include_router(conciliacao_aba1_router, tags=["Conciliação Vendas - Aba 1 V2"])
-app.include_router(conciliacao_historico_router, tags=["Conciliação - Histórico"])
+app.include_router(conciliacao_cartao_router, tags=["Financeiro - Conciliação de Cartão"], dependencies=_module_dependencies("financeiro_erp"))
+app.include_router(conciliacao_bancaria_router, tags=["Conciliação Bancária - OFX"], dependencies=_module_dependencies("financeiro_erp"))
+app.include_router(stone_router, tags=["Stone - Pagamentos & Conciliação"], dependencies=_module_dependencies("financeiro_erp"))
+app.include_router(conciliacao_router, tags=["Conciliação de Pagamentos"], dependencies=_module_dependencies("financeiro_erp"))
+app.include_router(conciliacao_aba1_router, tags=["Conciliação Vendas - Aba 1 V2"], dependencies=_module_dependencies("financeiro_erp"))
+app.include_router(conciliacao_historico_router, tags=["Conciliação - Histórico"], dependencies=_module_dependencies("financeiro_erp"))
 app.include_router(admin_router, tags=["Administração"])
 app.include_router(formas_pagamento_router, tags=["Formas de Pagamento & PDV"])
 app.include_router(operadoras_router, tags=["Operadoras de Cartão"])
-app.include_router(comissoes_router, tags=["Comissões"])
-app.include_router(comissoes_demonstrativo_router, tags=["Comissões - Demonstrativo"])
-app.include_router(comissoes_avancadas_router, tags=["Comissões - Avançadas"])
-app.include_router(comissoes_diagnostico_router, tags=["Comissões - Diagnóstico"])
-app.include_router(relatorios_comissoes_router, tags=["Comissões - Relatórios Analíticos"])
-app.include_router(acertos_router, prefix="/acertos", tags=["Acertos Financeiros de Parceiros"])
+app.include_router(comissoes_router, tags=["Comissões"], dependencies=_module_dependencies("comissoes"))
+app.include_router(comissoes_demonstrativo_router, tags=["Comissões - Demonstrativo"], dependencies=_module_dependencies("comissoes"))
+app.include_router(comissoes_avancadas_router, tags=["Comissões - Avançadas"], dependencies=_module_dependencies("comissoes"))
+app.include_router(comissoes_diagnostico_router, tags=["Comissões - Diagnóstico"], dependencies=_module_dependencies("comissoes"))
+app.include_router(relatorios_comissoes_router, tags=["Comissões - Relatórios Analíticos"], dependencies=_module_dependencies("comissoes"))
+app.include_router(acertos_router, prefix="/acertos", tags=["Acertos Financeiros de Parceiros"], dependencies=_module_dependencies("financeiro_erp"))
 
-app.include_router(dre_router, tags=["Financeiro - DRE"])
-app.include_router(dre_canais_router, tags=["Financeiro - DRE por Canal"])
-app.include_router(dre_plano_contas_router)
-app.include_router(dre_classificacao_router, tags=["DRE - Classificação Automática"])
-app.include_router(contas_bancarias_router, tags=["Financeiro - Contas Bancárias"])
+app.include_router(dre_router, tags=["Financeiro - DRE"], dependencies=_module_dependencies("financeiro_erp"))
+app.include_router(dre_canais_router, tags=["Financeiro - DRE por Canal"], dependencies=_module_dependencies("financeiro_erp"))
+app.include_router(dre_plano_contas_router, dependencies=_module_dependencies("financeiro_erp"))
+app.include_router(dre_classificacao_router, tags=["DRE - Classificação Automática"], dependencies=_module_dependencies("financeiro_erp"))
+app.include_router(contas_bancarias_router, tags=["Financeiro - Contas Bancárias"], dependencies=_module_dependencies("financeiro_erp"))
 app.include_router(financeiro_router, tags=["Financeiro - Configurações"])
-app.include_router(lancamentos_router, tags=["Financeiro - Lançamentos"])
+app.include_router(lancamentos_router, tags=["Financeiro - Lançamentos"], dependencies=_module_dependencies("financeiro_erp"))
 app.include_router(categorias_router, tags=["Financeiro - Categorias"])
-app.include_router(bling_router, tags=["Integração Bling"])
-app.include_router(bling_oauth_router, tags=["Bling OAuth"])
-app.include_router(bling_pedido_router, tags=["Integração Bling - Pedido"])
-app.include_router(bling_nf_router, tags=["Integração Bling - NF"])
+app.include_router(bling_router, tags=["Integração Bling"], dependencies=_module_dependencies("bling"))
+app.include_router(bling_oauth_router, tags=["Bling OAuth"], dependencies=_module_dependencies("bling"))
+app.include_router(bling_pedido_router, tags=["Integração Bling - Pedido"], dependencies=_module_dependencies("bling"))
+app.include_router(bling_nf_router, tags=["Integração Bling - NF"], dependencies=_module_dependencies("bling"))
 app.include_router(dashboard_router, tags=["Dashboard Financeiro"])
-app.include_router(ia_router, tags=["IA - Fluxo de Caixa"])
+app.include_router(ia_router, tags=["IA - Fluxo de Caixa"], dependencies=_module_dependencies("financeiro_erp"))
 app.include_router(chat_router, tags=["IA - Chat Financeiro"])
-app.include_router(dre_ia_router, tags=["IA - DRE Inteligente"])
-app.include_router(extrato_ia_router, tags=["IA - Extrato Bancário (ABA 7)"])
-app.include_router(ia_fluxo_router, tags=["IA - Fluxo Inteligente"])
+app.include_router(dre_ia_router, tags=["IA - DRE Inteligente"], dependencies=_module_dependencies("financeiro_erp"))
+app.include_router(extrato_ia_router, tags=["IA - Extrato Bancário (ABA 7)"], dependencies=_module_dependencies("financeiro_erp"))
+app.include_router(ia_fluxo_router, tags=["IA - Fluxo Inteligente"], dependencies=_module_dependencies("financeiro_erp"))
 app.include_router(analytics_router, tags=["Analytics - CQRS Read Models"])
 app.include_router(audit_router, tags=["Auditoria (Read-Only)"])
 app.include_router(tributacao_router, tags=["Tributação e Impostos"])
-app.include_router(whatsapp_router, tags=["WhatsApp IA - Sprint 3"])  # ✅ REATIVADO Sprint 3
+app.include_router(whatsapp_router, tags=["WhatsApp IA - Sprint 3"], dependencies=_module_dependencies("whatsapp"))  # ✅ REATIVADO Sprint 3
 # app.include_router(whatsapp_router, tags=["WhatsApp CRM"])  # DESATIVADO - Usar novos endpoints WhatsApp IA
-app.include_router(segmentacao_router, tags=["Segmentação de Clientes"])
+app.include_router(segmentacao_router, tags=["Segmentação de Clientes"], dependencies=_module_dependencies("campanhas"))
 app.include_router(pdv_ai_router, tags=["PDV - IA Contextual"])
 app.include_router(pdv_internal_router, tags=["PDV - Internal API"])
 app.include_router(racao_calculadora_internal_router, tags=["Calculadora de Ração - Internal API"])
-app.include_router(whatsapp_orchestrator_internal_router, tags=["WhatsApp - Internal Orchestrator"])
+app.include_router(whatsapp_orchestrator_internal_router, tags=["WhatsApp - Internal Orchestrator"], dependencies=_module_dependencies("whatsapp"))
 app.include_router(fiscal_sugestao_router, tags=["Fiscal - Sugestões Inteligentes"])
 app.include_router(produto_fiscal_router, tags=["Produto - Fiscal"])
 app.include_router(pdv_fiscal_router, tags=["PDV - Fiscal em Tempo Real"])
 app.include_router(produto_fiscal_v2_router, tags=["Produto - Fiscal V2"])
 app.include_router(empresa_fiscal_router, tags=["Empresa - Configuração Fiscal"])
-app.include_router(simples_router, tags=["Simples Nacional - Fechamento Mensal"])
-app.include_router(auditoria_provisoes_router, tags=["Auditoria - Provisões"])
-app.include_router(projecao_caixa_router, tags=["Projeção de Caixa - IA Determinística"])
-app.include_router(simulacao_contratacao_router, tags=["Simulação de Contratação - IA Determinística"])
-app.include_router(cargos_router, tags=["RH - Cargos"])
-app.include_router(funcionarios_router, tags=["RH - Funcionários"])
+app.include_router(simples_router, tags=["Simples Nacional - Fechamento Mensal"], dependencies=_module_dependencies("financeiro_erp"))
+app.include_router(auditoria_provisoes_router, tags=["Auditoria - Provisões"], dependencies=_module_dependencies("financeiro_erp"))
+app.include_router(projecao_caixa_router, tags=["Projeção de Caixa - IA Determinística"], dependencies=_module_dependencies("financeiro_erp"))
+app.include_router(simulacao_contratacao_router, tags=["Simulação de Contratação - IA Determinística"], dependencies=_module_dependencies("rh"))
+app.include_router(cargos_router, tags=["RH - Cargos"], dependencies=_module_dependencies("rh"))
+app.include_router(funcionarios_router, tags=["RH - Funcionários"], dependencies=_module_dependencies("rh"))
 app.include_router(empresa_config_router, tags=["Empresa - Configuração Geral"])
 app.include_router(pdv_indicadores_router, tags=["PDV - Indicadores e Margens"])
 app.include_router(empresa_router, tags=["Empresa - Configurações"])
-app.include_router(configuracoes_entrega_router, tags=["Configurações - Entregas"])
-app.include_router(rotas_entrega_router, tags=["Entregas - Rotas"])
-app.include_router(acertos_entrega_router, tags=["Entregas - Acertos Financeiros"])
-app.include_router(configuracao_custo_moto_router, tags=["Custos - Moto da Loja"])
-app.include_router(dashboard_entregas_router)  # ETAPA 11.1 - Dashboard Financeiro (tags no router)
+app.include_router(configuracoes_entrega_router, tags=["Configurações - Entregas"], dependencies=_module_dependencies("entregas"))
+app.include_router(rotas_entrega_router, tags=["Entregas - Rotas"], dependencies=_module_dependencies("entregas"))
+app.include_router(acertos_entrega_router, tags=["Entregas - Acertos Financeiros"], dependencies=_module_dependencies("entregas"))
+app.include_router(configuracao_custo_moto_router, tags=["Custos - Moto da Loja"], dependencies=_module_dependencies("entregas"))
+app.include_router(dashboard_entregas_router, dependencies=_module_dependencies("entregas"))  # ETAPA 11.1 - Dashboard Financeiro (tags no router)
 app.include_router(pendencia_estoque_router, tags=["Pendências de Estoque - Lista de Espera"])
 
 # ============================================================================
 # WHATSAPP + IA - SPRINT 2 & 4 & 5 & 6 & 7
 # ============================================================================
 app.include_router(whatsapp_webhook_router)  # Webhooks 360dialog (sem auth)
-app.include_router(whatsapp_config_router)   # Configuração (com auth)
-app.include_router(whatsapp_handoff_router)  # Sprint 4: Human Handoff (com auth)
+app.include_router(whatsapp_config_router, dependencies=_module_dependencies("whatsapp"))   # Configuração (com auth)
+app.include_router(whatsapp_handoff_router, dependencies=_module_dependencies("whatsapp"))  # Sprint 4: Human Handoff (com auth)
 app.include_router(whatsapp_websocket_router)  # Sprint 5: WebSocket Real-time
-app.include_router(whatsapp_api_router)  # Sprint 6: Tools & Tests (com auth)
-app.include_router(whatsapp_analytics_router)  # Sprint 7: Analytics & Reports (com auth)
-app.include_router(whatsapp_security_router)  # Sprint 8: Security & LGPD (com auth)
+app.include_router(whatsapp_api_router, dependencies=_module_dependencies("whatsapp"))  # Sprint 6: Tools & Tests (com auth)
+app.include_router(whatsapp_analytics_router, dependencies=_module_dependencies("whatsapp"))  # Sprint 7: Analytics & Reports (com auth)
+app.include_router(whatsapp_security_router, dependencies=_module_dependencies("whatsapp"))  # Sprint 8: Security & LGPD (com auth)
 app.include_router(lgpd_router)  # LGPD operacional geral (com auth)
 app.include_router(health_router)  # Sprint 9: Health & Monitoring (sem auth)
 app.include_router(admin_fix_router)  # Correções administrativas
@@ -909,17 +938,17 @@ app.include_router(ecommerce_public_router)
 app.include_router(ecommerce_cart_router)
 app.include_router(ecommerce_checkout_router)
 app.include_router(ecommerce_webhooks_router)
-app.include_router(ecommerce_aparencia_router)
-app.include_router(ecommerce_config_router)
+app.include_router(ecommerce_aparencia_router, dependencies=_module_dependencies("ecommerce"))
+app.include_router(ecommerce_config_router, dependencies=_module_dependencies("ecommerce"))
 app.include_router(ecommerce_notify_router)
-app.include_router(ecommerce_analytics_router)
-app.include_router(ecommerce_drive_router)     # Drive pickup — PDV + cliente
+app.include_router(ecommerce_analytics_router, dependencies=_module_dependencies("ecommerce"))
+app.include_router(ecommerce_drive_router, dependencies=_module_dependencies("ecommerce"))     # Drive pickup — PDV + cliente
 app.include_router(sefaz_router)               # SEFAZ — consulta NF-e por chave
 app.include_router(app_mobile_router)  # App Mobile - Rotas dos clientes
 app.include_router(app_privacy_router)  # App Mobile - Privacidade/LGPD
 app.include_router(app_banho_tosa_router)  # App Mobile - Banho & Tosa
-app.include_router(campaigns_router)   # Motor de Campanhas
-app.include_router(canal_descontos_router)  # Descontos Globais por Canal (Ecommerce / App)
+app.include_router(campaigns_router, dependencies=_module_dependencies("campanhas"))   # Motor de Campanhas
+app.include_router(canal_descontos_router, dependencies=_module_dependencies("campanhas"))  # Descontos Globais por Canal (Ecommerce / App)
 app.include_router(modulos_router)     # Módulos Premium
 
 # [DESATIVADO - PHASE 5] app.include_router(opportunity_metrics_router, tags=["PDV - Métricas de Oportunidades"])

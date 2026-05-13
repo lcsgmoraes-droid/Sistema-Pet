@@ -17,6 +17,7 @@ const PUBLIC_PATH_PREFIXES = [
   '/termos',
   '/privacidade',
   '/landing',
+  '/planos',
   '/app',
   '/ecommerce',
 ];

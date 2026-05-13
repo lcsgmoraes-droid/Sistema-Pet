@@ -10,14 +10,21 @@ from sqlalchemy import and_, desc, text
 from sqlalchemy.exc import NoReferencedTableError
 from datetime import datetime
 
-from app.auth import get_current_user
-from app.models import User
+from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.estoque_models import AlertaEstoqueNegativo
 from app.utils.logger import logger
 
 
 router = APIRouter(prefix="/estoque/alertas", tags=["Estoque - Alertas"])
+
+
+def _obter_usuario_e_tenant(user_and_tenant):
+    from app.tenancy.context import set_current_tenant
+
+    current_user, tenant_id = user_and_tenant
+    set_current_tenant(tenant_id)
+    return current_user, tenant_id
 
 def ensure_alertas_table_exists(db: Session) -> None:
     """Cria tabela de alertas de estoque automaticamente em ambientes sem migration."""
@@ -109,7 +116,7 @@ class DashboardAlertasResponse(BaseModel):
 def listar_alertas_pendentes(
     apenas_criticos: bool = Query(False, description="Filtrar apenas alertas críticos"),
     limit: int = Query(50, le=200, description="Limite de resultados"),
-    current_user: User = Depends(get_current_user),
+    user_and_tenant=Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session)
 ):
     """
@@ -117,7 +124,7 @@ def listar_alertas_pendentes(
     
     🟢 MODELO CONTROLADO - Visibilidade total de produtos com estoque negativo
     """
-    tenant_id = current_user.tenant_id
+    current_user, tenant_id = _obter_usuario_e_tenant(user_and_tenant)
     ensure_alertas_table_exists(db)
     
     query = db.query(AlertaEstoqueNegativo).filter(
@@ -142,13 +149,13 @@ def listar_alertas_pendentes(
 def listar_todos_alertas(
     status: Optional[str] = Query(None, description="Filtrar por status"),
     limit: int = Query(100, le=500, description="Limite de resultados"),
-    current_user: User = Depends(get_current_user),
+    user_and_tenant=Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session)
 ):
     """
     Lista todos os alertas de estoque negativo (histórico completo).
     """
-    tenant_id = current_user.tenant_id
+    current_user, tenant_id = _obter_usuario_e_tenant(user_and_tenant)
     ensure_alertas_table_exists(db)
     
     query = db.query(AlertaEstoqueNegativo).filter(
@@ -167,7 +174,7 @@ def listar_todos_alertas(
 
 @router.get("/dashboard", response_model=DashboardAlertasResponse)
 def dashboard_alertas(
-    current_user: User = Depends(get_current_user),
+    user_and_tenant=Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session)
 ):
     """
@@ -176,7 +183,7 @@ def dashboard_alertas(
     🟢 MODELO CONTROLADO - Métricas visíveis para tomada de decisão
     """
     from app.produtos_models import Produto
-    tenant_id = current_user.tenant_id
+    current_user, tenant_id = _obter_usuario_e_tenant(user_and_tenant)
     ensure_alertas_table_exists(db)
     
     # Total de TODOS os alertas (independente do status)
@@ -254,7 +261,7 @@ def dashboard_alertas(
 def resolver_alerta(
     alerta_id: int,
     dados: ResolverAlertaRequest,
-    current_user: User = Depends(get_current_user),
+    user_and_tenant=Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session)
 ):
     """
@@ -264,7 +271,7 @@ def resolver_alerta(
     - Produto foi reposto (status='resolvido')
     - Alerta é falso positivo (status='ignorado')
     """
-    tenant_id = current_user.tenant_id
+    current_user, tenant_id = _obter_usuario_e_tenant(user_and_tenant)
     ensure_alertas_table_exists(db)
     
     alerta = db.query(AlertaEstoqueNegativo).filter(
@@ -301,13 +308,13 @@ def resolver_alerta(
 @router.delete("/{alerta_id}")
 def excluir_alerta(
     alerta_id: int,
-    current_user: User = Depends(get_current_user),
+    user_and_tenant=Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session)
 ):
     """
     Exclui um alerta de estoque (apenas para correção de erros).
     """
-    tenant_id = current_user.tenant_id
+    current_user, tenant_id = _obter_usuario_e_tenant(user_and_tenant)
     ensure_alertas_table_exists(db)
     
     alerta = db.query(AlertaEstoqueNegativo).filter(
@@ -352,7 +359,7 @@ class ProdutoEstoqueNegativoResponse(BaseModel):
 @router.post("/verificar-estoque-negativo", response_model=List[ProdutoEstoqueNegativoResponse])
 def verificar_estoque_negativo_pre_venda(
     request: VerificarEstoqueRequest,
-    current_user: User = Depends(get_current_user),
+    user_and_tenant=Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session)
 ):
     """
@@ -361,7 +368,7 @@ def verificar_estoque_negativo_pre_venda(
     """
     from app.produtos_models import Produto
     
-    tenant_id = current_user.tenant_id
+    current_user, tenant_id = _obter_usuario_e_tenant(user_and_tenant)
     produtos_negativos = []
     
     for item in request.itens:

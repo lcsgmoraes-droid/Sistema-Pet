@@ -20,11 +20,19 @@ html,
 body,
 #root {
   min-height: 100%;
+  width: 100%;
 }
 
 body {
   overflow-x: hidden;
   background: #f8fafc;
+}
+
+.erp-shell,
+.erp-main-column,
+.erp-page-content {
+  min-width: 0;
+  width: 100%;
 }
 
 /* Scrollbar customizado */

@@ -125,6 +125,7 @@ export default function MovimentacoesProdutoHeader({
   podeLancarGranel,
   produto,
   saldoAposReserva,
+  mostrarControlesBling = true,
   syncDisponivel,
   syncProduto,
   syncStatusLabel,
@@ -159,13 +160,15 @@ export default function MovimentacoesProdutoHeader({
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-2xl font-black tracking-tight text-slate-900">{produto.nome}</h1>
-                  <span
-                    className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
-                      syncDisponivel ? "bg-sky-100 text-sky-700" : "bg-slate-100 text-slate-600"
-                    }`}
-                  >
-                    {syncStatusLabel}
-                  </span>
+                  {mostrarControlesBling ? (
+                    <span
+                      className={`inline-flex rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                        syncDisponivel ? "bg-sky-100 text-sky-700" : "bg-slate-100 text-slate-600"
+                      }`}
+                    >
+                      {syncStatusLabel}
+                    </span>
+                  ) : null}
                 </div>
 
                 <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1.5 text-xs text-slate-600">
@@ -178,7 +181,7 @@ export default function MovimentacoesProdutoHeader({
                       EAN: <span className="font-mono font-medium text-slate-900">{produto.codigo_barras}</span>
                     </div>
                   ) : null}
-                  {syncDisponivel ? (
+                  {mostrarControlesBling && syncDisponivel ? (
                     <div>
                       Bling ID:{" "}
                       <span className="font-mono font-medium text-slate-900">{syncProduto?.bling_produto_id}</span>
@@ -204,19 +207,23 @@ export default function MovimentacoesProdutoHeader({
                       </ActionButton>
                     ) : null}
 
-                    <ActionButton
-                      disabled={!syncDisponivel || forcandoSync}
-                      icon={RefreshCcw}
-                      intent="info"
-                      onClick={onForcarSyncProduto}
-                      tone="soft"
-                    >
-                      {forcandoSync ? "Enviando sync..." : "Forcar sync no Bling"}
-                    </ActionButton>
+                    {mostrarControlesBling ? (
+                      <>
+                        <ActionButton
+                          disabled={!syncDisponivel || forcandoSync}
+                          icon={RefreshCcw}
+                          intent="info"
+                          onClick={onForcarSyncProduto}
+                          tone="soft"
+                        >
+                          {forcandoSync ? "Enviando sync..." : "Forcar sync no Bling"}
+                        </ActionButton>
 
-                    <ActionButton icon={ExternalLink} onClick={onAbrirPainelBling} tone="soft">
-                      Abrir painel Bling
-                    </ActionButton>
+                        <ActionButton icon={ExternalLink} onClick={onAbrirPainelBling} tone="soft">
+                          Abrir painel Bling
+                        </ActionButton>
+                      </>
+                    ) : null}
                   </div>
                 </div>
               </div>

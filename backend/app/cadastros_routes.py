@@ -20,6 +20,35 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/cadastros", tags=["cadastros"])
 
 
+def _sincronizar_sequence_postgres(db: Session, tabela: str, coluna: str = "id") -> None:
+    """Realinha sequences legadas sem tocar nos registros existentes."""
+    if db.get_bind().dialect.name != "postgresql":
+        return
+    if tabela not in {"racas", "especies"} or coluna != "id":
+        raise ValueError("Tabela/coluna não permitida para sincronização de sequence")
+
+    sequence = db.execute(
+        text("SELECT pg_get_serial_sequence(:tabela, :coluna)"),
+        {"tabela": tabela, "coluna": coluna},
+    ).scalar()
+
+    if not sequence:
+        return
+
+    db.execute(
+        text(
+            f"""
+            SELECT setval(
+                :sequence,
+                GREATEST(COALESCE((SELECT MAX(id) FROM {tabela}), 0) + 1, 1),
+                false
+            )
+            """
+        ),
+        {"sequence": sequence},
+    )
+
+
 def ensure_especies_racas_tables_exist(db: Session) -> None:
     """Cria tabelas de espécies/raças automaticamente em ambientes sem migration."""
     Especie.__table__.create(bind=db.get_bind(), checkfirst=True)
@@ -56,6 +85,8 @@ def ensure_especies_racas_tables_exist(db: Session) -> None:
     """))
     db.execute(text("CREATE INDEX IF NOT EXISTS ix_racas_especie_id ON racas (especie_id)"))
     db.execute(text("CREATE INDEX IF NOT EXISTS ix_racas_tenant_id ON racas (tenant_id)"))
+    _sincronizar_sequence_postgres(db, "especies")
+    _sincronizar_sequence_postgres(db, "racas")
     db.commit()
 
 
@@ -431,6 +462,7 @@ def criar_raca(
     nova_raca = Raca(
         tenant_id=tenant_id,
         nome=raca_data.nome,
+        especie=especie.nome,
         especie_id=raca_data.especie_id,
         ativo=raca_data.ativo
     )
@@ -487,6 +519,7 @@ def atualizar_raca(
         "ativo": raca.ativo
     }
         # Verificar se a espécie existe (se estiver sendo alterada)
+    especie = None
     if raca_data.especie_id:
         especie = db.query(Especie).filter(
             Especie.id == raca_data.especie_id,
@@ -521,6 +554,7 @@ def atualizar_raca(
         raca.nome = raca_data.nome
     if raca_data.especie_id is not None:
         raca.especie_id = raca_data.especie_id
+        raca.especie = especie.nome if especie else raca.especie
     if raca_data.ativo is not None:
         raca.ativo = raca_data.ativo
     

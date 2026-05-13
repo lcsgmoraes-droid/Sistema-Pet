@@ -46,6 +46,7 @@ import {
   campaignAllowsSaleChannel,
   getCashbackBonusParamKey,
 } from '../utils/campaignChannelScope';
+import { useModulos } from '../contexts/ModulosContext';
 
 const BANDEIRAS = [
   'Visa',
@@ -64,6 +65,8 @@ export default function ModalPagamento({
   onVendaAtualizada,
   onAnalisarVenda,
 }) {
+  const { moduloAtivo } = useModulos();
+  const moduloCampanhasAtivo = moduloAtivo('campanhas');
   const [pagamentos, setPagamentos] = useState([]);
   const [pagamentosExistentes, setPagamentosExistentes] = useState([]);
   const [formasPagamento, setFormasPagamento] = useState([]);
@@ -126,17 +129,22 @@ export default function ModalPagamento({
 
   // 💰 Carregar saldo de cashback do cliente
   useEffect(() => {
+    if (!moduloCampanhasAtivo) {
+      setSaldoCashback(0);
+      return;
+    }
     if (!venda.cliente?.id) return;
     const clienteId = venda.cliente.id;
     api.get(`/campanhas/clientes/${clienteId}/saldo`)
       .then(res => setSaldoCashback(parseFloat(res.data.saldo_cashback || 0)))
       .catch(() => {}); // campanhas são opcionais
-  }, [venda.cliente?.id]);
+  }, [moduloCampanhasAtivo, venda.cliente?.id]);
 
   useEffect(() => {
-    if (!venda.cliente?.id) {
+    if (!moduloCampanhasAtivo || !venda.cliente?.id) {
       setCampanhasCompra([]);
       setRankCliente('bronze');
+      setLoadingBeneficiosCampanha(false);
       return;
     }
 
@@ -166,7 +174,7 @@ export default function ModalPagamento({
     };
 
     carregarBeneficiosCampanha();
-  }, [venda.cliente?.id]);
+  }, [moduloCampanhasAtivo, venda.cliente?.id]);
 
   // 🆕 Carregar operadoras de cartão
   useEffect(() => {
@@ -1499,6 +1507,7 @@ export default function ModalPagamento({
                 </div>
               </div>
 
+              {moduloCampanhasAtivo && (
               <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
                 <h3 className="font-semibold text-indigo-900 mb-2">Benefícios que esta venda pode gerar</h3>
                 <p className="text-xs text-indigo-700 mb-3">
@@ -1536,6 +1545,7 @@ export default function ModalPagamento({
                   </div>
                 )}
               </div>
+              )}
 
               {/* Pagamentos adicionados */}
               <div>
