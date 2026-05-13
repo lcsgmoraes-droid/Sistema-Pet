@@ -41,6 +41,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Summarize onboarding completeness for active tenants without applying changes.",
     )
+    target.add_argument(
+        "--future-tenant-check",
+        action="store_true",
+        help="Validate the default onboarding contract for a synthetic future tenant without reading existing tenants.",
+    )
     parser.add_argument(
         "--user-id",
         type=int,
@@ -62,6 +67,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--allow-production-apply",
         action="store_true",
         help="Allow --apply when APP_ENV/ENV/ENVIRONMENT is production/prod.",
+    )
+    parser.add_argument(
+        "--allow-existing-tenant-apply",
+        action="store_true",
+        help="Allow bulk --all-active-tenants --apply. Keep disabled unless intentionally backfilling existing tenants.",
     )
     return parser
 
@@ -245,6 +255,56 @@ def _run_health_check(db, args) -> dict[str, Any]:
     }
 
 
+def _run_future_tenant_check(db, args) -> dict[str, Any]:
+    synthetic_tenant_id = "00000000-0000-4000-8000-000000000001"
+    result = onboard_tenant_defaults(
+        db=db,
+        tenant_id=synthetic_tenant_id,
+        user_id=0,
+        bundle_code=args.bundle_code,
+        bundle_version=args.bundle_version,
+        dry_run=True,
+        include_products=args.include_products,
+    )
+    db.rollback()
+
+    required_sections = {
+        "payment_methods",
+        "dre_categories",
+        "dre_subcategories",
+        "financial_categories",
+        "expense_types",
+        "product_departments",
+        "product_categories",
+    }
+    would_create = result.get("would_create", {})
+    missing_sections = sorted(
+        section
+        for section in required_sections
+        if int(would_create.get(section, 0)) <= 0 and int(result.get("skipped", {}).get(section, 0)) <= 0
+    )
+    warnings = result.get("warnings", [])
+
+    return {
+        "ok": not missing_sections and not warnings,
+        "dry_run": True,
+        "mode": "future_tenant_check",
+        "tenant_scope": "synthetic_future_tenant",
+        "bundle_code": args.bundle_code,
+        "bundle_version": args.bundle_version,
+        "include_products": bool(args.include_products),
+        "required_sections": sorted(required_sections),
+        "missing_sections": missing_sections,
+        "warnings": warnings,
+        "result": {
+            "template_source": result.get("template_source"),
+            "would_create": would_create,
+            "skipped": result.get("skipped", {}),
+            "created": result.get("created", {}),
+        },
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     dry_run = not args.apply
@@ -254,6 +314,16 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.health_check and args.apply:
         return _fail("--health-check e somente leitura; remova --apply.", dry_run=True)
+
+    if args.future_tenant_check and args.apply:
+        return _fail("--future-tenant-check e somente leitura; remova --apply.", dry_run=True)
+
+    if args.all_active_tenants and args.apply and not args.allow_existing_tenant_apply:
+        return _fail(
+            "--all-active-tenants --apply bloqueado por padrao; use --allow-existing-tenant-apply "
+            "somente se for intencional atualizar tenants existentes.",
+            dry_run=False,
+        )
 
     environment = _environment_name()
     if args.apply and environment in PRODUCTION_ENVS and not args.allow_production_apply:
@@ -266,6 +336,8 @@ def main(argv: list[str] | None = None) -> int:
     try:
         if args.health_check:
             result = _run_health_check(db, args)
+        elif args.future_tenant_check:
+            result = _run_future_tenant_check(db, args)
         elif args.all_active_tenants:
             result = _run_all(db, args)
         else:

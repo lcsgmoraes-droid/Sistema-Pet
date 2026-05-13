@@ -201,6 +201,7 @@ def test_auth_multitenant_flow_nao_quebra_com_roles_fora_da_whitelist(monkeypatc
 
     user = auth_db_session.query(User).filter(User.email == "phase11@example.com").one()
     assert calls == [(tenant_id, user.id, False)]
+    set_current_tenant(tenant_id)
     role = auth_db_session.query(Role).filter(Role.tenant_id == tenant_id).one()
     user_tenant = auth_db_session.query(UserTenant).filter(UserTenant.user_id == user.id).one()
 

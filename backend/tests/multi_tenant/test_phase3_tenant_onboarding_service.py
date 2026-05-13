@@ -643,7 +643,61 @@ def test_onboarding_script_all_active_tenants_dry_run(monkeypatch, capsys, onboa
     assert _count(onboarding_session, "formas_pagamento", TENANT_B) == 0
 
 
-def test_onboarding_script_all_active_tenants_apply(monkeypatch, capsys, onboarding_session):
+def test_onboarding_script_future_tenant_check_does_not_read_or_update_existing_tenants(
+    monkeypatch,
+    capsys,
+    onboarding_session,
+):
+    onboarding_session.execute(text("INSERT INTO tenants (id, status) VALUES (:id, 'active')"), {"id": TENANT_A})
+    onboarding_session.execute(text("INSERT INTO users (tenant_id, is_active) VALUES (:tenant_id, 1)"), {"tenant_id": TENANT_A})
+    onboarding_session.commit()
+    monkeypatch.setattr(
+        run_tenant_onboarding,
+        "SessionLocal",
+        lambda: _SessionProxy(onboarding_session),
+    )
+
+    code = run_tenant_onboarding.main(["--future-tenant-check"])
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert code == 0
+    assert payload["mode"] == "future_tenant_check"
+    assert payload["tenant_scope"] == "synthetic_future_tenant"
+    assert payload["dry_run"] is True
+    assert payload["result"]["would_create"]["payment_methods"] == 4
+    assert payload["result"]["would_create"]["dre_categories"] == 3
+    assert payload["result"]["would_create"]["product_categories"] == 2
+    assert TENANT_A not in captured.out
+    assert _count(onboarding_session, "formas_pagamento", TENANT_A) == 0
+    assert _count(onboarding_session, "tenant_template_installs") == 0
+
+
+def test_onboarding_script_all_active_tenants_apply_blocks_bulk_existing_by_default(
+    monkeypatch,
+    capsys,
+    onboarding_session,
+):
+    onboarding_session.execute(text("INSERT INTO tenants (id, status) VALUES (:id, 'active')"), {"id": TENANT_A})
+    onboarding_session.execute(text("INSERT INTO users (tenant_id, is_active) VALUES (:tenant_id, 1)"), {"tenant_id": TENANT_A})
+    onboarding_session.commit()
+    monkeypatch.setattr(
+        run_tenant_onboarding,
+        "SessionLocal",
+        lambda: _SessionProxy(onboarding_session),
+    )
+
+    code = run_tenant_onboarding.main(["--all-active-tenants", "--apply"])
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.err)
+    assert code == 1
+    assert payload["dry_run"] is False
+    assert "tenants existentes" in payload["error"]
+    assert _count(onboarding_session, "formas_pagamento", TENANT_A) == 0
+
+
+def test_onboarding_script_all_active_tenants_apply_with_explicit_override(monkeypatch, capsys, onboarding_session):
     onboarding_session.execute(text("INSERT INTO tenants (id, status) VALUES (:id, 'active')"), {"id": TENANT_A})
     onboarding_session.execute(text("INSERT INTO tenants (id, status) VALUES (:id, 'ativo')"), {"id": TENANT_B})
     onboarding_session.execute(text("INSERT INTO users (tenant_id, is_active) VALUES (:tenant_id, 1)"), {"tenant_id": TENANT_A})
@@ -655,7 +709,9 @@ def test_onboarding_script_all_active_tenants_apply(monkeypatch, capsys, onboard
         lambda: _SessionProxy(onboarding_session),
     )
 
-    code = run_tenant_onboarding.main(["--all-active-tenants", "--apply"])
+    code = run_tenant_onboarding.main(
+        ["--all-active-tenants", "--apply", "--allow-existing-tenant-apply"]
+    )
 
     captured = capsys.readouterr()
     payload = json.loads(captured.out)
@@ -736,6 +792,16 @@ def test_onboarding_script_blocks_production_apply(monkeypatch, capsys):
 
 def test_onboarding_script_health_check_rejects_apply(capsys):
     code = run_tenant_onboarding.main(["--health-check", "--apply"])
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.err)
+    assert code == 1
+    assert payload["dry_run"] is True
+    assert "somente leitura" in payload["error"]
+
+
+def test_onboarding_script_future_tenant_check_rejects_apply(capsys):
+    code = run_tenant_onboarding.main(["--future-tenant-check", "--apply"])
 
     captured = capsys.readouterr()
     payload = json.loads(captured.err)

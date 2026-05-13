@@ -44,7 +44,7 @@ from app.services.auth_security import (
     remaining_lock_seconds,
 )
 from app.services.tenant_onboarding_service import onboard_tenant_defaults
-from app.tenancy.context import set_tenant_context
+from app.tenancy.context import clear_tenant_context, set_tenant_context
 # from app.audit import log_audit  # TODO: Fix audit import conflict
 
 logger = logging.getLogger(__name__)
@@ -443,6 +443,7 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
             tenant_id,
             exc_info=True,
         )
+        clear_tenant_context()
         db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -461,6 +462,7 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
     if EMAIL_VERIFICATION_REQUIRED:
         email_verification_sent = _send_email_verification(user, request)
         if not email_verification_sent:
+            clear_tenant_context()
             db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -469,6 +471,7 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
 
     register_account_created(db, user, request, "erp")
     db.commit()
+    clear_tenant_context()
 
     tenants_payload = [{
         "id": str(tenant_id),

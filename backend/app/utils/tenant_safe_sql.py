@@ -59,6 +59,7 @@ TENANT_SCOPED_TABLES = {
     "produtos",
     "produtos_historico_precos",
     "subcategorias",
+    "tenant_template_item_installs",
     "tenant_template_installs",
     "tipo_despesas",
     "users",

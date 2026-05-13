@@ -132,6 +132,15 @@ def test_tenant_scoped_sql_without_tenant_filter_marker_fails(raw_sql_session):
         )
 
 
+def test_template_item_install_mapping_is_tenant_scoped(raw_sql_session):
+    with pytest.raises(TenantSafeSQLError, match="sem marcador"):
+        execute_tenant_safe(
+            raw_sql_session,
+            "SELECT id FROM tenant_template_item_installs",
+            tenant_id=TENANT_1,
+        )
+
+
 def test_tenant_filter_marker_injects_tenant_id(raw_sql_session):
     rows = execute_tenant_safe_all(
         raw_sql_session,
