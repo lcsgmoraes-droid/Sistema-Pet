@@ -9,6 +9,7 @@ import app.db  # noqa: F401 - registra hooks multitenant
 from app.services.tenant_onboarding_service import (
     TenantOnboardingError,
     onboard_tenant_defaults,
+    validate_onboarding_template_contract,
 )
 from app.scripts import run_tenant_onboarding
 
@@ -603,6 +604,42 @@ def test_onboarding_strict_required_fails_when_operational_schema_is_absent():
         session.close()
 
 
+def test_template_contract_check_is_read_only_and_accepts_complete_builtin_contract(onboarding_session):
+    result = validate_onboarding_template_contract(onboarding_session, include_products=True)
+
+    assert result["ok"] is True
+    assert result["mode"] == "template_contract_check"
+    assert result["dry_run"] is True
+    assert result["missing_sections"] == []
+    assert result["missing_template_tables"] == []
+    assert result["missing_operational_tables"] == {}
+    assert result["dependency_errors"] == []
+    assert result["template_item_counts"]["payment_method"] == 4
+    assert result["template_item_counts"]["product_reference"] == 3
+    assert _count(onboarding_session, "template_items") == 0
+    assert _count(onboarding_session, "formas_pagamento", TENANT_A) == 0
+
+
+def test_template_contract_check_reports_missing_infra_without_writes():
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    SessionLocal = sessionmaker(bind=engine)
+    session = SessionLocal()
+
+    try:
+        result = validate_onboarding_template_contract(session)
+    finally:
+        session.close()
+
+    assert result["ok"] is False
+    assert "template_bundles" in result["missing_template_tables"]
+    assert "formas_pagamento" in result["missing_operational_tables"]["payment_methods"]
+    assert "payment_methods" not in result["missing_sections"]
+
+
 def test_onboarding_script_defaults_to_dry_run(monkeypatch, capsys, onboarding_session):
     monkeypatch.setattr(
         run_tenant_onboarding,
@@ -824,6 +861,35 @@ def test_onboarding_script_health_check_rejects_apply(capsys):
 
 def test_onboarding_script_future_tenant_check_rejects_apply(capsys):
     code = run_tenant_onboarding.main(["--future-tenant-check", "--apply"])
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.err)
+    assert code == 1
+    assert payload["dry_run"] is True
+    assert "somente leitura" in payload["error"]
+
+
+def test_onboarding_script_template_check_reports_contract(monkeypatch, capsys, onboarding_session):
+    monkeypatch.setattr(
+        run_tenant_onboarding,
+        "SessionLocal",
+        lambda: _SessionProxy(onboarding_session),
+    )
+
+    code = run_tenant_onboarding.main(["--template-check", "--include-products"])
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert code == 0
+    assert payload["ok"] is True
+    assert payload["mode"] == "template_contract_check"
+    assert payload["template_item_counts"]["payment_method"] == 4
+    assert payload["template_item_counts"]["product_reference"] == 3
+    assert _count(onboarding_session, "formas_pagamento", TENANT_A) == 0
+
+
+def test_onboarding_script_template_check_rejects_apply(capsys):
+    code = run_tenant_onboarding.main(["--template-check", "--apply"])
 
     captured = capsys.readouterr()
     payload = json.loads(captured.err)

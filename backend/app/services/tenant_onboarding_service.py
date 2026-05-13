@@ -44,6 +44,30 @@ REQUIRED_ONBOARDING_SECTIONS = {
     "product_departments",
     "product_categories",
 }
+REQUIRED_ONBOARDING_TABLES = {
+    "payment_methods": ("formas_pagamento",),
+    "dre_categories": ("dre_categorias",),
+    "dre_subcategories": ("dre_subcategorias",),
+    "financial_categories": ("categorias_financeiras",),
+    "expense_types": ("tipo_despesas",),
+    "product_departments": ("departamentos",),
+    "product_categories": ("categorias",),
+}
+REQUIRED_TEMPLATE_ITEM_TYPES = {
+    "payment_methods": "payment_method",
+    "dre_categories": "dre_category",
+    "dre_subcategories": "dre_subcategory",
+    "financial_categories": "financial_category",
+    "expense_types": "expense_type",
+    "product_departments": "product_department",
+    "product_categories": "product_category",
+}
+TEMPLATE_INFRA_TABLES = (
+    "template_bundles",
+    "template_items",
+    "tenant_template_installs",
+    "tenant_template_item_installs",
+)
 
 TIPO_CUSTO_DB_LABELS = {
     "direto": "DIRETO",
@@ -472,6 +496,15 @@ def _enforce_required_onboarding(result: OnboardingResult) -> None:
     )
 
 
+def _warn_missing_template_infra_for_strict(db: Session, result: OnboardingResult) -> None:
+    missing = [table_name for table_name in TEMPLATE_INFRA_TABLES if not _table_exists(db, table_name)]
+    if missing:
+        result.warnings.append(
+            "Infraestrutura de templates ausente para onboarding estrito "
+            f"({', '.join(missing)})."
+        )
+
+
 def _normalize_tenant_id(tenant_id: Any) -> str:
     if tenant_id is None or str(tenant_id).strip() == "":
         raise TenantOnboardingError("tenant_id e obrigatorio para onboarding.")
@@ -648,6 +681,187 @@ def _load_template_items(db: Session, bundle_code: str, bundle_version: str) -> 
     raise TenantOnboardingError(
         f"Template bundle nao encontrado: {bundle_code}@{bundle_version}."
     )
+
+
+def _count_items_by_type(items: list[dict[str, Any]]) -> dict[str, int]:
+    counts: dict[str, int] = {}
+    for item in items:
+        item_type = str(item.get("item_type") or "")
+        counts[item_type] = counts.get(item_type, 0) + 1
+    return counts
+
+
+def _template_codes_by_type(items: list[dict[str, Any]], item_type: str) -> set[str]:
+    return {
+        str(item.get("template_code"))
+        for item in items
+        if item.get("item_type") == item_type and item.get("template_code")
+    }
+
+
+def _validate_payload_reference(
+    errors: list[str],
+    item: dict[str, Any],
+    payload_key: str,
+    valid_codes: set[str],
+    target_label: str,
+) -> None:
+    payload = item.get("payload") or {}
+    reference = payload.get(payload_key)
+    template_code = item.get("template_code")
+    if not reference:
+        errors.append(f"Template {template_code} sem {payload_key}.")
+        return
+    if str(reference) not in valid_codes:
+        errors.append(
+            f"Template {template_code} referencia {target_label} inexistente: {reference}."
+        )
+
+
+def _find_template_dependency_errors(
+    items: list[dict[str, Any]],
+    include_products: bool,
+) -> tuple[list[str], list[str]]:
+    errors: list[str] = []
+    warnings: list[str] = []
+    dre_category_codes = _template_codes_by_type(items, "dre_category")
+    dre_subcategory_codes = _template_codes_by_type(items, "dre_subcategory")
+    product_department_codes = _template_codes_by_type(items, "product_department")
+    product_category_codes = _template_codes_by_type(items, "product_category")
+
+    for item in items:
+        item_type = item.get("item_type")
+        payload = item.get("payload") or {}
+        if item_type == "dre_subcategory":
+            _validate_payload_reference(errors, item, "categoria_code", dre_category_codes, "dre_category")
+        elif item_type == "expense_type":
+            _validate_payload_reference(
+                errors,
+                item,
+                "dre_subcategory_code",
+                dre_subcategory_codes,
+                "dre_subcategory",
+            )
+        elif item_type == "financial_category":
+            reference = payload.get("dre_subcategory_code")
+            if reference and str(reference) not in dre_subcategory_codes:
+                errors.append(
+                    f"Template {item.get('template_code')} referencia dre_subcategory inexistente: {reference}."
+                )
+            elif not reference:
+                warnings.append(
+                    f"Template {item.get('template_code')} sem vinculo DRE opcional."
+                )
+        elif item_type == "product_category":
+            _validate_payload_reference(
+                errors,
+                item,
+                "departamento_code",
+                product_department_codes,
+                "product_department",
+            )
+        elif item_type == "product_reference":
+            target = errors if include_products else warnings
+            _validate_payload_reference(
+                target,
+                item,
+                "departamento_code",
+                product_department_codes,
+                "product_department",
+            )
+            _validate_payload_reference(
+                target,
+                item,
+                "categoria_code",
+                product_category_codes,
+                "product_category",
+            )
+
+    return errors, warnings
+
+
+def validate_onboarding_template_contract(
+    db: Session,
+    bundle_code: str = DEFAULT_BUNDLE_CODE,
+    bundle_version: str = DEFAULT_BUNDLE_VERSION,
+    include_products: bool = False,
+) -> dict[str, Any]:
+    """
+    Read-only validation for the global template bundle needed by future tenants.
+
+    This check never creates tenants or tenant-owned rows. It validates the
+    template infrastructure, required operational tables and template dependency
+    graph before the strict signup onboarding path is exercised.
+    """
+    missing_template_tables = [
+        table_name for table_name in TEMPLATE_INFRA_TABLES if not _table_exists(db, table_name)
+    ]
+    missing_operational_tables = {
+        section: [table_name for table_name in table_names if not _table_exists(db, table_name)]
+        for section, table_names in REQUIRED_ONBOARDING_TABLES.items()
+    }
+    missing_operational_tables = {
+        section: missing
+        for section, missing in missing_operational_tables.items()
+        if missing
+    }
+    errors: list[str] = []
+    items: list[dict[str, Any]] = []
+    template_source = "unavailable"
+
+    try:
+        items, template_source = _load_template_items(db, bundle_code, bundle_version)
+    except TenantOnboardingError as exc:
+        errors.append(str(exc))
+
+    counts_by_type = _count_items_by_type(items)
+    missing_sections = sorted(
+        section
+        for section, item_type in REQUIRED_TEMPLATE_ITEM_TYPES.items()
+        if counts_by_type.get(item_type, 0) <= 0
+    )
+    product_reference_count = counts_by_type.get("product_reference", 0)
+
+    seen_codes: dict[str, int] = {}
+    for item in items:
+        code = str(item.get("template_code") or "")
+        seen_codes[code] = seen_codes.get(code, 0) + 1
+    duplicate_template_codes = sorted(code for code, count in seen_codes.items() if code and count > 1)
+
+    dependency_errors, dependency_warnings = _find_template_dependency_errors(items, include_products)
+
+    builtin_pending_count = 0
+    if _template_tables_ready(db) and bundle_code == DEFAULT_BUNDLE_CODE and bundle_version == DEFAULT_BUNDLE_VERSION:
+        builtin_pending_count = len(_missing_builtin_template_items(db, bundle_code, bundle_version))
+
+    ok = not (
+        missing_template_tables
+        or missing_operational_tables
+        or errors
+        or missing_sections
+        or duplicate_template_codes
+        or dependency_errors
+    )
+
+    return {
+        "ok": ok,
+        "mode": "template_contract_check",
+        "dry_run": True,
+        "bundle_code": bundle_code,
+        "bundle_version": bundle_version,
+        "include_products": bool(include_products),
+        "template_source": template_source,
+        "template_item_counts": counts_by_type,
+        "required_sections": sorted(REQUIRED_ONBOARDING_SECTIONS),
+        "missing_sections": missing_sections,
+        "missing_template_tables": missing_template_tables,
+        "missing_operational_tables": missing_operational_tables,
+        "duplicate_template_codes": duplicate_template_codes,
+        "dependency_errors": dependency_errors,
+        "dependency_warnings": dependency_warnings,
+        "product_reference_count": product_reference_count,
+        "builtin_pending_count": builtin_pending_count,
+    }
 
 
 def _items_by_type(items: list[dict[str, Any]], item_type: str) -> list[dict[str, Any]]:
@@ -1622,6 +1836,8 @@ def _run_onboarding_steps(
 ) -> dict[str, Any]:
     if not dry_run:
         ensure_builtin_templates(db)
+    if strict_required and not dry_run:
+        _warn_missing_template_infra_for_strict(db, result)
 
     items, source = _load_template_items(db, bundle_code, bundle_version)
     result.template_source = source

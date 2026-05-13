@@ -19,7 +19,10 @@ if __package__ in {None, ""}:
     sys.path.insert(0, str(backend_path))
 
 from app.db import SessionLocal
-from app.services.tenant_onboarding_service import onboard_tenant_defaults
+from app.services.tenant_onboarding_service import (
+    onboard_tenant_defaults,
+    validate_onboarding_template_contract,
+)
 
 
 PRODUCTION_ENVS = {"prod", "production"}
@@ -45,6 +48,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--future-tenant-check",
         action="store_true",
         help="Validate the default onboarding contract for a synthetic future tenant without reading existing tenants.",
+    )
+    target.add_argument(
+        "--template-check",
+        action="store_true",
+        help="Validate global template readiness for future tenants without applying changes.",
     )
     parser.add_argument(
         "--user-id",
@@ -318,6 +326,9 @@ def main(argv: list[str] | None = None) -> int:
     if args.future_tenant_check and args.apply:
         return _fail("--future-tenant-check e somente leitura; remova --apply.", dry_run=True)
 
+    if args.template_check and args.apply:
+        return _fail("--template-check e somente leitura; remova --apply.", dry_run=True)
+
     if args.all_active_tenants and args.apply and not args.allow_existing_tenant_apply:
         return _fail(
             "--all-active-tenants --apply bloqueado por padrao; use --allow-existing-tenant-apply "
@@ -338,6 +349,14 @@ def main(argv: list[str] | None = None) -> int:
             result = _run_health_check(db, args)
         elif args.future_tenant_check:
             result = _run_future_tenant_check(db, args)
+        elif args.template_check:
+            result = validate_onboarding_template_contract(
+                db=db,
+                bundle_code=args.bundle_code,
+                bundle_version=args.bundle_version,
+                include_products=args.include_products,
+            )
+            db.rollback()
         elif args.all_active_tenants:
             result = _run_all(db, args)
         else:
