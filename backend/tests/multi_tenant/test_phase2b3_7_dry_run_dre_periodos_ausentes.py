@@ -1,88 +1,24 @@
 import json
 
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import text
 
 from app.scripts.dry_run_criar_dre_periodos_ausentes import (
     analisar_dre_periodos_ausentes_para_detalhes,
 )
-
-
-TENANT_A = "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa"
-TENANT_B = "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb"
+from tests.multi_tenant.dre_test_helpers import (
+    TENANT_A,
+    TENANT_B,
+    make_dre_session,
+    seed_sensitive_dre_users,
+)
 
 
 def _session():
-    engine = create_engine("sqlite:///:memory:")
-    SessionLocal = sessionmaker(bind=engine)
-    db = SessionLocal()
-    _create_schema(db)
-    _seed_data(db)
-    db.commit()
-    return db
-
-
-def _create_schema(db):
-    db.execute(
-        text(
-            """
-            CREATE TABLE users (
-                id INTEGER PRIMARY KEY,
-                tenant_id TEXT NULL,
-                nome TEXT NULL,
-                email TEXT NULL,
-                documento TEXT NULL
-            )
-            """
-        )
-    )
-    db.execute(
-        text(
-            """
-            CREATE TABLE dre_periodos (
-                id INTEGER PRIMARY KEY,
-                tenant_id TEXT NULL,
-                usuario_id INTEGER NULL,
-                data_inicio DATE NULL,
-                data_fim DATE NULL,
-                mes INTEGER NULL,
-                ano INTEGER NULL,
-                canal TEXT NULL
-            )
-            """
-        )
-    )
-    db.execute(
-        text(
-            """
-            CREATE TABLE dre_detalhe_canais (
-                id INTEGER PRIMARY KEY,
-                tenant_id TEXT NOT NULL,
-                usuario_id INTEGER NULL,
-                data_inicio DATE NULL,
-                data_fim DATE NULL,
-                mes INTEGER NULL,
-                ano INTEGER NULL,
-                canal TEXT NULL,
-                receita_bruta NUMERIC NULL
-            )
-            """
-        )
-    )
+    return make_dre_session(_seed_data)
 
 
 def _seed_data(db):
-    db.execute(
-        text(
-            """
-            INSERT INTO users (id, tenant_id, nome, email, documento)
-            VALUES
-                (1, :tenant_a, 'SENSITIVE_NAME_A', 'SENSITIVE_EMAIL_A', 'SENSITIVE_DOC_A'),
-                (2, :tenant_b, 'SENSITIVE_NAME_B', 'SENSITIVE_EMAIL_B', 'SENSITIVE_DOC_B')
-            """
-        ),
-        {"tenant_a": TENANT_A, "tenant_b": TENANT_B},
-    )
+    seed_sensitive_dre_users(db)
     db.execute(
         text(
             """
