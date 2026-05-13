@@ -17,6 +17,9 @@ from app.utils.tenant_safe_sql import (
 
 DEFAULT_BUNDLE_CODE = "petshop-br"
 DEFAULT_BUNDLE_VERSION = "v1"
+NAME_RECEITAS_VENDAS = "Receitas de Vendas"
+NAME_TAXAS_CARTAO = "Taxas de Cartao"
+PRODUCT_REFERENCE_DESCRIPTION = "Produto de referencia para importacao opcional."
 
 TIPO_CUSTO_DB_LABELS = {
     "direto": "DIRETO",
@@ -153,8 +156,8 @@ BUILTIN_TEMPLATE_ITEMS: list[dict[str, Any]] = [
     _template_item(
         "dre_category",
         "dre_receitas",
-        "Receitas de Vendas",
-        {"nome": "Receitas de Vendas", "ordem": 1, "natureza": "receita", "ativo": True},
+        NAME_RECEITAS_VENDAS,
+        {"nome": NAME_RECEITAS_VENDAS, "ordem": 1, "natureza": "receita", "ativo": True},
         100,
     ),
     _template_item(
@@ -216,10 +219,10 @@ BUILTIN_TEMPLATE_ITEMS: list[dict[str, Any]] = [
     _template_item(
         "dre_subcategory",
         "dre_taxas_cartao",
-        "Taxas de Cartao",
+        NAME_TAXAS_CARTAO,
         {
             "categoria_code": "dre_despesas_operacionais",
-            "nome": "Taxas de Cartao",
+            "nome": NAME_TAXAS_CARTAO,
             "tipo_custo": "direto",
             "base_rateio": None,
             "escopo_rateio": "ambos",
@@ -230,9 +233,9 @@ BUILTIN_TEMPLATE_ITEMS: list[dict[str, Any]] = [
     _template_item(
         "financial_category",
         "fin_receitas_vendas",
-        "Receitas de Vendas",
+        NAME_RECEITAS_VENDAS,
         {
-            "nome": "Receitas de Vendas",
+            "nome": NAME_RECEITAS_VENDAS,
             "tipo": "receita",
             "cor": "#16A34A",
             "icone": "trending-up",
@@ -274,9 +277,9 @@ BUILTIN_TEMPLATE_ITEMS: list[dict[str, Any]] = [
     _template_item(
         "expense_type",
         "expense_taxas_cartao",
-        "Taxas de Cartao",
+        NAME_TAXAS_CARTAO,
         {
-            "nome": "Taxas de Cartao",
+            "nome": NAME_TAXAS_CARTAO,
             "e_custo_fixo": False,
             "dre_subcategory_code": "dre_taxas_cartao",
             "ativo": True,
@@ -330,7 +333,7 @@ BUILTIN_TEMPLATE_ITEMS: list[dict[str, Any]] = [
             "categoria_code": "cat_pet_food",
             "departamento_code": "dept_produtos",
             "tipo": "produto",
-            "descricao_curta": "Produto de referencia para importacao opcional.",
+            "descricao_curta": PRODUCT_REFERENCE_DESCRIPTION,
             "preco_custo": 0,
             "preco_venda": 0,
             "estoque_atual": 0,
@@ -353,7 +356,7 @@ BUILTIN_TEMPLATE_ITEMS: list[dict[str, Any]] = [
             "categoria_code": "cat_pet_food",
             "departamento_code": "dept_produtos",
             "tipo": "produto",
-            "descricao_curta": "Produto de referencia para importacao opcional.",
+            "descricao_curta": PRODUCT_REFERENCE_DESCRIPTION,
             "preco_custo": 0,
             "preco_venda": 0,
             "estoque_atual": 0,
@@ -376,7 +379,7 @@ BUILTIN_TEMPLATE_ITEMS: list[dict[str, Any]] = [
             "categoria_code": "cat_acessorios",
             "departamento_code": "dept_produtos",
             "tipo": "produto",
-            "descricao_curta": "Produto de referencia para importacao opcional.",
+            "descricao_curta": PRODUCT_REFERENCE_DESCRIPTION,
             "preco_custo": 0,
             "preco_venda": 0,
             "estoque_atual": 0,
@@ -532,46 +535,67 @@ def ensure_builtin_templates(db: Session) -> None:
     db.flush()
 
 
+def _query_template_items(db: Session, bundle_code: str, bundle_version: str) -> list[dict[str, Any]]:
+    rows = (
+        db.query(TemplateItem)
+        .filter(
+            TemplateItem.bundle_code == bundle_code,
+            TemplateItem.bundle_version == bundle_version,
+            TemplateItem.active == True,
+        )
+        .order_by(TemplateItem.sort_order.asc(), TemplateItem.id.asc())
+        .all()
+    )
+    return [
+        {
+            "item_type": row.item_type,
+            "template_code": row.template_code,
+            "name": row.name,
+            "payload": row.payload,
+            "sort_order": row.sort_order,
+        }
+        for row in rows
+    ]
+
+
+def _missing_builtin_template_items(db: Session, bundle_code: str, bundle_version: str) -> list[dict[str, Any]]:
+    existing_codes = {
+        row[0]
+        for row in db.query(TemplateItem.template_code)
+        .filter(
+            TemplateItem.bundle_code == bundle_code,
+            TemplateItem.bundle_version == bundle_version,
+        )
+        .all()
+    }
+    return [item for item in BUILTIN_TEMPLATE_ITEMS if item["template_code"] not in existing_codes]
+
+
+def _combine_template_items(
+    db: Session,
+    bundle_code: str,
+    bundle_version: str,
+    items: list[dict[str, Any]],
+) -> tuple[list[dict[str, Any]], str] | None:
+    if bundle_code != DEFAULT_BUNDLE_CODE or bundle_version != DEFAULT_BUNDLE_VERSION:
+        return None
+
+    missing_builtin_items = _missing_builtin_template_items(db, bundle_code, bundle_version)
+    if not items and not missing_builtin_items:
+        return None
+
+    combined = items + missing_builtin_items
+    combined.sort(key=lambda item: (int(item.get("sort_order") or 0), item["template_code"]))
+    source = "database" if not missing_builtin_items else "database+builtin_pending"
+    return combined, source
+
+
 def _load_template_items(db: Session, bundle_code: str, bundle_version: str) -> tuple[list[dict[str, Any]], str]:
     if _template_tables_ready(db):
-        rows = (
-            db.query(TemplateItem)
-            .filter(
-                TemplateItem.bundle_code == bundle_code,
-                TemplateItem.bundle_version == bundle_version,
-                TemplateItem.active == True,
-            )
-            .order_by(TemplateItem.sort_order.asc(), TemplateItem.id.asc())
-            .all()
-        )
-        items = [
-            {
-                "item_type": row.item_type,
-                "template_code": row.template_code,
-                "name": row.name,
-                "payload": row.payload,
-                "sort_order": row.sort_order,
-            }
-            for row in rows
-        ]
-        if bundle_code == DEFAULT_BUNDLE_CODE and bundle_version == DEFAULT_BUNDLE_VERSION:
-            existing_codes = {
-                row[0]
-                for row in db.query(TemplateItem.template_code)
-                .filter(
-                    TemplateItem.bundle_code == bundle_code,
-                    TemplateItem.bundle_version == bundle_version,
-                )
-                .all()
-            }
-            missing_builtin_items = [
-                item for item in BUILTIN_TEMPLATE_ITEMS if item["template_code"] not in existing_codes
-            ]
-            if items or missing_builtin_items:
-                combined = items + missing_builtin_items
-                combined.sort(key=lambda item: (int(item.get("sort_order") or 0), item["template_code"]))
-                source = "database" if not missing_builtin_items else "database+builtin_pending"
-                return combined, source
+        items = _query_template_items(db, bundle_code, bundle_version)
+        combined = _combine_template_items(db, bundle_code, bundle_version, items)
+        if combined is not None:
+            return combined
         if items:
             return items, "database"
 

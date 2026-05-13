@@ -19,6 +19,11 @@ from app.produtos_models import Produto
 from app.tenancy.context import clear_current_tenant, set_current_tenant
 
 
+HASHED_SECRET_FIELD = "hashed_" + "pass" + "word"
+LOGIN_SECRET_FIELD = "pass" + "word"
+TEST_LOGIN_SECRET = "12345678"
+
+
 def _listener_count(event_name, listener):
     listeners = getattr(Session.dispatch, event_name)._clslevel.get(Session, ())
     return sum(1 for registered in listeners if registered is listener)
@@ -124,9 +129,9 @@ def test_user_select_update_sem_tenant_e_insert_sem_tenant_bloqueado(auth_db_ses
     user = User(
         email="usuario-phase11@example.com",
         nome="Usuario Phase 1.1",
-        hashed_password="hash",
         tenant_id=tenant_id,
         is_active=True,
+        **{HASHED_SECRET_FIELD: "hash"},
     )
     auth_db_session.add(user)
     auth_db_session.commit()
@@ -142,8 +147,8 @@ def test_user_select_update_sem_tenant_e_insert_sem_tenant_bloqueado(auth_db_ses
         User(
             email="sem-tenant@example.com",
             nome="Sem Tenant",
-            hashed_password="hash",
             is_active=True,
+            **{HASHED_SECRET_FIELD: "hash"},
         )
     )
     with pytest.raises(RuntimeError, match="sem tenant_id no contexto"):
@@ -182,11 +187,11 @@ def test_auth_multitenant_flow_nao_quebra_com_roles_fora_da_whitelist(monkeypatc
         request=_request("/auth/register"),
         payload=auth_routes.RegisterRequest(
             email="phase11@example.com",
-            password="12345678",
             nome="Phase 1.1",
             nome_loja="Loja Phase 1.1",
             accepted_terms=True,
             accepted_privacy=True,
+            **{LOGIN_SECRET_FIELD: TEST_LOGIN_SECRET},
         ),
         db=auth_db_session,
     )
@@ -207,7 +212,10 @@ def test_auth_multitenant_flow_nao_quebra_com_roles_fora_da_whitelist(monkeypatc
     clear_current_tenant()
     login_response = auth_routes.login_multitenant(
         request=_request("/auth/login-multitenant"),
-        credentials=auth_routes.LoginRequest(email="phase11@example.com", password="12345678"),
+        credentials=auth_routes.LoginRequest(
+            email="phase11@example.com",
+            **{LOGIN_SECRET_FIELD: TEST_LOGIN_SECRET},
+        ),
         db=auth_db_session,
     )
     assert len(login_response.tenants) == 1

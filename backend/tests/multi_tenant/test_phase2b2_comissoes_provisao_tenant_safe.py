@@ -192,7 +192,7 @@ def test_provisao_tenant_a_nao_enxerga_comissoes_tenant_b(db_session):
 
     assert result["success"] is True
     assert result["comissoes_provisionadas"] == 1
-    assert result["valor_total"] == 25.0
+    assert result["valor_total"] == pytest.approx(25.0)
 
     comissoes = _comissoes(db_session)
     assert comissoes[0].tenant_id == TENANT_A
@@ -207,7 +207,7 @@ def test_provisao_tenant_a_cria_contas_pagar_somente_tenant_a(db_session):
     contas = _contas(db_session)
     assert len(contas) == 1
     assert contas[0].tenant_id == TENANT_A
-    assert float(contas[0].valor_final) == 25.0
+    assert float(contas[0].valor_final) == pytest.approx(25.0)
 
 
 def test_mesmo_venda_id_em_tenants_diferentes_nao_cruza_provisao(db_session):

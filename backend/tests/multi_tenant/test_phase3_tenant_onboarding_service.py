@@ -25,7 +25,8 @@ class _SessionProxy:
         return getattr(self._session, name)
 
     def close(self):
-        pass
+        # The fixture owns the wrapped session; callers may close the proxy safely.
+        return None
 
 
 @pytest.fixture()
@@ -394,8 +395,8 @@ def test_onboarding_include_products_apply_creates_inactive_reference_catalog(on
         "TPL-PETISCO-100G",
         "TPL-RACAO-ADULTO-1KG",
     }
-    assert all(row[1] in {False, 0} for row in products)
-    assert all(row[2] in {False, 0} for row in products)
+    assert not any(bool(row[1]) for row in products)
+    assert not any(bool(row[2]) for row in products)
     assert all(float(row[3]) == 0 for row in products)
 
     second = onboard_tenant_defaults(

@@ -333,7 +333,7 @@ def test_geracao_nao_usa_pagamento_de_outro_tenant_com_mesmo_venda_id(db_session
     rows = _commission_rows(db_session)
     assert len(rows) == 1
     assert rows[0].tenant_id == TENANT_A
-    assert float(rows[0].valor_comissao_gerada) == 10.0
+    assert float(rows[0].valor_comissao_gerada) == pytest.approx(10.0)
 
 
 def test_provisao_conta_pagar_recebe_tenant_correto(db_session):
@@ -381,8 +381,8 @@ def test_pagamento_parcial_mantem_parcela_numero(db_session):
     rows = _commission_rows(db_session)
     assert len(rows) == 1
     assert rows[0].parcela_numero == 2
-    assert float(rows[0].valor_pago_referencia) == 50.0
-    assert float(rows[0].valor_comissao_gerada) == 5.0
+    assert float(rows[0].valor_pago_referencia) == pytest.approx(50.0)
+    assert float(rows[0].valor_comissao_gerada) == pytest.approx(5.0)
 
 
 def test_reexecucao_nao_duplica_comissao_no_mesmo_tenant(db_session):
@@ -421,5 +421,5 @@ def test_mesmo_funcionario_e_referencia_em_tenants_diferentes_nao_cruza_config(d
         tenant_id=TENANT_B,
     )
 
-    assert float(config_a["percentual"]) == 10.0
-    assert float(config_b["percentual"]) == 90.0
+    assert float(config_a["percentual"]) == pytest.approx(10.0)
+    assert float(config_b["percentual"]) == pytest.approx(90.0)

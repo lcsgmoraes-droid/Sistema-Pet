@@ -9,7 +9,7 @@ from __future__ import annotations
 
 import json
 from collections import defaultdict
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from alembic import op
@@ -191,7 +191,7 @@ def _group_candidates(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
 
 def _insert_group(group: dict[str, Any]) -> None:
     table_columns = _columns(TABLE_PERIODOS)
-    now = datetime.utcnow()
+    now = datetime.now(timezone.utc)
     marker_payload = json.dumps(
         {
             "marcador": MARKER,

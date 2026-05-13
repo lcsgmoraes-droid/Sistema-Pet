@@ -253,11 +253,11 @@ def _get_alembic_head(engine: Engine, alembic_ini_path: Optional[str] = None) ->
         raise FileNotFoundError(f"alembic.ini not found at: {alembic_ini_path}")
     
     # Carregar configuração do Alembic
-    Config, ScriptDirectory, _MigrationContext = _load_external_alembic()
-    alembic_cfg = Config(alembic_ini_path)
+    config_cls, script_directory_cls, _ = _load_external_alembic()
+    alembic_cfg = config_cls(alembic_ini_path)
     
     # Obter ScriptDirectory
-    script = ScriptDirectory.from_config(alembic_cfg)
+    script = script_directory_cls.from_config(alembic_cfg)
     
     # Obter head (pode haver múltiplos heads em branches, pegamos o primeiro)
     heads = script.get_heads()

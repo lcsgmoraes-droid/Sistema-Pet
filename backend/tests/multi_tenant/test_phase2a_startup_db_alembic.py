@@ -150,14 +150,14 @@ def test_alembic_external_import_is_lazy_and_explicit():
 
     assert hasattr(migration_check, "ensure_db_ready")
     try:
-        Config, ScriptDirectory, MigrationContext = migration_check._load_external_alembic()
+        config_cls, script_directory_cls, migration_context_cls = migration_check._load_external_alembic()
     except RuntimeError as exc:
         assert "backend/alembic" in str(exc)
         assert "pacote externo" in str(exc).lower()
     else:
-        assert Config.__module__ == "alembic.config"
-        assert ScriptDirectory.__module__ == "alembic.script.base"
-        assert MigrationContext.__module__ == "alembic.runtime.migration"
+        assert config_cls.__module__ == "alembic.config"
+        assert script_directory_cls.__module__ == "alembic.script.base"
+        assert migration_context_cls.__module__ == "alembic.runtime.migration"
 
 
 def test_ensure_db_ready_fail_closed_when_alembic_head_fails_in_production(monkeypatch):
