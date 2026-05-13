@@ -1,4 +1,5 @@
 import inspect
+from pathlib import Path
 
 import app.db  # noqa: F401
 from app.base_models import BaseTenantModel
@@ -58,8 +59,14 @@ def test_rateio_engine_ainda_nao_tem_fail_fast_de_tenant():
 
 
 def test_migration_base_de_dre_periodos_nao_criou_tenant_id():
+    migration_path = (
+        Path(__file__).resolve().parents[2]
+        / "alembic"
+        / "versions"
+        / "bda1c213cae2_base_inicial_completa.py"
+    )
     with open(
-        "backend/alembic/versions/bda1c213cae2_base_inicial_completa.py",
+        migration_path,
         encoding="utf-8",
     ) as migration_file:
         migration_source = migration_file.read()

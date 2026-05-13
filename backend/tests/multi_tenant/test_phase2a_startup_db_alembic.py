@@ -62,6 +62,22 @@ def test_app_main_imports_with_debug_false_and_runtime_modules_loaded(monkeypatc
     assert event.contains(Session, "before_flush", orm_guards.force_identity_ids)
 
 
+def test_database_url_allows_sqlite_only_in_local_or_test_environments(monkeypatch):
+    config = importlib.import_module("app.config")
+
+    for name in ("APP_ENV", "ENVIRONMENT", "ENV"):
+        monkeypatch.delenv(name, raising=False)
+    monkeypatch.setenv("DATABASE_URL", "sqlite:///./test.db")
+    monkeypatch.setenv("ENVIRONMENT", "testing")
+
+    assert config.get_database_url() == "sqlite:///./test.db"
+
+    monkeypatch.setenv("ENVIRONMENT", "production")
+
+    with pytest.raises(RuntimeError, match="SQLite is allowed only"):
+        config.get_database_url()
+
+
 def test_db_exports_canonical_identity_and_reimport_does_not_create_engine():
     db_package = importlib.import_module("app.db")
     db_core = importlib.import_module("app.db.core")

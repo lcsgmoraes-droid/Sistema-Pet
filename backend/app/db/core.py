@@ -20,16 +20,28 @@ def _env_int(name: str, default: int) -> int:
         return default
 
 
-engine = create_engine(
-    DATABASE_URL,
-    pool_size=_env_int("SQLALCHEMY_POOL_SIZE", 10),
-    max_overflow=_env_int("SQLALCHEMY_MAX_OVERFLOW", 20),
-    pool_timeout=_env_int("SQLALCHEMY_POOL_TIMEOUT", 5),
-    pool_recycle=_env_int("SQLALCHEMY_POOL_RECYCLE", 1800),
-    pool_pre_ping=True,
-    pool_use_lifo=True,
-    echo=False,
-)
+def _engine_kwargs(database_url: str) -> dict:
+    kwargs = {
+        "pool_pre_ping": True,
+        "echo": False,
+    }
+    if database_url.startswith("sqlite"):
+        kwargs["connect_args"] = {"check_same_thread": False}
+        return kwargs
+
+    kwargs.update(
+        {
+            "pool_size": _env_int("SQLALCHEMY_POOL_SIZE", 10),
+            "max_overflow": _env_int("SQLALCHEMY_MAX_OVERFLOW", 20),
+            "pool_timeout": _env_int("SQLALCHEMY_POOL_TIMEOUT", 5),
+            "pool_recycle": _env_int("SQLALCHEMY_POOL_RECYCLE", 1800),
+            "pool_use_lifo": True,
+        }
+    )
+    return kwargs
+
+
+engine = create_engine(DATABASE_URL, **_engine_kwargs(DATABASE_URL))
 
 SessionLocal = sessionmaker(
     autocommit=False,
