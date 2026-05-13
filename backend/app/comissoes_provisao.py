@@ -12,19 +12,29 @@ CONCEITO-CHAVE: Comissão é DESPESA por COMPETÊNCIA, não depende de pagamento
 import logging
 from decimal import Decimal
 from datetime import date, timedelta
-from typing import Dict, List
+from typing import Dict, List, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import text
-from app.utils.tenant_safe_sql import execute_tenant_safe
+from app.tenancy.context import get_current_tenant_id
+from app.utils.tenant_safe_sql import TenantSafeSQLError, execute_tenant_safe
 from app.db.transaction import transactional_session
 
 logger = logging.getLogger(__name__)
 
 
+def _require_tenant_id(tenant_id=None):
+    resolved_tenant_id = tenant_id if tenant_id is not None else get_current_tenant_id()
+    if resolved_tenant_id is None or resolved_tenant_id == "":
+        raise TenantSafeSQLError(
+            "tenant_id ausente em comissoes_provisao. Informe tenant_id ou "
+            "configure app.tenancy.context antes de provisionar comissoes."
+        )
+    return resolved_tenant_id
+
+
 def provisionar_comissoes_venda(
     venda_id: int,
-    tenant_id: str,
-    db: Session
+    tenant_id: Optional[str] = None,
+    db: Optional[Session] = None
 ) -> Dict:
     """
     Cria provisões (Contas a Pagar + DRE) para todas as comissões de uma venda.
@@ -58,6 +68,11 @@ def provisionar_comissoes_venda(
             'message': str
         }
     """
+    if db is None:
+        raise TenantSafeSQLError("Sessao db obrigatoria para provisionar comissoes.")
+
+    tenant_id = _require_tenant_id(tenant_id)
+
     with transactional_session(db):
         # ============================================================
         # ETAPA 1: BUSCAR VENDA E VALIDAR
@@ -69,7 +84,7 @@ def provisionar_comissoes_venda(
                 v.cliente_id, v.status
             FROM vendas v
             WHERE v.id = :venda_id AND {tenant_filter}
-        """, {'venda_id': venda_id})
+        """, {'venda_id': venda_id}, tenant_id=tenant_id)
         
         venda = result_venda.fetchone()
         if not venda:
@@ -100,15 +115,16 @@ def provisionar_comissoes_venda(
         # ETAPA 2: BUSCAR COMISSÕES NÃO PROVISIONADAS
         # ============================================================
         
-        result_comissoes = db.execute(text("""
+        result_comissoes = execute_tenant_safe(db, """
             SELECT 
                 id, funcionario_id, valor_comissao_gerada, produto_id
             FROM comissoes_itens
             WHERE venda_id = :venda_id
               AND status = 'pendente'
               AND valor_comissao_gerada > 0
-              AND tenant_id = CAST(:tenant_id AS UUID)
-        """), {'venda_id': venda_id, 'tenant_id': str(tenant_id)})
+              AND COALESCE(comissao_provisionada, false) = false
+              AND {tenant_filter}
+        """, {'venda_id': venda_id}, tenant_id=tenant_id)
         
         comissoes_pendentes = result_comissoes.fetchall()
         
@@ -130,14 +146,14 @@ def provisionar_comissoes_venda(
         # ETAPA 3: BUSCAR SUBCATEGORIA DRE "Comissões de Vendas"
         # ============================================================
         
-        result_subcat = db.execute(text("""
+        result_subcat = execute_tenant_safe(db, """
             SELECT id
             FROM dre_subcategorias
             WHERE nome LIKE '%Vendedores%'
               AND ativo = true
-              AND tenant_id = CAST(:tenant_id AS UUID)
+              AND {tenant_filter}
             LIMIT 1
-        """), {'tenant_id': str(tenant_id)})
+        """, {}, tenant_id=tenant_id)
         
         subcat_comissoes = result_subcat.fetchone()
         
@@ -169,12 +185,12 @@ def provisionar_comissoes_venda(
             valor_comissao = Decimal(str(comissao[2]))
             
             # Buscar dados do funcionário
-            result_func = db.execute(text("""
+            result_func = execute_tenant_safe(db, """
                 SELECT nome, data_fechamento_comissao
                 FROM users
                 WHERE id = :funcionario_id
-                AND tenant_id = CAST(:tenant_id AS UUID)
-            """), {'funcionario_id': funcionario_id, 'tenant_id': str(tenant_id)})
+                  AND {tenant_filter}
+            """, {'funcionario_id': funcionario_id}, tenant_id=tenant_id)
             
             funcionario = result_func.fetchone()
             funcionario_nome = funcionario[0] if funcionario else f"Funcionário #{funcionario_id}"
@@ -213,7 +229,7 @@ def provisionar_comissoes_venda(
             
             # Inserir conta a pagar
             # 🔒 CAMPO CRÍTICO: fornecedor_id = funcionario_id (comissionado)
-            result_insert = db.execute(text("""
+            result_insert = execute_tenant_safe(db, """
                 INSERT INTO contas_pagar (
                     descricao,
                     fornecedor_id,
@@ -245,11 +261,11 @@ def provisionar_comissoes_venda(
                     :documento,
                     :observacoes,
                     :user_id,
-                    CAST(:tenant_id AS UUID),
+                    :tenant_id,
                     CURRENT_TIMESTAMP,
                     CURRENT_TIMESTAMP
                 ) RETURNING id
-            """), {
+            """, {
                 'descricao': descricao_conta,
                 'fornecedor_id': funcionario_id,  # ✅ Comissionado é o fornecedor
                 'dre_subcategoria_id': dre_subcategoria_id,
@@ -260,8 +276,8 @@ def provisionar_comissoes_venda(
                 'documento': f"COMISSAO-VENDA-{venda_id}-{comissao_id}",
                 'observacoes': f"Provisão automática - Comissão venda {venda.numero_venda}",
                 'user_id': funcionario_id,  # Pode ser ajustado conforme lógica do sistema
-                'tenant_id': str(tenant_id)
-            })
+                'tenant_id': tenant_id
+            }, tenant_id=tenant_id, require_tenant=False)
             
             # Obter ID da conta criada
             conta_pagar_id = result_insert.fetchone()[0]
@@ -296,19 +312,18 @@ def provisionar_comissoes_venda(
             # 4.3: Marcar comissão como provisionada
             # --------------------------------------------------------
             
-            db.execute(text("""
+            execute_tenant_safe(db, """
                 UPDATE comissoes_itens
                 SET comissao_provisionada = TRUE,
                     conta_pagar_id = :conta_pagar_id,
                     data_provisao = :data_provisao
                 WHERE id = :comissao_id
-                AND tenant_id = CAST(:tenant_id AS UUID)
-            """), {
+                  AND {tenant_filter}
+            """, {
                 'conta_pagar_id': conta_pagar_id,
                 'data_provisao': date.today(),
                 'comissao_id': comissao_id,
-                'tenant_id': str(tenant_id)
-            })
+            }, tenant_id=tenant_id)
             
             total_provisionado += valor_comissao
             comissoes_provisionadas_count += 1

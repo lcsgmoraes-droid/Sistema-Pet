@@ -1,3 +1,5 @@
+import os
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import List
 
@@ -126,12 +128,43 @@ ALLOWED_ORIGINS: List[str] = [
 
 # ====== HELPERS ======
 
+STRICT_DATABASE_ENVIRONMENTS = {"production", "prod", "staging"}
+LOCAL_DATABASE_ENVIRONMENTS = {"test", "testing", "dev", "development", "local"}
+
+
+def _database_environments() -> set[str]:
+    values = {
+        os.getenv("APP_ENV"),
+        os.getenv("ENVIRONMENT"),
+        os.getenv("ENV"),
+        settings.ENVIRONMENT,
+    }
+    return {value.strip().lower() for value in values if value and value.strip()}
+
+
+def _allows_sqlite_database() -> bool:
+    environments = _database_environments()
+    if environments & STRICT_DATABASE_ENVIRONMENTS:
+        return False
+    return bool(environments & LOCAL_DATABASE_ENVIRONMENTS)
+
+
 def get_database_url() -> str:
-    if not settings.DATABASE_URL.startswith("postgresql"):
+    database_url = os.getenv("DATABASE_URL", settings.DATABASE_URL)
+    if database_url.startswith("postgresql"):
+        return database_url
+    if database_url.startswith("sqlite") and _allows_sqlite_database():
+        return database_url
+    if database_url.startswith("sqlite"):
+        raise RuntimeError(
+            "Invalid database. SQLite is allowed only in test/dev/local environments; "
+            "production and staging must use PostgreSQL."
+        )
+    if not database_url.startswith("postgresql"):
         raise RuntimeError(
             "Invalid database. This system supports PostgreSQL only."
         )
-    return settings.DATABASE_URL
+    return database_url
 
 
 def print_config() -> None:

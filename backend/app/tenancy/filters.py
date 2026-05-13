@@ -26,16 +26,15 @@ logger = logging.getLogger(__name__)
 # WHITELIST: Tabelas que podem ser acessadas sem tenant_id no contexto
 # Critério de inclusão:
 # 1. Tabelas de autenticação (users, user_sessions)
-# 2. Tabelas de controle de acesso (tenants, user_tenants, roles, permissions, role_permissions)
+# 2. Tabelas de controle de acesso estritamente necessarias antes do tenant
+# Roles e role_permissions sao tenant-scoped e ficam bloqueadas sem contexto.
 # 3. Tabelas de auditoria que precisam registrar eventos sem tenant (audit_logs)
 TENANT_WHITELIST_TABLES = {
     'users',           # Necessário para login (antes de selecionar tenant)
     'tenants',         # Necessário para listar tenants disponíveis
     'user_sessions',   # Sessões não são tenant-specific
     'user_tenants',    # Necessário para /auth/select-tenant
-    'roles',           # Necessário para carregar permissões
     'permissions',     # Permissões globais do sistema
-    'role_permissions',# Necessário para carregar permissões
     'audit_logs',      # Pode precisar registrar eventos sem tenant
 }
 
@@ -70,7 +69,6 @@ def _get_query_primary_table(execute_state):
         return None
 
 
-@event.listens_for(Session, "do_orm_execute")
 def _add_tenant_filter(execute_state):
     """
     Filtro global automático de tenant com FAIL-FAST.
@@ -150,4 +148,25 @@ def _add_tenant_filter(execute_state):
     )
     logger.error(error_msg)
     raise RuntimeError(error_msg)
+
+
+def _registered_listeners(event_name: str):
+    return list(getattr(Session.dispatch, event_name)._clslevel.get(Session, ()))
+
+
+def register_tenant_filter_once() -> None:
+    """Registra o filtro global uma unica vez, inclusive apos reload do modulo."""
+    for listener in _registered_listeners("do_orm_execute"):
+        same_hook = (
+            getattr(listener, "__module__", None) == __name__
+            and getattr(listener, "__name__", None) == "_add_tenant_filter"
+        )
+        if same_hook and listener is not _add_tenant_filter:
+            event.remove(Session, "do_orm_execute", listener)
+
+    if not event.contains(Session, "do_orm_execute", _add_tenant_filter):
+        event.listen(Session, "do_orm_execute", _add_tenant_filter)
+
+
+register_tenant_filter_once()
 

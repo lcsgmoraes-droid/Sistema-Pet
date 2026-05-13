@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.audit_log import log_action
 from app.models import User
+from app.tenancy.context import clear_current_tenant, get_current_tenant, set_current_tenant
 
 
 logger = logging.getLogger(__name__)
@@ -76,7 +77,13 @@ def _audit_auth_event(
     if not user:
         return
 
+    previous_tenant = get_current_tenant()
+    temporary_tenant = previous_tenant is None and getattr(user, "tenant_id", None)
+
     try:
+        if temporary_tenant:
+            set_current_tenant(user.tenant_id)
+
         log_action(
             db=db,
             user_id=user.id,
@@ -91,6 +98,9 @@ def _audit_auth_event(
         )
     except Exception as exc:
         logger.warning("auth_audit_log_failed", extra={"action": action, "error": str(exc)})
+    finally:
+        if temporary_tenant:
+            clear_current_tenant()
 
 
 def register_failed_login(db: Session, user: User | None, request: Request | None) -> None:

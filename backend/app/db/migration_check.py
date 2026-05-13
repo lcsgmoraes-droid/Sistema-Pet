@@ -15,12 +15,10 @@ Data: 2026-02-05
 """
 
 import logging
+import os
 from typing import Optional
 from sqlalchemy import text, inspect
 from sqlalchemy.engine import Engine
-from alembic.config import Config
-from alembic.script import ScriptDirectory
-from alembic.runtime.migration import MigrationContext
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +26,79 @@ logger = logging.getLogger(__name__)
 class DatabaseMigrationError(RuntimeError):
     """Erro levantado quando há migrations pendentes ou problemas no schema."""
     pass
+
+
+def _load_external_alembic():
+    """
+    Importa o pacote Python externo alembic apenas quando a checagem precisa dele.
+
+    O repositorio tambem possui backend/alembic com os scripts de migration. Em
+    ambientes sem a dependencia instalada, esse diretorio aparece como namespace
+    package e import alembic.config falha. Manter o import aqui evita quebrar o
+    simples import de app.main e preserva a falha explicita quando a checagem de
+    migrations realmente precisa do pacote externo.
+    """
+    try:
+        from alembic.config import Config
+        from alembic.script import ScriptDirectory
+        from alembic.runtime.migration import MigrationContext
+    except ModuleNotFoundError as exc:
+        if exc.name == "alembic.config":
+            raise RuntimeError(
+                "Pacote Python externo 'alembic' nao encontrado ou sombreado pelo "
+                "diretorio local backend/alembic. Instale backend/requirements.txt "
+                "ou ajuste o ambiente/PYTHONPATH para resolver o pacote externo."
+            ) from exc
+        raise
+
+    return Config, ScriptDirectory, MigrationContext
+
+
+STRICT_MIGRATION_ENVIRONMENTS = {"production", "prod", "staging"}
+TOLERANT_MIGRATION_ENVIRONMENTS = {
+    "development",
+    "dev",
+    "local",
+    "test",
+    "testing",
+}
+
+
+def _env_bool(name: str) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return False
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _configured_environment_names() -> list[str]:
+    values = []
+    for name in ("ENVIRONMENT", "ENV", "APP_ENV"):
+        value = os.getenv(name)
+        if value:
+            values.append(value.strip().lower())
+    return values
+
+
+def _is_strict_migration_environment() -> bool:
+    environments = _configured_environment_names()
+    if any(environment in STRICT_MIGRATION_ENVIRONMENTS for environment in environments):
+        return True
+    if any(environment in TOLERANT_MIGRATION_ENVIRONMENTS for environment in environments):
+        return False
+    if _env_bool("DEBUG"):
+        return False
+    return True
+
+
+def _build_alembic_head_error(exc: Exception) -> str:
+    return (
+        "Could not determine Alembic head. This prevents the application from "
+        "guaranteeing that database migrations are up to date. Recommended "
+        "action: install the correct dependencies/Alembic package, adjust "
+        "PYTHONPATH so the external Alembic package is resolved, or run "
+        f"alembic upgrade head. Original error: {exc}"
+    )
 
 
 def ensure_db_ready(engine: Engine, alembic_ini_path: Optional[str] = None) -> None:
@@ -111,10 +182,16 @@ def ensure_db_ready(engine: Engine, alembic_ini_path: Optional[str] = None) -> N
             expected_head = _get_alembic_head(engine, alembic_ini_path)
             logger.info(f"📌 Expected head version: {expected_head}")
         except Exception as e:
-            # Se não conseguir obter head, apenas logamos warning
-            # (pode ser ambiente sem alembic.ini acessível)
-            logger.warning(f"⚠️  Could not determine alembic head: {str(e)}")
-            logger.warning("⚠️  Skipping head comparison (assuming current version is correct)")
+            error_msg = _build_alembic_head_error(e)
+            if _is_strict_migration_environment():
+                logger.error(f"❌ {error_msg}")
+                raise DatabaseMigrationError(error_msg) from e
+
+            logger.warning(f"⚠️  {error_msg}")
+            logger.warning(
+                "⚠️  Skipping head comparison only because this environment "
+                "is development/test/local."
+            )
             logger.info(f"✅ Database ready (version: {current_version}, head check skipped)")
             return
         
@@ -176,10 +253,11 @@ def _get_alembic_head(engine: Engine, alembic_ini_path: Optional[str] = None) ->
         raise FileNotFoundError(f"alembic.ini not found at: {alembic_ini_path}")
     
     # Carregar configuração do Alembic
-    alembic_cfg = Config(alembic_ini_path)
+    config_cls, script_directory_cls, _ = _load_external_alembic()
+    alembic_cfg = config_cls(alembic_ini_path)
     
     # Obter ScriptDirectory
-    script = ScriptDirectory.from_config(alembic_cfg)
+    script = script_directory_cls.from_config(alembic_cfg)
     
     # Obter head (pode haver múltiplos heads em branches, pegamos o primeiro)
     heads = script.get_heads()

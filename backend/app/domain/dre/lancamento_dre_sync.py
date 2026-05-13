@@ -5,18 +5,45 @@ Garante que toda movimentação financeira atualize imediatamente a DRE.
 
 from decimal import Decimal
 from datetime import date
+from uuid import UUID
+
 from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
 from app.dre_plano_contas_models import DRESubcategoria, NaturezaDRE, TipoCusto
 from app.ia.aba7_models import DREPeriodo
 from app.ia.aba7_dre_detalhada_models import DREDetalheCanal
+from app.tenancy.context import get_current_tenant_id, set_tenant_context
+from app.utils.tenant_safe_sql import TenantSafeSQLError, execute_tenant_safe
+
+
+def _require_tenant_id(tenant_id=None) -> UUID:
+    resolved_tenant_id = tenant_id if tenant_id is not None else get_current_tenant_id()
+    if resolved_tenant_id is None or resolved_tenant_id == "":
+        raise TenantSafeSQLError(
+            "tenant_id ausente em lancamento_dre_sync. Informe tenant_id ou "
+            "configure app.tenancy.context antes de atualizar a DRE."
+        )
+
+    try:
+        normalized_tenant_id = (
+            resolved_tenant_id
+            if isinstance(resolved_tenant_id, UUID)
+            else UUID(str(resolved_tenant_id))
+        )
+    except (TypeError, ValueError) as exc:
+        raise TenantSafeSQLError(
+            "tenant_id invalido em lancamento_dre_sync. Informe um UUID valido."
+        ) from exc
+
+    set_tenant_context(normalized_tenant_id)
+    return normalized_tenant_id
 
 
 def atualizar_dre_por_lancamento(
     db: Session,
     *,
-    tenant_id,
+    tenant_id=None,
     dre_subcategoria_id: int,
     canal: str,
     valor: Decimal,
@@ -42,6 +69,8 @@ def atualizar_dre_por_lancamento(
         tipo_movimentacao: 'DESPESA' ou 'RECEITA'
     """
     
+    tenant_id = _require_tenant_id(tenant_id)
+
     # 1. Validar subcategoria DRE
     subcategoria = (
         db.query(DRESubcategoria)
@@ -65,6 +94,7 @@ def atualizar_dre_por_lancamento(
     periodo = (
         db.query(DREPeriodo)
         .filter(
+            DREPeriodo.tenant_id == tenant_id,
             DREPeriodo.data_inicio <= data_lancamento,
             DREPeriodo.data_fim >= data_lancamento,
         )
@@ -213,8 +243,7 @@ def atualizar_dre_por_lancamento(
         dre_detalhe.status = 'equilibrio'
     
     # 6. Inserir lançamento detalhado para drill-down (cada subcategoria visível)
-    from sqlalchemy import text
-    db.execute(text("""
+    execute_tenant_safe(db, """
         INSERT INTO dre_lancamentos (
             tenant_id, usuario_id, dre_detalhe_canal_id, dre_subcategoria_id,
             canal, valor, data_lancamento, data_competencia, origem, descricao
@@ -222,7 +251,7 @@ def atualizar_dre_por_lancamento(
             :tenant_id, :usuario_id, :dre_detalhe_id, :subcategoria_id,
             :canal, :valor, :data_lancamento, :data_competencia, :origem, :descricao
         )
-    """), {
+    """, {
         'tenant_id': str(tenant_id),
         'usuario_id': dre_detalhe.usuario_id,
         'dre_detalhe_id': dre_detalhe.id,
@@ -233,7 +262,7 @@ def atualizar_dre_por_lancamento(
         'data_competencia': data_lancamento,
         'origem': tipo_movimentacao,
         'descricao': f"{subcategoria.nome} - {data_lancamento.strftime('%Y-%m-%d')}"
-    })
+    }, tenant_id=tenant_id, require_tenant=False)
     
     # 7. Persistir
     db.commit()
