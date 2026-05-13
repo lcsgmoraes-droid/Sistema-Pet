@@ -35,6 +35,15 @@ ITEM_INSTALL_TARGET_TABLES = {
     "categorias",
     "produtos",
 }
+REQUIRED_ONBOARDING_SECTIONS = {
+    "payment_methods",
+    "dre_categories",
+    "dre_subcategories",
+    "financial_categories",
+    "expense_types",
+    "product_departments",
+    "product_categories",
+}
 
 TIPO_CUSTO_DB_LABELS = {
     "direto": "DIRETO",
@@ -442,6 +451,25 @@ class OnboardingResult:
             "warnings": self.warnings,
             "template_source": self.template_source,
         }
+
+
+def _enforce_required_onboarding(result: OnboardingResult) -> None:
+    missing_sections = sorted(
+        section
+        for section in REQUIRED_ONBOARDING_SECTIONS
+        if result.created.get(section, 0) + result.skipped.get(section, 0) <= 0
+    )
+    if not missing_sections and not result.warnings:
+        return
+
+    details: list[str] = []
+    if missing_sections:
+        details.append("secoes obrigatorias ausentes: " + ", ".join(missing_sections))
+    if result.warnings:
+        details.append("avisos: " + " | ".join(result.warnings))
+    raise TenantOnboardingError(
+        "Onboarding obrigatorio incompleto para novo tenant: " + "; ".join(details)
+    )
 
 
 def _normalize_tenant_id(tenant_id: Any) -> str:
@@ -1589,6 +1617,7 @@ def _run_onboarding_steps(
     bundle_version: str,
     dry_run: bool,
     include_products: bool,
+    strict_required: bool,
     result: OnboardingResult,
 ) -> dict[str, Any]:
     if not dry_run:
@@ -1681,6 +1710,9 @@ def _run_onboarding_steps(
     if not dry_run:
         _record_install(db, tenant_id_str, user_id_int, result)
 
+    if strict_required and not dry_run:
+        _enforce_required_onboarding(result)
+
     return result.to_dict()
 
 
@@ -1692,6 +1724,7 @@ def onboard_tenant_defaults(
     bundle_version: str = DEFAULT_BUNDLE_VERSION,
     dry_run: bool = False,
     include_products: bool = False,
+    strict_required: bool = False,
 ) -> dict[str, Any]:
     """
     Copy system templates into tenant-owned tables.
@@ -1719,6 +1752,7 @@ def onboard_tenant_defaults(
             bundle_version,
             dry_run,
             include_products,
+            strict_required,
             result,
         )
     except SQLAlchemyError as exc:

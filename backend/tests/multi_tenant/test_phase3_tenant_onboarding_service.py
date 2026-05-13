@@ -581,6 +581,28 @@ def test_onboarding_skips_sections_when_operational_schema_is_absent():
     assert any("tenant_template_installs" in warning for warning in result["warnings"])
 
 
+def test_onboarding_strict_required_fails_when_operational_schema_is_absent():
+    engine = create_engine(
+        "sqlite:///:memory:",
+        connect_args={"check_same_thread": False},
+        poolclass=StaticPool,
+    )
+    SessionLocal = sessionmaker(bind=engine)
+    session = SessionLocal()
+
+    try:
+        with pytest.raises(TenantOnboardingError, match="Onboarding obrigatorio incompleto"):
+            onboard_tenant_defaults(
+                session,
+                tenant_id=TENANT_A,
+                user_id=1,
+                dry_run=False,
+                strict_required=True,
+            )
+    finally:
+        session.close()
+
+
 def test_onboarding_script_defaults_to_dry_run(monkeypatch, capsys, onboarding_session):
     monkeypatch.setattr(
         run_tenant_onboarding,

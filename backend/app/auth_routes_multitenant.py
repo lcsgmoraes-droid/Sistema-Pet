@@ -434,6 +434,7 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
             tenant_id=tenant_id,
             user_id=user.id,
             dry_run=False,
+            strict_required=True,
         )
         db.flush()
         logger.info("Onboarding inicial do tenant %s concluido: %s", tenant_id, onboarding_result)

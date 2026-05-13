@@ -5,7 +5,7 @@ from uuid import UUID
 import pytest
 from fastapi.security import HTTPAuthorizationCredentials
 from jose import jwt
-from sqlalchemy import create_engine, event
+from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import Session, sessionmaker
 from starlette.requests import Request
 
@@ -159,7 +159,14 @@ def test_auth_multitenant_flow_nao_quebra_com_roles_fora_da_whitelist(monkeypatc
     calls = []
 
     def fake_onboard(db, tenant_id, user_id, **kwargs):
-        calls.append((UUID(str(tenant_id)), user_id, kwargs.get("dry_run", False)))
+        calls.append(
+            (
+                UUID(str(tenant_id)),
+                user_id,
+                kwargs.get("dry_run", False),
+                kwargs.get("strict_required", False),
+            )
+        )
         return {
             "tenant_id": str(tenant_id),
             "bundle_code": "petshop-br",
@@ -200,7 +207,7 @@ def test_auth_multitenant_flow_nao_quebra_com_roles_fora_da_whitelist(monkeypatc
     tenant_id = UUID(register_response.tenants[0]["id"])
 
     user = auth_db_session.query(User).filter(User.email == "phase11@example.com").one()
-    assert calls == [(tenant_id, user.id, False)]
+    assert calls == [(tenant_id, user.id, False, True)]
     set_current_tenant(tenant_id)
     role = auth_db_session.query(Role).filter(Role.tenant_id == tenant_id).one()
     user_tenant = auth_db_session.query(UserTenant).filter(UserTenant.user_id == user.id).one()
@@ -240,3 +247,38 @@ def test_auth_multitenant_flow_nao_quebra_com_roles_fora_da_whitelist(monkeypatc
     assert me_payload["tenant"]["id"] == str(tenant_id)
     assert "produtos.ler" in me_payload["permissions"]
     assert "vendas.ler" in me_payload["permissions"]
+
+
+def test_register_fails_closed_when_required_onboarding_fails(monkeypatch, auth_db_session):
+    def fail_onboard(db, tenant_id, user_id, **kwargs):
+        assert kwargs.get("strict_required") is True
+        raise RuntimeError("Onboarding obrigatorio incompleto")
+
+    monkeypatch.setattr(auth_routes, "onboard_tenant_defaults", fail_onboard)
+    monkeypatch.setattr(auth_routes, "EMAIL_VERIFICATION_REQUIRED", False)
+
+    with pytest.raises(auth_routes.HTTPException) as exc_info:
+        auth_routes.register(
+            request=_request("/auth/register"),
+            payload=auth_routes.RegisterRequest(
+                email="phase11-onboarding-fail@example.com",
+                nome="Phase 1.1 Fail",
+                nome_loja="Loja Phase 1.1 Fail",
+                accepted_terms=True,
+                accepted_privacy=True,
+                **{LOGIN_SECRET_FIELD: TEST_LOGIN_SECRET},
+            ),
+            db=auth_db_session,
+        )
+
+    assert exc_info.value.status_code == 500
+    user_count = auth_db_session.execute(
+        text("SELECT count(*) FROM users WHERE email = :email"),
+        {"email": "phase11-onboarding-fail@example.com"},
+    ).scalar_one()
+    tenant_count = auth_db_session.execute(
+        text("SELECT count(*) FROM tenants WHERE name = :name"),
+        {"name": "Loja Phase 1.1 Fail"},
+    ).scalar_one()
+    assert user_count == 0
+    assert tenant_count == 0
