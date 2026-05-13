@@ -896,3 +896,57 @@ def test_onboarding_script_template_check_rejects_apply(capsys):
     assert code == 1
     assert payload["dry_run"] is True
     assert "somente leitura" in payload["error"]
+
+
+def test_migration_status_reports_pending_head(monkeypatch, onboarding_session):
+    onboarding_session.execute(text("CREATE TABLE alembic_version (version_num TEXT NOT NULL)"))
+    onboarding_session.execute(text("INSERT INTO alembic_version (version_num) VALUES ('old_head')"))
+    onboarding_session.commit()
+    monkeypatch.setattr(run_tenant_onboarding, "_get_alembic_heads", lambda: ["new_head"])
+
+    status = run_tenant_onboarding._migration_status(onboarding_session)
+
+    assert status["ok"] is False
+    assert status["current"] == ["old_head"]
+    assert status["heads"] == ["new_head"]
+    assert status["pending_heads"] == ["new_head"]
+    assert status["extra_current_versions"] == ["old_head"]
+
+
+def test_onboarding_script_signup_readiness_check_combines_migrations_and_templates(
+    monkeypatch,
+    capsys,
+    onboarding_session,
+):
+    onboarding_session.execute(text("CREATE TABLE alembic_version (version_num TEXT NOT NULL)"))
+    onboarding_session.execute(text("INSERT INTO alembic_version (version_num) VALUES ('test_head')"))
+    onboarding_session.commit()
+    monkeypatch.setattr(
+        run_tenant_onboarding,
+        "SessionLocal",
+        lambda: _SessionProxy(onboarding_session),
+    )
+    monkeypatch.setattr(run_tenant_onboarding, "_get_alembic_heads", lambda: ["test_head"])
+
+    code = run_tenant_onboarding.main(["--signup-readiness-check", "--include-products"])
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.out)
+    assert code == 0
+    assert payload["ok"] is True
+    assert payload["mode"] == "signup_readiness_check"
+    assert payload["blockers"] == []
+    assert payload["migration"]["ok"] is True
+    assert payload["template_contract"]["ok"] is True
+    assert payload["future_tenant_simulation"]["ok"] is True
+    assert _count(onboarding_session, "formas_pagamento", TENANT_A) == 0
+
+
+def test_onboarding_script_signup_readiness_check_rejects_apply(capsys):
+    code = run_tenant_onboarding.main(["--signup-readiness-check", "--apply"])
+
+    captured = capsys.readouterr()
+    payload = json.loads(captured.err)
+    assert code == 1
+    assert payload["dry_run"] is True
+    assert "somente leitura" in payload["error"]

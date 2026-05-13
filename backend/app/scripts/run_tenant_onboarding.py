@@ -6,6 +6,7 @@ Default mode is dry-run. Use --apply to persist data.
 from __future__ import annotations
 
 import argparse
+import ast
 import json
 import os
 import sys
@@ -53,6 +54,11 @@ def _build_parser() -> argparse.ArgumentParser:
         "--template-check",
         action="store_true",
         help="Validate global template readiness for future tenants without applying changes.",
+    )
+    target.add_argument(
+        "--signup-readiness-check",
+        action="store_true",
+        help="Validate migrations and template onboarding readiness for future tenant signup.",
     )
     parser.add_argument(
         "--user-id",
@@ -162,6 +168,121 @@ def _find_active_tenants_with_owner(db) -> tuple[list[dict[str, Any]], list[dict
 def _merge_counts(target: dict[str, int], source: dict[str, int]) -> None:
     for key, value in source.items():
         target[key] = target.get(key, 0) + int(value)
+
+
+def _get_alembic_heads() -> list[str]:
+    try:
+        from app.db.migration_check import _load_external_alembic
+
+        config_cls, script_directory_cls, _ = _load_external_alembic()
+        backend_path = Path(__file__).resolve().parents[2]
+        alembic_cfg = config_cls(str(backend_path / "alembic.ini"))
+        script = script_directory_cls.from_config(alembic_cfg)
+        return sorted(script.get_heads())
+    except Exception:
+        return _get_alembic_heads_from_version_files()
+
+
+def _literal_name_from_assignment(node: ast.AST, variable_name: str) -> str | None:
+    target_names: list[str] = []
+    value_node: ast.AST | None = None
+    if isinstance(node, ast.Assign):
+        target_names = [target.id for target in node.targets if isinstance(target, ast.Name)]
+        value_node = node.value
+    elif isinstance(node, ast.AnnAssign):
+        if isinstance(node.target, ast.Name):
+            target_names = [node.target.id]
+        value_node = node.value
+
+    if variable_name not in target_names or value_node is None:
+        return None
+    try:
+        value = ast.literal_eval(value_node)
+    except Exception:
+        return None
+    return value if isinstance(value, str) else None
+
+
+def _literal_down_revisions(node: ast.AST) -> set[str]:
+    target_names: list[str] = []
+    value_node: ast.AST | None = None
+    if isinstance(node, ast.Assign):
+        target_names = [target.id for target in node.targets if isinstance(target, ast.Name)]
+        value_node = node.value
+    elif isinstance(node, ast.AnnAssign):
+        if isinstance(node.target, ast.Name):
+            target_names = [node.target.id]
+        value_node = node.value
+
+    if "down_revision" not in target_names or value_node is None:
+        return set()
+    try:
+        value = ast.literal_eval(value_node)
+    except Exception:
+        return set()
+    if isinstance(value, str):
+        return {value}
+    if isinstance(value, (tuple, list)):
+        return {item for item in value if isinstance(item, str)}
+    return set()
+
+
+def _get_alembic_heads_from_version_files() -> list[str]:
+    versions_path = Path(__file__).resolve().parents[2] / "alembic" / "versions"
+    revisions: set[str] = set()
+    down_revisions: set[str] = set()
+    for migration_file in versions_path.glob("*.py"):
+        tree = ast.parse(migration_file.read_text(encoding="utf-8"))
+        for node in tree.body:
+            revision = _literal_name_from_assignment(node, "revision")
+            if revision:
+                revisions.add(revision)
+            down_revisions.update(_literal_down_revisions(node))
+    return sorted(revisions - down_revisions)
+
+
+def _migration_status(db) -> dict[str, Any]:
+    inspector = inspect(db.connection())
+    if not inspector.has_table("alembic_version"):
+        return {
+            "ok": False,
+            "dialect": db.get_bind().dialect.name,
+            "current": [],
+            "heads": [],
+            "pending_heads": [],
+            "extra_current_versions": [],
+            "error": "Tabela alembic_version ausente.",
+        }
+
+    current = sorted(
+        str(row[0])
+        for row in db.execute(text("SELECT version_num FROM alembic_version")).all()
+        if row[0]
+    )
+    try:
+        heads = _get_alembic_heads()
+    except Exception as exc:
+        return {
+            "ok": False,
+            "dialect": db.get_bind().dialect.name,
+            "current": current,
+            "heads": [],
+            "pending_heads": [],
+            "extra_current_versions": [],
+            "error": str(exc),
+        }
+
+    current_set = set(current)
+    head_set = set(heads)
+    return {
+        "ok": bool(heads) and current_set == head_set,
+        "dialect": db.get_bind().dialect.name,
+        "current": current,
+        "heads": heads,
+        "pending_heads": sorted(head_set - current_set),
+        "extra_current_versions": sorted(current_set - head_set),
+        "error": None,
+    }
 
 
 def _run_one(db, args, tenant_id: str, user_id: int) -> dict[str, Any]:
@@ -313,6 +434,37 @@ def _run_future_tenant_check(db, args) -> dict[str, Any]:
     }
 
 
+def _run_signup_readiness_check(db, args) -> dict[str, Any]:
+    migration = _migration_status(db)
+    template = validate_onboarding_template_contract(
+        db=db,
+        bundle_code=args.bundle_code,
+        bundle_version=args.bundle_version,
+        include_products=args.include_products,
+    )
+    future_tenant = _run_future_tenant_check(db, args)
+    db.rollback()
+
+    blockers: list[str] = []
+    if not migration.get("ok"):
+        blockers.append("migrations_pendentes_ou_indeterminadas")
+    if not template.get("ok"):
+        blockers.append("template_contract_incompleto")
+    if not future_tenant.get("ok"):
+        blockers.append("simulacao_onboarding_incompleta")
+
+    return {
+        "ok": not blockers,
+        "dry_run": True,
+        "mode": "signup_readiness_check",
+        "tenant_scope": "synthetic_future_tenant",
+        "blockers": blockers,
+        "migration": migration,
+        "template_contract": template,
+        "future_tenant_simulation": future_tenant,
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     args = _build_parser().parse_args(argv)
     dry_run = not args.apply
@@ -328,6 +480,9 @@ def main(argv: list[str] | None = None) -> int:
 
     if args.template_check and args.apply:
         return _fail("--template-check e somente leitura; remova --apply.", dry_run=True)
+
+    if args.signup_readiness_check and args.apply:
+        return _fail("--signup-readiness-check e somente leitura; remova --apply.", dry_run=True)
 
     if args.all_active_tenants and args.apply and not args.allow_existing_tenant_apply:
         return _fail(
@@ -357,6 +512,8 @@ def main(argv: list[str] | None = None) -> int:
                 include_products=args.include_products,
             )
             db.rollback()
+        elif args.signup_readiness_check:
+            result = _run_signup_readiness_check(db, args)
         elif args.all_active_tenants:
             result = _run_all(db, args)
         else:
