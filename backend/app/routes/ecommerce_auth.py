@@ -29,6 +29,7 @@ from app.services.auth_security import (
     register_successful_login,
     remaining_lock_seconds,
 )
+from app.tenancy.context import set_current_tenant
 
 
 router = APIRouter(prefix="/ecommerce/auth", tags=["ecommerce-auth"])
@@ -147,6 +148,7 @@ def _extract_tenant_id_from_request(request: Request) -> UUID:
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="X-Tenant-ID obrigatório e deve ser UUID válido",
         )
+    set_current_tenant(tenant_id)
     return tenant_id
 
 
@@ -384,12 +386,21 @@ def _get_current_ecommerce_user(
         payload = jwt.decode(credentials.credentials, JWT_SECRET_KEY, algorithms=[ALGORITHM])
         user_id = int(payload.get("sub"))
         token_type = payload.get("token_type")
+        tenant_id = _normalize_tenant_uuid(payload.get("tenant_id"))
         if token_type != "ecommerce_customer":
+            raise credentials_exception
+        if not tenant_id:
             raise credentials_exception
     except (JWTError, TypeError, ValueError):
         raise credentials_exception
 
-    user = db.query(User).filter(User.id == user_id).first()
+    set_current_tenant(tenant_id)
+
+    user = (
+        db.query(User)
+        .filter(User.id == user_id, User.tenant_id == tenant_id)
+        .first()
+    )
     if not user or not user.is_active:
         raise credentials_exception
 

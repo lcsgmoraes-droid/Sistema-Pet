@@ -3,6 +3,7 @@ from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
 import secrets
+from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -18,10 +19,20 @@ from app.models import Cliente, ConfiguracaoEntrega, User
 from app.rotas_entrega_models import RotaEntrega, RotaEntregaParada
 from app.schemas.rota_entrega import RotaEntregaResponse
 from app.services.google_maps_service import calcular_rota_otimizada
+from app.tenancy.context import set_current_tenant
 from app.vendas_models import Venda, VendaItem
 
 router = APIRouter(prefix="/ecommerce/entregador", tags=["ecommerce-entregador"])
 _security = HTTPBearer()
+
+
+def _normalize_tenant_uuid(raw_tenant_id: str | None) -> UUID | None:
+    if not raw_tenant_id:
+        return None
+    try:
+        return UUID(str(raw_tenant_id).strip())
+    except Exception:
+        return None
 
 
 class OtimizarSelecionadasPayload(BaseModel):
@@ -53,12 +64,21 @@ def _get_entregador_cliente(
     try:
         payload = jwt.decode(credentials.credentials, JWT_SECRET_KEY, algorithms=[ALGORITHM])
         user_id = int(payload.get("sub"))
+        tenant_id = _normalize_tenant_uuid(payload.get("tenant_id"))
         if payload.get("token_type") != "ecommerce_customer":
+            raise auth_exc
+        if not tenant_id:
             raise auth_exc
     except (JWTError, TypeError, ValueError):
         raise auth_exc
 
-    user = db.query(User).filter(User.id == user_id, User.is_active == True).first()
+    set_current_tenant(tenant_id)
+
+    user = (
+        db.query(User)
+        .filter(User.id == user_id, User.tenant_id == tenant_id, User.is_active == True)
+        .first()
+    )
     if not user:
         raise auth_exc
 
