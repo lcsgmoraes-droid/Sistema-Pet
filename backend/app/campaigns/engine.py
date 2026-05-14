@@ -23,6 +23,7 @@ Princípios:
 import logging
 from datetime import datetime
 from typing import Optional
+from uuid import UUID
 
 from sqlalchemy.orm import Session
 
@@ -40,6 +41,7 @@ from app.campaigns.channel_scope import (
     is_purchase_benefit_campaign,
     normalize_benefit_channel,
 )
+from app.tenancy.context import clear_current_tenant, set_current_tenant
 
 logger = logging.getLogger(__name__)
 
@@ -67,51 +69,55 @@ class CampaignEngine:
            b. execute() — concede recompensa se elegível
         4. Atualiza status do evento na fila
         """
-        if event.event_type not in CAMPAIGN_TRIGGER_EVENTS:
-            logger.warning(
-                "[CampaignEngine] event_type '%s' não está na allowlist — descartado",
-                event.event_type,
-            )
-            event.status = "skipped"
-            event.processed_at = datetime.now()
-            self.db.commit()
-            return
-
-        if event.event_depth > 1:
-            logger.warning(
-                "[CampaignEngine] event_depth=%d > 1 — descartado (proteção storm)",
-                event.event_depth,
-            )
-            event.status = "skipped"
-            event.processed_at = datetime.now()
-            self.db.commit()
-            return
-
+        set_current_tenant(UUID(str(event.tenant_id)))
         try:
-            # Buscar campanhas ativas para este tenant
-            campaigns = self._get_active_campaigns(
-                tenant_id=event.tenant_id,
-                event_type=event.event_type,
-                sale_channel=(event.payload or {}).get("canal"),
-            )
+            if event.event_type not in CAMPAIGN_TRIGGER_EVENTS:
+                logger.warning(
+                    "[CampaignEngine] event_type '%s' não está na allowlist — descartado",
+                    event.event_type,
+                )
+                event.status = "skipped"
+                event.processed_at = datetime.now()
+                self.db.commit()
+                return
 
-            for campaign in campaigns:
-                self._run_campaign(campaign=campaign, event=event)
+            if event.event_depth > 1:
+                logger.warning(
+                    "[CampaignEngine] event_depth=%d > 1 — descartado (proteção storm)",
+                    event.event_depth,
+                )
+                event.status = "skipped"
+                event.processed_at = datetime.now()
+                self.db.commit()
+                return
 
-            event.status = "done"
-            event.processed_at = datetime.now()
-            self.db.commit()
+            try:
+                # Buscar campanhas ativas para este tenant
+                campaigns = self._get_active_campaigns(
+                    tenant_id=event.tenant_id,
+                    event_type=event.event_type,
+                    sale_channel=(event.payload or {}).get("canal"),
+                )
 
-        except Exception as exc:
-            logger.exception("[CampaignEngine] Erro ao processar evento %d: %s", event.id, exc)
-            event.retry_count = (event.retry_count or 0) + 1
-            event.error_message = str(exc)
-            if event.retry_count >= event.max_retries:
-                event.status = "failed"
-            else:
-                event.status = "pending"  # Volta para fila
-            self.db.commit()
-            raise
+                for campaign in campaigns:
+                    self._run_campaign(campaign=campaign, event=event)
+
+                event.status = "done"
+                event.processed_at = datetime.now()
+                self.db.commit()
+
+            except Exception as exc:
+                logger.exception("[CampaignEngine] Erro ao processar evento %d: %s", event.id, exc)
+                event.retry_count = (event.retry_count or 0) + 1
+                event.error_message = str(exc)
+                if event.retry_count >= event.max_retries:
+                    event.status = "failed"
+                else:
+                    event.status = "pending"  # Volta para fila
+                self.db.commit()
+                raise
+        finally:
+            clear_current_tenant()
 
     # ------------------------------------------------------------------
     # Métodos internos
