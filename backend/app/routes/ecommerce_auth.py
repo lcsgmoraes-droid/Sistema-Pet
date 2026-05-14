@@ -152,6 +152,18 @@ def _extract_tenant_id_from_request(request: Request) -> UUID:
     return tenant_id
 
 
+def _activate_user_tenant_context(user: User) -> str:
+    tenant_id = _normalize_tenant_uuid(str(getattr(user, "tenant_id", "") or ""))
+    if not tenant_id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token invalido",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    set_current_tenant(tenant_id)
+    return str(tenant_id)
+
+
 def _build_storefront_reset_link(tenant: Tenant | None, user_email: str, reset_token: str) -> str:
     base_url = (os.getenv("ECOMMERCE_BASE_URL") or "https://mlprohub.com.br").rstrip("/")
     store_ref = None
@@ -542,7 +554,7 @@ def _upsert_delivery_details(cliente: Cliente, details: dict, enabled: bool) -> 
 
 
 def _get_or_create_cliente_for_user(db: Session, user: User) -> Cliente:
-    tenant_id = str(user.tenant_id)
+    tenant_id = _activate_user_tenant_context(user)
     clientes_vinculados = (
         db.query(Cliente)
         .filter(Cliente.tenant_id == tenant_id, Cliente.user_id == user.id)
@@ -953,9 +965,10 @@ def resetar_senha(payload: EcommerceResetPasswordRequest, request: Request, db: 
 
 @router.get("/me")
 def me(current_user: User = Depends(_get_current_ecommerce_user), db: Session = Depends(get_session)):
+    tenant_id = _activate_user_tenant_context(current_user)
     cliente = (
         db.query(Cliente)
-        .filter(Cliente.tenant_id == str(current_user.tenant_id), Cliente.user_id == current_user.id)
+        .filter(Cliente.tenant_id == tenant_id, Cliente.user_id == current_user.id)
         .first()
     )
     data = _serialize_profile(current_user, cliente)

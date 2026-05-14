@@ -8,6 +8,7 @@ from app.config import JWT_SECRET_KEY
 from app.routes.ecommerce_auth import (
     _extract_tenant_id_from_request,
     _get_current_ecommerce_user,
+    _get_or_create_cliente_for_user,
 )
 from app.routes.ecommerce_cart import _current_identity as cart_current_identity
 from app.routes.ecommerce_checkout import _current_identity as checkout_current_identity
@@ -24,8 +25,18 @@ class _Query:
     def filter(self, *_args, **_kwargs):
         return self
 
+    def order_by(self, *_args, **_kwargs):
+        return self
+
     def first(self):
         return self.result
+
+    def all(self):
+        if self.result is None:
+            return []
+        if isinstance(self.result, list):
+            return self.result
+        return [self.result]
 
 
 class _Db:
@@ -93,6 +104,35 @@ def test_get_entregador_cliente_uses_validated_ecommerce_user_context():
     entregador = _get_entregador_cliente(current_user=user, db=_Db(cliente))
 
     assert entregador is cliente
+    assert get_current_tenant() == tenant_id
+
+
+def test_get_or_create_cliente_for_user_sets_tenant_context_before_query():
+    tenant_id = uuid4()
+    user = SimpleNamespace(
+        id=123,
+        tenant_id=tenant_id,
+        is_active=True,
+        cpf_cnpj=None,
+        email="cliente@example.com",
+        telefone=None,
+        nome="Cliente Teste",
+    )
+    cliente = SimpleNamespace(
+        id=456,
+        tenant_id=str(tenant_id),
+        user_id=user.id,
+        cpf=None,
+        email=user.email,
+        telefone=None,
+        nome=user.nome,
+    )
+    clear_current_tenant()
+
+    result = _get_or_create_cliente_for_user(_Db([cliente]), user)
+
+    assert result is cliente
+    assert get_current_tenant() == tenant_id
 
 
 def test_get_active_public_tenant_sets_tenant_context():
