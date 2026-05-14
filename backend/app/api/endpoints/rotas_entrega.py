@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from pydantic import BaseModel, Field
@@ -158,8 +158,16 @@ def get_delivery_actor_and_tenant(
     return _validate_admin_delivery_actor(credentials, db, payload)
 
 
-def _rota_filters_for_actor(actor: DeliveryActor, rota_id: int):
-    filters = [RotaEntrega.id == rota_id, RotaEntrega.tenant_id == actor.tenant_id]
+def _is_int_like(value: object) -> bool:
+    return str(value).strip().isdigit()
+
+
+def _rota_filters_for_actor(actor: DeliveryActor, rota_ref):
+    filters = [RotaEntrega.tenant_id == actor.tenant_id]
+    if _is_int_like(rota_ref):
+        filters.append(RotaEntrega.id == int(str(rota_ref).strip()))
+    else:
+        filters.append(RotaEntrega.numero == str(rota_ref).strip())
     if actor.entregador is not None:
         filters.append(RotaEntrega.entregador_id == actor.entregador.id)
     return filters
@@ -384,7 +392,7 @@ def listar_vendas_pendentes_entrega(
 
 @router.post("/{rota_id}/paradas/{parada_id}/registrar-recebimento")
 def registrar_recebimento_entregador(
-    rota_id: int,
+    rota_id: str,
     parada_id: int,
     payload: RegistrarRecebimentoPayload,
     db: Session = Depends(get_session),
@@ -415,7 +423,7 @@ def registrar_recebimento_entregador(
         db.query(RotaEntregaParada)
         .filter(
             RotaEntregaParada.id == parada_id,
-            RotaEntregaParada.rota_id == rota_id,
+            RotaEntregaParada.rota_id == rota.id,
             RotaEntregaParada.tenant_id == tenant_id,
         )
         .first()
@@ -628,7 +636,7 @@ def otimizar_vendas_selecionadas(
 
 @router.get("/{rota_id}", response_model=RotaEntregaResponse)
 def obter_rota(
-    rota_id: int,
+    rota_id: str,
     db: Session = Depends(get_session),
     actor: DeliveryActor = Depends(get_delivery_actor_and_tenant),
 ):
@@ -752,7 +760,7 @@ def atualizar_rota(
 def criar_rota(
     payload: RotaEntregaCreate,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    actor: DeliveryActor = Depends(get_delivery_actor_and_tenant),
 ):
     """
     Cria uma nova rota de entrega.
@@ -765,11 +773,17 @@ def criar_rota(
     1. Rota simples (1 venda): Informar venda_id
     2. Rota múltipla (N vendas): Informar vendas_ids (lista)
     """
-    user, tenant_id = user_and_tenant
+    user = actor.user
+    tenant_id = actor.tenant_id
+    entregador_id = actor.entregador.id if actor.entregador is not None else payload.entregador_id
+    vendas_ids = payload.vendas_ids or payload.venda_ids
 
     # Validar entregador
+    if not entregador_id:
+        raise HTTPException(status_code=400, detail="Entregador invalido")
+
     entregador = db.query(Cliente).filter(
-        Cliente.id == payload.entregador_id,
+        Cliente.id == entregador_id,
         Cliente.tenant_id == tenant_id,
         Cliente.is_entregador == True,
         Cliente.entregador_ativo == True
@@ -784,14 +798,22 @@ def criar_rota(
     ).first()
 
     # ETAPA 9.3: Modo rota múltipla (várias vendas)
-    if payload.vendas_ids and len(payload.vendas_ids) > 0:
+    if vendas_ids and len(vendas_ids) > 0:
         # Buscar vendas
-        vendas = db.query(Venda).filter(
-            Venda.id.in_(payload.vendas_ids),
+        vendas_query = db.query(Venda).filter(
+            Venda.id.in_(vendas_ids),
             Venda.tenant_id == tenant_id
-        ).all()
+        )
+        if actor.entregador is not None:
+            vendas_query = vendas_query.filter(
+                Venda.tem_entrega == True,
+                or_(Venda.status_entrega == "pendente", Venda.status_entrega == None),
+                Venda.endereco_entrega.isnot(None),
+                or_(Venda.entregador_id == actor.entregador.id, Venda.entregador_id == None),
+            )
+        vendas = vendas_query.all()
 
-        if len(vendas) != len(payload.vendas_ids):
+        if len(vendas) != len(vendas_ids):
             raise HTTPException(status_code=404, detail="Uma ou mais vendas não encontradas")
 
         # Validar que todas têm endereço
@@ -801,7 +823,7 @@ def criar_rota(
         # Criar rota principal (sem venda_id específica, pois são várias)
         rota = RotaEntrega(
             tenant_id=tenant_id,
-            entregador_id=payload.entregador_id,
+            entregador_id=entregador_id,
             moto_da_loja=payload.moto_da_loja,
             status="pendente",
             created_by=user.id,
@@ -905,6 +927,7 @@ def criar_rota(
 
         # Marcar vendas como "em_rota"
         for venda in vendas:
+            venda.entregador_id = entregador_id
             venda.status_entrega = "em_rota"
 
         db.commit()
@@ -914,10 +937,18 @@ def criar_rota(
 
     # Modo tradicional: rota com 1 venda apenas
     # Buscar venda para obter endereço de destino
-    venda = db.query(Venda).filter(
+    venda_query = db.query(Venda).filter(
         Venda.id == payload.venda_id,
         Venda.tenant_id == tenant_id
-    ).first()
+    )
+    if actor.entregador is not None:
+        venda_query = venda_query.filter(
+            Venda.tem_entrega == True,
+            or_(Venda.status_entrega == "pendente", Venda.status_entrega == None),
+            Venda.endereco_entrega.isnot(None),
+            or_(Venda.entregador_id == actor.entregador.id, Venda.entregador_id == None),
+        )
+    venda = venda_query.first()
 
     if not venda:
         raise HTTPException(status_code=404, detail="Venda não encontrada")
@@ -942,7 +973,7 @@ def criar_rota(
     rota = RotaEntrega(
         tenant_id=tenant_id,
         venda_id=payload.venda_id,
-        entregador_id=payload.entregador_id,
+        entregador_id=entregador_id,
         endereco_destino=payload.endereco_destino,
         distancia_prevista=distancia_prevista,  # Calculado automaticamente
         custo_previsto=payload.custo_previsto,
@@ -961,6 +992,7 @@ def criar_rota(
     db.add(rota)
 
     # Marcar venda como "em_rota"
+    venda.entregador_id = entregador_id
     venda.status_entrega = "em_rota"
 
     db.commit()
@@ -971,7 +1003,7 @@ def criar_rota(
 
 @router.post("/{rota_id}/fechar", response_model=RotaEntregaResponse)
 def fechar_rota(
-    rota_id: int,
+    rota_id: str,
     payload: RotaEntregaUpdate,
     db: Session = Depends(get_session),
     actor: DeliveryActor = Depends(get_delivery_actor_and_tenant),
@@ -998,7 +1030,7 @@ def fechar_rota(
     ).first()
 
     paradas = db.query(RotaEntregaParada).filter(
-        RotaEntregaParada.rota_id == rota_id,
+        RotaEntregaParada.rota_id == rota.id,
         RotaEntregaParada.tenant_id == tenant_id,
     ).order_by(RotaEntregaParada.ordem).all()
 
@@ -1039,7 +1071,7 @@ def fechar_rota(
                 WHERE id = :rid AND tenant_id = :tenant
                 """
             ),
-            {"rid": rota_id, "tenant": tenant_id},
+            {"rid": rota.id, "tenant": tenant_id},
         ).scalar()
         if dist_real_gps is not None:
             rota.distancia_real = Decimal(str(dist_real_gps))
@@ -1134,10 +1166,10 @@ def listar_paradas_rota(
 
 @router.put("/{rota_id}/paradas/reordenar")
 def reordenar_paradas(
-    rota_id: int,
-    nova_ordem: List[int],  # Lista de IDs das paradas na nova ordem
+    rota_id: str,
+    nova_ordem=Body(...),  # Lista ou {"parada_ids": [...]} para compatibilidade com app
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    actor: DeliveryActor = Depends(get_delivery_actor_and_tenant),
 ):
     """
     ETAPA 9.3 - Reordena manualmente as paradas de uma rota
@@ -1150,13 +1182,16 @@ def reordenar_paradas(
         PUT /rotas-entrega/123/paradas/reordenar
         Body: [45, 47, 46]  # Ordem: parada 45 primeiro, depois 47, depois 46
     """
-    user, tenant_id = user_and_tenant
+    tenant_id = actor.tenant_id
+    if isinstance(nova_ordem, dict):
+        ordem_ids = nova_ordem.get("parada_ids") or nova_ordem.get("nova_ordem")
+    else:
+        ordem_ids = nova_ordem
+    if not isinstance(ordem_ids, list) or not all(isinstance(pid, int) for pid in ordem_ids):
+        raise HTTPException(status_code=400, detail="Lista de paradas invalida")
 
     # Validar que rota existe e pertence ao tenant
-    rota = db.query(RotaEntrega).filter(
-        RotaEntrega.id == rota_id,
-        RotaEntrega.tenant_id == tenant_id
-    ).first()
+    rota = db.query(RotaEntrega).filter(*_rota_filters_for_actor(actor, rota_id)).first()
 
     if not rota:
         raise HTTPException(status_code=404, detail="Rota não encontrada")
@@ -1166,21 +1201,21 @@ def reordenar_paradas(
 
     # Buscar todas as paradas
     paradas = db.query(RotaEntregaParada).filter(
-        RotaEntregaParada.rota_id == rota_id,
+        RotaEntregaParada.rota_id == rota.id,
         RotaEntregaParada.tenant_id == tenant_id
     ).all()
 
     paradas_dict = {p.id: p for p in paradas}
 
     # Validar que todos os IDs fornecidos existem
-    if set(nova_ordem) != set(paradas_dict.keys()):
+    if set(ordem_ids) != set(paradas_dict.keys()):
         raise HTTPException(
             status_code=400,
             detail="Lista de IDs não corresponde às paradas da rota"
         )
 
     # Atualizar ordem
-    for idx, parada_id in enumerate(nova_ordem):
+    for idx, parada_id in enumerate(ordem_ids):
         paradas_dict[parada_id].ordem = idx + 1
 
     db.commit()
@@ -1190,7 +1225,7 @@ def reordenar_paradas(
 
 @router.post("/{rota_id}/iniciar", response_model=RotaEntregaResponse)
 def iniciar_rota(
-    rota_id: int,
+    rota_id: str,
     km_inicial: Optional[float] = None,
     lat_inicio: Optional[float] = None,
     lon_inicio: Optional[float] = None,
@@ -1222,7 +1257,7 @@ def iniciar_rota(
 
     # Verificar se tem paradas
     paradas_count = db.query(RotaEntregaParada).filter(
-        RotaEntregaParada.rota_id == rota_id
+        RotaEntregaParada.rota_id == rota.id
     ).count()
 
     if paradas_count == 0:
@@ -1250,7 +1285,7 @@ def iniciar_rota(
             WHERE id = :rid AND tenant_id = :tenant
             """
         ),
-        {"lat": lat_inicio, "lon": lon_inicio, "rid": rota_id, "tenant": tenant_id},
+        {"lat": lat_inicio, "lon": lon_inicio, "rid": rota.id, "tenant": tenant_id},
     )
     db.execute(
         text(
@@ -1261,7 +1296,7 @@ def iniciar_rota(
             WHERE rota_id = :rid AND tenant_id = :tenant
             """
         ),
-        {"rid": rota_id, "tenant": tenant_id},
+        {"rid": rota.id, "tenant": tenant_id},
     )
 
     # Registrar KM inicial (opcional)
@@ -1274,7 +1309,7 @@ def iniciar_rota(
 
     # ETAPA 9.4: Disparar mensagens automáticas para todos os clientes
     try:
-        mensagens_enviadas = notificar_inicio_rota(db, rota_id, tenant_id)
+        mensagens_enviadas = notificar_inicio_rota(db, rota.id, tenant_id)
         if mensagens_enviadas > 0:
             db.commit()  # Commit das mensagens
     except Exception as e:
@@ -1338,7 +1373,7 @@ def reverter_inicio_rota(
 
 @router.post("/{rota_id}/atualizar-localizacao")
 def atualizar_localizacao_rota(
-    rota_id: int,
+    rota_id: str,
     lat: float,
     lon: float,
     db: Session = Depends(get_session),
@@ -1366,7 +1401,7 @@ def atualizar_localizacao_rota(
             WHERE id = :rid AND tenant_id = :tenant
             """
         ),
-        {"rid": rota_id, "tenant": tenant_id},
+        {"rid": rota.id, "tenant": tenant_id},
     ).fetchone()
 
     delta_km = 0.0
@@ -1390,7 +1425,7 @@ def atualizar_localizacao_rota(
                 LIMIT 1
                 """
             ),
-            {"rid": rota_id, "tenant": tenant_id},
+            {"rid": rota.id, "tenant": tenant_id},
         ).fetchone()
 
         if parada_pendente:
@@ -1416,7 +1451,7 @@ def atualizar_localizacao_rota(
                       AND ordem <= :ordem
                     """
                 ),
-                {"rid": rota_id, "tenant": tenant_id, "ordem": ordem_parada},
+                {"rid": rota.id, "tenant": tenant_id, "ordem": ordem_parada},
             ).scalar() or 0
 
             db.execute(
@@ -1438,7 +1473,7 @@ def atualizar_localizacao_rota(
                     WHERE id = :rid AND tenant_id = :tenant
                     """
                 ),
-                {"delta": delta_km, "rid": rota_id, "tenant": tenant_id},
+                {"delta": delta_km, "rid": rota.id, "tenant": tenant_id},
             )
 
     db.execute(
@@ -1457,7 +1492,7 @@ def atualizar_localizacao_rota(
             "lon": lon,
             "agora": datetime.now(),
             "delta": delta_km,
-            "rid": rota_id,
+            "rid": rota.id,
             "tenant": tenant_id,
         },
     )
@@ -1468,7 +1503,7 @@ def atualizar_localizacao_rota(
 
 @router.post("/{rota_id}/paradas/{parada_id}/marcar-entregue")
 def marcar_parada_entregue(
-    rota_id: int,
+    rota_id: str,
     parada_id: int,
     tentativa: bool = False,
     km_entrega: Optional[float] = None,
@@ -1500,7 +1535,7 @@ def marcar_parada_entregue(
     # Validar parada
     parada = db.query(RotaEntregaParada).filter(
         RotaEntregaParada.id == parada_id,
-        RotaEntregaParada.rota_id == rota_id,
+        RotaEntregaParada.rota_id == rota.id,
         RotaEntregaParada.tenant_id == tenant_id
     ).first()
 
@@ -1510,7 +1545,7 @@ def marcar_parada_entregue(
     if parada.status == "entregue":
         _sincronizar_venda_entregue_por_parada(db, parada, tenant_id)
         db.commit()
-        paradas_pendentes = _contar_paradas_nao_entregues(db, rota_id, tenant_id)
+        paradas_pendentes = _contar_paradas_nao_entregues(db, rota.id, tenant_id)
         mensagem = "Parada ja estava marcada como entregue."
         if paradas_pendentes == 0:
             mensagem += " Todas as paradas foram concluidas. Feche a rota."
@@ -1557,7 +1592,7 @@ def marcar_parada_entregue(
 
         # ETAPA 9.4: Disparar mensagem para próximo cliente
         try:
-            notificou = notificar_proximo_cliente(db, rota_id, parada.ordem, tenant_id)
+            notificou = notificar_proximo_cliente(db, rota.id, parada.ordem, tenant_id)
             if notificou:
                 mensagem += " Próximo cliente foi notificado."
         except Exception as e:
@@ -1568,7 +1603,7 @@ def marcar_parada_entregue(
 
     # Verificar se todas as paradas foram entregues.
     # Tentativas ainda contam como abertas para impedir fechamento acidental.
-    paradas_pendentes = _contar_paradas_nao_entregues(db, rota_id, tenant_id)
+    paradas_pendentes = _contar_paradas_nao_entregues(db, rota.id, tenant_id)
 
     if paradas_pendentes == 0:
         mensagem += " Todas as paradas foram concluídas. Feche a rota."
@@ -1608,23 +1643,20 @@ def adicionar_observacao_parada(
 
 @router.post("/{rota_id}/paradas/{parada_id}/nao-entregue")
 def marcar_parada_nao_entregue(
-    rota_id: int,
+    rota_id: str,
     parada_id: int,
     motivo: str = None,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    actor: DeliveryActor = Depends(get_delivery_actor_and_tenant),
 ):
     """
     Marca parada como não entregue e reverte venda para status 'aberto'.
     Usada quando entrega não pode ser realizada (cliente ausente, cartão recusado, etc).
     """
-    user, tenant_id = user_and_tenant
+    tenant_id = actor.tenant_id
 
     # Validar rota
-    rota = db.query(RotaEntrega).filter(
-        RotaEntrega.id == rota_id,
-        RotaEntrega.tenant_id == tenant_id
-    ).first()
+    rota = db.query(RotaEntrega).filter(*_rota_filters_for_actor(actor, rota_id)).first()
 
     if not rota:
         raise HTTPException(status_code=404, detail="Rota não encontrada")
@@ -1632,7 +1664,7 @@ def marcar_parada_nao_entregue(
     # Validar parada
     parada = db.query(RotaEntregaParada).filter(
         RotaEntregaParada.id == parada_id,
-        RotaEntregaParada.rota_id == rota_id,
+        RotaEntregaParada.rota_id == rota.id,
         RotaEntregaParada.tenant_id == tenant_id
     ).first()
 

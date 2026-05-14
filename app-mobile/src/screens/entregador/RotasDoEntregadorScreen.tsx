@@ -74,12 +74,25 @@ export default function RotasDoEntregadorScreen() {
 
   const carregar = useCallback(async () => {
     try {
-      const [rotasRes, abertasRes] = await Promise.all([
+      const [rotasRes, abertasRes] = await Promise.allSettled([
         api.get<Rota[]>('/ecommerce/entregador/minhas-rotas'),
         api.get<EntregaAberta[]>('/ecommerce/entregador/entregas-abertas'),
       ]);
-      setRotas(rotasRes.data || []);
-      setEntregasAbertas(abertasRes.data || []);
+      let carregouAlgumaLista = false;
+
+      if (rotasRes.status === 'fulfilled') {
+        setRotas(rotasRes.value.data || []);
+        carregouAlgumaLista = true;
+      }
+
+      if (abertasRes.status === 'fulfilled') {
+        setEntregasAbertas(abertasRes.value.data || []);
+        carregouAlgumaLista = true;
+      }
+
+      if (!carregouAlgumaLista) {
+        Alert.alert('Erro', 'Nao foi possivel carregar as entregas. Tente novamente.');
+      }
     } catch {
       Alert.alert('Erro', 'Não foi possível carregar as entregas. Tente novamente.');
     } finally {
