@@ -1,6 +1,7 @@
 """Rotas da API para o perfil de entregador no app mobile."""
 from datetime import datetime
 from decimal import Decimal
+from types import SimpleNamespace
 from typing import List, Optional
 from uuid import UUID
 import secrets
@@ -68,8 +69,14 @@ def _activate_cliente_tenant_context(cliente: Cliente) -> str:
     return str(tenant_id)
 
 
-def _admin_identity(cliente: Cliente, tenant_id: str):
-    return (cliente.user_id, tenant_id)
+def _delivery_actor(cliente: Cliente, tenant_id: str):
+    from app.api.endpoints import rotas_entrega as rotas_admin
+
+    return rotas_admin.DeliveryActor(
+        user=SimpleNamespace(id=cliente.user_id),
+        tenant_id=UUID(str(tenant_id)),
+        entregador=cliente,
+    )
 
 
 def _get_rota_do_entregador_or_404(
@@ -367,7 +374,7 @@ def obter_rota_entregador(
     return rotas_admin.obter_rota(
         rota_id=rota_id,
         db=db,
-        user_and_tenant=_admin_identity(cliente, tenant_id),
+        actor=_delivery_actor(cliente, tenant_id),
     )
 
 
@@ -395,7 +402,7 @@ def iniciar_rota_entregador(
         lat_inicio=lat_inicio,
         lon_inicio=lon_inicio,
         db=db,
-        user_and_tenant=_admin_identity(cliente, tenant_id),
+        actor=_delivery_actor(cliente, tenant_id),
     )
 
 
@@ -421,7 +428,7 @@ def atualizar_localizacao_rota_entregador(
         lat=lat,
         lon=lon,
         db=db,
-        user_and_tenant=_admin_identity(cliente, tenant_id),
+        actor=_delivery_actor(cliente, tenant_id),
     )
 
 
@@ -454,7 +461,7 @@ def marcar_parada_entregue_entregador(
         lat_entrega=lat_entrega,
         lon_entrega=lon_entrega,
         db=db,
-        user_and_tenant=_admin_identity(cliente, tenant_id),
+        actor=_delivery_actor(cliente, tenant_id),
     )
 
 
@@ -481,7 +488,7 @@ def registrar_recebimento_entregador_mobile(
         parada_id=parada_id,
         payload=payload,
         db=db,
-        user_and_tenant=_admin_identity(cliente, tenant_id),
+        actor=_delivery_actor(cliente, tenant_id),
     )
 
 
@@ -505,7 +512,7 @@ def fechar_rota_entregador(
         rota_id=rota_id,
         payload=payload,
         db=db,
-        user_and_tenant=_admin_identity(cliente, tenant_id),
+        actor=_delivery_actor(cliente, tenant_id),
     )
 
 

@@ -117,11 +117,11 @@ def test_obter_rota_entregador_validates_driver_before_delegating(monkeypatch):
 
     from app.api.endpoints import rotas_entrega as rotas_admin
 
-    def fake_obter_rota(*, rota_id, db, user_and_tenant):
+    def fake_obter_rota(*, rota_id, db, actor):
         delegated["args"] = {
             "rota_id": rota_id,
             "db": db,
-            "user_and_tenant": user_and_tenant,
+            "actor": actor,
         }
         return rota
 
@@ -133,7 +133,9 @@ def test_obter_rota_entregador_validates_driver_before_delegating(monkeypatch):
     assert result is rota
     assert delegated["args"]["rota_id"] == rota.id
     assert delegated["args"]["db"] is db
-    assert delegated["args"]["user_and_tenant"] == (cliente.user_id, str(tenant_id))
+    assert delegated["args"]["actor"].user.id == cliente.user_id
+    assert delegated["args"]["actor"].tenant_id == tenant_id
+    assert delegated["args"]["actor"].entregador is cliente
     assert get_current_tenant() == tenant_id
 
 
