@@ -113,6 +113,77 @@
 			"problemMatcher": []
 		},
 		{
+			"label": "Git Seguro: Ativar regras neste PC",
+			"detail": "Ativa hooks locais para bloquear commit/push direto na main.",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				".\\scripts\\git_setup_guardrails.ps1"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Git Seguro: Comecar tarefa",
+			"detail": "Atualiza main e cria branch de tarefa.",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				".\\scripts\\git_start_task.ps1",
+				"-Tipo",
+				"${input:gitTaskType}",
+				"-Nome",
+				"${input:gitTaskName}"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Git Seguro: Fechar tarefa (commit + push)",
+			"detail": "Valida, commita e envia a branch atual para o GitHub.",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				".\\scripts\\git_finish_task.ps1",
+				"-Mensagem",
+				"${input:gitCommitMessage}",
+				"-Push"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Git Seguro: Status",
+			"detail": "Mostra branch atual e alteracoes locais.",
+			"type": "shell",
+			"command": "git",
+			"args": [
+				"status",
+				"--short",
+				"--branch"
+			],
+			"problemMatcher": []
+		},
+		{
+			"label": "Git Seguro: Verificar atualizacoes",
+			"detail": "Mostra se este PC precisa baixar ou subir mudancas do GitHub.",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				".\\scripts\\git_check_updates.ps1"
+			],
+			"problemMatcher": []
+		},
+		{
 			"label": "App Mobile: Iniciar DEV",
 			"type": "shell",
 			"command": "npx",
@@ -181,6 +252,35 @@
 				"import requests; token=\"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxIiwianRpIjoiMjU3NDJiMzYtYzFiNy00ZTM2LWJiZDgtNGQ1YmZmN2VlOWE0IiwidGVuYW50X2lkIjoiN2JlOGRhZDctODk1Ni00NzU4LWI3YmMtODU1YTUyNTlmZTJiIiwiZXhwIjoxNzc0MTU2MDk0fQ.1260p7lID4cF-c2uJ7mC2m8EktoK3Okc7D0mqfVuxoI\"; r=requests.get(\"http://localhost:8000/whatsapp/handoffs/pending\", headers={\"Authorization\": f\"Bearer {token}\"}, timeout=15); print(\"STATUS=\" + str(r.status_code)); print(r.text)"
 			],
 			"isBackground": false
+		}
+	],
+	"inputs": [
+		{
+			"id": "gitTaskType",
+			"type": "pickString",
+			"description": "Tipo da branch",
+			"options": [
+				"feat",
+				"fix",
+				"docs",
+				"chore",
+				"refactor",
+				"test",
+				"hotfix"
+			],
+			"default": "feat"
+		},
+		{
+			"id": "gitTaskName",
+			"type": "promptString",
+			"description": "Nome curto da tarefa",
+			"default": "minha tarefa"
+		},
+		{
+			"id": "gitCommitMessage",
+			"type": "promptString",
+			"description": "Mensagem do commit",
+			"default": "Atualiza Sistema Pet"
 		}
 	]
 }

@@ -12,6 +12,23 @@
     "seguranca de dados",
     "git limpo e organizado"
   ],
+  "multi_pc_git_flow": {
+    "goal": "permitir que Lucas trabalhe em dois computadores sem divergir o repositorio",
+    "main_rule": "main deve ficar limpa e estavel; todo trabalho de codigo entra por branch de tarefa e Pull Request",
+    "assistant_must": [
+      "antes de alterar arquivos: executar git status --short --branch",
+      "se estiver em main ou master: criar branch com scripts/git_start_task.ps1 antes de editar",
+      "se ja estiver em branch de tarefa: continuar nela",
+      "nunca commitar direto em main ou master",
+      "nunca fazer push direto para main ou master",
+      "ao fechar tarefa: usar scripts/git_finish_task.ps1 quando for criar commit e enviar branch"
+    ],
+    "local_guardrails": [
+      "rodar scripts/git_setup_guardrails.ps1 uma vez em cada computador",
+      "usar hooks versionados em .githooks para bloquear commit/push direto em main/master"
+    ],
+    "docs": "docs/GIT_FLUXO_2_PCS.md"
+  },
   "mandatory_flow": {
     "step_1": "Executar FLUXO_UNICO.bat check antes de qualquer acao relevante",
     "step_2": "Trabalhar no DEV usando FLUXO_UNICO.bat dev-up",
