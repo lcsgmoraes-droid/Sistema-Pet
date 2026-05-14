@@ -1,4 +1,9 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from dataclasses import dataclass
+from uuid import UUID
+
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.security import HTTPAuthorizationCredentials
+from jose import JWTError, jwt
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -9,9 +14,11 @@ from typing import List, Optional
 import secrets
 
 from app.db import get_session
-from app.auth.dependencies import get_current_user_and_tenant
+from app.auth.core import ALGORITHM, get_current_user_from_token
+from app.auth.dependencies import get_current_user_and_tenant, security
+from app.config import JWT_SECRET_KEY
 from app.rotas_entrega_models import RotaEntrega, RotaEntregaParada
-from app.models import Cliente, ConfiguracaoEntrega
+from app.models import Cliente, ConfiguracaoEntrega, Tenant, User, UserTenant
 from app.vendas_models import Venda
 from app.schemas.rota_entrega import (
     RotaEntregaCreate,
@@ -23,15 +30,139 @@ from app.services.custo_moto_service import calcular_custo_moto
 from app.services.google_maps_service import calcular_distancia_km, calcular_rota_otimizada
 from app.services.notificacao_entrega_service import notificar_inicio_rota, notificar_proximo_cliente
 from app.models_configuracao_custo_moto import ConfiguracaoCustoMoto
+from app.session_manager import get_session_by_jti
+from app.tenancy.context import set_current_tenant
 from app.utils.logger import logger
 
 router = APIRouter(prefix="/rotas-entrega", tags=["Entregas - Rotas"])
 _rotas_schema_checked = False
 
 
+@dataclass
+class DeliveryActor:
+    user: User
+    tenant_id: UUID
+    entregador: Cliente | None = None
+
+
 class RegistrarRecebimentoPayload(BaseModel):
     forma_pagamento: str = Field(..., description="pix | cartao_debito | cartao_credito")
     numero_parcelas: int = Field(1, ge=1, le=12)
+
+
+def _tenant_status_is_active(status_value: object) -> bool:
+    return str(status_value or "").strip().lower() in {"active", "ativo"}
+
+
+def _credentials_exception(detail: str = "Could not validate credentials") -> HTTPException:
+    return HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail=detail,
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+
+def _decode_delivery_token(credentials: HTTPAuthorizationCredentials) -> dict:
+    try:
+        return jwt.decode(credentials.credentials, JWT_SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError as exc:
+        raise _credentials_exception() from exc
+
+
+def _validate_admin_delivery_actor(
+    credentials: HTTPAuthorizationCredentials,
+    db: Session,
+    payload: dict,
+) -> DeliveryActor:
+    tenant_id_str = payload.get("tenant_id")
+    token_jti = payload.get("jti")
+    if not tenant_id_str:
+        raise _credentials_exception("Tenant nao selecionado. Use /auth/select-tenant.")
+    if not token_jti:
+        raise _credentials_exception("Sessao invalida. Faca login novamente.")
+
+    try:
+        tenant_id = UUID(str(tenant_id_str))
+    except (TypeError, ValueError) as exc:
+        raise _credentials_exception("Tenant invalido no token") from exc
+
+    set_current_tenant(tenant_id)
+    user = get_current_user_from_token(credentials.credentials, db)
+
+    user_tenant = (
+        db.query(UserTenant)
+        .filter(
+            UserTenant.user_id == user.id,
+            UserTenant.tenant_id == tenant_id,
+            UserTenant.is_active == True,
+        )
+        .first()
+    )
+    if not user_tenant:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuario nao tem acesso ativo ao tenant selecionado",
+        )
+
+    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
+    if not tenant or not _tenant_status_is_active(tenant.status):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tenant inativo ou indisponivel",
+        )
+
+    db_session = get_session_by_jti(db, token_jti)
+    if not db_session or db_session.user_id != user.id:
+        raise _credentials_exception("Sessao invalida. Faca login novamente.")
+    if db_session.tenant_id and str(db_session.tenant_id) != str(tenant_id):
+        raise _credentials_exception("Sessao pertence a outro tenant. Faca login novamente.")
+    if db_session.tenant_id is None:
+        db_session.tenant_id = tenant_id
+        db.flush()
+
+    return DeliveryActor(user=user, tenant_id=tenant_id)
+
+
+def _validate_ecommerce_entregador_actor(
+    credentials: HTTPAuthorizationCredentials,
+    db: Session,
+) -> DeliveryActor:
+    from app.routes.ecommerce_auth import _get_current_ecommerce_user
+
+    user = _get_current_ecommerce_user(credentials=credentials, db=db)
+    tenant_id = UUID(str(user.tenant_id))
+    cliente = (
+        db.query(Cliente)
+        .filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.user_id == user.id,
+            Cliente.is_entregador == True,
+        )
+        .first()
+    )
+    if not cliente:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Acesso restrito a entregadores",
+        )
+    return DeliveryActor(user=user, tenant_id=tenant_id, entregador=cliente)
+
+
+def get_delivery_actor_and_tenant(
+    credentials: HTTPAuthorizationCredentials = Depends(security),
+    db: Session = Depends(get_session),
+) -> DeliveryActor:
+    payload = _decode_delivery_token(credentials)
+    if payload.get("token_type") == "ecommerce_customer":
+        return _validate_ecommerce_entregador_actor(credentials, db)
+    return _validate_admin_delivery_actor(credentials, db, payload)
+
+
+def _rota_filters_for_actor(actor: DeliveryActor, rota_id: int):
+    filters = [RotaEntrega.id == rota_id, RotaEntrega.tenant_id == actor.tenant_id]
+    if actor.entregador is not None:
+        filters.append(RotaEntrega.entregador_id == actor.entregador.id)
+    return filters
 
 
 
@@ -257,7 +388,7 @@ def registrar_recebimento_entregador(
     parada_id: int,
     payload: RegistrarRecebimentoPayload,
     db: Session = Depends(get_session),
-    user_and_tenant=Depends(get_current_user_and_tenant),
+    actor: DeliveryActor = Depends(get_delivery_actor_and_tenant),
 ):
     """
     Pré-integração de recebimento no app do entregador.
@@ -266,7 +397,7 @@ def registrar_recebimento_entregador(
     - NÃO baixa financeiro ainda.
     - Apenas registra intenção de cobrança para ficar pronto para integração Stone/operadora.
     """
-    _, tenant_id = user_and_tenant
+    tenant_id = actor.tenant_id
 
     forma = (payload.forma_pagamento or "").strip().lower()
     formas_validas = {"pix", "cartao_debito", "cartao_credito"}
@@ -275,6 +406,10 @@ def registrar_recebimento_entregador(
 
     if forma != "cartao_credito" and payload.numero_parcelas != 1:
         raise HTTPException(status_code=400, detail="Parcelas só são permitidas para cartão de crédito")
+
+    rota = db.query(RotaEntrega).filter(*_rota_filters_for_actor(actor, rota_id)).first()
+    if not rota:
+        raise HTTPException(status_code=404, detail="Rota nao encontrada")
 
     parada = (
         db.query(RotaEntregaParada)
@@ -495,12 +630,12 @@ def otimizar_vendas_selecionadas(
 def obter_rota(
     rota_id: int,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    actor: DeliveryActor = Depends(get_delivery_actor_and_tenant),
 ):
     """
     Obtém detalhes de uma rota específica.
     """
-    user, tenant_id = user_and_tenant
+    tenant_id = actor.tenant_id
     ensure_rotas_entrega_schema(db)
 
     from sqlalchemy.orm import joinedload
@@ -508,10 +643,7 @@ def obter_rota(
     rota = db.query(RotaEntrega).options(
         joinedload(RotaEntrega.entregador),
         joinedload(RotaEntrega.paradas).joinedload(RotaEntregaParada.venda).joinedload(Venda.cliente),
-    ).filter(
-        RotaEntrega.id == rota_id,
-        RotaEntrega.tenant_id == tenant_id
-    ).first()
+    ).filter(*_rota_filters_for_actor(actor, rota_id)).first()
 
     if not rota:
         raise HTTPException(status_code=404, detail="Rota não encontrada")
@@ -842,20 +974,17 @@ def fechar_rota(
     rota_id: int,
     payload: RotaEntregaUpdate,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    actor: DeliveryActor = Depends(get_delivery_actor_and_tenant),
 ):
     """
     Fecha uma rota de entrega, calculando o custo real.
 
     Se km_inicial e km_final forem informados, calcula distancia_real automaticamente.
     """
-    user, tenant_id = user_and_tenant
+    tenant_id = actor.tenant_id
     ensure_rotas_entrega_schema(db)
 
-    rota = db.query(RotaEntrega).filter(
-        RotaEntrega.id == rota_id,
-        RotaEntrega.tenant_id == tenant_id
-    ).first()
+    rota = db.query(RotaEntrega).filter(*_rota_filters_for_actor(actor, rota_id)).first()
 
     if not rota:
         raise HTTPException(status_code=404, detail="Rota não encontrada")
@@ -1066,7 +1195,7 @@ def iniciar_rota(
     lat_inicio: Optional[float] = None,
     lon_inicio: Optional[float] = None,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    actor: DeliveryActor = Depends(get_delivery_actor_and_tenant),
 ):
     """
     ETAPA 9.4 - Inicia navegação da rota
@@ -1076,14 +1205,11 @@ def iniciar_rota(
     - Registra KM inicial da moto (opcional)
     - Dispara eventos de mensagens
     """
-    user, tenant_id = user_and_tenant
+    tenant_id = actor.tenant_id
     ensure_rotas_entrega_schema(db)
 
     # Validar rota
-    rota = db.query(RotaEntrega).filter(
-        RotaEntrega.id == rota_id,
-        RotaEntrega.tenant_id == tenant_id
-    ).first()
+    rota = db.query(RotaEntrega).filter(*_rota_filters_for_actor(actor, rota_id)).first()
 
     if not rota:
         raise HTTPException(status_code=404, detail="Rota não encontrada")
@@ -1216,18 +1342,15 @@ def atualizar_localizacao_rota(
     lat: float,
     lon: float,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    actor: DeliveryActor = Depends(get_delivery_actor_and_tenant),
 ):
     """
     Atualiza a localização atual do entregador para rastreio ao vivo.
     """
-    _, tenant_id = user_and_tenant
+    tenant_id = actor.tenant_id
     ensure_rotas_entrega_schema(db)
 
-    rota = db.query(RotaEntrega).filter(
-        RotaEntrega.id == rota_id,
-        RotaEntrega.tenant_id == tenant_id,
-    ).first()
+    rota = db.query(RotaEntrega).filter(*_rota_filters_for_actor(actor, rota_id)).first()
 
     if not rota:
         raise HTTPException(status_code=404, detail="Rota não encontrada")
@@ -1352,7 +1475,7 @@ def marcar_parada_entregue(
     lat_entrega: Optional[float] = None,
     lon_entrega: Optional[float] = None,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    actor: DeliveryActor = Depends(get_delivery_actor_and_tenant),
 ):
     """
     ETAPA 9.4 - Marca parada como entregue ou tentativa
@@ -1363,13 +1486,10 @@ def marcar_parada_entregue(
         lat_entrega: Latitude GPS no momento da entrega (opcional)
         lon_entrega: Longitude GPS no momento da entrega (opcional)
     """
-    user, tenant_id = user_and_tenant
+    tenant_id = actor.tenant_id
 
     # Validar rota
-    rota = db.query(RotaEntrega).filter(
-        RotaEntrega.id == rota_id,
-        RotaEntrega.tenant_id == tenant_id
-    ).first()
+    rota = db.query(RotaEntrega).filter(*_rota_filters_for_actor(actor, rota_id)).first()
 
     if not rota:
         raise HTTPException(status_code=404, detail="Rota não encontrada")
@@ -1415,8 +1535,19 @@ def marcar_parada_entregue(
         if lat_entrega is not None and lon_entrega is not None:
             try:
                 db.execute(
-                    text("UPDATE rotas_entrega_paradas SET lat_entrega = :lat, lon_entrega = :lon WHERE id = :pid"),
-                    {"lat": lat_entrega, "lon": lon_entrega, "pid": parada_id}
+                    text(
+                        """
+                        UPDATE rotas_entrega_paradas
+                        SET lat_entrega = :lat, lon_entrega = :lon
+                        WHERE id = :pid AND tenant_id = :tenant
+                        """
+                    ),
+                    {
+                        "lat": lat_entrega,
+                        "lon": lon_entrega,
+                        "pid": parada_id,
+                        "tenant": tenant_id,
+                    },
                 )
                 logger.info(f"GPS da entrega {parada_id}: lat={lat_entrega}, lon={lon_entrega}")
             except Exception as e:

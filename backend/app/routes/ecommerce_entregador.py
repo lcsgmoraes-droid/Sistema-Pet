@@ -1,6 +1,7 @@
 """Rotas da API para o perfil de entregador no app mobile."""
 from datetime import datetime
 from decimal import Decimal
+from types import SimpleNamespace
 from typing import List, Optional
 from uuid import UUID
 import secrets
@@ -14,7 +15,7 @@ from app.db import get_session
 from app.models import Cliente, ConfiguracaoEntrega, User
 from app.rotas_entrega_models import RotaEntrega, RotaEntregaParada
 from app.routes.ecommerce_auth import _activate_user_tenant_context, _get_current_ecommerce_user
-from app.schemas.rota_entrega import RotaEntregaResponse
+from app.schemas.rota_entrega import RotaEntregaResponse, RotaEntregaUpdate
 from app.services.google_maps_service import calcular_rota_otimizada
 from app.tenancy.context import set_current_tenant
 from app.vendas_models import Venda, VendaItem
@@ -39,6 +40,11 @@ class NaoEntreguePayload(BaseModel):
     motivo: Optional[str] = None
 
 
+class RegistrarRecebimentoPayload(BaseModel):
+    forma_pagamento: str
+    numero_parcelas: int = 1
+
+
 def _get_entregador_cliente(
     current_user: User = Depends(_get_current_ecommerce_user),
     db: Session = Depends(get_session),
@@ -61,6 +67,65 @@ def _activate_cliente_tenant_context(cliente: Cliente) -> str:
     tenant_id = UUID(str(cliente.tenant_id))
     set_current_tenant(tenant_id)
     return str(tenant_id)
+
+
+def _delivery_actor(cliente: Cliente, tenant_id: str):
+    from app.api.endpoints import rotas_entrega as rotas_admin
+
+    return rotas_admin.DeliveryActor(
+        user=SimpleNamespace(id=cliente.user_id),
+        tenant_id=UUID(str(tenant_id)),
+        entregador=cliente,
+    )
+
+
+def _get_rota_do_entregador_or_404(
+    db: Session,
+    *,
+    rota_id: int,
+    tenant_id: str,
+    cliente: Cliente,
+) -> RotaEntrega:
+    rota = (
+        db.query(RotaEntrega)
+        .filter(
+            RotaEntrega.id == rota_id,
+            RotaEntrega.tenant_id == tenant_id,
+            RotaEntrega.entregador_id == cliente.id,
+        )
+        .first()
+    )
+    if not rota:
+        raise HTTPException(status_code=404, detail="Rota nao encontrada")
+    return rota
+
+
+def _get_parada_do_entregador_or_404(
+    db: Session,
+    *,
+    rota_id: int,
+    parada_id: int,
+    tenant_id: str,
+    cliente: Cliente,
+) -> RotaEntregaParada:
+    _get_rota_do_entregador_or_404(
+        db,
+        rota_id=rota_id,
+        tenant_id=tenant_id,
+        cliente=cliente,
+    )
+    parada = (
+        db.query(RotaEntregaParada)
+        .filter(
+            RotaEntregaParada.id == parada_id,
+            RotaEntregaParada.rota_id == rota_id,
+            RotaEntregaParada.tenant_id == tenant_id,
+        )
+        .first()
+    )
+    if not parada:
+        raise HTTPException(status_code=404, detail="Parada nao encontrada")
+    return parada
 
 
 def _montar_endereco_origem(config: Optional[ConfiguracaoEntrega]) -> Optional[str]:
@@ -289,6 +354,166 @@ def criar_rota_por_entregador(
                 parada.cliente_celular = parada.venda.cliente.celular
 
     return rota
+
+
+@router.get("/rotas/{rota_id}", response_model=RotaEntregaResponse)
+def obter_rota_entregador(
+    rota_id: int,
+    cliente: Cliente = Depends(_get_entregador_cliente),
+    db: Session = Depends(get_session),
+):
+    from app.api.endpoints import rotas_entrega as rotas_admin
+
+    tenant_id = _activate_cliente_tenant_context(cliente)
+    _get_rota_do_entregador_or_404(
+        db,
+        rota_id=rota_id,
+        tenant_id=tenant_id,
+        cliente=cliente,
+    )
+    return rotas_admin.obter_rota(
+        rota_id=rota_id,
+        db=db,
+        actor=_delivery_actor(cliente, tenant_id),
+    )
+
+
+@router.post("/rotas/{rota_id}/iniciar", response_model=RotaEntregaResponse)
+def iniciar_rota_entregador(
+    rota_id: int,
+    km_inicial: Optional[float] = None,
+    lat_inicio: Optional[float] = None,
+    lon_inicio: Optional[float] = None,
+    cliente: Cliente = Depends(_get_entregador_cliente),
+    db: Session = Depends(get_session),
+):
+    from app.api.endpoints import rotas_entrega as rotas_admin
+
+    tenant_id = _activate_cliente_tenant_context(cliente)
+    _get_rota_do_entregador_or_404(
+        db,
+        rota_id=rota_id,
+        tenant_id=tenant_id,
+        cliente=cliente,
+    )
+    return rotas_admin.iniciar_rota(
+        rota_id=rota_id,
+        km_inicial=km_inicial,
+        lat_inicio=lat_inicio,
+        lon_inicio=lon_inicio,
+        db=db,
+        actor=_delivery_actor(cliente, tenant_id),
+    )
+
+
+@router.post("/rotas/{rota_id}/atualizar-localizacao")
+def atualizar_localizacao_rota_entregador(
+    rota_id: int,
+    lat: float,
+    lon: float,
+    cliente: Cliente = Depends(_get_entregador_cliente),
+    db: Session = Depends(get_session),
+):
+    from app.api.endpoints import rotas_entrega as rotas_admin
+
+    tenant_id = _activate_cliente_tenant_context(cliente)
+    _get_rota_do_entregador_or_404(
+        db,
+        rota_id=rota_id,
+        tenant_id=tenant_id,
+        cliente=cliente,
+    )
+    return rotas_admin.atualizar_localizacao_rota(
+        rota_id=rota_id,
+        lat=lat,
+        lon=lon,
+        db=db,
+        actor=_delivery_actor(cliente, tenant_id),
+    )
+
+
+@router.post("/rotas/{rota_id}/paradas/{parada_id}/marcar-entregue")
+def marcar_parada_entregue_entregador(
+    rota_id: int,
+    parada_id: int,
+    tentativa: bool = False,
+    km_entrega: Optional[float] = None,
+    lat_entrega: Optional[float] = None,
+    lon_entrega: Optional[float] = None,
+    cliente: Cliente = Depends(_get_entregador_cliente),
+    db: Session = Depends(get_session),
+):
+    from app.api.endpoints import rotas_entrega as rotas_admin
+
+    tenant_id = _activate_cliente_tenant_context(cliente)
+    _get_parada_do_entregador_or_404(
+        db,
+        rota_id=rota_id,
+        parada_id=parada_id,
+        tenant_id=tenant_id,
+        cliente=cliente,
+    )
+    return rotas_admin.marcar_parada_entregue(
+        rota_id=rota_id,
+        parada_id=parada_id,
+        tentativa=tentativa,
+        km_entrega=km_entrega,
+        lat_entrega=lat_entrega,
+        lon_entrega=lon_entrega,
+        db=db,
+        actor=_delivery_actor(cliente, tenant_id),
+    )
+
+
+@router.post("/rotas/{rota_id}/paradas/{parada_id}/registrar-recebimento")
+def registrar_recebimento_entregador_mobile(
+    rota_id: int,
+    parada_id: int,
+    payload: RegistrarRecebimentoPayload,
+    cliente: Cliente = Depends(_get_entregador_cliente),
+    db: Session = Depends(get_session),
+):
+    from app.api.endpoints import rotas_entrega as rotas_admin
+
+    tenant_id = _activate_cliente_tenant_context(cliente)
+    _get_parada_do_entregador_or_404(
+        db,
+        rota_id=rota_id,
+        parada_id=parada_id,
+        tenant_id=tenant_id,
+        cliente=cliente,
+    )
+    return rotas_admin.registrar_recebimento_entregador(
+        rota_id=rota_id,
+        parada_id=parada_id,
+        payload=payload,
+        db=db,
+        actor=_delivery_actor(cliente, tenant_id),
+    )
+
+
+@router.post("/rotas/{rota_id}/fechar", response_model=RotaEntregaResponse)
+def fechar_rota_entregador(
+    rota_id: int,
+    payload: RotaEntregaUpdate,
+    cliente: Cliente = Depends(_get_entregador_cliente),
+    db: Session = Depends(get_session),
+):
+    from app.api.endpoints import rotas_entrega as rotas_admin
+
+    tenant_id = _activate_cliente_tenant_context(cliente)
+    _get_rota_do_entregador_or_404(
+        db,
+        rota_id=rota_id,
+        tenant_id=tenant_id,
+        cliente=cliente,
+    )
+    return rotas_admin.fechar_rota(
+        rota_id=rota_id,
+        payload=payload,
+        db=db,
+        actor=_delivery_actor(cliente, tenant_id),
+    )
 
 
 @router.put("/rotas/{rota_id}/paradas/reordenar")

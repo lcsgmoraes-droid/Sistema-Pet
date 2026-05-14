@@ -13,6 +13,7 @@ from app.routes.ecommerce_auth import (
 from app.routes.ecommerce_cart import _current_identity as cart_current_identity
 from app.routes.ecommerce_checkout import _current_identity as checkout_current_identity
 from app.routes.ecommerce_entregador import _get_entregador_cliente
+from app.routes.ecommerce_entregador import obter_rota_entregador
 from app.routes.ecommerce_notify_routes import _resolve_notify_tenant
 from app.routes.ecommerce_public import _get_active_tenant
 from app.tenancy.context import clear_current_tenant, get_current_tenant
@@ -104,6 +105,37 @@ def test_get_entregador_cliente_uses_validated_ecommerce_user_context():
     entregador = _get_entregador_cliente(current_user=user, db=_Db(cliente))
 
     assert entregador is cliente
+    assert get_current_tenant() == tenant_id
+
+
+def test_obter_rota_entregador_validates_driver_before_delegating(monkeypatch):
+    tenant_id = uuid4()
+    cliente = SimpleNamespace(id=456, tenant_id=str(tenant_id), user_id=123, is_entregador=True)
+    rota = SimpleNamespace(id=789, tenant_id=str(tenant_id), entregador_id=cliente.id)
+    delegated = {}
+    clear_current_tenant()
+
+    from app.api.endpoints import rotas_entrega as rotas_admin
+
+    def fake_obter_rota(*, rota_id, db, actor):
+        delegated["args"] = {
+            "rota_id": rota_id,
+            "db": db,
+            "actor": actor,
+        }
+        return rota
+
+    monkeypatch.setattr(rotas_admin, "obter_rota", fake_obter_rota)
+
+    db = _Db(rota)
+    result = obter_rota_entregador(rota_id=rota.id, cliente=cliente, db=db)
+
+    assert result is rota
+    assert delegated["args"]["rota_id"] == rota.id
+    assert delegated["args"]["db"] is db
+    assert delegated["args"]["actor"].user.id == cliente.user_id
+    assert delegated["args"]["actor"].tenant_id == tenant_id
+    assert delegated["args"]["actor"].entregador is cliente
     assert get_current_tenant() == tenant_id
 
 
