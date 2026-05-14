@@ -802,8 +802,8 @@ class DepartamentoUpdate(DepartamentoBase):
 class DepartamentoResponse(DepartamentoBase):
     id: int
     ativo: bool
-    created_at: datetime
-    updated_at: datetime
+    created_at: Optional[datetime] = None
+    updated_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}
 
@@ -1787,11 +1787,15 @@ def criar_departamento(
 @router.get("/departamentos", response_model=List[DepartamentoResponse])
 def listar_departamentos(
     busca: Optional[str] = None,
-    db: Session = Depends(get_session)
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
-    """Lista departamentos (rota pÃºblica)"""
+    """Lista departamentos do tenant atual"""
+
+    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
     query = db.query(Departamento).filter(
+        Departamento.tenant_id == tenant_id,
         Departamento.ativo == True
     )
 

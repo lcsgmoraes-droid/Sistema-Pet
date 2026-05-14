@@ -138,6 +138,31 @@ def _json_preenchido(valor) -> bool:
     return _texto_preenchido(parsed)
 
 
+def _tabela_consumo_tem_linha_valida(valor) -> bool:
+    if not _texto_preenchido(valor):
+        return False
+
+    try:
+        tabela = json.loads(str(valor)) if isinstance(valor, str) else valor
+    except Exception:
+        return False
+
+    if not isinstance(tabela, dict):
+        return False
+
+    dados = tabela.get("dados") if isinstance(tabela.get("dados"), dict) else tabela
+    if not isinstance(dados, dict):
+        return False
+
+    for peso, consumos in dados.items():
+        if not _texto_preenchido(peso) or not isinstance(consumos, dict):
+            continue
+        if any(_numero_positivo(valor_consumo) for valor_consumo in consumos.values()):
+            return True
+
+    return False
+
+
 def _numero_positivo(valor) -> bool:
     try:
         return float(valor or 0) > 0
@@ -179,7 +204,26 @@ def _avaliar_aptidao_calculadora(produto: Produto) -> List[str]:
         faltantes.append("sabor/proteína")
     if not _texto_preenchido(getattr(produto, "especies_indicadas", None)):
         faltantes.append("espécie indicada")
-    if not _json_preenchido(getattr(produto, "tabela_consumo", None)):
+    if not _tabela_consumo_tem_linha_valida(getattr(produto, "tabela_consumo", None)):
+        faltantes.append("tabela de consumo")
+
+    return faltantes
+
+
+def _campos_bloqueantes_calculadora(
+    produto: Produto,
+    peso_fallback: Optional[float] = None,
+    preco_fallback: Optional[float] = None,
+    exigir_tabela_consumo: bool = True,
+) -> List[str]:
+    """Campos sem os quais o calculo nao deve seguir para produto cadastrado."""
+    faltantes: List[str] = []
+
+    if not _numero_positivo(getattr(produto, "peso_embalagem", None) or peso_fallback):
+        faltantes.append("peso da embalagem")
+    if not _numero_positivo(getattr(produto, "preco_venda", None) or preco_fallback):
+        faltantes.append("preco de venda")
+    if exigir_tabela_consumo and not _tabela_consumo_tem_linha_valida(getattr(produto, "tabela_consumo", None)):
         faltantes.append("tabela de consumo")
 
     return faltantes
@@ -482,6 +526,7 @@ async def listar_opcoes_calculadora_racao(
     busca: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
     page_size: int = Query(120, ge=1, le=1500),
+    apenas_aptas: bool = Query(False),
     user_and_tenant=Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session),
 ):
@@ -533,6 +578,8 @@ async def listar_opcoes_calculadora_racao(
         _serializar_opcao_racao(produto, categoria_nome, marca_nome)
         for produto, categoria_nome, marca_nome in linhas
     ]
+    if apenas_aptas:
+        items = [item for item in items if item.apta]
     aptas = sum(1 for item in items if item.apta)
 
     return RacoesCalculadoraOptionsResponse(
@@ -581,7 +628,12 @@ async def calcular_racao(
             if not produto:
                 raise HTTPException(status_code=404, detail="Produto não encontrado")
 
-            campos_faltantes = _avaliar_aptidao_calculadora(produto)
+            campos_faltantes = _campos_bloqueantes_calculadora(
+                produto,
+                peso_fallback=req.peso_embalagem_kg,
+                preco_fallback=req.preco,
+                exigir_tabela_consumo=req.quantidade_diaria_g is None,
+            )
             if campos_faltantes:
                 raise HTTPException(
                     status_code=400,
@@ -590,9 +642,17 @@ async def calcular_racao(
                         f"Falta preencher: {', '.join(campos_faltantes)}"
                     ),
                 )
+
+            campos_recomendados = _avaliar_aptidao_calculadora(produto)
+            if campos_recomendados:
+                logger.info(
+                    "Racao %s sem cadastro detalhado completo; calculadora seguira com fallback quando necessario: %s",
+                    req.produto_id,
+                    ", ".join(campos_recomendados),
+                )
             
-            peso_embalagem_kg = produto.peso_embalagem
-            preco = produto.preco_venda
+            peso_embalagem_kg = produto.peso_embalagem or req.peso_embalagem_kg
+            preco = produto.preco_venda or req.preco
             produto_nome = produto.nome
             classificacao = produto.classificacao_racao
             categoria_racao = produto.categoria_racao

@@ -80,6 +80,7 @@ export default function useProdutosNovoPageComposition({
   const {
     handleApresentacaoPesoChange,
     handleClassificacaoRacaoChange,
+    handleCriarOpcaoRacao,
     handleFasePublicoChange,
     opcoesApresentacoes,
     opcoesFases,
@@ -195,6 +196,7 @@ export default function useProdutosNovoPageComposition({
     handleChange,
     handleApresentacaoPesoChange,
     handleClassificacaoRacaoChange,
+    handleCriarOpcaoRacao,
     handleFasePublicoChange,
     opcoesApresentacoes,
     opcoesFases,

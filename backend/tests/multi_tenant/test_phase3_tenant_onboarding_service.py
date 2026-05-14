@@ -16,6 +16,24 @@ from app.scripts import run_tenant_onboarding
 
 TENANT_A = "11111111-1111-1111-1111-111111111111"
 TENANT_B = "22222222-2222-2222-2222-222222222222"
+BASE_EXPECTED_COUNTS = {
+    "payment_methods": 4,
+    "bank_accounts": 2,
+    "pet_species": 2,
+    "pet_breeds": 2,
+    "dre_categories": 3,
+    "dre_subcategories": 4,
+    "financial_categories": 2,
+    "expense_types": 2,
+    "product_departments": 1,
+    "product_categories": 2,
+    "ration_lines": 4,
+    "animal_sizes": 6,
+    "life_stages": 4,
+    "treatment_types": 9,
+    "protein_flavors": 10,
+    "package_weights": 11,
+}
 
 
 class _SessionProxy:
@@ -139,6 +157,49 @@ def onboarding_session():
         )
         """,
         """
+        CREATE TABLE contas_bancarias (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id TEXT NOT NULL,
+            user_id INTEGER NOT NULL,
+            nome TEXT NOT NULL,
+            tipo TEXT NOT NULL,
+            banco TEXT,
+            agencia TEXT,
+            conta TEXT,
+            saldo_inicial NUMERIC,
+            saldo_atual NUMERIC,
+            cor TEXT,
+            icone TEXT,
+            instituicao_bancaria BOOLEAN,
+            ativa BOOLEAN,
+            observacoes TEXT,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """,
+        """
+        CREATE TABLE especies (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id TEXT NOT NULL,
+            nome TEXT NOT NULL,
+            ativo BOOLEAN,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """,
+        """
+        CREATE TABLE racas (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id TEXT NOT NULL,
+            nome TEXT NOT NULL,
+            especie TEXT,
+            especie_id INTEGER NOT NULL,
+            ativo BOOLEAN,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """,
+        """
         CREATE TABLE dre_categorias (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             tenant_id TEXT NOT NULL,
@@ -223,6 +284,78 @@ def onboarding_session():
         )
         """,
         """
+        CREATE TABLE linhas_racao (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id TEXT NOT NULL,
+            nome TEXT NOT NULL,
+            descricao TEXT,
+            ordem INTEGER,
+            ativo BOOLEAN,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """,
+        """
+        CREATE TABLE portes_animal (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id TEXT NOT NULL,
+            nome TEXT NOT NULL,
+            descricao TEXT,
+            ordem INTEGER,
+            ativo BOOLEAN,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """,
+        """
+        CREATE TABLE fases_publico (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id TEXT NOT NULL,
+            nome TEXT NOT NULL,
+            descricao TEXT,
+            ordem INTEGER,
+            ativo BOOLEAN,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """,
+        """
+        CREATE TABLE tipos_tratamento (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id TEXT NOT NULL,
+            nome TEXT NOT NULL,
+            descricao TEXT,
+            ordem INTEGER,
+            ativo BOOLEAN,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """,
+        """
+        CREATE TABLE sabores_proteina (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id TEXT NOT NULL,
+            nome TEXT NOT NULL,
+            descricao TEXT,
+            ordem INTEGER,
+            ativo BOOLEAN,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """,
+        """
+        CREATE TABLE apresentacoes_peso (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            tenant_id TEXT NOT NULL,
+            peso_kg NUMERIC NOT NULL,
+            descricao TEXT,
+            ordem INTEGER,
+            ativo BOOLEAN,
+            created_at TEXT,
+            updated_at TEXT
+        )
+        """,
+        """
         CREATE TABLE produtos (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             tenant_id TEXT NOT NULL,
@@ -282,14 +415,11 @@ def test_onboarding_dry_run_does_not_create_tenant_data(onboarding_session):
     )
 
     assert result["dry_run"] is True
-    assert result["would_create"]["payment_methods"] == 4
-    assert result["would_create"]["dre_categories"] == 3
-    assert result["would_create"]["dre_subcategories"] == 4
-    assert result["would_create"]["financial_categories"] == 2
-    assert result["would_create"]["expense_types"] == 2
-    assert result["would_create"]["product_departments"] == 1
-    assert result["would_create"]["product_categories"] == 2
+    for key, expected in BASE_EXPECTED_COUNTS.items():
+        assert result["would_create"][key] == expected
     assert _count(onboarding_session, "formas_pagamento", TENANT_A) == 0
+    assert _count(onboarding_session, "contas_bancarias", TENANT_A) == 0
+    assert _count(onboarding_session, "linhas_racao", TENANT_A) == 0
     assert _count(onboarding_session, "dre_categorias", TENANT_A) == 0
     assert _count(onboarding_session, "tenant_template_installs") == 0
 
@@ -303,20 +433,24 @@ def test_onboarding_apply_creates_default_copy_for_tenant(onboarding_session):
     )
     onboarding_session.commit()
 
-    assert result["created"]["payment_methods"] == 4
-    assert result["created"]["dre_categories"] == 3
-    assert result["created"]["dre_subcategories"] == 4
-    assert result["created"]["financial_categories"] == 2
-    assert result["created"]["expense_types"] == 2
-    assert result["created"]["product_departments"] == 1
-    assert result["created"]["product_categories"] == 2
+    for key, expected in BASE_EXPECTED_COUNTS.items():
+        assert result["created"][key] == expected
     assert result["template_source"] == "database"
     assert _count(onboarding_session, "template_items") >= 1
     assert _count(onboarding_session, "tenant_template_installs") == 1
     assert _count(onboarding_session, "formas_pagamento", TENANT_A) == 4
+    assert _count(onboarding_session, "contas_bancarias", TENANT_A) == 2
+    assert _count(onboarding_session, "especies", TENANT_A) == 2
+    assert _count(onboarding_session, "racas", TENANT_A) == 2
     assert _count(onboarding_session, "dre_categorias", TENANT_A) == 3
     assert _count(onboarding_session, "tipo_despesas", TENANT_A) == 2
     assert _count(onboarding_session, "categorias", TENANT_A) == 2
+    assert _count(onboarding_session, "linhas_racao", TENANT_A) == 4
+    assert _count(onboarding_session, "portes_animal", TENANT_A) == 6
+    assert _count(onboarding_session, "fases_publico", TENANT_A) == 4
+    assert _count(onboarding_session, "tipos_tratamento", TENANT_A) == 9
+    assert _count(onboarding_session, "sabores_proteina", TENANT_A) == 10
+    assert _count(onboarding_session, "apresentacoes_peso", TENANT_A) == 11
     assert _count(onboarding_session, "produtos", TENANT_A) == 0
     enum_values = onboarding_session.execute(
         text("SELECT DISTINCT tipo_custo, escopo_rateio FROM dre_subcategorias WHERE tenant_id = :tenant_id"),
@@ -335,12 +469,11 @@ def test_onboarding_is_idempotent_for_same_tenant(onboarding_session):
     onboarding_session.commit()
 
     assert second["created"] == {}
-    assert second["skipped"]["payment_methods"] == 4
-    assert second["skipped"]["dre_categories"] == 3
-    assert second["skipped"]["dre_subcategories"] == 4
-    assert second["skipped"]["financial_categories"] == 2
-    assert second["skipped"]["expense_types"] == 2
+    for key, expected in BASE_EXPECTED_COUNTS.items():
+        assert second["skipped"][key] == expected
     assert _count(onboarding_session, "formas_pagamento", TENANT_A) == 4
+    assert _count(onboarding_session, "contas_bancarias", TENANT_A) == 2
+    assert _count(onboarding_session, "linhas_racao", TENANT_A) == 4
     assert _count(onboarding_session, "dre_categorias", TENANT_A) == 3
     assert _count(onboarding_session, "tipo_despesas", TENANT_A) == 2
     assert _count(onboarding_session, "tenant_template_installs") == 1
@@ -615,6 +748,15 @@ def test_template_contract_check_is_read_only_and_accepts_complete_builtin_contr
     assert result["missing_operational_tables"] == {}
     assert result["dependency_errors"] == []
     assert result["template_item_counts"]["payment_method"] == 4
+    assert result["template_item_counts"]["bank_account"] == 2
+    assert result["template_item_counts"]["pet_species"] == 2
+    assert result["template_item_counts"]["pet_breed"] == 2
+    assert result["template_item_counts"]["ration_line"] == 4
+    assert result["template_item_counts"]["animal_size"] == 6
+    assert result["template_item_counts"]["life_stage"] == 4
+    assert result["template_item_counts"]["treatment_type"] == 9
+    assert result["template_item_counts"]["protein_flavor"] == 10
+    assert result["template_item_counts"]["package_weight"] == 11
     assert result["template_item_counts"]["product_reference"] == 3
     assert _count(onboarding_session, "template_items") == 0
     assert _count(onboarding_session, "formas_pagamento", TENANT_A) == 0
@@ -884,6 +1026,9 @@ def test_onboarding_script_template_check_reports_contract(monkeypatch, capsys, 
     assert payload["ok"] is True
     assert payload["mode"] == "template_contract_check"
     assert payload["template_item_counts"]["payment_method"] == 4
+    assert payload["template_item_counts"]["bank_account"] == 2
+    assert payload["template_item_counts"]["pet_species"] == 2
+    assert payload["template_item_counts"]["ration_line"] == 4
     assert payload["template_item_counts"]["product_reference"] == 3
     assert _count(onboarding_session, "formas_pagamento", TENANT_A) == 0
 

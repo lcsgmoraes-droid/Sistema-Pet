@@ -10,6 +10,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
+from app.tenancy.context import set_current_tenant
 from app.opcoes_racao_models import (
     LinhaRacao, PorteAnimal, FasePublico, TipoTratamento, SaborProteina, ApresentacaoPeso
 )
@@ -52,6 +53,7 @@ class ApresentacaoPesoResponse(ApresentacaoPesoBase):
 def _validar_tenant_e_obter_usuario(user_and_tenant):
     """Desempacota e valida user_and_tenant"""
     current_user, tenant_id = user_and_tenant
+    set_current_tenant(tenant_id)
     return current_user, tenant_id
 
 

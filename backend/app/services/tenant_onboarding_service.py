@@ -27,6 +27,15 @@ NAME_TAXAS_CARTAO = "Taxas de Cartao"
 PRODUCT_REFERENCE_DESCRIPTION = "Produto de referencia para importacao opcional."
 ITEM_INSTALL_TARGET_TABLES = {
     "formas_pagamento",
+    "contas_bancarias",
+    "especies",
+    "racas",
+    "linhas_racao",
+    "portes_animal",
+    "fases_publico",
+    "tipos_tratamento",
+    "sabores_proteina",
+    "apresentacoes_peso",
     "dre_categorias",
     "dre_subcategorias",
     "categorias_financeiras",
@@ -37,6 +46,15 @@ ITEM_INSTALL_TARGET_TABLES = {
 }
 REQUIRED_ONBOARDING_SECTIONS = {
     "payment_methods",
+    "bank_accounts",
+    "pet_species",
+    "pet_breeds",
+    "ration_lines",
+    "animal_sizes",
+    "life_stages",
+    "treatment_types",
+    "protein_flavors",
+    "package_weights",
     "dre_categories",
     "dre_subcategories",
     "financial_categories",
@@ -46,6 +64,15 @@ REQUIRED_ONBOARDING_SECTIONS = {
 }
 REQUIRED_ONBOARDING_TABLES = {
     "payment_methods": ("formas_pagamento",),
+    "bank_accounts": ("contas_bancarias",),
+    "pet_species": ("especies",),
+    "pet_breeds": ("racas", "especies"),
+    "ration_lines": ("linhas_racao",),
+    "animal_sizes": ("portes_animal",),
+    "life_stages": ("fases_publico",),
+    "treatment_types": ("tipos_tratamento",),
+    "protein_flavors": ("sabores_proteina",),
+    "package_weights": ("apresentacoes_peso",),
     "dre_categories": ("dre_categorias",),
     "dre_subcategories": ("dre_subcategorias",),
     "financial_categories": ("categorias_financeiras",),
@@ -55,6 +82,15 @@ REQUIRED_ONBOARDING_TABLES = {
 }
 REQUIRED_TEMPLATE_ITEM_TYPES = {
     "payment_methods": "payment_method",
+    "bank_accounts": "bank_account",
+    "pet_species": "pet_species",
+    "pet_breeds": "pet_breed",
+    "ration_lines": "ration_line",
+    "animal_sizes": "animal_size",
+    "life_stages": "life_stage",
+    "treatment_types": "treatment_type",
+    "protein_flavors": "protein_flavor",
+    "package_weights": "package_weight",
     "dre_categories": "dre_category",
     "dre_subcategories": "dre_subcategory",
     "financial_categories": "financial_category",
@@ -442,6 +478,168 @@ BUILTIN_TEMPLATE_ITEMS: list[dict[str, Any]] = [
     ),
 ]
 
+BUILTIN_TEMPLATE_ITEMS.extend(
+    [
+        _template_item(
+            "bank_account",
+            "bank_cash_register",
+            "Caixa",
+            {
+                "nome": "Caixa",
+                "tipo": "caixa_fisico",
+                "banco": None,
+                "agencia": None,
+                "conta": None,
+                "saldo_inicial": 0,
+                "saldo_atual": 0,
+                "cor": "#22C55E",
+                "icone": "banknote",
+                "instituicao_bancaria": False,
+                "ativa": True,
+                "observacoes": "Conta padrao para recebimentos em dinheiro.",
+            },
+            45,
+        ),
+        _template_item(
+            "bank_account",
+            "bank_main_account",
+            "Conta Bancaria Principal",
+            {
+                "nome": "Conta Bancaria Principal",
+                "tipo": "corrente",
+                "banco": None,
+                "agencia": None,
+                "conta": None,
+                "saldo_inicial": 0,
+                "saldo_atual": 0,
+                "cor": "#2563EB",
+                "icone": "landmark",
+                "instituicao_bancaria": True,
+                "ativa": True,
+                "observacoes": "Conta bancaria inicial para configurar depois.",
+            },
+            46,
+        ),
+        _template_item(
+            "pet_species",
+            "species_dog",
+            "Cao",
+            {"nome": "Cao", "ativo": True},
+            50,
+        ),
+        _template_item(
+            "pet_species",
+            "species_cat",
+            "Gato",
+            {"nome": "Gato", "ativo": True},
+            51,
+        ),
+        _template_item(
+            "pet_breed",
+            "breed_dog_srd",
+            "SRD - Cao",
+            {"nome": "SRD", "species_code": "species_dog", "especie": "Cao", "ativo": True},
+            60,
+        ),
+        _template_item(
+            "pet_breed",
+            "breed_cat_srd",
+            "SRD - Gato",
+            {"nome": "SRD", "species_code": "species_cat", "especie": "Gato", "ativo": True},
+            61,
+        ),
+    ]
+)
+
+for index, name in enumerate(
+    ("Super Premium", "Premium Special", "Premium", "Standard"),
+    start=1,
+):
+    BUILTIN_TEMPLATE_ITEMS.append(
+        _template_item(
+            "ration_line",
+            f"ration_line_{index}",
+            name,
+            {"nome": name, "descricao": None, "ordem": index, "ativo": True},
+            600 + index,
+        )
+    )
+
+for index, name in enumerate(
+    ("Pequeno", "Medio", "Medio e Grande", "Grande", "Gigante", "Todos"),
+    start=1,
+):
+    BUILTIN_TEMPLATE_ITEMS.append(
+        _template_item(
+            "animal_size",
+            f"animal_size_{index}",
+            name,
+            {"nome": name, "descricao": None, "ordem": index, "ativo": True},
+            620 + index,
+        )
+    )
+
+for index, name in enumerate(("Filhote", "Adulto", "Senior", "Gestante"), start=1):
+    BUILTIN_TEMPLATE_ITEMS.append(
+        _template_item(
+            "life_stage",
+            f"life_stage_{index}",
+            name,
+            {"nome": name, "descricao": None, "ordem": index, "ativo": True},
+            640 + index,
+        )
+    )
+
+for index, name in enumerate(
+    (
+        "Obesidade",
+        "Light",
+        "Hipoalergenico",
+        "Sensivel",
+        "Digestivo",
+        "Urinario",
+        "Renal",
+        "Articular",
+        "Dermatologico",
+    ),
+    start=1,
+):
+    BUILTIN_TEMPLATE_ITEMS.append(
+        _template_item(
+            "treatment_type",
+            f"treatment_type_{index}",
+            name,
+            {"nome": name, "descricao": None, "ordem": index, "ativo": True},
+            660 + index,
+        )
+    )
+
+for index, name in enumerate(
+    ("Frango", "Carne", "Peixe", "Salmao", "Cordeiro", "Peru", "Porco", "Vegetariano", "Soja", "Mix"),
+    start=1,
+):
+    BUILTIN_TEMPLATE_ITEMS.append(
+        _template_item(
+            "protein_flavor",
+            f"protein_flavor_{index}",
+            name,
+            {"nome": name, "descricao": None, "ordem": index, "ativo": True},
+            680 + index,
+        )
+    )
+
+for index, weight in enumerate((0.5, 1, 2, 3, 5, 7, 10, 10.1, 15, 20, 25), start=1):
+    label = f"{weight:g}kg"
+    BUILTIN_TEMPLATE_ITEMS.append(
+        _template_item(
+            "package_weight",
+            f"package_weight_{index}",
+            label,
+            {"peso_kg": weight, "descricao": label, "ordem": index, "ativo": True},
+            700 + index,
+        )
+    )
+
 
 class TenantOnboardingError(RuntimeError):
     pass
@@ -728,6 +926,7 @@ def _find_template_dependency_errors(
     dre_subcategory_codes = _template_codes_by_type(items, "dre_subcategory")
     product_department_codes = _template_codes_by_type(items, "product_department")
     product_category_codes = _template_codes_by_type(items, "product_category")
+    pet_species_codes = _template_codes_by_type(items, "pet_species")
 
     for item in items:
         item_type = item.get("item_type")
@@ -759,6 +958,14 @@ def _find_template_dependency_errors(
                 "departamento_code",
                 product_department_codes,
                 "product_department",
+            )
+        elif item_type == "pet_breed":
+            _validate_payload_reference(
+                errors,
+                item,
+                "species_code",
+                pet_species_codes,
+                "pet_species",
             )
         elif item_type == "product_reference":
             target = errors if include_products else warnings
@@ -1096,6 +1303,456 @@ def _copy_payment_methods(
             created_id,
         )
         result.bump("created", "payment_methods")
+
+
+def _copy_bank_accounts(
+    db: Session,
+    items: list[dict[str, Any]],
+    tenant_id: str,
+    user_id: int,
+    result: OnboardingResult,
+) -> None:
+    for item in items:
+        payload = item["payload"]
+        mapped_id = _mapped_template_row_id(db, tenant_id, result, item, "contas_bancarias")
+        if mapped_id:
+            result.bump("skipped", "bank_accounts")
+            continue
+
+        existing_id = _scalar(
+            db,
+            """
+            SELECT id
+            FROM contas_bancarias
+            WHERE {tenant_filter}
+              AND lower(nome) = lower(:nome)
+              AND tipo = :tipo
+            LIMIT 1
+            """,
+            {"nome": payload["nome"], "tipo": payload["tipo"]},
+            tenant_id,
+        )
+        if existing_id:
+            _record_template_item_install(
+                db,
+                tenant_id,
+                user_id,
+                result,
+                item,
+                "contas_bancarias",
+                existing_id,
+            )
+            result.bump("skipped", "bank_accounts")
+            continue
+        if result.dry_run:
+            result.bump("would_create", "bank_accounts")
+            continue
+
+        params = {
+            "tenant_id": tenant_id,
+            "user_id": user_id,
+            "nome": payload["nome"],
+            "tipo": payload["tipo"],
+            "banco": payload.get("banco"),
+            "agencia": payload.get("agencia"),
+            "conta": payload.get("conta"),
+            "saldo_inicial": payload.get("saldo_inicial", 0),
+            "saldo_atual": payload.get("saldo_atual", 0),
+            "cor": payload.get("cor"),
+            "icone": payload.get("icone"),
+            "instituicao_bancaria": bool(payload.get("instituicao_bancaria", False)),
+            "ativa": bool(payload.get("ativa", True)),
+            "observacoes": payload.get("observacoes"),
+        }
+        _execute_insert(
+            db,
+            """
+            INSERT INTO contas_bancarias (
+                tenant_id, user_id, nome, tipo, banco, agencia, conta,
+                saldo_inicial, saldo_atual, cor, icone, instituicao_bancaria,
+                ativa, observacoes, created_at, updated_at
+            ) VALUES (
+                :tenant_id, :user_id, :nome, :tipo, :banco, :agencia, :conta,
+                :saldo_inicial, :saldo_atual, :cor, :icone, :instituicao_bancaria,
+                :ativa, :observacoes, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            )
+            """,
+            params,
+            tenant_id,
+        )
+        created_id = _scalar(
+            db,
+            """
+            SELECT id
+            FROM contas_bancarias
+            WHERE {tenant_filter}
+              AND lower(nome) = lower(:nome)
+              AND tipo = :tipo
+            LIMIT 1
+            """,
+            {"nome": payload["nome"], "tipo": payload["tipo"]},
+            tenant_id,
+        )
+        _record_template_item_install(
+            db,
+            tenant_id,
+            user_id,
+            result,
+            item,
+            "contas_bancarias",
+            created_id,
+        )
+        result.bump("created", "bank_accounts")
+
+
+def _copy_pet_species(
+    db: Session,
+    items: list[dict[str, Any]],
+    tenant_id: str,
+    result: OnboardingResult,
+) -> dict[str, int]:
+    species_ids: dict[str, int] = {}
+    for item in items:
+        payload = item["payload"]
+        mapped_id = _mapped_template_row_id(db, tenant_id, result, item, "especies")
+        if mapped_id:
+            species_ids[item["template_code"]] = mapped_id
+            result.bump("skipped", "pet_species")
+            continue
+
+        existing_id = _scalar(
+            db,
+            """
+            SELECT id
+            FROM especies
+            WHERE {tenant_filter}
+              AND lower(nome) = lower(:nome)
+            LIMIT 1
+            """,
+            {"nome": payload["nome"]},
+            tenant_id,
+        )
+        if existing_id:
+            species_ids[item["template_code"]] = int(existing_id)
+            _record_template_item_install(
+                db,
+                tenant_id,
+                None,
+                result,
+                item,
+                "especies",
+                existing_id,
+            )
+            result.bump("skipped", "pet_species")
+            continue
+        if result.dry_run:
+            species_ids[item["template_code"]] = -int(item.get("sort_order") or 1)
+            result.bump("would_create", "pet_species")
+            continue
+
+        _execute_insert(
+            db,
+            """
+            INSERT INTO especies (
+                tenant_id, nome, ativo, created_at, updated_at
+            ) VALUES (
+                :tenant_id, :nome, :ativo, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            )
+            """,
+            {
+                "tenant_id": tenant_id,
+                "nome": payload["nome"],
+                "ativo": bool(payload.get("ativo", True)),
+            },
+            tenant_id,
+        )
+        created_id = _scalar(
+            db,
+            """
+            SELECT id
+            FROM especies
+            WHERE {tenant_filter}
+              AND lower(nome) = lower(:nome)
+            LIMIT 1
+            """,
+            {"nome": payload["nome"]},
+            tenant_id,
+        )
+        species_ids[item["template_code"]] = int(created_id)
+        _record_template_item_install(
+            db,
+            tenant_id,
+            None,
+            result,
+            item,
+            "especies",
+            created_id,
+        )
+        result.bump("created", "pet_species")
+    return species_ids
+
+
+def _copy_pet_breeds(
+    db: Session,
+    items: list[dict[str, Any]],
+    tenant_id: str,
+    result: OnboardingResult,
+    species_ids: dict[str, int],
+) -> None:
+    for item in items:
+        payload = item["payload"]
+        species_id = species_ids.get(payload.get("species_code"))
+        if not species_id:
+            result.warnings.append(f"Especie ausente para raca {item['template_code']}.")
+            continue
+
+        mapped_id = _mapped_template_row_id(db, tenant_id, result, item, "racas")
+        if mapped_id:
+            result.bump("skipped", "pet_breeds")
+            continue
+
+        existing_id = _scalar(
+            db,
+            """
+            SELECT id
+            FROM racas
+            WHERE {tenant_filter}
+              AND especie_id = :especie_id
+              AND lower(nome) = lower(:nome)
+            LIMIT 1
+            """,
+            {"especie_id": species_id, "nome": payload["nome"]},
+            tenant_id,
+        )
+        if existing_id:
+            _record_template_item_install(
+                db,
+                tenant_id,
+                None,
+                result,
+                item,
+                "racas",
+                existing_id,
+            )
+            result.bump("skipped", "pet_breeds")
+            continue
+        if result.dry_run:
+            result.bump("would_create", "pet_breeds")
+            continue
+
+        _execute_insert(
+            db,
+            """
+            INSERT INTO racas (
+                tenant_id, nome, especie, especie_id, ativo, created_at, updated_at
+            ) VALUES (
+                :tenant_id, :nome, :especie, :especie_id, :ativo,
+                CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            )
+            """,
+            {
+                "tenant_id": tenant_id,
+                "nome": payload["nome"],
+                "especie": payload.get("especie"),
+                "especie_id": species_id,
+                "ativo": bool(payload.get("ativo", True)),
+            },
+            tenant_id,
+        )
+        created_id = _scalar(
+            db,
+            """
+            SELECT id
+            FROM racas
+            WHERE {tenant_filter}
+              AND especie_id = :especie_id
+              AND lower(nome) = lower(:nome)
+            LIMIT 1
+            """,
+            {"especie_id": species_id, "nome": payload["nome"]},
+            tenant_id,
+        )
+        _record_template_item_install(
+            db,
+            tenant_id,
+            None,
+            result,
+            item,
+            "racas",
+            created_id,
+        )
+        result.bump("created", "pet_breeds")
+
+
+def _copy_named_options(
+    db: Session,
+    items: list[dict[str, Any]],
+    tenant_id: str,
+    result: OnboardingResult,
+    target_table: str,
+    result_key: str,
+) -> None:
+    _ensure_known_target_table(target_table)
+    for item in items:
+        payload = item["payload"]
+        mapped_id = _mapped_template_row_id(db, tenant_id, result, item, target_table)
+        if mapped_id:
+            result.bump("skipped", result_key)
+            continue
+
+        existing_id = _scalar(
+            db,
+            f"""
+            SELECT id
+            FROM {target_table}
+            WHERE {{tenant_filter}}
+              AND lower(nome) = lower(:nome)
+            LIMIT 1
+            """,
+            {"nome": payload["nome"]},
+            tenant_id,
+        )
+        if existing_id:
+            _record_template_item_install(
+                db,
+                tenant_id,
+                None,
+                result,
+                item,
+                target_table,
+                existing_id,
+            )
+            result.bump("skipped", result_key)
+            continue
+        if result.dry_run:
+            result.bump("would_create", result_key)
+            continue
+
+        _execute_insert(
+            db,
+            f"""
+            INSERT INTO {target_table} (
+                tenant_id, nome, descricao, ordem, ativo, created_at, updated_at
+            ) VALUES (
+                :tenant_id, :nome, :descricao, :ordem, :ativo,
+                CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            )
+            """,
+            {
+                "tenant_id": tenant_id,
+                "nome": payload["nome"],
+                "descricao": payload.get("descricao"),
+                "ordem": payload.get("ordem", 0),
+                "ativo": bool(payload.get("ativo", True)),
+            },
+            tenant_id,
+        )
+        created_id = _scalar(
+            db,
+            f"""
+            SELECT id
+            FROM {target_table}
+            WHERE {{tenant_filter}}
+              AND lower(nome) = lower(:nome)
+            LIMIT 1
+            """,
+            {"nome": payload["nome"]},
+            tenant_id,
+        )
+        _record_template_item_install(
+            db,
+            tenant_id,
+            None,
+            result,
+            item,
+            target_table,
+            created_id,
+        )
+        result.bump("created", result_key)
+
+
+def _copy_package_weights(
+    db: Session,
+    items: list[dict[str, Any]],
+    tenant_id: str,
+    result: OnboardingResult,
+) -> None:
+    for item in items:
+        payload = item["payload"]
+        mapped_id = _mapped_template_row_id(db, tenant_id, result, item, "apresentacoes_peso")
+        if mapped_id:
+            result.bump("skipped", "package_weights")
+            continue
+
+        existing_id = _scalar(
+            db,
+            """
+            SELECT id
+            FROM apresentacoes_peso
+            WHERE {tenant_filter}
+              AND peso_kg = :peso_kg
+            LIMIT 1
+            """,
+            {"peso_kg": payload["peso_kg"]},
+            tenant_id,
+        )
+        if existing_id:
+            _record_template_item_install(
+                db,
+                tenant_id,
+                None,
+                result,
+                item,
+                "apresentacoes_peso",
+                existing_id,
+            )
+            result.bump("skipped", "package_weights")
+            continue
+        if result.dry_run:
+            result.bump("would_create", "package_weights")
+            continue
+
+        _execute_insert(
+            db,
+            """
+            INSERT INTO apresentacoes_peso (
+                tenant_id, peso_kg, descricao, ordem, ativo, created_at, updated_at
+            ) VALUES (
+                :tenant_id, :peso_kg, :descricao, :ordem, :ativo,
+                CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+            )
+            """,
+            {
+                "tenant_id": tenant_id,
+                "peso_kg": payload["peso_kg"],
+                "descricao": payload.get("descricao"),
+                "ordem": payload.get("ordem", 0),
+                "ativo": bool(payload.get("ativo", True)),
+            },
+            tenant_id,
+        )
+        created_id = _scalar(
+            db,
+            """
+            SELECT id
+            FROM apresentacoes_peso
+            WHERE {tenant_filter}
+              AND peso_kg = :peso_kg
+            LIMIT 1
+            """,
+            {"peso_kg": payload["peso_kg"]},
+            tenant_id,
+        )
+        _record_template_item_install(
+            db,
+            tenant_id,
+            None,
+            result,
+            item,
+            "apresentacoes_peso",
+            created_id,
+        )
+        result.bump("created", "package_weights")
 
 
 def _copy_dre_categories(
@@ -1851,6 +2508,32 @@ def _run_onboarding_steps(
             result,
         )
 
+    if _tables_ready_or_warn(db, result, "contas bancarias", ("contas_bancarias",)):
+        _copy_bank_accounts(
+            db,
+            _items_by_type(items, "bank_account"),
+            tenant_id_str,
+            user_id_int,
+            result,
+        )
+
+    pet_species_ids: dict[str, int] = {}
+    if _tables_ready_or_warn(db, result, "especies de pets", ("especies",)):
+        pet_species_ids = _copy_pet_species(
+            db,
+            _items_by_type(items, "pet_species"),
+            tenant_id_str,
+            result,
+        )
+    if _tables_ready_or_warn(db, result, "racas de pets", ("racas", "especies")):
+        _copy_pet_breeds(
+            db,
+            _items_by_type(items, "pet_breed"),
+            tenant_id_str,
+            result,
+            pet_species_ids,
+        )
+
     category_ids: dict[str, int] = {}
     subcategory_ids: dict[str, int] = {}
     if _tables_ready_or_warn(
@@ -1909,6 +2592,32 @@ def _run_onboarding_steps(
             user_id_int,
             result,
             department_ids,
+        )
+
+    ration_option_sections = (
+        ("linhas de racao", "linhas_racao", "ration_line", "ration_lines"),
+        ("portes de animal", "portes_animal", "animal_size", "animal_sizes"),
+        ("fases/publicos de racao", "fases_publico", "life_stage", "life_stages"),
+        ("tratamentos de racao", "tipos_tratamento", "treatment_type", "treatment_types"),
+        ("sabores/proteinas de racao", "sabores_proteina", "protein_flavor", "protein_flavors"),
+    )
+    for section_name, table_name, item_type, result_key in ration_option_sections:
+        if _tables_ready_or_warn(db, result, section_name, (table_name,)):
+            _copy_named_options(
+                db,
+                _items_by_type(items, item_type),
+                tenant_id_str,
+                result,
+                table_name,
+                result_key,
+            )
+
+    if _tables_ready_or_warn(db, result, "apresentacoes de peso", ("apresentacoes_peso",)):
+        _copy_package_weights(
+            db,
+            _items_by_type(items, "package_weight"),
+            tenant_id_str,
+            result,
         )
 
     if include_products:

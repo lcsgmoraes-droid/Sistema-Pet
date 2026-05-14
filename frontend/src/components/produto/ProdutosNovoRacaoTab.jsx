@@ -1,3 +1,5 @@
+import { useState } from "react";
+import { Plus, Save, X } from "lucide-react";
 import TabelaConsumoEditor from "../TabelaConsumoEditor";
 
 export default function ProdutosNovoRacaoTab({
@@ -5,6 +7,7 @@ export default function ProdutosNovoRacaoTab({
   handleChange,
   handleApresentacaoPesoChange,
   handleClassificacaoRacaoChange,
+  handleCriarOpcaoRacao,
   handleFasePublicoChange,
   opcoesApresentacoes,
   opcoesFases,
@@ -13,10 +16,83 @@ export default function ProdutosNovoRacaoTab({
   opcoesSabores,
   opcoesTratamentos,
 }) {
+  const [modalOpcao, setModalOpcao] = useState(null);
+  const [nomeOpcao, setNomeOpcao] = useState("");
+  const [pesoOpcao, setPesoOpcao] = useState("");
+  const [descricaoOpcao, setDescricaoOpcao] = useState("");
+  const [erroOpcao, setErroOpcao] = useState("");
+  const [salvandoOpcao, setSalvandoOpcao] = useState(false);
+
   const linhaSelecionada = opcoesLinhas.find(
     (linha) => String(linha.id) === String(formData.linha_racao_id || ""),
   );
   const nomeLinhaSelecionada = linhaSelecionada?.nome || "";
+  const quickAddDisponivel = typeof handleCriarOpcaoRacao === "function";
+
+  const abrirModalOpcao = (tipo, titulo) => {
+    setModalOpcao({ tipo, titulo });
+    setNomeOpcao("");
+    setPesoOpcao("");
+    setDescricaoOpcao("");
+    setErroOpcao("");
+  };
+
+  const fecharModalOpcao = () => {
+    if (salvandoOpcao) return;
+    setModalOpcao(null);
+    setErroOpcao("");
+  };
+
+  const salvarOpcao = async () => {
+    if (!modalOpcao || !quickAddDisponivel) return;
+    setErroOpcao("");
+
+    const isApresentacao = modalOpcao.tipo === "apresentacao";
+    const nome = nomeOpcao.trim();
+    const peso = Number(String(pesoOpcao).replace(",", "."));
+
+    if (isApresentacao && (!Number.isFinite(peso) || peso <= 0)) {
+      setErroOpcao("Informe um peso valido em kg.");
+      return;
+    }
+    if (!isApresentacao && !nome) {
+      setErroOpcao("Informe um nome.");
+      return;
+    }
+
+    try {
+      setSalvandoOpcao(true);
+      await handleCriarOpcaoRacao(modalOpcao.tipo, {
+        nome,
+        peso_kg: peso,
+        descricao: descricaoOpcao.trim() || null,
+      });
+      setModalOpcao(null);
+    } catch (error) {
+      const detalhe = error?.response?.data?.detail;
+      setErroOpcao(typeof detalhe === "string" ? detalhe : "Nao foi possivel salvar agora.");
+    } finally {
+      setSalvandoOpcao(false);
+    }
+  };
+
+  const LabelComNovo = ({ children, tipo, titulo, opcional = false }) => (
+    <div className="mb-1 flex items-center justify-between gap-2">
+      <label className="block text-sm font-medium text-gray-700">
+        {children} {opcional && <span className="text-gray-400">(Opcional)</span>}
+      </label>
+      {quickAddDisponivel && (
+        <button
+          type="button"
+          onClick={() => abrirModalOpcao(tipo, titulo)}
+          className="inline-flex h-7 items-center gap-1 rounded-md border border-blue-200 bg-white px-2 text-xs font-semibold text-blue-700 hover:bg-blue-50"
+        >
+          <Plus className="h-3.5 w-3.5" />
+          Novo
+        </button>
+      )}
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -91,7 +167,9 @@ export default function ProdutosNovoRacaoTab({
           <h4 className="mb-4 text-sm font-semibold text-blue-900">Informacoes detalhadas da racao</h4>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Linha</label>
+              <LabelComNovo tipo="linha" titulo="Nova linha">
+                Linha
+              </LabelComNovo>
               <select
                 value={formData.linha_racao_id}
                 onChange={(e) => {
@@ -114,7 +192,9 @@ export default function ProdutosNovoRacaoTab({
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Porte do animal</label>
+              <LabelComNovo tipo="porte" titulo="Novo porte">
+                Porte do animal
+              </LabelComNovo>
               <select
                 value={formData.porte_animal_id}
                 onChange={(e) => handleChange("porte_animal_id", e.target.value)}
@@ -130,7 +210,9 @@ export default function ProdutosNovoRacaoTab({
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Fase/Publico</label>
+              <LabelComNovo tipo="fase" titulo="Nova fase/publico">
+                Fase/Publico
+              </LabelComNovo>
               <select
                 value={formData.fase_publico_id}
                 onChange={(e) => handleFasePublicoChange(e.target.value)}
@@ -146,9 +228,9 @@ export default function ProdutosNovoRacaoTab({
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">
-                Tratamento <span className="text-gray-400">(Opcional)</span>
-              </label>
+              <LabelComNovo tipo="tratamento" titulo="Novo tratamento" opcional>
+                Tratamento
+              </LabelComNovo>
               <select
                 value={formData.tipo_tratamento_id}
                 onChange={(e) => handleChange("tipo_tratamento_id", e.target.value)}
@@ -164,7 +246,9 @@ export default function ProdutosNovoRacaoTab({
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Sabor/Proteina</label>
+              <LabelComNovo tipo="sabor" titulo="Novo sabor/proteina">
+                Sabor/Proteina
+              </LabelComNovo>
               <select
                 value={formData.sabor_proteina_id}
                 onChange={(e) => handleChange("sabor_proteina_id", e.target.value)}
@@ -180,7 +264,9 @@ export default function ProdutosNovoRacaoTab({
             </div>
 
             <div>
-              <label className="mb-1 block text-sm font-medium text-gray-700">Apresentacao (Peso)</label>
+              <LabelComNovo tipo="apresentacao" titulo="Nova apresentacao">
+                Apresentacao (Peso)
+              </LabelComNovo>
               <select
                 value={formData.apresentacao_peso_id}
                 onChange={(e) => handleApresentacaoPesoChange(e.target.value)}
@@ -278,6 +364,94 @@ export default function ProdutosNovoRacaoTab({
               <p className="text-yellow-600">Sem tabela de consumo (usara calculo generico)</p>
             )}
             <p className="mt-2 text-orange-800">Use a Calculadora de Racao para ver duracao e custo/dia.</p>
+          </div>
+        </div>
+      )}
+
+      {modalOpcao && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/45 p-4">
+          <div className="w-full max-w-md rounded-lg bg-white shadow-xl">
+            <div className="flex items-center justify-between border-b border-slate-200 px-5 py-4">
+              <div>
+                <h3 className="text-base font-semibold text-slate-900">{modalOpcao.titulo}</h3>
+                <p className="text-sm text-slate-500">Cadastro rapido para este produto</p>
+              </div>
+              <button
+                type="button"
+                onClick={fecharModalOpcao}
+                className="rounded-md p-1 text-slate-500 hover:bg-slate-100 hover:text-slate-700"
+                aria-label="Fechar"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+
+            <div className="space-y-4 px-5 py-4">
+              {modalOpcao.tipo === "apresentacao" ? (
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Peso em kg</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={pesoOpcao}
+                    onChange={(e) => setPesoOpcao(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                    placeholder="Ex: 10.1"
+                    autoFocus
+                  />
+                </div>
+              ) : (
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-slate-700">Nome</label>
+                  <input
+                    type="text"
+                    value={nomeOpcao}
+                    onChange={(e) => setNomeOpcao(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                    placeholder="Digite o nome"
+                    autoFocus
+                  />
+                </div>
+              )}
+
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Descricao</label>
+                <input
+                  type="text"
+                  value={descricaoOpcao}
+                  onChange={(e) => setDescricaoOpcao(e.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-3 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                  placeholder="Opcional"
+                />
+              </div>
+
+              {erroOpcao && (
+                <div className="rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {erroOpcao}
+                </div>
+              )}
+            </div>
+
+            <div className="flex justify-end gap-3 border-t border-slate-200 px-5 py-4">
+              <button
+                type="button"
+                onClick={fecharModalOpcao}
+                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                disabled={salvandoOpcao}
+              >
+                Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={salvarOpcao}
+                className="inline-flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={salvandoOpcao}
+              >
+                <Save className="h-4 w-4" />
+                {salvandoOpcao ? "Salvando..." : "Salvar"}
+              </button>
+            </div>
           </div>
         </div>
       )}

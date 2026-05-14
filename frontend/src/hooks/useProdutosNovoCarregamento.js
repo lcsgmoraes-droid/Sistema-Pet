@@ -59,7 +59,14 @@ export default function useProdutosNovoCarregamento({
 }) {
   const carregarOpcoesRacao = async () => {
     try {
-      const [linhas, portes, fases, tratamentos, sabores, apresentacoes] = await Promise.all([
+      const [
+        linhasResult,
+        portesResult,
+        fasesResult,
+        tratamentosResult,
+        saboresResult,
+        apresentacoesResult,
+      ] = await Promise.allSettled([
         api.get('/opcoes-racao/linhas', { params: { apenas_ativos: true } }),
         api.get('/opcoes-racao/portes', { params: { apenas_ativos: true } }),
         api.get('/opcoes-racao/fases', { params: { apenas_ativos: true } }),
@@ -68,18 +75,29 @@ export default function useProdutosNovoCarregamento({
         api.get('/opcoes-racao/apresentacoes', { params: { apenas_ativos: true } }),
       ]);
 
-      setOpcoesLinhas(linhas.data);
-      setOpcoesPortes(portes.data);
-      setOpcoesFases(fases.data);
-      setOpcoesTratamentos(tratamentos.data);
-      setOpcoesSabores(sabores.data);
-      setOpcoesApresentacoes(apresentacoes.data);
+      const aplicarResultado = (resultado, setter, nome) => {
+        if (resultado.status === 'fulfilled') {
+          setter(Array.isArray(resultado.value.data) ? resultado.value.data : []);
+          return;
+        }
+
+        console.error(`Erro ao carregar opcoes de racao (${nome}):`, resultado.reason);
+      };
+
+      aplicarResultado(linhasResult, setOpcoesLinhas, 'linhas');
+      aplicarResultado(portesResult, setOpcoesPortes, 'portes');
+      aplicarResultado(fasesResult, setOpcoesFases, 'fases');
+      aplicarResultado(tratamentosResult, setOpcoesTratamentos, 'tratamentos');
+      aplicarResultado(saboresResult, setOpcoesSabores, 'sabores');
+      aplicarResultado(apresentacoesResult, setOpcoesApresentacoes, 'apresentacoes');
     } catch (error) {
       console.error('Erro ao carregar opções de ração:', error);
     }
   };
 
   const carregarDadosAuxiliares = async () => {
+    await carregarOpcoesRacao();
+
     try {
       const [categoriasResponse, marcasResponse, departamentosResponse, clientesResponse] =
         await Promise.all([
@@ -100,8 +118,6 @@ export default function useProdutosNovoCarregamento({
           ? clientesResponse.data
           : (clientesResponse.data.items || []),
       );
-
-      await carregarOpcoesRacao();
     } catch (error) {
       console.error('Erro ao carregar dados auxiliares:', error);
     }

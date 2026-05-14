@@ -48,6 +48,7 @@ export default function ModalCalculadoraUniversal({
   const [buscaRacao, setBuscaRacao] = useState('');
   const [racoesDisponiveis, setRacoesDisponiveis] = useState([]);
   const [buscandoRacoes, setBuscandoRacoes] = useState(false);
+  const [erroBuscaRacao, setErroBuscaRacao] = useState(null);
 
   // Estados do formulário
   const [form, setForm] = useState({
@@ -80,31 +81,67 @@ export default function ModalCalculadoraUniversal({
       })()
     : [];
 
+  const racaoCalculavel = (racao) =>
+    racao?.apta === true &&
+    Number(racao?.peso_embalagem || 0) > 0 &&
+    Number(racao?.preco_venda || racao?.preco_unitario || 0) > 0 &&
+    Boolean(racao?.tabela_consumo);
+
+  const formatarRacaoBusca = (racao) => {
+    if (!racao) return '';
+    const nome = racao.nome || racao.produto_nome || '';
+    const peso = racao.peso_embalagem ? ` - ${racao.peso_embalagem}kg` : '';
+    return `${nome}${peso}`;
+  };
+
   // Buscar rações disponíveis (modo FORA DO PDV)
   useEffect(() => {
-    if (!estaNoPDV && buscaRacao.length >= 2) {
+    if (!isOpen || estaNoPDV) return;
+
+    const termo = buscaRacao.trim();
+    if (racaoSelecionada && termo === formatarRacaoBusca(racaoSelecionada).trim()) {
+      setRacoesDisponiveis([racaoSelecionada]);
+      setMostraDropdown(false);
+      setErroBuscaRacao(null);
+      return;
+    }
+
+    if (termo.length >= 1) {
       const timer = setTimeout(async () => {
         setBuscandoRacoes(true);
+        setErroBuscaRacao(null);
         try {
-            const response = await api.get('/produtos/', {
-            params: { busca: buscaRacao }
+            const response = await api.get('/produtos/calculadora-racao/opcoes', {
+            params: {
+              busca: termo,
+              page: 1,
+              page_size: 12,
+              apenas_aptas: true,
+            }
           });
           
-          const produtos = response.data.items || response.data.produtos || [];
+          const produtos = Array.isArray(response.data)
+            ? response.data
+            : response.data.items || response.data.produtos || [];
           // Filtrar apenas rações (que têm peso_embalagem)
-          const racoes = produtos.filter(p => p.peso_embalagem && p.peso_embalagem > 0);
+          const racoes = produtos.filter(racaoCalculavel);
           setRacoesDisponiveis(racoes);
+          setMostraDropdown(true);
         } catch (error) {
+          setErroBuscaRacao('Nao foi possivel buscar racoes agora.');
+          setMostraDropdown(true);
           console.error('Erro ao buscar rações:', error);
         } finally {
           setBuscandoRacoes(false);
         }
-      }, 300);
+      }, 250);
       return () => clearTimeout(timer);
     } else {
       setRacoesDisponiveis([]);
+      setMostraDropdown(false);
+      setErroBuscaRacao(null);
     }
-  }, [buscaRacao, estaNoPDV]);
+  }, [buscaRacao, estaNoPDV, isOpen]);
 
   // Resetar posição quando o modal fecha
   useEffect(() => {
@@ -174,6 +211,8 @@ export default function ModalCalculadoraUniversal({
 
       const payload = {
         produto_id: racaoSelecionada.produto_id || racaoSelecionada.id,
+        peso_embalagem_kg: racaoSelecionada.peso_embalagem || null,
+        preco: racaoSelecionada.preco_venda || racaoSelecionada.preco_unitario || null,
         peso_pet_kg: parseFloat(form.peso_pet_kg),
         idade_meses: form.idade_meses ? parseInt(form.idade_meses) : null,
         nivel_atividade: form.nivel_atividade
@@ -198,7 +237,10 @@ export default function ModalCalculadoraUniversal({
       }
     } catch (error) {
       console.error('❌ Erro ao calcular:', error);
-      toast.error('Erro ao calcular. Tente novamente.');
+      const detalhe = error?.response?.data?.detail;
+      const mensagem = typeof detalhe === 'string' ? detalhe : 'Erro ao calcular. Tente novamente.';
+      setErroCalculo(mensagem);
+      toast.error(mensagem);
     } finally {
       setCarregando(false);
     }
@@ -208,7 +250,9 @@ export default function ModalCalculadoraUniversal({
   const selecionarRacaoAutocomplete = (racao) => {
     setRacaoSelecionadaId(racao.id);
     setRacaoSelecionada(racao);
-    setBuscaRacao(`${racao.nome} - ${racao.peso_embalagem}kg`);
+    setBuscaRacao(formatarRacaoBusca(racao));
+    setRacoesDisponiveis([racao]);
+    setErroBuscaRacao(null);
     setMostraDropdown(false);
   };
 
@@ -358,24 +402,35 @@ export default function ModalCalculadoraUniversal({
                   <input
                     type="text"
                     value={buscaRacao}
-                    onChange={(e) => setBuscaRacao(e.target.value)}
-                    onFocus={() => racoesDisponiveis.length > 0 && setMostraDropdown(true)}
+                    onChange={(e) => {
+                      setBuscaRacao(e.target.value);
+                      setRacaoSelecionada(null);
+                      setRacaoSelecionadaId(null);
+                    }}
+                    onFocus={() => {
+                      if (buscaRacao.trim().length > 0) setMostraDropdown(true);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && racoesDisponiveis.length > 0) {
+                        e.preventDefault();
+                        selecionarRacaoAutocomplete(racoesDisponiveis[0]);
+                      }
+                      if (e.key === 'Escape') {
+                        setMostraDropdown(false);
+                      }
+                    }}
                     placeholder="Digite para buscar ração..."
-                    className="w-full px-4 py-3 pr-20 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
+                    className="w-full px-4 py-3 pr-12 border-2 border-gray-300 rounded-lg focus:border-orange-500 focus:ring-2 focus:ring-orange-200"
                   />
                   
                   {buscandoRacoes ? (
                     <div className="absolute right-3 top-1/2 -translate-y-1/2">
                       <Loader2 size={20} className="animate-spin text-orange-500" />
                     </div>
-                  ) : racoesDisponiveis.length > 0 && (
-                    <button
-                      type="button"
-                      onClick={() => setMostraDropdown(!mostraDropdown)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700"
-                    >
-                      <ChevronDown size={20} className={`transition-transform ${mostraDropdown ? 'rotate-180' : ''}`} />
-                    </button>
+                  ) : (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-semibold text-orange-600">
+                      Buscar
+                    </div>
                   )}
                 </div>
 
@@ -385,23 +440,51 @@ export default function ModalCalculadoraUniversal({
                       <button
                         key={racao.id}
                         type="button"
-                        onClick={() => selecionarRacaoAutocomplete(racao)}
+                        onMouseDown={(event) => {
+                          event.preventDefault();
+                          selecionarRacaoAutocomplete(racao);
+                        }}
                         className={`w-full px-4 py-3 text-left hover:bg-orange-50 transition-colors border-b last:border-b-0 ${
                           racao.id === racaoSelecionadaId ? 'bg-orange-100 border-l-4 border-l-orange-600' : ''
                         }`}
                       >
-                        <div className="font-medium">{racao.nome}</div>
-                        <div className="text-xs text-gray-500">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="font-medium">{racao.nome}</div>
+                            <div className="text-xs text-gray-500">
                           {racao.peso_embalagem}kg • R$ {racao.preco_venda?.toFixed(2)}
                           {racao.classificacao_racao && ` • ${racao.classificacao_racao}`}
+                            </div>
+                          </div>
+                          <span className="rounded-full bg-green-50 px-2 py-1 text-xs font-semibold text-green-700">
+                            pronta
+                          </span>
                         </div>
                       </button>
                     ))}
                   </div>
                 )}
+
+                {mostraDropdown && !buscandoRacoes && buscaRacao.trim().length > 0 && racoesDisponiveis.length === 0 && (
+                  <div className="rounded-lg border border-orange-200 bg-orange-50 px-4 py-3 text-sm text-orange-800">
+                    Nenhuma racao pronta para calculo encontrada com esse termo.
+                  </div>
+                )}
+
+                {erroBuscaRacao && (
+                  <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {erroBuscaRacao}
+                  </div>
+                )}
               </div>
             )}
           </div>
+
+          {erroCalculo && (
+            <div className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+              {erroCalculo}
+            </div>
+          )}
 
           {/* Dados do Pet */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

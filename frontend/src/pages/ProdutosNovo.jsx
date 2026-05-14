@@ -18,6 +18,7 @@ import useProdutosNovoSubmit from '../hooks/useProdutosNovoSubmit';
 import useProdutosNovoTributacao from '../hooks/useProdutosNovoTributacao';
 import useProdutosNovoVariacoes from '../hooks/useProdutosNovoVariacoes';
 import useProdutosNovoPageComposition from '../hooks/useProdutosNovoPageComposition';
+import api from '../api';
 import {
   calcularPrecoVenda,
   calcularMarkup,
@@ -368,6 +369,93 @@ export default function ProdutosNovo() {
     navigate('/produtos');
   };
 
+  const handleCriarOpcaoRacao = async (tipo, dados) => {
+    const configs = {
+      linha: {
+        endpoint: '/opcoes-racao/linhas',
+        setter: setOpcoesLinhas,
+        field: 'linha_racao_id',
+        afterSelect: (item) => handleChange('classificacao_racao', item.nome || ''),
+      },
+      porte: {
+        endpoint: '/opcoes-racao/portes',
+        setter: setOpcoesPortes,
+        field: 'porte_animal_id',
+      },
+      fase: {
+        endpoint: '/opcoes-racao/fases',
+        setter: setOpcoesFases,
+        field: 'fase_publico_id',
+        afterSelect: (item) => handleChange('categoria_racao', item.nome || ''),
+      },
+      tratamento: {
+        endpoint: '/opcoes-racao/tratamentos',
+        setter: setOpcoesTratamentos,
+        field: 'tipo_tratamento_id',
+      },
+      sabor: {
+        endpoint: '/opcoes-racao/sabores',
+        setter: setOpcoesSabores,
+        field: 'sabor_proteina_id',
+      },
+      apresentacao: {
+        endpoint: '/opcoes-racao/apresentacoes',
+        setter: setOpcoesApresentacoes,
+        field: 'apresentacao_peso_id',
+        afterSelect: (item) => handleChange('peso_embalagem', item.peso_kg || ''),
+      },
+    };
+    const config = configs[tipo];
+    if (!config) {
+      throw new Error('Tipo de opcao de racao invalido.');
+    }
+
+    const pesoKg = Number(dados.peso_kg);
+    const pesoLabel = Number.isInteger(pesoKg) ? `${pesoKg}kg` : `${pesoKg.toString()}kg`;
+    const payload =
+      tipo === 'apresentacao'
+        ? {
+            peso_kg: pesoKg,
+            descricao: dados.descricao || pesoLabel,
+            ordem: 999,
+            ativo: true,
+          }
+        : {
+            nome: (dados.nome || '').trim(),
+            descricao: dados.descricao || null,
+            ordem: 999,
+            ativo: true,
+          };
+
+    const ordenarOpcoes = (items) =>
+      items.sort((a, b) => {
+        const ordemA = Number(a.ordem ?? 999);
+        const ordemB = Number(b.ordem ?? 999);
+        if (ordemA !== ordemB) return ordemA - ordemB;
+        return String(a.nome || a.descricao || a.peso_kg).localeCompare(
+          String(b.nome || b.descricao || b.peso_kg),
+        );
+      });
+
+    const response = await api.post(config.endpoint, payload);
+    const item = response.data;
+    try {
+      const listaResponse = await api.get(config.endpoint, { params: { apenas_ativos: true } });
+      const lista = Array.isArray(listaResponse.data) ? listaResponse.data : [];
+      const incluiCriado = lista.some((opcao) => String(opcao.id) === String(item.id));
+      config.setter(ordenarOpcoes(incluiCriado ? lista : [...lista, item]));
+    } catch (error) {
+      console.error('Erro ao recarregar opcoes de racao apos cadastro rapido:', error);
+      config.setter((prev) => {
+        const semDuplicado = prev.filter((opcao) => String(opcao.id) !== String(item.id));
+        return ordenarOpcoes([...semDuplicado, item]);
+      });
+    }
+    handleChange(config.field, item.id);
+    config.afterSelect?.(item);
+    return item;
+  };
+
 
   const { mainContentProps, modalsLayerProps } = useProdutosNovoPageComposition({
     pageState: {
@@ -440,6 +528,7 @@ export default function ProdutosNovo() {
       handleTipoRecorrenciaChange,
     },
     racaoState: {
+      handleCriarOpcaoRacao,
       handleApresentacaoPesoChange,
       handleClassificacaoRacaoChange,
       handleFasePublicoChange,

@@ -6,6 +6,7 @@ const TabelaConsumoEditor = ({ value, onChange, pesoEmbalagem }) => {
   const [linhas, setLinhas] = useState([]);
   const [carregado, setCarregado] = useState(false);
   const ultimoSalvoRef = useRef(null); // Rastreia última versão salva
+  const ultimoValorRecebidoRef = useRef(null);
   const [colunas] = useState([
     { id: '2m', label: '2 meses' },
     { id: '3m', label: '3 meses' },
@@ -19,27 +20,49 @@ const TabelaConsumoEditor = ({ value, onChange, pesoEmbalagem }) => {
     { id: 'adulto', label: 'Adulto' }
   ]);
 
-  // Carregar dados existentes APENAS UMA VEZ
+  // Carregar dados existentes e liberar o editor mesmo quando o produto ainda nao tem tabela.
   useEffect(() => {
-    if (value && !carregado) {
-      try {
-        const data = typeof value === 'string' ? JSON.parse(value) : value;
-        console.log('📥 Carregando tabela:', data);
-        if (data.tipo) setTipoTabela(data.tipo);
-        if (data.dados) {
-          const linhasCarregadas = Object.entries(data.dados).map(([peso, consumos]) => ({
-            peso,
-            consumos
-          }));
-          setLinhas(linhasCarregadas);
-        }
-        setCarregado(true);
-      } catch (error) {
-        console.error('Erro ao carregar tabela:', error);
-        setCarregado(true);
-      }
+    const valorNormalizado = typeof value === 'string'
+      ? value
+      : value
+        ? JSON.stringify(value)
+        : '';
+
+    if (valorNormalizado === ultimoValorRecebidoRef.current) {
+      return;
     }
-  }, [value, carregado]);
+
+    ultimoValorRecebidoRef.current = valorNormalizado;
+
+    if (!valorNormalizado) {
+      setLinhas([]);
+      setCarregado(true);
+      ultimoSalvoRef.current = '';
+      return;
+    }
+
+    if (valorNormalizado === ultimoSalvoRef.current) {
+      return;
+    }
+
+    try {
+      const data = typeof value === 'string' ? JSON.parse(value) : value;
+      console.log('📥 Carregando tabela:', data);
+      if (data.tipo) setTipoTabela(data.tipo);
+      if (data.dados) {
+        const linhasCarregadas = Object.entries(data.dados).map(([peso, consumos]) => ({
+          peso,
+          consumos
+        }));
+        setLinhas(linhasCarregadas);
+      }
+      setCarregado(true);
+      ultimoSalvoRef.current = valorNormalizado;
+    } catch (error) {
+      console.error('Erro ao carregar tabela:', error);
+      setCarregado(true);
+    }
+  }, [value]);
 
   const getLabelPeso = () => {
     switch (tipoTabela) {
@@ -104,19 +127,37 @@ const TabelaConsumoEditor = ({ value, onChange, pesoEmbalagem }) => {
     return `${dias}d`;
   };
 
-  const salvarDados = useCallback((linhasParaSalvar) => {
+  const salvarDados = useCallback((linhasParaSalvar, opcoes = {}) => {
     if (!carregado) {
       console.log('⏸️ Aguardando carregamento inicial...');
-      return; // Não salvar se ainda não carregou
+      return false; // Não salvar se ainda não carregou
     }
     
     const linhasAtuais = linhasParaSalvar || linhas;
     const dados = {};
     linhasAtuais.forEach(linha => {
-      if (linha.peso) {
-        dados[linha.peso] = linha.consumos;
+      const consumosValidos = Object.entries(linha.consumos || {}).reduce((acc, [coluna, valor]) => {
+        const gramas = parseFloat(valor);
+        if (Number.isFinite(gramas) && gramas > 0) {
+          acc[coluna] = gramas;
+        }
+        return acc;
+      }, {});
+
+      if (linha.peso && Object.keys(consumosValidos).length > 0) {
+        dados[linha.peso] = consumosValidos;
       }
     });
+
+    if (Object.keys(dados).length === 0) {
+      if (opcoes.exigirLinhaValida) {
+        return false;
+      }
+
+      ultimoSalvoRef.current = '';
+      onChange('');
+      return true;
+    }
 
     const tabelaCompleta = {
       tipo: tipoTabela,
@@ -128,17 +169,22 @@ const TabelaConsumoEditor = ({ value, onChange, pesoEmbalagem }) => {
     // Comparar com última versão salva para evitar salvamentos duplicados
     if (ultimoSalvoRef.current === jsonString) {
       console.log('⏭️ Ignorando - já está salvo');
-      return;
+      return true;
     }
     
     console.log('💾 Salvando tabela:', tabelaCompleta);
     ultimoSalvoRef.current = jsonString;
     onChange(jsonString);
+    return true;
   }, [linhas, tipoTabela, onChange, carregado]);
 
   const handleSalvar = () => {
-    salvarDados();
-    alert('✅ Tabela de consumo salva com sucesso!');
+    const salvou = salvarDados(undefined, { exigirLinhaValida: true });
+    if (!salvou) {
+      alert('Adicione pelo menos uma linha com peso e consumo em gramas antes de salvar.');
+      return;
+    }
+    alert('Tabela de consumo aplicada. Clique em Atualizar para gravar o produto.');
   };
 
   return (
@@ -274,7 +320,7 @@ const TabelaConsumoEditor = ({ value, onChange, pesoEmbalagem }) => {
           className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors text-sm"
         >
           <FiSave size={16} />
-          Salvar Tabela
+          Aplicar Tabela
         </button>
       </div>
 

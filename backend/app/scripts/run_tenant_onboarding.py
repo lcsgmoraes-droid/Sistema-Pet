@@ -21,6 +21,7 @@ if __package__ in {None, ""}:
 
 from app.db import SessionLocal
 from app.services.tenant_onboarding_service import (
+    REQUIRED_ONBOARDING_SECTIONS,
     onboard_tenant_defaults,
     validate_onboarding_template_contract,
 )
@@ -397,15 +398,7 @@ def _run_future_tenant_check(db, args) -> dict[str, Any]:
     )
     db.rollback()
 
-    required_sections = {
-        "payment_methods",
-        "dre_categories",
-        "dre_subcategories",
-        "financial_categories",
-        "expense_types",
-        "product_departments",
-        "product_categories",
-    }
+    required_sections = set(REQUIRED_ONBOARDING_SECTIONS)
     would_create = result.get("would_create", {})
     missing_sections = sorted(
         section
