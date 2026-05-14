@@ -19,7 +19,7 @@ from sqlalchemy.orm import Session
 from app.db import get_session
 from app.models import Cliente, Pet, User
 from app.produtos_models import Produto
-from app.routes.ecommerce_auth import _get_current_ecommerce_user
+from app.routes.ecommerce_auth import _activate_user_tenant_context, _get_current_ecommerce_user
 from app.services.validade_campanha_service import (
     mapear_ofertas_validade_por_produto,
     resolver_preco_publico_produto,
@@ -84,10 +84,11 @@ class ProdutoBarcodeResponse(BaseModel):
 
 def _get_cliente_or_404(db: Session, user: User) -> Cliente:
     """Retorna o Cliente ligado a este usuário ecommerce ou lança 404."""
+    tenant_id = _activate_user_tenant_context(user)
     cliente = (
         db.query(Cliente)
         .filter(
-            Cliente.tenant_id == str(user.tenant_id),
+            Cliente.tenant_id == tenant_id,
             Cliente.user_id == user.id,
         )
         .first()
@@ -445,6 +446,7 @@ def buscar_produto_barcode(
     Tenta `codigo_barras` e depois `gtin_ean`.
     Retorna apenas produtos ativos do tenant.
     """
+    tenant_id = _activate_user_tenant_context(current_user)
     barcode = (barcode or "").strip()
     barcode_digits = "".join(ch for ch in barcode if ch.isdigit())
     codigo_barras_digits = func.regexp_replace(func.coalesce(Produto.codigo_barras, ""), r"\D", "", "g")
@@ -469,7 +471,7 @@ def buscar_produto_barcode(
     produto = (
         db.query(Produto)
         .filter(
-            Produto.tenant_id == str(current_user.tenant_id),
+            Produto.tenant_id == tenant_id,
             Produto.situacao == True,
             or_(*filtros_codigo),
         )
@@ -562,12 +564,14 @@ def rastreio_entrega(
     from app.vendas_models import Venda
     from app.rotas_entrega_models import RotaEntrega, RotaEntregaParada
 
+    tenant_id = _activate_user_tenant_context(current_user)
+
     # Verificar se o pedido pertence ao cliente
     pedido = (
         db.query(Pedido)
         .filter(
             Pedido.pedido_id == pedido_id,
-            Pedido.tenant_id == str(current_user.tenant_id),
+            Pedido.tenant_id == tenant_id,
             Pedido.cliente_id == current_user.id,
         )
         .first()
@@ -579,7 +583,7 @@ def rastreio_entrega(
     venda = (
         db.query(Venda)
         .filter(
-            Venda.tenant_id == str(current_user.tenant_id),
+            Venda.tenant_id == tenant_id,
             Venda.canal.in_(["ecommerce", "aplicativo"]),
             Venda.observacoes.contains(pedido_id),
         )

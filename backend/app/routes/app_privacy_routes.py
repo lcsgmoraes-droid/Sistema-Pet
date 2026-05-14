@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.db import get_session
 from app.models import Cliente, User
-from app.routes.ecommerce_auth import _get_current_ecommerce_user
+from app.routes.ecommerce_auth import _activate_user_tenant_context, _get_current_ecommerce_user
 from app.services.lgpd_service import PREFERENCE_TYPES, PrivacyOpsService
 
 
@@ -37,9 +37,10 @@ def _request_ip(request: Request) -> str | None:
 
 
 def _get_cliente_or_404(db: Session, user: User) -> Cliente:
+    tenant_id = _activate_user_tenant_context(user)
     cliente = (
         db.query(Cliente)
-        .filter(Cliente.tenant_id == str(user.tenant_id), Cliente.user_id == user.id)
+        .filter(Cliente.tenant_id == tenant_id, Cliente.user_id == user.id)
         .first()
     )
     if not cliente:
@@ -51,7 +52,7 @@ def _get_cliente_or_404(db: Session, user: User) -> Cliente:
 
 
 def _service(db: Session, user: User) -> PrivacyOpsService:
-    return PrivacyOpsService(db, str(user.tenant_id))
+    return PrivacyOpsService(db, _activate_user_tenant_context(user))
 
 
 @router.get("/preferencias")

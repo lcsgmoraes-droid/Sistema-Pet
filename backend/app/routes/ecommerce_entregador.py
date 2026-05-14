@@ -2,6 +2,7 @@
 from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
+from uuid import UUID
 import secrets
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
@@ -12,9 +13,10 @@ from sqlalchemy.orm import Session, joinedload
 from app.db import get_session
 from app.models import Cliente, ConfiguracaoEntrega, User
 from app.rotas_entrega_models import RotaEntrega, RotaEntregaParada
-from app.routes.ecommerce_auth import _get_current_ecommerce_user
+from app.routes.ecommerce_auth import _activate_user_tenant_context, _get_current_ecommerce_user
 from app.schemas.rota_entrega import RotaEntregaResponse
 from app.services.google_maps_service import calcular_rota_otimizada
+from app.tenancy.context import set_current_tenant
 from app.vendas_models import Venda, VendaItem
 
 router = APIRouter(prefix="/ecommerce/entregador", tags=["ecommerce-entregador"])
@@ -41,9 +43,10 @@ def _get_entregador_cliente(
     current_user: User = Depends(_get_current_ecommerce_user),
     db: Session = Depends(get_session),
 ) -> Cliente:
+    tenant_id = _activate_user_tenant_context(current_user)
     cliente = (
         db.query(Cliente)
-        .filter(Cliente.tenant_id == str(current_user.tenant_id), Cliente.user_id == current_user.id)
+        .filter(Cliente.tenant_id == tenant_id, Cliente.user_id == current_user.id)
         .first()
     )
     if not cliente or not cliente.is_entregador:
@@ -52,6 +55,12 @@ def _get_entregador_cliente(
             detail="Acesso restrito a entregadores",
         )
     return cliente
+
+
+def _activate_cliente_tenant_context(cliente: Cliente) -> str:
+    tenant_id = UUID(str(cliente.tenant_id))
+    set_current_tenant(tenant_id)
+    return str(tenant_id)
 
 
 def _montar_endereco_origem(config: Optional[ConfiguracaoEntrega]) -> Optional[str]:
@@ -77,6 +86,7 @@ def minhas_rotas(
 ):
     from app.api.endpoints.rotas_entrega import ensure_rotas_entrega_schema
 
+    tenant_id = _activate_cliente_tenant_context(cliente)
     ensure_rotas_entrega_schema(db)
 
     query = db.query(RotaEntrega).options(
@@ -85,7 +95,7 @@ def minhas_rotas(
         .joinedload(RotaEntregaParada.venda)
         .joinedload(Venda.cliente),
     ).filter(
-        RotaEntrega.tenant_id == str(cliente.tenant_id),
+        RotaEntrega.tenant_id == tenant_id,
         RotaEntrega.entregador_id == cliente.id,
     )
 
@@ -113,11 +123,12 @@ def listar_entregas_abertas(
     cliente: Cliente = Depends(_get_entregador_cliente),
     db: Session = Depends(get_session),
 ):
+    tenant_id = _activate_cliente_tenant_context(cliente)
     vendas = (
         db.query(Venda)
         .options(joinedload(Venda.cliente))
         .filter(
-            Venda.tenant_id == str(cliente.tenant_id),
+            Venda.tenant_id == tenant_id,
             Venda.tem_entrega == True,
             or_(Venda.status_entrega == "pendente", Venda.status_entrega == None),
             Venda.endereco_entrega.isnot(None),
@@ -151,8 +162,9 @@ def otimizar_entregas_selecionadas(
     if not payload.venda_ids:
         raise HTTPException(status_code=400, detail="Selecione ao menos uma entrega")
 
+    tenant_id = _activate_cliente_tenant_context(cliente)
     config = db.query(ConfiguracaoEntrega).filter(
-        ConfiguracaoEntrega.tenant_id == str(cliente.tenant_id)
+        ConfiguracaoEntrega.tenant_id == tenant_id
     ).first()
     origem = _montar_endereco_origem(config)
     if not origem:
@@ -164,7 +176,7 @@ def otimizar_entregas_selecionadas(
     vendas = (
         db.query(Venda)
         .filter(
-            Venda.tenant_id == str(cliente.tenant_id),
+            Venda.tenant_id == tenant_id,
             Venda.id.in_(payload.venda_ids),
             Venda.tem_entrega == True,
             or_(Venda.status_entrega == "pendente", Venda.status_entrega == None),
@@ -204,6 +216,7 @@ def criar_rota_por_entregador(
 ):
     from app.api.endpoints.rotas_entrega import ensure_rotas_entrega_schema
 
+    tenant_id = _activate_cliente_tenant_context(cliente)
     ensure_rotas_entrega_schema(db)
 
     if not payload.venda_ids:
@@ -212,7 +225,7 @@ def criar_rota_por_entregador(
     vendas = (
         db.query(Venda)
         .filter(
-            Venda.tenant_id == str(cliente.tenant_id),
+            Venda.tenant_id == tenant_id,
             Venda.id.in_(payload.venda_ids),
             Venda.tem_entrega == True,
             or_(Venda.status_entrega == "pendente", Venda.status_entrega == None),
@@ -227,12 +240,12 @@ def criar_rota_por_entregador(
         raise HTTPException(status_code=400, detail="Uma ou mais entregas não podem entrar na rota")
 
     config = db.query(ConfiguracaoEntrega).filter(
-        ConfiguracaoEntrega.tenant_id == str(cliente.tenant_id)
+        ConfiguracaoEntrega.tenant_id == tenant_id
     ).first()
     ponto_origem = _montar_endereco_origem(config)
 
     rota = RotaEntrega(
-        tenant_id=str(cliente.tenant_id),
+        tenant_id=tenant_id,
         entregador_id=cliente.id,
         moto_da_loja=not bool(cliente.moto_propria),
         status="pendente",
@@ -250,7 +263,7 @@ def criar_rota_por_entregador(
 
     for idx, venda in enumerate(vendas, start=1):
         parada = RotaEntregaParada(
-            tenant_id=str(cliente.tenant_id),
+            tenant_id=tenant_id,
             rota_id=rota.id,
             venda_id=venda.id,
             ordem=idx,
@@ -285,9 +298,10 @@ def reordenar_paradas_rota_entregador(
     cliente: Cliente = Depends(_get_entregador_cliente),
     db: Session = Depends(get_session),
 ):
+    tenant_id = _activate_cliente_tenant_context(cliente)
     rota = db.query(RotaEntrega).filter(
         RotaEntrega.id == rota_id,
-        RotaEntrega.tenant_id == str(cliente.tenant_id),
+        RotaEntrega.tenant_id == tenant_id,
         RotaEntrega.entregador_id == cliente.id,
     ).first()
     if not rota:
@@ -297,7 +311,7 @@ def reordenar_paradas_rota_entregador(
 
     paradas = db.query(RotaEntregaParada).filter(
         RotaEntregaParada.rota_id == rota.id,
-        RotaEntregaParada.tenant_id == str(cliente.tenant_id),
+        RotaEntregaParada.tenant_id == tenant_id,
     ).all()
     paradas_por_id = {p.id: p for p in paradas}
 
@@ -322,9 +336,9 @@ def marcar_parada_nao_entregue_entregador(
 ):
     from app.api.endpoints.rotas_entrega import ensure_rotas_entrega_schema
 
+    tenant_id = _activate_cliente_tenant_context(cliente)
     ensure_rotas_entrega_schema(db)
 
-    tenant_id = str(cliente.tenant_id)
     rota = db.query(RotaEntrega).filter(
         RotaEntrega.id == rota_id,
         RotaEntrega.tenant_id == tenant_id,
@@ -372,6 +386,7 @@ def detalhes_venda_entregador(
     cliente: Cliente = Depends(_get_entregador_cliente),
     db: Session = Depends(get_session),
 ):
+    tenant_id = _activate_cliente_tenant_context(cliente)
     venda = (
         db.query(Venda)
         .options(
@@ -382,7 +397,7 @@ def detalhes_venda_entregador(
         )
         .filter(
             Venda.id == venda_id,
-            Venda.tenant_id == str(cliente.tenant_id),
+            Venda.tenant_id == tenant_id,
             Venda.tem_entrega == True,
             or_(Venda.entregador_id == cliente.id, Venda.entregador_id == None),
         )
