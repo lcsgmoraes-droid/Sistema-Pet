@@ -172,7 +172,7 @@ export default function DetalheEntregaScreen() {
 
   const carregar = useCallback(async () => {
     try {
-      const { data } = await api.get<Rota>(`/rotas-entrega/${rotaId}`);
+      const { data } = await api.get<Rota>(`/ecommerce/entregador/rotas/${rotaId}`);
       let r: Rota = data;
       if (r.paradas) {
         r = { ...r, paradas: [...r.paradas].sort((a, b) => a.ordem - b.ordem) };
@@ -207,7 +207,7 @@ export default function DetalheEntregaScreen() {
         enviandoLocalizacaoRef.current = true;
 
         await api.post(
-          `/rotas-entrega/${rotaId}/atualizar-localizacao`,
+          `/ecommerce/entregador/rotas/${rotaId}/atualizar-localizacao`,
           {},
           {
             params: {
@@ -298,7 +298,7 @@ export default function DetalheEntregaScreen() {
       }
 
       await api.post(
-        `/rotas-entrega/${rotaId}/paradas/${paradaId}/marcar-entregue`,
+        `/ecommerce/entregador/rotas/${rotaId}/paradas/${paradaId}/marcar-entregue`,
         {},
         {
           params: {
@@ -373,7 +373,7 @@ export default function DetalheEntregaScreen() {
         // GPS é opcional: a rota inicia mesmo sem coordenadas.
       }
       await api.post(
-        `/rotas-entrega/${rotaId}/iniciar`,
+        `/ecommerce/entregador/rotas/${rotaId}/iniciar`,
         {},
         {
           params: {
@@ -478,7 +478,7 @@ export default function DetalheEntregaScreen() {
     const confirmarFinalizacao = async () => {
       setProcessandoFinalizacao(true);
       try {
-        await api.post(`/rotas-entrega/${rotaId}/fechar`, {
+        await api.post(`/ecommerce/entregador/rotas/${rotaId}/fechar`, {
           tentativas: 1,
         });
         Alert.alert('Sucesso', 'Rota finalizada com sucesso.');
@@ -536,7 +536,7 @@ export default function DetalheEntregaScreen() {
     setProcessandoRecebimento(true);
     try {
       await api.post(
-        `/rotas-entrega/${rotaId}/paradas/${paradaRecebimentoId}/registrar-recebimento`,
+        `/ecommerce/entregador/rotas/${rotaId}/paradas/${paradaRecebimentoId}/registrar-recebimento`,
         {
           forma_pagamento: formaRecebimento,
           numero_parcelas:

@@ -1415,8 +1415,19 @@ def marcar_parada_entregue(
         if lat_entrega is not None and lon_entrega is not None:
             try:
                 db.execute(
-                    text("UPDATE rotas_entrega_paradas SET lat_entrega = :lat, lon_entrega = :lon WHERE id = :pid"),
-                    {"lat": lat_entrega, "lon": lon_entrega, "pid": parada_id}
+                    text(
+                        """
+                        UPDATE rotas_entrega_paradas
+                        SET lat_entrega = :lat, lon_entrega = :lon
+                        WHERE id = :pid AND tenant_id = :tenant
+                        """
+                    ),
+                    {
+                        "lat": lat_entrega,
+                        "lon": lon_entrega,
+                        "pid": parada_id,
+                        "tenant": tenant_id,
+                    },
                 )
                 logger.info(f"GPS da entrega {parada_id}: lat={lat_entrega}, lon={lon_entrega}")
             except Exception as e:
