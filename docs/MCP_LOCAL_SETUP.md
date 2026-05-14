@@ -9,6 +9,14 @@ Este projeto tem dois servidores MCP locais:
 
 Os ambientes virtuais ficam dentro de `mcp/*/.venv` e nao entram no Git.
 
+Forma automatica:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\setup_mcp_local.ps1 -InstalarGitHubCli
+```
+
+Forma manual:
+
 ```powershell
 cd mcp/frontend_react_server
 python -m venv .venv
