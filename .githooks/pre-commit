@@ -1,0 +1,15 @@
+#!/bin/sh
+
+branch="$(git rev-parse --abbrev-ref HEAD 2>/dev/null)"
+
+case "$branch" in
+  main|master)
+    echo "BLOQUEADO: commit direto na branch '$branch'."
+    echo "Crie uma branch de tarefa antes:"
+    echo "  powershell -ExecutionPolicy Bypass -File scripts/git_start_task.ps1 -Tipo feat -Nome \"minha tarefa\""
+    echo "Se for uma emergencia real, e voce souber o risco, use git commit --no-verify."
+    exit 1
+    ;;
+esac
+
+exit 0
