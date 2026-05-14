@@ -10,9 +10,8 @@ from pydantic import BaseModel
 from datetime import datetime
 
 from app.db import get_session as get_db
-from app.auth import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
-from app.models import User, UserTenant, Role, RolePermission, Permission
+from app.models import UserTenant, Role, RolePermission, Permission
 from app.ia.aba6_chat_ia import (
     criar_conversa_service,
     listar_conversas_service,
@@ -89,10 +88,11 @@ async def criar_nova_conversa(
 @router.get("/conversas", response_model=List[ConversaResponse])
 async def listar_conversas(
     limit: int = 20,
-    current_user: User = Depends(get_current_user),
+    user_and_tenant = Depends(get_current_user_and_tenant),
     db: Session = Depends(get_db)
 ):
     """Lista conversas do usuário"""
+    current_user, _tenant_id = user_and_tenant
     usuario_id = current_user.id
     
     conversas = listar_conversas_service(db, usuario_id, limit)
@@ -113,10 +113,11 @@ async def listar_conversas(
 @router.get("/conversa/{conversa_id}/mensagens", response_model=List[MensagemResponse])
 async def obter_mensagens(
     conversa_id: int,
-    current_user: User = Depends(get_current_user),
+    user_and_tenant = Depends(get_current_user_and_tenant),
     db: Session = Depends(get_db)
 ):
     """Obtém mensagens de uma conversa"""
+    current_user, _tenant_id = user_and_tenant
     usuario_id = current_user.id
     service = ChatIAService(db)
     
@@ -250,10 +251,11 @@ async def enviar_mensagem(
 @router.delete("/conversa/{conversa_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def deletar_conversa(
     conversa_id: int,
-    current_user: User = Depends(get_current_user),
+    user_and_tenant = Depends(get_current_user_and_tenant),
     db: Session = Depends(get_db)
 ):
     """Deleta uma conversa"""
+    current_user, _tenant_id = user_and_tenant
     usuario_id = current_user.id
     
     sucesso = deletar_conversa_service(db, conversa_id, usuario_id)
@@ -268,13 +270,14 @@ async def deletar_conversa(
 
 @router.get("/contexto-financeiro")
 async def obter_contexto_financeiro(
-    current_user: User = Depends(get_current_user),
+    user_and_tenant = Depends(get_current_user_and_tenant),
     db: Session = Depends(get_db)
 ):
     """Obtém contexto financeiro do usuário (para debug)"""
+    current_user, tenant_id = user_and_tenant
     usuario_id = current_user.id
     
     service = ChatIAService(db)
-    contexto = service.obter_contexto_financeiro(usuario_id)
+    contexto = service.obter_contexto_financeiro(usuario_id, tenant_id=tenant_id)
     
     return contexto

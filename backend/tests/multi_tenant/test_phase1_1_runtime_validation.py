@@ -1,6 +1,9 @@
 import importlib
+import asyncio
 import sys
-from uuid import UUID
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
+from uuid import UUID, uuid4
 
 import pytest
 from fastapi.security import HTTPAuthorizationCredentials
@@ -14,6 +17,7 @@ import app.db as db_package
 import app.tenancy.filters as tenant_filters
 import app.database.orm_guards as orm_guards
 from app.auth.core import ALGORITHM
+from app.auth.dependencies import get_current_user_and_tenant
 from app.models import AuditLog, Permission, Role, RolePermission, Tenant, User, UserSession, UserTenant
 from app.produtos_models import Produto
 from app.tenancy.context import clear_current_tenant, set_current_tenant
@@ -121,6 +125,66 @@ def _request(path="/auth/test"):
             "client": ("127.0.0.1", 12345),
         }
     )
+
+
+def _seed_auth_access(
+    db_session,
+    *,
+    tenant_status="active",
+    membership_active=True,
+    session_tenant_id=None,
+):
+    tenant_id = UUID("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+    set_current_tenant(tenant_id)
+
+    tenant = Tenant(
+        id=str(tenant_id),
+        name="Tenant Teste",
+        status=tenant_status,
+        plan="basico",
+    )
+    user = User(
+        email="tenant-access@example.com",
+        nome="Tenant Access",
+        tenant_id=tenant_id,
+        is_active=True,
+        **{HASHED_SECRET_FIELD: "hash"},
+    )
+    role = Role(name="Owner", tenant_id=tenant_id)
+    db_session.add_all([tenant, user, role])
+    db_session.flush()
+
+    user_tenant = UserTenant(
+        user_id=user.id,
+        role_id=role.id,
+        tenant_id=tenant_id,
+        is_active=membership_active,
+    )
+    db_session.add(user_tenant)
+
+    token_jti = str(uuid4())
+    user_session = UserSession(
+        user_id=user.id,
+        tenant_id=session_tenant_id,
+        token_jti=token_jti,
+        expires_at=datetime.now(timezone.utc) + timedelta(days=1),
+    )
+    db_session.add(user_session)
+    db_session.commit()
+    clear_current_tenant()
+
+    return tenant_id, user, token_jti
+
+
+def _tenant_credentials(user, token_jti, tenant_id):
+    token = auth_routes.create_access_token(
+        data={
+            "sub": str(user.id),
+            "jti": token_jti,
+            "tenant_id": str(tenant_id),
+        }
+    )
+    return HTTPAuthorizationCredentials(scheme="Bearer", credentials=token)
 
 
 def test_user_select_update_sem_tenant_e_insert_sem_tenant_bloqueado(auth_db_session):
@@ -249,6 +313,98 @@ def test_auth_multitenant_flow_nao_quebra_com_roles_fora_da_whitelist(monkeypatc
     assert me_payload["tenant"]["id"] == str(tenant_id)
     assert "produtos.ler" in me_payload["permissions"]
     assert "vendas.ler" in me_payload["permissions"]
+
+
+def test_select_tenant_bloqueia_vinculo_inativo(auth_db_session):
+    tenant_id, user, token_jti = _seed_auth_access(
+        auth_db_session,
+        membership_active=False,
+    )
+    credentials = _tenant_credentials(user, token_jti, tenant_id)
+
+    with pytest.raises(auth_routes.HTTPException) as exc_info:
+        auth_routes.select_tenant(
+            request=_request("/auth/select-tenant"),
+            body=auth_routes.SelectTenantRequest(tenant_id=str(tenant_id)),
+            credentials=credentials,
+            db=auth_db_session,
+            current_user=user,
+        )
+
+    assert exc_info.value.status_code == 403
+
+
+def test_select_tenant_bloqueia_tenant_inativo(auth_db_session):
+    tenant_id, user, token_jti = _seed_auth_access(
+        auth_db_session,
+        tenant_status="inactive",
+    )
+    credentials = _tenant_credentials(user, token_jti, tenant_id)
+
+    with pytest.raises(auth_routes.HTTPException) as exc_info:
+        auth_routes.select_tenant(
+            request=_request("/auth/select-tenant"),
+            body=auth_routes.SelectTenantRequest(tenant_id=str(tenant_id)),
+            credentials=credentials,
+            db=auth_db_session,
+            current_user=user,
+        )
+
+    assert exc_info.value.status_code == 403
+
+
+def test_get_current_user_and_tenant_revalida_vinculo_ativo(auth_db_session):
+    tenant_id, user, token_jti = _seed_auth_access(
+        auth_db_session,
+        membership_active=False,
+    )
+    credentials = _tenant_credentials(user, token_jti, tenant_id)
+
+    with pytest.raises(auth_routes.HTTPException) as exc_info:
+        asyncio.run(
+            get_current_user_and_tenant(
+                credentials=credentials,
+                user=user,
+                db=auth_db_session,
+            )
+        )
+
+    assert exc_info.value.status_code == 403
+
+
+def test_get_current_user_and_tenant_bloqueia_sessao_de_outro_tenant(auth_db_session):
+    other_tenant_id = UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")
+    tenant_id, user, token_jti = _seed_auth_access(
+        auth_db_session,
+        session_tenant_id=other_tenant_id,
+    )
+    credentials = _tenant_credentials(user, token_jti, tenant_id)
+
+    with pytest.raises(auth_routes.HTTPException) as exc_info:
+        asyncio.run(
+            get_current_user_and_tenant(
+                credentials=credentials,
+                user=user,
+                db=auth_db_session,
+            )
+        )
+
+    assert exc_info.value.status_code == 401
+
+
+def test_rotas_criticas_usam_dependency_tenant_oficial():
+    app_dir = Path(__file__).resolve().parents[2] / "app"
+    rotas_criticas = [
+        "categorias_routes.py",
+        "chat_routes.py",
+        "conciliacao_bancaria_routes.py",
+    ]
+
+    for rota in rotas_criticas:
+        source = (app_dir / rota).read_text(encoding="utf-8")
+        assert "get_current_user_and_tenant" in source
+        assert "Depends(get_current_user)" not in source
+        assert "current_user.tenant_id" not in source
 
 
 def test_register_fails_closed_when_required_onboarding_fails(monkeypatch, auth_db_session):

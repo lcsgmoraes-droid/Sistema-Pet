@@ -14,8 +14,7 @@ import uuid
 import json
 
 from app.db import get_session as get_db
-from app.models import User
-from app.auth import get_current_user
+from app.auth.dependencies import get_current_user_and_tenant
 from .financeiro_models import (
     ContaBancaria, ContaPagar, ContaReceber,
     ExtratoBancario, MovimentacaoBancaria, RegraConciliacao,
@@ -131,7 +130,7 @@ async def upload_ofx(
     arquivo: UploadFile = File(...),
     conta_bancaria_id: int = Query(..., description="ID da conta bancária"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
     Upload e parse de arquivo OFX
@@ -140,13 +139,14 @@ async def upload_ofx(
     - Sugere classificações
     """
     
+    current_user, tenant_id = user_and_tenant
     ensure_regras_conciliacao_table_exists(db)
 
     # Valida conta bancária
     conta = db.query(ContaBancaria).filter(
         and_(
             ContaBancaria.id == conta_bancaria_id,
-            ContaBancaria.tenant_id == current_user.tenant_id
+            ContaBancaria.tenant_id == tenant_id
         )
     ).first()
     
@@ -170,7 +170,7 @@ async def upload_ofx(
     
     # Cria registro de extrato
     extrato = ExtratoBancario(
-        tenant_id=current_user.tenant_id,
+        tenant_id=tenant_id,
         conta_bancaria_id=conta_bancaria_id,
         arquivo_nome=arquivo.filename,
         data_upload=datetime.utcnow(),
@@ -187,7 +187,7 @@ async def upload_ofx(
     # Carrega regras ativas
     regras = db.query(RegraConciliacao).filter(
         and_(
-            RegraConciliacao.tenant_id == current_user.tenant_id,
+            RegraConciliacao.tenant_id == tenant_id,
             RegraConciliacao.ativo == True
         )
     ).all()
@@ -198,7 +198,7 @@ async def upload_ofx(
         # Verifica se já existe (pelo FITID)
         existe = db.query(MovimentacaoBancaria).filter(
             and_(
-                MovimentacaoBancaria.tenant_id == current_user.tenant_id,
+                MovimentacaoBancaria.tenant_id == tenant_id,
                 MovimentacaoBancaria.conta_bancaria_id == conta_bancaria_id,
                 MovimentacaoBancaria.fitid == transacao.fitid
             )
@@ -209,7 +209,7 @@ async def upload_ofx(
         
         # Cria movimentação
         movimentacao = MovimentacaoBancaria(
-            tenant_id=current_user.tenant_id,
+            tenant_id=tenant_id,
             extrato_id=extrato.id,  # Usa o ID gerado pelo banco
             conta_bancaria_id=conta_bancaria_id,
             fitid=transacao.fitid,
@@ -294,12 +294,14 @@ async def listar_movimentacoes(
     limit: int = Query(100, le=500),
     offset: int = Query(0),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Lista movimentações bancárias com filtros"""
     
+    current_user, tenant_id = user_and_tenant
+
     query = db.query(MovimentacaoBancaria).filter(
-        MovimentacaoBancaria.tenant_id == current_user.tenant_id
+        MovimentacaoBancaria.tenant_id == tenant_id
     )
     
     if conta_bancaria_id:
@@ -353,7 +355,7 @@ async def classificar_movimentacao(
     movimentacao_id: int,
     dados: ClassificarMovimentacaoRequest,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
     Classifica uma movimentação manualmente
@@ -365,10 +367,12 @@ async def classificar_movimentacao(
     ensure_regras_conciliacao_table_exists(db)
 
     # Busca movimentação
+    current_user, tenant_id = user_and_tenant
+
     mov = db.query(MovimentacaoBancaria).filter(
         and_(
             MovimentacaoBancaria.id == movimentacao_id,
-            MovimentacaoBancaria.tenant_id == current_user.tenant_id
+            MovimentacaoBancaria.tenant_id == tenant_id
         )
     ).first()
     
@@ -411,14 +415,14 @@ async def classificar_movimentacao(
         # Verifica se já existe regra similar
         regra_existente = db.query(RegraConciliacao).filter(
             and_(
-                RegraConciliacao.tenant_id == current_user.tenant_id,
+                RegraConciliacao.tenant_id == tenant_id,
                 RegraConciliacao.padrao_memo == padrao
             )
         ).first()
         
         if not regra_existente:
             nova_regra = RegraConciliacao(
-                tenant_id=current_user.tenant_id,
+                tenant_id=tenant_id,
                 padrao_memo=padrao,
                 tipo_operacao=mov.tipo,
                 tipo_vinculo=dados.tipo_vinculo,
@@ -446,13 +450,15 @@ async def classificar_movimentacao(
 async def listar_regras(
     ativas_apenas: bool = Query(True),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Lista regras de conciliação"""
     ensure_regras_conciliacao_table_exists(db)
     
+    current_user, tenant_id = user_and_tenant
+
     query = db.query(RegraConciliacao).filter(
-        RegraConciliacao.tenant_id == current_user.tenant_id
+        RegraConciliacao.tenant_id == tenant_id
     )
     
     if ativas_apenas:
@@ -489,15 +495,17 @@ async def listar_regras(
 async def deletar_regra(
     regra_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Desativa uma regra"""
     ensure_regras_conciliacao_table_exists(db)
     
+    current_user, tenant_id = user_and_tenant
+
     regra = db.query(RegraConciliacao).filter(
         and_(
             RegraConciliacao.id == regra_id,
-            RegraConciliacao.tenant_id == current_user.tenant_id
+            RegraConciliacao.tenant_id == tenant_id
         )
     ).first()
     
@@ -513,12 +521,14 @@ async def deletar_regra(
 @router.get("/templates", response_model=List[TemplateResponse])
 async def listar_templates(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Lista templates de adquirentes disponíveis"""
     
+    current_user, tenant_id = user_and_tenant
+
     templates = db.query(TemplateAdquirente).filter(
-        TemplateAdquirente.tenant_id == current_user.tenant_id
+        TemplateAdquirente.tenant_id == tenant_id
     ).all()
     
     return [
@@ -537,13 +547,14 @@ async def listar_templates(
 async def obter_estatisticas(
     conta_bancaria_id: Optional[int] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Estatísticas da conciliação"""
+    current_user, tenant_id = user_and_tenant
     ensure_regras_conciliacao_table_exists(db)
     
     query = db.query(MovimentacaoBancaria).filter(
-        MovimentacaoBancaria.tenant_id == current_user.tenant_id
+        MovimentacaoBancaria.tenant_id == tenant_id
     )
     
     if conta_bancaria_id:
@@ -557,7 +568,7 @@ async def obter_estatisticas(
     # Taxa de automação
     regras_ativas = db.query(RegraConciliacao).filter(
         and_(
-            RegraConciliacao.tenant_id == current_user.tenant_id,
+            RegraConciliacao.tenant_id == tenant_id,
             RegraConciliacao.ativo == True
         )
     ).count()

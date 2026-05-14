@@ -8,8 +8,7 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 from app.db import get_session
-from app.auth import get_current_user
-from app.models import User
+from app.auth.dependencies import get_current_user_and_tenant
 from app.financeiro_models import CategoriaFinanceira
 from app.domain.validators.dre_validator import validar_categoria_financeira_dre
 from app.utils.logger import logger
@@ -126,7 +125,7 @@ def listar_categorias(
     apenas_raiz: bool = False,
     categoria_pai_id: Optional[int] = None,
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
     Lista categorias financeiras com filtros
@@ -135,7 +134,7 @@ def listar_categorias(
     - apenas_raiz: Retorna apenas categorias raiz (sem pai)
     - categoria_pai_id: Retorna subcategorias de uma categoria específica
     """
-    tenant_id = current_user.tenant_id
+    current_user, tenant_id = user_and_tenant
     
     logger.info("listar_categorias", "\n🔍 [CATEGORIAS] Listando categorias:")
     logger.info("user_info", f"  👤 User ID: {current_user.id}")
@@ -143,7 +142,6 @@ def listar_categorias(
     logger.info("filter_tipo", f"  📊 Tipo: {tipo}")
     logger.info("filter_ativas", f"  ✅ Apenas Ativas: {apenas_ativas}")
     logger.info("filter_raiz", f"  🌳 Apenas Raiz: {apenas_raiz}")
-    
     query = db.query(CategoriaFinanceira).filter(
         CategoriaFinanceira.user_id == current_user.id
     )
@@ -178,11 +176,13 @@ def listar_categorias_arvore(
     tipo: Optional[str] = None,
     apenas_ativas: bool = True,
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
     Retorna todas as categorias hierarquicamente
     """
+    current_user, _tenant_id = user_and_tenant
+
     query = db.query(CategoriaFinanceira).filter(
         CategoriaFinanceira.user_id == current_user.id
     )
@@ -206,9 +206,11 @@ def listar_categorias_arvore(
 def obter_categoria(
     categoria_id: int,
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Retorna uma categoria específica"""
+    current_user, _tenant_id = user_and_tenant
+
     categoria = db.query(CategoriaFinanceira).filter(
         and_(
             CategoriaFinanceira.id == categoria_id,
@@ -226,10 +228,10 @@ def obter_categoria(
 def criar_categoria(
     categoria_data: CategoriaFinanceiraCreate,
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Cria uma nova categoria financeira"""
-    tenant_id = current_user.tenant_id
+    current_user, tenant_id = user_and_tenant
     
     # Validar categoria pai se fornecida
     if categoria_data.categoria_pai_id:
@@ -278,10 +280,10 @@ def atualizar_categoria(
     categoria_id: int,
     categoria_data: CategoriaFinanceiraUpdate,
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Atualiza uma categoria existente"""
-    tenant_id = current_user.tenant_id
+    current_user, tenant_id = user_and_tenant
     
     categoria = db.query(CategoriaFinanceira).filter(
         and_(
@@ -346,9 +348,11 @@ def atualizar_categoria(
 def deletar_categoria(
     categoria_id: int,
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Desativa uma categoria (soft delete)"""
+    current_user, _tenant_id = user_and_tenant
+
     categoria = db.query(CategoriaFinanceira).filter(
         and_(
             CategoriaFinanceira.id == categoria_id,
@@ -383,14 +387,14 @@ def deletar_categoria(
 def listar_subcategorias_dre_da_categoria(
     categoria_id: int,
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
     Retorna as subcategorias DRE vinculadas a uma categoria financeira específica
     """
     from app.dre_plano_contas_models import DRESubcategoria
     
-    tenant_id = current_user.tenant_id
+    current_user, tenant_id = user_and_tenant
     
     # Verificar se a categoria existe e pertence ao usuário
     categoria = db.query(CategoriaFinanceira).filter(

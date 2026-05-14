@@ -11,16 +11,23 @@ from sqlalchemy.orm import Session
 from uuid import UUID
 from jose import jwt, JWTError
 from .core import get_current_user  # Importa do módulo local core.py
-from app.models import User
+from app.db import get_session
+from app.models import Tenant, User, UserTenant
 from app.config import JWT_SECRET_KEY
 from app.auth.core import ALGORITHM
+from app.session_manager import get_session_by_jti
 
 security = HTTPBearer()
+
+
+def _tenant_status_is_active(status_value: object) -> bool:
+    return str(status_value or "").strip().lower() in {"active", "ativo"}
 
 
 async def get_current_user_and_tenant(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     user: User = Depends(get_current_user),
+    db: Session = Depends(get_session),
 ) -> tuple[User, UUID]:
     """
     DEPENDENCY OFICIAL PARA ROTAS MULTI-TENANT.
@@ -49,6 +56,7 @@ async def get_current_user_and_tenant(
         # Decodificar token novamente para extrair tenant_id
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[ALGORITHM])
         tenant_id_str = payload.get("tenant_id")
+        token_jti = payload.get("jti")
         user_email = payload.get("sub")  # email do usuário
         
         logger.debug(f"[AUTH] User: {user_email} | Tenant ID no JWT: {tenant_id_str}")
@@ -62,6 +70,14 @@ async def get_current_user_and_tenant(
                 headers={"WWW-Authenticate": "Bearer"},
             )
         
+        if not token_jti:
+            logger.error("[get_current_user_and_tenant] ERRO: token sem JTI")
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Sessao invalida. Faca login novamente.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
         # Converter para UUID
         try:
             tenant_id = UUID(tenant_id_str)
@@ -78,6 +94,63 @@ async def get_current_user_and_tenant(
         from app.tenancy.context import set_current_tenant
         set_current_tenant(tenant_id)
         logger.debug(f"[MULTI-TENANT] Contexto configurado: tenant_id={tenant_id}")
+
+        user_tenant = db.query(UserTenant).filter(
+            UserTenant.user_id == user.id,
+            UserTenant.tenant_id == tenant_id,
+            UserTenant.is_active == True,
+        ).first()
+
+        if not user_tenant:
+            logger.warning(
+                "[get_current_user_and_tenant] Acesso negado: user_id=%s tenant_id=%s sem vinculo ativo",
+                user.id,
+                tenant_id,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Usuario nao tem acesso ativo ao tenant selecionado",
+            )
+
+        tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
+        if not tenant or not _tenant_status_is_active(tenant.status):
+            logger.warning(
+                "[get_current_user_and_tenant] Acesso negado: tenant_id=%s inativo ou inexistente",
+                tenant_id,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Tenant inativo ou indisponivel",
+            )
+
+        db_session = get_session_by_jti(db, token_jti)
+        if not db_session or db_session.user_id != user.id:
+            logger.warning(
+                "[get_current_user_and_tenant] Sessao/JTI invalida para user_id=%s tenant_id=%s",
+                user.id,
+                tenant_id,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Sessao invalida. Faca login novamente.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        if db_session.tenant_id and str(db_session.tenant_id) != str(tenant_id):
+            logger.warning(
+                "[get_current_user_and_tenant] Sessao pertence a outro tenant: session=%s jwt=%s",
+                db_session.tenant_id,
+                tenant_id,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Sessao pertence a outro tenant. Faca login novamente.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+
+        if db_session.tenant_id is None:
+            db_session.tenant_id = tenant_id
+            db.flush()
         
         logger.debug(f"[get_current_user_and_tenant] Retornando user.id={user.id} + tenant_id={tenant_id}")
         return user, tenant_id

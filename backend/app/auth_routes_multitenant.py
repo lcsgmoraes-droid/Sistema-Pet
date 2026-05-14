@@ -821,7 +821,8 @@ def select_tenant(
     
     user_tenant = db.query(UserTenant).filter(
         UserTenant.user_id == current_user.id,
-        UserTenant.tenant_id == tenant_uuid
+        UserTenant.tenant_id == tenant_uuid,
+        UserTenant.is_active == True,
     ).first()
     
     if not user_tenant:
@@ -837,6 +838,13 @@ def select_tenant(
             detail="Tenant não encontrado"
         )
     
+    tenant_status = str(tenant.status or "").strip().lower()
+    if tenant_status not in {"active", "ativo"}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tenant inativo ou indisponivel"
+        )
+
     # Extrair JTI do token atual
     token = credentials.credentials
     payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
@@ -858,6 +866,12 @@ def select_tenant(
         )
     
     # Atualizar tenant_id na sessão EXISTENTE
+    if db_session.user_id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Sessao invalida. Faca login novamente."
+        )
+
     db_session.tenant_id = tenant_uuid
     db.commit()
     
