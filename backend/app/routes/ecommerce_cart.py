@@ -2,17 +2,15 @@ from uuid import UUID, uuid4
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 
-from app.auth.core import ALGORITHM
-from app.config import JWT_SECRET_KEY
 from app.db import get_session
+from app.models import User
 from app.pedido_models import Pedido, PedidoItem
 from app.produtos_models import Produto
+from app.routes.ecommerce_auth import _get_current_ecommerce_user
 from app.services.validade_campanha_service import (
     mapear_ofertas_validade_por_produto,
     resolver_preco_publico_produto,
@@ -20,7 +18,6 @@ from app.services.validade_campanha_service import (
 
 
 router = APIRouter(prefix="/carrinho", tags=["ecommerce-cart"])
-security = HTTPBearer()
 
 RESERVA_EXPIRACAO_CARRINHO_MINUTOS = 30
 RESERVA_EXPIRACAO_PENDENTE_MINUTOS = 60
@@ -63,24 +60,8 @@ def _produto_disponivel_no_canal(produto: Produto, canal: str) -> bool:
     return bool(getattr(produto, "anunciar_ecommerce", True))
 
 
-def _current_identity(credentials: HTTPAuthorizationCredentials = Depends(security)) -> EcommerceIdentity:
-    credentials_exception = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Token inválido",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
-    try:
-        payload = jwt.decode(credentials.credentials, JWT_SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = int(payload.get("sub"))
-        token_type = payload.get("token_type")
-        tenant_id = str(UUID(str(payload.get("tenant_id"))))
-        if token_type != "ecommerce_customer":
-            raise credentials_exception
-    except (JWTError, TypeError, ValueError):
-        raise credentials_exception
-
-    return EcommerceIdentity(user_id=user_id, tenant_id=tenant_id)
+def _current_identity(current_user: User = Depends(_get_current_ecommerce_user)) -> EcommerceIdentity:
+    return EcommerceIdentity(user_id=current_user.id, tenant_id=str(UUID(str(current_user.tenant_id))))
 
 
 def _find_or_create_carrinho(db: Session, identity: EcommerceIdentity) -> Pedido:

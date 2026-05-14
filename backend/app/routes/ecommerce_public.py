@@ -13,6 +13,7 @@ from app.services.validade_campanha_service import (
     mapear_ofertas_validade_por_produto,
     resolver_preco_publico_produto,
 )
+from app.tenancy.context import set_current_tenant
 
 
 router = APIRouter(prefix="/ecommerce", tags=["ecommerce-public"])
@@ -123,6 +124,7 @@ def _get_active_tenant(db: Session, tenant_ref: tuple[str, str]) -> Tenant:
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Tenant inativo",
         )
+    set_current_tenant(UUID(str(tenant.id)))
     return tenant
 
 

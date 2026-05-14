@@ -278,6 +278,10 @@ def _email_verification_block(user: User) -> bool:
     return EMAIL_VERIFICATION_REQUIRED and not bool(getattr(user, "email_verified", False))
 
 
+def _tenant_status_is_active(status_value: object) -> bool:
+    return str(status_value or "").strip().lower() in {"active", "ativo"}
+
+
 def _resolve_password_recovery_channel(request: Request, payload: EcommerceForgotPasswordRequest) -> str:
     canal = (payload.canal or request.headers.get("X-Client-Channel") or "").strip().lower()
     if canal in {"app", "mobile", "site", "web", "loja"}:
@@ -403,6 +407,28 @@ def _get_current_ecommerce_user(
     )
     if not user or not user.is_active:
         raise credentials_exception
+
+    user_tenant = (
+        db.query(UserTenant)
+        .filter(
+            UserTenant.user_id == user.id,
+            UserTenant.tenant_id == tenant_id,
+            UserTenant.is_active == True,
+        )
+        .first()
+    )
+    if not user_tenant:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Usuario nao tem acesso ativo ao tenant selecionado",
+        )
+
+    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
+    if not tenant or not _tenant_status_is_active(tenant.status):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tenant inativo ou indisponivel",
+        )
 
     return user
 

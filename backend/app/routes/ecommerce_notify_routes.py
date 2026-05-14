@@ -6,6 +6,7 @@ chamada por produtos_routes quando estoque volta ao positivo.
 import logging
 import os
 from datetime import datetime, timezone
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, EmailStr
@@ -14,10 +15,39 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.models import EcommerceNotifyRequest, Tenant
+from app.tenancy.context import set_current_tenant
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ecommerce-notify", tags=["ecommerce-notify"])
+
+
+def _set_tenant_context(tenant_id: str) -> str:
+    tenant_uuid = UUID(str(tenant_id))
+    set_current_tenant(tenant_uuid)
+    return str(tenant_uuid)
+
+
+def _normalize_tenant_uuid(raw_tenant_id: str | None) -> str | None:
+    if not raw_tenant_id:
+        return None
+    try:
+        return str(UUID(str(raw_tenant_id).strip()))
+    except Exception:
+        return None
+
+
+def _resolve_notify_tenant(db: Session, tenant_ref: str | None) -> Tenant | None:
+    tenant_uuid = _normalize_tenant_uuid(tenant_ref)
+    if tenant_uuid:
+        tenant = db.query(Tenant).filter(Tenant.id == tenant_uuid).first()
+        if tenant:
+            return tenant
+
+    slug = str(tenant_ref or "").strip().lower()
+    if not slug:
+        return None
+    return db.query(Tenant).filter(Tenant.ecommerce_slug == slug).first()
 
 
 # ─── Schemas ───────────────────────────────────────────────────────────────
@@ -43,20 +73,21 @@ def registrar_avise_me(
 ):
     """Salva uma solicitação de 'Avise-me quando chegar' para um produto."""
     # Resolver tenant (aceita UUID ou slug)
-    tenant = (
-        db.query(Tenant).filter(Tenant.id == body.tenant_id).first()
-        or db.query(Tenant).filter(Tenant.ecommerce_slug == body.tenant_id).first()
-    )
+    tenant = _resolve_notify_tenant(db, body.tenant_id)
     if not tenant:
         raise HTTPException(status_code=404, detail="Loja não encontrada")
 
+    if str(tenant.status or "").strip().lower() not in {"active", "ativo"}:
+        raise HTTPException(status_code=403, detail="Loja inativa")
+
+    tenant_id = _set_tenant_context(str(tenant.id))
     email_lower = body.email.strip().lower()
 
     # Evitar duplicatas
     existing = (
         db.query(EcommerceNotifyRequest)
         .filter(
-            EcommerceNotifyRequest.tenant_id == str(tenant.id),
+            EcommerceNotifyRequest.tenant_id == tenant_id,
             EcommerceNotifyRequest.product_id == body.product_id,
             EcommerceNotifyRequest.email == email_lower,
             EcommerceNotifyRequest.notified == False,
@@ -67,7 +98,7 @@ def registrar_avise_me(
         return NotifyMeResponse(ok=True, message="Você já está na lista de avisos para este produto.")
 
     entry = EcommerceNotifyRequest(
-        tenant_id=str(tenant.id),
+        tenant_id=tenant_id,
         product_id=body.product_id,
         product_name=body.product_name,
         email=email_lower,
@@ -125,6 +156,7 @@ def notificar_clientes_estoque_disponivel(
     Retorna a quantidade de notificações enviadas.
     """
     from app.services.email_service import send_notify_me_email
+    tenant_id = _set_tenant_context(tenant_id)
 
     # Buscar tenant para montar URL da loja
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
@@ -134,7 +166,11 @@ def notificar_clientes_estoque_disponivel(
 
     # Buscar SKU do produto para incluir na URL (link direto filtrado)
     from app.produtos_models import Produto
-    produto_obj = db.query(Produto).filter(Produto.id == product_id).first()
+    produto_obj = (
+        db.query(Produto)
+        .filter(Produto.id == product_id, Produto.tenant_id == tenant_id)
+        .first()
+    )
     sku_param = produto_obj.codigo if produto_obj else None
     if sku_param:
         store_url = f"{base_url}/{store_ref}?busca={sku_param}"
