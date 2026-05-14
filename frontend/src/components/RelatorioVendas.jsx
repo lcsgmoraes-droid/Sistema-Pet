@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import api from '../api';
+import { getAccessToken } from '../auth/tokenStorage';
 import { Calendar, DollarSign, TrendingUp, Package, Users, CreditCard, Filter } from 'lucide-react';
 import CustomerIdentity from './ui/CustomerIdentity';
 import PetIdentity from './ui/PetIdentity';
@@ -30,7 +31,7 @@ export default function RelatorioVendas() {
   const [produtosDetalhados, setProdutosDetalhados] = useState([]);
   const [listaVendas, setListaVendas] = useState([]);
 
-  const getToken = () => localStorage.getItem('access_token');
+  const getToken = () => getAccessToken();
 
   const formatarMoeda = (valor) => {
     return new Intl.NumberFormat('pt-BR', {

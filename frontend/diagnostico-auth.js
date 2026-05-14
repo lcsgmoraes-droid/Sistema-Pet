@@ -15,9 +15,9 @@
   console.log('🔍 DIAGNÓSTICO DE AUTENTICAÇÃO');
   console.log('========================================\n');
 
-  // 1. Verificar token no localStorage
-  const token = localStorage.getItem('access_token');
-  console.log('1️⃣ TOKEN NO LOCALSTORAGE:');
+  // 1. Verificar token na sessao atual
+  const token = sessionStorage.getItem('access_token') || sessionStorage.getItem('token');
+  console.log('1️⃣ TOKEN NA SESSIONSTORAGE:');
   console.log('   Existe:', !!token);
   
   if (token) {

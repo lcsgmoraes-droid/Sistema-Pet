@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
+import { getAccessToken } from '../auth/tokenStorage';
 import SaleReference from '../components/ui/SaleReference';
 
 /**
@@ -44,7 +45,7 @@ export default function Aba1ConciliacaoVendasV2({ onConcluida, status }) {
   useEffect(() => {
     const carregarOperadoras = async () => {
       try {
-        const token = localStorage.getItem('access_token');
+        const token = getAccessToken();
         if (!token) {
           setErro('Você precisa estar logado.');
           setTimeout(() => navigate('/login'), 2000);
@@ -142,7 +143,7 @@ export default function Aba1ConciliacaoVendasV2({ onConcluida, status }) {
   const carregarVendasPDV = async () => {
     try {
       setCarregando(true);
-      const token = localStorage.getItem('access_token');
+      const token = getAccessToken();
       if (!token) {
         setErro('Você precisa estar logado.');
         setTimeout(() => navigate('/login'), 2000);

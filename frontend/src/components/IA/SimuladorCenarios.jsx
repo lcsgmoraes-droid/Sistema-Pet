@@ -5,6 +5,7 @@
 
 import React, { useState } from 'react';
 import api from '../../api';
+import { getAccessToken } from '../../auth/tokenStorage';
 import { toast } from 'react-hot-toast';
 import { TrendingUp, TrendingDown, Minus, Play } from 'lucide-react';
 import GraficoProjecoes from './GraficoProjecoes';
@@ -41,7 +42,7 @@ export default function SimuladorCenarios({ userId, projecoesBase = [] }) {
   const simularCenario = async () => {
     setSimulando(true);
     try {
-      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+      const token = getAccessToken();
       const headers = { Authorization: `Bearer ${token}` };
 
       const response = await api.post(

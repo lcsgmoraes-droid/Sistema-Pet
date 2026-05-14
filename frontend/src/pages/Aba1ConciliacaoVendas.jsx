@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
+import { clearAuthTokens, getAccessToken } from '../auth/tokenStorage';
 import SaleReference from '../components/ui/SaleReference';
 
 /**
@@ -37,7 +38,7 @@ export default function Aba1ConciliacaoVendas({ onConcluida, status }) {
     const carregarOperadoras = async () => {
       try {
         // Verificar se há token antes de fazer a requisição
-        const token = localStorage.getItem('access_token');
+        const token = getAccessToken();
         if (!token) {
           console.error('❌ Token não encontrado. Redirecionando para login...');
           setErro('Você precisa estar logado para acessar esta página.');
@@ -62,7 +63,7 @@ export default function Aba1ConciliacaoVendas({ onConcluida, status }) {
         // Tratamento específico por tipo de erro
         if (error.response?.status === 401) {
           setErro('Sessão expirada. Redirecionando para login...');
-          localStorage.removeItem('access_token');
+          clearAuthTokens();
           setTimeout(() => navigate('/login'), 2000);
         } else if (error.response?.status === 403) {
           setErro('Você não tem permissão para acessar as operadoras.');
@@ -100,7 +101,7 @@ export default function Aba1ConciliacaoVendas({ onConcluida, status }) {
     }
 
     // Verificar autenticação antes de processar
-    const token = localStorage.getItem('access_token');
+    const token = getAccessToken();
     if (!token) {
       setErro('Sessão expirada. Redirecionando para login...');
       setTimeout(() => navigate('/login'), 2000);
@@ -153,7 +154,7 @@ export default function Aba1ConciliacaoVendas({ onConcluida, status }) {
       // Tratamento específico por tipo de erro
       if (error.response?.status === 401) {
         setErro('Sessão expirada. Redirecionando para login...');
-        localStorage.removeItem('access_token');
+        clearAuthTokens();
         setTimeout(() => navigate('/login'), 2000);
       } else if (error.response?.status === 400) {
         const detalhe = error.response?.data?.detail || 'Erro de validação';

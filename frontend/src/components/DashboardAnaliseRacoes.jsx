@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 import { toast } from 'react-hot-toast';
 import api from '../api';
+import { getAccessToken } from '../auth/tokenStorage';
 
 /**
  * Dashboard de Análise Dinâmica de Rações - Fase 4
@@ -101,7 +102,7 @@ const DashboardAnaliseRacoes = () => {
       setLoading(true);
       
       // 🔍 DEBUG: Verificar token antes da requisição
-      const token = localStorage.getItem('access_token');
+      const token = getAccessToken();
       console.log('🔐 [DashboardAnaliseRacoes] Iniciando carregamento de dados', {
         hasToken: !!token,
         tokenPreview: token ? `${token.substring(0, 20)}...` : 'NO TOKEN'

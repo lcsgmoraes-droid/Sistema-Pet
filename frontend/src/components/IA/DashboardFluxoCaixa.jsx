@@ -10,6 +10,7 @@
 
 import React, { useState, useEffect } from 'react';
 import api from '../../api';
+import { getAccessToken } from '../../auth/tokenStorage';
 import { toast } from 'react-hot-toast';
 import {
   TrendingUp,
@@ -43,7 +44,7 @@ export default function DashboardFluxoCaixa({ userId }) {
   const carregarDados = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+      const token = getAccessToken();
       const headers = { Authorization: `Bearer ${token}` };
 
       // Carregar Ã­ndices, projeÃ§Ãµes e alertas em paralelo
@@ -67,7 +68,7 @@ export default function DashboardFluxoCaixa({ userId }) {
   const gerarNovaProjecao = async () => {
     const toastId = toast.loading('Gerando projeÃ§Ã£o com Prophet...');
     try {
-      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+      const token = getAccessToken();
       const headers = { Authorization: `Bearer ${token}` };
 
       await api.post(`/ia/fluxo/projetar-15-dias/${userId}`, {}, { headers });

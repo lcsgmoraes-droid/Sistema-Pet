@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect } from 'react';
 import { X, Plus } from 'lucide-react';
 import api from '../api';
+import { getAccessToken } from '../auth/tokenStorage';
 
 const ModalLancamentoCredito = ({ isOpen, onClose, onSave }) => {
   const [formData, setFormData] = useState({
@@ -26,7 +27,7 @@ const ModalLancamentoCredito = ({ isOpen, onClose, onSave }) => {
 
   const carregarDados = async () => {
     try {
-      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+      const token = getAccessToken();
       const headers = { Authorization: `Bearer ${token}` };
 
       // Carregar categorias de receita hierarquicamente
@@ -54,7 +55,7 @@ const ModalLancamentoCredito = ({ isOpen, onClose, onSave }) => {
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+      const token = getAccessToken();
       const headers = { Authorization: `Bearer ${token}` };
 
       const payload = {

@@ -17,6 +17,7 @@ import {
   useState,
 } from "react";
 import { api } from "../services/api";
+import { getAccessToken } from "../auth/tokenStorage";
 import { useAuth } from "./AuthContext";
 
 const ModulosContext = createContext();
@@ -280,7 +281,7 @@ export const ModulosProvider = ({ children }) => {
       setModulosAtivos(MODULOS_PREMIUM);
       return;
     }
-    const token = localStorage.getItem("access_token") || localStorage.getItem("token");
+    const token = getAccessToken();
     const selectedTenant = localStorage.getItem("selectedTenant");
     if (!token || !selectedTenant) {
       setModulosAtivos([]);

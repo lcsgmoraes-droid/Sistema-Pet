@@ -3,6 +3,7 @@
  */
 import { useState } from "react";
 import api from "../api";
+import { getAccessToken } from "../auth/tokenStorage";
 import toast from "react-hot-toast";
 
 export default function ModalImportacaoPessoas({
@@ -30,8 +31,7 @@ export default function ModalImportacaoPessoas({
 
   const baixarTemplate = async () => {
     try {
-      const token =
-        localStorage.getItem("access_token") || localStorage.getItem("token");
+      const token = getAccessToken();
       const response = await api.get("/pessoas/template-importacao", {
         headers: { Authorization: `Bearer ${token}` },
         responseType: "blob",

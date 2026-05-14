@@ -11,6 +11,7 @@ import { BotAssist } from './components/BotAssist.tsx';
 import { NotificationToast } from './components/NotificationToast.tsx';
 import { ConnectionStatus } from './components/ConnectionStatus.tsx';
 import { NotificationPermission } from './components/NotificationPermission.tsx';
+import { getAccessToken } from '../../auth/tokenStorage';
 
 export const WhatsAppDashboard: React.FC = () => {
   const [isInitializing, setIsInitializing] = React.useState(true);
@@ -37,8 +38,7 @@ export const WhatsAppDashboard: React.FC = () => {
     removeNotification
   } = useWhatsAppStore();
   
-  // Get auth token (use access_token from localStorage)
-  const token = localStorage.getItem('access_token');
+  const token = getAccessToken();
   
   // Initialize WebSocket connection
   const { socketId } = useSocket(

@@ -15,6 +15,7 @@ import {
   Download
 } from 'lucide-react';
 import { listarCaixas, obterResumoCaixa, reabrirCaixa } from '../api/caixa';
+import { getAccessToken } from '../auth/tokenStorage';
 
 export default function MeusCaixas() {
   const navigate = useNavigate();
@@ -65,7 +66,7 @@ export default function MeusCaixas() {
   const handleDownloadPDF = async (caixaId, numeroCaixa) => {
     try {
       const apiBaseUrl = import.meta.env.VITE_API_URL || '/api';
-      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+      const token = getAccessToken();
       const response = await fetch(`${apiBaseUrl}/caixas/${caixaId}/pdf`, {
         headers: {
           'Authorization': `Bearer ${token}`

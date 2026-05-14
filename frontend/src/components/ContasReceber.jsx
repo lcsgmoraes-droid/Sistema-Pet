@@ -2,6 +2,7 @@
 import { useNavigate } from 'react-router-dom';
 import { ArrowDownUp, Plus, Receipt, X } from 'lucide-react';
 import api from '../api';
+import { getAccessToken } from '../auth/tokenStorage';
 import { toast } from 'react-hot-toast';
 import { safeArray } from '../utils/safeArray';
 import ActionButton from './ui/ActionButton';
@@ -79,7 +80,7 @@ const ContasReceber = () => {
 
   const carregarDados = async () => {
     try {
-      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+      const token = getAccessToken();
       const headers = { Authorization: `Bearer ${token}` };
       
       const [contasRes, clientesRes, formasRes, bancariasRes] = await Promise.allSettled([

@@ -1,4 +1,5 @@
 import axios from "axios";
+import { clearAuthTokens, getAccessToken } from "../auth/tokenStorage";
 
 const configuredApiUrl = import.meta.env.VITE_API_URL;
 const baseURL = import.meta.env.DEV ? "/api" : (configuredApiUrl || "/api");
@@ -28,7 +29,7 @@ export const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem("access_token") || localStorage.getItem("token");
+    const token = getAccessToken();
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
@@ -50,8 +51,7 @@ api.interceptors.response.use(
         console.warn("Sessao invalida ou tenant nao selecionado");
       }
 
-      localStorage.removeItem("access_token");
-      localStorage.removeItem("token");
+      clearAuthTokens();
       localStorage.removeItem("tenants");
       localStorage.removeItem("selectedTenant");
 

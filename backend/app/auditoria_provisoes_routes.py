@@ -7,8 +7,7 @@ from sqlalchemy.orm import Session
 from typing import List, Dict
 from pydantic import BaseModel
 
-from app.auth import get_current_user
-from app.models import User
+from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.services.auditoria_provisao_service import auditar_provisoes, auditar_provisoes_anual
 
@@ -47,7 +46,7 @@ class AuditoriaMensalResponse(BaseModel):
 def buscar_auditoria_mensal(
     mes: int,
     ano: int,
-    current_user: User = Depends(get_current_user),
+    user_and_tenant = Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session)
 ):
     """
@@ -68,7 +67,7 @@ def buscar_auditoria_mensal(
     - SEM_DADOS (➖): Sem provisão e sem pagamento
     """
     
-    tenant_id = current_user.tenant_id
+    _current_user, tenant_id = user_and_tenant
     
     itens = auditar_provisoes(db, tenant_id, mes, ano)
     
@@ -90,7 +89,7 @@ def buscar_auditoria_mensal(
 @router.get("/anual")
 def buscar_auditoria_anual(
     ano: int,
-    current_user: User = Depends(get_current_user),
+    user_and_tenant = Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session)
 ):
     """
@@ -102,7 +101,7 @@ def buscar_auditoria_anual(
     - Relatórios para contabilidade
     """
     
-    tenant_id = current_user.tenant_id
+    _current_user, tenant_id = user_and_tenant
     
     resultado = auditar_provisoes_anual(db, tenant_id, ano)
     
@@ -116,7 +115,7 @@ def buscar_auditoria_anual(
 def buscar_resumo_status(
     mes: int,
     ano: int,
-    current_user: User = Depends(get_current_user),
+    user_and_tenant = Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session)
 ):
     """
@@ -125,7 +124,7 @@ def buscar_resumo_status(
     Útil para dashboard e alertas.
     """
     
-    tenant_id = current_user.tenant_id
+    _current_user, tenant_id = user_and_tenant
     
     itens = auditar_provisoes(db, tenant_id, mes, ano)
     

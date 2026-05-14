@@ -2,6 +2,7 @@
  * API Client - Axios Multi-Tenant
  */
 import axios from 'axios';
+import { clearAuthTokens, getAccessToken } from './auth/tokenStorage';
 
 const isDevelopment = import.meta.env.DEV;
 const isProduction = import.meta.env.PROD;
@@ -59,12 +60,12 @@ const api = axios.create({
 
 api.interceptors.request.use(
   (config) => {
-    const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+    const token = getAccessToken();
 
     if (token) {
       config.headers.Authorization = `Bearer ${token}`;
     } else {
-      debugWarn('[API] Nenhum token encontrado no localStorage');
+      debugWarn('[API] Nenhum token de sessao encontrado');
     }
 
     debugLog('[API Request]', {
@@ -97,8 +98,7 @@ api.interceptors.response.use(
 
     if (status === 401) {
       const isPublicPath = isPublicBrowserPath();
-      localStorage.removeItem('access_token');
-      localStorage.removeItem('token');
+      clearAuthTokens();
       localStorage.removeItem('tenants');
       localStorage.removeItem('selectedTenant');
       if (!isPublicPath) {

@@ -20,7 +20,7 @@ from pydantic import BaseModel, Field
 from decimal import Decimal
 
 from .db import get_session as get_db
-from .auth import get_current_user
+from .auth import get_current_user_and_tenant
 from .conciliacao_models import HistoricoConciliacao
 
 
@@ -81,7 +81,7 @@ class AtualizarAbaResponse(BaseModel):
 def verificar_conciliacao(
     request: VerificarConciliacaoRequest,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
     Verifica se uma data/operadora já foi conciliada.
@@ -92,7 +92,7 @@ def verificar_conciliacao(
     - mensagem: Orientação sobre o que fazer
     - historico: Dados do registro existente (se houver)
     """
-    tenant_id = current_user.tenant_id
+    _current_user, tenant_id = user_and_tenant
     
     # Buscar registro existente
     historico_existente = db.query(HistoricoConciliacao).filter(
@@ -134,7 +134,7 @@ def verificar_conciliacao(
 def iniciar_conciliacao(
     request: IniciarConciliacaoRequest,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
     Inicia novo registro de conciliação.
@@ -142,7 +142,7 @@ def iniciar_conciliacao(
     Cria registro em status 'em_andamento'.
     Será atualizado conforme abas são concluídas.
     """
-    tenant_id = current_user.tenant_id
+    current_user, tenant_id = user_and_tenant
     usuario = current_user.email or current_user.username
     
     # Verificar se já existe conciliação em andamento
@@ -193,10 +193,10 @@ def concluir_aba1(
     historico_id: int,
     request: AtualizarAbaRequest,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Marca Aba 1 (Conciliação de Vendas) como concluída"""
-    tenant_id = current_user.tenant_id
+    _current_user, tenant_id = user_and_tenant
     
     historico = db.query(HistoricoConciliacao).filter(
         and_(
@@ -240,10 +240,10 @@ def concluir_aba2(
     historico_id: int,
     request: AtualizarAbaRequest,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Marca Aba 2 (Validação de Recebimentos) como concluída"""
-    tenant_id = current_user.tenant_id
+    _current_user, tenant_id = user_and_tenant
     
     historico = db.query(HistoricoConciliacao).filter(
         and_(
@@ -293,14 +293,14 @@ def concluir_aba3(
     historico_id: int,
     request: AtualizarAbaRequest,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
     Marca Aba 3 (Amarração Automática) como concluída.
     
     Se todas as 3 abas estiverem concluídas, muda status para 'concluida'.
     """
-    tenant_id = current_user.tenant_id
+    _current_user, tenant_id = user_and_tenant
     
     historico = db.query(HistoricoConciliacao).filter(
         and_(
@@ -368,7 +368,7 @@ def listar_historico(
     data_inicio: Optional[date] = None,
     data_fim: Optional[date] = None,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
     Lista histórico de conciliações com filtros.
@@ -378,7 +378,7 @@ def listar_historico(
     - status: em_andamento | concluida | reprocessada | cancelada
     - data_inicio/data_fim: Range de datas conciliadas
     """
-    tenant_id = current_user.tenant_id
+    _current_user, tenant_id = user_and_tenant
     
     query = db.query(HistoricoConciliacao).filter(
         HistoricoConciliacao.tenant_id == tenant_id
@@ -413,10 +413,10 @@ def listar_historico(
 def detalhar_historico(
     historico_id: int,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Retorna detalhes completos de uma conciliação"""
-    tenant_id = current_user.tenant_id
+    _current_user, tenant_id = user_and_tenant
     
     historico = db.query(HistoricoConciliacao).filter(
         and_(
@@ -435,13 +435,13 @@ def detalhar_historico(
 def cancelar_conciliacao(
     historico_id: int,
     db: Session = Depends(get_db),
-    current_user: dict = Depends(get_current_user)
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
     Cancela uma conciliação (marca como cancelada).
     Não pode cancelar conciliações já concluídas.
     """
-    tenant_id = current_user.tenant_id
+    _current_user, tenant_id = user_and_tenant
     
     historico = db.query(HistoricoConciliacao).filter(
         and_(

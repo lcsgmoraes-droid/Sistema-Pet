@@ -7,6 +7,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import api from '../api';
+import { getAccessToken } from '../auth/tokenStorage';
 import toast from 'react-hot-toast';
 import {
   AlertTriangle,
@@ -40,7 +41,7 @@ export default function DashboardFinanceiro() {
 
   const carregarDashboard = async () => {
     try {
-      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+      const token = getAccessToken();
       const config = { headers: { Authorization: `Bearer ${token}` } };
 
       const [resPagar, resReceber, resContas, resResumo] = await Promise.all([

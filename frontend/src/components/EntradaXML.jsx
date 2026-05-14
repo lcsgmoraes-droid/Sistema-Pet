@@ -1,6 +1,7 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import api from '../api';
+import { getAccessToken } from '../auth/tokenStorage';
 import { toast } from 'react-hot-toast';
 import { formatBRL, formatMoneyBRL, formatPercent } from '../utils/formatters';
 import CardFiscal from './CardFiscal';
@@ -720,7 +721,7 @@ const EntradaXML = () => {
   const carregarDados = async () => {
     console.log('📊 [EntradaXML] Carregando dados...');
     try {
-      const token = localStorage.getItem('access_token') || localStorage.getItem('token');
+      const token = getAccessToken();
       console.log('🔑 [EntradaXML] Token obtido:', token ? 'SIM' : 'NAO');
       const headers = { Authorization: `Bearer ${token}` };
 

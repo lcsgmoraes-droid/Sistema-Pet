@@ -9,8 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from sqlalchemy import extract
 
-from app.auth import get_current_user
-from app.models import User
+from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.simples_nacional_models import SimplesNacionalMensal
 from app.empresa_config_fiscal_models import EmpresaConfigFiscal
@@ -54,7 +53,7 @@ class FecharMesRequest(BaseModel):
 def buscar_fechamento(
     mes: int,
     ano: int,
-    current_user: User = Depends(get_current_user),
+    user_and_tenant = Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session)
 ):
     """
@@ -69,7 +68,7 @@ def buscar_fechamento(
     - Alíquota sugerida para próximo mês
     """
     
-    tenant_id = current_user.tenant_id
+    _current_user, tenant_id = user_and_tenant
     
     # Buscar ou criar registro mensal
     registro = (
@@ -156,7 +155,7 @@ def buscar_fechamento(
 @router.post("/fechar")
 def fechar_mes(
     payload: FecharMesRequest,
-    current_user: User = Depends(get_current_user),
+    user_and_tenant = Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session)
 ):
     """
@@ -168,7 +167,7 @@ def fechar_mes(
     - Registra histórico
     """
     
-    tenant_id = current_user.tenant_id
+    _current_user, tenant_id = user_and_tenant
     
     # Verificar se Simples está ativo
     config = (
@@ -228,14 +227,14 @@ def fechar_mes(
 def reabrir_mes(
     mes: int,
     ano: int,
-    current_user: User = Depends(get_current_user),
+    user_and_tenant = Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session)
 ):
     """
     Reabre um fechamento mensal para ajustes.
     """
     
-    tenant_id = current_user.tenant_id
+    _current_user, tenant_id = user_and_tenant
     
     from app.services.fechamento_simples_service import reabrir_simples_mensal
     

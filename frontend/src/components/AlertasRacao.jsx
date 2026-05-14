@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AlertTriangle, CheckCircle, XCircle, RefreshCw, Archive, BarChart3, Lightbulb, Edit } from 'lucide-react';
 import api from '../api';
+import { getAccessToken } from '../auth/tokenStorage';
 import toast from 'react-hot-toast';
 import DashboardAnaliseRacoes from './DashboardAnaliseRacoes';
 import SugestoesInteligentesRacoes from './SugestoesInteligentesRacoes';
@@ -50,7 +51,7 @@ function AlertasRacao() {
     setLoading(true);
     try {
       // 🔍 DEBUG: Verificar token antes da requisição
-      const token = localStorage.getItem('access_token');
+      const token = getAccessToken();
       console.log('🔐 [AlertasRacao] Iniciando carregamento de alertas', {
         hasToken: !!token,
         tokenPreview: token ? `${token.substring(0, 20)}...` : 'NO TOKEN',

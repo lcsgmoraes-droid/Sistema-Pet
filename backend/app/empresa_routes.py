@@ -7,8 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, field_validator
 from sqlalchemy.orm import Session
 
-from app.auth import get_current_user
-from app.models import User, Tenant
+from app.auth.dependencies import get_current_user_and_tenant
+from app.models import Tenant
 from app.db import get_session
 from app.empresa_config_fiscal_models import EmpresaConfigFiscal
 from app.utils.logger import logger
@@ -104,14 +104,14 @@ class ConfigFiscalUpdate(BaseModel):
 
 @router.get("/fiscal", response_model=ConfigFiscalResponse)
 def buscar_config_fiscal(
-    current_user: User = Depends(get_current_user),
+    user_and_tenant = Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session)
 ):
     """
     Busca a configuração fiscal da empresa do tenant.
     """
     
-    tenant_id = current_user.tenant_id
+    _current_user, tenant_id = user_and_tenant
     
     config = (
         db.query(EmpresaConfigFiscal)
@@ -131,7 +131,7 @@ def buscar_config_fiscal(
 @router.put("/fiscal", response_model=ConfigFiscalResponse)
 def atualizar_config_fiscal(
     dados: ConfigFiscalUpdate,
-    current_user: User = Depends(get_current_user),
+    user_and_tenant = Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session)
 ):
     """
@@ -142,7 +142,7 @@ def atualizar_config_fiscal(
     - Se simples_ativo é False, zera campos relacionados
     """
     
-    tenant_id = current_user.tenant_id
+    _current_user, tenant_id = user_and_tenant
     
     config = (
         db.query(EmpresaConfigFiscal)
@@ -198,13 +198,13 @@ def atualizar_config_fiscal(
 
 @router.get("/dados-cadastrais", response_model=DadosCadastraisResponse)
 def buscar_dados_cadastrais(
-    current_user: User = Depends(get_current_user),
+    user_and_tenant = Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session)
 ):
     """
     Busca os dados cadastrais da empresa (tenant).
     """
-    tenant_id = current_user.tenant_id
+    _current_user, tenant_id = user_and_tenant
     
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     
@@ -235,13 +235,13 @@ def buscar_dados_cadastrais(
 @router.put("/dados-cadastrais", response_model=DadosCadastraisResponse)
 def atualizar_dados_cadastrais(
     dados: DadosCadastraisUpdate,
-    current_user: User = Depends(get_current_user),
+    user_and_tenant = Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session)
 ):
     """
     Atualiza os dados cadastrais da empresa (tenant).
     """
-    tenant_id = current_user.tenant_id
+    _current_user, tenant_id = user_and_tenant
     
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     
@@ -297,13 +297,13 @@ class ConfigEstoqueUpdate(BaseModel):
 
 @router.get("/config-estoque", response_model=ConfigEstoqueResponse)
 def buscar_config_estoque(
-    current_user: User = Depends(get_current_user),
+    user_and_tenant = Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session)
 ):
     """
     Busca configuraÃ§Ãµes de estoque do tenant.
     """
-    tenant_id = current_user.tenant_id
+    _current_user, tenant_id = user_and_tenant
     
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     
@@ -321,7 +321,7 @@ def buscar_config_estoque(
 @router.put("/config-estoque", response_model=ConfigEstoqueResponse)
 def atualizar_config_estoque(
     config: ConfigEstoqueUpdate,
-    current_user: User = Depends(get_current_user),
+    user_and_tenant = Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session)
 ):
     """
@@ -331,7 +331,7 @@ def atualizar_config_estoque(
     - Se permite_estoque_negativo = True: Sistema permite vendas mesmo sem estoque
     - Se permite_estoque_negativo = False: Sistema bloqueia vendas quando estoque insuficiente (padrÃ£o)
     """
-    tenant_id = current_user.tenant_id
+    _current_user, tenant_id = user_and_tenant
     
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     

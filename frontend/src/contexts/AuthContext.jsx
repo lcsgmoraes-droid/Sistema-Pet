@@ -3,6 +3,7 @@
  */
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import api from '../api';
+import { clearAuthTokens, getAccessToken, setAccessToken, setTempToken } from '../auth/tokenStorage';
 
 const AuthContext = createContext();
 
@@ -21,7 +22,7 @@ export const AuthProvider = ({ children }) => {
   useEffect(() => {
     const initAuth = async () => {
       try {
-        const token = localStorage.getItem('access_token');
+        const token = getAccessToken();
         const savedUser = localStorage.getItem('user');
 
         if (token && savedUser) {
@@ -53,7 +54,7 @@ export const AuthProvider = ({ children }) => {
       const status = error.response?.status;
       if (status === 401 || status === 403) {
         console.warn('Sessao expirada ou tenant invalido. Limpando autenticacao local.');
-        localStorage.removeItem('access_token');
+        clearAuthTokens();
         localStorage.removeItem('tenants');
         localStorage.removeItem('user');
         localStorage.removeItem('selectedTenant');
@@ -83,7 +84,7 @@ export const AuthProvider = ({ children }) => {
       };
     }
 
-    localStorage.setItem('tempToken', accessToken);
+    setTempToken(accessToken);
 
     const selectResponse = await api.post(
       '/auth/select-tenant',
@@ -92,7 +93,7 @@ export const AuthProvider = ({ children }) => {
     );
 
     const finalToken = selectResponse.data.access_token;
-    localStorage.setItem('access_token', finalToken);
+    setAccessToken(finalToken);
     localStorage.setItem('selectedTenant', JSON.stringify(tenants[0]));
 
     const userResponse = await api.get('/auth/me-multitenant');
@@ -161,11 +162,10 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('Erro ao fazer logout:', error);
     } finally {
-      localStorage.removeItem('access_token');
+      clearAuthTokens();
       localStorage.removeItem('tenants');
       localStorage.removeItem('user');
       localStorage.removeItem('selectedTenant');
-      localStorage.removeItem('tempToken');
       setUser(null);
       window.location.href = '/login';
     }

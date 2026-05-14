@@ -67,13 +67,52 @@ if not logger.handlers:
 # =============================================================================
 
 # Ler flags de ambiente
-SQL_AUDIT_ENFORCE = os.getenv("SQL_AUDIT_ENFORCE", "false").lower() in ("true", "1", "yes")
-SQL_AUDIT_ENFORCE_LEVEL = os.getenv("SQL_AUDIT_ENFORCE_LEVEL", "HIGH").upper()
+PROD_LIKE_ENVIRONMENTS = {"production", "prod", "staging"}
+
+
+def _current_environment_name() -> str:
+    return (
+        os.getenv("ENVIRONMENT")
+        or os.getenv("APP_ENV")
+        or os.getenv("ENV")
+        or ""
+    ).strip().lower()
+
+
+def _env_truthy(name: str, default: bool = False) -> bool:
+    raw_value = os.getenv(name)
+    if raw_value is None:
+        return default
+    return raw_value.strip().lower() in {"true", "1", "yes", "y", "on"}
+
+
+def _normalize_enforcement_level(raw_value: str | None) -> tuple[str, str]:
+    raw_level = (raw_value or "HIGH").strip().upper()
+    aliases = {
+        "ERROR": "HIGH",
+        "WARN": "HIGH",
+        "WARNING": "HIGH",
+        "STRICT": "MEDIUM",
+        "HIGH": "HIGH",
+        "MEDIUM": "MEDIUM",
+        "LOW": "LOW",
+    }
+    return aliases.get(raw_level, "HIGH"), raw_level
+
+
+SQL_AUDIT_ENVIRONMENT = _current_environment_name()
+SQL_AUDIT_ENFORCE = _env_truthy(
+    "SQL_AUDIT_ENFORCE",
+    default=SQL_AUDIT_ENVIRONMENT in PROD_LIKE_ENVIRONMENTS,
+)
+SQL_AUDIT_ENFORCE_LEVEL, SQL_AUDIT_ENFORCE_LEVEL_RAW = _normalize_enforcement_level(
+    os.getenv("SQL_AUDIT_ENFORCE_LEVEL")
+)
 
 # Validar level
-if SQL_AUDIT_ENFORCE_LEVEL not in ("HIGH", "MEDIUM", "LOW"):
+if SQL_AUDIT_ENFORCE_LEVEL_RAW not in ("HIGH", "MEDIUM", "LOW", "ERROR", "WARN", "WARNING", "STRICT"):
     logger.warning(
-        f"⚠️  SQL_AUDIT_ENFORCE_LEVEL inválido: {SQL_AUDIT_ENFORCE_LEVEL}. "
+        f"⚠️  SQL_AUDIT_ENFORCE_LEVEL inválido: {SQL_AUDIT_ENFORCE_LEVEL_RAW}. "
         f"Usando default: HIGH"
     )
     SQL_AUDIT_ENFORCE_LEVEL = "HIGH"
@@ -825,6 +864,8 @@ def get_enforcement_config() -> dict:
     return {
         "enabled": SQL_AUDIT_ENFORCE,
         "level": SQL_AUDIT_ENFORCE_LEVEL,
+        "raw_level": SQL_AUDIT_ENFORCE_LEVEL_RAW,
+        "environment": SQL_AUDIT_ENVIRONMENT,
         "blocks": f"{SQL_AUDIT_ENFORCE_LEVEL}+ risk queries" if SQL_AUDIT_ENFORCE else "none",
     }
 
