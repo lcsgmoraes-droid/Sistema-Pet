@@ -42,7 +42,9 @@ class RotaEntregaBase(BaseModel):
 class RotaEntregaCreate(RotaEntregaBase):
     """Schema para criação de rota de entrega"""
     # ETAPA 9.3: Criar rota com múltiplas vendas (entregas)
+    entregador_id: Optional[int] = None
     vendas_ids: Optional[List[int]] = None  # Lista de vendas para entregar
+    venda_ids: Optional[List[int]] = None  # Compatibilidade com app mobile
 
 
 class RotaEntregaUpdate(BaseModel):

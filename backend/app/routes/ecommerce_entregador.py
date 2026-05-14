@@ -79,17 +79,27 @@ def _delivery_actor(cliente: Cliente, tenant_id: str):
     )
 
 
+def _is_int_like(value: object) -> bool:
+    return str(value).strip().isdigit()
+
+
 def _get_rota_do_entregador_or_404(
     db: Session,
     *,
-    rota_id: int,
+    rota_id,
     tenant_id: str,
     cliente: Cliente,
 ) -> RotaEntrega:
+    rota_ref = str(rota_id).strip()
+    rota_filter = (
+        RotaEntrega.id == int(rota_ref)
+        if _is_int_like(rota_ref)
+        else RotaEntrega.numero == rota_ref
+    )
     rota = (
         db.query(RotaEntrega)
         .filter(
-            RotaEntrega.id == rota_id,
+            rota_filter,
             RotaEntrega.tenant_id == tenant_id,
             RotaEntrega.entregador_id == cliente.id,
         )
@@ -103,12 +113,12 @@ def _get_rota_do_entregador_or_404(
 def _get_parada_do_entregador_or_404(
     db: Session,
     *,
-    rota_id: int,
+    rota_id,
     parada_id: int,
     tenant_id: str,
     cliente: Cliente,
 ) -> RotaEntregaParada:
-    _get_rota_do_entregador_or_404(
+    rota = _get_rota_do_entregador_or_404(
         db,
         rota_id=rota_id,
         tenant_id=tenant_id,
@@ -118,7 +128,7 @@ def _get_parada_do_entregador_or_404(
         db.query(RotaEntregaParada)
         .filter(
             RotaEntregaParada.id == parada_id,
-            RotaEntregaParada.rota_id == rota_id,
+            RotaEntregaParada.rota_id == rota.id,
             RotaEntregaParada.tenant_id == tenant_id,
         )
         .first()
@@ -282,6 +292,7 @@ def criar_rota_por_entregador(
     from app.api.endpoints.rotas_entrega import ensure_rotas_entrega_schema
 
     tenant_id = _activate_cliente_tenant_context(cliente)
+    tenant_uuid = UUID(str(tenant_id))
     ensure_rotas_entrega_schema(db)
 
     if not payload.venda_ids:
@@ -310,7 +321,7 @@ def criar_rota_por_entregador(
     ponto_origem = _montar_endereco_origem(config)
 
     rota = RotaEntrega(
-        tenant_id=tenant_id,
+        tenant_id=tenant_uuid,
         entregador_id=cliente.id,
         moto_da_loja=not bool(cliente.moto_propria),
         status="pendente",
@@ -328,7 +339,7 @@ def criar_rota_por_entregador(
 
     for idx, venda in enumerate(vendas, start=1):
         parada = RotaEntregaParada(
-            tenant_id=tenant_id,
+            tenant_id=tenant_uuid,
             rota_id=rota.id,
             venda_id=venda.id,
             ordem=idx,
@@ -358,21 +369,21 @@ def criar_rota_por_entregador(
 
 @router.get("/rotas/{rota_id}", response_model=RotaEntregaResponse)
 def obter_rota_entregador(
-    rota_id: int,
+    rota_id: str,
     cliente: Cliente = Depends(_get_entregador_cliente),
     db: Session = Depends(get_session),
 ):
     from app.api.endpoints import rotas_entrega as rotas_admin
 
     tenant_id = _activate_cliente_tenant_context(cliente)
-    _get_rota_do_entregador_or_404(
+    rota = _get_rota_do_entregador_or_404(
         db,
         rota_id=rota_id,
         tenant_id=tenant_id,
         cliente=cliente,
     )
     return rotas_admin.obter_rota(
-        rota_id=rota_id,
+        rota_id=rota.id,
         db=db,
         actor=_delivery_actor(cliente, tenant_id),
     )
@@ -380,7 +391,7 @@ def obter_rota_entregador(
 
 @router.post("/rotas/{rota_id}/iniciar", response_model=RotaEntregaResponse)
 def iniciar_rota_entregador(
-    rota_id: int,
+    rota_id: str,
     km_inicial: Optional[float] = None,
     lat_inicio: Optional[float] = None,
     lon_inicio: Optional[float] = None,
@@ -390,14 +401,14 @@ def iniciar_rota_entregador(
     from app.api.endpoints import rotas_entrega as rotas_admin
 
     tenant_id = _activate_cliente_tenant_context(cliente)
-    _get_rota_do_entregador_or_404(
+    rota = _get_rota_do_entregador_or_404(
         db,
         rota_id=rota_id,
         tenant_id=tenant_id,
         cliente=cliente,
     )
     return rotas_admin.iniciar_rota(
-        rota_id=rota_id,
+        rota_id=rota.id,
         km_inicial=km_inicial,
         lat_inicio=lat_inicio,
         lon_inicio=lon_inicio,
@@ -408,7 +419,7 @@ def iniciar_rota_entregador(
 
 @router.post("/rotas/{rota_id}/atualizar-localizacao")
 def atualizar_localizacao_rota_entregador(
-    rota_id: int,
+    rota_id: str,
     lat: float,
     lon: float,
     cliente: Cliente = Depends(_get_entregador_cliente),
@@ -417,14 +428,14 @@ def atualizar_localizacao_rota_entregador(
     from app.api.endpoints import rotas_entrega as rotas_admin
 
     tenant_id = _activate_cliente_tenant_context(cliente)
-    _get_rota_do_entregador_or_404(
+    rota = _get_rota_do_entregador_or_404(
         db,
         rota_id=rota_id,
         tenant_id=tenant_id,
         cliente=cliente,
     )
     return rotas_admin.atualizar_localizacao_rota(
-        rota_id=rota_id,
+        rota_id=rota.id,
         lat=lat,
         lon=lon,
         db=db,
@@ -434,7 +445,7 @@ def atualizar_localizacao_rota_entregador(
 
 @router.post("/rotas/{rota_id}/paradas/{parada_id}/marcar-entregue")
 def marcar_parada_entregue_entregador(
-    rota_id: int,
+    rota_id: str,
     parada_id: int,
     tentativa: bool = False,
     km_entrega: Optional[float] = None,
@@ -446,7 +457,7 @@ def marcar_parada_entregue_entregador(
     from app.api.endpoints import rotas_entrega as rotas_admin
 
     tenant_id = _activate_cliente_tenant_context(cliente)
-    _get_parada_do_entregador_or_404(
+    parada = _get_parada_do_entregador_or_404(
         db,
         rota_id=rota_id,
         parada_id=parada_id,
@@ -454,7 +465,7 @@ def marcar_parada_entregue_entregador(
         cliente=cliente,
     )
     return rotas_admin.marcar_parada_entregue(
-        rota_id=rota_id,
+        rota_id=parada.rota_id,
         parada_id=parada_id,
         tentativa=tentativa,
         km_entrega=km_entrega,
@@ -467,7 +478,7 @@ def marcar_parada_entregue_entregador(
 
 @router.post("/rotas/{rota_id}/paradas/{parada_id}/registrar-recebimento")
 def registrar_recebimento_entregador_mobile(
-    rota_id: int,
+    rota_id: str,
     parada_id: int,
     payload: RegistrarRecebimentoPayload,
     cliente: Cliente = Depends(_get_entregador_cliente),
@@ -476,7 +487,7 @@ def registrar_recebimento_entregador_mobile(
     from app.api.endpoints import rotas_entrega as rotas_admin
 
     tenant_id = _activate_cliente_tenant_context(cliente)
-    _get_parada_do_entregador_or_404(
+    parada = _get_parada_do_entregador_or_404(
         db,
         rota_id=rota_id,
         parada_id=parada_id,
@@ -484,7 +495,7 @@ def registrar_recebimento_entregador_mobile(
         cliente=cliente,
     )
     return rotas_admin.registrar_recebimento_entregador(
-        rota_id=rota_id,
+        rota_id=parada.rota_id,
         parada_id=parada_id,
         payload=payload,
         db=db,
@@ -494,7 +505,7 @@ def registrar_recebimento_entregador_mobile(
 
 @router.post("/rotas/{rota_id}/fechar", response_model=RotaEntregaResponse)
 def fechar_rota_entregador(
-    rota_id: int,
+    rota_id: str,
     payload: RotaEntregaUpdate,
     cliente: Cliente = Depends(_get_entregador_cliente),
     db: Session = Depends(get_session),
@@ -502,14 +513,14 @@ def fechar_rota_entregador(
     from app.api.endpoints import rotas_entrega as rotas_admin
 
     tenant_id = _activate_cliente_tenant_context(cliente)
-    _get_rota_do_entregador_or_404(
+    rota = _get_rota_do_entregador_or_404(
         db,
         rota_id=rota_id,
         tenant_id=tenant_id,
         cliente=cliente,
     )
     return rotas_admin.fechar_rota(
-        rota_id=rota_id,
+        rota_id=rota.id,
         payload=payload,
         db=db,
         actor=_delivery_actor(cliente, tenant_id),
@@ -518,14 +529,20 @@ def fechar_rota_entregador(
 
 @router.put("/rotas/{rota_id}/paradas/reordenar")
 def reordenar_paradas_rota_entregador(
-    rota_id: int,
+    rota_id: str,
     payload: ReordenarParadasPayload,
     cliente: Cliente = Depends(_get_entregador_cliente),
     db: Session = Depends(get_session),
 ):
     tenant_id = _activate_cliente_tenant_context(cliente)
+    rota_ref = str(rota_id).strip()
+    rota_filter = (
+        RotaEntrega.id == int(rota_ref)
+        if _is_int_like(rota_ref)
+        else RotaEntrega.numero == rota_ref
+    )
     rota = db.query(RotaEntrega).filter(
-        RotaEntrega.id == rota_id,
+        rota_filter,
         RotaEntrega.tenant_id == tenant_id,
         RotaEntrega.entregador_id == cliente.id,
     ).first()
@@ -552,7 +569,7 @@ def reordenar_paradas_rota_entregador(
 
 @router.post("/rotas/{rota_id}/paradas/{parada_id}/nao-entregue")
 def marcar_parada_nao_entregue_entregador(
-    rota_id: int,
+    rota_id: str,
     parada_id: int,
     motivo: Optional[str] = Query(None),
     payload: Optional[NaoEntreguePayload] = Body(default=None),
@@ -564,8 +581,14 @@ def marcar_parada_nao_entregue_entregador(
     tenant_id = _activate_cliente_tenant_context(cliente)
     ensure_rotas_entrega_schema(db)
 
+    rota_ref = str(rota_id).strip()
+    rota_filter = (
+        RotaEntrega.id == int(rota_ref)
+        if _is_int_like(rota_ref)
+        else RotaEntrega.numero == rota_ref
+    )
     rota = db.query(RotaEntrega).filter(
-        RotaEntrega.id == rota_id,
+        rota_filter,
         RotaEntrega.tenant_id == tenant_id,
         RotaEntrega.entregador_id == cliente.id,
     ).first()
@@ -576,7 +599,7 @@ def marcar_parada_nao_entregue_entregador(
 
     parada = db.query(RotaEntregaParada).filter(
         RotaEntregaParada.id == parada_id,
-        RotaEntregaParada.rota_id == rota_id,
+        RotaEntregaParada.rota_id == rota.id,
         RotaEntregaParada.tenant_id == tenant_id,
     ).first()
     if not parada:
