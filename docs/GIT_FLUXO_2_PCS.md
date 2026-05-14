@@ -51,6 +51,28 @@ powershell -ExecutionPolicy Bypass -File .\scripts\git_start_task.ps1 -Tipo feat
 
 Ele atualiza a `main` antes de criar a branch nova.
 
+## Saber se este PC precisa atualizar
+
+Quando estiver em duvida se o outro computador subiu alguma novidade, rode:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\git_check_updates.ps1
+```
+
+O script consulta o GitHub e mostra:
+
+- se a `main` deste PC precisa baixar commits novos;
+- se a branch atual precisa baixar novidades;
+- se a branch atual tem commits locais que ainda precisam subir.
+
+Ele nao faz pull, push nem deploy sozinho. E apenas um aviso seguro para decidir o proximo passo.
+
+No VS Code, tambem existe a tarefa:
+
+```text
+Git Seguro: Verificar atualizacoes
+```
+
 ## Emergencia
 
 Os hooks bloqueiam `main/master`, mas podem ser contornados manualmente. Use isso somente se voce tiver certeza e depois de autorizacao explicita:

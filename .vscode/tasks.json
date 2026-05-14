@@ -171,6 +171,19 @@
 			"problemMatcher": []
 		},
 		{
+			"label": "Git Seguro: Verificar atualizacoes",
+			"detail": "Mostra se este PC precisa baixar ou subir mudancas do GitHub.",
+			"type": "shell",
+			"command": "powershell",
+			"args": [
+				"-ExecutionPolicy",
+				"Bypass",
+				"-File",
+				".\\scripts\\git_check_updates.ps1"
+			],
+			"problemMatcher": []
+		},
+		{
 			"label": "App Mobile: Iniciar DEV",
 			"type": "shell",
 			"command": "npx",
