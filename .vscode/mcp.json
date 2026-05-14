@@ -1,0 +1,14 @@
+{
+  "servers": {
+    "sistema-pet-frontend-react": {
+      "type": "stdio",
+      "command": "${workspaceFolder}\\mcp\\frontend_react_server\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "frontend_react_mcp.main"]
+    },
+    "sistema-pet-ops-api": {
+      "type": "stdio",
+      "command": "${workspaceFolder}\\mcp\\ops_api_server\\.venv\\Scripts\\python.exe",
+      "args": ["-m", "ops_api_mcp.main"]
+    }
+  }
+}
