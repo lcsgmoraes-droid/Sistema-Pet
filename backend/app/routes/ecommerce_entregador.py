@@ -3,36 +3,21 @@ from datetime import datetime
 from decimal import Decimal
 from typing import List, Optional
 import secrets
-from uuid import UUID
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError, jwt
 from pydantic import BaseModel
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
-from app.auth.core import ALGORITHM
-from app.config import JWT_SECRET_KEY
 from app.db import get_session
 from app.models import Cliente, ConfiguracaoEntrega, User
 from app.rotas_entrega_models import RotaEntrega, RotaEntregaParada
+from app.routes.ecommerce_auth import _get_current_ecommerce_user
 from app.schemas.rota_entrega import RotaEntregaResponse
 from app.services.google_maps_service import calcular_rota_otimizada
-from app.tenancy.context import set_current_tenant
 from app.vendas_models import Venda, VendaItem
 
 router = APIRouter(prefix="/ecommerce/entregador", tags=["ecommerce-entregador"])
-_security = HTTPBearer()
-
-
-def _normalize_tenant_uuid(raw_tenant_id: str | None) -> UUID | None:
-    if not raw_tenant_id:
-        return None
-    try:
-        return UUID(str(raw_tenant_id).strip())
-    except Exception:
-        return None
 
 
 class OtimizarSelecionadasPayload(BaseModel):
@@ -53,38 +38,12 @@ class NaoEntreguePayload(BaseModel):
 
 
 def _get_entregador_cliente(
-    credentials: HTTPAuthorizationCredentials = Depends(_security),
+    current_user: User = Depends(_get_current_ecommerce_user),
     db: Session = Depends(get_session),
 ) -> Cliente:
-    auth_exc = HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Token inválido",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-    try:
-        payload = jwt.decode(credentials.credentials, JWT_SECRET_KEY, algorithms=[ALGORITHM])
-        user_id = int(payload.get("sub"))
-        tenant_id = _normalize_tenant_uuid(payload.get("tenant_id"))
-        if payload.get("token_type") != "ecommerce_customer":
-            raise auth_exc
-        if not tenant_id:
-            raise auth_exc
-    except (JWTError, TypeError, ValueError):
-        raise auth_exc
-
-    set_current_tenant(tenant_id)
-
-    user = (
-        db.query(User)
-        .filter(User.id == user_id, User.tenant_id == tenant_id, User.is_active == True)
-        .first()
-    )
-    if not user:
-        raise auth_exc
-
     cliente = (
         db.query(Cliente)
-        .filter(Cliente.tenant_id == str(user.tenant_id), Cliente.user_id == user.id)
+        .filter(Cliente.tenant_id == str(current_user.tenant_id), Cliente.user_id == current_user.id)
         .first()
     )
     if not cliente or not cliente.is_entregador:

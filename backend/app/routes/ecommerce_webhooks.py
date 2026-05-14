@@ -12,6 +12,7 @@ from app.idempotency_models import IdempotencyKey
 from app.models import Cliente, User
 from app.pedido_models import Pedido, PedidoItem
 from app.produtos_models import Produto
+from app.tenancy.context import set_current_tenant
 
 
 router = APIRouter(prefix="/webhooks", tags=["ecommerce-webhooks"])
@@ -395,6 +396,8 @@ def _integrar_venda_ao_motor(db, pedido: Pedido, webhook_payload: dict | None = 
     from app.vendas.service import VendaService
     from app.vendas_models import Venda
 
+    set_current_tenant(UUID(str(pedido.tenant_id)))
+
     payload_data = webhook_payload or {}
     metadata = (payload_data.get("metadata") or {}) if isinstance(payload_data, dict) else {}
     nested_metadata = ((payload_data.get("data") or {}).get("metadata") or {}) if isinstance(payload_data, dict) else {}
@@ -665,6 +668,7 @@ async def webhook_pagarme(request: Request):
 
     signature_status = _validate_optional_signature(raw_body, request)
     tenant_id = _find_tenant_id(payload, request)
+    set_current_tenant(UUID(tenant_id))
     event_id, event_type, request_hash = _extract_event_info(payload, raw_body)
 
     db = SessionLocal()
