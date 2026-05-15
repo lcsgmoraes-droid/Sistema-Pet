@@ -52,13 +52,16 @@ export function FormField({
 }
 
 export function TextField({
+  autoComplete,
   className = "",
   disabled = false,
   error = "",
   help = "",
+  id,
   inputClassName = "",
   label,
   labelAccessory = null,
+  name,
   onChange,
   placeholder,
   required = false,
@@ -80,7 +83,10 @@ export function TextField({
       tone={tone}
     >
       <input
+        id={id}
+        name={name || id}
         type={type}
+        autoComplete={autoComplete}
         step={step ?? (type === "number" ? "0.01" : undefined)}
         value={value}
         placeholder={placeholder}

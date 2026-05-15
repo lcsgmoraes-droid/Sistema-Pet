@@ -187,6 +187,8 @@ TENANT_TABLES = {
     "notas_saida_itens",
     
     # Pedidos
+    "pedido_itens",
+    "pedidos",
     "pedidos_compra",
     "pedidos_compra_itens",
     

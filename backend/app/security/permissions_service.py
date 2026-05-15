@@ -5,6 +5,7 @@ from typing import Optional
 
 from app.tenancy.context import get_current_tenant
 from app.auth import get_current_user
+from app.auth.permission_dependencies import expand_permissions
 from app.models import UserTenant, RolePermission, Permission, User
 
 
@@ -21,7 +22,7 @@ def get_user_permissions(db: Session, user_id: int, tenant_id: UUID) -> set[str]
         )
         .all()
     )
-    return {p[0] for p in perms}
+    return set(expand_permissions([p[0] for p in perms]))
 
 
 def check_permission(
@@ -54,7 +55,7 @@ def check_permission(
     if tenant_id is None:
         raise HTTPException(status_code=403, detail="Tenant não definido")
 
-    perms = get_user_permissions(db, user_id, tenant_id)
+    perms = set(expand_permissions(list(get_user_permissions(db, user_id, tenant_id))))
     if permission not in perms:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

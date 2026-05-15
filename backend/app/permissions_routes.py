@@ -22,6 +22,7 @@ class PermissionResponse(BaseModel):
 
 
 @router.get("/permissions", response_model=List[PermissionResponse])
+@require_permission("usuarios.manage")
 def listar_permissions(
     db: Session = Depends(get_db),
     user_and_tenant=Depends(get_current_user_and_tenant),

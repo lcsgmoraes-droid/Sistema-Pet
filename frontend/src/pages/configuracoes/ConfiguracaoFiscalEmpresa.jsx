@@ -119,7 +119,11 @@ export default function ConfiguracaoFiscalEmpresa() {
             });
           }
         } catch (e) {
-          console.log("Endpoint de dados cadastrais não existe ainda");
+          if (e.response?.status === 404) {
+            console.log("Endpoint de dados cadastrais não existe ainda");
+          } else {
+            throw e;
+          }
         }
       } catch (e) {
         console.error("❌ Erro ao carregar configurações:", e);
@@ -306,7 +310,11 @@ export default function ConfiguracaoFiscalEmpresa() {
         console.log('💾 Salvando dados cadastrais:', dadosEmpresa);
         await api.put("/empresa/dados-cadastrais", dadosEmpresa);
       } catch (e) {
-        console.log("Endpoint de dados cadastrais não implementado ainda");
+        if (e.response?.status === 404) {
+          console.log("Endpoint de dados cadastrais não implementado ainda");
+        } else {
+          throw e;
+        }
       }
       
       toast.success("Configurações salvas com sucesso!");

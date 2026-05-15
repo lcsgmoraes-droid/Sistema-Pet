@@ -167,6 +167,32 @@ def _valor_cupom_venda(venda: Venda, cupons_por_venda: dict[int, float]) -> floa
     return round(_as_float(cupons_por_venda.get(venda.id, 0.0)), 2)
 
 
+def _snapshot_dict(venda: Venda) -> dict:
+    snapshot = getattr(venda, "rentabilidade_snapshot", None)
+    if isinstance(snapshot, dict):
+        return snapshot
+    if isinstance(snapshot, str) and snapshot.strip():
+        try:
+            parsed = json.loads(snapshot)
+        except Exception:
+            return {}
+        return parsed if isinstance(parsed, dict) else {}
+    return {}
+
+
+def _precisa_reclassificar_campanha(venda: Venda, custo_campanha: float, cupom_desconto: float) -> bool:
+    if custo_campanha <= 0 and cupom_desconto <= 0:
+        return False
+
+    snapshot = _snapshot_dict(venda)
+    if not snapshot:
+        return False
+
+    campanha_snapshot = _as_float(snapshot.get("custo_campanha", 0))
+    cupom_snapshot = _as_float(snapshot.get("cupom_desconto", 0))
+    return campanha_snapshot <= 0 or cupom_snapshot < cupom_desconto
+
+
 def _detectar_promocao_item(
     produto: Optional[Produto],
     item: Optional[VendaItem],
@@ -777,9 +803,15 @@ async def obter_relatorio_vendas(
             db,
             tenant_id,
             persist_if_missing=True,
+            force_refresh=_precisa_reclassificar_campanha(
+                venda,
+                custo_campanha_venda,
+                cupom_desconto,
+            ),
             impostos_percentual=impostos_percentual_global,
             formas_pagamento_map=formas_pagamento_map,
             custo_campanha=custo_campanha_venda,
+            cupom_desconto=cupom_desconto,
             comissao_total=comissao_total_por_venda.get(venda.id, 0.0),
             taxa_operacional_entrega=(
                 entregadores_map.get(venda.entregador_id, 0.0)
@@ -826,8 +858,11 @@ async def obter_relatorio_vendas(
             "nfe_numero": venda.nfe_numero,
             "nfe_chave": venda.nfe_chave,
             "nfe_bling_id": str(venda.nfe_bling_id) if venda.nfe_bling_id else None,
-            "cupom_code": venda.cupom_code,
-            "cupom_discount_applied": round(cupom_desconto, 2),
+            "cupom_code": snapshot.get("cupom_code") or venda.cupom_code,
+            "cupom_discount_applied": round(
+                float(snapshot.get("cupom_desconto", cupom_desconto) or 0),
+                2,
+            ),
             "venda_bruta": round(float(snapshot.get("venda_bruta", 0) or 0), 2),
             "taxa_loja": round(float(snapshot.get("taxa_loja", 0) or 0), 2),
             "desconto": round(float(snapshot.get("desconto", 0) or 0), 2),

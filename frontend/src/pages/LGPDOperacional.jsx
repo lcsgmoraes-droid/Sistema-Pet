@@ -588,7 +588,9 @@ export default function LGPDOperacional() {
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(380px,0.8fr)]">
           <div className="space-y-3">
             <PessoaSelector
+              id="lgpd-titular-search"
               minChars={2}
+              name="lgpd_titular_search"
               onChange={(value) => {
                 setClienteTermo(value);
                 setClienteSelecionado(null);
@@ -604,11 +606,18 @@ export default function LGPDOperacional() {
               suggestions={clientesSugeridos}
               value={clienteTermo}
               renderSuggestion={(cliente, index) => (
-                <button
+                <div
                   key={cliente?.id || index}
-                  type="button"
                   onClick={() => handleSelectCliente(cliente)}
-                  className="w-full border-b px-4 py-3 text-left last:border-b-0 hover:bg-slate-50"
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      handleSelectCliente(cliente);
+                    }
+                  }}
+                  role="button"
+                  tabIndex={0}
+                  className="w-full cursor-pointer border-b px-4 py-3 text-left last:border-b-0 hover:bg-slate-50"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <CustomerIdentity customer={cliente} />
@@ -619,7 +628,7 @@ export default function LGPDOperacional() {
                   <div className="mt-1 text-xs text-slate-500">
                     {cliente?.email || cliente?.telefone || cliente?.celular || "-"}
                   </div>
-                </button>
+                </div>
               )}
             />
             <div className="flex flex-wrap items-center gap-2">
@@ -713,6 +722,8 @@ export default function LGPDOperacional() {
             </ActionButton>
           ) : (
             <select
+              id="lgpd-requests-filter"
+              name="lgpd_requests_filter"
               value={requestsFilter}
               onChange={(event) => setRequestsFilter(event.target.value)}
               className="h-9 rounded-lg border border-slate-300 px-3 text-sm"

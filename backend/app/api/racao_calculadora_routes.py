@@ -19,6 +19,7 @@ from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
 from app.produtos_models import Produto
 from app.schemas.racao_calculadora import RacaoCalculadoraInput, RacaoCalculadoraOutput
+from app.security.permissions_decorator import require_permission
 from app.services.racao_calculadora_service import calcular_racao
 
 logger = logging.getLogger(__name__)
@@ -46,6 +47,7 @@ router = APIRouter(
     - Contexto preparado para futura IA
     """
 )
+@require_permission("produtos.visualizar")
 async def calcular_consumo_racao(
     payload: RacaoCalculadoraInput,
     user_and_tenant=Depends(get_current_user_and_tenant),

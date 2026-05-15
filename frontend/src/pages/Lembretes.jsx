@@ -5,9 +5,11 @@ import { useNavigate } from "react-router-dom";
 import api from "../api";
 import CustomerIdentity from "../components/ui/CustomerIdentity";
 import PetIdentity from "../components/ui/PetIdentity";
+import { useModulos } from "../contexts/ModulosContext";
 import "../styles/Lembretes.css";
 
 export default function Lembretes() {
+  const { moduloAtivo } = useModulos();
   const [lembretes, setLembretes] = useState([]);
   const [loading, setLoading] = useState(false);
   const [filter, setFilter] = useState("pendente"); // pendente, notificado, completado, todos
@@ -15,19 +17,25 @@ export default function Lembretes() {
   const [dresPendentes, setDresPendentes] = useState(0);
   const [autocadastrosBling, setAutocadastrosBling] = useState({ total: 0, items: [] });
   const navigate = useNavigate();
+  const campanhasAtivo = moduloAtivo("campanhas");
+  const financeiroErpAtivo = moduloAtivo("financeiro_erp");
+  const blingAtivo = moduloAtivo("bling");
 
   useEffect(() => {
     carregarLembretes();
-    carregarAlertasCampanhas();
-    carregarDresPendentes();
-    carregarAutocadastrosBling();
+    if (campanhasAtivo) carregarAlertasCampanhas();
+    else setAlertasCampanhas(null);
+    if (financeiroErpAtivo) carregarDresPendentes();
+    else setDresPendentes(0);
+    if (blingAtivo) carregarAutocadastrosBling();
+    else setAutocadastrosBling({ total: 0, items: [] });
     // Atualizar a cada 1 minuto
     const interval = setInterval(() => {
       carregarLembretes();
-      carregarAutocadastrosBling();
+      if (blingAtivo) carregarAutocadastrosBling();
     }, 60000);
     return () => clearInterval(interval);
-  }, []);
+  }, [campanhasAtivo, financeiroErpAtivo, blingAtivo]);
 
   const carregarAutocadastrosBling = async () => {
     try {

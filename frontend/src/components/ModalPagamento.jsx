@@ -244,6 +244,10 @@ export default function ModalPagamento({
             venda.cupom_discount_applied ?? venda.desconto_valor ?? null,
         }
       : null);
+  const descricaoCupomMargem =
+    cupomParaFinalizar?.code && Number(cupomParaFinalizar?.discount_applied || 0) > 0
+      ? `A margem ficou baixa por conta do cupom ${String(cupomParaFinalizar.code).toUpperCase()} (${formatMoneyBRL(cupomParaFinalizar.discount_applied)} de desconto).`
+      : "";
 
   const valorBaseBeneficios = Number(venda.total || 0);
   const canalVendaBeneficios = venda.canal || venda.origem_canal_venda || 'loja_fisica';
@@ -684,12 +688,19 @@ export default function ModalPagamento({
         return;
       }
       
-      // Se já tem justificativa válida, adicionar às observações
-      const observacoesAtualizadas = venda.observacoes 
-        ? `${venda.observacoes}\n\n⚠️ JUSTIFICATIVA (Margem Crítica): ${justificativaTexto}`
-        : `⚠️ JUSTIFICATIVA (Margem Crítica): ${justificativaTexto}`;
-      
-      venda.observacoes = observacoesAtualizadas;
+      const justificativaFinal = descricaoCupomMargem
+        ? `${descricaoCupomMargem} Observacao informada: ${justificativaTexto}`
+        : justificativaTexto;
+      const blocoJustificativa = `JUSTIFICATIVA (Margem Critica): ${justificativaFinal}`;
+      const observacoesAtuais = venda.observacoes || "";
+
+      if (!observacoesAtuais.includes(blocoJustificativa)) {
+        const observacoesAtualizadas = observacoesAtuais
+          ? `${observacoesAtuais}\n\n${blocoJustificativa}`
+          : blocoJustificativa;
+
+        venda.observacoes = observacoesAtualizadas;
+      }
     }
 
     // Adicionar pagamento normalmente
@@ -1828,7 +1839,7 @@ export default function ModalPagamento({
                       <div className="flex-1">
                         <h4 className="font-semibold text-red-900">⚠️ Justificativa Obrigatória</h4>
                         <p className="text-sm text-red-700 mt-1">
-                          Esta venda tem margem crítica. Informe o motivo para prosseguir.
+                          {descricaoCupomMargem || "Esta venda tem margem crítica. Informe o motivo para prosseguir."}
                         </p>
                       </div>
                     </div>
@@ -1841,7 +1852,11 @@ export default function ModalPagamento({
                           setErroJustificativa('');
                         }
                       }}
-                      placeholder="Ex: Cliente especial, promoção de lançamento, acordo comercial..."
+                      placeholder={
+                        descricaoCupomMargem
+                          ? "Ex: cupom autorizado pela campanha de fidelidade."
+                          : "Ex: Cliente especial, promoção de lançamento, acordo comercial..."
+                      }
                       className={`w-full px-3 py-2 border-2 rounded-lg focus:ring-2 focus:ring-red-500 resize-none ${
                         erroJustificativa ? 'border-red-500' : 'border-red-300'
                       }`}

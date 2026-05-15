@@ -344,7 +344,7 @@ class Pet(BaseTenantModel):
     id = Column(Integer, primary_key=True, index=True)
     cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)  # Multi-tenant
-    codigo = Column(String(50), unique=True, nullable=False, index=True)  # Código único do pet
+    codigo = Column(String(50), nullable=False, index=True)  # Código único por tenant
 
     # Dados do pet
     nome = Column(String(255), nullable=False, index=True)

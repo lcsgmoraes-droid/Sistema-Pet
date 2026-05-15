@@ -44,6 +44,7 @@ const Layout = () => {
   const isBradescoOrganizerRoute = location.pathname === "/organizador-bradesco";
   const { user, logout } = useAuth();
   const {
+    modulosAtivos,
     moduloAtivo,
     devControlesAtivos,
     devModoModulos,
@@ -335,7 +336,8 @@ const Layout = () => {
       lembretesPollingRef.current = true;
       try {
         const pendentesResp = await api.get("/lembretes/pendentes");
-        const autoResp = moduloAtivo("bling")
+        const blingAtivoConfirmado = Boolean(user) && Array.isArray(modulosAtivos) && moduloAtivo("bling");
+        const autoResp = blingAtivoConfirmado
           ? await api.get("/integracoes/bling/nf/autocadastros-recentes", {
               params: { horas: 24, resumo: true },
             })
@@ -358,7 +360,7 @@ const Layout = () => {
     fetchLembretesCount({ force: true });
     const interval = setInterval(fetchLembretesCount, 300000);
     return () => clearInterval(interval);
-  }, [moduloAtivo]);
+  }, [moduloAtivo, modulosAtivos]);
 
   const allMenuItems = [
     {
@@ -795,7 +797,11 @@ const Layout = () => {
         {
           path: "/cadastros/departamentos",
           label: "Departamentos",
-          modulo: "rh",
+          permission: "cadastros.categorias_produtos",
+        },
+        {
+          path: "/cadastros/marcas",
+          label: "Marcas",
           permission: "cadastros.categorias_produtos",
         },
         {

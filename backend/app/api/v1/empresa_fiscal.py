@@ -9,9 +9,10 @@ from typing import Optional
 from uuid import UUID
 
 from app.db import get_session as get_db
-from app.auth.dependencies import get_current_tenant, get_current_user_and_tenant
+from app.auth.dependencies import get_current_user_and_tenant
 from app.empresa_config_fiscal_models import EmpresaConfigFiscal
 from app.models import Tenant, User
+from app.security.permissions_decorator import require_any_permission
 from app.utils.logger import logger
 
 router = APIRouter(prefix="/empresa", tags=["Empresa - Configuração"])
@@ -62,6 +63,7 @@ class EmpresaConfigFiscalUpdate(BaseModel):
 
 
 @router.get("/dados-basicos")
+@require_any_permission(("configuracoes.empresa", "configuracoes.editar"))
 def obter_dados_basicos_empresa(
     user_and_tenant: tuple[User, UUID] = Depends(get_current_user_and_tenant),
     db: Session = Depends(get_db),
@@ -97,6 +99,7 @@ def obter_dados_basicos_empresa(
 
 
 @router.put("/dados-basicos")
+@require_any_permission(("configuracoes.empresa", "configuracoes.editar"))
 def atualizar_dados_basicos_empresa(
     data: EmpresaDadosBasicosUpdate,
     user_and_tenant: tuple[User, UUID] = Depends(get_current_user_and_tenant),
@@ -132,14 +135,17 @@ def atualizar_dados_basicos_empresa(
 
 
 @router.get("/fiscal")
+@require_any_permission(("configuracoes.empresa", "configuracoes.editar"))
 def obter_config_fiscal_empresa(
     db: Session = Depends(get_db),
-    tenant_id: UUID = Depends(get_current_tenant),
+    user_and_tenant: tuple[User, UUID] = Depends(get_current_user_and_tenant),
 ):
     """
     Retorna as configurações fiscais da empresa.
     Se não existir, cria uma configuração padrão baseada no estado.
     """
+    _, tenant_id = user_and_tenant
+
     config = (
         db.query(EmpresaConfigFiscal)
         .filter(EmpresaConfigFiscal.tenant_id == tenant_id)
@@ -188,14 +194,17 @@ def obter_config_fiscal_empresa(
 
 
 @router.put("/fiscal")
+@require_any_permission(("configuracoes.empresa", "configuracoes.editar"))
 def atualizar_config_fiscal_empresa(
     data: EmpresaConfigFiscalUpdate,
     db: Session = Depends(get_db),
-    tenant_id: UUID = Depends(get_current_tenant),
+    user_and_tenant: tuple[User, UUID] = Depends(get_current_user_and_tenant),
 ):
     """
     Atualiza as configurações fiscais da empresa.
     """
+    _, tenant_id = user_and_tenant
+
     config = (
         db.query(EmpresaConfigFiscal)
         .filter(EmpresaConfigFiscal.tenant_id == tenant_id)

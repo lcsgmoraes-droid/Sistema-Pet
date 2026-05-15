@@ -149,6 +149,7 @@ const RelatoriosComissoes = lazy(
 const Subcategorias = lazy(() => import("./pages/Subcategorias"));
 const Categorias = lazy(() => import("./pages/Cadastros/Categorias"));
 const Departamentos = lazy(() => import("./pages/Cadastros/Departamentos"));
+const Marcas = lazy(() => import("./pages/Cadastros/Marcas"));
 const TipoDespesa = lazy(() => import("./pages/Cadastros/TipoDespesa"));
 const CategoriasFinanceiras = lazy(
   () => import("./pages/CategoriasFinanceiras"),
@@ -761,7 +762,8 @@ function App() {
                   <Route path="subcategorias" element={<Subcategorias />} />
 
                   {/* Rotas de Cadastros */}
-                  <Route path="cadastros/departamentos" element={<ModuleGate modulo="rh"><Departamentos /></ModuleGate>} />
+                  <Route path="cadastros/departamentos" element={<Departamentos />} />
+                  <Route path="cadastros/marcas" element={<Marcas />} />
                   <Route path="cadastros/categorias" element={<Categorias />} />
                   <Route
                     path="cadastros/tipos-despesa"
@@ -827,11 +829,19 @@ function App() {
                   />
                   <Route
                     path="configuracoes/fiscal"
-                    element={<ConfiguracaoFiscalEmpresa />}
+                    element={
+                      <ProtectedRoute anyOfPermissions={["configuracoes.empresa", "configuracoes.editar"]}>
+                        <ConfiguracaoFiscalEmpresa />
+                      </ProtectedRoute>
+                    }
                   />
                   <Route
                     path="configuracoes/geral"
-                    element={<ConfiguracaoGeralNegocio />}
+                    element={
+                      <ProtectedRoute permission="configuracoes.editar">
+                        <ConfiguracaoGeralNegocio />
+                      </ProtectedRoute>
+                    }
                   />
                   <Route
                     path="configuracoes/entregas"
@@ -843,7 +853,11 @@ function App() {
                   />
                   <Route
                     path="configuracoes/estoque"
-                    element={<ConfiguracaoEstoque />}
+                    element={
+                      <ProtectedRoute permission="configuracoes.editar">
+                        <ConfiguracaoEstoque />
+                      </ProtectedRoute>
+                    }
                   />
                   <Route
                     path="configuracoes/integracoes"
@@ -860,7 +874,14 @@ function App() {
                     element={<SimulacaoContratacao />}
                   />
                   <Route path="rh/funcionarios" element={<ModuleGate modulo="rh"><Funcionarios /></ModuleGate>} />
-                  <Route path="admin/roles" element={<RolesPage />} />
+                  <Route
+                    path="admin/roles"
+                    element={
+                      <ProtectedRoute permission="usuarios.manage">
+                        <RolesPage />
+                      </ProtectedRoute>
+                    }
+                  />
                   <Route
                     path="admin/lgpd"
                     element={

@@ -1,5 +1,8 @@
+import { Plus, Users } from "lucide-react";
 import UsuarioModal from "../components/usuarios/UsuarioModal";
 import UsuariosTable from "../components/usuarios/UsuariosTable";
+import ActionButton from "../components/ui/ActionButton";
+import PageHeader from "../components/ui/PageHeader";
 import useUsuariosPage from "../hooks/useUsuariosPage";
 
 export default function UsuariosPage() {
@@ -21,22 +24,17 @@ export default function UsuariosPage() {
   } = useUsuariosPage();
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">Usuários</h1>
-          <p className="text-gray-600 mt-1">Gerencie os usuários do sistema</p>
-        </div>
-        <button
-          onClick={onAbrirModalUsuario}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2"
-        >
-          <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Novo Usuário
-        </button>
-      </div>
+    <div className="space-y-4 p-4 sm:p-6">
+      <PageHeader
+        icon={Users}
+        title="Usuarios"
+        subtitle="Gerencie usuarios, perfis e acessos do tenant atual."
+        actions={
+          <ActionButton icon={Plus} intent="create" onClick={onAbrirModalUsuario}>
+            Novo usuario
+          </ActionButton>
+        }
+      />
 
       <UsuariosTable
         loading={loading}

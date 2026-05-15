@@ -31,7 +31,7 @@ api.interceptors.request.use(
   (config) => {
     const token = getAccessToken();
 
-    if (token) {
+    if (!config.headers.Authorization && token) {
       config.headers.Authorization = `Bearer ${token}`;
     }
 

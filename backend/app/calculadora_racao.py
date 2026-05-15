@@ -15,6 +15,7 @@ from .auth import get_current_user, get_current_user_and_tenant
 from .models import User
 from .partner_utils import get_all_accessible_tenant_ids
 from .produtos_models import Categoria, Marca, Produto
+from .security.permissions_decorator import require_permission
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/produtos", tags=["calculadora-racao"])
@@ -522,6 +523,7 @@ def calcular_resultado(
 # ==================== ENDPOINTS ====================
 
 @router.get("/calculadora-racao/opcoes", response_model=RacoesCalculadoraOptionsResponse)
+@require_permission("produtos.visualizar")
 async def listar_opcoes_calculadora_racao(
     busca: Optional[str] = Query(None),
     page: int = Query(1, ge=1),
@@ -593,6 +595,7 @@ async def listar_opcoes_calculadora_racao(
 
 
 @router.post("/calculadora-racao", response_model=ResultadoCalculoRacao)
+@require_permission("produtos.visualizar")
 async def calcular_racao(
     req: CalculadoraRacaoRequest,
     user_and_tenant = Depends(get_current_user_and_tenant),
@@ -705,6 +708,7 @@ async def calcular_racao(
 
 
 @router.post("/comparar-racoes", response_model=ComparativoRacoesResponse)
+@require_permission("produtos.visualizar")
 async def comparar_racoes(
     peso_pet_kg: float = Query(..., description="Peso do pet em kg"),
     idade_meses: Optional[int] = Query(None, description="Idade do pet em meses"),

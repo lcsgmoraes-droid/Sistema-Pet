@@ -8,6 +8,8 @@ import {
   ArrowLeftRight,
   Receipt
 } from 'lucide-react';
+import { useAuth } from '../contexts/AuthContext';
+import { useModulos } from '../contexts/ModulosContext';
 import { getGuiaClassNames } from '../utils/guiaHighlight';
 
 const getIconeFormaPagamento = (icone, tipo) => {
@@ -70,6 +72,9 @@ const FormasPagamento = () => {
   const guiaAtiva = new URLSearchParams(window.location.search).get('guia');
   const destacarFormasPagamento = guiaAtiva === 'formas-pagamento';
   const guiaClasses = getGuiaClassNames(destacarFormasPagamento);
+  const { user } = useAuth();
+  const { moduloAtivo, modulosAtivos } = useModulos();
+  const financeiroErpAtivo = Boolean(user) && Array.isArray(modulosAtivos) && moduloAtivo('financeiro_erp');
   const [formas, setFormas] = useState([]);
   const [contasBancarias, setContasBancarias] = useState([]);
   const [operadoras, setOperadoras] = useState([]);
@@ -104,13 +109,15 @@ const FormasPagamento = () => {
 
   useEffect(() => {
     carregarDados();
-  }, []);
+  }, [financeiroErpAtivo]);
 
   const carregarDados = async () => {
     try {
       const [formasRes, bancariasRes, operadorasRes] = await Promise.allSettled([
         api.get(`/financeiro/formas-pagamento?apenas_ativas=false`),
-        api.get(`/contas-bancarias?apenas_ativas=true`),
+        financeiroErpAtivo
+          ? api.get(`/contas-bancarias?apenas_ativas=true`)
+          : Promise.resolve({ data: [] }),
         api.get(`/operadoras-cartao?apenas_ativas=true`)
       ]);
 
@@ -295,7 +302,9 @@ const FormasPagamento = () => {
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Taxa %</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Taxa Fixa</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Prazo</th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Conta Destino</th>
+              {financeiroErpAtivo && (
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Conta Destino</th>
+              )}
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Acoes</th>
             </tr>
@@ -303,7 +312,7 @@ const FormasPagamento = () => {
           <tbody className="divide-y divide-gray-200">
             {formas.length === 0 ? (
               <tr>
-                <td colSpan="8" className="px-6 py-4 text-center text-gray-500">
+                <td colSpan={financeiroErpAtivo ? 8 : 7} className="px-6 py-4 text-center text-gray-500">
                   Nenhuma forma de pagamento cadastrada
                 </td>
               </tr>
@@ -331,13 +340,15 @@ const FormasPagamento = () => {
                     R$ {forma.taxa_fixa?.toFixed(2) || '0.00'}
                   </td>
                   <td className="px-6 py-4 text-sm">{forma.prazo_dias} dias</td>
-                  <td className="px-6 py-4 text-sm">
-                    {forma.conta_bancaria_destino_id ? (
-                      contasBancarias.find(c => c.id === forma.conta_bancaria_destino_id)?.nome || 'N/A'
-                    ) : (
-                      <span className="text-gray-400">Nenhuma</span>
-                    )}
-                  </td>
+                  {financeiroErpAtivo && (
+                    <td className="px-6 py-4 text-sm">
+                      {forma.conta_bancaria_destino_id ? (
+                        contasBancarias.find(c => c.id === forma.conta_bancaria_destino_id)?.nome || 'N/A'
+                      ) : (
+                        <span className="text-gray-400">Nenhuma</span>
+                      )}
+                    </td>
+                  )}
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 rounded text-xs ${
                       forma.ativo ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'
@@ -462,23 +473,24 @@ const FormasPagamento = () => {
                   />
                 </div>
 
-                {/* Conta Bancaria Destino */}
-                <div className="col-span-2">
-                  <label className="block text-sm font-medium mb-1">Conta Bancaria Destino</label>
-                  <select
-                    className="w-full border border-gray-300 rounded px-3 py-2"
-                    value={formData.conta_bancaria_destino_id || ''}
-                    onChange={(e) => setFormData({...formData, conta_bancaria_destino_id: parseInt(e.target.value) || null})}
-                  >
-                    <option value="">Selecione...</option>
-                    {contasBancarias.map(c => (
-                      <option key={c.id} value={c.id}>{c.nome}</option>
-                    ))}
-                  </select>
-                  <p className="text-xs text-gray-500 mt-1">
-                    Esta conta sera usada automaticamente quando esta forma for selecionada em pagamentos/recebimentos
-                  </p>
-                </div>
+                {financeiroErpAtivo && (
+                  <div className="col-span-2">
+                    <label className="block text-sm font-medium mb-1">Conta Bancaria Destino</label>
+                    <select
+                      className="w-full border border-gray-300 rounded px-3 py-2"
+                      value={formData.conta_bancaria_destino_id || ''}
+                      onChange={(e) => setFormData({...formData, conta_bancaria_destino_id: parseInt(e.target.value) || null})}
+                    >
+                      <option value="">Selecione...</option>
+                      {contasBancarias.map(c => (
+                        <option key={c.id} value={c.id}>{c.nome}</option>
+                      ))}
+                    </select>
+                    <p className="text-xs text-gray-500 mt-1">
+                      Esta conta sera usada automaticamente quando esta forma for selecionada em pagamentos/recebimentos
+                    </p>
+                  </div>
+                )}
 
                 {/* Operadora (para cartoes) */}
                 {(formData.tipo === 'cartao_credito' || formData.tipo === 'cartao_debito') && (

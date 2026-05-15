@@ -36,6 +36,7 @@ class PermissionsUpdate(BaseModel):
 # =========================
 
 @router.get("", response_model=list[dict])
+@require_permission("usuarios.manage")
 def listar_roles(
     db: Session = Depends(get_db),
     user_and_tenant=Depends(get_current_user_and_tenant),
@@ -75,6 +76,7 @@ def listar_roles(
 
 
 @router.post("", response_model=dict)
+@require_permission("usuarios.manage")
 def criar_role(
     payload: RoleCreate,
     db: Session = Depends(get_db),
@@ -131,6 +133,7 @@ def criar_role(
 
 
 @router.put("/{role_id}", response_model=dict)
+@require_permission("usuarios.manage")
 def atualizar_role(
     role_id: int,
     payload: RoleCreate,
@@ -192,6 +195,7 @@ def atualizar_role(
 
 
 @router.delete("/{role_id}", status_code=204)
+@require_permission("usuarios.manage")
 def deletar_role(
     role_id: int,
     db: Session = Depends(get_db),
@@ -213,6 +217,11 @@ def deletar_role(
     )
     if not role:
         raise HTTPException(status_code=404, detail="Role n�o encontrado")
+
+    db.query(RolePermission).filter(
+        RolePermission.role_id == role_id,
+        RolePermission.tenant_id == tenant_id
+    ).delete()
 
     db.delete(role)
     db.commit()

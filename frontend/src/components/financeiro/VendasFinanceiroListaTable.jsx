@@ -7,7 +7,7 @@ import SaleReference from "../ui/SaleReference";
 import StatusBadge from "../ui/StatusBadge";
 import ProductIdentity from "../ui/ProductIdentity";
 
-function CodigoVendaCell({ criarUrlPdvVenda, venda }) {
+function CodigoVendaCell({ abrirVendaNoPdv, venda }) {
   const saleNumber = venda.numero_venda || venda.id;
 
   return (
@@ -17,18 +17,34 @@ function CodigoVendaCell({ criarUrlPdvVenda, venda }) {
       value={saleNumber}
       valueClassName=""
     >
-      <a
-        href={criarUrlPdvVenda(venda)}
-        target="_blank"
-        rel="noreferrer"
-        onClick={(event) => event.stopPropagation()}
-        className="inline-flex items-center gap-1 font-medium text-blue-700 hover:text-blue-900 hover:underline"
-        title="Abrir venda no PDV em nova aba"
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          abrirVendaNoPdv?.(venda);
+        }}
+        className="inline-flex items-center gap-1 border-0 bg-transparent p-0 font-medium text-blue-700 hover:text-blue-900 hover:underline"
+        title="Abrir venda no PDV"
       >
         #{saleNumber}
         <ExternalLink className="h-3.5 w-3.5" />
-      </a>
+      </button>
     </SaleReference>
+  );
+}
+
+function CustoCampanhaCell({ venda }) {
+  const cupomCode = venda.cupom_code ? String(venda.cupom_code).trim().toUpperCase() : "";
+
+  return (
+    <div className="flex flex-col items-end leading-tight">
+      <MoneyCell value={venda.custo_campanha} sign="-" zeroAsDash />
+      {cupomCode && Number(venda.custo_campanha || 0) > 0 && (
+        <span className="mt-0.5 max-w-[110px] truncate rounded bg-teal-50 px-1.5 py-0.5 text-[10px] font-semibold text-teal-700">
+          {cupomCode}
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -184,7 +200,7 @@ function ItensVendaDetalhes({ colSpan, formatarMoeda, venda }) {
 }
 
 export default function VendasFinanceiroListaTable({
-  criarUrlPdvVenda,
+  abrirVendaNoPdv,
   formatarData,
   formatarMoeda,
   getStatusVendaMeta,
@@ -217,7 +233,7 @@ export default function VendasFinanceiroListaTable({
       className: "whitespace-nowrap",
       render: (venda) => (
         <CodigoVendaCell
-          criarUrlPdvVenda={criarUrlPdvVenda}
+          abrirVendaNoPdv={abrirVendaNoPdv}
           venda={venda}
         />
       ),
@@ -304,8 +320,11 @@ export default function VendasFinanceiroListaTable({
       headerClassName: "whitespace-nowrap",
       title: "Cashback / cupons resgatados nesta venda",
       className: "text-teal-600 whitespace-nowrap",
-      cellTitle: "Custo com campanhas (cashback/cupom resgatado)",
-      render: (venda) => <MoneyCell value={venda.custo_campanha} sign="-" zeroAsDash />,
+      cellTitle: (venda) =>
+        venda.cupom_code
+          ? `Custo com campanha por cupom ${String(venda.cupom_code).trim().toUpperCase()}`
+          : "Custo com campanhas (cashback/cupom resgatado)",
+      render: (venda) => <CustoCampanhaCell venda={venda} />,
     },
     {
       key: "venda_liquida",

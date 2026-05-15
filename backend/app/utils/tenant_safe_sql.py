@@ -56,6 +56,8 @@ TENANT_SCOPED_TABLES = {
     "notas_entrada_itens",
     "notas_saida",
     "notas_saida_itens",
+    "pedido_itens",
+    "pedidos",
     "pedidos_compra",
     "pedidos_compra_itens",
     "pets",

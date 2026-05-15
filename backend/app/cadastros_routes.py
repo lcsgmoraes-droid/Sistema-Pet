@@ -11,7 +11,6 @@ import logging
 
 from app.db import get_session
 from app.models import User, Especie, Raca
-from app.auth import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
 from app.audit_log import log_create, log_update, log_delete
 

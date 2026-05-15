@@ -277,8 +277,9 @@ export const ModulosProvider = ({ children }) => {
 
   const carregarModulos = useCallback(async () => {
     if (!user) {
-      // Sem usuário logado: libera tudo para não bloquear tela de loading
-      setModulosAtivos(MODULOS_PREMIUM);
+      // Sem usuario logado: mantem estado de carregamento para evitar
+      // liberar modulos premium durante a hidratacao da sessao.
+      setModulosAtivos(null);
       return;
     }
     const token = getAccessToken();
