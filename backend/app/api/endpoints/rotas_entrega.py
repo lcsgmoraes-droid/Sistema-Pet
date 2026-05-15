@@ -131,6 +131,7 @@ def _validate_ecommerce_entregador_actor(
 
     user = _get_current_ecommerce_user(credentials=credentials, db=db)
     tenant_id = UUID(str(user.tenant_id))
+    set_current_tenant(tenant_id)
     cliente = (
         db.query(Cliente)
         .filter(

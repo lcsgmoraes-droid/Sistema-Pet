@@ -5,6 +5,7 @@ from uuid import uuid4
 from jose import jwt
 
 from app.auth.core import ALGORITHM
+from app.api.endpoints.rotas_entrega import _validate_ecommerce_entregador_actor
 from app.config import JWT_SECRET_KEY
 from app.routes.ecommerce_auth import (
     _extract_tenant_id_from_request,
@@ -195,3 +196,23 @@ def test_delivery_module_gate_allows_ecommerce_customer_token_without_admin_jti(
     dependency = require_active_module("entregas", allow_ecommerce_customer=True)
 
     asyncio.run(dependency(credentials=credentials, db=object()))
+
+
+def test_delivery_actor_ecommerce_token_sets_tenant_context():
+    tenant_id = uuid4()
+    user = SimpleNamespace(id=123, tenant_id=tenant_id, is_active=True)
+    user_tenant = SimpleNamespace(user_id=user.id, tenant_id=tenant_id, is_active=True)
+    tenant = SimpleNamespace(id=tenant_id, status="active")
+    cliente = SimpleNamespace(id=456, tenant_id=str(tenant_id), user_id=user.id, is_entregador=True)
+    credentials = SimpleNamespace(credentials=_token(user.id, tenant_id))
+    clear_current_tenant()
+
+    actor = _validate_ecommerce_entregador_actor(
+        credentials=credentials,
+        db=_Db(user, user_tenant, tenant, cliente),
+    )
+
+    assert actor.user is user
+    assert actor.tenant_id == tenant_id
+    assert actor.entregador is cliente
+    assert get_current_tenant() == tenant_id
