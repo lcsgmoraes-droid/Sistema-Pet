@@ -17,9 +17,13 @@ class _FakeSession:
         return _FakeQuery()
 
 
-def test_get_config_empresa_usa_tenant_da_dependencia_multitenant():
+def test_get_config_empresa_usa_tenant_da_dependencia_multitenant(monkeypatch):
     user = SimpleNamespace(id=1, email="smoke@teste.local")
     tenant_id = uuid4()
+    monkeypatch.setattr(
+        "app.security.permissions_decorator.check_permission",
+        lambda *args, **kwargs: True,
+    )
 
     response = get_config_empresa(
         user_and_tenant=(user, tenant_id),

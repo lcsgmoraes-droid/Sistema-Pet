@@ -11,6 +11,7 @@ from decimal import Decimal
 from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
 from app.empresa_config_geral_models import EmpresaConfigGeral
+from app.security.permissions_decorator import require_permission
 from app.utils.logger import logger
 
 router = APIRouter(prefix="/empresa/config", tags=["Configuração da Empresa"])
@@ -93,6 +94,7 @@ class EmpresaConfigGeralResponse(BaseModel):
 # ===== ENDPOINTS =====
 
 @router.get("/", response_model=EmpresaConfigGeralResponse)
+@require_permission("configuracoes.editar")
 def get_config_empresa(
     user_and_tenant = Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session)
@@ -126,6 +128,7 @@ def get_config_empresa(
 
 
 @router.post("/", response_model=EmpresaConfigGeralResponse)
+@require_permission("configuracoes.editar")
 def create_config_empresa(
     config_data: EmpresaConfigGeralCreate,
     user_and_tenant = Depends(get_current_user_and_tenant),
@@ -158,6 +161,7 @@ def create_config_empresa(
 
 
 @router.put("/", response_model=EmpresaConfigGeralResponse)
+@require_permission("configuracoes.editar")
 def update_config_empresa(
     config_data: EmpresaConfigGeralUpdate,
     user_and_tenant = Depends(get_current_user_and_tenant),
@@ -189,6 +193,7 @@ def update_config_empresa(
 
 
 @router.delete("/")
+@require_permission("configuracoes.editar")
 def delete_config_empresa(
     user_and_tenant = Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session)

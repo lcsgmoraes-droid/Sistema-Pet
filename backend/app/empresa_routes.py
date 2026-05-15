@@ -11,6 +11,7 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.models import Tenant
 from app.db import get_session
 from app.empresa_config_fiscal_models import EmpresaConfigFiscal
+from app.security.permissions_decorator import require_any_permission, require_permission
 from app.utils.logger import logger
 
 
@@ -103,6 +104,7 @@ class ConfigFiscalUpdate(BaseModel):
 # ============================================================================
 
 @router.get("/fiscal", response_model=ConfigFiscalResponse)
+@require_any_permission(("configuracoes.empresa", "configuracoes.editar"))
 def buscar_config_fiscal(
     user_and_tenant = Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session)
@@ -129,6 +131,7 @@ def buscar_config_fiscal(
 
 
 @router.put("/fiscal", response_model=ConfigFiscalResponse)
+@require_any_permission(("configuracoes.empresa", "configuracoes.editar"))
 def atualizar_config_fiscal(
     dados: ConfigFiscalUpdate,
     user_and_tenant = Depends(get_current_user_and_tenant),
@@ -197,6 +200,7 @@ def atualizar_config_fiscal(
 # ============================================================================
 
 @router.get("/dados-cadastrais", response_model=DadosCadastraisResponse)
+@require_any_permission(("configuracoes.empresa", "configuracoes.editar"))
 def buscar_dados_cadastrais(
     user_and_tenant = Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session)
@@ -233,6 +237,7 @@ def buscar_dados_cadastrais(
 
 
 @router.put("/dados-cadastrais", response_model=DadosCadastraisResponse)
+@require_any_permission(("configuracoes.empresa", "configuracoes.editar"))
 def atualizar_dados_cadastrais(
     dados: DadosCadastraisUpdate,
     user_and_tenant = Depends(get_current_user_and_tenant),
@@ -296,6 +301,7 @@ class ConfigEstoqueUpdate(BaseModel):
 
 
 @router.get("/config-estoque", response_model=ConfigEstoqueResponse)
+@require_permission("configuracoes.editar")
 def buscar_config_estoque(
     user_and_tenant = Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session)
@@ -319,6 +325,7 @@ def buscar_config_estoque(
 
 
 @router.put("/config-estoque", response_model=ConfigEstoqueResponse)
+@require_permission("configuracoes.editar")
 def atualizar_config_estoque(
     config: ConfigEstoqueUpdate,
     user_and_tenant = Depends(get_current_user_and_tenant),

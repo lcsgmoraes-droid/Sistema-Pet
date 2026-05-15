@@ -827,11 +827,19 @@ function App() {
                   />
                   <Route
                     path="configuracoes/fiscal"
-                    element={<ConfiguracaoFiscalEmpresa />}
+                    element={
+                      <ProtectedRoute anyOfPermissions={["configuracoes.empresa", "configuracoes.editar"]}>
+                        <ConfiguracaoFiscalEmpresa />
+                      </ProtectedRoute>
+                    }
                   />
                   <Route
                     path="configuracoes/geral"
-                    element={<ConfiguracaoGeralNegocio />}
+                    element={
+                      <ProtectedRoute permission="configuracoes.editar">
+                        <ConfiguracaoGeralNegocio />
+                      </ProtectedRoute>
+                    }
                   />
                   <Route
                     path="configuracoes/entregas"
@@ -843,7 +851,11 @@ function App() {
                   />
                   <Route
                     path="configuracoes/estoque"
-                    element={<ConfiguracaoEstoque />}
+                    element={
+                      <ProtectedRoute permission="configuracoes.editar">
+                        <ConfiguracaoEstoque />
+                      </ProtectedRoute>
+                    }
                   />
                   <Route
                     path="configuracoes/integracoes"
@@ -860,7 +872,14 @@ function App() {
                     element={<SimulacaoContratacao />}
                   />
                   <Route path="rh/funcionarios" element={<ModuleGate modulo="rh"><Funcionarios /></ModuleGate>} />
-                  <Route path="admin/roles" element={<RolesPage />} />
+                  <Route
+                    path="admin/roles"
+                    element={
+                      <ProtectedRoute permission="usuarios.manage">
+                        <RolesPage />
+                      </ProtectedRoute>
+                    }
+                  />
                   <Route
                     path="admin/lgpd"
                     element={

@@ -247,3 +247,26 @@ def test_payment_and_operator_catalog_routes_require_sales_or_config_permissions
     assert "FormaPagamento.tenant_id == tenant_id" in taxas_source
     assert "FormaPagamentoTaxa.tenant_id == tenant_id" in taxas_source
     assert "ConfiguracaoImposto.tenant_id == tenant_id" in taxas_source
+
+
+def test_company_configuration_routes_require_configuration_permissions():
+    empresa_fiscal_source = _source("backend/app/api/v1/empresa_fiscal.py")
+    empresa_routes_source = _source("backend/app/empresa_routes.py")
+    empresa_config_source = _source("backend/app/empresa_config_routes.py")
+    app_source = _source("frontend/src/App.jsx")
+    configuracoes_source = _source("frontend/src/pages/Configuracoes.jsx")
+
+    assert empresa_fiscal_source.count(
+        '@require_any_permission(("configuracoes.empresa", "configuracoes.editar"))'
+    ) >= 4
+    assert empresa_routes_source.count(
+        '@require_any_permission(("configuracoes.empresa", "configuracoes.editar"))'
+    ) >= 4
+    assert empresa_routes_source.count('@require_permission("configuracoes.editar")') >= 2
+    assert empresa_config_source.count('@require_permission("configuracoes.editar")') >= 4
+
+    assert 'anyOfPermissions={["configuracoes.empresa", "configuracoes.editar"]}' in app_source
+    assert '<ProtectedRoute permission="configuracoes.editar">' in app_source
+    assert 'path="admin/roles"' in app_source
+    assert 'permission="usuarios.manage"' in app_source
+    assert 'card.modulo && !moduloAtivo(card.modulo)' in configuracoes_source
