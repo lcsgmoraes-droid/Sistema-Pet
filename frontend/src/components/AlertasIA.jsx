@@ -4,17 +4,27 @@ import {
   Clock, DollarSign, Calendar, CheckCircle, X, Sparkles 
 } from 'lucide-react';
 import api from '../api';
+import { useModulos } from '../contexts/ModulosContext';
 
 const AlertasIA = ({ compacto = false }) => {
+  const { moduloAtivo } = useModulos();
+  const financeiroErpAtivo = moduloAtivo('financeiro_erp');
+  const iaAvancadaAtiva = moduloAtivo('ia_avancada');
   const [alertas, setAlertas] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [filtroSeveridade, setFiltroSeveridade] = useState('todos'); // todos, crítico, atenção, info
 
   useEffect(() => {
     carregarAlertas();
-  }, []);
+  }, [financeiroErpAtivo, iaAvancadaAtiva]);
 
   const carregarAlertas = async () => {
+    if (!financeiroErpAtivo || !iaAvancadaAtiva) {
+      setAlertas([]);
+      setCarregando(false);
+      return;
+    }
+
     setCarregando(true);
     try {
       // Por enquanto, gerar alertas no frontend

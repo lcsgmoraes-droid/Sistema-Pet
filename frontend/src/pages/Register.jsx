@@ -144,6 +144,7 @@ const Register = () => {
               <input
                 type="email"
                 value={email}
+                autoComplete="email"
                 onChange={(event) => setEmail(event.target.value)}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
                 placeholder="seu@email.com"
@@ -159,6 +160,7 @@ const Register = () => {
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={password}
+                autoComplete="new-password"
                 onChange={(event) => setPassword(event.target.value)}
                 className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
                 placeholder="Minimo 8 caracteres"
@@ -182,6 +184,7 @@ const Register = () => {
               <input
                 type={showConfirmPassword ? 'text' : 'password'}
                 value={confirmPassword}
+                autoComplete="new-password"
                 onChange={(event) => setConfirmPassword(event.target.value)}
                 className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
                 placeholder="Repita a senha"

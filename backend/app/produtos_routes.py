@@ -4003,6 +4003,7 @@ def entrada_estoque(
         custo_unitario=entrada.preco_custo,
         lote_id=lote.id,
         observacao=entrada.observacoes,
+        user_id=current_user.id,
         tenant_id=tenant_id
     )
     db.add(movimentacao)

@@ -2,6 +2,7 @@ import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import api from "../api";
 import { debugLog } from "../utils/debug";
+import { useModulos } from "../contexts/ModulosContext";
 import { useClientesNovoEnderecos } from "./useClientesNovoEnderecos";
 
 const STEPS = [
@@ -130,6 +131,8 @@ export function useClientesNovoCadastro({
   error,
   setError,
 }) {
+  const { moduloAtivo } = useModulos();
+  const moduloCampanhasAtivo = moduloAtivo("campanhas");
   const navigate = useNavigate();
   const [showModal, setShowModal] = useState(false);
   const [showModalImportacao, setShowModalImportacao] = useState(false);
@@ -202,6 +205,10 @@ export function useClientesNovoCadastro({
   };
 
   const loadSaldoCampanhas = async (clienteId) => {
+    if (!moduloCampanhasAtivo) {
+      setSaldoCampanhas(null);
+      return;
+    }
     if (!clienteId) return;
     try {
       const res = await api.get(`/campanhas/clientes/${clienteId}/saldo`);
