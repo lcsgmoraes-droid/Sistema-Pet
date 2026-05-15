@@ -1,3 +1,5 @@
+import { useEffect, useMemo, useState } from "react";
+
 import CampanhasGestorSection from "./CampanhasGestorSection";
 
 export default function CampanhasGestorCarimbosSection({
@@ -15,6 +17,7 @@ export default function CampanhasGestorCarimbosSection({
   setGestorIncluirEstornados,
   gestorRemovendo,
   estornarCarimboGestor,
+  estornarCarimbosSelecionadosGestor,
 }) {
   const isOpen = gestorSecao === "carimbos";
   const saldoAtual = Number(gestorSaldo?.total_carimbos || 0);
@@ -25,6 +28,54 @@ export default function CampanhasGestorCarimbosSection({
       0,
   );
   const carimbosEmDebito = Number(gestorSaldo?.carimbos_em_debito || 0);
+  const [carimbosSelecionados, setCarimbosSelecionados] = useState([]);
+  const removendoLote = gestorRemovendo === "lote";
+  const carimbosVisiveis = useMemo(
+    () =>
+      (gestorCarimbos || []).filter(
+        (stamp) => !stamp.voided_at || gestorIncluirEstornados,
+      ),
+    [gestorCarimbos, gestorIncluirEstornados],
+  );
+  const carimbosSelecionaveis = useMemo(
+    () => carimbosVisiveis.filter((stamp) => !stamp.voided_at),
+    [carimbosVisiveis],
+  );
+  const idsSelecionaveis = useMemo(
+    () => carimbosSelecionaveis.map((stamp) => stamp.id),
+    [carimbosSelecionaveis],
+  );
+  const selecionadosVisiveis = carimbosSelecionados.filter((id) =>
+    idsSelecionaveis.includes(id),
+  );
+  const todosVisiveisSelecionados =
+    idsSelecionaveis.length > 0 &&
+    idsSelecionaveis.every((id) => carimbosSelecionados.includes(id));
+
+  useEffect(() => {
+    setCarimbosSelecionados((atuais) =>
+      atuais.filter((id) => idsSelecionaveis.includes(id)),
+    );
+  }, [idsSelecionaveis]);
+
+  const alternarTodosVisiveis = () => {
+    setCarimbosSelecionados(todosVisiveisSelecionados ? [] : idsSelecionaveis);
+  };
+
+  const alternarCarimbo = (stampId) => {
+    setCarimbosSelecionados((atuais) =>
+      atuais.includes(stampId)
+        ? atuais.filter((id) => id !== stampId)
+        : [...atuais, stampId],
+    );
+  };
+
+  const removerSelecionados = async () => {
+    const ok = await estornarCarimbosSelecionadosGestor(selecionadosVisiveis);
+    if (ok) {
+      setCarimbosSelecionados([]);
+    }
+  };
 
   return (
     <CampanhasGestorSection
@@ -104,10 +155,51 @@ export default function CampanhasGestorCarimbosSection({
         </div>
 
         {gestorCarimbos && gestorCarimbos.length > 0 ? (
+          <div className="space-y-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-gray-200 bg-white px-3 py-2">
+              <label className="flex items-center gap-2 text-xs font-medium text-gray-600 cursor-pointer select-none">
+                <input
+                  type="checkbox"
+                  checked={todosVisiveisSelecionados}
+                  onChange={alternarTodosVisiveis}
+                  disabled={idsSelecionaveis.length === 0 || removendoLote}
+                  className="rounded"
+                />
+                Selecionar visiveis
+              </label>
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-gray-500">
+                  {selecionadosVisiveis.length} selecionado(s)
+                </span>
+                <button
+                  type="button"
+                  onClick={removerSelecionados}
+                  disabled={
+                    selecionadosVisiveis.length === 0 ||
+                    removendoLote ||
+                    !estornarCarimbosSelecionadosGestor
+                  }
+                  className="px-3 py-1.5 bg-red-600 text-white text-xs font-medium rounded-lg hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {removendoLote ? "Removendo..." : "Remover selecionados"}
+                </button>
+              </div>
+            </div>
+
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-gray-50">
                 <tr>
+                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-600 w-10">
+                    <input
+                      type="checkbox"
+                      checked={todosVisiveisSelecionados}
+                      onChange={alternarTodosVisiveis}
+                      disabled={idsSelecionaveis.length === 0 || removendoLote}
+                      className="rounded"
+                      aria-label="Selecionar carimbos visiveis"
+                    />
+                  </th>
                   <th className="px-4 py-2 text-left text-xs font-medium text-gray-600">
                     #ID
                   </th>
@@ -129,11 +221,7 @@ export default function CampanhasGestorCarimbosSection({
                 </tr>
               </thead>
               <tbody className="divide-y">
-                {gestorCarimbos
-                  .filter(
-                    (stamp) => !stamp.voided_at || gestorIncluirEstornados,
-                  )
-                  .map((stamp) => (
+                {carimbosVisiveis.map((stamp) => (
                     <tr
                       key={stamp.id}
                       className={
@@ -142,6 +230,16 @@ export default function CampanhasGestorCarimbosSection({
                           : "hover:bg-gray-50"
                       }
                     >
+                      <td className="px-4 py-2">
+                        <input
+                          type="checkbox"
+                          checked={carimbosSelecionados.includes(stamp.id)}
+                          onChange={() => alternarCarimbo(stamp.id)}
+                          disabled={Boolean(stamp.voided_at) || removendoLote}
+                          className="rounded"
+                          aria-label={`Selecionar carimbo ${stamp.id}`}
+                        />
+                      </td>
                       <td className="px-4 py-2 text-gray-500 font-mono text-xs">
                         {stamp.id}
                       </td>
@@ -181,7 +279,7 @@ export default function CampanhasGestorCarimbosSection({
                         {!stamp.voided_at && (
                           <button
                             onClick={() => estornarCarimboGestor(stamp.id)}
-                            disabled={gestorRemovendo === stamp.id}
+                            disabled={gestorRemovendo === stamp.id || removendoLote}
                             className="px-2 py-1 bg-red-100 text-red-700 text-xs rounded-lg hover:bg-red-200 disabled:opacity-50"
                           >
                             {gestorRemovendo === stamp.id ? "..." : "Remover"}
@@ -192,6 +290,7 @@ export default function CampanhasGestorCarimbosSection({
                   ))}
               </tbody>
             </table>
+          </div>
           </div>
         ) : (
           <p className="text-center text-gray-400 py-4 text-sm">

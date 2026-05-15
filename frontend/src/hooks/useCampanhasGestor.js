@@ -149,6 +149,35 @@ export default function useCampanhasGestor() {
     }
   };
 
+  const estornarCarimbosSelecionadosGestor = async (stampIds) => {
+    const ids = Array.from(new Set(stampIds)).filter(Boolean);
+    if (!ids.length) return false;
+
+    const motivo = window.prompt(
+      `Motivo do estorno para ${ids.length} carimbo(s) selecionado(s) (opcional):`,
+    );
+    if (motivo === null) return false;
+
+    if (!window.confirm(`Remover ${ids.length} carimbo(s) selecionado(s)?`)) {
+      return false;
+    }
+
+    setGestorRemovendo("lote");
+    try {
+      const qs = motivo ? `?motivo=${encodeURIComponent(motivo)}` : "";
+      for (const stampId of ids) {
+        await api.delete(`/campanhas/carimbos/${stampId}${qs}`);
+      }
+      await recarregarGestor();
+      return true;
+    } catch (e) {
+      alert("Erro ao estornar em lote: " + (e?.response?.data?.detail || e.message));
+      return false;
+    } finally {
+      setGestorRemovendo(null);
+    }
+  };
+
   const ajustarCashbackGestor = async () => {
     const valor = parseFloat(gestorCashbackValor);
     if (!valor || valor <= 0) {
@@ -234,6 +263,7 @@ export default function useCampanhasGestor() {
     abrirClienteNoGestor,
     lancarCarimboGestor,
     estornarCarimboGestor,
+    estornarCarimbosSelecionadosGestor,
     ajustarCashbackGestor,
     anularCupomGestor,
   };

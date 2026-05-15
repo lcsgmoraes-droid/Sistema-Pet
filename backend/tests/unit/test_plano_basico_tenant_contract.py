@@ -1,0 +1,123 @@
+import inspect
+import os
+from pathlib import Path
+from types import SimpleNamespace
+
+os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
+os.environ["DEBUG"] = "false"
+
+from app.api import racao_calculadora_routes
+from app.auth.dependencies import get_current_user_and_tenant
+from app.models import AssinaturaModulo, Tenant
+from app.routes import modulos_routes
+
+
+ROOT = Path(__file__).resolve().parents[3]
+
+
+def _source(path: str) -> str:
+    return (ROOT / path).read_text(encoding="utf-8")
+
+
+def _depends_on_selected_tenant(func) -> bool:
+    default = inspect.signature(func).parameters["user_and_tenant"].default
+    return getattr(default, "dependency", None) is get_current_user_and_tenant
+
+
+def test_basic_plan_route_files_use_selected_tenant_dependency():
+    route_files = [
+        "backend/app/clientes_routes.py",
+        "backend/app/pets_routes.py",
+        "backend/app/produtos_routes.py",
+        "backend/app/vendas_routes.py",
+        "backend/app/financeiro_routes.py",
+        "backend/app/formas_pagamento_routes.py",
+        "backend/app/usuarios_routes.py",
+        "backend/app/categorias_routes.py",
+        "backend/app/chat_routes.py",
+        "backend/app/api/racao_calculadora_routes.py",
+    ]
+
+    offenders = [
+        path
+        for path in route_files
+        if "Depends(get_current_user)" in _source(path)
+    ]
+
+    assert offenders == []
+
+
+def test_racao_calculadora_uses_tenant_selected_in_token():
+    assert _depends_on_selected_tenant(racao_calculadora_routes.calcular_consumo_racao)
+
+    source = inspect.getsource(racao_calculadora_routes.calcular_consumo_racao)
+    assert "current_user.tenant_id" not in source
+    assert "current_user, tenant_id = user_and_tenant" in source
+
+
+def test_racao_calculadora_info_also_requires_selected_tenant():
+    default = inspect.signature(racao_calculadora_routes.info_calculadora).parameters[
+        "_user_and_tenant"
+    ].default
+
+    assert getattr(default, "dependency", None) is get_current_user_and_tenant
+
+
+class _FakeQuery:
+    def __init__(self, model):
+        self.model = model
+
+    def filter(self, *criteria):
+        self.criteria = criteria
+        return self
+
+    def first(self):
+        if self.model is Tenant:
+            return SimpleNamespace(
+                id="tenant-selecionado",
+                plan="basico",
+                modulos_ativos='["campanhas"]',
+            )
+        return None
+
+    def all(self):
+        if self.model is AssinaturaModulo:
+            return []
+        return []
+
+
+class _FakeDb:
+    def query(self, model):
+        return _FakeQuery(model)
+
+
+def test_modulos_status_uses_selected_tenant_not_user_home_tenant():
+    user = SimpleNamespace(id=1, tenant_id="tenant-antigo")
+
+    response = modulos_routes.get_modulos_status(
+        user_and_tenant=(user, "tenant-selecionado"),
+        db=_FakeDb(),
+    )
+
+    assert response["tenant_id"] == "tenant-selecionado"
+    assert response["plano"] == "basico"
+    assert response["modulos_ativos"] == ["campanhas"]
+
+
+def test_premium_routers_remain_gated_in_main():
+    main_source = _source("backend/app/main.py")
+    required_gates = {
+        "campaigns_router": "campanhas",
+        "canal_descontos_router": "campanhas",
+        "veterinario_router": "veterinario",
+        "banho_tosa_router": "banho_tosa",
+        "bling_sync_router": "bling",
+        "nfe_router": "fiscal",
+        "simples_router": "financeiro_erp",
+        "auditoria_provisoes_router": "financeiro_erp",
+        "funcionarios_router": "rh",
+    }
+
+    for router_name, modulo in required_gates.items():
+        assert router_name in main_source
+        assert f'dependencies=_module_dependencies("{modulo}")' in main_source
