@@ -2,6 +2,9 @@ import React, { useState, useEffect } from 'react';
 import { FiPlus, FiEdit2, FiTrash2, FiCheck } from 'react-icons/fi';
 import api from '../../api.js';
 import { toast } from 'react-hot-toast';
+import ActionButton from '../../components/ui/ActionButton';
+import IconActionButton from '../../components/ui/IconActionButton';
+import LoadingState from '../../components/ui/LoadingState';
 
 const TipoDespesa = () => {
   const [tipos, setTipos] = useState([]);
@@ -111,12 +114,14 @@ const TipoDespesa = () => {
             Classifique cada tipo como <strong>Fixo</strong> ou <strong>Variável</strong> para calcular o Ponto de Equilíbrio corretamente.
           </p>
         </div>
-        <button
+        <ActionButton
           onClick={abrirNovo}
-          className="flex items-center gap-2 bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg text-sm font-medium"
+          icon={FiPlus}
+          intent="create"
+          size="md"
         >
-          <FiPlus /> Novo Tipo
-        </button>
+          Novo Tipo
+        </ActionButton>
       </div>
 
       {/* Legenda */}
@@ -132,7 +137,7 @@ const TipoDespesa = () => {
       </div>
 
       {loading ? (
-        <div className="text-center py-12 text-gray-400">Carregando...</div>
+        <LoadingState label="Carregando tipos de despesa..." />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           {/* FIXOS */}
@@ -155,20 +160,20 @@ const TipoDespesa = () => {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button
+                    <IconActionButton
                       onClick={() => abrirEdicao(tipo)}
-                      className="text-gray-400 hover:text-blue-600 p-1 rounded"
+                      icon={FiEdit2}
+                      intent="edit"
+                      size="xs"
                       title="Editar"
-                    >
-                      <FiEdit2 size={15} />
-                    </button>
-                    <button
+                    />
+                    <IconActionButton
                       onClick={() => excluir(tipo.id)}
-                      className="text-gray-400 hover:text-red-600 p-1 rounded"
+                      icon={FiTrash2}
+                      intent="delete"
+                      size="xs"
                       title="Desativar"
-                    >
-                      <FiTrash2 size={15} />
-                    </button>
+                    />
                   </div>
                 </div>
               ))}
@@ -198,20 +203,20 @@ const TipoDespesa = () => {
                     </div>
                   </div>
                   <div className="flex gap-2">
-                    <button
+                    <IconActionButton
                       onClick={() => abrirEdicao(tipo)}
-                      className="text-gray-400 hover:text-blue-600 p-1 rounded"
+                      icon={FiEdit2}
+                      intent="edit"
+                      size="xs"
                       title="Editar"
-                    >
-                      <FiEdit2 size={15} />
-                    </button>
-                    <button
+                    />
+                    <IconActionButton
                       onClick={() => excluir(tipo.id)}
-                      className="text-gray-400 hover:text-red-600 p-1 rounded"
+                      icon={FiTrash2}
+                      intent="delete"
+                      size="xs"
                       title="Desativar"
-                    >
-                      <FiTrash2 size={15} />
-                    </button>
+                    />
                   </div>
                 </div>
               ))}
@@ -298,19 +303,23 @@ const TipoDespesa = () => {
             </div>
 
             <div className="flex gap-3 mt-6">
-              <button
+              <ActionButton
                 onClick={() => setShowModal(false)}
-                className="flex-1 border border-gray-300 text-gray-700 rounded-lg py-2 text-sm hover:bg-gray-50"
+                className="flex-1"
+                intent="neutral"
+                tone="soft"
               >
                 Cancelar
-              </button>
-              <button
+              </ActionButton>
+              <ActionButton
                 onClick={salvar}
                 disabled={salvando}
-                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg py-2 text-sm font-medium disabled:opacity-50"
+                className="flex-1"
+                intent={editando ? 'edit' : 'create'}
+                loading={salvando}
               >
                 {salvando ? 'Salvando...' : editando ? 'Salvar Alterações' : 'Criar Tipo'}
-              </button>
+              </ActionButton>
             </div>
           </div>
         </div>

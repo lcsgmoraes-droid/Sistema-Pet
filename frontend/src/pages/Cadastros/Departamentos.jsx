@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { FiPlus, FiEdit2, FiTrash2, FiAlertCircle } from 'react-icons/fi';
 import api from '../../api';
+import ActionButton from '../../components/ui/ActionButton';
+import EmptyState from '../../components/ui/EmptyState';
+import IconActionButton from '../../components/ui/IconActionButton';
+import LoadingState from '../../components/ui/LoadingState';
 
 const Departamentos = () => {
   const [departamentos, setDepartamentos] = useState([]);
@@ -82,7 +86,7 @@ const Departamentos = () => {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-gray-600">Carregando departamentos...</div>
+        <LoadingState label="Carregando departamentos..." />
       </div>
     );
   }
@@ -96,27 +100,34 @@ const Departamentos = () => {
             Departamentos agrupam categorias de produtos (ex: Alimentação, Higiene, Acessórios)
           </p>
         </div>
-        <button
+        <ActionButton
           onClick={handleNovoDepartamento}
-          className="flex items-center gap-2 bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700 transition-colors"
+          icon={FiPlus}
+          intent="create"
+          size="md"
         >
-          <FiPlus size={20} />
           Novo Departamento
-        </button>
+        </ActionButton>
       </div>
 
       <div className="bg-white rounded-lg shadow overflow-hidden">
         {departamentos.length === 0 ? (
-          <div className="text-center py-12 text-gray-500">
-            <FiAlertCircle size={48} className="mx-auto mb-4 opacity-50" />
-            <p>Nenhum departamento cadastrado</p>
-            <button
-              onClick={handleNovoDepartamento}
-              className="mt-4 text-blue-600 hover:text-blue-700"
-            >
-              Criar primeiro departamento
-            </button>
-          </div>
+          <EmptyState
+            className="m-4"
+            description="Crie o primeiro departamento para agrupar categorias de produtos."
+            icon={FiAlertCircle}
+            title="Nenhum departamento cadastrado"
+            action={
+              <ActionButton
+                onClick={handleNovoDepartamento}
+                icon={FiPlus}
+                intent="create"
+                tone="soft"
+              >
+                Criar primeiro departamento
+              </ActionButton>
+            }
+          />
         ) : (
           <table className="w-full">
             <thead className="bg-gray-50 border-b">
@@ -133,20 +144,18 @@ const Departamentos = () => {
                   <td className="px-4 py-3 text-gray-600 text-sm">{dep.descricao || '—'}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center justify-end gap-2">
-                      <button
+                      <IconActionButton
                         onClick={() => handleEditar(dep)}
-                        className="p-2 text-yellow-600 hover:bg-yellow-50 rounded transition-colors"
+                        icon={FiEdit2}
+                        intent="edit"
                         title="Editar"
-                      >
-                        <FiEdit2 size={18} />
-                      </button>
-                      <button
+                      />
+                      <IconActionButton
                         onClick={() => handleExcluir(dep)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
+                        icon={FiTrash2}
+                        intent="delete"
                         title="Excluir"
-                      >
-                        <FiTrash2 size={18} />
-                      </button>
+                      />
                     </div>
                   </td>
                 </tr>
@@ -193,19 +202,19 @@ const Departamentos = () => {
               </div>
 
               <div className="flex justify-end gap-3">
-                <button
-                  type="button"
+                <ActionButton
                   onClick={() => setShowModal(false)}
-                  className="px-4 py-2 text-gray-600 border border-gray-300 rounded hover:bg-gray-50 transition-colors"
+                  intent="neutral"
+                  tone="soft"
                 >
                   Cancelar
-                </button>
-                <button
+                </ActionButton>
+                <ActionButton
                   type="submit"
-                  className="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                  intent={editando ? 'edit' : 'create'}
                 >
                   {editando ? 'Salvar' : 'Criar'}
-                </button>
+                </ActionButton>
               </div>
             </form>
           </div>

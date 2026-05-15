@@ -888,6 +888,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-12: botoes de geracao no cadastro de produto e acoes principais de valorizacao/validade proxima passaram a usar `ActionButton`, mantendo o padrao visual sem alterar regras das telas.
 - 2026-05-12: criado `SegmentedControl` para alternancias compactas, aplicado no modo de descricao do produto e no filtro de itens da Entrada XML, removendo botoes inline duplicados.
 - 2026-05-10: `EntradaXML` extraiu o modal de visualizacao da NF para `EntradaXmlVisualizacaoNotaModal`, preservando os callbacks da pagina e reduzindo o arquivo principal para 4169 linhas com build validado.
+- 2026-05-15: cadastros basicos de `Departamentos` e `Tipos de Despesa` iniciaram a padronizacao de acoes com `ActionButton`, `IconActionButton`, `LoadingState` e `EmptyState`, mantendo comportamento e endpoints iguais.
 
 ### Nao fazer nesta onda
 
