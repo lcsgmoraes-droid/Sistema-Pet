@@ -62,14 +62,14 @@ export function ModalSuprimento({ caixaId, onClose, onSucesso }) {
       <div className="space-y-4">
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Conta de origem*
+            Origem do dinheiro (opcional)
           </label>
           <select
             value={contaOrigem}
             onChange={(e) => setContaOrigem(e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
           >
-            <option value="">Selecione...</option>
+            <option value="">Nao informar</option>
             <option value="Dinheiro em mãos">Dinheiro em mãos</option>
             <option value="Caixa geral">Caixa geral</option>
             <option value="Banco">Banco</option>
@@ -95,7 +95,7 @@ export function ModalSuprimento({ caixaId, onClose, onSucesso }) {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Descrição*
+            Motivo / observacao
           </label>
           <textarea
             value={descricao}
@@ -196,14 +196,14 @@ export function ModalSangria({ caixaId, saldoAtual, onClose, onSucesso }) {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Selecione a conta de destino*
+            Destino do dinheiro (opcional)
           </label>
           <select
             value={contaDestino}
             onChange={(e) => setContaDestino(e.target.value)}
             className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
           >
-            <option value="">Selecione...</option>
+            <option value="">Nao informar</option>
             <option value="Cofre">Cofre</option>
             <option value="Banco">Banco</option>
             <option value="Outro caixa">Outro caixa</option>
@@ -212,7 +212,7 @@ export function ModalSangria({ caixaId, saldoAtual, onClose, onSucesso }) {
 
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-2">
-            Descrição
+            Motivo / observacao
           </label>
           <textarea
             value={descricao}
