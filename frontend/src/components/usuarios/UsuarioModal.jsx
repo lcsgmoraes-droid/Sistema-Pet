@@ -9,6 +9,7 @@ export default function UsuarioModal({
   setShowPassword,
   showModal,
   showPassword,
+  usuarioFormError,
 }) {
   if (!showModal) return null;
 
@@ -31,6 +32,15 @@ export default function UsuarioModal({
           </div>
 
           <form onSubmit={onSubmit} className="space-y-4">
+            {usuarioFormError ? (
+              <div
+                className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700"
+                role="alert"
+              >
+                {usuarioFormError}
+              </div>
+            ) : null}
+
             <div>
               <label
                 htmlFor="novo-usuario-email"
