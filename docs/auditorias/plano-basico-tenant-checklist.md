@@ -148,7 +148,7 @@ Status usados:
 | Pets | Detalhe do pet | `/pets/:petId` | `GET /pets/{id}` e antes endpoints vet | Parcial | Tela de pet basico nao deve chamar carteirinha/internacoes veterinarias se modulo vet estiver bloqueado. | `PetDetalhes` agora evita chamadas vet e oculta abas vet quando `veterinario` nao esta ativo. | Corrigido |
 | Pets | Editar/excluir pet | `/pets/:id/editar` | `PUT/DELETE /pets/{id}` | Sim | Auditoria A/B estendida confirmou edicao/exclusao no proprio tenant e 404 em tentativa cruzada. | Nenhuma nesta branch. | OK |
 | Pets | Cadastro rapido de especie/raca | `/pets/novo` e modal rapido | `POST /cadastros/especies`, `POST /cadastros/racas` | Sim por navegador | Smoke visual criou especie e raca por modal rapido no tenant basico; raca entrou selecionada no formulario; chamadas de especies/racas retornaram 201/200 sem 500. A tentativa de raca sem especie fica bloqueada/explicada no frontend. | `PetForm` limpa raca ao trocar especie, bloqueia quick-add de raca sem especie e `QuickAddModal` valida `especie_id` antes de chamar API; contrato inclui `cadastros_routes.py` no tenant selecionado. | OK local + smoke visual |
-| Produtos | Listar produtos | `/produtos` | `GET /produtos` | Sim | Auditoria A/B confirmou que produto do tenant A aparece no A e nao aparece no B, e vice-versa. | Nenhuma nesta branch. | OK |
+| Produtos | Listar produtos | `/produtos` | `GET /produtos` | Sim | Auditoria A/B confirmou que produto do tenant A aparece no A e nao aparece no B, e vice-versa. Regra de validade revalidada por teste: listagem usa o lote com saldo e validade mais urgente; tooltip recebe lotes com saldo. | Nenhuma nesta branch para isolamento; suite de validade/lote reexecutada. | OK |
 | Produtos | Criar produto | `/produtos/novo` | `POST /produtos` | Sim | Produto criado por endpoint real em dois tenants; acesso direto cruzado a `/produtos/{id}` retornou 404. | Nenhuma nesta branch. | OK |
 | Produtos | Editar produto | `/produtos/:id/editar` | `PUT /produtos/{id}` | Sim | Auditoria A/B estendida confirmou edicao no proprio tenant e 404 em tentativa cruzada. Checklist exaustivo de todos os campos segue pendente. | Correcoes anteriores na trilha de catalogos/racao. | OK parcial |
 | Produtos | Entrada de estoque pela tela do produto | `/produtos/:id/movimentacoes` ou acao de entrada | `POST /produtos/{id}/entrada` | Sim | Dava erro 500 por `user_id` nulo em `estoque_movimentacoes`; na auditoria A/B estendida, entrada propria retornou 200 e entrada cruzada retornou 404. | `backend/app/produtos_routes.py` agora grava `user_id=current_user.id`. | OK |
@@ -257,7 +257,7 @@ Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada com dois te
   - operador, permissoes implicitas, autocomplete de produto, caixa/sangria/suprimento por API e finalizacao visual ja passaram;
   - falta conferir recibo/historico visual com mais calma, sem bloquear a venda controlada.
 - Retestar visualmente entrada de estoque com lote/validade:
-  - o endpoint passou no A/B;
+  - o endpoint passou no A/B e a suite focada de lote/validade passou com `8 passed`;
   - ainda falta confirmar tela, tooltip/listagem de lotes e validade urgente no navegador.
 - Testar CRUD completo de:
   - categorias/departamentos/marcas visualmente;
@@ -512,6 +512,7 @@ Rodada estendida `866987` + reteste de estoque:
 - Build frontend apos ajuste de `PetForm`/`QuickAddModal`: `npm --prefix frontend run build`, resultado passou.
 - Contrato Plano Basico/configuracao da empresa apos protecao de endpoints e rotas: `12 passed`.
 - Build frontend apos protecao do hub/subrotas de configuracao: `npm --prefix frontend run build`, resultado passou.
+- Suite focada de lote/validade de produto e XML: `test_produtos_validade_listagem.py`, `test_estoque_routes_lotes.py`, `test_notas_entrada_parse_validade.py`, resultado `8 passed`.
 - Build frontend apos refactor de Roles/LGPD: `npm --prefix frontend run build`, resultado passou.
 - Py compile das migrations e arquivos backend alterados: passou.
 - Migrations completas em Postgres limpo reexecutadas ate `oq20260515a8`.
