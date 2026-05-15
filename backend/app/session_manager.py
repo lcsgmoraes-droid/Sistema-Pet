@@ -75,7 +75,10 @@ def get_session_by_jti(db: DBSession, token_jti: str) -> Optional[UserSession]:
 def validate_session(db: DBSession, token_jti: str) -> bool:
     """
     Valida se uma sessão está ativa e não expirou.
-    Atualiza last_activity_at automaticamente.
+    Nao atualiza last_activity_at aqui: esta funcao roda em toda request
+    autenticada. Atualizar a mesma linha de user_sessions em chamadas
+    concorrentes do frontend cria contencao de lock no Postgres e pode
+    derrubar endpoints autenticados por timeout.
     """
     session = get_session_by_jti(db, token_jti)
     
@@ -94,10 +97,6 @@ def validate_session(db: DBSession, token_jti: str) -> bool:
     
     if expires_at <= now:
         return False
-    
-    # Atualiza last_activity_at
-    session.last_activity_at = now
-    db.flush()
     
     return True
 
