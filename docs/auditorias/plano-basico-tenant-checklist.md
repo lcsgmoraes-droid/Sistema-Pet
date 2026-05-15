@@ -74,8 +74,8 @@ Status usados:
 | Pets | Quase pronto | Criacao real A/B passou com codigo unico por tenant; retestar detalhe visual e cadastro rapido de especie/raca. |
 | Produtos/estoque | Quase pronto | Listagem, criacao, edicao, exclusao e entrada de estoque com bloqueio cruzado passaram em auditoria A/B local; retestar lote/validade visual e fluxo completo de estoque. |
 | Calculadora de racao | Pendente P1 | Retestar fluxo visual completo depois das correcoes backend. |
-| PDV/vendas | Quase pronto | Rodar venda completa A/B: cliente, pet, produto, baixa de estoque e historico. |
-| Financeiro de vendas | Quase pronto | Confirmar que nao depende de financeiro ERP premium. |
+| PDV/vendas | Pronto local A/B | Venda completa A/B por API real passou: cliente, produto com lote, caixa, finalizacao, baixa de estoque e bloqueio cruzado. Falta smoke visual no navegador. |
+| Financeiro de vendas | Quase pronto | Finalizacao gerou reflexos financeiros sem 500 no A/B local; falta conferir telas/historico visual. |
 | Cadastros essenciais | Quase pronto | Formas de pagamento e opcoes de racao passaram em criacao/listagem A/B real; retestar edicao/exclusao e demais cadastros. |
 | Configuracoes/usuarios/LGPD | Pendente P1 | Testar salvar dados essenciais, criar usuario e permissao basica. |
 | Premium bloqueado | Pendente P1 | Smoke de menus e URLs diretas premium em tenant basico. |
@@ -86,7 +86,7 @@ Status usados:
 | Etapa | Objetivo | Status | Bloqueia venda? |
 |---|---|---|---|
 | 1. Base tecnica multi-tenant | Cadastro real de tenants A/B, selecao de tenant, migrations limpas e bloqueio de vazamento entre empresas. | Concluido local | Sim, mas ja passou localmente. |
-| 2. Fluxos essenciais do basico | Clientes, pets, produtos, estoque, PDV/vendas, historico financeiro de vendas e cadastros auxiliares. | Em andamento | Sim, enquanto PDV/vendas e usuarios nao fecharem 100%. |
+| 2. Fluxos essenciais do basico | Clientes, pets, produtos, estoque, PDV/vendas, historico financeiro de vendas e cadastros auxiliares. | Em andamento; PDV/vendas A/B local concluido | Sim, enquanto usuarios/permissoes, calculadora/cadastros e smoke visual nao fecharem. |
 | 3. Usuarios e permissoes | Criar usuario do tenant, validar permissoes basicas e bloqueio de acesso indevido. | Pendente P1 | Sim. |
 | 4. Calculadora/catalogos de racao | Validar fluxo visual, persistencia e mensagens de erro sem 500. | Pendente P1 | Sim se fizer parte da promessa comercial inicial. |
 | 5. Landing page e selecao de planos | Exibir planos, destacar Basico, iniciar contratacao com plano escolhido e levar ao cadastro/onboarding correto. | Concluido local | Sim para vender por autoatendimento; falta smoke visual em producao/staging. |
@@ -117,6 +117,7 @@ Status usados:
   - Tenants criados pela API real: `tenant.a.20260515152334@example.com` e `tenant.b.20260515152334@example.com`.
   - Foram usados selecao real de tenant, token real e endpoints reais das telas basicas.
   - A rodada confirmou isolamento em clientes, pets, formas de pagamento e opcoes de racao.
+  - A rodada de PDV/vendas `20260515154447` confirmou venda finalizada e bloqueio cruzado entre tenants.
   - A comparacao visual completa por navegador ainda fica pendente para PDV/vendas, financeiro de vendas, usuarios/permissoes e alguns cadastros auxiliares.
 - Data/hora aproximada dos testes: 2026-05-15, madrugada e tarde, horario local.
 
@@ -144,10 +145,10 @@ Status usados:
 | Produtos | Entrada oficial de estoque | Fluxo de estoque | `POST /estoque/entrada` | Sim | Entrada oficial funcionou no tenant de teste. | Nenhuma nesta branch. | OK |
 | Produtos | Calculadora de racao | `/produtos` / modal calculadora | `GET/POST /produtos/calculadora-racao` | Parcial | Houve erros anteriores quando produto aparecia como pronto sem tabela completa; fluxo foi trabalhado antes, mas nao revalidado nesta branch final. | Nao corrigido nesta branch final. | Pendente P1 |
 | Produtos | Catalogos auxiliares | `/produtos/:id/editar` | `GET /produtos/departamentos` e similares | Parcial | Erros 500 foram vistos anteriormente em catalogos auxiliares; nao auditado nesta branch final. | Nao corrigido nesta branch final. | Pendente P1 |
-| PDV | Abrir caixa | `/pdv` | Endpoints de caixa | Sim | Caixa aberto para venda de teste. | Nenhuma nesta branch. | OK |
-| PDV | Criar venda | `/pdv` | Endpoints de vendas/itens | Sim | Venda criada com cliente, pet opcional e produto do tenant. | Nenhuma nesta branch. | OK |
-| PDV | Registrar recebimento | `/pdv` | Endpoints de pagamento/finalizacao | Sim | Venda finalizada com Dinheiro. | Nenhuma nesta branch. | OK |
-| PDV | Reabrir/visualizar venda finalizada | `/pdv` | Endpoints de venda e itens | Sim | Venda finalizada abriu para visualizacao. | Nenhuma nesta branch. | OK |
+| PDV | Abrir caixa | `/pdv` | Endpoints de caixa | Sim | Caixa aberto para venda A/B por API real em dois tenants Basico. | Nenhuma regra de caixa alterada nesta rodada. | OK local |
+| PDV | Criar venda | `/pdv` | Endpoints de vendas/itens | Sim | Venda criada nos tenants A e B com cliente e produto do proprio tenant; acesso cruzado a venda do outro tenant retornou 404. | Adicionada migration para alinhar campos `tipo_retirada` e `palavra_chave_retirada` de `vendas`. | OK local |
+| PDV | Registrar recebimento | `/pdv` | Endpoints de pagamento/finalizacao | Sim | Venda finalizada com Dinheiro nos dois tenants; estoque caiu de 5 para 3 em cada tenant. | Adicionadas migrations para `empresa_config_fiscal` e campos faltantes em `dre_subcategorias`, removendo 500 na finalizacao. | OK local |
+| PDV | Reabrir/visualizar venda finalizada | `/pdv` | Endpoints de venda e itens | Sim | GET da venda finalizada retornou status `finalizada`; visualizacao cruzada pelo outro tenant retornou 404. | Nenhuma regra de reabertura alterada nesta rodada. | OK local |
 | PDV | Campanhas no recebimento | `/pdv` | `GET /campanhas/...` | Sim, por erro observado | Plano basico recebeu 403 em campanhas quando cliente/venda era selecionado. Parte ja estava protegida; saldo de cliente foi reforcado. | Reforco em `useClientesNovoCadastro`; `usePDVClienteContexto` ja respeitava modulo. | Corrigido |
 | Financeiro | Vendas | `/financeiro/vendas` | Endpoints de historico/listagem de vendas | Sim | Historico de vendas abriu para venda do tenant de teste. | Nenhuma nesta branch. | OK |
 | Financeiro ERP | Dashboard financeiro completo | `/financeiro` | Endpoints financeiros ERP | Sim, por erro observado no dashboard | Modulo ERP nao deve ser acessado automaticamente no basico. | Alertas/projecoes premium nao disparam sem modulo ativo. | Corrigido |
@@ -170,8 +171,8 @@ Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada com dois te
 | Pets | Nao: busca/listagem cruzada A/B passou | Sim, por endpoint real com tutor do mesmo tenant | Sim: edicao propria 200 e cruzada 404 | Sim: exclusao propria 204 e cruzada 404 | Sem token retornou 403; acesso direto cruzado a ID de outro tenant retornou 404 | OK |
 | Produtos | Nao: busca/listagem cruzada A/B passou | Sim, por endpoint real com SKU distinto por tenant | Sim: edicao propria 200 e cruzada 404 | Sim: exclusao propria 204 e cruzada 404 | Sem token retornou 403; acesso direto cruzado a ID de outro tenant retornou 404 | OK |
 | Estoque | Entrada propria retornou 200 e entrada cruzada em produto de outro tenant retornou 404 | Sim, por endpoint real com produto do tenant autenticado | Nao aplicavel | Nao testado | Cross-tenant por ID de produto retornou 404 | OK parcial |
-| PDV/Vendas | Venda criada no tenant novo apareceu no historico do tenant atual | Nao testado diretamente em DB | Visualizacao testada; edicao/reabertura nao auditada completa | Nao testado | Nao testado nesta rodada | Parcial |
-| Financeiro Vendas | Historico abriu com venda do tenant atual | Nao aplicavel | Nao testado | Nao testado | Nao testado nesta rodada | Parcial |
+| PDV/Vendas | Nao: GET cruzado de venda A/B retornou 404 e listagens ficaram separadas | Sim, venda criada/finalizada com token de cada tenant e estoque baixado somente no produto do tenant | Visualizacao propria 200; visualizacao cruzada 404; edicao/reabertura ainda nao auditada completa | Nao testado | Sem tenant/token segue coberto por suites de auth; acesso direto cruzado a ID de outro tenant retornou 404 | OK local |
+| Financeiro Vendas | Historico/reflexos de venda nao vazaram na rodada A/B local | Sim, finalizacao gerou DRE/financeiro sem 500 depois do alinhamento de schema | Tela visual ainda pendente | Nao testado | Nao testado nesta rodada visual | OK parcial |
 | Cadastros base | Formas de pagamento e linha de racao nao vazaram entre tenants A/B | Sim, por endpoint real com token de cada tenant | Nao testado nesta rodada | Nao testado nesta rodada | Acesso premium direto retornou 403 em Bling e WhatsApp no plano basico | OK parcial |
 | Modulos premium bloqueados | Bling e WhatsApp retornaram 403 no plano basico | Nao aplicavel | Nao aplicavel | Nao aplicavel | 403 observado em chamadas bloqueadas | OK parcial |
 
@@ -197,6 +198,9 @@ Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada com dois te
 | `backend/alembic/versions/ok20260515a2_create_missing_ration_option_tables.py` | Onboarding obrigatorio nao conseguia criar opcoes de racao porque as tabelas auxiliares nao existiam. | Criadas `linhas_racao`, `portes_animal`, `fases_publico`, `tipos_tratamento`, `sabores_proteina` e `apresentacoes_peso` com indices por tenant. | Novo tenant podia falhar no cadastro ou nascer sem dados obrigatorios. | `alembic upgrade head`; cadastro real A/B passou. |
 | `backend/app/models.py` e `backend/alembic/versions/ol20260515a3_pet_codigo_unique_per_tenant.py` | Codigo de pet era unico globalmente e colidia quando dois tenants tinham o primeiro cliente/pet com o mesmo codigo. | Removida unicidade global do modelo e trocado o indice para unico composto `(tenant_id, codigo)`. | Segundo tenant podia receber erro 500 ao criar pet com codigo interno igual ao de outro tenant. | Auditoria A/B criou pet `10001-PET-0001` nos dois tenants sem colisao. |
 | `frontend/src/pages/LandingPage.jsx`, `frontend/src/pages/Register.jsx`, `frontend/src/contexts/AuthContext.jsx`, `backend/app/auth_routes_multitenant.py` | Contratacao por plano existia visualmente em `/planos`, mas o plano escolhido nao era parte explicita do contrato com a API. | Landing recebeu bloco de selecao do Basico; register envia `plan`; backend valida plano permitido e grava o tenant com o plano selecionado. | Futuro autoatendimento poderia parecer selecionar plano sem o backend respeitar o contrato. | Build frontend, cadastro real com `plan=basico`, bloqueio de `plan=premium` e consulta do tenant no banco. |
+| `backend/alembic/versions/om20260515a4_add_venda_retirada_fields.py` | Criacao de venda no fluxo PDV A/B quebrava com 500 porque o modelo esperava campos de retirada que nao existiam no schema local. | Migration idempotente adiciona `vendas.tipo_retirada` e `vendas.palavra_chave_retirada`. | PDV do Plano Basico podia quebrar antes de finalizar a venda. | `alembic upgrade head`; criacao de venda A/B passou. |
+| `backend/alembic/versions/on20260515a5_create_empresa_config_fiscal.py` | Finalizacao de venda abortava a transacao ao buscar configuracao fiscal inexistente no banco. | Migration cria `empresa_config_fiscal` conforme modelo atual, com indice por tenant. | Venda finalizada podia virar 500 por dependencia fiscal opcional. | `alembic upgrade head`; tabela conferida no Postgres; finalizacao A/B avancou. |
+| `backend/alembic/versions/oo20260515a6_add_dre_subcategoria_fields.py` | Geracao de DRE por competencia na finalizacao buscava `dre_subcategorias.custo_pe` e `categoria_financeira_id`, ausentes no schema. | Migration adiciona os campos e FK opcional para `categorias_financeiras`. | Finalizacao de venda ficava vulneravel a 500 em tenants novos. | Venda A/B `20260515154447` finalizou nos dois tenants; estoque baixou corretamente; migrations passaram em banco limpo. |
 
 ## 6. Pendencias priorizadas
 
@@ -208,8 +212,10 @@ Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada com dois te
 ### P1 - Importante antes de escalar
 
 - Complementar comparacao A/B real entre dois tenants para fluxos ainda nao cobertos:
-  - PDV/vendas, baixa de estoque e historico financeiro de vendas;
   - cadastros auxiliares e usuarios/permissoes.
+- Complementar smoke visual no navegador para PDV/vendas:
+  - a API A/B ja passou com finalizacao e baixa de estoque;
+  - falta conferir estados de tela, mensagens, recibo/historico e ausencia de chamadas premium no console.
 - Retestar visualmente entrada de estoque com lote/validade:
   - o endpoint passou no A/B;
   - ainda falta confirmar tela, tooltip/listagem de lotes e validade urgente no navegador.
@@ -280,7 +286,7 @@ docker compose -f docker-compose.local-dev.yml exec -T backend alembic upgrade h
 docker compose -f docker-compose.local-dev.yml exec -T backend alembic current
 ```
 
-Resultado: passou; head local em `ol20260515a3`.
+Resultado: passou; head local atualizado em `oo20260515a6`.
 
 ```powershell
 docker compose -f docker-compose.local-dev.yml exec -T postgres psql -U postgres -d postgres -c "DROP DATABASE IF EXISTS petshop_migration_check WITH (FORCE);" -c "CREATE DATABASE petshop_migration_check;"
@@ -288,7 +294,7 @@ docker compose -f docker-compose.local-dev.yml exec -T -e DATABASE_URL=postgresq
 docker compose -f docker-compose.local-dev.yml exec -T -e DATABASE_URL=postgresql+psycopg2://postgres:postgres@postgres:5432/petshop_migration_check backend alembic current
 ```
 
-Resultado: passou em banco temporario limpo; head `ol20260515a3`, tabelas auxiliares de racao/webhook existem e indice `uq_pets_tenant_codigo` foi criado.
+Resultado: passou em banco temporario limpo; head `oo20260515a6`, tabelas auxiliares de racao/webhook, indice `uq_pets_tenant_codigo`, `empresa_config_fiscal` e campos novos de DRE/vendas foram criados.
 
 ```powershell
 # Auditoria A/B local real 2026-05-15
@@ -314,6 +320,15 @@ Rodada de contratacao por plano `20260515153410`:
 - `POST /auth/register` com `plan=premium` retornou 400.
 - `POST /auth/register` com `plan=basico` retornou 200.
 - Tenant criado `45e438b6-01ab-4e2c-8f8e-4303b5934fe8` ficou com `plan=basico` no banco.
+
+Rodada PDV/vendas A/B `20260515154447`:
+
+- Tenant A: `4b586466-1e70-44ae-8ac3-7edd9b757902`.
+- Tenant B: `f6c1c6e7-f86a-45c6-815b-9a6f4c492991`.
+- Cada tenant criou cliente, produto com lote, entrada de estoque e caixa aberto por API real.
+- Venda A `3` e venda B `4` finalizaram com status `finalizada`, total `50.0` e estoque final `3.0`.
+- GET cruzado de venda retornou 404 nos dois sentidos.
+- Produto do tenant A nao apareceu na lista do tenant B, e vice-versa.
 
 ```powershell
 # Auditoria A/B local historica 2026-05-15
@@ -357,8 +372,8 @@ Rodada estendida `866987` + reteste de estoque:
 
 ### Testes backend amplos
 
-- Nao foram rodados novamente nesta etapa final da branch.
-- Suites multitenant amplas ja foram usadas nas fases anteriores, mas devem ser reexecutadas antes de merge/deploy se a branch for para producao.
+- Suite multitenant/hardening reexecutada nesta rodada: `74 passed`.
+- Migrations completas reexecutadas em banco Postgres limpo ate `oo20260515a6`.
 
 ### Auditoria automatizada Codex consolidada
 
@@ -408,9 +423,7 @@ Correcoes registradas naquela rodada:
 
 Pendencias manuais que seguem abertas pelo checklist:
 
-- Editar/excluir cliente.
 - Financeiro do cliente.
-- Editar/excluir pet.
 - Cadastro rapido de especie/raca.
 - Editar produto com todos os campos.
 - Calculadora de racao na UI.
@@ -419,7 +432,8 @@ Pendencias manuais que seguem abertas pelo checklist:
 - Operadoras de cartao.
 - Configuracao da empresa.
 - Usuarios/admin.
-- Landing page com selecao de planos e CTA do Plano Basico para contratacao.
+- Landing page com selecao de planos e CTA do Plano Basico para contratacao: concluido local; falta smoke visual em staging/producao.
+- PDV/vendas: API A/B concluida; falta smoke visual no navegador.
 - A/B visual no navegador entre dois tenants.
 
 ### Deploy
@@ -429,9 +443,9 @@ Pendencias manuais que seguem abertas pelo checklist:
 
 ## Resumo Executivo
 
-- Telas/fluxos basicos com algum teste registrado: 14/22
-- Fluxos OK ou OK parcial: 11
-- Corrigidos/registrados nesta trilha: frontend padronizado, onboarding local, tabelas auxiliares de racao e unicidade de pet por tenant
+- Telas/fluxos basicos com algum teste registrado: 15/22
+- Fluxos OK ou OK parcial: 12
+- Corrigidos/registrados nesta trilha: frontend padronizado, onboarding local, tabelas auxiliares de racao, unicidade de pet por tenant, contratacao por plano e schema de PDV/DRE
 - Pendencias P0: 0 confirmadas apos esta branch
 - Pendencias P1: 6
 - Pendencias P2: 5
