@@ -1,3 +1,4 @@
+import asyncio
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -16,6 +17,7 @@ from app.routes.ecommerce_entregador import _get_entregador_cliente
 from app.routes.ecommerce_entregador import obter_rota_entregador
 from app.routes.ecommerce_notify_routes import _resolve_notify_tenant
 from app.routes.ecommerce_public import _get_active_tenant
+from app.security.module_access import require_active_module
 from app.tenancy.context import clear_current_tenant, get_current_tenant
 
 
@@ -185,3 +187,11 @@ def test_notify_tenant_resolver_accepts_slug_without_uuid_query_error():
     resolved = _resolve_notify_tenant(_Db(tenant), "loja-teste")
 
     assert resolved is tenant
+
+
+def test_delivery_module_gate_allows_ecommerce_customer_token_without_admin_jti():
+    tenant_id = uuid4()
+    credentials = SimpleNamespace(credentials=_token(123, tenant_id))
+    dependency = require_active_module("entregas", allow_ecommerce_customer=True)
+
+    asyncio.run(dependency(credentials=credentials, db=object()))

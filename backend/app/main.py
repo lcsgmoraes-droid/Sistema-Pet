@@ -222,8 +222,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 
-def _module_dependencies(modulo: str):
-    return [Depends(require_active_module(modulo))]
+def _module_dependencies(modulo: str, *, allow_ecommerce_customer: bool = False):
+    return [Depends(require_active_module(modulo, allow_ecommerce_customer=allow_ecommerce_customer))]
 
 
 BLING_TOKEN_RENOVACAO_INTERVALO_SEGUNDOS = 5 * 60 * 60  # 5 horas
@@ -908,7 +908,11 @@ app.include_router(empresa_config_router, tags=["Empresa - Configuração Geral"
 app.include_router(pdv_indicadores_router, tags=["PDV - Indicadores e Margens"])
 app.include_router(empresa_router, tags=["Empresa - Configurações"])
 app.include_router(configuracoes_entrega_router, tags=["Configurações - Entregas"], dependencies=_module_dependencies("entregas"))
-app.include_router(rotas_entrega_router, tags=["Entregas - Rotas"], dependencies=_module_dependencies("entregas"))
+app.include_router(
+    rotas_entrega_router,
+    tags=["Entregas - Rotas"],
+    dependencies=_module_dependencies("entregas", allow_ecommerce_customer=True),
+)
 app.include_router(acertos_entrega_router, tags=["Entregas - Acertos Financeiros"], dependencies=_module_dependencies("entregas"))
 app.include_router(configuracao_custo_moto_router, tags=["Custos - Moto da Loja"], dependencies=_module_dependencies("entregas"))
 app.include_router(dashboard_entregas_router, dependencies=_module_dependencies("entregas"))  # ETAPA 11.1 - Dashboard Financeiro (tags no router)
