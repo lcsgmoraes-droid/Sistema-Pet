@@ -4,12 +4,28 @@ from datetime import datetime, timezone
 from typing import Callable
 
 from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
+from app.auth.core import ALGORITHM, get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
+from app.config import JWT_SECRET_KEY
 from app.db import get_session
 from app.models import AssinaturaModulo, Tenant, User
 from app.routes.modulos_routes import MODULOS_PREMIUM, _resolver_modulos_ativos
+
+optional_security = HTTPBearer(auto_error=False)
+
+
+def _is_ecommerce_customer_token(credentials: HTTPAuthorizationCredentials | None) -> bool:
+    if not credentials:
+        return False
+    try:
+        payload = jwt.decode(credentials.credentials, JWT_SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        return False
+    return payload.get("token_type") == "ecommerce_customer"
 
 
 def _load_active_modules(db: Session, tenant_id: str, agora: datetime | None = None) -> list[str]:
@@ -35,16 +51,28 @@ def _load_active_modules(db: Session, tenant_id: str, agora: datetime | None = N
     )
 
 
-def require_active_module(modulo: str) -> Callable:
+def require_active_module(modulo: str, *, allow_ecommerce_customer: bool = False) -> Callable:
     """Bloqueia rotas de modulo premium quando o tenant nao tem acesso."""
     if modulo not in MODULOS_PREMIUM:
         raise ValueError(f"Modulo comercial desconhecido: {modulo}")
 
-    def dependency(
-        user_and_tenant: tuple[User, object] = Depends(get_current_user_and_tenant),
+    async def dependency(
+        credentials: HTTPAuthorizationCredentials | None = Depends(optional_security),
         db: Session = Depends(get_session),
     ) -> None:
-        current_user, tenant_id = user_and_tenant
+        if allow_ecommerce_customer and _is_ecommerce_customer_token(credentials):
+            return
+
+        if not credentials:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authenticated")
+
+        current_user = get_current_user(credentials=credentials, session=db)
+        current_user, tenant_id = await get_current_user_and_tenant(
+            credentials=credentials,
+            user=current_user,
+            db=db,
+        )
+
         # Administrador da plataforma pode auditar/suportar sem virar cliente do modulo.
         # Admin do tenant nao tem bypass: o plano do tenant continua mandando.
         if getattr(current_user, "is_superadmin", False) or getattr(current_user, "is_system_admin", False):
