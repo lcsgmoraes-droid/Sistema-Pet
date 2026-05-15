@@ -14,6 +14,12 @@ Transformar o sistema em uma base mais modular, previsivel e facil de manter:
 
 ## Andamento
 
+### Foco atual - Plano Basico vendavel
+
+Antes de ampliar a varredura para o sistema inteiro, a frente atual e fechar o Plano Basico como primeiro produto vendavel. O controle vivo de telas testadas, isolamento tenant, bloqueio de premium, padronizacao visual e pendencias P1 esta em `docs/auditorias/plano-basico-tenant-checklist.md`.
+
+Regra pratica desta fase: primeiro deixar Pessoas, Pets, Produtos, Estoque, PDV, Financeiro de Vendas, Cadastros essenciais, Configuracoes e Usuarios com fluxo principal confiavel em tenant novo; depois voltar para refatoracoes maiores fora desse escopo.
+
 ### Fase 1 - Fundacao visual e piloto PDV
 
 Status: iniciada.
