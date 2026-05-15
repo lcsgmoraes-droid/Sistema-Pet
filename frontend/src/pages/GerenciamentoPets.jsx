@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import toast from 'react-hot-toast';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../api';
 import {
@@ -15,7 +16,10 @@ import {
 } from 'lucide-react';
 import ActionButton from '../components/ui/ActionButton';
 import CustomerIdentity from '../components/ui/CustomerIdentity';
+import EmptyState from '../components/ui/EmptyState';
 import IconActionButton from '../components/ui/IconActionButton';
+import LoadingState from '../components/ui/LoadingState';
+import PageHeader from '../components/ui/PageHeader';
 import Panel from '../components/ui/Panel';
 import EntityCard, { EntityInfoRow } from '../components/ui/EntityCard';
 import FilterBar, { FilterAdvanced, FilterRow } from '../components/ui/FilterBar';
@@ -171,48 +175,44 @@ const GerenciamentoPets = () => {
       loadPets();
     } catch (err) {
       console.error('Erro ao alterar status do pet:', err);
-      alert('Erro ao alterar status do pet');
+      toast.error('Nao foi possivel alterar o status do pet.');
     }
   };
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Carregando pets...</p>
-        </div>
+      <div className="p-6">
+        <Panel>
+          <LoadingState label="Carregando pets..." />
+        </Panel>
       </div>
     );
   }
 
   return (
-    <div className="p-6">
-      {/* Header */}
-      <div className="mb-6 flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-            <PawPrint className="text-blue-600" size={36} />
-            Gerenciamento de Pets
-          </h1>
-          <p className="text-gray-600 mt-1">
-            {clienteFiltro 
-              ? `Pets do cliente: ${clientes.find(c => String(c.id) === String(clienteFiltro))?.nome || ''}`
-              : 'Gestão completa dos animais de estimação'}
-          </p>
-        </div>
-        <ActionButton
-          onClick={() => navigate('/pets/novo')}
-          intent="create"
-          icon={Plus}
-          size="md"
-        >
-          Adicionar Pet
-        </ActionButton>
-      </div>
+    <div className="space-y-6 p-6">
+      <PageHeader
+        icon={PawPrint}
+        title="Gerenciamento de Pets"
+        subtitle={
+          clienteFiltro
+            ? `Pets do cliente: ${clientes.find(c => String(c.id) === String(clienteFiltro))?.nome || ''}`
+            : 'Gestao completa dos animais de estimacao'
+        }
+        actions={
+          <ActionButton
+            onClick={() => navigate('/pets/novo')}
+            intent="create"
+            icon={Plus}
+            size="md"
+          >
+            Adicionar Pet
+          </ActionButton>
+        }
+      />
 
       {/* Barra de busca e filtros */}
-      <FilterBar className="mb-6" onSubmit={handleBusca}>
+      <FilterBar onSubmit={handleBusca}>
           {/* Busca principal */}
           <FilterRow className="items-stretch">
             <div className="flex-1 relative">
@@ -354,25 +354,25 @@ const GerenciamentoPets = () => {
 
       {/* Lista de pets */}
       {pets.length === 0 ? (
-        <Panel className="p-12 text-center">
-          <PawPrint className="mx-auto text-gray-300 mb-4" size={64} />
-          <h3 className="text-xl font-semibold text-gray-900 mb-2">
-            Nenhum pet encontrado
-          </h3>
-          <p className="text-gray-600 mb-6">
-            {busca || clienteFiltro || especieFiltro || statusFiltro
-              ? 'Tente ajustar os filtros ou fazer uma nova busca'
-              : 'Comece adicionando o primeiro pet'}
-          </p>
-          <ActionButton
-            onClick={() => navigate('/pets/novo')}
-            intent="create"
-            icon={Plus}
-            size="lg"
-          >
-            Adicionar Primeiro Pet
-          </ActionButton>
-        </Panel>
+        <EmptyState
+          icon={PawPrint}
+          title="Nenhum pet encontrado"
+          description={
+            busca || clienteFiltro || especieFiltro || statusFiltro
+              ? 'Tente ajustar os filtros ou fazer uma nova busca.'
+              : 'Comece adicionando o primeiro pet deste tenant.'
+          }
+          action={
+            <ActionButton
+              onClick={() => navigate('/pets/novo')}
+              intent="create"
+              icon={Plus}
+              size="lg"
+            >
+              Adicionar Primeiro Pet
+            </ActionButton>
+          }
+        />
       ) : (
         <div className="grid auto-rows-fr grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
           {pets.map(pet => {
