@@ -14,9 +14,11 @@ export default function PessoaSelector({
   autoComplete = "off",
   className = "",
   disabled = false,
+  id,
   inputClassName = "",
   inputRef,
   minChars = 2,
+  name,
   onChange,
   onFocus,
   onKeyDown,
@@ -36,6 +38,8 @@ export default function PessoaSelector({
   return (
     <div className={`relative ${className}`.trim()}>
       <input
+        id={id}
+        name={name || id}
         ref={inputRef}
         type="text"
         value={value}

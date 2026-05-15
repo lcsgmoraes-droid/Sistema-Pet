@@ -218,6 +218,11 @@ def deletar_role(
     if not role:
         raise HTTPException(status_code=404, detail="Role n�o encontrado")
 
+    db.query(RolePermission).filter(
+        RolePermission.role_id == role_id,
+        RolePermission.tenant_id == tenant_id
+    ).delete()
+
     db.delete(role)
     db.commit()
     return {"status": "ok"}
