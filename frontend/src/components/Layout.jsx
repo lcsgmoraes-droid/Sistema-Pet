@@ -797,7 +797,6 @@ const Layout = () => {
         {
           path: "/cadastros/departamentos",
           label: "Departamentos",
-          modulo: "rh",
           permission: "cadastros.categorias_produtos",
         },
         {

@@ -761,7 +761,7 @@ function App() {
                   <Route path="subcategorias" element={<Subcategorias />} />
 
                   {/* Rotas de Cadastros */}
-                  <Route path="cadastros/departamentos" element={<ModuleGate modulo="rh"><Departamentos /></ModuleGate>} />
+                  <Route path="cadastros/departamentos" element={<Departamentos />} />
                   <Route path="cadastros/categorias" element={<Categorias />} />
                   <Route
                     path="cadastros/tipos-despesa"

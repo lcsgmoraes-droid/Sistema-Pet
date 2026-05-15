@@ -270,3 +270,16 @@ def test_company_configuration_routes_require_configuration_permissions():
     assert 'path="admin/roles"' in app_source
     assert 'permission="usuarios.manage"' in app_source
     assert 'card.modulo && !moduloAtivo(card.modulo)' in configuracoes_source
+
+
+def test_product_departments_are_basic_catalog_not_rh_module():
+    app_source = _source("frontend/src/App.jsx")
+    layout_source = _source("frontend/src/components/Layout.jsx")
+
+    assert 'path="cadastros/departamentos" element={<Departamentos />}' in app_source
+    departamentos_menu_start = layout_source.index('path: "/cadastros/departamentos"')
+    departamentos_menu_end = layout_source.index('path: "/cadastros/categorias"', departamentos_menu_start)
+    departamentos_menu = layout_source[departamentos_menu_start:departamentos_menu_end]
+
+    assert 'modulo: "rh"' not in departamentos_menu
+    assert 'permission: "cadastros.categorias_produtos"' in departamentos_menu
