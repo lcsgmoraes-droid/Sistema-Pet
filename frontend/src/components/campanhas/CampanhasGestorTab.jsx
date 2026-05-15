@@ -40,6 +40,7 @@ export default function CampanhasGestorTab({
   lancarCarimboGestor,
   gestorRemovendo,
   estornarCarimboGestor,
+  estornarCarimbosSelecionadosGestor,
   formatBRL,
   RANK_LABELS,
   gestorCashbackTipo,
@@ -120,6 +121,9 @@ export default function CampanhasGestorTab({
               setGestorIncluirEstornados={setGestorIncluirEstornados}
               gestorRemovendo={gestorRemovendo}
               estornarCarimboGestor={estornarCarimboGestor}
+              estornarCarimbosSelecionadosGestor={
+                estornarCarimbosSelecionadosGestor
+              }
             />
 
             <CampanhasGestorCashbackSection
