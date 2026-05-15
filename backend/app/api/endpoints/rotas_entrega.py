@@ -940,7 +940,7 @@ def criar_rota(
         db.commit()
         db.refresh(rota)
 
-        return rota
+        return obter_rota(rota_id=rota.id, db=db, actor=actor)
 
     # Modo tradicional: rota com 1 venda apenas
     # Buscar venda para obter endereço de destino
@@ -1005,7 +1005,7 @@ def criar_rota(
     db.commit()
     db.refresh(rota)
 
-    return rota
+    return obter_rota(rota_id=rota.id, db=db, actor=actor)
 
 
 @router.post("/{rota_id}/fechar", response_model=RotaEntregaResponse)
@@ -1029,7 +1029,7 @@ def fechar_rota(
         raise HTTPException(status_code=404, detail="Rota não encontrada")
 
     if rota.status == "concluida":
-        return rota
+        return obter_rota(rota_id=rota.id, db=db, actor=actor)
 
     entregador = db.query(Cliente).filter(
         Cliente.id == rota.entregador_id,
@@ -1139,7 +1139,7 @@ def fechar_rota(
     # - Registrar custo no DRE (incluindo custo da moto)
     # (entrará na ETAPA 5)
 
-    return rota
+    return obter_rota(rota_id=rota.id, db=db, actor=actor)
 
 
 @router.get("/{rota_id}/paradas", response_model=List)
@@ -1323,7 +1323,7 @@ def iniciar_rota(
         # Log do erro mas não falha a operação
         logger.info(f"Erro ao enviar notificações de início: {e}")
 
-    return rota
+    return obter_rota(rota_id=rota.id, db=db, actor=actor)
 
 
 @router.post("/{rota_id}/reverter-inicio", response_model=RotaEntregaResponse)
@@ -1537,7 +1537,13 @@ def marcar_parada_entregue(
         raise HTTPException(status_code=404, detail="Rota não encontrada")
 
     if rota.status not in ["em_rota", "em_andamento"]:
-        raise HTTPException(status_code=400, detail="Rota não está em andamento")
+        if rota.status == "pendente":
+            detail = "Para marcar a entrega, primeiro toque em Iniciar Rota."
+        elif rota.status == "concluida":
+            detail = "Esta rota ja foi finalizada."
+        else:
+            detail = f"Rota nao esta em andamento. Status atual: {rota.status}."
+        raise HTTPException(status_code=400, detail=detail)
 
     # Validar parada
     parada = db.query(RotaEntregaParada).filter(
