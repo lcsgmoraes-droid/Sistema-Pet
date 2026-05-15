@@ -223,19 +223,22 @@ def _mapa_validade_proxima_produtos(
 
     rows = (
         db.query(
+            ProdutoLote.id,
             ProdutoLote.produto_id,
             ProdutoLote.nome_lote,
             ProdutoLote.data_validade,
+            ProdutoLote.quantidade_inicial,
+            ProdutoLote.quantidade_disponivel,
         )
         .filter(
             ProdutoLote.produto_id.in_(produto_ids),
             ProdutoLote.tenant_id.in_(tenant_ids),
-            ProdutoLote.data_validade.isnot(None),
             ProdutoLote.status != "excluido",
             func.coalesce(ProdutoLote.quantidade_disponivel, 0) > 0,
         )
         .order_by(
             ProdutoLote.produto_id.asc(),
+            ProdutoLote.data_validade.is_(None).asc(),
             ProdutoLote.data_validade.asc(),
             ProdutoLote.ordem_entrada.asc(),
             ProdutoLote.id.asc(),
@@ -244,14 +247,36 @@ def _mapa_validade_proxima_produtos(
     )
 
     validade_por_produto: dict[int, dict[str, Any]] = {}
-    for produto_id, nome_lote, data_validade in rows:
-        if produto_id in validade_por_produto:
-            continue
+    for (
+        lote_id,
+        produto_id,
+        nome_lote,
+        data_validade,
+        quantidade_inicial,
+        quantidade_disponivel,
+    ) in rows:
+        validade_info = validade_por_produto.setdefault(
+            produto_id,
+            {
+                "validade_proxima_listagem": None,
+                "lote_validade_proxima": None,
+                "lotes_validade_resumo": [],
+            },
+        )
 
-        validade_por_produto[produto_id] = {
-            "validade_proxima_listagem": data_validade,
-            "lote_validade_proxima": nome_lote,
-        }
+        if data_validade and not validade_info["validade_proxima_listagem"]:
+            validade_info["validade_proxima_listagem"] = data_validade
+            validade_info["lote_validade_proxima"] = nome_lote
+
+        validade_info["lotes_validade_resumo"].append(
+            {
+                "id": lote_id,
+                "nome_lote": nome_lote,
+                "data_validade": data_validade,
+                "quantidade_inicial": float(quantidade_inicial or 0),
+                "quantidade_disponivel": float(quantidade_disponivel or 0),
+            }
+        )
 
     return validade_por_produto
 
@@ -564,6 +589,7 @@ def _enriquecer_produto_listagem(
     validade_info = validade_por_produto.get(produto.id, {})
     produto.validade_proxima_listagem = validade_info.get("validade_proxima_listagem")
     produto.lote_validade_proxima = validade_info.get("lote_validade_proxima")
+    produto.lotes_validade_resumo = validade_info.get("lotes_validade_resumo", [])
     produto.estoque_reservado = estoque_reservado
     if produto.tipo_produto in ("KIT", "VARIACAO") and produto.tipo_kit == "VIRTUAL":
         produto.estoque_disponivel = float(produto.estoque_virtual or 0)
@@ -1127,6 +1153,16 @@ class LoteResponse(BaseModel):
     created_at: datetime
 
 
+class LoteValidadeResumoResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    nome_lote: str
+    data_validade: Optional[datetime] = None
+    quantidade_inicial: float = 0
+    quantidade_disponivel: float = 0
+
+
 class ProdutoResponse(ProdutoBase):
     model_config = ConfigDict(from_attributes=True)
 
@@ -1153,6 +1189,7 @@ class ProdutoResponse(ProdutoBase):
     validade_proxima: Optional[datetime] = None
     validade_proxima_listagem: Optional[datetime] = None
     lote_validade_proxima: Optional[str] = None
+    lotes_validade_resumo: List[LoteValidadeResumoResponse] = Field(default_factory=list)
     # Sistema Predecessor/Sucessor
     data_descontinuacao: Optional[datetime] = None  # Data em que foi marcado como descontinuado
     predecessor_nome: Optional[str] = None  # Nome do produto predecessor (populado manualmente)

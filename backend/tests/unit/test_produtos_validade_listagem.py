@@ -34,9 +34,9 @@ def test_mapa_validade_proxima_produtos_usa_primeira_validade_por_produto():
     primeira_validade = datetime(2026, 6, 10)
     validade_mais_distante = datetime(2026, 9, 10)
     rows = [
-        (10, "LOTE-A", primeira_validade),
-        (10, "LOTE-B", validade_mais_distante),
-        (11, "LOTE-C", validade_mais_distante),
+        (101, 10, "LOTE-A", primeira_validade, 10, 2),
+        (102, 10, "LOTE-B", validade_mais_distante, 10, 10),
+        (103, 11, "LOTE-C", validade_mais_distante, 5, 5),
     ]
 
     resultado = routes._mapa_validade_proxima_produtos(
@@ -45,13 +45,48 @@ def test_mapa_validade_proxima_produtos_usa_primeira_validade_por_produto():
         ["tenant-1"],
     )
 
-    assert resultado[10] == {
-        "validade_proxima_listagem": primeira_validade,
-        "lote_validade_proxima": "LOTE-A",
-    }
-    assert resultado[11] == {
-        "validade_proxima_listagem": validade_mais_distante,
-        "lote_validade_proxima": "LOTE-C",
+    assert resultado[10]["validade_proxima_listagem"] == primeira_validade
+    assert resultado[10]["lote_validade_proxima"] == "LOTE-A"
+    assert resultado[10]["lotes_validade_resumo"] == [
+        {
+            "id": 101,
+            "nome_lote": "LOTE-A",
+            "data_validade": primeira_validade,
+            "quantidade_inicial": 10.0,
+            "quantidade_disponivel": 2.0,
+        },
+        {
+            "id": 102,
+            "nome_lote": "LOTE-B",
+            "data_validade": validade_mais_distante,
+            "quantidade_inicial": 10.0,
+            "quantidade_disponivel": 10.0,
+        },
+    ]
+    assert resultado[11]["validade_proxima_listagem"] == validade_mais_distante
+    assert resultado[11]["lote_validade_proxima"] == "LOTE-C"
+
+
+def test_mapa_validade_proxima_produtos_mantem_lote_sem_validade_no_resumo():
+    validade = datetime(2026, 7, 20)
+    rows = [
+        (201, 10, "LOTE-VALIDADE", validade, 10, 3),
+        (202, 10, "LOTE-SEM-VALIDADE", None, 8, 8),
+    ]
+
+    resultado = routes._mapa_validade_proxima_produtos(
+        FakeDb(rows),
+        [SimpleNamespace(id=10)],
+        ["tenant-1"],
+    )
+
+    assert resultado[10]["validade_proxima_listagem"] == validade
+    assert resultado[10]["lotes_validade_resumo"][1] == {
+        "id": 202,
+        "nome_lote": "LOTE-SEM-VALIDADE",
+        "data_validade": None,
+        "quantidade_inicial": 8.0,
+        "quantidade_disponivel": 8.0,
     }
 
 
@@ -86,6 +121,7 @@ def test_enriquecer_produto_listagem_expoe_validade_calculada():
 
     assert produto.validade_proxima_listagem == validade
     assert produto.lote_validade_proxima == "LOTE-A"
+    assert produto.lotes_validade_resumo == []
 
 
 def test_enriquecer_produto_listagem_nao_atribui_property_validade_proxima():
