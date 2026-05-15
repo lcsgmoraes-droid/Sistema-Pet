@@ -1,9 +1,12 @@
-import { AlertTriangle, Plus } from "lucide-react";
+import { AlertTriangle, CreditCard, Plus } from "lucide-react";
 import OperadoraCartaoCard from "../components/operadorasCartao/OperadoraCartaoCard";
 import OperadoraCartaoEmptyState from "../components/operadorasCartao/OperadoraCartaoEmptyState";
 import OperadoraCartaoModal from "../components/operadorasCartao/OperadoraCartaoModal";
 import OperadoraCartaoPadraoInfo from "../components/operadorasCartao/OperadoraCartaoPadraoInfo";
+import ActionButton from "../components/ui/ActionButton";
 import LoadingState from "../components/ui/LoadingState";
+import PageHeader from "../components/ui/PageHeader";
+import Panel from "../components/ui/Panel";
 import { useOperadorasCartaoPage } from "../hooks/useOperadorasCartaoPage";
 import { getGuiaClassNames } from "../utils/guiaHighlight";
 
@@ -34,22 +37,32 @@ function OperadorasCartao() {
   }
 
   return (
-    <div className="p-6">
+    <div className="space-y-6 p-6">
       {destacarOperadoras && (
-        <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900">
+        <div className="rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900">
           Etapa da introducao guiada: comece por <strong>Nova Operadora</strong> e marque uma
           operadora ativa como padrao.
         </div>
       )}
 
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-gray-900 mb-2">Operadoras de Cartao</h1>
-        <p className="text-gray-600">
-          Configure as operadoras de cartao disponiveis (Stone, Cielo, Rede, Getnet, etc)
-        </p>
-      </div>
+      <PageHeader
+        icon={CreditCard}
+        title="Operadoras de Cartao"
+        subtitle="Configure as operadoras de cartao disponiveis para o PDV."
+        actions={
+          <ActionButton
+            onClick={() => abrirModal()}
+            className={destacarOperadoras ? guiaClasses.action : ""}
+            intent={destacarOperadoras ? "warning" : "create"}
+            icon={Plus}
+            size="md"
+          >
+            Nova Operadora
+          </ActionButton>
+        }
+      />
 
-      <div className="bg-amber-50 border border-amber-200 rounded-lg p-4 mb-6">
+      <Panel className="border-amber-200 bg-amber-50">
         <div className="flex items-start gap-3">
           <AlertTriangle className="w-5 h-5 text-amber-600 flex-shrink-0 mt-0.5" />
           <div>
@@ -61,23 +74,9 @@ function OperadorasCartao() {
             </ul>
           </div>
         </div>
-      </div>
+      </Panel>
 
       <OperadoraCartaoPadraoInfo operadora={operadoraPadrao} />
-
-      <div className="mb-6">
-        <button
-          onClick={() => abrirModal()}
-          className={`text-white px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
-            destacarOperadoras
-              ? `bg-amber-600 hover:bg-amber-700 ${guiaClasses.action}`
-              : "bg-blue-600 hover:bg-blue-700"
-          }`}
-        >
-          <Plus className="w-4 h-4" />
-          Nova Operadora
-        </button>
-      </div>
 
       {operadoras.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
