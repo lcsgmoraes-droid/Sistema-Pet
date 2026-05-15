@@ -9,6 +9,7 @@ import {
 import { PawPrint } from 'lucide-react';
 import { formatarIdadeMeses } from '../helpers/idadeHelper';
 import CustomerIdentity from '../components/ui/CustomerIdentity';
+import { useModulos } from '../contexts/ModulosContext';
 
 const listaClinica = (lista = [], fallback = '') => {
   if (Array.isArray(lista) && lista.length > 0) {
@@ -23,6 +24,8 @@ const listaClinica = (lista = [], fallback = '') => {
 const PetDetalhes = () => {
   const { petId } = useParams();
   const navigate = useNavigate();
+  const { moduloAtivo } = useModulos();
+  const moduloVeterinarioAtivo = moduloAtivo('veterinario');
 
   const [pet, setPet] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -58,8 +61,14 @@ const PetDetalhes = () => {
   }, [petId]);
 
   useEffect(() => {
+    if (!moduloVeterinarioAtivo) {
+      setCarteirinha(null);
+      setUltimaVacina(null);
+      setUltimaAlta(null);
+      return;
+    }
     carregarResumoClinico();
-  }, [petId]);
+  }, [petId, moduloVeterinarioAtivo]);
 
   const loadPet = async () => {
     try {
@@ -124,6 +133,7 @@ const PetDetalhes = () => {
   );
 
   const carregarHistoricoInternacoes = async () => {
+    if (!moduloVeterinarioAtivo) return;
     try {
       setLoadingInternacoes(true);
       const response = await vetApi.historicoInternacoesPet(petId);
@@ -137,6 +147,7 @@ const PetDetalhes = () => {
   };
 
   const carregarHistoricoVacinas = async () => {
+    if (!moduloVeterinarioAtivo) return;
     try {
       setLoadingVacinas(true);
       const response = await vetApi.listarVacinasPet(petId);
@@ -159,6 +170,7 @@ const PetDetalhes = () => {
   };
 
   const carregarHistoricoConsultas = async () => {
+    if (!moduloVeterinarioAtivo) return;
     try {
       setLoadingConsultas(true);
       const response = await vetApi.listarConsultas({
@@ -185,6 +197,7 @@ const PetDetalhes = () => {
   };
 
   const carregarExames = async () => {
+    if (!moduloVeterinarioAtivo) return;
     try {
       setLoadingExames(true);
       const response = await vetApi.listarExamesPet(petId);
@@ -198,6 +211,7 @@ const PetDetalhes = () => {
   };
 
   const carregarResumoClinico = async () => {
+    if (!moduloVeterinarioAtivo) return;
     try {
       const [resCarteirinha, resHistoricoInternacoes] = await Promise.all([
         vetApi.obterCarteirinhaPet(petId).catch(() => ({ data: null })),
@@ -316,6 +330,7 @@ const PetDetalhes = () => {
   };
 
   const salvarNovoExame = async () => {
+    if (!moduloVeterinarioAtivo) return;
     if (!novoExame.nome.trim()) return;
 
     try {

@@ -1,8 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { TrendingUp, TrendingDown, Calendar, DollarSign, AlertCircle, Sparkles } from 'lucide-react';
 import api from '../api';
+import { useModulos } from '../contexts/ModulosContext';
 
 const ProjecoesIA = () => {
+  const { moduloAtivo } = useModulos();
+  const financeiroErpAtivo = moduloAtivo('financeiro_erp');
   const [projecoes, setProjecoes] = useState([]);
   const [carregando, setCarregando] = useState(true);
   const [periodoProjecao, setPeriodoProjecao] = useState(30); // dias
@@ -10,9 +13,15 @@ const ProjecoesIA = () => {
 
   useEffect(() => {
     carregarProjecoes();
-  }, [periodoProjecao]);
+  }, [periodoProjecao, financeiroErpAtivo]);
 
   const carregarProjecoes = async () => {
+    if (!financeiroErpAtivo) {
+      setProjecoes([]);
+      setCarregando(false);
+      return;
+    }
+
     setCarregando(true);
     try {
       // Por enquanto, gerar projeções no frontend
