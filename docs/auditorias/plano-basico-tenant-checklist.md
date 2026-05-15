@@ -77,7 +77,7 @@ Status usados:
 | PDV/vendas | Pronto local A/B | Venda completa A/B por API real passou: cliente, produto com lote, caixa, finalizacao, baixa de estoque e bloqueio cruzado. Falta smoke visual no navegador. |
 | Financeiro de vendas | Quase pronto | Finalizacao gerou reflexos financeiros sem 500 no A/B local; falta conferir telas/historico visual. |
 | Cadastros essenciais | Quase pronto | Formas de pagamento e opcoes de racao passaram em criacao/listagem A/B real; retestar edicao/exclusao e demais cadastros. |
-| Configuracoes/usuarios/LGPD | Pendente P1 | Testar salvar dados essenciais, criar usuario e permissao basica. |
+| Configuracoes/usuarios/LGPD | Quase pronto | Usuario operacional PDV A/B passou por API real com permissoes minimas e bloqueio de RBAC; falta smoke visual da tela de usuarios. |
 | Premium bloqueado | Pendente P1 | Smoke de menus e URLs diretas premium em tenant basico. |
 | Landing page/contratacao | Pronto local | Bloco de selecao do Plano Basico criado na landing; cadastro envia `plan=basico` e API grava plano validado. |
 
@@ -87,7 +87,7 @@ Status usados:
 |---|---|---|---|
 | 1. Base tecnica multi-tenant | Cadastro real de tenants A/B, selecao de tenant, migrations limpas e bloqueio de vazamento entre empresas. | Concluido local | Sim, mas ja passou localmente. |
 | 2. Fluxos essenciais do basico | Clientes, pets, produtos, estoque, PDV/vendas, historico financeiro de vendas e cadastros auxiliares. | Em andamento; PDV/vendas A/B local concluido | Sim, enquanto usuarios/permissoes, calculadora/cadastros e smoke visual nao fecharem. |
-| 3. Usuarios e permissoes | Criar usuario do tenant, validar permissoes basicas e bloqueio de acesso indevido. | Pendente P1 | Sim. |
+| 3. Usuarios e permissoes | Criar usuario do tenant, validar permissoes basicas e bloqueio de acesso indevido. | Concluido local por API; falta smoke visual | Sim ate passar no navegador. |
 | 4. Calculadora/catalogos de racao | Validar fluxo visual, persistencia e mensagens de erro sem 500. | Pendente P1 | Sim se fizer parte da promessa comercial inicial. |
 | 5. Landing page e selecao de planos | Exibir planos, destacar Basico, iniciar contratacao com plano escolhido e levar ao cadastro/onboarding correto. | Concluido local | Sim para vender por autoatendimento; falta smoke visual em producao/staging. |
 | 6. A/B visual no navegador | Usar dois tenants reais no browser e conferir que menus, dados e mensagens batem com o plano. | Pendente P1 | Sim antes de abrir para varias empresas. |
@@ -118,6 +118,7 @@ Status usados:
   - Foram usados selecao real de tenant, token real e endpoints reais das telas basicas.
   - A rodada confirmou isolamento em clientes, pets, formas de pagamento e opcoes de racao.
   - A rodada de PDV/vendas `20260515154447` confirmou venda finalizada e bloqueio cruzado entre tenants.
+  - A rodada de usuarios `20260515155144` confirmou operador PDV nao-admin com permissoes minimas, busca/autocomplete isolados e bloqueio de administracao RBAC.
   - A comparacao visual completa por navegador ainda fica pendente para PDV/vendas, financeiro de vendas, usuarios/permissoes e alguns cadastros auxiliares.
 - Data/hora aproximada dos testes: 2026-05-15, madrugada e tarde, horario local.
 
@@ -156,7 +157,8 @@ Status usados:
 | Cadastros | Operadoras de cartao | `/cadastros/financeiro/operadoras` | Endpoints de operadoras | Nao | Tela padronizada visualmente com componentes globais; CRUD ainda nao foi retestado nesta rodada. | `PageHeader`, `ActionButton` e `Panel` aplicados sem alterar regra de negocio. | Pendente P1 |
 | Cadastros | Opcoes de racao | `/cadastros/opcoes-racao` | Endpoints de opcoes de racao | Parcial | Criacao e listagem de linha de racao passaram em A/B real; linha do tenant A nao apareceu no tenant B, e vice-versa. Selects e persistencia de tabela de consumo ainda precisam de reteste completo. | Componentes globais aplicados anteriormente; nesta etapa foram criadas as tabelas auxiliares que o onboarding real exige. | OK parcial |
 | Configuracoes | Configuracao da empresa | `/configuracoes/empresa` ou equivalente | Endpoints de configuracao | Nao | Nao testado nesta rodada final. | Nao houve. | Nao testado |
-| Administracao | Usuarios | `/admin/usuarios` | Endpoints de usuarios | Nao | Deve estar aberto no basico, mas nao foi testado nesta rodada final. | Nao houve. | Nao testado |
+| Administracao | Usuarios | `/admin/usuarios` | `POST/GET /usuarios` | Sim | Admin criou operador PDV em dois tenants; operador logou, recebeu apenas `clientes.visualizar`, `produtos.visualizar`, `vendas.criar` e nao acessou `/usuarios`. | Nenhuma regra de usuario alterada; validado contrato de permissao. | OK local |
+| Administracao | Roles/permissoes | `/admin/usuarios` e perfis | `/roles`, `/permissions` | Sim | Operador sem `usuarios.manage` conseguia criar role e listar permissoes; corrigido para retornar 403 em GET/POST/PUT/DELETE administrativos. | `roles_routes` e `permissions_routes` agora exigem `usuarios.manage`; teste de contrato adicionado. | Corrigido |
 | Premium bloqueado | Campanhas | `/campanhas` | `GET /campanhas/...` | Parcial | Menu/rota deve ficar bloqueado no basico. Antes havia chamadas indiretas gerando 403. | Chamadas indiretas relevantes foram reduzidas. Tela premium completa nao foi retestada. | Corrigido parcial |
 | Premium bloqueado | Veterinario | `/veterinario/*` | `GET /vet/...` | Parcial | Detalhe do pet chamava endpoints vet mesmo no basico. | `PetDetalhes` nao chama endpoints vet sem modulo. | Corrigido |
 | Premium bloqueado | Bling/fiscal/integracoes | Layout/badges | `/integracoes/bling/...` | Sim, por erro observado | Layout chamava badge Bling e recebia 403 quando modulo bloqueado. | Layout ja estava condicionado a `moduloAtivo("bling")` na branch atual; sem nova alteracao nesta etapa. | OK |
@@ -173,6 +175,7 @@ Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada com dois te
 | Estoque | Entrada propria retornou 200 e entrada cruzada em produto de outro tenant retornou 404 | Sim, por endpoint real com produto do tenant autenticado | Nao aplicavel | Nao testado | Cross-tenant por ID de produto retornou 404 | OK parcial |
 | PDV/Vendas | Nao: GET cruzado de venda A/B retornou 404 e listagens ficaram separadas | Sim, venda criada/finalizada com token de cada tenant e estoque baixado somente no produto do tenant | Visualizacao propria 200; visualizacao cruzada 404; edicao/reabertura ainda nao auditada completa | Nao testado | Sem tenant/token segue coberto por suites de auth; acesso direto cruzado a ID de outro tenant retornou 404 | OK local |
 | Financeiro Vendas | Historico/reflexos de venda nao vazaram na rodada A/B local | Sim, finalizacao gerou DRE/financeiro sem 500 depois do alinhamento de schema | Tela visual ainda pendente | Nao testado | Nao testado nesta rodada visual | OK parcial |
+| Usuarios/permissoes | Operador PDV do tenant A nao viu produto/cliente do tenant B e nao administrou RBAC | Sim, admin criou operador com role do proprio tenant | Nao aplicavel nesta rodada | Nao aplicavel nesta rodada | `/usuarios`, `/roles` e `/permissions` retornaram 403 para operador sem `usuarios.manage` | OK local |
 | Cadastros base | Formas de pagamento e linha de racao nao vazaram entre tenants A/B | Sim, por endpoint real com token de cada tenant | Nao testado nesta rodada | Nao testado nesta rodada | Acesso premium direto retornou 403 em Bling e WhatsApp no plano basico | OK parcial |
 | Modulos premium bloqueados | Bling e WhatsApp retornaram 403 no plano basico | Nao aplicavel | Nao aplicavel | Nao aplicavel | 403 observado em chamadas bloqueadas | OK parcial |
 
@@ -201,6 +204,7 @@ Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada com dois te
 | `backend/alembic/versions/om20260515a4_add_venda_retirada_fields.py` | Criacao de venda no fluxo PDV A/B quebrava com 500 porque o modelo esperava campos de retirada que nao existiam no schema local. | Migration idempotente adiciona `vendas.tipo_retirada` e `vendas.palavra_chave_retirada`. | PDV do Plano Basico podia quebrar antes de finalizar a venda. | `alembic upgrade head`; criacao de venda A/B passou. |
 | `backend/alembic/versions/on20260515a5_create_empresa_config_fiscal.py` | Finalizacao de venda abortava a transacao ao buscar configuracao fiscal inexistente no banco. | Migration cria `empresa_config_fiscal` conforme modelo atual, com indice por tenant. | Venda finalizada podia virar 500 por dependencia fiscal opcional. | `alembic upgrade head`; tabela conferida no Postgres; finalizacao A/B avancou. |
 | `backend/alembic/versions/oo20260515a6_add_dre_subcategoria_fields.py` | Geracao de DRE por competencia na finalizacao buscava `dre_subcategorias.custo_pe` e `categoria_financeira_id`, ausentes no schema. | Migration adiciona os campos e FK opcional para `categorias_financeiras`. | Finalizacao de venda ficava vulneravel a 500 em tenants novos. | Venda A/B `20260515154447` finalizou nos dois tenants; estoque baixou corretamente; migrations passaram em banco limpo. |
+| `backend/app/roles_routes.py`, `backend/app/permissions_routes.py`, `backend/tests/unit/test_plano_basico_tenant_contract.py` | Operador PDV sem `usuarios.manage` conseguia criar role e listar permissoes globais. | Endpoints administrativos de roles/permissoes agora exigem `usuarios.manage`; contrato automatizado protege a regra. | Escalada de permissao dentro do tenant por usuario operacional. | Rodada usuario A/B `20260515155144`: `/usuarios`, `/roles` e `/permissions` retornaram 403 para operador; suite tenant/hardening reexecutada. |
 
 ## 6. Pendencias priorizadas
 
@@ -212,7 +216,10 @@ Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada com dois te
 ### P1 - Importante antes de escalar
 
 - Complementar comparacao A/B real entre dois tenants para fluxos ainda nao cobertos:
-  - cadastros auxiliares e usuarios/permissoes.
+  - cadastros auxiliares.
+- Complementar smoke visual no navegador para usuarios/permissoes:
+  - a API A/B ja passou com operador PDV e bloqueio de RBAC;
+  - falta conferir tela de usuarios, criacao de perfil/usuario e mensagens de permissao.
 - Complementar smoke visual no navegador para PDV/vendas:
   - a API A/B ja passou com finalizacao e baixa de estoque;
   - falta conferir estados de tela, mensagens, recibo/historico e ausencia de chamadas premium no console.
@@ -330,6 +337,16 @@ Rodada PDV/vendas A/B `20260515154447`:
 - GET cruzado de venda retornou 404 nos dois sentidos.
 - Produto do tenant A nao apareceu na lista do tenant B, e vice-versa.
 
+Rodada usuarios/permissoes A/B `20260515155144`:
+
+- Tenant A: `03899ca2-56c8-47f6-8aa2-21359d66750a`.
+- Tenant B: `cf980a30-2757-4ff3-9244-30a4e7c3eeed`.
+- Admin criou role `Operador PDV` com `clientes.visualizar`, `produtos.visualizar` e `vendas.criar`.
+- Operador A encontrou produto/cliente do tenant A e nao encontrou produto/cliente do tenant B em busca/autocomplete.
+- Acesso direto cruzado a produto/cliente do tenant B retornou 404.
+- Venda propria pelo operador A foi criada; tentativa de venda com cliente/produto do tenant B retornou 404.
+- `/usuarios`, `/roles` e `/permissions` retornaram 403 para operador sem `usuarios.manage`.
+
 ```powershell
 # Auditoria A/B local historica 2026-05-15
 # 1. semear dois tenants DEV locais diretamente no banco;
@@ -431,7 +448,7 @@ Pendencias manuais que seguem abertas pelo checklist:
 - Formas de pagamento CRUD.
 - Operadoras de cartao.
 - Configuracao da empresa.
-- Usuarios/admin.
+- Usuarios/admin: API A/B concluida; falta smoke visual no navegador.
 - Landing page com selecao de planos e CTA do Plano Basico para contratacao: concluido local; falta smoke visual em staging/producao.
 - PDV/vendas: API A/B concluida; falta smoke visual no navegador.
 - A/B visual no navegador entre dois tenants.
@@ -443,8 +460,8 @@ Pendencias manuais que seguem abertas pelo checklist:
 
 ## Resumo Executivo
 
-- Telas/fluxos basicos com algum teste registrado: 15/22
-- Fluxos OK ou OK parcial: 12
+- Telas/fluxos basicos com algum teste registrado: 16/22
+- Fluxos OK ou OK parcial: 13
 - Corrigidos/registrados nesta trilha: frontend padronizado, onboarding local, tabelas auxiliares de racao, unicidade de pet por tenant, contratacao por plano e schema de PDV/DRE
 - Pendencias P0: 0 confirmadas apos esta branch
 - Pendencias P1: 6

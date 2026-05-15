@@ -121,3 +121,23 @@ def test_premium_routers_remain_gated_in_main():
     for router_name, modulo in required_gates.items():
         assert router_name in main_source
         assert f'dependencies=_module_dependencies("{modulo}")' in main_source
+
+
+def test_rbac_admin_routes_require_user_management_permission():
+    roles_source = _source("backend/app/roles_routes.py")
+    permissions_source = _source("backend/app/permissions_routes.py")
+
+    protected_role_routes = [
+        '@router.get("", response_model=list[dict])\n@require_permission("usuarios.manage")',
+        '@router.post("", response_model=dict)\n@require_permission("usuarios.manage")',
+        '@router.put("/{role_id}", response_model=dict)\n@require_permission("usuarios.manage")',
+        '@router.delete("/{role_id}", status_code=204)\n@require_permission("usuarios.manage")',
+    ]
+
+    for route in protected_role_routes:
+        assert route in roles_source
+
+    assert (
+        '@router.get("/permissions", response_model=List[PermissionResponse])\n'
+        '@require_permission("usuarios.manage")'
+    ) in permissions_source
