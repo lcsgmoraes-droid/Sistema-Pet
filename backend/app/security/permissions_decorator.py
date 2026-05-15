@@ -111,3 +111,98 @@ def require_permission(permission: str):
             return sync_wrapper
     
     return decorator
+
+
+def require_any_permission(permissions: tuple[str, ...]):
+    """
+    Decorator para verificar se o usuario tem ao menos uma das permissoes.
+    A funcao decorada deve ter parametros 'db' e ('current_user' ou 'user_and_tenant').
+    """
+    def decorator(func):
+        @wraps(func)
+        async def async_wrapper(*args, **kwargs):
+            db: Session = kwargs.get('db')
+            current_user = kwargs.get('current_user')
+            user_and_tenant = kwargs.get('user_and_tenant')
+            tenant_id: UUID = None
+
+            if user_and_tenant and isinstance(user_and_tenant, tuple):
+                current_user = user_and_tenant[0]
+                tenant_id = user_and_tenant[1] if len(user_and_tenant) > 1 else None
+                if tenant_id is not None:
+                    set_current_tenant(tenant_id)
+
+            if db is None or current_user is None:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Configuracao de permissao invalida: db e current_user sao obrigatorios"
+                )
+
+            last_error = None
+            for permission in permissions:
+                try:
+                    check_permission(
+                        db,
+                        current_user.id,
+                        permission,
+                        tenant_id,
+                        current_user=current_user,
+                    )
+                    break
+                except HTTPException as exc:
+                    last_error = exc
+            else:
+                detail = "Permissao negada: requer uma destas permissoes: " + ", ".join(permissions)
+                if last_error and last_error.status_code != status.HTTP_403_FORBIDDEN:
+                    raise last_error
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
+
+            if asyncio.iscoroutinefunction(func):
+                return await func(*args, **kwargs)
+            return func(*args, **kwargs)
+
+        @wraps(func)
+        def sync_wrapper(*args, **kwargs):
+            db: Session = kwargs.get('db')
+            current_user = kwargs.get('current_user')
+            user_and_tenant = kwargs.get('user_and_tenant')
+            tenant_id: UUID = None
+
+            if user_and_tenant and isinstance(user_and_tenant, tuple):
+                current_user = user_and_tenant[0]
+                tenant_id = user_and_tenant[1] if len(user_and_tenant) > 1 else None
+                if tenant_id is not None:
+                    set_current_tenant(tenant_id)
+
+            if db is None or current_user is None:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Configuracao de permissao invalida: db e current_user sao obrigatorios"
+                )
+
+            last_error = None
+            for permission in permissions:
+                try:
+                    check_permission(
+                        db,
+                        current_user.id,
+                        permission,
+                        tenant_id,
+                        current_user=current_user,
+                    )
+                    break
+                except HTTPException as exc:
+                    last_error = exc
+            else:
+                detail = "Permissao negada: requer uma destas permissoes: " + ", ".join(permissions)
+                if last_error and last_error.status_code != status.HTTP_403_FORBIDDEN:
+                    raise last_error
+                raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=detail)
+
+            return func(*args, **kwargs)
+
+        if asyncio.iscoroutinefunction(func):
+            return async_wrapper
+        return sync_wrapper
+
+    return decorator

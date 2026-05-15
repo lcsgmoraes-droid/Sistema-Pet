@@ -193,3 +193,46 @@ def test_product_auxiliary_catalog_routes_require_product_permissions():
 
     for route in protected_routes:
         assert route in produtos_source
+
+
+def test_payment_and_operator_catalog_routes_require_sales_or_config_permissions():
+    financeiro_source = _source("backend/app/financeiro_routes.py")
+    operadoras_source = _source("backend/app/operadoras_routes.py")
+    taxas_source = _source("backend/app/formas_pagamento_routes.py")
+
+    financeiro_routes = [
+        '@router.get("/formas-pagamento", response_model=List[FormaPagamentoResponse])\n@require_any_permission(("vendas.criar", "configuracoes.editar"))',
+        '@router.post("/formas-pagamento", response_model=FormaPagamentoResponse, status_code=status.HTTP_201_CREATED)\n@require_permission("configuracoes.editar")',
+        '@router.put("/formas-pagamento/{forma_id}", response_model=FormaPagamentoResponse)\n@require_permission("configuracoes.editar")',
+        '@router.delete("/formas-pagamento/{forma_id}", status_code=status.HTTP_204_NO_CONTENT)\n@require_permission("configuracoes.editar")',
+    ]
+
+    operadoras_routes = [
+        '@router.get("", response_model=List[OperadoraCartaoResponse])\n@require_any_permission(("vendas.criar", "configuracoes.editar"))',
+        '@router.get("/padrao", response_model=OperadoraCartaoResponse)\n@require_any_permission(("vendas.criar", "configuracoes.editar"))',
+        '@router.get("/{operadora_id}", response_model=OperadoraCartaoResponse)\n@require_any_permission(("vendas.criar", "configuracoes.editar"))',
+        '@router.post("", response_model=OperadoraCartaoResponse, status_code=status.HTTP_201_CREATED)\n@require_permission("configuracoes.editar")',
+        '@router.put("/{operadora_id}", response_model=OperadoraCartaoResponse)\n@require_permission("configuracoes.editar")',
+        '@router.delete("/{operadora_id}", status_code=status.HTTP_204_NO_CONTENT)\n@require_permission("configuracoes.editar")',
+    ]
+
+    taxas_routes = [
+        '@router.post("/taxas", response_model=FormaPagamentoTaxaResponse)\n@require_permission("configuracoes.editar")',
+        '@router.get("/taxas/{forma_pagamento_id}", response_model=List[FormaPagamentoTaxaResponse])\n@require_any_permission(("vendas.criar", "configuracoes.editar"))',
+        '@router.put("/taxas/{taxa_id}", response_model=FormaPagamentoTaxaResponse)\n@require_permission("configuracoes.editar")',
+        '@router.delete("/taxas/{taxa_id}")\n@require_permission("configuracoes.editar")',
+        '@router.post("/analisar-venda", response_model=AnaliseVendaResponse)\n@require_any_permission(("vendas.criar", "configuracoes.editar"))',
+    ]
+
+    for route in financeiro_routes:
+        assert route in financeiro_source
+
+    for route in operadoras_routes:
+        assert route in operadoras_source
+
+    for route in taxas_routes:
+        assert route in taxas_source
+
+    assert "FormaPagamento.tenant_id == tenant_id" in taxas_source
+    assert "FormaPagamentoTaxa.tenant_id == tenant_id" in taxas_source
+    assert "ConfiguracaoImposto.tenant_id == tenant_id" in taxas_source

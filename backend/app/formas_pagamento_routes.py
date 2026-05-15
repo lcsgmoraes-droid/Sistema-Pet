@@ -17,6 +17,7 @@ from .formas_pagamento_models import FormaPagamentoTaxa, ConfiguracaoImposto
 from .financeiro_models import FormaPagamento
 from .produtos_models import Produto
 from .empresa_config_fiscal_models import EmpresaConfigFiscal
+from .security.permissions_decorator import require_any_permission, require_permission
 from app.utils.logger import logger
 
 router = APIRouter(prefix="/formas-pagamento", tags=["Formas de Pagamento"])
@@ -99,20 +100,26 @@ class AnaliseVendaResponse(BaseModel):
 # ===== ENDPOINTS - TAXAS =====
 
 @router.post("/taxas", response_model=FormaPagamentoTaxaResponse)
+@require_permission("configuracoes.editar")
 def criar_taxa(
     taxa: FormaPagamentoTaxaCreate, 
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Criar nova taxa para forma de pagamento"""
+    current_user, tenant_id = user_and_tenant
     
     # Verificar se forma de pagamento existe
-    forma = db.query(FormaPagamento).filter(FormaPagamento.id == taxa.forma_pagamento_id).first()
+    forma = db.query(FormaPagamento).filter(
+        FormaPagamento.id == taxa.forma_pagamento_id,
+        FormaPagamento.tenant_id == tenant_id,
+    ).first()
     if not forma:
         raise HTTPException(status_code=404, detail="Forma de pagamento não encontrada")
     
     # Verificar se já existe taxa para esse número de parcelas
     taxa_existente = db.query(FormaPagamentoTaxa).filter(
+        FormaPagamentoTaxa.tenant_id == tenant_id,
         FormaPagamentoTaxa.forma_pagamento_id == taxa.forma_pagamento_id,
         FormaPagamentoTaxa.parcelas == taxa.parcelas
     ).first()
@@ -124,6 +131,7 @@ def criar_taxa(
         )
     
     nova_taxa = FormaPagamentoTaxa(
+        tenant_id=tenant_id,
         forma_pagamento_id=taxa.forma_pagamento_id,
         parcelas=taxa.parcelas,
         taxa_percentual=taxa.taxa_percentual,
@@ -138,14 +146,24 @@ def criar_taxa(
 
 
 @router.get("/taxas/{forma_pagamento_id}", response_model=List[FormaPagamentoTaxaResponse])
+@require_any_permission(("vendas.criar", "configuracoes.editar"))
 def listar_taxas(
     forma_pagamento_id: int,
     db: Session = Depends(get_session),
-    _user_and_tenant=Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Listar todas as taxas de uma forma de pagamento"""
+    current_user, tenant_id = user_and_tenant
+
+    forma = db.query(FormaPagamento).filter(
+        FormaPagamento.id == forma_pagamento_id,
+        FormaPagamento.tenant_id == tenant_id,
+    ).first()
+    if not forma:
+        raise HTTPException(status_code=404, detail="Forma de pagamento nao encontrada")
     
     taxas = db.query(FormaPagamentoTaxa).filter(
+        FormaPagamentoTaxa.tenant_id == tenant_id,
         FormaPagamentoTaxa.forma_pagamento_id == forma_pagamento_id
     ).order_by(FormaPagamentoTaxa.parcelas).all()
     
@@ -153,6 +171,7 @@ def listar_taxas(
 
 
 @router.put("/taxas/{taxa_id}", response_model=FormaPagamentoTaxaResponse)
+@require_permission("configuracoes.editar")
 def atualizar_taxa(
     taxa_id: int, 
     taxa_data: FormaPagamentoTaxaCreate, 
@@ -160,8 +179,19 @@ def atualizar_taxa(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Atualizar taxa existente"""
+    current_user, tenant_id = user_and_tenant
     
-    taxa = db.query(FormaPagamentoTaxa).filter(FormaPagamentoTaxa.id == taxa_id).first()
+    forma = db.query(FormaPagamento).filter(
+        FormaPagamento.id == taxa_data.forma_pagamento_id,
+        FormaPagamento.tenant_id == tenant_id,
+    ).first()
+    if not forma:
+        raise HTTPException(status_code=404, detail="Forma de pagamento nao encontrada")
+
+    taxa = db.query(FormaPagamentoTaxa).filter(
+        FormaPagamentoTaxa.id == taxa_id,
+        FormaPagamentoTaxa.tenant_id == tenant_id,
+    ).first()
     if not taxa:
         raise HTTPException(status_code=404, detail="Taxa não encontrada")
     
@@ -177,14 +207,19 @@ def atualizar_taxa(
 
 
 @router.delete("/taxas/{taxa_id}")
+@require_permission("configuracoes.editar")
 def deletar_taxa(
     taxa_id: int, 
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Deletar taxa"""
+    current_user, tenant_id = user_and_tenant
     
-    taxa = db.query(FormaPagamentoTaxa).filter(FormaPagamentoTaxa.id == taxa_id).first()
+    taxa = db.query(FormaPagamentoTaxa).filter(
+        FormaPagamentoTaxa.id == taxa_id,
+        FormaPagamentoTaxa.tenant_id == tenant_id,
+    ).first()
     if not taxa:
         raise HTTPException(status_code=404, detail="Taxa não encontrada")
     
@@ -197,6 +232,7 @@ def deletar_taxa(
 # ===== ENDPOINT - ANÁLISE DE VENDA =====
 
 @router.post("/analisar-venda", response_model=AnaliseVendaResponse)
+@require_any_permission(("vendas.criar", "configuracoes.editar"))
 def analisar_venda(
     dados: AnaliseVendaRequest,
     db: Session = Depends(get_session),
@@ -280,7 +316,8 @@ def analisar_venda(
         try:
             for forma_pag_item in dados.formas_pagamento:
                 forma_pag = db.query(FormaPagamento).filter(
-                    FormaPagamento.id == forma_pag_item.forma_pagamento_id
+                    FormaPagamento.id == forma_pag_item.forma_pagamento_id,
+                    FormaPagamento.tenant_id == tenant_id,
                 ).first()
                 
                 if not forma_pag:
@@ -317,6 +354,7 @@ def analisar_venda(
                 # TERCEIRO: Buscar na tabela formas_pagamento_taxas
                 if taxa_percentual == 0:
                     taxa_obj = db.query(FormaPagamentoTaxa).filter(
+                        FormaPagamentoTaxa.tenant_id == tenant_id,
                         FormaPagamentoTaxa.forma_pagamento_id == forma_pag_item.forma_pagamento_id,
                         FormaPagamentoTaxa.parcelas == forma_pag_item.parcelas
                     ).first()
@@ -378,6 +416,7 @@ def analisar_venda(
             else:
                 # 🔹 Prioridade 2: Imposto padrão cadastrado
                 config_imposto = db.query(ConfiguracaoImposto).filter(
+                    ConfiguracaoImposto.tenant_id == tenant_id,
                     ConfiguracaoImposto.ativo == True,
                     ConfiguracaoImposto.padrao == True
                 ).first()

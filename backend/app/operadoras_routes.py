@@ -16,6 +16,7 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.models import User
 from app.operadoras_models import OperadoraCartao
 from app.vendas_models import VendaPagamento
+from app.security.permissions_decorator import require_any_permission, require_permission
 
 router = APIRouter(prefix="/operadoras-cartao", tags=["Operadoras de Cartão"])
 
@@ -187,10 +188,11 @@ def desmarcar_outras_operadoras_padrao(db: Session, tenant_id: str, operadora_id
 # ============================================================================
 
 @router.get("", response_model=List[OperadoraCartaoResponse])
+@require_any_permission(("vendas.criar", "configuracoes.editar"))
 def listar_operadoras(
     apenas_ativas: bool = False,
     db: Session = Depends(get_session),
-    current_user_tenant: tuple = Depends(get_current_user_and_tenant)
+    user_and_tenant: tuple = Depends(get_current_user_and_tenant)
 ):
     """
     Lista todas as operadoras de cartão do tenant
@@ -198,7 +200,7 @@ def listar_operadoras(
     Query Parameters:
         - apenas_ativas: Se True, retorna apenas operadoras ativas
     """
-    current_user, tenant_id = current_user_tenant
+    current_user, tenant_id = user_and_tenant
     ensure_operadoras_table_exists(db)
     
     query = db.query(OperadoraCartao).filter(
@@ -224,16 +226,17 @@ def listar_operadoras(
 
 
 @router.get("/padrao", response_model=OperadoraCartaoResponse)
+@require_any_permission(("vendas.criar", "configuracoes.editar"))
 def obter_operadora_padrao(
     db: Session = Depends(get_session),
-    current_user_tenant: tuple = Depends(get_current_user_and_tenant)
+    user_and_tenant: tuple = Depends(get_current_user_and_tenant)
 ):
     """
     Retorna a operadora padrão do tenant
     
     Usado pelo PDV para pré-selecionar a operadora ao registrar venda com cartão
     """
-    current_user, tenant_id = current_user_tenant
+    current_user, tenant_id = user_and_tenant
     ensure_operadoras_table_exists(db)
     
     operadora = db.query(OperadoraCartao).filter(
@@ -254,13 +257,14 @@ def obter_operadora_padrao(
 
 
 @router.get("/{operadora_id}", response_model=OperadoraCartaoResponse)
+@require_any_permission(("vendas.criar", "configuracoes.editar"))
 def obter_operadora(
     operadora_id: int,
     db: Session = Depends(get_session),
-    current_user_tenant: tuple = Depends(get_current_user_and_tenant)
+    user_and_tenant: tuple = Depends(get_current_user_and_tenant)
 ):
     """Retorna uma operadora específica"""
-    current_user, tenant_id = current_user_tenant
+    current_user, tenant_id = user_and_tenant
     ensure_operadoras_table_exists(db)
     
     operadora = db.query(OperadoraCartao).filter(
@@ -280,10 +284,11 @@ def obter_operadora(
 
 
 @router.post("", response_model=OperadoraCartaoResponse, status_code=status.HTTP_201_CREATED)
+@require_permission("configuracoes.editar")
 def criar_operadora(
     operadora_data: OperadoraCartaoCreate,
     db: Session = Depends(get_session),
-    current_user_tenant: tuple = Depends(get_current_user_and_tenant)
+    user_and_tenant: tuple = Depends(get_current_user_and_tenant)
 ):
     """
     Cria nova operadora de cartão
@@ -291,7 +296,7 @@ def criar_operadora(
     Validações:
     - ⚠️ ALERTA 2: Se marcar como padrão, desmarca as outras
     """
-    current_user, tenant_id = current_user_tenant
+    current_user, tenant_id = user_and_tenant
     ensure_operadoras_table_exists(db)
     
     # Se marcar como padrão, desmarca as outras
@@ -313,11 +318,12 @@ def criar_operadora(
 
 
 @router.put("/{operadora_id}", response_model=OperadoraCartaoResponse)
+@require_permission("configuracoes.editar")
 def atualizar_operadora(
     operadora_id: int,
     operadora_data: OperadoraCartaoUpdate,
     db: Session = Depends(get_session),
-    current_user_tenant: tuple = Depends(get_current_user_and_tenant)
+    user_and_tenant: tuple = Depends(get_current_user_and_tenant)
 ):
     """
     Atualiza operadora existente
@@ -326,7 +332,7 @@ def atualizar_operadora(
     - ⚠️ ALERTA 2: Não permite desmarcar padrão se for a única
     - Se marcar como padrão, desmarca as outras
     """
-    current_user, tenant_id = current_user_tenant
+    current_user, tenant_id = user_and_tenant
     ensure_operadoras_table_exists(db)
     
     # Busca operadora
@@ -363,10 +369,11 @@ def atualizar_operadora(
 
 
 @router.delete("/{operadora_id}", status_code=status.HTTP_204_NO_CONTENT)
+@require_permission("configuracoes.editar")
 def excluir_operadora(
     operadora_id: int,
     db: Session = Depends(get_session),
-    current_user_tenant: tuple = Depends(get_current_user_and_tenant)
+    user_and_tenant: tuple = Depends(get_current_user_and_tenant)
 ):
     """
     Exclui operadora (soft delete - apenas marca como inativa)
@@ -375,7 +382,7 @@ def excluir_operadora(
     - ⚠️ ALERTA 2: Não permite excluir se for a única operadora padrão ativa
     - ⚠️ ALERTA 3: Não permite excluir se tiver vendas vinculadas
     """
-    current_user, tenant_id = current_user_tenant
+    current_user, tenant_id = user_and_tenant
     ensure_operadoras_table_exists(db)
     
     # Busca operadora

@@ -20,6 +20,7 @@ from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
 from .models import User
 from .financeiro_models import CategoriaFinanceira, FormaPagamento
+from .security.permissions_decorator import require_any_permission, require_permission
 
 router = APIRouter(prefix="/financeiro", tags=["Financeiro - Configurações"])
 
@@ -219,15 +220,16 @@ def desativar_categoria(
 # ============================================================================
 
 @router.get("/formas-pagamento", response_model=List[FormaPagamentoResponse])
+@require_any_permission(("vendas.criar", "configuracoes.editar"))
 def listar_formas_pagamento(
     apenas_ativas: bool = True,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
     Lista todas as formas de pagamento com todos os campos
     """
-    current_user, tenant_id = current_user_and_tenant
+    current_user, tenant_id = user_and_tenant
     query = db.query(FormaPagamento).filter(
         FormaPagamento.tenant_id == tenant_id
     )
@@ -248,15 +250,16 @@ def listar_formas_pagamento(
 
 
 @router.post("/formas-pagamento", response_model=FormaPagamentoResponse, status_code=status.HTTP_201_CREATED)
+@require_permission("configuracoes.editar")
 def criar_forma_pagamento(
     forma: FormaPagamentoCreate,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
     Cria nova forma de pagamento com todos os campos
     """
-    current_user, tenant_id = current_user_and_tenant
+    current_user, tenant_id = user_and_tenant
     nova_forma = FormaPagamento(
         nome=forma.nome,
         tipo=forma.tipo,
@@ -294,16 +297,17 @@ def criar_forma_pagamento(
 
 
 @router.put("/formas-pagamento/{forma_id}", response_model=FormaPagamentoResponse)
+@require_permission("configuracoes.editar")
 def atualizar_forma_pagamento(
     forma_id: int,
     forma: FormaPagamentoCreate,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
     Atualiza forma de pagamento com todos os campos
     """
-    current_user, tenant_id = current_user_and_tenant
+    current_user, tenant_id = user_and_tenant
     f = db.query(FormaPagamento).filter(
         FormaPagamento.id == forma_id,
         FormaPagamento.tenant_id == tenant_id
@@ -348,15 +352,16 @@ def atualizar_forma_pagamento(
 
 
 @router.delete("/formas-pagamento/{forma_id}", status_code=status.HTTP_204_NO_CONTENT)
+@require_permission("configuracoes.editar")
 def excluir_forma_pagamento(
     forma_id: int,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
     Exclui permanentemente uma forma de pagamento
     """
-    current_user, tenant_id = current_user_and_tenant
+    current_user, tenant_id = user_and_tenant
     
     forma = db.query(FormaPagamento).filter(
         FormaPagamento.id == forma_id,
