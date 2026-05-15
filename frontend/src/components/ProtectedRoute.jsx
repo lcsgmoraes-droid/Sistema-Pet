@@ -22,7 +22,7 @@ const ProtectedRoute = ({
   }
 
   // Se uma permissão específica é exigida
-  if (permission || requiredPermissions) {
+  if (permission || requiredPermissions || anyOfPermissions) {
     const userPermissions = user?.permissions || [];
     const roleName = user?.role?.name?.toLowerCase();
 

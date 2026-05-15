@@ -9,7 +9,7 @@ from typing import List, Optional
 import logging
 
 from .db import get_session
-from .auth import get_current_user, get_current_user_and_tenant
+from .auth import get_current_user_and_tenant
 from .models import User, Cliente, Pet
 from .produtos_models import Produto, Lembrete
 from .vendas_models import Venda
@@ -46,7 +46,6 @@ async def criar_lembrete(
 ):
     """Criar novo lembrete para um produto recorrente"""
     current_user, tenant_id = user_and_tenant
-    
     try:
         import json
         
@@ -179,7 +178,7 @@ async def listar_lembretes_para_notificar(
         
         # Lembretes que atingiram a data de notificação (7 dias antes)
         lembretes = db.query(Lembrete).filter(
-            Lembrete.user_id == current_user.id,
+            Lembrete.tenant_id == tenant_id,
             Lembrete.status == 'pendente',
             Lembrete.notificacao_enviada == False,
             Lembrete.data_notificacao_7_dias <= agora
@@ -211,10 +210,11 @@ async def listar_lembretes_para_notificar(
 @router.post("/{lembrete_id}/notificar", summary="Marcar notificação como enviada")
 async def marcar_notificacao_enviada(
     lembrete_id: int,
-    current_user: User = Depends(get_current_user),
+    user_and_tenant = Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session)
 ):
     """Marcar que a notificação foi enviada para este lembrete"""
+    current_user, tenant_id = user_and_tenant
     try:
         lembrete = db.query(Lembrete).filter(
             Lembrete.id == lembrete_id,

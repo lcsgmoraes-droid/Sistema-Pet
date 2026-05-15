@@ -35,6 +35,7 @@ def test_basic_plan_route_files_use_selected_tenant_dependency():
         "backend/app/usuarios_routes.py",
         "backend/app/categorias_routes.py",
         "backend/app/cadastros_routes.py",
+        "backend/app/lembretes.py",
         "backend/app/chat_routes.py",
         "backend/app/opcoes_racao_routes.py",
         "backend/app/calculadora_racao.py",
@@ -280,13 +281,57 @@ def test_company_configuration_routes_require_configuration_permissions():
     assert 'card.modulo && !moduloAtivo(card.modulo)' in configuracoes_source
 
 
+def test_protected_route_enforces_any_of_permissions():
+    protected_route_source = _source("frontend/src/components/ProtectedRoute.jsx")
+
+    assert "permission || requiredPermissions || anyOfPermissions" in protected_route_source
+
+
+def test_rh_simulation_page_is_module_gated_on_direct_url():
+    app_source = _source("frontend/src/App.jsx")
+
+    assert 'path="simulacao-contratacao"' in app_source
+    assert 'element={<ModuleGate modulo="rh"><SimulacaoContratacao /></ModuleGate>}' in app_source
+
+
+def test_basic_direct_urls_apply_same_frontend_permissions_as_menu():
+    app_source = _source("frontend/src/App.jsx")
+
+    expected_route_guards = [
+        'path="pets" element={<ProtectedRoute permission="clientes.visualizar"><GerenciamentoPets /></ProtectedRoute>}',
+        'path="pets/novo" element={<ProtectedRoute permission="clientes.visualizar"><PetForm /></ProtectedRoute>}',
+        'path="pets/:petId" element={<ProtectedRoute permission="clientes.visualizar"><PetDetalhes /></ProtectedRoute>}',
+        'path="pets/:petId/editar" element={<ProtectedRoute permission="clientes.visualizar"><PetForm /></ProtectedRoute>}',
+        'element={<ProtectedRoute permission="produtos.visualizar"><MovimentacoesProduto /></ProtectedRoute>}',
+        'element={<ProtectedRoute permission="produtos.visualizar"><ProdutosRelatorio /></ProtectedRoute>}',
+        'element={<ProtectedRoute permission="produtos.visualizar"><CalculadoraRacao /></ProtectedRoute>}',
+        'path="meus-caixas" element={<ProtectedRoute permission="vendas.criar"><MeusCaixas /></ProtectedRoute>}',
+        'path="cadastros/departamentos" element={<ProtectedRoute permission="cadastros.categorias_produtos"><Departamentos /></ProtectedRoute>}',
+        'path="cadastros/marcas" element={<ProtectedRoute permission="cadastros.categorias_produtos"><Marcas /></ProtectedRoute>}',
+        'path="cadastros/categorias" element={<ProtectedRoute permission="cadastros.categorias_produtos"><Categorias /></ProtectedRoute>}',
+        'element={<ProtectedRoute permission="cadastros.categorias_financeiras"><TipoDespesa /></ProtectedRoute>}',
+        'element={<ProtectedRoute permission="cadastros.especies_racas"><EspeciesRacas /></ProtectedRoute>}',
+    ]
+
+    for route_guard in expected_route_guards:
+        assert route_guard in app_source
+
+
+def test_lembretes_use_selected_tenant_context():
+    lembretes_source = _source("backend/app/lembretes.py")
+
+    assert "Depends(get_current_user)" not in lembretes_source
+    assert "Lembrete.tenant_id == tenant_id" in lembretes_source
+    assert "Lembrete.user_id == current_user.id" not in lembretes_source
+
+
 def test_product_catalog_auxiliary_pages_are_basic_catalog_not_premium_modules():
     app_source = _source("frontend/src/App.jsx")
     layout_source = _source("frontend/src/components/Layout.jsx")
 
-    assert 'path="cadastros/departamentos" element={<Departamentos />}' in app_source
-    assert 'path="cadastros/marcas" element={<Marcas />}' in app_source
-    assert 'path="cadastros/categorias" element={<Categorias />}' in app_source
+    assert 'path="cadastros/departamentos" element={<ProtectedRoute permission="cadastros.categorias_produtos"><Departamentos /></ProtectedRoute>}' in app_source
+    assert 'path="cadastros/marcas" element={<ProtectedRoute permission="cadastros.categorias_produtos"><Marcas /></ProtectedRoute>}' in app_source
+    assert 'path="cadastros/categorias" element={<ProtectedRoute permission="cadastros.categorias_produtos"><Categorias /></ProtectedRoute>}' in app_source
 
     departamentos_menu_start = layout_source.index('path: "/cadastros/departamentos"')
     departamentos_menu_end = layout_source.index('path: "/cadastros/marcas"', departamentos_menu_start)

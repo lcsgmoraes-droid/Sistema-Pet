@@ -378,10 +378,10 @@ function App() {
                   />
 
                   {/* Rotas de Pets - Módulo Dedicado */}
-                  <Route path="pets" element={<GerenciamentoPets />} />
-                  <Route path="pets/novo" element={<PetForm />} />
-                  <Route path="pets/:petId" element={<PetDetalhes />} />
-                  <Route path="pets/:petId/editar" element={<PetForm />} />
+                  <Route path="pets" element={<ProtectedRoute permission="clientes.visualizar"><GerenciamentoPets /></ProtectedRoute>} />
+                  <Route path="pets/novo" element={<ProtectedRoute permission="clientes.visualizar"><PetForm /></ProtectedRoute>} />
+                  <Route path="pets/:petId" element={<ProtectedRoute permission="clientes.visualizar"><PetDetalhes /></ProtectedRoute>} />
+                  <Route path="pets/:petId/editar" element={<ProtectedRoute permission="clientes.visualizar"><PetForm /></ProtectedRoute>} />
 
                   {/* ========================================
                 🩺 MÓDULO VETERINÁRIO
@@ -452,11 +452,11 @@ function App() {
                   {/* Rotas auxiliares de produtos (mantidas) */}
                   <Route
                     path="produtos/:id/movimentacoes"
-                    element={<MovimentacoesProduto />}
+                    element={<ProtectedRoute permission="produtos.visualizar"><MovimentacoesProduto /></ProtectedRoute>}
                   />
                   <Route
                     path="produtos/relatorio"
-                    element={<ProdutosRelatorio />}
+                    element={<ProtectedRoute permission="produtos.visualizar"><ProdutosRelatorio /></ProtectedRoute>}
                   />
                   <Route
                     path="produtos/validade-proxima"
@@ -509,7 +509,7 @@ function App() {
                   <Route path="lembretes" element={<Lembretes />} />
                   <Route
                     path="calculadora-racao"
-                    element={<CalculadoraRacao />}
+                    element={<ProtectedRoute permission="produtos.visualizar"><CalculadoraRacao /></ProtectedRoute>}
                   />
 
                   {/* Rotas de Vendas */}
@@ -521,7 +521,7 @@ function App() {
                       </ProtectedRoute>
                     }
                   />
-                  <Route path="meus-caixas" element={<MeusCaixas />} />
+                  <Route path="meus-caixas" element={<ProtectedRoute permission="vendas.criar"><MeusCaixas /></ProtectedRoute>} />
                   <Route path="notas-fiscais" element={<Navigate to="/notas-fiscais/saida" replace />} />
                   <Route path="notas-fiscais/vendas" element={<Navigate to="/notas-fiscais/saida" replace />} />
                   <Route path="notas-fiscais/saida" element={<ModuleGate modulo="fiscal"><CentralNFSaida /></ModuleGate>} />
@@ -762,16 +762,16 @@ function App() {
                   <Route path="subcategorias" element={<Subcategorias />} />
 
                   {/* Rotas de Cadastros */}
-                  <Route path="cadastros/departamentos" element={<Departamentos />} />
-                  <Route path="cadastros/marcas" element={<Marcas />} />
-                  <Route path="cadastros/categorias" element={<Categorias />} />
+                  <Route path="cadastros/departamentos" element={<ProtectedRoute permission="cadastros.categorias_produtos"><Departamentos /></ProtectedRoute>} />
+                  <Route path="cadastros/marcas" element={<ProtectedRoute permission="cadastros.categorias_produtos"><Marcas /></ProtectedRoute>} />
+                  <Route path="cadastros/categorias" element={<ProtectedRoute permission="cadastros.categorias_produtos"><Categorias /></ProtectedRoute>} />
                   <Route
                     path="cadastros/tipos-despesa"
-                    element={<TipoDespesa />}
+                    element={<ProtectedRoute permission="cadastros.categorias_financeiras"><TipoDespesa /></ProtectedRoute>}
                   />
                   <Route
                     path="cadastros/despesas-rapidas"
-                    element={<TipoDespesa />}
+                    element={<ProtectedRoute permission="cadastros.categorias_financeiras"><TipoDespesa /></ProtectedRoute>}
                   />
                   <Route
                     path="cadastros/categorias-financeiras"
@@ -779,7 +779,7 @@ function App() {
                   />
                   <Route
                     path="cadastros/especies-racas"
-                    element={<EspeciesRacas />}
+                    element={<ProtectedRoute permission="cadastros.especies_racas"><EspeciesRacas /></ProtectedRoute>}
                   />
                   <Route path="cadastros/cargos" element={<ModuleGate modulo="rh"><Cargos /></ModuleGate>} />
                   <Route
@@ -871,7 +871,7 @@ function App() {
                   <Route path="projecao-caixa" element={<ModuleGate modulo="financeiro_erp"><ProjecaoCaixa /></ModuleGate>} />
                   <Route
                     path="simulacao-contratacao"
-                    element={<SimulacaoContratacao />}
+                    element={<ModuleGate modulo="rh"><SimulacaoContratacao /></ModuleGate>}
                   />
                   <Route path="rh/funcionarios" element={<ModuleGate modulo="rh"><Funcionarios /></ModuleGate>} />
                   <Route
