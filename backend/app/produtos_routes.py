@@ -432,6 +432,11 @@ def _only_digits(value: Optional[str]) -> str:
     return "".join(ch for ch in str(value or "") if ch.isdigit())
 
 
+def _should_use_digit_fallback(value: Optional[str]) -> bool:
+    termo = str(value or "").strip()
+    return bool(termo) and not any(ch.isalpha() for ch in termo)
+
+
 def _digits_expr(column):
     return func.regexp_replace(func.coalesce(column, ""), "[^0-9]", "", "g")
 
@@ -461,7 +466,7 @@ def _produto_search_conditions(palavra: str):
         conditions.append(_unaccent_ilike(PRODUTO_SKU_COLUMN, busca_pattern))
 
     digitos = _only_digits(termo)
-    if len(digitos) >= 4:
+    if len(digitos) >= 4 and _should_use_digit_fallback(termo):
         digitos_pattern = f"%{digitos}%"
         conditions.extend(
             [
@@ -494,7 +499,7 @@ def _produto_search_conditions_fast(palavra: str):
         conditions.append(PRODUTO_SKU_COLUMN.ilike(prefix_pattern))
 
     digitos = _only_digits(termo)
-    if len(digitos) >= 4:
+    if len(digitos) >= 4 and _should_use_digit_fallback(termo):
         digits_prefix = f"{digitos}%"
         conditions.extend(
             [
