@@ -147,7 +147,7 @@ Status usados:
 | Pets | Criar pet vinculado a tutor | `/pets/novo?cliente_id=...` | `POST /pets` | Sim | Pet criado por endpoint real em dois tenants; ambos puderam usar `10001-PET-0001` sem colisao, isolado por tenant. | Corrigida busca de pets que duplicava join com cliente e unicidade de codigo de pet passou a ser por tenant. | OK |
 | Pets | Detalhe do pet | `/pets/:petId` | `GET /pets/{id}` e antes endpoints vet | Parcial | Tela de pet basico nao deve chamar carteirinha/internacoes veterinarias se modulo vet estiver bloqueado. | `PetDetalhes` agora evita chamadas vet e oculta abas vet quando `veterinario` nao esta ativo. | Corrigido |
 | Pets | Editar/excluir pet | `/pets/:id/editar` | `PUT/DELETE /pets/{id}` | Sim | Auditoria A/B estendida confirmou edicao/exclusao no proprio tenant e 404 em tentativa cruzada. | Nenhuma nesta branch. | OK |
-| Pets | Cadastro rapido de especie/raca | `/pets/novo` e modal rapido | `POST /cadastros/especies`, `POST /cadastros/racas` | Parcial | Houve erro anterior ao criar raca sem `especie_id`; nao foi foco desta branch final. | Nao corrigido nesta branch. | Pendente P1 |
+| Pets | Cadastro rapido de especie/raca | `/pets/novo` e modal rapido | `POST /cadastros/especies`, `POST /cadastros/racas` | Sim por navegador | Smoke visual criou especie e raca por modal rapido no tenant basico; raca entrou selecionada no formulario; chamadas de especies/racas retornaram 201/200 sem 500. A tentativa de raca sem especie fica bloqueada/explicada no frontend. | `PetForm` limpa raca ao trocar especie, bloqueia quick-add de raca sem especie e `QuickAddModal` valida `especie_id` antes de chamar API; contrato inclui `cadastros_routes.py` no tenant selecionado. | OK local + smoke visual |
 | Produtos | Listar produtos | `/produtos` | `GET /produtos` | Sim | Auditoria A/B confirmou que produto do tenant A aparece no A e nao aparece no B, e vice-versa. | Nenhuma nesta branch. | OK |
 | Produtos | Criar produto | `/produtos/novo` | `POST /produtos` | Sim | Produto criado por endpoint real em dois tenants; acesso direto cruzado a `/produtos/{id}` retornou 404. | Nenhuma nesta branch. | OK |
 | Produtos | Editar produto | `/produtos/:id/editar` | `PUT /produtos/{id}` | Sim | Auditoria A/B estendida confirmou edicao no proprio tenant e 404 em tentativa cruzada. Checklist exaustivo de todos os campos segue pendente. | Correcoes anteriores na trilha de catalogos/racao. | OK parcial |
@@ -209,6 +209,7 @@ Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada com dois te
 | `frontend/src/components/ProjecoesIA.jsx` | Fluxo/projecoes chamavam financeiro ERP sem modulo ativo. | Componente agora nao chama API quando `financeiro_erp` esta bloqueado. | Chamadas premium indevidas e 403 em plano basico. | `npm --prefix frontend run build`. |
 | `frontend/src/hooks/useClientesNovoCadastro.js` | Cadastro/edicao de cliente podia buscar saldo de campanhas no plano basico. | `loadSaldoCampanhas` agora respeita `moduloAtivo("campanhas")`. | 403 no cadastro/financeiro do cliente e ruido em fluxo basico. | `npm --prefix frontend run build`. |
 | `frontend/src/pages/PetDetalhes.jsx` | Detalhe do pet chamava carteirinha/internacoes/consultas/exames vet mesmo com modulo veterinario bloqueado. | Chamadas vet agora sao ignoradas quando `veterinario` nao esta ativo. | 403 em tela basica de pet e vazamento de experiencia premium. | `npm --prefix frontend run build`. |
+| `frontend/src/pages/PetForm.jsx`, `frontend/src/components/QuickAddModal.jsx`, `backend/app/cadastros_routes.py`, `backend/tests/unit/test_plano_basico_tenant_contract.py` | Cadastro rapido de raca podia depender de `especie_id` invalido e o contrato do Plano Basico nao monitorava `cadastros_routes.py`. | `PetForm` bloqueia raca sem especie, limpa raca ao trocar especie e usa nome da especie selecionada; `QuickAddModal` valida `especie_id`, mostra erro corrigivel e tem `id/name` no campo; contrato passou a cobrir a rota de cadastros. | Empresa nova poderia ver erro pouco claro ou raca presa na especie errada durante cadastro de pet; regressao de tenant em especies/racas ficaria sem alerta automatizado. | Smoke visual `202605151900`: especie e raca criadas pelo modal, raca selecionada, chamadas 201/200; contrato `10 passed`; build frontend passou. |
 | `frontend/src/App.jsx` | Warnings do React Router sobre flags futuras. | Ativadas flags `v7_startTransition` e `v7_relativeSplatPath`. | Ruido no console durante testes. | `npm --prefix frontend run build`. |
 | `frontend/src/pages/Login.jsx` | Warning de autocomplete em campos de senha. | Adicionado `autoComplete="username"` e `autoComplete="current-password"`. | Ruido no console/navegador. | `npm --prefix frontend run build`. |
 | `frontend/src/pages/Register.jsx` | Warning de autocomplete em campos de senha/cadastro. | Adicionado `autoComplete="email"` e `autoComplete="new-password"`. | Ruido no console/navegador. | `npm --prefix frontend run build`. |
@@ -261,9 +262,6 @@ Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada com dois te
   - categorias/departamentos/marcas visualmente;
   - formas de pagamento alem do smoke de listagem sem premium;
   - configuracao da empresa.
-- Retestar cadastro rapido de especie/raca:
-  - nao permitir raca sem especie;
-  - garantir que o item criado aparece no select imediatamente.
 - Conferir endpoint sem token/tenant para areas basicas:
   - deve retornar 401/403;
   - nao deve retornar dados.
@@ -489,6 +487,7 @@ Rodada estendida `866987` + reteste de estoque:
 - Smoke visual/API de LGPD operacional com busca de titular e dossie: testado.
 - Smoke visual de Calculadora de Racao com operador nao-admin, busca, calculo e comparativo: testado.
 - Smoke visual de Opcoes de Racao com listagem, criacao/edicao/inativacao de linha e criacao/inativacao de apresentacao: testado.
+- Smoke visual de cadastro rapido de especie/raca no formulario de pet: especie criada, raca criada, raca selecionada e chamadas 201/200.
 - Smoke visual de bloqueio de permissao para operador/usuario sem acesso: testado.
 - Health check de producao: apenas endpoint de saude consultado, sem deploy e sem alteracao.
 
@@ -507,6 +506,8 @@ Rodada estendida `866987` + reteste de estoque:
 - Smoke visual de calculadora/opcoes de racao `20260515181603`: chamadas 200, console limpo e CRUD visual de opcoes validado.
 - Contrato focado Plano Basico/racao reexecutado apos o smoke visual: `14 passed`.
 - Build frontend apos ajustes de labels/ids em calculadora/opcoes de racao: `npm --prefix frontend run build`, resultado passou.
+- Contrato Plano Basico apos ajuste de cadastro rapido especie/raca: `10 passed`.
+- Build frontend apos ajuste de `PetForm`/`QuickAddModal`: `npm --prefix frontend run build`, resultado passou.
 - Build frontend apos refactor de Roles/LGPD: `npm --prefix frontend run build`, resultado passou.
 - Py compile das migrations e arquivos backend alterados: passou.
 - Migrations completas em Postgres limpo reexecutadas ate `oq20260515a8`.
@@ -565,9 +566,8 @@ Correcoes registradas naquela rodada:
 Pendencias manuais que seguem abertas pelo checklist:
 
 - Financeiro do cliente.
-- Cadastro rapido de especie/raca.
 - Editar produto com todos os campos.
-- Calculadora de racao na UI: API A/B concluida; falta smoke visual.
+- Calculadora de racao na UI: API A/B e smoke visual concluidos.
 - Catalogos auxiliares de produto: API A/B concluida; falta smoke visual.
 - Formas de pagamento e operadoras: API A/B e smoke visual concluidos; falta CRUD completo no navegador.
 - Configuracao da empresa.
@@ -583,10 +583,10 @@ Pendencias manuais que seguem abertas pelo checklist:
 ## Resumo Executivo
 
 - Telas/fluxos basicos com algum teste registrado: 22/23
-- Fluxos OK ou OK parcial: 19
+- Fluxos OK ou OK parcial: 20
 - Corrigidos/registrados nesta trilha: frontend padronizado, onboarding local, tabelas auxiliares de racao/LGPD/e-commerce, unicidade de pet por tenant, contratacao por plano, schema de PDV/DRE, Roles & Permissoes e chamadas premium indevidas no Basico
 - Pendencias P0: 0 confirmadas apos esta branch
 - Pendencias P1: 3
 - Pendencias P2: 5
-- Minha recomendacao: liberar para revisao/merge em ambiente de teste/staging. Para producao/comercial controlada, seguir depois de retestar cadastro rapido de especie/raca, configuracao da empresa, lote/validade no navegador e cadastros auxiliares de produto restantes.
+- Minha recomendacao: liberar para revisao/merge em ambiente de teste/staging. Para producao/comercial controlada, seguir depois de retestar configuracao da empresa, lote/validade no navegador e cadastros auxiliares de produto restantes.
 

@@ -71,6 +71,9 @@ const PetForm = () => {
     foto_url: '',
     ativo: true
   });
+  const especieSelecionadaAtual = especies.find(
+    (especie) => String(especie.id) === String(formData.especie)
+  );
 
   useEffect(() => {
     const loadData = async () => {
@@ -191,6 +194,14 @@ const PetForm = () => {
 
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
+    if (name === 'especie') {
+      setFormData(prev => ({
+        ...prev,
+        especie: value,
+        raca: ''
+      }));
+      return;
+    }
     setFormData(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value
@@ -199,6 +210,11 @@ const PetForm = () => {
 
   // Funções para Quick Add
   const abrirQuickAdd = (tipo) => {
+    if (tipo === 'raca' && !especieSelecionadaAtual) {
+      setError('Escolha uma especie antes de cadastrar uma raca. Depois, clique em Nova novamente.');
+      return;
+    }
+    setError('');
     setQuickAddTipo(tipo);
     setShowQuickAddModal(true);
   };
@@ -210,16 +226,21 @@ const PetForm = () => {
 
   const handleQuickAddSuccess = (novoItem) => {
     if (quickAddTipo === 'especie') {
-      // Recarregar espécies e selecionar a nova
-      loadEspecies().then(() => {
-        setFormData(prev => ({ ...prev, especie: novoItem.id.toString() }));
+      setEspecies(prev => {
+        const semDuplicar = prev.filter((especie) => especie.id !== novoItem.id);
+        return [...semDuplicar, novoItem].sort((a, b) => a.nome.localeCompare(b.nome));
       });
+      setFormData(prev => ({ ...prev, especie: novoItem.id.toString(), raca: '' }));
+      loadEspecies();
     } else if (quickAddTipo === 'raca') {
-      // Recarregar raças e selecionar a nova
-      if (formData.especie) {
-        loadRacasPorEspecie(formData.especie).then(() => {
-          setFormData(prev => ({ ...prev, raca: novoItem.nome }));
+      const especieId = novoItem.especie_id || formData.especie;
+      if (especieId) {
+        setRacas(prev => {
+          const semDuplicar = prev.filter((raca) => raca.id !== novoItem.id);
+          return [...semDuplicar, novoItem].sort((a, b) => a.nome.localeCompare(b.nome));
         });
+        setFormData(prev => ({ ...prev, raca: novoItem.nome }));
+        loadRacasPorEspecie(especieId);
       }
     }
   };
@@ -487,7 +508,7 @@ const PetForm = () => {
               </div>
               {formData.especie && racas.length === 0 && (
                 <p className="text-xs text-amber-600 mt-1">
-                  Nenhuma raça cadastrada para {formData.especie}. Cadastre em Cadastros → Espécies e Raças.
+                  Nenhuma raça cadastrada para {especieSelecionadaAtual?.nome || 'a espécie selecionada'}.
                 </p>
               )}
             </div>
@@ -812,8 +833,8 @@ const PetForm = () => {
       {showQuickAddModal && (
         <QuickAddModal
           tipo={quickAddTipo}
-          especieId={quickAddTipo === 'raca' ? parseInt(formData.especie) : null}
-          especieNome={quickAddTipo === 'raca' ? especies.find(e => e.id === parseInt(formData.especie))?.nome : null}
+          especieId={quickAddTipo === 'raca' ? Number.parseInt(formData.especie, 10) : null}
+          especieNome={quickAddTipo === 'raca' ? especieSelecionadaAtual?.nome : null}
           onSuccess={handleQuickAddSuccess}
           onClose={fecharQuickAdd}
         />

@@ -34,6 +34,7 @@ def test_basic_plan_route_files_use_selected_tenant_dependency():
         "backend/app/formas_pagamento_routes.py",
         "backend/app/usuarios_routes.py",
         "backend/app/categorias_routes.py",
+        "backend/app/cadastros_routes.py",
         "backend/app/chat_routes.py",
         "backend/app/opcoes_racao_routes.py",
         "backend/app/calculadora_racao.py",
@@ -193,6 +194,16 @@ def test_product_auxiliary_catalog_routes_require_product_permissions():
 
     for route in protected_routes:
         assert route in produtos_source
+
+
+def test_pet_quick_add_blocks_race_without_selected_species():
+    pet_form_source = _source("frontend/src/pages/PetForm.jsx")
+    quick_add_source = _source("frontend/src/components/QuickAddModal.jsx")
+
+    assert "Escolha uma especie antes de cadastrar uma raca" in pet_form_source
+    assert "raca: ''" in pet_form_source
+    assert "Selecione uma especie antes de cadastrar a raca" in quick_add_source
+    assert "especie_id: especieIdNormalizado" in quick_add_source
 
 
 def test_payment_and_operator_catalog_routes_require_sales_or_config_permissions():
