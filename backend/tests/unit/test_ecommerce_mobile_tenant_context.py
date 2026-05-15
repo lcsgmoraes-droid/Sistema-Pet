@@ -5,7 +5,12 @@ from uuid import uuid4
 from jose import jwt
 
 from app.auth.core import ALGORITHM
-from app.api.endpoints.rotas_entrega import _validate_ecommerce_entregador_actor
+from app.api.endpoints.rotas_entrega import (
+    DeliveryActor,
+    _activate_delivery_actor_tenant,
+    _rota_filters_for_actor,
+    _validate_ecommerce_entregador_actor,
+)
 from app.config import JWT_SECRET_KEY
 from app.routes.ecommerce_auth import (
     _extract_tenant_id_from_request,
@@ -215,4 +220,19 @@ def test_delivery_actor_ecommerce_token_sets_tenant_context():
     assert actor.user is user
     assert actor.tenant_id == tenant_id
     assert actor.entregador is cliente
+    assert get_current_tenant() == tenant_id
+
+
+def test_delivery_route_helpers_reactivate_tenant_context_from_actor():
+    tenant_id = uuid4()
+    actor = DeliveryActor(user=SimpleNamespace(id=123), tenant_id=tenant_id, entregador=None)
+    clear_current_tenant()
+
+    assert _activate_delivery_actor_tenant(actor) == tenant_id
+    assert get_current_tenant() == tenant_id
+
+    clear_current_tenant()
+    filters = _rota_filters_for_actor(actor, 202)
+
+    assert filters
     assert get_current_tenant() == tenant_id

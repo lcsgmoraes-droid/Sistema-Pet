@@ -163,8 +163,14 @@ def _is_int_like(value: object) -> bool:
     return str(value).strip().isdigit()
 
 
+def _activate_delivery_actor_tenant(actor: DeliveryActor) -> UUID:
+    set_current_tenant(actor.tenant_id)
+    return actor.tenant_id
+
+
 def _rota_filters_for_actor(actor: DeliveryActor, rota_ref):
-    filters = [RotaEntrega.tenant_id == actor.tenant_id]
+    tenant_id = _activate_delivery_actor_tenant(actor)
+    filters = [RotaEntrega.tenant_id == tenant_id]
     if _is_int_like(rota_ref):
         filters.append(RotaEntrega.id == int(str(rota_ref).strip()))
     else:
@@ -406,7 +412,7 @@ def registrar_recebimento_entregador(
     - NÃO baixa financeiro ainda.
     - Apenas registra intenção de cobrança para ficar pronto para integração Stone/operadora.
     """
-    tenant_id = actor.tenant_id
+    tenant_id = _activate_delivery_actor_tenant(actor)
 
     forma = (payload.forma_pagamento or "").strip().lower()
     formas_validas = {"pix", "cartao_debito", "cartao_credito"}
@@ -644,7 +650,7 @@ def obter_rota(
     """
     Obtém detalhes de uma rota específica.
     """
-    tenant_id = actor.tenant_id
+    tenant_id = _activate_delivery_actor_tenant(actor)
     ensure_rotas_entrega_schema(db)
 
     from sqlalchemy.orm import joinedload
@@ -775,7 +781,7 @@ def criar_rota(
     2. Rota múltipla (N vendas): Informar vendas_ids (lista)
     """
     user = actor.user
-    tenant_id = actor.tenant_id
+    tenant_id = _activate_delivery_actor_tenant(actor)
     entregador_id = actor.entregador.id if actor.entregador is not None else payload.entregador_id
     vendas_ids = payload.vendas_ids or payload.venda_ids
 
@@ -1014,7 +1020,7 @@ def fechar_rota(
 
     Se km_inicial e km_final forem informados, calcula distancia_real automaticamente.
     """
-    tenant_id = actor.tenant_id
+    tenant_id = _activate_delivery_actor_tenant(actor)
     ensure_rotas_entrega_schema(db)
 
     rota = db.query(RotaEntrega).filter(*_rota_filters_for_actor(actor, rota_id)).first()
@@ -1183,7 +1189,7 @@ def reordenar_paradas(
         PUT /rotas-entrega/123/paradas/reordenar
         Body: [45, 47, 46]  # Ordem: parada 45 primeiro, depois 47, depois 46
     """
-    tenant_id = actor.tenant_id
+    tenant_id = _activate_delivery_actor_tenant(actor)
     if isinstance(nova_ordem, dict):
         ordem_ids = nova_ordem.get("parada_ids") or nova_ordem.get("nova_ordem")
     else:
@@ -1241,7 +1247,7 @@ def iniciar_rota(
     - Registra KM inicial da moto (opcional)
     - Dispara eventos de mensagens
     """
-    tenant_id = actor.tenant_id
+    tenant_id = _activate_delivery_actor_tenant(actor)
     ensure_rotas_entrega_schema(db)
 
     # Validar rota
@@ -1383,7 +1389,7 @@ def atualizar_localizacao_rota(
     """
     Atualiza a localização atual do entregador para rastreio ao vivo.
     """
-    tenant_id = actor.tenant_id
+    tenant_id = _activate_delivery_actor_tenant(actor)
     ensure_rotas_entrega_schema(db)
 
     rota = db.query(RotaEntrega).filter(*_rota_filters_for_actor(actor, rota_id)).first()
@@ -1522,7 +1528,7 @@ def marcar_parada_entregue(
         lat_entrega: Latitude GPS no momento da entrega (opcional)
         lon_entrega: Longitude GPS no momento da entrega (opcional)
     """
-    tenant_id = actor.tenant_id
+    tenant_id = _activate_delivery_actor_tenant(actor)
 
     # Validar rota
     rota = db.query(RotaEntrega).filter(*_rota_filters_for_actor(actor, rota_id)).first()
@@ -1654,7 +1660,7 @@ def marcar_parada_nao_entregue(
     Marca parada como não entregue e reverte venda para status 'aberto'.
     Usada quando entrega não pode ser realizada (cliente ausente, cartão recusado, etc).
     """
-    tenant_id = actor.tenant_id
+    tenant_id = _activate_delivery_actor_tenant(actor)
 
     # Validar rota
     rota = db.query(RotaEntrega).filter(*_rota_filters_for_actor(actor, rota_id)).first()
