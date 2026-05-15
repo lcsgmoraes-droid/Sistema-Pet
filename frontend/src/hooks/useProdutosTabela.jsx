@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { formatarData } from "../api/produtos";
-import { obterEstoqueVisualProduto } from "../components/produtos/produtosUtils";
+import {
+  montarTooltipLotesValidade,
+  obterEstoqueVisualProduto,
+  obterLotesValidadeDisponiveis,
+} from "../components/produtos/produtosUtils";
 
 const normalizeExpandId = (value) => String(value ?? "");
 const PRODUTOS_COLUNAS_STORAGE_KEY = "produtos_colunas_visiveis";
@@ -86,16 +90,22 @@ export default function useProdutosTabela({
   };
 
   const getValidadeMaisProxima = (produto) => {
-    const lotes = (produto.lotes || [])
-      .filter((lote) => lote.data_validade)
-      .sort((a, b) => new Date(a.data_validade) - new Date(b.data_validade));
+    const lotes = obterLotesValidadeDisponiveis(produto);
+    const primeiroLoteComValidade = lotes.find((lote) => lote.data_validade);
 
     const proximaValidade =
-      lotes[0]?.data_validade ||
+      primeiroLoteComValidade?.data_validade ||
       produto.validade_proxima_listagem ||
       produto.validade_proxima;
+    const tooltip = montarTooltipLotesValidade(lotes, formatarData);
 
-    if (!proximaValidade) return "-";
+    if (!proximaValidade) {
+      return (
+        <span className="cursor-help text-gray-500" title={tooltip}>
+          -
+        </span>
+      );
+    }
 
     const dias = Math.floor(
       (new Date(proximaValidade) - new Date()) / (1000 * 60 * 60 * 24),
@@ -106,7 +116,11 @@ export default function useProdutosTabela({
     else if (dias <= 30) cor = "text-orange-600 font-semibold";
     else if (dias <= 90) cor = "text-yellow-600";
 
-    return <span className={cor}>{formatarData(proximaValidade)}</span>;
+    return (
+      <span className={`${cor} cursor-help`} title={tooltip}>
+        {formatarData(proximaValidade)}
+      </span>
+    );
   };
 
   const garantirLinhaVisivel = (produtoId) => {

@@ -4,16 +4,21 @@ import ChannelBadges from "../ui/ChannelBadges";
 import DataTable from "../ui/DataTable";
 import MoneyCell from "../ui/MoneyCell";
 import PaginationControls from "../ui/PaginationControls";
-import { obterCanaisAtivosProduto, obterEstoqueVisualProduto } from "./produtosUtils";
+import {
+  montarTooltipLotesValidade,
+  obterCanaisAtivosProduto,
+  obterEstoqueVisualProduto,
+  obterLotesValidadeDisponiveis,
+} from "./produtosUtils";
 
 function obterValidadeResumoProduto(produto) {
-  const lotes = (produto?.lotes || [])
-    .filter((lote) => lote?.data_validade)
-    .sort((a, b) => new Date(a.data_validade) - new Date(b.data_validade));
+  const lotes = obterLotesValidadeDisponiveis(produto);
+  const primeiroLoteComValidade = lotes.find((lote) => lote.data_validade);
   const validadeProxima =
-    lotes[0]?.data_validade ||
+    primeiroLoteComValidade?.data_validade ||
     produto?.validade_proxima_listagem ||
     produto?.validade_proxima;
+  const tooltip = montarTooltipLotesValidade(lotes, formatarData);
 
   if (!validadeProxima) {
     return {
@@ -21,6 +26,7 @@ function obterValidadeResumoProduto(produto) {
       apoio: "Sem lote com validade",
       className: "text-gray-500",
       surfaceClassName: "bg-gray-50 border-gray-200",
+      tooltip,
     };
   }
 
@@ -36,6 +42,7 @@ function obterValidadeResumoProduto(produto) {
       apoio: `${Math.abs(dias)} dia(s) vencido`,
       className: "text-red-700",
       surfaceClassName: "bg-red-50 border-red-200",
+      tooltip,
     };
   }
 
@@ -45,6 +52,7 @@ function obterValidadeResumoProduto(produto) {
       apoio: `Vence em ${dias} dia(s)`,
       className: "text-orange-700",
       surfaceClassName: "bg-orange-50 border-orange-200",
+      tooltip,
     };
   }
 
@@ -54,6 +62,7 @@ function obterValidadeResumoProduto(produto) {
       apoio: `Vence em ${dias} dia(s)`,
       className: "text-yellow-700",
       surfaceClassName: "bg-yellow-50 border-yellow-200",
+      tooltip,
     };
   }
 
@@ -62,6 +71,7 @@ function obterValidadeResumoProduto(produto) {
     apoio: `Vence em ${dias} dia(s)`,
     className: "text-gray-700",
     surfaceClassName: "bg-gray-50 border-gray-200",
+    tooltip,
   };
 }
 
@@ -313,7 +323,10 @@ export default function ProdutosTabelaSection({
                     </div>
 
                     <div className="mt-3 flex gap-2">
-                      <div className={`min-w-0 flex-1 rounded-lg border p-2 ${validade.surfaceClassName}`}>
+                      <div
+                        className={`min-w-0 flex-1 rounded-lg border p-2 ${validade.surfaceClassName}`}
+                        title={validade.tooltip}
+                      >
                         <p className="text-[10px] font-semibold uppercase text-gray-500">
                           Validade
                         </p>
