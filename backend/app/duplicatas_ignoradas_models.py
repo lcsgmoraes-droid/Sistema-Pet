@@ -19,7 +19,7 @@ class DuplicataIgnorada(Base):
     __tablename__ = "duplicatas_ignoradas"
     
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False, index=True)
+    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     
     # Os dois produtos do par (sempre salvar em ordem: menor ID primeiro)
     produto_id_1 = Column(Integer, ForeignKey("produtos.id"), nullable=False, index=True)

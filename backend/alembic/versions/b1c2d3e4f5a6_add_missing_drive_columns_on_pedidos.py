@@ -22,10 +22,15 @@ def upgrade() -> None:
     """Upgrade schema."""
     op.execute(
         """
-        ALTER TABLE pedidos
-        ADD COLUMN IF NOT EXISTS is_drive BOOLEAN NOT NULL DEFAULT false,
-        ADD COLUMN IF NOT EXISTS drive_chegou_at TIMESTAMPTZ,
-        ADD COLUMN IF NOT EXISTS drive_entregue_at TIMESTAMPTZ
+        DO $$
+        BEGIN
+            IF to_regclass('public.pedidos') IS NOT NULL THEN
+                ALTER TABLE pedidos
+                ADD COLUMN IF NOT EXISTS is_drive BOOLEAN NOT NULL DEFAULT false,
+                ADD COLUMN IF NOT EXISTS drive_chegou_at TIMESTAMPTZ,
+                ADD COLUMN IF NOT EXISTS drive_entregue_at TIMESTAMPTZ;
+            END IF;
+        END $$;
         """
     )
 
@@ -34,9 +39,14 @@ def downgrade() -> None:
     """Downgrade schema."""
     op.execute(
         """
-        ALTER TABLE pedidos
-        DROP COLUMN IF EXISTS drive_entregue_at,
-        DROP COLUMN IF EXISTS drive_chegou_at,
-        DROP COLUMN IF EXISTS is_drive
+        DO $$
+        BEGIN
+            IF to_regclass('public.pedidos') IS NOT NULL THEN
+                ALTER TABLE pedidos
+                DROP COLUMN IF EXISTS drive_entregue_at,
+                DROP COLUMN IF EXISTS drive_chegou_at,
+                DROP COLUMN IF EXISTS is_drive;
+            END IF;
+        END $$;
         """
     )

@@ -11,6 +11,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from sqlalchemy import inspect
 
 # revision identifiers, used by Alembic.
 revision: str = 'd3e4f5a6b7c8'
@@ -20,6 +21,12 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
+    bind = op.get_bind()
+    inspector = inspect(bind)
+    columns = {column['name'] for column in inspector.get_columns('clientes')}
+    if 'data_nascimento' in columns:
+        return
+
     op.add_column(
         'clientes',
         sa.Column('data_nascimento', sa.DateTime(), nullable=True)
@@ -27,4 +34,8 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_column('clientes', 'data_nascimento')
+    bind = op.get_bind()
+    inspector = inspect(bind)
+    columns = {column['name'] for column in inspector.get_columns('clientes')}
+    if 'data_nascimento' in columns:
+        op.drop_column('clientes', 'data_nascimento')

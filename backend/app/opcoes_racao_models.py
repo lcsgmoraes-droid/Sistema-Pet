@@ -4,7 +4,7 @@ Models para Opções de Classificação de Rações
 Tabelas auxiliares para cadastros dinâmicos
 """
 
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, ForeignKey
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from .db import Base
@@ -15,7 +15,7 @@ class LinhaRacao(Base):
     __tablename__ = "linhas_racao"
 
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     nome = Column(String(100), nullable=False, index=True)
     descricao = Column(String(255), nullable=True)
     ordem = Column(Integer, default=0)
@@ -29,7 +29,7 @@ class PorteAnimal(Base):
     __tablename__ = "portes_animal"
 
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     nome = Column(String(100), nullable=False, index=True)
     descricao = Column(String(255), nullable=True)
     ordem = Column(Integer, default=0)
@@ -43,7 +43,7 @@ class FasePublico(Base):
     __tablename__ = "fases_publico"
 
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     nome = Column(String(100), nullable=False, index=True)
     descricao = Column(String(255), nullable=True)
     ordem = Column(Integer, default=0)
@@ -57,7 +57,7 @@ class TipoTratamento(Base):
     __tablename__ = "tipos_tratamento"
 
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     nome = Column(String(100), nullable=False, index=True)
     descricao = Column(String(255), nullable=True)
     ordem = Column(Integer, default=0)
@@ -71,7 +71,7 @@ class SaborProteina(Base):
     __tablename__ = "sabores_proteina"
 
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     nome = Column(String(100), nullable=False, index=True)
     descricao = Column(String(255), nullable=True)
     ordem = Column(Integer, default=0)
@@ -85,7 +85,7 @@ class ApresentacaoPeso(Base):
     __tablename__ = "apresentacoes_peso"
 
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id", ondelete="CASCADE"), nullable=False, index=True)
+    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
     peso_kg = Column(Float, nullable=False, index=True)
     descricao = Column(String(100), nullable=True)  # Ex: "15kg", "10.1kg"
     ordem = Column(Integer, default=0)
