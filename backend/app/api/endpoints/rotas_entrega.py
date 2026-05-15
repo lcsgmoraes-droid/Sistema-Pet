@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query, status
 from fastapi.security import HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from pydantic import BaseModel, Field
@@ -13,7 +13,7 @@ from math import radians, sin, cos, sqrt, atan2
 from typing import List, Optional
 import secrets
 
-from app.db import get_session
+from app.db import SessionLocal, get_session
 from app.auth.core import ALGORITHM, get_current_user_from_token
 from app.auth.dependencies import get_current_user_and_tenant, security
 from app.config import JWT_SECRET_KEY
@@ -31,7 +31,7 @@ from app.services.google_maps_service import calcular_distancia_km, calcular_rot
 from app.services.notificacao_entrega_service import notificar_inicio_rota, notificar_proximo_cliente
 from app.models_configuracao_custo_moto import ConfiguracaoCustoMoto
 from app.session_manager import get_session_by_jti
-from app.tenancy.context import set_current_tenant
+from app.tenancy.context import clear_current_tenant, set_current_tenant
 from app.utils.logger import logger
 
 router = APIRouter(prefix="/rotas-entrega", tags=["Entregas - Rotas"])
@@ -243,6 +243,17 @@ def _contar_paradas_nao_entregues(db: Session, rota_id: int, tenant_id) -> int:
         RotaEntregaParada.tenant_id == tenant_id,
         RotaEntregaParada.status != "entregue",
     ).count()
+
+
+def _notificar_proximo_cliente_background(rota_id: int, parada_ordem: int, tenant_id) -> None:
+    try:
+        set_current_tenant(tenant_id)
+        with SessionLocal() as db:
+            notificar_proximo_cliente(db, rota_id, parada_ordem, tenant_id)
+    except Exception as exc:
+        logger.info(f"Erro ao notificar proximo cliente em background: {exc}")
+    finally:
+        clear_current_tenant()
 
 
 @router.get("/", response_model=List[RotaEntregaResponse])
@@ -1512,6 +1523,7 @@ def atualizar_localizacao_rota(
 def marcar_parada_entregue(
     rota_id: str,
     parada_id: int,
+    background_tasks: BackgroundTasks,
     tentativa: bool = False,
     km_entrega: Optional[float] = None,
     lat_entrega: Optional[float] = None,
@@ -1605,7 +1617,16 @@ def marcar_parada_entregue(
 
         # ETAPA 9.4: Disparar mensagem para próximo cliente
         try:
-            notificou = notificar_proximo_cliente(db, rota.id, parada.ordem, tenant_id)
+            if background_tasks is not None:
+                background_tasks.add_task(
+                    _notificar_proximo_cliente_background,
+                    rota.id,
+                    parada.ordem,
+                    tenant_id,
+                )
+                notificou = False
+            else:
+                notificou = notificar_proximo_cliente(db, rota.id, parada.ordem, tenant_id)
             if notificou:
                 mensagem += " Próximo cliente foi notificado."
         except Exception as e:

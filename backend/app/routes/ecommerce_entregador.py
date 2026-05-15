@@ -6,7 +6,7 @@ from typing import List, Optional
 from uuid import UUID
 import secrets
 
-from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
+from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
@@ -447,6 +447,7 @@ def atualizar_localizacao_rota_entregador(
 def marcar_parada_entregue_entregador(
     rota_id: str,
     parada_id: int,
+    background_tasks: BackgroundTasks,
     tentativa: bool = False,
     km_entrega: Optional[float] = None,
     lat_entrega: Optional[float] = None,
@@ -471,6 +472,7 @@ def marcar_parada_entregue_entregador(
         km_entrega=km_entrega,
         lat_entrega=lat_entrega,
         lon_entrega=lon_entrega,
+        background_tasks=background_tasks,
         db=db,
         actor=_delivery_actor(cliente, tenant_id),
     )

@@ -1,4 +1,4 @@
-import { useNavigation } from '@react-navigation/native';
+import { RouteProp, useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import { NativeStackNavigationProp } from '@react-navigation/native-stack';
 import React, { useCallback, useEffect, useState } from 'react';
 import {
@@ -43,6 +43,7 @@ interface EntregaAberta {
 }
 
 type Nav = NativeStackNavigationProp<EntregadorStackParamList, 'MinhasRotas'>;
+type RouteProps = RouteProp<EntregadorStackParamList, 'MinhasRotas'>;
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
@@ -61,6 +62,7 @@ function badgeFor(status: string) {
 
 export default function RotasDoEntregadorScreen() {
   const navigation = useNavigation<Nav>();
+  const route = useRoute<RouteProps>();
   const [aba, setAba] = useState<'abertas' | 'rotas'>('abertas');
 
   const [entregasAbertas, setEntregasAbertas] = useState<EntregaAberta[]>([]);
@@ -72,7 +74,7 @@ export default function RotasDoEntregadorScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  const carregar = useCallback(async () => {
+  const carregar = useCallback(async (mostrarErro = true) => {
     try {
       const [rotasRes, abertasRes] = await Promise.allSettled([
         api.get<Rota[]>('/ecommerce/entregador/minhas-rotas'),
@@ -90,18 +92,33 @@ export default function RotasDoEntregadorScreen() {
         carregouAlgumaLista = true;
       }
 
-      if (!carregouAlgumaLista) {
+      if (!carregouAlgumaLista && mostrarErro) {
         Alert.alert('Erro', 'Nao foi possivel carregar as entregas. Tente novamente.');
       }
     } catch {
-      Alert.alert('Erro', 'Não foi possível carregar as entregas. Tente novamente.');
+      if (mostrarErro) {
+        Alert.alert('Erro', 'Nao foi possivel carregar as entregas. Tente novamente.');
+      }
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, []);
 
-  useEffect(() => { carregar(); }, [carregar]);
+  useEffect(() => {
+    const rotaFinalizadaId = route.params?.rotaFinalizadaId;
+    if (!rotaFinalizadaId) return;
+
+    setRotas((prev) => prev.filter((rota) => rota.id !== rotaFinalizadaId));
+    setAba('rotas');
+    navigation.setParams({ rotaFinalizadaId: undefined, refreshKey: undefined });
+  }, [navigation, route.params?.refreshKey, route.params?.rotaFinalizadaId]);
+
+  useFocusEffect(
+    useCallback(() => {
+      void carregar(false);
+    }, [carregar]),
+  );
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);

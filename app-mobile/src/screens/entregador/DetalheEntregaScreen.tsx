@@ -16,6 +16,7 @@ import {
 import DraggableFlatList, {
   RenderItemParams,
 } from "react-native-draggable-flatlist";
+import { NativeStackNavigationProp } from "@react-navigation/native-stack";
 import KeyboardSafeScrollView from "../../components/KeyboardSafeScrollView";
 import api from "../../services/api";
 import { EntregadorStackParamList } from "../../types/entregadorNavigation";
@@ -85,6 +86,7 @@ function reordenarParadasPorPosicao(
 }
 
 type RouteProps = RouteProp<EntregadorStackParamList, "DetalheEntrega">;
+type Nav = NativeStackNavigationProp<EntregadorStackParamList, "DetalheEntrega">;
 
 function obterMensagemErro(error: unknown, fallback: string) {
   if (
@@ -167,7 +169,7 @@ const STATUS_BADGE: Record<
 // ─── Componente ──────────────────────────────────────────────────────────────
 
 export default function DetalheEntregaScreen() {
-  const navigation = useNavigation();
+  const navigation = useNavigation<Nav>();
   const route = useRoute<RouteProps>();
   const { rotaId, numero } = route.params;
 
@@ -225,6 +227,13 @@ export default function DetalheEntregaScreen() {
     navigation.setOptions({ title: `Rota #${numero}` });
     carregar();
   }, [carregar, navigation, numero]);
+
+  const voltarParaListaComRotaFinalizada = useCallback(() => {
+    navigation.navigate("MinhasRotas", {
+      rotaFinalizadaId: rota?.id ?? rotaId,
+      refreshKey: Date.now(),
+    });
+  }, [navigation, rota?.id, rotaId]);
 
   useEffect(() => {
     if (!rota || !["em_rota", "em_andamento"].includes(rota.status)) {
@@ -516,12 +525,16 @@ export default function DetalheEntregaScreen() {
         await api.post(`/ecommerce/entregador/rotas/${rotaId}/fechar`, {
           tentativas: 1,
         });
-        Alert.alert('Sucesso', 'Rota finalizada com sucesso.');
-        await carregar();
+        await carregar(false);
+        Alert.alert('Sucesso', 'Rota finalizada com sucesso.', [
+          { text: 'OK', onPress: voltarParaListaComRotaFinalizada },
+        ]);
       } catch (error) {
         const rotaAtualizada = await carregar(false);
         if (rotaAtualizada?.status === "concluida") {
-          Alert.alert('Sucesso', 'Rota finalizada com sucesso.');
+          Alert.alert('Sucesso', 'Rota finalizada com sucesso.', [
+            { text: 'OK', onPress: voltarParaListaComRotaFinalizada },
+          ]);
           return;
         }
 
