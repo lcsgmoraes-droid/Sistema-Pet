@@ -22,7 +22,7 @@ def get_user_permissions(db: Session, user_id: int, tenant_id: UUID) -> set[str]
         )
         .all()
     )
-    return {p[0] for p in perms}
+    return set(expand_permissions([p[0] for p in perms]))
 
 
 def check_permission(

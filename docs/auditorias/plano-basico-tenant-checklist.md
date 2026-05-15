@@ -69,16 +69,16 @@ Status usados:
 | Area | Status atual | Proxima acao |
 |---|---|---|
 | Comercial/auth/onboarding | Pronto local | Cadastro real A/B por `/auth/register` passou depois do alinhamento das migrations. |
-| Dashboard | Quase pronto | Confirmar console limpo, sem chamadas premium em tenant basico. |
+| Dashboard | Quase pronto | Confirmar dashboard inicial completo no navegador; Lembretes ja ficou sem chamadas premium em tenant basico. |
 | Pessoas/clientes | Quase pronto | Listagem, criacao, edicao, exclusao e bloqueio cruzado passaram em auditoria A/B local; retestar financeiro/historico do cliente. |
 | Pets | Quase pronto | Criacao real A/B passou com codigo unico por tenant; retestar detalhe visual e cadastro rapido de especie/raca. |
 | Produtos/estoque | Quase pronto | Listagem, criacao, edicao, exclusao e entrada de estoque com bloqueio cruzado passaram em auditoria A/B local; retestar lote/validade visual e fluxo completo de estoque. |
 | Calculadora de racao | Quase pronto | API A/B com operador nao-admin passou; falta smoke visual completo no navegador. |
-| PDV/vendas | Pronto local A/B + smoke visual parcial | Venda completa por API real passou com operador nao-admin; caixa, sangria, suprimento e fechamento passaram; PDV no navegador carregou sem 403 indevido e autocomplete respeitou tenant A/B/SKU alfanumerico. Falta smoke visual da finalizacao/recibo no navegador. |
+| PDV/vendas | Pronto local A/B + smoke visual | Venda completa por API real e pelo navegador passou com operador nao-admin; caixa, sangria, suprimento, pagamento em dinheiro, finalizacao e baixa de estoque passaram. Falta apenas reteste visual de recibo/historico como refinamento. |
 | Financeiro de vendas | Quase pronto | Finalizacao gerou reflexos financeiros sem 500 no A/B local; falta conferir telas/historico visual. |
 | Cadastros essenciais | Quase pronto | Formas de pagamento e operadoras passaram em A/B real por API e smoke visual; catalogos de produto/opcoes de racao ainda precisam smoke visual no navegador. |
 | Configuracoes/usuarios/LGPD | Quase pronto | Operador PDV e usuario sem permissao passaram por smoke visual de bloqueio; falta smoke visual da tela de usuarios/admin. |
-| Premium bloqueado | Quase pronto | Smoke de chamadas premium indiretas em formas/layout passou; ainda falta varrer menus/URLs diretas premium. |
+| Premium bloqueado | Quase pronto | Smoke de chamadas premium indiretas em formas, layout e Lembretes passou; ainda falta varrer menus/URLs diretas premium. |
 | Landing page/contratacao | Pronto local | Bloco de selecao do Plano Basico criado na landing; cadastro envia `plan=basico` e API grava plano validado. |
 
 ### 0.4. Cronograma final para vender o Plano Basico
@@ -86,11 +86,11 @@ Status usados:
 | Etapa | Objetivo | Status | Bloqueia venda? |
 |---|---|---|---|
 | 1. Base tecnica multi-tenant | Cadastro real de tenants A/B, selecao de tenant, migrations limpas e bloqueio de vazamento entre empresas. | Concluido local | Sim, mas ja passou localmente. |
-| 2. Fluxos essenciais do basico | Clientes, pets, produtos, estoque, PDV/vendas, historico financeiro de vendas e cadastros auxiliares. | Em andamento; PDV A/B, caixa, sangria/suprimento e pagamentos/operadoras com smoke visual parcial concluido | Sim, enquanto calculadora/catalogos, usuarios/admin e smoke final de venda nao fecharem. |
+| 2. Fluxos essenciais do basico | Clientes, pets, produtos, estoque, PDV/vendas, historico financeiro de vendas e cadastros auxiliares. | Em andamento; PDV A/B, caixa, sangria/suprimento e pagamentos/operadoras com smoke visual concluido | Sim, enquanto calculadora/catalogos e usuarios/admin nao fecharem visualmente. |
 | 3. Usuarios e permissoes | Criar usuario do tenant, validar permissoes basicas e bloqueio de acesso indevido. | Concluido local por API e smoke visual parcial | Sim ate passar tela de usuarios/admin no navegador. |
 | 4. Calculadora/catalogos de racao | Validar fluxo visual, persistencia e mensagens de erro sem 500. | API A/B concluida; falta smoke visual | Sim se fizer parte da promessa comercial inicial. |
 | 5. Landing page e selecao de planos | Exibir planos, destacar Basico, iniciar contratacao com plano escolhido e levar ao cadastro/onboarding correto. | Concluido local | Sim para vender por autoatendimento; falta smoke visual em producao/staging. |
-| 6. A/B visual no navegador | Usar dois tenants reais no browser e conferir que menus, dados e mensagens batem com o plano. | Em andamento; PDV autocomplete e pagamentos/operadoras passaram | Sim antes de abrir para varias empresas. |
+| 6. A/B visual no navegador | Usar dois tenants reais no browser e conferir que menus, dados e mensagens batem com o plano. | Em andamento; PDV completo, autocomplete, Lembretes e pagamentos/operadoras passaram | Sim antes de abrir para varias empresas. |
 | 7. Produção controlada | Merge, deploy, migrations, health check e smoke real sem dados sensiveis. | Pendente | Sim. |
 
 ## 1. Branch e commits
@@ -124,7 +124,8 @@ Status usados:
   - A rodada de pagamentos/operadoras `20260515161901` confirmou operador de vendas nao-admin lendo formas/operadoras do proprio tenant, bloqueio de tenant cruzado, mutacoes restritas a `configuracoes.editar`, taxas filtradas por tenant e analise de venda sem processar forma de outro tenant.
   - A rodada visual `20260515162539` confirmou, via navegador isolado, formas de pagamento e operadoras no plano basico sem chamadas premium indevidas, operador nao-admin no PDV, autocomplete de produto isolado por tenant e usuario sem permissao bloqueado.
   - A rodada `20260515165148` confirmou operador PDV nao-admin com permissao `vendas.criar`, permissao implicita no backend, venda/finalizacao por API, caixa, sangria, suprimento, fechamento sem banco e autocomplete sem falso positivo entre SKUs alfanumericos A/B.
-  - A comparacao visual completa por navegador ainda fica pendente para finalizacao visual de venda/recibo, financeiro de vendas, tela de usuarios/admin, calculadora de racao e alguns cadastros auxiliares.
+  - A rodada visual `20260515201225` confirmou PDV completo no navegador com operador nao-admin: caixa aberto, produto adicionado por SKU, pagamento em dinheiro, venda finalizada, item gravado e estoque baixado. Tambem confirmou Lembretes sem chamadas premium indevidas no tenant basico.
+  - A comparacao visual completa por navegador ainda fica pendente para financeiro de vendas, tela de usuarios/admin, calculadora de racao e alguns cadastros auxiliares.
 - Data/hora aproximada dos testes: 2026-05-15, madrugada e tarde, horario local.
 
 ## 3. Checklist tela por tela do plano basico
@@ -152,8 +153,8 @@ Status usados:
 | Produtos | Calculadora de racao | `/produtos` / modal calculadora | `GET/POST /produtos/calculadora-racao` e `POST /internal/racao/calcular` | Sim por API | Operador A com `produtos.visualizar` buscou/calculou racao do tenant A, nao encontrou racao do tenant B e recebeu 404 ao forcar ID cruzado. Usuario sem `produtos.visualizar` recebeu 403. | Calculadora e rota interna agora exigem `produtos.visualizar`. | OK local; falta smoke visual |
 | Produtos | Catalogos auxiliares | `/produtos/:id/editar` | `GET/POST/PUT/DELETE /produtos/departamentos`, `/categorias`, `/marcas` | Sim por API | Departamentos, categorias e marcas passaram em A/B: operador A viu apenas tenant A, acesso direto cruzado retornou 404, operador apenas visualizacao nao mutou e usuario sem `produtos.visualizar` recebeu 403. | Rotas auxiliares de produto agora exigem permissao por acao; criacao de marca/departamento grava `user_id`; contagens de delete filtram tenant. | OK local; falta smoke visual |
 | PDV | Abrir caixa | `/pdv` | Endpoints de caixa | Sim | Caixa aberto para venda A/B por API real em dois tenants Basico. | Nenhuma regra de caixa alterada nesta rodada. | OK local |
-| PDV | Criar venda | `/pdv` | Endpoints de vendas/itens | Sim | Venda criada nos tenants A e B com cliente e produto do proprio tenant; acesso cruzado a venda do outro tenant retornou 404. No navegador, operador nao-admin abriu PDV sem 403 indevido, autocomplete encontrou produto do tenant A e nao mostrou produto/SKU B. | Adicionada migration para alinhar campos `tipo_retirada` e `palavra_chave_retirada` de `vendas`; backend agora respeita permissoes implicitas e busca de SKU alfanumerico nao cai no fallback numerico. | OK local + smoke visual parcial |
-| PDV | Registrar recebimento | `/pdv` | Endpoints de pagamento/finalizacao | Sim | Venda finalizada com Dinheiro nos dois tenants; estoque caiu de 5 para 3 em cada tenant. | Adicionadas migrations para `empresa_config_fiscal` e campos faltantes em `dre_subcategorias`, removendo 500 na finalizacao. | OK local |
+| PDV | Criar venda | `/pdv` | Endpoints de vendas/itens | Sim | Venda criada nos tenants A e B com cliente e produto do proprio tenant; acesso cruzado a venda do outro tenant retornou 404. No navegador, operador nao-admin abriu PDV sem 403 indevido, autocomplete encontrou produto do tenant A e nao mostrou produto/SKU B. | Adicionada migration para alinhar campos `tipo_retirada` e `palavra_chave_retirada` de `vendas`; backend agora respeita permissoes implicitas e busca de SKU alfanumerico nao cai no fallback numerico. | OK local + smoke visual |
+| PDV | Registrar recebimento | `/pdv` | Endpoints de pagamento/finalizacao | Sim | Venda finalizada com Dinheiro nos dois tenants; estoque caiu de 5 para 3 em cada tenant. Rodada visual `20260515201225` finalizou venda `202605150002` pelo navegador, gerou status `finalizada`, item gravado e estoque do produto caiu para 6. | Adicionadas migrations para `empresa_config_fiscal` e campos faltantes em `dre_subcategorias`, removendo 500 na finalizacao. | OK local + smoke visual |
 | PDV | Sangria e suprimento do caixa | `/pdv` / menu do caixa | `POST /caixas/{id}/movimentacao` | Sim por API e revisao de contrato | Sangria e suprimento sao movimentacoes do caixa fisico, nao dependem de banco, conta bancaria ou modulo `financeiro_erp`; origem/destino ficam opcionais. Rodada `20260515165148` confirmou suprimento, sangria e fechamento de caixa com diferenca zero. | Ajustada a UI para nao marcar origem/destino como obrigatorios. | OK local |
 | PDV | Reabrir/visualizar venda finalizada | `/pdv` | Endpoints de venda e itens | Sim | GET da venda finalizada retornou status `finalizada`; visualizacao cruzada pelo outro tenant retornou 404. | Nenhuma regra de reabertura alterada nesta rodada. | OK local |
 | PDV | Campanhas no recebimento | `/pdv` | `GET /campanhas/...` | Sim, por erro observado | Plano basico recebeu 403 em campanhas quando cliente/venda era selecionado. Parte ja estava protegida; saldo de cliente foi reforcado. | Reforco em `useClientesNovoCadastro`; `usePDVClienteContexto` ja respeitava modulo. | Corrigido |
@@ -166,9 +167,9 @@ Status usados:
 | Configuracoes | Configuracao da empresa | `/configuracoes/empresa` ou equivalente | Endpoints de configuracao | Nao | Nao testado nesta rodada final. | Nao houve. | Nao testado |
 | Administracao | Usuarios | `/admin/usuarios` | `POST/GET /usuarios` | Sim | Admin criou operador PDV em dois tenants; operador logou, recebeu apenas `clientes.visualizar`, `produtos.visualizar`, `vendas.criar` e nao acessou `/usuarios`. No navegador, operador foi bloqueado em tela administrativa e usuario sem permissao foi bloqueado no PDV. | Nenhuma regra de usuario alterada; validado contrato de permissao. | OK local + smoke visual parcial |
 | Administracao | Roles/permissoes | `/admin/usuarios` e perfis | `/roles`, `/permissions` | Sim | Operador sem `usuarios.manage` conseguia criar role e listar permissoes; corrigido para retornar 403 em GET/POST/PUT/DELETE administrativos. | `roles_routes` e `permissions_routes` agora exigem `usuarios.manage`; teste de contrato adicionado. | Corrigido |
-| Premium bloqueado | Campanhas | `/campanhas` | `GET /campanhas/...` | Parcial | Menu/rota deve ficar bloqueado no basico. Antes havia chamadas indiretas gerando 403. | Chamadas indiretas relevantes foram reduzidas. Tela premium completa nao foi retestada. | Corrigido parcial |
+| Premium bloqueado | Campanhas | `/campanhas` | `GET /campanhas/...` | Parcial | Menu/rota deve ficar bloqueado no basico. Antes havia chamadas indiretas gerando 403 em Lembretes. | Chamadas indiretas relevantes foram reduzidas; Lembretes agora respeita `moduloAtivo("campanhas")`. Tela premium completa nao foi retestada. | Corrigido parcial |
 | Premium bloqueado | Veterinario | `/veterinario/*` | `GET /vet/...` | Parcial | Detalhe do pet chamava endpoints vet mesmo no basico. | `PetDetalhes` nao chama endpoints vet sem modulo. | Corrigido |
-| Premium bloqueado | Bling/fiscal/integracoes | Layout/badges | `/integracoes/bling/...` | Sim, por erro observado | Layout chamava badge Bling e recebia 403 quando modulo bloqueado. | Layout ja estava condicionado a `moduloAtivo("bling")` na branch atual; sem nova alteracao nesta etapa. | OK |
+| Premium bloqueado | Bling/fiscal/integracoes | Layout/badges e Lembretes | `/integracoes/bling/...` | Sim, por erro observado | Layout/Lembretes chamavam Bling e recebiam 403 quando modulo bloqueado. | Layout ja estava condicionado a `moduloAtivo("bling")`; Lembretes tambem passou a respeitar `moduloAtivo("bling")`. | OK |
 
 ## 4. Checklist de isolamento tenant
 
@@ -180,7 +181,7 @@ Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada com dois te
 | Pets | Nao: busca/listagem cruzada A/B passou | Sim, por endpoint real com tutor do mesmo tenant | Sim: edicao propria 200 e cruzada 404 | Sim: exclusao propria 204 e cruzada 404 | Sem token retornou 403; acesso direto cruzado a ID de outro tenant retornou 404 | OK |
 | Produtos | Nao: busca/listagem cruzada A/B passou | Sim, por endpoint real com SKU distinto por tenant | Sim: edicao propria 200 e cruzada 404 | Sim: exclusao propria 204 e cruzada 404 | Sem token retornou 403; acesso direto cruzado a ID de outro tenant retornou 404 | OK |
 | Estoque | Entrada propria retornou 200 e entrada cruzada em produto de outro tenant retornou 404 | Sim, por endpoint real com produto do tenant autenticado | Nao aplicavel | Nao testado | Cross-tenant por ID de produto retornou 404 | OK parcial |
-| PDV/Vendas | Nao: GET cruzado de venda A/B retornou 404; autocomplete visual do operador A achou produto A e nao mostrou produto/SKU B | Sim, venda criada/finalizada com token de cada tenant e estoque baixado somente no produto do tenant | Visualizacao propria 200; visualizacao cruzada 404; edicao/reabertura ainda nao auditada completa | Nao testado | Sem tenant/token segue coberto por suites de auth; acesso direto cruzado a ID de outro tenant retornou 404 | OK local + smoke visual parcial |
+| PDV/Vendas | Nao: GET cruzado de venda A/B retornou 404; autocomplete visual do operador A achou produto A e nao mostrou produto/SKU B | Sim, venda criada/finalizada com token de cada tenant e estoque baixado somente no produto do tenant; smoke visual `20260515201225` confirmou venda finalizada e estoque baixado | Visualizacao propria 200; visualizacao cruzada 404; edicao/reabertura ainda nao auditada completa | Nao testado | Sem tenant/token segue coberto por suites de auth; acesso direto cruzado a ID de outro tenant retornou 404 | OK local + smoke visual |
 | Financeiro Vendas | Historico/reflexos de venda nao vazaram na rodada A/B local | Sim, finalizacao gerou DRE/financeiro sem 500 depois do alinhamento de schema | Tela visual ainda pendente | Nao testado | Nao testado nesta rodada visual | OK parcial |
 | Usuarios/permissoes | Operador PDV do tenant A nao viu produto/cliente do tenant B e nao administrou RBAC | Sim, admin criou operador com role do proprio tenant | Nao aplicavel nesta rodada | Nao aplicavel nesta rodada | `/usuarios`, `/roles` e `/permissions` retornaram 403 para operador sem `usuarios.manage`; navegador exibiu acesso negado para operador/usuario sem permissao | OK local + smoke visual parcial |
 | Calculadora/catalogos de racao | Operador A nao viu produto/opcoes do tenant B; calculo cruzado por ID retornou 404 | Sim, admin criou catalogos/produtos em cada tenant e operador A acessou somente tenant A | Nao testado visualmente | Mutacao de catalogo por operador sem permissao retornou 403 | Usuario sem `produtos.visualizar` recebeu 403 na calculadora | OK local |
@@ -221,8 +222,9 @@ Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada com dois te
 | `frontend/src/components/FormasPagamento.jsx` | Tela de formas sempre buscava contas bancarias e exibia campo/coluna de conta destino, que pertence ao Financeiro ERP premium. | Busca, coluna e campo de conta destino agora aparecem apenas com `financeiro_erp` ativo confirmado. | Usuario basico recebia 403 e via elemento premium indevido em cadastro essencial. | Smoke visual `20260515162539`: rede limpa, sem 403, forma A visivel, conta destino oculta. |
 | `frontend/src/components/Layout.jsx` | Badge/resumo Bling podia ser chamado antes da confirmacao real dos modulos do tenant. | Chamada de Bling agora depende de usuario autenticado e lista de modulos confirmada. | Tenant basico podia gerar 403 de Bling no carregamento. | Smoke visual `20260515162539`: sem chamada a `/integracoes/bling/nf/autocadastros-recentes`. |
 | `frontend/src/components/ModaisCaixa.jsx` | Modais de sangria/suprimento davam a entender que origem/destino eram obrigatorios, embora o caixa basico nao dependa de banco. | Labels ajustadas para origem/destino opcionais e opcao inicial `Nao informar`. | Usuario do plano basico poderia achar que precisava cadastrar banco para bater o caixa. | Revisao do contrato: backend aceita movimentacao sem conta bancaria; `npm --prefix frontend run build`. |
-| `backend/app/security/permissions_service.py` | Permissoes implicitas apareciam no frontend, mas o backend ainda exigia a permissao gravada diretamente no role. Operador com `vendas.criar` recebia 403 em chamadas auxiliares como entregadores/clientes. | `check_permission` agora expande dependencias antes de negar acesso. | Operador PDV nao-admin podia abrir a tela mas receber 403 indevido em fluxos basicos. | Testes unitarios e smoke visual do PDV: `/clientes/?is_entregador=true` passou de 403 para 200. |
+| `backend/app/security/permissions_service.py` | Permissoes implicitas apareciam no frontend, mas o backend ainda exigia a permissao gravada diretamente no role. Operador com `vendas.criar` recebia 403 em chamadas auxiliares como entregadores/clientes. | `get_user_permissions` e `check_permission` agora retornam/validam permissoes efetivas expandidas. | Operador PDV nao-admin podia abrir a tela mas receber 403 indevido em fluxos basicos. | Testes unitarios e smoke visual do PDV: `/clientes/?is_entregador=true` passou de 403 para 200. |
 | `backend/app/produtos_routes.py` | Busca/autocomplete de produtos usava fallback numerico mesmo em SKU alfanumerico, podendo retornar produto do proprio tenant com SKU parecido ao buscar outro SKU A/B. | Fallback por digitos agora roda apenas quando o termo digitado nao tem letras; SKUs alfanumericos usam busca textual completa. | Autocomplete podia sugerir produto errado em SKUs parecidos, confundindo validacao de isolamento. | Testes unitarios; API e navegador: busca por SKU B no tenant A retornou `items=[]`, busca por SKU A retornou o produto A. |
+| `frontend/src/pages/Lembretes.jsx` | Lembretes carregava alertas de campanhas, DRE e Bling mesmo quando o tenant basico nao tinha esses modulos. | Chamadas premium agora so rodam com `moduloAtivo("campanhas")`, `moduloAtivo("financeiro_erp")` e `moduloAtivo("bling")`; estados sao zerados quando o modulo esta bloqueado. | Console/rede do plano basico ficavam com 403 premium que nao pertencem ao fluxo vendido. | Navegador em `/lembretes`: somente `/auth/me-multitenant`, `/modulos/status` e `/lembretes/pendentes`, todos 200, sem console error. |
 
 ## 6. Pendencias priorizadas
 
@@ -241,8 +243,8 @@ Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada com dois te
   - falta conferir tela de usuarios, criacao de perfil/usuario e mensagens de permissao.
 - Complementar smoke visual no navegador para PDV/vendas:
   - a API A/B ja passou com finalizacao e baixa de estoque;
-  - operador, permissoes implicitas, autocomplete de produto e caixa/sangria/suprimento por API ja passaram;
-  - falta conferir finalizacao visual, mensagens, recibo/historico e ausencia de chamadas premium no console durante venda completa.
+  - operador, permissoes implicitas, autocomplete de produto, caixa/sangria/suprimento por API e finalizacao visual ja passaram;
+  - falta conferir recibo/historico visual com mais calma, sem bloquear a venda controlada.
 - Retestar visualmente entrada de estoque com lote/validade:
   - o endpoint passou no A/B;
   - ainda falta confirmar tela, tooltip/listagem de lotes e validade urgente no navegador.
@@ -403,6 +405,15 @@ Rodada visual no navegador `20260515162539`:
 - Usuario sem permissoes abriu `/pdv` e recebeu acesso negado por falta de `vendas.criar`.
 - Console sem erro relevante; unico aviso observado foi do tour do PDV para seletor ausente `#tour-pdv-resumo`.
 
+Rodada visual no navegador `20260515201225`:
+
+- API local 8001 e Vite 5174 apontado explicitamente para `VITE_DEV_API_PROXY_TARGET=http://127.0.0.1:8001`.
+- Operador A: `qa.basico.operador.a.20260515165148@example.com`, com permissao direta `vendas.criar` e permissoes efetivas expandidas.
+- `/pdv` abriu com `Caixa #2`; produto `QA-PDV-A-20260515165148` foi encontrado pelo autocomplete e adicionado a venda.
+- Pagamento em Dinheiro de `R$ 12,90` foi registrado pelo modal visual; `POST /vendas` e `POST /vendas/10/finalizar` retornaram 200.
+- Venda `202605150002` ficou `finalizada`, com total `12.90`, item gravado e estoque do produto A baixado para `6`.
+- `/lembretes` foi recarregado no mesmo operador basico; rede chamou apenas `me`, `modulos/status` e `lembretes/pendentes`, todos 200, sem console error e sem chamadas premium a campanhas/DRE/Bling.
+
 ```powershell
 # Auditoria A/B local historica 2026-05-15
 # 1. semear dois tenants DEV locais diretamente no banco;
@@ -444,6 +455,8 @@ Rodada estendida `866987` + reteste de estoque:
 - Smoke visual de formas de pagamento no Basico sem chamadas premium: testado.
 - Smoke visual de operadoras no Basico com isolamento A/B: testado.
 - Smoke visual de PDV como operador nao-admin e autocomplete de produto A/B: testado.
+- Smoke visual de finalizacao do PDV com Dinheiro e baixa de estoque: testado.
+- Smoke visual de Lembretes no Basico sem chamadas premium a campanhas/DRE/Bling: testado.
 - Smoke visual de bloqueio de permissao para operador/usuario sem acesso: testado.
 - Health check de producao: apenas endpoint de saude consultado, sem deploy e sem alteracao.
 
@@ -457,6 +470,8 @@ Rodada estendida `866987` + reteste de estoque:
 - Rodada API A/B de departamentos/categorias/marcas concluida na API local 8001 apontada para o Postgres DEV.
 - Rodada API A/B de pagamentos/operadoras `20260515161901` concluida na API local 8001 apontada para o Postgres DEV, com operador de vendas, usuario de configuracao e usuario sem permissao.
 - Rodada visual `20260515162539` concluida no Vite local 5174 contra API local 8001, com usuarios nao-admin e dois tenants A/B.
+- Testes unitarios de permissoes efetivas e busca de produto: `tests/unit/test_permissions_service.py` e `tests/unit/test_produtos_search_helpers.py`, resultado `4 passed`.
+- Observacao: o frontend nao possui script `lint`; scripts disponiveis no `package.json` sao `dev`, `build`, `build:dev` e `preview`.
 
 ### Auditoria automatizada Codex consolidada
 
@@ -518,7 +533,7 @@ Pendencias manuais que seguem abertas pelo checklist:
 - Configuracao da empresa.
 - Usuarios/admin: API A/B concluida e bloqueios visuais parciais passaram; falta smoke visual da tela de usuarios/admin.
 - Landing page com selecao de planos e CTA do Plano Basico para contratacao: concluido local; falta smoke visual em staging/producao.
-- PDV/vendas: API A/B concluida e smoke visual de operador/autocomplete passou; falta finalizacao visual de venda/recibo.
+- PDV/vendas: API A/B concluida e smoke visual de operador/autocomplete/finalizacao passou; falta apenas reteste de recibo/historico visual.
 - A/B visual no navegador entre dois tenants: em andamento.
 
 ### Deploy
@@ -528,11 +543,11 @@ Pendencias manuais que seguem abertas pelo checklist:
 
 ## Resumo Executivo
 
-- Telas/fluxos basicos com algum teste registrado: 18/22
-- Fluxos OK ou OK parcial: 15
-- Corrigidos/registrados nesta trilha: frontend padronizado, onboarding local, tabelas auxiliares de racao, unicidade de pet por tenant, contratacao por plano e schema de PDV/DRE
+- Telas/fluxos basicos com algum teste registrado: 19/22
+- Fluxos OK ou OK parcial: 16
+- Corrigidos/registrados nesta trilha: frontend padronizado, onboarding local, tabelas auxiliares de racao, unicidade de pet por tenant, contratacao por plano, schema de PDV/DRE e chamadas premium indevidas no Basico
 - Pendencias P0: 0 confirmadas apos esta branch
 - Pendencias P1: 5
 - Pendencias P2: 5
-- Minha recomendacao: liberar para revisao/merge em ambiente de teste/staging. Para producao/comercial, liberar com ressalvas somente depois de retestar CRUD completo restante, calculadora de racao, cadastro rapido de especie/raca, tela de usuarios/admin e finalizacao visual de venda.
+- Minha recomendacao: liberar para revisao/merge em ambiente de teste/staging. Para producao/comercial, liberar com ressalvas somente depois de retestar CRUD completo restante, calculadora de racao, cadastro rapido de especie/raca e tela de usuarios/admin.
 
