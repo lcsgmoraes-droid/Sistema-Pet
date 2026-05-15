@@ -68,21 +68,22 @@ Status usados:
 
 | Area | Status atual | Proxima acao |
 |---|---|---|
-| Comercial/auth/onboarding | Quase pronto | Retestar cadastro real, mensagens de erro corrigiveis e login com tenant novo. |
+| Comercial/auth/onboarding | Pronto local | Cadastro real A/B por `/auth/register` passou depois do alinhamento das migrations. |
 | Dashboard | Quase pronto | Confirmar console limpo, sem chamadas premium em tenant basico. |
 | Pessoas/clientes | Quase pronto | Listagem, criacao, edicao, exclusao e bloqueio cruzado passaram em auditoria A/B local; retestar financeiro/historico do cliente. |
-| Pets | Quase pronto | Listagem, criacao, edicao, exclusao e bloqueio cruzado passaram em auditoria A/B local; retestar detalhe visual e cadastro rapido de especie/raca. |
+| Pets | Quase pronto | Criacao real A/B passou com codigo unico por tenant; retestar detalhe visual e cadastro rapido de especie/raca. |
 | Produtos/estoque | Quase pronto | Listagem, criacao, edicao, exclusao e entrada de estoque com bloqueio cruzado passaram em auditoria A/B local; retestar lote/validade visual e fluxo completo de estoque. |
 | Calculadora de racao | Pendente P1 | Retestar fluxo visual completo depois das correcoes backend. |
 | PDV/vendas | Quase pronto | Rodar venda completa A/B: cliente, pet, produto, baixa de estoque e historico. |
 | Financeiro de vendas | Quase pronto | Confirmar que nao depende de financeiro ERP premium. |
-| Cadastros essenciais | Pendente P1 | Operadoras de cartao e opcoes de racao padronizadas visualmente; retestar CRUD de formas de pagamento, operadoras, especies/racas, opcoes de racao e departamentos. |
+| Cadastros essenciais | Quase pronto | Formas de pagamento e opcoes de racao passaram em criacao/listagem A/B real; retestar edicao/exclusao e demais cadastros. |
 | Configuracoes/usuarios/LGPD | Pendente P1 | Testar salvar dados essenciais, criar usuario e permissao basica. |
 | Premium bloqueado | Pendente P1 | Smoke de menus e URLs diretas premium em tenant basico. |
 
 ## 1. Branch e commits
 
-- Branch: `fix/20260514-2157-corrigir-entrada-estoque-produto-user-id`
+- Branch historica consolidada: `fix/20260514-2157-corrigir-entrada-estoque-produto-user-id`
+- Branch atual de alinhamento local/onboarding: `fix/20260515-1515-corrigir-onboarding-tenant-basico`
 - Base observada antes da branch: `a74e82bfb fix: ajustar feedback de rota do entregador`
 - Commits desta branch:
   - `cf47be7f9 fix: gravar usuario na entrada de estoque do produto`
@@ -99,18 +100,18 @@ Status usados:
 - Usuario usado: `basico.20260515002403@teste.local`
 - Senha: nao registrada.
 - Comparacao com outro tenant:
-  - Auditoria A/B local automatizada feita em 2026-05-15 para clientes, pets, produtos e entrada de estoque.
-  - Dois tenants locais foram semeados diretamente no banco DEV porque o onboarding local esta bloqueado por migrations antigas quebradas.
-  - A partir dai foram usados login real, selecao real de tenant, token real e endpoints reais das telas basicas.
-  - A rodada estendida cobriu edicao, exclusao, bloqueio sem token e entrada de estoque.
-  - A comparacao visual completa por navegador ainda fica pendente para PDV/vendas, financeiro de vendas, cadastros auxiliares e usuarios/permissoes.
+  - Auditoria A/B local automatizada feita em 2026-05-15 com cadastro real via `/auth/register`.
+  - Tenants criados pela API real: `tenant.a.20260515152334@example.com` e `tenant.b.20260515152334@example.com`.
+  - Foram usados selecao real de tenant, token real e endpoints reais das telas basicas.
+  - A rodada confirmou isolamento em clientes, pets, formas de pagamento e opcoes de racao.
+  - A comparacao visual completa por navegador ainda fica pendente para PDV/vendas, financeiro de vendas, usuarios/permissoes e alguns cadastros auxiliares.
 - Data/hora aproximada dos testes: 2026-05-15, madrugada e tarde, horario local.
 
 ## 3. Checklist tela por tela do plano basico
 
 | Area | Tela/Fluxo | Frontend | Endpoint | Testado | Resultado | Correcao | Status |
 |---|---|---|---|---|---|---|---|
-| Comercial | Registro com plano basico | `/register?plan=basico` | `POST /auth/register` | Sim | Conta/tenant criados no teste local. Houve erro anterior quando criacao de dados padrao falhava; depois o fluxo voltou a criar tenant. | Correcoes anteriores na trilha de onboarding/templates. Nesta branch apenas ajustei autocomplete dos campos. | OK |
+| Comercial | Registro com plano basico | `/register?plan=basico` | `POST /auth/register` | Sim | Conta/tenant criados em dois tenants A/B por API real. Erros locais de schema foram corrigidos por migrations. | Adicionadas migrations para gaps de onboarding local e tabelas auxiliares de racao. | OK |
 | Autenticacao | Login do novo usuario | `/login` | `POST /auth/login` | Sim | Login do usuario de teste funcionou e redirecionou para area autenticada. | Adicionado `autoComplete` correto para reduzir warnings do navegador. | OK |
 | Dashboard | Dashboard inicial do plano basico | `/dashboard` | Chamava endpoints premium de financeiro/IA e Bling | Sim | A tela abria, mas o console recebia 403 de endpoints premium bloqueados. | `AlertasIA`, `ProjecoesIA` e badge do layout agora evitam chamadas premium quando modulo nao esta ativo. | Corrigido |
 | Pessoas | Listar clientes | `/clientes` | `GET /clientes` | Sim | Auditoria A/B confirmou que cliente do tenant A aparece no A e nao aparece no B, e vice-versa. | Nenhuma nesta branch. | OK |
@@ -118,7 +119,7 @@ Status usados:
 | Pessoas | Editar/excluir cliente | `/clientes` | `PUT/DELETE /clientes/{id}` | Sim | Auditoria A/B estendida confirmou edicao/exclusao no proprio tenant e 404 em tentativa cruzada. | Nenhuma nesta branch. | OK |
 | Pessoas | Financeiro do cliente | `/clientes/:id/financeiro` | Endpoints de resumo financeiro e vendas | Parcial | Historico/financeiro do cliente precisa permanecer liberado no basico; tela nao foi auditada completa nesta rodada. | Nao houve. | Pendente P1 |
 | Pessoas | Saldo de campanhas no cadastro | Modal/wizard de cliente | `GET /campanhas/clientes/{id}/saldo` | Sim, por erro observado | Plano basico fazia chamada de campanhas e recebia 403. | `useClientesNovoCadastro` agora nao chama saldo de campanhas se modulo `campanhas` estiver bloqueado. | Corrigido |
-| Pets | Criar pet vinculado a tutor | `/pets/novo?cliente_id=...` | `POST /pets` | Sim | Pet criado por endpoint real em dois tenants; listagem e acesso direto cruzado retornaram isolamento correto. | Corrigida busca de pets que duplicava join com cliente. | OK |
+| Pets | Criar pet vinculado a tutor | `/pets/novo?cliente_id=...` | `POST /pets` | Sim | Pet criado por endpoint real em dois tenants; ambos puderam usar `10001-PET-0001` sem colisao, isolado por tenant. | Corrigida busca de pets que duplicava join com cliente e unicidade de codigo de pet passou a ser por tenant. | OK |
 | Pets | Detalhe do pet | `/pets/:petId` | `GET /pets/{id}` e antes endpoints vet | Parcial | Tela de pet basico nao deve chamar carteirinha/internacoes veterinarias se modulo vet estiver bloqueado. | `PetDetalhes` agora evita chamadas vet e oculta abas vet quando `veterinario` nao esta ativo. | Corrigido |
 | Pets | Editar/excluir pet | `/pets/:id/editar` | `PUT/DELETE /pets/{id}` | Sim | Auditoria A/B estendida confirmou edicao/exclusao no proprio tenant e 404 em tentativa cruzada. | Nenhuma nesta branch. | OK |
 | Pets | Cadastro rapido de especie/raca | `/pets/novo` e modal rapido | `POST /cadastros/especies`, `POST /cadastros/racas` | Parcial | Houve erro anterior ao criar raca sem `especie_id`; nao foi foco desta branch final. | Nao corrigido nesta branch. | Pendente P1 |
@@ -136,9 +137,9 @@ Status usados:
 | PDV | Campanhas no recebimento | `/pdv` | `GET /campanhas/...` | Sim, por erro observado | Plano basico recebeu 403 em campanhas quando cliente/venda era selecionado. Parte ja estava protegida; saldo de cliente foi reforcado. | Reforco em `useClientesNovoCadastro`; `usePDVClienteContexto` ja respeitava modulo. | Corrigido |
 | Financeiro | Vendas | `/financeiro/vendas` | Endpoints de historico/listagem de vendas | Sim | Historico de vendas abriu para venda do tenant de teste. | Nenhuma nesta branch. | OK |
 | Financeiro ERP | Dashboard financeiro completo | `/financeiro` | Endpoints financeiros ERP | Sim, por erro observado no dashboard | Modulo ERP nao deve ser acessado automaticamente no basico. | Alertas/projecoes premium nao disparam sem modulo ativo. | Corrigido |
-| Cadastros | Formas de pagamento | `/cadastros/financeiro/formas-pagamento` | Endpoints de formas de pagamento | Parcial | Formas de pagamento padrao existiam no tenant de teste e foram usadas no PDV. CRUD completo nao testado. | Nenhuma nesta branch. | Pendente P1 |
+| Cadastros | Formas de pagamento | `/cadastros/financeiro/formas-pagamento` | Endpoints de formas de pagamento | Parcial | Criacao e listagem A/B real passaram; forma do tenant A nao apareceu no tenant B, e vice-versa. Edicao/exclusao visual ainda pendentes. | Nenhuma regra de negocio alterada nesta etapa. | OK parcial |
 | Cadastros | Operadoras de cartao | `/cadastros/financeiro/operadoras` | Endpoints de operadoras | Nao | Tela padronizada visualmente com componentes globais; CRUD ainda nao foi retestado nesta rodada. | `PageHeader`, `ActionButton` e `Panel` aplicados sem alterar regra de negocio. | Pendente P1 |
-| Cadastros | Opcoes de racao | `/cadastros/opcoes-racao` | Endpoints de opcoes de racao | Parcial | Tela padronizada visualmente; criacao rapida foi usada/observada, mas selects e persistencia de tabela de consumo precisam de reteste completo. | `PageHeader`, `Panel`, `SegmentedControl`, `ActionButton`, `IconActionButton`, `LoadingState`, `EmptyState` e `StatusBadge` aplicados sem alterar endpoints. | Pendente P1 |
+| Cadastros | Opcoes de racao | `/cadastros/opcoes-racao` | Endpoints de opcoes de racao | Parcial | Criacao e listagem de linha de racao passaram em A/B real; linha do tenant A nao apareceu no tenant B, e vice-versa. Selects e persistencia de tabela de consumo ainda precisam de reteste completo. | Componentes globais aplicados anteriormente; nesta etapa foram criadas as tabelas auxiliares que o onboarding real exige. | OK parcial |
 | Configuracoes | Configuracao da empresa | `/configuracoes/empresa` ou equivalente | Endpoints de configuracao | Nao | Nao testado nesta rodada final. | Nao houve. | Nao testado |
 | Administracao | Usuarios | `/admin/usuarios` | Endpoints de usuarios | Nao | Deve estar aberto no basico, mas nao foi testado nesta rodada final. | Nao houve. | Nao testado |
 | Premium bloqueado | Campanhas | `/campanhas` | `GET /campanhas/...` | Parcial | Menu/rota deve ficar bloqueado no basico. Antes havia chamadas indiretas gerando 403. | Chamadas indiretas relevantes foram reduzidas. Tela premium completa nao foi retestada. | Corrigido parcial |
@@ -147,7 +148,7 @@ Status usados:
 
 ## 4. Checklist de isolamento tenant
 
-Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada para clientes, pets, produtos e entrada de estoque usando dois tenants semeados no banco DEV, login real, selecao real de tenant, token real e endpoints reais. A/B de PDV/vendas, financeiro de vendas, cadastros auxiliares e premium bloqueado ainda precisa ser complementado.
+Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada com dois tenants criados pela API real de cadastro, selecao real de tenant, token real e endpoints reais. A/B de PDV/vendas, financeiro de vendas, usuarios/permissoes e parte dos cadastros auxiliares ainda precisa ser complementado.
 
 | Area basica | Dados do tenant A aparecem no tenant B? | Criacao grava tenant_id correto? | Edicao respeita tenant? | Exclusao respeita tenant? | Endpoint sem tenant/token falha corretamente? | Status |
 |---|---|---|---|---|---|---|
@@ -157,8 +158,8 @@ Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada para client
 | Estoque | Entrada propria retornou 200 e entrada cruzada em produto de outro tenant retornou 404 | Sim, por endpoint real com produto do tenant autenticado | Nao aplicavel | Nao testado | Cross-tenant por ID de produto retornou 404 | OK parcial |
 | PDV/Vendas | Venda criada no tenant novo apareceu no historico do tenant atual | Nao testado diretamente em DB | Visualizacao testada; edicao/reabertura nao auditada completa | Nao testado | Nao testado nesta rodada | Parcial |
 | Financeiro Vendas | Historico abriu com venda do tenant atual | Nao aplicavel | Nao testado | Nao testado | Nao testado nesta rodada | Parcial |
-| Cadastros base | Formas de pagamento usadas no tenant atual | Nao testado diretamente em DB | Nao testado | Nao testado | Nao testado nesta rodada | Parcial |
-| Modulos premium bloqueados | Chamadas indevidas reduziram; rota premium completa nao auditada | Nao aplicavel | Nao aplicavel | Nao aplicavel | 403 observado em chamadas bloqueadas | Corrigido parcial |
+| Cadastros base | Formas de pagamento e linha de racao nao vazaram entre tenants A/B | Sim, por endpoint real com token de cada tenant | Nao testado nesta rodada | Nao testado nesta rodada | Acesso premium direto retornou 403 em Bling e WhatsApp no plano basico | OK parcial |
+| Modulos premium bloqueados | Bling e WhatsApp retornaram 403 no plano basico | Nao aplicavel | Nao aplicavel | Nao aplicavel | 403 observado em chamadas bloqueadas | OK parcial |
 
 ## 5. Correcoes aplicadas
 
@@ -178,6 +179,9 @@ Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada para client
 | `frontend/src/App.jsx` | Warnings do React Router sobre flags futuras. | Ativadas flags `v7_startTransition` e `v7_relativeSplatPath`. | Ruido no console durante testes. | `npm --prefix frontend run build`. |
 | `frontend/src/pages/Login.jsx` | Warning de autocomplete em campos de senha. | Adicionado `autoComplete="username"` e `autoComplete="current-password"`. | Ruido no console/navegador. | `npm --prefix frontend run build`. |
 | `frontend/src/pages/Register.jsx` | Warning de autocomplete em campos de senha/cadastro. | Adicionado `autoComplete="email"` e `autoComplete="new-password"`. | Ruido no console/navegador. | `npm --prefix frontend run build`. |
+| `backend/alembic/versions/oj20260515a1_repair_onboarding_local_schema.py` | Cadastro real de tenant falhava localmente porque o schema DEV nao tinha colunas/tabelas usadas pelo onboarding e jobs recentes. | Migration idempotente adiciona `categorias_financeiras.tipo_custo`, tabela `bling_pedido_webhook_events` e indices de pedidos integrados quando necessario. | Testes locais ficavam ficticios ou bloqueados antes do cadastro real do tenant. | `alembic upgrade head`; `POST /auth/register` deixou de falhar nesse ponto. |
+| `backend/alembic/versions/ok20260515a2_create_missing_ration_option_tables.py` | Onboarding obrigatorio nao conseguia criar opcoes de racao porque as tabelas auxiliares nao existiam. | Criadas `linhas_racao`, `portes_animal`, `fases_publico`, `tipos_tratamento`, `sabores_proteina` e `apresentacoes_peso` com indices por tenant. | Novo tenant podia falhar no cadastro ou nascer sem dados obrigatorios. | `alembic upgrade head`; cadastro real A/B passou. |
+| `backend/app/models.py` e `backend/alembic/versions/ol20260515a3_pet_codigo_unique_per_tenant.py` | Codigo de pet era unico globalmente e colidia quando dois tenants tinham o primeiro cliente/pet com o mesmo codigo. | Removida unicidade global do modelo e trocado o indice para unico composto `(tenant_id, codigo)`. | Segundo tenant podia receber erro 500 ao criar pet com codigo interno igual ao de outro tenant. | Auditoria A/B criou pet `10001-PET-0001` nos dois tenants sem colisao. |
 
 ## 6. Pendencias priorizadas
 
@@ -251,7 +255,47 @@ python -m compileall backend/app/produtos_routes.py
 Resultado: passou na validacao da correcao de entrada de estoque.
 
 ```powershell
-# Auditoria A/B local 2026-05-15
+python -m py_compile backend/app/models.py backend/alembic/versions/oj20260515a1_repair_onboarding_local_schema.py backend/alembic/versions/ok20260515a2_create_missing_ration_option_tables.py backend/alembic/versions/ol20260515a3_pet_codigo_unique_per_tenant.py
+```
+
+Resultado: passou.
+
+```powershell
+docker compose -f docker-compose.local-dev.yml exec -T backend alembic upgrade head
+docker compose -f docker-compose.local-dev.yml exec -T backend alembic current
+```
+
+Resultado: passou; head local em `ol20260515a3`.
+
+```powershell
+docker compose -f docker-compose.local-dev.yml exec -T postgres psql -U postgres -d postgres -c "DROP DATABASE IF EXISTS petshop_migration_check WITH (FORCE);" -c "CREATE DATABASE petshop_migration_check;"
+docker compose -f docker-compose.local-dev.yml exec -T -e DATABASE_URL=postgresql+psycopg2://postgres:postgres@postgres:5432/petshop_migration_check backend alembic upgrade head
+docker compose -f docker-compose.local-dev.yml exec -T -e DATABASE_URL=postgresql+psycopg2://postgres:postgres@postgres:5432/petshop_migration_check backend alembic current
+```
+
+Resultado: passou em banco temporario limpo; head `ol20260515a3`, tabelas auxiliares de racao/webhook existem e indice `uq_pets_tenant_codigo` foi criado.
+
+```powershell
+# Auditoria A/B local real 2026-05-15
+# 1. criar dois tenants por POST /auth/register;
+# 2. selecionar tenant por POST /auth/select-tenant;
+# 3. criar cliente, pet, forma de pagamento e linha de racao em cada tenant;
+# 4. comparar listagem e acesso direto cruzado por ID;
+# 5. confirmar bloqueio de Bling/WhatsApp no plano basico.
+```
+
+Resultado: passou na rodada `20260515152334`.
+
+- Tenant A: `tenant.a.20260515152334@example.com`, tenant `57b4aa0a-ddfc-496d-969b-015a706171f4`.
+- Tenant B: `tenant.b.20260515152334@example.com`, tenant `af90babf-6ad0-4a41-902b-781aa2a8b38f`.
+- Cliente A/B criados por endpoint real e nao aparecem no outro tenant.
+- Acesso direto cruzado a `/clientes/{id}` retornou 404.
+- Pets A/B criados com o mesmo codigo interno `10001-PET-0001`, agora isolado por tenant.
+- Formas de pagamento A/B e linhas de racao A/B nao aparecem no outro tenant.
+- `/bling/monitor/resumo` e `/whatsapp/analytics/dashboard` retornaram 403 no plano basico.
+
+```powershell
+# Auditoria A/B local historica 2026-05-15
 # 1. semear dois tenants DEV locais diretamente no banco;
 # 2. fazer login real em /auth/login-multitenant;
 # 3. selecionar tenant em /auth/select-tenant;
@@ -266,7 +310,7 @@ Resultado: passou para clientes, pets e produtos. Rodada `866741`:
 - Listagem por busca mostrou apenas dados do tenant autenticado.
 - Acesso direto cruzado a `/clientes/{id}`, `/pets/{id}` e `/produtos/{id}` retornou 404.
 
-Observacao de ambiente: o onboarding local por `/auth/register` ficou bloqueado por migrations antigas do DEV. Para isolar o teste de seguranca, os tenants A/B foram semeados diretamente no banco local e a auditoria usou os endpoints reais a partir do login/selecao de tenant.
+Observacao de ambiente historica: antes das migrations `oj20260515a1` e `ok20260515a2`, o onboarding local por `/auth/register` ficava bloqueado por gaps de schema do DEV. Esse bloqueio foi corrigido e a rodada A/B real acima substitui o atalho por seed direto no banco.
 
 Rodada estendida `866987` + reteste de estoque:
 
@@ -354,20 +398,20 @@ Pendencias manuais que seguem abertas pelo checklist:
 - Operadoras de cartao.
 - Configuracao da empresa.
 - Usuarios/admin.
-- A/B real no navegador entre dois tenants.
+- A/B visual no navegador entre dois tenants.
 
 ### Deploy
 
 - Nao houve deploy de producao nesta etapa.
-- Branch foi enviada para o GitHub para revisao/PR.
+- Branch atual ainda nao foi enviada para GitHub nesta etapa.
 
 ## Resumo Executivo
 
-- Telas basicas testadas: 12/22
-- Fluxos OK: 8
-- Corrigidos nesta branch: 7 arquivos frontend/backend com impacto direto em plano basico ou ruido de console
+- Telas/fluxos basicos com algum teste registrado: 14/22
+- Fluxos OK ou OK parcial: 11
+- Corrigidos/registrados nesta trilha: frontend padronizado, onboarding local, tabelas auxiliares de racao e unicidade de pet por tenant
 - Pendencias P0: 0 confirmadas apos esta branch
 - Pendencias P1: 6
 - Pendencias P2: 5
-- Minha recomendacao: liberar para revisao/merge em ambiente de teste/staging. Para producao/comercial, liberar com ressalvas somente depois de retestar CRUD completo, calculadora de racao, cadastro rapido de especie/raca e isolamento A/B entre dois tenants.
+- Minha recomendacao: liberar para revisao/merge em ambiente de teste/staging. Para producao/comercial, liberar com ressalvas somente depois de retestar CRUD completo, calculadora de racao, cadastro rapido de especie/raca, usuarios/permissoes e A/B visual no navegador.
 
