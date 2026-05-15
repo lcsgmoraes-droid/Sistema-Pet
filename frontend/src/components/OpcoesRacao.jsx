@@ -70,6 +70,7 @@ function OpcoesRacao() {
   const abaConfig = abas.find((aba) => aba.id === abaAtiva);
   const dadosAba = dados[abaAtiva] || [];
   const AbaIcon = abaConfig.icon;
+  const fieldPrefix = `opcoes-racao-${abaAtiva}`;
 
   const carregarDados = useCallback(async () => {
     setLoading(true);
@@ -195,8 +196,12 @@ function OpcoesRacao() {
           {abaAtiva === "apresentacoes" ? (
             <div className="space-y-4">
               <div>
-                <label className={LABEL_CLASS}>Peso (kg) *</label>
+                <label className={LABEL_CLASS} htmlFor={`${fieldPrefix}-peso`}>
+                  Peso (kg) *
+                </label>
                 <input
+                  id={`${fieldPrefix}-peso`}
+                  name={`${fieldPrefix}_peso`}
                   type="number"
                   step="0.001"
                   value={formPeso.peso_kg}
@@ -209,8 +214,12 @@ function OpcoesRacao() {
               </div>
 
               <div>
-                <label className={LABEL_CLASS}>Descricao</label>
+                <label className={LABEL_CLASS} htmlFor={`${fieldPrefix}-descricao`}>
+                  Descricao
+                </label>
                 <input
+                  id={`${fieldPrefix}-descricao`}
+                  name={`${fieldPrefix}_descricao`}
                   type="text"
                   value={formPeso.descricao}
                   onChange={(event) => setFormPeso({ ...formPeso, descricao: event.target.value })}
@@ -220,8 +229,12 @@ function OpcoesRacao() {
               </div>
 
               <div>
-                <label className={LABEL_CLASS}>Ordem</label>
+                <label className={LABEL_CLASS} htmlFor={`${fieldPrefix}-ordem`}>
+                  Ordem
+                </label>
                 <input
+                  id={`${fieldPrefix}-ordem`}
+                  name={`${fieldPrefix}_ordem`}
                   type="number"
                   value={formPeso.ordem}
                   onChange={(event) =>
@@ -236,6 +249,7 @@ function OpcoesRacao() {
 
               <label className="flex items-center gap-2 text-sm text-slate-700">
                 <input
+                  name={`${fieldPrefix}_ativo`}
                   type="checkbox"
                   checked={formPeso.ativo}
                   onChange={(event) => setFormPeso({ ...formPeso, ativo: event.target.checked })}
@@ -247,8 +261,12 @@ function OpcoesRacao() {
           ) : (
             <div className="space-y-4">
               <div>
-                <label className={LABEL_CLASS}>Nome *</label>
+                <label className={LABEL_CLASS} htmlFor={`${fieldPrefix}-nome`}>
+                  Nome *
+                </label>
                 <input
+                  id={`${fieldPrefix}-nome`}
+                  name={`${fieldPrefix}_nome`}
                   type="text"
                   value={formData.nome}
                   onChange={(event) => setFormData({ ...formData, nome: event.target.value })}
@@ -260,8 +278,12 @@ function OpcoesRacao() {
               </div>
 
               <div>
-                <label className={LABEL_CLASS}>Descricao</label>
+                <label className={LABEL_CLASS} htmlFor={`${fieldPrefix}-descricao`}>
+                  Descricao
+                </label>
                 <textarea
+                  id={`${fieldPrefix}-descricao`}
+                  name={`${fieldPrefix}_descricao`}
                   value={formData.descricao}
                   onChange={(event) => setFormData({ ...formData, descricao: event.target.value })}
                   className={FIELD_CLASS}
@@ -271,8 +293,12 @@ function OpcoesRacao() {
               </div>
 
               <div>
-                <label className={LABEL_CLASS}>Ordem</label>
+                <label className={LABEL_CLASS} htmlFor={`${fieldPrefix}-ordem`}>
+                  Ordem
+                </label>
                 <input
+                  id={`${fieldPrefix}-ordem`}
+                  name={`${fieldPrefix}_ordem`}
                   type="number"
                   value={formData.ordem}
                   onChange={(event) =>
@@ -287,6 +313,7 @@ function OpcoesRacao() {
 
               <label className="flex items-center gap-2 text-sm text-slate-700">
                 <input
+                  name={`${fieldPrefix}_ativo`}
                   type="checkbox"
                   checked={formData.ativo}
                   onChange={(event) => setFormData({ ...formData, ativo: event.target.checked })}

@@ -331,8 +331,10 @@ const escolherRacaoAptaPorTexto = (valor, ...listas) => {
 function RacaoSearchInput({
   disabled = false,
   hint,
+  id,
   label,
   loading = false,
+  name,
   onChange,
   onClear,
   onSelect,
@@ -405,9 +407,11 @@ function RacaoSearchInput({
 
   return (
     <div className="racao-search-field">
-      <label>{label}</label>
+      <label htmlFor={id}>{label}</label>
       <div className="racao-search-control" ref={controlRef}>
         <input
+          id={id}
+          name={name}
           type="text"
           value={value || ""}
           onChange={(e) => {
@@ -1107,8 +1111,10 @@ export default function CalculadoraRacao() {
 
           {/* NOVO: Buscar Pet Cadastrado */}
           <div className="form-group">
-            <label>🐾 Buscar Pet Cadastrado</label>
+            <label htmlFor="racao-pet-search">🐾 Buscar Pet Cadastrado</label>
             <input
+              id="racao-pet-search"
+              name="racao_pet_search"
               type="text"
               list="pets-list"
               value={form.pet_nome || ""}
@@ -1144,8 +1150,10 @@ export default function CalculadoraRacao() {
           </div>
 
           <div className="form-group">
-            <label>Peso do Pet (kg) *</label>
+            <label htmlFor="racao-peso-pet">Peso do Pet (kg) *</label>
             <input
+              id="racao-peso-pet"
+              name="racao_peso_pet_kg"
               type="number"
               step="0.1"
               value={form.peso_pet_kg}
@@ -1157,13 +1165,15 @@ export default function CalculadoraRacao() {
           </div>
 
           <div className="form-group">
-            <label>
+            <label htmlFor="racao-idade-meses">
               Idade (meses)
               {form.categoria_racao === "filhote" && (
                 <span style={{ color: "#ff6b6b" }}> *</span>
               )}
             </label>
             <input
+              id="racao-idade-meses"
+              name="racao_idade_meses"
               type="number"
               value={form.idade_meses}
               onChange={(e) =>
@@ -1184,8 +1194,10 @@ export default function CalculadoraRacao() {
           </div>
 
           <div className="form-group">
-            <label>Nível de Atividade</label>
+            <label htmlFor="racao-nivel-atividade">Nível de Atividade</label>
             <select
+              id="racao-nivel-atividade"
+              name="racao_nivel_atividade"
               value={form.nivel_atividade}
               onChange={(e) =>
                 setForm({ ...form, nivel_atividade: e.target.value })
@@ -1203,6 +1215,8 @@ export default function CalculadoraRacao() {
 
           <div className="form-group">
             <RacaoSearchInput
+              id="racao-produto-principal"
+              name="racao_produto_principal"
               label="Selecionar Ração"
               value={form.produto_nome || ""}
               onChange={alterarBuscaRacaoPrincipal}
@@ -1254,6 +1268,8 @@ export default function CalculadoraRacao() {
           <div className="form-group">
             <div style={{ display: "flex", gap: "8px" }}>
               <RacaoSearchInput
+                id="racao-produto-comparar"
+                name="racao_produto_comparar"
                 label="⭐ Comparar Ração Específica"
                 value={form.produto_comparar_nome || ""}
                 onChange={alterarBuscaRacaoComparativo}
@@ -1286,9 +1302,11 @@ export default function CalculadoraRacao() {
           <div className="divider-text">OU</div>
 
           <div className="form-group">
-            <label>📋 Filtro por Classificação</label>
+            <label htmlFor="racao-filtro-classificacao">📋 Filtro por Classificação</label>
             <div style={{ display: "flex", gap: "8px" }}>
               <select
+                id="racao-filtro-classificacao"
+                name="racao_filtro_classificacao"
                 value={form.classificacao}
                 onChange={(e) =>
                   setForm({
@@ -1326,8 +1344,10 @@ export default function CalculadoraRacao() {
           </div>
 
           <div className="form-group">
-            <label>Espécie</label>
+            <label htmlFor="racao-especie">Espécie</label>
             <select
+              id="racao-especie"
+              name="racao_especie"
               value={form.especies}
               onChange={(e) => setForm({ ...form, especies: e.target.value })}
             >
