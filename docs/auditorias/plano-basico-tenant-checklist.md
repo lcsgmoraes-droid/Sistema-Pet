@@ -4,6 +4,82 @@ Documento de controle para registrar o teste tela por tela do plano basico em no
 
 Nao registrar aqui senhas, tokens, cookies, JWT, URLs sensiveis ou credenciais.
 
+## 0. Como usar este arquivo a partir de agora
+
+Este passa a ser o arquivo vivo do Plano Basico vendavel. A ideia e parar de espalhar auditoria, padronizacao e prontidao em varios documentos pequenos.
+
+Uso pratico:
+
+- Registrar aqui as telas ja testadas no Plano Basico.
+- Atualizar o status quando uma tela passar por teste real em tenant novo.
+- Marcar claramente o que ainda e P1 antes de vender para novas empresas.
+- Usar o checklist como fonte unica para decidir a proxima fatia de padronizacao/refatoracao.
+- Manter as auditorias antigas como historico consolidado dentro deste mesmo arquivo, sem criar documentos paralelos.
+
+### 0.1. Escopo comercial do Plano Basico
+
+Promessa comercial:
+
+> Gestao para pet shop com cadastro de clientes e pets, produtos, estoque, PDV/vendas e visao gerencial basica de vendas.
+
+Inclui nesta fase:
+
+- Registro, login, selecao de tenant e onboarding basico.
+- Dashboard inicial sem chamadas premium indevidas.
+- Pessoas/clientes.
+- Pets.
+- Produtos.
+- Estoque operacional basico.
+- PDV e vendas.
+- Financeiro apenas para vendas/historico relacionado a vendas.
+- Cadastros essenciais: categorias de produto, especies/racas, opcoes de racao, formas de pagamento, operadoras de cartao, departamentos e tipos auxiliares necessarios ao basico.
+- Configuracoes essenciais da empresa.
+- Usuarios, permissoes basicas e LGPD operacional.
+
+Nao vender ainda como parte do Plano Basico:
+
+- Financeiro ERP completo, DRE operacional, contas a pagar/receber e conciliacoes.
+- Compras, entrada XML, pedidos de compra e sugestao inteligente de compras.
+- Veterinario completo.
+- Banho & Tosa completo.
+- Campanhas, WhatsApp, IA avancada, e-commerce, app mobile, entregas, Bling/marketplaces e fiscal/NF.
+
+### 0.2. Criterios de pronto por tela
+
+Uma tela do Plano Basico so fica `Pronta` quando passar pelos 5 eixos abaixo.
+
+| Eixo | Criterio |
+|---|---|
+| Funcional | Fluxo principal testado em tenant novo, sem erro 500/403 indevido. |
+| Tenant | Dados criados no tenant A nao aparecem no tenant B; inserts/updates usam tenant correto. |
+| Plano/permissao | Tela basica nao chama modulo premium bloqueado; acesso direto premium cai em bloqueio/venda. |
+| UX/padrao | Botoes, estados, tabela/lista, loading, empty/error e campos seguem componentes globais quando ja existem. |
+| Refatoracao | Arquivo esta aceitavel ou tem plano claro de quebra sem bloquear venda controlada. |
+
+Status usados:
+
+- `Pronto`: passou nos 5 eixos.
+- `Quase pronto`: fluxo principal ok, falta ajuste visual pequeno ou reteste pontual.
+- `Pendente P1`: importante antes de escalar venda.
+- `Pendente P2`: melhoria posterior; nao bloqueia venda controlada.
+- `Nao testado`: ainda precisa passar no fluxo.
+
+### 0.3. Status mestre atual
+
+| Area | Status atual | Proxima acao |
+|---|---|---|
+| Comercial/auth/onboarding | Quase pronto | Retestar cadastro real, mensagens de erro corrigiveis e login com tenant novo. |
+| Dashboard | Quase pronto | Confirmar console limpo, sem chamadas premium em tenant basico. |
+| Pessoas/clientes | Pendente P1 | Retestar CRUD completo, financeiro/historico do cliente e isolamento A/B. |
+| Pets | Pendente P1 | Retestar CRUD, detalhe do pet, cadastro rapido de especie/raca e premium vet bloqueado. |
+| Produtos/estoque | Quase pronto | Retestar lista/cadastro/edicao/entrada com lote e validade no tenant novo. |
+| Calculadora de racao | Pendente P1 | Retestar fluxo visual completo depois das correcoes backend. |
+| PDV/vendas | Quase pronto | Rodar venda completa A/B: cliente, pet, produto, baixa de estoque e historico. |
+| Financeiro de vendas | Quase pronto | Confirmar que nao depende de financeiro ERP premium. |
+| Cadastros essenciais | Pendente P1 | Retestar formas de pagamento, operadoras, especies/racas, opcoes de racao e departamentos. |
+| Configuracoes/usuarios/LGPD | Pendente P1 | Testar salvar dados essenciais, criar usuario e permissao basica. |
+| Premium bloqueado | Pendente P1 | Smoke de menus e URLs diretas premium em tenant basico. |
+
 ## 1. Branch e commits
 
 - Branch: `fix/20260514-2157-corrigir-entrada-estoque-produto-user-id`
@@ -184,6 +260,67 @@ Resultado: passou na validacao da correcao de entrada de estoque.
 
 - Nao foram rodados novamente nesta etapa final da branch.
 - Suites multitenant amplas ja foram usadas nas fases anteriores, mas devem ser reexecutadas antes de merge/deploy se a branch for para producao.
+
+### Auditoria automatizada Codex consolidada
+
+Branch original consolidada aqui: `test/20260514-2259-auditoria-plano-basico-isolamento-ab`.
+
+Resultados automatizados registrados:
+
+| Area | Validacao | Resultado |
+|---|---|---|
+| Auth/tenant | Rotas criticas do plano basico usando `get_current_user_and_tenant` | OK |
+| Auth/tenant | Membership ativa, tenant ativo e sessao/JTI revalidados nas dependencias centrais | OK pela suite existente |
+| Modulos premium | Gate `require_active_module` atualizado e testado com token/tenant atual | OK |
+| Modulos premium | Routers premium principais protegidos por `_module_dependencies(...)` | OK |
+| Plano basico | `/modulos/status` usa tenant selecionado no token, nao tenant legado do usuario | Corrigido e testado |
+| Produtos/racao | Calculadora interna de racao usa tenant selecionado no token | Corrigido e testado |
+| SQL tenant-safe | Helper e runtime guard de SQL bruto continuam bloqueando query sem tenant | OK |
+| Onboarding tenant | Criacao/base de tenant e dados padrao cobertos pela suite multi-tenant | OK |
+| Mobile/entregas | Contexto tenant do entregador/e-commerce e status de entrega | OK |
+| Frontend | Build de producao Vite | OK |
+
+Comandos registrados na auditoria automatizada:
+
+```powershell
+$env:APP_ENV='test'; $env:ENVIRONMENT='test'; $env:ENV='test'; $env:DATABASE_URL='sqlite:///./test.db'; $env:DEBUG='false'; .\backend\.venv\Scripts\python.exe -m pytest backend\tests\unit\test_plano_basico_tenant_contract.py backend\tests\unit\test_module_access_dependency.py backend\tests\unit\test_tenant_security_middleware.py backend\tests\unit\test_sql_audit_config.py backend\tests\multi_tenant\test_phase1_tenant_hardening.py backend\tests\multi_tenant\test_phase1_1_runtime_validation.py backend\tests\multi_tenant\test_phase2b_tenant_safe_sql.py backend\tests\multi_tenant\test_phase3_tenant_onboarding_service.py -q
+```
+
+Resultado: `74 passed`.
+
+```powershell
+$env:APP_ENV='test'; $env:ENVIRONMENT='test'; $env:ENV='test'; $env:DATABASE_URL='sqlite:///./test.db'; $env:DEBUG='false'; .\backend\.venv\Scripts\python.exe -m pytest backend\tests\unit\test_ecommerce_mobile_tenant_context.py backend\tests\unit\test_entrega_status_contract.py -q
+```
+
+Resultado: `14 passed`.
+
+```powershell
+npm --prefix frontend run build
+```
+
+Resultado: build concluido com sucesso.
+
+Correcoes registradas naquela rodada:
+
+- `backend/app/api/racao_calculadora_routes.py`: trocado `get_current_user` por `get_current_user_and_tenant`.
+- `backend/app/routes/modulos_routes.py`: `/modulos/status` agora resolve o tenant pelo token selecionado.
+- `backend/tests/unit/test_module_access_dependency.py`: testes ajustados ao contrato atual da dependency assincrona com credenciais.
+- `backend/tests/unit/test_plano_basico_tenant_contract.py`: novo contrato automatizado para evitar regressao no plano basico/tenant.
+
+Pendencias manuais que seguem abertas pelo checklist:
+
+- Editar/excluir cliente.
+- Financeiro do cliente.
+- Editar/excluir pet.
+- Cadastro rapido de especie/raca.
+- Editar produto com todos os campos.
+- Calculadora de racao na UI.
+- Catalogos auxiliares de produto.
+- Formas de pagamento CRUD.
+- Operadoras de cartao.
+- Configuracao da empresa.
+- Usuarios/admin.
+- A/B real no navegador entre dois tenants.
 
 ### Deploy
 
