@@ -11,6 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from app.auth import get_current_user
+from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.models import AssinaturaModulo, Tenant, User
 
@@ -96,7 +97,7 @@ def _resolver_modulos_ativos(
 
 @router.get("/status")
 def get_modulos_status(
-    current_user: User = Depends(get_current_user),
+    user_and_tenant=Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session),
 ):
     """
@@ -108,7 +109,8 @@ def get_modulos_status(
             "plano": "base"
         }
     """
-    tenant_id = str(current_user.tenant_id)
+    _current_user, tenant_id = user_and_tenant
+    tenant_id = str(tenant_id)
 
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     if not tenant:

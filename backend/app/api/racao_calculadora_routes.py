@@ -16,7 +16,7 @@ import logging
 from typing import Dict, Any
 
 from app.db import get_session
-from app.auth import get_current_user
+from app.auth.dependencies import get_current_user_and_tenant
 from app.produtos_models import Produto
 from app.schemas.racao_calculadora import RacaoCalculadoraInput, RacaoCalculadoraOutput
 from app.services.racao_calculadora_service import calcular_racao
@@ -48,7 +48,7 @@ router = APIRouter(
 )
 async def calcular_consumo_racao(
     payload: RacaoCalculadoraInput,
-    current_user: dict = Depends(get_current_user),
+    user_and_tenant=Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session)
 ):
     """
@@ -67,7 +67,7 @@ async def calcular_consumo_racao(
     """
     try:
         # Log da requisição (preserva tenant_id para auditoria)
-        tenant_id = current_user.tenant_id if hasattr(current_user, 'tenant_id') else None
+        current_user, tenant_id = user_and_tenant
         user_id = current_user.id if hasattr(current_user, 'id') else None
         logger.info(
             f"Calculadora de ração chamada - Tenant: {tenant_id}, User: {user_id}, "
@@ -168,7 +168,7 @@ async def calcular_consumo_racao(
     description="Retorna informações sobre como usar a calculadora de ração"
 )
 async def info_calculadora(
-    current_user: dict = Depends(get_current_user)
+    _user_and_tenant=Depends(get_current_user_and_tenant)
 ):
     """
     Endpoint informativo sobre a calculadora.
