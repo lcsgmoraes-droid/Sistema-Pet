@@ -10,8 +10,9 @@ function obterValidadeResumoProduto(produto) {
   const lotes = (produto?.lotes || [])
     .filter((lote) => lote?.data_validade)
     .sort((a, b) => new Date(a.data_validade) - new Date(b.data_validade));
+  const validadeProxima = lotes[0]?.data_validade || produto?.validade_proxima;
 
-  if (lotes.length === 0) {
+  if (!validadeProxima) {
     return {
       data: "-",
       apoio: "Sem lote com validade",
@@ -20,8 +21,7 @@ function obterValidadeResumoProduto(produto) {
     };
   }
 
-  const lote = lotes[0];
-  const dataValidade = new Date(lote.data_validade);
+  const dataValidade = new Date(validadeProxima);
   const hoje = new Date();
   hoje.setHours(0, 0, 0, 0);
   dataValidade.setHours(0, 0, 0, 0);
@@ -29,7 +29,7 @@ function obterValidadeResumoProduto(produto) {
 
   if (dias < 0) {
     return {
-      data: formatarData(lote.data_validade),
+      data: formatarData(validadeProxima),
       apoio: `${Math.abs(dias)} dia(s) vencido`,
       className: "text-red-700",
       surfaceClassName: "bg-red-50 border-red-200",
@@ -38,7 +38,7 @@ function obterValidadeResumoProduto(produto) {
 
   if (dias <= 30) {
     return {
-      data: formatarData(lote.data_validade),
+      data: formatarData(validadeProxima),
       apoio: `Vence em ${dias} dia(s)`,
       className: "text-orange-700",
       surfaceClassName: "bg-orange-50 border-orange-200",
@@ -47,7 +47,7 @@ function obterValidadeResumoProduto(produto) {
 
   if (dias <= 90) {
     return {
-      data: formatarData(lote.data_validade),
+      data: formatarData(validadeProxima),
       apoio: `Vence em ${dias} dia(s)`,
       className: "text-yellow-700",
       surfaceClassName: "bg-yellow-50 border-yellow-200",
@@ -55,7 +55,7 @@ function obterValidadeResumoProduto(produto) {
   }
 
   return {
-    data: formatarData(lote.data_validade),
+    data: formatarData(validadeProxima),
     apoio: `Vence em ${dias} dia(s)`,
     className: "text-gray-700",
     surfaceClassName: "bg-gray-50 border-gray-200",
