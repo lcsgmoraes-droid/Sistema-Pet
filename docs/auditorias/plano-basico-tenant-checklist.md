@@ -103,7 +103,7 @@ Status usados:
 | 4. Calculadora/catalogos de racao | Validar fluxo visual, persistencia e mensagens de erro sem 500. | Concluido local: API A/B e smoke visual passaram com operador nao-admin. | Nao bloqueia venda controlada; retestar em staging/producao. |
 | 5. Landing page, trial e selecao de planos | Exibir 30 dias gratis do Basico completo, destacar Basico como contratacao inicial, mostrar Beta como piloto acompanhado e levar ao cadastro/onboarding correto. | Smoke visual de `/landing` e `/planos` em producao passou; falta onboarding completo com confirmacao real de e-mail. | Sim para autoatendimento amplo; nao bloqueia venda controlada acompanhada. |
 | 6. A/B visual no navegador | Usar dois tenants reais no browser e conferir que menus, dados e mensagens batem com o plano. | Em andamento; PDV completo, autocomplete, Lembretes, pagamentos/operadoras, catalogos de produto, lote/validade, configuracao da empresa, usuarios/admin, Roles e LGPD passaram; tenant Basico real em producao confirmou menus e bloqueios visuais. | Sim antes de abrir para varias empresas. |
-| 7. Producao controlada | Merge, deploy, migrations, health check e smoke real sem dados sensiveis. | Parcial: smoke API + visual de leitura em producao passou; deploy controlado nao foi executado nesta rodada. | Sim. |
+| 7. Producao controlada | Merge, deploy, migrations, health check e smoke real sem dados sensiveis. | Concluido para venda acompanhada: producao validada em 2026-05-16 no commit `697a8479`, Alembic head, containers healthy, health/watchdog OK e smoke Basico API/visual OK; falta onboarding completo com confirmacao real de e-mail antes do autoatendimento amplo. | Sim para autoatendimento amplo; nao bloqueia venda controlada acompanhada. |
 
 ### 0.5. Desenho recomendado para trial e Beta
 
@@ -176,7 +176,7 @@ Detalhe do smoke visual em producao:
 - Rotas premium diretas abriram tela de modulo/upgrade, sem tela operacional: `/financeiro/contas-pagar`, `/financeiro/dre`, `/compras/pedidos`, `/notas-fiscais/entrada`, `/veterinario`, `/banho-tosa` e `/campanhas`.
 - Pagina `Meu Plano` confirmou `Plano Basico`, trial em andamento, 30 dias e cobranca assistida fora do sistema.
 - Paginas publicas `/landing` e `/planos` comunicaram 30 dias gratis do Basico e modulos avancados como Beta/piloto acompanhado.
-- Onboarding real: Yahoo recebeu o e-mail de confirmacao; Outlook nao recebeu. Correcao preparada em `email_service.py` para reforcar cabecalhos transacionais (`Date`, `Message-ID`, `Reply-To`, `X-Mailer`), usar politica SMTP/CRLF e envelope limpo; retestar Outlook apos deploy.
+- Onboarding real: Yahoo recebeu o e-mail de confirmacao; Outlook nao recebeu na primeira tentativa. Correcao de entregabilidade publicada no PR `#63`/commit `c220b2e6` para reforcar cabecalhos transacionais (`Date`, `Message-ID`, `Reply-To`, `X-Mailer`), usar politica SMTP/CRLF e envelope limpo; reteste manual no Outlook segue pendente.
 
 Cleanup da rodada:
 
@@ -186,7 +186,7 @@ Cleanup da rodada:
 
 Pendencias que continuam abertas:
 
-- Retestar e-mail de confirmacao no Outlook apos deploy da correcao de entregabilidade.
+- Retestar e-mail de confirmacao no Outlook com usuario externo/controlado apos a correcao de entregabilidade ja publicada.
 - Teste manual de onboarding completo de novo tenant com confirmacao real de e-mail.
 - Proximo deploy real autorizado deve usar `docs/PRODUCAO_ROLLBACK_CHECKLIST.md`.
 
@@ -200,7 +200,8 @@ Pendencias que continuam abertas:
   - `2e662a8b9 fix: evitar chamadas premium no plano basico`
 - PR:
   - Atual: `https://github.com/lcsgmoraes-droid/Sistema-Pet/pull/36`
-  - Status: draft, aguardando revisao/merge controlado.
+  - Status: mergeado e publicado em producao.
+  - Ajuste posterior de cupom/campanha: PR `#37`, mergeado e publicado em producao no commit `895cf6ae`.
 
 ## 2. Ambiente testado
 
@@ -628,7 +629,7 @@ Rodada estendida `866987` + reteste de estoque:
 
 ### Correcao operacional PDV/campanhas 2026-05-16
 
-- Implementado na branch `fix/20260516-1723-corrigir-cupom-carimbos-reabertura-venda`; pendente apenas de PR/merge/deploy.
+- Implementado na branch `fix/20260516-1723-corrigir-cupom-carimbos-reabertura-venda`, publicado no PR `#64` e deployado em producao no commit `697a8479`.
 - Gestor de Beneficios: busca de cliente agora considera tambem `clientes.codigo`, mostra o codigo nas sugestoes e resolve lancamentos manuais por ID interno ou codigo visivel.
 - Cupom manual: quando o operador informa o codigo visivel do cliente, o backend resolve para o ID interno correto antes de vincular o cupom.
 - Reabertura de venda ja paga: o PDV passa a permitir confirmar ajuste/cupom sem remover e lancar novamente a forma de pagamento existente.
@@ -735,9 +736,11 @@ Pendencias manuais que seguem abertas pelo checklist:
 
 ### Deploy
 
-- Nao houve deploy de producao nesta etapa.
+- PR `#36` e PR `#37` foram mergeados e publicados na rodada anterior, deixando o Plano Basico vendavel em acompanhamento.
 - Houve smoke real API + visual de leitura contra producao em 2026-05-16, sem SSH e sem alteracao operacional de venda/cliente/produto/estoque.
-- Branch atual enviada para GitHub no PR `#36`: `https://github.com/lcsgmoraes-droid/Sistema-Pet/pull/36`.
+- Deploy real posterior validado em 2026-05-16 no commit `697a8479` (`Corrige cupom e carimbos na reabertura de venda`), com Alembic head, containers `backend`, `nginx`, `postgres` e `worker-bling` saudaveis, `/api/health` 200 e `/api/health/watchdog` healthy.
+- A venda real `202605160025` foi corrigida apos o deploy: cupom `FIEL-YEWKR9` consumido, desconto de campanha aplicado e duplicidade de justificativa removida.
+- A entrega de e-mail de confirmacao precisa de reteste manual no Outlook depois da correcao de entregabilidade publicada.
 
 ## Resumo Executivo
 
@@ -748,4 +751,32 @@ Pendencias manuais que seguem abertas pelo checklist:
 - Pendencias P1: 0 bloqueadores tecnicos confirmados para venda controlada; refinamentos de financeiro/recibo/historico ainda recomendados antes de escalar.
 - Pendencias P2: 5
 - Minha recomendacao: liberar venda controlada acompanhada com monitoramento dos primeiros tenants; o smoke API + visual real de producao do Basico ja passou, mas onboarding completo com e-mail real ainda deve ser conferido antes de autoatendimento amplo.
+
+## Rodadas de conferencia pos-deploy - 2026-05-15 e 2026-05-16
+
+Objetivo: voltar ao checklist apos as correcoes emergenciais de producao e confirmar a base tecnica antes do smoke autenticado final.
+
+Resultados de 2026-05-15:
+
+- Producao alinhada no commit `895cf6ae`.
+- Alembic em producao: `or20260515a9 (head)`.
+- Containers em producao saudaveis: `backend`, `nginx`, `postgres`, `worker-bling`.
+- Suite principal do Plano Basico/multitenant: `81 passed`.
+- Suite mobile/e-commerce/entregas: `14 passed`.
+- Build frontend Vite de producao local: OK.
+- Checks publicos de producao:
+  - `/api/health`: 200.
+  - `/api/health/watchdog`: 200.
+  - `/`, `/landing`, `/planos`: 200.
+
+Resultados posteriores de 2026-05-16:
+
+- Smoke autenticado e visual do Plano Basico em producao passou, incluindo menus, telas permitidas e bloqueios premium diretos.
+- Producao atualizada depois para o commit `697a8479`, com deploy seguro validado, Alembic head, containers saudaveis e health/watchdog OK.
+- Venda real `202605160025` corrigida apos deploy, com cupom consumido e desconto de campanha aplicado.
+
+Proximo passo da conferencia:
+
+- Retestar e-mail de confirmacao no Outlook com usuario externo/controlado.
+- Completar onboarding real de novo tenant com confirmacao de e-mail antes de abrir autoatendimento amplo.
 
