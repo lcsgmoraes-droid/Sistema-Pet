@@ -73,7 +73,7 @@ Status usados:
 | Pessoas/clientes | Quase pronto | Listagem, criacao, edicao, exclusao e bloqueio cruzado passaram em auditoria A/B local; retestar financeiro/historico do cliente. |
 | Pets | Quase pronto | Criacao real A/B passou com codigo unico por tenant; retestar detalhe visual e cadastro rapido de especie/raca. |
 | Produtos/estoque | Quase pronto | Listagem, criacao, edicao, exclusao e entrada de estoque com bloqueio cruzado passaram em auditoria A/B local; retestar lote/validade visual e fluxo completo de estoque. |
-| Calculadora de racao | Pendente P1 | Retestar fluxo visual completo depois das correcoes backend. |
+| Calculadora de racao | Quase pronto | API A/B com operador nao-admin passou; falta smoke visual completo no navegador. |
 | PDV/vendas | Pronto local A/B | Venda completa A/B por API real passou: cliente, produto com lote, caixa, finalizacao, baixa de estoque e bloqueio cruzado. Falta smoke visual no navegador. |
 | Financeiro de vendas | Quase pronto | Finalizacao gerou reflexos financeiros sem 500 no A/B local; falta conferir telas/historico visual. |
 | Cadastros essenciais | Quase pronto | Formas de pagamento e opcoes de racao passaram em criacao/listagem A/B real; retestar edicao/exclusao e demais cadastros. |
@@ -88,7 +88,7 @@ Status usados:
 | 1. Base tecnica multi-tenant | Cadastro real de tenants A/B, selecao de tenant, migrations limpas e bloqueio de vazamento entre empresas. | Concluido local | Sim, mas ja passou localmente. |
 | 2. Fluxos essenciais do basico | Clientes, pets, produtos, estoque, PDV/vendas, historico financeiro de vendas e cadastros auxiliares. | Em andamento; PDV/vendas A/B local concluido | Sim, enquanto usuarios/permissoes, calculadora/cadastros e smoke visual nao fecharem. |
 | 3. Usuarios e permissoes | Criar usuario do tenant, validar permissoes basicas e bloqueio de acesso indevido. | Concluido local por API; falta smoke visual | Sim ate passar no navegador. |
-| 4. Calculadora/catalogos de racao | Validar fluxo visual, persistencia e mensagens de erro sem 500. | Pendente P1 | Sim se fizer parte da promessa comercial inicial. |
+| 4. Calculadora/catalogos de racao | Validar fluxo visual, persistencia e mensagens de erro sem 500. | API A/B concluida; falta smoke visual | Sim se fizer parte da promessa comercial inicial. |
 | 5. Landing page e selecao de planos | Exibir planos, destacar Basico, iniciar contratacao com plano escolhido e levar ao cadastro/onboarding correto. | Concluido local | Sim para vender por autoatendimento; falta smoke visual em producao/staging. |
 | 6. A/B visual no navegador | Usar dois tenants reais no browser e conferir que menus, dados e mensagens batem com o plano. | Pendente P1 | Sim antes de abrir para varias empresas. |
 | 7. Produção controlada | Merge, deploy, migrations, health check e smoke real sem dados sensiveis. | Pendente | Sim. |
@@ -119,6 +119,7 @@ Status usados:
   - A rodada confirmou isolamento em clientes, pets, formas de pagamento e opcoes de racao.
   - A rodada de PDV/vendas `20260515154447` confirmou venda finalizada e bloqueio cruzado entre tenants.
   - A rodada de usuarios `20260515155144` confirmou operador PDV nao-admin com permissoes minimas, busca/autocomplete isolados e bloqueio de administracao RBAC.
+  - A rodada de racao/catalogos `20260515160544` confirmou operador nao-admin, catalogos isolados, calculadora sem vazamento e bloqueio por permissao.
   - A comparacao visual completa por navegador ainda fica pendente para PDV/vendas, financeiro de vendas, usuarios/permissoes e alguns cadastros auxiliares.
 - Data/hora aproximada dos testes: 2026-05-15, madrugada e tarde, horario local.
 
@@ -144,7 +145,7 @@ Status usados:
 | Produtos | Editar produto | `/produtos/:id/editar` | `PUT /produtos/{id}` | Sim | Auditoria A/B estendida confirmou edicao no proprio tenant e 404 em tentativa cruzada. Checklist exaustivo de todos os campos segue pendente. | Correcoes anteriores na trilha de catalogos/racao. | OK parcial |
 | Produtos | Entrada de estoque pela tela do produto | `/produtos/:id/movimentacoes` ou acao de entrada | `POST /produtos/{id}/entrada` | Sim | Dava erro 500 por `user_id` nulo em `estoque_movimentacoes`; na auditoria A/B estendida, entrada propria retornou 200 e entrada cruzada retornou 404. | `backend/app/produtos_routes.py` agora grava `user_id=current_user.id`. | OK |
 | Produtos | Entrada oficial de estoque | Fluxo de estoque | `POST /estoque/entrada` | Sim | Entrada oficial funcionou no tenant de teste. | Nenhuma nesta branch. | OK |
-| Produtos | Calculadora de racao | `/produtos` / modal calculadora | `GET/POST /produtos/calculadora-racao` | Parcial | Houve erros anteriores quando produto aparecia como pronto sem tabela completa; fluxo foi trabalhado antes, mas nao revalidado nesta branch final. | Nao corrigido nesta branch final. | Pendente P1 |
+| Produtos | Calculadora de racao | `/produtos` / modal calculadora | `GET/POST /produtos/calculadora-racao` e `POST /internal/racao/calcular` | Sim por API | Operador A com `produtos.visualizar` buscou/calculou racao do tenant A, nao encontrou racao do tenant B e recebeu 404 ao forcar ID cruzado. Usuario sem `produtos.visualizar` recebeu 403. | Calculadora e rota interna agora exigem `produtos.visualizar`. | OK local; falta smoke visual |
 | Produtos | Catalogos auxiliares | `/produtos/:id/editar` | `GET /produtos/departamentos` e similares | Parcial | Erros 500 foram vistos anteriormente em catalogos auxiliares; nao auditado nesta branch final. | Nao corrigido nesta branch final. | Pendente P1 |
 | PDV | Abrir caixa | `/pdv` | Endpoints de caixa | Sim | Caixa aberto para venda A/B por API real em dois tenants Basico. | Nenhuma regra de caixa alterada nesta rodada. | OK local |
 | PDV | Criar venda | `/pdv` | Endpoints de vendas/itens | Sim | Venda criada nos tenants A e B com cliente e produto do proprio tenant; acesso cruzado a venda do outro tenant retornou 404. | Adicionada migration para alinhar campos `tipo_retirada` e `palavra_chave_retirada` de `vendas`. | OK local |
@@ -155,7 +156,7 @@ Status usados:
 | Financeiro ERP | Dashboard financeiro completo | `/financeiro` | Endpoints financeiros ERP | Sim, por erro observado no dashboard | Modulo ERP nao deve ser acessado automaticamente no basico. | Alertas/projecoes premium nao disparam sem modulo ativo. | Corrigido |
 | Cadastros | Formas de pagamento | `/cadastros/financeiro/formas-pagamento` | Endpoints de formas de pagamento | Parcial | Criacao e listagem A/B real passaram; forma do tenant A nao apareceu no tenant B, e vice-versa. Edicao/exclusao visual ainda pendentes. | Nenhuma regra de negocio alterada nesta etapa. | OK parcial |
 | Cadastros | Operadoras de cartao | `/cadastros/financeiro/operadoras` | Endpoints de operadoras | Nao | Tela padronizada visualmente com componentes globais; CRUD ainda nao foi retestado nesta rodada. | `PageHeader`, `ActionButton` e `Panel` aplicados sem alterar regra de negocio. | Pendente P1 |
-| Cadastros | Opcoes de racao | `/cadastros/opcoes-racao` | Endpoints de opcoes de racao | Parcial | Criacao e listagem de linha de racao passaram em A/B real; linha do tenant A nao apareceu no tenant B, e vice-versa. Selects e persistencia de tabela de consumo ainda precisam de reteste completo. | Componentes globais aplicados anteriormente; nesta etapa foram criadas as tabelas auxiliares que o onboarding real exige. | OK parcial |
+| Cadastros | Opcoes de racao | `/cadastros/opcoes-racao` | Endpoints de opcoes de racao | Sim por API | Catalogos A/B ficaram isolados; operador com apenas `produtos.visualizar` conseguiu listar, mas nao criar. Mutacoes agora exigem permissao de produto. Selects e persistencia visual ainda precisam de reteste no navegador. | Endpoints de opcoes de racao agora exigem `produtos.visualizar`, `produtos.criar` ou `produtos.editar` conforme acao. | OK local; falta smoke visual |
 | Configuracoes | Configuracao da empresa | `/configuracoes/empresa` ou equivalente | Endpoints de configuracao | Nao | Nao testado nesta rodada final. | Nao houve. | Nao testado |
 | Administracao | Usuarios | `/admin/usuarios` | `POST/GET /usuarios` | Sim | Admin criou operador PDV em dois tenants; operador logou, recebeu apenas `clientes.visualizar`, `produtos.visualizar`, `vendas.criar` e nao acessou `/usuarios`. | Nenhuma regra de usuario alterada; validado contrato de permissao. | OK local |
 | Administracao | Roles/permissoes | `/admin/usuarios` e perfis | `/roles`, `/permissions` | Sim | Operador sem `usuarios.manage` conseguia criar role e listar permissoes; corrigido para retornar 403 em GET/POST/PUT/DELETE administrativos. | `roles_routes` e `permissions_routes` agora exigem `usuarios.manage`; teste de contrato adicionado. | Corrigido |
@@ -176,6 +177,7 @@ Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada com dois te
 | PDV/Vendas | Nao: GET cruzado de venda A/B retornou 404 e listagens ficaram separadas | Sim, venda criada/finalizada com token de cada tenant e estoque baixado somente no produto do tenant | Visualizacao propria 200; visualizacao cruzada 404; edicao/reabertura ainda nao auditada completa | Nao testado | Sem tenant/token segue coberto por suites de auth; acesso direto cruzado a ID de outro tenant retornou 404 | OK local |
 | Financeiro Vendas | Historico/reflexos de venda nao vazaram na rodada A/B local | Sim, finalizacao gerou DRE/financeiro sem 500 depois do alinhamento de schema | Tela visual ainda pendente | Nao testado | Nao testado nesta rodada visual | OK parcial |
 | Usuarios/permissoes | Operador PDV do tenant A nao viu produto/cliente do tenant B e nao administrou RBAC | Sim, admin criou operador com role do proprio tenant | Nao aplicavel nesta rodada | Nao aplicavel nesta rodada | `/usuarios`, `/roles` e `/permissions` retornaram 403 para operador sem `usuarios.manage` | OK local |
+| Calculadora/catalogos de racao | Operador A nao viu produto/opcoes do tenant B; calculo cruzado por ID retornou 404 | Sim, admin criou catalogos/produtos em cada tenant e operador A acessou somente tenant A | Nao testado visualmente | Mutacao de catalogo por operador sem permissao retornou 403 | Usuario sem `produtos.visualizar` recebeu 403 na calculadora | OK local |
 | Cadastros base | Formas de pagamento e linha de racao nao vazaram entre tenants A/B | Sim, por endpoint real com token de cada tenant | Nao testado nesta rodada | Nao testado nesta rodada | Acesso premium direto retornou 403 em Bling e WhatsApp no plano basico | OK parcial |
 | Modulos premium bloqueados | Bling e WhatsApp retornaram 403 no plano basico | Nao aplicavel | Nao aplicavel | Nao aplicavel | 403 observado em chamadas bloqueadas | OK parcial |
 
@@ -205,6 +207,7 @@ Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada com dois te
 | `backend/alembic/versions/on20260515a5_create_empresa_config_fiscal.py` | Finalizacao de venda abortava a transacao ao buscar configuracao fiscal inexistente no banco. | Migration cria `empresa_config_fiscal` conforme modelo atual, com indice por tenant. | Venda finalizada podia virar 500 por dependencia fiscal opcional. | `alembic upgrade head`; tabela conferida no Postgres; finalizacao A/B avancou. |
 | `backend/alembic/versions/oo20260515a6_add_dre_subcategoria_fields.py` | Geracao de DRE por competencia na finalizacao buscava `dre_subcategorias.custo_pe` e `categoria_financeira_id`, ausentes no schema. | Migration adiciona os campos e FK opcional para `categorias_financeiras`. | Finalizacao de venda ficava vulneravel a 500 em tenants novos. | Venda A/B `20260515154447` finalizou nos dois tenants; estoque baixou corretamente; migrations passaram em banco limpo. |
 | `backend/app/roles_routes.py`, `backend/app/permissions_routes.py`, `backend/tests/unit/test_plano_basico_tenant_contract.py` | Operador PDV sem `usuarios.manage` conseguia criar role e listar permissoes globais. | Endpoints administrativos de roles/permissoes agora exigem `usuarios.manage`; contrato automatizado protege a regra. | Escalada de permissao dentro do tenant por usuario operacional. | Rodada usuario A/B `20260515155144`: `/usuarios`, `/roles` e `/permissions` retornaram 403 para operador; suite tenant/hardening reexecutada. |
+| `backend/app/opcoes_racao_routes.py`, `backend/app/calculadora_racao.py`, `backend/app/api/racao_calculadora_routes.py`, `backend/tests/unit/test_plano_basico_tenant_contract.py` | Catalogos de racao e calculadora tinham isolamento por tenant, mas dependiam apenas de autenticacao em alguns pontos. | Leitura exige `produtos.visualizar`; criacao de opcoes exige `produtos.criar`; edicao/exclusao exige `produtos.editar`; calculadoras exigem `produtos.visualizar`; contrato automatizado adicionado. | Usuario autenticado com permissao limitada podia mexer em cadastro auxiliar ou consultar calculadora fora da politica de produto. | Rodada racao A/B `20260515160544`: catalogos isolados, mutacao negada ao operador, busca/calculo cruzado 404 e usuario sem produto 403. |
 
 ## 6. Pendencias priorizadas
 
@@ -216,7 +219,7 @@ Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada com dois te
 ### P1 - Importante antes de escalar
 
 - Complementar comparacao A/B real entre dois tenants para fluxos ainda nao cobertos:
-  - cadastros auxiliares.
+  - categorias/departamentos/marcas, formas de pagamento completas e demais cadastros auxiliares.
 - Complementar smoke visual no navegador para usuarios/permissoes:
   - a API A/B ja passou com operador PDV e bloqueio de RBAC;
   - falta conferir tela de usuarios, criacao de perfil/usuario e mensagens de permissao.
@@ -230,10 +233,10 @@ Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada com dois te
   - categorias/opcoes de racao;
   - formas de pagamento;
   - usuarios.
-- Retestar calculadora de racao ponta a ponta:
+- Retestar calculadora de racao visualmente ponta a ponta:
   - produto sem tabela nao pode aparecer como pronto;
   - salvar tabela deve persistir;
-  - calculo deve retornar resultado sem 400/500.
+  - calculo ja passou por API, mas falta confirmar UX/mensagens no navegador.
 - Retestar cadastro rapido de especie/raca:
   - nao permitir raca sem especie;
   - garantir que o item criado aparece no select imediatamente.
@@ -347,6 +350,18 @@ Rodada usuarios/permissoes A/B `20260515155144`:
 - Venda propria pelo operador A foi criada; tentativa de venda com cliente/produto do tenant B retornou 404.
 - `/usuarios`, `/roles` e `/permissions` retornaram 403 para operador sem `usuarios.manage`.
 
+Rodada racao/catalogos A/B `20260515160544`:
+
+- Tenant A: `d51067c0-3c99-420d-a9f2-db2bb9421d0b`.
+- Tenant B: `f4987049-e92c-404d-ac68-1cb5553a4d20`.
+- Operador A: `qa.racao.operador.a.20260515160544@example.com`, com `produtos.visualizar`.
+- Produto A `29` e produto B `30` criados com tabela de consumo e opcoes de racao por tenant.
+- Operador A listou opcoes do tenant A e nao recebeu opcoes do tenant B.
+- `POST /opcoes-racao/linhas` retornou 403 para operador sem `produtos.criar`.
+- Busca da calculadora por produto A retornou item; busca por produto B retornou lista vazia.
+- Calculo legado `/produtos/calculadora-racao` e interno `/internal/racao/calcular` funcionaram para produto A e retornaram 404 quando forcaram produto B.
+- Usuario sem `produtos.visualizar` recebeu 403 na busca da calculadora e no calculo interno.
+
 ```powershell
 # Auditoria A/B local historica 2026-05-15
 # 1. semear dois tenants DEV locais diretamente no banco;
@@ -391,6 +406,8 @@ Rodada estendida `866987` + reteste de estoque:
 
 - Suite multitenant/hardening reexecutada nesta rodada: `74 passed`.
 - Migrations completas reexecutadas em banco Postgres limpo ate `oo20260515a6`.
+- Contrato de Plano Basico/racao reexecutado nesta rodada: `12 passed`.
+- Rodada API A/B de racao/catalogos concluida na API local 8001 apontada para o Postgres DEV, usando o codigo atual da branch.
 
 ### Auditoria automatizada Codex consolidada
 
@@ -405,7 +422,8 @@ Resultados automatizados registrados:
 | Modulos premium | Gate `require_active_module` atualizado e testado com token/tenant atual | OK |
 | Modulos premium | Routers premium principais protegidos por `_module_dependencies(...)` | OK |
 | Plano basico | `/modulos/status` usa tenant selecionado no token, nao tenant legado do usuario | Corrigido e testado |
-| Produtos/racao | Calculadora interna de racao usa tenant selecionado no token | Corrigido e testado |
+| Produtos/racao | Calculadora interna de racao usa tenant selecionado no token e exige `produtos.visualizar` | Corrigido e testado |
+| Produtos/racao | Catalogos de racao exigem permissao de produto por acao | Corrigido e testado |
 | SQL tenant-safe | Helper e runtime guard de SQL bruto continuam bloqueando query sem tenant | OK |
 | Onboarding tenant | Criacao/base de tenant e dados padrao cobertos pela suite multi-tenant | OK |
 | Mobile/entregas | Contexto tenant do entregador/e-commerce e status de entrega | OK |
@@ -443,7 +461,7 @@ Pendencias manuais que seguem abertas pelo checklist:
 - Financeiro do cliente.
 - Cadastro rapido de especie/raca.
 - Editar produto com todos os campos.
-- Calculadora de racao na UI.
+- Calculadora de racao na UI: API A/B concluida; falta smoke visual.
 - Catalogos auxiliares de produto.
 - Formas de pagamento CRUD.
 - Operadoras de cartao.
@@ -464,7 +482,7 @@ Pendencias manuais que seguem abertas pelo checklist:
 - Fluxos OK ou OK parcial: 13
 - Corrigidos/registrados nesta trilha: frontend padronizado, onboarding local, tabelas auxiliares de racao, unicidade de pet por tenant, contratacao por plano e schema de PDV/DRE
 - Pendencias P0: 0 confirmadas apos esta branch
-- Pendencias P1: 6
+- Pendencias P1: 5
 - Pendencias P2: 5
 - Minha recomendacao: liberar para revisao/merge em ambiente de teste/staging. Para producao/comercial, liberar com ressalvas somente depois de retestar CRUD completo, calculadora de racao, cadastro rapido de especie/raca, usuarios/permissoes e A/B visual no navegador.
 

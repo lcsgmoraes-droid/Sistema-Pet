@@ -35,6 +35,8 @@ def test_basic_plan_route_files_use_selected_tenant_dependency():
         "backend/app/usuarios_routes.py",
         "backend/app/categorias_routes.py",
         "backend/app/chat_routes.py",
+        "backend/app/opcoes_racao_routes.py",
+        "backend/app/calculadora_racao.py",
         "backend/app/api/racao_calculadora_routes.py",
     ]
 
@@ -141,3 +143,27 @@ def test_rbac_admin_routes_require_user_management_permission():
         '@router.get("/permissions", response_model=List[PermissionResponse])\n'
         '@require_permission("usuarios.manage")'
     ) in permissions_source
+
+
+def test_racao_catalog_and_calculator_routes_require_product_permissions():
+    opcoes_source = _source("backend/app/opcoes_racao_routes.py")
+    calculadora_source = _source("backend/app/calculadora_racao.py")
+    internal_source = _source("backend/app/api/racao_calculadora_routes.py")
+
+    assert opcoes_source.count('@require_permission("produtos.visualizar")') >= 6
+    assert opcoes_source.count('@require_permission("produtos.criar")') >= 6
+    assert opcoes_source.count('@require_permission("produtos.editar")') >= 12
+
+    assert (
+        '@router.get("/calculadora-racao/opcoes", response_model=RacoesCalculadoraOptionsResponse)\n'
+        '@require_permission("produtos.visualizar")'
+    ) in calculadora_source
+    assert (
+        '@router.post("/calculadora-racao", response_model=ResultadoCalculoRacao)\n'
+        '@require_permission("produtos.visualizar")'
+    ) in calculadora_source
+    assert (
+        '@router.post("/comparar-racoes", response_model=ComparativoRacoesResponse)\n'
+        '@require_permission("produtos.visualizar")'
+    ) in calculadora_source
+    assert '@require_permission("produtos.visualizar")\nasync def calcular_consumo_racao' in internal_source

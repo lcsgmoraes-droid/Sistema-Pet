@@ -10,6 +10,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
+from app.security.permissions_decorator import require_permission
 from app.tenancy.context import set_current_tenant
 from app.opcoes_racao_models import (
     LinhaRacao, PorteAnimal, FasePublico, TipoTratamento, SaborProteina, ApresentacaoPeso
@@ -73,6 +74,7 @@ def _verificar_duplicata(db: Session, model, tenant_id, nome: str, id_excluir: O
 # ==================== LINHAS DE RAÇÃO ====================
 
 @router.get("/linhas", response_model=List[OpcaoResponse])
+@require_permission("produtos.visualizar")
 async def listar_linhas_racao(
     apenas_ativos: bool = True,
     db: Session = Depends(get_session),
@@ -90,6 +92,7 @@ async def listar_linhas_racao(
 
 
 @router.post("/linhas", response_model=OpcaoResponse)
+@require_permission("produtos.criar")
 async def criar_linha_racao(
     dados: OpcaoBase,
     db: Session = Depends(get_session),
@@ -117,6 +120,7 @@ async def criar_linha_racao(
 
 
 @router.put("/linhas/{linha_id}", response_model=OpcaoResponse)
+@require_permission("produtos.editar")
 async def atualizar_linha_racao(
     linha_id: int,
     dados: OpcaoBase,
@@ -149,6 +153,7 @@ async def atualizar_linha_racao(
 
 
 @router.delete("/linhas/{linha_id}")
+@require_permission("produtos.editar")
 async def deletar_linha_racao(
     linha_id: int,
     db: Session = Depends(get_session),
@@ -174,6 +179,7 @@ async def deletar_linha_racao(
 # ==================== PORTES ====================
 
 @router.get("/portes", response_model=List[OpcaoResponse])
+@require_permission("produtos.visualizar")
 async def listar_portes(
     apenas_ativos: bool = True,
     db: Session = Depends(get_session),
@@ -191,6 +197,7 @@ async def listar_portes(
 
 
 @router.post("/portes", response_model=OpcaoResponse)
+@require_permission("produtos.criar")
 async def criar_porte(
     dados: OpcaoBase,
     db: Session = Depends(get_session),
@@ -218,6 +225,7 @@ async def criar_porte(
 
 
 @router.put("/portes/{porte_id}", response_model=OpcaoResponse)
+@require_permission("produtos.editar")
 async def atualizar_porte(
     porte_id: int,
     dados: OpcaoBase,
@@ -250,6 +258,7 @@ async def atualizar_porte(
 
 
 @router.delete("/portes/{porte_id}")
+@require_permission("produtos.editar")
 async def deletar_porte(
     porte_id: int,
     db: Session = Depends(get_session),
@@ -275,6 +284,7 @@ async def deletar_porte(
 # ==================== FASES/PÚBLICO ====================
 
 @router.get("/fases", response_model=List[OpcaoResponse])
+@require_permission("produtos.visualizar")
 async def listar_fases(
     apenas_ativos: bool = True,
     db: Session = Depends(get_session),
@@ -292,6 +302,7 @@ async def listar_fases(
 
 
 @router.post("/fases", response_model=OpcaoResponse)
+@require_permission("produtos.criar")
 async def criar_fase(
     dados: OpcaoBase,
     db: Session = Depends(get_session),
@@ -319,6 +330,7 @@ async def criar_fase(
 
 
 @router.put("/fases/{fase_id}", response_model=OpcaoResponse)
+@require_permission("produtos.editar")
 async def atualizar_fase(
     fase_id: int,
     dados: OpcaoBase,
@@ -351,6 +363,7 @@ async def atualizar_fase(
 
 
 @router.delete("/fases/{fase_id}")
+@require_permission("produtos.editar")
 async def deletar_fase(
     fase_id: int,
     db: Session = Depends(get_session),
@@ -376,6 +389,7 @@ async def deletar_fase(
 # ==================== TIPOS DE TRATAMENTO ====================
 
 @router.get("/tratamentos", response_model=List[OpcaoResponse])
+@require_permission("produtos.visualizar")
 async def listar_tratamentos(
     apenas_ativos: bool = True,
     db: Session = Depends(get_session),
@@ -393,6 +407,7 @@ async def listar_tratamentos(
 
 
 @router.post("/tratamentos", response_model=OpcaoResponse)
+@require_permission("produtos.criar")
 async def criar_tratamento(
     dados: OpcaoBase,
     db: Session = Depends(get_session),
@@ -420,6 +435,7 @@ async def criar_tratamento(
 
 
 @router.put("/tratamentos/{tratamento_id}", response_model=OpcaoResponse)
+@require_permission("produtos.editar")
 async def atualizar_tratamento(
     tratamento_id: int,
     dados: OpcaoBase,
@@ -452,6 +468,7 @@ async def atualizar_tratamento(
 
 
 @router.delete("/tratamentos/{tratamento_id}")
+@require_permission("produtos.editar")
 async def deletar_tratamento(
     tratamento_id: int,
     db: Session = Depends(get_session),
@@ -477,6 +494,7 @@ async def deletar_tratamento(
 # ==================== SABORES/PROTEÍNAS ====================
 
 @router.get("/sabores", response_model=List[OpcaoResponse])
+@require_permission("produtos.visualizar")
 async def listar_sabores(
     apenas_ativos: bool = True,
     db: Session = Depends(get_session),
@@ -494,6 +512,7 @@ async def listar_sabores(
 
 
 @router.post("/sabores", response_model=OpcaoResponse)
+@require_permission("produtos.criar")
 async def criar_sabor(
     dados: OpcaoBase,
     db: Session = Depends(get_session),
@@ -521,6 +540,7 @@ async def criar_sabor(
 
 
 @router.put("/sabores/{sabor_id}", response_model=OpcaoResponse)
+@require_permission("produtos.editar")
 async def atualizar_sabor(
     sabor_id: int,
     dados: OpcaoBase,
@@ -553,6 +573,7 @@ async def atualizar_sabor(
 
 
 @router.delete("/sabores/{sabor_id}")
+@require_permission("produtos.editar")
 async def deletar_sabor(
     sabor_id: int,
     db: Session = Depends(get_session),
@@ -578,6 +599,7 @@ async def deletar_sabor(
 # ==================== APRESENTAÇÕES (PESO) ====================
 
 @router.get("/apresentacoes", response_model=List[ApresentacaoPesoResponse])
+@require_permission("produtos.visualizar")
 async def listar_apresentacoes(
     apenas_ativos: bool = True,
     db: Session = Depends(get_session),
@@ -595,6 +617,7 @@ async def listar_apresentacoes(
 
 
 @router.post("/apresentacoes", response_model=ApresentacaoPesoResponse)
+@require_permission("produtos.criar")
 async def criar_apresentacao(
     dados: ApresentacaoPesoBase,
     db: Session = Depends(get_session),
@@ -628,6 +651,7 @@ async def criar_apresentacao(
 
 
 @router.put("/apresentacoes/{apresentacao_id}", response_model=ApresentacaoPesoResponse)
+@require_permission("produtos.editar")
 async def atualizar_apresentacao(
     apresentacao_id: int,
     dados: ApresentacaoPesoBase,
@@ -667,6 +691,7 @@ async def atualizar_apresentacao(
 
 
 @router.delete("/apresentacoes/{apresentacao_id}")
+@require_permission("produtos.editar")
 async def deletar_apresentacao(
     apresentacao_id: int,
     db: Session = Depends(get_session),
