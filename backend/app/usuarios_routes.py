@@ -175,7 +175,11 @@ def vincular_usuario(
 ):
     _, tenant_id = user_and_tenant
 
-    user = db.query(User).filter(User.id == user_id).first()
+    user = (
+        db.query(User)
+        .filter(User.id == user_id, User.tenant_id == tenant_id)
+        .first()
+    )
     if not user:
         raise HTTPException(status_code=404, detail="Usuário não encontrado")
 
@@ -282,6 +286,7 @@ def forcar_logout_usuario(
         db=db,
         user_id=user_id,
         reason="admin_forced_logout",
+        tenant_id=tenant_id,
     )
 
     return {

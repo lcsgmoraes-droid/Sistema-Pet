@@ -130,7 +130,8 @@ def revoke_all_sessions(
     db: DBSession,
     user_id: int,
     except_jti: Optional[str] = None,
-    reason: str = "logout_all_devices"
+    reason: str = "logout_all_devices",
+    tenant_id: Optional[str] = None,
 ) -> int:
     """
     Revoga todas as sessões do usuário, exceto a atual (opcional).
@@ -151,6 +152,9 @@ def revoke_all_sessions(
     
     if except_jti:
         query = query.filter(UserSession.token_jti != except_jti)
+
+    if tenant_id:
+        query = query.filter(UserSession.tenant_id == tenant_id)
     
     sessions = query.all()
     count = 0

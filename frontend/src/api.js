@@ -62,10 +62,12 @@ api.interceptors.request.use(
   (config) => {
     const token = getAccessToken();
 
-    if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
-    } else {
-      debugWarn('[API] Nenhum token de sessao encontrado');
+    if (!config.headers.Authorization) {
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+      } else {
+        debugWarn('[API] Nenhum token de sessao encontrado');
+      }
     }
 
     debugLog('[API Request]', {
