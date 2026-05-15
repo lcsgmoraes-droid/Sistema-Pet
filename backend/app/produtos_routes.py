@@ -1408,6 +1408,7 @@ class SaidaEstoqueRequest(BaseModel):
 # ==========================================
 
 @router.post("/categorias", response_model=CategoriaResponse, status_code=status.HTTP_201_CREATED)
+@require_permission("produtos.criar")
 def criar_categoria(
     categoria: CategoriaCreate,
     db: Session = Depends(get_session),
@@ -1453,6 +1454,7 @@ def criar_categoria(
 
 
 @router.get("/categorias", response_model=List[CategoriaResponse])
+@require_permission("produtos.visualizar")
 def listar_categorias(
     categoria_pai_id: Optional[int] = None,
     incluir_subcategorias: bool = True,
@@ -1563,6 +1565,7 @@ def calcular_nivel(db: Session, categoria_id: int, nivel: int = 1) -> int:
 
 
 @router.get("/categorias/hierarquia", response_model=List[dict])
+@require_permission("produtos.visualizar")
 def listar_categorias_hierarquia(
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
@@ -1598,6 +1601,7 @@ def listar_categorias_hierarquia(
 
 
 @router.get("/categorias/{categoria_id}", response_model=CategoriaResponse)
+@require_permission("produtos.visualizar")
 def obter_categoria(
     categoria_id: int,
     db: Session = Depends(get_session),
@@ -1620,6 +1624,7 @@ def obter_categoria(
 
 
 @router.put("/categorias/{categoria_id}", response_model=CategoriaResponse)
+@require_permission("produtos.editar")
 def atualizar_categoria(
     categoria_id: int,
     categoria_update: CategoriaUpdate,
@@ -1672,6 +1677,7 @@ def atualizar_categoria(
 
 
 @router.delete("/categorias/{categoria_id}", status_code=status.HTTP_204_NO_CONTENT)
+@require_permission("produtos.editar")
 def deletar_categoria(
     categoria_id: int,
     db: Session = Depends(get_session),
@@ -1693,6 +1699,7 @@ def deletar_categoria(
     # Verificar se categoria tem subcategorias
     subcategorias = db.query(Categoria).filter(
         Categoria.categoria_pai_id == categoria_id,
+        Categoria.tenant_id == tenant_id,
         Categoria.ativo == True
     ).count()
 
@@ -1705,6 +1712,7 @@ def deletar_categoria(
     # Verificar se categoria tem produtos
     produtos_count = db.query(Produto).filter(
         Produto.categoria_id == categoria_id,
+        Produto.tenant_id == tenant_id,
         Produto.ativo == True
     ).count()
 
@@ -1728,6 +1736,7 @@ def deletar_categoria(
 # ==========================================
 
 @router.post("/marcas", response_model=MarcaResponse, status_code=status.HTTP_201_CREATED)
+@require_permission("produtos.criar")
 def criar_marca(
     marca: MarcaCreate,
     db: Session = Depends(get_session),
@@ -1739,7 +1748,8 @@ def criar_marca(
 
     nova_marca = Marca(
         **marca.model_dump(),
-        tenant_id=tenant_id
+        tenant_id=tenant_id,
+        user_id=current_user.id,
     )
 
     db.add(nova_marca)
@@ -1750,6 +1760,7 @@ def criar_marca(
 
 
 @router.get("/marcas", response_model=List[MarcaResponse])
+@require_permission("produtos.visualizar")
 def listar_marcas(
     busca: Optional[str] = None,
     db: Session = Depends(get_session),
@@ -1772,6 +1783,7 @@ def listar_marcas(
 
 
 @router.get("/marcas/{marca_id}", response_model=MarcaResponse)
+@require_permission("produtos.visualizar")
 def obter_marca(
     marca_id: int,
     db: Session = Depends(get_session),
@@ -1784,6 +1796,7 @@ def obter_marca(
 
 
 @router.put("/marcas/{marca_id}", response_model=MarcaResponse)
+@require_permission("produtos.editar")
 def atualizar_marca(
     marca_id: int,
     marca_update: MarcaUpdate,
@@ -1809,6 +1822,7 @@ def atualizar_marca(
 
 
 @router.delete("/marcas/{marca_id}", status_code=status.HTTP_204_NO_CONTENT)
+@require_permission("produtos.editar")
 def deletar_marca(
     marca_id: int,
     db: Session = Depends(get_session),
@@ -1829,6 +1843,7 @@ def deletar_marca(
     # Verificar se marca tem produtos
     produtos_count = db.query(Produto).filter(
         Produto.marca_id == marca_id,
+        Produto.tenant_id == tenant_id,
         Produto.ativo == True
     ).count()
 
@@ -1852,6 +1867,7 @@ def deletar_marca(
 # ==========================================
 
 @router.post("/departamentos", response_model=DepartamentoResponse, status_code=status.HTTP_201_CREATED)
+@require_permission("produtos.criar")
 def criar_departamento(
     departamento: DepartamentoCreate,
     db: Session = Depends(get_session),
@@ -1863,7 +1879,8 @@ def criar_departamento(
 
     novo_departamento = Departamento(
         **departamento.model_dump(),
-        tenant_id=tenant_id
+        tenant_id=tenant_id,
+        user_id=current_user.id,
     )
 
     db.add(novo_departamento)
@@ -1874,6 +1891,7 @@ def criar_departamento(
 
 
 @router.get("/departamentos", response_model=List[DepartamentoResponse])
+@require_permission("produtos.visualizar")
 def listar_departamentos(
     busca: Optional[str] = None,
     db: Session = Depends(get_session),
@@ -1897,6 +1915,7 @@ def listar_departamentos(
 
 
 @router.get("/departamentos/{departamento_id}", response_model=DepartamentoResponse)
+@require_permission("produtos.visualizar")
 def obter_departamento(
     departamento_id: int,
     db: Session = Depends(get_session),
@@ -1919,6 +1938,7 @@ def obter_departamento(
 
 
 @router.put("/departamentos/{departamento_id}", response_model=DepartamentoResponse)
+@require_permission("produtos.editar")
 def atualizar_departamento(
     departamento_id: int,
     departamento_update: DepartamentoUpdate,
@@ -1950,6 +1970,7 @@ def atualizar_departamento(
 
 
 @router.delete("/departamentos/{departamento_id}", status_code=status.HTTP_204_NO_CONTENT)
+@require_permission("produtos.editar")
 def deletar_departamento(
     departamento_id: int,
     db: Session = Depends(get_session),

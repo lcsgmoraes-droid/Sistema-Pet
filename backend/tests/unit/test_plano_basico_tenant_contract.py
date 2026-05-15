@@ -167,3 +167,29 @@ def test_racao_catalog_and_calculator_routes_require_product_permissions():
         '@require_permission("produtos.visualizar")'
     ) in calculadora_source
     assert '@require_permission("produtos.visualizar")\nasync def calcular_consumo_racao' in internal_source
+
+
+def test_product_auxiliary_catalog_routes_require_product_permissions():
+    produtos_source = _source("backend/app/produtos_routes.py")
+
+    protected_routes = [
+        '@router.post("/categorias", response_model=CategoriaResponse, status_code=status.HTTP_201_CREATED)\n@require_permission("produtos.criar")',
+        '@router.get("/categorias", response_model=List[CategoriaResponse])\n@require_permission("produtos.visualizar")',
+        '@router.get("/categorias/hierarquia", response_model=List[dict])\n@require_permission("produtos.visualizar")',
+        '@router.get("/categorias/{categoria_id}", response_model=CategoriaResponse)\n@require_permission("produtos.visualizar")',
+        '@router.put("/categorias/{categoria_id}", response_model=CategoriaResponse)\n@require_permission("produtos.editar")',
+        '@router.delete("/categorias/{categoria_id}", status_code=status.HTTP_204_NO_CONTENT)\n@require_permission("produtos.editar")',
+        '@router.post("/marcas", response_model=MarcaResponse, status_code=status.HTTP_201_CREATED)\n@require_permission("produtos.criar")',
+        '@router.get("/marcas", response_model=List[MarcaResponse])\n@require_permission("produtos.visualizar")',
+        '@router.get("/marcas/{marca_id}", response_model=MarcaResponse)\n@require_permission("produtos.visualizar")',
+        '@router.put("/marcas/{marca_id}", response_model=MarcaResponse)\n@require_permission("produtos.editar")',
+        '@router.delete("/marcas/{marca_id}", status_code=status.HTTP_204_NO_CONTENT)\n@require_permission("produtos.editar")',
+        '@router.post("/departamentos", response_model=DepartamentoResponse, status_code=status.HTTP_201_CREATED)\n@require_permission("produtos.criar")',
+        '@router.get("/departamentos", response_model=List[DepartamentoResponse])\n@require_permission("produtos.visualizar")',
+        '@router.get("/departamentos/{departamento_id}", response_model=DepartamentoResponse)\n@require_permission("produtos.visualizar")',
+        '@router.put("/departamentos/{departamento_id}", response_model=DepartamentoResponse)\n@require_permission("produtos.editar")',
+        '@router.delete("/departamentos/{departamento_id}", status_code=status.HTTP_204_NO_CONTENT)\n@require_permission("produtos.editar")',
+    ]
+
+    for route in protected_routes:
+        assert route in produtos_source
