@@ -27,7 +27,7 @@ def upgrade() -> None:
         op.create_table(
             'duplicatas_ignoradas',
             sa.Column('id', sa.Integer(), primary_key=True),
-            sa.Column('tenant_id', postgresql.UUID(as_uuid=True), sa.ForeignKey('tenants.id'), nullable=False, index=True),
+            sa.Column('tenant_id', postgresql.UUID(as_uuid=True), nullable=False, index=True),
             sa.Column('produto_id_1', sa.Integer(), sa.ForeignKey('produtos.id'), nullable=False, index=True),
             sa.Column('produto_id_2', sa.Integer(), sa.ForeignKey('produtos.id'), nullable=False, index=True),
             sa.Column('usuario_id', sa.Integer(), sa.ForeignKey('users.id'), nullable=True),

@@ -665,6 +665,7 @@ def upgrade() -> None:
         sa.Column("seed_uuid", postgresql.UUID(as_uuid=True), nullable=True),
         sa.Column("winner_entry_id", sa.BigInteger(), nullable=True),
         sa.Column("prize_description", sa.Text(), nullable=True),
+        sa.Column("auto_execute", sa.Boolean(), nullable=False, server_default="false"),
         sa.Column(
             "created_at",
             sa.DateTime(timezone=True),

@@ -550,13 +550,11 @@ class VetPartnerLink(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     empresa_tenant_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("tenants.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
     vet_tenant_id = Column(
         UUID(as_uuid=True),
-        ForeignKey("tenants.id", ondelete="CASCADE"),
         nullable=False,
         index=True,
     )
