@@ -30,7 +30,9 @@ export default function PDVResumoFinanceiroCard({
         }
       : null);
   const descontoPercentualTexto =
-    vendaAtual.desconto_valor > 0 && totalBruto > 0
+    cupomExibicao
+      ? `Cupom ${String(cupomExibicao.code || "").toUpperCase()} aplicado:`
+      : vendaAtual.desconto_valor > 0 && totalBruto > 0
       ? `${((vendaAtual.desconto_valor / totalBruto) * 100).toLocaleString(
           "pt-BR",
           {
@@ -76,7 +78,7 @@ export default function PDVResumoFinanceiroCard({
             <span className="font-medium">{formatMoneyBRL(totalBruto)}</span>
           </div>
 
-          {!modoVisualizacao && (
+          {(!modoVisualizacao || cupomExibicao) && (
             <div className="border rounded-lg p-3 bg-purple-50 border-purple-200">
               <div className="flex items-center gap-1 mb-2">
                 <Tag className="w-3.5 h-3.5 text-purple-600" />
@@ -94,15 +96,17 @@ export default function PDVResumoFinanceiroCard({
                       - {formatMoneyBRL(cupomExibicao.discount_applied)}
                     </span>
                   </div>
-                  <button
-                    onClick={onRemoverCupom}
-                    className="text-xs text-red-500 hover:text-red-700 flex items-center gap-0.5"
-                    title="Remover cupom"
-                  >
-                    <X className="w-3 h-3" /> Remover
-                  </button>
+                  {!modoVisualizacao && (
+                    <button
+                      onClick={onRemoverCupom}
+                      className="text-xs text-red-500 hover:text-red-700 flex items-center gap-0.5"
+                      title="Remover cupom"
+                    >
+                      <X className="w-3 h-3" /> Remover
+                    </button>
+                  )}
                 </div>
-              ) : (
+              ) : !modoVisualizacao ? (
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -121,7 +125,7 @@ export default function PDVResumoFinanceiroCard({
                     {loadingCupom ? "..." : "Aplicar"}
                   </button>
                 </div>
-              )}
+              ) : null}
               {erroCupom && (
                 <p className="text-xs text-red-600 mt-1">{erroCupom}</p>
               )}

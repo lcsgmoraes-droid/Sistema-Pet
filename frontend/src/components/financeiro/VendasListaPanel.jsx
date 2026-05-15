@@ -3,8 +3,8 @@ import MetricGrid from "../ui/MetricGrid";
 import VendasFinanceiroListaTable from "./VendasFinanceiroListaTable";
 
 export default function VendasListaPanel({
+  abrirVendaNoPdv,
   cardsTotalizadoresLista,
-  criarUrlPdvVenda,
   filtroStatusLista,
   formatarData,
   formatarMoeda,
@@ -76,7 +76,7 @@ export default function VendasListaPanel({
         ))}
       </MetricGrid>
       <VendasFinanceiroListaTable
-        criarUrlPdvVenda={criarUrlPdvVenda}
+        abrirVendaNoPdv={abrirVendaNoPdv}
         formatarData={formatarData}
         formatarMoeda={formatarMoeda}
         getStatusVendaMeta={getStatusVendaMeta}

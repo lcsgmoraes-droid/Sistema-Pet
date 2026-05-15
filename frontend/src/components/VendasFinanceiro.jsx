@@ -1,5 +1,6 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
+import { useNavigate } from "react-router-dom";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import writeExcelFile from "write-excel-file/browser";
 import api from "../api";
@@ -380,6 +381,7 @@ function ajustarVendaImposto(venda, mostrarImpostoTodasVendas) {
 
 export default function VendasFinanceiro() {
   const { user } = useAuth();
+  const navigate = useNavigate();
   const userPermissions = user?.permissions || [];
   const podeVerFinanceiroCompleto =
     user?.is_admin === true || userPermissions.includes("relatorios.financeiro");
@@ -493,6 +495,10 @@ export default function VendasFinanceiro() {
   };
 
   const criarUrlPdvVenda = (venda) => `/pdv?venda_id=${encodeURIComponent(venda.id)}`;
+  const abrirVendaNoPdv = (venda) => {
+    if (!venda?.id) return;
+    navigate(criarUrlPdvVenda(venda));
+  };
 
   const formatarMoeda = (valor) => {
     return formatMoneyCellValue(valor);
@@ -1947,8 +1953,8 @@ export default function VendasFinanceiro() {
       {/* Aba Lista de Vendas */}
       {abaAtiva === "lista" && (
         <VendasListaPanel
+          abrirVendaNoPdv={abrirVendaNoPdv}
           cardsTotalizadoresLista={cardsTotalizadoresLista}
-          criarUrlPdvVenda={criarUrlPdvVenda}
           filtroStatusLista={filtroStatusLista}
           formatarData={formatarData}
           formatarMoeda={formatarMoeda}

@@ -14,7 +14,7 @@ from app.utils.timezone import now_brasilia
 
 logger = logging.getLogger(__name__)
 
-SNAPSHOT_VERSION = 3
+SNAPSHOT_VERSION = 4
 FROZEN_STATUSES = {"finalizada", "baixa_parcial"}
 
 
@@ -267,7 +267,8 @@ def build_venda_rentabilidade_snapshot(
     taxa_operacional_entrega: Optional[float] = None,
     estoque_custos_por_produto: Optional[Dict[int, Dict[str, float]]] = None,
 ) -> Dict[str, Any]:
-    formas_pagamento_map = formas_pagamento_map or _get_formas_pagamento_map(db, tenant_id)
+    if formas_pagamento_map is None:
+        formas_pagamento_map = _get_formas_pagamento_map(db, tenant_id)
     estoque_custos_por_produto = _resolve_estoque_costs_map(
         db, tenant_id, venda.id, estoque_custos_por_produto
     )
@@ -415,6 +416,8 @@ def build_venda_rentabilidade_snapshot(
         "comissao": _round_money(comissao_total),
         "imposto": _round_money(imposto_total),
         "impostos_percentual": round(impostos_percentual, 4),
+        "cupom_code": getattr(venda, "cupom_code", None),
+        "cupom_desconto": _round_money(cupom_desconto),
         "custo_campanha": _round_money(custo_campanha),
         "venda_liquida": _round_money(venda_liquida),
         "custo_produtos": _round_money(custo_total),
