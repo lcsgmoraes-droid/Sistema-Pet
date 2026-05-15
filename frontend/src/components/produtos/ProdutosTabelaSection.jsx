@@ -10,7 +10,10 @@ function obterValidadeResumoProduto(produto) {
   const lotes = (produto?.lotes || [])
     .filter((lote) => lote?.data_validade)
     .sort((a, b) => new Date(a.data_validade) - new Date(b.data_validade));
-  const validadeProxima = lotes[0]?.data_validade || produto?.validade_proxima;
+  const validadeProxima =
+    lotes[0]?.data_validade ||
+    produto?.validade_proxima_listagem ||
+    produto?.validade_proxima;
 
   if (!validadeProxima) {
     return {

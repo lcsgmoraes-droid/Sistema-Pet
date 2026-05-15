@@ -90,7 +90,10 @@ export default function useProdutosTabela({
       .filter((lote) => lote.data_validade)
       .sort((a, b) => new Date(a.data_validade) - new Date(b.data_validade));
 
-    const proximaValidade = lotes[0]?.data_validade || produto.validade_proxima;
+    const proximaValidade =
+      lotes[0]?.data_validade ||
+      produto.validade_proxima_listagem ||
+      produto.validade_proxima;
 
     if (!proximaValidade) return "-";
 

@@ -46,11 +46,11 @@ def test_mapa_validade_proxima_produtos_usa_primeira_validade_por_produto():
     )
 
     assert resultado[10] == {
-        "validade_proxima": primeira_validade,
+        "validade_proxima_listagem": primeira_validade,
         "lote_validade_proxima": "LOTE-A",
     }
     assert resultado[11] == {
-        "validade_proxima": validade_mais_distante,
+        "validade_proxima_listagem": validade_mais_distante,
         "lote_validade_proxima": "LOTE-C",
     }
 
@@ -78,11 +78,49 @@ def test_enriquecer_produto_listagem_expoe_validade_calculada():
         incluir_detalhes_composto=False,
         validade_por_produto={
             10: {
-                "validade_proxima": validade,
+                "validade_proxima_listagem": validade,
                 "lote_validade_proxima": "LOTE-A",
             }
         },
     )
 
-    assert produto.validade_proxima == validade
+    assert produto.validade_proxima_listagem == validade
     assert produto.lote_validade_proxima == "LOTE-A"
+
+
+def test_enriquecer_produto_listagem_nao_atribui_property_validade_proxima():
+    class ProdutoComProperty(SimpleNamespace):
+        @property
+        def validade_proxima(self):
+            return None
+
+    produto = ProdutoComProperty(
+        id=10,
+        tenant_id="tenant-1",
+        categoria=None,
+        tipo_produto="SIMPLES",
+        tipo_kit=None,
+        estoque_atual=5,
+        preco_venda=20,
+        preco_promocional=None,
+        promocao_inicio=None,
+        promocao_fim=None,
+    )
+    validade = datetime(2026, 6, 10)
+
+    routes._enriquecer_produto_listagem(
+        FakeDb([]),
+        produto,
+        "tenant-1",
+        reservas_por_produto={},
+        incluir_detalhes_composto=False,
+        validade_por_produto={
+            10: {
+                "validade_proxima_listagem": validade,
+                "lote_validade_proxima": "LOTE-A",
+            }
+        },
+    )
+
+    assert produto.validade_proxima is None
+    assert produto.validade_proxima_listagem == validade
