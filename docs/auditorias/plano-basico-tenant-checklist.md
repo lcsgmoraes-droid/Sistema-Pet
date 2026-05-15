@@ -70,9 +70,9 @@ Status usados:
 |---|---|---|
 | Comercial/auth/onboarding | Quase pronto | Retestar cadastro real, mensagens de erro corrigiveis e login com tenant novo. |
 | Dashboard | Quase pronto | Confirmar console limpo, sem chamadas premium em tenant basico. |
-| Pessoas/clientes | Pendente P1 | Listagem e financeiro/historico do cliente padronizados visualmente; retestar CRUD completo, financeiro/historico do cliente e isolamento A/B. |
-| Pets | Pendente P1 | Listagem padronizada visualmente; retestar CRUD, detalhe do pet, cadastro rapido de especie/raca e premium vet bloqueado. |
-| Produtos/estoque | Quase pronto | Retestar lista/cadastro/edicao/entrada com lote e validade no tenant novo. |
+| Pessoas/clientes | Pendente P1 | Listagem/criacao passaram em auditoria A/B local; retestar edicao, exclusao e financeiro/historico do cliente. |
+| Pets | Pendente P1 | Listagem/criacao/detalhe cruzado passaram em auditoria A/B local; retestar edicao, exclusao, detalhe visual e cadastro rapido de especie/raca. |
+| Produtos/estoque | Quase pronto | Listagem/criacao/detalhe cruzado passaram em auditoria A/B local; retestar edicao, entrada com lote/validade e estoque completo. |
 | Calculadora de racao | Pendente P1 | Retestar fluxo visual completo depois das correcoes backend. |
 | PDV/vendas | Quase pronto | Rodar venda completa A/B: cliente, pet, produto, baixa de estoque e historico. |
 | Financeiro de vendas | Quase pronto | Confirmar que nao depende de financeiro ERP premium. |
@@ -99,9 +99,10 @@ Status usados:
 - Usuario usado: `basico.20260515002403@teste.local`
 - Senha: nao registrada.
 - Comparacao com outro tenant:
-  - Nao foi feita comparacao visual A/B completa nesta rodada.
-  - O tenant novo iniciou sem dados de clientes/pets/produtos do admin existente, o que foi usado como evidencia parcial de isolamento.
-  - Suite multitenant ampla nao foi rodada nesta etapa final; ja havia sido rodada em fases anteriores.
+  - Auditoria A/B local automatizada feita em 2026-05-15 para clientes, pets e produtos.
+  - Dois tenants locais foram semeados diretamente no banco DEV porque o onboarding local esta bloqueado por migrations antigas quebradas.
+  - A partir dai foram usados login real, selecao real de tenant, token real e endpoints reais das telas basicas.
+  - A comparacao visual completa por navegador ainda fica pendente para fluxos edit/delete/PDV/estoque.
 - Data/hora aproximada dos testes: 2026-05-15, madrugada, horario local.
 
 ## 3. Checklist tela por tela do plano basico
@@ -111,17 +112,17 @@ Status usados:
 | Comercial | Registro com plano basico | `/register?plan=basico` | `POST /auth/register` | Sim | Conta/tenant criados no teste local. Houve erro anterior quando criacao de dados padrao falhava; depois o fluxo voltou a criar tenant. | Correcoes anteriores na trilha de onboarding/templates. Nesta branch apenas ajustei autocomplete dos campos. | OK |
 | Autenticacao | Login do novo usuario | `/login` | `POST /auth/login` | Sim | Login do usuario de teste funcionou e redirecionou para area autenticada. | Adicionado `autoComplete` correto para reduzir warnings do navegador. | OK |
 | Dashboard | Dashboard inicial do plano basico | `/dashboard` | Chamava endpoints premium de financeiro/IA e Bling | Sim | A tela abria, mas o console recebia 403 de endpoints premium bloqueados. | `AlertasIA`, `ProjecoesIA` e badge do layout agora evitam chamadas premium quando modulo nao esta ativo. | Corrigido |
-| Pessoas | Listar clientes | `/clientes` | `GET /clientes` | Sim | Tenant novo iniciou sem clientes do admin/tenant antigo. | Nenhuma nesta branch. | OK |
-| Pessoas | Criar cliente | `/clientes` | `POST /clientes` | Sim | Cliente de teste criado e listado no tenant atual. | Nenhuma nesta branch. | OK |
+| Pessoas | Listar clientes | `/clientes` | `GET /clientes` | Sim | Auditoria A/B confirmou que cliente do tenant A aparece no A e nao aparece no B, e vice-versa. | Nenhuma nesta branch. | OK |
+| Pessoas | Criar cliente | `/clientes` | `POST /clientes` | Sim | Cliente criado por endpoint real em dois tenants; acesso direto cruzado a `/clientes/{id}` retornou 404. | Nenhuma nesta branch. | OK |
 | Pessoas | Editar/excluir cliente | `/clientes` | `PUT/DELETE /clientes/{id}` | Nao | Nao testado nesta rodada final via MCP. | Nao houve. | Nao testado |
 | Pessoas | Financeiro do cliente | `/clientes/:id/financeiro` | Endpoints de resumo financeiro e vendas | Parcial | Historico/financeiro do cliente precisa permanecer liberado no basico; tela nao foi auditada completa nesta rodada. | Nao houve. | Pendente P1 |
 | Pessoas | Saldo de campanhas no cadastro | Modal/wizard de cliente | `GET /campanhas/clientes/{id}/saldo` | Sim, por erro observado | Plano basico fazia chamada de campanhas e recebia 403. | `useClientesNovoCadastro` agora nao chama saldo de campanhas se modulo `campanhas` estiver bloqueado. | Corrigido |
-| Pets | Criar pet vinculado a tutor | `/pets/novo?cliente_id=...` | `POST /pets` | Sim | Pet de teste criado para o cliente do tenant atual. | Nenhuma nesta branch. | OK |
+| Pets | Criar pet vinculado a tutor | `/pets/novo?cliente_id=...` | `POST /pets` | Sim | Pet criado por endpoint real em dois tenants; listagem e acesso direto cruzado retornaram isolamento correto. | Corrigida busca de pets que duplicava join com cliente. | OK |
 | Pets | Detalhe do pet | `/pets/:petId` | `GET /pets/{id}` e antes endpoints vet | Parcial | Tela de pet basico nao deve chamar carteirinha/internacoes veterinarias se modulo vet estiver bloqueado. | `PetDetalhes` agora evita chamadas vet e oculta abas vet quando `veterinario` nao esta ativo. | Corrigido |
 | Pets | Editar/excluir pet | `/pets/:id/editar` | `PUT/DELETE /pets/{id}` | Nao | Nao testado nesta rodada final. | Nao houve. | Nao testado |
 | Pets | Cadastro rapido de especie/raca | `/pets/novo` e modal rapido | `POST /cadastros/especies`, `POST /cadastros/racas` | Parcial | Houve erro anterior ao criar raca sem `especie_id`; nao foi foco desta branch final. | Nao corrigido nesta branch. | Pendente P1 |
-| Produtos | Listar produtos | `/produtos` | `GET /produtos` | Sim | Tenant novo iniciou sem produtos herdados indevidamente; produto criado apareceu no tenant atual. | Nenhuma nesta branch. | OK |
-| Produtos | Criar produto | `/produtos/novo` | `POST /produtos` | Sim | Produto de teste criado com SKU/EAN/preco. | Nenhuma nesta branch. | OK |
+| Produtos | Listar produtos | `/produtos` | `GET /produtos` | Sim | Auditoria A/B confirmou que produto do tenant A aparece no A e nao aparece no B, e vice-versa. | Nenhuma nesta branch. | OK |
+| Produtos | Criar produto | `/produtos/novo` | `POST /produtos` | Sim | Produto criado por endpoint real em dois tenants; acesso direto cruzado a `/produtos/{id}` retornou 404. | Nenhuma nesta branch. | OK |
 | Produtos | Editar produto | `/produtos/:id/editar` | `PUT /produtos/{id}` | Parcial | Edicao foi usada para configurar produto/racao, mas sem checklist exaustivo de todos os campos. | Correcoes anteriores na trilha de catalogos/racao. | Pendente P1 |
 | Produtos | Entrada de estoque pela tela do produto | `/produtos/:id/movimentacoes` ou acao de entrada | `POST /produtos/{id}/entrada` | Sim | Dava erro 500 por `user_id` nulo em `estoque_movimentacoes`. | `backend/app/produtos_routes.py` agora grava `user_id=current_user.id`. | Corrigido |
 | Produtos | Entrada oficial de estoque | Fluxo de estoque | `POST /estoque/entrada` | Sim | Entrada oficial funcionou no tenant de teste. | Nenhuma nesta branch. | OK |
@@ -145,13 +146,13 @@ Status usados:
 
 ## 4. Checklist de isolamento tenant
 
-Observacao: esta tabela registra o que foi observado no teste do tenant novo. Validacao A/B completa com outro tenant nao foi feita nesta rodada final, entao os itens marcados como "Nao testado diretamente" nao devem ser tratados como aprovacao definitiva.
+Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada para clientes, pets e produtos usando dois tenants semeados no banco DEV, login real, selecao real de tenant, token real e endpoints reais. A/B de estoque, PDV/vendas, financeiro de vendas, cadastros auxiliares e premium bloqueado ainda precisa ser complementado.
 
 | Area basica | Dados do tenant A aparecem no tenant B? | Criacao grava tenant_id correto? | Edicao respeita tenant? | Exclusao respeita tenant? | Endpoint sem tenant/token falha corretamente? | Status |
 |---|---|---|---|---|---|---|
-| Clientes | Nao observado no tenant novo; comparacao A/B nao feita | Nao testado diretamente em DB | Nao testado | Nao testado | Nao testado nesta rodada | Parcial |
-| Pets | Nao observado no tenant novo; comparacao A/B nao feita | Nao testado diretamente em DB | Nao testado | Nao testado | Nao testado nesta rodada | Parcial |
-| Produtos | Nao observado no tenant novo; comparacao A/B nao feita | Nao testado diretamente em DB | Parcial | Nao testado | Nao testado nesta rodada | Parcial |
+| Clientes | Nao: busca/listagem cruzada A/B passou | Sim, por endpoint real com token de cada tenant | Nao testado | Nao testado | Acesso direto cruzado a ID de outro tenant retornou 404 | OK parcial |
+| Pets | Nao: busca/listagem cruzada A/B passou | Sim, por endpoint real com tutor do mesmo tenant | Nao testado | Nao testado | Acesso direto cruzado a ID de outro tenant retornou 404 | OK parcial |
+| Produtos | Nao: busca/listagem cruzada A/B passou | Sim, por endpoint real com SKU distinto por tenant | Parcial | Nao testado | Acesso direto cruzado a ID de outro tenant retornou 404 | OK parcial |
 | Estoque | Produto do tenant novo recebeu entrada isolada no fluxo testado | Nao testado diretamente em DB | Nao aplicavel | Nao testado | Nao testado nesta rodada | Parcial |
 | PDV/Vendas | Venda criada no tenant novo apareceu no historico do tenant atual | Nao testado diretamente em DB | Visualizacao testada; edicao/reabertura nao auditada completa | Nao testado | Nao testado nesta rodada | Parcial |
 | Financeiro Vendas | Historico abriu com venda do tenant atual | Nao aplicavel | Nao testado | Nao testado | Nao testado nesta rodada | Parcial |
@@ -167,6 +168,7 @@ Observacao: esta tabela registra o que foi observado no teste do tenant novo. Va
 | `frontend/src/pages/GerenciamentoPets.jsx` | Listagem de Pets ja estava avancada, mas ainda tinha header/loading/empty e alerta imperativo fora do padrao. | Migrado header para `PageHeader`, loading para `LoadingState`, vazio para `EmptyState` e erro de status para `toast.error`. | Experiencia menos consistente entre Pessoas/Pets e feedback de erro pouco padronizado. | `npm --prefix frontend run build`. |
 | `frontend/src/pages/OperadorasCartao.jsx` | Tela de operadoras de cartao ainda usava header, acao principal e aviso importante locais, fora da fundacao visual do Plano Basico. | Migrado para `PageHeader`, `ActionButton` e `Panel`, mantendo hook, modal, cards e comportamento de guia. | Cadastro essencial ficava visualmente desalinhado e mais dificil de manter. | `npm --prefix frontend run build`. |
 | `frontend/src/components/OpcoesRacao.jsx` | Tela de opcoes de racao tinha header, abas, paineis, loading, empty state e acoes locais; tambem exibia icones/textos quebrados por encoding antigo. | Migrado para componentes globais e icones `lucide`, preservando endpoints, formularios, lista, edicao, inativacao e guia. | Cadastro essencial ficava visualmente desalinhado e com manutencao mais custosa. | `npm --prefix frontend run build`. |
+| `backend/app/pets_routes.py` | `GET /pets?busca=...` fazia join com `clientes` duas vezes e quebrava no Postgres com `DuplicateAlias`. | Removido o segundo join dentro do filtro de busca, mantendo o join base usado para isolamento por tenant. | Busca de pets podia falhar com 500 e impedir auditoria A/B/uso da tela. | Auditoria A/B local passou em criacao, listagem e acesso cruzado de pets. |
 | `backend/app/produtos_routes.py` | `POST /produtos/{id}/entrada` gravava movimentacao sem `user_id` e quebrava com 500. | Incluido `user_id=current_user.id` ao criar `EstoqueMovimentacao`. | Fluxo basico de estoque quebrava ao fazer entrada pela tela do produto. | `python -m compileall backend/app/produtos_routes.py`; reteste manual do endpoint retornou 200. |
 | `frontend/src/components/AlertasIA.jsx` | Dashboard/plano basico disparava endpoints de financeiro ERP/IA premium e recebia 403. | Componente agora retorna vazio sem chamar API quando `financeiro_erp` ou `ia_avancada` estao bloqueados. | Console poluido por 403 e risco de experiencia ruim no plano basico. | `npm --prefix frontend run build`. |
 | `frontend/src/components/ProjecoesIA.jsx` | Fluxo/projecoes chamavam financeiro ERP sem modulo ativo. | Componente agora nao chama API quando `financeiro_erp` esta bloqueado. | Chamadas premium indevidas e 403 em plano basico. | `npm --prefix frontend run build`. |
@@ -185,10 +187,11 @@ Observacao: esta tabela registra o que foi observado no teste do tenant novo. Va
 
 ### P1 - Importante antes de escalar
 
-- Fazer comparacao A/B real entre dois tenants:
-  - criar dados no tenant de teste;
-  - logar em outro tenant;
-  - confirmar que clientes, pets, produtos, estoque e vendas nao aparecem cruzados.
+- Complementar comparacao A/B real entre dois tenants para fluxos ainda nao cobertos:
+  - editar/excluir clientes, pets e produtos;
+  - entrada de estoque com lote/validade;
+  - PDV/vendas, baixa de estoque e historico financeiro de vendas;
+  - cadastros auxiliares e usuarios/permissoes.
 - Testar CRUD completo de:
   - clientes;
   - pets;
@@ -247,6 +250,24 @@ python -m compileall backend/app/produtos_routes.py
 ```
 
 Resultado: passou na validacao da correcao de entrada de estoque.
+
+```powershell
+# Auditoria A/B local 2026-05-15
+# 1. semear dois tenants DEV locais diretamente no banco;
+# 2. fazer login real em /auth/login-multitenant;
+# 3. selecionar tenant em /auth/select-tenant;
+# 4. criar cliente, pet e produto em cada tenant;
+# 5. comparar listagem e acesso direto cruzado por ID.
+```
+
+Resultado: passou para clientes, pets e produtos. Rodada `866741`:
+
+- Tenant A: cliente `9`, pet `9`, produto `9`.
+- Tenant B: cliente `10`, pet `10`, produto `10`.
+- Listagem por busca mostrou apenas dados do tenant autenticado.
+- Acesso direto cruzado a `/clientes/{id}`, `/pets/{id}` e `/produtos/{id}` retornou 404.
+
+Observacao de ambiente: o onboarding local por `/auth/register` ficou bloqueado por migrations antigas do DEV. Para isolar o teste de seguranca, os tenants A/B foram semeados diretamente no banco local e a auditoria usou os endpoints reais a partir do login/selecao de tenant.
 
 ### Testes manuais via MCP/navegador
 

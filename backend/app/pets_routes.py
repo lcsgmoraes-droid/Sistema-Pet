@@ -216,8 +216,8 @@ def listar_pets(
     
     if busca:
         busca_term = f"%{busca}%"
-        # Join com Cliente para buscar pelo nome do tutor também
-        query = query.join(Pet.cliente).filter(
+        # A query base ja faz join com Cliente para filtrar por tenant.
+        query = query.filter(
             or_(
                 Pet.nome.ilike(busca_term),
                 Pet.raca.ilike(busca_term),
