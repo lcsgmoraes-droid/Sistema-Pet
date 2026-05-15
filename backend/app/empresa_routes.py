@@ -18,6 +18,10 @@ from app.utils.logger import logger
 router = APIRouter(prefix="/empresa", tags=["Empresa"])
 
 
+def _buscar_tenant_por_contexto(db: Session, tenant_id) -> Tenant | None:
+    return db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
+
+
 # ============================================================================
 # SCHEMAS
 # ============================================================================
@@ -210,7 +214,7 @@ def buscar_dados_cadastrais(
     """
     _current_user, tenant_id = user_and_tenant
     
-    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    tenant = _buscar_tenant_por_contexto(db, tenant_id)
     
     if not tenant:
         raise HTTPException(
@@ -248,7 +252,7 @@ def atualizar_dados_cadastrais(
     """
     _current_user, tenant_id = user_and_tenant
     
-    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    tenant = _buscar_tenant_por_contexto(db, tenant_id)
     
     if not tenant:
         raise HTTPException(
@@ -311,7 +315,7 @@ def buscar_config_estoque(
     """
     _current_user, tenant_id = user_and_tenant
     
-    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    tenant = _buscar_tenant_por_contexto(db, tenant_id)
     
     if not tenant:
         raise HTTPException(
@@ -340,7 +344,7 @@ def atualizar_config_estoque(
     """
     _current_user, tenant_id = user_and_tenant
     
-    tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+    tenant = _buscar_tenant_por_contexto(db, tenant_id)
     
     if not tenant:
         raise HTTPException(

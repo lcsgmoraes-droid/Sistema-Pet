@@ -77,7 +77,7 @@ Status usados:
 | PDV/vendas | Pronto local A/B + smoke visual | Venda completa por API real e pelo navegador passou com operador nao-admin; caixa, sangria, suprimento, pagamento em dinheiro, finalizacao e baixa de estoque passaram. Falta apenas reteste visual de recibo/historico como refinamento. |
 | Financeiro de vendas | Quase pronto | Finalizacao gerou reflexos financeiros sem 500 no A/B local; falta conferir telas/historico visual. |
 | Cadastros essenciais | Pronto local | Formas de pagamento, operadoras, opcoes de racao e catalogos de produto passaram em A/B real; departamentos, categorias e marcas passaram tambem por smoke visual CRUD no navegador. |
-| Configuracoes/usuarios/LGPD | Pronto local | Usuarios/admin passou por smoke visual; Roles & Permissoes passou por criar, duplicar, editar e excluir perfil; LGPD passou busca de titular e dossie com schema local alinhado. |
+| Configuracoes/usuarios/LGPD | Pronto local + smoke visual | Usuarios/admin passou por smoke visual; Roles & Permissoes passou por criar, duplicar, editar e excluir perfil; LGPD passou busca de titular e dossie com schema local alinhado; configuracao fiscal, parametros gerais e estoque salvaram no navegador com chamadas 200. |
 | Premium bloqueado | Quase pronto | Smoke de chamadas premium indiretas em formas, layout e Lembretes passou; ainda falta varrer menus/URLs diretas premium. |
 | Landing page/contratacao | Pronto local | Bloco de selecao do Plano Basico criado na landing; cadastro envia `plan=basico` e API grava plano validado. |
 
@@ -86,11 +86,11 @@ Status usados:
 | Etapa | Objetivo | Status | Bloqueia venda? |
 |---|---|---|---|
 | 1. Base tecnica multi-tenant | Cadastro real de tenants A/B, selecao de tenant, migrations limpas e bloqueio de vazamento entre empresas. | Concluido local | Sim, mas ja passou localmente. |
-| 2. Fluxos essenciais do basico | Clientes, pets, produtos, estoque, PDV/vendas, historico financeiro de vendas e cadastros auxiliares. | Em andamento; PDV A/B, caixa, sangria/suprimento, pagamentos/operadoras, opcoes de racao, catalogos de produto, usuarios/admin, Roles e LGPD com smoke visual concluido | Sim, enquanto configuracao da empresa e lote/validade visual nao fecharem. |
+| 2. Fluxos essenciais do basico | Clientes, pets, produtos, estoque, PDV/vendas, historico financeiro de vendas e cadastros auxiliares. | Em andamento; PDV A/B, caixa, sangria/suprimento, pagamentos/operadoras, opcoes de racao, catalogos de produto, usuarios/admin, configuracao da empresa, Roles e LGPD com smoke visual concluido | Sim, enquanto lote/validade visual nao fechar. |
 | 3. Usuarios e permissoes | Criar usuario do tenant, validar permissoes basicas e bloqueio de acesso indevido. | Concluido local: Usuarios/Admin, Roles & Permissoes e LGPD operacional passaram por API/smoke visual. | Nao bloqueia venda controlada; manter reteste em staging/producao. |
 | 4. Calculadora/catalogos de racao | Validar fluxo visual, persistencia e mensagens de erro sem 500. | Concluido local: API A/B e smoke visual passaram com operador nao-admin. | Nao bloqueia venda controlada; retestar em staging/producao. |
 | 5. Landing page e selecao de planos | Exibir planos, destacar Basico, iniciar contratacao com plano escolhido e levar ao cadastro/onboarding correto. | Concluido local | Sim para vender por autoatendimento; falta smoke visual em producao/staging. |
-| 6. A/B visual no navegador | Usar dois tenants reais no browser e conferir que menus, dados e mensagens batem com o plano. | Em andamento; PDV completo, autocomplete, Lembretes, pagamentos/operadoras, catalogos de produto, usuarios/admin, Roles e LGPD passaram | Sim antes de abrir para varias empresas. |
+| 6. A/B visual no navegador | Usar dois tenants reais no browser e conferir que menus, dados e mensagens batem com o plano. | Em andamento; PDV completo, autocomplete, Lembretes, pagamentos/operadoras, catalogos de produto, configuracao da empresa, usuarios/admin, Roles e LGPD passaram | Sim antes de abrir para varias empresas. |
 | 7. Produção controlada | Merge, deploy, migrations, health check e smoke real sem dados sensiveis. | Pendente | Sim. |
 
 ## 1. Branch e commits
@@ -129,7 +129,8 @@ Status usados:
   - A rodada visual/API `20260515175152` confirmou Roles & Permissoes e LGPD operacional: criacao/duplicidade/edicao/exclusao de perfil, busca de titular e dossie LGPD sem 500 depois das migrations de reparo.
   - A rodada visual `20260515181603` confirmou calculadora de racao e opcoes de racao no navegador com operador nao-admin.
   - A rodada visual `20260515215846` confirmou CRUD visual de departamentos, categorias e marcas no navegador com isolamento A/B.
-  - A comparacao visual completa por navegador ainda fica pendente para financeiro de vendas e configuracao da empresa.
+  - A rodada visual `202605151925` confirmou configuracao da empresa no navegador: fiscal/dados cadastrais, parametros gerais e estoque salvaram com chamadas 200, persistencia apos reload e console limpo.
+  - A comparacao visual completa por navegador ainda fica pendente para financeiro de vendas e lote/validade.
 - Data/hora aproximada dos testes: 2026-05-15, madrugada e tarde, horario local.
 
 ## 3. Checklist tela por tela do plano basico
@@ -168,7 +169,7 @@ Status usados:
 | Cadastros | Taxas/analise de formas de pagamento | PDV/modal pagamento | `GET/POST/PUT/DELETE /formas-pagamento/taxas` e `POST /formas-pagamento/analisar-venda` | Sim por API | Taxas foram filtradas por tenant; operador de vendas conseguiu analisar forma do proprio tenant; forma do tenant B nao foi processada na analise do tenant A; usuario sem permissao recebeu 403. | Taxas e analise agora exigem permissao por leitura/alteracao e filtram `FormaPagamento`, `FormaPagamentoTaxa` e imposto padrao por tenant. | OK local; falta smoke visual |
 | Cadastros | Operadoras de cartao | `/cadastros/financeiro/operadoras` | Endpoints de operadoras | Sim por API e navegador | Operador com `vendas.criar` listou operadoras do proprio tenant e nao viu tenant B; acesso direto a operadora do tenant B retornou 404; mutacao por operador retornou 403. No navegador, usuario de configuracao viu operadora A e nao viu operadora B. | Leitura agora aceita `vendas.criar` ou `configuracoes.editar`; mutacoes exigem `configuracoes.editar`; contrato automatizado adicionado. | OK local + smoke visual |
 | Cadastros | Opcoes de racao | `/cadastros/opcoes-racao` | Endpoints de opcoes de racao | Sim por API e navegador | Catalogos A/B ficaram isolados; operador com apenas `produtos.visualizar` conseguiu listar, mas nao criar. Mutacoes agora exigem permissao de produto. No navegador, operador com permissao de produto listou, criou, editou e inativou linha; criou e inativou apresentacao; abas carregaram sem warnings de form ou erros de rede. | Endpoints de opcoes de racao agora exigem `produtos.visualizar`, `produtos.criar` ou `produtos.editar` conforme acao; tela recebeu labels/ids/names nos campos. | OK local + smoke visual |
-| Configuracoes | Configuracao da empresa | `/configuracoes`, `/configuracoes/fiscal`, `/configuracoes/geral`, `/configuracoes/estoque` | `/empresa/fiscal`, `/empresa/dados-cadastrais`, `/empresa/config`, `/empresa/config-estoque` | Parcial | Contrato local confirmou que rotas e endpoints de configuracao exigem permissao de configuracao; hub de configuracoes agora respeita modulos premium e permissoes. | Protegidos endpoints de dados/fiscal/geral/estoque com `configuracoes.empresa` ou `configuracoes.editar`; subrotas frontend e `/admin/roles` receberam `ProtectedRoute`; cards premium somem quando modulo esta bloqueado. | Corrigido local; falta smoke visual |
+| Configuracoes | Configuracao da empresa | `/configuracoes`, `/configuracoes/fiscal`, `/configuracoes/geral`, `/configuracoes/estoque` | `/empresa/fiscal`, `/empresa/dados-cadastrais`, `/empresa/config`, `/empresa/config-estoque` | Sim por navegador | Contrato local confirmou que rotas e endpoints de configuracao exigem permissao de configuracao; hub respeita modulos premium/permissoes. No navegador, fiscal/dados cadastrais salvaram e persistiram apos reload; parametros gerais salvaram; estoque salvou e persistiu. | Protegidos endpoints de dados/fiscal/geral/estoque; `Tenant.id` cadastral usa `str(tenant_id)`; adicionada migration de `empresa_config_geral`; frontend nao trata 500 cadastral como sucesso. | OK local + smoke visual |
 | Administracao | Usuarios | `/admin/usuarios` | `POST/GET /usuarios` | Sim | Admin criou operador PDV em dois tenants; operador logou, recebeu apenas `clientes.visualizar`, `produtos.visualizar`, `vendas.criar` e nao acessou `/usuarios`. No navegador, operador foi bloqueado em tela administrativa e usuario sem permissao foi bloqueado no PDV. | Nenhuma regra de usuario alterada; validado contrato de permissao. | OK local + smoke visual parcial |
 | Administracao | Roles/permissoes | `/admin/roles` e perfis | `/roles`, `/permissions` | Sim | Operador sem `usuarios.manage` recebe 403; admin criou perfil, duplicidade exibiu mensagem corrigivel, edicao atualizou permissoes e exclusao removeu vinculos sem 500. | Tela refatorada para componentes globais; `roles_routes` apaga `role_permissions` antes da role; endpoints seguem exigindo `usuarios.manage`. | OK local + smoke visual |
 | Administracao | LGPD operacional | `/admin/lgpd` | `/lgpd/status`, `/lgpd/solicitacoes`, `/lgpd/clientes/{id}/dossie`, `/lgpd/clientes/{id}/consentimentos` | Sim | Busca de titular funcionou; dossie LGPD respondeu 200 e incluiu dados do cliente, vendas, e-commerce, preferencias, consentimentos, solicitacoes e logs. | Adicionadas migrations idempotentes para tabelas LGPD/e-commerce faltantes e ajustes de acessibilidade/nesting na tela. | OK local + smoke visual parcial |
@@ -178,7 +179,7 @@ Status usados:
 
 ## 4. Checklist de isolamento tenant
 
-Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada com dois tenants criados pela API real de cadastro, selecao real de tenant, token real e endpoints reais. Em seguida foram feitas rodadas visuais no navegador para pagamentos/operadoras, PDV autocomplete, bloqueio de permissoes, PDV completo, Lembretes, Usuarios/Admin, Roles & Permissoes, LGPD operacional, calculadora de racao, opcoes de racao e catalogos auxiliares de produto. Financeiro de vendas e configuracao da empresa ainda precisam complemento visual.
+Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada com dois tenants criados pela API real de cadastro, selecao real de tenant, token real e endpoints reais. Em seguida foram feitas rodadas visuais no navegador para pagamentos/operadoras, PDV autocomplete, bloqueio de permissoes, PDV completo, Lembretes, Usuarios/Admin, Roles & Permissoes, LGPD operacional, calculadora de racao, opcoes de racao, catalogos auxiliares de produto e configuracao da empresa. Financeiro de vendas e lote/validade ainda precisam complemento visual.
 
 | Area basica | Dados do tenant A aparecem no tenant B? | Criacao grava tenant_id correto? | Edicao respeita tenant? | Exclusao respeita tenant? | Endpoint sem tenant/token falha corretamente? | Status |
 |---|---|---|---|---|---|---|
@@ -212,6 +213,7 @@ Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada com dois te
 | `frontend/src/pages/PetDetalhes.jsx` | Detalhe do pet chamava carteirinha/internacoes/consultas/exames vet mesmo com modulo veterinario bloqueado. | Chamadas vet agora sao ignoradas quando `veterinario` nao esta ativo. | 403 em tela basica de pet e vazamento de experiencia premium. | `npm --prefix frontend run build`. |
 | `frontend/src/pages/PetForm.jsx`, `frontend/src/components/QuickAddModal.jsx`, `backend/app/cadastros_routes.py`, `backend/tests/unit/test_plano_basico_tenant_contract.py` | Cadastro rapido de raca podia depender de `especie_id` invalido e o contrato do Plano Basico nao monitorava `cadastros_routes.py`. | `PetForm` bloqueia raca sem especie, limpa raca ao trocar especie e usa nome da especie selecionada; `QuickAddModal` valida `especie_id`, mostra erro corrigivel e tem `id/name` no campo; contrato passou a cobrir a rota de cadastros. | Empresa nova poderia ver erro pouco claro ou raca presa na especie errada durante cadastro de pet; regressao de tenant em especies/racas ficaria sem alerta automatizado. | Smoke visual `202605151900`: especie e raca criadas pelo modal, raca selecionada, chamadas 201/200; contrato `10 passed`; build frontend passou. |
 | `backend/app/api/v1/empresa_fiscal.py`, `backend/app/empresa_routes.py`, `backend/app/empresa_config_routes.py`, `frontend/src/App.jsx`, `frontend/src/pages/Configuracoes.jsx`, `backend/tests/unit/test_plano_basico_tenant_contract.py` | Configuracoes da empresa estavam protegidas no menu principal, mas subrotas/API podiam ficar expostas para usuario autenticado sem permissao correta; o hub tambem mostrava cards premium mesmo em tenant basico. | Endpoints de dados/fiscal exigem `configuracoes.empresa` ou `configuracoes.editar`; configuracao geral/estoque exige `configuracoes.editar`; subrotas frontend e `/admin/roles` receberam `ProtectedRoute`; cards de entregas/integracoes somem sem modulo ativo. | Usuario operacional poderia tentar alterar dados da empresa por chamada direta/API; tenant basico podia ver atalhos premium que nao pertencem ao plano. | Contrato focado `12 passed`; `npm --prefix frontend run build`; `git diff --check`. |
+| `backend/app/empresa_routes.py`, `backend/alembic/versions/or20260515a9_create_empresa_config_geral.py`, `frontend/src/pages/configuracoes/ConfiguracaoFiscalEmpresa.jsx`, `backend/tests/unit/test_plano_basico_tenant_contract.py` | Smoke visual encontrou 500 em dados cadastrais/estoque por comparar `Tenant.id` string com UUID, falso sucesso na tela fiscal e tabela `empresa_config_geral` ausente. | Busca cadastral de tenant passa a usar `str(tenant_id)`; tela fiscal nao engole 500 de dados cadastrais; migration idempotente cria/alinha `empresa_config_geral`; contrato bloqueia regressao. | Tenant basico novo podia achar que salvou a empresa sem persistir dados, ou receber 500 em parametros gerais/estoque. | Rodada visual `202605151925`: fiscal/dados cadastrais, parametros gerais e estoque retornaram 200 e persistiram apos reload; contrato `12 passed`; py compile passou. |
 | `frontend/src/App.jsx` | Warnings do React Router sobre flags futuras. | Ativadas flags `v7_startTransition` e `v7_relativeSplatPath`. | Ruido no console durante testes. | `npm --prefix frontend run build`. |
 | `frontend/src/pages/Login.jsx` | Warning de autocomplete em campos de senha. | Adicionado `autoComplete="username"` e `autoComplete="current-password"`. | Ruido no console/navegador. | `npm --prefix frontend run build`. |
 | `frontend/src/pages/Register.jsx` | Warning de autocomplete em campos de senha/cadastro. | Adicionado `autoComplete="email"` e `autoComplete="new-password"`. | Ruido no console/navegador. | `npm --prefix frontend run build`. |
@@ -252,13 +254,16 @@ Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada com dois te
 
 ### P1 - Importante antes de escalar
 
-Bloqueiam abertura para mais empresas, mesmo que a venda controlada com acompanhamento ja esteja mais proxima:
+Bloqueio que ainda falta antes de abrir para mais empresas, mesmo que a venda controlada com acompanhamento ja esteja mais proxima:
 
 - Retestar visualmente entrada de estoque com lote/validade:
   - o endpoint passou no A/B e a suite focada de lote/validade passou com `8 passed`;
   - ainda falta confirmar tela, tooltip/listagem de lotes e validade urgente no navegador.
-- Testar configuracao da empresa no navegador:
-  - salvar dados fiscal/geral/estoque com tenant basico novo.
+P1 fechado nesta rodada:
+
+- Configuracao da empresa no navegador:
+  - concluido local: fiscal/dados cadastrais, parametros gerais e estoque salvaram com 200 e persistiram apos reload;
+  - manter reteste em staging/producao antes de abrir autoatendimento.
 
 Refinamentos antes de escalar para varias empresas:
 
@@ -412,6 +417,15 @@ Rodada visual catalogos de produto `20260515215846`:
 - `/cadastros/marcas`: nova tela adicionada; admin A criou, editou e excluiu marca; marca criada no tenant B nao apareceu no A.
 - Rede normal: `POST` 201, `PUT` 200, `DELETE` 204 e listagens 200; console sem erros ou avisos relevantes.
 
+Rodada visual configuracao da empresa `202605151925`:
+
+- API local 8000 e Vite 5173 contra Postgres DEV, com tenant Basico da rodada `20260515215846`.
+- `/configuracoes` exibiu apenas cards essenciais e sem cards premium de entregas/integracoes no tenant Basico.
+- `/configuracoes/fiscal`: o primeiro teste detectou 500 escondido em `/empresa/dados-cadastrais`; depois da correcao, `GET /empresa/fiscal`, `GET /empresa/dados-cadastrais`, `PUT /empresa/fiscal` e `PUT /empresa/dados-cadastrais` retornaram 200, persistindo apos reload.
+- `/configuracoes/geral`: o primeiro teste detectou schema faltante em `empresa_config_geral`; depois da migration `or20260515a9`, `GET/PUT /empresa/config/` retornaram 200.
+- `/configuracoes/estoque`: o primeiro teste detectou 500 no `PUT /empresa/config-estoque`; depois da correcao de tenant, `GET/PUT /empresa/config-estoque` retornaram 200 e o valor persistiu apos reload.
+- Console ficou sem erros ou avisos relevantes ao final da rodada.
+
 Rodada visual no navegador `20260515162539`:
 
 - Tenant A: `03b3e67b-5dce-451e-bcd0-1138c951eeb8`.
@@ -529,6 +543,10 @@ Rodada estendida `866987` + reteste de estoque:
 - Build frontend apos protecao do hub/subrotas de configuracao: `npm --prefix frontend run build`, resultado passou.
 - Contrato Plano Basico apos tela de Marcas e rotas/menu de catalogos: `12 passed`.
 - Build frontend apos tela de Marcas: `npm --prefix frontend run build`, resultado passou.
+- Contrato Plano Basico apos smoke visual de configuracao da empresa e migration `or20260515a9`: `12 passed`.
+- Build frontend apos correcao de falso sucesso em configuracao fiscal: `npm --prefix frontend run build`, resultado passou.
+- Py compile de `empresa_routes.py` e migration `or20260515a9`: passou.
+- Alembic local aplicado ate `or20260515a9`; `/configuracoes/fiscal`, `/configuracoes/geral` e `/configuracoes/estoque` salvaram no navegador com chamadas 200 e console limpo.
 - Suite focada de lote/validade de produto e XML: `test_produtos_validade_listagem.py`, `test_estoque_routes_lotes.py`, `test_notas_entrada_parse_validade.py`, resultado `8 passed`.
 - Build frontend apos refactor de Roles/LGPD: `npm --prefix frontend run build`, resultado passou.
 - Py compile das migrations e arquivos backend alterados: passou.
@@ -553,7 +571,7 @@ Resultados automatizados registrados:
 | Produtos/racao | Catalogos de racao exigem permissao de produto por acao | Corrigido e testado |
 | Produtos/catalogos | Categorias, marcas e departamentos exigem permissao de produto por acao | Corrigido e testado |
 | Cadastros/pagamentos | Formas de pagamento, taxas, analise de venda e operadoras exigem permissao por leitura/alteracao e filtram tenant | Corrigido e testado |
-| Configuracoes empresa | Dados/fiscal/geral/estoque exigem permissao de configuracao no backend e nas subrotas frontend | Corrigido local; falta smoke visual |
+| Configuracoes empresa | Dados/fiscal/geral/estoque exigem permissao de configuracao no backend e nas subrotas frontend | Corrigido e testado visualmente |
 | SQL tenant-safe | Helper e runtime guard de SQL bruto continuam bloqueando query sem tenant | OK |
 | Onboarding tenant | Criacao/base de tenant e dados padrao cobertos pela suite multi-tenant | OK |
 | Mobile/entregas | Contexto tenant do entregador/e-commerce e status de entrega | OK |
@@ -591,9 +609,9 @@ Pendencias manuais que seguem abertas pelo checklist:
 - Financeiro do cliente.
 - Editar produto com todos os campos.
 - Calculadora de racao na UI: API A/B e smoke visual concluidos.
-- Catalogos auxiliares de produto: API A/B concluida; falta smoke visual.
+- Catalogos auxiliares de produto: API A/B e smoke visual concluidos.
 - Formas de pagamento e operadoras: API A/B e smoke visual concluidos; falta CRUD completo no navegador como refinamento.
-- Configuracao da empresa: permissao/tenant corrigidos por contrato; falta smoke visual de salvar dados fiscal/geral/estoque no navegador.
+- Configuracao da empresa: permissao/tenant, schema local e smoke visual de salvar dados fiscal/geral/estoque concluidos.
 - Landing page com selecao de planos e CTA do Plano Basico para contratacao: concluido local; falta smoke visual em staging/producao.
 - PDV/vendas: API A/B concluida e smoke visual de operador/autocomplete/finalizacao passou; falta apenas reteste de recibo/historico visual.
 - A/B visual no navegador entre dois tenants: em andamento.
@@ -607,9 +625,9 @@ Pendencias manuais que seguem abertas pelo checklist:
 
 - Telas/fluxos basicos com algum teste registrado: 22/23
 - Fluxos OK ou OK parcial: 20
-- Corrigidos/registrados nesta trilha: frontend padronizado, onboarding local, tabelas auxiliares de racao/LGPD/e-commerce, unicidade de pet por tenant, contratacao por plano, schema de PDV/DRE, Roles & Permissoes e chamadas premium indevidas no Basico
+- Corrigidos/registrados nesta trilha: frontend padronizado, onboarding local, tabelas auxiliares de racao/LGPD/e-commerce/configuracao geral, unicidade de pet por tenant, contratacao por plano, schema de PDV/DRE, Roles & Permissoes e chamadas premium indevidas no Basico
 - Pendencias P0: 0 confirmadas apos esta branch
-- Pendencias P1: 2
+- Pendencias P1: 1 bloqueador visual principal + refinamentos de financeiro/historico
 - Pendencias P2: 5
-- Minha recomendacao: liberar para revisao/merge em ambiente de teste/staging. Para producao/comercial controlada, seguir depois de retestar visualmente configuracao da empresa e lote/validade no navegador.
+- Minha recomendacao: liberar para revisao/merge em ambiente de teste/staging. Para producao/comercial controlada, seguir depois de retestar visualmente lote/validade no navegador e fazer smoke real pos-deploy.
 

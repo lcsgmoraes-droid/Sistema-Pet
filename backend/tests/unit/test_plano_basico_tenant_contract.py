@@ -253,6 +253,9 @@ def test_company_configuration_routes_require_configuration_permissions():
     empresa_fiscal_source = _source("backend/app/api/v1/empresa_fiscal.py")
     empresa_routes_source = _source("backend/app/empresa_routes.py")
     empresa_config_source = _source("backend/app/empresa_config_routes.py")
+    empresa_config_geral_migration = _source(
+        "backend/alembic/versions/or20260515a9_create_empresa_config_geral.py"
+    )
     app_source = _source("frontend/src/App.jsx")
     configuracoes_source = _source("frontend/src/pages/Configuracoes.jsx")
 
@@ -263,7 +266,12 @@ def test_company_configuration_routes_require_configuration_permissions():
         '@require_any_permission(("configuracoes.empresa", "configuracoes.editar"))'
     ) >= 4
     assert empresa_routes_source.count('@require_permission("configuracoes.editar")') >= 2
+    assert "def _buscar_tenant_por_contexto(db: Session, tenant_id)" in empresa_routes_source
+    assert "Tenant.id == str(tenant_id)" in empresa_routes_source
+    assert "Tenant.id == tenant_id" not in empresa_routes_source
     assert empresa_config_source.count('@require_permission("configuracoes.editar")') >= 4
+    assert 'op.create_table(\n            "empresa_config_geral"' in empresa_config_geral_migration
+    assert "ix_empresa_config_geral_tenant_id" in empresa_config_geral_migration
 
     assert 'anyOfPermissions={["configuracoes.empresa", "configuracoes.editar"]}' in app_source
     assert '<ProtectedRoute permission="configuracoes.editar">' in app_source
