@@ -86,15 +86,14 @@ export default function useProdutosTabela({
   };
 
   const getValidadeMaisProxima = (produto) => {
-    if (!produto.lotes || produto.lotes.length === 0) return "-";
-
-    const lotes = produto.lotes
+    const lotes = (produto.lotes || [])
       .filter((lote) => lote.data_validade)
       .sort((a, b) => new Date(a.data_validade) - new Date(b.data_validade));
 
-    if (lotes.length === 0) return "-";
+    const proximaValidade = lotes[0]?.data_validade || produto.validade_proxima;
 
-    const proximaValidade = lotes[0].data_validade;
+    if (!proximaValidade) return "-";
+
     const dias = Math.floor(
       (new Date(proximaValidade) - new Date()) / (1000 * 60 * 60 * 24),
     );

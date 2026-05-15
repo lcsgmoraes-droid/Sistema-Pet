@@ -122,6 +122,46 @@ class ConferenciaNotaPayload(BaseModel):
     observacao_geral: Optional[str] = None
 
 
+def _parse_data_validade_texto(valor: str):
+    valor_normalizado = (valor or "").strip()
+    if not valor_normalizado:
+        return None
+
+    for formato in ("%Y-%m-%d", "%d/%m/%Y", "%d-%m-%Y", "%d.%m.%Y"):
+        try:
+            return datetime.strptime(valor_normalizado, formato).date()
+        except ValueError:
+            continue
+
+    return None
+
+
+def _extrair_lote_validade_info_adicional(texto: str) -> tuple[str, Any]:
+    texto_normalizado = (texto or "").strip().upper()
+    if not texto_normalizado:
+        return "", None
+
+    lote = ""
+    data_validade = None
+
+    lote_match = re.search(
+        r"\b(?:LOTE|LOT)\s*[:\-]?\s*([A-Z0-9][A-Z0-9._/\-]*)",
+        texto_normalizado,
+    )
+    if lote_match:
+        lote = lote_match.group(1).strip(".,;")
+
+    validade_match = re.search(
+        r"\b(?:VALIDADE|VALID|VAL\.?|VENCIMENTO|VENC|VECTO|VCTO|VENCTO)\s*[:\-]?\s*"
+        r"(\d{4}-\d{2}-\d{2}|\d{2}[\/\-\.]\d{2}[\/\-\.]\d{4})",
+        texto_normalizado,
+    )
+    if validade_match:
+        data_validade = _parse_data_validade_texto(validade_match.group(1))
+
+    return lote, data_validade
+
+
 # ============================================================================
 # PARSER DE XML NF-e
 # ============================================================================
@@ -405,6 +445,132 @@ def _round_quantity(value: Any) -> float:
 def _normalizar_texto_curto(value: Optional[str]) -> Optional[str]:
     texto = (value or "").strip()
     return texto or None
+
+
+def _data_para_datetime(value: Any) -> Optional[datetime]:
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        return value
+    return datetime.combine(value, datetime.min.time())
+
+
+def _mapear_lotes_rastro_xml(xml_content: Optional[str]) -> Dict[int, List[Dict[str, Any]]]:
+    if not xml_content:
+        return {}
+
+    try:
+        root = ET.fromstring(xml_content)
+        ns = {'nfe': 'http://www.portalfiscal.inf.br/nfe'}
+        inf_nfe = root.find('.//nfe:infNFe', ns)
+        if inf_nfe is None:
+            return {}
+
+        lotes_por_item: Dict[int, List[Dict[str, Any]]] = {}
+        for idx, det in enumerate(inf_nfe.findall('.//nfe:det', ns), start=1):
+            try:
+                numero_item = int(det.attrib.get('nItem') or idx)
+            except (TypeError, ValueError):
+                numero_item = idx
+
+            prod = det.find('nfe:prod', ns)
+            if prod is None:
+                continue
+
+            rastros = []
+            for rastro in prod.findall('nfe:rastro', ns):
+                nome_lote = _normalizar_texto_curto(
+                    rastro.findtext('nfe:nLote', default='', namespaces=ns)
+                )
+                quantidade_nf = _round_quantity(
+                    rastro.findtext('nfe:qLote', default='0', namespaces=ns)
+                )
+                data_fabricacao = _parse_data_validade_texto(
+                    rastro.findtext('nfe:dFab', default='', namespaces=ns)
+                )
+                data_validade = _parse_data_validade_texto(
+                    rastro.findtext('nfe:dVal', default='', namespaces=ns)
+                )
+
+                if not any([nome_lote, quantidade_nf > 0, data_validade]):
+                    continue
+
+                rastros.append({
+                    "nome_lote": nome_lote,
+                    "quantidade_nf": quantidade_nf,
+                    "data_fabricacao": data_fabricacao,
+                    "data_validade": data_validade,
+                })
+
+            if rastros:
+                lotes_por_item[numero_item] = rastros
+
+        return lotes_por_item
+    except Exception as exc:
+        logger.warning(f"Nao foi possivel mapear lotes rastro do XML: {exc}")
+        return {}
+
+
+def _montar_lotes_entrada_item(
+    item: NotaEntradaItem,
+    nota: NotaEntrada,
+    quantidade_entrada: float,
+    lotes_rastro_por_item: Dict[int, List[Dict[str, Any]]],
+) -> List[Dict[str, Any]]:
+    quantidade_entrada = _round_quantity(quantidade_entrada)
+    if quantidade_entrada <= 0:
+        return []
+
+    try:
+        numero_item = int(item.numero_item)
+    except (TypeError, ValueError):
+        numero_item = 0
+
+    rastros = lotes_rastro_por_item.get(numero_item) or []
+    if rastros:
+        soma_quantidade_nf = _round_quantity(
+            sum(lote.get("quantidade_nf", 0) for lote in rastros)
+        )
+
+        if soma_quantidade_nf > 0:
+            lotes = []
+            restante = quantidade_entrada
+            for index, lote_xml in enumerate(rastros):
+                if index == len(rastros) - 1:
+                    quantidade_lote = restante
+                else:
+                    proporcao = (lote_xml.get("quantidade_nf", 0) or 0) / soma_quantidade_nf
+                    quantidade_lote = _round_quantity(quantidade_entrada * proporcao)
+                    restante = _round_quantity(restante - quantidade_lote)
+
+                if quantidade_lote <= 0:
+                    continue
+
+                lotes.append({
+                    "nome_lote": lote_xml.get("nome_lote") or f"NF{nota.numero_nota}-{item.numero_item}-{index + 1}",
+                    "quantidade": quantidade_lote,
+                    "data_fabricacao": _data_para_datetime(lote_xml.get("data_fabricacao")),
+                    "data_validade": _data_para_datetime(lote_xml.get("data_validade") or item.data_validade),
+                })
+
+            if lotes:
+                return lotes
+
+        if len(rastros) == 1:
+            lote_xml = rastros[0]
+            return [{
+                "nome_lote": lote_xml.get("nome_lote") or f"NF{nota.numero_nota}-{item.numero_item}",
+                "quantidade": quantidade_entrada,
+                "data_fabricacao": _data_para_datetime(lote_xml.get("data_fabricacao")),
+                "data_validade": _data_para_datetime(lote_xml.get("data_validade") or item.data_validade),
+            }]
+
+    return [{
+        "nome_lote": item.lote if item.lote else f"NF{nota.numero_nota}-{item.numero_item}",
+        "quantidade": quantidade_entrada,
+        "data_fabricacao": None,
+        "data_validade": _data_para_datetime(item.data_validade),
+    }]
 
 
 def _obter_override_mapa(mapa: Dict[Any, Any], chave: Any) -> Any:
@@ -709,17 +875,21 @@ def parse_nfe_xml(xml_content: str) -> dict:
                                 except:
                                     pass
             
-            # Se nÃ£o encontrar em rastro, tentar em informaÃ§Ãµes adicionais do produto
-            if not lote:
-                inf_ad_prod = prod.find('nfe:infAdProd', ns)
+            # Se nao encontrar em rastro, tentar informacoes adicionais do item.
+            # Na NF-e, infAdProd costuma ser filho de <det>, nao de <prod>.
+            if not lote or not data_validade:
+                inf_ad_prod = det.find('nfe:infAdProd', ns)
+                if inf_ad_prod is None:
+                    inf_ad_prod = prod.find('nfe:infAdProd', ns)
+
                 if inf_ad_prod is not None and inf_ad_prod.text:
-                    texto_info = inf_ad_prod.text.upper()
-                    # Tentar encontrar LOTE: XXXX
-                    if 'LOTE' in texto_info or 'LOTE:' in texto_info:
-                        import re
-                        match = re.search(r'LOTE[:\s]+([A-Z0-9]+)', texto_info)
-                        if match:
-                            lote = match.group(1)
+                    lote_info, validade_info = _extrair_lote_validade_info_adicional(
+                        inf_ad_prod.text
+                    )
+                    if not lote and lote_info:
+                        lote = lote_info
+                    if not data_validade and validade_info:
+                        data_validade = validade_info
             
             itens.append({
                 'numero_item': idx,
@@ -2695,6 +2865,7 @@ def processar_entrada_estoque(
     
     itens_processados = []
     composicoes_custo = calcular_composicao_custos_nota(nota)
+    lotes_rastro_por_item = _mapear_lotes_rastro_xml(nota.xml_content)
     
     # Processar cada item
     for item in nota.itens:
@@ -2809,32 +2980,39 @@ def processar_entrada_estoque(
                 # Atualizar preÃ§o de custo no vÃ­nculo
                 vinculo_existente.preco_custo = custo_unitario_entrada
         
-        # Criar lote
-        nome_lote = item.lote if item.lote else f"NF{nota.numero_nota}-{item.numero_item}"
-        
-        # Preparar data de validade (converter de date para datetime se necessÃ¡rio)
-        data_validade = None
-        if item.data_validade:
-            from datetime import datetime as dt
-            if isinstance(item.data_validade, dt):
-                data_validade = item.data_validade
-            else:
-                # Ã‰ um objeto date, converter para datetime
-                data_validade = dt.combine(item.data_validade, dt.min.time())
-        
-        lote = ProdutoLote(
-            produto_id=produto.id,
-            nome_lote=nome_lote,
-            quantidade_inicial=quantidade_entrada,
-            quantidade_disponivel=quantidade_entrada,
-            custo_unitario=float(custo_unitario_entrada),
-            data_fabricacao=None,
-            data_validade=data_validade,
-            ordem_entrada=int(datetime.utcnow().timestamp()),
-            tenant_id=tenant_id
+        lotes_entrada = _montar_lotes_entrada_item(
+            item,
+            nota,
+            quantidade_entrada,
+            lotes_rastro_por_item,
         )
-        db.add(lote)
-        db.flush()
+        if not lotes_entrada:
+            continue
+
+        lotes_criados = []
+        ordem_base = int(datetime.utcnow().timestamp())
+        for lote_index, lote_entrada in enumerate(lotes_entrada):
+            quantidade_lote = _round_quantity(lote_entrada["quantidade"])
+            if quantidade_lote <= 0:
+                continue
+
+            lote = ProdutoLote(
+                produto_id=produto.id,
+                nome_lote=lote_entrada["nome_lote"],
+                quantidade_inicial=quantidade_lote,
+                quantidade_disponivel=quantidade_lote,
+                custo_unitario=float(custo_unitario_entrada),
+                data_fabricacao=lote_entrada.get("data_fabricacao"),
+                data_validade=lote_entrada.get("data_validade"),
+                ordem_entrada=ordem_base + lote_index,
+                tenant_id=tenant_id
+            )
+            db.add(lote)
+            db.flush()
+            lotes_criados.append((lote, quantidade_lote))
+
+        if not lotes_criados:
+            continue
         
         # Atualizar estoque
         estoque_anterior = produto.estoque_atual or 0
@@ -2886,37 +3064,42 @@ def processar_entrada_estoque(
                 f"({variacao_custo:+.2f}%)"
             )
         
-        # Registrar movimentaÃ§Ã£o
-        movimentacao = EstoqueMovimentacao(
-            produto_id=produto.id,
-            lote_id=lote.id,
-            tipo="entrada",
-            motivo="compra",
-            quantidade=quantidade_entrada,
-            quantidade_anterior=estoque_anterior,
-            quantidade_nova=produto.estoque_atual,
-            custo_unitario=float(custo_unitario_entrada),
-            valor_total=float(quantidade_entrada * custo_unitario_entrada),
-            documento=nota.chave_acesso,
-            referencia_tipo="nota_entrada",
-            referencia_id=nota.id,
-            observacao=(
-                f"Entrada NF-e {nota.numero_nota} - {item.descricao}"
-                if conferencia_item["status_conferencia"] == "ok"
-                else (
-                    f"Entrada NF-e {nota.numero_nota} - {item.descricao} | "
-                    f"Conferida: {conferencia_item['quantidade_conferida']} | "
-                    f"Avariada: {conferencia_item['quantidade_avariada']} | "
-                    f"Faltante: {conferencia_item['quantidade_faltante']}"
-                )
-            ) + (
-                f" | Custo sistema manual: R$ {custo_unitario_entrada:.4f}"
-                if custo_unitario_manual is not None else ""
-            ),
-            user_id=current_user.id,
-            tenant_id=tenant_id
+        observacao_movimentacao = (
+            f"Entrada NF-e {nota.numero_nota} - {item.descricao}"
+            if conferencia_item["status_conferencia"] == "ok"
+            else (
+                f"Entrada NF-e {nota.numero_nota} - {item.descricao} | "
+                f"Conferida: {conferencia_item['quantidade_conferida']} | "
+                f"Avariada: {conferencia_item['quantidade_avariada']} | "
+                f"Faltante: {conferencia_item['quantidade_faltante']}"
+            )
+        ) + (
+            f" | Custo sistema manual: R$ {custo_unitario_entrada:.4f}"
+            if custo_unitario_manual is not None else ""
         )
-        db.add(movimentacao)
+
+        estoque_movimento_anterior = estoque_anterior
+        for lote, quantidade_lote in lotes_criados:
+            estoque_movimento_novo = _round_quantity(estoque_movimento_anterior + quantidade_lote)
+            movimentacao = EstoqueMovimentacao(
+                produto_id=produto.id,
+                lote_id=lote.id,
+                tipo="entrada",
+                motivo="compra",
+                quantidade=quantidade_lote,
+                quantidade_anterior=estoque_movimento_anterior,
+                quantidade_nova=estoque_movimento_novo,
+                custo_unitario=float(custo_unitario_entrada),
+                valor_total=float(quantidade_lote * custo_unitario_entrada),
+                documento=nota.chave_acesso,
+                referencia_tipo="nota_entrada",
+                referencia_id=nota.id,
+                observacao=observacao_movimentacao,
+                user_id=current_user.id,
+                tenant_id=tenant_id
+            )
+            db.add(movimentacao)
+            estoque_movimento_anterior = estoque_movimento_novo
         
         # Atualizar status do item
         item.status = 'processado'
@@ -2925,7 +3108,7 @@ def processar_entrada_estoque(
             "produto_id": produto.id,
             "produto_nome": produto.nome,
             "quantidade": quantidade_entrada,
-            "lote": nome_lote,
+            "lote": ", ".join(lote.nome_lote for lote, _ in lotes_criados),
             "estoque_atual": produto.estoque_atual,
             "pack_multiplicador": multiplicador_pack,
             "status_conferencia": conferencia_item["status_conferencia"],
@@ -2935,6 +3118,7 @@ def processar_entrada_estoque(
         
         logger.info(
             f"  âœ… {produto.nome}: +{quantidade_entrada} unidades "
+            f"em {len(lotes_criados)} lote(s) "
             f"(estoque: {estoque_anterior} â†’ {produto.estoque_atual})"
         )
 
@@ -3079,16 +3263,35 @@ def reverter_entrada_estoque(
             try:
                 produto = item.produto
                 
-                # Buscar lote criado para esta entrada
-                nome_lote = item.lote if item.lote else f"NF{nota.numero_nota}-{item.numero_item}"
-                lote = db.query(ProdutoLote).filter(
-                    ProdutoLote.produto_id == produto.id,
-                    ProdutoLote.nome_lote == nome_lote,
-                    ProdutoLote.tenant_id == tenant_id
-                ).first()
-                
-                if lote:
-                    quantidade_lancada = float(lote.quantidade_inicial or 0)
+                # Buscar lotes criados para esta entrada. Notas podem ter mais de um
+                # rastro/lote para o mesmo item do XML.
+                lotes = (
+                    db.query(ProdutoLote)
+                    .join(EstoqueMovimentacao, EstoqueMovimentacao.lote_id == ProdutoLote.id)
+                    .filter(
+                        ProdutoLote.produto_id == produto.id,
+                        ProdutoLote.tenant_id == tenant_id,
+                        EstoqueMovimentacao.referencia_tipo == "nota_entrada",
+                        EstoqueMovimentacao.referencia_id == nota.id,
+                        EstoqueMovimentacao.produto_id == produto.id,
+                        EstoqueMovimentacao.tenant_id == tenant_id,
+                    )
+                    .distinct()
+                    .all()
+                )
+
+                if not lotes:
+                    nome_lote = item.lote if item.lote else f"NF{nota.numero_nota}-{item.numero_item}"
+                    lote_fallback = db.query(ProdutoLote).filter(
+                        ProdutoLote.produto_id == produto.id,
+                        ProdutoLote.nome_lote == nome_lote,
+                        ProdutoLote.tenant_id == tenant_id
+                    ).first()
+                    lotes = [lote_fallback] if lote_fallback else []
+
+                if lotes:
+                    quantidade_lancada = float(sum(lote.quantidade_inicial or 0 for lote in lotes))
+                    lote_base = lotes[0]
 
                     # REVERTER PREÇO DE CUSTO se foi alterado
                     try:
@@ -3131,8 +3334,8 @@ def reverter_entrada_estoque(
                             quantidade=quantidade_lancada,
                             quantidade_anterior=float(estoque_anterior),
                             quantidade_nova=float(produto.estoque_atual or 0),
-                            custo_unitario=float(lote.custo_unitario or item.valor_unitario or 0),
-                            valor_total=float(quantidade_lancada * float(lote.custo_unitario or item.valor_unitario or 0)),
+                            custo_unitario=float(lote_base.custo_unitario or item.valor_unitario or 0),
+                            valor_total=float(quantidade_lancada * float(lote_base.custo_unitario or item.valor_unitario or 0)),
                             documento=nota.chave_acesso or "",
                             referencia_tipo="estorno_nota_entrada",
                             referencia_id=nota.id,
@@ -3144,20 +3347,21 @@ def reverter_entrada_estoque(
                     except Exception as e:
                         logger.warning(f"  ⚠️ Erro ao criar movimentação: {str(e)}")
                     
-                    # Excluir movimentações de estoque vinculadas ao lote (antes de deletar o lote)
-                    movimentacoes_lote = db.query(EstoqueMovimentacao).filter(
-                        EstoqueMovimentacao.lote_id == lote.id,
-                        EstoqueMovimentacao.tenant_id == tenant_id
-                    ).all()
-                    
-                    for mov in movimentacoes_lote:
-                        db.delete(mov)
-                    
-                    if movimentacoes_lote:
-                        logger.info(f"  🗑️  {len(movimentacoes_lote)} movimentações do lote excluídas")
-                    
-                    # Excluir lote
-                    db.delete(lote)
+                    for lote in lotes:
+                        # Excluir movimentações de estoque vinculadas ao lote (antes de deletar o lote)
+                        movimentacoes_lote = db.query(EstoqueMovimentacao).filter(
+                            EstoqueMovimentacao.lote_id == lote.id,
+                            EstoqueMovimentacao.tenant_id == tenant_id
+                        ).all()
+
+                        for mov in movimentacoes_lote:
+                            db.delete(mov)
+
+                        if movimentacoes_lote:
+                            logger.info(f"  🗑️  {len(movimentacoes_lote)} movimentações do lote excluídas")
+
+                        # Excluir lote
+                        db.delete(lote)
                     
                     # Adicionar à lista de revertidos
                     itens_revertidos.append({

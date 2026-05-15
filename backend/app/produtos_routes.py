@@ -212,6 +212,50 @@ def _calcular_faixa_campanha_validade(dias_para_vencer: Optional[int]) -> Option
     return None
 
 
+def _mapa_validade_proxima_produtos(
+    db: Session,
+    produtos: list[Produto],
+    tenant_ids: list[Any],
+) -> dict[int, dict[str, Any]]:
+    produto_ids = [produto.id for produto in produtos if getattr(produto, "id", None)]
+    if not produto_ids:
+        return {}
+
+    rows = (
+        db.query(
+            ProdutoLote.produto_id,
+            ProdutoLote.nome_lote,
+            ProdutoLote.data_validade,
+        )
+        .filter(
+            ProdutoLote.produto_id.in_(produto_ids),
+            ProdutoLote.tenant_id.in_(tenant_ids),
+            ProdutoLote.data_validade.isnot(None),
+            ProdutoLote.status != "excluido",
+            func.coalesce(ProdutoLote.quantidade_disponivel, 0) > 0,
+        )
+        .order_by(
+            ProdutoLote.produto_id.asc(),
+            ProdutoLote.data_validade.asc(),
+            ProdutoLote.ordem_entrada.asc(),
+            ProdutoLote.id.asc(),
+        )
+        .all()
+    )
+
+    validade_por_produto: dict[int, dict[str, Any]] = {}
+    for produto_id, nome_lote, data_validade in rows:
+        if produto_id in validade_por_produto:
+            continue
+
+        validade_por_produto[produto_id] = {
+            "validade_proxima": data_validade,
+            "lote_validade_proxima": nome_lote,
+        }
+
+    return validade_por_produto
+
+
 # ==========================================
 # FUNÃ‡Ã•ES AUXILIARES - CONSOLIDAÃ‡ÃƒO DE LÃ“GICA REPETIDA
 # ==========================================
@@ -452,9 +496,11 @@ def _enriquecer_produto_listagem(
     tenant_id,
     reservas_por_produto: dict[int, float] | None = None,
     incluir_detalhes_composto: bool = True,
+    validade_por_produto: dict[int, dict[str, Any]] | None = None,
 ):
     """Padroniza dados de listagem para produtos simples, kits e variaÃ§Ãµes-kit."""
     reservas_por_produto = reservas_por_produto or {}
+    validade_por_produto = validade_por_produto or {}
     tenant_produto = getattr(produto, "tenant_id", tenant_id)
     reservas_mesmo_tenant = str(tenant_produto) == str(tenant_id)
     estoque_reservado = float(
@@ -515,6 +561,9 @@ def _enriquecer_produto_listagem(
         produto.composicao_kit = []
         produto.estoque_virtual = int(produto.estoque_atual or 0)
 
+    validade_info = validade_por_produto.get(produto.id, {})
+    produto.validade_proxima = validade_info.get("validade_proxima")
+    produto.lote_validade_proxima = validade_info.get("lote_validade_proxima")
     produto.estoque_reservado = estoque_reservado
     if produto.tipo_produto in ("KIT", "VARIACAO") and produto.tipo_kit == "VIRTUAL":
         produto.estoque_disponivel = float(produto.estoque_virtual or 0)
@@ -1101,6 +1150,8 @@ class ProdutoResponse(ProdutoBase):
     estoque_virtual: Optional[int] = None  # Estoque calculado (apenas para KIT virtual)
     estoque_reservado: Optional[float] = 0  # Unidades reservadas por pedidos Bling em aberto
     estoque_disponivel: Optional[float] = 0  # Estoque livre apos reservas
+    validade_proxima: Optional[datetime] = None
+    lote_validade_proxima: Optional[str] = None
     # Sistema Predecessor/Sucessor
     data_descontinuacao: Optional[datetime] = None  # Data em que foi marcado como descontinuado
     predecessor_nome: Optional[str] = None  # Nome do produto predecessor (populado manualmente)
@@ -2556,6 +2607,7 @@ def listar_produtos(
     produtos = [p for p in produtos if p is not None]
 
     reservas_por_produto = _mapa_reservas_ativas_multitenant(db, access_ids)
+    validade_por_produto = _mapa_validade_proxima_produtos(db, produtos, access_ids)
 
     # HIERARQUIA: Para produtos PAI, buscar suas variaÃ§Ãµes
     # Para produtos KIT, calcular estoque virtual e carregar composiÃ§Ã£o
@@ -2576,6 +2628,7 @@ def listar_produtos(
             tenant_id,
             reservas_por_produto,
             incluir_detalhes_composto=incluir_detalhes_composto,
+            validade_por_produto=validade_por_produto,
         )
         produtos_expandidos.append(produto)
 
@@ -2587,6 +2640,11 @@ def listar_produtos(
                 Produto.tipo_produto == 'VARIACAO',
                 Produto.ativo == True
             ).options(*load_options).order_by(Produto.nome).all()
+            validade_por_variacao = _mapa_validade_proxima_produtos(
+                db,
+                variacoes,
+                access_ids,
+            )
 
             for variacao in variacoes:
                 _enriquecer_produto_listagem(
@@ -2595,6 +2653,7 @@ def listar_produtos(
                     tenant_id,
                     reservas_por_produto,
                     incluir_detalhes_composto=incluir_detalhes_composto,
+                    validade_por_produto=validade_por_variacao,
                 )
                 produtos_expandidos.append(variacao)
 
