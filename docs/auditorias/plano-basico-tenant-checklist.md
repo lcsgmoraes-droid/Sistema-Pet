@@ -79,6 +79,19 @@ Status usados:
 | Cadastros essenciais | Quase pronto | Formas de pagamento e opcoes de racao passaram em criacao/listagem A/B real; retestar edicao/exclusao e demais cadastros. |
 | Configuracoes/usuarios/LGPD | Pendente P1 | Testar salvar dados essenciais, criar usuario e permissao basica. |
 | Premium bloqueado | Pendente P1 | Smoke de menus e URLs diretas premium em tenant basico. |
+| Landing page/contratacao | Nao testado | Criar/validar bloco de selecao de planos; contratacao do Plano Basico deve partir dali para registro com plano correto. |
+
+### 0.4. Cronograma final para vender o Plano Basico
+
+| Etapa | Objetivo | Status | Bloqueia venda? |
+|---|---|---|---|
+| 1. Base tecnica multi-tenant | Cadastro real de tenants A/B, selecao de tenant, migrations limpas e bloqueio de vazamento entre empresas. | Concluido local | Sim, mas ja passou localmente. |
+| 2. Fluxos essenciais do basico | Clientes, pets, produtos, estoque, PDV/vendas, historico financeiro de vendas e cadastros auxiliares. | Em andamento | Sim, enquanto PDV/vendas e usuarios nao fecharem 100%. |
+| 3. Usuarios e permissoes | Criar usuario do tenant, validar permissoes basicas e bloqueio de acesso indevido. | Pendente P1 | Sim. |
+| 4. Calculadora/catalogos de racao | Validar fluxo visual, persistencia e mensagens de erro sem 500. | Pendente P1 | Sim se fizer parte da promessa comercial inicial. |
+| 5. Landing page e selecao de planos | Exibir planos, destacar Basico, iniciar contratacao com plano escolhido e levar ao cadastro/onboarding correto. | Pendente P1 | Sim para vender por autoatendimento. |
+| 6. A/B visual no navegador | Usar dois tenants reais no browser e conferir que menus, dados e mensagens batem com o plano. | Pendente P1 | Sim antes de abrir para varias empresas. |
+| 7. Produção controlada | Merge, deploy, migrations, health check e smoke real sem dados sensiveis. | Pendente | Sim. |
 
 ## 1. Branch e commits
 
@@ -89,8 +102,8 @@ Status usados:
   - `cf47be7f9 fix: gravar usuario na entrada de estoque do produto`
   - `2e662a8b9 fix: evitar chamadas premium no plano basico`
 - PR:
-  - Ainda nao aberto automaticamente nesta maquina.
-  - Link para abrir/revisar PR: `https://github.com/lcsgmoraes-droid/Sistema-Pet/pull/new/fix/20260514-2157-corrigir-entrada-estoque-produto-user-id`
+  - Atual: `https://github.com/lcsgmoraes-droid/Sistema-Pet/pull/36`
+  - Status: draft, aguardando revisao/merge controlado.
 
 ## 2. Ambiente testado
 
@@ -112,6 +125,7 @@ Status usados:
 | Area | Tela/Fluxo | Frontend | Endpoint | Testado | Resultado | Correcao | Status |
 |---|---|---|---|---|---|---|---|
 | Comercial | Registro com plano basico | `/register?plan=basico` | `POST /auth/register` | Sim | Conta/tenant criados em dois tenants A/B por API real. Erros locais de schema foram corrigidos por migrations. | Adicionadas migrations para gaps de onboarding local e tabelas auxiliares de racao. | OK |
+| Comercial | Landing page com selecao de planos | `/` ou landing publica | Plano escolhido deve alimentar cadastro/contratacao | Nao | Contratacao comercial deve partir da landing page, com card de planos e CTA do Plano Basico para registro com plano correto. | A fazer em etapa dedicada. | Pendente P1 |
 | Autenticacao | Login do novo usuario | `/login` | `POST /auth/login` | Sim | Login do usuario de teste funcionou e redirecionou para area autenticada. | Adicionado `autoComplete` correto para reduzir warnings do navegador. | OK |
 | Dashboard | Dashboard inicial do plano basico | `/dashboard` | Chamava endpoints premium de financeiro/IA e Bling | Sim | A tela abria, mas o console recebia 403 de endpoints premium bloqueados. | `AlertasIA`, `ProjecoesIA` e badge do layout agora evitam chamadas premium quando modulo nao esta ativo. | Corrigido |
 | Pessoas | Listar clientes | `/clientes` | `GET /clientes` | Sim | Auditoria A/B confirmou que cliente do tenant A aparece no A e nao aparece no B, e vice-versa. | Nenhuma nesta branch. | OK |
@@ -398,12 +412,13 @@ Pendencias manuais que seguem abertas pelo checklist:
 - Operadoras de cartao.
 - Configuracao da empresa.
 - Usuarios/admin.
+- Landing page com selecao de planos e CTA do Plano Basico para contratacao.
 - A/B visual no navegador entre dois tenants.
 
 ### Deploy
 
 - Nao houve deploy de producao nesta etapa.
-- Branch atual ainda nao foi enviada para GitHub nesta etapa.
+- Branch atual enviada para GitHub no PR `#36`: `https://github.com/lcsgmoraes-droid/Sistema-Pet/pull/36`.
 
 ## Resumo Executivo
 
