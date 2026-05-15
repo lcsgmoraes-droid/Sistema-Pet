@@ -800,6 +800,11 @@ const Layout = () => {
           permission: "cadastros.categorias_produtos",
         },
         {
+          path: "/cadastros/marcas",
+          label: "Marcas",
+          permission: "cadastros.categorias_produtos",
+        },
+        {
           path: "/cadastros/categorias",
           label: "Categorias de Produtos",
           permission: "cadastros.categorias_produtos",

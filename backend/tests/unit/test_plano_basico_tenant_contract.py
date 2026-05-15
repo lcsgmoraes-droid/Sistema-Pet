@@ -272,14 +272,22 @@ def test_company_configuration_routes_require_configuration_permissions():
     assert 'card.modulo && !moduloAtivo(card.modulo)' in configuracoes_source
 
 
-def test_product_departments_are_basic_catalog_not_rh_module():
+def test_product_catalog_auxiliary_pages_are_basic_catalog_not_premium_modules():
     app_source = _source("frontend/src/App.jsx")
     layout_source = _source("frontend/src/components/Layout.jsx")
 
     assert 'path="cadastros/departamentos" element={<Departamentos />}' in app_source
+    assert 'path="cadastros/marcas" element={<Marcas />}' in app_source
+    assert 'path="cadastros/categorias" element={<Categorias />}' in app_source
+
     departamentos_menu_start = layout_source.index('path: "/cadastros/departamentos"')
-    departamentos_menu_end = layout_source.index('path: "/cadastros/categorias"', departamentos_menu_start)
+    departamentos_menu_end = layout_source.index('path: "/cadastros/marcas"', departamentos_menu_start)
     departamentos_menu = layout_source[departamentos_menu_start:departamentos_menu_end]
+    marcas_menu_start = layout_source.index('path: "/cadastros/marcas"')
+    marcas_menu_end = layout_source.index('path: "/cadastros/categorias"', marcas_menu_start)
+    marcas_menu = layout_source[marcas_menu_start:marcas_menu_end]
 
     assert 'modulo: "rh"' not in departamentos_menu
+    assert 'modulo:' not in marcas_menu
     assert 'permission: "cadastros.categorias_produtos"' in departamentos_menu
+    assert 'permission: "cadastros.categorias_produtos"' in marcas_menu
