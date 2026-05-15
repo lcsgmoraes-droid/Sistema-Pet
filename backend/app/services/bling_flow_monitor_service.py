@@ -64,6 +64,7 @@ def _garantir_registry_sqlalchemy_auditoria() -> None:
     # então ela precisa bootstrapar explicitamente os modelos com relacionamentos
     # declarados por string antes de qualquer query.
     import app.models  # noqa: F401
+    import app.vendas_models  # noqa: F401
     import app.financeiro_models  # noqa: F401
     import app.dre_plano_contas_models  # noqa: F401
     import app.ia.aba7_extrato_models  # noqa: F401

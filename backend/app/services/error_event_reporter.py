@@ -90,6 +90,18 @@ def _path_tenant_fallback(path: str) -> tuple[str | None, str | None]:
     return None, None
 
 
+def _path_allows_context_tenant(path: str) -> bool:
+    public_prefixes = (
+        "/health",
+        "/docs",
+        "/redoc",
+        "/openapi.json",
+        "/assets/",
+        "/static/",
+    )
+    return not path.startswith(public_prefixes)
+
+
 def _extract_identity(request: Request) -> dict[str, Any]:
     authorization = request.headers.get("authorization", "")
     tenant_source = None
@@ -113,15 +125,15 @@ def _extract_identity(request: Request) -> dict[str, Any]:
         tenant_id = state_tenant_id
         tenant_source = _request_state_text(request, "tenant_source") or "request_state"
 
-    context_tenant_id = _uuid_text(_current_tenant_text())
-    if not tenant_id and context_tenant_id:
-        tenant_id = context_tenant_id
-        tenant_source = "tenant_context"
-
     fallback_tenant_id, fallback_source = _path_tenant_fallback(request.url.path)
     if not tenant_id and fallback_tenant_id:
         tenant_id = fallback_tenant_id
         tenant_source = fallback_source
+
+    context_tenant_id = _uuid_text(_current_tenant_text())
+    if not tenant_id and context_tenant_id and _path_allows_context_tenant(request.url.path):
+        tenant_id = context_tenant_id
+        tenant_source = "tenant_context"
 
     return {
         "tenant_id": tenant_id,
