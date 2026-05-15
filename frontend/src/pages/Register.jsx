@@ -20,7 +20,8 @@ const Register = () => {
   const { register } = useAuth();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const selectedPlan = (searchParams.get('plan') || 'basico').trim().toLowerCase();
+  const requestedPlan = (searchParams.get('plan') || 'basico').trim().toLowerCase();
+  const selectedPlan = requestedPlan === 'basico' ? 'basico' : 'basico';
   const selectedPlanLabel = selectedPlan === 'basico' ? 'Plano Básico' : 'Plano Básico';
 
   const handleSubmit = async (event) => {
@@ -48,6 +49,7 @@ const Register = () => {
       password,
       nome,
       nome_loja: nomeLoja,
+      plan: selectedPlan,
       organization_type: organizationType,
       accepted_terms: acceptedTerms,
       accepted_privacy: acceptedPrivacy,

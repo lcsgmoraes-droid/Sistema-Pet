@@ -57,6 +57,7 @@ TERMS_VERSION = os.getenv("TERMS_VERSION", "termos-2026-05-08")
 PRIVACY_VERSION = os.getenv("PRIVACY_VERSION", "privacidade-2026-05-08")
 STRICT_EMAIL_ENVS = {"production", "prod", "staging"}
 LOCAL_REQUEST_HOSTS = {"localhost", "127.0.0.1", "::1", "0.0.0.0"}
+ALLOWED_SIGNUP_PLANS = {"basico"}
 
 
 # =============================================================================
@@ -153,6 +154,7 @@ class RegisterRequest(BaseModel):
     password: str
     nome: Optional[str] = None
     nome_loja: Optional[str] = None
+    plan: Optional[str] = "basico"
     organization_type: Optional[str] = "petshop"
     accepted_terms: bool = False
     accepted_privacy: bool = False
@@ -404,6 +406,13 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
             detail="Senha deve ter no minimo 8 caracteres"
         )
 
+    selected_plan = (payload.plan or "basico").strip().lower()
+    if selected_plan not in ALLOWED_SIGNUP_PLANS:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Plano selecionado indisponivel. Escolha o Plano Basico ou fale com vendas.",
+        )
+
     email_verification_required = _email_verification_required_for_request(request)
     
     # Criar tenant primeiro
@@ -413,7 +422,7 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
         id=str(tenant_id),
         name=tenant_name,
         status='active',
-        plan='basico',
+        plan=selected_plan,
         organization_type=payload.organization_type or 'petshop'
     )
     db.add(tenant)

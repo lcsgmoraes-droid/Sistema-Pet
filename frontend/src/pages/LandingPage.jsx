@@ -4,6 +4,7 @@ import {
   Bell,
   Brain,
   Building2,
+  Check,
   ChevronRight,
   CreditCard,
   FileText,
@@ -193,12 +194,12 @@ export default function LandingPage() {
             >
               Como funciona
             </a>
-            <Link
-              to="/planos"
+            <a
+              href="#planos"
               className="hover:text-purple-600 transition-colors"
             >
               Planos
-            </Link>
+            </a>
             <a
               href="#depoimentos"
               className="hover:text-purple-600 transition-colors"
@@ -255,10 +256,10 @@ export default function LandingPage() {
                 Quero uma demonstração
               </a>
               <a
-                href="#funcionalidades"
+                href="#planos"
                 className="inline-flex items-center justify-center gap-2 bg-white/20 hover:bg-white/30 text-white font-semibold px-6 py-3 rounded-xl transition-colors backdrop-blur"
               >
-                Ver funcionalidades
+                Selecionar plano
                 <ChevronRight className="w-4 h-4" />
               </a>
             </div>
@@ -347,6 +348,75 @@ export default function LandingPage() {
               <div className="text-sm text-gray-600">{item.label}</div>
             </div>
           ))}
+        </div>
+      </section>
+
+      {/* ============ PLANOS ============ */}
+      <section id="planos" className="py-20 bg-white">
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="grid gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-center">
+            <div>
+              <span className="text-purple-600 font-semibold text-sm uppercase tracking-wide">
+                Comece pelo essencial
+              </span>
+              <h2 className="text-3xl md:text-4xl font-extrabold text-gray-900 mt-2 mb-4">
+                Escolha o plano antes de criar sua empresa
+              </h2>
+              <p className="text-gray-500 max-w-xl leading-relaxed">
+                A contratacao do Pet Shop Pro parte da selecao de plano. Nesta
+                fase comercial, o Basico e o plano validado para novos tenants.
+              </p>
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+                <Link
+                  to="/register?plan=basico"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-purple-600 px-6 py-3 font-bold text-white shadow-lg transition-colors hover:bg-purple-700"
+                >
+                  Criar conta no Basico
+                  <ArrowRight className="h-4 w-4" />
+                </Link>
+                <Link
+                  to="/planos"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl border border-gray-200 bg-white px-6 py-3 font-semibold text-gray-700 transition-colors hover:bg-gray-50"
+                >
+                  Ver detalhes dos planos
+                </Link>
+              </div>
+            </div>
+
+            <article className="rounded-2xl border border-purple-100 bg-purple-50 p-6 shadow-sm">
+              <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-sm font-bold uppercase text-purple-700">
+                    Plano Basico
+                  </p>
+                  <h3 className="mt-2 text-2xl font-extrabold text-gray-950">
+                    Operacao diaria do pet shop
+                  </h3>
+                  <p className="mt-2 text-sm text-gray-600">
+                    Cadastro, estoque, PDV, vendas e visao gerencial basica.
+                  </p>
+                </div>
+                <span className="inline-flex w-fit rounded-full bg-emerald-100 px-3 py-1 text-xs font-bold uppercase text-emerald-700">
+                  Validacao final
+                </span>
+              </div>
+              <ul className="mt-6 grid gap-3 sm:grid-cols-2">
+                {[
+                  "Clientes e pets",
+                  "Produtos e estoque",
+                  "PDV e caixa",
+                  "Historico de vendas",
+                  "Formas de pagamento",
+                  "Usuarios e LGPD",
+                ].map((item) => (
+                  <li key={item} className="flex items-center gap-2 text-sm text-gray-700">
+                    <Check className="h-4 w-4 flex-none text-emerald-600" />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </article>
+          </div>
         </div>
       </section>
 
@@ -532,6 +602,9 @@ export default function LandingPage() {
               className="hover:text-white transition-colors"
             >
               Como funciona
+            </a>
+            <a href="#planos" className="hover:text-white transition-colors">
+              Planos
             </a>
             <Link to="/login" className="hover:text-white transition-colors">
               Entrar

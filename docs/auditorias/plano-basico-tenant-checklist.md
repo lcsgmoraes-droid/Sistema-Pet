@@ -79,7 +79,7 @@ Status usados:
 | Cadastros essenciais | Quase pronto | Formas de pagamento e opcoes de racao passaram em criacao/listagem A/B real; retestar edicao/exclusao e demais cadastros. |
 | Configuracoes/usuarios/LGPD | Pendente P1 | Testar salvar dados essenciais, criar usuario e permissao basica. |
 | Premium bloqueado | Pendente P1 | Smoke de menus e URLs diretas premium em tenant basico. |
-| Landing page/contratacao | Nao testado | Criar/validar bloco de selecao de planos; contratacao do Plano Basico deve partir dali para registro com plano correto. |
+| Landing page/contratacao | Pronto local | Bloco de selecao do Plano Basico criado na landing; cadastro envia `plan=basico` e API grava plano validado. |
 
 ### 0.4. Cronograma final para vender o Plano Basico
 
@@ -89,7 +89,7 @@ Status usados:
 | 2. Fluxos essenciais do basico | Clientes, pets, produtos, estoque, PDV/vendas, historico financeiro de vendas e cadastros auxiliares. | Em andamento | Sim, enquanto PDV/vendas e usuarios nao fecharem 100%. |
 | 3. Usuarios e permissoes | Criar usuario do tenant, validar permissoes basicas e bloqueio de acesso indevido. | Pendente P1 | Sim. |
 | 4. Calculadora/catalogos de racao | Validar fluxo visual, persistencia e mensagens de erro sem 500. | Pendente P1 | Sim se fizer parte da promessa comercial inicial. |
-| 5. Landing page e selecao de planos | Exibir planos, destacar Basico, iniciar contratacao com plano escolhido e levar ao cadastro/onboarding correto. | Pendente P1 | Sim para vender por autoatendimento. |
+| 5. Landing page e selecao de planos | Exibir planos, destacar Basico, iniciar contratacao com plano escolhido e levar ao cadastro/onboarding correto. | Concluido local | Sim para vender por autoatendimento; falta smoke visual em producao/staging. |
 | 6. A/B visual no navegador | Usar dois tenants reais no browser e conferir que menus, dados e mensagens batem com o plano. | Pendente P1 | Sim antes de abrir para varias empresas. |
 | 7. Produção controlada | Merge, deploy, migrations, health check e smoke real sem dados sensiveis. | Pendente | Sim. |
 
@@ -125,7 +125,7 @@ Status usados:
 | Area | Tela/Fluxo | Frontend | Endpoint | Testado | Resultado | Correcao | Status |
 |---|---|---|---|---|---|---|---|
 | Comercial | Registro com plano basico | `/register?plan=basico` | `POST /auth/register` | Sim | Conta/tenant criados em dois tenants A/B por API real. Erros locais de schema foram corrigidos por migrations. | Adicionadas migrations para gaps de onboarding local e tabelas auxiliares de racao. | OK |
-| Comercial | Landing page com selecao de planos | `/` ou landing publica | Plano escolhido deve alimentar cadastro/contratacao | Nao | Contratacao comercial deve partir da landing page, com card de planos e CTA do Plano Basico para registro com plano correto. | A fazer em etapa dedicada. | Pendente P1 |
+| Comercial | Landing page com selecao de planos | `/landing` e `/planos` | Plano escolhido alimenta cadastro/contratacao | Sim | Landing tem bloco de selecao do Plano Basico, `/planos` detalha o Basico e o cadastro recebe `plan=basico`. API bloqueia plano invalido e grava tenant com `plan=basico`. | `LandingPage`, `Register`, `AuthContext` e `auth_routes_multitenant` amarrados ao contrato de plano. | OK local |
 | Autenticacao | Login do novo usuario | `/login` | `POST /auth/login` | Sim | Login do usuario de teste funcionou e redirecionou para area autenticada. | Adicionado `autoComplete` correto para reduzir warnings do navegador. | OK |
 | Dashboard | Dashboard inicial do plano basico | `/dashboard` | Chamava endpoints premium de financeiro/IA e Bling | Sim | A tela abria, mas o console recebia 403 de endpoints premium bloqueados. | `AlertasIA`, `ProjecoesIA` e badge do layout agora evitam chamadas premium quando modulo nao esta ativo. | Corrigido |
 | Pessoas | Listar clientes | `/clientes` | `GET /clientes` | Sim | Auditoria A/B confirmou que cliente do tenant A aparece no A e nao aparece no B, e vice-versa. | Nenhuma nesta branch. | OK |
@@ -196,6 +196,7 @@ Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada com dois te
 | `backend/alembic/versions/oj20260515a1_repair_onboarding_local_schema.py` | Cadastro real de tenant falhava localmente porque o schema DEV nao tinha colunas/tabelas usadas pelo onboarding e jobs recentes. | Migration idempotente adiciona `categorias_financeiras.tipo_custo`, tabela `bling_pedido_webhook_events` e indices de pedidos integrados quando necessario. | Testes locais ficavam ficticios ou bloqueados antes do cadastro real do tenant. | `alembic upgrade head`; `POST /auth/register` deixou de falhar nesse ponto. |
 | `backend/alembic/versions/ok20260515a2_create_missing_ration_option_tables.py` | Onboarding obrigatorio nao conseguia criar opcoes de racao porque as tabelas auxiliares nao existiam. | Criadas `linhas_racao`, `portes_animal`, `fases_publico`, `tipos_tratamento`, `sabores_proteina` e `apresentacoes_peso` com indices por tenant. | Novo tenant podia falhar no cadastro ou nascer sem dados obrigatorios. | `alembic upgrade head`; cadastro real A/B passou. |
 | `backend/app/models.py` e `backend/alembic/versions/ol20260515a3_pet_codigo_unique_per_tenant.py` | Codigo de pet era unico globalmente e colidia quando dois tenants tinham o primeiro cliente/pet com o mesmo codigo. | Removida unicidade global do modelo e trocado o indice para unico composto `(tenant_id, codigo)`. | Segundo tenant podia receber erro 500 ao criar pet com codigo interno igual ao de outro tenant. | Auditoria A/B criou pet `10001-PET-0001` nos dois tenants sem colisao. |
+| `frontend/src/pages/LandingPage.jsx`, `frontend/src/pages/Register.jsx`, `frontend/src/contexts/AuthContext.jsx`, `backend/app/auth_routes_multitenant.py` | Contratacao por plano existia visualmente em `/planos`, mas o plano escolhido nao era parte explicita do contrato com a API. | Landing recebeu bloco de selecao do Basico; register envia `plan`; backend valida plano permitido e grava o tenant com o plano selecionado. | Futuro autoatendimento poderia parecer selecionar plano sem o backend respeitar o contrato. | Build frontend, cadastro real com `plan=basico`, bloqueio de `plan=premium` e consulta do tenant no banco. |
 
 ## 6. Pendencias priorizadas
 
@@ -307,6 +308,12 @@ Resultado: passou na rodada `20260515152334`.
 - Pets A/B criados com o mesmo codigo interno `10001-PET-0001`, agora isolado por tenant.
 - Formas de pagamento A/B e linhas de racao A/B nao aparecem no outro tenant.
 - `/bling/monitor/resumo` e `/whatsapp/analytics/dashboard` retornaram 403 no plano basico.
+
+Rodada de contratacao por plano `20260515153410`:
+
+- `POST /auth/register` com `plan=premium` retornou 400.
+- `POST /auth/register` com `plan=basico` retornou 200.
+- Tenant criado `45e438b6-01ab-4e2c-8f8e-4303b5934fe8` ficou com `plan=basico` no banco.
 
 ```powershell
 # Auditoria A/B local historica 2026-05-15
