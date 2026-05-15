@@ -179,10 +179,8 @@ if [[ "$backend_health" == "healthy" || "$backend_health" == "running" ]]; then
 fi
 
 nginx_5xx_count="$(
-  docker logs --since "${NGINX_5XX_WINDOW_SECONDS}s" petshop-prod-nginx 2>&1 \
-    | grep -E ' 50[0-9] ' \
-    | wc -l \
-    | tr -d ' '
+  { docker logs --since "${NGINX_5XX_WINDOW_SECONDS}s" petshop-prod-nginx 2>&1 || true; } \
+    | awk '/ 50[0-9] / {count++} END {print count + 0}'
 )"
 
 healthy=true
