@@ -72,7 +72,7 @@ Status usados:
 | Dashboard | Quase pronto | Confirmar dashboard inicial completo no navegador; Lembretes ja ficou sem chamadas premium em tenant basico. |
 | Pessoas/clientes | Quase pronto | Listagem, criacao, edicao, exclusao e bloqueio cruzado passaram em auditoria A/B local; retestar financeiro/historico do cliente. |
 | Pets | Quase pronto | Criacao real A/B passou com codigo unico por tenant; retestar detalhe visual e cadastro rapido de especie/raca. |
-| Produtos/estoque | Quase pronto | Listagem, criacao, edicao, exclusao e entrada de estoque com bloqueio cruzado passaram em auditoria A/B local; retestar lote/validade visual e fluxo completo de estoque. |
+| Produtos/estoque | Pronto local + smoke visual | Listagem, criacao, edicao, exclusao, entrada de estoque e lote/validade visual passaram em auditoria local; manter reteste em staging/producao e editar todos os campos como refinamento. |
 | Calculadora de racao | Pronto local | API A/B e smoke visual no navegador passaram com operador nao-admin; busca, calculo e comparativo retornaram 200 e console limpo. |
 | PDV/vendas | Pronto local A/B + smoke visual | Venda completa por API real e pelo navegador passou com operador nao-admin; caixa, sangria, suprimento, pagamento em dinheiro, finalizacao e baixa de estoque passaram. Falta apenas reteste visual de recibo/historico como refinamento. |
 | Financeiro de vendas | Quase pronto | Finalizacao gerou reflexos financeiros sem 500 no A/B local; falta conferir telas/historico visual. |
@@ -86,11 +86,11 @@ Status usados:
 | Etapa | Objetivo | Status | Bloqueia venda? |
 |---|---|---|---|
 | 1. Base tecnica multi-tenant | Cadastro real de tenants A/B, selecao de tenant, migrations limpas e bloqueio de vazamento entre empresas. | Concluido local | Sim, mas ja passou localmente. |
-| 2. Fluxos essenciais do basico | Clientes, pets, produtos, estoque, PDV/vendas, historico financeiro de vendas e cadastros auxiliares. | Em andamento; PDV A/B, caixa, sangria/suprimento, pagamentos/operadoras, opcoes de racao, catalogos de produto, usuarios/admin, configuracao da empresa, Roles e LGPD com smoke visual concluido | Sim, enquanto lote/validade visual nao fechar. |
+| 2. Fluxos essenciais do basico | Clientes, pets, produtos, estoque, PDV/vendas, historico financeiro de vendas e cadastros auxiliares. | Em andamento; PDV A/B, caixa, sangria/suprimento, pagamentos/operadoras, opcoes de racao, catalogos de produto, lote/validade, usuarios/admin, configuracao da empresa, Roles e LGPD com smoke visual concluido | Nao para venda controlada; retestar staging/producao antes de escalar. |
 | 3. Usuarios e permissoes | Criar usuario do tenant, validar permissoes basicas e bloqueio de acesso indevido. | Concluido local: Usuarios/Admin, Roles & Permissoes e LGPD operacional passaram por API/smoke visual. | Nao bloqueia venda controlada; manter reteste em staging/producao. |
 | 4. Calculadora/catalogos de racao | Validar fluxo visual, persistencia e mensagens de erro sem 500. | Concluido local: API A/B e smoke visual passaram com operador nao-admin. | Nao bloqueia venda controlada; retestar em staging/producao. |
 | 5. Landing page e selecao de planos | Exibir planos, destacar Basico, iniciar contratacao com plano escolhido e levar ao cadastro/onboarding correto. | Concluido local | Sim para vender por autoatendimento; falta smoke visual em producao/staging. |
-| 6. A/B visual no navegador | Usar dois tenants reais no browser e conferir que menus, dados e mensagens batem com o plano. | Em andamento; PDV completo, autocomplete, Lembretes, pagamentos/operadoras, catalogos de produto, configuracao da empresa, usuarios/admin, Roles e LGPD passaram | Sim antes de abrir para varias empresas. |
+| 6. A/B visual no navegador | Usar dois tenants reais no browser e conferir que menus, dados e mensagens batem com o plano. | Em andamento; PDV completo, autocomplete, Lembretes, pagamentos/operadoras, catalogos de produto, lote/validade, configuracao da empresa, usuarios/admin, Roles e LGPD passaram | Sim antes de abrir para varias empresas. |
 | 7. Produção controlada | Merge, deploy, migrations, health check e smoke real sem dados sensiveis. | Pendente | Sim. |
 
 ## 1. Branch e commits
@@ -130,7 +130,8 @@ Status usados:
   - A rodada visual `20260515181603` confirmou calculadora de racao e opcoes de racao no navegador com operador nao-admin.
   - A rodada visual `20260515215846` confirmou CRUD visual de departamentos, categorias e marcas no navegador com isolamento A/B.
   - A rodada visual `202605151925` confirmou configuracao da empresa no navegador: fiscal/dados cadastrais, parametros gerais e estoque salvaram com chamadas 200, persistencia apos reload e console limpo.
-  - A comparacao visual completa por navegador ainda fica pendente para financeiro de vendas e lote/validade.
+  - A rodada visual `202605151931567` confirmou produto com dois lotes e validades diferentes: a listagem exibiu a validade mais urgente e o tooltip mostrou os dois lotes com saldo.
+  - A comparacao visual completa por navegador ainda fica pendente para financeiro de vendas/recibo/historico.
 - Data/hora aproximada dos testes: 2026-05-15, madrugada e tarde, horario local.
 
 ## 3. Checklist tela por tela do plano basico
@@ -150,7 +151,7 @@ Status usados:
 | Pets | Detalhe do pet | `/pets/:petId` | `GET /pets/{id}` e antes endpoints vet | Parcial | Tela de pet basico nao deve chamar carteirinha/internacoes veterinarias se modulo vet estiver bloqueado. | `PetDetalhes` agora evita chamadas vet e oculta abas vet quando `veterinario` nao esta ativo. | Corrigido |
 | Pets | Editar/excluir pet | `/pets/:id/editar` | `PUT/DELETE /pets/{id}` | Sim | Auditoria A/B estendida confirmou edicao/exclusao no proprio tenant e 404 em tentativa cruzada. | Nenhuma nesta branch. | OK |
 | Pets | Cadastro rapido de especie/raca | `/pets/novo` e modal rapido | `POST /cadastros/especies`, `POST /cadastros/racas` | Sim por navegador | Smoke visual criou especie e raca por modal rapido no tenant basico; raca entrou selecionada no formulario; chamadas de especies/racas retornaram 201/200 sem 500. A tentativa de raca sem especie fica bloqueada/explicada no frontend. | `PetForm` limpa raca ao trocar especie, bloqueia quick-add de raca sem especie e `QuickAddModal` valida `especie_id` antes de chamar API; contrato inclui `cadastros_routes.py` no tenant selecionado. | OK local + smoke visual |
-| Produtos | Listar produtos | `/produtos` | `GET /produtos` | Sim | Auditoria A/B confirmou que produto do tenant A aparece no A e nao aparece no B, e vice-versa. Regra de validade revalidada por teste: listagem usa o lote com saldo e validade mais urgente; tooltip recebe lotes com saldo. | Nenhuma nesta branch para isolamento; suite de validade/lote reexecutada. | OK |
+| Produtos | Listar produtos | `/produtos` | `GET /produtos` | Sim | Auditoria A/B confirmou que produto do tenant A aparece no A e nao aparece no B, e vice-versa. Rodada visual `202605151931567` confirmou que a coluna exibe a validade mais urgente (`01/06/2026`) e o tooltip lista os lotes com saldo (`2 un` e `10 un`). | Nenhuma nesta branch para isolamento; suite de validade/lote reexecutada. | OK local + smoke visual |
 | Produtos | Criar produto | `/produtos/novo` | `POST /produtos` | Sim | Produto criado por endpoint real em dois tenants; acesso direto cruzado a `/produtos/{id}` retornou 404. | Nenhuma nesta branch. | OK |
 | Produtos | Editar produto | `/produtos/:id/editar` | `PUT /produtos/{id}` | Sim | Auditoria A/B estendida confirmou edicao no proprio tenant e 404 em tentativa cruzada. Checklist exaustivo de todos os campos segue pendente. | Correcoes anteriores na trilha de catalogos/racao. | OK parcial |
 | Produtos | Entrada de estoque pela tela do produto | `/produtos/:id/movimentacoes` ou acao de entrada | `POST /produtos/{id}/entrada` | Sim | Dava erro 500 por `user_id` nulo em `estoque_movimentacoes`; na auditoria A/B estendida, entrada propria retornou 200 e entrada cruzada retornou 404. | `backend/app/produtos_routes.py` agora grava `user_id=current_user.id`. | OK |
@@ -179,7 +180,7 @@ Status usados:
 
 ## 4. Checklist de isolamento tenant
 
-Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada com dois tenants criados pela API real de cadastro, selecao real de tenant, token real e endpoints reais. Em seguida foram feitas rodadas visuais no navegador para pagamentos/operadoras, PDV autocomplete, bloqueio de permissoes, PDV completo, Lembretes, Usuarios/Admin, Roles & Permissoes, LGPD operacional, calculadora de racao, opcoes de racao, catalogos auxiliares de produto e configuracao da empresa. Financeiro de vendas e lote/validade ainda precisam complemento visual.
+Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada com dois tenants criados pela API real de cadastro, selecao real de tenant, token real e endpoints reais. Em seguida foram feitas rodadas visuais no navegador para pagamentos/operadoras, PDV autocomplete, bloqueio de permissoes, PDV completo, Lembretes, Usuarios/Admin, Roles & Permissoes, LGPD operacional, calculadora de racao, opcoes de racao, catalogos auxiliares de produto, configuracao da empresa e lote/validade. Financeiro de vendas/recibo/historico ainda precisa complemento visual.
 
 | Area basica | Dados do tenant A aparecem no tenant B? | Criacao grava tenant_id correto? | Edicao respeita tenant? | Exclusao respeita tenant? | Endpoint sem tenant/token falha corretamente? | Status |
 |---|---|---|---|---|---|---|
@@ -254,16 +255,17 @@ Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada com dois te
 
 ### P1 - Importante antes de escalar
 
-Bloqueio que ainda falta antes de abrir para mais empresas, mesmo que a venda controlada com acompanhamento ja esteja mais proxima:
+Nao ha novo P1 tecnico confirmado nesta rodada para impedir venda controlada com acompanhamento. Ainda assim, antes de abrir para varias empresas, manter os refinamentos abaixo e repetir smoke em staging/producao.
 
-- Retestar visualmente entrada de estoque com lote/validade:
-  - o endpoint passou no A/B e a suite focada de lote/validade passou com `8 passed`;
-  - ainda falta confirmar tela, tooltip/listagem de lotes e validade urgente no navegador.
 P1 fechado nesta rodada:
 
 - Configuracao da empresa no navegador:
   - concluido local: fiscal/dados cadastrais, parametros gerais e estoque salvaram com 200 e persistiram apos reload;
   - manter reteste em staging/producao antes de abrir autoatendimento.
+- Lote/validade na listagem de produtos:
+  - concluido local: API retornou o lote com saldo e validade mais urgente;
+  - no navegador, a coluna exibiu a validade urgente e o tooltip mostrou os lotes disponiveis com saldo;
+  - console sem erro e chamadas de produto/modulos/lembretes com 200.
 
 Refinamentos antes de escalar para varias empresas:
 
@@ -518,6 +520,7 @@ Rodada estendida `866987` + reteste de estoque:
 - Smoke visual de Calculadora de Racao com operador nao-admin, busca, calculo e comparativo: testado.
 - Smoke visual de Opcoes de Racao com listagem, criacao/edicao/inativacao de linha e criacao/inativacao de apresentacao: testado.
 - Smoke visual de Departamentos, Categorias e Marcas com CRUD e isolamento A/B: testado.
+- Smoke visual de lote/validade em Produtos: validade mais urgente visivel na coluna e tooltip com dois lotes/saldos.
 - Smoke visual de cadastro rapido de especie/raca no formulario de pet: especie criada, raca criada, raca selecionada e chamadas 201/200.
 - Smoke visual de bloqueio de permissao para operador/usuario sem acesso: testado.
 - Health check de producao: apenas endpoint de saude consultado, sem deploy e sem alteracao.
@@ -548,6 +551,7 @@ Rodada estendida `866987` + reteste de estoque:
 - Py compile de `empresa_routes.py` e migration `or20260515a9`: passou.
 - Alembic local aplicado ate `or20260515a9`; `/configuracoes/fiscal`, `/configuracoes/geral` e `/configuracoes/estoque` salvaram no navegador com chamadas 200 e console limpo.
 - Suite focada de lote/validade de produto e XML: `test_produtos_validade_listagem.py`, `test_estoque_routes_lotes.py`, `test_notas_entrada_parse_validade.py`, resultado `8 passed`.
+- Rodada visual de lote/validade `202605151931567`: API criou produto com dois lotes; `/produtos` exibiu `01/06/2026` como validade urgente, tooltip listou lote urgente `2 un` e lote longo `10 un`, console limpo e requests 200.
 - Build frontend apos refactor de Roles/LGPD: `npm --prefix frontend run build`, resultado passou.
 - Py compile das migrations e arquivos backend alterados: passou.
 - Migrations completas em Postgres limpo reexecutadas ate `oq20260515a8`.
@@ -623,11 +627,11 @@ Pendencias manuais que seguem abertas pelo checklist:
 
 ## Resumo Executivo
 
-- Telas/fluxos basicos com algum teste registrado: 22/23
-- Fluxos OK ou OK parcial: 20
+- Telas/fluxos basicos com algum teste registrado: 23/23
+- Fluxos OK ou OK parcial: 21
 - Corrigidos/registrados nesta trilha: frontend padronizado, onboarding local, tabelas auxiliares de racao/LGPD/e-commerce/configuracao geral, unicidade de pet por tenant, contratacao por plano, schema de PDV/DRE, Roles & Permissoes e chamadas premium indevidas no Basico
 - Pendencias P0: 0 confirmadas apos esta branch
-- Pendencias P1: 1 bloqueador visual principal + refinamentos de financeiro/historico
+- Pendencias P1: 0 bloqueadores tecnicos confirmados para venda controlada; refinamentos de financeiro/recibo/historico ainda recomendados antes de escalar.
 - Pendencias P2: 5
-- Minha recomendacao: liberar para revisao/merge em ambiente de teste/staging. Para producao/comercial controlada, seguir depois de retestar visualmente lote/validade no navegador e fazer smoke real pos-deploy.
+- Minha recomendacao: liberar para revisao/merge em ambiente de teste/staging. Para producao/comercial controlada, fazer smoke real pos-deploy e acompanhar os primeiros tenants de perto.
 
