@@ -2,12 +2,23 @@ import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import api from '../api';
 import { 
-  FiArrowLeft, FiFilter, FiCalendar, FiDollarSign, FiCreditCard,
-  FiChevronLeft, FiChevronRight, FiUser, FiAlertCircle, FiChevronDown,
-  FiChevronUp, FiShoppingCart, FiPackage, FiTrendingUp, FiPercent
+  FiArrowLeft, FiCalendar, FiDollarSign, FiCreditCard,
+  FiChevronLeft, FiChevronRight, FiChevronDown,
+  FiChevronUp, FiShoppingCart, FiPackage
 } from 'react-icons/fi';
+import ActionButton from '../components/ui/ActionButton';
+import EmptyState from '../components/ui/EmptyState';
+import ErrorState from '../components/ui/ErrorState';
+import IconActionButton from '../components/ui/IconActionButton';
+import LoadingState from '../components/ui/LoadingState';
+import MetricCard from '../components/ui/MetricCard';
+import MetricGrid from '../components/ui/MetricGrid';
+import PageHeader from '../components/ui/PageHeader';
+import Panel from '../components/ui/Panel';
 import ProductIdentity from '../components/ui/ProductIdentity';
 import SaleReference from '../components/ui/SaleReference';
+
+const formatCurrency = (value) => `R$ ${(Number(value) || 0).toFixed(2).replace('.', ',')}`;
 
 const ClienteFinanceiro = () => {
   const { clienteId } = useParams();
@@ -167,10 +178,11 @@ const ClienteFinanceiro = () => {
 
   if (loading && !historico.length) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-purple-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Carregando histórico financeiro...</p>
+      <div className="min-h-screen bg-slate-50 p-6">
+        <div className="mx-auto max-w-7xl">
+          <Panel>
+            <LoadingState label="Carregando historico financeiro..." />
+          </Panel>
         </div>
       </div>
     );
@@ -178,120 +190,101 @@ const ClienteFinanceiro = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gray-50 p-6">
-        <div className="max-w-2xl mx-auto">
-          <div className="bg-red-50 border border-red-300 rounded-xl p-6 text-center">
-            <FiAlertCircle className="text-red-600 text-4xl mx-auto mb-4" />
-            <h3 className="text-lg font-semibold text-red-800 mb-2">Erro ao Carregar Dados</h3>
-            <p className="text-red-600 mb-4">{error}</p>
-            <button
-              onClick={() => navigate('/clientes')}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
-            >
-              Voltar para Clientes
-            </button>
-          </div>
+      <div className="min-h-screen bg-slate-50 p-6">
+        <div className="mx-auto max-w-2xl">
+          <ErrorState
+            title="Erro ao carregar dados"
+            description={error}
+            action={
+              <ActionButton
+                onClick={() => navigate('/clientes')}
+                intent="neutral"
+                icon={FiArrowLeft}
+                size="md"
+              >
+                Voltar para Clientes
+              </ActionButton>
+            }
+          />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 p-6">
-      <div className="max-w-7xl mx-auto">
-        {/* Cabeçalho */}
-        <div className="mb-6">
-          <button
+    <div className="min-h-screen bg-slate-50 p-6">
+      <div className="mx-auto max-w-7xl space-y-6">
+        <div className="space-y-4">
+          <ActionButton
             onClick={() => navigate('/clientes')}
-            className="flex items-center gap-2 text-gray-600 hover:text-gray-900 mb-4 transition-colors"
+            intent="neutral"
+            tone="ghost"
+            icon={FiArrowLeft}
           >
-            <FiArrowLeft />
-            <span className="font-medium">Voltar para Clientes</span>
-          </button>
+            Voltar para Clientes
+          </ActionButton>
 
-          <div className="flex items-center justify-between">
-            <div>
-              <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-                <FiCreditCard className="text-purple-600" />
-                Histórico Financeiro
-              </h1>
-              {cliente && (
-                <p className="text-lg text-gray-600 mt-2 flex items-center gap-2">
-                  <FiUser className="text-gray-400" />
-                  {cliente.nome}
-                  <span className="text-sm text-gray-400">({cliente.codigo})</span>
-                </p>
-              )}
-            </div>
-
-            {resumo && (
-              <div className="bg-gradient-to-br from-purple-50 to-blue-50 border border-purple-200 rounded-xl p-4">
-                <p className="text-sm text-gray-600 mb-1">Crédito Disponível</p>
-                <p className="text-2xl font-bold text-purple-600">
-                  R$ {cliente.credito_atual?.toFixed(2).replace('.', ',') || '0,00'}
-                </p>
-              </div>
-            )}
-          </div>
+          <PageHeader
+            icon={FiCreditCard}
+            title="Historico Financeiro"
+            subtitle={
+              cliente
+                ? `${cliente.nome}${cliente.codigo ? ` (${cliente.codigo})` : ''}`
+                : 'Historico de vendas e movimentacoes do cliente'
+            }
+          />
         </div>
 
         {/* Resumo Rápido (Cards) */}
         {resumo && (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
-              <p className="text-xs text-gray-500 mb-2">Total Vendas (90d)</p>
-              <p className="text-2xl font-bold text-blue-600">
-                R$ {resumo.total_vendas_90d?.toFixed(2).replace('.', ',') || '0,00'}
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
-              <p className="text-xs text-gray-500 mb-2">Total em Aberto</p>
-              <p className="text-2xl font-bold text-orange-600">
-                R$ {resumo.total_em_aberto?.toFixed(2).replace('.', ',') || '0,00'}
-              </p>
-            </div>
-
-            <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
-              <p className="text-xs text-gray-500 mb-2">Última Compra</p>
-              {resumo.ultima_compra ? (
-                <>
-                  <p className="text-2xl font-bold text-green-600">
-                    R$ {resumo.ultima_compra.valor?.toFixed(2).replace('.', ',') || '0,00'}
-                  </p>
-                  <p className="text-xs text-gray-500 mt-1">
-                    {new Date(resumo.ultima_compra.data).toLocaleDateString('pt-BR')}
-                  </p>
-                </>
-              ) : (
-                <p className="text-sm text-gray-400">Nenhuma compra</p>
-              )}
-            </div>
-
-            <div className="bg-white rounded-xl p-5 border border-gray-200 shadow-sm">
-              <p className="text-xs text-gray-500 mb-2">Total Transações</p>
-              <p className="text-2xl font-bold text-purple-600">
-                {resumo.total_transacoes_historico || 0}
-              </p>
-            </div>
-          </div>
+          <MetricGrid className="xl:grid-cols-5">
+            <MetricCard
+              intent="violet"
+              label="Credito disponivel"
+              value={formatCurrency(cliente?.credito_atual)}
+            />
+            <MetricCard
+              intent="blue"
+              label="Total vendas (90d)"
+              value={formatCurrency(resumo.total_vendas_90d)}
+            />
+            <MetricCard
+              intent="amber"
+              label="Total em aberto"
+              value={formatCurrency(resumo.total_em_aberto)}
+            />
+            <MetricCard
+              intent="emerald"
+              label="Ultima compra"
+              value={resumo.ultima_compra ? formatCurrency(resumo.ultima_compra.valor) : "-"}
+              subtitle={
+                resumo.ultima_compra?.data
+                  ? new Date(resumo.ultima_compra.data).toLocaleDateString('pt-BR')
+                  : "Nenhuma compra"
+              }
+            />
+            <MetricCard
+              intent="slate"
+              label="Total transacoes"
+              value={resumo.total_transacoes_historico || 0}
+            />
+          </MetricGrid>
         )}
 
-        {/* Filtros */}
-        <div className="bg-white border border-gray-200 rounded-xl p-5 mb-6 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-md font-semibold text-gray-800 flex items-center gap-2">
-              <FiFilter />
-              Filtros
-            </h3>
-            <button
+        <Panel
+          title="Filtros"
+          subtitle="Refine o historico por periodo, tipo, status e quantidade por pagina."
+          actions={
+            <ActionButton
               onClick={limparFiltros}
-              className="text-sm text-gray-600 hover:text-gray-900 underline"
+              intent="neutral"
+              tone="ghost"
+              size="sm"
             >
               Limpar filtros
-            </button>
-          </div>
-
+            </ActionButton>
+          }
+        >
           <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
             {/* Data Início */}
             <div>
@@ -303,7 +296,7 @@ const ClienteFinanceiro = () => {
                 type="date"
                 value={filtros.data_inicio}
                 onChange={(e) => aplicarFiltros({ data_inicio: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                className="h-9 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
             </div>
 
@@ -317,7 +310,7 @@ const ClienteFinanceiro = () => {
                 type="date"
                 value={filtros.data_fim}
                 onChange={(e) => aplicarFiltros({ data_fim: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                className="h-9 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               />
             </div>
 
@@ -327,7 +320,7 @@ const ClienteFinanceiro = () => {
               <select
                 value={filtros.tipo}
                 onChange={(e) => aplicarFiltros({ tipo: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                className="h-9 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               >
                 <option value="">Todas as transações</option>
                 <option value="venda">🛒 Vendas</option>
@@ -341,7 +334,7 @@ const ClienteFinanceiro = () => {
               <select
                 value={filtros.status}
                 onChange={(e) => aplicarFiltros({ status: e.target.value })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                className="h-9 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               >
                 <option value="">Todos os status</option>
                 <option value="aberta">📋 Em Aberto</option>
@@ -356,7 +349,7 @@ const ClienteFinanceiro = () => {
               <select
                 value={filtros.per_page}
                 onChange={(e) => aplicarFiltros({ per_page: parseInt(e.target.value) })}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-sm"
+                className="h-9 w-full rounded-lg border border-slate-300 px-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
               >
                 <option value="10">10</option>
                 <option value="20">20</option>
@@ -365,15 +358,12 @@ const ClienteFinanceiro = () => {
               </select>
             </div>
           </div>
-        </div>
+        </Panel>
 
         {/* Tabela de Histórico */}
-        <div className="bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden">
+        <Panel padding="none" className="overflow-hidden">
           {loading ? (
-            <div className="text-center py-12">
-              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
-              <p className="text-gray-600">Atualizando...</p>
-            </div>
+            <LoadingState label="Atualizando historico..." />
           ) : historico.length > 0 ? (
             <>
               <div className="overflow-x-auto">
@@ -413,14 +403,14 @@ const ClienteFinanceiro = () => {
                       return (
                         <React.Fragment key={key}>
                           <tr className="hover:bg-gray-50 transition-colors">
-                            {/* Botão Expandir */}
                             <td className="px-4 py-4 text-center">
-                              <button
+                              <IconActionButton
+                                icon={isExpanded ? FiChevronUp : FiChevronDown}
+                                intent="neutral"
+                                tone="ghost"
                                 onClick={() => toggleExpansao(transacao, index)}
-                                className="text-gray-600 hover:text-purple-600 transition-colors"
-                              >
-                                {isExpanded ? <FiChevronUp size={18} /> : <FiChevronDown size={18} />}
-                              </button>
+                                title={isExpanded ? "Recolher detalhes" : "Ver detalhes"}
+                              />
                             </td>
 
                             {/* Data */}
@@ -471,13 +461,14 @@ const ClienteFinanceiro = () => {
                             {/* Ações */}
                             <td className="px-6 py-4 whitespace-nowrap text-center">
                               {transacao.tipo === 'venda' && vendaId && (
-                                <button
+                                <ActionButton
                                   onClick={() => navegarParaVenda(vendaId)}
-                                  className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white text-xs rounded-lg transition-colors flex items-center gap-1 mx-auto"
+                                  intent="edit"
+                                  icon={FiShoppingCart}
+                                  size="xs"
                                 >
-                                  <FiShoppingCart size={14} />
                                   Ver no PDV
-                                </button>
+                                </ActionButton>
                               )}
                             </td>
                           </tr>
@@ -488,10 +479,7 @@ const ClienteFinanceiro = () => {
                               <td colSpan="7" className="px-6 py-4 bg-gray-50">
                                 {transacao.tipo === 'venda' && vendaId ? (
                                   loadingDetalhes[vendaId] ? (
-                                    <div className="text-center py-4">
-                                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600 mx-auto"></div>
-                                      <p className="text-sm text-gray-600 mt-2">Carregando detalhes...</p>
-                                    </div>
+                                    <LoadingState compact label="Carregando detalhes..." />
                                   ) : detalhes ? (
                                     <div className="space-y-4">
                                       {/* Header dos Detalhes */}
@@ -644,63 +632,54 @@ const ClienteFinanceiro = () => {
                     </div>
 
                     <div className="flex items-center gap-2">
-                      <button
+                      <ActionButton
                         onClick={() => mudarPagina(paginacao.pagina_atual - 1)}
                         disabled={!paginacao.tem_anterior}
-                        className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
-                          paginacao.tem_anterior
-                            ? 'bg-purple-600 text-white hover:bg-purple-700'
-                            : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                        }`}
+                        intent="neutral"
+                        icon={FiChevronLeft}
+                        size="sm"
                       >
-                        <FiChevronLeft />
                         Anterior
-                      </button>
+                      </ActionButton>
 
                       <span className="px-4 py-2 text-sm text-gray-700">
                         Página {paginacao.pagina_atual} de {paginacao.total_paginas}
                       </span>
 
-                      <button
+                      <ActionButton
                         onClick={() => mudarPagina(paginacao.pagina_atual + 1)}
                         disabled={!paginacao.tem_proxima}
-                        className={`px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${
-                          paginacao.tem_proxima
-                            ? 'bg-purple-600 text-white hover:bg-purple-700'
-                            : 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                        }`}
+                        intent="neutral"
+                        icon={FiChevronRight}
+                        iconPosition="right"
+                        size="sm"
                       >
-                        Próxima
-                        <FiChevronRight />
-                      </button>
+                        Proxima
+                      </ActionButton>
                     </div>
                   </div>
                 </div>
               )}
             </>
           ) : (
-            <div className="text-center py-16">
-              <FiDollarSign className="text-gray-300 text-6xl mx-auto mb-4" />
-              <h3 className="text-lg font-semibold text-gray-700 mb-2">
-                Nenhuma transação encontrada
-              </h3>
-              <p className="text-gray-500 mb-6">
-                {filtros.tipo || filtros.status || filtros.data_inicio || filtros.data_fim
-                  ? 'Tente ajustar os filtros para ver mais resultados'
-                  : 'Ainda não há transações financeiras para este cliente'
-                }
-              </p>
-              {(filtros.tipo || filtros.status || filtros.data_inicio || filtros.data_fim) && (
-                <button
-                  onClick={limparFiltros}
-                  className="px-6 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
-                >
-                  Limpar Filtros
-                </button>
-              )}
-            </div>
+            <EmptyState
+              icon={FiDollarSign}
+              title="Nenhuma transacao encontrada"
+              description={
+                filtros.tipo || filtros.status || filtros.data_inicio || filtros.data_fim
+                  ? 'Tente ajustar os filtros para ver mais resultados.'
+                  : 'Ainda nao ha transacoes financeiras para este cliente.'
+              }
+              action={
+                filtros.tipo || filtros.status || filtros.data_inicio || filtros.data_fim ? (
+                  <ActionButton onClick={limparFiltros} intent="neutral" size="md">
+                    Limpar filtros
+                  </ActionButton>
+                ) : null
+              }
+            />
           )}
-        </div>
+        </Panel>
       </div>
     </div>
   );

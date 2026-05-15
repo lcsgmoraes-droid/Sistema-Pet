@@ -70,7 +70,7 @@ Status usados:
 |---|---|---|
 | Comercial/auth/onboarding | Quase pronto | Retestar cadastro real, mensagens de erro corrigiveis e login com tenant novo. |
 | Dashboard | Quase pronto | Confirmar console limpo, sem chamadas premium em tenant basico. |
-| Pessoas/clientes | Pendente P1 | Listagem padronizada visualmente; retestar CRUD completo, financeiro/historico do cliente e isolamento A/B. |
+| Pessoas/clientes | Pendente P1 | Listagem e financeiro/historico do cliente padronizados visualmente; retestar CRUD completo, financeiro/historico do cliente e isolamento A/B. |
 | Pets | Pendente P1 | Listagem padronizada visualmente; retestar CRUD, detalhe do pet, cadastro rapido de especie/raca e premium vet bloqueado. |
 | Produtos/estoque | Quase pronto | Retestar lista/cadastro/edicao/entrada com lote e validade no tenant novo. |
 | Calculadora de racao | Pendente P1 | Retestar fluxo visual completo depois das correcoes backend. |
@@ -163,6 +163,7 @@ Observacao: esta tabela registra o que foi observado no teste do tenant novo. Va
 | Arquivo alterado | Problema encontrado | Como foi corrigido | Risco antes | Como validou depois |
 |---|---|---|---|---|
 | `frontend/src/pages/Pessoas.jsx` | Listagem de Pessoas ainda tinha header, botoes, loading, empty state, tabela e acao de linha locais, fora da fundacao visual. | Migrado para `PageHeader`, `ActionButton`, `Panel`, `LoadingState`, `EmptyState`, `DataTable`, `CustomerIdentity`, `StatusBadge` e `IconActionButton`, mantendo filtros, importacao e fusao. | Tela essencial do Plano Basico ficava visualmente diferente e mais dificil de manter. | `npm --prefix frontend run build`. |
+| `frontend/src/pages/ClienteFinanceiro.jsx` | Financeiro/historico do cliente ainda tinha header, loading, erro, cards, filtros, paginacao e empty state locais. | Migrado para `PageHeader`, `ActionButton`, `Panel`, `LoadingState`, `ErrorState`, `MetricGrid`, `MetricCard`, `IconActionButton` e `EmptyState`, preservando chamadas e tabela expandida. | Fluxo essencial do Plano Basico ficava visualmente desalinhado e mais dificil de manter. | `npm --prefix frontend run build`. |
 | `frontend/src/pages/GerenciamentoPets.jsx` | Listagem de Pets ja estava avancada, mas ainda tinha header/loading/empty e alerta imperativo fora do padrao. | Migrado header para `PageHeader`, loading para `LoadingState`, vazio para `EmptyState` e erro de status para `toast.error`. | Experiencia menos consistente entre Pessoas/Pets e feedback de erro pouco padronizado. | `npm --prefix frontend run build`. |
 | `backend/app/produtos_routes.py` | `POST /produtos/{id}/entrada` gravava movimentacao sem `user_id` e quebrava com 500. | Incluido `user_id=current_user.id` ao criar `EstoqueMovimentacao`. | Fluxo basico de estoque quebrava ao fazer entrada pela tela do produto. | `python -m compileall backend/app/produtos_routes.py`; reteste manual do endpoint retornou 200. |
 | `frontend/src/components/AlertasIA.jsx` | Dashboard/plano basico disparava endpoints de financeiro ERP/IA premium e recebia 403. | Componente agora retorna vazio sem chamar API quando `financeiro_erp` ou `ia_avancada` estao bloqueados. | Console poluido por 403 e risco de experiencia ruim no plano basico. | `npm --prefix frontend run build`. |
