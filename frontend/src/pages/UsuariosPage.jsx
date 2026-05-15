@@ -16,6 +16,7 @@ export default function UsuariosPage() {
     showModal,
     showPassword,
     toggleStatus,
+    usuarioFormError,
     usuarios,
   } = useUsuariosPage();
 
@@ -53,6 +54,7 @@ export default function UsuariosPage() {
         setShowPassword={setShowPassword}
         showModal={showModal}
         showPassword={showPassword}
+        usuarioFormError={usuarioFormError}
       />
     </div>
   );

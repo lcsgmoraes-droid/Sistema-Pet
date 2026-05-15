@@ -1,13 +1,14 @@
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import text
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 
 from app.db import get_session
 from app.auth import get_current_user_and_tenant
 from app.auth.core import hash_password
-from app.tenancy.context import get_current_tenant
 from app.security.permissions_decorator import require_permission
 from app.models import User, UserTenant, Role
 from app.session_manager import revoke_all_sessions
@@ -38,6 +39,24 @@ class UserResponse(BaseModel):
 
     class Config:
         from_attributes = True
+
+
+def _email_ja_cadastrado_globalmente(db: Session, email: str) -> bool:
+    """Users.email tem unicidade global; a checagem precisa ignorar o filtro de tenant."""
+    row = db.execute(
+        text("SELECT id FROM users WHERE lower(email) = :email LIMIT 1"),
+        {"email": email},
+    ).first()
+    return row is not None
+
+
+def _is_unique_email_violation(exc: IntegrityError) -> bool:
+    error_text = str(getattr(exc, "orig", exc)).lower()
+    return (
+        "users_email" in error_text
+        or "users.email" in error_text
+        or ("unique" in error_text and "email" in error_text)
+    )
 
 
 @router.get("", response_model=list[UsuarioListResponse])
@@ -77,46 +96,59 @@ def criar_usuario(
     if len(payload.password) < 8:
         raise HTTPException(
             status_code=400,
-            detail="Senha deve ter no minimo 8 caracteres",
+            detail="Senha deve ter no minimo 8 caracteres. Use uma senha com 8 caracteres ou mais.",
         )
 
-    existing = db.query(User).filter(User.email == email).first()
-    if existing:
+    if _email_ja_cadastrado_globalmente(db, email):
         raise HTTPException(
-            status_code=400,
-            detail="Usuário com este email já existe",
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Este e-mail ja esta cadastrado. Use outro e-mail ou verifique se o usuario ja existe em outro tenant.",
         )
 
-    # Validar que a role existe
-    role = db.query(Role).filter(Role.id == payload.role_id).first()
+    role = (
+        db.query(Role)
+        .filter(Role.id == payload.role_id, Role.tenant_id == tenant_id)
+        .first()
+    )
     if not role:
         raise HTTPException(
             status_code=400,
-            detail=f"Role com ID {payload.role_id} não encontrada",
+            detail="Perfil de acesso invalido para este tenant. Atualize a pagina e selecione um perfil novamente.",
         )
 
-    # Criar usuário
     user = User(
         email=email,
-        hashed_password=hash_password(payload.password),  # Hash com bcrypt
+        hashed_password=hash_password(payload.password),
         is_active=True,
         tenant_id=tenant_id,
         email_verified=True,
         email_verified_at=datetime.now(timezone.utc),
     )
-    db.add(user)
-    db.flush()  # Garante que user.id seja gerado
 
-    # Criar vínculo UserTenant com a role selecionada
-    vinculo = UserTenant(
-        user_id=user.id,
-        tenant_id=tenant_id,
-        role_id=payload.role_id,  # Usa a role enviada no payload
-        is_active=True,
-    )
-    db.add(vinculo)
-    db.commit()
-    db.refresh(user)
+    try:
+        db.add(user)
+        db.flush()
+
+        vinculo = UserTenant(
+            user_id=user.id,
+            tenant_id=tenant_id,
+            role_id=role.id,
+            is_active=True,
+        )
+        db.add(vinculo)
+        db.commit()
+        db.refresh(user)
+    except IntegrityError as exc:
+        db.rollback()
+        if _is_unique_email_violation(exc):
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Este e-mail ja esta cadastrado. Use outro e-mail ou verifique se o usuario ja existe em outro tenant.",
+            ) from exc
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Nao foi possivel criar o usuario agora. Tente novamente em instantes.",
+        ) from exc
 
     return user
 
