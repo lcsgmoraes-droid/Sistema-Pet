@@ -70,9 +70,9 @@ Status usados:
 |---|---|---|
 | Comercial/auth/onboarding | Quase pronto | Retestar cadastro real, mensagens de erro corrigiveis e login com tenant novo. |
 | Dashboard | Quase pronto | Confirmar console limpo, sem chamadas premium em tenant basico. |
-| Pessoas/clientes | Pendente P1 | Listagem/criacao passaram em auditoria A/B local; retestar edicao, exclusao e financeiro/historico do cliente. |
-| Pets | Pendente P1 | Listagem/criacao/detalhe cruzado passaram em auditoria A/B local; retestar edicao, exclusao, detalhe visual e cadastro rapido de especie/raca. |
-| Produtos/estoque | Quase pronto | Listagem/criacao/detalhe cruzado passaram em auditoria A/B local; retestar edicao, entrada com lote/validade e estoque completo. |
+| Pessoas/clientes | Quase pronto | Listagem, criacao, edicao, exclusao e bloqueio cruzado passaram em auditoria A/B local; retestar financeiro/historico do cliente. |
+| Pets | Quase pronto | Listagem, criacao, edicao, exclusao e bloqueio cruzado passaram em auditoria A/B local; retestar detalhe visual e cadastro rapido de especie/raca. |
+| Produtos/estoque | Quase pronto | Listagem, criacao, edicao, exclusao e entrada de estoque com bloqueio cruzado passaram em auditoria A/B local; retestar lote/validade visual e fluxo completo de estoque. |
 | Calculadora de racao | Pendente P1 | Retestar fluxo visual completo depois das correcoes backend. |
 | PDV/vendas | Quase pronto | Rodar venda completa A/B: cliente, pet, produto, baixa de estoque e historico. |
 | Financeiro de vendas | Quase pronto | Confirmar que nao depende de financeiro ERP premium. |
@@ -99,11 +99,12 @@ Status usados:
 - Usuario usado: `basico.20260515002403@teste.local`
 - Senha: nao registrada.
 - Comparacao com outro tenant:
-  - Auditoria A/B local automatizada feita em 2026-05-15 para clientes, pets e produtos.
+  - Auditoria A/B local automatizada feita em 2026-05-15 para clientes, pets, produtos e entrada de estoque.
   - Dois tenants locais foram semeados diretamente no banco DEV porque o onboarding local esta bloqueado por migrations antigas quebradas.
   - A partir dai foram usados login real, selecao real de tenant, token real e endpoints reais das telas basicas.
-  - A comparacao visual completa por navegador ainda fica pendente para fluxos edit/delete/PDV/estoque.
-- Data/hora aproximada dos testes: 2026-05-15, madrugada, horario local.
+  - A rodada estendida cobriu edicao, exclusao, bloqueio sem token e entrada de estoque.
+  - A comparacao visual completa por navegador ainda fica pendente para PDV/vendas, financeiro de vendas, cadastros auxiliares e usuarios/permissoes.
+- Data/hora aproximada dos testes: 2026-05-15, madrugada e tarde, horario local.
 
 ## 3. Checklist tela por tela do plano basico
 
@@ -114,17 +115,17 @@ Status usados:
 | Dashboard | Dashboard inicial do plano basico | `/dashboard` | Chamava endpoints premium de financeiro/IA e Bling | Sim | A tela abria, mas o console recebia 403 de endpoints premium bloqueados. | `AlertasIA`, `ProjecoesIA` e badge do layout agora evitam chamadas premium quando modulo nao esta ativo. | Corrigido |
 | Pessoas | Listar clientes | `/clientes` | `GET /clientes` | Sim | Auditoria A/B confirmou que cliente do tenant A aparece no A e nao aparece no B, e vice-versa. | Nenhuma nesta branch. | OK |
 | Pessoas | Criar cliente | `/clientes` | `POST /clientes` | Sim | Cliente criado por endpoint real em dois tenants; acesso direto cruzado a `/clientes/{id}` retornou 404. | Nenhuma nesta branch. | OK |
-| Pessoas | Editar/excluir cliente | `/clientes` | `PUT/DELETE /clientes/{id}` | Nao | Nao testado nesta rodada final via MCP. | Nao houve. | Nao testado |
+| Pessoas | Editar/excluir cliente | `/clientes` | `PUT/DELETE /clientes/{id}` | Sim | Auditoria A/B estendida confirmou edicao/exclusao no proprio tenant e 404 em tentativa cruzada. | Nenhuma nesta branch. | OK |
 | Pessoas | Financeiro do cliente | `/clientes/:id/financeiro` | Endpoints de resumo financeiro e vendas | Parcial | Historico/financeiro do cliente precisa permanecer liberado no basico; tela nao foi auditada completa nesta rodada. | Nao houve. | Pendente P1 |
 | Pessoas | Saldo de campanhas no cadastro | Modal/wizard de cliente | `GET /campanhas/clientes/{id}/saldo` | Sim, por erro observado | Plano basico fazia chamada de campanhas e recebia 403. | `useClientesNovoCadastro` agora nao chama saldo de campanhas se modulo `campanhas` estiver bloqueado. | Corrigido |
 | Pets | Criar pet vinculado a tutor | `/pets/novo?cliente_id=...` | `POST /pets` | Sim | Pet criado por endpoint real em dois tenants; listagem e acesso direto cruzado retornaram isolamento correto. | Corrigida busca de pets que duplicava join com cliente. | OK |
 | Pets | Detalhe do pet | `/pets/:petId` | `GET /pets/{id}` e antes endpoints vet | Parcial | Tela de pet basico nao deve chamar carteirinha/internacoes veterinarias se modulo vet estiver bloqueado. | `PetDetalhes` agora evita chamadas vet e oculta abas vet quando `veterinario` nao esta ativo. | Corrigido |
-| Pets | Editar/excluir pet | `/pets/:id/editar` | `PUT/DELETE /pets/{id}` | Nao | Nao testado nesta rodada final. | Nao houve. | Nao testado |
+| Pets | Editar/excluir pet | `/pets/:id/editar` | `PUT/DELETE /pets/{id}` | Sim | Auditoria A/B estendida confirmou edicao/exclusao no proprio tenant e 404 em tentativa cruzada. | Nenhuma nesta branch. | OK |
 | Pets | Cadastro rapido de especie/raca | `/pets/novo` e modal rapido | `POST /cadastros/especies`, `POST /cadastros/racas` | Parcial | Houve erro anterior ao criar raca sem `especie_id`; nao foi foco desta branch final. | Nao corrigido nesta branch. | Pendente P1 |
 | Produtos | Listar produtos | `/produtos` | `GET /produtos` | Sim | Auditoria A/B confirmou que produto do tenant A aparece no A e nao aparece no B, e vice-versa. | Nenhuma nesta branch. | OK |
 | Produtos | Criar produto | `/produtos/novo` | `POST /produtos` | Sim | Produto criado por endpoint real em dois tenants; acesso direto cruzado a `/produtos/{id}` retornou 404. | Nenhuma nesta branch. | OK |
-| Produtos | Editar produto | `/produtos/:id/editar` | `PUT /produtos/{id}` | Parcial | Edicao foi usada para configurar produto/racao, mas sem checklist exaustivo de todos os campos. | Correcoes anteriores na trilha de catalogos/racao. | Pendente P1 |
-| Produtos | Entrada de estoque pela tela do produto | `/produtos/:id/movimentacoes` ou acao de entrada | `POST /produtos/{id}/entrada` | Sim | Dava erro 500 por `user_id` nulo em `estoque_movimentacoes`. | `backend/app/produtos_routes.py` agora grava `user_id=current_user.id`. | Corrigido |
+| Produtos | Editar produto | `/produtos/:id/editar` | `PUT /produtos/{id}` | Sim | Auditoria A/B estendida confirmou edicao no proprio tenant e 404 em tentativa cruzada. Checklist exaustivo de todos os campos segue pendente. | Correcoes anteriores na trilha de catalogos/racao. | OK parcial |
+| Produtos | Entrada de estoque pela tela do produto | `/produtos/:id/movimentacoes` ou acao de entrada | `POST /produtos/{id}/entrada` | Sim | Dava erro 500 por `user_id` nulo em `estoque_movimentacoes`; na auditoria A/B estendida, entrada propria retornou 200 e entrada cruzada retornou 404. | `backend/app/produtos_routes.py` agora grava `user_id=current_user.id`. | OK |
 | Produtos | Entrada oficial de estoque | Fluxo de estoque | `POST /estoque/entrada` | Sim | Entrada oficial funcionou no tenant de teste. | Nenhuma nesta branch. | OK |
 | Produtos | Calculadora de racao | `/produtos` / modal calculadora | `GET/POST /produtos/calculadora-racao` | Parcial | Houve erros anteriores quando produto aparecia como pronto sem tabela completa; fluxo foi trabalhado antes, mas nao revalidado nesta branch final. | Nao corrigido nesta branch final. | Pendente P1 |
 | Produtos | Catalogos auxiliares | `/produtos/:id/editar` | `GET /produtos/departamentos` e similares | Parcial | Erros 500 foram vistos anteriormente em catalogos auxiliares; nao auditado nesta branch final. | Nao corrigido nesta branch final. | Pendente P1 |
@@ -146,14 +147,14 @@ Status usados:
 
 ## 4. Checklist de isolamento tenant
 
-Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada para clientes, pets e produtos usando dois tenants semeados no banco DEV, login real, selecao real de tenant, token real e endpoints reais. A/B de estoque, PDV/vendas, financeiro de vendas, cadastros auxiliares e premium bloqueado ainda precisa ser complementado.
+Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada para clientes, pets, produtos e entrada de estoque usando dois tenants semeados no banco DEV, login real, selecao real de tenant, token real e endpoints reais. A/B de PDV/vendas, financeiro de vendas, cadastros auxiliares e premium bloqueado ainda precisa ser complementado.
 
 | Area basica | Dados do tenant A aparecem no tenant B? | Criacao grava tenant_id correto? | Edicao respeita tenant? | Exclusao respeita tenant? | Endpoint sem tenant/token falha corretamente? | Status |
 |---|---|---|---|---|---|---|
-| Clientes | Nao: busca/listagem cruzada A/B passou | Sim, por endpoint real com token de cada tenant | Nao testado | Nao testado | Acesso direto cruzado a ID de outro tenant retornou 404 | OK parcial |
-| Pets | Nao: busca/listagem cruzada A/B passou | Sim, por endpoint real com tutor do mesmo tenant | Nao testado | Nao testado | Acesso direto cruzado a ID de outro tenant retornou 404 | OK parcial |
-| Produtos | Nao: busca/listagem cruzada A/B passou | Sim, por endpoint real com SKU distinto por tenant | Parcial | Nao testado | Acesso direto cruzado a ID de outro tenant retornou 404 | OK parcial |
-| Estoque | Produto do tenant novo recebeu entrada isolada no fluxo testado | Nao testado diretamente em DB | Nao aplicavel | Nao testado | Nao testado nesta rodada | Parcial |
+| Clientes | Nao: busca/listagem cruzada A/B passou | Sim, por endpoint real com token de cada tenant | Sim: edicao propria 200 e cruzada 404 | Sim: exclusao propria 204 e cruzada 404 | Sem token retornou 403; acesso direto cruzado a ID de outro tenant retornou 404 | OK |
+| Pets | Nao: busca/listagem cruzada A/B passou | Sim, por endpoint real com tutor do mesmo tenant | Sim: edicao propria 200 e cruzada 404 | Sim: exclusao propria 204 e cruzada 404 | Sem token retornou 403; acesso direto cruzado a ID de outro tenant retornou 404 | OK |
+| Produtos | Nao: busca/listagem cruzada A/B passou | Sim, por endpoint real com SKU distinto por tenant | Sim: edicao propria 200 e cruzada 404 | Sim: exclusao propria 204 e cruzada 404 | Sem token retornou 403; acesso direto cruzado a ID de outro tenant retornou 404 | OK |
+| Estoque | Entrada propria retornou 200 e entrada cruzada em produto de outro tenant retornou 404 | Sim, por endpoint real com produto do tenant autenticado | Nao aplicavel | Nao testado | Cross-tenant por ID de produto retornou 404 | OK parcial |
 | PDV/Vendas | Venda criada no tenant novo apareceu no historico do tenant atual | Nao testado diretamente em DB | Visualizacao testada; edicao/reabertura nao auditada completa | Nao testado | Nao testado nesta rodada | Parcial |
 | Financeiro Vendas | Historico abriu com venda do tenant atual | Nao aplicavel | Nao testado | Nao testado | Nao testado nesta rodada | Parcial |
 | Cadastros base | Formas de pagamento usadas no tenant atual | Nao testado diretamente em DB | Nao testado | Nao testado | Nao testado nesta rodada | Parcial |
@@ -188,14 +189,12 @@ Observacao: em 2026-05-15 foi feita auditoria A/B local automatizada para client
 ### P1 - Importante antes de escalar
 
 - Complementar comparacao A/B real entre dois tenants para fluxos ainda nao cobertos:
-  - editar/excluir clientes, pets e produtos;
-  - entrada de estoque com lote/validade;
   - PDV/vendas, baixa de estoque e historico financeiro de vendas;
   - cadastros auxiliares e usuarios/permissoes.
+- Retestar visualmente entrada de estoque com lote/validade:
+  - o endpoint passou no A/B;
+  - ainda falta confirmar tela, tooltip/listagem de lotes e validade urgente no navegador.
 - Testar CRUD completo de:
-  - clientes;
-  - pets;
-  - produtos;
   - categorias/opcoes de racao;
   - formas de pagamento;
   - usuarios.
@@ -268,6 +267,15 @@ Resultado: passou para clientes, pets e produtos. Rodada `866741`:
 - Acesso direto cruzado a `/clientes/{id}`, `/pets/{id}` e `/produtos/{id}` retornou 404.
 
 Observacao de ambiente: o onboarding local por `/auth/register` ficou bloqueado por migrations antigas do DEV. Para isolar o teste de seguranca, os tenants A/B foram semeados diretamente no banco local e a auditoria usou os endpoints reais a partir do login/selecao de tenant.
+
+Rodada estendida `866987` + reteste de estoque:
+
+- Sem token em `/clientes/`, `/pets` e `/produtos/`: 403.
+- Cliente: edicao propria 200, edicao cruzada 404, exclusao propria 204, exclusao cruzada 404.
+- Pet: edicao propria 200, edicao cruzada 404, exclusao propria 204, exclusao cruzada 404.
+- Produto: edicao propria 200, edicao cruzada 404, exclusao propria 204, exclusao cruzada 404.
+- Estoque: entrada propria 200 e entrada cruzada por ID de produto de outro tenant 404 nos dois tenants.
+- Observacao de ambiente: o primeiro teste de entrada de estoque retornou 500 porque o schema DEV local nao tinha `estoque_movimentacoes.status`; apos alinhar a coluna local ao modelo atual, o reteste passou.
 
 ### Testes manuais via MCP/navegador
 
