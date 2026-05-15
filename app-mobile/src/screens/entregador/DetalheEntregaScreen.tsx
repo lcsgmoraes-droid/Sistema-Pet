@@ -123,6 +123,38 @@ function ligar(telefone?: string | null) {
   );
 }
 
+async function obterLocalizacaoOpcional(): Promise<{
+  latitude?: number;
+  longitude?: number;
+}> {
+  try {
+    const { status } = await Location.requestForegroundPermissionsAsync();
+    if (status !== "granted") {
+      return {};
+    }
+
+    const posicao = await Promise.race([
+      Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.Balanced,
+      }),
+      new Promise<null>((resolve) => {
+        setTimeout(() => resolve(null), 3500);
+      }),
+    ]);
+
+    if (!posicao) {
+      return {};
+    }
+
+    return {
+      latitude: posicao.coords.latitude,
+      longitude: posicao.coords.longitude,
+    };
+  } catch {
+    return {};
+  }
+}
+
 const STATUS_BADGE: Record<
   string,
   { label: string; color: string; bg: string }
@@ -170,7 +202,7 @@ export default function DetalheEntregaScreen() {
   const intervaloLocalizacaoMs = paradasPendentes <= 2 ? 4000 : 7000;
   const distanciaLocalizacaoM = paradasPendentes <= 2 ? 8 : 15;
 
-  const carregar = useCallback(async () => {
+  const carregar = useCallback(async (mostrarErro = true): Promise<Rota | null> => {
     try {
       const { data } = await api.get<Rota>(`/ecommerce/entregador/rotas/${rotaId}`);
       let r: Rota = data;
@@ -178,8 +210,12 @@ export default function DetalheEntregaScreen() {
         r = { ...r, paradas: [...r.paradas].sort((a, b) => a.ordem - b.ordem) };
       }
       setRota(r);
+      return r;
     } catch {
-      Alert.alert("Erro", "Não foi possível carregar a rota.");
+      if (mostrarErro) {
+        Alert.alert("Erro", "Nao foi possivel carregar a rota.");
+      }
+      return null;
     } finally {
       setLoading(false);
     }
@@ -279,37 +315,40 @@ export default function DetalheEntregaScreen() {
   // ── Ações nas paradas ─────────────────────────────────────────────────────
 
   async function marcarEntregue(paradaId: number) {
+    if (rota?.status === "pendente") {
+      Alert.alert(
+        "Rota ainda nao iniciada",
+        "Toque em Iniciar Rota antes de confirmar uma entrega.",
+      );
+      return;
+    }
+
     setProcessando(paradaId);
     try {
-      let latEntrega: number | undefined;
-      let lonEntrega: number | undefined;
-
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status === "granted") {
-          const posicao = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-          });
-          latEntrega = posicao.coords.latitude;
-          lonEntrega = posicao.coords.longitude;
-        }
-      } catch {
-        // GPS é opcional: a entrega continua mesmo sem coordenadas.
-      }
+      const localizacao = await obterLocalizacaoOpcional();
 
       await api.post(
         `/ecommerce/entregador/rotas/${rotaId}/paradas/${paradaId}/marcar-entregue`,
         {},
         {
           params: {
-            lat_entrega: latEntrega,
-            lon_entrega: lonEntrega,
+            lat_entrega: localizacao.latitude,
+            lon_entrega: localizacao.longitude,
           },
         },
       );
       await carregar();
-    } catch {
-      Alert.alert("Erro", "Não foi possível marcar como entregue.");
+    } catch (error) {
+      const rotaAtualizada = await carregar(false);
+      const paradaAtualizada = rotaAtualizada?.paradas.find((p) => p.id === paradaId);
+      if (paradaAtualizada?.status === "entregue") {
+        return;
+      }
+
+      Alert.alert(
+        "Entrega nao concluida",
+        obterMensagemErro(error, "Nao foi possivel marcar como entregue agora."),
+      );
     } finally {
       setProcessando(null);
     }
@@ -358,33 +397,29 @@ export default function DetalheEntregaScreen() {
 
   async function iniciarRota() {
     try {
-      let latInicio: number | undefined;
-      let lonInicio: number | undefined;
-      try {
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status === "granted") {
-          const posicao = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-          });
-          latInicio = posicao.coords.latitude;
-          lonInicio = posicao.coords.longitude;
-        }
-      } catch {
-        // GPS é opcional: a rota inicia mesmo sem coordenadas.
-      }
+      const localizacao = await obterLocalizacaoOpcional();
       await api.post(
         `/ecommerce/entregador/rotas/${rotaId}/iniciar`,
         {},
         {
           params: {
-            lat_inicio: latInicio,
-            lon_inicio: lonInicio,
+            lat_inicio: localizacao.latitude,
+            lon_inicio: localizacao.longitude,
           },
         },
       );
       await carregar();
-    } catch {
-      Alert.alert("Erro", "Não foi possível iniciar a rota.");
+    } catch (error) {
+      const rotaAtualizada = await carregar(false);
+      if (rotaAtualizada && rotaAtualizada.status !== "pendente") {
+        Alert.alert("Rota iniciada", "A rota ja esta em andamento.");
+        return;
+      }
+
+      Alert.alert(
+        "Rota nao iniciada",
+        obterMensagemErro(error, "Nao foi possivel iniciar a rota agora."),
+      );
     }
   }
 
@@ -484,9 +519,15 @@ export default function DetalheEntregaScreen() {
         Alert.alert('Sucesso', 'Rota finalizada com sucesso.');
         await carregar();
       } catch (error) {
+        const rotaAtualizada = await carregar(false);
+        if (rotaAtualizada?.status === "concluida") {
+          Alert.alert('Sucesso', 'Rota finalizada com sucesso.');
+          return;
+        }
+
         Alert.alert(
           'Erro',
-          obterMensagemErro(error, 'Não foi possível finalizar a rota agora.'),
+          obterMensagemErro(error, 'Nao foi possivel finalizar a rota agora.'),
         );
       } finally {
         setProcessandoFinalizacao(false);
