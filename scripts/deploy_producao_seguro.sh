@@ -16,6 +16,7 @@ DEPLOY_EVENT_RECORDED=0
 HEAD_BEFORE=""
 HEAD_AFTER=""
 backup_dir=""
+DEPLOY_LOCK_FILE="${DEPLOY_LOCK_FILE:-/tmp/petshop-deploy-in-progress}"
 
 log() {
   printf '\n[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
@@ -98,6 +99,12 @@ on_error() {
 
 trap 'on_error $LINENO' ERR
 
+cleanup_deploy_lock() {
+  rm -f "$DEPLOY_LOCK_FILE" 2>/dev/null || true
+}
+
+trap cleanup_deploy_lock EXIT
+
 wait_for() {
   local label="$1"
   local command="$2"
@@ -125,6 +132,7 @@ require_cmd curl
 require_cmd python3
 
 cd "$APP_DIR"
+touch "$DEPLOY_LOCK_FILE" || true
 
 mark_step "validar_repositorio"
 log "Validando repositorio limpo"
@@ -170,6 +178,12 @@ fi
 
 if [[ -f "$APP_DIR/scripts/ops_disk_guard.sh" ]]; then
   bash "$APP_DIR/scripts/ops_disk_guard.sh" || log "Aviso: disk guard imediato falhou"
+fi
+
+mark_step "instalar_host_watchdog"
+log "Instalando watchdog externo do host"
+if [[ -f "$APP_DIR/scripts/install_ops_host_watchdog_cron.sh" ]]; then
+  bash "$APP_DIR/scripts/install_ops_host_watchdog_cron.sh" || log "Aviso: nao foi possivel instalar o cron do host watchdog"
 fi
 
 mark_step "build_frontend"
@@ -249,6 +263,13 @@ mark_step "disk_guard_final"
 log "Rodando verificacao final de disco"
 if [[ -f "$APP_DIR/scripts/ops_disk_guard.sh" ]]; then
   bash "$APP_DIR/scripts/ops_disk_guard.sh" || log "Aviso: disk guard final falhou"
+fi
+
+mark_step "host_watchdog_final"
+log "Rodando verificacao final do watchdog externo"
+cleanup_deploy_lock
+if [[ -f "$APP_DIR/scripts/ops_host_watchdog.sh" ]]; then
+  bash "$APP_DIR/scripts/ops_host_watchdog.sh" || log "Aviso: host watchdog final falhou"
 fi
 
 if [[ -n "$(git status --porcelain)" ]]; then
