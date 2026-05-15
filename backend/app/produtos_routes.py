@@ -249,7 +249,7 @@ def _mapa_validade_proxima_produtos(
             continue
 
         validade_por_produto[produto_id] = {
-            "validade_proxima": data_validade,
+            "validade_proxima_listagem": data_validade,
             "lote_validade_proxima": nome_lote,
         }
 
@@ -562,7 +562,7 @@ def _enriquecer_produto_listagem(
         produto.estoque_virtual = int(produto.estoque_atual or 0)
 
     validade_info = validade_por_produto.get(produto.id, {})
-    produto.validade_proxima = validade_info.get("validade_proxima")
+    produto.validade_proxima_listagem = validade_info.get("validade_proxima_listagem")
     produto.lote_validade_proxima = validade_info.get("lote_validade_proxima")
     produto.estoque_reservado = estoque_reservado
     if produto.tipo_produto in ("KIT", "VARIACAO") and produto.tipo_kit == "VIRTUAL":
@@ -1151,6 +1151,7 @@ class ProdutoResponse(ProdutoBase):
     estoque_reservado: Optional[float] = 0  # Unidades reservadas por pedidos Bling em aberto
     estoque_disponivel: Optional[float] = 0  # Estoque livre apos reservas
     validade_proxima: Optional[datetime] = None
+    validade_proxima_listagem: Optional[datetime] = None
     lote_validade_proxima: Optional[str] = None
     # Sistema Predecessor/Sucessor
     data_descontinuacao: Optional[datetime] = None  # Data em que foi marcado como descontinuado
