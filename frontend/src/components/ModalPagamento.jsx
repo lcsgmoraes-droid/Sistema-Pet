@@ -815,7 +815,14 @@ export default function ModalPagamento({
         }
       }
       
-      const payloadVenda = montarPayloadVenda(venda);
+      const vendaParaPersistir = cupomParaFinalizar
+        ? {
+            ...venda,
+            cupom_code: cupomParaFinalizar.code,
+            cupom_discount_applied: cupomParaFinalizar.discount_applied,
+          }
+        : venda;
+      const payloadVenda = montarPayloadVenda(vendaParaPersistir);
 
       // Criar a venda primeiro se ainda não foi criada
       let vendaId = venda.id;
