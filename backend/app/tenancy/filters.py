@@ -18,7 +18,6 @@ from sqlalchemy.orm import with_loader_criteria
 import logging
 
 from app.tenancy.context import get_current_tenant
-from app.base_models import BaseTenantModel
 
 
 logger = logging.getLogger(__name__)
@@ -90,6 +89,10 @@ def _add_tenant_filter(execute_state):
     # Permitir operações que não são SELECT (INSERT, UPDATE, DELETE)
     if not execute_state.is_select:
         return
+
+    # Import lazy para evitar ciclo app.base_models -> app.db -> filters -> app.base_models
+    # quando modulos/modelos sao importados diretamente em testes e utilitarios.
+    from app.base_models import BaseTenantModel
 
     tenant_id = get_current_tenant()
     

@@ -22,7 +22,7 @@ def test_build_message_content_audio_prefers_transcription():
         text="fallback",
     )
 
-    assert _build_message_content(payload) == "quero racao renal"
+    assert _build_message_content(payload) == "[Audio do cliente] quero racao renal"
 
 
 def test_build_message_content_image_with_caption_prefixes_marker():

@@ -475,11 +475,15 @@ def _localizar_pedido_local_por_numero_bling(
         )
         .first()
     )
-    return localizar_pedido_por_bling_id(
+    if not pedido:
+        return None
+
+    pedido_canonico = localizar_pedido_por_bling_id(
         db,
         tenant_id=tenant_id,
         pedido_bling_id=getattr(pedido, "pedido_bling_id", None),
-    ) if pedido else None
+    )
+    return pedido_canonico or pedido
 
 
 def _localizar_pedido_local_por_numero_loja(

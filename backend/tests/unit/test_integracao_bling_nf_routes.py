@@ -611,6 +611,7 @@ def test_nf_webhook_considera_autorizada_quando_texto_da_nf_diz_autorizada_mesmo
 def test_nf_autorizada_nao_faz_fallback_para_numero_do_pedido_no_documento(monkeypatch):
     db = Mock()
     db.query.return_value.filter.return_value.order_by.return_value.all.return_value = []
+    db.query.return_value.filter.return_value.order_by.return_value.scalar.return_value = None
     pedido = SimpleNamespace(
         status="aberto",
         confirmado_em=None,

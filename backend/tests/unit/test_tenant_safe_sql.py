@@ -96,11 +96,17 @@ def create_test_table(db_session, test_table_name, tenant_id, another_tenant_id)
     Cria tabela temporária para testes com dados de múltiplos tenants.
     """
     db_session.execute(text(f"DROP TABLE IF EXISTS {test_table_name}"))
+    dialect_name = db_session.bind.dialect.name
+    id_column = (
+        "id INTEGER PRIMARY KEY AUTOINCREMENT"
+        if dialect_name == "sqlite"
+        else "id SERIAL PRIMARY KEY"
+    )
 
     # Criar tabela
     db_session.execute(text(f"""
         CREATE TEMPORARY TABLE {test_table_name} (
-            id SERIAL PRIMARY KEY,
+            {id_column},
             tenant_id UUID NOT NULL,
             status VARCHAR(50) NOT NULL,
             valor DECIMAL(10, 2) NOT NULL,
