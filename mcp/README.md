@@ -57,3 +57,13 @@ O workflow `.github/workflows/mcp-ci.yml` roda estes testes automaticamente:
 - `.github/workflows/mcp-ci.yml`
 
 O check `MCP tests` e obrigatorio na branch protection da `main`.
+
+## Dependencias
+
+O Dependabot revisa semanalmente:
+
+- dependencias Python do MCP Frontend;
+- dependencias Python do MCP Ops/API;
+- GitHub Actions usadas pelo repositorio.
+
+Cada PR gerado pelo Dependabot tambem passa pelo check obrigatorio `MCP tests`.
