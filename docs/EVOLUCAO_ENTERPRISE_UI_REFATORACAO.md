@@ -1,3 +1,1045 @@
+# Evolucao enterprise, UI e refatoracao
+
+Arquivo consolidado para reduzir a dispersao de documentacao sobre padronizacao visual, componentes reutilizaveis, refatoracao de arquivos grandes, auditoria enterprise e historico de padronizacao.
+
+Este arquivo substitui os documentos antigos abaixo, preservando o conteudo util em uma unica fonte de consulta:
+- docs/MAPEAMENTO_EVOLUCAO_ENTERPRISE_2026-05-02.md
+- docs/DESIGN_SYSTEM_UI.md
+- docs/AUDITORIA_ENTERPRISE_SISTEMA_2026-03-29.md
+- CHANGELOG_PADRONIZACAO.md
+
+## Indice
+
+- Mapa de evolucao enterprise
+- Design system UI
+- Auditoria enterprise do sistema
+- Changelog de padronizacao de nomes
+
+---
+
+<!-- Origem consolidada: docs/MAPEAMENTO_EVOLUCAO_ENTERPRISE_2026-05-02.md -->
+
+# Mapeamento de evolucao enterprise - sistema inteiro - 2026-05-02
+
+Este documento organiza a evolucao visual, estrutural e logica do sistema inteiro. Produtos, campanhas e comissoes foram apenas exemplos iniciais; a meta e repassar todas as telas e todos os fluxos recorrentes.
+
+## Objetivo
+
+Transformar o sistema em uma base mais modular, previsivel e facil de manter:
+
+- Componentes reutilizaveis para pessoas, produtos, pets, filtros, tabelas, botoes, cards, modais e dashboards.
+- Regras visuais claras: mesmas cores, tamanhos, fontes, espacamentos e estados para a mesma intencao.
+- Regras de negocio centrais e auditaveis, sem depender do caminho executado pelo usuario.
+- Arquivos grandes sendo reduzidos por etapas, sem refatoracao cega.
+- Conteudo rico seguro via Markdown/renderizacao controlada.
+
+## Andamento
+
+### Foco atual - Plano Basico vendavel
+
+Antes de ampliar a varredura para o sistema inteiro, a frente atual e fechar o Plano Basico como primeiro produto vendavel. O controle vivo de telas testadas, isolamento tenant, bloqueio de premium, padronizacao visual e pendencias P1 esta em `docs/auditorias/plano-basico-tenant-checklist.md`.
+
+Regra pratica desta fase: primeiro deixar Pessoas, Pets, Produtos, Estoque, PDV, Financeiro de Vendas, Cadastros essenciais, Configuracoes e Usuarios com fluxo principal confiavel em tenant novo; depois voltar para refatoracoes maiores fora desse escopo.
+
+### Fase 1 - Fundacao visual e piloto PDV
+
+Status: iniciada.
+
+Componentes globais criados ou consolidados:
+
+- `ActionButton` e `IconActionButton` para a regra unica de cores por intencao.
+- `Panel` para cards/blocos com borda, raio, sombra e padding consistentes.
+- `PageHeader` para cabecalho padrao de telas e modulos.
+- `StatusBadge` para status como pago, aberto, cancelado, ativo e entregue.
+- `MetricCard` e `MetricGrid` para padronizar dashboards e cards de indicadores.
+- `MoneyCell`, `ChannelBadges` e `SafeMarkdown`, ja iniciados na fatia de produtos.
+- `CopyableValue` para valores copiaveis padronizados, como numero de venda, nome de produto, SKU e codigos operacionais.
+- `CustomerIdentity`, `PetIdentity`, `FornecedorIdentity`, `ProductIdentity` e `SaleReference` para cliente/codigo, pet/codigo, fornecedor/documento, produto/SKU e venda sempre copiaveis.
+- `FornecedorSelector` para busca de fornecedor com autocomplete e cadastro rapido, evitando selects locais e campos livres inconsistentes.
+- `FormField`, `TextField` e `SelectField` para campos de formulario com tons visuais reaproveitaveis sem quebrar telas existentes.
+- `PaginationControls` para paginacao, seletor de quantidade por pagina e navegacao com tamanho/cor padrao.
+- `EmptyState`, `LoadingState` e `ErrorState` para estados vazios, carregamento e falhas com visual unico.
+
+Separacao operacional iniciada:
+
+- `MLProHub Ops`: central propria em `/ops`, fora do layout de operacao do Pet Shop.
+- Cockpit inicial em `/ops`, com health, alertas automaticos, tenants/rotas sensiveis, deploys recentes e auto-recuperacao.
+- A observabilidade detalhada saiu do menu normal de Administracao e passou para `/ops/observabilidade`.
+- A rota antiga `/admin/observabilidade` deve apenas redirecionar, para nao quebrar link salvo.
+- Backend consolidado em `/admin/observabilidade/ops-summary`, para a inteligencia operacional ficar centralizada e reutilizavel.
+- Watchdog passou a registrar eventos em `logs/watchdog_events.jsonl`, permitindo auditar quando o sistema tentou se recuperar sozinho.
+- Painel de suporte em `/ops/incidentes`, com drilldown por tenant, rota e request_id para investigar producao sem depender apenas de relato do cliente.
+- Alertas acionaveis por tenant/rota em `/ops/incidentes`, com severidade, filtro em um clique e sugestao de correcao para erro repetido, lentidao recorrente e recuperacao automatica.
+- Incidentes operacionais passaram a ter persistencia em banco (`ops_error_events`, `ops_alerts`, `ops_recovery_actions`), mantendo os `.jsonl` apenas como fallback/backfill.
+- Deploy seguro agora aplica Alembic automaticamente antes das validacoes finais, para evitar producao com codigo novo e banco antigo.
+- Watchdog ganhou registro de recuperacao de health e guarda contra loop de restart em janela curta.
+- Incidente de lentidao de 2026-05-04: Ops apontou degradacao sem 5xx, concentrada em requisicoes lentas no tenant principal. A rota mais critica foi `/produtos/vendaveis`, usada pelo PDV durante digitacao/bipagem.
+- Hotfix local preparado: `/produtos/vendaveis` passou a usar enriquecimento leve, sem calcular composicao/custo/estoque virtual detalhado por sugestao; logs de kit/custo foram rebaixados para debug; o frontend do PDV passou a cancelar buscas antigas e limitar sugestoes.
+- Proxima evolucao de performance: criar endpoint dedicado de sugestao de produtos para PDV, cachear estoque virtual/custo de kits por evento de estoque, auditar dados de `tipo_kit` inconsistentes e adicionar indices/EXPLAIN nas rotas mais lentas do Ops.
+- Incidente de lentidao de 2026-05-07: Ops apontou degradacao sem 5xx, concentrada em `/integracoes/bling/pedido`. Causa raiz: webhook fazia consulta externa ao Bling, retries e esperas dentro da request publica.
+- Melhoria de escala preparada: `/integracoes/bling/pedido` passou a enfileirar eventos em `bling_pedido_webhook_events` e responder rapidamente; o processamento pesado fica no `BlingSyncScheduler`, com idempotencia por `eventId`/payload, retry com backoff e indices por tenant/pedido/status.
+- Correcao de rastreabilidade Ops: webhooks Bling agora marcam `tenant_id` no contexto da request pelo `BLING_WEBHOOK_TENANT_ID`, evitando incidentes operacionais como `sem_tenant`; historico recente pode ser corrigido com `python -m app.scripts.backfill_ops_tenant_context --path-prefix /integracoes/bling/`.
+- Orientacao de producao registrada em `docs/PRODUCAO_DEPLOY_SSH.md`: deploy real por SSH no IP `192.241.150.121`, caminho `/opt/petshop`, script oficial `bash scripts/deploy_producao_seguro.sh`.
+- Proxima evolucao operacional: separar containers de `backend-api`, `worker-bling`, `worker-campanhas` e `worker-sefaz`, para impedir que integracoes externas concorram com PDV/admin pelo mesmo orcamento de workers e conexoes.
+
+Tela piloto:
+
+- PDV: cabecalho, botoes principais, botoes de modo visualizacao, sidebar de vendas recentes e cards principais comecaram a consumir a fundacao global.
+- Banho & Tosa: agenda, ficha operacional, creditos, fotos, ocorrencias e taxi dog passaram a usar os campos reutilizaveis mantendo o tom visual atual.
+- Banho & Tosa: listas de servicos, recursos, parametros e pacotes passaram a usar `ActionButton` global para edicao/exclusao com cores por intencao.
+- Banho & Tosa: formularios de pacotes e campanhas de retorno tambem passaram a usar `TextField`/`SelectField` globais.
+- Banho & Tosa: `FormField` ganhou acessorio de rotulo e os formularios com tooltip migraram para os campos globais, removendo os campos locais duplicados do modulo.
+- Banho & Tosa: checkboxes de servicos, recursos, portes e pacotes passaram a usar `CheckboxField` global com o mesmo tom visual.
+- Banho & Tosa: tela de parametros foi reorganizada para abrir com resumo e lista compacta; configuracoes gerais e cadastro/edicao de porte agora aparecem apenas por acao explicita.
+- Banho & Tosa: agenda deixou de exibir a grade "Horarios x recursos"; agenda, sugestoes de horarios e fila passaram a exibir foto do pet quando disponivel.
+- Banho & Tosa: fila do dia foi redesenhada em kanban compacto com cards arrastaveis, etapas reordenaveis por drag and drop e acoes reduzidas para avancar ou escolher etapa.
+- Banho & Tosa: ao marcar atendimento como entregue, o frontend tenta gerar a venda no PDV pelo endpoint existente, reduzindo dependencia da tela de fechamentos.
+- Produtos e Pessoas: paginacoes locais foram substituidas por `PaginationControls` global, removendo controles duplicados.
+- Operadoras, internacoes veterinarias e Estoque Bling comecaram a usar estados globais de vazio/carregamento.
+- Pets: `PetSelector` e `NovoPetButton` passaram para `components/pets`; PDV, seletor tutor/pet do veterinario e fluxos de agenda, IA, calculadora de doses, exames, internacoes e vacinas agora usam a mesma base visual e de comportamento.
+- PDV: resumo de cliente selecionado passou a usar `EntityCard` em modo compacto, mantendo o alinhamento de CPF, codigo, telefone, fidelidade, cupons e credito.
+- PDV/Caixa: devolucao aberta a partir de uma venda carregada passa a iniciar diretamente naquela venda, mantendo a busca manual como caminho alternativo.
+- PDV/Produtos: numero de venda, nomes de produtos e SKUs avancaram para o padrao copiavel reutilizavel.
+- Fornecedores: cadastro de fornecedor no produto, edicao em lote de fornecedores e despesa do caixa passaram a usar autocomplete/cadastro rapido via `FornecedorSelector`.
+- Produtos: filtros de categoria e marca migraram para `AutocompleteSelect`, mantendo seta de abertura e busca digitavel; o filtro de fornecedor segue com `FornecedorSelector`.
+- Produtos: opcao "Persistir filtros" agora salva busca, categoria, marca, fornecedor, status, estoque baixo, promocao, pais/variacoes, pagina e itens por pagina.
+- Produtos/Estoque: tela de movimentacoes voltou a exibir "Lancar granel" para produtos elegiveis e manteve balanco manual permitido em produto granel para ajuste de inventario.
+- Pessoas: listagem ganhou selecao em massa e fluxo de fusao de 2 cadastros, transferindo vinculos/historico para o principal e inativando o duplicado.
+- Financeiro/Vendas: a tabela principal da lista de vendas foi extraida para `VendasFinanceiroListaTable` e passou a consumir `DataTable`, `MoneyCell`, `NumberCell` e `StatusBadge`.
+- Financeiro/Vendas: a tabela "Vendas por data" do resumo foi extraida para `VendasPorDataTable`, mantendo badges de dia, valores zerados como traco e totalizacao no componente.
+- Financeiro/Vendas: as tabelas "Formas de recebimento" e "Funcionario" foram extraidas para componentes dedicados com `DataTable`, mantendo totalizacao local e celulas monetarias padronizadas.
+- Financeiro/Vendas: as tabelas agregadas de "Tipo" e "Grupo de produto" passaram a usar `VendasResumoAgregadoTable`, preparando o mesmo padrao para outros resumos.
+- Financeiro/Vendas: as comparacoes de periodo por forma de pagamento, grupo de produto e funcionario passaram para `VendasComparativoPeriodoTable`, padronizando variacao, valores e estados vazios.
+- Financeiro/Vendas: a aba de produtos/servicos detalhados passou a usar `ProdutosServicosDetalhadosTable`, mantendo hierarquia de categoria, subcategoria, produto e total geral.
+- Financeiro/Vendas: a tabela de itens promocionais foi extraida para `ProdutosPromocionaisTable`, reaproveitando celulas numericas e monetarias globais.
+- Financeiro/Vendas: o ranking de top produtos por lucro foi extraido para `TopProdutosLucroTable`, padronizando ranking, margem e valores.
+- Financeiro/Vendas: acoes superiores de relatorios/exportacoes foram alinhadas em altura e densidade, mantendo cor compacta por referencia sem competir com a tela.
+- Financeiro/Fluxo de Caixa: cabecalho passou para `PageHeader` e o Chat IA existente foi conectado ao modal padrao.
+- Financeiro/Contas: estados de carregamento de contas a pagar/receber passaram para `LoadingState` global.
+- Financeiro/DRE e Fluxo de Caixa: carregamentos iniciais passaram para `LoadingState`; botoes PDF/Excel da DRE ganharam referencia visual compacta no padrao de acoes.
+
+Proxima varredura recomendada:
+
+- Finalizar PDV cliente/produtos/modais.
+- Depois aplicar o mesmo padrao em Financeiro/Vendas, DRE, Produtos, Pessoas, Pets, Veterinario, Banho & Tosa, Campanhas e demais modulos.
+
+## Escopo global
+
+O trabalho vale para todos os modulos:
+
+- Dashboard e Dashboard Gerencial.
+- Pessoas/clientes e pets.
+- Veterinario.
+- Banho & Tosa.
+- Produtos, estoque, validade, balanco, movimentacoes e Bling.
+- Lembretes.
+- Calculadora de racao.
+- PDV/vendas.
+- Campanhas.
+- E-commerce/app.
+- Pedidos Bling e monitor Bling.
+- NF de saida e NF de entrada.
+- Compras.
+- Financeiro/contabil: vendas, DRE, fluxo de caixa, contas, conciliacoes.
+- Comissoes.
+- Entregas.
+- Cadastros.
+- RH.
+- IA.
+- Administracao, usuarios, roles e configuracoes.
+- Telas publicas como rastreio e e-commerce.
+- Central MLProHub Ops: saude tecnica, erros por tenant, watchdog, deploys, alertas e suporte interno.
+
+## Principios obrigatorios
+
+1. Antes de criar componente novo, procurar se ja existe algo em `frontend/src/components` ou `frontend/src/components/ui`.
+2. O componente deve nascer transversal quando o padrao aparece em mais de uma tela.
+3. Cor representa intencao da acao, nao gosto do modulo.
+4. Cards, botoes, filtros e tabelas devem ter densidade operacional, sem visual de landing page.
+5. Regras de negocio nao devem depender do caminho da tela. Se a regra existe, deve valer ao criar, editar, reabrir, cancelar, reprocessar ou importar.
+6. Toda regra financeira/campanha/comissao/estoque/cupom deve ser rastreavel por extrato, log, ledger ou evento.
+7. Refatorar em fatias pequenas, com comportamento externo preservado.
+8. Nao misturar melhoria visual, regra de negocio e reorganizacao grande no mesmo pacote quando isso aumentar risco.
+
+## Refatoracao de arquivos grandes
+
+Arquivos grandes devem virar uma frente explicita do roadmap. A regra pratica:
+
+- Acima de 700 linhas: arquivo em atencao, mapear responsabilidades internas.
+- Acima de 1000 linhas: prioridade de refatoracao por fatias.
+- Acima de 1500 linhas: critico, separar em componentes/servicos/hooks antes de novas funcionalidades grandes.
+
+Regras para refatorar sem quebrar producao:
+
+- Nao misturar mudanca visual, regra de negocio e extracao grande no mesmo pacote.
+- Primeiro extrair componentes/servicos puros mantendo comportamento igual.
+- Depois mover regras repetidas para helpers/servicos centrais.
+- Cada extracao deve ter build/teste e, quando possivel, validacao visual da tela afetada.
+- Arquivos de rota backend devem ser quebrados por dominio, schema, service e router.
+- Arquivos frontend devem ser quebrados por `Page`, `Header`, `Filters`, `Table`, `Modal`, `Card`, `hooks` e `utils`.
+
+Maiores arquivos mapeados em 2026-05-04:
+
+| Linhas | Arquivo | Prioridade |
+| --- | --- | --- |
+| 4844 | `backend/app/produtos_routes.py` | Critico |
+| 4169 | `frontend/src/components/EntradaXML.jsx` | Critico |
+| 4064 | `backend/app/estoque_routes.py` | Critico |
+| 1980 | `frontend/src/components/VendasFinanceiro.jsx` | Critico |
+| 3411 | `backend/app/notas_entrada_routes.py` | Critico |
+| 3295 | `backend/app/campaigns/routes.py` | Critico |
+| 3225 | `frontend/src/components/PedidosCompra.jsx` | Critico |
+| 3036 | `backend/app/vendas/service.py` | Critico |
+| 2724 | `backend/app/clientes_routes.py` | Critico |
+| 2599 | `backend/app/bling_sync_routes.py` | Critico |
+| 2550 | `backend/app/pedidos_compra_routes.py` | Critico |
+| 2533 | `frontend/src/pages/ecommerce/EcommerceMVP.jsx` | Critico |
+| 2418 | `frontend/src/pages/EstoqueTransferenciaParceiro.jsx` | Critico |
+| 2280 | `backend/app/nfe_routes.py` | Critico |
+| 2181 | `backend/app/vendas_routes.py` | Critico |
+| 1760 | `frontend/src/components/ModalPagamento.jsx` | Critico |
+| 1729 | `backend/app/services/bling_flow_monitor_service.py` | Critico |
+| 1721 | `backend/app/integracao_bling_pedido_routes.py` | Critico |
+| 1670 | `frontend/src/pages/ProdutosForm.jsx` | Critico |
+| 1654 | `frontend/src/pages/entregas/RotasEntrega.jsx` | Critico |
+| 1641 | `backend/app/dre_canais_routes.py` | Critico |
+| 1560 | `backend/app/conciliacao_services.py` | Critico |
+| 1490 | `backend/app/api/endpoints/rotas_entrega.py` | Prioridade |
+| 1452 | `frontend/src/components/EstoqueBling.jsx` | Prioridade |
+| 1424 | `frontend/src/pages/CalculadoraRacao.jsx` | Prioridade |
+| 1413 | `frontend/src/components/DashboardAnaliseRacoes.jsx` | Prioridade |
+| 844 | `frontend/src/components/MovimentacoesProduto.jsx` | Atencao |
+| 1330 | `backend/app/financeiro_routes.py` | Prioridade |
+| 1329 | `frontend/src/pages/comissoes/ComissoesListagem.jsx` | Prioridade |
+| 1325 | `frontend/src/components/Layout.jsx` | Prioridade |
+
+## Regra visual base
+
+Ver a secao "Design System UI - Sistema Pet" neste arquivo.
+
+Resumo de intencoes:
+
+| Intencao | Uso | Cor |
+| --- | --- | --- |
+| `create` | Novo, adicionar, cadastrar, incluir, importar quando adiciona dados | verde/emerald |
+| `edit` | Editar, salvar alteracao, atualizar cadastro | azul |
+| `delete` | Excluir, remover, cancelar destrutivo, estornar destrutivo | vermelho |
+| `neutral` | Voltar, fechar, limpar, navegar, imprimir, atualizar lista | slate/cinza |
+| `warning` | Reabrir, alerta, pendencia, conflito, acao sensivel reversivel | amber/orange |
+| `success` | Pago, concluido, ativo, entregue, reconciliado | emerald |
+| `info` | Informativo, sincronizacao, detalhes, ajuda | blue/cyan |
+
+## Padrao de tamanho e alinhamento
+
+### Botoes
+
+- Altura padrao compacta: `h-9` ou equivalente.
+- Botao principal de tela: `md`, com icone + texto.
+- Botao de linha/tabela: quadrado `h-8 w-8`, com tooltip/title.
+- O mesmo verbo deve usar o mesmo intent em todas as telas.
+- Evitar botao grande quando a acao e secundaria.
+
+### Cards e dashboards
+
+Problema observado: dashboards e cards de resumo variam muito em altura, largura, cor e densidade, como no PDV.
+
+Padrao desejado:
+
+- `MetricCard`: mesmo padding, borda, raio, titulo, valor e subtitulo.
+- Grid com linhas alinhadas: `auto-rows-fr` ou `items-stretch`.
+- Cards de uma mesma faixa devem ter mesma altura minima.
+- Valor principal sempre no mesmo ponto visual.
+- Zero pode virar traco quando o objetivo for destacar numeros relevantes.
+- Cores dos cards indicam natureza do dado, nao modulo.
+
+### Paineis
+
+- `Panel`: bloco de trabalho com titulo, subtitulo opcional e acoes.
+- Nao usar card dentro de card.
+- Evitar paineis muito altos quando a informacao e pequena.
+
+### Tabelas e listas
+
+- `DataTable`: cabecalho, colunas, linhas, empty/loading/error state, acoes e paginacao.
+- `MobileList`: versao responsiva de tabela.
+- Colunas monetarias e numericas sempre alinhadas a direita.
+- Status, canais e tags sempre via componentes de badge.
+
+## Mapa de componentes globais
+
+### Fundacao UI
+
+| Componente | Objetivo | Onde usar |
+| --- | --- | --- |
+| `ActionButton` | Botao semantico com intent, tone, size, icone, loading e disabled | Todas as telas |
+| `IconActionButton` | Acao compacta de tabela/card com tooltip | Produtos, PDV, financeiro, cadastros, campanhas |
+| `ButtonGroup` | Agrupar acoes relacionadas sem desalinhamento | PDV, DRE, vendas, dashboards |
+| `PageHeader` | Titulo da pagina, subtitulo, icone, acoes principais | Todos os modulos internos |
+| `ModuleTabs` | Abas padronizadas | Veterinario, banho/tosa, campanhas, DRE, produtos |
+| `Panel` | Area de trabalho padrao | Formularios, dashboards, relatorios |
+| `EmptyState` | Lista vazia com mensagem e acao opcional | Todas as listas |
+| `LoadingState` | Carregamento padrao | Todas as telas |
+| `ErrorState` | Erro padrao com tentar novamente | Todas as telas |
+
+### Formularios
+
+| Componente | Objetivo | Onde usar |
+| --- | --- | --- |
+| `FormField` | Label, ajuda, erro, obrigatorio, input/select/textarea | Todos os formularios |
+| `FormSection` | Agrupar campos com titulo e descricao curta | Produto, cliente, pet, venda, configuracoes |
+| `SearchInput` | Campo de busca com icone, limpar e loading | Produtos, pessoas, PDV, financeiro |
+| `FilterBar` | Filtros horizontais/empilhados responsivos | Produtos, vendas, campanhas, entregas, financeiro |
+| `DateRangeFilter` | Periodos rapidos + personalizado | Financeiro, campanhas, entregas, relatorios |
+| `MoneyInput` | Moeda BR com mascara | PDV, financeiro, produtos, comissoes |
+| `PercentInput` | Percentual consistente | Produtos, margem, campanhas, comissoes |
+| `QuantityInput` | Stepper de quantidade | PDV, compras, estoque |
+| `SafeMarkdownField` | Texto rico seguro com editar/previa | Produtos, e-commerce, app, mensagens |
+
+### Entidades recorrentes
+
+| Componente | Objetivo | Onde usar |
+| --- | --- | --- |
+| `PessoaSelector` | Buscar/selecionar cliente/tutor/pessoa | PDV, financeiro, campanhas, veterinario, banho/tosa |
+| `CustomerIdentity` | Exibir cliente com nome/codigo copiaveis | PDV, vendas, financeiro, NF, entregas, comissoes |
+| `PetIdentity` | Exibir pet com nome/codigo copiaveis | Banho & Tosa, veterinario, PDV, lembretes, relatorios |
+| `TutorPetSelector` | Selecionar tutor + pet + novo pet | Veterinario, banho/tosa, vacinas, internacoes, exames, calculadoras |
+| `PetSelector` | Selecionar pet quando tutor ja esta definido | PDV item pet, campanhas pet, app/vet |
+| `ProdutoSelector` | Buscar produto/servico/SKU/codigo de barras | PDV, compras, NF, estoque, kits, campanhas |
+| `FornecedorSelector` | Buscar fornecedor | Produtos, compras, NF entrada |
+| `FornecedorIdentity` | Exibir fornecedor com nome/documento/codigo copiaveis | Produtos, compras, contas a pagar, conciliacao, NF entrada |
+| `FuncionarioSelector` | Buscar funcionario/vendedor/entregador/veterinario | PDV, comissoes, entregas, RH, veterinario |
+| `ContaBancariaSelector` | Selecionar conta | Financeiro, caixa, conciliacao |
+| `FormaPagamentoSelector` | Selecionar forma de pagamento | PDV, financeiro, contas, configuracoes |
+
+### Dados, status e badges
+
+| Componente | Objetivo | Onde usar |
+| --- | --- | --- |
+| `MoneyCell` | Valor em BRL, com `zeroAsDash` | Vendas, DRE, PDV, relatorios, produtos |
+| `NumberCell` | Numero alinhado e com traco opcional | Dashboards, relatorios, estoque |
+| `PercentCell` | Percentual padrao | Margem, DRE, campanhas, comissoes |
+| `StatusBadge` | Status semantico | Venda, pedido, NF, campanha, pet, produto, entrega |
+| `ChannelBadges` | App/E-commerce/PDV, sem exibir desligados | Produtos, campanhas, vendas |
+| `StockBadge` | Estoque baixo/zerado/ok/reservado | Produtos, PDV, compras |
+| `PaymentStatusBadge` | Pago/aberto/parcial/cancelado | PDV, financeiro, contas |
+| `DueDateBadge` | Vencido/vencendo/ok | Contas, validade, campanhas |
+
+### Tabelas, cards e dashboards
+
+| Componente | Objetivo | Onde usar |
+| --- | --- | --- |
+| `DataTable` | Tabela padrao desktop | Todas as listagens |
+| `MobileList` | Lista mobile equivalente a tabela | Produtos, vendas, campanhas, entregas |
+| `ColumnSelector` | Mostrar/ocultar colunas | Produtos, vendas, relatorios |
+| `PaginationControls` | Paginacao padrao | Todas as listas paginadas |
+| `MetricCard` | Card de indicador com altura padronizada | Dashboards, PDV, financeiro, campanhas |
+| `MetricGrid` | Grade alinhada de cards | PDV, DRE, Dashboard, entregas |
+| `SummaryStrip` | Faixa compacta de indicadores | Vendas, PDV, campanhas |
+| `InfoCard` | Card de informacao nao numerica | Cliente, pet, produto, ajuda |
+| `EntityCard` | Card de pessoa/produto/pet com campos alinhados | Pessoas, pets, produtos, campanhas |
+
+### Modais e fluxos
+
+| Componente | Objetivo | Onde usar |
+| --- | --- | --- |
+| `AppModal` | Modal padrao com header/body/footer | Todas as telas |
+| `ConfirmDialog` | Confirmacao destrutiva/sensivel | Excluir, cancelar, estornar |
+| `Drawer` | Painel lateral de detalhes | Vendas recentes, analise, cliente, produto |
+| `WizardSteps` | Passos de fluxo | Consulta vet, importacoes, cadastro cliente |
+| `InlineAlert` | Aviso dentro da tela | PDV, DRE, campanhas, estoque |
+| `ToastPattern` | Mensagem de sucesso/erro consistente | Sistema inteiro |
+
+### Conteudo rico seguro
+
+| Componente | Objetivo | Onde usar |
+| --- | --- | --- |
+| `SafeMarkdown` | Renderizar Markdown sem HTML cru | Produtos, mensagens, ajuda, app/e-commerce |
+| `MarkdownPreview` | Previa de texto editavel | Produtos, campanhas, mensagens |
+| `RichTextSanitizer` | Limpar HTML legado de ERP/Bling | Produtos, descricoes importadas |
+
+## Mapa por entidade
+
+### Pessoas/clientes/tutores
+
+Telas provaveis:
+
+- Clientes/pessoas.
+- PDV.
+- Financeiro vendas e historico por cliente.
+- Campanhas.
+- Veterinario.
+- Banho & Tosa.
+- Contas a receber.
+- Entregas.
+
+Padronizar:
+
+- Busca, selecao, card resumido, link para detalhes, telefone/documento, status.
+- Acoes: novo cliente, editar, ver historico, selecionar.
+
+### Pets
+
+Telas provaveis:
+
+- Pets.
+- Pet detalhes.
+- Veterinario.
+- Banho & Tosa.
+- Calculadora de racao.
+- PDV quando item/venda exige pet.
+- Campanhas de aniversario de pet.
+
+Padronizar:
+
+- `TutorPetSelector`.
+- `PetInfoRow` com nome, especie, raca, sexo, idade, codigo.
+- Cards de pet com campos sempre alinhados, mesmo quando vazios.
+- Botao `Novo pet` sempre `create`.
+
+### Produtos/servicos
+
+Telas provaveis:
+
+- Produtos.
+- Produto novo/editar.
+- PDV.
+- Compras.
+- Entrada XML/NF.
+- Estoque.
+- Kits/variacoes.
+- E-commerce/app.
+- Calculadora de racao.
+- Alertas de racao/IA.
+
+Padronizar:
+
+- `ProdutoSelector`.
+- `ChannelBadges`.
+- `StockBadge`.
+- `MoneyCell`, `PercentCell`, `QuantityInput`.
+- `SafeMarkdownField` para descricoes.
+
+### Vendas/caixa/financeiro
+
+Telas provaveis:
+
+- PDV.
+- Meus caixas.
+- Financeiro/vendas.
+- DRE.
+- Fluxo de caixa.
+- Contas a pagar/receber.
+- Conciliacao.
+- Comissoes.
+- Campanhas quando envolve cupom/cashback.
+
+Padronizar:
+
+- `PaymentStatusBadge`.
+- `MoneyCell` com `zeroAsDash`.
+- `DateRangeFilter`.
+- `MetricGrid`.
+- `DataTable`.
+- Regras centrais para comissao, cupom, cashback, imposto e rentabilidade.
+
+### Campanhas/cupons/creditos
+
+Telas provaveis:
+
+- Campanhas.
+- PDV.
+- Cliente.
+- App/e-commerce.
+- Financeiro/vendas.
+
+Padronizar:
+
+- Extrato/ledger.
+- `StatusBadge` para cupom.
+- `ChannelBadges`.
+- `MetricCard`.
+- Reprocessamento idempotente.
+
+### Entregas
+
+Telas provaveis:
+
+- Entregas abertas.
+- Rotas.
+- Historico.
+- Financeiro entregas.
+- PDV com taxa/entrega.
+
+Padronizar:
+
+- Status de entrega.
+- Cards de rota.
+- Tabelas com motorista/cliente/valor/status.
+- Mapas e paineis com mesma estrutura.
+
+## Mapa por modulo
+
+| Modulo | Componentes prioritarios |
+| --- | --- |
+| Dashboard/Dashboard Gerencial | `PageHeader`, `MetricGrid`, `MetricCard`, `Panel`, `DataTable` |
+| Pessoas/clientes | `PessoaSelector`, `EntityCard`, `DataTable`, `StatusBadge`, `ActionButton` |
+| Pets | `TutorPetSelector`, `PetInfoRow`, `EntityCard`, `ActionButton`, `EmptyState` |
+| Veterinario | `TutorPetSelector`, `ModuleTabs`, `FormField`, `Panel`, `WizardSteps`, `MetricCard` |
+| Banho & Tosa | `TutorPetSelector`, `ModuleTabs`, `DataTable`, `MetricGrid`, `StatusBadge` |
+| Produtos/Estoque | `ProdutoSelector`, `DataTable`, `ChannelBadges`, `StockBadge`, `SafeMarkdown` |
+| Calculadora de Racao | `PetSelector`, `ProdutoSelector`, `Panel`, `Dropdown/Combobox`, `MetricCard` |
+| PDV | `PessoaSelector`, `ProdutoSelector`, `PetSelector`, `ActionButton`, `MetricGrid`, `Drawer`, `StatusBadge` |
+| Campanhas | `PessoaSelector`, `DataTable`, `MetricGrid`, `StatusBadge`, `Statement/Extrato` |
+| E-commerce/App | `SafeMarkdown`, `ChannelBadges`, `ProdutoSelector`, `StatusBadge` |
+| Compras/NF Entrada | `FornecedorSelector`, `ProdutoSelector`, `DataTable`, `UploadArea`, `ConfirmDialog`, `PendenciaFornecedorPanel`, `ExportActionButton` |
+| NF Saida | `DataTable`, `StatusBadge`, `ActionButton`, `FilterBar` |
+| Financeiro | `DateRangeFilter`, `MetricGrid`, `MoneyCell`, `DataTable`, `PaymentStatusBadge` |
+| Comissoes | `FuncionarioSelector`, `MoneyCell`, `StatusBadge`, `DataTable`, `Statement/Extrato` |
+| Entregas | `FuncionarioSelector`, `StatusBadge`, `MetricGrid`, `DataTable`, `MapPanel` |
+| Cadastros | `DataTable`, `FormField`, `AppModal`, `ActionButton`, `ConfirmDialog` |
+| RH | `FuncionarioSelector`, `DataTable`, `StatusBadge`, `FormField` |
+| IA | `Panel`, `MetricCard`, `MarkdownPreview`, `DataTable`, `InlineAlert` |
+| Administracao/Configuracoes | `FormSection`, `FormField`, `ActionButton`, `DataTable`, `StatusBadge` |
+
+## Markdown seguro
+
+### Problema
+
+Descricoes de produtos e textos vindos de ERP/Bling podem vir com HTML, tags ou codigos de formatacao. Renderizar HTML puro resolve aparencia, mas abre risco de seguranca.
+
+### Direcao
+
+Usar Markdown como formato principal para conteudo rico editavel pelo usuario.
+
+### Padrao
+
+- `SafeMarkdown`: renderizacao segura, HTML desligado.
+- `SafeMarkdownField`: textarea + previa.
+- `normalizeMarkdownContent`: limpar HTML legado antes de salvar/exibir.
+- Evitar `dangerouslySetInnerHTML` fora de componentes controlados.
+
+Primeiros usos:
+
+- Produtos.
+- App/e-commerce.
+- Mensagens de campanhas.
+- Central de ajuda.
+- Observacoes padronizadas quando fizer sentido.
+
+## Pendencias rastreaveis
+
+### Compras e NF de entrada
+
+Quando a conferencia de uma NF identifica falta, avaria ou divergencia que depende do fornecedor, o sistema deve transformar isso em uma pendencia operacional rastreavel.
+
+Padrao esperado:
+
+- origem vinculada a NF de entrada, pedido de compra e fornecedor;
+- itens divergentes congelados no momento da criacao da pendencia;
+- PDF informativo com resumo, itens, quantidades e valores estimados;
+- mensagem sugerida para fornecedor, editavel antes do envio;
+- registro de envio ou envio automatico com anexo quando SMTP estiver configurado;
+- historico com data, usuario, observacao, mudanca de status e resolucao;
+- tela propria em Compras > Pendencias para acompanhar prazo, retorno e fechamento.
+
+Esse mesmo modelo pode ser reaproveitado depois para outras pendencias operacionais: estoque, entrega, comissao, financeiro e integracoes.
+
+## Regras de negocio centrais auditaveis
+
+Esta frente vale para todo o sistema, nao so campanhas/comissoes.
+
+### Nome pratico
+
+**Regras centrais auditaveis**.
+
+### Problema
+
+Algumas regras podem depender do caminho executado.
+
+Exemplos:
+
+- Parametro X carimbos = 1 cupom deve valer sempre, inclusive apos cancelamento, restauracao ou reprocessamento.
+- Se uma venda tem comissao marcada/configurada, a comissao deve existir mesmo se foi incluida depois, reaberta ou ajustada.
+- Se estoque muda por venda, devolucao, NF, ajuste ou kit, o saldo deve reconciliar pela mesma regra.
+- Se uma venda muda de status, financeiro, cupom, comissao, caixa, DRE e estoque devem ser atualizados pelo mesmo mecanismo central.
+
+### Padrao recomendado
+
+Para cada dominio sensivel:
+
+1. `sync_<dominio>_for_<entidade>()`
+2. `reconcile_<dominio>()`
+3. ledger/extrato com creditos, debitos, reversoes e origem
+4. testes de dominio cobrindo criar, editar, cancelar, reabrir e reprocessar
+5. rotas e telas chamando o mesmo service
+
+### Dominios prioritarios
+
+| Dominio | Regra central |
+| --- | --- |
+| Campanhas/carimbos/cupons/cashback | Credito, debito, conversao, anulacao, saldo negativo |
+| Comissoes | Gerar, recalcular, estornar, reabrir, auditar |
+| Estoque | Venda, devolucao, compra, NF, kit, reserva, ajuste |
+| Financeiro/caixa | Baixa, reabertura, cancelamento, contas, conciliacao |
+| DRE/rentabilidade | Snapshot, rateio, imposto, custo, comissao |
+| Entregas | Taxa, status, financeiro do entregador |
+| NF/Bling | Importacao, vinculo, conciliacao, idempotencia |
+
+## Arquivos grandes e risco
+
+### Frontend mais criticos
+
+| Arquivo | Linhas aprox. | Risco |
+| --- | ---: | --- |
+| `frontend/src/components/EntradaXML.jsx` | 4169 | Muito alto |
+| `frontend/src/components/VendasFinanceiro.jsx` | 1980 | Alto |
+| `frontend/src/components/PedidosCompra.jsx` | 3225 | Alto |
+| `frontend/src/pages/ecommerce/EcommerceMVP.jsx` | 2533 | Alto |
+| `frontend/src/pages/EstoqueTransferenciaParceiro.jsx` | 2418 | Alto |
+| `frontend/src/components/ModalPagamento.jsx` | 1760 | Medio/alto |
+| `frontend/src/pages/ProdutosForm.jsx` | 1670 | Medio/alto |
+| `frontend/src/pages/CalculadoraRacao.jsx` | 1424 | Medio |
+| `frontend/src/components/Layout.jsx` | 1324 | Alto por ser global |
+| `frontend/src/components/DRE.jsx` | 835 | Medio |
+
+### Backend mais criticos
+
+| Arquivo | Linhas aprox. | Risco |
+| --- | ---: | --- |
+| `backend/app/produtos_routes.py` | 4842 | Muito alto |
+| `backend/app/estoque_routes.py` | 4064 | Muito alto |
+| `backend/app/notas_entrada_routes.py` | 3411 | Alto |
+| `backend/app/campaigns/routes.py` | 3295 | Alto |
+| `backend/app/vendas/service.py` | 3036 | Muito alto |
+| `backend/app/clientes_routes.py` | 2724 | Alto |
+| `backend/app/bling_sync_routes.py` | 2599 | Alto |
+| `backend/app/pedidos_compra_routes.py` | 2550 | Alto |
+| `backend/app/nfe_routes.py` | 2280 | Alto |
+| `backend/app/vendas_routes.py` | 2181 | Alto |
+
+## Como refatorar sem quebrar
+
+1. Primeiro criar componente global com API pequena.
+2. Aplicar em uma tela piloto.
+3. Validar visual e build.
+4. Aplicar em telas irmas.
+5. So depois remover duplicacoes antigas.
+6. Para regra de negocio, adicionar teste antes ou junto.
+7. Para tela grande, extrair primeiro componentes de apresentacao, depois hooks, depois services.
+
+## Sequencia sugerida
+
+### Fase 0 - Inventario e governanca
+
+- Criar checklist de componentes globais.
+- Marcar cada tela com: botoes, cards, filtros, tabelas, seletores, modais, regras sensiveis.
+- Atualizar a secao "Design System UI - Sistema Pet" deste arquivo com tamanhos oficiais de botao/card/tabela.
+
+### Fase 1 - Fundacao visual global
+
+- `ActionButton`, `IconActionButton`, `PageHeader`, `Panel`.
+- `MetricCard`, `MetricGrid`.
+- `StatusBadge`, `ChannelBadges`, `MoneyCell`, `NumberCell`.
+- `EmptyState`, `LoadingState`, `ErrorState`.
+
+### Fase 2 - Seletores de entidades
+
+- `PessoaSelector`.
+- `TutorPetSelector` consolidado.
+- `ProdutoSelector`.
+- `FornecedorSelector`.
+- `FuncionarioSelector`.
+- `FormaPagamentoSelector`.
+
+### Fase 3 - Tabelas, filtros e modais
+
+- `DataTable`.
+- `MobileList`.
+- `FilterBar`.
+- `DateRangeFilter`.
+- `AppModal`.
+- `ConfirmDialog`.
+- `Drawer`.
+
+### Fase 4 - Aplicacao por modulo
+
+Ordem sugerida por impacto e repeticao:
+
+1. PDV, porque concentra pessoa, produto, pet, cards, botoes, status e drawer.
+2. Financeiro/vendas/DRE, porque concentra cards, tabelas, periodo e dinheiro.
+3. Pessoas e pets, porque viram fonte para outros fluxos.
+4. Produtos/estoque/compras/NF, porque compartilham produto, fornecedor, estoque e canal.
+5. Veterinario e banho/tosa, porque ja tem parte do `TutorPetSelector`.
+6. Campanhas e comissoes, porque precisam de padrao visual e regra central auditavel.
+7. Entregas, e-commerce/app, cadastros, RH, IA, configuracoes.
+
+### Fase 5 - Regras centrais auditaveis
+
+- Campanhas/carimbos/cupons/cashback.
+- Comissoes.
+- Estoque.
+- Financeiro/caixa.
+- DRE/rentabilidade.
+- NF/Bling.
+
+### Fase 6 - Refatoracao dos arquivos grandes
+
+- Atacar um arquivo grande por vez.
+- Extrair componentes sem mudar comportamento.
+- Criar testes nos dominios sensiveis.
+
+## Definition of Done para padronizacao
+
+Uma melhoria so esta pronta quando:
+
+- usa componente existente ou justifica componente novo;
+- aplica `ActionButton`/`IconActionButton` quando for acao;
+- usa `MetricCard`/`MetricGrid` em indicadores;
+- usa `DataTable`/`MobileList` em listagens novas ou refatoradas;
+- usa seletor de entidade quando selecionar pessoa, produto, pet, fornecedor ou funcionario;
+- segue a secao "Design System UI - Sistema Pet" deste arquivo;
+- mantem alinhamento e tamanho consistente no desktop e mobile;
+- regra de negocio fica em service/domain, nao so na tela;
+- caso sensivel tem teste ou roteiro de validacao;
+- tem rastreabilidade quando envolve dinheiro, campanha, estoque, cupom, NF ou comissao;
+- build/check passam antes de deploy.
+
+## Situacao atual da primeira fatia
+
+Ja foi iniciada uma primeira aplicacao em Produtos:
+
+- `ActionButton`.
+- `ChannelBadges`.
+- `MoneyCell`.
+- `SafeMarkdown`.
+- limpeza de HTML legado em descricao.
+
+Isso deve ser tratado como **piloto de fundacao**, nao como prioridade exclusiva de Produtos.
+
+## Inventario operacional do frontend - 2026-05-02
+
+Este inventario foi extraido do codigo atual em `frontend/src`, principalmente `App.jsx`, `pages` e `components`. Ele serve como mapa de execucao, nao como documentacao estatica definitiva.
+
+### Volume por area
+
+| Area | Arquivos aproximados | Leitura |
+| --- | ---: | --- |
+| `pages/veterinario` | 265 | Modulo mais componentizado; bom candidato para padronizacao incremental por subpasta |
+| `components/campanhas` | 64 | Ja tem decomposicao, mas precisa consolidar tabelas, badges, extrato e regras visuais |
+| `pages/banhoTosa` | 49 | Precisa reaproveitar seletores e paineis padrao |
+| `components/pdv` | 26 | Tela piloto transversal; concentra pessoa, pet, produto, financeiro, campanhas e caixa |
+| `components/produto` | 22 | Produto novo/editar ja esta separado em secoes; bom para `FormField`, `SafeMarkdownField` e `ChannelBadges` |
+| `components/clientes` | 15 | Deve alimentar `PessoaSelector`, `EntityCard` e padrao de wizard/modal |
+| `components/produtos` | 12 | Ja iniciou tabela/listagem padronizada |
+| `components/ui` | 11 | Fundacao existe, mas ainda precisa ganhar `DataTable`, `FilterBar`, `AppModal`, `EmptyState`, `NumberCell` |
+
+### Hotspots de padronizacao visual
+
+Estes arquivos combinam muito botao, modal, card, filtro, tabela ou dashboard. Sao bons alvos para migracao para componentes globais porque cada ajuste elimina muita repeticao.
+
+| Prioridade | Arquivo | Motivo principal |
+| --- | --- | --- |
+| 1 | `frontend/src/components/VendasFinanceiro.jsx` | Financeiro, filtros, cards, tabelas, dinheiro, periodo e status |
+| 2 | `frontend/src/components/PedidosCompra.jsx` | Compras, produtos, fornecedor, acoes, modais e tabelas |
+| 3 | `frontend/src/components/EntradaXML.jsx` | Arquivo muito grande, NF/itens/produtos, modais e conciliacao |
+| 4 | `frontend/src/pages/EstoqueTransferenciaParceiro.jsx` | Estoque, produtos, filtros, cards e acoes |
+| 5 | `frontend/src/pages/ecommerce/EcommerceMVP.jsx` | Produto/canal/markdown/aparencia e telas publicas |
+| 6 | `frontend/src/pages/ProdutosValidadeProxima.jsx` | Produtos, alertas, tabelas e status |
+| 7 | `frontend/src/components/ContasPagar.jsx` e `ContasReceber.jsx` | Financeiro, dinheiro, vencimento, filtros e modais |
+| 8 | `frontend/src/components/DRE.jsx` | Indicadores, periodo, dinheiro, tabelas e exportacoes |
+| 9 | `frontend/src/pages/GerenciamentoPets.jsx` | Cards desalinhados, entidade pet e acoes repetidas |
+| 10 | `frontend/src/pages/comissoes/ComissoesListagem.jsx` | Regras sensiveis, dinheiro, funcionario, tabelas e status |
+
+### Padroes repetidos encontrados
+
+| Padrao textual no codigo | Ocorrencias aproximadas | Direcao |
+| --- | ---: | --- |
+| `button` | 4206 | Migrar gradualmente para `ActionButton` e `IconActionButton` |
+| `Modal` | 1658 | Criar `AppModal` e `ConfirmDialog` antes de mexer em todos |
+| `Filtro/Filtros` | 2638 | Criar `FilterBar`, `DateRangeFilter`, `SearchInput` |
+| `toast` | 830 | Criar padrao de mensagens por tipo de operacao |
+| `Card` | 595 | Consolidar `Panel`, `MetricCard`, `EntityCard`, `InfoCard` |
+| `confirm` | 555 | Padronizar confirmacao destrutiva/sensivel |
+| `Badge` | 341 | Expandir `StatusBadge` e badges especificos |
+| `<select` | 297 | Criar `FormField`/`SelectField` e depois `Combobox` |
+| `<table` | 138 | Criar `DataTable` antes de refatorar listas grandes |
+| `dangerouslySetInnerHTML` | 1 | Manter excecao monitorada; preferir `SafeMarkdown` |
+
+### Adoção dos componentes globais
+
+| Componente | Referencias aproximadas | Estado |
+| --- | ---: | --- |
+| `ActionButton` | 90 | Ja util; precisa virar padrao obrigatorio em novas telas/refatores |
+| `Panel` | 85 | Ja entrou no PDV; precisa migrar cards soltos |
+| `StatusBadge` | 47 | Bom inicio, faltam mapeamentos por dominio |
+| `MetricCard` | 30 | Ainda pouco frente aos dashboards existentes |
+| `IconActionButton` | 10 | Prioritario para acoes de tabela |
+| `MoneyCell` | 6 | Deve ir para financeiro, DRE, vendas e relatorios |
+| `ChannelBadges` | 5 | Deve ir para produtos, campanhas, app/e-commerce |
+| `SafeMarkdown` | 3 | Deve ir para produtos, app/e-commerce, campanhas e ajuda |
+| `TutorPetSelector` | 6 | Ja existe; deve ser padrao para vet, banho/tosa, vacinas, internacoes e calculadoras |
+| `PageHeader` | 3 | Prioritario para uniformizar telas |
+| `MetricGrid` | 1 | Prioritario para dashboards/resumos |
+
+### Rotas e modulos que precisam entrar no ciclo
+
+| Grupo | Rotas principais | Componentes base obrigatorios |
+| --- | --- | --- |
+| Publico/e-commerce | `/landing`, `/ecommerce`, `/:tenantId`, `/rastreio/:token` | `SafeMarkdown`, `ChannelBadges`, `StatusBadge`, `Panel` |
+| Dashboard | `/dashboard`, `/dashboard-gerencial` | `PageHeader`, `MetricGrid`, `MetricCard`, `Panel` |
+| Pessoas/clientes | `/clientes`, `/clientes/:id/financeiro`, `/clientes/:id/timeline` | `PessoaSelector`, `EntityCard`, `DataTable`, `StatusBadge` |
+| Pets | `/pets`, `/pets/novo`, `/pets/:id`, `/pets/:id/editar` | `TutorPetSelector`, `PetInfoRow`, `EntityCard`, `ActionButton` |
+| Veterinario | `/veterinario/*` | `TutorPetSelector`, `ModuleTabs`, `FormField`, `Panel`, `DataTable` |
+| Banho & Tosa | `/banho-tosa/*` | `TutorPetSelector`, `ModuleTabs`, `Panel`, `DataTable`, `StatusBadge` |
+| Produtos/estoque | `/produtos/*`, `/estoque/*` | `ProdutoSelector`, `DataTable`, `FilterBar`, `ChannelBadges`, `StockBadge` |
+| PDV/caixa | `/pdv`, `/meus-caixas` | `PessoaSelector`, `ProdutoSelector`, `PetSelector`, `ActionButton`, `Panel`, `MetricGrid` |
+| Fiscal/Bling/compras | `/notas-fiscais/*`, `/compras/*`, `/vendas/bling-*`, `/produtos/sinc-bling` | `ProdutoSelector`, `FornecedorSelector`, `StatusBadge`, `DataTable`, `ConfirmDialog` |
+| Financeiro | `/financeiro/*` | `MoneyCell`, `DateRangeFilter`, `MetricGrid`, `DataTable`, `PaymentStatusBadge` |
+| Comissoes | `/comissoes/*` | `FuncionarioSelector`, `MoneyCell`, `StatusBadge`, `DataTable`, extrato/regra central |
+| Campanhas | `/campanhas`, `/campanhas/canais` | `PessoaSelector`, `StatusBadge`, `MetricGrid`, `DataTable`, extrato/ledger |
+| Entregas | `/entregas/*` | `FuncionarioSelector`, `StatusBadge`, `MetricGrid`, `DataTable`, `MapPanel` |
+| Cadastros/RH/Admin | `/cadastros/*`, `/rh/*`, `/admin/*`, `/configuracoes/*` | `PageHeader`, `FormField`, `DataTable`, `AppModal`, `ConfirmDialog` |
+| IA/Ajuda | `/ia/*`, `/ajuda` | `Panel`, `SafeMarkdown`, `MetricCard`, `InlineAlert` |
+
+## Onda 1 - Fundacao realmente transversal
+
+Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "embelezar tudo"; ela cria blocos pequenos e aplica em telas que mais repetem padrao.
+
+### Componentes a fechar primeiro
+
+| Componente | Por que vem agora | Telas piloto |
+| --- | --- | --- |
+| `DataTable` | Existem muitas tabelas com cabecalho, empty state, paginacao e acoes repetidas | Produtos, financeiro/vendas, pets |
+| `FilterBar` + `SearchInput` | Filtros aparecem em praticamente todos os modulos | Produtos, financeiro/vendas, pets |
+| `FormField` + `SelectField` | Muitos formularios e selects soltos | Produto editar, pet, banho/tosa agenda |
+| `AppModal` + `ConfirmDialog` | Modais e confirms estao espalhados | Produtos, PDV, campanhas |
+| `EntityCard` | Pessoas, pets e produtos precisam de alinhamento consistente | Pets, cliente no PDV, pessoas |
+| `NumberCell` + ampliar `MoneyCell` | Zero como traco e alinhamento numerico deve ser padrao | Financeiro/vendas, DRE, produtos |
+| `StockBadge` + `PaymentStatusBadge` | Status precisa parar de variar por tela | Produtos, vendas, contas |
+
+### Ordem de aplicacao da Onda 1
+
+1. **Pets**: resolver desalinhamento de cards e criar `EntityCard`/`PetInfoRow`.
+2. **Financeiro/Vendas**: aplicar `MoneyCell`, `NumberCell`, `MetricGrid`, `FilterBar` e preparar `DataTable`.
+3. **Produtos**: terminar listagem com `DataTable`/`FilterBar` e consolidar `ChannelBadges`.
+4. **PDV**: manter como vitrine de interacao compacta e aplicar `EntityCard` no cliente.
+5. **Banho & Tosa + Veterinario**: reaproveitar `TutorPetSelector` e padronizar formularios.
+
+### Progresso da Onda 1
+
+- 2026-05-02: criado `EntityCard`/`EntityInfoRow` e aplicado em `/pets`, com campos fixos mesmo vazios, botoes padronizados e card preparado para reuso em pessoas/produtos.
+- 2026-05-02: ampliado `MoneyCell` com sinal/zero como traco, criado `NumberCell` e aplicado na consulta de vendas em resumo por data, lista de vendas e itens expandidos.
+- 2026-05-02: criado `FilterBar`/`FilterRow`/`FilterAdvanced` e aplicado em `/pets` como primeiro padrao de filtros reutilizaveis.
+- 2026-05-03: iniciada a fatia Financeiro/DRE, com `MetricGrid`/`MetricCard` na DRE e `MoneyCell`/`NumberCell`/`StatusBadge`/`ActionButton` aplicados em DRE, contas a pagar e contas a receber.
+- 2026-05-03: `FluxoCaixa` entrou na mesma fundacao visual, com cards de resumo via `MetricGrid`/`MetricCard`, valores via `MoneyCell`, botoes via `ActionButton` e status de movimentacao via `StatusBadge`.
+- 2026-05-03: `VendasFinanceiro` recebeu primeira fatia da fundacao, com filtros avancados em `FilterBar`, status da lista via `StatusBadge` e totalizadores compactos em `MetricGrid`/`MetricCard`.
+- 2026-05-03: criado `DataTable` base para migrar listagens com cabecalho, alinhamento, loading, vazio, clique de linha e linha expandida sem reescrever cada tela.
+- 2026-05-03: `ContasPagar` e `ContasReceber` migraram a listagem principal para `DataTable`, mantendo `MoneyCell`, `StatusBadge` e `ActionButton` como padrao financeiro.
+- 2026-05-03: `DataTable` ganhou compatibilidade com colunas legadas que renderizam `<th>`/`<td>`, permitindo migrar a listagem desktop de `ProdutosTabelaSection` sem reescrever as colunas existentes.
+- 2026-05-03: `ProdutosFiltrosPanel` passou a usar `FilterBar`, preservando a grade atual de filtros e alinhando o container ao padrao global.
+- 2026-05-03: `ProdutosHeaderActions` passou a usar `PageHeader`, padronizando titulo, subtitulo, tour e acoes principais da tela de Produtos.
+- 2026-05-03: filtros de `ContasPagar` e `ContasReceber` passaram a usar `FilterBar`, mantendo os campos e handlers atuais.
+- 2026-05-03: cabecalhos de `ContasPagar` e `ContasReceber` passaram a usar `PageHeader`, com acoes em `ActionButton` e icones padronizados.
+- 2026-05-03: `PDVClienteCard` foi quebrado em blocos internos de busca, resumo, fidelidade, credito, acoes e seletor de pet, preparando o card de cliente para virar componente reutilizavel sem mudar o fluxo do PDV.
+- 2026-05-03: criado `ProdutoSelector` reutilizavel e aplicado na busca de produtos/servicos do PDV, mantendo a renderizacao customizada das sugestoes do carrinho.
+- 2026-05-03: criado `PessoaSelector` reutilizavel e aplicado na busca de cliente do PDV, preservando a busca externa atual e preparando o reaproveitamento em pets, financeiro, campanhas e banho/tosa.
+- 2026-05-03: `/pets` passou a usar `PessoaSelector` na busca de tutor, removendo o dropdown manual duplicado e consolidando o segundo uso real do selector de pessoa.
+- 2026-05-03: `EntityCard` ganhou modo compacto/header opcional e passou a ser usado no resumo de cliente selecionado do PDV, aproximando o card de cliente do mesmo padrao usado em pets.
+- 2026-05-03: `Banho & Tosa` iniciou a reorganizacao visual: parametros, painel, servicos e agenda passaram a abrir formularios sob demanda e usar `Panel`, `MetricGrid`, `MetricCard`, `StatusBadge`, `ActionButton`, `EmptyState` e `TutorPetSelector` em vez de cards grandes sempre expostos.
+- 2026-05-03: agenda de `Banho & Tosa` alinhada ao padrao da agenda veterinaria: o botao `Agendar` abre modal com tutor/pet/servico, horarios livres/ocupados e compromissos do dia selecionado.
+- 2026-05-03: fluxo operacional de `Banho & Tosa` simplificado: a etapa `entregue` agora centraliza a geracao da venda no backend, `Retornos` virou `Reagendar`, taxi dog/relatorios foram alinhados aos componentes globais e fotos de pets passaram a aparecer tambem nas sugestoes de reagendamento.
+- 2026-05-03: `Banho & Tosa` teve a grade antiga de capacidade removida da agenda, o taxi dog recebeu painel compacto com metricas e a limpeza de componentes antigos/orfaos reduziu o risco de retorno do visual anterior.
+- 2026-05-03: indicadores restantes do `Banho & Tosa` foram suavizados para o padrao visual atual, removendo tons laranja decorativos e pesos de fonte excessivos onde nao havia alerta real.
+- 2026-05-03: criado `ModuleTabs` e aplicado em Financeiro/Vendas, DRE, Fluxo de Caixa, Campanhas e Pessoas, removendo abas manuais duplicadas e aproximando a navegacao interna dos modulos ao mesmo padrao visual.
+- 2026-05-03: DRE avancou na padronizacao financeira com acoes principais, presets, paginacao e detalhes usando `ActionButton`, alem da tabela principal e da tabela de lancamentos migradas para `DataTable`.
+- 2026-05-03: Fluxo de Caixa substituiu a tabela manual de previsto/realizado por `DataTable` com linhas expansivas, valores por `MoneyCell`, status por `StatusBadge` e erro via toast em vez de alerta bloqueante.
+- 2026-05-03: modais de `ContasPagar` e `ContasReceber` tiveram acoes de confirmar/cancelar/fechar e atalhos de fluxo/venda alinhados ao padrao `ActionButton`, mantendo intencao de cor e tamanho consistente.
+- 2026-05-07: `Compras/Pedidos` iniciou a fatia enterprise segura: filtros da listagem extraidos para `PedidosCompraFiltros`, tabela de pedidos extraida para `PedidosCompraTabela` e acoes/status/valor da lista passaram a consumir `ActionButton`, `StatusBadge` e `MoneyCell` sem alterar a regra de negocio.
+- 2026-05-07: `Compras/Pedidos` teve o modal de sugestao inteligente extraido para `PedidosCompraSugestaoModal` e o modal de grupos de fornecedor extraido para `ModalGruposFornecedores`, reduzindo o arquivo principal sem mover regra de negocio.
+- 2026-05-07: `Compras/Pedidos` teve os modais restantes de rascunho, recebimento, exportacao e envio extraidos para `components/compras`, com o seletor de colunas do documento centralizado em `pedidoDocumentoColunas`, mantendo a regra de negocio na pagina principal.
+- 2026-05-07: `Compras/Pedidos` teve o formulario de novo/editar pedido extraido para `PedidoCompraFormulario`, mantendo carregamento, sugestao, submit e estado no componente pai.
+- 2026-05-07: `Compras/Pedidos` moveu helpers puros de normalizacao, consolidacao de itens e download de documento para `pedidoCompraUtils`, deixando a pagina focada em estado e orquestracao.
+- 2026-05-07: `Compras/Pedidos` agrupou a renderizacao dos modais em `PedidosCompraModalsLayer`, reduzindo o JSX da pagina principal sem mover regras de envio, recebimento, rascunho ou sugestao.
+- 2026-05-07: `Compras/Pedidos` extraiu o estado, filtros e calculos da sugestao inteligente para `usePedidosCompraSugestao`, mantendo a decisao de rascunho e aplicacao final orquestradas na pagina.
+- 2026-05-07: `Compras/Pedidos` extraiu o estado e operacoes de grupos de fornecedores para `usePedidosCompraGruposFornecedores`, mantendo a tela principal apenas como consumidora do fluxo.
+- 2026-05-07: iniciado o padrao operacional de selecao/copia: `ContasPagar` passou a usar `FornecedorSelector` no filtro e nomes copiaveis, enquanto Financeiro/Vendas passou a mostrar produto/SKU com `CopyableValue`/`CopyableCode` nas listas detalhadas.
+- 2026-05-07: `Compras/Pedidos` trocou o autocomplete proprio do formulario pelo `FornecedorSelector` compartilhado e os itens do pedido passaram a exibir produto/SKU com componentes copiaveis.
+- 2026-05-07: historicos financeiros de cliente e produtos promocionais passaram a usar `CopyableValue`/`CopyableCode` para numero de venda, produto e SKU, reforcando o padrao de consulta operacional.
+- 2026-05-07: criado `ProductIdentity` como padrao reutilizavel para nome de produto + SKU/codigo copiavel, aplicado em vendas financeiras, devolucao, compras, widget de cliente, campanhas e rotas de entrega.
+- 2026-05-07: criado `SaleReference` para padronizar referencias copiaveis de venda em PDV, devolucao, financeiro, campanhas, caixa e entregas.
+- 2026-05-07: PDV reforcou o padrao `SaleReference` em vendas em aberto, vendas recentes e historico do cliente, mantendo a venda copiavel no fluxo de atendimento.
+- 2026-05-07: `SaleReference` e codigos copiaveis foram aplicados em conciliacao de vendas, comissoes, devolucao e lista financeira, reduzindo exibicoes manuais de numero de venda/produto.
+- 2026-05-07: filtros de fornecedor em Valorizacao de Estoque e Validade Proxima passaram a usar `FornecedorSelector`, mantendo autocomplete, limpar e cadastro rapido no mesmo padrao dos demais fluxos.
+- 2026-05-07: filtros de fornecedor em Balanco de Estoque e na listagem de Pedidos de Compra tambem passaram a usar `FornecedorSelector`, removendo selects duplicados.
+- 2026-05-07: filtro principal de fornecedor em Produtos e a modal de Nova Conta a Pagar passaram a usar `FornecedorSelector`, reforcando autocomplete/cadastro rapido no cadastro operacional.
+- 2026-05-07: Pendencias de fornecedor, Entrada de Estoque, modal legado de fornecedor do produto e Grupos de Fornecedores passaram a usar `FornecedorSelector`, incluindo cadastro rapido e selecao padronizada.
+- 2026-05-07: PDV passou a expor `Devolucao` diretamente no modo de visualizacao da venda elegivel, reaproveitando o modal de devolucao com venda inicial e mantendo produtos/SKUs copiaveis tambem nos componentes de kits.
+- 2026-05-07: Relatorio de Movimentacoes passou a reutilizar `ProductIdentity` e `SaleReference` no produto selecionado, cabecalho, historico de vendas e tabela de movimentos, padronizando copia de produto/SKU/venda.
+- 2026-05-08: Sugestao inteligente de compras deixou de somar movimentacoes de estoque com `referencia_tipo=venda` quando a venda referenciada nao existe, evitando que historico orfao infle o giro e gere compra exagerada.
+- 2026-05-08: `Comissoes/Listagem` iniciou padronizacao visual com `MetricGrid`/`MetricCard`, `MoneyCell`, `NumberCell`, `StatusBadge`, `ActionButton` e estados globais de carregamento/erro/vazio, sem alterar a regra de fechamento.
+- 2026-05-08: Modal de devolucao no PDV passou a usar `data_venda`, codigo do cliente e copia padronizada de cliente/codigo; producao ganhou `ops_disk_guard` preventivo para limpar cache Docker quando o disco entrar em faixa de risco.
+- 2026-05-08: criado `CustomerIdentity` para nome/codigo de cliente copiaveis e aplicado em devolucao PDV, vendas recentes, financeiro, contas a receber, relatorio de produto, NF, entregas e comissoes.
+- 2026-05-08: `CustomerIdentity` passou a reconhecer campos de tutor/pessoa e foi expandido para Banho & Tosa, Pets, campanhas, creditos, Pedido Bling e cards veterinarios.
+- 2026-05-08: PDV expandiu `CustomerIdentity` para card do cliente, assistente IA, widget lateral, historico de compras e vendas em aberto, mantendo nome/codigo copiaveis nos fluxos de atendimento.
+- 2026-05-08: criado `PetIdentity` para nome/codigo de pet copiaveis e aplicado em Banho & Tosa, veterinario, lembretes, relatorio de vendas, widget de cliente e alertas inteligentes do PDV.
+- 2026-05-08: criado `FornecedorIdentity` para nome/documento/codigo de fornecedor copiaveis e aplicado em compras, contas a pagar, conciliacao e relatorios de produtos/validade.
+- 2026-05-08: Go-live de autenticacao iniciado. Cadastro de novo tenant passou a exigir aceite explicito de Termos/Privacidade, salvar versoes/IP/user-agent, enviar confirmacao de e-mail e nao tentar carregar `/auth/me-multitenant` antes de selecionar tenant.
+- 2026-05-08: Clientes do e-commerce/app tambem passaram a aceitar Termos/Privacidade e ficam bloqueados ate confirmar e-mail quando `EMAIL_VERIFICATION_REQUIRED=true`. Foram adicionadas `/verificar-email`, `/termos`, `/privacidade` e a migration `nv20260508a1_user_email_verification_lgpd.py`.
+- 2026-05-08: Login ERP/e-commerce recebeu trava configuravel por tentativas falhas, auditoria de eventos sensiveis, registro de ultimo login/IP, revogacao de sessoes apos troca de senha e hardening de headers/CORS para reduzir risco antes do go-live.
+- 2026-05-08: Endpoints LGPD legados do WhatsApp tiveram listagem/processamento de solicitacoes de exclusao e log de auditoria corrigidos para voltar a bater com os campos reais do banco.
+- 2026-05-08: Termos de Uso e Politica de Privacidade foram expandidos para cobrir ERP, app, e-commerce, tenant, cookies, integracoes, retencao, direitos dos titulares, incidentes, IA, comunicacoes e canal de privacidade sem aviso juridico para o cliente final.
+- 2026-05-08: LGPD operacional iniciada com dossie/exportacao de cliente, historico de consentimentos, preferencias de comunicacao, solicitacoes gerais de titulares e trilha de acesso tanto no ERP (`/lgpd`) quanto no app/e-commerce (`/app/privacidade`).
+- 2026-05-08: tela operacional de LGPD adicionada ao ERP em Administracao > LGPD e Privacidade, com busca de cliente, dossie exportavel, preferencias, abertura/processamento de solicitacoes e campanhas respeitando opt-out explicito de email/push.
+- 2026-05-08: API operacional de LGPD passou a exigir `usuarios.manage`, ganhou anonimizacao auditavel de cliente por solicitacao de exclusao e centralizou helpers de opt-out para WhatsApp/SMS quando esses disparos forem usados.
+- 2026-05-08: migration complementar garante a tabela `data_access_logs` usada pela trilha de auditoria LGPD mesmo em ambientes que ja tinham consentimentos/exclusoes legados parcialmente criados.
+- 2026-05-08: busca de titular na LGPD passou a usar `PessoaSelector` com `incluir_inativos=true`, permitindo localizar clientes ja inativados pelo cadastro antes da anonimizacao.
+- 2026-05-08: tela LGPD reorganizada em fluxo guiado: cards de status, busca unica do titular, solicitacoes daquele cliente, acao explicita de exclusao/anonimizacao e dossie/preferencias apenas depois da selecao. Migration `nz20260508a5_lgpd_consent_audit_columns.py` alinha `data_privacy_consents` com as colunas de auditoria usadas pelo servico para evitar erro 500 no dossie.
+- 2026-05-08: LGPD operacional foi simplificada para tela principal com apenas busca do titular e fila de solicitacoes; tratamento, registro manual de pedido, dossie/exportacao e preferencias passaram para modais. A busca de titular deixou de filtrar apenas `tipo_cadastro=cliente`, permitindo localizar titulares cadastrados como veterinario/funcionario/fornecedor, como `Lucas Guerra de Moraes`.
+- 2026-05-08: exclusoes LGPD concluidas continuam auditaveis por filtro/pesquisa, mas a solicitacao deixa de guardar nome, e-mail, telefone e texto livre do solicitante apos a anonimizacao. Migration `oa20260508a6_scrub_completed_lgpd_deletion_requests.py` limpa tambem os historicos ja concluidos.
+- 2026-05-08: auditoria pre-go-live de autenticacao encontrou rotas antigas sem dependencia explicita. Foram protegidas por auth/tenant as rotas legadas de comissoes, taxas de forma de pagamento, sugestao fiscal, canais DRE e lista de tools WhatsApp; o scanner local voltou a `0` rotas suspeitas fora da allowlist publica.
+- 2026-05-09: promocao ERP de produto passou a usar componente com preco + inicio/fim em data e hora, e o PDV passou a consumir `preco_venda_pdv` com selo de promocao quando a janela estiver ativa. A antiga fusao de produtos encontrada em sugestoes de racoes e limitada; proxima entrega recomendada e uma fusao operacional segura por pares, com decisao campo a campo e transferencia auditada de historico.
+- 2026-05-09: SKU de produto passou a ser normalizado em maiusculas no backend e validado por `lower(trim(codigo))` em cadastro, edicao, variacoes, importacao por planilha, criacao via XML e autocadastro Bling/NF. Isso bloqueia novos duplicados por diferenca de caixa, como `pet5136` versus `PET5136`; duplicados historicos devem ser resolvidos pela fusao segura.
+- 2026-05-09: iniciado fluxo operacional de fusao segura de produtos na listagem: selecionar exatamente 2 produtos, escolher o principal, revisar conflitos campo a campo, somar estoque e transferir referencias historicas antes de inativar o duplicado. O indice unico de SKU tambem passa a usar `tenant_id + lower(trim(codigo))` no banco para impedir reincidencia.
+- 2026-05-09: criado `scripts/smoke_golive.py` para rodada curta de go-live autenticado sem escrita de dados: health/frontend legal, login ERP, selecao de tenant, usuario atual, produtos, produtos vendaveis PDV, clientes, caixa aberto, LGPD status e catalogo publico e-commerce/app.
+- 2026-05-16: `scripts/smoke_golive.py` ganhou modo publico (`GOLIVE_PUBLIC_ONLY=true`) e teste automatizado, permitindo validar health/paginas publicas sem credenciais antes da rodada autenticada.
+- 2026-05-09: webhook Pagar.me endurecido para exigir assinatura HMAC quando a validacao estiver ligada ou quando o gateway Pagar.me estiver ativo; se faltar segredo em producao, o endpoint falha explicitamente em vez de aceitar payload sem validacao.
+- 2026-05-09: Relatorio de Movimentacoes teve os modais de reservas, lancamento manual e lancamento de granel extraidos para `components/estoque`, reaproveitando `ActionButton`, `ProductIdentity`, `StatusBadge` e `EmptyState` sem alterar a regra da pagina.
+- 2026-05-09: Relatorio de Movimentacoes tambem extraiu o painel `VendasPorCanalPanel`, deixando a pagina principal com calculo/orquestracao e a apresentacao do resumo por canal em componente dedicado.
+- 2026-05-09: Relatorio de Movimentacoes extraiu a tabela de lancamentos para `MovimentacoesLancamentosTable`, padronizando a acao de exclusao com `ActionButton` e badges com `StatusBadge` enquanto preserva selecao, navegacao por origem e edicao por clique.
+- 2026-05-09: Relatorio de Movimentacoes extraiu o cabecalho/resumo do produto para `MovimentacoesProdutoHeader`, incluindo avisos de kit, acoes rapidas e cards de estoque; o arquivo principal saiu da zona acima de 1000 linhas.
+- 2026-05-09: `VendasFinanceiro` extraiu cabecalho/filtros/abas para `VendasFinanceiroHeader`, graficos do resumo para `VendasFinanceiroGraficosResumo` e painel de promocoes para `VendasPromocoesResumoPanel`, reduzindo o arquivo principal para 3177 linhas com build validado.
+- 2026-05-10: `VendasFinanceiro` extraiu o painel de dias uteis para `DiasUteisResumoPanel` e o modal de relatorio personalizado para `VendasRelatorioPersonalizadoModal`, reduzindo o arquivo principal para 2988 linhas com build validado.
+- 2026-05-10: `VendasFinanceiro` extraiu blocos visuais de composicao, resumo, lista, comparacao e analise inteligente para componentes dedicados, reduzindo o arquivo principal para 1980 linhas com build validado.
+- 2026-05-10: `EntradaXML` iniciou a quebra segura dos modais operacionais, extraindo historico de precos, revisao de precos, resultado de lote e rascunho de devolucao para `components/entrada-xml`, reduzindo o arquivo principal para 4420 linhas com build validado.
+- 2026-05-12: `EstoqueFullNF` passou a usar `PageHeader`, `ModuleTabs`, `Panel`, `ActionButton`, `IconActionButton`, `EmptyState` e `DataTable`; o badge de canal foi centralizado em `ChannelBadges` com suporte a Amazon, Mercado Livre, Shopee e FULL.
+- 2026-05-12: criado `CatalogoProdutoSelectors` para centralizar autocomplete de categoria e marca de produtos, aplicado em filtros de produtos, edicao em lote, cadastro/edicao de produto, balanco, valorizacao e validade proxima.
+- 2026-05-12: botoes de geracao no cadastro de produto e acoes principais de valorizacao/validade proxima passaram a usar `ActionButton`, mantendo o padrao visual sem alterar regras das telas.
+- 2026-05-12: criado `SegmentedControl` para alternancias compactas, aplicado no modo de descricao do produto e no filtro de itens da Entrada XML, removendo botoes inline duplicados.
+- 2026-05-10: `EntradaXML` extraiu o modal de visualizacao da NF para `EntradaXmlVisualizacaoNotaModal`, preservando os callbacks da pagina e reduzindo o arquivo principal para 4169 linhas com build validado.
+- 2026-05-15: cadastros basicos de `Departamentos` e `Tipos de Despesa` iniciaram a padronizacao de acoes com `ActionButton`, `IconActionButton`, `LoadingState` e `EmptyState`, mantendo comportamento e endpoints iguais.
+
+### Nao fazer nesta onda
+
+- Nao reescrever arquivos gigantes inteiros.
+- Nao mexer em regra de negocio junto com refator visual grande.
+- Nao trocar todos os botoes do sistema em massa sem validar por modulo.
+- Nao criar mais um componente se `ActionButton`, `Panel`, `StatusBadge`, `MetricCard` ou `TutorPetSelector` ja resolverem.
+
+## Onda 2 - Regras centrais auditaveis
+
+Depois da fundacao visual, atacar a logica sensivel com pouco ruido visual.
+
+| Dominio | Primeira entrega concreta |
+| --- | --- |
+| Campanhas | Extrato/ledger geral: credito, debito, conversao, estorno, origem, saldo |
+| Carimbos/cupons | Reconciliador: parametro X carimbos = 1 cupom, independente do caminho |
+| Comissoes | Reconciliador por venda: se tem comissao configurada, gera/atualiza/estorna |
+| Estoque | Extrato unico por produto: venda, compra, ajuste, cancelamento, NF, kit |
+| Financeiro/caixa | Evento unico para venda criada/editada/cancelada/reaberta/baixada |
+| DRE | Snapshot/recalculo auditavel por periodo e origem |
+
+### Nome tecnico interno
+
+Usar o termo **orquestradores/reconciliadores de dominio com ledger**.
+
+Na pratica:
+
+- Orquestrador: decide o que precisa acontecer quando uma entidade muda.
+- Reconciliador: confere e corrige o estado final esperado.
+- Ledger/extrato: registra por que houve credito, debito, estorno, cupom, comissao ou ajuste.
+
+## Proximo passo recomendado
+
+Ao retomar, antes de abrir nova frente grande, fazer uma rodada curta de go-live:
+
+1. Rodar `scripts/smoke_golive.py` em modo publico com `GOLIVE_PUBLIC_ONLY=true`.
+2. Rodar `scripts/smoke_golive.py` em modo autenticado com credenciais seguras de operador.
+3. Testar permissoes por perfil real (`admin`, `vendedor`, `financeiro`, `entregador`) nas telas criticas.
+4. Validar webhooks publicos/externos com segredo, assinatura ou token quando o provedor permitir.
+5. Confirmar onboarding de novo tenant: cadastro, confirmacao de e-mail, aceite LGPD/termos, primeiro login e selecao de tenant.
+6. Depois disso, voltar para a refatoracao visual/padronizacao da Onda 1.
+
+Continuar a **Onda 1** com uma destas frentes, conforme prioridade operacional:
+
+- **Financeiro/Vendas**: seguir a padronizacao de tabelas, filtros e status.
+- **Pessoas/Pets/PDV**: transformar os blocos de cliente/pet/produto em `EntityCard` reutilizavel.
+- **Banho & Tosa**: proxima etapa deve ser funcional, nao visual: validar regra de entrega -> venda PDV, pacotes/creditos, reagendamento e relatorios com dados reais.
+
+Entrega esperada:
+
+1. Levar `MoneyCell`/`NumberCell` para DRE, contas a pagar/receber e compras.
+2. Levar `FilterBar` para Financeiro/Vendas, Produtos e Compras.
+3. Preparar `DataTable` sem reescrever a tela inteira.
+4. Padronizar `StatusBadge` em vendas, contas e compras.
+5. Rodar build e validar visual local a cada fatia.
+
+---
+
+<!-- Origem consolidada: docs/DESIGN_SYSTEM_UI.md -->
+
+# Design System UI - Sistema Pet
+
+Este documento define regras visuais obrigatorias para novas telas, refactors e componentes reutilizaveis do frontend.
+
+## Principios
+
+- Antes de criar um componente novo, procurar componente existente em `frontend/src/components`.
+- Regras de negocio nao devem ficar presas na tela; a tela coleta dados e chama uma regra/servico central.
+- Componentes compartilhados devem manter o mesmo comportamento, cor, fonte, espacamento e estados em todos os modulos.
+- Evitar cor por modulo quando a cor representa acao. A cor da acao deve ter o mesmo significado em todo o sistema.
+- Usar icone quando a acao for reconhecivel, com texto quando a acao precisar ser explicitada.
+- Manter botoes, campos e cards com densidade operacional: profissional, legivel e sem excesso decorativo.
+
+## Regra de cores por acao
+
+| Acao semantica | Uso | Cor padrao |
+| --- | --- | --- |
+| `create` | Novo, adicionar, cadastrar, incluir | verde/emerald |
+| `edit` | Editar, salvar alteracao, atualizar cadastro | azul |
+| `delete` | Excluir, remover, cancelar destrutivo | vermelho |
+| `neutral` | Fechar, voltar, limpar, atualizar lista, navegar | slate/cinza |
+| `warning` | Alerta, conflito, pendencia, acao sensivel reversivel | amber |
+
+Exemplos:
+
+- `+ Novo pet` usa `create`, portanto sempre verde.
+- `Editar pessoa` usa `edit`, portanto sempre azul.
+- `Excluir venda` usa `delete`, portanto sempre vermelho.
+- `Atualizar` usa `neutral`, exceto quando for uma acao de gravacao.
+- `Cancelar venda` usa `delete` se muda estado de negocio de forma destrutiva.
+- `Cancelar modal` usa `neutral`, porque apenas fecha a interface.
+
+## Implementacao no codigo
+
+A fonte inicial de classes semanticas fica em:
+
+`frontend/src/components/ui/actionStyles.js`
+
+Use `actionButtonClasses` em novos botoes e em refactors graduais:
+
+```jsx
+import { actionButtonClasses } from "../ui/actionStyles";
+
+<button className={actionButtonClasses({ intent: "create", tone: "soft", size: "sm" })}>
+  Novo pet
+</button>
+```
+
+Evite classes diretas como `bg-orange-600`, `text-cyan-700` ou `border-blue-200` em botoes de acao quando existir uma intencao semantica clara.
+
+## Checklist para novas alteracoes frontend
+
+- O componente existente foi procurado antes de criar outro?
+- A cor do botao vem da intencao da acao, nao do gosto da tela?
+- O mesmo componente fica igual em Consulta, Banho & Tosa, PDV e demais modulos?
+- Estados `disabled`, `hover`, carregamento e erro estao previstos?
+- O texto cabe no mobile e no desktop?
+- A tela ficou operacional e escaneavel, sem estilo de landing page?
+
+---
+
+<!-- Origem consolidada: docs/AUDITORIA_ENTERPRISE_SISTEMA_2026-03-29.md -->
+
 # Auditoria Enterprise do Sistema Pet
 
 Data: 29/03/2026  
@@ -1086,3 +2128,92 @@ Pente fino detalhado desta fase:
 - [ ] controlar status operacional: agendado, confirmado, a caminho, chegou, em banho, em secagem, em tosa, pronto, entregue, cancelado/no-show
 - [ ] gerar dashboards de ocupacao, produtividade, custo medio, ticket medio, margem e gargalos da agenda
 - [ ] reaproveitar cadastros ja existentes: clientes, pets, funcionarios, produtos/estoque, financeiro, entregas/taxi dog e campanhas
+
+---
+
+<!-- Origem consolidada: CHANGELOG_PADRONIZACAO.md -->
+
+# 📝 Changelog - Sistema de Padronização de Nomes
+
+## [1.1.0] - 2026-02-14
+
+### 🎉 Adicionado
+- **Sistema Completo de Padronização de Nomes**
+  - Algoritmo de reconstrução estruturada: `Ração [Marca] [Espécie] [Fase] [Porte] [Sabor] [Tratamento] [Peso]`
+  - Inclusão de espécie (Cães/Gatos) usando campo `especies_indicadas`
+  - Inclusão de porte com prefixo "Raças" (ex: "Raças Pequenas")
+  - Inclusão de tratamento (Light, Hipoalergênico) como campo opcional
+  - Sistema de confiança (0-100%) para cada sugestão
+  - Sugestões filtradas por confiança mínima (≥50%)
+
+- **Edição de Sugestões Antes de Aplicar**
+  - Botão "Editar" para tornar sugestão editável
+  - Campo de input com destaque visual (borda azul)
+  - Botão "Cancelar Edição" para descartar mudanças
+  - Botão "Aplicar Edição" dinâmico (muda texto conforme estado)
+  - Estado `nomesEditados` para controlar edições por produto
+
+- **Seleção Visual de Duplicatas**
+  - Cards clicáveis para escolher qual produto manter
+  - Feedback visual: verde (mantém) vs vermelho (remove)
+  - Ícones checkmark (✓) e X nos cards
+  - Status badges: "ESTE PRODUTO SERÁ MANTIDO" vs "Este produto será inativado"
+  - Botão "Confirmar Mesclagem" só habilitado após seleção
+  - Estado `produtosSelecionados` para controlar seleções
+
+- **Persistência de Duplicatas Ignoradas**
+  - Nova tabela `duplicatas_ignoradas` no banco
+  - Registra pares que usuário marcou como "não são duplicatas"
+  - Duplicatas ignoradas não reaparecem ao atualizar
+  - Filtro automático na query de detecção
+
+### 🔧 Corrigido
+- **Bug Crítico 500 no Endpoint de Atualização**
+  - Corrigido erro `NameError: name 'tenant_id' is not defined`
+  - Adicionada extração de `tenant_id` de `user_and_tenant`
+  - Endpoint PATCH `/produtos/{produto_id}` agora funcional
+
+- **Campo Incorreto de Espécie**
+  - Mudado de `especie_compativel` para `especies_indicadas`
+  - Agora reflete corretamente o campo da tela de edição
+
+### 🗄️ Banco de Dados
+- **Nova Tabela**: `duplicatas_ignoradas`
+  - Colunas: id, tenant_id, produto_id_1, produto_id_2, usuario_id, data_ignorado
+  - Unique constraint em (tenant_id, produto_id_1, produto_id_2)
+  - 4 índices criados para otimização
+
+### 📁 Arquivos Modificados
+```
+backend/app/sugestoes_racoes_routes.py (linhas 376-480)
+backend/app/produtos_routes.py (linha 2197)
+backend/app/duplicatas_ignoradas_models.py (novo)
+frontend/src/components/SugestoesInteligentesRacoes.jsx (múltiplas seções)
+```
+
+### 🎯 Exemplos de Transformação
+```
+Antes:  "Premier Cães Adultos Raças Médias e Grandes Frango 15kg"
+Depois: "Ração Premier Cães Adultos Raças Médias e Grandes Frango 15kg"
+
+Antes:  "Golden Formula Cães Adultos Frango e Arroz 15kg"
+Depois: "Ração Golden Cães Adultos Raças Médias e Grandes Frango 15kg"
+
+Antes:  "SPECIAL DOG AD PEQ PORTE 10.1KG"
+Depois: "Ração Special Dog Cães Adultos Raças Pequenas Frango 10.1kg"
+```
+
+---
+
+## [1.0.0] - 2026-02-14 (Pré-Padronização)
+
+### 🎉 Implementado
+- Sistema de Classificação Inteligente de Rações
+- Dashboard de Análise Dinâmica
+- Integração PDV com Alertas
+- Sugestões Inteligentes (duplicatas, gaps de estoque)
+- Machine Learning (feedback e previsão de demanda)
+
+---
+
+**Backup Criado**: `backups/backup_pos_padronizacao_nomes_20260214_172530`
