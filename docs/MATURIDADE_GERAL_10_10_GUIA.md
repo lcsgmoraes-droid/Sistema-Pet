@@ -20,7 +20,7 @@ Regra de uso:
 | Estrutura geral | 5/10 | 6,5/10 | 10/10 | Em andamento |
 | Seguranca operacional | 2,5/10 | 8/10 | 10/10 | Em andamento |
 | Testes/CI | 1/10 | 8,5/10 | 10/10 | Em andamento |
-| Observabilidade/auditoria | 2/10 | 6,5/10 | 10/10 | Em andamento prioritario |
+| Observabilidade/auditoria | 2/10 | 7/10 | 10/10 | Em andamento prioritario |
 | Portabilidade/configuracao | 3/10 | 6,5/10 | 10/10 | Em andamento |
 | Documentacao | 4/10 | 8/10 | 10/10 | Em andamento |
 
@@ -181,7 +181,7 @@ Proxima acao concreta:
 
 Nota inicial: 2/10.
 
-Nota atual: 6,5/10.
+Nota atual: 7/10.
 
 Referencia principal: `docs/roadmaps/FASE2_OBSERVABILIDADE.md` e secoes de Ops em `docs/EVOLUCAO_ENTERPRISE_UI_REFATORACAO.md`.
 
@@ -196,6 +196,7 @@ Ja feito:
 - [x] Auditoria de login/logout enriquecida com `request_id`.
 - [x] Auditoria de acesso para criacao, vinculo, ativacao/desativacao e logout forcado de usuarios.
 - [x] Auditoria de configuracao sensivel para ativacao manual de modulo e ativacao manual do Plano Basico.
+- [x] Smoke CI confirma gravacao real de evento de auditoria com `request_id`.
 
 Falta para 10/10:
 
@@ -206,11 +207,10 @@ Falta para 10/10:
 - [ ] Alertar falhas recorrentes, lentidao, 5xx e falha de jobs.
 - [ ] Estender eventos de negocio de campanhas/cupons/carimbos para reconciliacao e relatorio operacional.
 - [ ] Documentar retencao de logs e dados de auditoria.
-- [ ] Criar smoke que confirme que eventos de auditoria foram gravados.
 
 Proxima acao concreta:
 
-- [ ] Criar smoke automatizado que confirme gravacao de eventos de auditoria com `request_id`.
+- [ ] Criar relatorio/painel simples de incidentes e auditoria filtravel por tenant, rota, status e `request_id`.
 
 ## 7. Portabilidade/configuracao
 
@@ -302,6 +302,7 @@ Proxima acao concreta:
 | #69 | Observabilidade/auditoria | `request_id` seguro e log HTTP estruturado |
 | #70 | Observabilidade/auditoria | Auditoria de negocio para cupom, desconto manual e reabertura |
 | #71 | Observabilidade/auditoria | Auditoria de acesso, login e configuracoes sensiveis |
+| #72 | Observabilidade/auditoria | Smoke CI confirma auditoria gravada com `request_id` |
 
 ## Criterio para declarar 10/10 geral
 
