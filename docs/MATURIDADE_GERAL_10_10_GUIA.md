@@ -302,6 +302,7 @@ Proxima acao concreta:
 | #69 | Observabilidade/auditoria | `request_id` seguro e log HTTP estruturado |
 | #70 | Observabilidade/auditoria | Auditoria de negocio para cupom, desconto manual e reabertura |
 | #71 | Observabilidade/auditoria | Auditoria de acesso, login e configuracoes sensiveis |
+| #72 | Observabilidade/auditoria | Smoke CI confirma auditoria gravada com `request_id` |
 
 ## Criterio para declarar 10/10 geral
 
