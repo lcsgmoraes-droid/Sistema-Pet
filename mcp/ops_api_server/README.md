@@ -13,6 +13,7 @@ Este servidor entrega ferramentas MCP para:
 - validar permissoes usadas por abas do sistema
 - consultar logs e fila do motor de campanhas no banco DEV
 - ler logs recentes do backend DEV com redaction de segredos
+- resumir auditoria local dos MCPs Frontend e Ops/API
 
 ## Arquitetura
 
@@ -42,6 +43,7 @@ Este servidor entrega ferramentas MCP para:
 | `campaign_queue_status` | leitura DEV | banco DEV | usa container/banco configurados |
 | `campaign_enqueue_test_event` | escrita DEV local | banco DEV | valida evento, UUID e JSON |
 | `backend_logs` | leitura DEV | container DEV | aplica redaction de segredos |
+| `mcp_audit_report` | leitura | auditoria local | resume os JSONL locais dos MCPs |
 
 ## Trava de prod-up
 
@@ -64,11 +66,13 @@ Mesmo liberada, a ferramenta exige o parametro `confirmacao` com a frase exata. 
 - `SISTEMA_PET_MCP_DEV_DB_USER`
 - `SISTEMA_PET_MCP_DEV_DB_NAME`
 - `SISTEMA_PET_MCP_AUDIT_LOG`
+- `SISTEMA_PET_FRONT_MCP_AUDIT_LOG`
 - `SISTEMA_PET_MCP_TIMEOUT_SECONDS`
 - `SISTEMA_PET_MCP_MAX_TIMEOUT_SECONDS`
 - `SISTEMA_PET_MCP_MAX_OUTPUT_CHARS`
 
 Por padrao, a auditoria local fica no diretorio temporario do Windows, em `sistema_pet_mcp_ops_audit.jsonl`.
+A ferramenta `mcp_audit_report` tambem le o log do MCP Frontend, por padrao em `sistema_pet_mcp_frontend_audit.jsonl`.
 
 ## Instalacao
 

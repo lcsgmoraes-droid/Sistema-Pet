@@ -10,7 +10,7 @@ Levar os MCPs locais do Sistema Pet para um padrao seguro, repetivel e facil de 
 
 Nota inicial estimada: 4/10.
 
-Nota atual estimada: 9,5/10.
+Nota atual estimada: 9,8/10.
 
 Meta: 10/10 para uso interno profissional.
 
@@ -43,6 +43,7 @@ Meta: 10/10 para uso interno profissional.
 | Feito | Testes de protocolo MCP ponta a ponta via stdio | `tests/test_mcp_protocol.py` dos MCPs |
 | Feito | Checklist obrigatorio para novas ferramentas MCP | secao "Checklist obrigatorio para novas ferramentas MCP" |
 | Feito | Classificacao de risco das ferramentas atuais | READMEs internos dos MCPs |
+| Feito | Relatorio local de auditoria dos MCPs | ferramenta `mcp_audit_report` |
 | Feito | Documentacao de uso e arquitetura dos MCPs | `mcp/README.md` e READMEs internos |
 | Feito | Badge visual do CI no README dos MCPs | `mcp/README.md` |
 
@@ -79,13 +80,11 @@ Validacao geral do fluxo:
 
 | Prioridade | Status | Item | Motivo |
 |---|---|---|---|
-| Media | Pendente | Centralizar auditoria ou criar relatorio local de auditoria | Facilita rastrear uso sem abrir JSONL manualmente |
 | Baixa | Pendente | Revisao periodica de dependencias dos MCPs | Mantem `mcp`, `requests` e `pytest` atualizados com seguranca |
 
 ## Proximo passo recomendado
 
-1. Centralizar auditoria ou criar relatorio local de auditoria.
-2. Criar rotina de revisao periodica de dependencias dos MCPs.
+1. Criar rotina de revisao periodica de dependencias dos MCPs.
 
 ## Branch protection atual
 
