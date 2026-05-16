@@ -87,23 +87,23 @@ Status usados:
 | Produtos/estoque | Pronto local + smoke visual | Listagem, criacao, edicao, exclusao, entrada de estoque e lote/validade visual passaram em auditoria local; manter reteste em staging/producao e editar todos os campos como refinamento. |
 | Calculadora de racao | Pronto local | API A/B e smoke visual no navegador passaram com operador nao-admin; busca, calculo e comparativo retornaram 200 e console limpo. |
 | PDV/vendas | Pronto local A/B + smoke visual | Venda completa por API real e pelo navegador passou com operador nao-admin; caixa, sangria, suprimento, pagamento em dinheiro, finalizacao e baixa de estoque passaram. Falta apenas reteste visual de recibo/historico como refinamento. |
-| Financeiro de vendas | Quase pronto | Finalizacao gerou reflexos financeiros sem 500 no A/B local; menu do Basico e backend premium foram realinhados na PR #39; falta conferir telas/historico visual. |
+| Financeiro de vendas | Pronto em smoke visual de producao | Finalizacao gerou reflexos financeiros sem 500 no A/B local; em producao o Basico exibiu somente `Financeiro > Vendas` e a tela `/financeiro/vendas` carregou como leitura. |
 | Cadastros essenciais | Pronto local | Formas de pagamento, operadoras, opcoes de racao e catalogos de produto passaram em A/B real; departamentos, categorias e marcas passaram tambem por smoke visual CRUD no navegador. |
 | Configuracoes/usuarios/LGPD | Pronto local + smoke visual | Usuarios/admin passou por smoke visual; Roles & Permissoes passou por criar, duplicar, editar e excluir perfil; LGPD passou busca de titular e dossie com schema local alinhado; configuracao fiscal, parametros gerais e estoque salvaram no navegador com chamadas 200. |
-| Premium bloqueado | Pronto em smoke API de producao | Tenant Basico real em producao bloqueou financeiro ERP, contas a pagar/receber, conciliacao, compras e SEFAZ por `module_not_enabled`; operador minimo tambem foi bloqueado em usuarios/roles/permissions. |
-| Landing page/contratacao | Em ajuste | Landing comunica 30 dias gratis do Plano Basico completo, Plano Basico como contratacao inicial e recursos avancados como Beta/piloto mediante solicitacao. |
+| Premium bloqueado | Pronto em smoke API + visual de producao | Tenant Basico real em producao bloqueou financeiro ERP, contas a pagar/receber, conciliacao, compras e SEFAZ por `module_not_enabled`; no navegador, URLs premium diretas abriram upsell/bloqueio sem montar telas operacionais. |
+| Landing page/contratacao | Pronto em smoke visual de producao | Landing e planos comunicam 30 dias gratis do Plano Basico completo, Plano Basico como contratacao inicial e recursos avancados como Beta/piloto mediante solicitacao; falta onboarding real com confirmacao de e-mail antes de autoatendimento amplo. |
 
 ### 0.4. Cronograma final para vender o Plano Basico
 
 | Etapa | Objetivo | Status | Bloqueia venda? |
 |---|---|---|---|
 | 1. Base tecnica multi-tenant | Cadastro real de tenants A/B, selecao de tenant, migrations limpas e bloqueio de vazamento entre empresas. | Concluido local | Sim, mas ja passou localmente. |
-| 2. Fluxos essenciais do basico | Clientes, pets, produtos, estoque, PDV/vendas, historico financeiro de vendas e cadastros auxiliares. | Em andamento; PDV A/B, caixa, sangria/suprimento, pagamentos/operadoras, opcoes de racao, catalogos de produto, lote/validade, usuarios/admin, configuracao da empresa, Roles e LGPD com smoke visual concluido | Nao para venda controlada; retestar staging/producao antes de escalar. |
+| 2. Fluxos essenciais do basico | Clientes, pets, produtos, estoque, PDV/vendas, historico financeiro de vendas e cadastros auxiliares. | Em andamento; PDV A/B, caixa, sangria/suprimento, pagamentos/operadoras, opcoes de racao, catalogos de produto, lote/validade, usuarios/admin, configuracao da empresa, Roles e LGPD com smoke visual concluido; producao validou telas permitidas em leitura. | Nao para venda controlada; retestar criacao operacional em staging/producao antes de escalar. |
 | 3. Usuarios e permissoes | Criar usuario do tenant, validar permissoes basicas e bloqueio de acesso indevido. | Concluido local: Usuarios/Admin, Roles & Permissoes e LGPD operacional passaram por API/smoke visual. | Nao bloqueia venda controlada; manter reteste em staging/producao. |
 | 4. Calculadora/catalogos de racao | Validar fluxo visual, persistencia e mensagens de erro sem 500. | Concluido local: API A/B e smoke visual passaram com operador nao-admin. | Nao bloqueia venda controlada; retestar em staging/producao. |
-| 5. Landing page, trial e selecao de planos | Exibir 30 dias gratis do Basico completo, destacar Basico como contratacao inicial, mostrar Beta como piloto acompanhado e levar ao cadastro/onboarding correto. | Copy em ajuste; falta smoke visual final | Sim para vender por autoatendimento; falta smoke visual em producao/staging. |
-| 6. A/B visual no navegador | Usar dois tenants reais no browser e conferir que menus, dados e mensagens batem com o plano. | Em andamento; PDV completo, autocomplete, Lembretes, pagamentos/operadoras, catalogos de produto, lote/validade, configuracao da empresa, usuarios/admin, Roles e LGPD passaram | Sim antes de abrir para varias empresas. |
-| 7. Producao controlada | Merge, deploy, migrations, health check e smoke real sem dados sensiveis. | Parcial: smoke real de leitura em producao passou; deploy controlado nao foi executado nesta rodada. | Sim. |
+| 5. Landing page, trial e selecao de planos | Exibir 30 dias gratis do Basico completo, destacar Basico como contratacao inicial, mostrar Beta como piloto acompanhado e levar ao cadastro/onboarding correto. | Smoke visual de `/landing` e `/planos` em producao passou; falta onboarding completo com confirmacao real de e-mail. | Sim para autoatendimento amplo; nao bloqueia venda controlada acompanhada. |
+| 6. A/B visual no navegador | Usar dois tenants reais no browser e conferir que menus, dados e mensagens batem com o plano. | Em andamento; PDV completo, autocomplete, Lembretes, pagamentos/operadoras, catalogos de produto, lote/validade, configuracao da empresa, usuarios/admin, Roles e LGPD passaram; tenant Basico real em producao confirmou menus e bloqueios visuais. | Sim antes de abrir para varias empresas. |
+| 7. Producao controlada | Merge, deploy, migrations, health check e smoke real sem dados sensiveis. | Parcial: smoke API + visual de leitura em producao passou; deploy controlado nao foi executado nesta rodada. | Sim. |
 
 ### 0.5. Desenho recomendado para trial e Beta
 
@@ -164,6 +164,18 @@ Rodadas executadas contra `https://mlprohub.com.br`, sem deploy, sem SSH e sem c
 | Operador Basico temporario | 14/14 OK | Perfil com `vendas.criar` recebeu apenas permissoes efetivas esperadas e foi bloqueado em admin/premium. |
 | Rotas sem token | 8/8 OK | Rotas protegidas retornaram `Not authenticated` sem token. |
 | Conciliacao premium Basico | 2/2 OK | `financeiro_erp` bloqueou conciliacao de cartao; metodo invalido respondeu 405 sem expor dados. |
+| Smoke visual em tenant Basico | OK | Login real, menu Basico, telas permitidas e bloqueios premium diretos passaram no navegador; console sem erros. |
+| Smoke visual landing/planos | OK | `/landing` e `/planos` reforcaram 30 dias gratis do Basico, modulos Beta como piloto acompanhado e CTAs corretos; console sem erros. |
+
+Detalhe do smoke visual em producao:
+
+- Menu `Financeiro` exibiu apenas `Vendas` para o Basico.
+- Menu `Cadastros` exibiu cadastros essenciais: departamentos, marcas, categorias, despesas rapidas, especies/racas, opcoes de racao, formas de pagamento e operadoras.
+- Menu `Inteligencia Artificial` exibiu apenas `Comparador de Racoes`; Chat IA financeiro nao apareceu.
+- Rotas permitidas carregaram em leitura: `/clientes`, `/produtos`, `/pdv`, `/financeiro/vendas` e `/meu-plano`.
+- Rotas premium diretas abriram tela de modulo/upgrade, sem tela operacional: `/financeiro/contas-pagar`, `/financeiro/dre`, `/compras/pedidos`, `/notas-fiscais/entrada`, `/veterinario`, `/banho-tosa` e `/campanhas`.
+- Pagina `Meu Plano` confirmou `Plano Basico`, trial em andamento, 30 dias e cobranca assistida fora do sistema.
+- Paginas publicas `/landing` e `/planos` comunicaram 30 dias gratis do Basico e modulos avancados como Beta/piloto acompanhado.
 
 Cleanup da rodada:
 
@@ -173,7 +185,6 @@ Cleanup da rodada:
 
 Pendencias que continuam abertas:
 
-- Smoke visual no navegador em producao para confirmar menus/mensagens do Basico.
 - Teste manual de onboarding completo de novo tenant com confirmacao real de e-mail.
 - Proximo deploy real autorizado deve usar `docs/PRODUCAO_ROLLBACK_CHECKLIST.md`.
 
@@ -224,7 +235,7 @@ Pendencias que continuam abertas:
 | Area | Tela/Fluxo | Frontend | Endpoint | Testado | Resultado | Correcao | Status |
 |---|---|---|---|---|---|---|---|
 | Comercial | Registro com plano basico | `/register?plan=basico` | `POST /auth/register` | Sim | Conta/tenant criados em dois tenants A/B por API real. Erros locais de schema foram corrigidos por migrations. | Adicionadas migrations para gaps de onboarding local e tabelas auxiliares de racao. | OK |
-| Comercial | Landing page com trial e selecao de planos | `/landing` e `/planos` | Plano escolhido alimenta cadastro/contratacao | Sim + smoke visual anterior; precisa reteste apos copy | Landing agora deve comunicar 30 dias gratis do Basico completo, Plano Basico como contratacao inicial e recursos avancados como Beta/piloto mediante solicitacao. API continua gravando tenant com `plan=basico`. | `LandingPage`, `Planos` e `Register` atualizados para a comunicacao do trial Basico; Betas ficam sem liberacao automatica. | Em ajuste |
+| Comercial | Landing page com trial e selecao de planos | `/landing` e `/planos` | Plano escolhido alimenta cadastro/contratacao | Sim + smoke visual de producao | Landing e planos comunicam 30 dias gratis do Basico completo, Plano Basico como contratacao inicial e recursos avancados como Beta/piloto mediante solicitacao. API continua gravando tenant com `plan=basico`. | `LandingPage`, `Planos` e `Register` atualizados para a comunicacao do trial Basico; Betas ficam sem liberacao automatica. | OK visual producao |
 | Autenticacao | Login do novo usuario | `/login` | `POST /auth/login` | Sim | Login do usuario de teste funcionou e redirecionou para area autenticada. | Adicionado `autoComplete` correto para reduzir warnings do navegador. | OK |
 | Dashboard | Dashboard inicial do plano basico | `/dashboard` | Chamava endpoints premium de financeiro/IA e Bling | Sim | A tela abria, mas o console recebia 403 de endpoints premium bloqueados. | `AlertasIA`, `ProjecoesIA` e badge do layout agora evitam chamadas premium quando modulo nao esta ativo. | Corrigido |
 | Pessoas | Listar clientes | `/clientes` | `GET /clientes` | Sim | Auditoria A/B confirmou que cliente do tenant A aparece no A e nao aparece no B, e vice-versa. | Nenhuma nesta branch. | OK |
@@ -611,6 +622,7 @@ Rodada estendida `866987` + reteste de estoque:
 - Smoke visual de bloqueio de permissao para operador/usuario sem acesso: testado.
 - Health check de producao: apenas endpoint de saude consultado, sem deploy e sem alteracao.
 - Smoke real de leitura em producao do Plano Basico: testado em 2026-05-16 com tenant Basico real, admin Basico, operador temporario minimo e rotas sem token; premium bloqueado por modulo e cleanup confirmado.
+- Smoke visual em producao do Plano Basico: testado em 2026-05-16 com tenant Basico real; menus, telas permitidas, paginas de upsell/bloqueio premium e `Meu Plano` conferidos no navegador, sem erro de console.
 
 ### Testes backend amplos
 
@@ -705,14 +717,14 @@ Pendencias manuais que seguem abertas pelo checklist:
 - Catalogos auxiliares de produto: API A/B e smoke visual concluidos.
 - Formas de pagamento e operadoras: API A/B e smoke visual concluidos; falta CRUD completo no navegador como refinamento.
 - Configuracao da empresa: permissao/tenant, schema local e smoke visual de salvar dados fiscal/geral/estoque concluidos.
-- Landing page com selecao de planos e CTA do Plano Basico para contratacao: concluido local; falta smoke visual em staging/producao.
+- Landing page com selecao de planos e CTA do Plano Basico para contratacao: concluido local; falta onboarding real com confirmacao de e-mail antes de autoatendimento amplo.
 - PDV/vendas: API A/B concluida e smoke visual de operador/autocomplete/finalizacao passou; falta apenas reteste de recibo/historico visual.
-- A/B visual no navegador entre dois tenants: em andamento.
+- A/B visual no navegador entre dois tenants: em andamento; producao Basico ja validou menu, leitura e bloqueio premium.
 
 ### Deploy
 
 - Nao houve deploy de producao nesta etapa.
-- Houve apenas smoke real de leitura contra producao em 2026-05-16, sem SSH e sem alteracao operacional de venda/cliente/produto/estoque.
+- Houve smoke real API + visual de leitura contra producao em 2026-05-16, sem SSH e sem alteracao operacional de venda/cliente/produto/estoque.
 - Branch atual enviada para GitHub no PR `#36`: `https://github.com/lcsgmoraes-droid/Sistema-Pet/pull/36`.
 
 ## Resumo Executivo
@@ -723,5 +735,5 @@ Pendencias manuais que seguem abertas pelo checklist:
 - Pendencias P0: 0 confirmadas apos esta branch
 - Pendencias P1: 0 bloqueadores tecnicos confirmados para venda controlada; refinamentos de financeiro/recibo/historico ainda recomendados antes de escalar.
 - Pendencias P2: 5
-- Minha recomendacao: liberar venda controlada acompanhada apenas com smoke visual final no navegador e acompanhamento dos primeiros tenants; o smoke API real de producao do Basico ja passou, mas onboarding completo com e-mail real ainda deve ser conferido antes de autoatendimento amplo.
+- Minha recomendacao: liberar venda controlada acompanhada com monitoramento dos primeiros tenants; o smoke API + visual real de producao do Basico ja passou, mas onboarding completo com e-mail real ainda deve ser conferido antes de autoatendimento amplo.
 
