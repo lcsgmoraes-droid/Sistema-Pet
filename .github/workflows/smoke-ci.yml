@@ -7,7 +7,9 @@ on:
       - "backend/**"
       - "frontend/**"
       - "scripts/ci_smoke.py"
+      - "scripts/smoke_golive.py"
       - "tests/test_ci_smoke_script.py"
+      - "tests/test_smoke_golive_script.py"
       - ".github/workflows/smoke-ci.yml"
   pull_request:
     branches: [main]
@@ -45,7 +47,7 @@ jobs:
           python -m pip install -r backend/requirements.txt
 
       - name: Test smoke helpers
-        run: python -m pytest tests/test_ci_smoke_script.py -q
+        run: python -m pytest tests/test_ci_smoke_script.py tests/test_smoke_golive_script.py -q
 
       - name: Backend and auth smoke
         run: python scripts/ci_smoke.py
