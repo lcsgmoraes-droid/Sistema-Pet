@@ -301,6 +301,7 @@ Proxima acao concreta:
 | #68 | Documentacao/governanca | Plano mestre de maturidade geral criado |
 | #69 | Observabilidade/auditoria | `request_id` seguro e log HTTP estruturado |
 | #70 | Observabilidade/auditoria | Auditoria de negocio para cupom, desconto manual e reabertura |
+| #71 | Observabilidade/auditoria | Auditoria de acesso, login e configuracoes sensiveis |
 
 ## Criterio para declarar 10/10 geral
 
