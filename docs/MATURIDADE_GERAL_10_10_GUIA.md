@@ -20,7 +20,7 @@ Regra de uso:
 | Estrutura geral | 5/10 | 6,5/10 | 10/10 | Em andamento |
 | Seguranca operacional | 2,5/10 | 8/10 | 10/10 | Em andamento |
 | Testes/CI | 1/10 | 8,5/10 | 10/10 | Em andamento |
-| Observabilidade/auditoria | 2/10 | 5,5/10 | 10/10 | Em andamento prioritario |
+| Observabilidade/auditoria | 2/10 | 6/10 | 10/10 | Em andamento prioritario |
 | Portabilidade/configuracao | 3/10 | 6,5/10 | 10/10 | Em andamento |
 | Documentacao | 4/10 | 8/10 | 10/10 | Em andamento |
 
@@ -181,7 +181,7 @@ Proxima acao concreta:
 
 Nota inicial: 2/10.
 
-Nota atual: 5/10.
+Nota atual: 6/10.
 
 Referencia principal: `docs/roadmaps/FASE2_OBSERVABILIDADE.md` e secoes de Ops em `docs/EVOLUCAO_ENTERPRISE_UI_REFATORACAO.md`.
 
@@ -192,21 +192,22 @@ Ja feito:
 - [x] MCPs geram auditoria local JSONL.
 - [x] Incidentes e watchdog aparecem no material enterprise consolidado.
 - [x] Primeiro corte de `request_id`: header seguro `X-Request-ID`, UUID automatico para valor inseguro, propagacao para `trace_id` e log HTTP estruturado.
+- [x] Trilha inicial de auditoria de negocio para cupom consumido, desconto manual efetivado e reabertura de venda com reversao de cupom/carimbo.
 
 Falta para 10/10:
 
 - [ ] Estender `request_id`/`correlation_id` para jobs, workers e integracoes externas.
 - [ ] Garantir logs estruturados JSON nas rotas criticas com eventos de negocio, nao apenas log HTTP.
-- [ ] Criar trilha de auditoria para acoes sensiveis: login, permissao, venda, desconto, cupom, reabertura, configuracao e deploy.
+- [ ] Estender trilha de auditoria para login, permissao, configuracao, deploy e alteracoes sensiveis fora de vendas.
 - [ ] Criar painel ou relatorio de incidentes com filtros por tenant, rota, status e request_id.
 - [ ] Alertar falhas recorrentes, lentidao, 5xx e falha de jobs.
-- [ ] Registrar eventos de negocio para campanhas/cupons/carimbos com reconciliacao.
+- [ ] Estender eventos de negocio de campanhas/cupons/carimbos para reconciliacao e relatorio operacional.
 - [ ] Documentar retencao de logs e dados de auditoria.
 - [ ] Criar smoke que confirme que eventos de auditoria foram gravados.
 
 Proxima acao concreta:
 
-- [ ] Criar trilha de auditoria de negocio para desconto, cupom, reabertura de venda e alteracoes sensiveis de configuracao.
+- [ ] Estender auditoria para login, permissoes, configuracoes sensiveis e deploy.
 
 ## 7. Portabilidade/configuracao
 
@@ -294,6 +295,8 @@ Proxima acao concreta:
 | #66 | CI/CD/docs | Deploy real registrado no guia |
 | #38 | Produto/docs | Checklist pos-deploy do Plano Basico atualizado |
 | #67 | Documentacao | Docs enterprise/UI/refatoracao consolidados |
+| #68 | Documentacao/governanca | Plano mestre de maturidade geral criado |
+| #69 | Observabilidade/auditoria | `request_id` seguro e log HTTP estruturado |
 
 ## Criterio para declarar 10/10 geral
 

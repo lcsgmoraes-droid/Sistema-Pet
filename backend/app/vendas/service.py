@@ -1303,6 +1303,11 @@ class VendaService:
         from app.caixa.service import CaixaService
         from app.financeiro import ContasReceberService
         from app.financeiro_models import LancamentoManual, CategoriaFinanceira
+        from app.services.business_audit_service import (
+            build_sale_coupon_redeemed_metadata,
+            calculate_manual_discount_amount,
+            log_business_event,
+        )
         
         logger.info(f"🚀 Iniciando finalização da venda #{venda_id} - {len(pagamentos)} pagamento(s)")
         
@@ -1793,6 +1798,43 @@ class VendaService:
             # 🔥 COMMIT ÚNICO - TRANSAÇÃO ATÔMICA 🔥
             # ============================================================
             
+            if cupom_consumido:
+                log_business_event(
+                    db=db,
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    event="sale.coupon_redeemed",
+                    entity_type="vendas",
+                    entity_id=venda.id,
+                    metadata=build_sale_coupon_redeemed_metadata(
+                        venda=venda,
+                        coupon_consumed=cupom_consumido,
+                    ),
+                    details=f"Cupom consumido na venda #{venda.numero_venda}",
+                    commit=False,
+                )
+
+            manual_discount_amount = calculate_manual_discount_amount(venda)
+            if manual_discount_amount > 0:
+                log_business_event(
+                    db=db,
+                    tenant_id=tenant_id,
+                    user_id=user_id,
+                    event="sale.manual_discount_finalized",
+                    entity_type="vendas",
+                    entity_id=venda.id,
+                    metadata={
+                        "sale_number": venda.numero_venda,
+                        "discount_amount": manual_discount_amount,
+                        "gross_discount": float(venda.desconto_valor or 0),
+                        "coupon_discount": float(venda.cupom_discount_applied or 0),
+                        "customer_id": venda.cliente_id,
+                        "sale_total": float(venda.total or 0),
+                    },
+                    details=f"Desconto manual efetivado na venda #{venda.numero_venda}",
+                    commit=False,
+                )
+
             db.commit()
             logger.info(f"✅ ✅ ✅ COMMIT REALIZADO - Venda #{venda.numero_venda} finalizada com sucesso! ✅ ✅ ✅")
             

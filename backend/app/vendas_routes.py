@@ -1412,19 +1412,39 @@ def reabrir_venda(
 
     from app.campaigns.coupon_service import reverse_coupon_redemptions_for_sale
     from app.campaigns.loyalty_service import void_loyalty_stamps_for_sale
+    from app.services.business_audit_service import build_sale_reopened_metadata, log_business_event
 
-    reverse_coupon_redemptions_for_sale(
+    coupon_reversal_result = reverse_coupon_redemptions_for_sale(
         db,
         tenant_id=tenant_id,
         venda_id=venda.id,
         reason="Venda reaberta para edicao",
     )
 
-    void_loyalty_stamps_for_sale(
+    loyalty_void_result = void_loyalty_stamps_for_sale(
         db,
         tenant_id=tenant_id,
         venda_id=venda.id,
         reason="Venda reaberta para edicao",
+    )
+
+    log_business_event(
+        db=db,
+        tenant_id=tenant_id,
+        user_id=current_user.id,
+        event="sale.reopened",
+        entity_type="vendas",
+        entity_id=venda.id,
+        old_value={"status": status_anterior},
+        metadata=build_sale_reopened_metadata(
+            venda=venda,
+            previous_status=status_anterior,
+            commissions_removed=comissoes_removidas,
+            coupon_reversal=coupon_reversal_result,
+            loyalty_void=loyalty_void_result,
+        ),
+        details=f"Venda #{venda.id} reaberta para edicao",
+        commit=False,
     )
 
     db.commit()
