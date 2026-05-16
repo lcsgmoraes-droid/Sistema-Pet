@@ -47,6 +47,15 @@ O guia de maturidade e proximos passos fica em `docs/MCP_MATURIDADE_GUIA.md`.
 
 Os testes tambem sobem os servidores MCP por stdio e usam um cliente real do SDK MCP para validar `initialize`, `list_tools` e uma chamada segura de ferramenta.
 
+## Ver auditoria local dos MCPs
+
+No Codex ou VS Code, use a ferramenta `mcp_audit_report` do MCP Ops/API para resumir os eventos locais dos dois MCPs.
+
+Ela le os arquivos JSONL configurados por:
+
+- `SISTEMA_PET_MCP_AUDIT_LOG`
+- `SISTEMA_PET_FRONT_MCP_AUDIT_LOG`
+
 ## Depurar com MCP Inspector
 
 O Inspector pode ser instalado globalmente:

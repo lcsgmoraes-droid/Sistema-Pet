@@ -19,6 +19,11 @@ Ferramentas de leitura podem rodar normalmente. Ferramentas que sobem ambiente o
 
 `fluxo_prod_up` fica bloqueado por padrao e exige variavel de ambiente mais frase de confirmacao. Deploy remoto de producao nao e feito por estes MCPs.
 
+## Auditoria
+
+Os servidores gravam auditoria local em JSONL no diretorio temporario do Windows.
+Use a ferramenta `mcp_audit_report`, no MCP Ops/API, para resumir os eventos dos dois MCPs sem abrir os arquivos manualmente.
+
 ## Testes
 
 Pela raiz do projeto:

@@ -4,6 +4,7 @@ from mcp.server.fastmcp import FastMCP
 
 from ops_api_mcp.config import ServerConfig
 from ops_api_mcp.services.api_service import ApiService
+from ops_api_mcp.services.audit_report_service import AuditReportService
 from ops_api_mcp.services.audit_service import AuditService
 from ops_api_mcp.services.campaign_service import CampaignService
 from ops_api_mcp.services.command_service import CommandService
@@ -18,6 +19,12 @@ docker_service = DockerService(config)
 campaign_service = CampaignService(config, docker_service)
 log_service = LogService(config, docker_service)
 audit_service = AuditService(config)
+audit_report_service = AuditReportService(
+    {
+        "frontend": config.frontend_audit_log_path,
+        "ops": config.audit_log_path,
+    }
+)
 
 mcp = FastMCP(
     "sistema-pet-ops-api",
@@ -141,3 +148,11 @@ def backend_logs(lines: int = 50, filter_text: str = "") -> dict:
     Retorna logs recentes do container backend DEV, com redaction de segredos.
     """
     return _record("backend_logs", log_service.backend_logs(lines=lines, filter_text=filter_text))
+
+
+@mcp.tool()
+def mcp_audit_report(limit: int = 50) -> dict:
+    """
+    Resume os logs locais de auditoria dos MCPs Frontend e Ops/API.
+    """
+    return _record("mcp_audit_report", audit_report_service.build(limit=limit))

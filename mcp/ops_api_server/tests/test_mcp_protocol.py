@@ -22,6 +22,7 @@ def test_ops_mcp_responds_over_stdio_protocol(tmp_path: Path):
             env={
                 "PYTHONIOENCODING": "utf-8",
                 "SISTEMA_PET_MCP_AUDIT_LOG": str(tmp_path / "ops-audit.jsonl"),
+                "SISTEMA_PET_FRONT_MCP_AUDIT_LOG": str(tmp_path / "frontend-audit.jsonl"),
                 "SISTEMA_PET_MCP_ALLOW_PROD_ACTIONS": "false",
             },
         )
@@ -39,6 +40,7 @@ def test_ops_mcp_responds_over_stdio_protocol(tmp_path: Path):
                 tool_names = {tool.name for tool in tools_result.tools}
                 assert "fluxo_check" in tool_names
                 assert "fluxo_prod_up" in tool_names
+                assert "mcp_audit_report" in tool_names
 
                 call_result = await session.call_tool(
                     "fluxo_prod_up",
@@ -49,5 +51,12 @@ def test_ops_mcp_responds_over_stdio_protocol(tmp_path: Path):
                 assert payload["ok"] is False
                 assert payload["exit_code"] == 126
                 assert "bloqueada" in payload["stderr"]
+
+                audit_result = await session.call_tool("mcp_audit_report", {"limit": 5})
+                assert audit_result.isError is False
+                audit_payload = json.loads(audit_result.content[0].text)
+                assert audit_payload["ok"] is True
+                assert audit_payload["total_events"] >= 1
+                assert audit_payload["recent_events"][0]["tool"] == "fluxo_prod_up"
 
     anyio.run(run_client)

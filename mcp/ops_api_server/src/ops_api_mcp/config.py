@@ -38,6 +38,7 @@ class ServerConfig:
     dev_db_user: str = "postgres"
     dev_db_name: str = "petshop_dev"
     audit_log_path: Path | None = None
+    frontend_audit_log_path: Path | None = None
 
     @staticmethod
     def load() -> "ServerConfig":
@@ -72,6 +73,12 @@ class ServerConfig:
                 os.getenv(
                     "SISTEMA_PET_MCP_AUDIT_LOG",
                     str(Path(tempfile.gettempdir()) / "sistema_pet_mcp_ops_audit.jsonl"),
+                )
+            ),
+            frontend_audit_log_path=Path(
+                os.getenv(
+                    "SISTEMA_PET_FRONT_MCP_AUDIT_LOG",
+                    str(Path(tempfile.gettempdir()) / "sistema_pet_mcp_frontend_audit.jsonl"),
                 )
             ),
         )
