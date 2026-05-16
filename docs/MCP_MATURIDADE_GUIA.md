@@ -10,7 +10,7 @@ Levar os MCPs locais do Sistema Pet para um padrao seguro, repetivel e facil de 
 
 Nota inicial estimada: 4/10.
 
-Nota atual estimada: 9,8/10.
+Nota atual estimada: 10/10.
 
 Meta: 10/10 para uso interno profissional.
 
@@ -44,6 +44,7 @@ Meta: 10/10 para uso interno profissional.
 | Feito | Checklist obrigatorio para novas ferramentas MCP | secao "Checklist obrigatorio para novas ferramentas MCP" |
 | Feito | Classificacao de risco das ferramentas atuais | READMEs internos dos MCPs |
 | Feito | Relatorio local de auditoria dos MCPs | ferramenta `mcp_audit_report` |
+| Feito | Revisao periodica de dependencias dos MCPs | `.github/dependabot.yml` |
 | Feito | Documentacao de uso e arquitetura dos MCPs | `mcp/README.md` e READMEs internos |
 | Feito | Badge visual do CI no README dos MCPs | `mcp/README.md` |
 
@@ -55,6 +56,8 @@ Meta: 10/10 para uso interno profissional.
 | #45 | CI dos MCPs e bootstrap automatico dos venvs | Mergeado |
 | #47 | Ajuste do MCP CI para rodar em todo PR antes da branch protection | Mergeado |
 | #48 | Guia atualizado com branch protection e proximos passos | Mergeado |
+| #49 | Testes de protocolo MCP ponta a ponta | Mergeado |
+| #50 | Relatorio local de auditoria dos MCPs | Mergeado |
 
 ## Como validar agora
 
@@ -76,15 +79,16 @@ Validacao geral do fluxo:
 .\FLUXO_UNICO.bat check
 ```
 
-## O que falta para 10/10
+## O que falta para manter 10/10
 
 | Prioridade | Status | Item | Motivo |
 |---|---|---|---|
-| Baixa | Pendente | Revisao periodica de dependencias dos MCPs | Mantem `mcp`, `requests` e `pytest` atualizados com seguranca |
+| Baixa | Continuo | Revisar PRs do Dependabot dos MCPs | Mantem `mcp`, `requests` e `pytest` atualizados com seguranca |
 
 ## Proximo passo recomendado
 
-1. Criar rotina de revisao periodica de dependencias dos MCPs.
+1. Quando o Dependabot abrir PR, revisar e mergear se o check `MCP tests` passar.
+2. Reauditar maturidade dos MCPs quando uma ferramenta nova for adicionada.
 
 ## Branch protection atual
 
