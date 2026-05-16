@@ -848,7 +848,7 @@ app.include_router(notas_entrada_router, tags=["Notas de Entrada (XML)"], depend
 app.include_router(compras_pendencias_router, tags=["Compras - Pendencias"], dependencies=_module_dependencies("compras"))
 app.include_router(contas_pagar_router, tags=["Financeiro - Contas a Pagar"], dependencies=_module_dependencies("financeiro_erp"))
 app.include_router(tipo_despesa_router, tags=["Cadastros - Tipo de Despesa"])
-app.include_router(contas_receber_router, tags=["Financeiro - Contas a Receber"])
+app.include_router(contas_receber_router, tags=["Financeiro - Contas a Receber"], dependencies=_module_dependencies("financeiro_erp"))
 app.include_router(conciliacao_cartao_router, tags=["Financeiro - Conciliação de Cartão"], dependencies=_module_dependencies("financeiro_erp"))
 app.include_router(conciliacao_bancaria_router, tags=["Conciliação Bancária - OFX"], dependencies=_module_dependencies("financeiro_erp"))
 app.include_router(stone_router, tags=["Stone - Pagamentos & Conciliação"], dependencies=_module_dependencies("financeiro_erp"))
@@ -947,7 +947,7 @@ app.include_router(ecommerce_config_router, dependencies=_module_dependencies("e
 app.include_router(ecommerce_notify_router)
 app.include_router(ecommerce_analytics_router, dependencies=_module_dependencies("ecommerce"))
 app.include_router(ecommerce_drive_router, dependencies=_module_dependencies("ecommerce"))     # Drive pickup — PDV + cliente
-app.include_router(sefaz_router)               # SEFAZ — consulta NF-e por chave
+app.include_router(sefaz_router, dependencies=_module_dependencies("compras"))  # SEFAZ — consulta NF-e por chave
 app.include_router(app_mobile_router)  # App Mobile - Rotas dos clientes
 app.include_router(app_privacy_router)  # App Mobile - Privacidade/LGPD
 app.include_router(app_banho_tosa_router)  # App Mobile - Banho & Tosa
