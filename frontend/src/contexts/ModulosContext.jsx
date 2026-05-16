@@ -48,6 +48,11 @@ export const MODULOS_PREMIUM = [
   "marketplaces",
 ];
 
+export const MODULOS_FORA_DA_OFERTA_PUBLICA = ["bling"];
+export const MODULOS_BETA_PUBLICOS = MODULOS_PREMIUM.filter(
+  (modulo) => !MODULOS_FORA_DA_OFERTA_PUBLICA.includes(modulo),
+);
+
 export const MODULOS_INFO = {
   compras: {
     nome: "Compras e Entrada XML",
@@ -248,6 +253,10 @@ export const MODULOS_INFO = {
 export const ModulosProvider = ({ children }) => {
   const { user } = useAuth();
   const [modulosAtivos, setModulosAtivos] = useState(null); // null = carregando
+  const [modulosBetaPublicos, setModulosBetaPublicos] = useState(MODULOS_BETA_PUBLICOS);
+  const [modulosForaOfertaPublica, setModulosForaOfertaPublica] = useState(
+    MODULOS_FORA_DA_OFERTA_PUBLICA,
+  );
   const devControlesAtivos = import.meta.env.DEV;
   const [devModulosConfig, setDevModulosConfig] = useState(() => {
     if (!devControlesAtivos) {
@@ -280,22 +289,39 @@ export const ModulosProvider = ({ children }) => {
       // Sem usuario logado: mantem estado de carregamento para evitar
       // liberar modulos premium durante a hidratacao da sessao.
       setModulosAtivos(null);
+      setModulosBetaPublicos(MODULOS_BETA_PUBLICOS);
+      setModulosForaOfertaPublica(MODULOS_FORA_DA_OFERTA_PUBLICA);
       return;
     }
     const token = getAccessToken();
     const selectedTenant = localStorage.getItem("selectedTenant");
     if (!token || !selectedTenant) {
       setModulosAtivos([]);
+      setModulosBetaPublicos(MODULOS_BETA_PUBLICOS);
+      setModulosForaOfertaPublica(MODULOS_FORA_DA_OFERTA_PUBLICA);
       return;
     }
 
     try {
       const response = await api.get("/modulos/status");
       const modulosApi = response.data?.modulos_ativos;
+      const modulosBetaApi = response.data?.modulos_beta;
+      const modulosForaOfertaApi = response.data?.modulos_fora_oferta_publica;
+
       setModulosAtivos(Array.isArray(modulosApi) ? modulosApi : []);
+      setModulosBetaPublicos(
+        Array.isArray(modulosBetaApi) ? modulosBetaApi : MODULOS_BETA_PUBLICOS,
+      );
+      setModulosForaOfertaPublica(
+        Array.isArray(modulosForaOfertaApi)
+          ? modulosForaOfertaApi
+          : MODULOS_FORA_DA_OFERTA_PUBLICA,
+      );
     } catch {
       // Fail-closed: se não conseguir confirmar o plano, não libera premium.
       setModulosAtivos([]);
+      setModulosBetaPublicos(MODULOS_BETA_PUBLICOS);
+      setModulosForaOfertaPublica(MODULOS_FORA_DA_OFERTA_PUBLICA);
     }
   }, [user]);
 
@@ -351,6 +377,16 @@ export const ModulosProvider = ({ children }) => {
     [devControlesAtivos, devModulosConfig, moduloAtivoBase],
   );
 
+  const moduloBetaPublico = useCallback(
+    (modulo) => modulosBetaPublicos.includes(modulo),
+    [modulosBetaPublicos],
+  );
+
+  const moduloForaOfertaPublica = useCallback(
+    (modulo) => modulosForaOfertaPublica.includes(modulo),
+    [modulosForaOfertaPublica],
+  );
+
   const definirModoDevModulos = useCallback(
     (modo) => {
       if (!devControlesAtivos) return;
@@ -394,7 +430,11 @@ export const ModulosProvider = ({ children }) => {
   const value = useMemo(
     () => ({
       modulosAtivos,
+      modulosBetaPublicos,
+      modulosForaOfertaPublica,
       moduloAtivo,
+      moduloBetaPublico,
+      moduloForaOfertaPublica,
       carregarModulos,
       devControlesAtivos,
       devModoModulos: devModulosConfig.modo,
@@ -403,7 +443,11 @@ export const ModulosProvider = ({ children }) => {
     }),
     [
       modulosAtivos,
+      modulosBetaPublicos,
+      modulosForaOfertaPublica,
       moduloAtivo,
+      moduloBetaPublico,
+      moduloForaOfertaPublica,
       carregarModulos,
       devControlesAtivos,
       devModulosConfig.modo,

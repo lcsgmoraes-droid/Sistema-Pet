@@ -5,7 +5,6 @@
 import { useEffect, useState } from "react";
 import {
   FiCheckCircle,
-  FiCreditCard,
   FiHelpCircle,
   FiLock,
   FiMessageCircle,
@@ -737,7 +736,12 @@ function getBeneficiosPorSecao(modulo, beneficios) {
    Componente principal
 --------------------------------------------------- */
 const ModuloBloqueado = ({ modulo, children }) => {
-  const { moduloAtivo, modulosAtivos } = useModulos();
+  const {
+    moduloAtivo,
+    modulosAtivos,
+    moduloBetaPublico,
+    moduloForaOfertaPublica,
+  } = useModulos();
 
   // Registrar tentativa de acesso a módulo bloqueado (tracking leve)
   useEffect(() => {
@@ -775,11 +779,43 @@ const ModuloBloqueado = ({ modulo, children }) => {
     recursos: [],
   };
 
+  if (moduloForaOfertaPublica(modulo)) {
+    return (
+      <div className="min-h-full bg-slate-50 p-4 md:p-6 flex items-start justify-center">
+        <div className="w-full max-w-2xl rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
+          <div className="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-slate-100 text-slate-500">
+            <FiLock className="h-6 w-6" />
+          </div>
+          <p className="text-xs font-bold uppercase tracking-wide text-slate-400">
+            Recurso fora da oferta atual
+          </p>
+          <h2 className="mt-2 text-2xl font-bold text-slate-900">
+            Este recurso nao esta disponivel para novos tenants.
+          </h2>
+          <p className="mx-auto mt-3 max-w-xl text-sm leading-6 text-slate-600">
+            O trial publico libera o Plano Basico completo por 30 dias. Modulos
+            avancados entram apenas como Beta acompanhado, quando fizer sentido
+            para o cliente e para a operacao.
+          </p>
+          <Link
+            to="/dashboard"
+            className="mt-6 inline-flex rounded-xl bg-slate-900 px-5 py-3 text-sm font-semibold text-white transition hover:bg-slate-800"
+          >
+            Voltar ao sistema
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   const extras = getExtras(modulo, info);
   const secoesBeneficios = getBeneficiosPorSecao(modulo, extras.beneficios);
+  const betaPublico = moduloBetaPublico(modulo);
 
   const msgWhatsApp = encodeURIComponent(
-    `Ola! Quero contratar o modulo ${info.nome} do Sistema Pet. Pode me ajudar?`,
+    betaPublico
+      ? `Ola! Quero solicitar acesso Beta ao modulo ${info.nome} do Sistema Pet. Pode me ajudar?`
+      : `Ola! Quero saber mais sobre o modulo ${info.nome} do Sistema Pet. Pode me ajudar?`,
   );
 
   const Preview = PREVIEWS[modulo] ?? null;
@@ -792,7 +828,9 @@ const ModuloBloqueado = ({ modulo, children }) => {
           <div className="inline-flex items-center gap-2 bg-white border border-indigo-200 rounded-full px-4 py-1.5 shadow-sm mb-3">
             <FiTrendingUp className="w-3.5 h-3.5 text-indigo-500" />
             <span className="text-xs font-semibold text-indigo-600">
-              Modulo Premium — Resultados Comprovados
+              {betaPublico
+                ? "Modulo Beta — piloto acompanhado"
+                : "Modulo controlado — acesso sob liberacao"}
             </span>
           </div>
           <h2 className="text-2xl font-bold text-gray-800 mb-1">{info.nome}</h2>
@@ -802,7 +840,7 @@ const ModuloBloqueado = ({ modulo, children }) => {
         {/* Banner ROI */}
         <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-2xl p-4 mb-5 text-white text-center shadow-lg">
           <p className="text-sm font-medium opacity-90">
-            💡 {extras.roi_banner}
+            {extras.roi_banner}
           </p>
         </div>
 
@@ -866,16 +904,14 @@ const ModuloBloqueado = ({ modulo, children }) => {
               ))}
             </div>
 
-            {/* Preco */}
+            {/* Acesso */}
             <div className="mt-5 pt-5 border-t border-gray-100">
               <div className="flex items-end justify-between mb-1">
                 <div>
-                  <p className="text-xs text-gray-400">Valor mensal</p>
+                  <p className="text-xs text-gray-400">Tipo de acesso</p>
                   <p className="text-3xl font-bold text-gray-900">
-                    R${info.preco}
-                    <span className="text-base font-normal text-gray-400">
-                      /mes
-                    </span>
+                    Beta
+                    <span className="text-base font-normal text-gray-400"> acompanhado</span>
                   </p>
                 </div>
                 {extras.payback && (
@@ -892,8 +928,8 @@ const ModuloBloqueado = ({ modulo, children }) => {
                 rel="noreferrer"
                 className="flex items-center justify-center gap-2 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-3 px-4 rounded-xl transition-colors mt-4"
               >
-                <FiCreditCard className="w-4 h-4" />
-                Contratar agora — R${info.preco}/mes
+                <FiMessageCircle className="w-4 h-4" />
+                Solicitar acesso Beta
               </a>
               <a
                 href={`https://wa.me/${WHATSAPP_NUMERO}?text=${encodeURIComponent(`Quero saber mais sobre o modulo ${info.nome}`)}`}
@@ -911,7 +947,7 @@ const ModuloBloqueado = ({ modulo, children }) => {
               <div className="flex items-center justify-center gap-2 text-xs text-gray-400">
                 <FiLock className="w-3 h-3 flex-shrink-0" />
                 <span>
-                  Liberado automaticamente em ate 5 minutos apos confirmacao.
+                  Liberacao manual por tenant, com acompanhamento do piloto.
                 </span>
               </div>
               <Link

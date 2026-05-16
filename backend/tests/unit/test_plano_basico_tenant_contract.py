@@ -107,6 +107,10 @@ def test_modulos_status_uses_selected_tenant_not_user_home_tenant():
     assert response["tenant_id"] == "tenant-selecionado"
     assert response["plano"] == "basico"
     assert response["modulos_ativos"] == ["campanhas"]
+    assert "bling" in response["modulos_fora_oferta_publica"]
+    assert "bling" not in response["modulos_beta"]
+    assert response["trial_padrao"]["escopo"] == "basico_completo"
+    assert response["trial_padrao"]["libera_premium_automaticamente"] is False
 
 
 def test_premium_routers_remain_gated_in_main():

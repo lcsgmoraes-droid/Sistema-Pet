@@ -2,6 +2,8 @@ from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 from app.routes.modulos_routes import (
+    MODULOS_BETA_PUBLICOS,
+    MODULOS_FORA_DA_OFERTA_PUBLICA,
     MODULOS_PREMIUM,
     _normalizar_modulos_ativos,
     _raw_modulos_ativos_valido,
@@ -29,6 +31,12 @@ def test_plano_basico_nao_libera_extras_sem_assinatura_ou_modulo_expresso():
     )
 
     assert ativos == []
+
+
+def test_bling_nao_entra_na_vitrine_beta_publica():
+    assert "bling" in MODULOS_PREMIUM
+    assert "bling" in MODULOS_FORA_DA_OFERTA_PUBLICA
+    assert "bling" not in MODULOS_BETA_PUBLICOS
 
 
 def test_plano_basico_preserva_assinaturas_ativas_e_ignora_expiradas():

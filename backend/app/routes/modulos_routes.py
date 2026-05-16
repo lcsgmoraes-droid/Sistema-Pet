@@ -42,6 +42,11 @@ MODULOS_PREMIUM = frozenset(
     ]
 )
 
+# Bling/webhooks seguem disponiveis apenas para tenants explicitamente
+# configurados. Nao entram na vitrine publica nem no piloto Beta.
+MODULOS_FORA_DA_OFERTA_PUBLICA = frozenset(["bling"])
+MODULOS_BETA_PUBLICOS = frozenset(MODULOS_PREMIUM - MODULOS_FORA_DA_OFERTA_PUBLICA)
+
 # Tenants criados antes da politica comercial ficavam com plan=free. Mantemos
 # esse plano legado liberado para nao cortar fluxo real em uso.
 PLANOS_LEGADO_LIBERADOS = frozenset(["free", "legacy", "legado"])
@@ -142,6 +147,14 @@ def get_modulos_status(
         "plano": tenant.plan or "basico",
         "tenant_id": tenant_id,
         "modulos_controlados": sorted(MODULOS_PREMIUM),
+        "modulos_beta": sorted(MODULOS_BETA_PUBLICOS),
+        "modulos_fora_oferta_publica": sorted(MODULOS_FORA_DA_OFERTA_PUBLICA),
+        "trial_padrao": {
+            "plano": "basico",
+            "dias": 30,
+            "escopo": "basico_completo",
+            "libera_premium_automaticamente": False,
+        },
         "plano_legado_liberado": (tenant.plan or "").strip().lower() in PLANOS_LEGADO_LIBERADOS,
     }
 
