@@ -626,6 +626,16 @@ Rodada estendida `866987` + reteste de estoque:
 - Smoke real de leitura em producao do Plano Basico: testado em 2026-05-16 com tenant Basico real, admin Basico, operador temporario minimo e rotas sem token; premium bloqueado por modulo e cleanup confirmado.
 - Smoke visual em producao do Plano Basico: testado em 2026-05-16 com tenant Basico real; menus, telas permitidas, paginas de upsell/bloqueio premium e `Meu Plano` conferidos no navegador, sem erro de console.
 
+### Correcao operacional PDV/campanhas 2026-05-16
+
+- Implementado na branch `fix/20260516-1723-corrigir-cupom-carimbos-reabertura-venda`; pendente apenas de PR/merge/deploy.
+- Gestor de Beneficios: busca de cliente agora considera tambem `clientes.codigo`, mostra o codigo nas sugestoes e resolve lancamentos manuais por ID interno ou codigo visivel.
+- Cupom manual: quando o operador informa o codigo visivel do cliente, o backend resolve para o ID interno correto antes de vincular o cupom.
+- Reabertura de venda ja paga: o PDV passa a permitir confirmar ajuste/cupom sem remover e lancar novamente a forma de pagamento existente.
+- Backend de finalizacao: a regra de pagamento foi centralizada para permitir venda reaberta ja quitada sem novo pagamento e continuar rejeitando pagamento adicional quando a venda ja esta quitada.
+- Testes focados criados: `backend/tests/unit/test_campaigns_customer_resolution.py` e `backend/tests/unit/test_venda_finalizacao_pagamentos.py`.
+- Validado em 2026-05-16 com testes focados de campanhas/cupom/finalizacao, `py_compile` dos modulos alterados e `npm --prefix frontend run build`.
+
 ### Testes backend amplos
 
 - Suite multitenant/hardening reexecutada nesta rodada: `74 passed`.

@@ -246,6 +246,8 @@ export function usePDVVendaCarregamento({
         desconto_percentual: parseFloat(
           vendaCompleta.desconto_percentual || 0,
         ),
+        cupom_code: vendaCompleta.cupom_code || null,
+        cupom_discount_applied: vendaCompleta.cupom_discount_applied ?? null,
         total: parseFloat(vendaCompleta.total),
         observacoes: vendaCompleta.observacoes || "",
         status: vendaCompleta.status,

@@ -59,7 +59,7 @@ export default function CampanhasGestorHeader({
               buscarClientesGestor(e.target.value);
             }}
             onKeyDown={(e) => e.key === "Escape" && setGestorSugestoes([])}
-            placeholder="Nome, CPF ou telefone do cliente..."
+            placeholder="Codigo, nome, CPF ou telefone..."
             className="w-full border rounded-lg px-3 py-2.5 text-sm"
             autoComplete="off"
           />
@@ -82,6 +82,8 @@ export default function CampanhasGestorHeader({
                     {cliente.nome}
                   </p>
                   <p className="text-xs text-gray-400">
+                    {cliente.codigo ? `Cod.: ${cliente.codigo}` : ""}
+                    {cliente.codigo && (cliente.cpf || cliente.telefone) ? " - " : ""}
                     {cliente.cpf ? `CPF: ${cliente.cpf}` : ""}
                     {cliente.cpf && cliente.telefone ? " - " : ""}
                     {cliente.telefone || ""}
