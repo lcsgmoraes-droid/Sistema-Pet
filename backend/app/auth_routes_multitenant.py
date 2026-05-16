@@ -58,6 +58,7 @@ PRIVACY_VERSION = os.getenv("PRIVACY_VERSION", "privacidade-2026-05-08")
 STRICT_EMAIL_ENVS = {"production", "prod", "staging"}
 LOCAL_REQUEST_HOSTS = {"localhost", "127.0.0.1", "::1", "0.0.0.0"}
 ALLOWED_SIGNUP_PLANS = {"basico"}
+DEFAULT_TRIAL_DAYS = 30
 
 
 # =============================================================================
@@ -418,11 +419,16 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
     # Criar tenant primeiro
     tenant_name = payload.nome_loja or f"Loja de {payload.nome or email}"
     tenant_id = uuid.uuid4()  # Gerar UUID
+    trial_started_at = _now_utc()
     tenant = Tenant(
         id=str(tenant_id),
         name=tenant_name,
         status='active',
         plan=selected_plan,
+        billing_status='trial',
+        trial_started_at=trial_started_at,
+        trial_ends_at=trial_started_at + timedelta(days=DEFAULT_TRIAL_DAYS),
+        subscription_source='manual',
         organization_type=payload.organization_type or 'petshop'
     )
     db.add(tenant)

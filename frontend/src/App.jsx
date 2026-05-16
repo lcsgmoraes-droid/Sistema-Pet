@@ -17,6 +17,7 @@ const EmailVerification = lazy(() => import("./pages/EmailVerification"));
 const LegalPage = lazy(() => import("./pages/LegalPage"));
 const LandingPage = lazy(() => import("./pages/LandingPage"));
 const Planos = lazy(() => import("./pages/Planos"));
+const MeuPlano = lazy(() => import("./pages/MeuPlano"));
 const AppPublicEntry = lazy(() => import("./pages/AppPublicEntry"));
 const preloadPessoas = () => import("./pages/ClientesNovo");
 const Pessoas = lazy(preloadPessoas);
@@ -336,6 +337,7 @@ function App() {
                   }
                 >
                   <Route index element={<DefaultProtectedHomeRedirect />} />
+                  <Route path="meu-plano" element={<MeuPlano />} />
                   <Route
                     path="dashboard"
                     element={

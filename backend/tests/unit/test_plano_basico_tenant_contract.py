@@ -111,6 +111,8 @@ def test_modulos_status_uses_selected_tenant_not_user_home_tenant():
     assert "bling" not in response["modulos_beta"]
     assert response["trial_padrao"]["escopo"] == "basico_completo"
     assert response["trial_padrao"]["libera_premium_automaticamente"] is False
+    assert response["assinatura"]["pagamento_integrado"] is False
+    assert response["assinatura"]["contratacao"]["modelo"] == "manual_assistida"
 
 
 def test_premium_routers_remain_gated_in_main():

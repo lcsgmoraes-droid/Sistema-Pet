@@ -26,6 +26,9 @@ Estrategia atual:
 
 - Novos clientes iniciam com 30 dias gratis do Plano Basico completo.
 - O plano comercial de contratacao inicial continua sendo o Plano Basico.
+- Nao ha gateway de pagamento nesta fase: cobranca e confirmacao acontecem fora do sistema.
+- Depois da confirmacao externa, o administrativo ativa o Plano Basico manualmente no tenant.
+- A tela interna `/meu-plano` mostra status do trial, fim do periodo gratis e canal de ativacao assistida.
 - Recursos ainda nao 100% validados podem aparecer como vitrine, roadmap ou `Beta`, mas nao sao liberados automaticamente no trial padrao.
 - Acesso Beta deve ser liberado caso a caso, como piloto acompanhado.
 - Bling, webhooks e rotinas especificas do tenant `admin@mlprohub.com.br` ficam 100% fora da oferta inicial para novos tenants.

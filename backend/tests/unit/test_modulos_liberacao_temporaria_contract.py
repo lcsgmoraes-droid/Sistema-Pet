@@ -5,6 +5,7 @@ from app.routes.modulos_routes import (
     MODULOS_BETA_PUBLICOS,
     MODULOS_FORA_DA_OFERTA_PUBLICA,
     MODULOS_PREMIUM,
+    _assinatura_resumo_tenant,
     _normalizar_modulos_ativos,
     _raw_modulos_ativos_valido,
     _resolver_modulos_ativos,
@@ -75,3 +76,40 @@ def test_modulos_ativos_json_vazio_e_valido():
         "entregas",
         "campanhas",
     ]
+
+
+def test_assinatura_trial_informa_dias_restantes_e_pagamento_manual():
+    agora = datetime(2026, 5, 16, 12, 0, tzinfo=timezone.utc)
+    tenant = SimpleNamespace(
+        billing_status="trial",
+        subscription_source="manual",
+        trial_started_at=agora - timedelta(days=2),
+        trial_ends_at=agora + timedelta(days=28),
+        subscription_activated_at=None,
+    )
+
+    resumo = _assinatura_resumo_tenant(tenant, agora)
+
+    assert resumo["status"] == "trial"
+    assert resumo["status_efetivo"] == "trial"
+    assert resumo["dias_restantes_trial"] == 28
+    assert resumo["pagamento_integrado"] is False
+    assert resumo["contratacao"]["modelo"] == "manual_assistida"
+
+
+def test_assinatura_trial_expirada_nao_precisa_mudar_banco_para_sinalizar():
+    agora = datetime(2026, 5, 16, 12, 0, tzinfo=timezone.utc)
+    tenant = SimpleNamespace(
+        billing_status="trial",
+        subscription_source="manual",
+        trial_started_at=agora - timedelta(days=31),
+        trial_ends_at=agora - timedelta(days=1),
+        subscription_activated_at=None,
+    )
+
+    resumo = _assinatura_resumo_tenant(tenant, agora)
+
+    assert resumo["status"] == "trial"
+    assert resumo["status_efetivo"] == "expired"
+    assert resumo["trial_expirado"] is True
+    assert resumo["dias_restantes_trial"] == 0
