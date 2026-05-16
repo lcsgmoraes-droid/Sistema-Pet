@@ -186,6 +186,26 @@ if [[ -f "$APP_DIR/scripts/install_ops_host_watchdog_cron.sh" ]]; then
   bash "$APP_DIR/scripts/install_ops_host_watchdog_cron.sh" || log "Aviso: nao foi possivel instalar o cron do host watchdog"
 fi
 
+mark_step "preparar_diretorios_persistentes"
+log "Preparando diretorios persistentes do backend"
+mkdir -p \
+  "$APP_DIR/backend/data/bling_snapshots" \
+  "$APP_DIR/backend/uploads/bling_snapshots" \
+  "$APP_DIR/backend/logs" \
+  "$APP_DIR/backend/secrets"
+chown -R 1000:1000 \
+  "$APP_DIR/backend/data" \
+  "$APP_DIR/backend/uploads/bling_snapshots" \
+  "$APP_DIR/backend/logs" \
+  "$APP_DIR/backend/secrets" \
+  || log "Aviso: nao foi possivel ajustar owner dos diretorios persistentes"
+chmod -R u+rwX,g+rwX \
+  "$APP_DIR/backend/data" \
+  "$APP_DIR/backend/uploads/bling_snapshots" \
+  "$APP_DIR/backend/logs" \
+  "$APP_DIR/backend/secrets" \
+  || log "Aviso: nao foi possivel ajustar permissao dos diretorios persistentes"
+
 mark_step "build_frontend"
 log "Gerando frontend em $NEXT_RUNTIME_DIST"
 rm -rf "$NEXT_RUNTIME_DIST"
