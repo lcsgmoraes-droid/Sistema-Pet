@@ -1,6 +1,10 @@
 # MCPs do Sistema Pet
 
+[![MCP CI](https://github.com/lcsgmoraes-droid/Sistema-Pet/actions/workflows/mcp-ci.yml/badge.svg)](https://github.com/lcsgmoraes-droid/Sistema-Pet/actions/workflows/mcp-ci.yml)
+
 Este diretorio contem os MCPs locais usados pelo VS Code e pelo Codex.
+
+Guia vivo de maturidade e proximos passos: `docs/MCP_MATURIDADE_GUIA.md`.
 
 ## Servidores
 
