@@ -71,6 +71,7 @@ def test_consume_coupon_redemption_marks_coupon_used_and_links_sale():
             "app.campaigns.coupon_service.CouponRedemption",
             side_effect=fake_redemption,
         ),
+        patch("app.campaigns.coupon_service.log_campaign_event") as audit_mock,
     ):
         result = consume_coupon_redemption(
             db,
@@ -93,6 +94,11 @@ def test_consume_coupon_redemption_marks_coupon_used_and_links_sale():
         "discount_applied": 25.0,
         "redemption_id": 77,
     }
+    audit_mock.assert_called_once()
+    assert audit_mock.call_args.kwargs["event"] == "campaign.coupon.consumed"
+    assert audit_mock.call_args.kwargs["entity_type"] == "campaign_coupon_redemptions"
+    assert audit_mock.call_args.kwargs["entity_id"] == 77
+    assert audit_mock.call_args.kwargs["metadata"]["venda_id"] == 999
 
 
 def test_reverse_coupon_redemptions_for_sale_voids_loyalty_and_restores_regular():
@@ -146,7 +152,7 @@ def test_reverse_coupon_redemptions_for_sale_voids_loyalty_and_restores_regular(
             "matched": coupon_id == 101,
             "revoked": coupon_id == 101,
         },
-    ):
+    ), patch("app.campaigns.coupon_service.log_campaign_event") as audit_mock:
         result = reverse_coupon_redemptions_for_sale(
             db,
             tenant_id="tenant-1",
@@ -166,3 +172,9 @@ def test_reverse_coupon_redemptions_for_sale_voids_loyalty_and_restores_regular(
         "loyalty_rewards_reversed": 1,
         "regular_coupons_restored": 1,
     }
+    assert audit_mock.call_count == 2
+    first_call = audit_mock.call_args_list[0].kwargs
+    assert first_call["event"] == "campaign.coupon.redemption_reversed"
+    assert first_call["entity_type"] == "campaign_coupon_redemptions"
+    assert first_call["metadata"]["redemption_id"] == 1
+    assert first_call["metadata"]["reason"] == "Venda reaberta para ajuste"

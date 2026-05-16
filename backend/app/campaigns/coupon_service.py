@@ -21,6 +21,11 @@ from typing import Any
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
+from app.campaigns.audit import (
+    build_coupon_audit_metadata,
+    build_coupon_redemption_audit_metadata,
+    log_campaign_event,
+)
 from app.campaigns.models import (
     Campaign,
     Coupon,
@@ -212,6 +217,18 @@ def create_coupon(
             tenant_id,
             attempt + 1,
         )
+        log_campaign_event(
+            db=db,
+            tenant_id=tenant_id,
+            event="campaign.coupon.created",
+            entity_type="campaign_coupons",
+            entity_id=coupon.id,
+            metadata=build_coupon_audit_metadata(
+                coupon,
+                source="campaign" if campaign is not None else "system",
+            ),
+            details=f"Cupom {coupon.code} criado pelo motor de campanhas",
+        )
         return coupon
 
     raise RuntimeError(
@@ -288,6 +305,20 @@ def consume_coupon_redemption(
     db.add(redemption)
     db.flush()
 
+    log_campaign_event(
+        db=db,
+        tenant_id=tenant_id,
+        event="campaign.coupon.consumed",
+        entity_type="campaign_coupon_redemptions",
+        entity_id=redemption.id,
+        metadata=build_coupon_redemption_audit_metadata(
+            coupon=coupon,
+            redemption=redemption,
+            reason="Venda finalizada",
+        ),
+        details=f"Cupom {coupon.code} consumido na venda #{venda_id}",
+    )
+
     logger.info(
         "[coupon_service] Cupom consumido no fechamento: code=%s tenant=%s venda_id=%s discount=R$%.2f",
         coupon.code,
@@ -362,11 +393,45 @@ def reverse_coupon_redemptions_for_sale(
             coupon.status = CouponStatusEnum.voided
             if loyalty_result.get("revoked"):
                 loyalty_rewards_reversed += 1
+            log_campaign_event(
+                db=db,
+                tenant_id=tenant_id,
+                event="campaign.coupon.redemption_reversed",
+                entity_type="campaign_coupon_redemptions",
+                entity_id=redemption.id,
+                metadata=build_coupon_redemption_audit_metadata(
+                    coupon=coupon,
+                    redemption=redemption,
+                    reason=reason,
+                    extra={
+                        "coupon_status_after": coupon.status.value,
+                        "loyalty_reversal": loyalty_result,
+                    },
+                ),
+                details=f"Uso do cupom {getattr(coupon, 'code', coupon.id)} revertido",
+            )
             continue
 
         coupon.status = _restored_coupon_status(coupon, now_ref)
         if coupon.status == CouponStatusEnum.active:
             regular_coupons_restored += 1
+        log_campaign_event(
+            db=db,
+            tenant_id=tenant_id,
+            event="campaign.coupon.redemption_reversed",
+            entity_type="campaign_coupon_redemptions",
+            entity_id=redemption.id,
+            metadata=build_coupon_redemption_audit_metadata(
+                coupon=coupon,
+                redemption=redemption,
+                reason=reason,
+                extra={
+                    "coupon_status_after": coupon.status.value,
+                    "loyalty_reversal": loyalty_result,
+                },
+            ),
+            details=f"Uso do cupom {getattr(coupon, 'code', coupon.id)} revertido",
+        )
 
     db.flush()
     return {

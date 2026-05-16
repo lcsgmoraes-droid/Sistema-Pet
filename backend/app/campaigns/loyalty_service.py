@@ -9,6 +9,7 @@ from typing import Any
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
+from app.campaigns.audit import log_campaign_event
 from app.campaigns.coupon_service import create_coupon
 from app.campaigns.models import (
     Campaign,
@@ -349,6 +350,33 @@ def sync_loyalty_stamps_for_sale(
         customer_id=customer_id,
         source_event_id=source_event_id,
     )
+    if added or reactivated or voided or reward_sync["awarded"] or reward_sync["revoked"]:
+        log_campaign_event(
+            db=db,
+            tenant_id=campaign.tenant_id,
+            event="campaign.loyalty.stamps_synced",
+            entity_type="campaign_loyalty_stamps",
+            entity_id=venda_id,
+            metadata={
+                "campaign_id": campaign.id,
+                "campaign_name": campaign.name,
+                "customer_id": customer_id,
+                "venda_id": venda_id,
+                "source_event_id": source_event_id,
+                "reason": reason,
+                "expected_stamps": expected_stamps,
+                "stamps_added": added,
+                "stamps_reactivated": reactivated,
+                "stamps_voided": voided,
+                "total_stamps": reward_sync["total_stamps"],
+                "available_stamps": reward_sync["available_stamps"],
+                "converted_stamps": reward_sync["converted_stamps"],
+                "debt_stamps": reward_sync["debt_stamps"],
+                "awarded": reward_sync["awarded"],
+                "revoked": reward_sync["revoked"],
+            },
+            details=f"Carimbos sincronizados para venda #{venda_id}",
+        )
 
     return {
         "expected_stamps": expected_stamps,

@@ -80,6 +80,11 @@ from app.campaigns.models import (
     CustomerMergeLog,
 )
 from app.campaigns.models import CampaignTypeEnum, CampaignExecution, CampaignEventQueue, EventStatusEnum
+from app.campaigns.audit import (
+    build_coupon_audit_metadata,
+    build_loyalty_stamp_audit_metadata,
+    log_campaign_event,
+)
 from app.campaigns.coupon_service import preview_coupon_redemption
 from app.services.validade_campanha_service import (
     contar_exclusoes_ativas,
@@ -107,6 +112,14 @@ def get_db():
 
 
 router = APIRouter(prefix="/campanhas", tags=["Campanhas"])
+
+
+def _current_user_id(user) -> int | None:
+    if user is None:
+        return None
+    if isinstance(user, int):
+        return user
+    return getattr(user, "id", None)
 
 
 def _resolver_customer_id_campanhas(db: Session, *, tenant_id, customer_ref) -> int:
@@ -546,7 +559,7 @@ def criar_cupom_manual(
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """Cria um cupom manualmente para casos especiais."""
-    user_id, tenant_id = user_and_tenant
+    user, tenant_id = user_and_tenant
 
     try:
         tipo = CouponTypeEnum(body.coupon_type)
@@ -597,6 +610,21 @@ def criar_cupom_manual(
         meta={"descricao": body.descricao or "Cupom manual", "criado_por": "manual"},
     )
     db.add(cupom)
+    db.flush()
+    log_campaign_event(
+        db=db,
+        tenant_id=tenant_id,
+        user_id=_current_user_id(user),
+        event="campaign.coupon.manual_created",
+        entity_type="campaign_coupons",
+        entity_id=cupom.id,
+        metadata=build_coupon_audit_metadata(
+            cupom,
+            source="manual",
+            extra={"description": body.descricao or "Cupom manual"},
+        ),
+        details=f"Cupom manual {cupom.code} criado",
+    )
     db.commit()
     db.refresh(cupom)
 
@@ -1679,7 +1707,7 @@ def anular_cupom(
     devolve automaticamente os carimbos comprometidos para saldo disponivel.
     So e possivel anular cupoes com status `active`.
     """
-    _, tenant_id = user_and_tenant
+    user, tenant_id = user_and_tenant
     cupom = (
         db.query(Coupon)
         .filter(Coupon.tenant_id == tenant_id, Coupon.code == code)
@@ -1703,6 +1731,23 @@ def anular_cupom(
         "voided_reason": "cupom_anulado_manualmente",
         "voided_at": datetime.now(timezone.utc).isoformat(),
     }
+    log_campaign_event(
+        db=db,
+        tenant_id=tenant_id,
+        user_id=_current_user_id(user),
+        event="campaign.coupon.voided",
+        entity_type="campaign_coupons",
+        entity_id=cupom.id,
+        metadata=build_coupon_audit_metadata(
+            cupom,
+            source="manual_void",
+            extra={
+                "reason": "cupom_anulado_manualmente",
+                "loyalty_reversal": loyalty_reversal,
+            },
+        ),
+        details=f"Cupom {cupom.code} anulado manualmente",
+    )
     db.commit()
     return {
         "ok": True,
@@ -1824,7 +1869,7 @@ def lancar_carimbo_manual(
     Idempotente: se já existe um carimbo manual sem venda_id para este cliente
     na mesma hora, retorna o existente.
     """
-    _, tenant_id = user_and_tenant
+    user, tenant_id = user_and_tenant
     customer_id = _resolver_customer_id_campanhas(
         db,
         tenant_id=tenant_id,
@@ -1899,14 +1944,29 @@ def lancar_carimbo_manual(
         source_event_id=None,
     )
 
-    db.commit()
-    db.refresh(stamp)
-
     saldo = summarize_loyalty_balances_for_customer(
         db,
         tenant_id=tenant_id,
         customer_id=customer_id,
     )
+    log_campaign_event(
+        db=db,
+        tenant_id=tenant_id,
+        user_id=_current_user_id(user),
+        event="campaign.loyalty.manual_stamp_added",
+        entity_type="campaign_loyalty_stamps",
+        entity_id=stamp.id,
+        metadata=build_loyalty_stamp_audit_metadata(
+            stamp=stamp,
+            campaign=campanha,
+            operation="manual_added",
+            balance=saldo,
+        ),
+        details=f"Carimbo manual #{stamp.id} lancado",
+    )
+
+    db.commit()
+    db.refresh(stamp)
 
     logger.info(
         "[Campanhas] Carimbo manual lançado customer_id=%d tenant=%s total=%d",
@@ -1942,7 +2002,7 @@ def estornar_carimbo(
     Estorna (remove) um carimbo de fidelidade lançado por engano.
     Registra voided_at — não deleta o registro para manter rastreabilidade.
     """
-    _, tenant_id = user_and_tenant
+    user, tenant_id = user_and_tenant
 
     stamp = (
         db.query(LoyaltyStamp)
@@ -1976,13 +2036,29 @@ def estornar_carimbo(
             source_event_id=None,
         )
 
-    db.commit()
-
     saldo = summarize_loyalty_balances_for_customer(
         db,
         tenant_id=tenant_id,
         customer_id=stamp.customer_id,
     )
+    log_campaign_event(
+        db=db,
+        tenant_id=tenant_id,
+        user_id=_current_user_id(user),
+        event="campaign.loyalty.stamp_voided",
+        entity_type="campaign_loyalty_stamps",
+        entity_id=stamp.id,
+        metadata=build_loyalty_stamp_audit_metadata(
+            stamp=stamp,
+            campaign=campanha,
+            operation="voided",
+            balance=saldo,
+            extra={"reason": motivo},
+        ),
+        details=f"Carimbo #{stamp.id} estornado",
+    )
+
+    db.commit()
 
     logger.info(
         "[Campanhas] Carimbo #%d estornado customer_id=%d tenant=%s restantes=%d",
