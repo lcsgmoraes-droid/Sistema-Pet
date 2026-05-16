@@ -10,7 +10,7 @@ Levar os MCPs locais do Sistema Pet para um padrao seguro, repetivel e facil de 
 
 Nota inicial estimada: 4/10.
 
-Nota atual estimada: 9/10.
+Nota atual estimada: 9,5/10.
 
 Meta: 10/10 para uso interno profissional.
 
@@ -40,6 +40,9 @@ Meta: 10/10 para uso interno profissional.
 | Feito | CI do GitHub para MCPs | `.github/workflows/mcp-ci.yml` |
 | Feito | CI dos MCPs rodando em todo Pull Request para permitir branch protection | `.github/workflows/mcp-ci.yml` |
 | Feito | Branch protection da `main` exigindo o check `MCP tests` | GitHub branch protection |
+| Feito | Testes de protocolo MCP ponta a ponta via stdio | `tests/test_mcp_protocol.py` dos MCPs |
+| Feito | Checklist obrigatorio para novas ferramentas MCP | secao "Checklist obrigatorio para novas ferramentas MCP" |
+| Feito | Classificacao de risco das ferramentas atuais | READMEs internos dos MCPs |
 | Feito | Documentacao de uso e arquitetura dos MCPs | `mcp/README.md` e READMEs internos |
 | Feito | Badge visual do CI no README dos MCPs | `mcp/README.md` |
 
@@ -50,6 +53,7 @@ Meta: 10/10 para uso interno profissional.
 | #44 | Hardening dos MCPs: seguranca, services, testes, auditoria, docs | Mergeado |
 | #45 | CI dos MCPs e bootstrap automatico dos venvs | Mergeado |
 | #47 | Ajuste do MCP CI para rodar em todo PR antes da branch protection | Mergeado |
+| #48 | Guia atualizado com branch protection e proximos passos | Mergeado |
 
 ## Como validar agora
 
@@ -75,17 +79,13 @@ Validacao geral do fluxo:
 
 | Prioridade | Status | Item | Motivo |
 |---|---|---|---|
-| Alta | Pendente | Criar teste de protocolo MCP ponta a ponta | Garante que o servidor MCP responde como cliente real espera |
-| Media | Pendente | Criar checklist obrigatorio para novas ferramentas MCP | Evita ferramenta nova sem teste, docs e classificacao de risco |
-| Media | Pendente | Classificar cada ferramenta por risco: leitura, escrita DEV, escrita sensivel | Ajuda o Lucas e assistentes a nao usarem ferramenta errada |
 | Media | Pendente | Centralizar auditoria ou criar relatorio local de auditoria | Facilita rastrear uso sem abrir JSONL manualmente |
 | Baixa | Pendente | Revisao periodica de dependencias dos MCPs | Mantem `mcp`, `requests` e `pytest` atualizados com seguranca |
 
 ## Proximo passo recomendado
 
-1. Criar teste de protocolo MCP ponta a ponta.
-2. Criar checklist obrigatorio para novas ferramentas MCP.
-3. Classificar cada ferramenta por risco: leitura, escrita DEV ou escrita sensivel.
+1. Centralizar auditoria ou criar relatorio local de auditoria.
+2. Criar rotina de revisao periodica de dependencias dos MCPs.
 
 ## Branch protection atual
 
@@ -101,9 +101,9 @@ Configurada em 2026-05-16 no GitHub:
 
 Observacao: o workflow `MCP CI` roda em todo Pull Request para que o check `MCP tests` exista mesmo quando o PR nao altera arquivos em `mcp/`.
 
-## Regra para novas ferramentas MCP
+## Checklist obrigatorio para novas ferramentas MCP
 
-Antes de adicionar uma ferramenta MCP nova, preencher mentalmente estes itens:
+Antes de adicionar uma ferramenta MCP nova, preencher estes itens no PR:
 
 | Pergunta | Obrigatorio |
 |---|---|
@@ -113,6 +113,19 @@ Antes de adicionar uma ferramenta MCP nova, preencher mentalmente estes itens:
 | Evita shell livre e argumentos inseguros? | Sim |
 | Usa config/env em vez de hardcode? | Sim |
 | Tem teste automatizado? | Sim |
+| Tem teste de protocolo MCP se for ferramenta publica nova? | Sim |
 | Esta documentada no README do MCP? | Sim |
 
 Se uma resposta for "nao", a ferramenta ainda nao esta pronta para entrar.
+
+## Classes de risco
+
+| Classe | Uso permitido |
+|---|---|
+| leitura | consulta estado local ou metadados sem alterar nada |
+| leitura HTTP | consulta endpoints locais permitidos por allowlist |
+| leitura DEV | consulta banco, container ou logs do ambiente DEV |
+| leitura autenticada | usa credenciais fornecidas pelo operador, sem retornar tokens |
+| leitura/validacao | executa validacao local sem alterar dados persistentes |
+| escrita DEV local | altera apenas ambiente DEV/local ou sobe processo local |
+| escrita sensivel | exige trava explicita e confirmacao; nunca faz deploy remoto por MCP |

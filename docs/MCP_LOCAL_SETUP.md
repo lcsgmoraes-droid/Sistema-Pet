@@ -45,6 +45,8 @@ powershell -ExecutionPolicy Bypass -File .\scripts\test_mcp.ps1 -InstallDevDepen
 
 O guia de maturidade e proximos passos fica em `docs/MCP_MATURIDADE_GUIA.md`.
 
+Os testes tambem sobem os servidores MCP por stdio e usam um cliente real do SDK MCP para validar `initialize`, `list_tools` e uma chamada segura de ferramenta.
+
 ## Depurar com MCP Inspector
 
 O Inspector pode ser instalado globalmente:

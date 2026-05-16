@@ -28,20 +28,20 @@ Este servidor entrega ferramentas MCP para:
 
 ## Ferramentas MCP disponiveis
 
-| Ferramenta | Tipo | Ambiente | Observacao |
+| Ferramenta | Risco | Ambiente | Observacao |
 |---|---|---|---|
 | `fluxo_check` | leitura/validacao | local | roda `FLUXO_UNICO check` |
-| `fluxo_dev_up` | escrita operacional | DEV local | sobe DEV local |
+| `fluxo_dev_up` | escrita DEV local | DEV local | sobe DEV local |
 | `fluxo_release_check` | leitura/validacao | local | valida release sem permitir alteracoes locais |
 | `fluxo_status` | leitura | local | consulta status do compose usado pelo fluxo |
 | `fluxo_prod_up` | escrita sensivel | local PROD | bloqueada por padrao |
-| `api_health_check` | leitura | HTTP local | default `http://localhost:8000/health` |
-| `api_auth_route_smoke` | leitura | HTTP local | default `http://localhost:8000/auth/login-multitenant` |
+| `api_health_check` | leitura HTTP | HTTP local | default `http://localhost:8000/health` |
+| `api_auth_route_smoke` | leitura HTTP | HTTP local | default `http://localhost:8000/auth/login-multitenant` |
 | `auth_validate_tabs_permissions` | leitura autenticada | HTTP local | nao retorna tokens |
-| `campaign_logs` | leitura | banco DEV | usa container/banco configurados |
-| `campaign_queue_status` | leitura | banco DEV | usa container/banco configurados |
-| `campaign_enqueue_test_event` | escrita de teste | banco DEV | valida evento, UUID e JSON |
-| `backend_logs` | leitura | container DEV | aplica redaction de segredos |
+| `campaign_logs` | leitura DEV | banco DEV | usa container/banco configurados |
+| `campaign_queue_status` | leitura DEV | banco DEV | usa container/banco configurados |
+| `campaign_enqueue_test_event` | escrita DEV local | banco DEV | valida evento, UUID e JSON |
+| `backend_logs` | leitura DEV | container DEV | aplica redaction de segredos |
 
 ## Trava de prod-up
 
@@ -90,3 +90,5 @@ Ou, pela raiz do projeto:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\test_mcp.ps1 -InstallDevDependencies
 ```
+
+Os testes incluem cobertura de protocolo MCP por stdio em `tests/test_mcp_protocol.py`.
