@@ -590,19 +590,19 @@ Comandos registrados na auditoria automatizada:
 $env:APP_ENV='test'; $env:ENVIRONMENT='test'; $env:ENV='test'; $env:DATABASE_URL='sqlite:///./test.db'; $env:DEBUG='false'; .\backend\.venv\Scripts\python.exe -m pytest backend\tests\unit\test_plano_basico_tenant_contract.py backend\tests\unit\test_module_access_dependency.py backend\tests\unit\test_tenant_security_middleware.py backend\tests\unit\test_sql_audit_config.py backend\tests\multi_tenant\test_phase1_tenant_hardening.py backend\tests\multi_tenant\test_phase1_1_runtime_validation.py backend\tests\multi_tenant\test_phase2b_tenant_safe_sql.py backend\tests\multi_tenant\test_phase3_tenant_onboarding_service.py -q
 ```
 
-Resultado: `74 passed`.
+Resultado atualizado na PR #39: `89 passed`.
 
 ```powershell
 $env:APP_ENV='test'; $env:ENVIRONMENT='test'; $env:ENV='test'; $env:DATABASE_URL='sqlite:///./test.db'; $env:DEBUG='false'; .\backend\.venv\Scripts\python.exe -m pytest backend\tests\unit\test_ecommerce_mobile_tenant_context.py backend\tests\unit\test_entrega_status_contract.py -q
 ```
 
-Resultado: `14 passed`.
+Resultado reexecutado na PR #39: `14 passed`.
 
 ```powershell
 npm --prefix frontend run build
 ```
 
-Resultado: build concluido com sucesso.
+Resultado reexecutado na PR #39: build concluido com sucesso.
 
 Correcoes registradas naquela rodada:
 
