@@ -35,10 +35,20 @@ powershell -ExecutionPolicy Bypass -File .\scripts\test_mcp.ps1
 
 Em ambiente limpo, `-InstallDevDependencies` tambem cria os `.venv` dos MCPs se eles ainda nao existirem.
 
+Os testes incluem:
+
+- testes unitarios das services internas;
+- testes de protocolo MCP por stdio, simulando um cliente real com `ClientSession`.
+
 ## CI
 
-O workflow `.github/workflows/mcp-ci.yml` roda estes testes automaticamente em Pull Requests e pushes para `main` quando houver mudanca em:
+O workflow `.github/workflows/mcp-ci.yml` roda estes testes automaticamente:
+
+- em todo Pull Request para `main`;
+- em pushes para `main` quando houver mudanca em:
 
 - `mcp/**`
 - `scripts/test_mcp.ps1`
 - `.github/workflows/mcp-ci.yml`
+
+O check `MCP tests` e obrigatorio na branch protection da `main`.

@@ -23,14 +23,14 @@ Entregar ferramentas para:
 
 ## Ferramentas MCP disponiveis
 
-| Ferramenta | Tipo | Observacao |
-|---|---|---|
-| `front_status` | leitura | confere frontend, `package.json`, Node e npm |
-| `front_build_check` | validacao | roda `npm run build` |
-| `front_build_dev_check` | validacao | roda `npm run build:dev` |
-| `front_dev_smoke` | validacao | roda `npm run dev` com host permitido |
-| `front_http_check` | leitura HTTP | default `http://localhost:5173` |
-| `front_api_auth_smoke` | leitura HTTP | default `http://localhost:8000/auth/login-multitenant` |
+| Ferramenta | Risco | Ambiente | Observacao |
+|---|---|---|---|
+| `front_status` | leitura | local | confere frontend, `package.json`, Node e npm |
+| `front_build_check` | leitura/validacao | local | roda `npm run build` |
+| `front_build_dev_check` | leitura/validacao | local | roda `npm run build:dev` |
+| `front_dev_smoke` | escrita DEV local | local | roda `npm run dev` com host permitido |
+| `front_http_check` | leitura HTTP | HTTP local | default `http://localhost:5173` |
+| `front_api_auth_smoke` | leitura HTTP | HTTP local | default `http://localhost:8000/auth/login-multitenant` |
 
 ## Seguranca local
 
@@ -72,3 +72,5 @@ Ou, pela raiz do projeto:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\test_mcp.ps1 -InstallDevDependencies
 ```
+
+Os testes incluem cobertura de protocolo MCP por stdio em `tests/test_mcp_protocol.py`.
