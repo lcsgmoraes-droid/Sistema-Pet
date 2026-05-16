@@ -38,6 +38,7 @@ Meta: 10/10 para uso interno profissional.
 | Feito | Script unico para testes dos MCPs | `scripts/test_mcp.ps1` |
 | Feito | Bootstrap automatico de `.venv` com `-InstallDevDependencies` | `scripts/test_mcp.ps1` |
 | Feito | CI do GitHub para MCPs | `.github/workflows/mcp-ci.yml` |
+| Feito | CI dos MCPs rodando em todo Pull Request para permitir branch protection | `.github/workflows/mcp-ci.yml` |
 | Feito | Documentacao de uso e arquitetura dos MCPs | `mcp/README.md` e READMEs internos |
 | Feito | Badge visual do CI no README dos MCPs | `mcp/README.md` |
 
@@ -82,7 +83,7 @@ Validacao geral do fluxo:
 ## Proximo passo recomendado
 
 1. Configurar branch protection da `main` no GitHub.
-2. Exigir o check `MCP tests` quando houver PR.
+2. Exigir o check `MCP tests` em todo PR.
 3. Depois abrir nova tarefa para teste MCP ponta a ponta.
 
 ## Como configurar branch protection manualmente
@@ -97,7 +98,7 @@ No GitHub:
 6. Selecionar o check `MCP tests`.
 7. Salvar.
 
-Observacao: ate o momento, o conector GitHub disponivel aqui nao expos uma ferramenta para configurar branch protection automaticamente. Por isso este passo ficou operacional/manual.
+Observacao: o workflow `MCP CI` roda em todo Pull Request para que o check `MCP tests` possa ser exigido com seguranca pela branch protection.
 
 ## Regra para novas ferramentas MCP
 

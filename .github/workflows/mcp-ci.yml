@@ -9,10 +9,6 @@ on:
       - ".github/workflows/mcp-ci.yml"
   pull_request:
     branches: [main]
-    paths:
-      - "mcp/**"
-      - "scripts/test_mcp.ps1"
-      - ".github/workflows/mcp-ci.yml"
 
 jobs:
   mcp-tests:
