@@ -53,6 +53,7 @@ def ensure_especies_racas_tables_exist(db: Session) -> None:
     Especie.__table__.create(bind=db.get_bind(), checkfirst=True)
     Raca.__table__.create(bind=db.get_bind(), checkfirst=True)
     # Compatibilidade com schema legado de racas (coluna `especie` textual).
+    db.execute(text("ALTER TABLE racas ADD COLUMN IF NOT EXISTS especie VARCHAR(50)"))
     db.execute(text("ALTER TABLE racas ADD COLUMN IF NOT EXISTS especie_id INTEGER"))
     db.execute(text("ALTER TABLE racas ADD COLUMN IF NOT EXISTS tenant_id UUID"))
     db.execute(text("ALTER TABLE racas ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()"))
@@ -83,6 +84,7 @@ def ensure_especies_racas_tables_exist(db: Session) -> None:
           AND r.especie_id = e.id
     """))
     db.execute(text("CREATE INDEX IF NOT EXISTS ix_racas_especie_id ON racas (especie_id)"))
+    db.execute(text("CREATE INDEX IF NOT EXISTS ix_racas_especie ON racas (especie)"))
     db.execute(text("CREATE INDEX IF NOT EXISTS ix_racas_tenant_id ON racas (tenant_id)"))
     _sincronizar_sequence_postgres(db, "especies")
     _sincronizar_sequence_postgres(db, "racas")
