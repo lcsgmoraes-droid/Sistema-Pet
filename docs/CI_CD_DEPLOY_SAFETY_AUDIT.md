@@ -8,7 +8,7 @@ Este arquivo acompanha a maturidade de CI/CD e deploy seguro do Sistema Pet.
 
 Nota inicial estimada: 7/10.
 
-Nota atual estimada: 8,5/10.
+Nota atual estimada: 9/10.
 
 Meta: 10/10 antes de automatizar qualquer deploy de producao.
 
@@ -20,7 +20,14 @@ Meta: 10/10 antes de automatizar qualquer deploy de producao.
 | Feito | CI dos MCPs roda em todo PR | `.github/workflows/mcp-ci.yml` |
 | Feito | Backend CI passa a rodar em todo PR para `main` e `develop` | `.github/workflows/backend-ci.yml` |
 | Feito | Check de deploy safety roda em todo PR para `main` | `.github/workflows/deploy-safety.yml` |
+| Feito | Branch protection da `main` exige `MCP tests`, `Fluxo unico safety` e `Quality Gate` | GitHub branch protection |
 | Feito | Validador local bloqueia multiplas heads Alembic, artefatos e arquivos proibidos | `scripts/validar_fluxo.ps1` |
+
+## PRs ja juntados
+
+| PR | Conteudo | Status |
+|---|---|---|
+| #55 | Deploy Safety em PRs, Backend CI em todo PR e guia CI/CD | Mergeado |
 
 ## Checks que devem proteger a `main`
 
@@ -34,13 +41,12 @@ Meta: 10/10 antes de automatizar qualquer deploy de producao.
 
 | Prioridade | Status | Item | Motivo |
 |---|---|---|---|
-| Alta | Pendente | Exigir `Fluxo unico safety` e `Quality Gate` na branch protection | Impede merge sem checks de deploy/backend |
 | Alta | Pendente | Criar smoke test pos-merge para backend, auth e frontend build | Garante que a `main` continua executavel |
 | Media | Pendente | Documentar rollback operacional simples | Reduz risco em incidente de producao |
 | Media | Pendente | Criar checklist de deploy com backup, health e rollback | Evita passos manuais esquecidos |
 
 ## Proximo passo recomendado
 
-1. Mergear o PR deste ajuste.
-2. Atualizar branch protection da `main` para exigir `Fluxo unico safety` e `Quality Gate`.
-3. Criar smoke test pos-merge para API, auth basico e build frontend.
+1. Criar smoke test pos-merge para API, auth basico e build frontend.
+2. Documentar rollback operacional simples.
+3. Criar checklist de deploy com backup, health e rollback.
