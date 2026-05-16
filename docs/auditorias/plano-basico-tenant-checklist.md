@@ -176,6 +176,7 @@ Detalhe do smoke visual em producao:
 - Rotas premium diretas abriram tela de modulo/upgrade, sem tela operacional: `/financeiro/contas-pagar`, `/financeiro/dre`, `/compras/pedidos`, `/notas-fiscais/entrada`, `/veterinario`, `/banho-tosa` e `/campanhas`.
 - Pagina `Meu Plano` confirmou `Plano Basico`, trial em andamento, 30 dias e cobranca assistida fora do sistema.
 - Paginas publicas `/landing` e `/planos` comunicaram 30 dias gratis do Basico e modulos avancados como Beta/piloto acompanhado.
+- Onboarding real: Yahoo recebeu o e-mail de confirmacao; Outlook nao recebeu. Correcao preparada em `email_service.py` para reforcar cabecalhos transacionais (`Date`, `Message-ID`, `Reply-To`, `X-Mailer`), usar politica SMTP/CRLF e envelope limpo; retestar Outlook apos deploy.
 
 Cleanup da rodada:
 
@@ -185,6 +186,7 @@ Cleanup da rodada:
 
 Pendencias que continuam abertas:
 
+- Retestar e-mail de confirmacao no Outlook apos deploy da correcao de entregabilidade.
 - Teste manual de onboarding completo de novo tenant com confirmacao real de e-mail.
 - Proximo deploy real autorizado deve usar `docs/PRODUCAO_ROLLBACK_CHECKLIST.md`.
 

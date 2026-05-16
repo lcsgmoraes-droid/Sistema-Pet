@@ -14,12 +14,16 @@ Se nenhuma variável estiver configurada, o envio é apenas simulado
 import logging
 import os
 import smtplib
+import ssl
+from email import policy
 from pathlib import Path
 from email.message import EmailMessage
+from email.utils import formataddr, formatdate, make_msgid, parseaddr
 from typing import Iterable, Mapping, Any
 from dotenv import load_dotenv
 
 logger = logging.getLogger(__name__)
+DEFAULT_SENDER_NAME = "Pet Shop Pro"
 
 
 for env_path in (Path("/opt/petshop/.env"), Path(".env")):
@@ -81,6 +85,34 @@ def _normalizar_conteudo_anexo(content: Any) -> bytes:
     return bytes(content)
 
 
+def _email_address(value: str) -> str:
+    _, address = parseaddr(str(value or ""))
+    return address or str(value or "").strip()
+
+
+def _sender_domain(from_addr: str) -> str | None:
+    address = _email_address(from_addr)
+    if "@" not in address:
+        return None
+    domain = address.rsplit("@", 1)[1].strip().strip(">")
+    return domain or None
+
+
+def _format_from_header(from_addr: str) -> str:
+    name, address = parseaddr(str(from_addr or ""))
+    if address and not name:
+        return formataddr((DEFAULT_SENDER_NAME, address))
+    return str(from_addr or "").strip()
+
+
+def _smtp_tls_context() -> ssl.SSLContext:
+    context = ssl.create_default_context(purpose=ssl.Purpose.SERVER_AUTH)
+    context.minimum_version = ssl.TLSVersion.TLSv1_2
+    context.verify_mode = ssl.CERT_REQUIRED
+    context.check_hostname = True
+    return context
+
+
 def _build_email_message(
     *,
     from_addr: str,
@@ -90,10 +122,14 @@ def _build_email_message(
     text_body: str | None = None,
     attachments: Iterable[Mapping[str, Any]] | None = None,
 ) -> EmailMessage:
-    msg = EmailMessage()
+    msg = EmailMessage(policy=policy.SMTP)
     msg["Subject"] = subject
-    msg["From"] = from_addr
+    msg["From"] = _format_from_header(from_addr)
     msg["To"] = to
+    msg["Date"] = formatdate(localtime=True)
+    msg["Message-ID"] = make_msgid(domain=_sender_domain(from_addr))
+    msg["Reply-To"] = _email_address(from_addr)
+    msg["X-Mailer"] = DEFAULT_SENDER_NAME
 
     texto_fallback = text_body or "Seu cliente de e-mail nao exibiu o conteudo HTML desta mensagem."
     msg.set_content(texto_fallback, subtype="plain", charset="utf-8")
@@ -136,6 +172,7 @@ def send_email(
     password = str(config["password"])
     from_addr = str(config["from_addr"])
     use_tls = bool(config["use_tls"])
+    envelope_from = _email_address(from_addr) or user
 
     msg = _build_email_message(
         from_addr=from_addr,
@@ -148,10 +185,12 @@ def send_email(
 
     try:
         with smtplib.SMTP(host, port, timeout=10) as server:
+            server.ehlo()
             if use_tls:
-                server.starttls()
+                server.starttls(context=_smtp_tls_context())
+                server.ehlo()
             server.login(user, password)
-            server.sendmail(from_addr, [to], msg.as_string())
+            server.sendmail(envelope_from, [to], msg.as_bytes(policy=policy.SMTP))
         logger.info("[EMAIL-ENVIADO] Para: %s | Assunto: %s", to, subject)
         return True
     except Exception as exc:
