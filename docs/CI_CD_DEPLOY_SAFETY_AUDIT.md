@@ -4,6 +4,8 @@ Atualizado em: 2026-05-16
 
 Este arquivo acompanha a maturidade de CI/CD e deploy seguro do Sistema Pet.
 
+Guia mestre da maturidade geral do sistema: `docs/MATURIDADE_GERAL_10_10_GUIA.md`.
+
 ## Nota atual
 
 Nota inicial estimada: 7/10.

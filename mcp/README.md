@@ -4,6 +4,8 @@
 
 Este diretorio contem os MCPs locais usados pelo VS Code e pelo Codex.
 
+Guia mestre de maturidade geral: `docs/MATURIDADE_GERAL_10_10_GUIA.md`.
+
 Guia vivo de maturidade e proximos passos: `docs/MCP_MATURIDADE_GUIA.md`.
 
 ## Servidores
