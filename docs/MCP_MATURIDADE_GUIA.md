@@ -10,7 +10,7 @@ Levar os MCPs locais do Sistema Pet para um padrao seguro, repetivel e facil de 
 
 Nota inicial estimada: 4/10.
 
-Nota atual estimada: 8,5/10.
+Nota atual estimada: 9/10.
 
 Meta: 10/10 para uso interno profissional.
 
@@ -39,6 +39,7 @@ Meta: 10/10 para uso interno profissional.
 | Feito | Bootstrap automatico de `.venv` com `-InstallDevDependencies` | `scripts/test_mcp.ps1` |
 | Feito | CI do GitHub para MCPs | `.github/workflows/mcp-ci.yml` |
 | Feito | CI dos MCPs rodando em todo Pull Request para permitir branch protection | `.github/workflows/mcp-ci.yml` |
+| Feito | Branch protection da `main` exigindo o check `MCP tests` | GitHub branch protection |
 | Feito | Documentacao de uso e arquitetura dos MCPs | `mcp/README.md` e READMEs internos |
 | Feito | Badge visual do CI no README dos MCPs | `mcp/README.md` |
 
@@ -48,6 +49,7 @@ Meta: 10/10 para uso interno profissional.
 |---|---|---|
 | #44 | Hardening dos MCPs: seguranca, services, testes, auditoria, docs | Mergeado |
 | #45 | CI dos MCPs e bootstrap automatico dos venvs | Mergeado |
+| #47 | Ajuste do MCP CI para rodar em todo PR antes da branch protection | Mergeado |
 
 ## Como validar agora
 
@@ -73,7 +75,6 @@ Validacao geral do fluxo:
 
 | Prioridade | Status | Item | Motivo |
 |---|---|---|---|
-| Alta | Pendente | Proteger a branch `main` exigindo o check `MCP tests` | Impede merge de PR que quebre MCPs |
 | Alta | Pendente | Criar teste de protocolo MCP ponta a ponta | Garante que o servidor MCP responde como cliente real espera |
 | Media | Pendente | Criar checklist obrigatorio para novas ferramentas MCP | Evita ferramenta nova sem teste, docs e classificacao de risco |
 | Media | Pendente | Classificar cada ferramenta por risco: leitura, escrita DEV, escrita sensivel | Ajuda o Lucas e assistentes a nao usarem ferramenta errada |
@@ -82,23 +83,23 @@ Validacao geral do fluxo:
 
 ## Proximo passo recomendado
 
-1. Configurar branch protection da `main` no GitHub.
-2. Exigir o check `MCP tests` em todo PR.
-3. Depois abrir nova tarefa para teste MCP ponta a ponta.
+1. Criar teste de protocolo MCP ponta a ponta.
+2. Criar checklist obrigatorio para novas ferramentas MCP.
+3. Classificar cada ferramenta por risco: leitura, escrita DEV ou escrita sensivel.
 
-## Como configurar branch protection manualmente
+## Branch protection atual
 
-No GitHub:
+Configurada em 2026-05-16 no GitHub:
 
-1. Abrir o repositorio `lcsgmoraes-droid/Sistema-Pet`.
-2. Ir em `Settings`.
-3. Ir em `Branches`.
-4. Criar ou editar regra para `main`.
-5. Ativar `Require status checks to pass before merging`.
-6. Selecionar o check `MCP tests`.
-7. Salvar.
+| Regra | Valor |
+|---|---|
+| Branch protegida | `main` |
+| Status check obrigatorio | `MCP tests` |
+| Branch atualizada antes de merge | Sim (`strict: true`) |
+| Force push | Bloqueado |
+| Delecao da branch | Bloqueada |
 
-Observacao: o workflow `MCP CI` roda em todo Pull Request para que o check `MCP tests` possa ser exigido com seguranca pela branch protection.
+Observacao: o workflow `MCP CI` roda em todo Pull Request para que o check `MCP tests` exista mesmo quando o PR nao altera arquivos em `mcp/`.
 
 ## Regra para novas ferramentas MCP
 
