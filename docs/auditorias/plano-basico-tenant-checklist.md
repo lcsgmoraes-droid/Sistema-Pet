@@ -75,10 +75,10 @@ Status usados:
 | Produtos/estoque | Pronto local + smoke visual | Listagem, criacao, edicao, exclusao, entrada de estoque e lote/validade visual passaram em auditoria local; manter reteste em staging/producao e editar todos os campos como refinamento. |
 | Calculadora de racao | Pronto local | API A/B e smoke visual no navegador passaram com operador nao-admin; busca, calculo e comparativo retornaram 200 e console limpo. |
 | PDV/vendas | Pronto local A/B + smoke visual | Venda completa por API real e pelo navegador passou com operador nao-admin; caixa, sangria, suprimento, pagamento em dinheiro, finalizacao e baixa de estoque passaram. Falta apenas reteste visual de recibo/historico como refinamento. |
-| Financeiro de vendas | Quase pronto | Finalizacao gerou reflexos financeiros sem 500 no A/B local; falta conferir telas/historico visual. |
+| Financeiro de vendas | Quase pronto | Finalizacao gerou reflexos financeiros sem 500 no A/B local; menu do Basico e backend premium foram realinhados na PR #39; falta conferir telas/historico visual. |
 | Cadastros essenciais | Pronto local | Formas de pagamento, operadoras, opcoes de racao e catalogos de produto passaram em A/B real; departamentos, categorias e marcas passaram tambem por smoke visual CRUD no navegador. |
 | Configuracoes/usuarios/LGPD | Pronto local + smoke visual | Usuarios/admin passou por smoke visual; Roles & Permissoes passou por criar, duplicar, editar e excluir perfil; LGPD passou busca de titular e dossie com schema local alinhado; configuracao fiscal, parametros gerais e estoque salvaram no navegador com chamadas 200. |
-| Premium bloqueado | Quase pronto | Smoke de chamadas premium indiretas em formas, layout e Lembretes passou; ainda falta varrer menus/URLs diretas premium. |
+| Premium bloqueado | Quase pronto | Smoke de chamadas premium indiretas passou; URLs diretas de contas a receber, SEFAZ/compras e financeiro ERP foram fechadas na PR #39; ainda falta varrer restante de menus/URLs diretas premium. |
 | Landing page/contratacao | Pronto local | Bloco de selecao do Plano Basico criado na landing; cadastro envia `plan=basico` e API grava plano validado. |
 
 ### 0.4. Cronograma final para vender o Plano Basico
@@ -131,6 +131,7 @@ Status usados:
   - A rodada visual `20260515215846` confirmou CRUD visual de departamentos, categorias e marcas no navegador com isolamento A/B.
   - A rodada visual `202605151925` confirmou configuracao da empresa no navegador: fiscal/dados cadastrais, parametros gerais e estoque salvaram com chamadas 200, persistencia apos reload e console limpo.
   - A rodada visual `202605151931567` confirmou produto com dois lotes e validades diferentes: a listagem exibiu a validade mais urgente e o tooltip mostrou os dois lotes com saldo.
+  - A rodada estatica/contratual da PR #39 confirmou `anyOfPermissions` em rotas diretas, gate de modulo em contas a receber e SEFAZ, menu `Financeiro > Vendas` liberado para permissoes basicas e endpoints premium de `financeiro_routes.py` bloqueados por `financeiro_erp`.
   - A comparacao visual completa por navegador ainda fica pendente para financeiro de vendas/recibo/historico.
 - Data/hora aproximada dos testes: 2026-05-15, madrugada e tarde, horario local.
 
