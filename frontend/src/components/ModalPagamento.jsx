@@ -233,7 +233,10 @@ export default function ModalPagamento({
 
   const valorTotal = venda.total;
   const valorPago = pagamentos.reduce((sum, p) => sum + p.valor, 0) + totalPagoExistente;
-  const valorRestante = valorTotal - valorPago;
+  const valorRestante = Math.max(0, valorTotal - valorPago);
+  const vendaQuitadaComPagamentosExistentes = totalPagoExistente >= valorTotal - 0.01;
+  const podeConfirmarFinalizacao =
+    pagamentos.length > 0 || vendaQuitadaComPagamentosExistentes;
   const troco = valorRecebido > 0 ? valorRecebido - valorRestante : 0;
   const cupomParaFinalizar =
     cupomAplicado ||
@@ -777,7 +780,7 @@ export default function ModalPagamento({
   // Finalizar venda
   const handleFinalizar = async () => {
     // Permitir baixa parcial - não exigir pagamento total
-    if (pagamentos.length === 0) {
+    if (!podeConfirmarFinalizacao) {
       setErro('Adicione pelo menos uma forma de pagamento');
       return;
     }
@@ -1906,7 +1909,7 @@ export default function ModalPagamento({
 
             <button
               onClick={handleFinalizar}
-              disabled={loading || pagamentos.length === 0}
+              disabled={loading || !podeConfirmarFinalizacao}
               className="flex items-center space-x-2 px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {loading ? (
@@ -1917,7 +1920,7 @@ export default function ModalPagamento({
               ) : (
                 <>
                   <CheckCircle className="w-5 h-5" />
-                  <span>Registrar Recebimento</span>
+                  <span>{pagamentos.length === 0 ? 'Confirmar Ajustes' : 'Registrar Recebimento'}</span>
                 </>
               )}
             </button>

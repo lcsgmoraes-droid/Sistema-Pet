@@ -70,6 +70,8 @@ function montarVendaReaberta(vendaAtualizada, clienteCompleto) {
     subtotal: parseFloat(vendaAtualizada.subtotal || vendaAtualizada.total),
     desconto_valor: parseFloat(vendaAtualizada.desconto_valor || 0),
     desconto_percentual: parseFloat(vendaAtualizada.desconto_percentual || 0),
+    cupom_code: vendaAtualizada.cupom_code || null,
+    cupom_discount_applied: vendaAtualizada.cupom_discount_applied ?? null,
     total: parseFloat(vendaAtualizada.total),
     observacoes: vendaAtualizada.observacoes || "",
     status: "aberta",

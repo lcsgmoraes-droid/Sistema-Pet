@@ -129,6 +129,41 @@ from app.db.transaction import transactional_session
 logger = logging.getLogger(__name__)
 
 
+def _calcular_pagamentos_finalizacao(
+    *,
+    total_venda: Any,
+    pagamentos_existentes: List[Any],
+    pagamentos_novos: List[Dict[str, Any]],
+) -> Dict[str, float]:
+    total_venda_float = float(total_venda or 0)
+    total_ja_pago = sum(float(p.valor) for p in pagamentos_existentes)
+    total_novos_pagamentos = sum(float(p.get('valor') or 0) for p in pagamentos_novos)
+    valor_restante_bruto = total_venda_float - total_ja_pago
+
+    if not pagamentos_novos and total_ja_pago < total_venda_float - 0.01:
+        raise HTTPException(status_code=400, detail='Informe pelo menos uma forma de pagamento')
+
+    if valor_restante_bruto <= 0.01 and total_novos_pagamentos > 0.01:
+        raise HTTPException(status_code=400, detail='Venda já está totalmente paga')
+
+    if total_novos_pagamentos > valor_restante_bruto + 0.01:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f'Valor dos pagamentos excede o saldo da venda. '
+                f'Saldo: R$ {max(0, valor_restante_bruto):.2f}, '
+                f'informado: R$ {total_novos_pagamentos:.2f}.'
+            )
+        )
+
+    return {
+        'total_ja_pago': total_ja_pago,
+        'total_novos_pagamentos': total_novos_pagamentos,
+        'total_pagamentos': total_ja_pago + total_novos_pagamentos,
+        'valor_restante': max(0, valor_restante_bruto),
+    }
+
+
 class VendaService:
     """
     Serviço orquestrador para vendas com transação atômica.
@@ -1293,29 +1328,17 @@ class VendaService:
                     detail=f'Apenas vendas abertas ou com baixa parcial podem receber pagamentos (status atual: {venda.status})'
                 )
             
-            # Validar pagamentos
-            if not pagamentos:
-                raise HTTPException(status_code=400, detail='Informe pelo menos uma forma de pagamento')
-            
             # Calcular totais
             pagamentos_existentes = db.query(VendaPagamento).filter_by(venda_id=venda.id).all()
-            total_ja_pago = sum(float(p.valor) for p in pagamentos_existentes)
             total_venda = float(venda.total)
-            valor_restante = total_venda - total_ja_pago
-            
-            if valor_restante <= 0.01:
-                raise HTTPException(status_code=400, detail='Venda já está totalmente paga')
-            
-            total_novos_pagamentos = sum(float(p.get('valor') or 0) for p in pagamentos)
-            if total_novos_pagamentos > valor_restante + 0.01:
-                raise HTTPException(
-                    status_code=400,
-                    detail=(
-                        f'Valor dos pagamentos excede o saldo da venda. '
-                        f'Saldo: R$ {valor_restante:.2f}, informado: R$ {total_novos_pagamentos:.2f}.'
-                    )
-                )
-            total_pagamentos = total_ja_pago + total_novos_pagamentos
+            totais_pagamento = _calcular_pagamentos_finalizacao(
+                total_venda=total_venda,
+                pagamentos_existentes=pagamentos_existentes,
+                pagamentos_novos=pagamentos,
+            )
+            total_ja_pago = totais_pagamento['total_ja_pago']
+            total_novos_pagamentos = totais_pagamento['total_novos_pagamentos']
+            total_pagamentos = totais_pagamento['total_pagamentos']
             
             logger.info(
                 f"💰 Totais: Venda=R$ {total_venda:.2f}, "
@@ -1993,8 +2016,7 @@ class VendaService:
             contas_pagar_taxas_ids = []
             logger.info(f"💳 Iniciando processamento de taxas de pagamento - Venda #{venda.numero_venda}")
             try:
-                # Combinar pagamentos existentes com novos
-                todos_pagamentos = list(pagamentos_existentes) + [
+                pagamentos_para_taxas = [
                     type('obj', (object,), {
                         'forma_pagamento': p['forma_pagamento'],
                         'valor': p['valor'],
@@ -2002,13 +2024,13 @@ class VendaService:
                     })() for p in pagamentos
                 ]
                 
-                logger.info(f"💳 Total de pagamentos a processar: {len(todos_pagamentos)}")
-                for pag in todos_pagamentos:
+                logger.info(f"💳 Total de pagamentos a processar: {len(pagamentos_para_taxas)}")
+                for pag in pagamentos_para_taxas:
                     logger.info(f"  - {pag.forma_pagamento}: R$ {pag.valor}")
                 
                 resultado_taxas = processar_contas_pagar_taxas(
                     venda=venda,
-                    pagamentos=todos_pagamentos,
+                    pagamentos=pagamentos_para_taxas,
                     user_id=user_id,
                     tenant_id=tenant_id,
                     db=db

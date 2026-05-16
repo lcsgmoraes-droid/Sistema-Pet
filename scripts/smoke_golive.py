@@ -10,6 +10,7 @@ Uso:
 
 Opcional:
   GOLIVE_TEST_EMAIL / GOLIVE_TEST_PASSWORD para validar um segundo tenant.
+  GOLIVE_PUBLIC_ONLY=true para validar apenas health e paginas publicas.
 
 O script faz apenas leituras e login/selecao de tenant. Nao cria venda,
 produto ou cliente.
@@ -148,6 +149,10 @@ def _query(path: str, params: dict[str, Any]) -> str:
     return f"{path}?{urlencode(params)}"
 
 
+def _env_flag(name: str) -> bool:
+    return os.getenv(name, "").strip().lower() in {"1", "true", "yes", "sim", "on"}
+
+
 def run_erp_flow(
     client: SmokeClient,
     results: list[CheckResult],
@@ -234,6 +239,7 @@ def run_erp_flow(
 
 def main() -> int:
     base_url = os.getenv("GOLIVE_BASE_URL", DEFAULT_BASE_URL)
+    public_only = _env_flag("GOLIVE_PUBLIC_ONLY")
     client = SmokeClient(base_url)
     results: list[CheckResult] = []
 
@@ -247,23 +253,32 @@ def main() -> int:
         result, _ = client.request("GET", path, expected={200})
         _append(results, result, name=name)
 
-    email = os.getenv("GOLIVE_ERP_EMAIL")
-    password = os.getenv("GOLIVE_ERP_PASSWORD")
-    if email and password:
-        run_erp_flow(client, results, label="tenant principal", email=email, password=password)
-    else:
+    if public_only:
         results.append(
             CheckResult(
-                name="tenant principal: login ERP",
-                ok=False,
-                detail="defina GOLIVE_ERP_EMAIL e GOLIVE_ERP_PASSWORD",
+                name="modo publico",
+                ok=True,
+                detail="login autenticado pulado por GOLIVE_PUBLIC_ONLY=true",
             )
         )
+    else:
+        email = os.getenv("GOLIVE_ERP_EMAIL")
+        password = os.getenv("GOLIVE_ERP_PASSWORD")
+        if email and password:
+            run_erp_flow(client, results, label="tenant principal", email=email, password=password)
+        else:
+            results.append(
+                CheckResult(
+                    name="tenant principal: login ERP",
+                    ok=False,
+                    detail="defina GOLIVE_ERP_EMAIL e GOLIVE_ERP_PASSWORD",
+                )
+            )
 
-    test_email = os.getenv("GOLIVE_TEST_EMAIL")
-    test_password = os.getenv("GOLIVE_TEST_PASSWORD")
-    if test_email and test_password:
-        run_erp_flow(client, results, label="tenant teste", email=test_email, password=test_password)
+        test_email = os.getenv("GOLIVE_TEST_EMAIL")
+        test_password = os.getenv("GOLIVE_TEST_PASSWORD")
+        if test_email and test_password:
+            run_erp_flow(client, results, label="tenant teste", email=test_email, password=test_password)
 
     failed = [result for result in results if not result.ok]
     for result in results:

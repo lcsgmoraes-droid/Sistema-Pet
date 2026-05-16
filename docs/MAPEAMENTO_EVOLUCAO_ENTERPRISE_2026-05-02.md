@@ -880,6 +880,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-09: SKU de produto passou a ser normalizado em maiusculas no backend e validado por `lower(trim(codigo))` em cadastro, edicao, variacoes, importacao por planilha, criacao via XML e autocadastro Bling/NF. Isso bloqueia novos duplicados por diferenca de caixa, como `pet5136` versus `PET5136`; duplicados historicos devem ser resolvidos pela fusao segura.
 - 2026-05-09: iniciado fluxo operacional de fusao segura de produtos na listagem: selecionar exatamente 2 produtos, escolher o principal, revisar conflitos campo a campo, somar estoque e transferir referencias historicas antes de inativar o duplicado. O indice unico de SKU tambem passa a usar `tenant_id + lower(trim(codigo))` no banco para impedir reincidencia.
 - 2026-05-09: criado `scripts/smoke_golive.py` para rodada curta de go-live autenticado sem escrita de dados: health/frontend legal, login ERP, selecao de tenant, usuario atual, produtos, produtos vendaveis PDV, clientes, caixa aberto, LGPD status e catalogo publico e-commerce/app.
+- 2026-05-16: `scripts/smoke_golive.py` ganhou modo publico (`GOLIVE_PUBLIC_ONLY=true`) e teste automatizado, permitindo validar health/paginas publicas sem credenciais antes da rodada autenticada.
 - 2026-05-09: webhook Pagar.me endurecido para exigir assinatura HMAC quando a validacao estiver ligada ou quando o gateway Pagar.me estiver ativo; se faltar segredo em producao, o endpoint falha explicitamente em vez de aceitar payload sem validacao.
 - 2026-05-09: Relatorio de Movimentacoes teve os modais de reservas, lancamento manual e lancamento de granel extraidos para `components/estoque`, reaproveitando `ActionButton`, `ProductIdentity`, `StatusBadge` e `EmptyState` sem alterar a regra da pagina.
 - 2026-05-09: Relatorio de Movimentacoes tambem extraiu o painel `VendasPorCanalPanel`, deixando a pagina principal com calculo/orquestracao e a apresentacao do resumo por canal em componente dedicado.
@@ -928,12 +929,14 @@ Na pratica:
 
 ## Proximo passo recomendado
 
-Ao retomar, antes de abrir nova frente grande, fazer uma rodada curta de go-live autenticado:
+Ao retomar, antes de abrir nova frente grande, fazer uma rodada curta de go-live:
 
-1. Testar permissoes por perfil real (`admin`, `vendedor`, `financeiro`, `entregador`) nas telas criticas.
-2. Validar webhooks publicos/externos com segredo, assinatura ou token quando o provedor permitir.
-3. Confirmar onboarding de novo tenant: cadastro, confirmacao de e-mail, aceite LGPD/termos, primeiro login e selecao de tenant.
-4. Depois disso, voltar para a refatoracao visual/padronizacao da Onda 1.
+1. Rodar `scripts/smoke_golive.py` em modo publico com `GOLIVE_PUBLIC_ONLY=true`.
+2. Rodar `scripts/smoke_golive.py` em modo autenticado com credenciais seguras de operador.
+3. Testar permissoes por perfil real (`admin`, `vendedor`, `financeiro`, `entregador`) nas telas criticas.
+4. Validar webhooks publicos/externos com segredo, assinatura ou token quando o provedor permitir.
+5. Confirmar onboarding de novo tenant: cadastro, confirmacao de e-mail, aceite LGPD/termos, primeiro login e selecao de tenant.
+6. Depois disso, voltar para a refatoracao visual/padronizacao da Onda 1.
 
 Continuar a **Onda 1** com uma destas frentes, conforme prioridade operacional:
 
