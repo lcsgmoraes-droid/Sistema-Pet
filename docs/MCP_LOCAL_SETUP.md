@@ -29,6 +29,22 @@ python -m venv .venv
 
 O VS Code le a configuracao em `.vscode/mcp.json`.
 
+## Testar MCPs neste PC
+
+Depois de preparar os ambientes:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\test_mcp.ps1
+```
+
+Em um PC limpo, este comando tambem cria os `.venv` e instala dependencias de teste:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\test_mcp.ps1 -InstallDevDependencies
+```
+
+O guia de maturidade e proximos passos fica em `docs/MCP_MATURIDADE_GUIA.md`.
+
 ## Depurar com MCP Inspector
 
 O Inspector pode ser instalado globalmente:
