@@ -114,6 +114,43 @@ Status usados:
 - Bling/webhooks nao entram nem como Beta publico neste momento.
 - Evitar regra por e-mail hardcoded sempre que possivel; preferir flag de tenant ou `AssinaturaModulo` para qualquer excecao futura.
 
+### 0.6. Smoke de go-live antes de venda controlada
+
+Usar `scripts/smoke_golive.py` como checklist executavel antes de liberar ou validar um tenant real.
+
+Rodada publica, sem credenciais:
+
+```powershell
+$env:GOLIVE_BASE_URL="https://mlprohub.com.br"
+$env:GOLIVE_PUBLIC_ONLY="true"
+python scripts/smoke_golive.py
+```
+
+Rodada autenticada, somente quando houver credenciais seguras no ambiente local:
+
+```powershell
+$env:GOLIVE_BASE_URL="https://mlprohub.com.br"
+$env:GOLIVE_ERP_EMAIL="email-do-operador"
+$env:GOLIVE_ERP_PASSWORD="senha-do-operador"
+python scripts/smoke_golive.py
+```
+
+Opcionalmente validar um segundo tenant:
+
+```powershell
+$env:GOLIVE_TEST_EMAIL="email-do-segundo-tenant"
+$env:GOLIVE_TEST_PASSWORD="senha-do-segundo-tenant"
+python scripts/smoke_golive.py
+```
+
+Regras deste smoke:
+
+- Nao registrar senha, token ou cookie em documento ou chat.
+- Nao cria cliente, pet, produto, venda ou estoque.
+- Faz apenas health, paginas publicas, login, selecao de tenant e leituras basicas.
+- Nao substitui deploy nem autorizacao de producao; e apenas validacao.
+- Se falhar em producao/staging, registrar o erro aqui antes de vender para mais empresas.
+
 ## 1. Branch e commits
 
 - Branch historica consolidada: `fix/20260514-2157-corrigir-entrada-estoque-produto-user-id`
