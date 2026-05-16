@@ -20,7 +20,7 @@ Regra de uso:
 | Estrutura geral | 5/10 | 6,5/10 | 10/10 | Em andamento |
 | Seguranca operacional | 2,5/10 | 8/10 | 10/10 | Em andamento |
 | Testes/CI | 1/10 | 8,5/10 | 10/10 | Em andamento |
-| Observabilidade/auditoria | 2/10 | 5/10 | 10/10 | Em andamento prioritario |
+| Observabilidade/auditoria | 2/10 | 5,5/10 | 10/10 | Em andamento prioritario |
 | Portabilidade/configuracao | 3/10 | 6,5/10 | 10/10 | Em andamento |
 | Documentacao | 4/10 | 8/10 | 10/10 | Em andamento |
 
@@ -191,11 +191,12 @@ Ja feito:
 - [x] Ops possui historico e direcao documentada.
 - [x] MCPs geram auditoria local JSONL.
 - [x] Incidentes e watchdog aparecem no material enterprise consolidado.
+- [x] Primeiro corte de `request_id`: header seguro `X-Request-ID`, UUID automatico para valor inseguro, propagacao para `trace_id` e log HTTP estruturado.
 
 Falta para 10/10:
 
-- [ ] Padronizar `request_id`/`correlation_id` ponta a ponta.
-- [ ] Garantir logs estruturados JSON nas rotas criticas.
+- [ ] Estender `request_id`/`correlation_id` para jobs, workers e integracoes externas.
+- [ ] Garantir logs estruturados JSON nas rotas criticas com eventos de negocio, nao apenas log HTTP.
 - [ ] Criar trilha de auditoria para acoes sensiveis: login, permissao, venda, desconto, cupom, reabertura, configuracao e deploy.
 - [ ] Criar painel ou relatorio de incidentes com filtros por tenant, rota, status e request_id.
 - [ ] Alertar falhas recorrentes, lentidao, 5xx e falha de jobs.
@@ -205,7 +206,7 @@ Falta para 10/10:
 
 Proxima acao concreta:
 
-- [ ] Implementar primeiro corte de `request_id` + logs estruturados nas rotas de auth, vendas, campanhas/cupons e health.
+- [ ] Criar trilha de auditoria de negocio para desconto, cupom, reabertura de venda e alteracoes sensiveis de configuracao.
 
 ## 7. Portabilidade/configuracao
 

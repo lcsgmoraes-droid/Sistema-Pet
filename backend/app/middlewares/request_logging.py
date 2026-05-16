@@ -8,6 +8,7 @@ import os
 import time
 from starlette.middleware.base import BaseHTTPMiddleware
 from fastapi import Request
+from app.middlewares.request_context import get_request_id
 from app.utils.logger import logger
 
 
@@ -40,6 +41,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
         
         path = request.url.path
         status_code = response.status_code
+        request_id = get_request_id() or response.headers.get("X-Request-ID")
 
         if path in QUIET_PATHS and status_code < 500:
             return response
@@ -58,6 +60,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             path=path,
             status_code=status_code,
             duration_ms=duration_ms,
+            request_id=request_id,
             client_ip=request.client.host if request.client else None
         )
         
