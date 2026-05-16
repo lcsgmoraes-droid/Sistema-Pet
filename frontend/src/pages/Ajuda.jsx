@@ -48,43 +48,37 @@ const ICONES_MODULO = {
 /* FAQ — dúvidas comuns */
 const FAQS = [
   {
-    pergunta: "Como faço para contratar um módulo?",
+    pergunta: "Como faco para contratar?",
     resposta:
-      'Clique no botão "Falar com suporte" em qualquer módulo desta página ou direto pelo WhatsApp. O módulo é liberado automaticamente em até 5 minutos após a confirmação do pagamento.',
-  },
-  {
-    pergunta: "Posso contratar só um módulo e não os outros?",
-    resposta:
-      "Sim! Cada módulo premium é independente e pode ser contratado separadamente. Você paga apenas pelo que vai usar.",
-  },
-  {
-    pergunta: "Como funciona o pagamento?",
-    resposta:
-      "O pagamento é mensal e pode ser feito por Pix ou cartão de crédito. Sem fidelidade — você pode cancelar a qualquer momento sem multa.",
-  },
-  {
-    pergunta: "O módulo é liberado na hora?",
-    resposta:
-      "Após a confirmação do pagamento, o módulo é liberado automaticamente em até 5 minutos. Você não precisa fazer nada — basta recarregar a página.",
-  },
-  {
-    pergunta: "Se eu cancelar, perco os dados?",
-    resposta:
-      "Não. Seus dados ficam salvos. Se reativar o módulo no futuro, tudo estará lá como antes.",
+      "O Plano Basico e a oferta inicial. A ativacao paga acontece com atendimento assistido e registro manual pelo administrativo.",
   },
   {
     pergunta: "Posso testar antes de pagar?",
     resposta:
-      "Sim! Fale com nosso suporte pelo WhatsApp e solicite um período de demonstração. Mostramos o módulo funcionando na sua própria conta.",
+      "Sim. Novas empresas comecam com 30 dias gratis do Plano Basico.",
   },
   {
-    pergunta: "Tenho dúvidas sobre um módulo específico. O que faço?",
+    pergunta: "Como funciona o pagamento?",
     resposta:
-      "Fale direto com a gente pelo WhatsApp. Nossa equipe explica o funcionamento e tira todas as dúvidas antes de qualquer contratação.",
+      "Nesta etapa, o pagamento e feito fora do sistema. Depois da confirmacao, o acesso e ativado manualmente.",
+  },
+  {
+    pergunta: "Os modulos extras entram no trial?",
+    resposta:
+      "Nao automaticamente. Modulos extras ficam como Beta acompanhado e podem ser solicitados caso a caso.",
+  },
+  {
+    pergunta: "Se eu cancelar, perco os dados?",
+    resposta:
+      "Nao. Seus dados ficam salvos. Se reativar o acesso no futuro, tudo continua no tenant.",
+  },
+  {
+    pergunta: "Tenho duvidas sobre um modulo especifico. O que faco?",
+    resposta:
+      "Fale direto pelo WhatsApp. A gente explica o funcionamento e avalia se faz sentido liberar como Beta acompanhado.",
   },
 ];
 
-/* Ordem de exibição dos módulos */
 const ORDEM_MODULOS = [
   "compras",
   "financeiro_erp",
@@ -95,7 +89,6 @@ const ORDEM_MODULOS = [
   "entregas",
   "whatsapp",
   "ecommerce",
-  "bling",
   "comissoes",
   "app_mobile",
   "marketplaces",
@@ -111,7 +104,7 @@ const CardModulo = ({ moduloKey }) => {
     `Olá! Quero saber mais sobre o módulo ${info.nome} do Sistema Pet. Pode me ajudar?`,
   );
   const msgContratar = encodeURIComponent(
-    `Olá! Quero contratar o módulo ${info.nome} do Sistema Pet.`,
+    `Ola! Quero solicitar acesso Beta ao modulo ${info.nome} do Sistema Pet.`,
   );
 
   return (
@@ -141,14 +134,14 @@ const CardModulo = ({ moduloKey }) => {
       <div className="border-t border-gray-100 pt-4">
         <div className="flex items-end justify-between mb-4">
           <div>
-            <p className="text-xs text-gray-400">a partir de</p>
+            <p className="text-xs text-gray-400">tipo de acesso</p>
             <p className="text-2xl font-bold text-gray-900">
-              R$ {info.preco}
-              <span className="text-sm font-normal text-gray-400">/mês</span>
+              Beta
+              <span className="text-sm font-normal text-gray-400"> acompanhado</span>
             </p>
           </div>
-          <span className="text-xs text-green-600 font-semibold bg-green-50 px-2 py-1 rounded-full">
-            Sem fidelidade
+          <span className="text-xs text-amber-700 font-semibold bg-amber-50 px-2 py-1 rounded-full">
+            Manual
           </span>
         </div>
 
@@ -159,7 +152,7 @@ const CardModulo = ({ moduloKey }) => {
           className="flex items-center justify-center gap-2 w-full bg-indigo-600 hover:bg-indigo-700 text-white font-semibold py-2.5 px-4 rounded-xl transition-colors text-sm"
         >
           <FiCreditCard className="w-4 h-4" />
-          Contratar este módulo
+          Solicitar acesso Beta
         </a>
         <a
           href={`https://wa.me/${WHATSAPP_NUMERO}?text=${msgWhatsApp}`}
@@ -223,14 +216,14 @@ const Ajuda = () => {
               ? "Preparando seu sistema"
               : aba === "central"
               ? "Como usar o Sistema Pet"
-              : "Módulos extras do Sistema Pet"}
+              : "Módulos Beta do Sistema Pet"}
           </h1>
           <p className="text-indigo-100 text-base max-w-xl mx-auto">
             {aba === "introducao"
               ? "Checklist guiado, com sequencia recomendada, para configurar o sistema com seguranca do inicio ao fim."
               : aba === "central"
               ? "Aprenda a usar cada funcionalidade do sistema. Pesquise por dúvidas, navegue por módulo ou leia o passo a passo."
-              : "O sistema base já está funcionando para você. Quer vender mais, entregar mais rápido ou atender sem parar? Veja o que cada módulo faz e quanto custa."}
+              : "O Plano Básico fica no centro da oferta. Os recursos avançados aparecem como Beta acompanhado para você conhecer e pedir liberação quando fizer sentido."}
           </p>
           <div className="mt-6 flex flex-col sm:flex-row gap-3 justify-center">
             <a
@@ -265,7 +258,7 @@ const Ajuda = () => {
               }`}
             >
               <FiStar className="w-4 h-4" />
-              Módulos Premium
+              Módulos Beta
             </button>
             <button
               onClick={() => setAba("introducao")}
@@ -299,7 +292,7 @@ const Ajuda = () => {
       {/* Conteudo da aba Introducao Guiada */}
       {aba === "introducao" && <IntroducaoGuiada />}
 
-      {/* Conteúdo da aba Módulos Premium */}
+      {/* Conteúdo da aba Módulos Beta */}
       {aba === "planos" && (
         <div className="max-w-5xl mx-auto px-4 py-10">
           {/* Seção: módulos base (inclusos sem custo) */}
@@ -320,14 +313,14 @@ const Ajuda = () => {
             </div>
           </div>
 
-          {/* Seção: módulos premium */}
+          {/* Seção: módulos beta */}
           <div className="mb-12">
             <h2 className="text-xl font-bold text-gray-900 mb-1">
-              Módulos premium disponíveis
+              Módulos Beta disponíveis
             </h2>
             <p className="text-sm text-gray-500 mb-6">
-              Cada módulo é independente — contrate só o que fizer sentido para
-              o seu negócio. Cancele a qualquer hora, sem multa.
+              Eles mostram o que vem por aí e podem ser liberados como piloto
+              acompanhado, sem checkout automático dentro do sistema.
             </p>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
@@ -337,34 +330,34 @@ const Ajuda = () => {
             </div>
           </div>
 
-          {/* Seção: como contratar */}
+          {/* Seção: como solicitar */}
           <div className="mb-12">
             <h2 className="text-xl font-bold text-gray-900 mb-1">
-              Como contratar
+              Como pedir acesso
             </h2>
             <p className="text-sm text-gray-500 mb-6">
-              Simples e rápido — tudo pelo WhatsApp.
+              Simples e direto — tudo pelo WhatsApp.
             </p>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {[
                 {
                   passo: "1",
-                  titulo: "Escolha o módulo",
+                  titulo: "Escolha o Beta",
                   descricao:
-                    "Veja os módulos acima, entenda o que cada um faz e escolha o que resolve seu problema.",
+                    "Veja os módulos acima e escolha qual recurso avançado faz sentido testar primeiro.",
                 },
                 {
                   passo: "2",
                   titulo: "Fale com o suporte",
                   descricao:
-                    'Clique em "Contratar" ou "Tirar dúvidas". A gente explica tudo e confirma o acesso.',
+                    'Clique em "Solicitar acesso Beta" ou "Tirar dúvidas". A gente explica o escopo e combina o piloto.',
                 },
                 {
                   passo: "3",
-                  titulo: "Pronto, acesso liberado",
+                  titulo: "Liberação acompanhada",
                   descricao:
-                    "Em até 5 minutos após o pagamento o módulo aparece desbloqueado no sistema.",
+                    "Quando aprovado, o acesso é liberado manualmente e acompanhado de perto para validar o uso.",
                 },
               ].map((etapa) => (
                 <div
@@ -391,7 +384,7 @@ const Ajuda = () => {
               Dúvidas comuns
             </h2>
             <p className="text-sm text-gray-500 mb-6">
-              Perguntas que a maioria dos usuários faz antes de contratar.
+              Perguntas que a maioria dos usuários faz antes de começar.
             </p>
 
             <div className="space-y-2">
@@ -412,8 +405,8 @@ const Ajuda = () => {
             </h3>
             <p className="text-indigo-100 text-sm mb-5">
               Nossa equipe responde em minutos pelo WhatsApp. Nenhuma pergunta é
-              boba — é melhor perguntar antes de contratar do que contratar sem
-              saber.
+              boba — é melhor perguntar antes de ativar algo do que usar sem
+              entender.
             </p>
             <a
               href={`https://wa.me/${WHATSAPP_NUMERO}?text=${msgGeral}`}

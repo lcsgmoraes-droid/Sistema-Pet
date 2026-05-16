@@ -257,6 +257,9 @@ export const ModulosProvider = ({ children }) => {
   const [modulosForaOfertaPublica, setModulosForaOfertaPublica] = useState(
     MODULOS_FORA_DA_OFERTA_PUBLICA,
   );
+  const [planoAtual, setPlanoAtual] = useState(null);
+  const [assinaturaAtual, setAssinaturaAtual] = useState(null);
+  const [trialPadrao, setTrialPadrao] = useState(null);
   const devControlesAtivos = import.meta.env.DEV;
   const [devModulosConfig, setDevModulosConfig] = useState(() => {
     if (!devControlesAtivos) {
@@ -291,6 +294,9 @@ export const ModulosProvider = ({ children }) => {
       setModulosAtivos(null);
       setModulosBetaPublicos(MODULOS_BETA_PUBLICOS);
       setModulosForaOfertaPublica(MODULOS_FORA_DA_OFERTA_PUBLICA);
+      setPlanoAtual(null);
+      setAssinaturaAtual(null);
+      setTrialPadrao(null);
       return;
     }
     const token = getAccessToken();
@@ -299,6 +305,9 @@ export const ModulosProvider = ({ children }) => {
       setModulosAtivos([]);
       setModulosBetaPublicos(MODULOS_BETA_PUBLICOS);
       setModulosForaOfertaPublica(MODULOS_FORA_DA_OFERTA_PUBLICA);
+      setPlanoAtual(null);
+      setAssinaturaAtual(null);
+      setTrialPadrao(null);
       return;
     }
 
@@ -309,6 +318,9 @@ export const ModulosProvider = ({ children }) => {
       const modulosForaOfertaApi = response.data?.modulos_fora_oferta_publica;
 
       setModulosAtivos(Array.isArray(modulosApi) ? modulosApi : []);
+      setPlanoAtual(response.data?.plano || "basico");
+      setAssinaturaAtual(response.data?.assinatura || null);
+      setTrialPadrao(response.data?.trial_padrao || null);
       setModulosBetaPublicos(
         Array.isArray(modulosBetaApi) ? modulosBetaApi : MODULOS_BETA_PUBLICOS,
       );
@@ -322,6 +334,9 @@ export const ModulosProvider = ({ children }) => {
       setModulosAtivos([]);
       setModulosBetaPublicos(MODULOS_BETA_PUBLICOS);
       setModulosForaOfertaPublica(MODULOS_FORA_DA_OFERTA_PUBLICA);
+      setPlanoAtual(null);
+      setAssinaturaAtual(null);
+      setTrialPadrao(null);
     }
   }, [user]);
 
@@ -430,6 +445,9 @@ export const ModulosProvider = ({ children }) => {
   const value = useMemo(
     () => ({
       modulosAtivos,
+      planoAtual,
+      assinaturaAtual,
+      trialPadrao,
       modulosBetaPublicos,
       modulosForaOfertaPublica,
       moduloAtivo,
@@ -443,6 +461,9 @@ export const ModulosProvider = ({ children }) => {
     }),
     [
       modulosAtivos,
+      planoAtual,
+      assinaturaAtual,
+      trialPadrao,
       modulosBetaPublicos,
       modulosForaOfertaPublica,
       moduloAtivo,

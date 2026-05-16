@@ -9,6 +9,7 @@ import {
   FiChevronDown,
   FiChevronRight,
   FiCpu,
+  FiCreditCard,
   FiDollarSign,
   FiFileText,
   FiGift,
@@ -1328,9 +1329,20 @@ const Layout = () => {
           {/* Bottom Actions */}
           <div className="border-t border-indigo-100 bg-white/30">
             <Link
+              to="/meu-plano"
+              onClick={handleMenuClick}
+              className="w-full flex items-center gap-3 px-4 py-2.5 mx-2 mt-2 rounded-lg text-emerald-700 hover:bg-emerald-50 transition-all"
+              title={!sidebarOpen ? "Meu Plano" : ""}
+            >
+              <FiCreditCard className="text-lg flex-shrink-0" />
+              {sidebarOpen && (
+                <span className="font-medium text-sm">Meu Plano</span>
+              )}
+            </Link>
+            <Link
               to="/ajuda"
               onClick={handleMenuClick}
-              className="w-full flex items-center gap-3 px-4 py-2.5 mx-2 mt-2 rounded-lg text-indigo-600 hover:bg-indigo-50 transition-all"
+              className="w-full flex items-center gap-3 px-4 py-2.5 mx-2 mt-1 rounded-lg text-indigo-600 hover:bg-indigo-50 transition-all"
               title={!sidebarOpen ? "Ajuda & Planos" : ""}
             >
               <FiHelpCircle className="text-lg flex-shrink-0" />

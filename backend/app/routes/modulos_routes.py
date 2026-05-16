@@ -52,6 +52,62 @@ MODULOS_BETA_PUBLICOS = frozenset(MODULOS_PREMIUM - MODULOS_FORA_DA_OFERTA_PUBLI
 PLANOS_LEGADO_LIBERADOS = frozenset(["free", "legacy", "legado"])
 PLANOS_TODOS_MODULOS = frozenset(["premium", "enterprise", "full", "completo"])
 PLANOS_BASICOS = frozenset(["basico", "básico", "base", "basic"])
+TRIAL_DIAS_PADRAO = 30
+ASSINATURA_STATUS_VALIDOS = frozenset(["trial", "active", "expired", "blocked", "canceled"])
+
+
+def _datetime_utc(value: datetime | None) -> datetime | None:
+    if value is None:
+        return None
+    if value.tzinfo is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
+def _iso_datetime(value: datetime | None) -> str | None:
+    value = _datetime_utc(value)
+    if value is None:
+        return None
+    return value.isoformat().replace("+00:00", "Z")
+
+
+def _dias_restantes_trial(trial_ends_at: datetime | None, agora: datetime) -> int | None:
+    trial_ends_at = _datetime_utc(trial_ends_at)
+    if trial_ends_at is None:
+        return None
+
+    segundos = (trial_ends_at - agora).total_seconds()
+    if segundos <= 0:
+        return 0
+    return int((segundos + 86399) // 86400)
+
+
+def _assinatura_resumo_tenant(tenant: Tenant, agora: datetime) -> dict:
+    status_raw = (getattr(tenant, "billing_status", None) or "active").strip().lower()
+    if status_raw not in ASSINATURA_STATUS_VALIDOS:
+        status_raw = "active"
+
+    trial_ends_at = _datetime_utc(getattr(tenant, "trial_ends_at", None))
+    status_efetivo = status_raw
+    if status_raw == "trial" and trial_ends_at and trial_ends_at < agora:
+        status_efetivo = "expired"
+
+    return {
+        "status": status_raw,
+        "status_efetivo": status_efetivo,
+        "origem": getattr(tenant, "subscription_source", None) or "manual",
+        "trial_inicio": _iso_datetime(getattr(tenant, "trial_started_at", None)),
+        "trial_fim": _iso_datetime(trial_ends_at),
+        "dias_restantes_trial": _dias_restantes_trial(trial_ends_at, agora),
+        "trial_expirado": status_efetivo == "expired",
+        "ativada_em": _iso_datetime(getattr(tenant, "subscription_activated_at", None)),
+        "pagamento_integrado": False,
+        "contratacao": {
+            "modelo": "manual_assistida",
+            "canal": "whatsapp",
+            "acao_cliente": "falar_com_atendimento",
+        },
+    }
 
 
 def _normalizar_modulos_ativos(raw_modulos: str | None) -> list[str]:
@@ -151,10 +207,11 @@ def get_modulos_status(
         "modulos_fora_oferta_publica": sorted(MODULOS_FORA_DA_OFERTA_PUBLICA),
         "trial_padrao": {
             "plano": "basico",
-            "dias": 30,
+            "dias": TRIAL_DIAS_PADRAO,
             "escopo": "basico_completo",
             "libera_premium_automaticamente": False,
         },
+        "assinatura": _assinatura_resumo_tenant(tenant, agora),
         "plano_legado_liberado": (tenant.plan or "").strip().lower() in PLANOS_LEGADO_LIBERADOS,
     }
 
@@ -219,3 +276,41 @@ def ativar_modulo(
         db.commit()
 
     return {"ok": True, "modulo": modulo, "tenant_id": tenant_id_alvo}
+
+
+@router.post("/admin/plano-basico/ativar")
+def ativar_plano_basico_manual(
+    tenant_id_alvo: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_session),
+):
+    """
+    Marca manualmente o Plano Basico como ativo apos confirmacao externa de pagamento.
+    Este endpoint nao processa pagamento; ele apenas registra a ativacao operacional.
+    """
+    if not (current_user.is_superadmin or getattr(current_user, "is_system_admin", False)):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso negado")
+
+    tenant = db.query(Tenant).filter(Tenant.id == tenant_id_alvo).first()
+    if not tenant:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant nao encontrado")
+
+    agora = datetime.now(tz=timezone.utc)
+    tenant.plan = "basico"
+    tenant.billing_status = "active"
+    tenant.subscription_source = "manual"
+    tenant.subscription_activated_at = agora
+    if not tenant.trial_started_at:
+        tenant.trial_started_at = agora
+    if not tenant.trial_ends_at:
+        tenant.trial_ends_at = agora
+
+    db.commit()
+    db.refresh(tenant)
+
+    return {
+        "ok": True,
+        "tenant_id": tenant_id_alvo,
+        "plano": tenant.plan,
+        "assinatura": _assinatura_resumo_tenant(tenant, agora),
+    }

@@ -614,6 +614,11 @@ class Tenant(Base):
     banner_3_url = Column(String(500), nullable=True)
     status = Column(String(50), nullable=False, server_default='active')
     plan = Column(String(50), nullable=False, server_default='free')
+    billing_status = Column(String(20), nullable=False, server_default='active')
+    trial_started_at = Column(DateTime(timezone=True), nullable=True)
+    trial_ends_at = Column(DateTime(timezone=True), nullable=True)
+    subscription_activated_at = Column(DateTime(timezone=True), nullable=True)
+    subscription_source = Column(String(50), nullable=False, server_default='manual')
 
     # Configurações operacionais
     permite_estoque_negativo = Column(Boolean, nullable=False, server_default='false')
