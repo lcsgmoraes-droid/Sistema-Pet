@@ -54,6 +54,14 @@ def _to_float(value: Any, default: float = 0.0) -> float:
         return default
 
 
+def _to_serializable_id(value: Any) -> str | int | None:
+    if value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    return str(value)
+
+
 def calculate_manual_discount_amount(venda: Any) -> float:
     gross_discount = _to_float(getattr(venda, "desconto_valor", 0))
     coupon_discount = _to_float(getattr(venda, "cupom_discount_applied", 0))
@@ -73,6 +81,70 @@ def build_sale_coupon_redeemed_metadata(
         "discount_applied": _to_float(coupon_consumed.get("discount_applied")),
         "customer_id": getattr(venda, "cliente_id", None),
         "sale_total": _to_float(getattr(venda, "total", None)),
+    }
+
+
+def build_user_access_metadata(
+    *,
+    actor: Any,
+    target_user: Any,
+    tenant_id: Any,
+    role: Any | None = None,
+    extra: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    metadata = {
+        "actor_user_id": getattr(actor, "id", None),
+        "actor_email": getattr(actor, "email", None),
+        "target_user_id": getattr(target_user, "id", None),
+        "target_email": getattr(target_user, "email", None),
+        "tenant_id": _to_serializable_id(tenant_id),
+        "role_id": getattr(role, "id", None) if role else None,
+        "role_name": getattr(role, "name", None) if role else None,
+    }
+    metadata.update(extra or {})
+    return metadata
+
+
+def build_module_activation_metadata(
+    *,
+    tenant: Any,
+    module: str,
+    previous_modules: list[str],
+    current_modules: list[str],
+    subscription_created: bool,
+) -> dict[str, Any]:
+    return {
+        "tenant_id": _to_serializable_id(getattr(tenant, "id", None)),
+        "tenant_plan": getattr(tenant, "plan", None),
+        "module": module,
+        "previous_modules": sorted(previous_modules),
+        "current_modules": sorted(current_modules),
+        "subscription_created": subscription_created,
+    }
+
+
+def build_plan_activation_metadata(
+    *,
+    tenant: Any,
+    previous_state: dict[str, Any],
+) -> dict[str, Any]:
+    return {
+        "tenant_id": _to_serializable_id(getattr(tenant, "id", None)),
+        "previous": previous_state,
+        "current": {
+            "plan": getattr(tenant, "plan", None),
+            "billing_status": getattr(tenant, "billing_status", None),
+            "subscription_source": getattr(tenant, "subscription_source", None),
+            "subscription_activated_at": getattr(tenant, "subscription_activated_at", None).isoformat()
+            if getattr(tenant, "subscription_activated_at", None)
+            else None,
+            "trial_started_at": getattr(tenant, "trial_started_at", None).isoformat()
+            if getattr(tenant, "trial_started_at", None)
+            else None,
+            "trial_ends_at": getattr(tenant, "trial_ends_at", None).isoformat()
+            if getattr(tenant, "trial_ends_at", None)
+            else None,
+        },
     }
 
 
