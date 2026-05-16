@@ -338,6 +338,32 @@ def test_financeiro_mixed_router_keeps_premium_endpoints_module_gated():
     assert "_module_access: None = financeiro_erp_required" not in cliente_history_signature
 
 
+def test_cliente_financeiro_remains_basic_but_tenant_scoped():
+    app_source = _source("frontend/src/App.jsx")
+    financeiro_source = _source("backend/app/financeiro_routes.py")
+
+    assert 'path="clientes/:clienteId/financeiro"' in app_source
+    assert '<ProtectedRoute permission="clientes.visualizar">' in app_source
+
+    for function_name in [
+        "def get_historico_financeiro_cliente(",
+        "def get_resumo_financeiro_cliente(",
+    ]:
+        start = financeiro_source.index(function_name)
+        end = financeiro_source.index("):", start)
+        signature = financeiro_source[start:end]
+        assert "_module_access: None = financeiro_erp_required" not in signature
+
+    required_tenant_filters = [
+        "Cliente.tenant_id == tenant_id",
+        "Venda.tenant_id == tenant_id",
+        "ContaReceber.tenant_id == tenant_id",
+    ]
+
+    for tenant_filter in required_tenant_filters:
+        assert tenant_filter in financeiro_source
+
+
 def test_rh_simulation_page_is_module_gated_on_direct_url():
     app_source = _source("frontend/src/App.jsx")
 
