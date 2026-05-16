@@ -303,7 +303,7 @@ Proxima acao concreta:
 | #70 | Observabilidade/auditoria | Auditoria de negocio para cupom, desconto manual e reabertura |
 | #71 | Observabilidade/auditoria | Auditoria de acesso, login e configuracoes sensiveis |
 | #72 | Observabilidade/auditoria | Smoke CI confirma auditoria gravada com `request_id` |
-| PR atual | Observabilidade/auditoria | Painel de incidentes com filtro por `request_id` e auditoria correlacionada |
+| #73 | Observabilidade/auditoria | Painel de incidentes com filtro por `request_id` e auditoria correlacionada |
 
 ## Criterio para declarar 10/10 geral
 
