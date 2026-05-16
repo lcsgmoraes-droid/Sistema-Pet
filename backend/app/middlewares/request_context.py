@@ -16,6 +16,7 @@ Data: 2026-02-05
 """
 
 import os
+import re
 import time
 import uuid
 from typing import Optional
@@ -25,6 +26,8 @@ from contextvars import ContextVar
 import logging
 
 from app.services.error_event_reporter import record_request_event
+from app.utils.logger import clear_context as clear_log_context
+from app.utils.logger import set_endpoint, set_trace_id
 
 logger = logging.getLogger(__name__)
 
@@ -40,6 +43,8 @@ def _env_int(name: str, default: int) -> int:
 
 
 SLOW_REQUEST_LOG_MS = _env_int("REQUEST_CONTEXT_SLOW_MS", 3000)
+REQUEST_ID_MAX_LENGTH = 80
+REQUEST_ID_SAFE_PATTERN = re.compile(r"^[A-Za-z0-9._-]+$")
 
 # ============================================================================
 # CONTEXTVARS PARA REQUEST_ID E METADATA
@@ -62,6 +67,23 @@ def generate_request_id() -> str:
         String UUID no formato: "a1b2c3d4-e5f6-..."
     """
     return str(uuid.uuid4())
+
+
+def normalize_request_id(value: Optional[str]) -> str:
+    """
+    Retorna um request_id seguro para log/header.
+
+    IDs vindos do cliente so sao aceitos quando curtos e compostos por
+    caracteres seguros. Qualquer valor vazio, longo ou estranho vira UUID novo.
+    """
+    candidate = (value or "").strip()
+    if (
+        candidate
+        and len(candidate) <= REQUEST_ID_MAX_LENGTH
+        and REQUEST_ID_SAFE_PATTERN.fullmatch(candidate)
+    ):
+        return candidate
+    return generate_request_id()
 
 
 def set_request_id(request_id: str) -> None:
@@ -157,15 +179,12 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         # 1️⃣ GERAR OU OBTER REQUEST_ID
         # ============================================================
         
-        # Tentar obter request_id de header (cliente pode enviar)
-        request_id = request.headers.get('X-Request-ID')
-        
-        # Se não veio do cliente, gerar novo
-        if not request_id:
-            request_id = generate_request_id()
-        
+        # Tentar obter request_id seguro de header (cliente pode enviar)
+        request_id = normalize_request_id(request.headers.get('X-Request-ID'))
+
         # Propagar via contextvars
         set_request_id(request_id)
+        set_trace_id(request_id)
         
         # ============================================================
         # 2️⃣ CAPTURAR METADATA DA REQUEST
@@ -176,6 +195,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         
         # Propagar metadata via contextvars
         set_request_metadata(method, path)
+        set_endpoint(path)
         
         # Timestamp de início (para calcular duração)
         start_time = time.time()
@@ -271,6 +291,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
             # ============================================================
             
             clear_request_context()
+            clear_log_context()
 
 
 # ============================================================================
