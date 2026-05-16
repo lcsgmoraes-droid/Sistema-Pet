@@ -4,6 +4,8 @@ Atualizado em: 2026-05-16
 
 Este arquivo e o quadro de controle dos MCPs locais. Use para saber o que ja foi feito, o que falta e qual deve ser o proximo passo sem se perder.
 
+Guia mestre da maturidade geral do sistema: `docs/MATURIDADE_GERAL_10_10_GUIA.md`.
+
 ## Objetivo
 
 Levar os MCPs locais do Sistema Pet para um padrao seguro, repetivel e facil de manter.
