@@ -1,0 +1,34 @@
+name: MCP CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "mcp/**"
+      - "scripts/test_mcp.ps1"
+      - ".github/workflows/mcp-ci.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "mcp/**"
+      - "scripts/test_mcp.ps1"
+      - ".github/workflows/mcp-ci.yml"
+
+jobs:
+  mcp-tests:
+    name: MCP tests
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Run MCP tests
+        shell: pwsh
+        run: powershell -ExecutionPolicy Bypass -File .\scripts\test_mcp.ps1 -InstallDevDependencies

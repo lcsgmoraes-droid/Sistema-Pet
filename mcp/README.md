@@ -28,3 +28,13 @@ Depois da primeira instalacao de dependencias de teste:
 ```powershell
 powershell -ExecutionPolicy Bypass -File .\scripts\test_mcp.ps1
 ```
+
+Em ambiente limpo, `-InstallDevDependencies` tambem cria os `.venv` dos MCPs se eles ainda nao existirem.
+
+## CI
+
+O workflow `.github/workflows/mcp-ci.yml` roda estes testes automaticamente em Pull Requests e pushes para `main` quando houver mudanca em:
+
+- `mcp/**`
+- `scripts/test_mcp.ps1`
+- `.github/workflows/mcp-ci.yml`
