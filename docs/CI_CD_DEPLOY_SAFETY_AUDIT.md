@@ -25,6 +25,7 @@ Meta: 10/10 antes de automatizar qualquer deploy de producao.
 | Feito | Validador local bloqueia multiplas heads Alembic, artefatos e arquivos proibidos | `scripts/validar_fluxo.ps1` |
 | Feito | Rollback operacional simples documentado | `docs/PRODUCAO_ROLLBACK_CHECKLIST.md` |
 | Feito | Checklist de deploy com backup, health e rollback criado | `docs/PRODUCAO_ROLLBACK_CHECKLIST.md` |
+| Feito | Deploy real validado com script seguro, health publico e containers healthy | `scripts/deploy_producao_seguro.sh` |
 
 ## PRs ja juntados
 
@@ -33,6 +34,26 @@ Meta: 10/10 antes de automatizar qualquer deploy de producao.
 | #55 | Deploy Safety em PRs, Backend CI em todo PR e guia CI/CD | Mergeado |
 | #57 | Smoke CI com backend, auth basico e build frontend | Mergeado |
 | #58 | `Smoke test` obrigatorio na branch protection | Mergeado |
+| #64 | Correcao operacional de cupom/carimbos/reabertura de venda | Mergeado e deployado |
+| #52/#53/#54 | Dependabot GitHub Actions v6 | Mergeados; sem impacto de runtime |
+
+## Ultimo deploy real validado
+
+Data: 2026-05-16.
+
+Escopo deployado:
+
+- Commit de runtime em producao: `697a8479` (`Corrige cupom e carimbos na reabertura de venda (#64)`).
+- Script usado: `cd /opt/petshop && bash scripts/deploy_producao_seguro.sh`.
+- Backup operacional criado no servidor: `/opt/petshop/backups/deploy_20260516_175143`.
+- Backend reconstruido com imagem `petshop-backend:prod`.
+- Frontend gerado em `runtime/frontend/dist`.
+- Alembic executado com sucesso.
+- Containers finais saudaveis: `backend`, `nginx`, `postgres`, `worker-bling`.
+- Health publico validado: `https://mlprohub.com.br/api/health`.
+- Watchdog publico validado: `https://mlprohub.com.br/api/health/watchdog`.
+
+Observacao: apos esse deploy, os PRs #52, #53, #54 e #65 atualizaram apenas GitHub Actions/documentacao. Eles ficam na `main`, mas nao mudam codigo de runtime do servidor.
 
 ## Checks que devem proteger a `main`
 
@@ -47,11 +68,12 @@ Meta: 10/10 antes de automatizar qualquer deploy de producao.
 
 | Prioridade | Status | Item | Motivo |
 |---|---|---|---|
-| Media | Continuo | Revisar este guia apos o proximo deploy real | Ajusta o procedimento com evidencia operacional |
+| Media | Feito em 2026-05-16; manter continuo | Revisar este guia apos deploy real | Ajusta o procedimento com evidencia operacional |
 | Media | Continuo | Manter checks obrigatorios verdes em todo PR | Evita regressao do trilho seguro |
 | Baixa | Continuo | Registrar incidentes e rollbacks quando ocorrerem | Mantem historico auditavel |
 
 ## Proximo passo recomendado
 
-1. Usar `docs/PRODUCAO_ROLLBACK_CHECKLIST.md` no proximo deploy real autorizado.
-2. Revisar o checklist com base no resultado real do deploy.
+1. Em todo proximo deploy real autorizado, repetir `release-check`, script seguro no servidor e validacoes de health/watchdog.
+2. Registrar neste guia o commit deployado, backup operacional e resultado final.
+3. Manter a `main` protegida pelos checks obrigatorios antes de merge.
