@@ -404,6 +404,7 @@ def test_financial_chat_ia_is_not_available_in_basic_without_premium_module():
     main_source = _source("backend/app/main.py")
     app_source = _source("frontend/src/App.jsx")
     layout_source = _source("frontend/src/components/Layout.jsx")
+    modulo_bloqueado_source = _source("frontend/src/components/ModuloBloqueado.jsx")
 
     assert (
         'app.include_router(chat_router, tags=["IA - Chat Financeiro"], '
@@ -416,6 +417,11 @@ def test_financial_chat_ia_is_not_available_in_basic_without_premium_module():
     chat_menu_end = layout_source.index('path: "/ia/fluxo-caixa"', chat_menu_start)
     chat_menu = layout_source[chat_menu_start:chat_menu_end]
     assert 'modulo: "financeiro_erp"' in chat_menu
+
+    loading_gate_start = modulo_bloqueado_source.index("if (modulosAtivos === null)")
+    loading_gate_end = modulo_bloqueado_source.index("if (moduloAtivo(modulo))", loading_gate_start)
+    loading_gate = modulo_bloqueado_source[loading_gate_start:loading_gate_end]
+    assert "return children" not in loading_gate
 
 
 def test_lembretes_use_selected_tenant_context():

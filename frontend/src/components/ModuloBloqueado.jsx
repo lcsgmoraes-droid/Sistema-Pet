@@ -758,9 +758,10 @@ const ModuloBloqueado = ({ modulo, children }) => {
     }
   }, [modulo, moduloAtivo, modulosAtivos]);
 
-  // Enquanto carrega status dos módulos, não bloqueia (evita flash de bloqueio)
+  // Enquanto carrega status dos modulos, nao monta filhos premium.
+  // Isso evita chamadas de API antes de confirmar que o tenant tem acesso.
   if (modulosAtivos === null) {
-    return children;
+    return <div className="min-h-[240px]" aria-hidden="true" />;
   }
 
   if (moduloAtivo(modulo)) {
