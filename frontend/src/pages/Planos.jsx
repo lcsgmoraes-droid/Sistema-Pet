@@ -44,10 +44,10 @@ const controlledModules = [
     status: "Adicional controlado",
   },
   {
-    title: "Compras e integrações",
+    title: "Compras e automações",
     icon: Package,
-    description: "XML, Bling, fornecedores, marketplaces e automações.",
-    status: "Em validação",
+    description: "Entrada XML, fornecedores, compras e automações internas.",
+    status: "Beta no período grátis",
   },
   {
     title: "Veterinário",
@@ -92,14 +92,14 @@ export default function Planos() {
         <div>
           <span className="inline-flex items-center gap-2 rounded-md bg-emerald-100 px-3 py-1 text-sm font-bold text-emerald-800">
             <ShieldCheck className="h-4 w-4" />
-            Plano validado para venda controlada
+            30 dias grátis com acesso ampliado
           </span>
           <h1 className="mt-5 max-w-3xl text-4xl font-extrabold tracking-normal text-slate-950 md:text-5xl">
-            Comece pelo Básico e libere módulos avançados depois.
+            Experimente mais recursos e contrate pelo Básico.
           </h1>
           <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
-            O Plano Básico concentra o que o pet shop precisa para operar: cadastro,
-            estoque, PDV, caixa, vendas, usuários e gestão essencial.
+            Novas empresas começam com 30 dias de acesso ampliado. O que ainda está
+            em validação aparece como Beta, e a contratação inicial continua pelo Plano Básico.
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -107,7 +107,7 @@ export default function Planos() {
               to="/register?plan=basico"
               className="inline-flex items-center justify-center gap-2 rounded-md bg-slate-950 px-5 py-3 font-bold text-white hover:bg-slate-800"
             >
-              Selecionar Plano Básico
+              Começar 30 dias grátis
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
@@ -125,8 +125,8 @@ export default function Planos() {
               <p className="text-sm font-bold uppercase text-emerald-700">Plano Básico</p>
               <h2 className="mt-2 text-2xl font-extrabold text-slate-950">Operação essencial</h2>
               <p className="mt-2 text-sm leading-6 text-slate-500">
-                Contratação online nesta fase inicial. Pagamento e módulos adicionais podem ser
-                tratados com a equipe comercial.
+                Depois da experiência gratuita, este é o plano inicial de contratação para
+                operar o dia a dia com segurança.
               </p>
             </div>
             <div className="rounded-md bg-emerald-50 p-3 text-emerald-700">
@@ -147,7 +147,7 @@ export default function Planos() {
             to="/register?plan=basico"
             className="mt-7 inline-flex w-full items-center justify-center gap-2 rounded-md bg-emerald-500 px-4 py-3 font-bold text-slate-950 hover:bg-emerald-400"
           >
-            Criar empresa no Básico
+            Criar empresa e testar grátis
             <ArrowRight className="h-4 w-4" />
           </Link>
         </section>
@@ -184,15 +184,15 @@ export default function Planos() {
         <div className="mx-auto max-w-6xl px-4 py-12 text-white">
           <div className="flex flex-col justify-between gap-3 md:flex-row md:items-end">
             <div>
-              <h2 className="text-2xl font-extrabold">Módulos fora do Básico</h2>
+              <h2 className="text-2xl font-extrabold">Recursos em validação</h2>
               <p className="mt-2 max-w-2xl text-slate-300">
-                Eles continuam bloqueados por plano para proteger o cliente de fluxos ainda em
-                validação ou que precisam de contratação específica.
+                Durante os 30 dias grátis, esses módulos podem aparecer com selo Beta para o
+                cliente conhecer o que vem por aí. Integrações externas específicas ficam fora da oferta inicial.
               </p>
             </div>
             <span className="inline-flex w-fit items-center gap-2 rounded-md bg-amber-300/15 px-3 py-2 text-sm font-bold text-amber-200">
               <Lock className="h-4 w-4" />
-              Liberação controlada
+              Beta quando aplicável
             </span>
           </div>
 

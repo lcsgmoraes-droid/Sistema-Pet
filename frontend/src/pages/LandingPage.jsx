@@ -4,7 +4,6 @@ import {
   Check,
   CreditCard,
   Database,
-  Lock,
   MessageCircle,
   Package,
   PawPrint,
@@ -34,23 +33,23 @@ const includedItems = [
 
 const processSteps = [
   {
-    title: "Escolha o Básico",
-    text: "O plano validado para começar com segurança.",
+    title: "Comece grátis",
+    text: "30 dias para testar a operação com acesso ampliado.",
   },
   {
     title: "Crie sua empresa",
-    text: "Cadastro online com plano já selecionado.",
+    text: "Cadastro online com o Básico como plano de contratação inicial.",
   },
   {
-    title: "Faça o primeiro uso",
-    text: "Entre no sistema e configure a operação essencial.",
+    title: "Experimente os módulos",
+    text: "Recursos em validação aparecem marcados como Beta.",
   },
 ];
 
 const nextModules = [
   "Financeiro ERP completo",
   "Campanhas e fidelidade avançadas",
-  "Bling, marketplaces e e-commerce",
+  "E-commerce e canais de venda",
   "Veterinário, banho e tosa e app mobile",
 ];
 
@@ -75,10 +74,10 @@ export default function LandingPage() {
       document.head.appendChild(metaDescription);
     }
 
-    document.title = "Pet Shop Pro | Plano Básico para vender, atender e controlar estoque";
+    document.title = "Pet Shop Pro | 30 dias grátis e Plano Básico para pet shops";
     metaDescription.setAttribute(
       "content",
-      "Plano Básico do Pet Shop Pro para pet shops: clientes, pets, produtos, estoque, PDV, caixa, vendas, usuários e permissões em um sistema online."
+      "Teste o Pet Shop Pro por 30 dias com acesso ampliado. Depois, contrate o Plano Básico para clientes, pets, produtos, estoque, PDV, caixa e vendas."
     );
 
     return () => {
@@ -139,14 +138,14 @@ export default function LandingPage() {
             <div className="max-w-3xl">
               <span className="inline-flex items-center gap-2 rounded-md border border-emerald-300/40 bg-emerald-300/15 px-3 py-1 text-sm font-bold text-emerald-100">
                 <Sparkles className="h-4 w-4" />
-                Plano Básico pronto para novos pet shops
+                30 dias grátis para novos pet shops
               </span>
               <h1 className="mt-6 text-4xl font-extrabold leading-tight md:text-6xl">
                 Pet Shop Pro
               </h1>
               <p className="mt-5 max-w-2xl text-xl leading-8 text-slate-100">
-                Comece vendendo, controlando estoque e atendendo clientes em um sistema online,
-                com o plano inicial focado no dia a dia do pet shop.
+                Experimente o sistema com acesso ampliado. Recursos ainda em validação aparecem
+                como Beta, e a contratação inicial segue pelo Plano Básico.
               </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -154,7 +153,7 @@ export default function LandingPage() {
                   to="/register?plan=basico"
                   className="inline-flex items-center justify-center gap-2 rounded-md bg-emerald-400 px-6 py-3 font-bold text-slate-950 shadow-lg shadow-emerald-950/20 transition hover:bg-emerald-300"
                 >
-                  Criar conta no Plano Básico
+                  Começar 30 dias grátis
                   <ArrowRight className="h-4 w-4" />
                 </Link>
                 <a
@@ -181,8 +180,8 @@ export default function LandingPage() {
                 O Básico é o ponto de entrada.
               </h2>
               <p className="mt-4 text-lg leading-8 text-slate-600">
-                A landing direciona o cliente para um único caminho seguro: selecionar o
-                Plano Básico, criar a empresa e validar o uso real antes de liberar módulos maiores.
+                O primeiro acesso libera 30 dias de experiência ampla. Quando o cliente decidir
+                contratar, o caminho comercial inicial continua sendo o Plano Básico.
               </p>
             </div>
 
@@ -236,15 +235,15 @@ export default function LandingPage() {
           <div className="mx-auto grid max-w-6xl gap-10 px-4 lg:grid-cols-[1fr_1fr] lg:items-center">
             <div>
               <span className="inline-flex items-center gap-2 rounded-md bg-amber-300/15 px-3 py-1 text-sm font-bold text-amber-200">
-                <Lock className="h-4 w-4" />
-                Crescimento por módulos
+                <Sparkles className="h-4 w-4" />
+                O que vem por aí
               </span>
               <h2 className="mt-5 text-3xl font-extrabold md:text-4xl">
-                O que não está no Básico fica separado.
+                Mais recursos para experimentar e acompanhar.
               </h2>
               <p className="mt-4 text-lg leading-8 text-slate-300">
-                Essa separação protege a implantação inicial: o cliente compra o que já está
-                pronto para rodar e os módulos avançados entram depois, com liberação controlada.
+                A experiência gratuita pode mostrar módulos em validação com o selo Beta. Assim o
+                cliente conhece o potencial do sistema sem confundir isso com o plano contratado.
               </p>
             </div>
 
@@ -266,10 +265,11 @@ export default function LandingPage() {
                 Próximo passo
               </p>
               <h2 className="mt-2 text-3xl font-extrabold text-slate-950">
-                Criar a primeira empresa no Plano Básico.
+                Comece com 30 dias de acesso gratuito.
               </h2>
               <p className="mt-3 max-w-2xl text-slate-600">
-                O cadastro já leva o plano selecionado e cria o tenant com a configuração inicial correta.
+                O cadastro cria a empresa com o Plano Básico como referência comercial e libera a
+                experiência inicial ampliada. Integrações externas específicas não fazem parte desta oferta.
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
@@ -277,7 +277,7 @@ export default function LandingPage() {
                 to="/register?plan=basico"
                 className="inline-flex items-center justify-center gap-2 rounded-md bg-slate-950 px-6 py-3 font-bold text-white transition hover:bg-slate-800"
               >
-                Começar no Básico
+                Começar 30 dias grátis
                 <ArrowRight className="h-4 w-4" />
               </Link>
               <Link
