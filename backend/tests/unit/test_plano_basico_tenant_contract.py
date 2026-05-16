@@ -389,6 +389,29 @@ def test_chat_ia_conversation_history_uses_selected_tenant_context():
     assert "MensagemChat.tenant_id == str(tenant_id)" in chat_service_source
 
 
+def test_ia_fluxo_caixa_uses_selected_tenant_context():
+    ia_routes_source = _source("backend/app/ia_routes.py")
+    fluxo_source = _source("backend/app/ia/aba5_fluxo_caixa.py")
+    chat_service_source = _source("backend/app/ia/aba6_chat_ia.py")
+
+    assert "calcular_indices_saude(usuario_id, db, tenant_id=tenant_id)" in ia_routes_source
+    assert "obter_projecoes_proximos_dias(usuario_id, dias, db, tenant_id=tenant_id)" in ia_routes_source
+    assert "projetar_fluxo_15_dias(usuario_id, db, tenant_id=tenant_id)" in ia_routes_source
+    assert "simular_cenario(usuario_id, request.cenario, db, tenant_id=tenant_id)" in ia_routes_source
+    assert "gerar_alertas_caixa(usuario_id, db, tenant_id=tenant_id)" in ia_routes_source
+    assert "tenant_id=tenant_id" in ia_routes_source
+
+    assert "def _resolve_tenant_id(usuario_id: int, db: Session, tenant_id: Optional[str] = None)" in fluxo_source
+    assert "FluxoCaixa.tenant_id == tenant_id_resolvido" in fluxo_source
+    assert "IndicesSaudeCaixa.tenant_id == tenant_id_resolvido" in fluxo_source
+    assert "ProjecaoFluxoCaixa.tenant_id == tenant_id_resolvido" in fluxo_source
+    assert "tenant_id=tenant_id_resolvido" in fluxo_source
+
+    assert "calcular_indices_saude(usuario_id, self.db, tenant_id=tenant_id_resolvido)" in chat_service_source
+    assert "tenant_id=tenant_id_resolvido" in chat_service_source
+    assert "gerar_alertas_caixa(usuario_id, self.db, tenant_id=tenant_id_resolvido)" in chat_service_source
+
+
 def test_product_catalog_auxiliary_pages_are_basic_catalog_not_premium_modules():
     app_source = _source("frontend/src/App.jsx")
     layout_source = _source("frontend/src/components/Layout.jsx")

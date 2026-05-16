@@ -44,11 +44,22 @@ def _get_user_tenant_id(usuario_id: int, db: Session) -> Optional[str]:
     return user.tenant_id if user else None
 
 
+def _resolve_tenant_id(usuario_id: int, db: Session, tenant_id: Optional[str] = None) -> Optional[str]:
+    if tenant_id:
+        return str(tenant_id)
+    tenant = _get_user_tenant_id(usuario_id, db)
+    return str(tenant) if tenant else None
+
+
 # ============================================================================
 # FUNÇÃO 1: CALCULAR ÍNDICES DE SAÚDE DO CAIXA
 # ============================================================================
 
-def calcular_indices_saude(usuario_id: int, db: Session) -> Optional[Dict]:
+def calcular_indices_saude(
+    usuario_id: int,
+    db: Session,
+    tenant_id: Optional[str] = None,
+) -> Optional[Dict]:
     """
     Calcula os índices de saúde do caixa.
     
@@ -64,6 +75,11 @@ def calcular_indices_saude(usuario_id: int, db: Session) -> Optional[Dict]:
     """
     
     try:
+        tenant_id_resolvido = _resolve_tenant_id(usuario_id, db, tenant_id)
+        if not tenant_id_resolvido:
+            logger.error(f"❌ Usuário {usuario_id} não encontrado ou sem tenant")
+            return None
+
         # 1. SALDO ATUAL
         # Soma movimentações dos últimos 90 dias (otimização)
         data_90d_atras = datetime.utcnow() - timedelta(days=90)
@@ -78,6 +94,7 @@ def calcular_indices_saude(usuario_id: int, db: Session) -> Optional[Dict]:
         ).filter(
             and_(
                 FluxoCaixa.usuario_id == usuario_id,
+                FluxoCaixa.tenant_id == tenant_id_resolvido,
                 FluxoCaixa.status == "realizado",
                 FluxoCaixa.data_movimentacao >= data_90d_atras
             )
@@ -93,6 +110,7 @@ def calcular_indices_saude(usuario_id: int, db: Session) -> Optional[Dict]:
         ).filter(
             and_(
                 FluxoCaixa.usuario_id == usuario_id,
+                FluxoCaixa.tenant_id == tenant_id_resolvido,
                 FluxoCaixa.tipo == "despesa",
                 FluxoCaixa.status == "realizado",
                 FluxoCaixa.data_movimentacao >= data_30d_atras
@@ -187,19 +205,14 @@ def calcular_indices_saude(usuario_id: int, db: Session) -> Optional[Dict]:
         
         # Salvar no cache
         indices = db.query(IndicesSaudeCaixa).filter(
-            IndicesSaudeCaixa.usuario_id == usuario_id
+            IndicesSaudeCaixa.usuario_id == usuario_id,
+            IndicesSaudeCaixa.tenant_id == tenant_id_resolvido
         ).first()
         
         if not indices:
-            # Buscar tenant_id do usuário
-            user = db.query(User).filter(User.id == usuario_id).first()
-            if not user:
-                logger.error(f"❌ Usuário {usuario_id} não encontrado")
-                return None
-            
             indices = IndicesSaudeCaixa(
                 usuario_id=usuario_id,
-                tenant_id=user.tenant_id
+                tenant_id=tenant_id_resolvido
             )
             db.add(indices)
         
@@ -222,7 +235,11 @@ def calcular_indices_saude(usuario_id: int, db: Session) -> Optional[Dict]:
 # FUNÇÃO 2: PROJETAR FLUXO 15 DIAS COM PROPHET
 # ============================================================================
 
-def projetar_fluxo_15_dias(usuario_id: int, db: Session) -> Optional[List[Dict]]:
+def projetar_fluxo_15_dias(
+    usuario_id: int,
+    db: Session,
+    tenant_id: Optional[str] = None,
+) -> Optional[List[Dict]]:
     """
     Projeta o fluxo de caixa para os próximos 15 dias usando Prophet.
     
@@ -247,6 +264,11 @@ def projetar_fluxo_15_dias(usuario_id: int, db: Session) -> Optional[List[Dict]]
         return None
     
     try:
+        tenant_id_resolvido = _resolve_tenant_id(usuario_id, db, tenant_id)
+        if not tenant_id_resolvido:
+            logger.error(f"❌ Usuário {usuario_id} não encontrado ou sem tenant")
+            return None
+
         # 1. COLETAR DADOS HISTÓRICOS (últimos 90 dias)
         data_90d_atras = datetime.utcnow() - timedelta(days=90)
         
@@ -257,6 +279,7 @@ def projetar_fluxo_15_dias(usuario_id: int, db: Session) -> Optional[List[Dict]]
         ).filter(
             and_(
                 FluxoCaixa.usuario_id == usuario_id,
+                FluxoCaixa.tenant_id == tenant_id_resolvido,
                 FluxoCaixa.status == "realizado",
                 FluxoCaixa.data_movimentacao >= data_90d_atras
             )
@@ -275,6 +298,7 @@ def projetar_fluxo_15_dias(usuario_id: int, db: Session) -> Optional[List[Dict]]
             ).filter(
                 and_(
                     FluxoCaixa.usuario_id == usuario_id,
+                    FluxoCaixa.tenant_id == tenant_id_resolvido,
                     FluxoCaixa.status == "realizado"
                 )
             ).scalar() or 0.0
@@ -297,7 +321,7 @@ def projetar_fluxo_15_dias(usuario_id: int, db: Session) -> Optional[List[Dict]]
                 })
 
             # Persistir fallback
-            tenant_id = _get_user_tenant_id(usuario_id, db)
+            tenant_id = tenant_id_resolvido
             if not tenant_id:
                 logger.error(f"❌ Usuário {usuario_id} não encontrado ou sem tenant")
                 return None
@@ -365,6 +389,7 @@ def projetar_fluxo_15_dias(usuario_id: int, db: Session) -> Optional[List[Dict]]
             ).filter(
                 and_(
                     FluxoCaixa.usuario_id == usuario_id,
+                    FluxoCaixa.tenant_id == tenant_id_resolvido,
                     FluxoCaixa.status == "realizado"
                 )
             ).scalar() or 0.0
@@ -386,7 +411,7 @@ def projetar_fluxo_15_dias(usuario_id: int, db: Session) -> Optional[List[Dict]]
                     'alerta_nivel': 'info'
                 })
 
-            tenant_id = _get_user_tenant_id(usuario_id, db)
+            tenant_id = tenant_id_resolvido
             if not tenant_id:
                 logger.error(f"❌ Usuário {usuario_id} não encontrado ou sem tenant")
                 return None
@@ -434,7 +459,7 @@ def projetar_fluxo_15_dias(usuario_id: int, db: Session) -> Optional[List[Dict]]
         hoje = datetime.utcnow().date()
         
         # Buscar tenant_id
-        tenant_id = _get_user_tenant_id(usuario_id, db)
+        tenant_id = tenant_id_resolvido
         if not tenant_id:
             logger.error(f"❌ Usuário {usuario_id} não encontrado ou sem tenant")
             return None
@@ -450,6 +475,7 @@ def projetar_fluxo_15_dias(usuario_id: int, db: Session) -> Optional[List[Dict]]
         ).filter(
             and_(
                 FluxoCaixa.usuario_id == usuario_id,
+                FluxoCaixa.tenant_id == tenant_id_resolvido,
                 FluxoCaixa.status == "realizado"
             )
         ).scalar() or 0.0
@@ -523,7 +549,12 @@ def projetar_fluxo_15_dias(usuario_id: int, db: Session) -> Optional[List[Dict]]
 # FUNÇÃO 3: OBTER PROJEÇÕES DO BANCO
 # ============================================================================
 
-def obter_projecoes_proximos_dias(usuario_id: int, dias: int = 15, db: Session = None) -> List[Dict]:
+def obter_projecoes_proximos_dias(
+    usuario_id: int,
+    dias: int = 15,
+    db: Session = None,
+    tenant_id: Optional[str] = None,
+) -> List[Dict]:
     """
     Retorna projeções já calculadas do banco de dados.
     """
@@ -531,12 +562,17 @@ def obter_projecoes_proximos_dias(usuario_id: int, dias: int = 15, db: Session =
         return []
     
     try:
+        tenant_id_resolvido = _resolve_tenant_id(usuario_id, db, tenant_id)
+        if not tenant_id_resolvido:
+            return []
+
         data_futura = datetime.utcnow() + timedelta(days=dias)
         hoje = datetime.utcnow().date()
         
         projecoes = db.query(ProjecaoFluxoCaixa).filter(
             and_(
                 ProjecaoFluxoCaixa.usuario_id == usuario_id,
+                ProjecaoFluxoCaixa.tenant_id == tenant_id_resolvido,
                 ProjecaoFluxoCaixa.data_projetada <= data_futura,
                 ProjecaoFluxoCaixa.data_projetada >= datetime.utcnow()
             )
@@ -563,7 +599,12 @@ def obter_projecoes_proximos_dias(usuario_id: int, dias: int = 15, db: Session =
 # FUNÇÃO 4: SIMULAR CENÁRIOS
 # ============================================================================
 
-def simular_cenario(usuario_id: int, cenario: str, db: Session) -> Optional[Dict]:
+def simular_cenario(
+    usuario_id: int,
+    cenario: str,
+    db: Session,
+    tenant_id: Optional[str] = None,
+) -> Optional[Dict]:
     """
     Simula cenários: 'otimista', 'pessimista', 'realista'
     
@@ -575,7 +616,7 @@ def simular_cenario(usuario_id: int, cenario: str, db: Session) -> Optional[Dict
     
     try:
         # Obter projeção atual
-        projecoes = obter_projecoes_proximos_dias(usuario_id, 15, db)
+        projecoes = obter_projecoes_proximos_dias(usuario_id, 15, db, tenant_id=tenant_id)
         
         if not projecoes:
             return None
@@ -618,7 +659,11 @@ def simular_cenario(usuario_id: int, cenario: str, db: Session) -> Optional[Dict
 # FUNÇÃO 5: GERAR ALERTAS
 # ============================================================================
 
-def gerar_alertas_caixa(usuario_id: int, db: Session) -> List[Dict]:
+def gerar_alertas_caixa(
+    usuario_id: int,
+    db: Session,
+    tenant_id: Optional[str] = None,
+) -> List[Dict]:
     """
     Gera alertas baseado em:
     - Dias de caixa crítico
@@ -629,11 +674,16 @@ def gerar_alertas_caixa(usuario_id: int, db: Session) -> List[Dict]:
     """
     
     try:
+        tenant_id_resolvido = _resolve_tenant_id(usuario_id, db, tenant_id)
+        if not tenant_id_resolvido:
+            return []
+
         alertas = []
         
         # 1. Verificar índices
         indices = db.query(IndicesSaudeCaixa).filter(
-            IndicesSaudeCaixa.usuario_id == usuario_id
+            IndicesSaudeCaixa.usuario_id == usuario_id,
+            IndicesSaudeCaixa.tenant_id == tenant_id_resolvido
         ).first()
         
         if indices:
@@ -664,6 +714,7 @@ def gerar_alertas_caixa(usuario_id: int, db: Session) -> List[Dict]:
         projecoes = db.query(ProjecaoFluxoCaixa).filter(
             and_(
                 ProjecaoFluxoCaixa.usuario_id == usuario_id,
+                ProjecaoFluxoCaixa.tenant_id == tenant_id_resolvido,
                 ProjecaoFluxoCaixa.vai_faltar_caixa == True
             )
         ).order_by(ProjecaoFluxoCaixa.data_projetada).first()
@@ -697,7 +748,8 @@ def registrar_movimentacao(
     data_prevista: Optional[datetime] = None,
     origem_tipo: str = "lancamento_manual",
     origem_id: Optional[int] = None,
-    db: Session = None
+    db: Session = None,
+    tenant_id: Optional[str] = None,
 ) -> Optional[FluxoCaixa]:
     """
     Registra uma movimentação manual no fluxo de caixa.
@@ -707,8 +759,14 @@ def registrar_movimentacao(
         return None
     
     try:
+        tenant_id_resolvido = _resolve_tenant_id(usuario_id, db, tenant_id)
+        if not tenant_id_resolvido:
+            logger.error(f"❌ Usuário {usuario_id} não encontrado ou sem tenant")
+            return None
+
         mov = FluxoCaixa(
             usuario_id=usuario_id,
+            tenant_id=tenant_id_resolvido,
             tipo=tipo,
             categoria=categoria,
             valor=valor,
@@ -727,7 +785,7 @@ def registrar_movimentacao(
         logger.info(f"✅ Movimentação registrada: {tipo} {categoria} R${valor}")
         
         # Recalcular índices
-        calcular_indices_saude(usuario_id, db)
+        calcular_indices_saude(usuario_id, db, tenant_id=tenant_id_resolvido)
         
         return mov
         

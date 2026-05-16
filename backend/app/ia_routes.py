@@ -139,7 +139,7 @@ async def get_indices_saude(
         raise HTTPException(status_code=403, detail="Sem permissão")
     
     # Calcular índices
-    resultado = calcular_indices_saude(usuario_id, db)
+    resultado = calcular_indices_saude(usuario_id, db, tenant_id=tenant_id)
     
     if not resultado:
         raise HTTPException(status_code=500, detail="Erro ao calcular índices")
@@ -173,7 +173,7 @@ async def get_projecoes(
     if usuario_id != current_user.id and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Sem permissão")
     
-    projecoes = obter_projecoes_proximos_dias(usuario_id, dias, db)
+    projecoes = obter_projecoes_proximos_dias(usuario_id, dias, db, tenant_id=tenant_id)
     
     # Transformar para ProjecaoResponse
     return [
@@ -230,7 +230,7 @@ async def post_projetar_15_dias(
     if usuario_id != current_user.id and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Sem permissão")
     
-    projecoes = projetar_fluxo_15_dias(usuario_id, db)
+    projecoes = projetar_fluxo_15_dias(usuario_id, db, tenant_id=tenant_id)
     
     if not projecoes:
         raise HTTPException(
@@ -297,7 +297,7 @@ async def post_simular_cenario(
             detail="Cenário inválido. Use: otimista, pessimista ou realista"
         )
     
-    resultado = simular_cenario(usuario_id, request.cenario, db)
+    resultado = simular_cenario(usuario_id, request.cenario, db, tenant_id=tenant_id)
     
     if not resultado:
         raise HTTPException(status_code=500, detail="Erro ao simular cenário")
@@ -344,7 +344,7 @@ async def get_alertas(
     if usuario_id != current_user.id and not current_user.is_admin:
         raise HTTPException(status_code=403, detail="Sem permissão")
     
-    alertas = gerar_alertas_caixa(usuario_id, db)
+    alertas = gerar_alertas_caixa(usuario_id, db, tenant_id=tenant_id)
     
     return alertas
 
@@ -400,7 +400,8 @@ async def post_registrar_movimentacao(
         valor=request.valor,
         descricao=request.descricao,
         data_prevista=request.data_prevista,
-        db=db
+        db=db,
+        tenant_id=tenant_id
     )
     
     if not mov:

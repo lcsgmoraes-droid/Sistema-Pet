@@ -623,7 +623,7 @@ class ChatIAService:
         
         try:
             # 1. Índices de saúde
-            indices = calcular_indices_saude(usuario_id, self.db)
+            indices = calcular_indices_saude(usuario_id, self.db, tenant_id=tenant_id_resolvido)
             contexto["indices_saude"] = {
                 "saldo_atual": float(indices.get('saldo_atual', 0)),
                 "dias_de_caixa": float(indices.get('dias_de_caixa', 0)),
@@ -633,7 +633,12 @@ class ChatIAService:
             }
             
             # 2. Projeções 15 dias
-            projecoes = obter_projecoes_proximos_dias(usuario_id, dias=15, db=self.db)
+            projecoes = obter_projecoes_proximos_dias(
+                usuario_id,
+                dias=15,
+                db=self.db,
+                tenant_id=tenant_id_resolvido,
+            )
             contexto["projecoes"] = [
                 {
                     "data": p.get('data_projetada'),
@@ -645,7 +650,7 @@ class ChatIAService:
             ]
             
             # 3. Alertas
-            alertas = gerar_alertas_caixa(usuario_id, self.db)
+            alertas = gerar_alertas_caixa(usuario_id, self.db, tenant_id=tenant_id_resolvido)
             contexto["alertas"] = [
                 {
                     "tipo": a.get("tipo", ""),
