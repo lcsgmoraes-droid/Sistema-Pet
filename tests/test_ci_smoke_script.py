@@ -42,3 +42,15 @@ def test_assert_route_exists_rejects_missing_method():
 
     with pytest.raises(AssertionError, match="POST /health"):
         smoke.assert_route_exists(FakeApp(), "/health", "POST")
+
+
+def test_audit_request_id_smoke_records_request_id(tmp_path):
+    smoke = _load_smoke_module()
+
+    result = smoke.run_audit_request_id_smoke(
+        db_path=tmp_path / "audit-smoke.db",
+        request_id="ci-test-request-id",
+    )
+
+    assert result["action"] == "business.smoke.audit_request_id"
+    assert result["request_id"] == "ci-test-request-id"
