@@ -75,7 +75,7 @@ const Register = () => {
           </div>
           <h1 className="text-3xl font-bold text-gray-900">Criar empresa</h1>
           <p className="text-gray-600 mt-2">
-            Comece com 30 dias grátis no Pet Shop Pro
+            Comece com 30 dias grátis do Plano Básico
           </p>
         </div>
 
@@ -87,10 +87,10 @@ const Register = () => {
         )}
 
         <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
-          <p className="font-semibold">30 dias grátis com acesso ampliado</p>
+          <p className="font-semibold">Plano Básico grátis por 30 dias</p>
           <p className="mt-1">
-            Sua empresa será criada com o {selectedPlanLabel} como referência comercial. Recursos
-            em validação podem aparecer como Beta durante a experiência inicial.
+            Sua empresa será criada no {selectedPlanLabel}. Módulos avançados ficam como Beta
+            ou piloto acompanhado, sem liberação automática no cadastro.
           </p>
           <Link to="/planos" className="mt-3 inline-flex text-xs font-bold text-emerald-800 underline">
             Conferir plano e recursos

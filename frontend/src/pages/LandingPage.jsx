@@ -33,16 +33,16 @@ const includedItems = [
 
 const processSteps = [
   {
-    title: "Comece grátis",
-    text: "30 dias para testar a operação com acesso ampliado.",
+    title: "Teste o Básico",
+    text: "30 dias grátis com o plano essencial completo.",
   },
   {
     title: "Crie sua empresa",
-    text: "Cadastro online com o Básico como plano de contratação inicial.",
+    text: "Cadastro online já cria o tenant no Plano Básico.",
   },
   {
-    title: "Experimente os módulos",
-    text: "Recursos em validação aparecem marcados como Beta.",
+    title: "Conheça os Betas",
+    text: "Módulos avançados aparecem como vitrine e piloto acompanhado.",
   },
 ];
 
@@ -74,10 +74,10 @@ export default function LandingPage() {
       document.head.appendChild(metaDescription);
     }
 
-    document.title = "Pet Shop Pro | 30 dias grátis e Plano Básico para pet shops";
+    document.title = "Pet Shop Pro | 30 dias grátis do Plano Básico";
     metaDescription.setAttribute(
       "content",
-      "Teste o Pet Shop Pro por 30 dias com acesso ampliado. Depois, contrate o Plano Básico para clientes, pets, produtos, estoque, PDV, caixa e vendas."
+      "Teste o Plano Básico do Pet Shop Pro por 30 dias: clientes, pets, produtos, estoque, PDV, caixa, vendas, usuários e permissões."
     );
 
     return () => {
@@ -138,14 +138,14 @@ export default function LandingPage() {
             <div className="max-w-3xl">
               <span className="inline-flex items-center gap-2 rounded-md border border-emerald-300/40 bg-emerald-300/15 px-3 py-1 text-sm font-bold text-emerald-100">
                 <Sparkles className="h-4 w-4" />
-                30 dias grátis para novos pet shops
+                30 dias grátis do Plano Básico
               </span>
               <h1 className="mt-6 text-4xl font-extrabold leading-tight md:text-6xl">
                 Pet Shop Pro
               </h1>
               <p className="mt-5 max-w-2xl text-xl leading-8 text-slate-100">
-                Experimente o sistema com acesso ampliado. Recursos ainda em validação aparecem
-                como Beta, e a contratação inicial segue pelo Plano Básico.
+                Use clientes, pets, estoque, PDV, caixa, vendas e permissões sem pagar no
+                primeiro mês. Os módulos avançados aparecem como próximos passos ou pilotos.
               </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -180,8 +180,8 @@ export default function LandingPage() {
                 O Básico é o ponto de entrada.
               </h2>
               <p className="mt-4 text-lg leading-8 text-slate-600">
-                O primeiro acesso libera 30 dias de experiência ampla. Quando o cliente decidir
-                contratar, o caminho comercial inicial continua sendo o Plano Básico.
+                O primeiro acesso libera 30 dias do Básico completo. Quando o cliente decidir
+                contratar, ele segue no mesmo plano, sem troca de promessa no meio do caminho.
               </p>
             </div>
 
@@ -239,11 +239,11 @@ export default function LandingPage() {
                 O que vem por aí
               </span>
               <h2 className="mt-5 text-3xl font-extrabold md:text-4xl">
-                Mais recursos para experimentar e acompanhar.
+                Mais recursos para conhecer e pedir acesso.
               </h2>
               <p className="mt-4 text-lg leading-8 text-slate-300">
-                A experiência gratuita pode mostrar módulos em validação com o selo Beta. Assim o
-                cliente conhece o potencial do sistema sem confundir isso com o plano contratado.
+                A vitrine mostra módulos em validação com selo Beta. Eles não são liberados
+                automaticamente: entram como piloto acompanhado quando fizer sentido para o cliente.
               </p>
             </div>
 
@@ -265,11 +265,11 @@ export default function LandingPage() {
                 Próximo passo
               </p>
               <h2 className="mt-2 text-3xl font-extrabold text-slate-950">
-                Comece com 30 dias de acesso gratuito.
+                Comece com 30 dias grátis no Básico.
               </h2>
               <p className="mt-3 max-w-2xl text-slate-600">
-                O cadastro cria a empresa com o Plano Básico como referência comercial e libera a
-                experiência inicial ampliada. Integrações externas específicas não fazem parte desta oferta.
+                O cadastro cria a empresa no Plano Básico e mantém módulos avançados como
+                Beta sob liberação acompanhada. Integrações externas específicas não fazem parte desta oferta.
               </p>
             </div>
             <div className="flex flex-col gap-3 sm:flex-row">
