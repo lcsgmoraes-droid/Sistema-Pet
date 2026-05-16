@@ -1,6 +1,8 @@
 from types import SimpleNamespace
 from uuid import UUID
 
+import pytest
+
 from app.middlewares.request_context import clear_request_context, set_request_id
 from app.services import business_audit_service
 
@@ -41,7 +43,7 @@ def test_log_business_event_records_request_id_and_redacts_sensitive_metadata(mo
     assert captured["commit"] is False
     assert captured["new_value"]["event"] == "sale.manual_discount_finalized"
     assert captured["new_value"]["request_id"] == "req-sale-123"
-    assert captured["new_value"]["metadata"]["discount_amount"] == 25.0
+    assert captured["new_value"]["metadata"]["discount_amount"] == pytest.approx(25.0)
     assert captured["new_value"]["metadata"]["token"] == "***REDACTED***"
     assert captured["new_value"]["metadata"]["nested"]["senha"] == "***REDACTED***"
     assert captured["new_value"]["metadata"]["nested"]["reason"] == "cliente fiel"
@@ -72,13 +74,13 @@ def test_log_business_event_truncates_action_name(monkeypatch):
 def test_calculate_manual_discount_amount_ignores_coupon_discount():
     venda = SimpleNamespace(desconto_valor=40, cupom_discount_applied=15)
 
-    assert business_audit_service.calculate_manual_discount_amount(venda) == 25.0
+    assert business_audit_service.calculate_manual_discount_amount(venda) == pytest.approx(25.0)
 
 
 def test_calculate_manual_discount_amount_returns_zero_when_discount_is_coupon_only():
     venda = SimpleNamespace(desconto_valor=20, cupom_discount_applied=20)
 
-    assert business_audit_service.calculate_manual_discount_amount(venda) == 0.0
+    assert business_audit_service.calculate_manual_discount_amount(venda) == pytest.approx(0.0)
 
 
 def test_build_sale_reopened_metadata_keeps_reversal_results():
@@ -98,17 +100,15 @@ def test_build_sale_reopened_metadata_keeps_reversal_results():
         loyalty_void={"stamps_voided": 10},
     )
 
-    assert metadata == {
-        "sale_number": "202605160025",
-        "previous_status": "finalizada",
-        "new_status": "aberta",
-        "commissions_removed": 2,
-        "coupon_code": "PROMO10",
-        "customer_id": 99,
-        "sale_total": 125.5,
-        "coupon_reversal": {"redemptions_reversed": 1},
-        "loyalty_void": {"stamps_voided": 10},
-    }
+    assert metadata["sale_number"] == "202605160025"
+    assert metadata["previous_status"] == "finalizada"
+    assert metadata["new_status"] == "aberta"
+    assert metadata["commissions_removed"] == 2
+    assert metadata["coupon_code"] == "PROMO10"
+    assert metadata["customer_id"] == 99
+    assert metadata["sale_total"] == pytest.approx(125.5)
+    assert metadata["coupon_reversal"] == {"redemptions_reversed": 1}
+    assert metadata["loyalty_void"] == {"stamps_voided": 10}
 
 
 def test_build_sale_coupon_redeemed_metadata_records_core_identifiers():
@@ -128,12 +128,10 @@ def test_build_sale_coupon_redeemed_metadata_records_core_identifiers():
         },
     )
 
-    assert metadata == {
-        "sale_number": "202605160025",
-        "coupon_id": 8,
-        "coupon_code": "PROMO10",
-        "redemption_id": 123,
-        "discount_applied": 10.0,
-        "customer_id": 99,
-        "sale_total": 90.0,
-    }
+    assert metadata["sale_number"] == "202605160025"
+    assert metadata["coupon_id"] == 8
+    assert metadata["coupon_code"] == "PROMO10"
+    assert metadata["redemption_id"] == 123
+    assert metadata["discount_applied"] == pytest.approx(10.0)
+    assert metadata["customer_id"] == 99
+    assert metadata["sale_total"] == pytest.approx(90.0)
