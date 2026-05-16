@@ -222,7 +222,7 @@ function ActionableAlertsPanel({ alerts, notifications, recoveryActions, onApply
   );
 }
 
-function EventDetail({ event }) {
+function EventDetail({ event, auditTrail = [], auditLoading = false }) {
   if (!event) {
     return (
       <div className="rounded-lg border border-slate-200 bg-white p-4 text-sm text-slate-500 shadow-sm">
@@ -274,6 +274,40 @@ function EventDetail({ event }) {
           <div className="mt-1 whitespace-pre-wrap text-xs">{event.exception_message || "Sem mensagem detalhada."}</div>
         </div>
       ) : null}
+
+      <div className="mt-4 border-t border-slate-100 pt-4">
+        <div className="flex items-center justify-between gap-3">
+          <div>
+            <h3 className="text-sm font-bold text-slate-900">Auditoria do request</h3>
+            <p className="mt-1 text-xs text-slate-500">Eventos de negocio vinculados ao mesmo request_id.</p>
+          </div>
+          <Badge className="border-slate-200 bg-slate-50 text-slate-600">{auditTrail.length}</Badge>
+        </div>
+
+        {auditLoading ? (
+          <div className="mt-3 rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-500">Carregando auditoria...</div>
+        ) : auditTrail.length === 0 ? (
+          <div className="mt-3 rounded-lg bg-slate-50 px-3 py-3 text-sm text-slate-500">
+            Nenhum evento de auditoria encontrado para este request.
+          </div>
+        ) : (
+          <div className="mt-3 divide-y divide-slate-100 overflow-hidden rounded-lg border border-slate-200">
+            {auditTrail.slice(0, 8).map((item) => (
+              <div key={item.id} className="bg-white px-3 py-3 text-sm">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="font-semibold text-slate-900">{item.action}</span>
+                  <span className="text-xs text-slate-500">{formatDate(item.timestamp)}</span>
+                </div>
+                <div className="mt-1 flex flex-wrap gap-2 text-xs text-slate-500">
+                  <span>{item.entity_type || "sem_entidade"}</span>
+                  {item.entity_id ? <span>#{item.entity_id}</span> : null}
+                  {item.user_id ? <span>user {item.user_id}</span> : null}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
     </section>
   );
 }
@@ -284,11 +318,14 @@ export default function OpsIncidentes() {
   const [selectedPath, setSelectedPath] = useState("");
   const [statusMin, setStatusMin] = useState("");
   const [slowOnly, setSlowOnly] = useState(false);
+  const [requestIdFilter, setRequestIdFilter] = useState("");
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [summary, setSummary] = useState(null);
   const [events, setEvents] = useState({ items: [], total: 0 });
   const [selectedEvent, setSelectedEvent] = useState(null);
+  const [auditTrail, setAuditTrail] = useState([]);
+  const [auditLoading, setAuditLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
@@ -327,6 +364,7 @@ export default function OpsIncidentes() {
 
     const tenantParam = selectedTenant || undefined;
     const pathParam = selectedPath || undefined;
+    const requestParam = requestIdFilter.trim() || undefined;
 
     try {
       const [summaryResult, eventsResult] = await Promise.all([
@@ -337,6 +375,7 @@ export default function OpsIncidentes() {
             page,
             page_size: PAGE_SIZE,
             tenant_id: tenantParam,
+            request_id: requestParam,
             path_contains: pathParam,
             status_min: statusMin === "" ? undefined : Number(statusMin),
             slow_only: slowOnly,
@@ -356,7 +395,38 @@ export default function OpsIncidentes() {
     } finally {
       setLoading(false);
     }
-  }, [page, selectedPath, selectedTenant, since, slowOnly, statusMin]);
+  }, [page, requestIdFilter, selectedPath, selectedTenant, since, slowOnly, statusMin]);
+
+  useEffect(() => {
+    const requestId = selectedEvent?.request_id;
+    if (!requestId) {
+      setAuditTrail([]);
+      return undefined;
+    }
+
+    let cancelled = false;
+    setAuditLoading(true);
+    api.get("/admin/observabilidade/audit-events", {
+      params: {
+        request_id: requestId,
+        tenant_id: selectedEvent.tenant_id || undefined,
+        limit: 40,
+      },
+    })
+      .then((response) => {
+        if (!cancelled) setAuditTrail(response.data.items || []);
+      })
+      .catch(() => {
+        if (!cancelled) setAuditTrail([]);
+      })
+      .finally(() => {
+        if (!cancelled) setAuditLoading(false);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedEvent]);
 
   useEffect(() => {
     loadData();
@@ -367,6 +437,7 @@ export default function OpsIncidentes() {
     setSelectedPath("");
     setStatusMin("");
     setSlowOnly(false);
+    setRequestIdFilter("");
     setQuery("");
     setPage(1);
   }
@@ -377,7 +448,8 @@ export default function OpsIncidentes() {
     setSelectedPath(alert?.path || "");
     setStatusMin(Number(alert?.errors_5xx || 0) > 0 ? "500" : "");
     setSlowOnly(Number(alert?.slow_requests || 0) > 0 && Number(alert?.errors_5xx || 0) === 0);
-    setQuery(alert?.request_id || "");
+    setRequestIdFilter(alert?.request_id || "");
+    setQuery("");
     setPage(1);
   }
 
@@ -413,7 +485,7 @@ export default function OpsIncidentes() {
         ) : null}
 
         <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
-          <div className="grid gap-3 lg:grid-cols-[180px_160px_150px_1fr_auto]">
+          <div className="grid gap-3 lg:grid-cols-[180px_160px_150px_minmax(220px,0.8fr)_1fr_auto]">
             <label className="block">
               <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Periodo</span>
               <select
@@ -462,6 +534,22 @@ export default function OpsIncidentes() {
             </div>
 
             <label className="block">
+              <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Request ID</span>
+              <div className="relative mt-1">
+                <FiSearch className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
+                <input
+                  value={requestIdFilter}
+                  onChange={(event) => {
+                    setRequestIdFilter(event.target.value);
+                    setPage(1);
+                  }}
+                  placeholder="request_id exato"
+                  className="h-10 w-full rounded-lg border border-slate-300 pl-9 pr-3 font-mono text-sm text-slate-900"
+                />
+              </div>
+            </label>
+
+            <label className="block">
               <span className="text-xs font-semibold uppercase tracking-wide text-slate-500">Buscar no resultado</span>
               <div className="relative mt-1">
                 <FiSearch className="pointer-events-none absolute left-3 top-3 h-4 w-4 text-slate-400" />
@@ -489,6 +577,7 @@ export default function OpsIncidentes() {
           <div className="mt-3 flex flex-wrap gap-2 border-t border-slate-100 pt-3 text-xs text-slate-500">
             {selectedTenant ? <Badge className="border-blue-200 bg-blue-50 text-blue-700">Tenant: {tenantNameById.get(selectedTenant) || selectedTenant}</Badge> : null}
             {selectedPath ? <Badge className="border-blue-200 bg-blue-50 text-blue-700">Rota: {selectedPath}</Badge> : null}
+            {requestIdFilter ? <Badge className="border-blue-200 bg-blue-50 font-mono text-blue-700">Request: {requestIdFilter}</Badge> : null}
             {!selectedTenant && !selectedPath ? <span>Selecione um card abaixo para afunilar a investigacao.</span> : null}
           </div>
         </section>
@@ -635,7 +724,7 @@ export default function OpsIncidentes() {
             </div>
           </section>
 
-          <EventDetail event={selectedEvent} />
+          <EventDetail event={selectedEvent} auditTrail={auditTrail} auditLoading={auditLoading} />
         </div>
       </div>
     </div>
