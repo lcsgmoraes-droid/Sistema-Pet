@@ -47,6 +47,7 @@ Meta: 10/10 para uso interno profissional.
 | Feito | Revisao periodica de dependencias dos MCPs | `.github/dependabot.yml` |
 | Feito | Documentacao de uso e arquitetura dos MCPs | `mcp/README.md` e READMEs internos |
 | Feito | Badge visual do CI no README dos MCPs | `mcp/README.md` |
+| Feito | Rodada Dependabot GitHub Actions revisada e mergeada | PRs #52, #53 e #54 |
 
 ## PRs ja juntados
 
@@ -58,6 +59,9 @@ Meta: 10/10 para uso interno profissional.
 | #48 | Guia atualizado com branch protection e proximos passos | Mergeado |
 | #49 | Testes de protocolo MCP ponta a ponta | Mergeado |
 | #50 | Relatorio local de auditoria dos MCPs | Mergeado |
+| #52 | Dependabot: `actions/setup-node` v4 -> v6 | Mergeado |
+| #53 | Dependabot: `actions/checkout` v4 -> v6 | Mergeado |
+| #54 | Dependabot: `actions/setup-python` v5 -> v6 | Mergeado |
 
 ## Como validar agora
 
@@ -84,6 +88,13 @@ Validacao geral do fluxo:
 | Prioridade | Status | Item | Motivo |
 |---|---|---|---|
 | Baixa | Continuo | Revisar PRs do Dependabot dos MCPs | Mantem `mcp`, `requests` e `pytest` atualizados com seguranca |
+
+Rodada 2026-05-16:
+
+- PRs Dependabot abertos para GitHub Actions revisados e mergeados: #52, #53 e #54.
+- Checks obrigatorios passaram em cada PR antes do merge: `MCP tests`, `Fluxo unico safety`, `Quality Gate` e `Smoke test`.
+- Teste local dos MCPs neste PC: `14 passed` via `powershell -ExecutionPolicy Bypass -File .\scripts\test_mcp.ps1`.
+- Dependabot aberto relacionado a MCP/CI apos a rodada: nenhum.
 
 ## Proximo passo recomendado
 
