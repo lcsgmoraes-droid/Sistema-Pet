@@ -109,6 +109,42 @@ def get_db():
 router = APIRouter(prefix="/campanhas", tags=["Campanhas"])
 
 
+def _resolver_customer_id_campanhas(db: Session, *, tenant_id, customer_ref) -> int:
+    ref_text = str(customer_ref or "").strip()
+    if not ref_text:
+        raise HTTPException(status_code=400, detail="Cliente nao informado")
+
+    if ref_text.isdigit():
+        cliente_por_id = (
+            db.query(Cliente)
+            .filter(
+                Cliente.tenant_id == tenant_id,
+                Cliente.id == int(ref_text),
+                Cliente.ativo == True,
+            )
+            .first()
+        )
+        if cliente_por_id:
+            return cliente_por_id.id
+
+    cliente_por_codigo = (
+        db.query(Cliente)
+        .filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.codigo == ref_text,
+            Cliente.ativo == True,
+        )
+        .first()
+    )
+    if cliente_por_codigo:
+        return cliente_por_codigo.id
+
+    raise HTTPException(
+        status_code=404,
+        detail=f"Cliente nao encontrado para o codigo/ID {ref_text}",
+    )
+
+
 def _serializar_exclusao_validade(exclusao: CampanhaValidadeExclusao) -> dict:
     return {
         "id": exclusao.id,
@@ -537,6 +573,16 @@ def criar_cupom_manual(
         except ValueError:
             raise HTTPException(status_code=400, detail="valid_until deve ser YYYY-MM-DD")
 
+    customer_id_resolvido = (
+        _resolver_customer_id_campanhas(
+            db,
+            tenant_id=tenant_id,
+            customer_ref=body.customer_id,
+        )
+        if body.customer_id
+        else None
+    )
+
     cupom = Coupon(
         tenant_id=tenant_id,
         code=code,
@@ -546,7 +592,7 @@ def criar_cupom_manual(
         channel=canal,
         valid_until=valid_until,
         min_purchase_value=body.min_purchase_value,
-        customer_id=body.customer_id,
+        customer_id=customer_id_resolvido,
         campaign_id=None,
         meta={"descricao": body.descricao or "Cupom manual", "criado_por": "manual"},
     )
@@ -630,6 +676,7 @@ def buscar_clientes_campanhas(
             Cliente.ativo == True,
             (
                 Cliente.nome.ilike(termo)
+                | Cliente.codigo.ilike(termo)
                 | Cliente.cpf.ilike(termo)
                 | Cliente.telefone.ilike(termo)
                 | Cliente.celular.ilike(termo)
@@ -643,6 +690,7 @@ def buscar_clientes_campanhas(
         "clientes": [
             {
                 "id": c.id,
+                "codigo": c.codigo,
                 "nome": c.nome,
                 "cpf": c.cpf,
                 "telefone": c.telefone or c.celular,
@@ -1777,6 +1825,11 @@ def lancar_carimbo_manual(
     na mesma hora, retorna o existente.
     """
     _, tenant_id = user_and_tenant
+    customer_id = _resolver_customer_id_campanhas(
+        db,
+        tenant_id=tenant_id,
+        customer_ref=body.customer_id,
+    )
 
     # Buscar campanha de fidelidade ativa do tenant
     campanha = (
@@ -1796,7 +1849,7 @@ def lancar_carimbo_manual(
 
     stamp = LoyaltyStamp(
         tenant_id=tenant_id,
-        customer_id=body.customer_id,
+        customer_id=customer_id,
         venda_id=body.venda_id,
         campaign_id=campanha.id,
         stamp_index=1,
@@ -1814,7 +1867,7 @@ def lancar_carimbo_manual(
             .filter(
                 LoyaltyStamp.tenant_id == tenant_id,
                 LoyaltyStamp.campaign_id == campanha.id,
-                LoyaltyStamp.customer_id == body.customer_id,
+                LoyaltyStamp.customer_id == customer_id,
                 LoyaltyStamp.venda_id == body.venda_id,
             )
             .first()
@@ -1823,7 +1876,7 @@ def lancar_carimbo_manual(
             saldo = summarize_loyalty_balances_for_customer(
                 db,
                 tenant_id=tenant_id,
-                customer_id=body.customer_id,
+                customer_id=customer_id,
             )
             return {
                 "ok": True,
@@ -1842,7 +1895,7 @@ def lancar_carimbo_manual(
     sync_loyalty_rewards_for_customer(
         db,
         campaign=campanha,
-        customer_id=body.customer_id,
+        customer_id=customer_id,
         source_event_id=None,
     )
 
@@ -1852,12 +1905,12 @@ def lancar_carimbo_manual(
     saldo = summarize_loyalty_balances_for_customer(
         db,
         tenant_id=tenant_id,
-        customer_id=body.customer_id,
+        customer_id=customer_id,
     )
 
     logger.info(
         "[Campanhas] Carimbo manual lançado customer_id=%d tenant=%s total=%d",
-        body.customer_id, tenant_id, saldo["total_carimbos"],
+        customer_id, tenant_id, saldo["total_carimbos"],
     )
 
     return {
