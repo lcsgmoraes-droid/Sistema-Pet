@@ -579,8 +579,8 @@ const Layout = () => {
       path: "/calculadora-racao",
       icon: FiTarget,
       label: "Calculadora de Ração",
-      permission: null,
-    }, // Sempre visível
+      permission: "produtos.visualizar",
+    },
     {
       path: "/pdv",
       icon: FiShoppingCart,
@@ -885,7 +885,7 @@ const Layout = () => {
       label: "Inteligência Artificial",
       permission: null, // Menu principal sempre visível
       submenu: [
-        { path: "/ia/chat", label: "Chat IA", permission: null }, // Sempre disponível
+        { path: "/ia/chat", label: "Chat IA", modulo: "financeiro_erp", permission: null },
         {
           path: "/ia/fluxo-caixa",
           label: "Fluxo de Caixa Preditivo",

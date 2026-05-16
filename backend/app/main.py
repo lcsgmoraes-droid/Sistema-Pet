@@ -879,7 +879,7 @@ app.include_router(bling_pedido_router, tags=["Integração Bling - Pedido"], de
 app.include_router(bling_nf_router, tags=["Integração Bling - NF"], dependencies=_module_dependencies("bling"))
 app.include_router(dashboard_router, tags=["Dashboard Financeiro"])
 app.include_router(ia_router, tags=["IA - Fluxo de Caixa"], dependencies=_module_dependencies("financeiro_erp"))
-app.include_router(chat_router, tags=["IA - Chat Financeiro"])
+app.include_router(chat_router, tags=["IA - Chat Financeiro"], dependencies=_module_dependencies("financeiro_erp"))
 app.include_router(dre_ia_router, tags=["IA - DRE Inteligente"], dependencies=_module_dependencies("financeiro_erp"))
 app.include_router(extrato_ia_router, tags=["IA - Extrato Bancário (ABA 7)"], dependencies=_module_dependencies("financeiro_erp"))
 app.include_router(ia_fluxo_router, tags=["IA - Fluxo Inteligente"], dependencies=_module_dependencies("financeiro_erp"))

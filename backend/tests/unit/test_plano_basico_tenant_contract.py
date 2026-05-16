@@ -122,6 +122,7 @@ def test_premium_routers_remain_gated_in_main():
         "simples_router": "financeiro_erp",
         "auditoria_provisoes_router": "financeiro_erp",
         "contas_receber_router": "financeiro_erp",
+        "chat_router": "financeiro_erp",
         "funcionarios_router": "rh",
     }
 
@@ -346,6 +347,7 @@ def test_rh_simulation_page_is_module_gated_on_direct_url():
 
 def test_basic_direct_urls_apply_same_frontend_permissions_as_menu():
     app_source = _source("frontend/src/App.jsx")
+    layout_source = _source("frontend/src/components/Layout.jsx")
 
     expected_route_guards = [
         'path="pets" element={<ProtectedRoute permission="clientes.visualizar"><GerenciamentoPets /></ProtectedRoute>}',
@@ -365,6 +367,29 @@ def test_basic_direct_urls_apply_same_frontend_permissions_as_menu():
 
     for route_guard in expected_route_guards:
         assert route_guard in app_source
+
+    calculadora_menu_start = layout_source.index('path: "/calculadora-racao"')
+    calculadora_menu_end = layout_source.index('path: "/pdv"', calculadora_menu_start)
+    calculadora_menu = layout_source[calculadora_menu_start:calculadora_menu_end]
+    assert 'permission: "produtos.visualizar"' in calculadora_menu
+
+
+def test_financial_chat_ia_is_not_available_in_basic_without_premium_module():
+    main_source = _source("backend/app/main.py")
+    app_source = _source("frontend/src/App.jsx")
+    layout_source = _source("frontend/src/components/Layout.jsx")
+
+    assert (
+        'app.include_router(chat_router, tags=["IA - Chat Financeiro"], '
+        'dependencies=_module_dependencies("financeiro_erp"))'
+    ) in main_source
+    assert 'path="ia/chat"' in app_source
+    assert 'element={<ModuleGate modulo="financeiro_erp"><ChatIA /></ModuleGate>}' in app_source
+
+    chat_menu_start = layout_source.index('path: "/ia/chat"')
+    chat_menu_end = layout_source.index('path: "/ia/fluxo-caixa"', chat_menu_start)
+    chat_menu = layout_source[chat_menu_start:chat_menu_end]
+    assert 'modulo: "financeiro_erp"' in chat_menu
 
 
 def test_lembretes_use_selected_tenant_context():

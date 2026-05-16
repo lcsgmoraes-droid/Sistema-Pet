@@ -948,7 +948,10 @@ function App() {
                       </ModuleGate>
                     }
                   />
-                  <Route path="ia/chat" element={<ChatIA />} />
+                  <Route
+                    path="ia/chat"
+                    element={<ModuleGate modulo="financeiro_erp"><ChatIA /></ModuleGate>}
+                  />
                   <Route
                     path="ia/whatsapp"
                     element={

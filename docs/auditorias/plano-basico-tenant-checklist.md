@@ -131,7 +131,7 @@ Status usados:
   - A rodada visual `20260515215846` confirmou CRUD visual de departamentos, categorias e marcas no navegador com isolamento A/B.
   - A rodada visual `202605151925` confirmou configuracao da empresa no navegador: fiscal/dados cadastrais, parametros gerais e estoque salvaram com chamadas 200, persistencia apos reload e console limpo.
   - A rodada visual `202605151931567` confirmou produto com dois lotes e validades diferentes: a listagem exibiu a validade mais urgente e o tooltip mostrou os dois lotes com saldo.
-  - A rodada estatica/contratual da PR #39 confirmou `anyOfPermissions` em rotas diretas, gate de modulo em contas a receber e SEFAZ, menu `Financeiro > Vendas` liberado para permissoes basicas, endpoints premium de `financeiro_routes.py` bloqueados por `financeiro_erp`, historico do Chat IA isolado por tenant selecionado e indicadores/projecoes/alertas de IA financeira usando o tenant do token.
+  - A rodada estatica/contratual da PR #39 confirmou `anyOfPermissions` em rotas diretas, gate de modulo em contas a receber e SEFAZ, menu `Financeiro > Vendas` liberado para permissoes basicas, endpoints premium de `financeiro_routes.py` bloqueados por `financeiro_erp`, historico do Chat IA isolado por tenant selecionado, Chat IA financeiro bloqueado pelo modulo `financeiro_erp`, Calculadora de Racao alinhada a `produtos.visualizar` no menu/rota e indicadores/projecoes/alertas de IA financeira usando o tenant do token.
   - A comparacao visual completa por navegador ainda fica pendente para financeiro de vendas/recibo/historico.
 - Data/hora aproximada dos testes: 2026-05-15, madrugada e tarde, horario local.
 
@@ -578,7 +578,7 @@ Resultados automatizados registrados:
 | Produtos/catalogos | Categorias, marcas e departamentos exigem permissao de produto por acao | Corrigido e testado |
 | Cadastros/pagamentos | Formas de pagamento, taxas, analise de venda e operadoras exigem permissao por leitura/alteracao e filtram tenant | Corrigido e testado |
 | Configuracoes empresa | Dados/fiscal/geral/estoque exigem permissao de configuracao no backend e nas subrotas frontend | Corrigido e testado visualmente |
-| IA/financeiro | Historico do Chat IA, indices, projecoes e alertas de caixa usam tenant selecionado no token | Corrigido e testado por contrato |
+| IA/financeiro | Historico do Chat IA, rota/menu do Chat IA financeiro, indices, projecoes e alertas de caixa usam tenant selecionado e/ou modulo correto | Corrigido e testado por contrato |
 | SQL tenant-safe | Helper e runtime guard de SQL bruto continuam bloqueando query sem tenant | OK |
 | Onboarding tenant | Criacao/base de tenant e dados padrao cobertos pela suite multi-tenant | OK |
 | Mobile/entregas | Contexto tenant do entregador/e-commerce e status de entrega | OK |
@@ -590,7 +590,7 @@ Comandos registrados na auditoria automatizada:
 $env:APP_ENV='test'; $env:ENVIRONMENT='test'; $env:ENV='test'; $env:DATABASE_URL='sqlite:///./test.db'; $env:DEBUG='false'; .\backend\.venv\Scripts\python.exe -m pytest backend\tests\unit\test_plano_basico_tenant_contract.py backend\tests\unit\test_module_access_dependency.py backend\tests\unit\test_tenant_security_middleware.py backend\tests\unit\test_sql_audit_config.py backend\tests\multi_tenant\test_phase1_tenant_hardening.py backend\tests\multi_tenant\test_phase1_1_runtime_validation.py backend\tests\multi_tenant\test_phase2b_tenant_safe_sql.py backend\tests\multi_tenant\test_phase3_tenant_onboarding_service.py -q
 ```
 
-Resultado atualizado na PR #39: `89 passed`.
+Resultado atualizado na PR #39: `90 passed`.
 
 ```powershell
 $env:APP_ENV='test'; $env:ENVIRONMENT='test'; $env:ENV='test'; $env:DATABASE_URL='sqlite:///./test.db'; $env:DEBUG='false'; .\backend\.venv\Scripts\python.exe -m pytest backend\tests\unit\test_ecommerce_mobile_tenant_context.py backend\tests\unit\test_entrega_status_contract.py -q
