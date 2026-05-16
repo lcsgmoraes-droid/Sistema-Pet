@@ -244,6 +244,7 @@ def query_error_events(
     db: Session,
     *,
     tenant_id: str | None = None,
+    request_id: str | None = None,
     path_contains: str | None = None,
     status_min: int | None = None,
     slow_only: bool = False,
@@ -261,6 +262,8 @@ def query_error_events(
             if tenant_uuid is None:
                 return []
             query = query.filter(OpsErrorEvent.tenant_id == tenant_uuid)
+    if request_id:
+        query = query.filter(OpsErrorEvent.request_id == request_id.strip())
     if path_contains:
         query = query.filter(OpsErrorEvent.path.ilike(f"%{path_contains}%"))
     if status_min is not None:

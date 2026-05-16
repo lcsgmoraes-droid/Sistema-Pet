@@ -4,6 +4,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, Query
 
 from app.auth.dependencies import require_admin
+from app.services.audit_event_report_service import list_audit_events
 from app.services.deploy_event_reporter import list_deploy_events, summarize_deploy_events
 from app.services.error_event_reporter import list_error_events, summarize_error_events
 from app.services.ops_dashboard_service import build_ops_dashboard
@@ -34,6 +35,7 @@ def listar_eventos_erro(
     page: int = Query(1, ge=1),
     page_size: int = Query(50, ge=1, le=200),
     tenant_id: str | None = Query(None),
+    request_id: str | None = Query(None),
     path_contains: str | None = Query(None),
     status_min: int | None = Query(None, ge=100, le=599),
     slow_only: bool = Query(False),
@@ -45,6 +47,7 @@ def listar_eventos_erro(
         page=page,
         page_size=page_size,
         tenant_id=tenant_id,
+        request_id=request_id,
         path_contains=path_contains,
         status_min=status_min,
         slow_only=slow_only,
@@ -66,6 +69,25 @@ def resumo_eventos_erro(
         since=since,
         until=until,
         db=db,
+    )
+
+
+@router.get("/audit-events")
+def listar_eventos_auditoria(
+    tenant_id: str | None = Query(None),
+    request_id: str | None = Query(None),
+    since: datetime | None = Query(None),
+    until: datetime | None = Query(None),
+    limit: int = Query(100, ge=1, le=500),
+    db: Session = Depends(get_session),
+) -> dict[str, Any]:
+    return list_audit_events(
+        db,
+        tenant_id=tenant_id,
+        request_id=request_id,
+        since=since,
+        until=until,
+        limit=limit,
     )
 
 

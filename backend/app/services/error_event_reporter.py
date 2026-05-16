@@ -246,6 +246,7 @@ def _filter_events(
     events: list[dict[str, Any]],
     *,
     tenant_id: str | None = None,
+    request_id: str | None = None,
     path_contains: str | None = None,
     status_min: int | None = None,
     slow_only: bool = False,
@@ -254,8 +255,11 @@ def _filter_events(
 ) -> list[dict[str, Any]]:
     filtered: list[dict[str, Any]] = []
     path_filter = path_contains.lower() if path_contains else None
+    request_filter = request_id.strip() if request_id else None
 
     for event in events:
+        if request_filter and str(event.get("request_id") or "") != request_filter:
+            continue
         if tenant_id:
             event_tenant_id = str(event.get("tenant_id") or "")
             if tenant_id == "sem_tenant":
@@ -286,6 +290,7 @@ def list_error_events(
     page: int = 1,
     page_size: int = 50,
     tenant_id: str | None = None,
+    request_id: str | None = None,
     path_contains: str | None = None,
     status_min: int | None = None,
     slow_only: bool = False,
@@ -295,6 +300,7 @@ def list_error_events(
 ) -> dict[str, Any]:
     events = get_error_events(
         tenant_id=tenant_id,
+        request_id=request_id,
         path_contains=path_contains,
         status_min=status_min,
         slow_only=slow_only,
@@ -365,6 +371,7 @@ def summarize_error_events(
 def get_error_events(
     *,
     tenant_id: str | None = None,
+    request_id: str | None = None,
     path_contains: str | None = None,
     status_min: int | None = None,
     slow_only: bool = False,
@@ -380,6 +387,7 @@ def get_error_events(
             return query_error_events(
                 db,
                 tenant_id=tenant_id,
+                request_id=request_id,
                 path_contains=path_contains,
                 status_min=status_min,
                 slow_only=slow_only,
@@ -396,6 +404,7 @@ def get_error_events(
     return _filter_events(
         _read_recent_events(),
         tenant_id=tenant_id,
+        request_id=request_id,
         path_contains=path_contains,
         status_min=status_min,
         slow_only=slow_only,
