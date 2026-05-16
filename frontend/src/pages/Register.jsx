@@ -73,8 +73,10 @@ const Register = () => {
           <div className="inline-flex items-center justify-center w-16 h-16 bg-purple-100 rounded-full mb-4">
             <PawPrint className="w-8 h-8 text-purple-600" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900">Criar Conta</h1>
-          <p className="text-gray-600 mt-2">Cadastre sua empresa para usar o Pet Shop Pro</p>
+          <h1 className="text-3xl font-bold text-gray-900">Criar empresa</h1>
+          <p className="text-gray-600 mt-2">
+            Cadastro inicial do Pet Shop Pro com o Plano Básico selecionado
+          </p>
         </div>
 
         {error && (
@@ -87,16 +89,21 @@ const Register = () => {
         <div className="mb-6 rounded-lg border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-900">
           <p className="font-semibold">{selectedPlanLabel} selecionado</p>
           <p className="mt-1">
-            Sua empresa sera criada com cadastro, produtos, estoque, PDV e vendas liberados.
+            Sua empresa será criada com clientes, pets, produtos, estoque, PDV, caixa e vendas liberados.
           </p>
+          <Link to="/planos" className="mt-3 inline-flex text-xs font-bold text-emerald-800 underline">
+            Conferir o que está incluso
+          </Link>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Seu nome</label>
+            <label htmlFor="register-nome" className="block text-sm font-medium text-gray-700 mb-2">Seu nome</label>
             <div className="relative">
               <FiUser className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
+                id="register-nome"
+                name="nome"
                 type="text"
                 value={nome}
                 onChange={(event) => setNome(event.target.value)}
@@ -108,10 +115,12 @@ const Register = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Nome da empresa</label>
+            <label htmlFor="register-nome-loja" className="block text-sm font-medium text-gray-700 mb-2">Nome da empresa</label>
             <div className="relative">
               <FiBriefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
+                id="register-nome-loja"
+                name="nome_loja"
                 type="text"
                 value={nomeLoja}
                 onChange={(event) => setNomeLoja(event.target.value)}
@@ -123,10 +132,12 @@ const Register = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Tipo de empresa</label>
+            <label htmlFor="register-organization-type" className="block text-sm font-medium text-gray-700 mb-2">Tipo de empresa</label>
             <div className="relative">
               <FiBriefcase className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <select
+                id="register-organization-type"
+                name="organization_type"
                 value={organizationType}
                 onChange={(event) => setOrganizationType(event.target.value)}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition bg-white"
@@ -140,10 +151,12 @@ const Register = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
+            <label htmlFor="register-email" className="block text-sm font-medium text-gray-700 mb-2">Email</label>
             <div className="relative">
               <FiMail className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
+                id="register-email"
+                name="email"
                 type="email"
                 value={email}
                 autoComplete="email"
@@ -156,10 +169,12 @@ const Register = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Senha</label>
+            <label htmlFor="register-password" className="block text-sm font-medium text-gray-700 mb-2">Senha</label>
             <div className="relative">
               <FiLock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
+                id="register-password"
+                name="password"
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 autoComplete="new-password"
@@ -180,10 +195,12 @@ const Register = () => {
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">Confirmar senha</label>
+            <label htmlFor="register-confirm-password" className="block text-sm font-medium text-gray-700 mb-2">Confirmar senha</label>
             <div className="relative">
               <FiLock className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
               <input
+                id="register-confirm-password"
+                name="confirm_password"
                 type={showConfirmPassword ? 'text' : 'password'}
                 value={confirmPassword}
                 autoComplete="new-password"
@@ -206,6 +223,8 @@ const Register = () => {
           <div className="rounded-lg border border-gray-200 bg-gray-50 p-4 space-y-3 text-sm text-gray-700">
             <label className="flex gap-3">
               <input
+                id="register-accepted-terms"
+                name="accepted_terms"
                 type="checkbox"
                 checked={acceptedTerms}
                 onChange={(event) => setAcceptedTerms(event.target.checked)}
@@ -217,6 +236,8 @@ const Register = () => {
             </label>
             <label className="flex gap-3">
               <input
+                id="register-accepted-privacy"
+                name="accepted_privacy"
                 type="checkbox"
                 checked={acceptedPrivacy}
                 onChange={(event) => setAcceptedPrivacy(event.target.checked)}
