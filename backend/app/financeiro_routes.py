@@ -20,9 +20,11 @@ from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
 from .models import User
 from .financeiro_models import CategoriaFinanceira, FormaPagamento
+from .security.module_access import require_active_module
 from .security.permissions_decorator import require_any_permission, require_permission
 
 router = APIRouter(prefix="/financeiro", tags=["Financeiro - Configurações"])
+financeiro_erp_required = Depends(require_active_module("financeiro_erp"))
 
 # ============================================================================
 # SCHEMAS
@@ -106,7 +108,8 @@ class FormaPagamentoResponse(BaseModel):
 def listar_categorias(
     tipo: Optional[str] = None,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant = Depends(get_current_user_and_tenant),
+    _module_access: None = financeiro_erp_required,
 ):
     """
     Lista todas as categorias financeiras
@@ -137,7 +140,8 @@ def listar_categorias(
 def criar_categoria(
     categoria: CategoriaCreate,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant = Depends(get_current_user_and_tenant),
+    _module_access: None = financeiro_erp_required,
 ):
     """
     Cria nova categoria financeira
@@ -166,7 +170,8 @@ def atualizar_categoria(
     categoria_id: int,
     categoria: CategoriaCreate,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant = Depends(get_current_user_and_tenant),
+    _module_access: None = financeiro_erp_required,
 ):
     """
     Atualiza categoria financeira
@@ -195,7 +200,8 @@ def atualizar_categoria(
 def desativar_categoria(
     categoria_id: int,
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant = Depends(get_current_user_and_tenant),
+    _module_access: None = financeiro_erp_required,
 ):
     """
     Desativa uma categoria (não exclui, apenas marca como inativa)
@@ -446,7 +452,8 @@ def get_fluxo_caixa(
     agrupamento: str = 'dia',  # dia, semana, mes
     numero_venda: Optional[str] = None,  # Filtro por número de venda
     db: Session = Depends(get_session),
-    current_user_and_tenant = Depends(get_current_user_and_tenant)
+    current_user_and_tenant = Depends(get_current_user_and_tenant),
+    _module_access: None = financeiro_erp_required,
 ):
     """
     Retorna o fluxo de caixa consolidado para um período - Estilo Flua.

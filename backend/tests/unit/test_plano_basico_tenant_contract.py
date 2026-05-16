@@ -312,6 +312,31 @@ def test_basic_finance_sales_menu_matches_direct_route_permissions():
     assert '"relatorios.financeiro"' in app_source
 
 
+def test_financeiro_mixed_router_keeps_premium_endpoints_module_gated():
+    financeiro_source = _source("backend/app/financeiro_routes.py")
+
+    assert 'financeiro_erp_required = Depends(require_active_module("financeiro_erp"))' in financeiro_source
+
+    premium_functions = [
+        "def listar_categorias(",
+        "def criar_categoria(",
+        "def atualizar_categoria(",
+        "def desativar_categoria(",
+        "def get_fluxo_caixa(",
+    ]
+
+    for function_name in premium_functions:
+        start = financeiro_source.index(function_name)
+        end = financeiro_source.index("):", start)
+        signature = financeiro_source[start:end]
+        assert "_module_access: None = financeiro_erp_required" in signature
+
+    cliente_history_start = financeiro_source.index("def get_historico_financeiro_cliente(")
+    cliente_history_end = financeiro_source.index("):", cliente_history_start)
+    cliente_history_signature = financeiro_source[cliente_history_start:cliente_history_end]
+    assert "_module_access: None = financeiro_erp_required" not in cliente_history_signature
+
+
 def test_rh_simulation_page_is_module_gated_on_direct_url():
     app_source = _source("frontend/src/App.jsx")
 
