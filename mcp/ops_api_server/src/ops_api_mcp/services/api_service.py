@@ -6,7 +6,9 @@ from typing import Any
 import requests
 from requests import Response
 
+from ops_api_mcp.config import ServerConfig
 from ops_api_mcp.models import ApiResult
+from ops_api_mcp.security import redact_text, redact_value, validate_local_http_url
 
 
 @dataclass(frozen=True)
@@ -16,13 +18,15 @@ class ApiDefaults:
 
 
 class ApiService:
-    def __init__(self, defaults: ApiDefaults | None = None) -> None:
+    def __init__(self, config: ServerConfig, defaults: ApiDefaults | None = None) -> None:
+        self.config = config
         self.defaults = defaults or ApiDefaults()
 
     def health_check(self, url: str) -> ApiResult:
         try:
+            safe_url = validate_local_http_url(url, self.config.allowed_http_hosts)
             response = requests.get(
-                url,
+                safe_url,
                 timeout=self.defaults.timeout_seconds,
                 verify=self.defaults.verify_tls,
             )
@@ -30,7 +34,7 @@ class ApiService:
                 ok=response.status_code == 200,
                 operation="health_check",
                 status_code=response.status_code,
-                url=url,
+                url=safe_url,
                 details={"body": self._safe_json(response)},
             )
         except Exception as exc:
@@ -39,13 +43,14 @@ class ApiService:
                 operation="health_check",
                 status_code=None,
                 url=url,
-                details={"error": str(exc)},
+                details={"error": redact_text(str(exc))},
             )
 
     def auth_route_smoke(self, url: str) -> ApiResult:
         try:
+            safe_url = validate_local_http_url(url, self.config.allowed_http_hosts)
             response = requests.post(
-                url,
+                safe_url,
                 json={},
                 timeout=self.defaults.timeout_seconds,
                 verify=self.defaults.verify_tls,
@@ -55,7 +60,7 @@ class ApiService:
                 ok=ok,
                 operation="auth_route_smoke",
                 status_code=response.status_code,
-                url=url,
+                url=safe_url,
                 details={"body": self._safe_json(response)},
             )
         except Exception as exc:
@@ -64,7 +69,7 @@ class ApiService:
                 operation="auth_route_smoke",
                 status_code=None,
                 url=url,
-                details={"error": str(exc)},
+                details={"error": redact_text(str(exc))},
             )
 
     def validate_tabs_permissions(
@@ -81,11 +86,12 @@ class ApiService:
             "configuracoes.editar",
         ]
 
-        login_url = f"{base_url.rstrip('/')}/auth/login-multitenant"
-        select_url = f"{base_url.rstrip('/')}/auth/select-tenant"
-        me_url = f"{base_url.rstrip('/')}/auth/me-multitenant"
-
         try:
+            safe_base_url = validate_local_http_url(base_url.rstrip("/"), self.config.allowed_http_hosts)
+            login_url = f"{safe_base_url}/auth/login-multitenant"
+            select_url = f"{safe_base_url}/auth/select-tenant"
+            me_url = f"{safe_base_url}/auth/me-multitenant"
+
             login_response = requests.post(
                 login_url,
                 json={"email": email, "password": password},
@@ -102,7 +108,7 @@ class ApiService:
                     details={"step": "login", "body": self._safe_json(login_response)},
                 )
 
-            login_data = self._safe_json(login_response)
+            login_data = self._raw_json(login_response)
             temp_token = login_data.get("access_token")
             tenants = login_data.get("tenants") or []
 
@@ -133,7 +139,7 @@ class ApiService:
                     details={"step": "select_tenant", "body": self._safe_json(select_response)},
                 )
 
-            final_token = self._safe_json(select_response).get("access_token")
+            final_token = self._raw_json(select_response).get("access_token")
             if not final_token:
                 return ApiResult(
                     ok=False,
@@ -159,7 +165,7 @@ class ApiService:
                     details={"step": "me", "body": self._safe_json(me_response)},
                 )
 
-            me_data = self._safe_json(me_response)
+            me_data = self._raw_json(me_response)
             permissions = set(me_data.get("permissions") or [])
             missing = [perm for perm in required if perm not in permissions]
 
@@ -183,11 +189,17 @@ class ApiService:
                 operation="validate_tabs_permissions",
                 status_code=None,
                 url=base_url,
-                details={"error": str(exc)},
+                details={"error": redact_text(str(exc))},
             )
 
     def _safe_json(self, response: Response) -> Any:
         try:
+            return redact_value(response.json())
+        except Exception:
+            return {"text": redact_text(response.text[:2000])}
+
+    def _raw_json(self, response: Response) -> Any:
+        try:
             return response.json()
         except Exception:
-            return {"text": response.text[:2000]}
+            return {}
