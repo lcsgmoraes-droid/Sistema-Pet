@@ -1,0 +1,30 @@
+name: Deploy Safety
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - "frontend/**"
+      - "scripts/**"
+      - "docs/FLUXO_UNICO_DEV_PROD.md"
+      - "docker-compose*.yml"
+      - ".github/workflows/deploy-safety.yml"
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  fluxo-unico-safety:
+    name: Fluxo unico safety
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Validate DEV to PROD guardrails
+        shell: pwsh
+        run: pwsh -NoLogo -NoProfile -File scripts/validar_fluxo.ps1
