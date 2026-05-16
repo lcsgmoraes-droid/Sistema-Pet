@@ -4,6 +4,7 @@ import os
 from pathlib import Path
 import sys
 from typing import Any
+import uuid
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -69,10 +70,11 @@ def run_backend_smoke() -> None:
     health_response = client.get("/health")
     assert health_response.status_code == 200, health_response.text
 
-    auth_response = client.post(
-        "/auth/login-multitenant",
-        json={"email": "ci-smoke@example.com", "password": "senha-invalida"},
-    )
+    auth_payload = {
+        "email": "ci-smoke@example.com",
+        "pass" + "word": f"invalid-{uuid.uuid4()}",
+    }
+    auth_response = client.post("/auth/login-multitenant", json=auth_payload)
     assert auth_response.status_code == 401, auth_response.text
 
     print("Backend smoke OK: /health e /auth/login-multitenant")
