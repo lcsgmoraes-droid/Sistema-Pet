@@ -14,6 +14,11 @@ from app.auth import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.models import AssinaturaModulo, Tenant, User
+from app.services.business_audit_service import (
+    build_module_activation_metadata,
+    build_plan_activation_metadata,
+    log_business_event,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -249,10 +254,10 @@ def ativar_modulo(
         except (json.JSONDecodeError, TypeError):
             modulos_atuais = []
 
+    modulos_anteriores = sorted(modulo_atual for modulo_atual in modulos_atuais if isinstance(modulo_atual, str))
     if modulo not in modulos_atuais:
         modulos_atuais.append(modulo)
         tenant.modulos_ativos = json.dumps(modulos_atuais)
-        db.commit()
 
     # Cria registro de assinatura manual
     existente = (
@@ -264,6 +269,7 @@ def ativar_modulo(
         )
         .first()
     )
+    assinatura_criada = False
     if not existente:
         assinatura = AssinaturaModulo(
             tenant_id=tenant_id_alvo,
@@ -273,7 +279,27 @@ def ativar_modulo(
             data_inicio=datetime.now(tz=timezone.utc),
         )
         db.add(assinatura)
-        db.commit()
+        assinatura_criada = True
+
+    log_business_event(
+        db=db,
+        tenant_id=tenant_id_alvo,
+        user_id=current_user.id,
+        event="config.module_activated",
+        entity_type="tenant_modules",
+        entity_id=None,
+        old_value={"modules": modulos_anteriores},
+        metadata=build_module_activation_metadata(
+            tenant=tenant,
+            module=modulo,
+            previous_modules=modulos_anteriores,
+            current_modules=modulos_atuais,
+            subscription_created=assinatura_criada,
+        ),
+        details=f"Modulo {modulo} ativado manualmente para tenant {tenant_id_alvo}",
+        commit=False,
+    )
+    db.commit()
 
     return {"ok": True, "modulo": modulo, "tenant_id": tenant_id_alvo}
 
@@ -296,6 +322,16 @@ def ativar_plano_basico_manual(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant nao encontrado")
 
     agora = datetime.now(tz=timezone.utc)
+    previous_state = {
+        "plan": tenant.plan,
+        "billing_status": tenant.billing_status,
+        "subscription_source": tenant.subscription_source,
+        "subscription_activated_at": tenant.subscription_activated_at.isoformat()
+        if tenant.subscription_activated_at
+        else None,
+        "trial_started_at": tenant.trial_started_at.isoformat() if tenant.trial_started_at else None,
+        "trial_ends_at": tenant.trial_ends_at.isoformat() if tenant.trial_ends_at else None,
+    }
     tenant.plan = "basico"
     tenant.billing_status = "active"
     tenant.subscription_source = "manual"
@@ -305,6 +341,21 @@ def ativar_plano_basico_manual(
     if not tenant.trial_ends_at:
         tenant.trial_ends_at = agora
 
+    log_business_event(
+        db=db,
+        tenant_id=tenant_id_alvo,
+        user_id=current_user.id,
+        event="config.plan_activated",
+        entity_type="tenants",
+        entity_id=None,
+        old_value=previous_state,
+        metadata=build_plan_activation_metadata(
+            tenant=tenant,
+            previous_state=previous_state,
+        ),
+        details=f"Plano basico ativado manualmente para tenant {tenant_id_alvo}",
+        commit=False,
+    )
     db.commit()
     db.refresh(tenant)
 

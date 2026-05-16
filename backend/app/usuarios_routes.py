@@ -11,6 +11,7 @@ from app.auth import get_current_user_and_tenant
 from app.auth.core import hash_password
 from app.security.permissions_decorator import require_permission
 from app.models import User, UserTenant, Role
+from app.services.business_audit_service import build_user_access_metadata, log_business_event
 from app.session_manager import revoke_all_sessions
 
 router = APIRouter(prefix="/usuarios", tags=["Usuários"])
@@ -91,7 +92,7 @@ def criar_usuario(
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    _, tenant_id = user_and_tenant
+    actor, tenant_id = user_and_tenant
     email = payload.email.strip().lower()
     if len(payload.password) < 8:
         raise HTTPException(
@@ -136,6 +137,23 @@ def criar_usuario(
             is_active=True,
         )
         db.add(vinculo)
+        log_business_event(
+            db=db,
+            tenant_id=tenant_id,
+            user_id=actor.id,
+            event="access.user_created",
+            entity_type="users",
+            entity_id=user.id,
+            metadata=build_user_access_metadata(
+                actor=actor,
+                target_user=user,
+                tenant_id=tenant_id,
+                role=role,
+                extra={"is_active": True},
+            ),
+            details=f"Usuario {user.email} criado no tenant",
+            commit=False,
+        )
         db.commit()
         db.refresh(user)
     except IntegrityError as exc:
@@ -173,7 +191,7 @@ def vincular_usuario(
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    _, tenant_id = user_and_tenant
+    actor, tenant_id = user_and_tenant
 
     user = (
         db.query(User)
@@ -209,6 +227,23 @@ def vincular_usuario(
         is_active=True,
     )
     db.add(vinculo)
+    log_business_event(
+        db=db,
+        tenant_id=tenant_id,
+        user_id=actor.id,
+        event="access.user_linked",
+        entity_type="users",
+        entity_id=user.id,
+        metadata=build_user_access_metadata(
+            actor=actor,
+            target_user=user,
+            tenant_id=tenant_id,
+            role=role,
+            extra={"is_active": True},
+        ),
+        details=f"Usuario {user.email} vinculado ao tenant",
+        commit=False,
+    )
     db.commit()
 
     return {"status": "ok", "message": "Usuário vinculado com sucesso"}
@@ -222,7 +257,7 @@ def atualizar_status_usuario(
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    _, tenant_id = user_and_tenant
+    actor, tenant_id = user_and_tenant
 
     vinculo = (
         db.query(UserTenant)
@@ -235,6 +270,7 @@ def atualizar_status_usuario(
     if not vinculo:
         raise HTTPException(status_code=404, detail="Usuário não vinculado a este tenant")
 
+    previous_status = bool(vinculo.is_active)
     vinculo.is_active = payload.is_active
 
     user = db.query(User).filter(User.id == user_id).first()
@@ -253,6 +289,27 @@ def atualizar_status_usuario(
             )
             user.is_active = tem_algum_vinculo_ativo
 
+    log_business_event(
+        db=db,
+        tenant_id=tenant_id,
+        user_id=actor.id,
+        event="access.user_status_changed",
+        entity_type="users",
+        entity_id=user_id,
+        old_value={"is_active": previous_status},
+        metadata=build_user_access_metadata(
+            actor=actor,
+            target_user=user,
+            tenant_id=tenant_id,
+            role=None,
+            extra={
+                "previous_is_active": previous_status,
+                "new_is_active": bool(payload.is_active),
+            },
+        ),
+        details=f"Status de usuario #{user_id} alterado",
+        commit=False,
+    )
     db.commit()
 
     return {
@@ -269,7 +326,7 @@ def forcar_logout_usuario(
     db: Session = Depends(get_session),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
-    _, tenant_id = user_and_tenant
+    actor, tenant_id = user_and_tenant
 
     vinculo = (
         db.query(UserTenant)
@@ -287,6 +344,25 @@ def forcar_logout_usuario(
         user_id=user_id,
         reason="admin_forced_logout",
         tenant_id=tenant_id,
+    )
+
+    target_user = db.query(User).filter(User.id == user_id).first()
+    log_business_event(
+        db=db,
+        tenant_id=tenant_id,
+        user_id=actor.id,
+        event="access.user_forced_logout",
+        entity_type="users",
+        entity_id=user_id,
+        metadata=build_user_access_metadata(
+            actor=actor,
+            target_user=target_user,
+            tenant_id=tenant_id,
+            role=None,
+            extra={"sessions_revoked": revogadas},
+        ),
+        details=f"Logout forcado do usuario #{user_id}",
+        commit=True,
     )
 
     return {

@@ -135,3 +135,81 @@ def test_build_sale_coupon_redeemed_metadata_records_core_identifiers():
     assert metadata["discount_applied"] == pytest.approx(10.0)
     assert metadata["customer_id"] == 99
     assert metadata["sale_total"] == pytest.approx(90.0)
+
+
+def test_build_user_access_metadata_normalizes_actor_target_and_role():
+    actor = SimpleNamespace(id=1, email="admin@example.com")
+    target = SimpleNamespace(id=2, email="operador@example.com")
+    role = SimpleNamespace(id=3, name="Operador")
+
+    metadata = business_audit_service.build_user_access_metadata(
+        actor=actor,
+        target_user=target,
+        tenant_id=UUID("11111111-1111-1111-1111-111111111111"),
+        role=role,
+        extra={"is_active": True},
+    )
+
+    assert metadata == {
+        "actor_user_id": 1,
+        "actor_email": "admin@example.com",
+        "target_user_id": 2,
+        "target_email": "operador@example.com",
+        "tenant_id": "11111111-1111-1111-1111-111111111111",
+        "role_id": 3,
+        "role_name": "Operador",
+        "is_active": True,
+    }
+
+
+def test_build_module_activation_metadata_records_before_after_state():
+    tenant = SimpleNamespace(id=UUID("11111111-1111-1111-1111-111111111111"), plan="basico")
+
+    metadata = business_audit_service.build_module_activation_metadata(
+        tenant=tenant,
+        module="campanhas",
+        previous_modules=["entregas"],
+        current_modules=["campanhas", "entregas"],
+        subscription_created=True,
+    )
+
+    assert metadata == {
+        "tenant_id": "11111111-1111-1111-1111-111111111111",
+        "tenant_plan": "basico",
+        "module": "campanhas",
+        "previous_modules": ["entregas"],
+        "current_modules": ["campanhas", "entregas"],
+        "subscription_created": True,
+    }
+
+
+def test_build_plan_activation_metadata_records_previous_and_current_state():
+    activated_at = "2026-05-16T22:00:00+00:00"
+    tenant = SimpleNamespace(
+        id=UUID("11111111-1111-1111-1111-111111111111"),
+        plan="basico",
+        billing_status="active",
+        subscription_source="manual",
+        subscription_activated_at=SimpleNamespace(isoformat=lambda: activated_at),
+        trial_started_at=None,
+        trial_ends_at=None,
+    )
+    previous_state = {"plan": "trial", "billing_status": "trial"}
+
+    metadata = business_audit_service.build_plan_activation_metadata(
+        tenant=tenant,
+        previous_state=previous_state,
+    )
+
+    assert metadata == {
+        "tenant_id": "11111111-1111-1111-1111-111111111111",
+        "previous": previous_state,
+        "current": {
+            "plan": "basico",
+            "billing_status": "active",
+            "subscription_source": "manual",
+            "subscription_activated_at": activated_at,
+            "trial_started_at": None,
+            "trial_ends_at": None,
+        },
+    }

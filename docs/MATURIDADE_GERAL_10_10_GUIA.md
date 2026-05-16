@@ -20,7 +20,7 @@ Regra de uso:
 | Estrutura geral | 5/10 | 6,5/10 | 10/10 | Em andamento |
 | Seguranca operacional | 2,5/10 | 8/10 | 10/10 | Em andamento |
 | Testes/CI | 1/10 | 8,5/10 | 10/10 | Em andamento |
-| Observabilidade/auditoria | 2/10 | 6/10 | 10/10 | Em andamento prioritario |
+| Observabilidade/auditoria | 2/10 | 6,5/10 | 10/10 | Em andamento prioritario |
 | Portabilidade/configuracao | 3/10 | 6,5/10 | 10/10 | Em andamento |
 | Documentacao | 4/10 | 8/10 | 10/10 | Em andamento |
 
@@ -181,7 +181,7 @@ Proxima acao concreta:
 
 Nota inicial: 2/10.
 
-Nota atual: 6/10.
+Nota atual: 6,5/10.
 
 Referencia principal: `docs/roadmaps/FASE2_OBSERVABILIDADE.md` e secoes de Ops em `docs/EVOLUCAO_ENTERPRISE_UI_REFATORACAO.md`.
 
@@ -193,12 +193,15 @@ Ja feito:
 - [x] Incidentes e watchdog aparecem no material enterprise consolidado.
 - [x] Primeiro corte de `request_id`: header seguro `X-Request-ID`, UUID automatico para valor inseguro, propagacao para `trace_id` e log HTTP estruturado.
 - [x] Trilha inicial de auditoria de negocio para cupom consumido, desconto manual efetivado e reabertura de venda com reversao de cupom/carimbo.
+- [x] Auditoria de login/logout enriquecida com `request_id`.
+- [x] Auditoria de acesso para criacao, vinculo, ativacao/desativacao e logout forcado de usuarios.
+- [x] Auditoria de configuracao sensivel para ativacao manual de modulo e ativacao manual do Plano Basico.
 
 Falta para 10/10:
 
 - [ ] Estender `request_id`/`correlation_id` para jobs, workers e integracoes externas.
 - [ ] Garantir logs estruturados JSON nas rotas criticas com eventos de negocio, nao apenas log HTTP.
-- [ ] Estender trilha de auditoria para login, permissao, configuracao, deploy e alteracoes sensiveis fora de vendas.
+- [ ] Estender trilha de auditoria para deploy, integracoes externas e demais alteracoes sensiveis fora das rotas ja cobertas.
 - [ ] Criar painel ou relatorio de incidentes com filtros por tenant, rota, status e request_id.
 - [ ] Alertar falhas recorrentes, lentidao, 5xx e falha de jobs.
 - [ ] Estender eventos de negocio de campanhas/cupons/carimbos para reconciliacao e relatorio operacional.
@@ -207,7 +210,7 @@ Falta para 10/10:
 
 Proxima acao concreta:
 
-- [ ] Estender auditoria para login, permissoes, configuracoes sensiveis e deploy.
+- [ ] Criar smoke automatizado que confirme gravacao de eventos de auditoria com `request_id`.
 
 ## 7. Portabilidade/configuracao
 
@@ -298,6 +301,7 @@ Proxima acao concreta:
 | #68 | Documentacao/governanca | Plano mestre de maturidade geral criado |
 | #69 | Observabilidade/auditoria | `request_id` seguro e log HTTP estruturado |
 | #70 | Observabilidade/auditoria | Auditoria de negocio para cupom, desconto manual e reabertura |
+| #71 | Observabilidade/auditoria | Auditoria de acesso, login e configuracoes sensiveis |
 
 ## Criterio para declarar 10/10 geral
 

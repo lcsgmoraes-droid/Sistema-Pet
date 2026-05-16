@@ -11,6 +11,7 @@ from fastapi import Request
 from sqlalchemy.orm import Session
 
 from app.audit_log import log_action
+from app.middlewares.request_context import get_request_id
 from app.models import User
 from app.tenancy.context import clear_current_tenant, get_current_tenant, set_current_tenant
 
@@ -84,6 +85,8 @@ def _audit_auth_event(
         if temporary_tenant:
             set_current_tenant(user.tenant_id)
 
+        audit_details = {"request_id": get_request_id(), **(details or {})}
+
         log_action(
             db=db,
             user_id=user.id,
@@ -92,7 +95,7 @@ def _audit_auth_event(
             entity_id=user.id,
             ip_address=get_request_ip(request),
             user_agent=get_user_agent(request),
-            details=json.dumps(details or {}, ensure_ascii=False),
+            details=json.dumps(audit_details, ensure_ascii=False),
             tenant_id=getattr(user, "tenant_id", None),
             commit=False,
         )
