@@ -1,5 +1,6 @@
 import inspect
 import os
+import re
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -125,8 +126,11 @@ def test_premium_routers_remain_gated_in_main():
     }
 
     for router_name, modulo in required_gates.items():
-        assert router_name in main_source
-        assert f'dependencies=_module_dependencies("{modulo}")' in main_source
+        pattern = (
+            rf"app\.include_router\(\s*{router_name}\b"
+            rf"[^\n]*dependencies=_module_dependencies\(\"{modulo}\"\)"
+        )
+        assert re.search(pattern, main_source), f"{router_name} sem gate {modulo}"
 
 
 def test_rbac_admin_routes_require_user_management_permission():
