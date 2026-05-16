@@ -17,6 +17,8 @@ import { Link } from "react-router-dom";
 
 const whatsappUrl =
   "https://wa.me/5518997401641?text=Ol%C3%A1!%20Quero%20entender%20o%20Plano%20B%C3%A1sico%20do%20Pet%20Shop%20Pro.";
+const betaAccessUrl =
+  "https://wa.me/5518997401641?text=Ol%C3%A1!%20Quero%20testar%20um%20m%C3%B3dulo%20Beta%20do%20Pet%20Shop%20Pro.";
 
 const basicFeatures = [
   "Pessoas, clientes e pets",
@@ -41,25 +43,25 @@ const controlledModules = [
     title: "Financeiro ERP",
     icon: BarChart3,
     description: "Contas a pagar, receber, DRE, conciliação e projeções.",
-    status: "Adicional controlado",
+    status: "Piloto mediante liberação",
   },
   {
-    title: "Compras e integrações",
+    title: "Compras e automações",
     icon: Package,
-    description: "XML, Bling, fornecedores, marketplaces e automações.",
-    status: "Em validação",
+    description: "Entrada XML, fornecedores, compras e automações internas.",
+    status: "Beta mediante liberação",
   },
   {
     title: "Veterinário",
     icon: Stethoscope,
     description: "Agenda clínica, prontuário, exames e relatórios veterinários.",
-    status: "Módulo futuro",
+    status: "Beta futuro",
   },
   {
     title: "Banho e Tosa",
     icon: Sparkles,
     description: "Agenda, serviços, pacotes e operação de atendimento.",
-    status: "Módulo futuro",
+    status: "Beta futuro",
   },
 ];
 
@@ -92,14 +94,15 @@ export default function Planos() {
         <div>
           <span className="inline-flex items-center gap-2 rounded-md bg-emerald-100 px-3 py-1 text-sm font-bold text-emerald-800">
             <ShieldCheck className="h-4 w-4" />
-            Plano validado para venda controlada
+            Plano Básico grátis por 30 dias
           </span>
           <h1 className="mt-5 max-w-3xl text-4xl font-extrabold tracking-normal text-slate-950 md:text-5xl">
-            Comece pelo Básico e libere módulos avançados depois.
+            Teste o Básico completo e conheça os próximos módulos.
           </h1>
           <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
-            O Plano Básico concentra o que o pet shop precisa para operar: cadastro,
-            estoque, PDV, caixa, vendas, usuários e gestão essencial.
+            Novas empresas começam com 30 dias grátis do que está sendo vendido agora:
+            o Plano Básico completo. Módulos avançados aparecem como Beta ou piloto e
+            podem ser solicitados caso a caso.
           </p>
 
           <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -107,7 +110,7 @@ export default function Planos() {
               to="/register?plan=basico"
               className="inline-flex items-center justify-center gap-2 rounded-md bg-slate-950 px-5 py-3 font-bold text-white hover:bg-slate-800"
             >
-              Selecionar Plano Básico
+              Testar o Básico grátis
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
@@ -125,8 +128,8 @@ export default function Planos() {
               <p className="text-sm font-bold uppercase text-emerald-700">Plano Básico</p>
               <h2 className="mt-2 text-2xl font-extrabold text-slate-950">Operação essencial</h2>
               <p className="mt-2 text-sm leading-6 text-slate-500">
-                Contratação online nesta fase inicial. Pagamento e módulos adicionais podem ser
-                tratados com a equipe comercial.
+                Depois da experiência gratuita, este é o plano inicial de contratação para
+                operar o dia a dia com segurança.
               </p>
             </div>
             <div className="rounded-md bg-emerald-50 p-3 text-emerald-700">
@@ -184,15 +187,15 @@ export default function Planos() {
         <div className="mx-auto max-w-6xl px-4 py-12 text-white">
           <div className="flex flex-col justify-between gap-3 md:flex-row md:items-end">
             <div>
-              <h2 className="text-2xl font-extrabold">Módulos fora do Básico</h2>
+              <h2 className="text-2xl font-extrabold">Recursos em validação</h2>
               <p className="mt-2 max-w-2xl text-slate-300">
-                Eles continuam bloqueados por plano para proteger o cliente de fluxos ainda em
-                validação ou que precisam de contratação específica.
+                Eles mostram o caminho do produto, mas não entram automaticamente no trial padrão.
+                O cliente pode solicitar acesso Beta para um piloto acompanhado.
               </p>
             </div>
             <span className="inline-flex w-fit items-center gap-2 rounded-md bg-amber-300/15 px-3 py-2 text-sm font-bold text-amber-200">
               <Lock className="h-4 w-4" />
-              Liberação controlada
+              Piloto acompanhado
             </span>
           </div>
 
@@ -205,6 +208,14 @@ export default function Planos() {
                 <h3 className="mt-4 font-bold text-white">{title}</h3>
                 <p className="mt-2 text-sm leading-6 text-slate-300">{description}</p>
                 <p className="mt-4 text-xs font-bold uppercase text-slate-400">{status}</p>
+                <a
+                  href={betaAccessUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="mt-4 inline-flex rounded-md border border-white/15 px-3 py-2 text-xs font-bold text-slate-100 transition hover:bg-white/10"
+                >
+                  Solicitar acesso Beta
+                </a>
               </article>
             ))}
           </div>

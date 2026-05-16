@@ -16,11 +16,20 @@ Uso pratico:
 - Usar o checklist como fonte unica para decidir a proxima fatia de padronizacao/refatoracao.
 - Manter as auditorias antigas como historico consolidado dentro deste mesmo arquivo, sem criar documentos paralelos.
 
-### 0.1. Escopo comercial do Plano Basico
+### 0.1. Escopo comercial, trial e Beta
 
 Promessa comercial:
 
 > Gestao para pet shop com cadastro de clientes e pets, produtos, estoque, PDV/vendas e visao gerencial basica de vendas.
+
+Estrategia atual:
+
+- Novos clientes iniciam com 30 dias gratis do Plano Basico completo.
+- O plano comercial de contratacao inicial continua sendo o Plano Basico.
+- Recursos ainda nao 100% validados podem aparecer como vitrine, roadmap ou `Beta`, mas nao sao liberados automaticamente no trial padrao.
+- Acesso Beta deve ser liberado caso a caso, como piloto acompanhado.
+- Bling, webhooks e rotinas especificas do tenant `admin@mlprohub.com.br` ficam 100% fora da oferta inicial para novos tenants.
+- Nao confundir `plano contratado` com `acesso temporario de avaliacao`: no cadastro publico, o tenant nasce no Basico e o trial gratis cobre esse mesmo escopo.
 
 Inclui nesta fase:
 
@@ -36,13 +45,13 @@ Inclui nesta fase:
 - Configuracoes essenciais da empresa.
 - Usuarios, permissoes basicas e LGPD operacional.
 
-Nao vender ainda como parte do Plano Basico:
+Nao vender ainda como parte contratada do Plano Basico:
 
 - Financeiro ERP completo, DRE operacional, contas a pagar/receber e conciliacoes.
 - Compras, entrada XML, pedidos de compra e sugestao inteligente de compras.
 - Veterinario completo.
 - Banho & Tosa completo.
-- Campanhas, WhatsApp, IA avancada, e-commerce, app mobile, entregas, Bling/marketplaces e fiscal/NF.
+- Campanhas, WhatsApp, IA avancada, e-commerce, app mobile, entregas, marketplaces e fiscal/NF.
 
 ### 0.2. Criterios de pronto por tela
 
@@ -79,7 +88,7 @@ Status usados:
 | Cadastros essenciais | Pronto local | Formas de pagamento, operadoras, opcoes de racao e catalogos de produto passaram em A/B real; departamentos, categorias e marcas passaram tambem por smoke visual CRUD no navegador. |
 | Configuracoes/usuarios/LGPD | Pronto local + smoke visual | Usuarios/admin passou por smoke visual; Roles & Permissoes passou por criar, duplicar, editar e excluir perfil; LGPD passou busca de titular e dossie com schema local alinhado; configuracao fiscal, parametros gerais e estoque salvaram no navegador com chamadas 200. |
 | Premium bloqueado | Quase pronto | Smoke de chamadas premium indiretas passou; URLs diretas de contas a receber, SEFAZ/compras e financeiro ERP foram fechadas na PR #39; ainda falta varrer restante de menus/URLs diretas premium. |
-| Landing page/contratacao | Pronto local + smoke visual | Landing remodelada para conduzir Plano Basico -> `/register?plan=basico`; `/planos` detalha escopo do Basico e modulos futuros bloqueados; cadastro deixa o plano selecionado explicito. |
+| Landing page/contratacao | Em ajuste | Landing comunica 30 dias gratis do Plano Basico completo, Plano Basico como contratacao inicial e recursos avancados como Beta/piloto mediante solicitacao. |
 
 ### 0.4. Cronograma final para vender o Plano Basico
 
@@ -89,9 +98,18 @@ Status usados:
 | 2. Fluxos essenciais do basico | Clientes, pets, produtos, estoque, PDV/vendas, historico financeiro de vendas e cadastros auxiliares. | Em andamento; PDV A/B, caixa, sangria/suprimento, pagamentos/operadoras, opcoes de racao, catalogos de produto, lote/validade, usuarios/admin, configuracao da empresa, Roles e LGPD com smoke visual concluido | Nao para venda controlada; retestar staging/producao antes de escalar. |
 | 3. Usuarios e permissoes | Criar usuario do tenant, validar permissoes basicas e bloqueio de acesso indevido. | Concluido local: Usuarios/Admin, Roles & Permissoes e LGPD operacional passaram por API/smoke visual. | Nao bloqueia venda controlada; manter reteste em staging/producao. |
 | 4. Calculadora/catalogos de racao | Validar fluxo visual, persistencia e mensagens de erro sem 500. | Concluido local: API A/B e smoke visual passaram com operador nao-admin. | Nao bloqueia venda controlada; retestar em staging/producao. |
-| 5. Landing page e selecao de planos | Exibir planos, destacar Basico, iniciar contratacao com plano escolhido e levar ao cadastro/onboarding correto. | Concluido local + smoke visual desktop/mobile | Sim para vender por autoatendimento; falta smoke visual em producao/staging. |
+| 5. Landing page, trial e selecao de planos | Exibir 30 dias gratis do Basico completo, destacar Basico como contratacao inicial, mostrar Beta como piloto acompanhado e levar ao cadastro/onboarding correto. | Copy em ajuste; falta smoke visual final | Sim para vender por autoatendimento; falta smoke visual em producao/staging. |
 | 6. A/B visual no navegador | Usar dois tenants reais no browser e conferir que menus, dados e mensagens batem com o plano. | Em andamento; PDV completo, autocomplete, Lembretes, pagamentos/operadoras, catalogos de produto, lote/validade, configuracao da empresa, usuarios/admin, Roles e LGPD passaram | Sim antes de abrir para varias empresas. |
 | 7. Produção controlada | Merge, deploy, migrations, health check e smoke real sem dados sensiveis. | Pendente | Sim. |
+
+### 0.5. Desenho recomendado para trial e Beta
+
+- Manter `Tenant.plan = basico` para nao confundir cobranca, contrato e gates permanentes.
+- Trial publico padrao: Basico completo por 30 dias, sem liberar todos os modulos automaticamente.
+- Modulos avancados aparecem no produto/landing como `Beta`, `Piloto` ou `Em validacao`.
+- Acesso Beta deve depender de flag/assinatura explicita por tenant, com acompanhamento manual.
+- Bling/webhooks nao entram nem como Beta publico neste momento.
+- Evitar regra por e-mail hardcoded sempre que possivel; preferir flag de tenant ou `AssinaturaModulo` para qualquer excecao futura.
 
 ## 1. Branch e commits
 
@@ -140,7 +158,7 @@ Status usados:
 | Area | Tela/Fluxo | Frontend | Endpoint | Testado | Resultado | Correcao | Status |
 |---|---|---|---|---|---|---|---|
 | Comercial | Registro com plano basico | `/register?plan=basico` | `POST /auth/register` | Sim | Conta/tenant criados em dois tenants A/B por API real. Erros locais de schema foram corrigidos por migrations. | Adicionadas migrations para gaps de onboarding local e tabelas auxiliares de racao. | OK |
-| Comercial | Landing page com selecao de planos | `/landing` e `/planos` | Plano escolhido alimenta cadastro/contratacao | Sim + smoke visual | Landing conduz o cliente para o Plano Basico, `/planos` separa Basico dos modulos futuros e o cadastro recebe `plan=basico`. API bloqueia plano invalido e grava tenant com `plan=basico`. | `LandingPage`, `Planos` e `Register` atualizados para fluxo comercial do Basico; formulario ganhou `id/name` para campos e console limpo no Chrome local. | OK local + smoke visual |
+| Comercial | Landing page com trial e selecao de planos | `/landing` e `/planos` | Plano escolhido alimenta cadastro/contratacao | Sim + smoke visual anterior; precisa reteste apos copy | Landing agora deve comunicar 30 dias gratis do Basico completo, Plano Basico como contratacao inicial e recursos avancados como Beta/piloto mediante solicitacao. API continua gravando tenant com `plan=basico`. | `LandingPage`, `Planos` e `Register` atualizados para a comunicacao do trial Basico; Betas ficam sem liberacao automatica. | Em ajuste |
 | Autenticacao | Login do novo usuario | `/login` | `POST /auth/login` | Sim | Login do usuario de teste funcionou e redirecionou para area autenticada. | Adicionado `autoComplete` correto para reduzir warnings do navegador. | OK |
 | Dashboard | Dashboard inicial do plano basico | `/dashboard` | Chamava endpoints premium de financeiro/IA e Bling | Sim | A tela abria, mas o console recebia 403 de endpoints premium bloqueados. | `AlertasIA`, `ProjecoesIA` e badge do layout agora evitam chamadas premium quando modulo nao esta ativo. | Corrigido |
 | Pessoas | Listar clientes | `/clientes` | `GET /clientes` | Sim | Auditoria A/B confirmou que cliente do tenant A aparece no A e nao aparece no B, e vice-versa. | Nenhuma nesta branch. | OK |
