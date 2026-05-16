@@ -50,30 +50,47 @@ class ChatIAService:
         self.db.refresh(conversa)
         return conversa
     
-    def listar_conversas(self, usuario_id: int, limit: int = 20) -> List[Conversa]:
+    def listar_conversas(self, usuario_id: int, tenant_id: Optional[str], limit: int = 20) -> List[Conversa]:
         """Lista conversas do usuário"""
+        tenant_id_resolvido = self._resolver_tenant_id(usuario_id, tenant_id)
+        if not tenant_id_resolvido:
+            return []
+
         return (
             self.db.query(Conversa)
-            .filter(Conversa.usuario_id == usuario_id)
+            .filter(
+                Conversa.usuario_id == usuario_id,
+                Conversa.tenant_id == tenant_id_resolvido,
+            )
             .order_by(Conversa.atualizado_em.desc())
             .limit(limit)
             .all()
         )
     
-    def obter_conversa(self, conversa_id: int, usuario_id: int) -> Optional[Conversa]:
+    def obter_conversa(
+        self,
+        conversa_id: int,
+        usuario_id: int,
+        tenant_id: Optional[str] = None,
+    ) -> Optional[Conversa]:
         """Obtém conversa específica"""
+        tenant_id_resolvido = self._resolver_tenant_id(usuario_id, tenant_id)
+        if not tenant_id_resolvido:
+            return None
+
         return (
             self.db.query(Conversa)
             .filter(
                 Conversa.id == conversa_id,
-                Conversa.usuario_id == usuario_id
+                Conversa.usuario_id == usuario_id,
+                Conversa.tenant_id == tenant_id_resolvido,
             )
             .first()
         )
     
-    def deletar_conversa(self, conversa_id: int, usuario_id: int) -> bool:
+    def deletar_conversa(self, conversa_id: int, usuario_id: int, tenant_id: Optional[str]) -> bool:
         """Deleta conversa"""
-        conversa = self.obter_conversa(conversa_id, usuario_id)
+        conversa = self.obter_conversa(conversa_id, usuario_id, tenant_id)
         if not conversa:
             return False
         
@@ -94,7 +111,12 @@ class ChatIAService:
         tenant_id: Optional[str] = None,
     ) -> MensagemChat:
         """Adiciona mensagem à conversa"""
-        conversa = self.db.query(Conversa).filter(Conversa.id == conversa_id).first()
+        conversa_query = self.db.query(Conversa).filter(Conversa.id == conversa_id)
+        if tenant_id:
+            conversa_query = conversa_query.filter(Conversa.tenant_id == str(tenant_id))
+        conversa = conversa_query.first()
+        if tenant_id and not conversa:
+            raise ValueError("Conversa nao encontrada")
 
         # MensagemChat exige tenant_id não nulo: prioriza tenant recebido e
         # usa o tenant da conversa como fallback para manter consistência.
@@ -128,15 +150,18 @@ class ChatIAService:
         self.db.refresh(mensagem)
         return mensagem
     
-    def obter_historico(self, conversa_id: int, limit: int = 50) -> List[MensagemChat]:
+    def obter_historico(
+        self,
+        conversa_id: int,
+        tenant_id: Optional[str],
+        limit: int = 50,
+    ) -> List[MensagemChat]:
         """Obtém histórico de mensagens"""
-        return (
-            self.db.query(MensagemChat)
-            .filter(MensagemChat.conversa_id == conversa_id)
-            .order_by(MensagemChat.criado_em.asc())
-            .limit(limit)
-            .all()
-        )
+        query = self.db.query(MensagemChat).filter(MensagemChat.conversa_id == conversa_id)
+        if tenant_id:
+            query = query.filter(MensagemChat.tenant_id == str(tenant_id))
+
+        return query.order_by(MensagemChat.criado_em.asc()).limit(limit).all()
 
     def _resolver_tenant_id(self, usuario_id: int, tenant_id: Optional[str]) -> Optional[str]:
         """Resolve tenant_id para consultas seguras de dados."""
@@ -664,6 +689,10 @@ class ChatIAService:
         """Gera resposta da IA baseada na mensagem do usuário"""
         
         # 1. Adicionar mensagem do usuário
+        conversa = self.obter_conversa(conversa_id, usuario_id, tenant_id)
+        if not conversa:
+            raise ValueError("Conversa nao encontrada")
+
         msg_usuario = self.adicionar_mensagem(
             conversa_id=conversa_id,
             tipo="usuario",
@@ -940,10 +969,15 @@ def criar_conversa_service(db: Session, usuario_id: int, tenant_id: Optional[str
     return service.criar_conversa(usuario_id, tenant_id=tenant_id)
 
 
-def listar_conversas_service(db: Session, usuario_id: int, limit: int = 20) -> List[Conversa]:
+def listar_conversas_service(
+    db: Session,
+    usuario_id: int,
+    tenant_id: Optional[str],
+    limit: int = 20,
+) -> List[Conversa]:
     """Helper para listar conversas"""
     service = ChatIAService(db)
-    return service.listar_conversas(usuario_id, limit)
+    return service.listar_conversas(usuario_id, tenant_id, limit)
 
 
 def enviar_mensagem_service(
@@ -958,7 +992,12 @@ def enviar_mensagem_service(
     return service.gerar_resposta_ia(usuario_id, conversa_id, mensagem, tenant_id=tenant_id)
 
 
-def deletar_conversa_service(db: Session, conversa_id: int, usuario_id: int) -> bool:
+def deletar_conversa_service(
+    db: Session,
+    conversa_id: int,
+    usuario_id: int,
+    tenant_id: Optional[str],
+) -> bool:
     """Helper para deletar conversa"""
     service = ChatIAService(db)
-    return service.deletar_conversa(conversa_id, usuario_id)
+    return service.deletar_conversa(conversa_id, usuario_id, tenant_id)

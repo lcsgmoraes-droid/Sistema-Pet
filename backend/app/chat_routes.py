@@ -92,10 +92,10 @@ async def listar_conversas(
     db: Session = Depends(get_db)
 ):
     """Lista conversas do usuário"""
-    current_user, _tenant_id = user_and_tenant
+    current_user, tenant_id = user_and_tenant
     usuario_id = current_user.id
     
-    conversas = listar_conversas_service(db, usuario_id, limit)
+    conversas = listar_conversas_service(db, usuario_id, tenant_id, limit)
     
     return [
         ConversaResponse(
@@ -117,19 +117,19 @@ async def obter_mensagens(
     db: Session = Depends(get_db)
 ):
     """Obtém mensagens de uma conversa"""
-    current_user, _tenant_id = user_and_tenant
+    current_user, tenant_id = user_and_tenant
     usuario_id = current_user.id
     service = ChatIAService(db)
     
     # Verificar se conversa pertence ao usuário
-    conversa = service.obter_conversa(conversa_id, usuario_id)
+    conversa = service.obter_conversa(conversa_id, usuario_id, tenant_id)
     if not conversa:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Conversa não encontrada"
         )
     
-    mensagens = service.obter_historico(conversa_id)
+    mensagens = service.obter_historico(conversa_id, tenant_id)
     
     return [
         MensagemResponse(
@@ -155,7 +155,7 @@ async def enviar_mensagem(
     
     # Verificar se conversa existe e pertence ao usuário
     service = ChatIAService(db)
-    conversa = service.obter_conversa(request.conversa_id, usuario_id)
+    conversa = service.obter_conversa(request.conversa_id, usuario_id, tenant_id)
     if not conversa:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -255,10 +255,10 @@ async def deletar_conversa(
     db: Session = Depends(get_db)
 ):
     """Deleta uma conversa"""
-    current_user, _tenant_id = user_and_tenant
+    current_user, tenant_id = user_and_tenant
     usuario_id = current_user.id
     
-    sucesso = deletar_conversa_service(db, conversa_id, usuario_id)
+    sucesso = deletar_conversa_service(db, conversa_id, usuario_id, tenant_id)
     if not sucesso:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

@@ -375,6 +375,20 @@ def test_lembretes_use_selected_tenant_context():
     assert "Lembrete.user_id == current_user.id" not in lembretes_source
 
 
+def test_chat_ia_conversation_history_uses_selected_tenant_context():
+    chat_routes_source = _source("backend/app/chat_routes.py")
+    chat_service_source = _source("backend/app/ia/aba6_chat_ia.py")
+
+    assert "listar_conversas_service(db, usuario_id, tenant_id, limit)" in chat_routes_source
+    assert "service.obter_conversa(conversa_id, usuario_id, tenant_id)" in chat_routes_source
+    assert "service.obter_historico(conversa_id, tenant_id)" in chat_routes_source
+    assert "deletar_conversa_service(db, conversa_id, usuario_id, tenant_id)" in chat_routes_source
+
+    assert "def listar_conversas(self, usuario_id: int, tenant_id: Optional[str]" in chat_service_source
+    assert "Conversa.tenant_id == tenant_id_resolvido" in chat_service_source
+    assert "MensagemChat.tenant_id == str(tenant_id)" in chat_service_source
+
+
 def test_product_catalog_auxiliary_pages_are_basic_catalog_not_premium_modules():
     app_source = _source("frontend/src/App.jsx")
     layout_source = _source("frontend/src/components/Layout.jsx")
