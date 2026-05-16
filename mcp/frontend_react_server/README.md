@@ -1,65 +1,74 @@
 # MCP Frontend React - Sistema Pet
 
-Servidor MCP para automação do frontend React (Vite) do Sistema Pet.
+Servidor MCP para automacao do frontend React/Vite do Sistema Pet.
 
 ## Objetivo
 
 Entregar ferramentas para:
 
 - validar status do frontend
-- executar build de produção e build de desenvolvimento
-- realizar smoke de inicialização `npm run dev`
-- validar disponibilidade HTTP da aplicação
-- validar resposta da rota de login multitenant da API (do ponto de vista do front)
+- executar build de producao e build de desenvolvimento
+- realizar smoke de inicializacao `npm run dev`
+- validar disponibilidade HTTP da aplicacao
+- validar resposta da rota de login multitenant da API local
 
 ## Arquitetura
 
 - `frontend_react_mcp/server.py`: ferramentas MCP
-- `frontend_react_mcp/services/frontend_service.py`: execução segura de scripts npm
-- `frontend_react_mcp/services/http_service.py`: validações HTTP (front e API)
-- `frontend_react_mcp/config.py`: paths, timeout e limites
+- `frontend_react_mcp/services/frontend_service.py`: execucao segura de scripts npm
+- `frontend_react_mcp/services/http_service.py`: validacoes HTTP locais
+- `frontend_react_mcp/security.py`: allowlist de hosts, redaction e limites
+- `frontend_react_mcp/config.py`: paths, URLs, hosts permitidos, timeouts e limites
 - `frontend_react_mcp/models.py`: respostas padronizadas
 
-## Instalação (ambiente isolado recomendado)
+## Ferramentas MCP disponiveis
 
-```bash
+| Ferramenta | Tipo | Observacao |
+|---|---|---|
+| `front_status` | leitura | confere frontend, `package.json`, Node e npm |
+| `front_build_check` | validacao | roda `npm run build` |
+| `front_build_dev_check` | validacao | roda `npm run build:dev` |
+| `front_dev_smoke` | validacao | roda `npm run dev` com host permitido |
+| `front_http_check` | leitura HTTP | default `http://localhost:5173` |
+| `front_api_auth_smoke` | leitura HTTP | default `http://localhost:8000/auth/login-multitenant` |
+
+## Seguranca local
+
+- URLs HTTP passam por allowlist de hosts.
+- Por padrao, somente `localhost`, `127.0.0.1` e `::1` sao aceitos.
+- `front_dev_smoke` aceita apenas hosts de desenvolvimento permitidos.
+- Saidas de comando passam por redaction de tokens/senhas comuns.
+
+## Variaveis principais
+
+- `SISTEMA_PET_FRONT_MCP_FRONT_URL`
+- `SISTEMA_PET_FRONT_MCP_AUTH_URL`
+- `SISTEMA_PET_FRONT_MCP_ALLOWED_HTTP_HOSTS`
+- `SISTEMA_PET_FRONT_MCP_ALLOWED_DEV_HOSTS`
+- `SISTEMA_PET_FRONT_MCP_AUDIT_LOG`
+- `SISTEMA_PET_FRONT_MCP_TIMEOUT_SECONDS`
+- `SISTEMA_PET_FRONT_MCP_MAX_TIMEOUT_SECONDS`
+- `SISTEMA_PET_FRONT_MCP_MAX_OUTPUT_CHARS`
+
+Por padrao, a auditoria local fica no diretorio temporario do Windows, em `sistema_pet_mcp_frontend_audit.jsonl`.
+
+## Instalacao
+
+```powershell
 cd mcp/frontend_react_server
 python -m venv .venv
-.venv\Scripts\activate
-pip install -e .
+.\.venv\Scripts\python.exe -m pip install -e .
 ```
 
-## Execução
+Para rodar testes:
 
-```bash
-frontend-react-mcp
+```powershell
+.\.venv\Scripts\python.exe -m pip install -e .[dev]
+.\.venv\Scripts\python.exe -m pytest
 ```
 
-ou
+Ou, pela raiz do projeto:
 
-```bash
-python -m frontend_react_mcp.main
-```
-
-## Ferramentas MCP disponíveis
-
-- `front_status`
-- `front_build_check`
-- `front_build_dev_check`
-- `front_dev_smoke`
-- `front_http_check`
-- `front_api_auth_smoke`
-
-## Exemplo de configuração MCP no VS Code
-
-```json
-{
-  "mcpServers": {
-    "sistema-pet-frontend-react": {
-      "command": "python",
-      "args": ["-m", "frontend_react_mcp.main"],
-      "cwd": "c:/Users/Lucas/OneDrive/Área de Trabalho/Programa/Sistema Pet/mcp/frontend_react_server"
-    }
-  }
-}
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\test_mcp.ps1 -InstallDevDependencies
 ```

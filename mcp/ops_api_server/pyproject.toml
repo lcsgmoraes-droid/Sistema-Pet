@@ -13,6 +13,11 @@ dependencies = [
   "requests>=2.32.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+]
+
 [project.scripts]
 ops-api-mcp = "ops_api_mcp.main:main"
 

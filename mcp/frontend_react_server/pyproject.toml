@@ -13,6 +13,11 @@ dependencies = [
   "requests>=2.32.0",
 ]
 
+[project.optional-dependencies]
+dev = [
+  "pytest>=8.0.0",
+]
+
 [project.scripts]
 frontend-react-mcp = "frontend_react_mcp.main:main"
 
