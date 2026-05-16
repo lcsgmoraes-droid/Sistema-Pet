@@ -293,6 +293,25 @@ def test_protected_route_enforces_any_of_permissions():
     assert "permission || requiredPermissions || anyOfPermissions" in protected_route_source
 
 
+def test_basic_finance_sales_menu_matches_direct_route_permissions():
+    layout_source = _source("frontend/src/components/Layout.jsx")
+    app_source = _source("frontend/src/App.jsx")
+
+    assert "const itemLiberadoPorPermissao = (item) => {" in layout_source
+    assert "if (item.anyOfPermissions) return hasAnyPermission(item.anyOfPermissions);" in layout_source
+
+    finance_menu_start = layout_source.index('path: "/financeiro"')
+    finance_sales_start = layout_source.index('path: "/financeiro/vendas"', finance_menu_start)
+    finance_sales_end = layout_source.index('path: "/financeiro/fluxo-caixa"', finance_sales_start)
+    finance_sales_menu = layout_source[finance_sales_start:finance_sales_end]
+
+    for permission in ["relatorios.financeiro", "financeiro.vendas", "clientes.visualizar", "vendas.criar"]:
+        assert f'"{permission}"' in finance_sales_menu
+
+    assert '"clientes.visualizar"' in app_source
+    assert '"relatorios.financeiro"' in app_source
+
+
 def test_rh_simulation_page_is_module_gated_on_direct_url():
     app_source = _source("frontend/src/App.jsx")
 

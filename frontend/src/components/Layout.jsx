@@ -104,6 +104,11 @@ const Layout = () => {
     return hasAccess;
   };
 
+  const hasAnyPermission = (permissions = []) => {
+    if (!Array.isArray(permissions) || permissions.length === 0) return false;
+    return permissions.some((permission) => hasPermission(permission));
+  };
+
   // Estado da sidebar com persistência e fechada por padrão no PDV
   const [sidebarOpen, setSidebarOpen] = useState(() => {
     // Em mobile, sempre começa fechada
@@ -668,6 +673,12 @@ const Layout = () => {
       icon: FiTrendingUp,
       label: "Financeiro",
       permission: "relatorios.financeiro",
+      anyOfPermissions: [
+        "relatorios.financeiro",
+        "financeiro.vendas",
+        "clientes.visualizar",
+        "vendas.criar",
+      ],
       submenu: [
         {
           path: "/financeiro",
@@ -679,6 +690,12 @@ const Layout = () => {
           path: "/financeiro/vendas",
           label: "Vendas",
           permission: "financeiro.vendas",
+          anyOfPermissions: [
+            "relatorios.financeiro",
+            "financeiro.vendas",
+            "clientes.visualizar",
+            "vendas.criar",
+          ],
         },
         {
           path: "/financeiro/fluxo-caixa",
@@ -946,6 +963,11 @@ const Layout = () => {
   ];
 
   const itemLiberadoPorModulo = (item) => !item.modulo || moduloAtivo(item.modulo);
+  const itemLiberadoPorPermissao = (item) => {
+    if (item.anyOfPermissions) return hasAnyPermission(item.anyOfPermissions);
+    if (!item.permission) return true;
+    return hasPermission(item.permission);
+  };
 
   // Filtrar menus baseado nas permissões do usuário e no plano do tenant
   const menuItems = allMenuItems.filter((item) => {
@@ -960,7 +982,7 @@ const Layout = () => {
         // Se subitem não tem permissão, é sempre visível
         if (!subitem.permission) return true;
         // Verifica se usuário tem a permissão
-        return hasPermission(subitem.permission);
+        return itemLiberadoPorPermissao(subitem);
       });
       // Se o submenu ficou vazio após filtrar, não mostra o menu principal
       if (submenuFiltrado.length === 0) return false;
@@ -974,7 +996,7 @@ const Layout = () => {
     }
 
     // Verifica se usuário tem a permissão do menu principal
-    return hasPermission(item.permission);
+    return itemLiberadoPorPermissao(item);
   });
 
   useEffect(() => {
