@@ -10,7 +10,6 @@ from typing import List, Optional
 from datetime import datetime, date, timedelta
 from pydantic import BaseModel
 from decimal import Decimal
-import re
 
 from .db import get_session
 from .auth import get_current_user
@@ -26,6 +25,10 @@ from .produtos_models import NotaEntrada
 from .domain.validators.dre_validator import validar_categoria_financeira_dre
 from .domain.dre.lancamento_dre_sync import atualizar_dre_por_lancamento
 from .dre_plano_contas_models import DRESubcategoria
+from .financeiro.contas_pagar_origem import (
+    CAIXA_PDV_OBSERVACAO_MARKER,
+    _identificar_origem_conta_pagar,
+)
 from app.services.reconciliacao_simples_service import reconciliar_das_simples
 from app.services.reconciliacao_provisao_service import reconciliar_provisao
 
@@ -131,40 +134,6 @@ class ContaPagarResponse(BaseModel):
     caixa_referencia: Optional[str] = None
     
     model_config = {"from_attributes": True}
-
-
-CAIXA_PDV_OBSERVACAO_MARKER = "Gerada automaticamente pelo PDV"
-
-
-def _extrair_caixa_referencia(observacoes: Optional[str]) -> Optional[str]:
-    match = re.search(r"Caixa\s+#?([0-9]+)", observacoes or "", re.IGNORECASE)
-    if not match:
-        return None
-    return f"Caixa #{match.group(1)}"
-
-
-def _identificar_origem_conta_pagar(conta: ContaPagar) -> dict:
-    observacoes = conta.observacoes or ""
-    if CAIXA_PDV_OBSERVACAO_MARKER.lower() in observacoes.lower():
-        caixa_ref = _extrair_caixa_referencia(observacoes)
-        return {
-            "origem_lancamento": "caixa_pdv",
-            "origem_lancamento_label": "Caixa/PDV",
-            "caixa_referencia": caixa_ref,
-        }
-
-    if conta.nota_entrada_id:
-        return {
-            "origem_lancamento": "nota_entrada",
-            "origem_lancamento_label": "Nota de entrada",
-            "caixa_referencia": None,
-        }
-
-    return {
-        "origem_lancamento": "manual",
-        "origem_lancamento_label": "Manual/financeiro",
-        "caixa_referencia": None,
-    }
 
 
 def _obter_tipo_produto_revenda_id(db: Session, tenant_id) -> Optional[int]:
