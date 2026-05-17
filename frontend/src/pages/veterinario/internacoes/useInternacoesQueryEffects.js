@@ -2,6 +2,7 @@ import { useEffect } from "react";
 
 export function useInternacoesQueryEffects({
   abrirNovaQuery,
+  motivoQuery,
   novoPetIdQuery,
   setFormNova,
   setModalNova,
@@ -12,6 +13,14 @@ export function useInternacoesQueryEffects({
   useEffect(() => {
     if (abrirNovaQuery) setModalNova(true);
   }, [abrirNovaQuery, setModalNova]);
+
+  useEffect(() => {
+    if (!abrirNovaQuery || !motivoQuery) return;
+    setFormNova((prev) => ({
+      ...prev,
+      motivo: prev.motivo || motivoQuery,
+    }));
+  }, [abrirNovaQuery, motivoQuery, setFormNova]);
 
   useEffect(() => {
     if (!tutorIdQuery) return;

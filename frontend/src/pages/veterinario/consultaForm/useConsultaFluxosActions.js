@@ -6,6 +6,10 @@ import {
   criarNovoExameFormInicial,
 } from "./consultaFormState";
 import { parseNumero } from "./consultaFormUtils";
+import {
+  buildAgendarRetornoConsultaLink,
+  buildInternacaoConsultaLink,
+} from "./consultaFluxoLinks";
 
 export default function useConsultaFluxosActions({
   agendamentoIdQuery,
@@ -52,6 +56,44 @@ export default function useConsultaFluxosActions({
       params.set(chave, String(valor));
     });
     navigate(`${pathname}?${params.toString()}`);
+  }
+
+  function agendarRetornoConsulta() {
+    if (!consultaIdAtual) {
+      setErro("Salve a consulta em rascunho antes de agendar o retorno.");
+      return;
+    }
+
+    const link = buildAgendarRetornoConsultaLink({
+      contextoConsultaParams,
+      form,
+      consultaIdAtual,
+    });
+    if (!link) {
+      setErro("Salve a consulta com um pet valido antes de agendar o retorno.");
+      return;
+    }
+
+    navigate(link);
+  }
+
+  function abrirInternacaoConsulta() {
+    if (!consultaIdAtual) {
+      setErro("Salve a consulta em rascunho antes de abrir a internacao.");
+      return;
+    }
+
+    const link = buildInternacaoConsultaLink({
+      contextoConsultaParams,
+      form,
+      consultaIdAtual,
+    });
+    if (!link) {
+      setErro("Salve a consulta com um pet valido antes de abrir a internacao.");
+      return;
+    }
+
+    navigate(link);
   }
 
   async function salvarNovoExameRapido() {
@@ -141,6 +183,8 @@ export default function useConsultaFluxosActions({
   }
 
   return {
+    agendarRetornoConsulta,
+    abrirInternacaoConsulta,
     abrirFluxoConsulta,
     abrirModalInsumoRapido,
     salvarInsumoRapidoConsulta,
