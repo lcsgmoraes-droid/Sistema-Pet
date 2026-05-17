@@ -17,7 +17,7 @@ Regra de uso:
 |---|---:|---:|---:|---|
 | MCP Frontend | 5,5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | MCP Ops/API | 3,5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
-| Estrutura geral | 5/10 | 8,8/10 | 10/10 | Em andamento |
+| Estrutura geral | 5/10 | 9/10 | 10/10 | Em andamento |
 | Seguranca operacional | 2,5/10 | 8,5/10 | 10/10 | Em andamento |
 | Testes/CI | 1/10 | 8,5/10 | 10/10 | Em andamento |
 | Observabilidade/auditoria | 2/10 | 9,9/10 | 10/10 | Em andamento prioritario |
@@ -90,7 +90,7 @@ Para manter 10/10:
 
 Nota inicial: 5/10.
 
-Nota atual: 8,8/10.
+Nota atual: 9/10.
 
 Referencia principal: `docs/EVOLUCAO_ENTERPRISE_UI_REFATORACAO.md`.
 
@@ -105,6 +105,7 @@ Ja feito:
 - [x] Definition of Done de refatoracao modular criada em `docs/auditorias/estrutura-geral-definition-of-done.md`.
 - [x] Primeira fatia piloto de Produtos extrai helpers de busca para `backend/app/produtos/search.py` sem mudar endpoints.
 - [x] Segunda fatia piloto de Produtos extrai helpers de validade/listagem para `backend/app/produtos/validade.py` sem mudar endpoints.
+- [x] Terceira fatia piloto de Produtos extrai helpers de racao/classificacao para `backend/app/produtos/racao.py` sem mudar endpoints.
 
 Falta para 10/10:
 
@@ -118,7 +119,7 @@ Falta para 10/10:
 
 Proxima acao concreta:
 
-- [ ] Aplicar o padrao em Produtos/Estoque ou iniciar extracao controlada de filtros/listagem no frontend de Produtos.
+- [ ] Aplicar o padrao em Estoque ou iniciar extracao controlada de filtros/listagem no frontend de Produtos.
 
 ## 4. Seguranca operacional
 
@@ -337,6 +338,7 @@ Proxima acao concreta:
 | #88 | Estrutura geral | Definition of Done para refatoracao modular |
 | #89 | Estrutura geral | Primeira fatia piloto de Produtos sem mudar contrato |
 | #90 | Estrutura geral | Segunda fatia piloto de Produtos para validade/listagem |
+| PR atual | Estrutura geral | Terceira fatia piloto de Produtos para racao/classificacao |
 
 ## Criterio para declarar 10/10 geral
 
