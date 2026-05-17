@@ -7,6 +7,7 @@ Ele nao autoriza deploy. Qualquer comando no servidor de producao ou push direto
 ## Referencias oficiais
 
 - Deploy por SSH: `docs/PRODUCAO_DEPLOY_SSH.md`
+- Backup e restore smoke: `docs/PRODUCAO_BACKUP_RESTORE_TESTE.md`
 - Fluxo unico DEV -> PROD: `docs/FLUXO_UNICO_DEV_PROD.md`
 - Script oficial de deploy: `scripts/deploy_producao_seguro.sh`
 - Servidor preferencial: `petdeploy@192.241.150.121`
@@ -141,8 +142,9 @@ Seguir esta regra:
 1. Parar deploys e novas mudancas.
 2. Confirmar qual migration rodou e qual erro aconteceu.
 3. Validar se existe `downgrade` Alembic seguro para o caso.
-4. Se nao houver downgrade seguro, planejar restore de backup com janela de manutencao.
-5. So executar com autorizacao explicita do Lucas.
+4. Confirmar que existe dump real e que ele passa no restore smoke controlado.
+5. Se nao houver downgrade seguro, planejar restore de backup com janela de manutencao.
+6. So executar com autorizacao explicita do Lucas.
 
 Nao usar `alembic downgrade` em producao sem plano validado.
 

@@ -153,6 +153,7 @@ Ja feito:
 - [x] Deploy completo em producao executado via `petdeploy` em 2026-05-17 para o commit `520f8a2b`, com backup operacional `/opt/petshop/backups/deploy_20260517_133717` e containers finais saudaveis.
 - [x] Rotacao de SSH/secrets documentada em `docs/SEGURANCA_ROTACAO_SSH_SECRETS.md`.
 - [x] Checklist de rollback inclui responsaveis e tempos alvo em `docs/PRODUCAO_ROLLBACK_CHECKLIST.md`.
+- [x] Scripts e roteiro de backup/restore smoke controlado criados para validar dump real sem tocar o banco de producao.
 
 Falta para 10/10:
 
@@ -164,7 +165,7 @@ Falta para 10/10:
 
 Proxima acao concreta:
 
-- [ ] Planejar teste de restore real de backup em ambiente controlado sem tocar a producao.
+- [ ] Depois do merge/deploy dos scripts, executar `scripts/prod_db_restore_smoke.sh` via `petdeploy` e registrar evidencia.
 
 ## 5. Testes/CI
 

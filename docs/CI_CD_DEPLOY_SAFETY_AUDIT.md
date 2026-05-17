@@ -33,6 +33,7 @@ Meta: 10/10 antes de automatizar qualquer deploy de producao.
 | Feito | Usuario operacional `petdeploy` criado para status/deploy sem SSH direto como root | `docs/PRODUCAO_DEPLOY_SSH.md` |
 | Feito | Deploy completo via `petdeploy` validado com containers saudaveis | `docs/PRODUCAO_DEPLOY_SSH.md` |
 | Feito | Rotacao de SSH/secrets documentada | `docs/SEGURANCA_ROTACAO_SSH_SECRETS.md` |
+| Feito | Scripts de backup e restore smoke controlado criados para validar dump real sem tocar o banco de producao | `docs/PRODUCAO_BACKUP_RESTORE_TESTE.md` |
 
 ## PRs ja juntados
 
@@ -88,4 +89,4 @@ como `healthy`, com health publico `ok` e watchdog publico `healthy`.
 
 1. Em todo proximo deploy real autorizado, repetir `release-check`, usar `petdeploy` com `/usr/local/sbin/petshop-deploy-producao` e validar health/watchdog.
 2. Conferir no painel Ops ou no arquivo `backend/logs/deploy_events.jsonl` os eventos `running`, `success` ou `failed` do deploy.
-3. Planejar o teste de restore real de backup em ambiente controlado.
+3. Depois de deployar os scripts de backup/restore, executar `scripts/prod_db_restore_smoke.sh` via `petdeploy` e registrar a evidencia no guia mestre.

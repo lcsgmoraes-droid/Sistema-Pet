@@ -157,6 +157,12 @@ fi
 
 backup_dir="$APP_DIR/backups/deploy_$(date '+%Y%m%d_%H%M%S')"
 mkdir -p "$backup_dir"
+db_backup_dir="$APP_DIR/backups/db"
+mkdir -p "$db_backup_dir"
+if getent group docker >/dev/null 2>&1; then
+  chgrp docker "$APP_DIR/backups" "$db_backup_dir" || true
+  chmod 770 "$APP_DIR/backups" "$db_backup_dir" || true
+fi
 HEAD_BEFORE="$(git rev-parse HEAD)"
 printf '%s\n' "$HEAD_BEFORE" >"$backup_dir/head_before.txt"
 docker compose -f "$COMPOSE_FILE" ps >"$backup_dir/docker_ps_before.txt" || true
