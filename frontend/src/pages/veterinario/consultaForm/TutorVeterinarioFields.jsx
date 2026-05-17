@@ -1,3 +1,5 @@
+import AutocompleteSelect from "../../../components/ui/AutocompleteSelect";
+
 export default function TutorVeterinarioFields({
   isEdicao,
   form,
@@ -54,7 +56,7 @@ export default function TutorVeterinarioFields({
                 >
                   <div className="text-sm font-medium text-gray-800">{tutor.nome}</div>
                   <div className="text-xs text-gray-500">
-                    {[tutor.telefone, tutor.celular].filter(Boolean).join(" • ") || "Sem telefone"}
+                    {[tutor.telefone, tutor.celular].filter(Boolean).join(" - ") || "Sem telefone"}
                   </div>
                 </button>
               ))}
@@ -63,13 +65,16 @@ export default function TutorVeterinarioFields({
         </div>
       )}
 
-      {renderCampo("Veterinário")(
-        <select value={form.veterinario_id} onChange={(event) => setCampo("veterinario_id", event.target.value)} className={css.select}>
-          <option value="">Selecione...</option>
-          {veterinarios.map((veterinario) => (
-            <option key={veterinario.id} value={veterinario.id}>{veterinario.nome}</option>
-          ))}
-        </select>
+      {renderCampo("Veterin\u00e1rio")(
+        <AutocompleteSelect
+          value={form.veterinario_id}
+          onChange={(veterinarioId) => setCampo("veterinario_id", veterinarioId)}
+          options={veterinarios}
+          getOptionLabel={(veterinario) => veterinario.nome}
+          placeholder={"Digite para buscar veterin\u00e1rio..."}
+          emptyLabel={"Nenhum veterin\u00e1rio encontrado"}
+          showLabel={false}
+        />
       )}
     </div>
   );
