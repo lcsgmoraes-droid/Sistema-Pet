@@ -60,9 +60,55 @@ jobs:
         run: |
           coverage report --fail-under=70 || echo "Coverage below 70%; informational only for this hardening PR"
 
+  migration-smoke:
+    name: Migration Smoke
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: petshop_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d petshop_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    env:
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@localhost:5432/petshop_ci
+      DEBUG: "false"
+      ENVIRONMENT: testing
+      JWT_SECRET_KEY: migration-smoke-secret-key-with-more-than-32-characters
+      EMAIL_VERIFICATION_REQUIRED: "false"
+      BLING_SYNC_SCHEDULER_ENABLED: "false"
+      SEFAZ_IMPORTACAO_AUTOMATICA: "false"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r backend/requirements.txt
+
+      - name: Run Alembic migration smoke
+        run: python scripts/ci_migration_smoke.py
+
   quality-gate:
     name: Quality Gate
-    needs: tests
+    needs: [tests, migration-smoke]
     runs-on: ubuntu-latest
 
     steps:
@@ -70,3 +116,4 @@ jobs:
         run: |
           echo "Multitenant safety suite passed"
           echo "Startup import passed"
+          echo "Migration smoke passed"
