@@ -45,7 +45,7 @@ def test_anular_cupom_reverte_fidelidade_e_marca_voided():
     with patch(
         "app.campaigns.routes.revoke_loyalty_reward_by_coupon",
         return_value={"matched": True, "revoked": True},
-    ) as revoke_mock:
+    ) as revoke_mock, patch("app.campaigns.routes.log_campaign_event") as audit_mock:
         response = anular_cupom(
             code="FIEL-ABC",
             db=db,
@@ -64,6 +64,15 @@ def test_anular_cupom_reverte_fidelidade_e_marca_voided():
     assert response["status"] == "voided"
     assert response["fidelidade"]["cupom_vinculado"] is True
     assert response["fidelidade"]["carimbos_restaurados"] is True
+    audit_mock.assert_called_once()
+    assert audit_mock.call_args.kwargs["event"] == "campaign.coupon.voided"
+    assert audit_mock.call_args.kwargs["entity_type"] == "campaign_coupons"
+    assert audit_mock.call_args.kwargs["entity_id"] == 101
+    assert audit_mock.call_args.kwargs["metadata"]["coupon_code"] == "FIEL-ABC"
+    assert audit_mock.call_args.kwargs["metadata"]["loyalty_reversal"] == {
+        "matched": True,
+        "revoked": True,
+    }
 
 
 def test_anular_cupom_rejeita_quando_nao_esta_ativo():
