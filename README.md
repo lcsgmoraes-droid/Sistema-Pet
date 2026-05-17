@@ -1,167 +1,89 @@
-# 🐾 Sistema Pet Shop Pro v1.0.0 Enterprise
+# Sistema Pet
 
-Sistema ERP completo para Pet Shops com PDV, estoque, produtos com variações, comissões, financeiro, IA integrada e muito mais.
+ERP multi-tenant para pet shops, com PDV, estoque, clientes, produtos,
+financeiro, campanhas, integracoes e operacao segura em producao.
 
-## 🚀 Quick Start - 2 Ambientes Organizados
+## Comece por aqui
 
-### 🔵 DESENVOLVIMENTO (Recomendado para programar)
-**Use quando:** Desenvolver features, testar código, debug  
-**Banco:** PostgreSQL DEV no Docker (`petshop_dev` em `localhost:5433`)  
-**Como iniciar:**
-```bash
-INICIAR_DEV.bat
-```
-- Backend: http://localhost:8000
-- Frontend: http://localhost:5173
-- Docs: http://localhost:8000/docs
+O indice oficial de documentacao fica em:
 
-### 🟢 PRODUÇÃO (Dados reais)
-**Use quando:** Operar a loja com dados reais  
-**Banco:** PostgreSQL no Docker (com backup automático)  
-**Como iniciar:**
-```bash
-INICIAR_PRODUCAO.bat
-```
-- Backend: http://localhost:8000
-- Backups: Automáticos a cada 6h em `./backups/`
-- **⚠️ CUIDADO: Dados reais!**
+- `docs/INDICE_OPERACIONAL.md`
 
-### 🧭 Rotina simples (sem decorar Docker)
-Use sempre estes atalhos na raiz do projeto:
+O guia vivo de maturidade 10/10 fica em:
 
-- `INICIAR_PRODUCAO.bat` → sobe produção sem rebuild pesado
-- `REBUILD_BACKEND.bat` → só rebuild do backend (mudou API/Python)
-- `REBUILD_FRONTEND.bat` → só rebuild do frontend (mudou React/PDV)
-- `STATUS_PRODUCAO.bat` → mostra status dos containers + memória do host
-- `PARAR_PRODUCAO.bat` → para tudo com segurança
+- `docs/MATURIDADE_GERAL_10_10_GUIA.md`
 
-Regra prática para ficar rápido:
-1. Mudou só frontend? rode `REBUILD_FRONTEND.bat`
-2. Mudou só backend? rode `REBUILD_BACKEND.bat`
-3. Só reiniciar ambiente? rode `INICIAR_PRODUCAO.bat`
-4. Só use rebuild total quando for realmente necessário
+Esses dois arquivos mandam mais do que documentos antigos, backups historicos ou
+anotacoes soltas.
 
-Observação: no primeiro uso local, o script gera automaticamente certificado em `nginx/ssl` para evitar reinício contínuo do nginx.
+## Fluxo de trabalho
 
-## ✅ Fluxo Único Oficial (DEV -> PROD sem perder nada)
+Antes de alterar codigo, use sempre o fluxo Git do repositorio:
 
-Para evitar divergência entre desenvolvimento e produção, use **sempre este trilho**:
-
-1. Rodar validação estrutural do repositório:
-```bash
-FLUXO_UNICO.bat check
+```powershell
+git status --short --branch
+powershell -ExecutionPolicy Bypass -File .\scripts\git_start_task.ps1 -Tipo feat -Nome "nome da tarefa"
 ```
 
-2. Trabalhar e testar no DEV:
-```bash
-FLUXO_UNICO.bat dev-up
+Ao terminar:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\git_finish_task.ps1 -Mensagem "mensagem clara" -Push
 ```
 
-3. Antes de subir produção, validar release:
-```bash
-FLUXO_UNICO.bat release-check
+Nunca faca commit ou push direto em `main`.
+
+## Validacao local
+
+Validacao geral:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\validar_fluxo.ps1
 ```
 
-4. Subir produção pelo caminho seguro:
-```bash
-FLUXO_UNICO.bat prod-up
-```
-Para producao real no servidor, usar SSH pelo IP e o script seguro:
-```bash
-ssh root@192.241.150.121 "cd /opt/petshop && bash scripts/deploy_producao_seguro.sh"
+Check seguro de ambiente DEV:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\check_dev_environment.ps1
 ```
 
-5. Verificar status:
-```bash
-FLUXO_UNICO.bat status
+Bootstrap de PC novo:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_dev_environment.ps1
 ```
 
-Documentação detalhada do processo: `docs/FLUXO_UNICO_DEV_PROD.md`.
+## Ambientes
 
-## 📋 Configuração de Ambientes
+| Ambiente | Uso | Referencia |
+|---|---|---|
+| DEV local | Desenvolvimento, testes e validacao antes de PR | `docs/DEV_ENVIRONMENT_CHECK.md` |
+| MCP local | Ferramentas locais para Codex/VS Code | `mcp/README.md` |
+| CI/GitHub | Checks obrigatorios e suites longas | `docs/CI_CD_DEPLOY_SAFETY_AUDIT.md` |
+| Producao | Dados reais, deploy via `petdeploy` | `docs/PRODUCAO_DEPLOY_SSH.md` |
 
-### Arquivos de Configuração
-- **`.env.development`** - Desenvolvimento local oficial (`petshop_dev` em `localhost:5433`)
-- **`.env.production`** - Produção com Docker (PostgreSQL + Backups)
+## Producao
 
-### Docker Compose
-- **`docker-compose.local-dev.yml`** - Desenvolvimento oficial
-- **`docker-compose.prod.yml`** - Produção (dados reais)
-- ~~`docker-compose.yml`~~ - Antigo (não usar)
-- ~~`docker-compose.staging.yml`~~ - Antigo (não usar)
-- ~~`docker-compose.local-prod.yml`~~ - Antigo (não usar)
+Deploy real so pelo caminho seguro documentado:
 
-### ⚠️ IMPORTANTE - Segurança
-Antes de usar PRODUÇÃO, edite `.env.production`:
-1. Mude `POSTGRES_PASSWORD` para senha forte
-2. Gere novo `JWT_SECRET_KEY` com: `python -c "import secrets; print(secrets.token_urlsafe(64))"`
-3. Mude `ADMIN_TOKEN` para algo único
-4. Configure suas APIs (Google Maps, OpenAI, Bling, Stone)
-
-## 📋 Status Atual
-
-✅ **Sprint 2 - Produtos com Variação CONCLUÍDO**
-- Sistema de variações implementado
-- Frontend e backend integrados
-- Validações e constraints aplicadas
-- Documentação completa
-
-## 📁 Estrutura
-
-```
-Sistema Pet/
-├── backend/          # FastAPI + SQLAlchemy + PostgreSQL
-├── frontend/         # React 19 + Vite + TailwindCSS
-├── arquivo_documentacao/  # 244 arquivos MD históricos
-├── arquivo_testes/        # 5 arquivos de teste
-├── arquivo_scripts/       # Scripts temporários
-└── backup_sistema_YYYYMMDD_HHMMSS/  # Backups completos
+```powershell
+ssh -i ~/.ssh/mlprohub_codex_deploy -o IdentitiesOnly=yes -o BatchMode=yes petdeploy@192.241.150.121 "sudo -n /usr/local/sbin/petshop-deploy-producao"
 ```
 
-## 🎯 Funcionalidades
+Antes de qualquer deploy real, confirmar escopo, rollback e autorizacao.
 
-- ✅ Autenticação JWT Multi-Tenant
-- ✅ CRUD Produtos com Variações
-- ✅ PDV (Ponto de Venda)
-- ✅ Controle de Estoque
-- ✅ Gestão de Clientes e Pets
-- ✅ Sistema de Comissões
-- ✅ Financeiro Completo
-- ✅ Dashboard Gerencial
-- ✅ IA Integrada (OpenAI/Groq/Gemini)
-- ✅ Integração Bling
-- ✅ Relatórios e Analytics
+## Documentacao
 
-## 📚 Documentação
+Novas evidencias de trabalho devem seguir:
 
-Toda a documentação detalhada está em:
-```
-backup_sistema_20260127_032250/
-├── DOCUMENTACAO_COMPLETA_SISTEMA.md (LEIA PRIMEIRO!)
-└── INDICE_BACKUP.md
-```
+- `docs/PADRAO_EVIDENCIA.md`
 
-## 🔧 Tecnologias
+Quando um PR fecha uma frente de maturidade, atualizar no mesmo PR:
 
-**Backend:** Python 3.11 · FastAPI · SQLAlchemy · PostgreSQL · Alembic  
-**Frontend:** React 19 · Vite · TailwindCSS · Axios  
-**IA:** OpenAI · Groq · Gemini  
-**Infra:** Docker · Uvicorn · APScheduler
+- `docs/MATURIDADE_GERAL_10_10_GUIA.md`
+- o guia especifico da area afetada
+- o indice operacional se a rota de leitura mudar
 
-## 📦 Últimos Backups
+## Status
 
-- `backup_sistema_20260127_032250/` - Sprint 2 COMPLETO
-- Todos os backups contêm documentação completa
-
-## 🆘 Suporte
-
-Consulte `DOCUMENTACAO_COMPLETA_SISTEMA.md` no backup mais recente para:
-- Arquitetura completa
-- Guia de instalação
-- Troubleshooting
-- Referência de API
-- Próximos passos
-
----
-
-**Desenvolvido por Lucas** | Janeiro 2026 | v1.0.0 Enterprise
+O placar atualizado esta sempre em `docs/MATURIDADE_GERAL_10_10_GUIA.md`.

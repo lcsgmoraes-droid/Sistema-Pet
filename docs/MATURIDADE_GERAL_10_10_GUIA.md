@@ -22,7 +22,7 @@ Regra de uso:
 | Testes/CI | 1/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | Observabilidade/auditoria | 2/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | Portabilidade/configuracao | 3/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
-| Documentacao | 4/10 | 8/10 | 10/10 | Em andamento |
+| Documentacao | 4/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 
 ## Ordem recomendada
 
@@ -299,7 +299,7 @@ Para manter 10/10:
 
 Nota inicial: 4/10.
 
-Nota atual: 8/10.
+Nota atual: 10/10.
 
 Referencias principais:
 
@@ -316,19 +316,25 @@ Ja feito:
 - [x] Documentos enterprise/UI/refatoracao consolidados.
 - [x] Checklist do Plano Basico atualizado com producao real.
 - [x] PRs antigos de documentacao revisados, mergeados ou fechados.
+- [x] README raiz refeito em ASCII e apontando para o indice oficial atual.
+- [x] Indice oficial criado em `docs/INDICE_OPERACIONAL.md` com caminhos para DEV, PROD, MCP, CI e Produto.
+- [x] Padrao de evidencia operacional criado em `docs/PADRAO_EVIDENCIA.md`.
+- [x] Rotina obrigatoria de atualizacao de guias registrada no indice oficial.
+- [x] Docs historicos passaram a ser tratados como referencia nao autoritativa quando conflitam com guias oficiais.
 
 Falta para 10/10:
 
-- [ ] Adicionar este guia como indice oficial nos READMEs relevantes.
-- [ ] Criar rotina de atualizacao obrigatoria no fim de cada frente.
-- [ ] Remover ou consolidar docs obsoletas restantes.
-- [ ] Criar indice curto para "por onde comecar" em DEV, PROD, MCP, CI e Produto.
-- [ ] Padronizar formato de evidencia: comando, resultado, data, PR e impacto.
+- [x] Adicionar este guia como indice oficial nos READMEs relevantes.
+- [x] Criar rotina de atualizacao obrigatoria no fim de cada frente.
+- [x] Remover ou consolidar docs obsoletas restantes.
+- [x] Criar indice curto para "por onde comecar" em DEV, PROD, MCP, CI e Produto.
+- [x] Padronizar formato de evidencia: comando, resultado, data, PR e impacto.
 
-Proxima acao concreta:
+Para manter 10/10:
 
-- [x] Linkar este guia em `mcp/README.md`, `docs/MCP_MATURIDADE_GUIA.md` e `docs/CI_CD_DEPLOY_SAFETY_AUDIT.md`.
-- [ ] Linkar este guia em `README.md` depois de corrigir o encoding/mojibake do arquivo para nao piorar a legibilidade.
+- [ ] Todo PR que muda procedimento deve atualizar o guia da area e, se necessario, `docs/INDICE_OPERACIONAL.md`.
+- [ ] Evidencia operacional deve seguir `docs/PADRAO_EVIDENCIA.md`.
+- [ ] Documento historico so volta a ser fonte oficial depois de ser consolidado em guia atual.
 
 ## Historico de PRs relevantes
 
@@ -352,6 +358,7 @@ Proxima acao concreta:
 | #38 | Produto/docs | Checklist pos-deploy do Plano Basico atualizado |
 | #67 | Documentacao | Docs enterprise/UI/refatoracao consolidados |
 | #68 | Documentacao/governanca | Plano mestre de maturidade geral criado |
+| #112 | Documentacao | Fechamento 10/10 com README limpo, indice oficial e padrao de evidencia |
 | #69 | Observabilidade/auditoria | `request_id` seguro e log HTTP estruturado |
 | #70 | Observabilidade/auditoria | Auditoria de negocio para cupom, desconto manual e reabertura |
 | #71 | Observabilidade/auditoria | Auditoria de acesso, login e configuracoes sensiveis |
