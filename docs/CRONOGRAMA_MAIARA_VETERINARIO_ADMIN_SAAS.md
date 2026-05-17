@@ -21,6 +21,13 @@ Verificacao de usuario:
 - O tenant usado na checagem foi `PET TESTE LUCAS`.
 - O modulo `veterinario` estava ativo nesse tenant.
 
+Decisao de preparacao:
+
+- A clinica sera criada como tenant novo.
+- Nome operacional confirmado: `Clinica Veterinaria Sao Jose`.
+- O nome pode ser cadastrado com acentos na aplicacao; este documento mantem
+  ASCII para evitar problema de encoding no Windows/chat.
+
 Smoke autenticado do modulo veterinario em producao:
 
 - `/veterinario`: carregou sem erro de console/rede critico.
@@ -49,8 +56,9 @@ Checklist:
 - [x] Confirmar se o email informado ja existia no sistema.
 - [x] Confirmar que o modulo veterinario abre autenticado em producao.
 - [x] Confirmar que as abas principais carregam sem erro critico.
-- [ ] Confirmar com Lucas o nome exato da empresa/clinica.
-- [ ] Criar tenant da clinica, se a Maiara for usar ambiente proprio.
+- [x] Confirmar com Lucas o nome exato da empresa/clinica.
+- [x] Confirmar se a Maiara vai usar ambiente proprio.
+- [ ] Criar tenant novo `Clinica Veterinaria Sao Jose`.
 - [ ] Criar usuario admin da Maiara.
 - [ ] Ativar o modulo `veterinario` para o tenant dela.
 - [ ] Rodar seed veterinario base sem dados falsos sensiveis.
@@ -62,6 +70,13 @@ Checklist:
 
 Regra operacional: criar usuario real da Maiara em producao deve ser uma acao
 explicita, feita apenas depois de Lucas confirmar que quer criar o acesso.
+
+Observacao importante: o fluxo publico `/auth/register` tambem registra aceite
+de Termos de Uso e Politica de Privacidade. Para cliente real, o ideal e a
+propria Maiara aceitar os termos no cadastro. Se Lucas pedir criacao assistida,
+registrar no chat que a criacao foi autorizada e usar estrategia sem compartilhar
+senha: senha temporaria aleatoria descartada + confirmacao de email + redefinicao
+de senha pela propria usuaria.
 
 ## Frente 2 - Padronizacao visual do Veterinario
 
@@ -194,7 +209,7 @@ Fora do escopo inicial:
 
 Antes de criar qualquer acesso real para a Maiara, Lucas precisa confirmar:
 
-- nome exato da clinica/empresa;
-- se ela deve usar um tenant proprio agora ou apenas assistir a demo no tenant
-  de teste;
-- se o acesso deve ser criado antes ou depois da apresentacao.
+- se a Maiara ja autorizou/aceitou a criacao assistida da conta, ou se ela fara
+  o cadastro pela tela publica;
+- se o acesso deve ser criado antes ou depois da apresentacao;
+- se o modulo `veterinario` deve ser ativado imediatamente no tenant novo.
