@@ -340,7 +340,7 @@ Proxima acao concreta:
 | #89 | Estrutura geral | Primeira fatia piloto de Produtos sem mudar contrato |
 | #90 | Estrutura geral | Segunda fatia piloto de Produtos para validade/listagem |
 | #91 | Estrutura geral | Terceira fatia piloto de Produtos para racao/classificacao |
-| PR atual | Estrutura geral | Primeira fatia de Estoque para granel |
+| #92 | Estrutura geral | Primeira fatia de Estoque para granel |
 
 ## Criterio para declarar 10/10 geral
 
