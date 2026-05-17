@@ -46,7 +46,7 @@ export function buildAgendarRetornoConsultaLink({
   params.set("abrir_novo", "1");
   params.set("tipo", "retorno");
   if (consultaOrigemId) {
-    params.set("return_to", `/veterinario/consultas/${consultaOrigemId}`);
+    params.set("return_to", `/veterinario/consultas/${consultaOrigemId}?etapa=2`);
   }
   params.set(
     "motivo",

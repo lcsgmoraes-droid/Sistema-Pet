@@ -1,7 +1,9 @@
+import { useEffect } from "react";
 import { PlayCircle, X } from "lucide-react";
 import CustomerIdentity from "../../../components/ui/CustomerIdentity";
 import PetIdentity from "../../../components/ui/PetIdentity";
 import { STATUS_BADGE, STATUS_LABEL, TIPO_BADGE, TIPO_LABEL } from "./agendaUtils";
+import { shouldCloseModalWithKeyboardEvent } from "./modalKeyboardUtils";
 
 export default function GerenciarAgendamentoModal({
   agendamento,
@@ -19,6 +21,19 @@ export default function GerenciarAgendamentoModal({
   onExcluir,
   onIniciar,
 }) {
+  useEffect(() => {
+    if (!agendamento) return undefined;
+
+    function handleKeyDown(event) {
+      if (shouldCloseModalWithKeyboardEvent(event)) {
+        onClose();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [agendamento, onClose]);
+
   if (!agendamento) return null;
 
   const processando = processandoAgendamentoId === agendamento.id;

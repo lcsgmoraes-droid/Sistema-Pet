@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session, joinedload
 
 from .models import Cliente
 from .veterinario_core import (
+    _normalizar_data_hora_agendada_vet,
     _normalizar_datetime_vet,
     _serializar_data_hora_agendada_vet,
     _serializar_datetime_vet,
@@ -95,7 +96,7 @@ def _validar_consultorio_agendamento(db: Session, tenant_id, consultorio_id: Opt
 
 
 def _agendamento_intervalo(data_hora: datetime, duracao_minutos: Optional[int]) -> tuple[datetime, datetime]:
-    inicio = _normalizar_datetime_vet(data_hora)
+    inicio = _normalizar_data_hora_agendada_vet(data_hora)
     fim = inicio + timedelta(minutes=max(int(duracao_minutos or 30), 1))
     return inicio, fim
 

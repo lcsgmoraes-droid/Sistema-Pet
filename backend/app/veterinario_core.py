@@ -52,6 +52,11 @@ def _serializar_data_hora_agendada_vet(value: Optional[datetime]) -> Optional[da
     return value
 
 
+def _normalizar_data_hora_agendada_vet(value: Optional[datetime]) -> Optional[datetime]:
+    """Normaliza data/hora de agenda sem aplicar conversao de fuso."""
+    return _serializar_data_hora_agendada_vet(value)
+
+
 def _date_para_datetime_vet(value: Optional[date]) -> Optional[datetime]:
     if value is None:
         return None
