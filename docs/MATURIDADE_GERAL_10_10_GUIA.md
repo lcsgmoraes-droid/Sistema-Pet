@@ -309,7 +309,7 @@ Proxima acao concreta:
 | #75 | Observabilidade/auditoria | Politica de retencao de logs e dados de auditoria |
 | #76 | Observabilidade/auditoria | Correlacao para jobs criticos do scheduler Bling |
 | #77 | Observabilidade/auditoria | Correlacao para WhatsApp, SEFAZ e e-mail |
-| PR atual | Observabilidade/auditoria | Logs estruturados de eventos de negocio |
+| #78 | Observabilidade/auditoria | Logs estruturados de eventos de negocio |
 
 ## Criterio para declarar 10/10 geral
 
