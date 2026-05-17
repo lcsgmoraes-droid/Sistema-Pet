@@ -21,7 +21,7 @@ Regra de uso:
 | Seguranca operacional | 2,5/10 | 8,5/10 | 10/10 | Em andamento |
 | Testes/CI | 1/10 | 8,5/10 | 10/10 | Em andamento |
 | Observabilidade/auditoria | 2/10 | 9,9/10 | 10/10 | Em andamento prioritario |
-| Portabilidade/configuracao | 3/10 | 8,5/10 | 10/10 | Em andamento |
+| Portabilidade/configuracao | 3/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | Documentacao | 4/10 | 8/10 | 10/10 | Em andamento |
 
 ## Ordem recomendada
@@ -222,7 +222,7 @@ Proxima acao concreta:
 
 Nota inicial: 3/10.
 
-Nota atual: 8,5/10.
+Nota atual: 10/10.
 
 Referencia principal: `docs/MCP_LOCAL_SETUP.md`, `docs/CI_CD_DEPLOY_SAFETY_AUDIT.md` e scripts de fluxo.
 
@@ -236,20 +236,22 @@ Ja feito:
 - [x] Script `scripts/check_dev_environment.ps1` diagnostica ambiente DEV sem expor secrets.
 - [x] Dependencias locais e correcoes comuns documentadas em `docs/DEV_ENVIRONMENT_CHECK.md`.
 - [x] Bootstrap `scripts/bootstrap_dev_environment.ps1` prepara PC novo com dry-run, JSON e modo sem rede.
+- [x] Fluxo para segundo computador documentado com `scripts/git_check_updates.ps1` e `scripts/git_start_task.ps1`.
+- [x] Portas locais padrao (`8000`, `5173`, `5433`) diagnosticadas no check e documentadas com fallback.
 
-Falta para 10/10:
+Fechado:
 
 - [x] Criar bootstrap de PC novo em um comando para DEV.
 - [x] Validar `.env` com mensagem clara de variaveis faltantes.
 - [x] Documentar dependencias locais: Python, Node, Docker, GitHub CLI, SSH.
 - [x] Criar check de ambiente que nao exponha secrets.
-- [ ] Documentar fluxo para segundo computador atualizar `main` antes de tarefa.
-- [ ] Padronizar portas locais e fallback quando porta estiver ocupada.
+- [x] Documentar fluxo para segundo computador atualizar `main` antes de tarefa.
+- [x] Padronizar portas locais e fallback quando porta estiver ocupada.
 - [x] Criar troubleshooting de setup local inicial.
 
-Proxima acao concreta:
+Para manter 10/10:
 
-- [ ] Documentar fluxo de segundo computador e padronizar diagnostico de portas locais.
+- [ ] Atualizar `scripts/check_dev_environment.ps1` e `docs/DEV_ENVIRONMENT_CHECK.md` quando novas dependencias, portas ou MCPs entrarem no projeto.
 
 ## 8. Documentacao
 
@@ -325,6 +327,7 @@ Proxima acao concreta:
 | #83 | Observabilidade/auditoria | Script de teste controlado do notifier Ops |
 | #84 | Portabilidade/configuracao | Check seguro de ambiente DEV e guia de correcao |
 | #85 | Portabilidade/configuracao | Bootstrap de PC novo para ambiente DEV |
+| PR atual | Portabilidade/configuracao | Fluxo de segundo PC e diagnostico de portas locais |
 
 ## Criterio para declarar 10/10 geral
 

@@ -226,6 +226,49 @@ function Test-DockerDaemon {
     }
 }
 
+function Test-Port {
+    param(
+        [string]$Id,
+        [string]$Name,
+        [int]$Port,
+        [string]$ExpectedUse,
+        [string]$Fix
+    )
+
+    try {
+        $listeners = [System.Net.NetworkInformation.IPGlobalProperties]::GetIPGlobalProperties().GetActiveTcpListeners()
+        $inUse = @($listeners | Where-Object { $_.Port -eq $Port })
+    }
+    catch {
+        Add-Check -Id $Id -Name $Name -Status 'skipped' -Message "Nao foi possivel inspecionar a porta $Port." -Fix 'Rode o script novamente em um PowerShell normal do usuario.' -Details @{
+            port = $Port
+            expected_use = $ExpectedUse
+        }
+        return
+    }
+
+    if ($inUse.Count -gt 0) {
+        Add-Check -Id $Id -Name $Name -Status 'warning' -Message "Porta $Port ja esta em uso." -Fix $Fix -Details @{
+            port = $Port
+            expected_use = $ExpectedUse
+            in_use = $true
+        }
+        return
+    }
+
+    Add-Check -Id $Id -Name $Name -Status 'ok' -Message "Porta $Port livre para $ExpectedUse." -Details @{
+        port = $Port
+        expected_use = $ExpectedUse
+        in_use = $false
+    }
+}
+
+function Test-LocalPorts {
+    Test-Port -Id 'ports.backend' -Name 'Porta backend local' -Port 8000 -ExpectedUse 'backend FastAPI local' -Fix 'Se o DEV nao estiver rodando, pare o processo/container que usa 8000 antes do docker compose local.'
+    Test-Port -Id 'ports.frontend' -Name 'Porta frontend local' -Port 5173 -ExpectedUse 'frontend Vite local' -Fix 'O Vite pode cair para 5174; confirme a URL exibida no terminal e mantenha o backend apontando para a porta correta.'
+    Test-Port -Id 'ports.postgres' -Name 'Porta PostgreSQL DEV' -Port 5433 -ExpectedUse 'PostgreSQL DEV no host' -Fix 'Se o DEV nao estiver rodando, libere a porta 5433 ou ajuste somente o compose local conscientemente.'
+}
+
 function Test-LocalDependencies {
     $backendPython = Join-Path $root 'backend/.venv/Scripts/python.exe'
     $backendPythonUnix = Join-Path $root 'backend/.venv/bin/python'
@@ -273,6 +316,7 @@ Test-EnvFile
 Test-GitWorkingTree
 Test-GitHubAuth
 Test-DockerDaemon
+Test-LocalPorts
 Test-LocalDependencies
 
 $errors = @($checks | Where-Object { $_.status -eq 'error' }).Count
