@@ -19,6 +19,7 @@ export function useVetAgenda() {
   const motivoQuery = searchParams.get("motivo") || "";
   const dataQuery = searchParams.get("data") || "";
   const returnToQuery = searchParams.get("return_to") || "";
+  const consultaOrigemIdQuery = searchParams.get("consulta_origem_id") || "";
   const [dataRef, setDataRef] = useState(new Date());
   const [modo, setModo] = useState("dia");
   const [agendamentos, setAgendamentos] = useState([]);
@@ -106,6 +107,7 @@ export function useVetAgenda() {
 
   useAgendaApoios({
     abrirNovoQuery,
+    consultaOrigemIdQuery,
     dataQuery,
     dataRef,
     formNovoData: formNovo.data,

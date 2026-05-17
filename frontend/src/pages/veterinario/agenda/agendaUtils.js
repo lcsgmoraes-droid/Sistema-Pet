@@ -46,6 +46,10 @@ export const TIPO_BADGE = {
   exame: "bg-violet-100 text-violet-700",
 };
 
+export const TIPO_CARD_COLOR = {
+  retorno: "border-l-indigo-500 bg-indigo-50 ring-1 ring-indigo-100",
+};
+
 export const TIPO_ACAO = {
   consulta: "Iniciar consulta",
   retorno: "Iniciar retorno",
@@ -57,6 +61,7 @@ export const FORM_NOVO_INICIAL = {
   pet_id: "",
   veterinario_id: "",
   consultorio_id: "",
+  consulta_origem_id: "",
   tipo: "consulta",
   data: "",
   hora: "",

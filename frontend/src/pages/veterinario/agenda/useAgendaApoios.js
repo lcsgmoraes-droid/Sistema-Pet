@@ -6,6 +6,7 @@ import { aplicarDefaultsQueryAgenda } from "./agendaQueryDefaults";
 
 export function useAgendaApoios({
   abrirNovoQuery,
+  consultaOrigemIdQuery,
   dataQuery,
   dataRef,
   formNovoData,
@@ -39,6 +40,7 @@ export function useAgendaApoios({
     setFormNovo((prev) =>
       aplicarDefaultsQueryAgenda({
         formAtual: prev,
+        consultaOrigemIdQuery,
         dataBase: dataRef,
         dataQuery,
         motivoQuery,
@@ -47,6 +49,7 @@ export function useAgendaApoios({
     );
   }, [
     abrirNovoQuery,
+    consultaOrigemIdQuery,
     dataQuery,
     dataRef,
     motivoQuery,

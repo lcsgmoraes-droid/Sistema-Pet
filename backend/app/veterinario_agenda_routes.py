@@ -256,6 +256,29 @@ def listar_pets_vet(
     ]
 
 
+def _validar_consulta_origem_agendamento(
+    db: Session,
+    *,
+    tenant_id,
+    consulta_origem_id: Optional[int],
+    pet_id: Optional[int],
+) -> Optional[ConsultaVet]:
+    if not consulta_origem_id:
+        return None
+    if str(consulta_origem_id).strip() == "":
+        return None
+
+    consulta = db.query(ConsultaVet).filter(
+        ConsultaVet.id == consulta_origem_id,
+        ConsultaVet.tenant_id == tenant_id,
+    ).first()
+    if not consulta:
+        raise HTTPException(status_code=422, detail="Consulta de origem do retorno nao foi encontrada")
+    if pet_id and consulta.pet_id != pet_id:
+        raise HTTPException(status_code=422, detail="Consulta de origem nao pertence ao pet selecionado")
+    return consulta
+
+
 @router.get("/agenda/calendario")
 def obter_calendario_agenda_vet(
     request: Request,
@@ -378,6 +401,7 @@ def listar_agendamentos(
             "cliente_id": ag.cliente_id,
             "veterinario_id": ag.veterinario_id,
             "consultorio_id": ag.consultorio_id,
+            "consulta_origem_id": ag.consulta_origem_id,
             "data_hora": ag.data_hora,
             "duracao_minutos": ag.duracao_minutos,
             "tipo": ag.tipo,
@@ -480,6 +504,21 @@ def criar_agendamento(
 
     _validar_veterinario_agendamento(db, tenant_id, body.veterinario_id)
     _validar_consultorio_agendamento(db, tenant_id, body.consultorio_id)
+    _validar_consulta_origem_agendamento(
+        db,
+        tenant_id=tenant_id,
+        consulta_origem_id=body.consulta_origem_id,
+        pet_id=body.pet_id,
+    )
+    retorno_existente = None
+    if body.tipo == "retorno" and body.consulta_origem_id:
+        retorno_existente = db.query(AgendamentoVet).filter(
+            AgendamentoVet.tenant_id == tenant_id,
+            AgendamentoVet.consulta_origem_id == body.consulta_origem_id,
+            AgendamentoVet.tipo == "retorno",
+            AgendamentoVet.status.in_(["agendado", "confirmado", "aguardando"]),
+        ).first()
+
     _garantir_sem_conflitos_agendamento(
         db,
         tenant_id=tenant_id,
@@ -487,11 +526,28 @@ def criar_agendamento(
         duracao_minutos=body.duracao_minutos,
         veterinario_id=body.veterinario_id,
         consultorio_id=body.consultorio_id,
+        agendamento_id_ignorar=retorno_existente.id if retorno_existente else None,
     )
 
     tenant_agendamento = tenant_id or getattr(pet_ref, "tenant_id", None)
     if tenant_agendamento is None:
         raise HTTPException(status_code=400, detail="Nao foi possivel identificar o tenant do agendamento")
+
+    if retorno_existente:
+        retorno_existente.pet_id = body.pet_id
+        retorno_existente.cliente_id = cliente_id
+        retorno_existente.veterinario_id = body.veterinario_id
+        retorno_existente.consultorio_id = body.consultorio_id
+        retorno_existente.data_hora = body.data_hora
+        retorno_existente.duracao_minutos = body.duracao_minutos
+        retorno_existente.motivo = body.motivo
+        retorno_existente.is_emergencia = body.is_emergencia
+        retorno_existente.sintoma_emergencia = body.sintoma_emergencia
+        retorno_existente.observacoes = body.observacoes
+        _upsert_lembretes_push_agendamento(db, retorno_existente, tenant_id)
+        db.commit()
+        db.refresh(retorno_existente)
+        return _agendamento_to_dict(retorno_existente)
 
     ag = AgendamentoVet(
         tenant_id=tenant_agendamento,
@@ -499,6 +555,7 @@ def criar_agendamento(
         cliente_id=cliente_id,
         veterinario_id=body.veterinario_id,
         consultorio_id=body.consultorio_id,
+        consulta_origem_id=body.consulta_origem_id,
         user_id=user.id,
         data_hora=body.data_hora,
         duracao_minutos=body.duracao_minutos,
@@ -559,11 +616,18 @@ def atualizar_agendamento(
 
     veterinario_id_novo = payload.get("veterinario_id", ag.veterinario_id)
     consultorio_id_novo = payload.get("consultorio_id", ag.consultorio_id)
+    consulta_origem_id_nova = payload.get("consulta_origem_id", ag.consulta_origem_id)
     data_hora_nova = payload.get("data_hora", ag.data_hora)
     duracao_nova = payload.get("duracao_minutos", ag.duracao_minutos)
 
     _validar_veterinario_agendamento(db, tenant_id, veterinario_id_novo)
     _validar_consultorio_agendamento(db, tenant_id, consultorio_id_novo)
+    _validar_consulta_origem_agendamento(
+        db,
+        tenant_id=tenant_id,
+        consulta_origem_id=consulta_origem_id_nova,
+        pet_id=ag.pet_id,
+    )
     _garantir_sem_conflitos_agendamento(
         db,
         tenant_id=tenant_id,

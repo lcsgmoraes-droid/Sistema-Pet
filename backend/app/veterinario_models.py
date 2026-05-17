@@ -105,6 +105,7 @@ class AgendamentoVet(BaseTenantModel):
 
     # Vínculo com consulta gerada
     consulta_id = Column(Integer, ForeignKey("vet_consultas.id"), nullable=True)
+    consulta_origem_id = Column(Integer, ForeignKey("vet_consultas.id"), nullable=True, index=True)
 
     # Hora efetiva de início e fim
     inicio_atendimento = Column(DateTime(timezone=True), nullable=True)
@@ -118,6 +119,7 @@ class AgendamentoVet(BaseTenantModel):
     veterinario = relationship("Cliente", foreign_keys=[veterinario_id])
     consultorio = relationship("ConsultorioVet", foreign_keys=[consultorio_id])
     consulta = relationship("ConsultaVet", foreign_keys=[consulta_id], back_populates="agendamento")
+    consulta_origem = relationship("ConsultaVet", foreign_keys=[consulta_origem_id])
 
 
 # ==============================================================

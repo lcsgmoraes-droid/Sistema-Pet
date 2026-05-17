@@ -18,11 +18,16 @@ from app.veterinario_schemas import (
 
 
 def test_agendamento_create_defaults_principais():
-    payload = AgendamentoCreate(pet_id=1, data_hora=datetime(2026, 4, 25, 9, 0))
+    payload = AgendamentoCreate(
+        pet_id=1,
+        data_hora=datetime(2026, 4, 25, 9, 0),
+        consulta_origem_id=7,
+    )
 
     assert payload.tipo == "consulta"
     assert payload.duracao_minutos == 30
     assert payload.is_emergencia is False
+    assert payload.consulta_origem_id == 7
 
 
 def test_prescricao_create_converte_itens_aninhados():

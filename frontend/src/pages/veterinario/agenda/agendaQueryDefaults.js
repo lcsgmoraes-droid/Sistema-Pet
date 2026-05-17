@@ -11,6 +11,7 @@ export function aplicarDefaultsQueryAgenda({
   dataQuery = "",
   tipoQuery = "",
   motivoQuery = "",
+  consultaOrigemIdQuery = "",
 } = {}) {
   const form = {
     ...FORM_NOVO_INICIAL,
@@ -20,6 +21,7 @@ export function aplicarDefaultsQueryAgenda({
   return {
     ...form,
     tipo: tipoQuery ? normalizarTipoAgendamento(tipoQuery) : form.tipo,
+    consulta_origem_id: consultaOrigemIdQuery || form.consulta_origem_id || "",
     data: normalizarDataQuery(dataQuery) || form.data || isoDate(dataBase),
     motivo: motivoQuery || form.motivo,
   };

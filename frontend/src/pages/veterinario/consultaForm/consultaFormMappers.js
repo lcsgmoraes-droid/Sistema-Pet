@@ -88,6 +88,7 @@ export function mapConsultaParaForm(consulta) {
     tratamento: consulta.conduta ?? consulta.tratamento ?? "",
     observacoes: consulta.observacoes_tutor ?? consulta.observacoes_internas ?? consulta.observacoes ?? "",
     retorno_em_dias: consulta.retorno_em_dias ?? "",
+    retorno_agendado: consulta.retorno_agendado ?? null,
     prescricao_itens: listaOuVazia(consulta.prescricao_rascunho),
     procedimentos_realizados: listaOuVazia(consulta.procedimentos_rascunho),
   };

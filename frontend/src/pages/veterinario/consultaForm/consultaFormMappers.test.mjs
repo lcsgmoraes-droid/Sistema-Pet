@@ -33,6 +33,20 @@ test("mapConsultaParaForm restaura prescricao e procedimentos salvos no rascunho
   assert.equal(form.procedimentos_realizados[0].nome, "Curativo");
 });
 
+test("mapConsultaParaForm expõe retorno agendado para a consulta em andamento", () => {
+  const form = mapConsultaParaForm({
+    pet_id: 10,
+    retorno_agendado: {
+      id: 44,
+      data_hora: "2026-05-20T14:30:00",
+      tipo: "retorno",
+    },
+  });
+
+  assert.equal(form.retorno_agendado.id, 44);
+  assert.equal(form.retorno_agendado.data_hora, "2026-05-20T14:30:00");
+});
+
 test("mapPrescricoesParaForm converte prescricao persistida para campos editaveis", () => {
   const itens = mapPrescricoesParaForm([
     {

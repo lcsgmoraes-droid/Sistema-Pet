@@ -1,6 +1,6 @@
 import { CalendarPlus } from "lucide-react";
 
-import { css } from "./consultaFormUtils";
+import { css, formatDateTimeBR } from "./consultaFormUtils";
 
 function campo(label, obrigatorio = false) {
   return function renderCampo(children) {
@@ -22,6 +22,8 @@ export default function DiagnosticoBasicoSection({
   onAgendarRetorno,
   setCampo,
 }) {
+  const retornoAgendado = form.retorno_agendado;
+
   return (
     <fieldset disabled={modoSomenteLeitura} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-4 disabled:opacity-100">
       <h2 className="font-semibold text-gray-700">Diagnóstico e tratamento</h2>
@@ -39,8 +41,14 @@ export default function DiagnosticoBasicoSection({
       )}
       <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <p className="text-sm font-medium text-gray-700">Retorno</p>
-          <p className="text-xs text-gray-500">Escolha o dia e horario livre na agenda.</p>
+          <p className="text-sm font-medium text-gray-700">
+            {retornoAgendado ? "Retorno agendado" : "Retorno"}
+          </p>
+          <p className="text-xs text-gray-500">
+            {retornoAgendado
+              ? formatDateTimeBR(retornoAgendado.data_hora)
+              : "Escolha o dia e horario livre na agenda."}
+          </p>
         </div>
         <button
           type="button"
@@ -50,7 +58,7 @@ export default function DiagnosticoBasicoSection({
           title={!consultaIdAtual ? "Salve a consulta em rascunho antes de agendar retorno" : ""}
         >
           <CalendarPlus size={16} />
-          Agendar retorno
+          {retornoAgendado ? "Alterar retorno" : "Agendar retorno"}
         </button>
       </div>
       {campo("Observações adicionais")(

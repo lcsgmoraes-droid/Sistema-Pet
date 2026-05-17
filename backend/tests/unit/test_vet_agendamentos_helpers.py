@@ -79,6 +79,7 @@ def test_agendamento_to_dict_preserva_campos_do_contrato():
         status="confirmado",
         is_emergencia=False,
         consulta_id=99,
+        consulta_origem_id=88,
         observacoes="sem jejum",
         created_at=created_at,
         pet=SimpleNamespace(nome="Mel"),
@@ -93,4 +94,5 @@ def test_agendamento_to_dict_preserva_campos_do_contrato():
     assert payload["pet_nome"] == "Mel"
     assert payload["veterinario_nome"] == "Dra. Julia"
     assert payload["consultorio_nome"] == "Sala 1"
+    assert payload["consulta_origem_id"] == 88
     assert payload["data_hora"] == data_hora

@@ -139,9 +139,18 @@ entrar no cronograma sem se perderem.
       agenda com contexto do pet/consulta para escolher dia e horario livre.
       Implementado na branch de 2026-05-17: o botao leva para a agenda com
       pet, tutor, consulta, tipo `retorno` e motivo preenchidos.
+- [x] Persistir o vinculo do retorno com a consulta de origem
+      (`consulta_origem_id`) para a consulta conseguir exibir o retorno
+      agendado depois que o modal da agenda fechar.
+- [x] Mostrar na consulta em andamento a data e horario do retorno agendado,
+      com opcao de alterar o retorno.
+- [x] Se ja existir retorno pendente para a consulta, novo agendamento de
+      retorno atualiza o retorno pendente em vez de criar duplicado.
+- [x] Diferenciar visualmente agendamentos do tipo `retorno` na agenda para
+      nao parecerem consultas comuns.
 - [ ] Ampliar catalogo veterinario de produtos/medicamentos com bulas, resumo de
       uso clinico e dados para prescricao.
-- [ ] Ajustar calculadora de dose para usar primeiro o peso informado na
+- [x] Ajustar calculadora de dose para usar primeiro o peso informado na
       consulta; se estiver vazio, usar o peso cadastrado no pet.
 - [ ] Ampliar a base padrao de procedimentos veterinarios e seus insumos.
 - [ ] Revisar padrao de horario do modulo veterinario e do sistema: usar

@@ -66,6 +66,7 @@ def test_consulta_to_dict_preserva_contrato_principal():
     assert payload["veterinario_nome"] == "Dra. Julia"
     assert payload["diagnostico"] == "dermatite alergica"
     assert payload["finalizado_em"] == datetime(2026, 4, 25, 11, 0)
+    assert payload["retorno_agendado"] is None
 
 
 def test_hash_prontuario_consulta_e_deterministico():
