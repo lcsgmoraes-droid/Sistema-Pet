@@ -21,7 +21,7 @@ Regra de uso:
 | Seguranca operacional | 2,5/10 | 8,5/10 | 10/10 | Em andamento |
 | Testes/CI | 1/10 | 8,5/10 | 10/10 | Em andamento |
 | Observabilidade/auditoria | 2/10 | 9,9/10 | 10/10 | Em andamento prioritario |
-| Portabilidade/configuracao | 3/10 | 6,5/10 | 10/10 | Em andamento |
+| Portabilidade/configuracao | 3/10 | 7,5/10 | 10/10 | Em andamento |
 | Documentacao | 4/10 | 8/10 | 10/10 | Em andamento |
 
 ## Ordem recomendada
@@ -222,7 +222,7 @@ Proxima acao concreta:
 
 Nota inicial: 3/10.
 
-Nota atual: 6,5/10.
+Nota atual: 7,5/10.
 
 Referencia principal: `docs/MCP_LOCAL_SETUP.md`, `docs/CI_CD_DEPLOY_SAFETY_AUDIT.md` e scripts de fluxo.
 
@@ -233,20 +233,22 @@ Ja feito:
 - [x] Fluxo Git padronizado em scripts.
 - [x] SSH de producao deste PC configurado.
 - [x] Guia local de MCP existe.
+- [x] Script `scripts/check_dev_environment.ps1` diagnostica ambiente DEV sem expor secrets.
+- [x] Dependencias locais e correcoes comuns documentadas em `docs/DEV_ENVIRONMENT_CHECK.md`.
 
 Falta para 10/10:
 
 - [ ] Criar bootstrap de PC novo em um comando para DEV.
 - [ ] Validar `.env` com mensagem clara de variaveis faltantes.
-- [ ] Documentar dependencias locais: Python, Node, Docker, GitHub CLI, SSH.
-- [ ] Criar check de ambiente que nao exponha secrets.
+- [x] Documentar dependencias locais: Python, Node, Docker, GitHub CLI, SSH.
+- [x] Criar check de ambiente que nao exponha secrets.
 - [ ] Documentar fluxo para segundo computador atualizar `main` antes de tarefa.
 - [ ] Padronizar portas locais e fallback quando porta estiver ocupada.
-- [ ] Criar troubleshooting de setup local.
+- [x] Criar troubleshooting de setup local inicial.
 
 Proxima acao concreta:
 
-- [ ] Criar `scripts/check_dev_environment.ps1` com diagnostico seguro e guia de correcao.
+- [ ] Criar bootstrap de PC novo que chame o check, prepare backend, frontend e MCPs sem imprimir secrets.
 
 ## 8. Documentacao
 
@@ -320,6 +322,7 @@ Proxima acao concreta:
 | #81 | Observabilidade/auditoria | Alertas acionaveis para 5xx, lentidao, falhas recorrentes e worker/job degradado |
 | #82 | Observabilidade/auditoria | Notifier externo opcional para alertas Ops criticos |
 | #83 | Observabilidade/auditoria | Script de teste controlado do notifier Ops |
+| #84 | Portabilidade/configuracao | Check seguro de ambiente DEV e guia de correcao |
 
 ## Criterio para declarar 10/10 geral
 
