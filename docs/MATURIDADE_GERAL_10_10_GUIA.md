@@ -18,7 +18,7 @@ Regra de uso:
 | MCP Frontend | 5,5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | MCP Ops/API | 3,5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | Estrutura geral | 5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
-| Seguranca operacional | 2,5/10 | 9,6/10 | 10/10 | Em andamento |
+| Seguranca operacional | 2,5/10 | 9,8/10 | 10/10 | Em andamento |
 | Testes/CI | 1/10 | 9/10 | 10/10 | Em andamento |
 | Observabilidade/auditoria | 2/10 | 9,9/10 | 10/10 | Em andamento prioritario |
 | Portabilidade/configuracao | 3/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
@@ -134,7 +134,7 @@ Para manter 10/10:
 
 Nota inicial: 2,5/10.
 
-Nota atual: 9,6/10.
+Nota atual: 9,8/10.
 
 Referencia principal: `docs/CI_CD_DEPLOY_SAFETY_AUDIT.md`.
 
@@ -154,18 +154,19 @@ Ja feito:
 - [x] Rotacao de SSH/secrets documentada em `docs/SEGURANCA_ROTACAO_SSH_SECRETS.md`.
 - [x] Checklist de rollback inclui responsaveis e tempos alvo em `docs/PRODUCAO_ROLLBACK_CHECKLIST.md`.
 - [x] Scripts e roteiro de backup/restore smoke controlado criados para validar dump real sem tocar o banco de producao.
+- [x] Restore smoke de dump real executado em producao sem tocar o banco principal: backup `/opt/petshop/backups/db/restore_smoke_20260517_135920.dump.gz`, `public_tables=217`, `alembic_rows=1`, container temporario removido e health/watchdog saudaveis depois do teste.
 
 Falta para 10/10:
 
 - [x] Criar caminho de deploy/status por usuario operacional com privilegio minimo e root apenas como fallback.
 - [x] Documentar rotacao de SSH/secrets.
-- [ ] Testar restore real de backup em ambiente controlado.
+- [x] Testar restore real de backup em ambiente controlado.
 - [x] Criar checklist de rollback com tempo alvo e responsavel.
 - [ ] Separar ainda mais deploy de runtime e docs/workflows sem impacto de servidor.
 
 Proxima acao concreta:
 
-- [ ] Depois do merge/deploy dos scripts, executar `scripts/prod_db_restore_smoke.sh` via `petdeploy` e registrar evidencia.
+- [ ] Separar deploy de runtime e docs/workflows para evitar rebuild de servidor quando a mudanca nao afeta aplicacao.
 
 ## 5. Testes/CI
 
@@ -364,6 +365,7 @@ Proxima acao concreta:
 | #98 | Seguranca operacional | Usuario operacional `petdeploy` e deploy sem root direto |
 | #99 | Seguranca operacional | Deploy via `petdeploy`, rotacao de SSH/secrets e rollback com responsaveis |
 | #100 | Seguranca operacional | Scripts de backup e restore smoke controlado do banco |
+| #101 | Seguranca operacional | Evidencia de restore smoke real do banco em producao |
 
 ## Criterio para declarar 10/10 geral
 

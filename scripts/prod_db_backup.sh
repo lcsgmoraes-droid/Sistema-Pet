@@ -33,7 +33,7 @@ require_cmd sha256sum
 
 cd "$APP_DIR"
 mkdir -p "$BACKUP_DIR"
-chmod 700 "$BACKUP_DIR" || true
+chmod 700 "$BACKUP_DIR" 2>/dev/null || true
 
 tmp_file="$BACKUP_DIR/${BACKUP_NAME}.dump.gz.tmp"
 backup_file="$BACKUP_DIR/${BACKUP_NAME}.dump.gz"
