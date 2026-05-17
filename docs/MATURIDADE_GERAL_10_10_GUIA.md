@@ -20,7 +20,7 @@ Regra de uso:
 | Estrutura geral | 5/10 | 6,5/10 | 10/10 | Em andamento |
 | Seguranca operacional | 2,5/10 | 8/10 | 10/10 | Em andamento |
 | Testes/CI | 1/10 | 8,5/10 | 10/10 | Em andamento |
-| Observabilidade/auditoria | 2/10 | 8/10 | 10/10 | Em andamento prioritario |
+| Observabilidade/auditoria | 2/10 | 8,5/10 | 10/10 | Em andamento prioritario |
 | Portabilidade/configuracao | 3/10 | 6,5/10 | 10/10 | Em andamento |
 | Documentacao | 4/10 | 8/10 | 10/10 | Em andamento |
 
@@ -181,9 +181,9 @@ Proxima acao concreta:
 
 Nota inicial: 2/10.
 
-Nota atual: 8/10.
+Nota atual: 8,5/10.
 
-Referencia principal: `docs/roadmaps/FASE2_OBSERVABILIDADE.md` e secoes de Ops em `docs/EVOLUCAO_ENTERPRISE_UI_REFATORACAO.md`.
+Referencia principal: `docs/roadmaps/FASE2_OBSERVABILIDADE.md`, `docs/RETENCAO_LOGS_AUDITORIA.md` e secoes de Ops em `docs/EVOLUCAO_ENTERPRISE_UI_REFATORACAO.md`.
 
 Ja feito:
 
@@ -199,6 +199,7 @@ Ja feito:
 - [x] Smoke CI confirma gravacao real de evento de auditoria com `request_id`.
 - [x] Painel `/ops/incidentes` filtra incidentes por `request_id` no backend e mostra trilha de auditoria correlacionada ao evento selecionado.
 - [x] Eventos de negocio de campanhas/cupons/carimbos registram chaves de reconciliacao: cupom criado/consumido/anulado/revertido, carimbo manual, estorno de carimbo e sincronizacao automatica de fidelidade.
+- [x] Politica operacional de retencao de logs e dados de auditoria documentada em `docs/RETENCAO_LOGS_AUDITORIA.md`.
 
 Falta para 10/10:
 
@@ -206,11 +207,10 @@ Falta para 10/10:
 - [ ] Garantir logs estruturados JSON nas rotas criticas com eventos de negocio, nao apenas log HTTP.
 - [ ] Estender trilha de auditoria para deploy, integracoes externas e demais alteracoes sensiveis fora das rotas ja cobertas.
 - [ ] Alertar falhas recorrentes, lentidao, 5xx e falha de jobs.
-- [ ] Documentar retencao de logs e dados de auditoria.
 
 Proxima acao concreta:
 
-- [ ] Documentar retencao de logs e dados de auditoria.
+- [ ] Estender `request_id`/`correlation_id` para jobs, workers e integracoes externas.
 
 ## 7. Portabilidade/configuracao
 
@@ -305,6 +305,7 @@ Proxima acao concreta:
 | #72 | Observabilidade/auditoria | Smoke CI confirma auditoria gravada com `request_id` |
 | #73 | Observabilidade/auditoria | Painel de incidentes com filtro por `request_id` e auditoria correlacionada |
 | #74 | Observabilidade/auditoria | Eventos de negocio de campanhas, cupons e carimbos para reconciliacao |
+| #75 | Observabilidade/auditoria | Politica de retencao de logs e dados de auditoria |
 
 ## Criterio para declarar 10/10 geral
 
