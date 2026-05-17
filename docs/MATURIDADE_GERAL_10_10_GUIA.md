@@ -20,7 +20,7 @@ Regra de uso:
 | Estrutura geral | 5/10 | 6,5/10 | 10/10 | Em andamento |
 | Seguranca operacional | 2,5/10 | 8/10 | 10/10 | Em andamento |
 | Testes/CI | 1/10 | 8,5/10 | 10/10 | Em andamento |
-| Observabilidade/auditoria | 2/10 | 8,9/10 | 10/10 | Em andamento prioritario |
+| Observabilidade/auditoria | 2/10 | 9,1/10 | 10/10 | Em andamento prioritario |
 | Portabilidade/configuracao | 3/10 | 6,5/10 | 10/10 | Em andamento |
 | Documentacao | 4/10 | 8/10 | 10/10 | Em andamento |
 
@@ -181,7 +181,7 @@ Proxima acao concreta:
 
 Nota inicial: 2/10.
 
-Nota atual: 8,9/10.
+Nota atual: 9,1/10.
 
 Referencia principal: `docs/roadmaps/FASE2_OBSERVABILIDADE.md`, `docs/RETENCAO_LOGS_AUDITORIA.md` e secoes de Ops em `docs/EVOLUCAO_ENTERPRISE_UI_REFATORACAO.md`.
 
@@ -202,16 +202,16 @@ Ja feito:
 - [x] Politica operacional de retencao de logs e dados de auditoria documentada em `docs/RETENCAO_LOGS_AUDITORIA.md`.
 - [x] `correlation_id` aplicado aos jobs criticos do scheduler Bling: fila de webhooks, auditoria de fluxo, status de pedidos, NFs pendentes/autorizadas e duplicidades.
 - [x] `correlation_id` aplicado nas integracoes externas restantes de WhatsApp, SEFAZ e e-mail transacional.
+- [x] Eventos de negocio auditaveis tambem emitem log estruturado JSON via caminho central de auditoria.
 
 Falta para 10/10:
 
-- [ ] Garantir logs estruturados JSON nas rotas criticas com eventos de negocio, nao apenas log HTTP.
 - [ ] Estender trilha de auditoria para deploy, integracoes externas e demais alteracoes sensiveis fora das rotas ja cobertas.
 - [ ] Alertar falhas recorrentes, lentidao, 5xx e falha de jobs.
 
 Proxima acao concreta:
 
-- [ ] Garantir logs estruturados JSON nas rotas criticas com eventos de negocio, nao apenas log HTTP.
+- [ ] Estender trilha de auditoria para deploy, integracoes externas e demais alteracoes sensiveis fora das rotas ja cobertas.
 
 ## 7. Portabilidade/configuracao
 
@@ -309,6 +309,7 @@ Proxima acao concreta:
 | #75 | Observabilidade/auditoria | Politica de retencao de logs e dados de auditoria |
 | #76 | Observabilidade/auditoria | Correlacao para jobs criticos do scheduler Bling |
 | #77 | Observabilidade/auditoria | Correlacao para WhatsApp, SEFAZ e e-mail |
+| PR atual | Observabilidade/auditoria | Logs estruturados de eventos de negocio |
 
 ## Criterio para declarar 10/10 geral
 

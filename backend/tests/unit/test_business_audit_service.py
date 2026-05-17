@@ -9,12 +9,20 @@ from app.services import business_audit_service
 
 def test_log_business_event_records_request_id_and_redacts_sensitive_metadata(monkeypatch):
     captured = {}
+    structured_logs = []
 
     def fake_log_action(**kwargs):
         captured.update(kwargs)
         return "audit-row"
 
     monkeypatch.setattr(business_audit_service, "log_action", fake_log_action)
+    monkeypatch.setattr(
+        business_audit_service.structured_logger,
+        "info",
+        lambda event, message, **kwargs: structured_logs.append(
+            {"event": event, "message": message, **kwargs}
+        ),
+    )
     set_request_id("req-sale-123")
 
     try:
@@ -47,6 +55,25 @@ def test_log_business_event_records_request_id_and_redacts_sensitive_metadata(mo
     assert captured["new_value"]["metadata"]["token"] == "***REDACTED***"
     assert captured["new_value"]["metadata"]["nested"]["senha"] == "***REDACTED***"
     assert captured["new_value"]["metadata"]["nested"]["reason"] == "cliente fiel"
+    assert structured_logs == [
+        {
+            "event": "business_event",
+            "message": "Business audit event recorded",
+            "business_event": "sale.manual_discount_finalized",
+            "request_id": "req-sale-123",
+            "tenant_id": "11111111-1111-1111-1111-111111111111",
+            "user_id": 7,
+            "entity_type": "vendas",
+            "entity_id": 55,
+            "action": "business.sale.manual_discount_finalized",
+            "metadata": {
+                "discount_amount": 25.0,
+                "token": "***REDACTED***",
+                "nested": {"senha": "***REDACTED***", "reason": "cliente fiel"},
+            },
+            "commit": False,
+        }
+    ]
 
 
 def test_log_business_event_truncates_action_name(monkeypatch):
