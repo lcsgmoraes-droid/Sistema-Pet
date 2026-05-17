@@ -89,10 +89,17 @@ export default function VetAgenda() {
         abrindoAgendamentoId={agenda.abrindoAgendamentoId}
         salvandoNovo={agenda.salvandoNovo}
         bloqueioCamposAgendamento={agenda.bloqueioCamposAgendamento}
+        consultorioInlineAberto={agenda.consultorioInlineAberto}
+        consultorioInlineErro={agenda.consultorioInlineErro}
+        consultorioInlineForm={agenda.consultorioInlineForm}
+        salvandoConsultorioInline={agenda.salvandoConsultorioInline}
         onClose={agenda.fecharModalNovo}
+        onChangeConsultorioInline={agenda.atualizarConsultorioInlineForm}
+        onCloseConsultorioInline={agenda.fecharConsultorioInline}
+        onNovoConsultorio={agenda.abrirConsultorioInline}
+        onSalvarConsultorioInline={agenda.salvarConsultorioInline}
         onTutorSelect={agenda.selecionarTutorNovoAgendamento}
         onHideForNovoPet={agenda.ocultarNovoParaNovoPet}
-        onConfiguracoesVet={agenda.abrirConfiguracoesVet}
         onOpenAgendamento={agenda.abrirGerenciarAgendamento}
         onConfirm={agenda.criarAgendamento}
       />

@@ -1,6 +1,11 @@
 import { useCallback } from "react";
 
 import { vetApi } from "../vetApi";
+import {
+  FORM_CONSULTORIO_AGENDA_INICIAL,
+  inserirConsultorioAgenda,
+  montarPayloadConsultorioAgenda,
+} from "./agendaConsultoriosUtils";
 import { FORM_NOVO_INICIAL, isoDate, normalizarTipoAgendamento } from "./agendaUtils";
 
 export function useAgendaFormularioAcoes({
@@ -10,26 +15,34 @@ export function useAgendaFormularioAcoes({
   conflitoHorarioSelecionado,
   dataRef,
   formNovo,
-  navigate,
   petSelecionadoModal,
   setAgendaDiaModal,
   setAgendamentoEditandoId,
   setAgendamentoSelecionado,
+  setConsultorioInlineAberto,
+  setConsultorioInlineErro,
+  setConsultorioInlineForm,
+  setConsultorios,
   setErro,
   setErroNovo,
   setFormNovo,
   setNovoAberto,
   setPetsDoTutor,
+  setSalvandoConsultorioInline,
   setSalvandoNovo,
   setTutorSelecionado,
   sugerirHoraLivre,
   tutorSelecionado,
+  consultorioInlineForm,
 }) {
   const abrirModalNovo = useCallback(
     (dataBase = dataRef, agendamentoBase = null) => {
       setErro(null);
       setErroNovo(null);
       setAgendamentoSelecionado(null);
+      setConsultorioInlineAberto(false);
+      setConsultorioInlineErro(null);
+      setConsultorioInlineForm(FORM_CONSULTORIO_AGENDA_INICIAL);
       setNovoAberto(true);
 
       if (agendamentoBase) {
@@ -65,6 +78,9 @@ export function useAgendaFormularioAcoes({
       dataRef,
       setAgendamentoEditandoId,
       setAgendamentoSelecionado,
+      setConsultorioInlineAberto,
+      setConsultorioInlineErro,
+      setConsultorioInlineForm,
       setErro,
       setErroNovo,
       setFormNovo,
@@ -102,6 +118,9 @@ export function useAgendaFormularioAcoes({
       }
 
       setNovoAberto(false);
+      setConsultorioInlineAberto(false);
+      setConsultorioInlineErro(null);
+      setConsultorioInlineForm(FORM_CONSULTORIO_AGENDA_INICIAL);
       setAgendamentoEditandoId(null);
       setTutorSelecionado(null);
       setPetsDoTutor([]);
@@ -123,6 +142,9 @@ export function useAgendaFormularioAcoes({
     petSelecionadoModal?.cliente_id,
     setAgendaDiaModal,
     setAgendamentoEditandoId,
+    setConsultorioInlineAberto,
+    setConsultorioInlineErro,
+    setConsultorioInlineForm,
     setErroNovo,
     setFormNovo,
     setNovoAberto,
@@ -135,6 +157,9 @@ export function useAgendaFormularioAcoes({
   const fecharModalNovo = useCallback(() => {
     setNovoAberto(false);
     setErroNovo(null);
+    setConsultorioInlineAberto(false);
+    setConsultorioInlineErro(null);
+    setConsultorioInlineForm(FORM_CONSULTORIO_AGENDA_INICIAL);
     setAgendamentoEditandoId(null);
     setTutorSelecionado(null);
     setPetsDoTutor([]);
@@ -143,6 +168,9 @@ export function useAgendaFormularioAcoes({
   }, [
     setAgendaDiaModal,
     setAgendamentoEditandoId,
+    setConsultorioInlineAberto,
+    setConsultorioInlineErro,
+    setConsultorioInlineForm,
     setErroNovo,
     setFormNovo,
     setNovoAberto,
@@ -150,15 +178,65 @@ export function useAgendaFormularioAcoes({
     setTutorSelecionado,
   ]);
 
-  const abrirConfiguracoesVet = useCallback(() => {
-    setNovoAberto(false);
-    navigate("/veterinario/configuracoes");
-  }, [navigate, setNovoAberto]);
+  const abrirConsultorioInline = useCallback(() => {
+    setConsultorioInlineErro(null);
+    setConsultorioInlineForm(FORM_CONSULTORIO_AGENDA_INICIAL);
+    setConsultorioInlineAberto(true);
+  }, [setConsultorioInlineAberto, setConsultorioInlineErro, setConsultorioInlineForm]);
+
+  const fecharConsultorioInline = useCallback(() => {
+    setConsultorioInlineAberto(false);
+    setConsultorioInlineErro(null);
+    setConsultorioInlineForm(FORM_CONSULTORIO_AGENDA_INICIAL);
+  }, [setConsultorioInlineAberto, setConsultorioInlineErro, setConsultorioInlineForm]);
+
+  const atualizarConsultorioInlineForm = useCallback(
+    (patch) => {
+      setConsultorioInlineForm((prev) => ({ ...prev, ...patch }));
+    },
+    [setConsultorioInlineForm]
+  );
+
+  const salvarConsultorioInline = useCallback(async () => {
+    const payload = montarPayloadConsultorioAgenda(consultorioInlineForm);
+    if (!payload.nome) {
+      setConsultorioInlineErro("Informe o nome do consultorio.");
+      return;
+    }
+
+    try {
+      setSalvandoConsultorioInline(true);
+      setConsultorioInlineErro(null);
+      const resposta = await vetApi.criarConsultorio(payload);
+      const consultorioCriado = resposta.data;
+
+      setConsultorios((prev) => inserirConsultorioAgenda(prev, consultorioCriado));
+      setFormNovo((prev) => ({
+        ...prev,
+        consultorio_id: consultorioCriado?.id ? String(consultorioCriado.id) : prev.consultorio_id,
+      }));
+      fecharConsultorioInline();
+    } catch (e) {
+      setConsultorioInlineErro(e?.response?.data?.detail || "Erro ao cadastrar consultorio.");
+    } finally {
+      setSalvandoConsultorioInline(false);
+    }
+  }, [
+    consultorioInlineForm,
+    fecharConsultorioInline,
+    setConsultorioInlineErro,
+    setConsultorios,
+    setFormNovo,
+    setSalvandoConsultorioInline,
+  ]);
 
   return {
-    abrirConfiguracoesVet,
+    abrirConsultorioInline,
     abrirModalNovo,
+    atualizarConsultorioInlineForm,
+    fecharConsultorioInline,
     criarAgendamento,
     fecharModalNovo,
+    salvarConsultorioInline,
   };
 }

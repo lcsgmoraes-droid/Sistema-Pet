@@ -2,6 +2,7 @@ import { AlertCircle } from "lucide-react";
 
 import NovoAgendamentoAgendaDiaSection from "./NovoAgendamentoAgendaDiaSection";
 import NovoAgendamentoFormSection from "./NovoAgendamentoFormSection";
+import NovoConsultorioInlineModal from "./NovoConsultorioInlineModal";
 import NovoAgendamentoModalFooter from "./NovoAgendamentoModalFooter";
 import NovoAgendamentoModalHeader from "./NovoAgendamentoModalHeader";
 
@@ -30,10 +31,17 @@ export default function NovoAgendamentoModal({
   abrindoAgendamentoId,
   salvandoNovo,
   bloqueioCamposAgendamento,
+  consultorioInlineAberto,
+  consultorioInlineErro,
+  consultorioInlineForm,
+  salvandoConsultorioInline,
+  onChangeConsultorioInline,
   onClose,
+  onCloseConsultorioInline,
+  onNovoConsultorio,
+  onSalvarConsultorioInline,
   onTutorSelect,
   onHideForNovoPet,
-  onConfiguracoesVet,
   onOpenAgendamento,
   onConfirm,
 }) {
@@ -75,8 +83,8 @@ export default function NovoAgendamentoModal({
             formNovo={formNovo}
             motivoPlaceholderPorTipo={motivoPlaceholderPorTipo}
             onChangeCampo={atualizarCampo}
-            onConfiguracoesVet={onConfiguracoesVet}
             onHideForNovoPet={onHideForNovoPet}
+            onNovoConsultorio={onNovoConsultorio}
             onTutorSelect={onTutorSelect}
             petsDoTutor={petsDoTutor}
             retornoNovoPet={retornoNovoPet}
@@ -105,6 +113,16 @@ export default function NovoAgendamentoModal({
           onClose={onClose}
           onConfirm={onConfirm}
           salvandoNovo={salvandoNovo}
+        />
+
+        <NovoConsultorioInlineModal
+          erro={consultorioInlineErro}
+          form={consultorioInlineForm}
+          isOpen={consultorioInlineAberto}
+          onChange={onChangeConsultorioInline}
+          onClose={onCloseConsultorioInline}
+          onSubmit={onSalvarConsultorioInline}
+          salvando={salvandoConsultorioInline}
         />
       </div>
     </div>

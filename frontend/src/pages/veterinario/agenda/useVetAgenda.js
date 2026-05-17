@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 
+import { FORM_CONSULTORIO_AGENDA_INICIAL } from "./agendaConsultoriosUtils";
 import { FORM_NOVO_INICIAL } from "./agendaUtils";
 import { useAgendaAcoes } from "./useAgendaAcoes";
 import { useAgendaApoios } from "./useAgendaApoios";
@@ -37,6 +38,10 @@ export function useVetAgenda() {
   const [calendarioMeta, setCalendarioMeta] = useState(null);
   const [carregandoCalendario, setCarregandoCalendario] = useState(false);
   const [mensagemCalendario, setMensagemCalendario] = useState("");
+  const [consultorioInlineAberto, setConsultorioInlineAberto] = useState(false);
+  const [consultorioInlineForm, setConsultorioInlineForm] = useState(FORM_CONSULTORIO_AGENDA_INICIAL);
+  const [consultorioInlineErro, setConsultorioInlineErro] = useState(null);
+  const [salvandoConsultorioInline, setSalvandoConsultorioInline] = useState(false);
 
   const derivados = useAgendaDerivados({
     agendaDiaModal,
@@ -65,12 +70,17 @@ export function useVetAgenda() {
     modo,
     navigate,
     petSelecionadoModal: derivados.petSelecionadoModal,
+    consultorioInlineForm,
     setAbrindoAgendamentoId,
     setAgendaDiaModal,
     setAgendamentoEditandoId,
     setAgendamentos,
     setAgendamentoSelecionado,
     setCarregando,
+    setConsultorioInlineAberto,
+    setConsultorioInlineErro,
+    setConsultorioInlineForm,
+    setConsultorios,
     setDataRef,
     setErro,
     setErroNovo,
@@ -79,6 +89,7 @@ export function useVetAgenda() {
     setNovoAberto,
     setPetsDoTutor,
     setProcessandoAgendamentoId,
+    setSalvandoConsultorioInline,
     setSalvandoNovo,
     setTutorSelecionado,
     tutorSelecionado,
@@ -137,6 +148,9 @@ export function useVetAgenda() {
     carregandoAgendaDiaModal,
     carregandoCalendario,
     carregandoPetsTutor,
+    consultorioInlineAberto,
+    consultorioInlineErro,
+    consultorioInlineForm,
     consultorios,
     dataRef,
     editarAgendamentoSelecionado,
@@ -149,6 +163,7 @@ export function useVetAgenda() {
     ocultarNovoParaNovoPet,
     petsDoTutor,
     processandoAgendamentoId,
+    salvandoConsultorioInline,
     salvandoNovo,
     selecionarTutorNovoAgendamento,
     setDataRef,

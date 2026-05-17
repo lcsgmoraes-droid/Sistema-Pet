@@ -1,7 +1,19 @@
-export default function AgendaSelectField({ alerta = "", disabled, label, onChange, options, placeholder, value }) {
+export default function AgendaSelectField({
+  alerta = "",
+  disabled,
+  label,
+  labelAccessory = null,
+  onChange,
+  options,
+  placeholder,
+  value,
+}) {
   return (
     <div>
-      <label className="mb-1 block text-xs font-medium text-gray-600">{label}</label>
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <label className="block text-xs font-medium text-gray-600">{label}</label>
+        {labelAccessory}
+      </div>
       <select
         value={value}
         onChange={(event) => onChange(event.target.value)}
