@@ -1,9 +1,18 @@
 from email import policy
 
+from app.middlewares.request_context import clear_request_context, set_request_id
 from app.services import email_service
+from app.utils.logger import clear_context
+
+
+def teardown_function():
+    clear_request_context()
+    clear_context()
 
 
 def test_build_email_message_adds_transactional_delivery_headers():
+    set_request_id("req-email-123")
+
     msg = email_service._build_email_message(
         from_addr="noreply@mlprohub.com.br",
         to="cliente@outlook.com",
@@ -17,6 +26,7 @@ def test_build_email_message_adds_transactional_delivery_headers():
     assert "@mlprohub.com.br" in msg["Message-ID"]
     assert msg["Reply-To"] == "noreply@mlprohub.com.br"
     assert msg["X-Mailer"] == "Pet Shop Pro"
+    assert msg["X-Correlation-ID"] == "req-email-123"
 
 
 def test_send_email_uses_smtp_policy_and_clean_envelope_sender(monkeypatch):

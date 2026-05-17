@@ -20,7 +20,7 @@ Regra de uso:
 | Estrutura geral | 5/10 | 6,5/10 | 10/10 | Em andamento |
 | Seguranca operacional | 2,5/10 | 8/10 | 10/10 | Em andamento |
 | Testes/CI | 1/10 | 8,5/10 | 10/10 | Em andamento |
-| Observabilidade/auditoria | 2/10 | 8,7/10 | 10/10 | Em andamento prioritario |
+| Observabilidade/auditoria | 2/10 | 8,9/10 | 10/10 | Em andamento prioritario |
 | Portabilidade/configuracao | 3/10 | 6,5/10 | 10/10 | Em andamento |
 | Documentacao | 4/10 | 8/10 | 10/10 | Em andamento |
 
@@ -181,7 +181,7 @@ Proxima acao concreta:
 
 Nota inicial: 2/10.
 
-Nota atual: 8,7/10.
+Nota atual: 8,9/10.
 
 Referencia principal: `docs/roadmaps/FASE2_OBSERVABILIDADE.md`, `docs/RETENCAO_LOGS_AUDITORIA.md` e secoes de Ops em `docs/EVOLUCAO_ENTERPRISE_UI_REFATORACAO.md`.
 
@@ -201,17 +201,17 @@ Ja feito:
 - [x] Eventos de negocio de campanhas/cupons/carimbos registram chaves de reconciliacao: cupom criado/consumido/anulado/revertido, carimbo manual, estorno de carimbo e sincronizacao automatica de fidelidade.
 - [x] Politica operacional de retencao de logs e dados de auditoria documentada em `docs/RETENCAO_LOGS_AUDITORIA.md`.
 - [x] `correlation_id` aplicado aos jobs criticos do scheduler Bling: fila de webhooks, auditoria de fluxo, status de pedidos, NFs pendentes/autorizadas e duplicidades.
+- [x] `correlation_id` aplicado nas integracoes externas restantes de WhatsApp, SEFAZ e e-mail transacional.
 
 Falta para 10/10:
 
-- [ ] Estender `request_id`/`correlation_id` para integracoes externas restantes: WhatsApp, SEFAZ, e-mail e novos workers.
 - [ ] Garantir logs estruturados JSON nas rotas criticas com eventos de negocio, nao apenas log HTTP.
 - [ ] Estender trilha de auditoria para deploy, integracoes externas e demais alteracoes sensiveis fora das rotas ja cobertas.
 - [ ] Alertar falhas recorrentes, lentidao, 5xx e falha de jobs.
 
 Proxima acao concreta:
 
-- [ ] Estender `request_id`/`correlation_id` para integracoes externas restantes: WhatsApp, SEFAZ e e-mail.
+- [ ] Garantir logs estruturados JSON nas rotas criticas com eventos de negocio, nao apenas log HTTP.
 
 ## 7. Portabilidade/configuracao
 
@@ -308,6 +308,7 @@ Proxima acao concreta:
 | #74 | Observabilidade/auditoria | Eventos de negocio de campanhas, cupons e carimbos para reconciliacao |
 | #75 | Observabilidade/auditoria | Politica de retencao de logs e dados de auditoria |
 | #76 | Observabilidade/auditoria | Correlacao para jobs criticos do scheduler Bling |
+| PR atual | Observabilidade/auditoria | Correlacao para WhatsApp, SEFAZ e e-mail |
 
 ## Criterio para declarar 10/10 geral
 

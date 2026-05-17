@@ -22,6 +22,8 @@ from email.utils import formataddr, formatdate, make_msgid, parseaddr
 from typing import Iterable, Mapping, Any
 from dotenv import load_dotenv
 
+from app.utils.correlation import current_correlation_id
+
 logger = logging.getLogger(__name__)
 DEFAULT_SENDER_NAME = "Pet Shop Pro"
 
@@ -121,7 +123,13 @@ def _build_email_message(
     html_body: str,
     text_body: str | None = None,
     attachments: Iterable[Mapping[str, Any]] | None = None,
+    correlation_id: str | None = None,
 ) -> EmailMessage:
+    resolved_correlation_id = current_correlation_id(
+        "integration.email.smtp",
+        reference=f"{to}:{subject}",
+        correlation_id=correlation_id,
+    )
     msg = EmailMessage(policy=policy.SMTP)
     msg["Subject"] = subject
     msg["From"] = _format_from_header(from_addr)
@@ -130,6 +138,7 @@ def _build_email_message(
     msg["Message-ID"] = make_msgid(domain=_sender_domain(from_addr))
     msg["Reply-To"] = _email_address(from_addr)
     msg["X-Mailer"] = DEFAULT_SENDER_NAME
+    msg["X-Correlation-ID"] = resolved_correlation_id
 
     texto_fallback = text_body or "Seu cliente de e-mail nao exibiu o conteudo HTML desta mensagem."
     msg.set_content(texto_fallback, subtype="plain", charset="utf-8")
@@ -158,11 +167,12 @@ def send_email(
     simulate_if_unconfigured: bool = True,
 ) -> bool:
     """Envia um e-mail. Retorna True se enviado com sucesso, False caso contrario."""
+    correlation_id = current_correlation_id("integration.email.smtp", reference=f"{to}:{subject}")
     if not _smtp_configured():
         if simulate_if_unconfigured:
-            logger.info("[EMAIL-SIMULADO] Para: %s | Assunto: %s", to, subject)
+            logger.info("[EMAIL-SIMULADO] Para: %s | Assunto: %s | correlation_id=%s", to, subject, correlation_id)
             return True
-        logger.warning("[EMAIL-NAO-CONFIGURADO] Para: %s | Assunto: %s", to, subject)
+        logger.warning("[EMAIL-NAO-CONFIGURADO] Para: %s | Assunto: %s | correlation_id=%s", to, subject, correlation_id)
         return False
 
     config = _smtp_settings()
@@ -181,6 +191,7 @@ def send_email(
         html_body=html_body,
         text_body=text_body,
         attachments=attachments,
+        correlation_id=correlation_id,
     )
 
     try:
@@ -191,10 +202,10 @@ def send_email(
                 server.ehlo()
             server.login(user, password)
             server.sendmail(envelope_from, [to], msg.as_bytes(policy=policy.SMTP))
-        logger.info("[EMAIL-ENVIADO] Para: %s | Assunto: %s", to, subject)
+        logger.info("[EMAIL-ENVIADO] Para: %s | Assunto: %s | correlation_id=%s", to, subject, correlation_id)
         return True
     except Exception as exc:
-        logger.error("[EMAIL-ERRO] Para: %s | Erro: %s", to, exc)
+        logger.error("[EMAIL-ERRO] Para: %s | Erro: %s | correlation_id=%s", to, exc, correlation_id)
         return False
 
 
