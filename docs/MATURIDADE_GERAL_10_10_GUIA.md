@@ -370,6 +370,7 @@ Proxima acao concreta:
 | #108 | Observabilidade/auditoria | Compose de producao repassa webhook real de alertas Ops para o backend |
 | #109 | Observabilidade/auditoria/seguranca operacional | Evidencia do deploy do webhook Ops no guia vivo |
 | #110 | Observabilidade/auditoria | Alerta Ops por e-mail operacional via `OPS_ALERT_EMAIL_TO` |
+| #111 | Observabilidade/auditoria | Fechamento 10/10 com alerta Ops por e-mail validado |
 | #84 | Portabilidade/configuracao | Check seguro de ambiente DEV e guia de correcao |
 | #85 | Portabilidade/configuracao | Bootstrap de PC novo para ambiente DEV |
 | #86 | Portabilidade/configuracao | Fluxo de segundo PC e diagnostico de portas locais |
