@@ -19,7 +19,7 @@ Regra de uso:
 | MCP Ops/API | 3,5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | Estrutura geral | 5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | Seguranca operacional | 2,5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
-| Testes/CI | 1/10 | 9,3/10 | 10/10 | Em andamento |
+| Testes/CI | 1/10 | 9,5/10 | 10/10 | Em andamento |
 | Observabilidade/auditoria | 2/10 | 9,9/10 | 10/10 | Em andamento prioritario |
 | Portabilidade/configuracao | 3/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | Documentacao | 4/10 | 8/10 | 10/10 | Em andamento |
@@ -174,7 +174,7 @@ Proxima acao concreta:
 
 Nota inicial: 1/10.
 
-Nota atual: 9,3/10.
+Nota atual: 9,5/10.
 
 Referencia principal: `docs/CI_CD_DEPLOY_SAFETY_AUDIT.md`.
 
@@ -190,12 +190,13 @@ Ja feito:
 - [x] Plano E2E minimo do Plano Basico definido com dados descartaveis e suites separadas.
 - [x] Restore smoke real do banco executado com backup, hash e banco temporario isolado.
 - [x] Suite E2E longa do Plano Basico implementada com skip seguro por variaveis de ambiente.
+- [x] Smoke E2E controlado do Plano Basico executado contra producao com usuario/tenant de teste, sem dados sensiveis.
 
 Falta para 10/10:
 
 - [x] Desenhar E2E autenticado minimo para fluxo de login, tenant, clientes, produtos e PDV.
 - [x] Implementar E2E autenticado minimo com skip seguro quando variaveis estiverem ausentes.
-- [ ] Smoke controlado contra staging ou producao sem dados sensiveis.
+- [x] Smoke controlado contra staging ou producao sem dados sensiveis.
 - [ ] Teste automatizado de migrations em banco limpo e banco com historico.
 - [x] Teste de rollback/restore em ambiente controlado.
 - [ ] Relatorio de cobertura por areas criticas, sem perseguir porcentagem cega.
@@ -203,7 +204,7 @@ Falta para 10/10:
 
 Proxima acao concreta:
 
-- [ ] Executar smoke E2E controlado contra staging/local com tenant Plano Basico descartavel.
+- [ ] Automatizar teste de migrations em banco limpo e banco com historico controlado.
 
 ## 6. Observabilidade/auditoria
 

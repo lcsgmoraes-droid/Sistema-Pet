@@ -121,3 +121,33 @@ Status:
   `E2E_TENANT_ID`, a suite pula com mensagem clara.
 - Contra `mlprohub.com.br`, a suite tambem exige `E2E_ALLOW_PRODUCTION=true`
   para evitar escrita acidental em producao.
+
+## Evidencia de smoke controlado
+
+Data: 2026-05-17.
+
+Ambiente: `https://mlprohub.com.br/api`.
+
+Tenant de teste: `Neto Yahoo`
+(`9e8642e7-3e57-4798-8f7d-f5c7cbe0040a`).
+
+Comando executado com variaveis `E2E_*` locais e sem expor senha/token em log:
+
+```text
+python -m pytest tests/test_plano_basico_e2e.py -m e2e_long -q
+```
+
+Resultado:
+
+```text
+tests\test_plano_basico_e2e.py . [100%]
+1 passed in 10.15s
+```
+
+Observacoes:
+
+- A suite usou dados descartaveis com prefixo `E2E-PB-*`.
+- O teste validou login multitenant, selecao de tenant, barreira de modulo,
+  abertura de caixa quando necessario, cliente, produto, entrada de estoque,
+  venda PDV, finalizacao e baixa de estoque.
+- O tenant usado e exclusivo de teste; nao foram usados dados reais de cliente.
