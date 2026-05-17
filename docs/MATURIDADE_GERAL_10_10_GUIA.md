@@ -357,7 +357,7 @@ Proxima acao concreta:
 | #95 | Estrutura geral | Primeira fatia de financeiro para origem de contas a pagar |
 | #96 | Estrutura geral | Fechamento 10/10 com varredura final e criterio de manutencao |
 | #97 | Testes/CI | Plano E2E minimo do Plano Basico com dados descartaveis |
-| PR atual | Seguranca operacional | Usuario operacional `petdeploy` e deploy sem root direto |
+| #98 | Seguranca operacional | Usuario operacional `petdeploy` e deploy sem root direto |
 
 ## Criterio para declarar 10/10 geral
 
