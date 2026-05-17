@@ -4,6 +4,9 @@ Documento de controle para registrar o teste tela por tela do plano basico em no
 
 Nao registrar aqui senhas, tokens, cookies, JWT, URLs sensiveis ou credenciais.
 
+Para venda, implantacao e acompanhamento dos primeiros clientes, usar tambem
+`docs/GUIA_VENDA_PLANO_BASICO.md`.
+
 ## 0. Como usar este arquivo a partir de agora
 
 Este passa a ser o arquivo vivo do Plano Basico vendavel. A ideia e parar de espalhar auditoria, padronizacao e prontidao em varios documentos pequenos.

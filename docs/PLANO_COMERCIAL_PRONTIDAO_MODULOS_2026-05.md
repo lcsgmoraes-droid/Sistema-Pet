@@ -3,6 +3,8 @@
 Objetivo: chegar ate o final de maio/2026 com uma oferta vendavel, segura e honesta
 para terceiros, sem esperar o ERP inteiro ficar perfeito.
 
+Guia operacional de venda e implantacao: `docs/GUIA_VENDA_PLANO_BASICO.md`.
+
 ## Decisao Principal
 
 Nao vamos esperar todas as refatoracoes e todos os modulos ficarem 100%.
