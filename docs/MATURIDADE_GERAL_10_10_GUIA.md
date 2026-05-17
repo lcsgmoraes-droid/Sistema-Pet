@@ -307,7 +307,7 @@ Proxima acao concreta:
 | #73 | Observabilidade/auditoria | Painel de incidentes com filtro por `request_id` e auditoria correlacionada |
 | #74 | Observabilidade/auditoria | Eventos de negocio de campanhas, cupons e carimbos para reconciliacao |
 | #75 | Observabilidade/auditoria | Politica de retencao de logs e dados de auditoria |
-| PR atual | Observabilidade/auditoria | Correlacao para jobs criticos do scheduler Bling |
+| #76 | Observabilidade/auditoria | Correlacao para jobs criticos do scheduler Bling |
 
 ## Criterio para declarar 10/10 geral
 
