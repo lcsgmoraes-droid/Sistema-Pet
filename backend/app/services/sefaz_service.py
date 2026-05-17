@@ -14,6 +14,7 @@ from cryptography.hazmat.primitives.serialization import Encoding, NoEncryption,
 from fastapi import HTTPException
 
 from app.config import settings
+from app.utils.correlation import current_correlation_id
 
 
 @dataclass
@@ -426,6 +427,7 @@ class SefazService:
 
     @classmethod
     def sincronizar_nsu(cls, config: Optional[dict[str, Any]] = None, ultimo_nsu: str = "000000000000000") -> dict[str, Any]:
+        correlation_id = current_correlation_id("integration.sefaz.nsu", reference=ultimo_nsu)
         cfg = cls._read_config(config)
         cls.garantir_pronto_para_consulta_real(cfg)
 
@@ -458,6 +460,7 @@ class SefazService:
             else "Sincronizacao concluida. Nenhum documento novo no NSU informado."
         )
         return {
+            "correlation_id": correlation_id,
             "status": "ok",
             "mensagem": mensagem,
             "documentos": total_docs,
@@ -539,10 +542,12 @@ class SefazService:
         """
         Ponto único da consulta SEFAZ.
         """
+        correlation_id = current_correlation_id("integration.sefaz.chave", reference=chave)
         cfg = cls._read_config(config)
         modo = cls._validar_modo(cfg["modo"])
         if not cfg["enabled"] or modo == "mock":
             return {
+                "correlation_id": correlation_id,
                 "modo": "mock",
                 "chave_acesso": chave,
                 "numero_nf": "000123",
@@ -584,4 +589,6 @@ class SefazService:
             }
 
         cls.garantir_pronto_para_consulta_real(cfg)
-        return cls._consultar_por_chave_real(chave, cfg)
+        resultado = cls._consultar_por_chave_real(chave, cfg)
+        resultado.setdefault("correlation_id", correlation_id)
+        return resultado

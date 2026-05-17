@@ -10,6 +10,7 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 from sqlalchemy.orm import Session
 
+from app.utils.correlation import current_correlation_id
 from app.whatsapp.models import TenantWhatsAppConfig, WhatsAppSession, WhatsAppMessage
 
 logger = logging.getLogger(__name__)
@@ -34,6 +35,13 @@ class Dialog360Client:
             "D360-API-KEY": api_key,
             "Content-Type": "application/json"
         }
+
+    def _headers_with_correlation(self, reference: str | None = None) -> Dict[str, str]:
+        correlation_id = current_correlation_id("integration.whatsapp.360dialog", reference=reference)
+        headers = dict(self.headers)
+        headers["X-Correlation-ID"] = correlation_id
+        headers["X-Request-ID"] = correlation_id
+        return headers
     
     async def send_text_message(
         self,
@@ -62,7 +70,7 @@ class Dialog360Client:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 f"{self.BASE_URL}/messages",
-                headers=self.headers,
+                headers=self._headers_with_correlation(to),
                 json=payload
             )
             
@@ -98,7 +106,7 @@ class Dialog360Client:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 f"{self.BASE_URL}/messages",
-                headers=self.headers,
+                headers=self._headers_with_correlation(to),
                 json=payload
             )
             
@@ -146,7 +154,7 @@ class Dialog360Client:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 f"{self.BASE_URL}/messages",
-                headers=self.headers,
+                headers=self._headers_with_correlation(to),
                 json=payload
             )
             
@@ -173,6 +181,13 @@ class WahaClient:
         }
         self.base_url = base_url.rstrip("/")
 
+    def _headers_with_correlation(self, reference: str | None = None) -> Dict[str, str]:
+        correlation_id = current_correlation_id("integration.whatsapp.waha", reference=reference)
+        headers = dict(self.headers)
+        headers["X-Correlation-ID"] = correlation_id
+        headers["X-Request-ID"] = correlation_id
+        return headers
+
     async def send_text_message(self, to: str, message: str) -> Dict[str, Any]:
         # WAHA espera número no formato "XXXXXXXXXXX@c.us"
         chat_id = to if "@" in to else f"{to}@c.us"
@@ -184,7 +199,7 @@ class WahaClient:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 f"{self.base_url}/api/sendText",
-                headers=self.headers,
+                headers=self._headers_with_correlation(to),
                 json=payload
             )
             response.raise_for_status()
@@ -202,7 +217,7 @@ class WahaClient:
         async with httpx.AsyncClient(timeout=30.0) as client:
             response = await client.post(
                 f"{self.base_url}/api/sendImage",
-                headers=self.headers,
+                headers=self._headers_with_correlation(to),
                 json=payload
             )
             response.raise_for_status()
