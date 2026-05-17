@@ -54,7 +54,8 @@ Use para: ver se os servicos estao de pe e saudaveis.
    - O build de producao deve gerar os arquivos em `runtime/frontend/dist`
    - Sem esse passo no deploy, a producao continua mostrando o codigo antigo
 5. No servidor: `bash scripts/deploy_producao_seguro.sh`
-   - Producao real via SSH: `ssh root@192.241.150.121 "cd /opt/petshop && bash scripts/deploy_producao_seguro.sh"`
+   - Producao real via SSH preferencial: `ssh -i ~/.ssh/mlprohub_codex_deploy -o IdentitiesOnly=yes -o BatchMode=yes petdeploy@192.241.150.121 "sudo -n /usr/local/sbin/petshop-deploy-producao"`
+   - `root@192.241.150.121` fica apenas como fallback operacional autorizado.
    - Guia oficial com IP, health e validacoes: `docs/PRODUCAO_DEPLOY_SSH.md`
 6. `FLUXO_UNICO.bat status`
 
@@ -105,17 +106,16 @@ So o frontend e diferente: o nginx serve os arquivos estaticos gerados em `runti
 
 ## Deploy seguro no servidor
 
-Para producao real, acessar por SSH direto no IP:
+Para producao real, acessar por SSH direto no IP usando o usuario operacional:
 
 ```
-ssh root@192.241.150.121
+ssh -i ~/.ssh/mlprohub_codex_deploy -o IdentitiesOnly=yes petdeploy@192.241.150.121
 ```
 
-No servidor de producao, o caminho padrao agora e:
+No servidor de producao, o caminho padrao com root-owned wrapper e:
 
 ```
-cd /opt/petshop
-bash scripts/deploy_producao_seguro.sh
+sudo -n /usr/local/sbin/petshop-deploy-producao
 ```
 
 Esse script:

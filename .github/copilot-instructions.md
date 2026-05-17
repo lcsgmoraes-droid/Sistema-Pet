@@ -10,14 +10,14 @@ Antes de agir, leia e siga obrigatoriamente:
 - `docs/FLUXO_UNICO_DEV_PROD.md`
 - `README.md` (secao de fluxo unico)
 
-## REGRA ABSOLUTA — NUNCA SUBIR PARA PRODUCAO SEM AUTORIZACAO EXPLICITA
+## REGRA ABSOLUTA - NUNCA SUBIR PARA PRODUCAO SEM AUTORIZACAO EXPLICITA
 
 **Antes de qualquer `git push origin main` ou qualquer comando SSH no servidor de producao (mlprohub.com.br / 192.241.150.121), o assistente DEVE:**
 
 1. Parar o que esta fazendo
 2. Perguntar em portugues simples: "Posso subir para producao agora? O que vai subir: [lista]"
 3. Aguardar o Lucas dizer "sim" ou "pode subir"
-4. SÓ ENTAO executar o deploy
+4. SO ENTAO executar o deploy
 
 **Esta regra nao tem excecoes. Nem urgencia, nem simplicidade da mudanca justificam pular esta etapa.**
 
@@ -34,7 +34,7 @@ Use sempre esta sequencia:
 3. `FLUXO_UNICO.bat release-check`
 4. **Se alterou arquivos em `frontend/src`: rodar `npm run build` dentro da pasta `frontend` e incluir o `dist` no commit com `git add -f frontend/dist`**
 5. `git push origin main`
-6. **DEPLOY NO SERVIDOR REMOTO (mlprohub.com.br / 192.241.150.121): via MCP SSH (conexao ID 1 ou nome mlprohub-producao), rodar: `cd /opt/petshop && git pull origin main && docker restart petshop-prod-nginx`. Se houver mudancas no backend (qualquer arquivo dentro de `backend/`): OBRIGATORIO reconstruir a imagem antes de reiniciar: `docker compose -f docker-compose.prod.yml build backend && docker compose -f docker-compose.prod.yml up -d backend` — um simples `docker restart` NAO e suficiente porque o codigo fica dentro da imagem Docker, nao em volume montado.**
+6. **DEPLOY NO SERVIDOR REMOTO (mlprohub.com.br / 192.241.150.121): preferir o usuario operacional `petdeploy` e rodar `ssh -i ~/.ssh/mlprohub_codex_deploy -o IdentitiesOnly=yes -o BatchMode=yes petdeploy@192.241.150.121 "sudo -n /usr/local/sbin/petshop-deploy-producao"`. Esse wrapper root-owned executa o script oficial `scripts/deploy_producao_seguro.sh`, que faz pull, build frontend, rebuild backend/worker, migrations e health. `root@192.241.150.121` fica apenas como fallback operacional autorizado.**
 7. `FLUXO_UNICO.bat status` (mostra containers locais; para ver estado real da producao, checar via SSH)
 
 ## Comunicacao com o usuario
@@ -50,25 +50,25 @@ Use sempre esta sequencia:
 - Nao enviar dados de DEV para producao.
 - Nao pular validacao de release.
 - Nao corrigir em producao manualmente sem refletir no Git.
-- **Sempre rodar `npm run build` (na pasta `frontend`) antes de qualquer deploy quando houver mudancas no frontend. O nginx de producao serve arquivos estaticos da pasta `dist` — sem build, o codigo novo nao aparece em producao.**
+- **Sempre rodar `npm run build` (na pasta `frontend`) antes de qualquer deploy quando houver mudancas no frontend. O nginx de producao serve arquivos estaticos da pasta `dist` - sem build, o codigo novo nao aparece em producao.**
 - **NUNCA usar `git add -A` sem antes verificar `git status --short` e checar se ha arquivos de infraestrutura sendo deletados (linhas com ` D` ou `D `). Arquivos protegidos: `docker-compose.*.yml`, `.env.*`, `scripts/*.ps1`, `.github/`, `docs/FLUXO_UNICO_DEV_PROD.md`. Se aparecerem como deletados: restaurar com `git checkout HEAD -- <arquivo>` antes de commitar.**
-- **PRODUCAO REAL E REMOTA: `mlprohub.com.br` esta hospedado no servidor DigitalOcean (IP 192.241.150.121). O `prod-up` local NAO afeta a producao real. Para deployar em producao: fazer `git push origin main` e depois SSH no servidor via MCP (ID 1) e rodar `cd /opt/petshop && git pull origin main && docker restart petshop-prod-nginx`. Se houver mudancas no backend: NUNCA usar apenas `docker restart petshop-prod-backend` — o codigo do backend fica DENTRO DA IMAGEM DOCKER (nao em volume), entao e obrigatorio reconstruir: `docker compose -f docker-compose.prod.yml build backend && docker compose -f docker-compose.prod.yml up -d backend`.**
+- **PRODUCAO REAL E REMOTA: `mlprohub.com.br` esta hospedado no servidor DigitalOcean (IP 192.241.150.121). O `prod-up` local NAO afeta a producao real. Para deployar em producao: fazer `git push origin main` e depois usar `petdeploy@192.241.150.121` com `sudo -n /usr/local/sbin/petshop-deploy-producao`. NUNCA usar `git pull` + `docker restart` como deploy de codigo; o backend fica DENTRO DA IMAGEM DOCKER e precisa do script seguro com rebuild.**
 
 ## Padronizacao de numeros e moeda (OBRIGATORIO)
 
 **Formato brasileiro obrigatorio em todo o sistema:**
 - Ponto como separador de milhar: `17.555,25`
 - Virgula como separador decimal: `0,99`
-- NUNCA usar `value.toFixed(2).replace('.', ',')` — isso nao inclui separador de milhar.
+- NUNCA usar `value.toFixed(2).replace('.', ',')` - isso nao inclui separador de milhar.
 
-**Funcoes utilitarias — sempre usar:**
-- `formatBRL(value)` → `"17.555,25"` (sem prefixo)
-- `formatMoneyBRL(value)` → `"R$ 17.555,25"` (com prefixo)
+**Funcoes utilitarias - sempre usar:**
+- `formatBRL(value)` -> `"17.555,25"` (sem prefixo)
+- `formatMoneyBRL(value)` -> `"R$ 17.555,25"` (com prefixo)
 - Arquivo: `frontend/src/utils/formatters.js`
 
-**Inputs monetarios — sempre usar `CurrencyInput`:**
+**Inputs monetarios - sempre usar `CurrencyInput`:**
 - Comportamento de virgula fixa: digitos entram da direita para esquerda
-- Ex: digitar 5 → 0,05 → 0,55 → 5,55 → 55,55
+- Ex: digitar 5 -> 0,05 -> 0,55 -> 5,55 -> 55,55
 - Suporta selecionar tudo e digitar para substituir
 - Mostra separador de milhar automaticamente: `17.555,25`
 - Arquivo: `frontend/src/components/CurrencyInput.jsx`

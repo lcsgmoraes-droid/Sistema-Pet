@@ -18,7 +18,7 @@ Regra de uso:
 | MCP Frontend | 5,5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | MCP Ops/API | 3,5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | Estrutura geral | 5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
-| Seguranca operacional | 2,5/10 | 8,5/10 | 10/10 | Em andamento |
+| Seguranca operacional | 2,5/10 | 9,2/10 | 10/10 | Em andamento |
 | Testes/CI | 1/10 | 9/10 | 10/10 | Em andamento |
 | Observabilidade/auditoria | 2/10 | 9,9/10 | 10/10 | Em andamento prioritario |
 | Portabilidade/configuracao | 3/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
@@ -134,7 +134,7 @@ Para manter 10/10:
 
 Nota inicial: 2,5/10.
 
-Nota atual: 9/10.
+Nota atual: 9,2/10.
 
 Referencia principal: `docs/CI_CD_DEPLOY_SAFETY_AUDIT.md`.
 
@@ -149,10 +149,11 @@ Ja feito:
 - [x] SSH deste PC configurado para producao.
 - [x] Script oficial de deploy registra linha do tempo auditavel das etapas sensiveis em `backend/logs/deploy_events.jsonl`.
 - [x] Wrapper `scripts/auditar_comando_producao.sh` registra comandos manuais sensiveis fora do deploy oficial em `backend/logs/ops_command_events.jsonl`.
+- [x] Usuario operacional `petdeploy` criado em producao com SSH por chave deste PC, wrappers root-owned de deploy/status e sudo restrito a esses wrappers.
 
 Falta para 10/10:
 
-- [ ] Trocar deploy root por usuario operacional com privilegio minimo.
+- [x] Criar caminho de deploy/status por usuario operacional com privilegio minimo e root apenas como fallback.
 - [ ] Documentar rotacao de SSH/secrets.
 - [ ] Testar restore real de backup em ambiente controlado.
 - [ ] Criar checklist de rollback com tempo alvo e responsavel.
@@ -160,13 +161,13 @@ Falta para 10/10:
 
 Proxima acao concreta:
 
-- [ ] Criar plano de hardening SSH/producao sem interromper o deploy atual.
+- [ ] Executar o proximo deploy completo via `petdeploy` e documentar rotacao de SSH/secrets.
 
 ## 5. Testes/CI
 
 Nota inicial: 1/10.
 
-Nota atual: 8,5/10.
+Nota atual: 9/10.
 
 Referencia principal: `docs/CI_CD_DEPLOY_SAFETY_AUDIT.md`.
 
@@ -356,6 +357,7 @@ Proxima acao concreta:
 | #95 | Estrutura geral | Primeira fatia de financeiro para origem de contas a pagar |
 | #96 | Estrutura geral | Fechamento 10/10 com varredura final e criterio de manutencao |
 | #97 | Testes/CI | Plano E2E minimo do Plano Basico com dados descartaveis |
+| #98 | Seguranca operacional | Usuario operacional `petdeploy` e deploy sem root direto |
 
 ## Criterio para declarar 10/10 geral
 

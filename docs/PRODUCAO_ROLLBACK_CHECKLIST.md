@@ -9,7 +9,8 @@ Ele nao autoriza deploy. Qualquer comando no servidor de producao ou push direto
 - Deploy por SSH: `docs/PRODUCAO_DEPLOY_SSH.md`
 - Fluxo unico DEV -> PROD: `docs/FLUXO_UNICO_DEV_PROD.md`
 - Script oficial de deploy: `scripts/deploy_producao_seguro.sh`
-- Servidor: `root@192.241.150.121`
+- Servidor preferencial: `petdeploy@192.241.150.121`
+- Servidor fallback: `root@192.241.150.121`
 - Projeto no servidor: `/opt/petshop`
 - Health publico: `https://mlprohub.com.br/api/health`
 - Watchdog publico: `https://mlprohub.com.br/api/health/watchdog`
@@ -34,7 +35,7 @@ Marcar estes itens antes de rodar qualquer comando no servidor:
 Rodar somente depois da autorizacao explicita:
 
 ```bash
-ssh -o BatchMode=yes root@192.241.150.121 "cd /opt/petshop && bash scripts/deploy_producao_seguro.sh"
+ssh -i ~/.ssh/mlprohub_codex_deploy -o IdentitiesOnly=yes -o BatchMode=yes petdeploy@192.241.150.121 "sudo -n /usr/local/sbin/petshop-deploy-producao"
 ```
 
 Durante o deploy, guardar estes dados:
@@ -57,7 +58,7 @@ curl -fsS https://mlprohub.com.br/api/health/watchdog
 ```
 
 ```bash
-ssh -o BatchMode=yes root@192.241.150.121 "cd /opt/petshop && git rev-parse --short HEAD && docker compose -f docker-compose.prod.yml ps && docker compose -f docker-compose.prod.yml exec -T backend alembic current"
+ssh -i ~/.ssh/mlprohub_codex_deploy -o IdentitiesOnly=yes -o BatchMode=yes petdeploy@192.241.150.121 "sudo -n /usr/local/sbin/petshop-status-producao"
 ```
 
 Se a mudanca envolver Ops ou observabilidade, validar tambem:
