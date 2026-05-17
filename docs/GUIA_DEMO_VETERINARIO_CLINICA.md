@@ -11,17 +11,18 @@ como final algo que ainda deve ser tratado como piloto acompanhado.
 Status recomendado: demonstravel e bom para piloto controlado.
 
 Nao recomendado ainda: vender em escala como modulo veterinario fechado, sem
-smoke autenticado completo em producao e validacao de perfis reais.
+validacao de perfis reais e fluxo operacional de uma clinica piloto.
 
-Nota pratica para demo: 7,5/10.
+Nota pratica para demo: 8/10.
 
 Motivo da nota:
 
 - o modulo tem muita coisa implementada e buildando;
 - existem testes focados passando;
 - agenda, consulta, vacinas, exames, internacao, catalogo, IA e repasse existem;
-- ainda falta smoke real guiado com usuario/tenant de clinica antes de prometer
-  uso diario sem acompanhamento.
+- ja passou por smoke autenticado em producao com usuario admin de teste;
+- ainda falta validar perfis reais de clinica antes de prometer uso diario sem
+  acompanhamento.
 
 ## Evidencias de 2026-05-17
 
@@ -40,6 +41,16 @@ Checagem publica de producao:
   banco conectado.
 - `https://mlprohub.com.br/veterinario`: 200, SPA acessivel publicamente antes
   da autenticacao/gate.
+
+Smoke autenticado de producao:
+
+- Usuario admin de teste autenticou no tenant `PET TESTE LUCAS`.
+- O tenant tinha o modulo `veterinario` ativo.
+- Todas as abas principais do modulo abriram sem erro critico de console/rede:
+  dashboard, agenda, consultas, nova consulta, exames, IA, calculadora de doses,
+  vacinas, internacoes, catalogo, repasse e configuracoes.
+- O email da Maiara informado pelo Lucas no chat nao foi encontrado no cadastro
+  global, e nenhum usuario foi criado durante a checagem.
 
 ## Como posicionar na conversa
 
@@ -175,10 +186,9 @@ No-Go:
 
 ## Proxima acao recomendada
 
-Antes da apresentacao, fazer um smoke visual autenticado com um usuario que tenha
-o modulo `veterinario` ativo. Se nao houver esse usuario pronto, a demo deve ser
-feita como apresentacao guiada do potencial do modulo, deixando claro que a
-implantacao real seria um piloto acompanhado.
+Antes da apresentacao, decidir se a demo sera feita no tenant de teste ou se
+Lucas quer criar um tenant/acesso proprio para a Maiara. Se for criar acesso
+real, registrar a acao e manter a implantacao como piloto acompanhado.
 
 ## Referencias
 
@@ -186,3 +196,4 @@ implantacao real seria um piloto acompanhado.
 - `docs/PLANEJAMENTO_MODULO_VETERINARIO.md`
 - `docs/PLANO_COMERCIAL_PRONTIDAO_MODULOS_2026-05.md`
 - `docs/GUIA_VENDA_PLANO_BASICO.md`
+- `docs/CRONOGRAMA_MAIARA_VETERINARIO_ADMIN_SAAS.md`
