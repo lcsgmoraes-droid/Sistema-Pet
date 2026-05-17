@@ -81,6 +81,8 @@ alternativa operacional.
 
 O painel Ops pode enviar alertas criticos para um webhook externo quando
 `OPS_ALERT_WEBHOOK_URL` estiver configurado no ambiente seguro do backend.
+O `docker-compose.prod.yml` repassa as variaveis `OPS_ALERT_*` para o container
+`backend`; os valores continuam vindo do `.env` seguro do servidor.
 
 Variaveis relevantes:
 
