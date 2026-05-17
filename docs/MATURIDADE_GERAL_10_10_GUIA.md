@@ -374,6 +374,7 @@ Proxima acao concreta:
 | #102 | Seguranca operacional | Deploy sem rebuild para mudancas sem impacto de runtime |
 | #103 | Seguranca operacional | Fechamento 10/10 com evidencia do deploy sem rebuild |
 | #104 | Testes/CI | Suite E2E longa do Plano Basico com skip seguro por ambiente |
+| #105 | Testes/CI | Smoke E2E controlado do Plano Basico em tenant de teste |
 
 ## Criterio para declarar 10/10 geral
 
