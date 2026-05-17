@@ -6,6 +6,11 @@ os.environ["DATABASE_URL"] = os.environ.get("DATABASE_URL") or "sqlite:///./test
 os.environ["DEBUG"] = "false"
 
 from app import produtos_routes as routes  # noqa: E402
+from app.produtos.validade import (  # noqa: E402
+    _calcular_faixa_campanha_validade,
+    _calcular_status_validade,
+    _mapa_validade_proxima_produtos,
+)
 
 
 class FakeQuery:
@@ -39,7 +44,7 @@ def test_mapa_validade_proxima_produtos_usa_primeira_validade_por_produto():
         (103, 11, "LOTE-C", validade_mais_distante, 5, 5),
     ]
 
-    resultado = routes._mapa_validade_proxima_produtos(
+    resultado = _mapa_validade_proxima_produtos(
         FakeDb(rows),
         [SimpleNamespace(id=10), SimpleNamespace(id=11)],
         ["tenant-1"],
@@ -74,7 +79,7 @@ def test_mapa_validade_proxima_produtos_mantem_lote_sem_validade_no_resumo():
         (202, 10, "LOTE-SEM-VALIDADE", None, 8, 8),
     ]
 
-    resultado = routes._mapa_validade_proxima_produtos(
+    resultado = _mapa_validade_proxima_produtos(
         FakeDb(rows),
         [SimpleNamespace(id=10)],
         ["tenant-1"],
@@ -88,6 +93,22 @@ def test_mapa_validade_proxima_produtos_mantem_lote_sem_validade_no_resumo():
         "quantidade_inicial": 8.0,
         "quantidade_disponivel": 8.0,
     }
+
+
+def test_classificadores_de_validade_preservam_faixas_operacionais():
+    assert _calcular_status_validade(None) == "sem_validade"
+    assert _calcular_status_validade(-1) == "vencido"
+    assert _calcular_status_validade(7) == "urgente"
+    assert _calcular_status_validade(30) == "alerta_30"
+    assert _calcular_status_validade(60) == "alerta_60"
+    assert _calcular_status_validade(61) == "monitorar"
+
+    assert _calcular_faixa_campanha_validade(None) is None
+    assert _calcular_faixa_campanha_validade(-1) == "vencido"
+    assert _calcular_faixa_campanha_validade(7) == "7_dias"
+    assert _calcular_faixa_campanha_validade(30) == "30_dias"
+    assert _calcular_faixa_campanha_validade(60) == "60_dias"
+    assert _calcular_faixa_campanha_validade(61) is None
 
 
 def test_enriquecer_produto_listagem_expoe_validade_calculada():
