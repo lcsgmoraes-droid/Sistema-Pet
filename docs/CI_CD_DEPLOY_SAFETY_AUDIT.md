@@ -29,6 +29,7 @@ Meta: 10/10 antes de automatizar qualquer deploy de producao.
 | Feito | Checklist de deploy com backup, health e rollback criado | `docs/PRODUCAO_ROLLBACK_CHECKLIST.md` |
 | Feito | Deploy real validado com script seguro, health publico e containers healthy | `scripts/deploy_producao_seguro.sh` |
 | Feito | Deploy oficial registra linha do tempo auditavel por etapa sensivel | `backend/logs/deploy_events.jsonl` |
+| Feito | Comandos manuais sensiveis possuem wrapper auditavel com motivo obrigatorio | `scripts/auditar_comando_producao.sh` |
 
 ## PRs ja juntados
 

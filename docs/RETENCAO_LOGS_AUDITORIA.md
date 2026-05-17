@@ -45,6 +45,7 @@ Referencias externas:
 | `ops_recovery_actions` | Watchdog e recuperacoes automaticas | Banco principal | 24 meses | 36 meses agregado | Purgar payload bruto, manter resumo operacional |
 | `backend/logs/error_events.jsonl` | Espelho local de erros de request | Servidor/producao | 30 dias | 90 dias compactado | Rotacionar e apagar arquivo antigo |
 | `backend/logs/deploy_events.jsonl` | Deploys, falhas e rollbacks | Servidor/producao | 24 meses | Historico resumido em docs | Compactar antigo; registro essencial fica no checklist |
+| `backend/logs/ops_command_events.jsonl` | Comandos manuais sensiveis em producao | Servidor/producao | 24 meses | Historico resumido em docs | Compactar antigo; preservar eventos de incidente |
 | `backend/logs/watchdog_events.jsonl` | Watchdog interno do backend | Servidor/producao | 90 dias | 24 meses agregado | Rotacionar e apagar bruto antigo |
 | `backend/logs/host_watchdog_events.jsonl` | Watchdog externo do host | Servidor/producao | 90 dias | 24 meses agregado | Rotacionar e apagar bruto antigo |
 | `backend/logs/disk_guard_events.jsonl` | Guardiao preventivo de disco | Servidor/producao | 90 dias | 24 meses agregado | Rotacionar e apagar bruto antigo |
@@ -130,6 +131,8 @@ Apos cada deploy real:
 - Registrar commit, backup, health e evento de deploy em
   `docs/CI_CD_DEPLOY_SAFETY_AUDIT.md` ou checklist equivalente.
 - Confirmar que `backend/logs/deploy_events.jsonl` recebeu sucesso ou falha.
+- Para comando manual sensivel fora do deploy oficial, usar
+  `scripts/auditar_comando_producao.sh` e conferir `backend/logs/ops_command_events.jsonl`.
 
 ## Backlog para 10/10
 

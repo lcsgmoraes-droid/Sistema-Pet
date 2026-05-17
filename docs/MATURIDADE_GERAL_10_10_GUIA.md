@@ -18,9 +18,9 @@ Regra de uso:
 | MCP Frontend | 5,5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | MCP Ops/API | 3,5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | Estrutura geral | 5/10 | 6,5/10 | 10/10 | Em andamento |
-| Seguranca operacional | 2,5/10 | 8,2/10 | 10/10 | Em andamento |
+| Seguranca operacional | 2,5/10 | 8,5/10 | 10/10 | Em andamento |
 | Testes/CI | 1/10 | 8,5/10 | 10/10 | Em andamento |
-| Observabilidade/auditoria | 2/10 | 9,2/10 | 10/10 | Em andamento prioritario |
+| Observabilidade/auditoria | 2/10 | 9,3/10 | 10/10 | Em andamento prioritario |
 | Portabilidade/configuracao | 3/10 | 6,5/10 | 10/10 | Em andamento |
 | Documentacao | 4/10 | 8/10 | 10/10 | Em andamento |
 
@@ -119,7 +119,7 @@ Proxima acao concreta:
 
 Nota inicial: 2,5/10.
 
-Nota atual: 8,2/10.
+Nota atual: 8,5/10.
 
 Referencia principal: `docs/CI_CD_DEPLOY_SAFETY_AUDIT.md`.
 
@@ -133,6 +133,7 @@ Ja feito:
 - [x] Deploy real validado com backup, migrations, health e watchdog.
 - [x] SSH deste PC configurado para producao.
 - [x] Script oficial de deploy registra linha do tempo auditavel das etapas sensiveis em `backend/logs/deploy_events.jsonl`.
+- [x] Wrapper `scripts/auditar_comando_producao.sh` registra comandos manuais sensiveis fora do deploy oficial em `backend/logs/ops_command_events.jsonl`.
 
 Falta para 10/10:
 
@@ -140,7 +141,6 @@ Falta para 10/10:
 - [ ] Documentar rotacao de SSH/secrets.
 - [ ] Testar restore real de backup em ambiente controlado.
 - [ ] Criar checklist de rollback com tempo alvo e responsavel.
-- [ ] Registrar auditoria de comandos sensiveis manuais executados em producao fora do script oficial.
 - [ ] Separar ainda mais deploy de runtime e docs/workflows sem impacto de servidor.
 
 Proxima acao concreta:
@@ -182,7 +182,7 @@ Proxima acao concreta:
 
 Nota inicial: 2/10.
 
-Nota atual: 9,2/10.
+Nota atual: 9,3/10.
 
 Referencia principal: `docs/roadmaps/FASE2_OBSERVABILIDADE.md`, `docs/RETENCAO_LOGS_AUDITORIA.md` e secoes de Ops em `docs/EVOLUCAO_ENTERPRISE_UI_REFATORACAO.md`.
 
@@ -205,15 +205,15 @@ Ja feito:
 - [x] `correlation_id` aplicado nas integracoes externas restantes de WhatsApp, SEFAZ e e-mail transacional.
 - [x] Eventos de negocio auditaveis tambem emitem log estruturado JSON via caminho central de auditoria.
 - [x] Deploy oficial registra eventos `running`, `success` e `failed` por etapa sensivel, preservando falhas finais mesmo apos eventos intermediarios.
+- [x] Comandos manuais sensiveis podem ser executados com auditoria `started`, `success` e `failed`, motivo obrigatorio e redaction basica de argumentos.
 
 Falta para 10/10:
 
-- [ ] Estender trilha de auditoria para comandos manuais em producao e demais alteracoes sensiveis fora das rotas ja cobertas.
 - [ ] Alertar falhas recorrentes, lentidao, 5xx e falha de jobs.
 
 Proxima acao concreta:
 
-- [ ] Estender trilha de auditoria para comandos manuais em producao e demais alteracoes sensiveis fora das rotas ja cobertas.
+- [ ] Alertar falhas recorrentes, lentidao, 5xx e falha de jobs.
 
 ## 7. Portabilidade/configuracao
 
@@ -313,6 +313,7 @@ Proxima acao concreta:
 | #77 | Observabilidade/auditoria | Correlacao para WhatsApp, SEFAZ e e-mail |
 | #78 | Observabilidade/auditoria | Logs estruturados de eventos de negocio |
 | #79 | Observabilidade/auditoria/seguranca operacional | Linha do tempo auditavel das etapas sensiveis do deploy |
+| PR atual | Observabilidade/auditoria/seguranca operacional | Auditoria de comandos manuais sensiveis em producao |
 
 ## Criterio para declarar 10/10 geral
 
