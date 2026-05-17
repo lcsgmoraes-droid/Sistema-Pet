@@ -12,6 +12,7 @@ import useConsultaTimeline from "./useConsultaTimeline";
 import usePrescricaoProcedimentosConsulta from "./usePrescricaoProcedimentosConsulta";
 import useTutorPetSelection from "./useTutorPetSelection";
 import { normalizarEtapaConsultaQuery } from "./consultaEtapaQuery";
+import { buildCalculadoraDoseFormParaPrescricao } from "./prescricaoDoseUtils";
 
 export default function useVetConsultaFormController() {
   const navigate = useNavigate();
@@ -132,8 +133,10 @@ export default function useVetConsultaFormController() {
     setModalInsumoAberto: state.setModalInsumoAberto,
     setModalNovoExameAberto: state.setModalNovoExameAberto,
     setModalNovoPetAberto: state.setModalNovoPetAberto,
+    setModalRascunhoSalvoAberto: state.setModalRascunhoSalvoAberto,
     setNovoExameArquivo: state.setNovoExameArquivo,
     setNovoExameForm: state.setNovoExameForm,
+    setRascunhoSalvoMensagem: state.setRascunhoSalvoMensagem,
     setRefreshExamesToken: state.setRefreshExamesToken,
     setSalvando: state.setSalvando,
     setSalvandoInsumoRapido: state.setSalvandoInsumoRapido,
@@ -152,8 +155,29 @@ export default function useVetConsultaFormController() {
     ...timeline,
     ...state,
     abrirModalCalculadora: () => state.setModalCalculadoraAberto(true),
+    abrirCalculadoraPrescricaoItem: (idx) => {
+      const itemPrescricao = state.form.prescricao_itens[idx] ?? {};
+      calculadora.setCalculadoraForm((prev) =>
+        buildCalculadoraDoseFormParaPrescricao({
+          calculadoraFormAtual: prev,
+          formConsulta: state.form,
+          itemPrescricao,
+          petSelecionado: selecaoTutorPet.petSelecionado,
+        })
+      );
+      state.setModalCalculadoraAberto(true);
+    },
     abrirModalNovoExame: () => state.setModalNovoExameAberto(true),
     abrirTimelineLink: (link) => navigate(link),
+    fecharModalRascunhoSalvo: () => state.setModalRascunhoSalvoAberto(false),
+    irParaTopoAposRascunho: () => {
+      state.setModalRascunhoSalvoAberto(false);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    },
+    sairParaListaAposRascunho: () => {
+      state.setModalRascunhoSalvoAberto(false);
+      navigate("/veterinario/consultas");
+    },
     assinatura,
     carregando,
     finalizado,

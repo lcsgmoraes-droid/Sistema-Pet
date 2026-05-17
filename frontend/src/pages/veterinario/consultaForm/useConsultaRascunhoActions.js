@@ -1,5 +1,6 @@
 import { vetApi } from "../vetApi";
 import { buildConsultaPayload, buildRascunhoItensConsultaPayload } from "./consultaFormState";
+import { buildMensagemRascunhoSalvo } from "./consultaRascunhoFeedback";
 import { ETAPAS } from "./consultaFormUtils";
 
 export default function useConsultaRascunhoActions({
@@ -14,6 +15,8 @@ export default function useConsultaRascunhoActions({
   setErro,
   setEtapa,
   setModalNovoPetAberto,
+  setModalRascunhoSalvoAberto,
+  setRascunhoSalvoMensagem,
   setSalvando,
   setSucesso,
   tipoQuery,
@@ -74,11 +77,10 @@ export default function useConsultaRascunhoActions({
         buildRascunhoItensConsultaPayload(form)
       );
 
-      setSucesso(
-        etapa < ETAPAS.length - 1
-          ? "Rascunho salvo com sucesso."
-          : "Rascunho salvo com sucesso. Voce pode finalizar quando quiser."
-      );
+      const mensagem = buildMensagemRascunhoSalvo({ etapa, totalEtapas: ETAPAS.length });
+      setSucesso(mensagem);
+      setRascunhoSalvoMensagem(mensagem);
+      setModalRascunhoSalvoAberto(true);
 
       if (etapa < ETAPAS.length - 1) setEtapa((etapaAtual) => etapaAtual + 1);
     } catch (error) {

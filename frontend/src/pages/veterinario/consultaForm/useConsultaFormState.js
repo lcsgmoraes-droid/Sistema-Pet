@@ -13,6 +13,8 @@ export default function useConsultaFormState(consultaId) {
   const [sucesso, setSucesso] = useState(null);
   const [consultaIdAtual, setConsultaIdAtual] = useState(consultaId ?? null);
   const [modalCalculadoraAberto, setModalCalculadoraAberto] = useState(false);
+  const [modalRascunhoSalvoAberto, setModalRascunhoSalvoAberto] = useState(false);
+  const [rascunhoSalvoMensagem, setRascunhoSalvoMensagem] = useState("");
   const [modalNovoExameAberto, setModalNovoExameAberto] = useState(false);
   const [salvandoNovoExame, setSalvandoNovoExame] = useState(false);
   const [modalNovoPetAberto, setModalNovoPetAberto] = useState(false);
@@ -40,8 +42,10 @@ export default function useConsultaFormState(consultaId) {
     modalInsumoAberto,
     modalNovoExameAberto,
     modalNovoPetAberto,
+    modalRascunhoSalvoAberto,
     novoExameArquivo,
     novoExameForm,
+    rascunhoSalvoMensagem,
     refreshExamesToken,
     salvando,
     salvandoInsumoRapido,
@@ -57,8 +61,10 @@ export default function useConsultaFormState(consultaId) {
     setModalInsumoAberto,
     setModalNovoExameAberto,
     setModalNovoPetAberto,
+    setModalRascunhoSalvoAberto,
     setNovoExameArquivo,
     setNovoExameForm,
+    setRascunhoSalvoMensagem,
     setRefreshExamesToken,
     setSalvando,
     setSalvandoInsumoRapido,

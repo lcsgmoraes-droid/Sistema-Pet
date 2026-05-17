@@ -159,6 +159,12 @@ entrar no cronograma sem se perderem.
       uso clinico e dados para prescricao.
 - [x] Ajustar calculadora de dose para usar primeiro o peso informado na
       consulta; se estiver vazio, usar o peso cadastrado no pet.
+- [x] Fazer o botao `Calcular dose pelo peso` da prescricao abrir o modal da
+      calculadora de dose dentro da propria consulta, ja preenchido com
+      medicamento, peso e dose de referencia quando houver catalogo.
+- [x] Ao salvar rascunho da consulta, exibir modal de confirmacao visivel mesmo
+      no fim da tela, com acoes para continuar editando, ir para o topo ou sair
+      para a lista de consultas.
 - [ ] Ampliar a base padrao de procedimentos veterinarios e seus insumos.
 - [ ] Revisar padrao de horario do modulo veterinario e do sistema: usar
       Brasilia na exibicao e/ou UTC persistido de forma consistente, com foco em

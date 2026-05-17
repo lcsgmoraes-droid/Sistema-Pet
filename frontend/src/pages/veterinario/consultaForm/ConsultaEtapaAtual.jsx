@@ -76,7 +76,7 @@ function DiagnosticoStep({ consulta }) {
       removerItem={consulta.removerItem}
       setItem={consulta.setItem}
       selecionarMedicamentoNoItem={consulta.selecionarMedicamentoNoItem}
-      recalcularDoseItem={consulta.recalcularDoseItem}
+      abrirCalculadoraPrescricaoItem={consulta.abrirCalculadoraPrescricaoItem}
       adicionarProcedimento={consulta.adicionarProcedimento}
       removerProcedimento={consulta.removerProcedimento}
       setProcedimentoItem={consulta.setProcedimentoItem}

@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildCalculadoraDoseFormParaPrescricao,
   calcularDosePrescricaoPorPeso,
   obterPesoParaCalculoDose,
 } from "./prescricaoDoseUtils.js";
@@ -32,5 +33,33 @@ test("calcularDosePrescricaoPorPeso calcula dose média usando campos do catálo
   assert.deepEqual(dose, {
     dose_mg: "75.00",
     unidade: "mg",
+  });
+});
+
+test("buildCalculadoraDoseFormParaPrescricao preenche modal com medicamento, peso e dose de referencia", () => {
+  const formCalculadora = buildCalculadoraDoseFormParaPrescricao({
+    calculadoraFormAtual: {
+      medicamento_id: "",
+      peso_kg: "",
+      dose_mg_kg: "",
+      frequencia_horas: "12",
+      dias: "7",
+    },
+    formConsulta: { peso_kg: "15" },
+    itemPrescricao: {
+      medicamento_id: 42,
+      dose_minima_mg_kg: 20,
+      dose_maxima_mg_kg: 30,
+      duracao_dias: "5",
+    },
+    petSelecionado: { peso: "9" },
+  });
+
+  assert.deepEqual(formCalculadora, {
+    medicamento_id: "42",
+    peso_kg: "15",
+    dose_mg_kg: "25",
+    frequencia_horas: "12",
+    dias: "5",
   });
 });
