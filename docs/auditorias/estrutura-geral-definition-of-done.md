@@ -87,3 +87,17 @@ Parar e abrir nova tarefa se aparecer:
 - Falta de teste para comportamento que sera movido.
 - Arquivo tocado por outra frente ativa.
 
+## Manutencao do 10/10 estrutural
+
+Depois dos PRs #89 a #95, o padrao modular esta provado em Produtos, Estoque,
+PDV/vendas, campanhas/cupons e financeiro. Para manter a nota estrutural:
+
+- Arquivo acima de 2.000 linhas nao deve receber nova regra de negocio sem
+  plano de extracao ou justificativa no PR.
+- Helper puro novo em rota critica deve nascer em modulo dedicado quando for
+  reutilizavel, testavel isoladamente ou sensivel para dinheiro/estoque/cupom.
+- Toda extracao deve preservar endpoint, payload, permissao, tenant e auditoria.
+- O PR deve citar quais testes provam que o comportamento foi preservado.
+- Duplicacao de regra em frontend deve apontar para service/helper central ou
+  abrir tarefa de consolidacao.
+
