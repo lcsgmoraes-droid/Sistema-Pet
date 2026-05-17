@@ -86,6 +86,8 @@ Validacao apos deploy:
   `sent=1`, `sent_email=1`, `sent_webhook=0` e `status=sent`.
 - `backend/logs/ops_alert_notifications.jsonl` registrou a deduplicacao do
   alerta controlado.
+- Recebimento humano do e-mail em `prohubml@gmail.com` confirmado por Lucas em
+  2026-05-17.
 
 Restore smoke validado:
 

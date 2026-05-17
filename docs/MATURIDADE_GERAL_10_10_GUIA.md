@@ -249,6 +249,7 @@ Ja feito:
 - [x] PR #110 deployado em producao no commit `56c59119`; health publico `ok`, watchdog `healthy` e containers saudaveis apos aquecimento.
 - [x] Disparo controlado de alerta Ops por e-mail validado em producao: `enabled=true`, `sent=1`, `sent_email=1`, `status=sent`.
 - [x] Deduplicacao registrada em `backend/logs/ops_alert_notifications.jsonl` para o alerta controlado de 2026-05-17.
+- [x] Recebimento humano do e-mail de alerta confirmado por Lucas em 2026-05-17.
 
 Falta para 10/10:
 
@@ -256,7 +257,7 @@ Falta para 10/10:
 
 Para manter 10/10:
 
-- [ ] Confirmar recebimento humano do e-mail de alerta em `prohubml@gmail.com`.
+- [x] Confirmar recebimento humano do e-mail de alerta em `prohubml@gmail.com`.
 - [ ] Revalidar `scripts/test_ops_alert_webhook.py` apos mudanca de SMTP, dominio ou destino de alerta.
 - [ ] Manter `backend/logs/ops_alert_notifications.jsonl` com retencao e sem dados sensiveis.
 
@@ -379,6 +380,7 @@ Para manter 10/10:
 | #110 | Observabilidade/auditoria | Alerta Ops por e-mail operacional via `OPS_ALERT_EMAIL_TO` |
 | #111 | Observabilidade/auditoria | Fechamento 10/10 com alerta Ops por e-mail validado |
 | #113 | Governanca | Fechamento geral 10/10 com release-check e criterios marcados |
+| #114 | Observabilidade/auditoria | Confirmacao humana de recebimento do alerta Ops por e-mail |
 | #84 | Portabilidade/configuracao | Check seguro de ambiente DEV e guia de correcao |
 | #85 | Portabilidade/configuracao | Bootstrap de PC novo para ambiente DEV |
 | #86 | Portabilidade/configuracao | Fluxo de segundo PC e diagnostico de portas locais |
