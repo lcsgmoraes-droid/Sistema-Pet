@@ -324,7 +324,7 @@ Proxima acao concreta:
 | #82 | Observabilidade/auditoria | Notifier externo opcional para alertas Ops criticos |
 | #83 | Observabilidade/auditoria | Script de teste controlado do notifier Ops |
 | #84 | Portabilidade/configuracao | Check seguro de ambiente DEV e guia de correcao |
-| PR atual | Portabilidade/configuracao | Bootstrap de PC novo para ambiente DEV |
+| #85 | Portabilidade/configuracao | Bootstrap de PC novo para ambiente DEV |
 
 ## Criterio para declarar 10/10 geral
 
