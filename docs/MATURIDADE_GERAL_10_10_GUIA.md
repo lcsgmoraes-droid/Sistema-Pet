@@ -347,7 +347,7 @@ Proxima acao concreta:
 | #92 | Estrutura geral | Primeira fatia de Estoque para granel |
 | #93 | Estrutura geral | Primeira fatia de PDV/vendas para regras puras |
 | #94 | Estrutura geral | Primeira fatia de campanhas/cupons para regras puras |
-| PR atual | Estrutura geral | Primeira fatia de financeiro para origem de contas a pagar |
+| #95 | Estrutura geral | Primeira fatia de financeiro para origem de contas a pagar |
 
 ## Criterio para declarar 10/10 geral
 
