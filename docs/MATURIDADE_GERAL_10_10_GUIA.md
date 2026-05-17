@@ -372,6 +372,7 @@ Proxima acao concreta:
 | #101 | Seguranca operacional | Evidencia de restore smoke real do banco em producao |
 | #102 | Seguranca operacional | Deploy sem rebuild para mudancas sem impacto de runtime |
 | #103 | Seguranca operacional | Fechamento 10/10 com evidencia do deploy sem rebuild |
+| #104 | Testes/CI | Suite E2E longa do Plano Basico com skip seguro por ambiente |
 
 ## Criterio para declarar 10/10 geral
 
