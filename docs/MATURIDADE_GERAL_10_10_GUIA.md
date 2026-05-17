@@ -322,7 +322,7 @@ Proxima acao concreta:
 | #81 | Observabilidade/auditoria | Alertas acionaveis para 5xx, lentidao, falhas recorrentes e worker/job degradado |
 | #82 | Observabilidade/auditoria | Notifier externo opcional para alertas Ops criticos |
 | #83 | Observabilidade/auditoria | Script de teste controlado do notifier Ops |
-| PR atual | Portabilidade/configuracao | Check seguro de ambiente DEV e guia de correcao |
+| #84 | Portabilidade/configuracao | Check seguro de ambiente DEV e guia de correcao |
 
 ## Criterio para declarar 10/10 geral
 
