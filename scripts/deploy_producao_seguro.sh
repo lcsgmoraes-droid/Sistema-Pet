@@ -85,7 +85,14 @@ with open(path, "a", encoding="utf-8") as file:
     file.write(json.dumps(event, ensure_ascii=False, separators=(",", ":")) + "\n")
 PY
 
-  DEPLOY_EVENT_RECORDED=1
+  if [[ "$status" == "success" || "$status" == "failed" ]]; then
+    DEPLOY_EVENT_RECORDED=1
+  fi
+}
+
+audit_step() {
+  local message="${1:-Etapa iniciada: $CURRENT_STEP}"
+  write_deploy_event "running" "$CURRENT_STEP" "$message" || log "Aviso: nao foi possivel auditar etapa $CURRENT_STEP"
 }
 
 on_error() {
@@ -135,6 +142,7 @@ cd "$APP_DIR"
 touch "$DEPLOY_LOCK_FILE" || true
 
 mark_step "validar_repositorio"
+audit_step "Validando repositorio de producao antes do deploy"
 log "Validando repositorio limpo"
 if [[ -n "$(git status --porcelain)" ]]; then
   git status --short
@@ -154,6 +162,7 @@ printf '%s\n' "$HEAD_BEFORE" >"$backup_dir/head_before.txt"
 docker compose -f "$COMPOSE_FILE" ps >"$backup_dir/docker_ps_before.txt" || true
 
 mark_step "atualizar_codigo"
+audit_step "Atualizando codigo em producao"
 log "Atualizando codigo para $REMOTE/$BRANCH"
 git fetch "$REMOTE" "$BRANCH"
 git reset --hard "$REMOTE/$BRANCH"
@@ -171,6 +180,7 @@ if [[ "$tracked_dist_count" != "0" ]]; then
 fi
 
 mark_step "instalar_disk_guard"
+audit_step "Instalando ou validando guardiao preventivo de disco"
 log "Instalando monitor preventivo de disco"
 if [[ -f "$APP_DIR/scripts/install_ops_disk_guard_cron.sh" ]]; then
   bash "$APP_DIR/scripts/install_ops_disk_guard_cron.sh" || log "Aviso: nao foi possivel instalar o cron do disk guard"
@@ -181,12 +191,14 @@ if [[ -f "$APP_DIR/scripts/ops_disk_guard.sh" ]]; then
 fi
 
 mark_step "instalar_host_watchdog"
+audit_step "Instalando ou validando watchdog externo do host"
 log "Instalando watchdog externo do host"
 if [[ -f "$APP_DIR/scripts/install_ops_host_watchdog_cron.sh" ]]; then
   bash "$APP_DIR/scripts/install_ops_host_watchdog_cron.sh" || log "Aviso: nao foi possivel instalar o cron do host watchdog"
 fi
 
 mark_step "preparar_diretorios_persistentes"
+audit_step "Preparando diretorios persistentes do backend"
 log "Preparando diretorios persistentes do backend"
 mkdir -p \
   "$APP_DIR/backend/data/bling_snapshots" \
@@ -207,6 +219,7 @@ chmod -R u+rwX,g+rwX \
   || log "Aviso: nao foi possivel ajustar permissao dos diretorios persistentes"
 
 mark_step "build_frontend"
+audit_step "Gerando build do frontend"
 log "Gerando frontend em $NEXT_RUNTIME_DIST"
 rm -rf "$NEXT_RUNTIME_DIST"
 mkdir -p "$NEXT_RUNTIME_DIST"
@@ -219,14 +232,17 @@ mkdir -p "$NEXT_RUNTIME_DIST"
 [[ -s "$NEXT_RUNTIME_DIST/index.html" ]] || fail "Build do frontend nao gerou index.html em $NEXT_RUNTIME_DIST"
 
 mark_step "validar_compose"
+audit_step "Validando docker compose de producao"
 log "Validando docker compose"
 docker compose -f "$COMPOSE_FILE" config --quiet
 
 mark_step "build_backend"
+audit_step "Reconstruindo backend e worker"
 log "Reconstruindo backend e imagem do worker"
 docker compose -f "$COMPOSE_FILE" build backend
 
 mark_step "subir_postgres"
+audit_step "Garantindo Postgres ativo antes das migrations"
 log "Garantindo Postgres ativo"
 docker compose -f "$COMPOSE_FILE" up -d postgres
 
@@ -237,14 +253,17 @@ wait_for \
   5
 
 mark_step "migrar_banco"
+audit_step "Aplicando migrations Alembic"
 log "Aplicando migrations Alembic"
 docker compose -f "$COMPOSE_FILE" run --rm --no-deps backend alembic upgrade head
 
 mark_step "subir_servicos"
+audit_step "Subindo backend e worker"
 log "Subindo backend e worker"
 docker compose -f "$COMPOSE_FILE" up -d backend worker-bling
 
 mark_step "publicar_frontend"
+audit_step "Publicando frontend gerado"
 log "Publicando frontend em $RUNTIME_DIST"
 rm -rf "$PREV_RUNTIME_DIST"
 if [[ -d "$RUNTIME_DIST" ]]; then
@@ -256,6 +275,7 @@ log "Recriando nginx para renovar DNS interno do backend e servir o novo fronten
 docker compose -f "$COMPOSE_FILE" up -d --force-recreate --no-deps nginx
 
 mark_step "validar_watchdog"
+audit_step "Validando watchdog interno do backend"
 log "Aguardando watchdog interno"
 wait_for \
   "backend watchdog" \
@@ -264,6 +284,7 @@ wait_for \
   5
 
 mark_step "validar_worker_bling"
+audit_step "Validando heartbeat do worker Bling"
 log "Aguardando worker Bling"
 wait_for \
   "worker Bling" \
@@ -272,20 +293,24 @@ wait_for \
   5
 
 mark_step "validar_health_publico"
+audit_step "Validando health publico"
 log "Aguardando health publico"
 wait_for "health publico" "curl -fsS --max-time 10 '$PUBLIC_HEALTH_URL'" 12 5
 
 mark_step "checar_estado_final"
+audit_step "Checando estado final dos containers"
 log "Checando estado final"
 docker compose -f "$COMPOSE_FILE" ps
 
 mark_step "disk_guard_final"
+audit_step "Rodando verificacao final de disco"
 log "Rodando verificacao final de disco"
 if [[ -f "$APP_DIR/scripts/ops_disk_guard.sh" ]]; then
   bash "$APP_DIR/scripts/ops_disk_guard.sh" || log "Aviso: disk guard final falhou"
 fi
 
 mark_step "host_watchdog_final"
+audit_step "Rodando verificacao final do watchdog externo"
 log "Rodando verificacao final do watchdog externo"
 cleanup_deploy_lock
 if [[ -f "$APP_DIR/scripts/ops_host_watchdog.sh" ]]; then
