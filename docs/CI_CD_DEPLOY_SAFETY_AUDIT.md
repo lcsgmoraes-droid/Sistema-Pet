@@ -37,6 +37,7 @@ Meta: 10/10 antes de automatizar qualquer deploy de producao.
 | Feito | Restore smoke de dump real validado em container Postgres descartavel | `docs/PRODUCAO_BACKUP_RESTORE_TESTE.md` |
 | Feito | Deploy seguro detecta mudancas sem impacto de runtime e pula rebuild/restart | `scripts/deploy_producao_seguro.sh` |
 | Feito | Caminho sem rebuild validado em producao sem recriar containers | `scripts/deploy_producao_seguro.sh` |
+| Feito | Backend CI valida migrations Alembic em Postgres descartavel para banco limpo e historico controlado | `.github/workflows/backend-ci.yml`, `scripts/ci_migration_smoke.py` |
 
 ## PRs ja juntados
 
@@ -50,6 +51,7 @@ Meta: 10/10 antes de automatizar qualquer deploy de producao.
 | #97 | Plano E2E minimo do Plano Basico | Mergeado e deployado |
 | #98 | Usuario operacional `petdeploy` e deploy sem root direto | Mergeado e deployado via `petdeploy` |
 | #100 | Backup e restore smoke controlado do banco | Mergeado e deployado via `petdeploy` |
+| #106 | Migration Smoke no Backend CI com Postgres descartavel | Em PR |
 
 ## Ultimo deploy real validado
 
@@ -93,8 +95,29 @@ Deploy sem rebuild validado:
 |---|---|
 | `MCP tests` | Garante maturidade e funcionamento dos MCPs locais |
 | `Fluxo unico safety` | Garante trilho basico DEV -> PROD antes do merge |
-| `Quality Gate` | Garante suite backend multitenant e import smoke |
+| `Quality Gate` | Garante suite backend multitenant, import smoke e Migration Smoke |
 | `Smoke test` | Garante smoke de backend/auth e build de frontend |
+
+## Migration Smoke CI
+
+O job `Migration Smoke` cria dois bancos Postgres descartaveis:
+
+- `petshop_migration_smoke_clean`: roda `alembic upgrade head` a partir de banco vazio.
+- `petshop_migration_smoke_history`: roda `alembic upgrade oj20260515a1` e depois `alembic upgrade head`.
+
+O script confirma que `alembic_version` chega ao head unico esperado e que o
+schema possui volume minimo de tabelas. Ao final, os bancos temporarios sao
+removidos automaticamente, exceto quando `MIGRATION_SMOKE_KEEP_DATABASES=true`
+for usado para diagnostico local.
+
+Evidencia local em 2026-05-17:
+
+```text
+migration_smoke_expected_head=ot20260516a2
+migration_smoke_status label=clean status=ok
+migration_smoke_status label=history status=ok
+migration_smoke_status=ok
+```
 
 ## O que falta para manter 10/10
 
