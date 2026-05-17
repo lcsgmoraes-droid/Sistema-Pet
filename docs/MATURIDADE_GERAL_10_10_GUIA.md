@@ -18,7 +18,7 @@ Regra de uso:
 | MCP Frontend | 5,5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | MCP Ops/API | 3,5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | Estrutura geral | 5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
-| Seguranca operacional | 2,5/10 | 9,9/10 | 10/10 | Em andamento |
+| Seguranca operacional | 2,5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | Testes/CI | 1/10 | 9/10 | 10/10 | Em andamento |
 | Observabilidade/auditoria | 2/10 | 9,9/10 | 10/10 | Em andamento prioritario |
 | Portabilidade/configuracao | 3/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
@@ -134,7 +134,7 @@ Para manter 10/10:
 
 Nota inicial: 2,5/10.
 
-Nota atual: 9,9/10.
+Nota atual: 10/10.
 
 Referencia principal: `docs/CI_CD_DEPLOY_SAFETY_AUDIT.md`.
 
@@ -156,6 +156,7 @@ Ja feito:
 - [x] Scripts e roteiro de backup/restore smoke controlado criados para validar dump real sem tocar o banco de producao.
 - [x] Restore smoke de dump real executado em producao sem tocar o banco principal: backup `/opt/petshop/backups/db/restore_smoke_20260517_135920.dump.gz`, `public_tables=217`, `alembic_rows=1`, container temporario removido e health/watchdog saudaveis depois do teste.
 - [x] Deploy seguro passa a detectar mudancas sem impacto de runtime e pular rebuild/restart quando o diff for apenas docs/workflows/Markdown.
+- [x] Caminho sem rebuild validado em producao em 2026-05-17 no commit `7c390ed8`: deploy normal instalou a logica com backup `/opt/petshop/backups/deploy_20260517_140902`; deploy seguinte no mesmo commit encerrou sem rebuild com backup `/opt/petshop/backups/deploy_20260517_141303`, health `ok` e watchdog `healthy`.
 
 Falta para 10/10:
 
@@ -167,7 +168,7 @@ Falta para 10/10:
 
 Proxima acao concreta:
 
-- [ ] Depois do merge/deploy, rodar um deploy sem mudanca de runtime e registrar a evidencia do caminho sem rebuild.
+- [ ] Manter o criterio: qualquer mudanca de runtime deve continuar usando rebuild completo; docs/workflows podem usar o caminho sem rebuild quando o health estiver saudavel.
 
 ## 5. Testes/CI
 
@@ -368,6 +369,7 @@ Proxima acao concreta:
 | #100 | Seguranca operacional | Scripts de backup e restore smoke controlado do banco |
 | #101 | Seguranca operacional | Evidencia de restore smoke real do banco em producao |
 | #102 | Seguranca operacional | Deploy sem rebuild para mudancas sem impacto de runtime |
+| #103 | Seguranca operacional | Fechamento 10/10 com evidencia do deploy sem rebuild |
 
 ## Criterio para declarar 10/10 geral
 

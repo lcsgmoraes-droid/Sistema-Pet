@@ -45,6 +45,10 @@ somente arquivos sem impacto de runtime (`docs/`, `.github/`, arquivos
 Markdown e metadados equivalentes), ele atualiza o repositorio, valida o health
 publico e encerra sem rebuild/restart de containers.
 
+Ultima validacao do caminho sem rebuild: 2026-05-17, commit `7c390ed8`, backup
+operacional `/opt/petshop/backups/deploy_20260517_141303`, health publico `ok`
+e watchdog publico `healthy`.
+
 O deploy tambem instala o guardiao preventivo de disco (`scripts/ops_disk_guard.sh`) em `/etc/cron.d/petshop-ops-disk-guard`. Ele roda a cada 30 minutos e tambem ao fim do deploy, registra eventos em `backend/logs/disk_guard_events.jsonl` e, quando o uso do disco chega ao limite de risco, limpa apenas cache/imagens Docker nao usados. Ele nao remove volumes, banco, uploads nem dados operacionais.
 
 O deploy tambem instala o watchdog externo do host (`scripts/ops_host_watchdog.sh`) em `/etc/cron.d/petshop-ops-host-watchdog`. Ele roda a cada minuto fora dos containers, valida o watchdog publico, o watchdog interno, health dos containers e excesso recente de 50x no nginx. Depois de falhas consecutivas, ele reinicia primeiro `backend`, depois `nginx` se o health publico continuar falhando, e `worker-bling` se estiver unhealthy. Ele nao reinicia Postgres automaticamente; nesse caso registra evento e aguarda acao humana. Eventos ficam em `backend/logs/host_watchdog_events.jsonl`.

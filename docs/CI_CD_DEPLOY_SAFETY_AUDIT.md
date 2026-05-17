@@ -36,6 +36,7 @@ Meta: 10/10 antes de automatizar qualquer deploy de producao.
 | Feito | Scripts de backup e restore smoke controlado criados para validar dump real sem tocar o banco de producao | `docs/PRODUCAO_BACKUP_RESTORE_TESTE.md` |
 | Feito | Restore smoke de dump real validado em container Postgres descartavel | `docs/PRODUCAO_BACKUP_RESTORE_TESTE.md` |
 | Feito | Deploy seguro detecta mudancas sem impacto de runtime e pula rebuild/restart | `scripts/deploy_producao_seguro.sh` |
+| Feito | Caminho sem rebuild validado em producao sem recriar containers | `scripts/deploy_producao_seguro.sh` |
 
 ## PRs ja juntados
 
@@ -56,9 +57,9 @@ Data: 2026-05-17.
 
 Escopo deployado:
 
-- Commit de runtime em producao: `e950ec9a` (`Adiciona restore smoke de backup do banco`).
+- Commit de runtime em producao: `7c390ed8` (`Separa deploy de docs sem rebuild`).
 - Script usado: `sudo -n /usr/local/sbin/petshop-deploy-producao` via `petdeploy`.
-- Backup operacional criado no servidor: `/opt/petshop/backups/deploy_20260517_135349`.
+- Backup operacional criado no servidor: `/opt/petshop/backups/deploy_20260517_140902`.
 - Backend reconstruido com imagem `petshop-backend:prod`.
 - Frontend gerado em `runtime/frontend/dist`.
 - Alembic executado com sucesso.
@@ -78,6 +79,13 @@ Restore smoke validado:
 - SHA-256: `5589dd14897a7f5f954fb623cb3a678ba895fdbc528a836eaa89fd87f6be6686`.
 - Resultado: `restore_smoke_status=ok`, `public_tables=217`, `alembic_rows=1`.
 - Container temporario removido e health/watchdog saudaveis apos o teste.
+
+Deploy sem rebuild validado:
+
+- Commit em producao: `7c390ed8`.
+- Backup operacional do teste sem rebuild: `/opt/petshop/backups/deploy_20260517_141303`.
+- Resultado: repositorio ja atualizado, health publico `ok`, sem build frontend/backend e sem restart/recreate de containers.
+- Health publico e watchdog publico saudaveis apos o teste.
 
 ## Checks que devem proteger a `main`
 
@@ -100,4 +108,4 @@ Restore smoke validado:
 
 1. Em todo proximo deploy real autorizado, repetir `release-check`, usar `petdeploy` com `/usr/local/sbin/petshop-deploy-producao` e validar health/watchdog.
 2. Conferir no painel Ops ou no arquivo `backend/logs/deploy_events.jsonl` os eventos `running`, `success` ou `failed` do deploy.
-3. Validar em producao um deploy sem mudanca de runtime para confirmar o caminho sem rebuild.
+3. Seguir para Testes/CI avancado ou para o canal real de notificacao Ops, que depende de webhook seguro configurado em producao.
