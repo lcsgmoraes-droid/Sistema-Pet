@@ -315,7 +315,7 @@ Proxima acao concreta:
 | #78 | Observabilidade/auditoria | Logs estruturados de eventos de negocio |
 | #79 | Observabilidade/auditoria/seguranca operacional | Linha do tempo auditavel das etapas sensiveis do deploy |
 | #80 | Observabilidade/auditoria/seguranca operacional | Auditoria de comandos manuais sensiveis em producao |
-| PR atual | Observabilidade/auditoria | Alertas acionaveis para 5xx, lentidao, falhas recorrentes e worker/job degradado |
+| #81 | Observabilidade/auditoria | Alertas acionaveis para 5xx, lentidao, falhas recorrentes e worker/job degradado |
 
 ## Criterio para declarar 10/10 geral
 
