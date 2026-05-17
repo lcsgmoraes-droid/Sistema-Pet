@@ -17,7 +17,7 @@ Regra de uso:
 |---|---:|---:|---:|---|
 | MCP Frontend | 5,5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | MCP Ops/API | 3,5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
-| Estrutura geral | 5/10 | 6,5/10 | 10/10 | Em andamento |
+| Estrutura geral | 5/10 | 7,2/10 | 10/10 | Em andamento |
 | Seguranca operacional | 2,5/10 | 8,5/10 | 10/10 | Em andamento |
 | Testes/CI | 1/10 | 8,5/10 | 10/10 | Em andamento |
 | Observabilidade/auditoria | 2/10 | 9,9/10 | 10/10 | Em andamento prioritario |
@@ -90,7 +90,7 @@ Para manter 10/10:
 
 Nota inicial: 5/10.
 
-Nota atual: 6,5/10.
+Nota atual: 7,2/10.
 
 Referencia principal: `docs/EVOLUCAO_ENTERPRISE_UI_REFATORACAO.md`.
 
@@ -100,11 +100,13 @@ Ja feito:
 - [x] Plano Basico concentrado em checklist vivo: `docs/auditorias/plano-basico-tenant-checklist.md`.
 - [x] Separacao operacional inicial de MCPs e services.
 - [x] Alguns componentes globais ja existem no frontend.
+- [x] Inventario de estrutura geral criado em `docs/auditorias/estrutura-geral-inventario.md`.
+- [x] Top 10 arquivos de maior risco definidos com primeira fatia recomendada.
 
 Falta para 10/10:
 
-- [ ] Inventariar arquivos frontend e backend mais longos e mais alterados.
-- [ ] Definir top 10 arquivos de maior risco para quebra gradual.
+- [x] Inventariar arquivos frontend e backend mais longos e mais alterados.
+- [x] Definir top 10 arquivos de maior risco para quebra gradual.
 - [ ] Criar padrao de modulo: rotas, services, schemas, testes e docs.
 - [ ] Quebrar 1 modulo piloto sem mudar comportamento.
 - [ ] Repetir o padrao em PDV/vendas, campanhas/cupons, produtos/estoque e financeiro.
@@ -113,7 +115,7 @@ Falta para 10/10:
 
 Proxima acao concreta:
 
-- [ ] Criar relatorio `docs/auditorias/estrutura-geral-inventario.md` com maiores arquivos, hotspots e primeira fatia de refatoracao.
+- [ ] Transformar o padrao de modulo recomendado em checklist de Definition of Done para a refatoracao piloto de Produtos.
 
 ## 4. Seguranca operacional
 
@@ -328,6 +330,7 @@ Proxima acao concreta:
 | #84 | Portabilidade/configuracao | Check seguro de ambiente DEV e guia de correcao |
 | #85 | Portabilidade/configuracao | Bootstrap de PC novo para ambiente DEV |
 | #86 | Portabilidade/configuracao | Fluxo de segundo PC e diagnostico de portas locais |
+| PR atual | Estrutura geral | Inventario de hotspots e primeira fatia de refatoracao |
 
 ## Criterio para declarar 10/10 geral
 
