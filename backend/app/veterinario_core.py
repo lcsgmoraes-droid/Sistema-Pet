@@ -1,12 +1,12 @@
 """Helpers compartilhados do modulo veterinario."""
 
 import re
-from datetime import date, datetime, time
+from datetime import date, datetime, time, timezone
 from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from .utils.timezone import now_brasilia, to_brasilia
+from .utils.timezone import to_brasilia
 from .veterinario_models import VetPartnerLink
 
 
@@ -17,7 +17,7 @@ def _get_tenant(current: tuple) -> tuple:
 
 
 def _vet_now() -> datetime:
-    return now_brasilia()
+    return datetime.now(timezone.utc)
 
 
 def _normalizar_datetime_vet(value: Optional[datetime]) -> Optional[datetime]:

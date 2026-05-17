@@ -38,6 +38,8 @@ def _consulta_to_dict(c) -> dict:
         "asa_justificativa": c.asa_justificativa,
         "observacoes_internas": c.observacoes_internas,
         "observacoes_tutor": c.observacoes_tutor,
+        "prescricao_rascunho": getattr(c, "prescricao_rascunho", None) or [],
+        "procedimentos_rascunho": getattr(c, "procedimentos_rascunho", None) or [],
         "hash_prontuario": c.hash_prontuario,
         "finalizado_em": _serializar_datetime_vet(c.finalizado_em),
         "inicio_atendimento": _serializar_datetime_vet(c.inicio_atendimento),

@@ -3,10 +3,14 @@ Utilitários para gerenciamento de timezone
 Configurado para Brasília (America/Sao_Paulo) UTC-3
 """
 from datetime import datetime, timezone, timedelta
-from zoneinfo import ZoneInfo
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 # Timezone de Brasília
-BRASILIA_TZ = ZoneInfo("America/Sao_Paulo")
+try:
+    BRASILIA_TZ = ZoneInfo("America/Sao_Paulo")
+except ZoneInfoNotFoundError:
+    # Fallback para Windows/ambientes mínimos sem o pacote tzdata instalado.
+    BRASILIA_TZ = timezone(timedelta(hours=-3), name="America/Sao_Paulo")
 
 
 def now_brasilia() -> datetime:

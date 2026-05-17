@@ -185,6 +185,8 @@ class ConsultaVet(BaseTenantModel):
     # ---- OBSERVAÇÕES ----
     observacoes_internas = Column(Text, nullable=True)     # não aparece para tutor
     observacoes_tutor = Column(Text, nullable=True)        # visível no app
+    prescricao_rascunho = Column(JSON, nullable=True)
+    procedimentos_rascunho = Column(JSON, nullable=True)
 
     # Hash para imutabilidade do prontuário finalizado
     hash_prontuario = Column(String(64), nullable=True)    # SHA-256 ao finalizar

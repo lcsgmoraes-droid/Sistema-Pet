@@ -132,6 +132,22 @@ class ConsultaUpdate(BaseModel):
     veterinario_id: Optional[int] = None
 
 
+class ProcedimentoConsultaDraftIn(BaseModel):
+    catalogo_id: Optional[int] = None
+    nome: str
+    descricao: Optional[str] = None
+    valor: Optional[float] = None
+    realizado: bool = True
+    observacoes: Optional[str] = None
+    insumos: list[dict] = Field(default_factory=list)
+    baixar_estoque: bool = True
+
+
+class ConsultaRascunhoItensSync(BaseModel):
+    prescricao_itens: List[dict] = Field(default_factory=list)
+    procedimentos_realizados: List[dict] = Field(default_factory=list)
+
+
 class ConsultaResponse(BaseModel):
     id: int
     pet_id: int
@@ -164,6 +180,8 @@ class ConsultaResponse(BaseModel):
     asa_justificativa: Optional[str]
     observacoes_internas: Optional[str]
     observacoes_tutor: Optional[str]
+    prescricao_rascunho: Optional[list] = None
+    procedimentos_rascunho: Optional[list] = None
     hash_prontuario: Optional[str]
     finalizado_em: Optional[datetime]
     inicio_atendimento: Optional[datetime]

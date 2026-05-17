@@ -1,21 +1,71 @@
+const inputClass = "border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white";
+const labelClass = "text-xs font-medium text-gray-600";
+
+function Campo({ label, children, className = "" }) {
+  return (
+    <label className={`flex flex-col gap-1 ${className}`}>
+      <span className={labelClass}>{label}</span>
+      {children}
+    </label>
+  );
+}
+
+function doseReferenciaMedicamento(medicamento) {
+  if (!medicamento) return "";
+  if (medicamento.posologia_referencia) return medicamento.posologia_referencia;
+  const min = medicamento.dose_minima_mg_kg ?? medicamento.dose_min_mgkg;
+  const max = medicamento.dose_maxima_mg_kg ?? medicamento.dose_max_mgkg;
+  if (min && max) return `${min} a ${max} mg/kg`;
+  if (min || max) return `${min || max} mg/kg`;
+  return "";
+}
+
 export default function AgendaProcedimentoForm({
   agendaForm,
   setAgendaForm,
   internacoesOrdenadas,
   internacaoSelecionadaAgenda,
+  medicamentosCatalogo = [],
+  procedimentosCatalogo = [],
   salvando,
   onAdicionarProcedimentoAgenda,
   onAbrirInsumoRapido,
 }) {
+  function selecionarCatalogo(valor) {
+    if (!valor) return;
+    const [tipo, id] = valor.split(":");
+
+    if (tipo === "med") {
+      const medicamento = medicamentosCatalogo.find((item) => String(item.id) === String(id));
+      if (!medicamento) return;
+      setAgendaForm((prev) => ({
+        ...prev,
+        medicamento: medicamento.nome || prev.medicamento,
+        dose: prev.dose || doseReferenciaMedicamento(medicamento),
+        via: prev.via || medicamento.via_administracao || "oral",
+        unidade_quantidade: prev.unidade_quantidade || medicamento.forma_farmaceutica || "",
+      }));
+      return;
+    }
+
+    const procedimento = procedimentosCatalogo.find((item) => String(item.id) === String(id));
+    if (!procedimento) return;
+    setAgendaForm((prev) => ({
+      ...prev,
+      medicamento: procedimento.nome || prev.medicamento,
+      dose: prev.dose || procedimento.descricao || "",
+      unidade_quantidade: prev.unidade_quantidade || "un",
+    }));
+  }
+
   return (
     <div className="bg-white border border-gray-200 rounded-xl p-4">
       <div className="mb-3 flex flex-wrap items-start justify-between gap-3">
         <div>
           <p className="text-sm font-semibold text-gray-700">Novo procedimento / lembrete</p>
           <p className="mt-1 text-xs text-gray-500">
-            Preencha o que estava previsto para o paciente: horario, nome do medicamento/procedimento,
-            dose clinica, quantidade prevista e via. Se quiser apenas baixar um material usado na rotina,
-            use o botao de insumo rapido.
+            Agende medicacoes e procedimentos previstos para o internado. Use quantidade para o que sera aplicado
+            ou baixado do estoque em cada execucao.
           </p>
         </div>
         <button
@@ -27,89 +77,140 @@ export default function AgendaProcedimentoForm({
         </button>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
-        <select
-          value={agendaForm.internacao_id}
-          onChange={(event) => setAgendaForm((prev) => ({ ...prev, internacao_id: event.target.value }))}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white"
-        >
-          <option value="">Selecione o internado...</option>
-          {internacoesOrdenadas.map((internacao) => (
-            <option key={internacao.id} value={internacao.id}>
-              {internacao.pet_nome ?? `Pet #${internacao.pet_id}`}
-              {internacao.box ? ` (${internacao.box})` : ""}
-            </option>
-          ))}
-        </select>
-        <input
-          type="datetime-local"
-          value={agendaForm.horario}
-          onChange={(event) => setAgendaForm((prev) => ({ ...prev, horario: event.target.value }))}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
-        />
-        <input
-          type="text"
-          placeholder="Medicamento / procedimento"
-          value={agendaForm.medicamento}
-          onChange={(event) => setAgendaForm((prev) => ({ ...prev, medicamento: event.target.value }))}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
-        />
-        <input
-          type="text"
-          placeholder="Dose"
-          value={agendaForm.dose}
-          onChange={(event) => setAgendaForm((prev) => ({ ...prev, dose: event.target.value }))}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
-        />
-        <input
-          type="number"
-          min="0"
-          step="0.01"
-          placeholder="Qtd. prevista"
-          value={agendaForm.quantidade_prevista}
-          onChange={(event) => setAgendaForm((prev) => ({ ...prev, quantidade_prevista: event.target.value }))}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
-        />
-        <input
-          type="text"
-          placeholder="Unidade (mL, mg, comp, un...)"
-          value={agendaForm.unidade_quantidade}
-          onChange={(event) => setAgendaForm((prev) => ({ ...prev, unidade_quantidade: event.target.value }))}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
-        />
-        <input
-          type="text"
-          placeholder="Via (oral, IV, IM...)"
-          value={agendaForm.via}
-          onChange={(event) => setAgendaForm((prev) => ({ ...prev, via: event.target.value }))}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
-        />
-        <input
-          type="text"
-          value={agendaForm.internacao_id ? (internacaoSelecionadaAgenda?.box || "Sem baia") : "Selecione um internado"}
-          disabled
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-600"
-        />
-        <input
-          type="number"
-          min="0"
-          placeholder="Lembrete (min)"
-          value={agendaForm.lembrete_min}
-          onChange={(event) => setAgendaForm((prev) => ({ ...prev, lembrete_min: event.target.value }))}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm"
-        />
-        <input
-          type="text"
-          placeholder="Observacoes"
-          value={agendaForm.observacoes}
-          onChange={(event) => setAgendaForm((prev) => ({ ...prev, observacoes: event.target.value }))}
-          className="border border-gray-200 rounded-lg px-3 py-2 text-sm md:col-span-2"
-        />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        <Campo label="Internado / paciente">
+          <select
+            value={agendaForm.internacao_id}
+            onChange={(event) => setAgendaForm((prev) => ({ ...prev, internacao_id: event.target.value }))}
+            className={inputClass}
+          >
+            <option value="">Selecione o internado...</option>
+            {internacoesOrdenadas.map((internacao) => (
+              <option key={internacao.id} value={internacao.id}>
+                {internacao.pet_nome ?? `Pet #${internacao.pet_id}`}
+                {internacao.box ? ` (${internacao.box})` : ""}
+              </option>
+            ))}
+          </select>
+        </Campo>
+
+        <Campo label="Horario programado">
+          <input
+            type="datetime-local"
+            value={agendaForm.horario}
+            onChange={(event) => setAgendaForm((prev) => ({ ...prev, horario: event.target.value }))}
+            className={inputClass}
+          />
+        </Campo>
+
+        <Campo label="Buscar no catalogo">
+          <select
+            value=""
+            onChange={(event) => selecionarCatalogo(event.target.value)}
+            className={inputClass}
+          >
+            <option value="">Medicamento ou procedimento...</option>
+            {medicamentosCatalogo.length > 0 && (
+              <optgroup label="Medicamentos">
+                {medicamentosCatalogo.map((medicamento) => (
+                  <option key={`med-${medicamento.id}`} value={`med:${medicamento.id}`}>
+                    {medicamento.nome}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+            {procedimentosCatalogo.length > 0 && (
+              <optgroup label="Procedimentos">
+                {procedimentosCatalogo.map((procedimento) => (
+                  <option key={`proc-${procedimento.id}`} value={`proc:${procedimento.id}`}>
+                    {procedimento.nome}
+                  </option>
+                ))}
+              </optgroup>
+            )}
+          </select>
+        </Campo>
+
+        <Campo label="Medicamento/procedimento escolhido">
+          <input
+            type="text"
+            value={agendaForm.medicamento}
+            onChange={(event) => setAgendaForm((prev) => ({ ...prev, medicamento: event.target.value }))}
+            className={inputClass}
+          />
+        </Campo>
+
+        <Campo label="Dose clinica por execucao">
+          <input
+            type="text"
+            value={agendaForm.dose}
+            onChange={(event) => setAgendaForm((prev) => ({ ...prev, dose: event.target.value }))}
+            className={inputClass}
+          />
+        </Campo>
+
+        <Campo label="Quantidade a aplicar/baixar por execucao">
+          <input
+            type="number"
+            min="0"
+            step="0.01"
+            value={agendaForm.quantidade_prevista}
+            onChange={(event) => setAgendaForm((prev) => ({ ...prev, quantidade_prevista: event.target.value }))}
+            className={inputClass}
+          />
+        </Campo>
+
+        <Campo label="Unidade da quantidade">
+          <input
+            type="text"
+            value={agendaForm.unidade_quantidade}
+            onChange={(event) => setAgendaForm((prev) => ({ ...prev, unidade_quantidade: event.target.value }))}
+            className={inputClass}
+          />
+        </Campo>
+
+        <Campo label="Via de administracao">
+          <input
+            type="text"
+            value={agendaForm.via}
+            onChange={(event) => setAgendaForm((prev) => ({ ...prev, via: event.target.value }))}
+            className={inputClass}
+          />
+        </Campo>
+
+        <Campo label="Baia / local">
+          <input
+            type="text"
+            value={agendaForm.internacao_id ? (internacaoSelecionadaAgenda?.box || "Sem baia") : "Selecione um internado"}
+            disabled
+            className={`${inputClass} bg-gray-50 text-gray-600`}
+          />
+        </Campo>
+
+        <Campo label="Lembrete antes (min)">
+          <input
+            type="number"
+            min="0"
+            value={agendaForm.lembrete_min}
+            onChange={(event) => setAgendaForm((prev) => ({ ...prev, lembrete_min: event.target.value }))}
+            className={inputClass}
+          />
+        </Campo>
+
+        <Campo label="Observacoes da agenda" className="md:col-span-2">
+          <input
+            type="text"
+            value={agendaForm.observacoes}
+            onChange={(event) => setAgendaForm((prev) => ({ ...prev, observacoes: event.target.value }))}
+            className={inputClass}
+          />
+        </Campo>
+
         <button
           type="button"
           onClick={onAdicionarProcedimentoAgenda}
           disabled={salvando}
-          className="bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-3 py-2 text-sm disabled:opacity-60"
+          className="self-end bg-purple-600 hover:bg-purple-700 text-white rounded-lg px-3 py-2 text-sm disabled:opacity-60"
         >
           {salvando ? "Salvando..." : "Adicionar na agenda"}
         </button>

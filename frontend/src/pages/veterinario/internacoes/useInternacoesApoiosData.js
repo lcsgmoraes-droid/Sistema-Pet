@@ -6,6 +6,8 @@ import { vetApi } from "../vetApi";
 export function useInternacoesApoiosData() {
   const [pets, setPets] = useState([]);
   const [veterinarios, setVeterinarios] = useState([]);
+  const [medicamentosCatalogo, setMedicamentosCatalogo] = useState([]);
+  const [procedimentosCatalogo, setProcedimentosCatalogo] = useState([]);
 
   useEffect(() => {
     api
@@ -17,7 +19,17 @@ export function useInternacoesApoiosData() {
       .listarVeterinarios()
       .then((res) => setVeterinarios(Array.isArray(res.data) ? res.data : []))
       .catch(() => setVeterinarios([]));
+
+    vetApi
+      .listarMedicamentos()
+      .then((res) => setMedicamentosCatalogo(Array.isArray(res.data) ? res.data : (res.data?.items ?? [])))
+      .catch(() => setMedicamentosCatalogo([]));
+
+    vetApi
+      .listarCatalogoProcedimentos()
+      .then((res) => setProcedimentosCatalogo(Array.isArray(res.data) ? res.data : (res.data?.items ?? [])))
+      .catch(() => setProcedimentosCatalogo([]));
   }, []);
 
-  return { pets, veterinarios };
+  return { medicamentosCatalogo, pets, procedimentosCatalogo, veterinarios };
 }

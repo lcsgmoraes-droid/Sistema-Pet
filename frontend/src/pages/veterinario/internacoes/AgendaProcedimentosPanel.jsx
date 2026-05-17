@@ -6,6 +6,8 @@ export default function AgendaProcedimentosPanel({
   setAgendaForm,
   internacoesOrdenadas,
   internacaoSelecionadaAgenda,
+  medicamentosCatalogo,
+  procedimentosCatalogo,
   agendaCarregando,
   agendaOrdenada,
   internacaoPorId,
@@ -23,6 +25,8 @@ export default function AgendaProcedimentosPanel({
         setAgendaForm={setAgendaForm}
         internacoesOrdenadas={internacoesOrdenadas}
         internacaoSelecionadaAgenda={internacaoSelecionadaAgenda}
+        medicamentosCatalogo={medicamentosCatalogo}
+        procedimentosCatalogo={procedimentosCatalogo}
         salvando={salvando}
         onAdicionarProcedimentoAgenda={onAdicionarProcedimentoAgenda}
         onAbrirInsumoRapido={onAbrirInsumoRapido}

@@ -8,6 +8,7 @@ export default function usePrescricaoProcedimentosConsulta({
   form,
   setForm,
   medicamentosCatalogo,
+  petSelecionado,
   procedimentosCatalogo,
   setErro,
 }) {
@@ -77,7 +78,7 @@ export default function usePrescricaoProcedimentosConsulta({
   }
 
   function calcularDosePorPeso(item) {
-    const peso = parseNumero(form.peso_kg);
+    const peso = parseNumero(form.peso_kg) || parseNumero(petSelecionado?.peso);
     if (!Number.isFinite(peso) || peso <= 0) {
       setErro("Informe o peso do pet para calcular a dose automaticamente.");
       return null;
@@ -107,6 +108,8 @@ export default function usePrescricaoProcedimentosConsulta({
   function selecionarMedicamentoNoItem(idx, medicamentoId) {
     const medicamento = medicamentosCatalogo.find((m) => String(m.id) === String(medicamentoId));
     if (!medicamento) return;
+    const doseMinima = medicamento.dose_minima_mg_kg ?? medicamento.dose_min_mgkg ?? "";
+    const doseMaxima = medicamento.dose_maxima_mg_kg ?? medicamento.dose_max_mgkg ?? "";
 
     setForm((prev) => {
       const itens = [...prev.prescricao_itens];
@@ -117,8 +120,9 @@ export default function usePrescricaoProcedimentosConsulta({
         nome: medicamento.nome ?? itemAtual.nome ?? "",
         principio_ativo: medicamento.principio_ativo ?? itemAtual.principio_ativo ?? "",
         via: medicamento.via_administracao ?? itemAtual.via ?? "oral",
-        dose_minima_mg_kg: medicamento.dose_minima_mg_kg,
-        dose_maxima_mg_kg: medicamento.dose_maxima_mg_kg,
+        dose_minima_mg_kg: doseMinima,
+        dose_maxima_mg_kg: doseMaxima,
+        frequencia: itemAtual.frequencia || medicamento.posologia_referencia || "",
       };
 
       const doseCalculada = calcularDosePorPeso(itemAtualizado);

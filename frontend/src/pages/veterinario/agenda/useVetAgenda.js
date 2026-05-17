@@ -18,6 +18,7 @@ export function useVetAgenda() {
   const tipoQuery = searchParams.get("tipo") || "";
   const motivoQuery = searchParams.get("motivo") || "";
   const dataQuery = searchParams.get("data") || "";
+  const returnToQuery = searchParams.get("return_to") || "";
   const [dataRef, setDataRef] = useState(new Date());
   const [modo, setModo] = useState("dia");
   const [agendamentos, setAgendamentos] = useState([]);
@@ -73,6 +74,7 @@ export function useVetAgenda() {
     modo,
     navigate,
     petSelecionadoModal: derivados.petSelecionadoModal,
+    returnToQuery,
     consultorioInlineForm,
     setAbrindoAgendamentoId,
     setAgendaDiaModal,

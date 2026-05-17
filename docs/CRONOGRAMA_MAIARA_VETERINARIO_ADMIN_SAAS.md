@@ -149,6 +149,19 @@ entrar no cronograma sem se perderem.
       inicio/fim de consulta, duracao, custos e relatorios.
       Ajuste imediato feito: a lista de consultas passou a exibir
       `inicio_atendimento` quando existir, em vez de depender de `created_at`.
+- [x] Corrigir persistencia do horario de inicio/fim da consulta veterinaria:
+      novos marcos clinicos passam a ser gravados em UTC com timezone e exibidos
+      em horario de Brasilia.
+- [x] Salvar itens de prescricao e procedimentos realizados junto com o
+      rascunho da consulta, sem gerar estoque/financeiro antes da finalizacao.
+- [x] Ao agendar retorno a partir da consulta, fechar/concluir o modal da agenda
+      volta para a consulta de origem para continuar o atendimento.
+- [x] Melhorar a agenda de procedimentos da internacao com labels acima dos
+      campos, nomes mais claros, busca em catalogos de medicamentos/procedimentos
+      e preenchimento inicial de dose/referencia quando houver catalogo.
+- [ ] Evoluir prescricao e internacao para agenda de horarios sugeridos por
+      posologia, por exemplo a cada 8h/12h gerando os proximos horarios
+      operacionais automaticamente.
 - [x] Revisar fechamento da consulta: manter `Salvar rascunho` editavel,
       diferenciar finalizacao/assinatura e remover redundancias de `Dar alta`.
       Ajuste feito: removido o botao duplicado `Dar alta / finalizar`.

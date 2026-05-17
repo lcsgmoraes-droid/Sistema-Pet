@@ -117,6 +117,8 @@ export default function useInternacoesController() {
     ...state,
     consultaIdQuery,
     onAbrirFichaPet: (petId) => navigate(`/pets/${petId}`),
+    medicamentosCatalogo: apoios.medicamentosCatalogo,
+    procedimentosCatalogo: apoios.procedimentosCatalogo,
     veterinarios: apoios.veterinarios,
   };
 }
