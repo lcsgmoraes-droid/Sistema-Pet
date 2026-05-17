@@ -1,14 +1,17 @@
 import { Fragment } from "react";
 import {
-  FiArrowRight,
-  FiDollarSign,
-  FiEdit2,
-  FiMessageCircle,
-  FiTrash2,
-  FiUser,
-} from "react-icons/fi";
-import { PawPrint } from "lucide-react";
+  ArrowRight,
+  DollarSign,
+  Edit2,
+  MessageCircle,
+  PawPrint,
+  Trash2,
+  UsersRound,
+} from "lucide-react";
+import EmptyState from "../ui/EmptyState";
+import IconActionButton from "../ui/IconActionButton";
 import PaginationControls from "../ui/PaginationControls";
+import Panel from "../ui/Panel";
 
 const ClientesNovoTabelaSection = ({
   loading,
@@ -45,39 +48,39 @@ const ClientesNovoTabelaSection = ({
         variant="top"
       />
 
-      <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+      <Panel className="overflow-hidden" padding="none">
         {filteredClientes.length > 0 ? (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+            <table className="min-w-full divide-y divide-slate-200">
+              <thead className="bg-slate-50">
                 <tr>
-                  <th className="w-12 px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="w-12 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
                     Fusao
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
                     ID
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
                     Nome
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
                     CPF/CNPJ
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
                     Celular
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
                     Pets
                   </th>
-                  <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
                     Segmento
                   </th>
-                  <th className="px-4 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider text-slate-500">
                     Acoes
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
+              <tbody className="divide-y divide-slate-200 bg-white">
                 {filteredClientes.map((cliente) => {
                   const clienteDestacado = highlightedClienteId === cliente.id;
                   const clienteSelecionadoFusao = pessoasSelecionadasFusao.includes(cliente.id);
@@ -112,18 +115,18 @@ const ClientesNovoTabelaSection = ({
                         </td>
                         <td className="px-4 py-3 whitespace-nowrap">
                           <div className="flex flex-col gap-1">
-                            <span className="text-sm font-medium text-gray-900">
+                            <span className="text-sm font-medium text-slate-900">
                               {cliente.nome}
                             </span>
                             {cliente.tipo_pessoa === "PJ" &&
                               cliente.razao_social && (
-                                <span className="text-xs text-gray-500">
+                                <span className="text-xs text-slate-500">
                                   {cliente.razao_social}
                                 </span>
                               )}
                             {cliente.parceiro_ativo && (
                               <span className="inline-flex items-center gap-1 text-xs font-medium text-green-700 bg-green-100 px-2 py-0.5 rounded-full w-fit">
-                                <FiDollarSign size={12} />
+                                <DollarSign size={12} />
                                 Parceiro
                               </span>
                             )}
@@ -163,7 +166,7 @@ const ClientesNovoTabelaSection = ({
                             <PawPrint size={16} className="text-gray-400" />
                             <span>{cliente.pets?.length || 0}</span>
                             {cliente.pets && cliente.pets.length > 0 && (
-                              <FiArrowRight
+                              <ArrowRight
                                 size={14}
                                 className={`transform transition-transform ${
                                   expandedPets[cliente.id] ? "rotate-90" : ""
@@ -181,7 +184,7 @@ const ClientesNovoTabelaSection = ({
                         >
                           <div className="flex items-center justify-end gap-2">
                             {cliente.celular && (
-                              <button
+                              <IconActionButton
                                 onClick={() => {
                                   const celular = cliente.celular.replace(
                                     /\D/g,
@@ -192,27 +195,30 @@ const ClientesNovoTabelaSection = ({
                                     "_blank",
                                   );
                                 }}
-                                className="text-green-600 hover:text-green-900 transition-colors"
+                                icon={MessageCircle}
+                                intent="create"
+                                tone="ghost"
                                 title="Abrir WhatsApp"
-                              >
-                                <FiMessageCircle size={16} />
-                              </button>
+                                aria-label="Abrir WhatsApp"
+                              />
                             )}
-                            <button
+                            <IconActionButton
                               onClick={() => openModal(cliente)}
-                              className="text-blue-600 hover:text-blue-900 transition-colors"
+                              icon={Edit2}
+                              intent="edit"
+                              tone="ghost"
                               title="Editar"
-                            >
-                              <FiEdit2 size={16} />
-                            </button>
+                              aria-label="Editar"
+                            />
                             {!cliente.de_parceiro && (
-                              <button
+                              <IconActionButton
                                 onClick={() => handleDelete(cliente.id)}
-                                className="text-red-600 hover:text-red-900 transition-colors"
+                                icon={Trash2}
+                                intent="delete"
+                                tone="ghost"
                                 title="Excluir"
-                              >
-                                <FiTrash2 size={16} />
-                              </button>
+                                aria-label="Excluir"
+                              />
                             )}
                           </div>
                         </td>
@@ -276,23 +282,27 @@ const ClientesNovoTabelaSection = ({
                                       </div>
                                     </div>
                                     <div className="flex gap-2 ml-4">
-                                      <button
+                                      <IconActionButton
                                         onClick={() => {
                                           setHighlightedPetId(pet.id);
                                           openModal(cliente, null, pet.id);
                                         }}
-                                        className="text-blue-600 hover:text-blue-900 p-1 transition-colors"
+                                        icon={Edit2}
+                                        intent="edit"
+                                        tone="ghost"
+                                        size="xs"
                                         title="Editar pet"
-                                      >
-                                        <FiEdit2 size={14} />
-                                      </button>
-                                      <button
+                                        aria-label="Editar pet"
+                                      />
+                                      <IconActionButton
                                         onClick={() => handleDeletePet(pet.id)}
-                                        className="text-red-600 hover:text-red-900 p-1 transition-colors"
+                                        icon={Trash2}
+                                        intent="delete"
+                                        tone="ghost"
+                                        size="xs"
                                         title="Excluir pet"
-                                      >
-                                        <FiTrash2 size={14} />
-                                      </button>
+                                        aria-label="Excluir pet"
+                                      />
                                     </div>
                                   </div>
                                 ))}
@@ -307,10 +317,12 @@ const ClientesNovoTabelaSection = ({
             </table>
           </div>
         ) : (
-          <div className="text-center py-12">
-            <FiUser className="mx-auto text-gray-400 mb-4" size={48} />
-            <p className="text-gray-600">Nenhum cliente encontrado</p>
-          </div>
+          <EmptyState
+            className="rounded-none border-0 shadow-none"
+            icon={UsersRound}
+            title="Nenhuma pessoa encontrada"
+            description="Use a busca ou cadastre uma nova pessoa para iniciar."
+          />
         )}
 
         <PaginationControls
@@ -326,7 +338,7 @@ const ClientesNovoTabelaSection = ({
           totalItems={totalRegistros}
           variant="bottom"
         />
-      </div>
+      </Panel>
     </>
   );
 };
