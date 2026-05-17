@@ -43,6 +43,15 @@ def _serializar_datetime_vet(value: Optional[datetime]) -> Optional[datetime]:
     return value
 
 
+def _serializar_data_hora_agendada_vet(value: Optional[datetime]) -> Optional[datetime]:
+    """Preserva o horario de parede escolhido na agenda veterinaria."""
+    if value is None:
+        return None
+    if getattr(value, "tzinfo", None):
+        return value.replace(tzinfo=None)
+    return value
+
+
 def _date_para_datetime_vet(value: Optional[date]) -> Optional[datetime]:
     if value is None:
         return None

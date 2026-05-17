@@ -96,3 +96,32 @@ def test_agendamento_to_dict_preserva_campos_do_contrato():
     assert payload["consultorio_nome"] == "Sala 1"
     assert payload["consulta_origem_id"] == 88
     assert payload["data_hora"] == data_hora
+
+
+def test_agendamento_to_dict_preserva_horario_agendado_com_timezone_do_banco():
+    data_hora = datetime(2026, 5, 18, 17, 30, tzinfo=timezone.utc)
+    agendamento = SimpleNamespace(
+        id=10,
+        pet_id=2,
+        cliente_id=3,
+        veterinario_id=4,
+        consultorio_id=5,
+        data_hora=data_hora,
+        duracao_minutos=30,
+        tipo="retorno",
+        motivo="Retorno",
+        status="agendado",
+        is_emergencia=False,
+        consulta_id=None,
+        consulta_origem_id=18,
+        observacoes=None,
+        created_at=data_hora,
+        pet=SimpleNamespace(nome="Mel"),
+        cliente=SimpleNamespace(nome="Ana"),
+        veterinario=SimpleNamespace(nome="Dra. Julia"),
+        consultorio=SimpleNamespace(nome="Sala 1"),
+    )
+
+    payload = _agendamento_to_dict(agendamento)
+
+    assert payload["data_hora"] == datetime(2026, 5, 18, 17, 30)
