@@ -144,6 +144,8 @@ entrar no cronograma sem se perderem.
       agendado depois que o modal da agenda fechar.
 - [x] Mostrar na consulta em andamento a data e horario do retorno agendado,
       com opcao de alterar o retorno.
+- [x] Preservar o horario escolhido na agenda ao exibir retorno dentro da
+      consulta, evitando deslocamento de fuso nos agendamentos veterinarios.
 - [x] Se ja existir retorno pendente para a consulta, novo agendamento de
       retorno atualiza o retorno pendente em vez de criar duplicado.
 - [x] Diferenciar visualmente agendamentos do tipo `retorno` na agenda para

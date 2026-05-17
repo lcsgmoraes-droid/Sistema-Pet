@@ -8,7 +8,12 @@ from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from .models import Cliente
-from .veterinario_core import _normalizar_datetime_vet, _serializar_datetime_vet, _vet_now
+from .veterinario_core import (
+    _normalizar_datetime_vet,
+    _serializar_data_hora_agendada_vet,
+    _serializar_datetime_vet,
+    _vet_now,
+)
 from .veterinario_models import (
     AgendamentoVet,
     ConsultaVet,
@@ -227,7 +232,7 @@ def _agendamento_to_dict(ag: AgendamentoVet) -> dict:
         "veterinario_id": ag.veterinario_id,
         "consultorio_id": ag.consultorio_id,
         "consulta_origem_id": getattr(ag, "consulta_origem_id", None),
-        "data_hora": _serializar_datetime_vet(ag.data_hora),
+        "data_hora": _serializar_data_hora_agendada_vet(ag.data_hora),
         "duracao_minutos": ag.duracao_minutos,
         "tipo": ag.tipo,
         "motivo": ag.motivo,

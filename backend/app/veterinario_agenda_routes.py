@@ -393,35 +393,7 @@ def listar_agendamentos(
 
     agendamentos = q.order_by(AgendamentoVet.data_hora).all()
 
-    result = []
-    for ag in agendamentos:
-        d = {
-            "id": ag.id,
-            "pet_id": ag.pet_id,
-            "cliente_id": ag.cliente_id,
-            "veterinario_id": ag.veterinario_id,
-            "consultorio_id": ag.consultorio_id,
-            "consulta_origem_id": ag.consulta_origem_id,
-            "data_hora": ag.data_hora,
-            "duracao_minutos": ag.duracao_minutos,
-            "tipo": ag.tipo,
-            "motivo": ag.motivo,
-            "status": ag.status,
-            "is_emergencia": ag.is_emergencia,
-            "consulta_id": ag.consulta_id,
-            "observacoes": ag.observacoes,
-            "created_at": ag.created_at,
-        }
-        if ag.pet:
-            d["pet_nome"] = ag.pet.nome
-        if ag.cliente:
-            d["cliente_nome"] = ag.cliente.nome
-        if ag.veterinario:
-            d["veterinario_nome"] = ag.veterinario.nome
-        if ag.consultorio:
-            d["consultorio_nome"] = ag.consultorio.nome
-        result.append(d)
-    return result
+    return [_agendamento_to_dict(ag) for ag in agendamentos]
 
 
 @router.get("/agendamentos/{agendamento_id}/push-diagnostico")
