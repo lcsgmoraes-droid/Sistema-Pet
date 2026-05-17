@@ -19,7 +19,7 @@ Regra de uso:
 | MCP Ops/API | 3,5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | Estrutura geral | 5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | Seguranca operacional | 2,5/10 | 8,5/10 | 10/10 | Em andamento |
-| Testes/CI | 1/10 | 8,5/10 | 10/10 | Em andamento |
+| Testes/CI | 1/10 | 9/10 | 10/10 | Em andamento |
 | Observabilidade/auditoria | 2/10 | 9,9/10 | 10/10 | Em andamento prioritario |
 | Portabilidade/configuracao | 3/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | Documentacao | 4/10 | 8/10 | 10/10 | Em andamento |
@@ -134,7 +134,7 @@ Para manter 10/10:
 
 Nota inicial: 2,5/10.
 
-Nota atual: 8,5/10.
+Nota atual: 9/10.
 
 Referencia principal: `docs/CI_CD_DEPLOY_SAFETY_AUDIT.md`.
 
@@ -179,10 +179,12 @@ Ja feito:
 - [x] Branch protection exige checks principais.
 - [x] Dependabot de GitHub Actions revisado e mergeado.
 - [x] Suites focadas de MCP e Plano Basico registradas nos guias.
+- [x] Plano E2E minimo do Plano Basico definido com dados descartaveis e suites separadas.
 
 Falta para 10/10:
 
-- [ ] E2E autenticado minimo para fluxo de login, tenant, clientes, produtos e PDV.
+- [x] Desenhar E2E autenticado minimo para fluxo de login, tenant, clientes, produtos e PDV.
+- [ ] Implementar E2E autenticado minimo com skip seguro quando variaveis estiverem ausentes.
 - [ ] Smoke controlado contra staging ou producao sem dados sensiveis.
 - [ ] Teste automatizado de migrations em banco limpo e banco com historico.
 - [ ] Teste de rollback/restore em ambiente controlado.
@@ -191,7 +193,7 @@ Falta para 10/10:
 
 Proxima acao concreta:
 
-- [ ] Desenhar E2E minimo do Plano Basico com usuario de teste e dados descartaveis.
+- [ ] Implementar `TestPlanoBasicoMinimo` lendo `E2E_*` de ambiente e marcando a suite como longa.
 
 ## 6. Observabilidade/auditoria
 
@@ -353,6 +355,7 @@ Proxima acao concreta:
 | #94 | Estrutura geral | Primeira fatia de campanhas/cupons para regras puras |
 | #95 | Estrutura geral | Primeira fatia de financeiro para origem de contas a pagar |
 | #96 | Estrutura geral | Fechamento 10/10 com varredura final e criterio de manutencao |
+| PR atual | Testes/CI | Plano E2E minimo do Plano Basico com dados descartaveis |
 
 ## Criterio para declarar 10/10 geral
 
