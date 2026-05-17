@@ -47,7 +47,7 @@ jobs:
           python -m pip install -r backend/requirements.txt
 
       - name: Test smoke helpers
-        run: python -m pytest tests/test_ci_smoke_script.py tests/test_smoke_golive_script.py -q
+        run: python -m pytest tests/test_ci_smoke_script.py tests/test_smoke_golive_script.py tests/test_prod_compose_ops_alert_env.py -q
 
       - name: Backend and auth smoke
         run: python scripts/ci_smoke.py
