@@ -15,6 +15,20 @@ Ele nao autoriza deploy. Qualquer comando no servidor de producao ou push direto
 - Health publico: `https://mlprohub.com.br/api/health`
 - Watchdog publico: `https://mlprohub.com.br/api/health/watchdog`
 
+## Responsaveis e tempos alvo
+
+| Situacao | Responsavel por autorizar | Responsavel por executar | Tempo alvo |
+|---|---|---|---|
+| Deploy padrao | Lucas | Codex/operador autorizado | 15 minutos |
+| Validacao pos-deploy | Codex/operador autorizado | Codex/operador autorizado | 5 minutos apos deploy |
+| Rollback rapido de frontend | Lucas | Codex/operador autorizado | 10 minutos apos decisao |
+| Rollback de codigo backend | Lucas | Codex/operador autorizado | 20 minutos apos decisao |
+| Suspeita de problema no banco | Lucas | Lucas + operador tecnico | Parar e planejar; sem prazo automatico |
+
+Regra de decisao: se health publico ou watchdog continuarem falhando por mais
+de 5 minutos apos o deploy, parar novas mudancas e decidir entre corrigir ou
+rollback. Se houver risco de dados, nao executar rollback automatico.
+
 ## Checklist antes do deploy
 
 Marcar estes itens antes de rodar qualquer comando no servidor:

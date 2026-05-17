@@ -18,7 +18,7 @@ Regra de uso:
 | MCP Frontend | 5,5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | MCP Ops/API | 3,5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | Estrutura geral | 5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
-| Seguranca operacional | 2,5/10 | 9,2/10 | 10/10 | Em andamento |
+| Seguranca operacional | 2,5/10 | 9,6/10 | 10/10 | Em andamento |
 | Testes/CI | 1/10 | 9/10 | 10/10 | Em andamento |
 | Observabilidade/auditoria | 2/10 | 9,9/10 | 10/10 | Em andamento prioritario |
 | Portabilidade/configuracao | 3/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
@@ -134,7 +134,7 @@ Para manter 10/10:
 
 Nota inicial: 2,5/10.
 
-Nota atual: 9,2/10.
+Nota atual: 9,6/10.
 
 Referencia principal: `docs/CI_CD_DEPLOY_SAFETY_AUDIT.md`.
 
@@ -150,18 +150,21 @@ Ja feito:
 - [x] Script oficial de deploy registra linha do tempo auditavel das etapas sensiveis em `backend/logs/deploy_events.jsonl`.
 - [x] Wrapper `scripts/auditar_comando_producao.sh` registra comandos manuais sensiveis fora do deploy oficial em `backend/logs/ops_command_events.jsonl`.
 - [x] Usuario operacional `petdeploy` criado em producao com SSH por chave deste PC, wrappers root-owned de deploy/status e sudo restrito a esses wrappers.
+- [x] Deploy completo em producao executado via `petdeploy` em 2026-05-17 para o commit `520f8a2b`, com backup operacional `/opt/petshop/backups/deploy_20260517_133717` e containers finais saudaveis.
+- [x] Rotacao de SSH/secrets documentada em `docs/SEGURANCA_ROTACAO_SSH_SECRETS.md`.
+- [x] Checklist de rollback inclui responsaveis e tempos alvo em `docs/PRODUCAO_ROLLBACK_CHECKLIST.md`.
 
 Falta para 10/10:
 
 - [x] Criar caminho de deploy/status por usuario operacional com privilegio minimo e root apenas como fallback.
-- [ ] Documentar rotacao de SSH/secrets.
+- [x] Documentar rotacao de SSH/secrets.
 - [ ] Testar restore real de backup em ambiente controlado.
-- [ ] Criar checklist de rollback com tempo alvo e responsavel.
+- [x] Criar checklist de rollback com tempo alvo e responsavel.
 - [ ] Separar ainda mais deploy de runtime e docs/workflows sem impacto de servidor.
 
 Proxima acao concreta:
 
-- [ ] Executar o proximo deploy completo via `petdeploy` e documentar rotacao de SSH/secrets.
+- [ ] Planejar teste de restore real de backup em ambiente controlado sem tocar a producao.
 
 ## 5. Testes/CI
 
@@ -358,6 +361,7 @@ Proxima acao concreta:
 | #96 | Estrutura geral | Fechamento 10/10 com varredura final e criterio de manutencao |
 | #97 | Testes/CI | Plano E2E minimo do Plano Basico com dados descartaveis |
 | #98 | Seguranca operacional | Usuario operacional `petdeploy` e deploy sem root direto |
+| PR atual | Seguranca operacional | Deploy via `petdeploy`, rotacao de SSH/secrets e rollback com responsaveis |
 
 ## Criterio para declarar 10/10 geral
 
