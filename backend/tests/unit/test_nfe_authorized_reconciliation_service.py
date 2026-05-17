@@ -1,8 +1,16 @@
 from types import SimpleNamespace
 
 from app.services.nfe_authorized_reconciliation_service import (
+    executar_reconciliacao_automatica_nfes_autorizadas,
     reconciliar_nf_autorizada_cache,
 )
+from app.middlewares.request_context import clear_request_context, get_request_id
+from app.utils.logger import clear_context
+
+
+def teardown_function():
+    clear_request_context()
+    clear_context()
 
 
 class _FakeQuery:
@@ -198,3 +206,14 @@ def test_reconciliar_nf_autorizada_cache_reprocessa_quando_so_existe_baixa_legad
     assert resultado["success"] is True
     assert resultado["motivo"] == "reconciliada"
     assert capturado["processou_nf"]["nf_id"] == "25441651448"
+
+
+def test_executar_reconciliacao_automatica_nfes_autorizadas_inclui_correlacao(monkeypatch):
+    import app.services.nfe_authorized_reconciliation_service as service
+
+    monkeypatch.setattr(service, "listar_tenants_com_nfes_autorizadas_recentes", lambda *args, **kwargs: [])
+
+    resultado = executar_reconciliacao_automatica_nfes_autorizadas(object(), dias=3)
+
+    assert resultado["correlation_id"].startswith("job.nfe-authorized-reconciliation-")
+    assert get_request_id() is None

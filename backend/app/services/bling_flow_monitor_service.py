@@ -22,6 +22,7 @@ from app.services.pedido_integrado_duplicate_review_service import (
     reconciliar_fluxo_pedido_integrado,
 )
 from app.services.pedido_integrado_consolidation_service import localizar_pedido_por_bling_id
+from app.utils.correlation import current_correlation_id, operation_correlation_context
 from app.utils.logger import logger
 
 
@@ -150,6 +151,17 @@ def _json_safe(value: Any) -> Any:
         except Exception:
             return None
     return value
+
+
+def _payload_with_correlation(payload: dict | None) -> dict:
+    safe_payload = _json_safe(payload or {})
+    if not isinstance(safe_payload, dict):
+        safe_payload = {"value": safe_payload}
+
+    correlation_id = current_correlation_id("bling.flow.event")
+    safe_payload.setdefault("request_id", correlation_id)
+    safe_payload.setdefault("correlation_id", correlation_id)
+    return safe_payload
 
 
 def _nf_bling_id_valido(value: Any) -> str | None:
@@ -1089,7 +1101,7 @@ def registrar_evento(
             pedido_bling_id=_text(pedido_bling_id),
             nf_bling_id=_nf_bling_id_valido(nf_bling_id),
             sku=_text(sku),
-            payload=_json_safe(payload or {}),
+            payload=_payload_with_correlation(payload),
             auto_fix_applied=auto_fix_applied,
             processed_at=normalizar_data_evento_monitor(processed_at) or _utcnow(),
         )
@@ -1642,7 +1654,21 @@ def auditar_fluxo_bling(
     dias: int = 7,
     limite: int = 300,
     auto_fix: bool = True,
+    _correlation_context_applied: bool = False,
 ) -> dict:
+    if not _correlation_context_applied:
+        with operation_correlation_context("job.bling_flow_audit") as correlation_id:
+            result = auditar_fluxo_bling(
+                db,
+                tenant_id=tenant_id,
+                dias=dias,
+                limite=limite,
+                auto_fix=auto_fix,
+                _correlation_context_applied=True,
+            )
+            result.setdefault("correlation_id", correlation_id)
+            return result
+
     _garantir_registry_sqlalchemy_auditoria()
     cutoff = _utcnow() - timedelta(days=max(1, dias))
     query = db.query(PedidoIntegrado).filter(

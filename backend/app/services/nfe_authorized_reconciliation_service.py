@@ -10,6 +10,7 @@ from app.pedido_integrado_item_models import PedidoIntegradoItem
 from app.pedido_integrado_models import PedidoIntegrado
 from app.produtos_models import EstoqueMovimentacao
 from app.services.pedido_integrado_consolidation_service import localizar_pedido_por_bling_id
+from app.utils.correlation import current_correlation_id, operation_correlation_context
 from app.utils.logger import logger
 
 
@@ -456,7 +457,19 @@ def executar_reconciliacao_automatica_nfes_autorizadas(
     *,
     dias: int = 3,
     limite_notas_por_tenant: int = 200,
+    _correlation_context_applied: bool = False,
 ) -> dict:
+    if not _correlation_context_applied:
+        with operation_correlation_context("job.nfe_authorized_reconciliation") as correlation_id:
+            result = executar_reconciliacao_automatica_nfes_autorizadas(
+                db,
+                dias=dias,
+                limite_notas_por_tenant=limite_notas_por_tenant,
+                _correlation_context_applied=True,
+            )
+            result.setdefault("correlation_id", correlation_id)
+            return result
+
     tenant_ids = listar_tenants_com_nfes_autorizadas_recentes(db, dias=dias)
     resultados: list[dict] = []
 
@@ -486,6 +499,7 @@ def executar_reconciliacao_automatica_nfes_autorizadas(
             )
 
     return {
+        "correlation_id": current_correlation_id("job.nfe_authorized_reconciliation"),
         "tenants_processados": len(resultados),
         "tenants_com_notas": len(tenant_ids),
         "notas_reconciliadas_total": sum(int(item.get("notas_reconciliadas") or 0) for item in resultados),

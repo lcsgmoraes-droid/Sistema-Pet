@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from app.pedido_integrado_item_models import PedidoIntegradoItem
 from app.pedido_integrado_models import PedidoIntegrado
+from app.utils.correlation import current_correlation_id, operation_correlation_context
 from app.utils.logger import logger
 
 
@@ -299,9 +300,25 @@ def reconciliar_status_pedidos_recentes(
     *,
     dias: int = 7,
     limite_pedidos: int = 60,
+    _correlation_context_applied: bool = False,
 ) -> dict:
+    if not _correlation_context_applied:
+        with operation_correlation_context("job.pedido_status_reconciliation") as correlation_id:
+            result = reconciliar_status_pedidos_recentes(
+                db,
+                tenant_id,
+                dias=dias,
+                limite_pedidos=limite_pedidos,
+                _correlation_context_applied=True,
+            )
+            result.setdefault("correlation_id", correlation_id)
+            return result
+
+    correlation_id = current_correlation_id("job.pedido_status_reconciliation")
+
     if _rate_limit_diario_ativo():
         return {
+            "correlation_id": correlation_id,
             "tenant_id": str(tenant_id),
             "executada": False,
             "motivo": "bling_rate_limit_diario_ativo",
@@ -327,6 +344,7 @@ def reconciliar_status_pedidos_recentes(
 
     if not pedidos:
         return {
+            "correlation_id": correlation_id,
             "tenant_id": str(tenant_id),
             "executada": False,
             "motivo": "sem_pedidos_reconciliaveis_recentes",
@@ -387,6 +405,7 @@ def reconciliar_status_pedidos_recentes(
                 break
 
     return {
+        "correlation_id": correlation_id,
         "tenant_id": str(tenant_id),
         "executada": True,
         "dias": dias,
@@ -408,7 +427,19 @@ def executar_reconciliacao_automatica_status_pedidos(
     *,
     dias: int = 7,
     limite_pedidos_por_tenant: int = 60,
+    _correlation_context_applied: bool = False,
 ) -> dict:
+    if not _correlation_context_applied:
+        with operation_correlation_context("job.pedido_status_reconciliation_batch") as correlation_id:
+            result = executar_reconciliacao_automatica_status_pedidos(
+                db,
+                dias=dias,
+                limite_pedidos_por_tenant=limite_pedidos_por_tenant,
+                _correlation_context_applied=True,
+            )
+            result.setdefault("correlation_id", correlation_id)
+            return result
+
     tenant_ids = listar_tenants_com_pedidos_reconciliaveis(db, dias=dias)
     resultados: list[dict] = []
 
@@ -439,6 +470,7 @@ def executar_reconciliacao_automatica_status_pedidos(
             )
 
     return {
+        "correlation_id": current_correlation_id("job.pedido_status_reconciliation_batch"),
         "tenants_processados": len(resultados),
         "tenants_com_pedidos_reconciliaveis": len(tenant_ids),
         "pedidos_processados_total": sum(int(item.get("pedidos_processados") or 0) for item in resultados),

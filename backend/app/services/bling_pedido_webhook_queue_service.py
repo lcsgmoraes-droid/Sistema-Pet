@@ -12,6 +12,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.bling_pedido_webhook_queue_models import BlingPedidoWebhookEvent
+from app.utils.correlation import derive_correlation_id, operation_correlation_context
 from app.utils.logger import logger
 
 
@@ -104,7 +105,7 @@ def _summarize_response(value: Any) -> dict:
     if isinstance(value, dict):
         return {
             key: value.get(key)
-            for key in ("status", "acao", "motivo", "pedido_id", "erros_estoque")
+            for key in ("status", "acao", "motivo", "pedido_id", "erros_estoque", "request_id", "correlation_id")
             if key in value
         }
     return {"result": str(value)[:300]}
@@ -114,6 +115,15 @@ def _backoff_seconds(attempts: int) -> int:
     base = _env_int("BLING_PEDIDO_WEBHOOK_RETRY_BASE_SECONDS", 30)
     cap = _env_int("BLING_PEDIDO_WEBHOOK_RETRY_MAX_SECONDS", 15 * 60)
     return min(cap, max(5, base) * (2 ** max(0, attempts - 1)))
+
+
+def _event_correlation_id(event: Any) -> str:
+    reference = (
+        getattr(event, "event_id", None)
+        or getattr(event, "dedupe_key", None)
+        or getattr(event, "id", None)
+    )
+    return derive_correlation_id("job.bling_pedido_webhook", reference)
 
 
 def enqueue_bling_pedido_webhook(db: Session, payload: dict) -> dict[str, Any]:
@@ -245,14 +255,29 @@ def process_pending_bling_pedido_webhooks(db: Session, *, limit: int | None = No
         if not event:
             break
 
+        correlation_id = _event_correlation_id(event)
         try:
             from app.integracao_bling_pedido_routes import processar_pedido_bling_payload
 
-            response = processar_pedido_bling_payload(dict(event.payload or {}), db)
+            with operation_correlation_context(
+                "job.bling_pedido_webhook",
+                correlation_id=correlation_id,
+            ):
+                response = processar_pedido_bling_payload(dict(event.payload or {}), db)
+                if isinstance(response, dict):
+                    response = dict(response)
+                    response.setdefault("request_id", correlation_id)
+                    response.setdefault("correlation_id", correlation_id)
             _mark_processed(db, event.id, response)
             processed += 1
         except Exception as exc:  # pragma: no cover - defensive operational guard
-            logger.exception("[BLING PEDIDO QUEUE] Falha ao processar webhook id=%s: %s", event.id, exc)
+            logger.error(
+                "bling_pedido_webhook_queue_failed",
+                f"Falha ao processar webhook id={event.id}: {exc}",
+                event_id=event.id,
+                correlation_id=correlation_id,
+                error=str(exc),
+            )
             _mark_failed(db, event.id, exc)
             failed += 1
             refreshed = db.get(BlingPedidoWebhookEvent, event.id)
