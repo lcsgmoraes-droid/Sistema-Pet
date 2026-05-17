@@ -1,0 +1,89 @@
+name: E2E Long
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 7 * * 0"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-long-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  plano-basico-e2e:
+    name: Plano Basico E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    env:
+      DEBUG: "false"
+      ENVIRONMENT: testing
+      ENV: testing
+      DATABASE_URL: sqlite:///./test.db
+      JWT_SECRET_KEY: e2e-long-secret-key-with-more-than-32-characters
+      EMAIL_VERIFICATION_REQUIRED: "false"
+      BLING_SYNC_SCHEDULER_ENABLED: "false"
+      SEFAZ_IMPORTACAO_AUTOMATICA: "false"
+      E2E_BASE_URL: ${{ secrets.E2E_BASE_URL }}
+      E2E_USER_EMAIL: ${{ secrets.E2E_USER_EMAIL }}
+      E2E_USER_PASSWORD: ${{ secrets.E2E_USER_PASSWORD }}
+      E2E_TENANT_ID: ${{ secrets.E2E_TENANT_ID }}
+      E2E_BLOCKED_PATH: ${{ secrets.E2E_BLOCKED_PATH }}
+      E2E_ALLOW_PRODUCTION: ${{ secrets.E2E_ALLOW_PRODUCTION }}
+      E2E_TIMEOUT_SECONDS: ${{ secrets.E2E_TIMEOUT_SECONDS }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v6
+
+      - name: Setup Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install backend dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -r backend/requirements.txt
+
+      - name: Show redacted E2E readiness
+        run: |
+          python - <<'PY'
+          import os
+
+          required = [
+              "E2E_BASE_URL",
+              "E2E_USER_EMAIL",
+              "E2E_USER_PASSWORD",
+              "E2E_TENANT_ID",
+          ]
+          missing = [name for name in required if not os.getenv(name)]
+          if missing:
+              print(
+                  "Plano Basico E2E will skip inside pytest; missing env vars: "
+                  + ", ".join(missing)
+              )
+          else:
+              base_url = os.environ["E2E_BASE_URL"].rstrip("/")
+              allow_prod = os.getenv("E2E_ALLOW_PRODUCTION", "").strip().lower()
+              print("Plano Basico E2E configured for base_url=" + base_url)
+              if "mlprohub.com.br" in base_url and allow_prod not in {
+                  "1",
+                  "true",
+                  "yes",
+                  "sim",
+                  "on",
+              }:
+                  print(
+                      "Production target detected without E2E_ALLOW_PRODUCTION=true; "
+                      "pytest will skip safely."
+                  )
+          PY
+
+      - name: Run Plano Basico long E2E
+        working-directory: backend
+        run: python -m pytest tests/test_plano_basico_e2e.py -m e2e_long -q

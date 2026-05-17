@@ -19,7 +19,7 @@ Regra de uso:
 | MCP Ops/API | 3,5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | Estrutura geral | 5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | Seguranca operacional | 2,5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
-| Testes/CI | 1/10 | 9,7/10 | 10/10 | Em andamento |
+| Testes/CI | 1/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | Observabilidade/auditoria | 2/10 | 9,9/10 | 10/10 | Em andamento prioritario |
 | Portabilidade/configuracao | 3/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | Documentacao | 4/10 | 8/10 | 10/10 | Em andamento |
@@ -174,7 +174,7 @@ Proxima acao concreta:
 
 Nota inicial: 1/10.
 
-Nota atual: 9,7/10.
+Nota atual: 10/10.
 
 Referencia principal: `docs/CI_CD_DEPLOY_SAFETY_AUDIT.md`.
 
@@ -192,6 +192,8 @@ Ja feito:
 - [x] Suite E2E longa do Plano Basico implementada com skip seguro por variaveis de ambiente.
 - [x] Smoke E2E controlado do Plano Basico executado contra producao com usuario/tenant de teste, sem dados sensiveis.
 - [x] Migration Smoke automatizado no Backend CI com Postgres descartavel, cobrindo banco limpo e banco historico controlado.
+- [x] Matriz de cobertura critica criada em `docs/auditorias/testes-ci-cobertura-critica.md`.
+- [x] Workflow `E2E Long` criado para execucao manual/agendada da suite longa, separado dos checks rapidos obrigatorios.
 
 Falta para 10/10:
 
@@ -200,12 +202,14 @@ Falta para 10/10:
 - [x] Smoke controlado contra staging ou producao sem dados sensiveis.
 - [x] Teste automatizado de migrations em banco limpo e banco com historico.
 - [x] Teste de rollback/restore em ambiente controlado.
-- [ ] Relatorio de cobertura por areas criticas, sem perseguir porcentagem cega.
-- [ ] Separar testes rapidos obrigatorios de suites longas agendadas.
+- [x] Relatorio de cobertura por areas criticas, sem perseguir porcentagem cega.
+- [x] Separar testes rapidos obrigatorios de suites longas agendadas.
 
-Proxima acao concreta:
+Para manter 10/10:
 
-- [ ] Criar relatorio curto de cobertura por areas criticas e definir quais suites ficam obrigatorias vs longas.
+- [ ] Toda mudanca de regra critica deve apontar para uma linha da matriz de cobertura.
+- [ ] Suites longas devem continuar manuais/agendadas ate serem rapidas, estaveis e sem segredo obrigatorio.
+- [ ] Se uma area critica nova entrar no produto, atualizar a matriz no mesmo PR.
 
 ## 6. Observabilidade/auditoria
 
@@ -376,6 +380,7 @@ Proxima acao concreta:
 | #103 | Seguranca operacional | Fechamento 10/10 com evidencia do deploy sem rebuild |
 | #104 | Testes/CI | Suite E2E longa do Plano Basico com skip seguro por ambiente |
 | #105 | Testes/CI | Smoke E2E controlado do Plano Basico em tenant de teste |
+| #106 | Testes/CI | Migration Smoke no Backend CI com Postgres descartavel |
 
 ## Criterio para declarar 10/10 geral
 

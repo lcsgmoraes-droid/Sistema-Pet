@@ -38,6 +38,8 @@ Meta: 10/10 antes de automatizar qualquer deploy de producao.
 | Feito | Deploy seguro detecta mudancas sem impacto de runtime e pula rebuild/restart | `scripts/deploy_producao_seguro.sh` |
 | Feito | Caminho sem rebuild validado em producao sem recriar containers | `scripts/deploy_producao_seguro.sh` |
 | Feito | Backend CI valida migrations Alembic em Postgres descartavel para banco limpo e historico controlado | `.github/workflows/backend-ci.yml`, `scripts/ci_migration_smoke.py` |
+| Feito | Matriz de cobertura critica separa checks rapidos obrigatorios de suites longas | `docs/auditorias/testes-ci-cobertura-critica.md` |
+| Feito | Suite E2E longa do Plano Basico possui workflow manual/agendado separado dos checks obrigatorios | `.github/workflows/e2e-long.yml` |
 
 ## PRs ja juntados
 
@@ -51,7 +53,7 @@ Meta: 10/10 antes de automatizar qualquer deploy de producao.
 | #97 | Plano E2E minimo do Plano Basico | Mergeado e deployado |
 | #98 | Usuario operacional `petdeploy` e deploy sem root direto | Mergeado e deployado via `petdeploy` |
 | #100 | Backup e restore smoke controlado do banco | Mergeado e deployado via `petdeploy` |
-| #106 | Migration Smoke no Backend CI com Postgres descartavel | Em PR |
+| #106 | Migration Smoke no Backend CI com Postgres descartavel | Mergeado |
 
 ## Ultimo deploy real validado
 
@@ -97,6 +99,16 @@ Deploy sem rebuild validado:
 | `Fluxo unico safety` | Garante trilho basico DEV -> PROD antes do merge |
 | `Quality Gate` | Garante suite backend multitenant, import smoke e Migration Smoke |
 | `Smoke test` | Garante smoke de backend/auth e build de frontend |
+
+## Suites longas separadas
+
+O workflow `E2E Long` fica fora dos checks obrigatorios de PR. Ele roda por
+`workflow_dispatch` ou agenda semanal, usando somente variaveis `E2E_*` vindas
+de GitHub Secrets ou ambiente local seguro. Quando as variaveis obrigatorias nao
+existem, a suite pula com mensagem clara. Contra `mlprohub.com.br`, tambem exige
+`E2E_ALLOW_PRODUCTION=true`.
+
+Matriz de risco e cobertura: `docs/auditorias/testes-ci-cobertura-critica.md`.
 
 ## Migration Smoke CI
 
