@@ -313,7 +313,7 @@ Proxima acao concreta:
 | #77 | Observabilidade/auditoria | Correlacao para WhatsApp, SEFAZ e e-mail |
 | #78 | Observabilidade/auditoria | Logs estruturados de eventos de negocio |
 | #79 | Observabilidade/auditoria/seguranca operacional | Linha do tempo auditavel das etapas sensiveis do deploy |
-| PR atual | Observabilidade/auditoria/seguranca operacional | Auditoria de comandos manuais sensiveis em producao |
+| #80 | Observabilidade/auditoria/seguranca operacional | Auditoria de comandos manuais sensiveis em producao |
 
 ## Criterio para declarar 10/10 geral
 
