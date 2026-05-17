@@ -330,7 +330,7 @@ Proxima acao concreta:
 | #84 | Portabilidade/configuracao | Check seguro de ambiente DEV e guia de correcao |
 | #85 | Portabilidade/configuracao | Bootstrap de PC novo para ambiente DEV |
 | #86 | Portabilidade/configuracao | Fluxo de segundo PC e diagnostico de portas locais |
-| PR atual | Estrutura geral | Inventario de hotspots e primeira fatia de refatoracao |
+| #87 | Estrutura geral | Inventario de hotspots e primeira fatia de refatoracao |
 
 ## Criterio para declarar 10/10 geral
 
