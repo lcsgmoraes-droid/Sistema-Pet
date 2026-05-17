@@ -44,6 +44,7 @@ from .services.venda_rentabilidade_snapshot_service import (
     invalidate_venda_rentabilidade_snapshot,
 )
 from .utils.tenant_safe_sql import execute_tenant_safe
+from .vendas.regras import _resolver_status_entrega_atualizacao, calcular_totais_venda
 
 router = APIRouter(prefix="/vendas", tags=["vendas"])
 
@@ -224,51 +225,6 @@ class CancelarVendaRequest(BaseModel):
 # ============================================================================
 # FUNÇÕES AUXILIARES
 # ============================================================================
-
-def calcular_totais_venda(itens: List, desconto_valor: float, desconto_percentual: float, taxa_entrega: float) -> dict:
-    """
-    Calcula os totais da venda (subtotal, desconto, total)
-
-    Args:
-        itens: Lista de itens da venda
-        desconto_valor: Valor do desconto em reais
-        desconto_percentual: Percentual de desconto
-        taxa_entrega: Taxa de entrega
-
-    Returns:
-        Dict com subtotal, desconto_valor, total
-    """
-    # O PDV grava desconto rateado no item e envia item.subtotal ja liquido.
-    # Se subtrair desconto_valor novamente aqui, a venda fica menor que o valor recebido.
-    subtotal_liquido = sum(float(item.subtotal or 0) for item in itens)
-    desconto_itens = sum(float(item.desconto_item or 0) for item in itens)
-    taxa_entrega = float(taxa_entrega or 0)
-
-    if desconto_itens > 0:
-        desconto_calculado = desconto_itens
-        total = subtotal_liquido + taxa_entrega
-    else:
-        desconto_calculado = float(desconto_valor or 0)
-        if desconto_percentual and desconto_percentual > 0:
-            desconto_calculado = subtotal_liquido * (float(desconto_percentual) / 100)
-        total = subtotal_liquido - desconto_calculado + taxa_entrega
-
-    return {
-        'subtotal': subtotal_liquido,
-        'desconto_valor': round(desconto_calculado, 2),
-        'total': total
-    }
-
-
-def _resolver_status_entrega_atualizacao(tem_entrega: bool, status_atual: Optional[str]) -> Optional[str]:
-    """
-    Atualizacao de venda nao deve reabrir entrega ja roteirizada/concluida.
-    Sem isso, uma venda entregue pode voltar para "pendente" ao salvar o PDV.
-    """
-    if not tem_entrega:
-        return None
-    return status_atual or "pendente"
-
 
 # ============================================================================
 # ENDPOINTS - CONFIGURAÇÕES DE ENTREGA [DEPRECATED]
