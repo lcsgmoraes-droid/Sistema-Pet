@@ -8,6 +8,10 @@ import pytest
 import requests
 
 
+os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
+os.environ.setdefault("ENVIRONMENT", "test")
+os.environ.setdefault("ENV", "test")
+
 pytestmark = pytest.mark.e2e_long
 
 
@@ -107,7 +111,7 @@ def api(e2e_config: E2EConfig) -> E2EApi:
 
     login = client.expect(
         "POST",
-        "/auth/login",
+        "/auth/login-multitenant",
         {200},
         "auth.login",
         json={
