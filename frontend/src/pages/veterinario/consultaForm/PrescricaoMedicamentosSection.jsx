@@ -9,13 +9,14 @@ export default function PrescricaoMedicamentosSection({
   removerItem,
   setItem,
   selecionarMedicamentoNoItem,
-  recalcularDoseItem,
+  abrirCalculadoraPrescricaoItem,
 }) {
   return (
     <fieldset disabled={modoSomenteLeitura} className="bg-white rounded-xl border border-gray-200 shadow-sm p-5 space-y-3 disabled:opacity-100">
       <div className="flex items-center justify-between">
         <h2 className="font-semibold text-gray-700">Prescrição (opcional)</h2>
         <button
+          type="button"
           onClick={adicionarItem}
           className="text-xs text-blue-600 hover:text-blue-800 underline"
         >
@@ -28,6 +29,7 @@ export default function PrescricaoMedicamentosSection({
       {form.prescricao_itens.map((item, idx) => (
         <div key={idx} className="border border-gray-100 rounded-lg p-3 space-y-2 relative">
           <button
+            type="button"
             onClick={() => removerItem(idx)}
             className="absolute top-2 right-2 text-gray-300 hover:text-red-400"
           >
@@ -46,7 +48,7 @@ export default function PrescricaoMedicamentosSection({
             </select>
             <button
               type="button"
-              onClick={() => recalcularDoseItem(idx)}
+              onClick={() => abrirCalculadoraPrescricaoItem(idx)}
               className="inline-flex items-center justify-center gap-2 px-3 py-2 text-xs border border-blue-200 text-blue-700 rounded-lg hover:bg-blue-50"
             >
               <Calculator size={14} />

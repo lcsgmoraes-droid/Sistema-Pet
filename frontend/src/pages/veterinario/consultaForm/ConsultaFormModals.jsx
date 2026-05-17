@@ -1,5 +1,6 @@
 import NovoPetModal from "../../../components/veterinario/NovoPetModal";
 import CalculadoraDoseModal from "./CalculadoraDoseModal";
+import ConsultaRascunhoSalvoModal from "./ConsultaRascunhoSalvoModal";
 import InsumoRapidoModal from "./InsumoRapidoModal";
 import NovoExameConsultaModal from "./NovoExameConsultaModal";
 
@@ -22,6 +23,11 @@ export default function ConsultaFormModals({
   handleNovoPetCriado,
   modalCalculadoraAberto,
   setModalCalculadoraAberto,
+  modalRascunhoSalvoAberto,
+  rascunhoSalvoMensagem,
+  fecharModalRascunhoSalvo,
+  irParaTopoAposRascunho,
+  sairParaListaAposRascunho,
   calculadoraForm,
   setCalculadoraForm,
   medicamentosCatalogo,
@@ -70,6 +76,14 @@ export default function ConsultaFormModals({
         medicamentosCatalogo={medicamentosCatalogo}
         medicamentoSelecionado={medicamentoCalculadoraSelecionado}
         resultado={calculadoraResultado}
+      />
+
+      <ConsultaRascunhoSalvoModal
+        isOpen={modalRascunhoSalvoAberto}
+        mensagem={rascunhoSalvoMensagem}
+        onContinuar={fecharModalRascunhoSalvo}
+        onIrParaTopo={irParaTopoAposRascunho}
+        onSairParaLista={sairParaListaAposRascunho}
       />
 
       <NovoExameConsultaModal

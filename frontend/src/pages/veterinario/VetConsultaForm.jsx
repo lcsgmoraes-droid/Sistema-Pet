@@ -101,6 +101,11 @@ export default function VetConsultaForm() {
         handleNovoPetCriado={consulta.handleNovoPetCriado}
         modalCalculadoraAberto={consulta.modalCalculadoraAberto}
         setModalCalculadoraAberto={consulta.setModalCalculadoraAberto}
+        modalRascunhoSalvoAberto={consulta.modalRascunhoSalvoAberto}
+        rascunhoSalvoMensagem={consulta.rascunhoSalvoMensagem}
+        fecharModalRascunhoSalvo={consulta.fecharModalRascunhoSalvo}
+        irParaTopoAposRascunho={consulta.irParaTopoAposRascunho}
+        sairParaListaAposRascunho={consulta.sairParaListaAposRascunho}
         calculadoraForm={consulta.calculadoraForm}
         setCalculadoraForm={consulta.setCalculadoraForm}
         medicamentosCatalogo={consulta.medicamentosCatalogo}

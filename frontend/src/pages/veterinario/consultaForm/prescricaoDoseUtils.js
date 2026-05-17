@@ -1,5 +1,12 @@
 import { parseNumero } from "./consultaFormUtils.js";
 
+function formatarNumeroCampo(valor) {
+  if (!Number.isFinite(valor)) return "";
+  return Number.isInteger(valor)
+    ? String(valor)
+    : String(Number(valor.toFixed(2)));
+}
+
 export function obterPesoParaCalculoDose(form = {}, petSelecionado = {}) {
   const candidatos = [
     form.peso_kg,
@@ -46,5 +53,32 @@ export function calcularDosePrescricaoPorPeso(item = {}, pesoKg) {
   return {
     dose_mg: (doseMgKg * peso).toFixed(2),
     unidade: "mg",
+  };
+}
+
+export function buildCalculadoraDoseFormParaPrescricao({
+  calculadoraFormAtual = {},
+  formConsulta = {},
+  itemPrescricao = {},
+  petSelecionado = {},
+} = {}) {
+  const peso = obterPesoParaCalculoDose(formConsulta, petSelecionado);
+  const doseMgKg = obterDoseMgKgReferencia(itemPrescricao);
+
+  return {
+    ...calculadoraFormAtual,
+    medicamento_id: itemPrescricao.medicamento_id
+      ? String(itemPrescricao.medicamento_id)
+      : calculadoraFormAtual.medicamento_id || "",
+    peso_kg: Number.isFinite(peso)
+      ? formatarNumeroCampo(peso)
+      : calculadoraFormAtual.peso_kg || "",
+    dose_mg_kg: Number.isFinite(doseMgKg)
+      ? formatarNumeroCampo(doseMgKg)
+      : calculadoraFormAtual.dose_mg_kg || "",
+    frequencia_horas: calculadoraFormAtual.frequencia_horas || "12",
+    dias: itemPrescricao.duracao_dias
+      ? String(itemPrescricao.duracao_dias)
+      : calculadoraFormAtual.dias || "7",
   };
 }

@@ -18,7 +18,7 @@ export default function DiagnosticoTratamentoSection({
   removerItem,
   setItem,
   selecionarMedicamentoNoItem,
-  recalcularDoseItem,
+  abrirCalculadoraPrescricaoItem,
   adicionarProcedimento,
   removerProcedimento,
   setProcedimentoItem,
@@ -46,7 +46,7 @@ export default function DiagnosticoTratamentoSection({
         removerItem={removerItem}
         setItem={setItem}
         selecionarMedicamentoNoItem={selecionarMedicamentoNoItem}
-        recalcularDoseItem={recalcularDoseItem}
+        abrirCalculadoraPrescricaoItem={abrirCalculadoraPrescricaoItem}
       />
 
       <ProcedimentosRealizadosSection
