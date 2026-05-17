@@ -9,6 +9,14 @@ Este projeto tem dois servidores MCP locais:
 
 Os ambientes virtuais ficam dentro de `mcp/*/.venv` e nao entram no Git.
 
+Antes do setup, voce pode rodar o diagnostico seguro de ambiente DEV:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\check_dev_environment.ps1 -NoNetwork
+```
+
+Detalhes e correcoes comuns ficam em `docs/DEV_ENVIRONMENT_CHECK.md`.
+
 Forma automatica:
 
 ```powershell
