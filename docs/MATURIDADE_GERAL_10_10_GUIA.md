@@ -359,6 +359,7 @@ Proxima acao concreta:
 | #81 | Observabilidade/auditoria | Alertas acionaveis para 5xx, lentidao, falhas recorrentes e worker/job degradado |
 | #82 | Observabilidade/auditoria | Notifier externo opcional para alertas Ops criticos |
 | #83 | Observabilidade/auditoria | Script de teste controlado do notifier Ops |
+| #108 | Observabilidade/auditoria | Compose de producao repassa webhook real de alertas Ops para o backend |
 | #84 | Portabilidade/configuracao | Check seguro de ambiente DEV e guia de correcao |
 | #85 | Portabilidade/configuracao | Bootstrap de PC novo para ambiente DEV |
 | #86 | Portabilidade/configuracao | Fluxo de segundo PC e diagnostico de portas locais |
