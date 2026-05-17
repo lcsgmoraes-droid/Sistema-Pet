@@ -332,7 +332,7 @@ Proxima acao concreta:
 | #85 | Portabilidade/configuracao | Bootstrap de PC novo para ambiente DEV |
 | #86 | Portabilidade/configuracao | Fluxo de segundo PC e diagnostico de portas locais |
 | #87 | Estrutura geral | Inventario de hotspots e primeira fatia de refatoracao |
-| PR atual | Estrutura geral | Definition of Done para refatoracao modular |
+| #88 | Estrutura geral | Definition of Done para refatoracao modular |
 
 ## Criterio para declarar 10/10 geral
 
