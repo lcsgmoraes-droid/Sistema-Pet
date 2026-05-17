@@ -66,11 +66,21 @@ E2E_BASE_URL
 E2E_USER_EMAIL
 E2E_USER_PASSWORD
 E2E_TENANT_ID
-E2E_ALLOW_DESTRUCTIVE_CLEANUP=false
 ```
 
 Sem essas variaveis, a suite deve pular com mensagem clara, nao falhar de forma
 ruidosa.
+
+Variaveis opcionais:
+
+```text
+E2E_BLOCKED_PATH=/banho-tosa/configuracao
+E2E_TIMEOUT_SECONDS=20
+E2E_ALLOW_PRODUCTION=false
+```
+
+Contra `mlprohub.com.br`, a suite so roda quando `E2E_ALLOW_PRODUCTION=true`
+estiver definido explicitamente.
 
 ## Criterio de aceite
 
@@ -84,9 +94,10 @@ ruidosa.
 
 ## Caminho de implementacao
 
-1. Adaptar `backend/tests/e2e_test_sistema_completo.py` para ler variaveis de
-   ambiente e pular quando ausentes.
-2. Criar uma primeira classe `TestPlanoBasicoMinimo` com a jornada acima.
+1. Criar `backend/tests/test_plano_basico_e2e.py` lendo variaveis de ambiente e
+   pulando quando ausentes.
+2. Criar a primeira jornada minima com login, selecao de tenant, barreira de
+   modulo, cliente, produto, estoque, venda e finalizacao.
 3. Adicionar marcador `pytest.mark.e2e_long`.
 4. Criar comando documentado para execucao local:
 
@@ -94,7 +105,19 @@ ruidosa.
 $env:E2E_BASE_URL="http://localhost:8000"
 $env:E2E_USER_EMAIL="e2e.plano.basico@mlprohub.test"
 $env:E2E_USER_PASSWORD="<senha-local>"
-.\backend\.venv\Scripts\python.exe -m pytest backend/tests/e2e_test_sistema_completo.py -m e2e_long -q
+$env:E2E_TENANT_ID="<tenant-local-ou-staging>"
+.\backend\.venv\Scripts\python.exe -m pytest backend/tests/test_plano_basico_e2e.py -m e2e_long -q
 ```
 
 5. Depois de estabilizar local/staging, criar workflow agendado separado.
+
+## Implementacao inicial
+
+Status:
+
+- Suite criada em `backend/tests/test_plano_basico_e2e.py`.
+- Marcador `e2e_long` registrado em `backend/pytest.ini`.
+- Sem `E2E_BASE_URL`, `E2E_USER_EMAIL`, `E2E_USER_PASSWORD` e
+  `E2E_TENANT_ID`, a suite pula com mensagem clara.
+- Contra `mlprohub.com.br`, a suite tambem exige `E2E_ALLOW_PRODUCTION=true`
+  para evitar escrita acidental em producao.
