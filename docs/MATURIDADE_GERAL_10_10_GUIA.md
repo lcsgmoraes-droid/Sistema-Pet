@@ -20,7 +20,7 @@ Regra de uso:
 | Estrutura geral | 5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | Seguranca operacional | 2,5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | Testes/CI | 1/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
-| Observabilidade/auditoria | 2/10 | 9,9/10 | 10/10 | Em andamento prioritario |
+| Observabilidade/auditoria | 2/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | Portabilidade/configuracao | 3/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | Documentacao | 4/10 | 8/10 | 10/10 | Em andamento |
 
@@ -215,7 +215,7 @@ Para manter 10/10:
 
 Nota inicial: 2/10.
 
-Nota atual: 9,9/10.
+Nota atual: 10/10.
 
 Referencia principal: `docs/roadmaps/FASE2_OBSERVABILIDADE.md`, `docs/RETENCAO_LOGS_AUDITORIA.md` e secoes de Ops em `docs/EVOLUCAO_ENTERPRISE_UI_REFATORACAO.md`.
 
@@ -245,14 +245,20 @@ Ja feito:
 - [x] `docker-compose.prod.yml` repassa `OPS_ALERT_*` para o container backend quando o secret existir no `.env` seguro do servidor.
 - [x] PR #108 deployado em producao no commit `9ca4f5dd`; container backend recebeu as chaves `OPS_ALERT_*`, health publico `ok` e watchdog `healthy`.
 - [x] Notifier Ops passa a aceitar e-mail operacional via `OPS_ALERT_EMAIL_TO` quando nao houver webhook configurado.
+- [x] `OPS_ALERT_EMAIL_TO=prohubml@gmail.com` configurado no `.env` seguro de producao com backup `backups/env/.env_20260517_151349_ops_alert_email`.
+- [x] PR #110 deployado em producao no commit `56c59119`; health publico `ok`, watchdog `healthy` e containers saudaveis apos aquecimento.
+- [x] Disparo controlado de alerta Ops por e-mail validado em producao: `enabled=true`, `sent=1`, `sent_email=1`, `status=sent`.
+- [x] Deduplicacao registrada em `backend/logs/ops_alert_notifications.jsonl` para o alerta controlado de 2026-05-17.
 
 Falta para 10/10:
 
-- [ ] Configurar canal real em `OPS_ALERT_EMAIL_TO` ou `OPS_ALERT_WEBHOOK_URL` no `.env` seguro de producao e testar disparo controlado sem expor secrets.
+- [x] Configurar canal real em `OPS_ALERT_EMAIL_TO` ou `OPS_ALERT_WEBHOOK_URL` no `.env` seguro de producao e testar disparo controlado sem expor secrets.
 
-Proxima acao concreta:
+Para manter 10/10:
 
-- [ ] Configurar `OPS_ALERT_EMAIL_TO=prohubml@gmail.com` no servidor e validar `scripts/test_ops_alert_webhook.py`.
+- [ ] Confirmar recebimento humano do e-mail de alerta em `prohubml@gmail.com`.
+- [ ] Revalidar `scripts/test_ops_alert_webhook.py` apos mudanca de SMTP, dominio ou destino de alerta.
+- [ ] Manter `backend/logs/ops_alert_notifications.jsonl` com retencao e sem dados sensiveis.
 
 ## 7. Portabilidade/configuracao
 

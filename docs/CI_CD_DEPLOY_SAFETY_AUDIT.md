@@ -56,6 +56,7 @@ Meta: 10/10 antes de automatizar qualquer deploy de producao.
 | #106 | Migration Smoke no Backend CI com Postgres descartavel | Mergeado |
 | #107 | Fechamento Testes/CI 10/10 com matriz critica e E2E longo | Mergeado |
 | #108 | Compose de producao repassa `OPS_ALERT_*` para o backend | Mergeado e deployado via `petdeploy` |
+| #110 | Alerta Ops por e-mail operacional | Mergeado e deployado via `petdeploy` |
 
 ## Ultimo deploy real validado
 
@@ -63,9 +64,9 @@ Data: 2026-05-17.
 
 Escopo deployado:
 
-- Commit de runtime em producao: `9ca4f5dd` (`Prepara webhook real de alertas Ops`).
+- Commit de runtime em producao: `56c59119` (`Adiciona alerta Ops por email`).
 - Script usado: `sudo -n /usr/local/sbin/petshop-deploy-producao` via `petdeploy`.
-- Backup operacional criado no servidor: `/opt/petshop/backups/deploy_20260517_145334`.
+- Backup operacional criado no servidor: `/opt/petshop/backups/deploy_20260517_151356`.
 - Backend reconstruido com imagem `petshop-backend:prod`.
 - Frontend gerado em `runtime/frontend/dist`.
 - Alembic executado com sucesso.
@@ -75,13 +76,16 @@ Escopo deployado:
 
 Validacao apos deploy:
 
-- `petshop-status-producao`: commit `9ca4f5dd`, branch `main`, containers
+- `petshop-status-producao`: commit `56c59119`, branch `main`, containers
   `backend`, `nginx`, `postgres` e `worker-bling` saudaveis.
 - `https://mlprohub.com.br/api/health`: `{"status":"ok"}`.
 - `https://mlprohub.com.br/api/health/watchdog`: `{"status":"healthy"}`.
-- Container backend recebeu as chaves `OPS_ALERT_*`; `OPS_ALERT_WEBHOOK_URL`
-  ainda esta vazia porque falta configurar a URL real do canal no `.env` seguro
-  de producao.
+- `OPS_ALERT_EMAIL_TO` configurado no `.env` seguro de producao com backup
+  `backups/env/.env_20260517_151349_ops_alert_email`.
+- Disparo controlado de alerta Ops por e-mail retornou `enabled=true`,
+  `sent=1`, `sent_email=1`, `sent_webhook=0` e `status=sent`.
+- `backend/logs/ops_alert_notifications.jsonl` registrou a deduplicacao do
+  alerta controlado.
 
 Restore smoke validado:
 
