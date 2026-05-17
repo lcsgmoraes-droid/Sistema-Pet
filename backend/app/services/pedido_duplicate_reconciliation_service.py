@@ -9,6 +9,7 @@ from app.services.pedido_integrado_duplicate_review_service import (
     consolidar_duplicidades_seguras_pedido,
     listar_grupos_duplicados_pedido_loja,
 )
+from app.utils.correlation import current_correlation_id, operation_correlation_context
 from app.utils.logger import logger
 
 
@@ -109,10 +110,11 @@ def reconciliar_duplicidades_recentes_pedido_loja(
         except Exception as exc:
             db.rollback()
             erros += 1
-            logger.exception(
-                "[BLING DUPLICATES] Falha ao reconciliar duplicidade recente do pedido canonico %s: %s",
-                pedido_canonico_id,
-                exc,
+            logger.error(
+                "pedido_duplicate_reconciliation_failed",
+                f"Falha ao reconciliar duplicidade recente do pedido canonico {pedido_canonico_id}: {exc}",
+                pedido_canonico_id=pedido_canonico_id,
+                error=str(exc),
             )
             resultados.append(
                 {
@@ -169,7 +171,19 @@ def executar_reconciliacao_automatica_duplicidades_pedidos(
     *,
     dias: int = 7,
     limite_grupos_por_tenant: int = 20,
+    _correlation_context_applied: bool = False,
 ) -> dict:
+    if not _correlation_context_applied:
+        with operation_correlation_context("job.pedido_duplicate_reconciliation") as correlation_id:
+            result = executar_reconciliacao_automatica_duplicidades_pedidos(
+                db,
+                dias=dias,
+                limite_grupos_por_tenant=limite_grupos_por_tenant,
+                _correlation_context_applied=True,
+            )
+            result.setdefault("correlation_id", correlation_id)
+            return result
+
     tenants = listar_tenants_com_duplicidades_recentes(db, dias=dias)
 
     resultados = []
@@ -192,6 +206,7 @@ def executar_reconciliacao_automatica_duplicidades_pedidos(
         erros_total += int(resultado.get("erros") or 0)
 
     return {
+        "correlation_id": current_correlation_id("job.pedido_duplicate_reconciliation"),
         "tenants_processados": len(tenants),
         "tenants_com_duplicidades": sum(1 for item in resultados if item.get("grupos_mapeados")),
         "grupos_mapeados_total": grupos_mapeados_total,

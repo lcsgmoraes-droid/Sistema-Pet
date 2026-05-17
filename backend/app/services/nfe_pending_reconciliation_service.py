@@ -6,6 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.nfe_cache_models import BlingNotaFiscalCache
+from app.utils.correlation import current_correlation_id, operation_correlation_context
 from app.utils.logger import logger
 
 
@@ -157,7 +158,19 @@ def executar_reconciliacao_automatica_nfes_pendentes(
     *,
     dias: int = 3,
     limite_notas_por_tenant: int = 200,
+    _correlation_context_applied: bool = False,
 ) -> dict:
+    if not _correlation_context_applied:
+        with operation_correlation_context("job.nfe_pending_reconciliation") as correlation_id:
+            result = executar_reconciliacao_automatica_nfes_pendentes(
+                db,
+                dias=dias,
+                limite_notas_por_tenant=limite_notas_por_tenant,
+                _correlation_context_applied=True,
+            )
+            result.setdefault("correlation_id", correlation_id)
+            return result
+
     tenant_ids = listar_tenants_com_nfes_pendentes_recentes(db, dias=dias)
     resultados: list[dict] = []
 
@@ -188,6 +201,7 @@ def executar_reconciliacao_automatica_nfes_pendentes(
             )
 
     return {
+        "correlation_id": current_correlation_id("job.nfe_pending_reconciliation"),
         "tenants_processados": len(resultados),
         "tenants_com_pendencias": len(tenant_ids),
         "pendentes_antes_total": sum(int(item.get("pendentes_antes") or 0) for item in resultados),

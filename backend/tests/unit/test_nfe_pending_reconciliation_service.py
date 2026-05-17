@@ -2,6 +2,13 @@ from datetime import datetime
 from types import SimpleNamespace
 
 import app.services.nfe_pending_reconciliation_service as service
+from app.middlewares.request_context import clear_request_context, get_request_id
+from app.utils.logger import clear_context
+
+
+def teardown_function():
+    clear_request_context()
+    clear_context()
 
 
 def test_planejar_janela_reconciliacao_usa_datas_minima_e_maxima():
@@ -61,3 +68,12 @@ def test_reconciliar_nfes_pendentes_recentes_executa_sync_incremental(monkeypatc
         "data_inicial": "2026-03-29",
         "data_final": "2026-03-30",
     }
+
+
+def test_executar_reconciliacao_automatica_nfes_pendentes_inclui_correlacao(monkeypatch):
+    monkeypatch.setattr(service, "listar_tenants_com_nfes_pendentes_recentes", lambda *args, **kwargs: [])
+
+    resultado = service.executar_reconciliacao_automatica_nfes_pendentes(object(), dias=3)
+
+    assert resultado["correlation_id"].startswith("job.nfe-pending-reconciliation-")
+    assert get_request_id() is None

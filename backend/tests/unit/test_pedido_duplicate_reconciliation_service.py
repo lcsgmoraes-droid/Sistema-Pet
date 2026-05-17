@@ -1,4 +1,11 @@
 import app.services.pedido_duplicate_reconciliation_service as service
+from app.middlewares.request_context import clear_request_context, get_request_id
+from app.utils.logger import clear_context
+
+
+def teardown_function():
+    clear_request_context()
+    clear_context()
 
 
 def test_reconciliar_duplicidades_recentes_retorna_sem_execucao_quando_nao_ha_grupos(monkeypatch):
@@ -132,6 +139,8 @@ def test_executar_reconciliacao_automatica_duplicidades_agrega_tenants(monkeypat
     )
 
     assert resultado["tenants_processados"] == 2
+    assert resultado["correlation_id"].startswith("job.pedido-duplicate-reconciliation-")
+    assert get_request_id() is None
     assert resultado["tenants_com_duplicidades"] == 2
     assert resultado["grupos_mapeados_total"] == 3
     assert resultado["grupos_consolidados_total"] == 2
