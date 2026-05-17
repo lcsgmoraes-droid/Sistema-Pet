@@ -35,6 +35,7 @@ Meta: 10/10 antes de automatizar qualquer deploy de producao.
 | Feito | Rotacao de SSH/secrets documentada | `docs/SEGURANCA_ROTACAO_SSH_SECRETS.md` |
 | Feito | Scripts de backup e restore smoke controlado criados para validar dump real sem tocar o banco de producao | `docs/PRODUCAO_BACKUP_RESTORE_TESTE.md` |
 | Feito | Restore smoke de dump real validado em container Postgres descartavel | `docs/PRODUCAO_BACKUP_RESTORE_TESTE.md` |
+| Feito | Deploy seguro detecta mudancas sem impacto de runtime e pula rebuild/restart | `scripts/deploy_producao_seguro.sh` |
 
 ## PRs ja juntados
 
@@ -99,4 +100,4 @@ Restore smoke validado:
 
 1. Em todo proximo deploy real autorizado, repetir `release-check`, usar `petdeploy` com `/usr/local/sbin/petshop-deploy-producao` e validar health/watchdog.
 2. Conferir no painel Ops ou no arquivo `backend/logs/deploy_events.jsonl` os eventos `running`, `success` ou `failed` do deploy.
-3. Separar deploy de runtime e docs/workflows para evitar rebuild de servidor quando a mudanca nao afeta aplicacao.
+3. Validar em producao um deploy sem mudanca de runtime para confirmar o caminho sem rebuild.

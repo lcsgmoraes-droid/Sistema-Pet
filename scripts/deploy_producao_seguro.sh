@@ -132,6 +132,28 @@ wait_for() {
   fail "Timeout aguardando $label"
 }
 
+requires_runtime_deploy() {
+  local changed_files="$1"
+  local file
+
+  if [[ -z "${changed_files//[[:space:]]/}" ]]; then
+    return 1
+  fi
+
+  while IFS= read -r file; do
+    [[ -z "$file" ]] && continue
+    case "$file" in
+      .github/*|docs/*|*.md|AGENTS.md|LICENSE|LICENSE.*)
+        ;;
+      *)
+        return 0
+        ;;
+    esac
+  done <<<"$changed_files"
+
+  return 1
+}
+
 require_cmd git
 require_cmd docker
 require_cmd npm
@@ -173,6 +195,7 @@ log "Atualizando codigo para $REMOTE/$BRANCH"
 git fetch "$REMOTE" "$BRANCH"
 git reset --hard "$REMOTE/$BRANCH"
 HEAD_AFTER="$(git rev-parse HEAD)"
+changed_files="$(git diff --name-only "$HEAD_BEFORE" "$HEAD_AFTER" || true)"
 
 if [[ -n "$(git status --porcelain)" ]]; then
   git status --short
@@ -183,6 +206,31 @@ tracked_dist_count="$(git ls-files frontend/dist runtime | wc -l | tr -d ' ')"
 if [[ "$tracked_dist_count" != "0" ]]; then
   git ls-files frontend/dist runtime
   fail "Artefatos gerados voltaram a aparecer no Git."
+fi
+
+if ! requires_runtime_deploy "$changed_files"; then
+  mark_step "sem_mudanca_runtime"
+  if [[ "$HEAD_BEFORE" == "$HEAD_AFTER" ]]; then
+    audit_step "Repositorio ja estava atualizado; rebuild nao necessario"
+    log "Repositorio ja estava atualizado; validando health sem rebuild"
+  else
+    audit_step "Mudanca sem impacto de runtime; pulando rebuild e restart"
+    log "Mudanca sem impacto de runtime; validando health sem rebuild"
+  fi
+
+  wait_for \
+    "health publico" \
+    "curl -fsS '$PUBLIC_HEALTH_URL'" \
+    6 \
+    5
+
+  git rev-parse HEAD >"$backup_dir/head_after.txt"
+  docker compose -f "$COMPOSE_FILE" ps >"$backup_dir/docker_ps_after.txt" || true
+  write_deploy_event "success" "$CURRENT_STEP" "Deploy sem rebuild; sem mudanca de runtime"
+  cleanup_deploy_lock
+  log "Deploy sem rebuild concluido"
+  printf 'Backup operacional: %s\n' "$backup_dir"
+  exit 0
 fi
 
 mark_step "instalar_disk_guard"
