@@ -28,6 +28,17 @@ Decisao de preparacao:
 - O nome pode ser cadastrado com acentos na aplicacao; este documento mantem
   ASCII para evitar problema de encoding no Windows/chat.
 
+Execucao em producao:
+
+- Tenant criado e validado em producao em 2026-05-17.
+- Usuario admin da Maiara criado, ativo e com email verificado.
+- Plano liberado como `premium` para piloto acompanhado.
+- 16 modulos premium configurados como ativos.
+- Modulo `veterinario` validado via API autenticada.
+- Onboarding base aplicado.
+- Seed veterinario base aplicado sem lancamentos falsos de atendimento.
+- Senha inicial nao deve ser registrada em documento versionado.
+
 Smoke autenticado do modulo veterinario em producao:
 
 - `/veterinario`: carregou sem erro de console/rede critico.
@@ -58,14 +69,14 @@ Checklist:
 - [x] Confirmar que as abas principais carregam sem erro critico.
 - [x] Confirmar com Lucas o nome exato da empresa/clinica.
 - [x] Confirmar se a Maiara vai usar ambiente proprio.
-- [ ] Criar tenant novo `Clinica Veterinaria Sao Jose`.
-- [ ] Criar usuario admin da Maiara.
-- [ ] Ativar o modulo `veterinario` para o tenant dela.
-- [ ] Rodar seed veterinario base sem dados falsos sensiveis.
+- [x] Criar tenant novo `Clinica Veterinaria Sao Jose`.
+- [x] Criar usuario admin da Maiara.
+- [x] Ativar o modulo `veterinario` para o tenant dela.
+- [x] Rodar seed veterinario base sem dados falsos sensiveis.
 - [ ] Criar ao menos um tutor e um pet de exemplo para demo.
 - [ ] Criar consultorio/sala e agenda basica.
 - [ ] Criar procedimento/medicamento de exemplo.
-- [ ] Fazer smoke autenticado no tenant dela.
+- [x] Fazer smoke autenticado no tenant dela.
 - [ ] Registrar evidencia da demo sem senhas, tokens ou dados sensiveis.
 
 Regra operacional: criar usuario real da Maiara em producao deve ser uma acao
@@ -77,6 +88,21 @@ propria Maiara aceitar os termos no cadastro. Se Lucas pedir criacao assistida,
 registrar no chat que a criacao foi autorizada e usar estrategia sem compartilhar
 senha: senha temporaria aleatoria descartada + confirmacao de email + redefinicao
 de senha pela propria usuaria.
+
+Evidencia de validacao:
+
+- Login autenticado da Maiara: passou.
+- Tenant selecionado: `Clinica Veterinaria Sao Jose`.
+- Email verificado: sim.
+- Permissoes carregadas: 55.
+- Modulos ativos: 16.
+- Plano: `premium`.
+- Dashboard veterinario: respondeu com sucesso.
+- Catalogo Vet inicial: 8 medicamentos, 4 procedimentos e 5 protocolos de
+  vacina.
+- Validacao auditada no servidor confirmou: 4 formas de pagamento, 2 especies,
+  2 racas, 10 produtos/insumos Vet, 8 medicamentos, 4 procedimentos, 5
+  protocolos de vacina e 16 assinaturas de modulo ativas.
 
 ## Frente 2 - Padronizacao visual do Veterinario
 
