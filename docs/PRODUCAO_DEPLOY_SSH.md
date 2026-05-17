@@ -4,7 +4,8 @@ Fonte oficial para deploy real do MLProHub em producao.
 
 ## Servidor atual
 
-- Host SSH: `root@192.241.150.121`
+- Host SSH preferencial: `petdeploy@192.241.150.121`
+- Host SSH de fallback: `root@192.241.150.121`
 - Caminho do projeto no servidor: `/opt/petshop`
 - Dominio publico: `https://mlprohub.com.br`
 - Health publico: `https://mlprohub.com.br/api/health`
@@ -19,10 +20,19 @@ Se algum MCP/conector listar outro IP, valide antes de usar. No ultimo deploy va
 Rodar a partir da maquina local:
 
 ```bash
-ssh -o BatchMode=yes root@192.241.150.121 "cd /opt/petshop && bash scripts/deploy_producao_seguro.sh"
+ssh -i ~/.ssh/mlprohub_codex_deploy -o IdentitiesOnly=yes -o BatchMode=yes petdeploy@192.241.150.121 "sudo -n /usr/local/sbin/petshop-deploy-producao"
 ```
 
 Antes de rodar o deploy, preencher o checklist e revisar o plano de rollback em `docs/PRODUCAO_ROLLBACK_CHECKLIST.md`.
+
+O usuario `petdeploy` foi criado em producao em 2026-05-17 com chave SSH deste
+PC, pertence ao grupo `docker` e tem sudo sem senha apenas para wrappers
+root-owned:
+
+- `/usr/local/sbin/petshop-deploy-producao`
+- `/usr/local/sbin/petshop-status-producao`
+
+Usar `root@192.241.150.121` somente como fallback operacional autorizado.
 
 O script `scripts/deploy_producao_seguro.sh` e o caminho oficial. Ele faz pull de `origin/main`, gera frontend, reconstrui a imagem `petshop-backend:prod`, sobe `postgres`, `backend`, `worker-bling` e `nginx`, aplica Alembic e valida health.
 
@@ -85,7 +95,7 @@ exibir a URL do webhook.
 ## Validacao apos deploy
 
 ```bash
-ssh -o BatchMode=yes root@192.241.150.121 "cd /opt/petshop && git rev-parse --short HEAD && docker compose -f docker-compose.prod.yml ps && docker compose -f docker-compose.prod.yml exec -T backend alembic current"
+ssh -i ~/.ssh/mlprohub_codex_deploy -o IdentitiesOnly=yes -o BatchMode=yes petdeploy@192.241.150.121 "sudo -n /usr/local/sbin/petshop-status-producao"
 ```
 
 ```bash
