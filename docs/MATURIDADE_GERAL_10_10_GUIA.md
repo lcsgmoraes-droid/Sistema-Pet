@@ -327,7 +327,7 @@ Proxima acao concreta:
 | #83 | Observabilidade/auditoria | Script de teste controlado do notifier Ops |
 | #84 | Portabilidade/configuracao | Check seguro de ambiente DEV e guia de correcao |
 | #85 | Portabilidade/configuracao | Bootstrap de PC novo para ambiente DEV |
-| PR atual | Portabilidade/configuracao | Fluxo de segundo PC e diagnostico de portas locais |
+| #86 | Portabilidade/configuracao | Fluxo de segundo PC e diagnostico de portas locais |
 
 ## Criterio para declarar 10/10 geral
 
