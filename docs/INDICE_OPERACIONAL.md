@@ -25,6 +25,7 @@ Guia mestre:
 | Estrutura/refatoracao | `docs/auditorias/estrutura-geral-definition-of-done.md` | Testes focados da fatia |
 | Vender Plano Basico | `docs/GUIA_VENDA_PLANO_BASICO.md` | Checklist de onboarding e clientes piloto |
 | Demo Veterinario | `docs/GUIA_DEMO_VETERINARIO_CLINICA.md` | Roteiro de demo e limites de piloto |
+| Maiara/Vet/Admin SaaS | `docs/CRONOGRAMA_MAIARA_VETERINARIO_ADMIN_SAAS.md` | Preparacao de demo, padronizacao Vet e admin global |
 | Plano Basico | `docs/auditorias/plano-basico-tenant-checklist.md` | E2E longo controlado |
 | Produto/roadmap | `docs/ROADMAP_MASTER.md` | Checklist da frente especifica |
 
@@ -40,6 +41,7 @@ Guia mestre:
 | Portabilidade/configuracao | `docs/DEV_ENVIRONMENT_CHECK.md` |
 | Venda do Plano Basico | `docs/GUIA_VENDA_PLANO_BASICO.md` |
 | Demo/Piloto Veterinario | `docs/GUIA_DEMO_VETERINARIO_CLINICA.md` |
+| Maiara, Veterinario e Admin SaaS | `docs/CRONOGRAMA_MAIARA_VETERINARIO_ADMIN_SAAS.md` |
 | Evidencias | `docs/PADRAO_EVIDENCIA.md` |
 
 ## Rotina obrigatoria por PR
