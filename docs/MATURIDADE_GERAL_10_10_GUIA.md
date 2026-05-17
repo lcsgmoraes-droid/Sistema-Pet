@@ -319,7 +319,7 @@ Proxima acao concreta:
 | #80 | Observabilidade/auditoria/seguranca operacional | Auditoria de comandos manuais sensiveis em producao |
 | #81 | Observabilidade/auditoria | Alertas acionaveis para 5xx, lentidao, falhas recorrentes e worker/job degradado |
 | #82 | Observabilidade/auditoria | Notifier externo opcional para alertas Ops criticos |
-| PR atual | Observabilidade/auditoria | Script de teste controlado do notifier Ops |
+| #83 | Observabilidade/auditoria | Script de teste controlado do notifier Ops |
 
 ## Criterio para declarar 10/10 geral
 
