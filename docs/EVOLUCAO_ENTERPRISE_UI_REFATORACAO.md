@@ -105,6 +105,7 @@ Tela piloto:
 - Produtos: opcao "Persistir filtros" agora salva busca, categoria, marca, fornecedor, status, estoque baixo, promocao, pais/variacoes, pagina e itens por pagina.
 - Produtos/Estoque: tela de movimentacoes voltou a exibir "Lancar granel" para produtos elegiveis e manteve balanco manual permitido em produto granel para ajuste de inventario.
 - Pessoas: listagem ganhou selecao em massa e fluxo de fusao de 2 cadastros, transferindo vinculos/historico para o principal e inativando o duplicado.
+- Pessoas `/clientes`: a barra de busca e acoes voltou para `Panel`, `ActionButton` e `IconActionButton`; o botao `Novo` usa `intent=create` (verde/emerald) e `Importar Excel` ficou como acao secundaria neutra.
 - Financeiro/Vendas: a tabela principal da lista de vendas foi extraida para `VendasFinanceiroListaTable` e passou a consumir `DataTable`, `MoneyCell`, `NumberCell` e `StatusBadge`.
 - Financeiro/Vendas: a tabela "Vendas por data" do resumo foi extraida para `VendasPorDataTable`, mantendo badges de dia, valores zerados como traco e totalizacao no componente.
 - Financeiro/Vendas: as tabelas "Formas de recebimento" e "Funcionario" foram extraidas para componentes dedicados com `DataTable`, mantendo totalizacao local e celulas monetarias padronizadas.
@@ -917,6 +918,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-12: criado `SegmentedControl` para alternancias compactas, aplicado no modo de descricao do produto e no filtro de itens da Entrada XML, removendo botoes inline duplicados.
 - 2026-05-10: `EntradaXML` extraiu o modal de visualizacao da NF para `EntradaXmlVisualizacaoNotaModal`, preservando os callbacks da pagina e reduzindo o arquivo principal para 4169 linhas com build validado.
 - 2026-05-15: cadastros basicos de `Departamentos` e `Tipos de Despesa` iniciaram a padronizacao de acoes com `ActionButton`, `IconActionButton`, `LoadingState` e `EmptyState`, mantendo comportamento e endpoints iguais.
+- 2026-05-17: `/clientes` foi realinhada com a fundacao visual: `PageHeader`, `Panel`, `LoadingState`, `EmptyState`, `ActionButton` e `IconActionButton`; `Novo` voltou para a cor semantica de criacao.
 
 ### Nao fazer nesta onda
 

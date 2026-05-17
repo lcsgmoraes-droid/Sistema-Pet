@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { FiAlertCircle } from "react-icons/fi";
+import { AlertCircle, UsersRound } from "lucide-react";
 import toast from "react-hot-toast";
 import api from "../api";
 import ClientesNovoActionsBar from "../components/clientes/ClientesNovoActionsBar";
@@ -8,6 +8,8 @@ import ClientesNovoModalsLayer from "../components/clientes/ClientesNovoModalsLa
 import ClientesNovoTabelaSection from "../components/clientes/ClientesNovoTabelaSection";
 import ClientesNovoTabsBar from "../components/clientes/ClientesNovoTabsBar";
 import PessoasFusaoModal from "../components/pessoas/PessoasFusaoModal";
+import LoadingState from "../components/ui/LoadingState";
+import PageHeader from "../components/ui/PageHeader";
 import { useClientesNovoCadastro } from "../hooks/useClientesNovoCadastro";
 import { useClientesNovoListagem } from "../hooks/useClientesNovoListagem";
 import { debugLog } from "../utils/debug";
@@ -235,26 +237,18 @@ const Pessoas = () => {
   const isCarregamentoInicial = loading && !carregamentoInicialConcluido;
 
   if (isCarregamentoInicial) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Carregando...</p>
-        </div>
-      </div>
-    );
+    return <LoadingState className="h-96" label="Carregando pessoas..." />;
   }
 
   return (
     <div className="p-6">
-      {/* Header */}
-      <div className="mb-6">
-        <h1 className="text-3xl font-bold text-gray-900">Cadastros</h1>
-        <p className="text-gray-600 mt-1">
-          Gerenciamento de clientes, fornecedores, veterinários, funcionários e
-          pets
-        </p>
-      </div>
+      <PageHeader
+        className="mb-6"
+        icon={UsersRound}
+        iconClassName="bg-emerald-50 text-emerald-600"
+        title="Cadastros"
+        subtitle="Gerenciamento de clientes, fornecedores, veterinarios, funcionarios e pets"
+      />
 
       <ClientesNovoTabsBar
         tipoFiltro={tipoFiltro}
@@ -280,7 +274,7 @@ const Pessoas = () => {
       />
       {error && !cadastro.showModal && (
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
-          <FiAlertCircle />
+          <AlertCircle className="h-5 w-5" aria-hidden="true" />
           <span>{error}</span>
         </div>
       )}
