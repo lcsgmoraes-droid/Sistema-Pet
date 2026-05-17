@@ -34,6 +34,7 @@ Meta: 10/10 antes de automatizar qualquer deploy de producao.
 | Feito | Deploy completo via `petdeploy` validado com containers saudaveis | `docs/PRODUCAO_DEPLOY_SSH.md` |
 | Feito | Rotacao de SSH/secrets documentada | `docs/SEGURANCA_ROTACAO_SSH_SECRETS.md` |
 | Feito | Scripts de backup e restore smoke controlado criados para validar dump real sem tocar o banco de producao | `docs/PRODUCAO_BACKUP_RESTORE_TESTE.md` |
+| Feito | Restore smoke de dump real validado em container Postgres descartavel | `docs/PRODUCAO_BACKUP_RESTORE_TESTE.md` |
 
 ## PRs ja juntados
 
@@ -46,6 +47,7 @@ Meta: 10/10 antes de automatizar qualquer deploy de producao.
 | #52/#53/#54 | Dependabot GitHub Actions v6 | Mergeados; sem impacto de runtime |
 | #97 | Plano E2E minimo do Plano Basico | Mergeado e deployado |
 | #98 | Usuario operacional `petdeploy` e deploy sem root direto | Mergeado e deployado via `petdeploy` |
+| #100 | Backup e restore smoke controlado do banco | Mergeado e deployado via `petdeploy` |
 
 ## Ultimo deploy real validado
 
@@ -53,9 +55,9 @@ Data: 2026-05-17.
 
 Escopo deployado:
 
-- Commit de runtime em producao: `520f8a2b` (`Documenta deploy operacional petdeploy`).
+- Commit de runtime em producao: `e950ec9a` (`Adiciona restore smoke de backup do banco`).
 - Script usado: `sudo -n /usr/local/sbin/petshop-deploy-producao` via `petdeploy`.
-- Backup operacional criado no servidor: `/opt/petshop/backups/deploy_20260517_133717`.
+- Backup operacional criado no servidor: `/opt/petshop/backups/deploy_20260517_135349`.
 - Backend reconstruido com imagem `petshop-backend:prod`.
 - Frontend gerado em `runtime/frontend/dist`.
 - Alembic executado com sucesso.
@@ -67,6 +69,14 @@ Observacao: o deploy via `petdeploy` teve um aviso transitorio do watchdog no
 fim porque o backend ainda estava aquecendo o healthcheck interno. A validacao
 repetida logo depois confirmou `backend`, `nginx`, `postgres` e `worker-bling`
 como `healthy`, com health publico `ok` e watchdog publico `healthy`.
+
+Restore smoke validado:
+
+- Backup real: `/opt/petshop/backups/db/restore_smoke_20260517_135920.dump.gz`.
+- Tamanho: `14699879` bytes.
+- SHA-256: `5589dd14897a7f5f954fb623cb3a678ba895fdbc528a836eaa89fd87f6be6686`.
+- Resultado: `restore_smoke_status=ok`, `public_tables=217`, `alembic_rows=1`.
+- Container temporario removido e health/watchdog saudaveis apos o teste.
 
 ## Checks que devem proteger a `main`
 
@@ -89,4 +99,4 @@ como `healthy`, com health publico `ok` e watchdog publico `healthy`.
 
 1. Em todo proximo deploy real autorizado, repetir `release-check`, usar `petdeploy` com `/usr/local/sbin/petshop-deploy-producao` e validar health/watchdog.
 2. Conferir no painel Ops ou no arquivo `backend/logs/deploy_events.jsonl` os eventos `running`, `success` ou `failed` do deploy.
-3. Depois de deployar os scripts de backup/restore, executar `scripts/prod_db_restore_smoke.sh` via `petdeploy` e registrar a evidencia no guia mestre.
+3. Separar deploy de runtime e docs/workflows para evitar rebuild de servidor quando a mudanca nao afeta aplicacao.

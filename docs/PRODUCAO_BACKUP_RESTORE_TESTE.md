@@ -73,3 +73,16 @@ So marcar o item do guia mestre como feito quando houver evidencia de:
 
 Registrar apenas caminho do backup, tamanho, checksum e resultado. Nunca
 registrar conteudo do banco.
+
+## Ultimo teste validado
+
+Data: 2026-05-17.
+
+- Commit em producao: `e950ec9a`.
+- Backup real testado: `/opt/petshop/backups/db/restore_smoke_20260517_135920.dump.gz`.
+- Tamanho: `14699879` bytes.
+- SHA-256: `5589dd14897a7f5f954fb623cb3a678ba895fdbc528a836eaa89fd87f6be6686`.
+- Resultado: `restore_smoke_status=ok`.
+- Validacao: `public_tables=217`, `alembic_rows=1`.
+- Container temporario removido: `true`.
+- Health publico e watchdog saudaveis depois do teste.
