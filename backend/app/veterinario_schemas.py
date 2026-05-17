@@ -11,6 +11,7 @@ class AgendamentoCreate(BaseModel):
     cliente_id: Optional[int] = None
     veterinario_id: Optional[int] = None
     consultorio_id: Optional[int] = None
+    consulta_origem_id: Optional[int] = None
     data_hora: datetime
     duracao_minutos: int = 30
     tipo: str = "consulta"
@@ -25,6 +26,7 @@ class AgendamentoUpdate(BaseModel):
     cliente_id: Optional[int] = None
     veterinario_id: Optional[int] = None
     consultorio_id: Optional[int] = None
+    consulta_origem_id: Optional[int] = None
     data_hora: Optional[datetime] = None
     duracao_minutos: Optional[int] = None
     tipo: Optional[str] = None
@@ -41,6 +43,7 @@ class AgendamentoResponse(BaseModel):
     cliente_id: int
     veterinario_id: Optional[int]
     consultorio_id: Optional[int]
+    consulta_origem_id: Optional[int] = None
     data_hora: datetime
     duracao_minutos: int
     tipo: str
@@ -182,6 +185,7 @@ class ConsultaResponse(BaseModel):
     observacoes_tutor: Optional[str]
     prescricao_rascunho: Optional[list] = None
     procedimentos_rascunho: Optional[list] = None
+    retorno_agendado: Optional[dict] = None
     hash_prontuario: Optional[str]
     finalizado_em: Optional[datetime]
     inicio_atendimento: Optional[datetime]

@@ -226,6 +226,7 @@ def _agendamento_to_dict(ag: AgendamentoVet) -> dict:
         "cliente_id": ag.cliente_id,
         "veterinario_id": ag.veterinario_id,
         "consultorio_id": ag.consultorio_id,
+        "consulta_origem_id": getattr(ag, "consulta_origem_id", None),
         "data_hora": _serializar_datetime_vet(ag.data_hora),
         "duracao_minutos": ag.duracao_minutos,
         "tipo": ag.tipo,

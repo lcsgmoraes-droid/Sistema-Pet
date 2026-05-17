@@ -2,6 +2,7 @@ import PetIdentity from "../../../components/ui/PetIdentity";
 import {
   STATUS_COLOR,
   TIPO_BADGE,
+  TIPO_CARD_COLOR,
   TIPO_LABEL,
   isoDate,
   normalizarTipoAgendamento,
@@ -67,7 +68,7 @@ export default function AgendaMesView({
                         onGerenciarAgendamento(ag);
                       }}
                       className={`w-full rounded border-l-2 px-1.5 py-1 text-left text-[11px] ${
-                        STATUS_COLOR[ag.status] ?? "border-l-gray-200 bg-white"
+                        TIPO_CARD_COLOR[tipoAgendamento] || STATUS_COLOR[ag.status] || "border-l-gray-200 bg-white"
                       }`}
                     >
                       <p className="truncate">

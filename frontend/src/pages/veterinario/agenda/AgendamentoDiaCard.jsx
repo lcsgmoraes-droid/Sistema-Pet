@@ -8,6 +8,7 @@ import {
   STATUS_LABEL,
   TIPO_ACAO,
   TIPO_BADGE,
+  TIPO_CARD_COLOR,
   TIPO_LABEL,
   normalizarTipoAgendamento,
 } from "./agendaUtils";
@@ -20,7 +21,7 @@ export default function AgendamentoDiaCard({ abrindoAgendamentoId, agendamento, 
       type="button"
       onClick={() => onOpenAgendamento(agendamento)}
       className={`w-full rounded-lg border px-3 py-2 text-left ${
-        STATUS_COLOR[agendamento.status] ?? "border-l-gray-200 bg-white"
+        TIPO_CARD_COLOR[tipoAgendamento] || STATUS_COLOR[agendamento.status] || "border-l-gray-200 bg-white"
       }`}
     >
       <div className="flex items-center gap-2">

@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from .auth.dependencies import get_current_user_and_tenant
 from .db import get_session
 from .models import Cliente, Pet
-from .veterinario_agendamentos import _sincronizar_marcos_agendamento
+from .veterinario_agendamentos import _agendamento_to_dict, _sincronizar_marcos_agendamento
 from .veterinario_clinico import _bloquear_lancamento_em_consulta_finalizada, _consulta_or_404
 from .veterinario_core import (
     _date_para_datetime_vet,
@@ -93,6 +93,18 @@ def _sanitizar_procedimentos_rascunho(itens: list[dict]) -> list[dict]:
             "baixar_estoque": item.get("baixar_estoque") is not False,
         })
     return itens_limpos
+
+
+def _retorno_agendado_consulta(db: Session, consulta: ConsultaVet, tenant_id) -> Optional[dict]:
+    retorno = db.query(AgendamentoVet).filter(
+        AgendamentoVet.tenant_id == tenant_id,
+        AgendamentoVet.consulta_origem_id == consulta.id,
+        AgendamentoVet.tipo == "retorno",
+        AgendamentoVet.status.notin_(["cancelado", "faltou"]),
+    ).order_by(AgendamentoVet.data_hora.asc()).first()
+    if not retorno:
+        return None
+    return _agendamento_to_dict(retorno)
 
 
 @router.get("/consultas", response_model=List[ConsultaResponse])
@@ -182,7 +194,9 @@ def obter_consulta(
 ):
     user, tenant_id = _get_tenant(current)
     c = _consulta_or_404(db, consulta_id, tenant_id)
-    return _consulta_to_dict(c)
+    payload = _consulta_to_dict(c)
+    payload["retorno_agendado"] = _retorno_agendado_consulta(db, c, tenant_id)
+    return payload
 
 
 @router.get("/consultas/{consulta_id}/timeline")

@@ -21,6 +21,7 @@ export function criarConsultaFormInicial() {
     tratamento: "",
     observacoes: "",
     retorno_em_dias: "",
+    retorno_agendado: null,
     prescricao_itens: [],
     procedimentos_realizados: [],
   };

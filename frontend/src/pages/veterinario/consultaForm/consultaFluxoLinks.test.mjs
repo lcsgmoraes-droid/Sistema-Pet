@@ -21,6 +21,7 @@ test("buildAgendarRetornoConsultaLink monta deep link com pet, tutor, consulta e
   assert.equal(url.searchParams.get("abrir_novo"), "1");
   assert.equal(url.searchParams.get("novo_pet_id"), "1150");
   assert.equal(url.searchParams.get("consulta_id"), "16");
+  assert.equal(url.searchParams.get("consulta_origem_id"), "16");
   assert.equal(url.searchParams.get("tutor_id"), "77");
   assert.equal(url.searchParams.get("tutor_nome"), "Lucas Guerra");
   assert.equal(url.searchParams.get("tipo"), "retorno");

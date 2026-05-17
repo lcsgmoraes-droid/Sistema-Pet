@@ -2,7 +2,10 @@ import {
   criarPrescricaoItemInicial,
   criarProcedimentoRealizadoInicial,
 } from "./consultaFormState";
-import { parseNumero } from "./consultaFormUtils";
+import {
+  calcularDosePrescricaoPorPeso,
+  obterPesoParaCalculoDose,
+} from "./prescricaoDoseUtils";
 
 export default function usePrescricaoProcedimentosConsulta({
   form,
@@ -78,31 +81,19 @@ export default function usePrescricaoProcedimentosConsulta({
   }
 
   function calcularDosePorPeso(item) {
-    const peso = parseNumero(form.peso_kg) || parseNumero(petSelecionado?.peso);
+    const peso = obterPesoParaCalculoDose(form, petSelecionado);
     if (!Number.isFinite(peso) || peso <= 0) {
       setErro("Informe o peso do pet para calcular a dose automaticamente.");
       return null;
     }
 
-    const doseMin = parseNumero(item.dose_minima_mg_kg);
-    const doseMax = parseNumero(item.dose_maxima_mg_kg);
-    let doseMgKg = Number.isFinite(doseMin) ? doseMin : NaN;
-
-    if (Number.isFinite(doseMin) && Number.isFinite(doseMax)) {
-      doseMgKg = (doseMin + doseMax) / 2;
-    } else if (!Number.isFinite(doseMgKg) && Number.isFinite(doseMax)) {
-      doseMgKg = doseMax;
-    }
-
-    if (!Number.isFinite(doseMgKg) || doseMgKg <= 0) {
+    const doseCalculada = calcularDosePrescricaoPorPeso(item, peso);
+    if (!doseCalculada) {
       setErro("Esse medicamento não tem dose mg/kg cadastrada no catálogo.");
       return null;
     }
 
-    return {
-      dose_mg: (doseMgKg * peso).toFixed(2),
-      unidade: "mg",
-    };
+    return doseCalculada;
   }
 
   function selecionarMedicamentoNoItem(idx, medicamentoId) {

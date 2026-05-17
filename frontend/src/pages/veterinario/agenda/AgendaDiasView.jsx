@@ -5,6 +5,7 @@ import {
   STATUS_COLOR,
   STATUS_LABEL,
   TIPO_BADGE,
+  TIPO_CARD_COLOR,
   TIPO_LABEL,
   isoDate,
   normalizarTipoAgendamento,
@@ -69,7 +70,7 @@ export default function AgendaDiasView({
                       onGerenciarAgendamento(ag);
                     }}
                     className={`cursor-pointer rounded-xl border border-slate-200 border-l-4 px-3 py-2 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md ${
-                      STATUS_COLOR[ag.status] ?? "border-l-gray-200 bg-white"
+                      TIPO_CARD_COLOR[tipoAgendamento] || STATUS_COLOR[ag.status] || "border-l-gray-200 bg-white"
                     }`}
                   >
                     <div className="mb-0.5 flex items-center gap-1">
