@@ -54,6 +54,8 @@ Meta: 10/10 antes de automatizar qualquer deploy de producao.
 | #98 | Usuario operacional `petdeploy` e deploy sem root direto | Mergeado e deployado via `petdeploy` |
 | #100 | Backup e restore smoke controlado do banco | Mergeado e deployado via `petdeploy` |
 | #106 | Migration Smoke no Backend CI com Postgres descartavel | Mergeado |
+| #107 | Fechamento Testes/CI 10/10 com matriz critica e E2E longo | Mergeado |
+| #108 | Compose de producao repassa `OPS_ALERT_*` para o backend | Mergeado e deployado via `petdeploy` |
 
 ## Ultimo deploy real validado
 
@@ -61,9 +63,9 @@ Data: 2026-05-17.
 
 Escopo deployado:
 
-- Commit de runtime em producao: `7c390ed8` (`Separa deploy de docs sem rebuild`).
+- Commit de runtime em producao: `9ca4f5dd` (`Prepara webhook real de alertas Ops`).
 - Script usado: `sudo -n /usr/local/sbin/petshop-deploy-producao` via `petdeploy`.
-- Backup operacional criado no servidor: `/opt/petshop/backups/deploy_20260517_140902`.
+- Backup operacional criado no servidor: `/opt/petshop/backups/deploy_20260517_145334`.
 - Backend reconstruido com imagem `petshop-backend:prod`.
 - Frontend gerado em `runtime/frontend/dist`.
 - Alembic executado com sucesso.
@@ -71,10 +73,15 @@ Escopo deployado:
 - Health publico validado: `https://mlprohub.com.br/api/health`.
 - Watchdog interno e health publico validados pelo script de deploy.
 
-Observacao: o deploy via `petdeploy` teve um aviso transitorio do watchdog no
-fim porque o backend ainda estava aquecendo o healthcheck interno. A validacao
-repetida logo depois confirmou `backend`, `nginx`, `postgres` e `worker-bling`
-como `healthy`, com health publico `ok` e watchdog publico `healthy`.
+Validacao apos deploy:
+
+- `petshop-status-producao`: commit `9ca4f5dd`, branch `main`, containers
+  `backend`, `nginx`, `postgres` e `worker-bling` saudaveis.
+- `https://mlprohub.com.br/api/health`: `{"status":"ok"}`.
+- `https://mlprohub.com.br/api/health/watchdog`: `{"status":"healthy"}`.
+- Container backend recebeu as chaves `OPS_ALERT_*`; `OPS_ALERT_WEBHOOK_URL`
+  ainda esta vazia porque falta configurar a URL real do canal no `.env` seguro
+  de producao.
 
 Restore smoke validado:
 
