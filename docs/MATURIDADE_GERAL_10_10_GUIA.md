@@ -20,7 +20,7 @@ Regra de uso:
 | Estrutura geral | 5/10 | 6,5/10 | 10/10 | Em andamento |
 | Seguranca operacional | 2,5/10 | 8,5/10 | 10/10 | Em andamento |
 | Testes/CI | 1/10 | 8,5/10 | 10/10 | Em andamento |
-| Observabilidade/auditoria | 2/10 | 9,6/10 | 10/10 | Em andamento prioritario |
+| Observabilidade/auditoria | 2/10 | 9,8/10 | 10/10 | Em andamento prioritario |
 | Portabilidade/configuracao | 3/10 | 6,5/10 | 10/10 | Em andamento |
 | Documentacao | 4/10 | 8/10 | 10/10 | Em andamento |
 
@@ -182,7 +182,7 @@ Proxima acao concreta:
 
 Nota inicial: 2/10.
 
-Nota atual: 9,6/10.
+Nota atual: 9,8/10.
 
 Referencia principal: `docs/roadmaps/FASE2_OBSERVABILIDADE.md`, `docs/RETENCAO_LOGS_AUDITORIA.md` e secoes de Ops em `docs/EVOLUCAO_ENTERPRISE_UI_REFATORACAO.md`.
 
@@ -207,14 +207,15 @@ Ja feito:
 - [x] Deploy oficial registra eventos `running`, `success` e `failed` por etapa sensivel, preservando falhas finais mesmo apos eventos intermediarios.
 - [x] Comandos manuais sensiveis podem ser executados com auditoria `started`, `success` e `failed`, motivo obrigatorio e redaction basica de argumentos.
 - [x] Painel Ops gera alertas acionaveis para 5xx recorrente, lentidao recorrente, falhas recorrentes do watchdog externo e worker/job Bling degradado.
+- [x] Alertas Ops criticos possuem notifier externo opcional por webhook configuravel via env, com payload minimo e deduplicacao local em JSONL.
 
 Falta para 10/10:
 
-- [ ] Conectar alertas Ops a uma rotina/canal externo de notificacao operacional sem expor secrets.
+- [ ] Configurar canal real de notificacao Ops em producao e testar disparo controlado sem expor secrets.
 
 Proxima acao concreta:
 
-- [ ] Definir e implementar saida segura para notificacao operacional dos alertas Ops criticos.
+- [ ] Configurar `OPS_ALERT_WEBHOOK_URL` no ambiente seguro de producao e validar um alerta controlado.
 
 ## 7. Portabilidade/configuracao
 
@@ -316,6 +317,7 @@ Proxima acao concreta:
 | #79 | Observabilidade/auditoria/seguranca operacional | Linha do tempo auditavel das etapas sensiveis do deploy |
 | #80 | Observabilidade/auditoria/seguranca operacional | Auditoria de comandos manuais sensiveis em producao |
 | #81 | Observabilidade/auditoria | Alertas acionaveis para 5xx, lentidao, falhas recorrentes e worker/job degradado |
+| #82 | Observabilidade/auditoria | Notifier externo opcional para alertas Ops criticos |
 
 ## Criterio para declarar 10/10 geral
 

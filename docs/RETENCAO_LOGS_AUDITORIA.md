@@ -46,6 +46,7 @@ Referencias externas:
 | `backend/logs/error_events.jsonl` | Espelho local de erros de request | Servidor/producao | 30 dias | 90 dias compactado | Rotacionar e apagar arquivo antigo |
 | `backend/logs/deploy_events.jsonl` | Deploys, falhas e rollbacks | Servidor/producao | 24 meses | Historico resumido em docs | Compactar antigo; registro essencial fica no checklist |
 | `backend/logs/ops_command_events.jsonl` | Comandos manuais sensiveis em producao | Servidor/producao | 24 meses | Historico resumido em docs | Compactar antigo; preservar eventos de incidente |
+| `backend/logs/ops_alert_notifications.jsonl` | Deduplicacao de notificacao de alerta Ops | Servidor/producao | 24 meses | Historico resumido em docs | Compactar antigo; preservar eventos de incidente |
 | `backend/logs/watchdog_events.jsonl` | Watchdog interno do backend | Servidor/producao | 90 dias | 24 meses agregado | Rotacionar e apagar bruto antigo |
 | `backend/logs/host_watchdog_events.jsonl` | Watchdog externo do host | Servidor/producao | 90 dias | 24 meses agregado | Rotacionar e apagar bruto antigo |
 | `backend/logs/disk_guard_events.jsonl` | Guardiao preventivo de disco | Servidor/producao | 90 dias | 24 meses agregado | Rotacionar e apagar bruto antigo |
@@ -133,6 +134,8 @@ Apos cada deploy real:
 - Confirmar que `backend/logs/deploy_events.jsonl` recebeu sucesso ou falha.
 - Para comando manual sensivel fora do deploy oficial, usar
   `scripts/auditar_comando_producao.sh` e conferir `backend/logs/ops_command_events.jsonl`.
+- Se `OPS_ALERT_WEBHOOK_URL` estiver configurado, confirmar que
+  `backend/logs/ops_alert_notifications.jsonl` registrou a deduplicacao da notificacao.
 
 ## Backlog para 10/10
 
