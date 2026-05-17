@@ -134,8 +134,9 @@ Apos cada deploy real:
 - Confirmar que `backend/logs/deploy_events.jsonl` recebeu sucesso ou falha.
 - Para comando manual sensivel fora do deploy oficial, usar
   `scripts/auditar_comando_producao.sh` e conferir `backend/logs/ops_command_events.jsonl`.
-- Se `OPS_ALERT_WEBHOOK_URL` estiver configurado, confirmar que
-  `backend/logs/ops_alert_notifications.jsonl` registrou a deduplicacao da notificacao.
+- Se `OPS_ALERT_WEBHOOK_URL` ou `OPS_ALERT_EMAIL_TO` estiver configurado,
+  confirmar que `backend/logs/ops_alert_notifications.jsonl` registrou a
+  deduplicacao da notificacao.
 
 ## Backlog para 10/10
 

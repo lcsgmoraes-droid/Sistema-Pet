@@ -79,14 +79,16 @@ alternativa operacional.
 
 ## Notificacao de alertas Ops
 
-O painel Ops pode enviar alertas criticos para um webhook externo quando
-`OPS_ALERT_WEBHOOK_URL` estiver configurado no ambiente seguro do backend.
-O `docker-compose.prod.yml` repassa as variaveis `OPS_ALERT_*` para o container
-`backend`; os valores continuam vindo do `.env` seguro do servidor.
+O painel Ops pode enviar alertas criticos para um webhook externo ou para e-mail
+operacional quando `OPS_ALERT_WEBHOOK_URL` ou `OPS_ALERT_EMAIL_TO` estiverem
+configurados no ambiente seguro do backend. O `docker-compose.prod.yml` repassa
+as variaveis `OPS_ALERT_*` para o container `backend`; os valores continuam
+vindo do `.env` seguro do servidor.
 
 Variaveis relevantes:
 
 - `OPS_ALERT_WEBHOOK_URL`: URL secreta do webhook. Nao versionar e nao colar no chat.
+- `OPS_ALERT_EMAIL_TO`: destino de e-mail para alerta Ops quando webhook nao for usado.
 - `OPS_ALERT_WEBHOOK_MIN_SEVERITY`: severidade minima; padrao `critical`.
 - `OPS_ALERT_WEBHOOK_TIMEOUT_SECONDS`: timeout HTTP; padrao `5`.
 - `OPS_ALERT_NOTIFICATION_LOG_PATH`: log local de deduplicacao; padrao `logs/ops_alert_notifications.jsonl`.
@@ -95,7 +97,7 @@ O payload enviado e minimo: tipo/severidade do alerta, titulo, detalhe, acao,
 tenant/rota/request quando existirem. O notifier nao envia o payload bruto do
 alerta e nao registra a URL do webhook no resultado.
 
-Depois de configurar a variavel secreta no servidor, validar com um alerta
+Depois de configurar o webhook ou e-mail no servidor, validar com um alerta
 controlado:
 
 ```bash
@@ -105,7 +107,7 @@ docker compose -f docker-compose.prod.yml exec -T backend python -m app.services
 
 O comando deve retornar JSON com `enabled: true` e `sent: 1`, e o canal
 operacional deve receber "Teste controlado de alerta Ops". O output nao deve
-exibir a URL do webhook.
+exibir URL secreta de webhook nem destinatarios internos.
 
 ## Validacao apos deploy
 

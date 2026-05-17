@@ -33,7 +33,7 @@ def _build_alert(label: str) -> dict[str, Any]:
 
 def _parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
-        description="Dispara um alerta Ops controlado para validar OPS_ALERT_WEBHOOK_URL sem expor o webhook.",
+        description="Dispara um alerta Ops controlado para validar webhook/e-mail sem expor secrets.",
     )
     parser.add_argument(
         "--label",
@@ -45,10 +45,13 @@ def _parser() -> argparse.ArgumentParser:
 
 def main(argv: list[str] | None = None) -> int:
     args = _parser().parse_args(argv)
-    if not os.getenv("OPS_ALERT_WEBHOOK_URL", "").strip():
+    if not (
+        os.getenv("OPS_ALERT_WEBHOOK_URL", "").strip()
+        or os.getenv("OPS_ALERT_EMAIL_TO", "").strip()
+    ):
         print(
-            "ERRO: OPS_ALERT_WEBHOOK_URL nao esta configurado no ambiente. "
-            "Configure o secret no servidor antes do teste controlado.",
+            "ERRO: nenhum canal de alerta Ops esta configurado. "
+            "Configure OPS_ALERT_WEBHOOK_URL ou OPS_ALERT_EMAIL_TO antes do teste controlado.",
             file=sys.stderr,
         )
         return 2
