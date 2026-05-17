@@ -127,6 +127,31 @@ entrar no cronograma sem se perderem.
 - [ ] Homologar agendamento em dispositivo real depois do deploy: criar primeiro
       agendamento, criar segundo em horario livre e confirmar que conflito real
       retorna mensagem amigavel em vez de erro 500.
+- [x] Separar melhor visualmente um agendamento/consulta do outro na agenda,
+      especialmente quando ha horarios proximos no mesmo dia.
+- [x] Ao clicar em um agendamento da agenda, exibir acao primaria clara para
+      `Iniciar consulta`/`Iniciar retorno`, mantendo os dados do agendamento.
+- [x] Em `/veterinario/consultas`, mostrar os agendamentos clinicos do dia para
+      o veterinario iniciar a consulta sem voltar para a agenda.
+- [x] Ao iniciar consulta pela agenda ou pela lista de consultas, preencher pet,
+      tutor, veterinario, tipo e motivo a partir do agendamento.
+- [ ] Trocar o campo `Retorno em dias` por fluxo de `Agendar retorno`, abrindo a
+      agenda com contexto do pet/consulta para escolher dia e horario livre.
+- [ ] Ampliar catalogo veterinario de produtos/medicamentos com bulas, resumo de
+      uso clinico e dados para prescricao.
+- [ ] Ajustar calculadora de dose para usar primeiro o peso informado na
+      consulta; se estiver vazio, usar o peso cadastrado no pet.
+- [ ] Ampliar a base padrao de procedimentos veterinarios e seus insumos.
+- [ ] Revisar padrao de horario do modulo veterinario e do sistema: usar
+      Brasilia na exibicao e/ou UTC persistido de forma consistente, com foco em
+      inicio/fim de consulta, duracao, custos e relatorios.
+      Ajuste imediato feito: a lista de consultas passou a exibir
+      `inicio_atendimento` quando existir, em vez de depender de `created_at`.
+- [ ] Revisar fechamento da consulta: manter `Salvar rascunho` editavel,
+      diferenciar finalizacao/assinatura e remover redundancias de `Dar alta`.
+- [ ] Criar botao `Internacao` ao fim da consulta para abrir o modulo de
+      internacao ja vinculado, preservando a sequencia chegada -> consulta ->
+      internacao -> alta.
 
 ## Frente 2 - Padronizacao visual do Veterinario
 

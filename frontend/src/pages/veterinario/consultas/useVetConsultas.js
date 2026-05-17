@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import { isoDate } from "../agenda/agendaUtils";
+import { filtrarAgendamentosClinicosAbertos } from "../fluxoConsultaAgendamentoUtils";
 import { vetApi } from "../vetApi";
 import { CONSULTAS_POR_PAGINA, filtrarConsultas } from "./consultasUtils";
 
@@ -9,6 +11,9 @@ export function useVetConsultas() {
   const [pagina, setPagina] = useState(1);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState(null);
+  const [agendamentosHoje, setAgendamentosHoje] = useState([]);
+  const [carregandoAgendaHoje, setCarregandoAgendaHoje] = useState(true);
+  const [erroAgendaHoje, setErroAgendaHoje] = useState(null);
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("");
 
@@ -37,9 +42,27 @@ export function useVetConsultas() {
     }
   }, [pagina, filtroStatus]);
 
+  const carregarAgendamentosHoje = useCallback(async () => {
+    try {
+      setCarregandoAgendaHoje(true);
+      setErroAgendaHoje(null);
+      const hoje = isoDate(new Date());
+      const res = await vetApi.listarAgendamentos({ data_inicio: hoje, data_fim: hoje });
+      setAgendamentosHoje(filtrarAgendamentosClinicosAbertos(res.data));
+    } catch {
+      setErroAgendaHoje("Nao foi possivel carregar os agendamentos de hoje.");
+    } finally {
+      setCarregandoAgendaHoje(false);
+    }
+  }, []);
+
   useEffect(() => {
     carregar();
   }, [carregar]);
+
+  useEffect(() => {
+    carregarAgendamentosHoje();
+  }, [carregarAgendamentosHoje]);
 
   const consultasFiltradas = useMemo(
     () => filtrarConsultas(consultas, busca),
@@ -54,12 +77,17 @@ export function useVetConsultas() {
 
   return {
     alterarStatus,
+    agendamentosHoje,
     busca,
     carregando,
+    carregandoAgendaHoje,
     consultasFiltradas,
     erro,
+    erroAgendaHoje,
     filtroStatus,
     pagina,
+    recarregarAgendaHoje: carregarAgendamentosHoje,
+    recarregarConsultas: carregar,
     setBusca,
     setPagina,
     total,

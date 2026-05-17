@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 
 import { buildReturnTo } from "../../../utils/petReturnFlow";
+import { getAgendamentoConsultaActionLabel } from "../fluxoConsultaAgendamentoUtils";
 import {
   MOTIVO_PLACEHOLDER_POR_TIPO,
   diagnosticarConflitoAgendamento,
@@ -103,9 +104,10 @@ export function useAgendaDerivados({
     ? "Desfazer inicio do atendimento"
     : "Voltar para agendado";
 
-  const labelAbrirAgendamentoSelecionado = agendamentoSelecionado?.consulta_id
-    ? "Continuar atendimento"
-    : TIPO_ACAO[tipoAgendamentoSelecionado] ?? "Abrir atendimento";
+  const labelAbrirAgendamentoSelecionado =
+    tipoAgendamentoSelecionado === "consulta" || tipoAgendamentoSelecionado === "retorno"
+      ? getAgendamentoConsultaActionLabel(agendamentoSelecionado)
+      : TIPO_ACAO[tipoAgendamentoSelecionado] ?? "Abrir atendimento";
 
   const mensagemAgendamentoSelecionado = montarMensagemGerenciamento(
     agendamentoSelecionado,

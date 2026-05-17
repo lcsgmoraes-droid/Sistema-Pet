@@ -1,5 +1,6 @@
 import { useCallback } from "react";
 
+import { buildConsultaPayloadFromAgendamento } from "../fluxoConsultaAgendamentoUtils";
 import { vetApi } from "../vetApi";
 import { normalizarTipoAgendamento } from "./agendaUtils";
 
@@ -44,14 +45,7 @@ export function useAgendaGerenciamentoAcoes({
         }
 
         if (tipoAgendamento === "consulta" || tipoAgendamento === "retorno") {
-          const res = await vetApi.criarConsulta({
-            pet_id: ag.pet_id,
-            cliente_id: ag.cliente_id,
-            veterinario_id: ag.veterinario_id || undefined,
-            tipo: tipoAgendamento,
-            agendamento_id: ag.id,
-            queixa_principal: ag.motivo || undefined,
-          });
+          const res = await vetApi.criarConsulta(buildConsultaPayloadFromAgendamento(ag));
           await carregar();
           navigate(`/veterinario/consultas/${res.data.id}`);
           return;

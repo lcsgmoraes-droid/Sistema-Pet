@@ -51,9 +51,9 @@ export default function AgendaDiasView({
               )}
             </div>
 
-            <div className="min-h-[80px] divide-y divide-gray-50">
+            <div className="min-h-[80px] space-y-2 bg-slate-50/70 p-3">
               {ags.length === 0 && (
-                <div className="px-3 py-4 text-center">
+                <div className="rounded-lg border border-dashed border-slate-200 bg-white px-3 py-4 text-center">
                   <p className="text-xs text-gray-300">Livre</p>
                   <p className="mt-1 text-[11px] text-blue-500">Clique para agendar</p>
                 </div>
@@ -68,7 +68,7 @@ export default function AgendaDiasView({
                       e.stopPropagation();
                       onGerenciarAgendamento(ag);
                     }}
-                    className={`cursor-pointer border-l-4 px-3 py-2 transition-opacity hover:opacity-80 ${
+                    className={`cursor-pointer rounded-xl border border-slate-200 border-l-4 px-3 py-2 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-md ${
                       STATUS_COLOR[ag.status] ?? "border-l-gray-200 bg-white"
                     }`}
                   >

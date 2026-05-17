@@ -1,4 +1,4 @@
-import { X } from "lucide-react";
+import { PlayCircle, X } from "lucide-react";
 import CustomerIdentity from "../../../components/ui/CustomerIdentity";
 import PetIdentity from "../../../components/ui/PetIdentity";
 import { STATUS_BADGE, STATUS_LABEL, TIPO_BADGE, TIPO_LABEL } from "./agendaUtils";
@@ -164,8 +164,9 @@ export default function GerenciarAgendamentoModal({
             type="button"
             onClick={onIniciar}
             disabled={abrindo || processando}
-            className="flex-1 rounded-lg bg-blue-600 px-4 py-2 text-sm text-white hover:bg-blue-700 disabled:opacity-60"
+            className="inline-flex flex-1 items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm font-semibold text-white hover:bg-blue-700 disabled:opacity-60"
           >
+            <PlayCircle size={16} />
             {abrindo ? "Abrindo..." : labelAbrir}
           </button>
         </div>
