@@ -54,6 +54,22 @@ de argumentos sensiveis como `token=...` e `password=...`.
 Nao colocar secrets no `--reason`, no `--label` ou em argumentos quando houver
 alternativa operacional.
 
+## Notificacao de alertas Ops
+
+O painel Ops pode enviar alertas criticos para um webhook externo quando
+`OPS_ALERT_WEBHOOK_URL` estiver configurado no ambiente seguro do backend.
+
+Variaveis relevantes:
+
+- `OPS_ALERT_WEBHOOK_URL`: URL secreta do webhook. Nao versionar e nao colar no chat.
+- `OPS_ALERT_WEBHOOK_MIN_SEVERITY`: severidade minima; padrao `critical`.
+- `OPS_ALERT_WEBHOOK_TIMEOUT_SECONDS`: timeout HTTP; padrao `5`.
+- `OPS_ALERT_NOTIFICATION_LOG_PATH`: log local de deduplicacao; padrao `logs/ops_alert_notifications.jsonl`.
+
+O payload enviado e minimo: tipo/severidade do alerta, titulo, detalhe, acao,
+tenant/rota/request quando existirem. O notifier nao envia o payload bruto do
+alerta e nao registra a URL do webhook no resultado.
+
 ## Validacao apos deploy
 
 ```bash

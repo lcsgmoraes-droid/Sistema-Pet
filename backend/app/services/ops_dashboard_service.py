@@ -20,6 +20,7 @@ from app.services.ops_persistence_service import (
     summarize_ops_alerts,
     upsert_ops_alerts,
 )
+from app.services.ops_alert_notifier import notify_ops_alerts
 from app.services.watchdog_event_reporter import (
     get_watchdog_events,
     summarize_watchdog_events,
@@ -782,6 +783,18 @@ def build_ops_dashboard(db: Session, *, since: datetime | None = None, until: da
         deploy_events,
     )
     persisted_actionable_alerts = upsert_ops_alerts(db, actionable_alerts)
+    try:
+        ops_notification_delivery = notify_ops_alerts(persisted_actionable_alerts or actionable_alerts)
+    except Exception as exc:
+        ops_notification_delivery = {
+            "enabled": False,
+            "status": "failed",
+            "error_type": type(exc).__name__,
+            "attempted": 0,
+            "sent": 0,
+            "failed": 0,
+            "skipped_duplicate": 0,
+        }
     ops_notifications = summarize_ops_alerts(db, since=period_since)
     active_ops_alerts = list_ops_alerts(db, status="open", since=period_since, limit=20)
     recovery_actions = query_recovery_actions(db, since=period_since, until=period_until, limit=20)
@@ -819,6 +832,7 @@ def build_ops_dashboard(db: Session, *, since: datetime | None = None, until: da
         "ops_notifications": {
             **ops_notifications,
             "active": active_ops_alerts,
+            "delivery": ops_notification_delivery,
         },
         "recovery_actions": recovery_actions,
         "tenant_incidents": tenant_incidents,
