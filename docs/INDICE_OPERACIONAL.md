@@ -23,6 +23,7 @@ Guia mestre:
 | Backup/restore de banco | `docs/PRODUCAO_BACKUP_RESTORE_TESTE.md` | Restore smoke controlado |
 | Observabilidade e auditoria | `docs/RETENCAO_LOGS_AUDITORIA.md` | Painel Ops e logs JSONL |
 | Estrutura/refatoracao | `docs/auditorias/estrutura-geral-definition-of-done.md` | Testes focados da fatia |
+| Vender Plano Basico | `docs/GUIA_VENDA_PLANO_BASICO.md` | Checklist de onboarding e clientes piloto |
 | Plano Basico | `docs/auditorias/plano-basico-tenant-checklist.md` | E2E longo controlado |
 | Produto/roadmap | `docs/ROADMAP_MASTER.md` | Checklist da frente especifica |
 
@@ -36,6 +37,7 @@ Guia mestre:
 | Testes/CI | `docs/auditorias/testes-ci-cobertura-critica.md` |
 | Observabilidade/auditoria | `docs/RETENCAO_LOGS_AUDITORIA.md` |
 | Portabilidade/configuracao | `docs/DEV_ENVIRONMENT_CHECK.md` |
+| Venda do Plano Basico | `docs/GUIA_VENDA_PLANO_BASICO.md` |
 | Evidencias | `docs/PADRAO_EVIDENCIA.md` |
 
 ## Rotina obrigatoria por PR
