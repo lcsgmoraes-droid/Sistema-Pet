@@ -70,6 +70,18 @@ O payload enviado e minimo: tipo/severidade do alerta, titulo, detalhe, acao,
 tenant/rota/request quando existirem. O notifier nao envia o payload bruto do
 alerta e nao registra a URL do webhook no resultado.
 
+Depois de configurar a variavel secreta no servidor, validar com um alerta
+controlado:
+
+```bash
+cd /opt/petshop
+docker compose -f docker-compose.prod.yml exec -T backend python -m app.services.ops_alert_webhook_smoke --label "validacao-producao"
+```
+
+O comando deve retornar JSON com `enabled: true` e `sent: 1`, e o canal
+operacional deve receber "Teste controlado de alerta Ops". O output nao deve
+exibir a URL do webhook.
+
 ## Validacao apos deploy
 
 ```bash
