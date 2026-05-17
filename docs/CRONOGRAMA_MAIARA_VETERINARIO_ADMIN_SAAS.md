@@ -104,6 +104,29 @@ Evidencia de validacao:
   2 racas, 10 produtos/insumos Vet, 8 medicamentos, 4 procedimentos, 5
   protocolos de vacina e 16 assinaturas de modulo ativas.
 
+## Anotacoes do teste real em 2026-05-17
+
+Lucas testou o fluxo de agenda no tenant da Maiara e registrou pontos que devem
+entrar no cronograma sem se perderem.
+
+- [x] Corrigir erro 500 ao criar o segundo agendamento do dia. Causa: a checagem
+      de conflito comparava datas com timezone e sem timezone. Corrigido nesta
+      entrega normalizando os horarios antes da comparacao.
+- [ ] Trocar o campo de foto do cadastro de pet de `url` para upload de arquivo,
+      com preview, remocao e validacao de tamanho/formato.
+- [ ] Atualizar o cadastro de pet para exibir corretamente servicos/situacoes de
+      Banho e Tosa onde o fluxo de servicos do pet precisar aparecer.
+- [ ] Criar consultorio/sala dentro do modal de novo agendamento, sem levar o
+      usuario para outra pagina, e selecionar automaticamente o consultorio
+      criado.
+- [ ] Melhorar a explicacao e o fluxo de calendario externo. Arquivo `.ics` e o
+      formato iCalendar usado por Google Calendar, Outlook e Apple Calendar. Para
+      alertas no celular, o usuario precisa importar/assinar esse calendario ou o
+      sistema precisa evoluir para integracao/sincronizacao com calendario.
+- [ ] Homologar agendamento em dispositivo real depois do deploy: criar primeiro
+      agendamento, criar segundo em horario livre e confirmar que conflito real
+      retorna mensagem amigavel em vez de erro 500.
+
 ## Frente 2 - Padronizacao visual do Veterinario
 
 Objetivo: aplicar o modelo visual padrao do sistema nas telas veterinarias:

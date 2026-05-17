@@ -1,5 +1,5 @@
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from types import SimpleNamespace
 
 os.environ["DEBUG"] = "false"
@@ -19,6 +19,18 @@ def test_agendamento_intervalo_usa_30_minutos_por_padrao():
     assert _agendamento_intervalo(inicio, None) == (inicio, inicio + timedelta(minutes=30))
     assert _agendamento_intervalo(inicio, 0) == (inicio, inicio + timedelta(minutes=30))
     assert _agendamento_intervalo(inicio, -5) == (inicio, inicio + timedelta(minutes=1))
+
+
+def test_agendamento_intervalo_normaliza_timezone_para_comparacao():
+    novo_inicio, novo_fim = _agendamento_intervalo(datetime(2026, 5, 17, 18, 0), 30)
+    existente_inicio, existente_fim = _agendamento_intervalo(
+        datetime(2026, 5, 17, 21, 0, tzinfo=timezone.utc),
+        30,
+    )
+
+    assert existente_inicio == datetime(2026, 5, 17, 18, 0)
+    assert existente_fim == datetime(2026, 5, 17, 18, 30)
+    assert not (novo_inicio >= existente_fim or novo_fim <= existente_inicio)
 
 
 def test_sincronizar_marcos_agendamento_finalizado_preenche_inicio_e_fim(monkeypatch):

@@ -60,6 +60,20 @@ Pacotes iniciais recomendados:
 - `banho-tosa-br`: servicos, pacotes, adicionais e produtos de apoio.
 - `campanhas-br`: campanhas sugeridas, cupons modelo e regras de fidelidade.
 
+## Cadastros base anotados por Lucas
+
+Itens que devem crescer para todo tenant novo iniciar com uma base melhor:
+
+- [ ] Ampliar especies padrao alem da base minima atual.
+- [ ] Ampliar racas padrao por especie, com aliases comuns e revisao para evitar
+      duplicidade.
+- [ ] Disponibilizar produtos base com dados e imagens como importacao opcional.
+- [ ] Ampliar insumos/produtos veterinarios iniciais.
+- [ ] Ampliar procedimentos veterinarios iniciais.
+- [ ] Ampliar medicamentos e bulas/resumos tecnicos com fonte e data de revisao.
+- [ ] Criar mecanismo para o cliente aceitar novidades da biblioteca oficial sem
+      sobrescrever personalizacoes locais.
+
 ## Modelo de atualizacao
 
 Cada item oficial deve ter:
