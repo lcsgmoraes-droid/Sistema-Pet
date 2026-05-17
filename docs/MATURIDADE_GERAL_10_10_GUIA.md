@@ -334,7 +334,7 @@ Proxima acao concreta:
 | #86 | Portabilidade/configuracao | Fluxo de segundo PC e diagnostico de portas locais |
 | #87 | Estrutura geral | Inventario de hotspots e primeira fatia de refatoracao |
 | #88 | Estrutura geral | Definition of Done para refatoracao modular |
-| PR atual | Estrutura geral | Primeira fatia piloto de Produtos sem mudar contrato |
+| #89 | Estrutura geral | Primeira fatia piloto de Produtos sem mudar contrato |
 
 ## Criterio para declarar 10/10 geral
 
