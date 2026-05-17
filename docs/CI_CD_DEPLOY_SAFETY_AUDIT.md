@@ -31,6 +31,8 @@ Meta: 10/10 antes de automatizar qualquer deploy de producao.
 | Feito | Deploy oficial registra linha do tempo auditavel por etapa sensivel | `backend/logs/deploy_events.jsonl` |
 | Feito | Comandos manuais sensiveis possuem wrapper auditavel com motivo obrigatorio | `scripts/auditar_comando_producao.sh` |
 | Feito | Usuario operacional `petdeploy` criado para status/deploy sem SSH direto como root | `docs/PRODUCAO_DEPLOY_SSH.md` |
+| Feito | Deploy completo via `petdeploy` validado com containers saudaveis | `docs/PRODUCAO_DEPLOY_SSH.md` |
+| Feito | Rotacao de SSH/secrets documentada | `docs/SEGURANCA_ROTACAO_SSH_SECRETS.md` |
 
 ## PRs ja juntados
 
@@ -42,6 +44,7 @@ Meta: 10/10 antes de automatizar qualquer deploy de producao.
 | #64 | Correcao operacional de cupom/carimbos/reabertura de venda | Mergeado e deployado |
 | #52/#53/#54 | Dependabot GitHub Actions v6 | Mergeados; sem impacto de runtime |
 | #97 | Plano E2E minimo do Plano Basico | Mergeado e deployado |
+| #98 | Usuario operacional `petdeploy` e deploy sem root direto | Mergeado e deployado via `petdeploy` |
 
 ## Ultimo deploy real validado
 
@@ -49,9 +52,9 @@ Data: 2026-05-17.
 
 Escopo deployado:
 
-- Commit de runtime em producao: `0438eeed` (`Documenta E2E minimo do Plano Basico`).
-- Script usado: `cd /opt/petshop && bash scripts/deploy_producao_seguro.sh`.
-- Backup operacional criado no servidor: `/opt/petshop/backups/deploy_20260517_132217`.
+- Commit de runtime em producao: `520f8a2b` (`Documenta deploy operacional petdeploy`).
+- Script usado: `sudo -n /usr/local/sbin/petshop-deploy-producao` via `petdeploy`.
+- Backup operacional criado no servidor: `/opt/petshop/backups/deploy_20260517_133717`.
 - Backend reconstruido com imagem `petshop-backend:prod`.
 - Frontend gerado em `runtime/frontend/dist`.
 - Alembic executado com sucesso.
@@ -59,10 +62,10 @@ Escopo deployado:
 - Health publico validado: `https://mlprohub.com.br/api/health`.
 - Watchdog interno e health publico validados pelo script de deploy.
 
-Observacao: apos esse deploy, o usuario `petdeploy` foi criado com SSH por chave
-deste PC e validado com `sudo -n /usr/local/sbin/petshop-status-producao`.
-O proximo deploy real deve preferir `petdeploy`; `root` fica apenas como
-fallback operacional autorizado.
+Observacao: o deploy via `petdeploy` teve um aviso transitorio do watchdog no
+fim porque o backend ainda estava aquecendo o healthcheck interno. A validacao
+repetida logo depois confirmou `backend`, `nginx`, `postgres` e `worker-bling`
+como `healthy`, com health publico `ok` e watchdog publico `healthy`.
 
 ## Checks que devem proteger a `main`
 
@@ -85,4 +88,4 @@ fallback operacional autorizado.
 
 1. Em todo proximo deploy real autorizado, repetir `release-check`, usar `petdeploy` com `/usr/local/sbin/petshop-deploy-producao` e validar health/watchdog.
 2. Conferir no painel Ops ou no arquivo `backend/logs/deploy_events.jsonl` os eventos `running`, `success` ou `failed` do deploy.
-3. Manter a `main` protegida pelos checks obrigatorios antes de merge.
+3. Planejar o teste de restore real de backup em ambiente controlado.
