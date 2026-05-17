@@ -378,6 +378,7 @@ Para manter 10/10:
 | #109 | Observabilidade/auditoria/seguranca operacional | Evidencia do deploy do webhook Ops no guia vivo |
 | #110 | Observabilidade/auditoria | Alerta Ops por e-mail operacional via `OPS_ALERT_EMAIL_TO` |
 | #111 | Observabilidade/auditoria | Fechamento 10/10 com alerta Ops por e-mail validado |
+| #113 | Governanca | Fechamento geral 10/10 com release-check e criterios marcados |
 | #84 | Portabilidade/configuracao | Check seguro de ambiente DEV e guia de correcao |
 | #85 | Portabilidade/configuracao | Bootstrap de PC novo para ambiente DEV |
 | #86 | Portabilidade/configuracao | Fluxo de segundo PC e diagnostico de portas locais |
@@ -407,9 +408,16 @@ Para manter 10/10:
 
 So declarar 10/10 geral quando todos os itens abaixo estiverem marcados:
 
-- [ ] Todas as areas do placar geral com nota 10/10.
-- [ ] Nenhum item "Falta para 10/10" aberto sem justificativa.
-- [ ] `release-check` passando na `main`.
-- [ ] GitHub sem PR antigo pendente ou conflito esquecido.
-- [ ] Evidencia registrada para deploy, testes, observabilidade e auditoria.
-- [ ] Guia atualizado no mesmo PR que fecha cada etapa.
+- [x] Todas as areas do placar geral com nota 10/10.
+- [x] Nenhum item "Falta para 10/10" aberto sem justificativa.
+- [x] `release-check` passando na `main`.
+- [x] GitHub sem PR antigo pendente ou conflito esquecido.
+- [x] Evidencia registrada para deploy, testes, observabilidade e auditoria.
+- [x] Guia atualizado no mesmo PR que fecha cada etapa.
+
+Fechamento geral em 2026-05-17:
+
+- Main limpa em `d876f94f` apos PR #112.
+- `powershell -ExecutionPolicy Bypass -File .\scripts\fluxo_unico.ps1 release-check` passou.
+- `gh pr list --state open --limit 20` nao retornou PR aberto.
+- Todas as areas do placar geral estao em 10/10 para uso interno profissional.
