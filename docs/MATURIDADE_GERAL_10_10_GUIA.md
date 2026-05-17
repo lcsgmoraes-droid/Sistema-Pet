@@ -308,7 +308,7 @@ Proxima acao concreta:
 | #74 | Observabilidade/auditoria | Eventos de negocio de campanhas, cupons e carimbos para reconciliacao |
 | #75 | Observabilidade/auditoria | Politica de retencao de logs e dados de auditoria |
 | #76 | Observabilidade/auditoria | Correlacao para jobs criticos do scheduler Bling |
-| PR atual | Observabilidade/auditoria | Correlacao para WhatsApp, SEFAZ e e-mail |
+| #77 | Observabilidade/auditoria | Correlacao para WhatsApp, SEFAZ e e-mail |
 
 ## Criterio para declarar 10/10 geral
 
