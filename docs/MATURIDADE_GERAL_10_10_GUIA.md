@@ -17,7 +17,7 @@ Regra de uso:
 |---|---:|---:|---:|---|
 | MCP Frontend | 5,5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | MCP Ops/API | 3,5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
-| Estrutura geral | 5/10 | 9/10 | 10/10 | Em andamento |
+| Estrutura geral | 5/10 | 9,2/10 | 10/10 | Em andamento |
 | Seguranca operacional | 2,5/10 | 8,5/10 | 10/10 | Em andamento |
 | Testes/CI | 1/10 | 8,5/10 | 10/10 | Em andamento |
 | Observabilidade/auditoria | 2/10 | 9,9/10 | 10/10 | Em andamento prioritario |
@@ -90,7 +90,7 @@ Para manter 10/10:
 
 Nota inicial: 5/10.
 
-Nota atual: 9/10.
+Nota atual: 9,2/10.
 
 Referencia principal: `docs/EVOLUCAO_ENTERPRISE_UI_REFATORACAO.md`.
 
@@ -106,6 +106,7 @@ Ja feito:
 - [x] Primeira fatia piloto de Produtos extrai helpers de busca para `backend/app/produtos/search.py` sem mudar endpoints.
 - [x] Segunda fatia piloto de Produtos extrai helpers de validade/listagem para `backend/app/produtos/validade.py` sem mudar endpoints.
 - [x] Terceira fatia piloto de Produtos extrai helpers de racao/classificacao para `backend/app/produtos/racao.py` sem mudar endpoints.
+- [x] Primeira fatia de Estoque extrai helpers de granel para `backend/app/estoque/granel.py` sem mudar endpoints.
 
 Falta para 10/10:
 
@@ -113,13 +114,13 @@ Falta para 10/10:
 - [x] Definir top 10 arquivos de maior risco para quebra gradual.
 - [x] Criar padrao de modulo: rotas, services, schemas, testes e docs.
 - [x] Quebrar 1 modulo piloto sem mudar comportamento.
-- [ ] Repetir o padrao em PDV/vendas, campanhas/cupons, produtos/estoque e financeiro.
+- [ ] Repetir o padrao em PDV/vendas, campanhas/cupons e financeiro; completar novas fatias de Estoque quando fizer sentido.
 - [ ] Remover duplicacao de regras de negocio em telas quando houver service central.
 - [x] Registrar Definition of Done para refatoracao segura.
 
 Proxima acao concreta:
 
-- [ ] Aplicar o padrao em Estoque ou iniciar extracao controlada de filtros/listagem no frontend de Produtos.
+- [ ] Aplicar o padrao em PDV/vendas ou campanhas/cupons, priorizando helpers puros com teste focado.
 
 ## 4. Seguranca operacional
 
@@ -339,6 +340,7 @@ Proxima acao concreta:
 | #89 | Estrutura geral | Primeira fatia piloto de Produtos sem mudar contrato |
 | #90 | Estrutura geral | Segunda fatia piloto de Produtos para validade/listagem |
 | #91 | Estrutura geral | Terceira fatia piloto de Produtos para racao/classificacao |
+| PR atual | Estrutura geral | Primeira fatia de Estoque para granel |
 
 ## Criterio para declarar 10/10 geral
 
