@@ -14,8 +14,8 @@ export default function NovoAgendamentoFormSection({
   formNovo,
   motivoPlaceholderPorTipo,
   onChangeCampo,
-  onConfiguracoesVet,
   onHideForNovoPet,
+  onNovoConsultorio,
   onTutorSelect,
   petsDoTutor,
   retornoNovoPet,
@@ -41,7 +41,7 @@ export default function NovoAgendamentoFormSection({
         consultorios={consultorios}
         formNovo={formNovo}
         onChangeCampo={onChangeCampo}
-        onConfiguracoesVet={onConfiguracoesVet}
+        onNovoConsultorio={onNovoConsultorio}
         veterinarios={veterinarios}
       />
 

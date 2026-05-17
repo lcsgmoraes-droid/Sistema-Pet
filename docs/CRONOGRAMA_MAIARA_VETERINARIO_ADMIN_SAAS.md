@@ -116,9 +116,10 @@ entrar no cronograma sem se perderem.
       com preview, remocao e validacao de tamanho/formato.
 - [ ] Atualizar o cadastro de pet para exibir corretamente servicos/situacoes de
       Banho e Tosa onde o fluxo de servicos do pet precisar aparecer.
-- [ ] Criar consultorio/sala dentro do modal de novo agendamento, sem levar o
+- [x] Criar consultorio/sala dentro do modal de novo agendamento, sem levar o
       usuario para outra pagina, e selecionar automaticamente o consultorio
-      criado.
+      criado. Implementado na branch de 2026-05-17; falta homologar em producao
+      depois de merge/deploy.
 - [ ] Melhorar a explicacao e o fluxo de calendario externo. Arquivo `.ics` e o
       formato iCalendar usado por Google Calendar, Outlook e Apple Calendar. Para
       alertas no celular, o usuario precisa importar/assinar esse calendario ou o
