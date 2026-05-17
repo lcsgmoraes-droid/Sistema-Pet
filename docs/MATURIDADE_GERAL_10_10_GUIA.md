@@ -336,7 +336,7 @@ Proxima acao concreta:
 | #87 | Estrutura geral | Inventario de hotspots e primeira fatia de refatoracao |
 | #88 | Estrutura geral | Definition of Done para refatoracao modular |
 | #89 | Estrutura geral | Primeira fatia piloto de Produtos sem mudar contrato |
-| PR atual | Estrutura geral | Segunda fatia piloto de Produtos para validade/listagem |
+| #90 | Estrutura geral | Segunda fatia piloto de Produtos para validade/listagem |
 
 ## Criterio para declarar 10/10 geral
 
