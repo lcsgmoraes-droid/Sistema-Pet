@@ -55,6 +55,8 @@ export default function ConsultasTableCard({ carregando, consultas, erro, onAbri
 }
 
 function ConsultaTableRow({ consulta, onAbrirConsulta }) {
+  const dataAtendimento = consulta.inicio_atendimento || consulta.created_at;
+
   return (
     <tr
       className="hover:bg-blue-50 transition-colors cursor-pointer"
@@ -65,9 +67,9 @@ function ConsultaTableRow({ consulta, onAbrirConsulta }) {
         <div className="text-[11px] text-gray-400">Consulta</div>
       </td>
       <td className="px-4 py-3 text-gray-500 whitespace-nowrap">
-        {formatDataConsulta(consulta.created_at)}
+        {formatDataConsulta(dataAtendimento)}
         {" "}
-        <span className="text-xs ml-1 text-gray-400">{formatHoraConsulta(consulta.created_at)}</span>
+        <span className="text-xs ml-1 text-gray-400">{formatHoraConsulta(dataAtendimento)}</span>
       </td>
       <td className="px-4 py-3 font-medium text-gray-800">
         <PetIdentity

@@ -1,5 +1,6 @@
 import { Activity } from "lucide-react";
 import PetIdentity from "../../../components/ui/PetIdentity";
+import { getAgendamentoConsultaActionLabel } from "../fluxoConsultaAgendamentoUtils";
 
 import {
   STATUS_BADGE,
@@ -59,7 +60,9 @@ export default function AgendamentoDiaCard({ abrindoAgendamentoId, agendamento, 
       <div className="mt-2 text-[11px] font-medium text-blue-600">
         {abrindoAgendamentoId === agendamento.id
           ? "Abrindo fluxo..."
-          : TIPO_ACAO[tipoAgendamento] ?? "Abrir atendimento"}
+          : tipoAgendamento === "consulta" || tipoAgendamento === "retorno"
+            ? getAgendamentoConsultaActionLabel(agendamento)
+            : TIPO_ACAO[tipoAgendamento] ?? "Abrir atendimento"}
       </div>
     </button>
   );
