@@ -20,7 +20,7 @@ Regra de uso:
 | Estrutura geral | 5/10 | 6,5/10 | 10/10 | Em andamento |
 | Seguranca operacional | 2,5/10 | 8,5/10 | 10/10 | Em andamento |
 | Testes/CI | 1/10 | 8,5/10 | 10/10 | Em andamento |
-| Observabilidade/auditoria | 2/10 | 9,3/10 | 10/10 | Em andamento prioritario |
+| Observabilidade/auditoria | 2/10 | 9,6/10 | 10/10 | Em andamento prioritario |
 | Portabilidade/configuracao | 3/10 | 6,5/10 | 10/10 | Em andamento |
 | Documentacao | 4/10 | 8/10 | 10/10 | Em andamento |
 
@@ -182,7 +182,7 @@ Proxima acao concreta:
 
 Nota inicial: 2/10.
 
-Nota atual: 9,3/10.
+Nota atual: 9,6/10.
 
 Referencia principal: `docs/roadmaps/FASE2_OBSERVABILIDADE.md`, `docs/RETENCAO_LOGS_AUDITORIA.md` e secoes de Ops em `docs/EVOLUCAO_ENTERPRISE_UI_REFATORACAO.md`.
 
@@ -206,14 +206,15 @@ Ja feito:
 - [x] Eventos de negocio auditaveis tambem emitem log estruturado JSON via caminho central de auditoria.
 - [x] Deploy oficial registra eventos `running`, `success` e `failed` por etapa sensivel, preservando falhas finais mesmo apos eventos intermediarios.
 - [x] Comandos manuais sensiveis podem ser executados com auditoria `started`, `success` e `failed`, motivo obrigatorio e redaction basica de argumentos.
+- [x] Painel Ops gera alertas acionaveis para 5xx recorrente, lentidao recorrente, falhas recorrentes do watchdog externo e worker/job Bling degradado.
 
 Falta para 10/10:
 
-- [ ] Alertar falhas recorrentes, lentidao, 5xx e falha de jobs.
+- [ ] Conectar alertas Ops a uma rotina/canal externo de notificacao operacional sem expor secrets.
 
 Proxima acao concreta:
 
-- [ ] Alertar falhas recorrentes, lentidao, 5xx e falha de jobs.
+- [ ] Definir e implementar saida segura para notificacao operacional dos alertas Ops criticos.
 
 ## 7. Portabilidade/configuracao
 
@@ -314,6 +315,7 @@ Proxima acao concreta:
 | #78 | Observabilidade/auditoria | Logs estruturados de eventos de negocio |
 | #79 | Observabilidade/auditoria/seguranca operacional | Linha do tempo auditavel das etapas sensiveis do deploy |
 | #80 | Observabilidade/auditoria/seguranca operacional | Auditoria de comandos manuais sensiveis em producao |
+| #81 | Observabilidade/auditoria | Alertas acionaveis para 5xx, lentidao, falhas recorrentes e worker/job degradado |
 
 ## Criterio para declarar 10/10 geral
 
