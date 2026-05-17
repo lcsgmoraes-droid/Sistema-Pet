@@ -355,7 +355,7 @@ Proxima acao concreta:
 | #94 | Estrutura geral | Primeira fatia de campanhas/cupons para regras puras |
 | #95 | Estrutura geral | Primeira fatia de financeiro para origem de contas a pagar |
 | #96 | Estrutura geral | Fechamento 10/10 com varredura final e criterio de manutencao |
-| PR atual | Testes/CI | Plano E2E minimo do Plano Basico com dados descartaveis |
+| #97 | Testes/CI | Plano E2E minimo do Plano Basico com dados descartaveis |
 
 ## Criterio para declarar 10/10 geral
 
