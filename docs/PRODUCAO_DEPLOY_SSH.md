@@ -30,6 +30,30 @@ O deploy tambem instala o guardiao preventivo de disco (`scripts/ops_disk_guard.
 
 O deploy tambem instala o watchdog externo do host (`scripts/ops_host_watchdog.sh`) em `/etc/cron.d/petshop-ops-host-watchdog`. Ele roda a cada minuto fora dos containers, valida o watchdog publico, o watchdog interno, health dos containers e excesso recente de 50x no nginx. Depois de falhas consecutivas, ele reinicia primeiro `backend`, depois `nginx` se o health publico continuar falhando, e `worker-bling` se estiver unhealthy. Ele nao reinicia Postgres automaticamente; nesse caso registra evento e aguarda acao humana. Eventos ficam em `backend/logs/host_watchdog_events.jsonl`.
 
+## Comandos manuais auditaveis
+
+Para qualquer comando sensivel em producao fora do script oficial de deploy,
+envolver a execucao com `scripts/auditar_comando_producao.sh`.
+
+Exemplo dentro do servidor:
+
+```bash
+cd /opt/petshop
+bash scripts/auditar_comando_producao.sh \
+  --action docker.ps \
+  --reason "validacao operacional autorizada" \
+  --label "docker compose ps" \
+  -- docker compose -f docker-compose.prod.yml ps
+```
+
+O wrapper exige `--action`, `--reason` e o comando apos `--`. Ele registra
+`started`, `success` ou `failed` em `backend/logs/ops_command_events.jsonl`,
+incluindo usuario, host, commit atual, exit code e comando com redaction basica
+de argumentos sensiveis como `token=...` e `password=...`.
+
+Nao colocar secrets no `--reason`, no `--label` ou em argumentos quando houver
+alternativa operacional.
+
 ## Validacao apos deploy
 
 ```bash
