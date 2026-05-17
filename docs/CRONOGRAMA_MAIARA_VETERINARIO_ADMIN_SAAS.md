@@ -135,8 +135,10 @@ entrar no cronograma sem se perderem.
       o veterinario iniciar a consulta sem voltar para a agenda.
 - [x] Ao iniciar consulta pela agenda ou pela lista de consultas, preencher pet,
       tutor, veterinario, tipo e motivo a partir do agendamento.
-- [ ] Trocar o campo `Retorno em dias` por fluxo de `Agendar retorno`, abrindo a
+- [x] Trocar o campo `Retorno em dias` por fluxo de `Agendar retorno`, abrindo a
       agenda com contexto do pet/consulta para escolher dia e horario livre.
+      Implementado na branch de 2026-05-17: o botao leva para a agenda com
+      pet, tutor, consulta, tipo `retorno` e motivo preenchidos.
 - [ ] Ampliar catalogo veterinario de produtos/medicamentos com bulas, resumo de
       uso clinico e dados para prescricao.
 - [ ] Ajustar calculadora de dose para usar primeiro o peso informado na
@@ -147,11 +149,13 @@ entrar no cronograma sem se perderem.
       inicio/fim de consulta, duracao, custos e relatorios.
       Ajuste imediato feito: a lista de consultas passou a exibir
       `inicio_atendimento` quando existir, em vez de depender de `created_at`.
-- [ ] Revisar fechamento da consulta: manter `Salvar rascunho` editavel,
+- [x] Revisar fechamento da consulta: manter `Salvar rascunho` editavel,
       diferenciar finalizacao/assinatura e remover redundancias de `Dar alta`.
-- [ ] Criar botao `Internacao` ao fim da consulta para abrir o modulo de
+      Ajuste feito: removido o botao duplicado `Dar alta / finalizar`.
+- [x] Criar botao `Internacao` ao fim da consulta para abrir o modulo de
       internacao ja vinculado, preservando a sequencia chegada -> consulta ->
-      internacao -> alta.
+      internacao -> alta. O link ja abre a nova internacao com pet, tutor,
+      consulta e motivo inicial preenchidos.
 
 ## Frente 2 - Padronizacao visual do Veterinario
 

@@ -15,6 +15,9 @@ export function useVetAgenda() {
   const novoPetIdQuery = searchParams.get("novo_pet_id") || "";
   const tutorIdQuery = searchParams.get("tutor_id") || "";
   const tutorNomeQuery = searchParams.get("tutor_nome") || "";
+  const tipoQuery = searchParams.get("tipo") || "";
+  const motivoQuery = searchParams.get("motivo") || "";
+  const dataQuery = searchParams.get("data") || "";
   const [dataRef, setDataRef] = useState(new Date());
   const [modo, setModo] = useState("dia");
   const [agendamentos, setAgendamentos] = useState([]);
@@ -101,7 +104,10 @@ export function useVetAgenda() {
 
   useAgendaApoios({
     abrirNovoQuery,
+    dataQuery,
+    dataRef,
     formNovoData: formNovo.data,
+    motivoQuery,
     novoAberto,
     novoPetIdQuery,
     petsDoTutor,
@@ -119,6 +125,7 @@ export function useVetAgenda() {
     tutorIdQuery,
     tutorNomeQuery,
     tutorSelecionado,
+    tipoQuery,
   });
 
   function selecionarTutorNovoAgendamento(tutor) {

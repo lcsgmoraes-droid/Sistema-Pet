@@ -1,3 +1,5 @@
+import { CalendarPlus } from "lucide-react";
+
 import { css } from "./consultaFormUtils";
 
 function campo(label, obrigatorio = false) {
@@ -14,8 +16,10 @@ function campo(label, obrigatorio = false) {
 }
 
 export default function DiagnosticoBasicoSection({
+  consultaIdAtual,
   modoSomenteLeitura,
   form,
+  onAgendarRetorno,
   setCampo,
 }) {
   return (
@@ -33,10 +37,21 @@ export default function DiagnosticoBasicoSection({
       {campo("Tratamento prescrito")(
         <textarea value={form.tratamento} onChange={(e) => setCampo("tratamento", e.target.value)} className={css.textarea} placeholder="Protocolo terapêutico, cuidados em casa..." />
       )}
-      <div className="grid grid-cols-2 gap-3">
-        {campo("Retorno em (dias)")(
-          <input type="number" value={form.retorno_em_dias} onChange={(e) => setCampo("retorno_em_dias", e.target.value)} className={css.input} placeholder="ex: 15" />
-        )}
+      <div className="rounded-lg border border-blue-100 bg-blue-50 px-4 py-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-sm font-medium text-gray-700">Retorno</p>
+          <p className="text-xs text-gray-500">Escolha o dia e horario livre na agenda.</p>
+        </div>
+        <button
+          type="button"
+          onClick={onAgendarRetorno}
+          disabled={!consultaIdAtual || modoSomenteLeitura}
+          className="inline-flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white px-4 py-2 text-sm font-medium text-blue-700 hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
+          title={!consultaIdAtual ? "Salve a consulta em rascunho antes de agendar retorno" : ""}
+        >
+          <CalendarPlus size={16} />
+          Agendar retorno
+        </button>
       </div>
       {campo("Observações adicionais")(
         <textarea value={form.observacoes} onChange={(e) => setCampo("observacoes", e.target.value)} className={css.textarea} placeholder="Observações para o tutor, cuidados especiais..." />

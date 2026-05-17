@@ -69,6 +69,7 @@ function DiagnosticoStep({ consulta }) {
       medicamentosCatalogo={consulta.medicamentosCatalogo}
       procedimentosCatalogo={consulta.procedimentosCatalogo}
       consultaIdAtual={consulta.consultaIdAtual}
+      onAgendarRetorno={consulta.agendarRetornoConsulta}
       timelineConsulta={consulta.timelineConsulta}
       carregandoTimeline={consulta.carregandoTimeline}
       adicionarItem={consulta.adicionarItem}

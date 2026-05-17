@@ -11,6 +11,7 @@ export default function DiagnosticoTratamentoSection({
   medicamentosCatalogo,
   procedimentosCatalogo,
   consultaIdAtual,
+  onAgendarRetorno,
   timelineConsulta,
   carregandoTimeline,
   adicionarItem,
@@ -30,8 +31,10 @@ export default function DiagnosticoTratamentoSection({
   return (
     <div className="space-y-4">
       <DiagnosticoBasicoSection
+        consultaIdAtual={consultaIdAtual}
         modoSomenteLeitura={modoSomenteLeitura}
         form={form}
+        onAgendarRetorno={onAgendarRetorno}
         setCampo={setCampo}
       />
 

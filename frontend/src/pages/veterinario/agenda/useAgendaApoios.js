@@ -2,10 +2,14 @@ import { useEffect } from "react";
 
 import { api } from "../../../services/api";
 import { vetApi } from "../vetApi";
+import { aplicarDefaultsQueryAgenda } from "./agendaQueryDefaults";
 
 export function useAgendaApoios({
   abrirNovoQuery,
+  dataQuery,
+  dataRef,
   formNovoData,
+  motivoQuery,
   novoAberto,
   novoPetIdQuery,
   petsDoTutor,
@@ -23,11 +27,33 @@ export function useAgendaApoios({
   tutorIdQuery,
   tutorNomeQuery,
   tutorSelecionado,
+  tipoQuery,
 }) {
   useEffect(() => {
     if (!abrirNovoQuery) return;
     setNovoAberto(true);
   }, [abrirNovoQuery, setNovoAberto]);
+
+  useEffect(() => {
+    if (!abrirNovoQuery || !novoAberto) return;
+    setFormNovo((prev) =>
+      aplicarDefaultsQueryAgenda({
+        formAtual: prev,
+        dataBase: dataRef,
+        dataQuery,
+        motivoQuery,
+        tipoQuery,
+      })
+    );
+  }, [
+    abrirNovoQuery,
+    dataQuery,
+    dataRef,
+    motivoQuery,
+    novoAberto,
+    setFormNovo,
+    tipoQuery,
+  ]);
 
   useEffect(() => {
     let ativo = true;

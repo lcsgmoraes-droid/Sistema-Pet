@@ -71,9 +71,12 @@ export default function VetConsultaForm() {
         totalEtapas={ETAPAS.length}
         salvando={consulta.salvando}
         diagnosticoPreenchido={Boolean(consulta.form.diagnostico)}
+        consultaIdAtual={consulta.consultaIdAtual}
         onCancel={() => consulta.navigate(-1)}
         onVoltarConsultas={() => consulta.navigate("/veterinario/consultas")}
         onVoltarEtapa={() => consulta.setEtapa((e) => e - 1)}
+        onAgendarRetorno={consulta.agendarRetornoConsulta}
+        onAbrirInternacao={consulta.abrirInternacaoConsulta}
         onSalvarRascunho={consulta.salvarRascunho}
         onSalvarAssinar={consulta.finalizar}
         onFinalizar={consulta.finalizar}

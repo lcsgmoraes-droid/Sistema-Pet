@@ -15,6 +15,7 @@ export default function useInternacoesController() {
   const abrirNovaQuery = searchParams.get("abrir_nova") === "1";
   const novoPetIdQuery = searchParams.get("novo_pet_id") || "";
   const consultaIdQuery = searchParams.get("consulta_id") || "";
+  const motivoQuery = searchParams.get("motivo") || "";
   const tutorIdQuery = searchParams.get("tutor_id") || "";
   const tutorNomeQuery = searchParams.get("tutor_nome") || "";
   const state = useInternacoesState();
@@ -23,6 +24,7 @@ export default function useInternacoesController() {
 
   useInternacoesQueryEffects({
     abrirNovaQuery,
+    motivoQuery,
     novoPetIdQuery,
     setFormNova: state.setFormNova,
     setModalNova: state.setModalNova,
