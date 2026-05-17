@@ -243,6 +243,7 @@ Ja feito:
 - [x] Alertas Ops criticos possuem notifier externo opcional por webhook configuravel via env, com payload minimo e deduplicacao local em JSONL.
 - [x] Script `scripts/test_ops_alert_webhook.py` valida disparo controlado do notifier sem imprimir a URL secreta do webhook.
 - [x] `docker-compose.prod.yml` repassa `OPS_ALERT_*` para o container backend quando o secret existir no `.env` seguro do servidor.
+- [x] PR #108 deployado em producao no commit `9ca4f5dd`; container backend recebeu as chaves `OPS_ALERT_*`, health publico `ok` e watchdog `healthy`.
 
 Falta para 10/10:
 
@@ -360,6 +361,7 @@ Proxima acao concreta:
 | #82 | Observabilidade/auditoria | Notifier externo opcional para alertas Ops criticos |
 | #83 | Observabilidade/auditoria | Script de teste controlado do notifier Ops |
 | #108 | Observabilidade/auditoria | Compose de producao repassa webhook real de alertas Ops para o backend |
+| #109 | Observabilidade/auditoria/seguranca operacional | Evidencia do deploy do webhook Ops no guia vivo |
 | #84 | Portabilidade/configuracao | Check seguro de ambiente DEV e guia de correcao |
 | #85 | Portabilidade/configuracao | Bootstrap de PC novo para ambiente DEV |
 | #86 | Portabilidade/configuracao | Fluxo de segundo PC e diagnostico de portas locais |
