@@ -28,6 +28,7 @@ Meta: 10/10 antes de automatizar qualquer deploy de producao.
 | Feito | Rollback operacional simples documentado | `docs/PRODUCAO_ROLLBACK_CHECKLIST.md` |
 | Feito | Checklist de deploy com backup, health e rollback criado | `docs/PRODUCAO_ROLLBACK_CHECKLIST.md` |
 | Feito | Deploy real validado com script seguro, health publico e containers healthy | `scripts/deploy_producao_seguro.sh` |
+| Feito | Deploy oficial registra linha do tempo auditavel por etapa sensivel | `backend/logs/deploy_events.jsonl` |
 
 ## PRs ja juntados
 
@@ -77,5 +78,5 @@ Observacao: apos esse deploy, os PRs #52, #53, #54 e #65 atualizaram apenas GitH
 ## Proximo passo recomendado
 
 1. Em todo proximo deploy real autorizado, repetir `release-check`, script seguro no servidor e validacoes de health/watchdog.
-2. Registrar neste guia o commit deployado, backup operacional e resultado final.
+2. Conferir no painel Ops ou no arquivo `backend/logs/deploy_events.jsonl` os eventos `running`, `success` ou `failed` do deploy.
 3. Manter a `main` protegida pelos checks obrigatorios antes de merge.
