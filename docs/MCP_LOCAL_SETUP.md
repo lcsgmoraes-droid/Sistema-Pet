@@ -9,6 +9,13 @@ Este projeto tem dois servidores MCP locais:
 
 Os ambientes virtuais ficam dentro de `mcp/*/.venv` e nao entram no Git.
 
+Em PC novo, use o bootstrap geral primeiro:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_dev_environment.ps1 -DryRun
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_dev_environment.ps1
+```
+
 Antes do setup, voce pode rodar o diagnostico seguro de ambiente DEV:
 
 ```powershell

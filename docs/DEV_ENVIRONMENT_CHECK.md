@@ -3,6 +3,36 @@
 Use este check quando abrir o projeto em um PC novo, depois de atualizar a
 `main`, ou antes de investigar erro local de setup.
 
+## Bootstrap de PC novo
+
+Para preparar um PC novo com um comando, primeiro veja o plano sem executar:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_dev_environment.ps1 -DryRun
+```
+
+Depois execute o bootstrap:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_dev_environment.ps1
+```
+
+Modo seguro sem baixar pacotes, util para conferencia offline:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_dev_environment.ps1 -NoNetwork
+```
+
+Saida JSON para automacao:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\bootstrap_dev_environment.ps1 -DryRun -Json
+```
+
+O bootstrap chama o check seguro, cria o `.venv` do backend quando faltar,
+instala dependencias do backend, roda `npm ci` no frontend e executa o setup dos
+MCPs locais. Ele nao cria nem imprime secrets.
+
 ## Comando principal
 
 ```powershell
