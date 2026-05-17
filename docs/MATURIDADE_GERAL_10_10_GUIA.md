@@ -363,6 +363,7 @@ Proxima acao concreta:
 | #97 | Testes/CI | Plano E2E minimo do Plano Basico com dados descartaveis |
 | #98 | Seguranca operacional | Usuario operacional `petdeploy` e deploy sem root direto |
 | #99 | Seguranca operacional | Deploy via `petdeploy`, rotacao de SSH/secrets e rollback com responsaveis |
+| #100 | Seguranca operacional | Scripts de backup e restore smoke controlado do banco |
 
 ## Criterio para declarar 10/10 geral
 
