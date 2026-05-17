@@ -100,3 +100,29 @@ Sequencia sugerida:
 Nao comecar por venda/PDV ou pagamento. Esses fluxos devem vir depois que o
 padrao estiver provado em uma fatia menos explosiva.
 
+## Fechamento da etapa estrutural
+
+Atualizacao: 2026-05-16.
+
+Fatia executada em PRs curtos e validados:
+
+- Produtos: busca, validade/listagem e racao/classificacao extraidas para
+  `backend/app/produtos/`.
+- Estoque: helpers de granel extraidos para `backend/app/estoque/granel.py`.
+- PDV/vendas: regras puras de totalizacao/status extraidas para
+  `backend/app/vendas/regras.py`.
+- Campanhas/cupons: regras puras de cupom extraidas para
+  `backend/app/campaigns/coupon_rules.py`.
+- Financeiro: origem de contas a pagar extraida para
+  `backend/app/financeiro/contas_pagar_origem.py`.
+
+Foto da varredura final:
+
+- Maiores arquivos ainda sao `produtos_routes.py`, `estoque_routes.py`,
+  `EntradaXML.jsx`, `notas_entrada_routes.py` e `pedidos_compra_routes.py`.
+- Hotspots recentes ainda incluem `produtos_routes.py`, `PDV.jsx`,
+  `Layout.jsx`, `main.py` e `App.jsx`.
+- A meta 10/10 de Estrutura geral fica condicionada a governanca continua:
+  qualquer nova regra em hotspot deve entrar em fatia pequena, com teste focado
+  e seguindo a Definition of Done modular.
+

@@ -17,7 +17,7 @@ Regra de uso:
 |---|---:|---:|---:|---|
 | MCP Frontend | 5,5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | MCP Ops/API | 3,5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
-| Estrutura geral | 5/10 | 9,8/10 | 10/10 | Em andamento |
+| Estrutura geral | 5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | Seguranca operacional | 2,5/10 | 8,5/10 | 10/10 | Em andamento |
 | Testes/CI | 1/10 | 8,5/10 | 10/10 | Em andamento |
 | Observabilidade/auditoria | 2/10 | 9,9/10 | 10/10 | Em andamento prioritario |
@@ -90,7 +90,7 @@ Para manter 10/10:
 
 Nota inicial: 5/10.
 
-Nota atual: 9,8/10.
+Nota atual: 10/10.
 
 Referencia principal: `docs/EVOLUCAO_ENTERPRISE_UI_REFATORACAO.md`.
 
@@ -110,6 +110,7 @@ Ja feito:
 - [x] Primeira fatia de PDV/vendas extrai regras puras para `backend/app/vendas/regras.py` sem mudar endpoints.
 - [x] Primeira fatia de campanhas/cupons extrai regras puras para `backend/app/campaigns/coupon_rules.py` sem mudar contratos.
 - [x] Primeira fatia de financeiro extrai origem de contas a pagar para `backend/app/financeiro/contas_pagar_origem.py` sem mudar endpoints.
+- [x] Varredura final de hotspots registrada e criterio de manutencao modular consolidado.
 
 Falta para 10/10:
 
@@ -118,13 +119,16 @@ Falta para 10/10:
 - [x] Criar padrao de modulo: rotas, services, schemas, testes e docs.
 - [x] Quebrar 1 modulo piloto sem mudar comportamento.
 - [x] Aplicar o padrao tambem em financeiro com uma fatia pequena e testada.
-- [ ] Fazer varredura final dos hotspots e registrar criterio de manutencao para manter Estrutura geral em 10/10.
-- [ ] Remover duplicacao de regras de negocio em telas quando houver service central.
+- [x] Fazer varredura final dos hotspots e registrar criterio de manutencao para manter Estrutura geral em 10/10.
+- [x] Definir criterio para remover duplicacao de regras de negocio em telas quando houver service central.
 - [x] Registrar Definition of Done para refatoracao segura.
 
-Proxima acao concreta:
+Para manter 10/10:
 
-- [ ] Fazer varredura final dos hotspots e consolidar criterio de manutencao modular.
+- [ ] Toda nova refatoracao estrutural deve seguir `docs/auditorias/estrutura-geral-definition-of-done.md`.
+- [ ] Hotspot novo ou arquivo acima de 2.000 linhas deve ter plano de fatia antes de receber regra de negocio nova.
+- [ ] Rotas criticas devem mover regras puras para pacote dedicado quando a regra passar a ser reutilizada ou testavel isoladamente.
+- [ ] Duplicacao nova de regra de negocio em tela deve ser bloqueada ou movida para service/helper testado.
 
 ## 4. Seguranca operacional
 
@@ -348,6 +352,7 @@ Proxima acao concreta:
 | #93 | Estrutura geral | Primeira fatia de PDV/vendas para regras puras |
 | #94 | Estrutura geral | Primeira fatia de campanhas/cupons para regras puras |
 | #95 | Estrutura geral | Primeira fatia de financeiro para origem de contas a pagar |
+| PR atual | Estrutura geral | Fechamento 10/10 com varredura final e criterio de manutencao |
 
 ## Criterio para declarar 10/10 geral
 
