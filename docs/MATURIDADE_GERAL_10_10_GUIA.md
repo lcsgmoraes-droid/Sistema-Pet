@@ -344,7 +344,7 @@ Proxima acao concreta:
 | #91 | Estrutura geral | Terceira fatia piloto de Produtos para racao/classificacao |
 | #92 | Estrutura geral | Primeira fatia de Estoque para granel |
 | #93 | Estrutura geral | Primeira fatia de PDV/vendas para regras puras |
-| PR atual | Estrutura geral | Primeira fatia de campanhas/cupons para regras puras |
+| #94 | Estrutura geral | Primeira fatia de campanhas/cupons para regras puras |
 
 ## Criterio para declarar 10/10 geral
 
