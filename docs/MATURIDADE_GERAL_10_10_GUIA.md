@@ -361,7 +361,7 @@ Proxima acao concreta:
 | #96 | Estrutura geral | Fechamento 10/10 com varredura final e criterio de manutencao |
 | #97 | Testes/CI | Plano E2E minimo do Plano Basico com dados descartaveis |
 | #98 | Seguranca operacional | Usuario operacional `petdeploy` e deploy sem root direto |
-| PR atual | Seguranca operacional | Deploy via `petdeploy`, rotacao de SSH/secrets e rollback com responsaveis |
+| #99 | Seguranca operacional | Deploy via `petdeploy`, rotacao de SSH/secrets e rollback com responsaveis |
 
 ## Criterio para declarar 10/10 geral
 
