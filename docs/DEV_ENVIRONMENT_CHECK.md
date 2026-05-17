@@ -66,7 +66,35 @@ powershell -ExecutionPolicy Bypass -File .\scripts\check_dev_environment.ps1 -St
 - Estado da branch atual e quantidade de alteracoes locais.
 - Autenticacao do GitHub CLI, exceto quando usar `-NoNetwork`.
 - Docker daemon e Docker Compose.
+- Portas locais padrao: backend `8000`, frontend `5173` e PostgreSQL DEV `5433`.
 - `.venv` do backend, `node_modules` do frontend e `.venv` dos MCPs.
+
+## Fluxo para segundo computador
+
+Sempre que trocar de computador:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\git_check_updates.ps1
+```
+
+Se a `main` local estiver atrasada, comece a proxima tarefa pelo script oficial:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File .\scripts\git_start_task.ps1 -Tipo feat -Nome "nome da tarefa"
+```
+
+Ele atualiza a `main` antes de criar a branch. Evite trabalhar direto na
+`main` e nao force `git pull` por cima de alteracoes locais.
+
+## Portas locais
+
+| Porta | Uso padrao | Quando estiver ocupada |
+|---:|---|---|
+| `8000` | Backend FastAPI local | Se o DEV nao estiver rodando, pare o processo/container que usa `8000` antes do compose local. |
+| `5173` | Frontend Vite local | O Vite tem `strictPort: false` e pode usar `5174`; confira a URL exibida no terminal. |
+| `5433` | PostgreSQL DEV no host | Se o DEV nao estiver rodando, libere `5433` ou ajuste somente o compose local conscientemente. |
+
+O backend DEV ja permite origens `5173` e `5174` no compose local.
 
 ## Regra de seguranca
 

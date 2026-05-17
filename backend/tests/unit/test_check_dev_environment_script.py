@@ -71,5 +71,7 @@ def test_check_dev_environment_json_is_structured_and_redacts_secret_values():
         "project.env_file",
         "git.working_tree",
         "network.github_auth",
+        "ports.backend",
+        "ports.frontend",
+        "ports.postgres",
     }.issubset(check_ids)
-
