@@ -1,3 +1,5 @@
+import AutocompleteSelect from "../../../components/ui/AutocompleteSelect";
+
 export default function CalculadoraDoseFields({
   css,
   petSelecionadoLabel,
@@ -26,24 +28,22 @@ export default function CalculadoraDoseFields({
       </div>
       <div className="md:col-span-2">
         <label className="mb-1 block text-xs font-medium text-gray-600">Medicamento</label>
-        <select
+        <AutocompleteSelect
           value={calculadoraForm.medicamento_id}
-          onChange={(e) => {
+          onChange={(medicamentoId) => {
             setCalculadoraForm((prev) => ({
               ...prev,
-              medicamento_id: e.target.value,
+              medicamento_id: medicamentoId,
               dose_mg_kg: "",
             }));
           }}
-          className={css.select}
-        >
-          <option value="">Selecione...</option>
-          {medicamentosCatalogo.map((med) => (
-            <option key={med.id} value={med.id}>
-              {med.nome}
-            </option>
-          ))}
-        </select>
+          options={medicamentosCatalogo}
+          getOptionLabel={(med) => med.nome}
+          getOptionMeta={(med) => [med.principio_ativo, med.via_administracao].filter(Boolean).join(" - ")}
+          placeholder="Digite para buscar medicamento..."
+          emptyLabel="Nenhum medicamento encontrado"
+          showLabel={false}
+        />
       </div>
       <div>
         <label className="mb-1 block text-xs font-medium text-gray-600">Dose (mg/kg)</label>

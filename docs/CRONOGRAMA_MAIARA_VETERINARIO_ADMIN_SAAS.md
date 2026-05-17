@@ -165,6 +165,9 @@ entrar no cronograma sem se perderem.
 - [x] Ao salvar rascunho da consulta, exibir modal de confirmacao visivel mesmo
       no fim da tela, com acoes para continuar editando, ir para o topo ou sair
       para a lista de consultas.
+- [x] Trocar os campos de selecao do fluxo de consulta veterinaria por
+      autocomplete digitavel: veterinario, sinais vitais, prognostico, exames,
+      medicamentos, via, procedimentos e calculadora de dose.
 - [ ] Ampliar a base padrao de procedimentos veterinarios e seus insumos.
 - [ ] Revisar padrao de horario do modulo veterinario e do sistema: usar
       Brasilia na exibicao e/ou UTC persistido de forma consistente, com foco em

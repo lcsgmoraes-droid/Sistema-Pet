@@ -1,12 +1,7 @@
 import { ChevronDown, Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-function normalizarTexto(valor) {
-  return String(valor || "")
-    .normalize("NFD")
-    .replace(/[\u0300-\u036f]/g, "")
-    .toLocaleLowerCase("pt-BR");
-}
+import { filtrarOpcoesAutocomplete } from "./autocompleteSelectUtils";
 
 export default function AutocompleteSelect({
   allowClear = true,
@@ -58,19 +53,18 @@ export default function AutocompleteSelect({
     return () => document.removeEventListener("mousedown", handleClickFora);
   }, []);
 
-  const opcoesFiltradas = useMemo(() => {
-    const consulta = normalizarTexto(termo);
-    const base = consulta
-      ? options.filter((option) => {
-          const textoBusca =
-            getOptionSearchText?.(option) ||
-            [getOptionLabel(option), getOptionMeta?.(option)].filter(Boolean).join(" ");
-          return normalizarTexto(textoBusca).includes(consulta);
-        })
-      : options;
-
-    return base.slice(0, maxOptions);
-  }, [getOptionLabel, getOptionMeta, getOptionSearchText, maxOptions, options, termo]);
+  const opcoesFiltradas = useMemo(
+    () =>
+      filtrarOpcoesAutocomplete({
+        termo,
+        options,
+        getOptionLabel,
+        getOptionMeta,
+        getOptionSearchText,
+        maxOptions,
+      }),
+    [getOptionLabel, getOptionMeta, getOptionSearchText, maxOptions, options, termo],
+  );
 
   const selecionar = (option) => {
     setTermo(getOptionLabel(option));
@@ -94,6 +88,18 @@ export default function AutocompleteSelect({
     }
   };
 
+  const handleInputKeyDown = (event) => {
+    if (event.key === "Escape") {
+      setAberto(false);
+      return;
+    }
+
+    if (event.key === "Enter" && aberto && opcoesFiltradas.length > 0) {
+      event.preventDefault();
+      selecionar(opcoesFiltradas[0]);
+    }
+  };
+
   return (
     <div className={`relative ${className}`.trim()} ref={containerRef}>
       {showLabel && label ? (
@@ -106,6 +112,7 @@ export default function AutocompleteSelect({
           type="text"
           value={termo}
           onChange={handleInputChange}
+          onKeyDown={handleInputKeyDown}
           onFocus={() => setAberto(true)}
           placeholder={searchPlaceholder || placeholder}
           disabled={disabled}
