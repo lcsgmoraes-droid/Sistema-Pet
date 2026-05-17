@@ -47,6 +47,7 @@ export default function VetInternacoes() {
         internacoes={internacoes.internacoes}
         internacoesOrdenadas={internacoes.internacoesOrdenadas}
         mapaInternacao={internacoes.mapaInternacao}
+        medicamentosCatalogo={internacoes.medicamentosCatalogo}
         onAbrirAlta={internacoes.setModalAlta}
         onAbrirDetalhe={internacoes.abrirDetalhe}
         onAbrirEvolucao={internacoes.setModalEvolucao}
@@ -60,6 +61,7 @@ export default function VetInternacoes() {
         onRemoverProcedimentoAgenda={internacoes.removerProcedimentoAgenda}
         onSelecionarInternacaoMapa={internacoes.selecionarInternacaoNoMapa}
         procedimentosInternacao={internacoes.procedimentosInternacao}
+        procedimentosCatalogo={internacoes.procedimentosCatalogo}
         salvando={internacoes.salvando}
         setAgendaForm={internacoes.setAgendaForm}
         setTotalBaias={internacoes.setTotalBaias}

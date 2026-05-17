@@ -1,5 +1,5 @@
 import { vetApi } from "../vetApi";
-import { buildConsultaPayload } from "./consultaFormState";
+import { buildConsultaPayload, buildRascunhoItensConsultaPayload } from "./consultaFormState";
 import { ETAPAS } from "./consultaFormUtils";
 
 export default function useConsultaRascunhoActions({
@@ -56,15 +56,23 @@ export default function useConsultaRascunhoActions({
         agendamentoIdQuery,
       });
 
+      let consultaIdParaSalvar = consultaIdAtual;
+
       if (!consultaIdAtual) {
         const res = await vetApi.criarConsulta(payload);
         const novoId = res.data.id;
         await vetApi.atualizarConsulta(novoId, payload);
+        consultaIdParaSalvar = novoId;
         setConsultaIdAtual(novoId);
         navigate(`/veterinario/consultas/${novoId}`, { replace: true });
       } else {
         await vetApi.atualizarConsulta(consultaIdAtual, payload);
       }
+
+      await vetApi.sincronizarRascunhoConsulta(
+        consultaIdParaSalvar,
+        buildRascunhoItensConsultaPayload(form)
+      );
 
       setSucesso(
         etapa < ETAPAS.length - 1

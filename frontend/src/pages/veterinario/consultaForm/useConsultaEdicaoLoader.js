@@ -1,7 +1,11 @@
 import { useEffect, useState } from "react";
 
 import { vetApi } from "../vetApi";
-import { mapConsultaParaForm } from "./consultaFormState";
+import {
+  mapConsultaParaForm,
+  mapPrescricoesParaForm,
+  mapProcedimentosParaForm,
+} from "./consultaFormMappers";
 
 export default function useConsultaEdicaoLoader({
   isEdicao,
@@ -14,15 +18,32 @@ export default function useConsultaEdicaoLoader({
 
   useEffect(() => {
     if (!isEdicao) return;
-    vetApi
-      .obterConsulta(consultaId)
-      .then((res) => {
+
+    async function carregarConsulta() {
+      try {
+        const res = await vetApi.obterConsulta(consultaId);
         const consulta = res.data;
-        setForm((prev) => ({ ...prev, ...mapConsultaParaForm(consulta) }));
-        if (consulta.status === "finalizada") setFinalizado(true);
-      })
-      .catch(() => setErro("Não foi possível carregar a consulta."))
-      .finally(() => setCarregando(false));
+        const formConsulta = mapConsultaParaForm(consulta);
+
+        if (consulta.status === "finalizada") {
+          const [prescricoesRes, procedimentosRes] = await Promise.all([
+            vetApi.listarPrescricoes(consultaId),
+            vetApi.listarProcedimentosConsulta(consultaId),
+          ]);
+          formConsulta.prescricao_itens = mapPrescricoesParaForm(prescricoesRes.data);
+          formConsulta.procedimentos_realizados = mapProcedimentosParaForm(procedimentosRes.data);
+          setFinalizado(true);
+        }
+
+        setForm((prev) => ({ ...prev, ...formConsulta }));
+      } catch {
+        setErro("Nao foi possivel carregar a consulta.");
+      } finally {
+        setCarregando(false);
+      }
+    }
+
+    carregarConsulta();
   }, [consultaId, isEdicao, setErro, setForm]);
 
   return {

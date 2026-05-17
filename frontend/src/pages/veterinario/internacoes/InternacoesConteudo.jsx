@@ -20,6 +20,7 @@ export default function InternacoesConteudo({
   internacoes,
   internacoesOrdenadas,
   mapaInternacao,
+  medicamentosCatalogo,
   onAbrirAlta,
   onAbrirDetalhe,
   onAbrirEvolucao,
@@ -33,6 +34,7 @@ export default function InternacoesConteudo({
   onRemoverProcedimentoAgenda,
   onSelecionarInternacaoMapa,
   procedimentosInternacao,
+  procedimentosCatalogo,
   salvando,
   setAgendaForm,
   setTotalBaias,
@@ -93,6 +95,8 @@ export default function InternacoesConteudo({
           setAgendaForm={setAgendaForm}
           internacoesOrdenadas={internacoesOrdenadas}
           internacaoSelecionadaAgenda={internacaoSelecionadaAgenda}
+          medicamentosCatalogo={medicamentosCatalogo}
+          procedimentosCatalogo={procedimentosCatalogo}
           agendaCarregando={agendaCarregando}
           agendaOrdenada={agendaOrdenada}
           internacaoPorId={internacaoPorId}

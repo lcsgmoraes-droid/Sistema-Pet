@@ -32,10 +32,67 @@ from .veterinario_models import (
     ProcedimentoConsulta,
     VacinaRegistro,
 )
-from .veterinario_schemas import ConsultaCreate, ConsultaResponse, ConsultaUpdate, PrescricaoCreate, PrescricaoResponse
+from .veterinario_schemas import (
+    ConsultaCreate,
+    ConsultaRascunhoItensSync,
+    ConsultaResponse,
+    ConsultaUpdate,
+    PrescricaoCreate,
+    PrescricaoResponse,
+)
 from .veterinario_serializers import _consulta_to_dict, _hash_prontuario_consulta, _prescricao_to_dict
 
 router = APIRouter()
+
+
+def _texto_limpo(valor) -> Optional[str]:
+    if valor is None:
+        return None
+    texto = str(valor).strip()
+    return texto or None
+
+
+def _sanitizar_prescricao_rascunho(itens: list[dict]) -> list[dict]:
+    itens_limpos: list[dict] = []
+    for item in itens or []:
+        if not isinstance(item, dict):
+            continue
+        nome = _texto_limpo(item.get("nome"))
+        if not nome:
+            continue
+        itens_limpos.append({
+            "medicamento_id": item.get("medicamento_id") or "",
+            "nome": nome,
+            "principio_ativo": _texto_limpo(item.get("principio_ativo")) or "",
+            "dose_mg": _texto_limpo(item.get("dose_mg")) or "",
+            "unidade": _texto_limpo(item.get("unidade")) or "mg",
+            "dose_minima_mg_kg": item.get("dose_minima_mg_kg") or "",
+            "dose_maxima_mg_kg": item.get("dose_maxima_mg_kg") or "",
+            "frequencia": _texto_limpo(item.get("frequencia")) or "",
+            "duracao_dias": item.get("duracao_dias") or "",
+            "via": _texto_limpo(item.get("via")) or "oral",
+            "instrucoes": _texto_limpo(item.get("instrucoes")) or "",
+        })
+    return itens_limpos
+
+
+def _sanitizar_procedimentos_rascunho(itens: list[dict]) -> list[dict]:
+    itens_limpos: list[dict] = []
+    for item in itens or []:
+        if not isinstance(item, dict):
+            continue
+        nome = _texto_limpo(item.get("nome"))
+        if not nome:
+            continue
+        itens_limpos.append({
+            "catalogo_id": item.get("catalogo_id") or "",
+            "nome": nome,
+            "descricao": _texto_limpo(item.get("descricao")) or "",
+            "valor": item.get("valor") or "",
+            "observacoes": _texto_limpo(item.get("observacoes")) or "",
+            "baixar_estoque": item.get("baixar_estoque") is not False,
+        })
+    return itens_limpos
 
 
 @router.get("/consultas", response_model=List[ConsultaResponse])
@@ -338,6 +395,26 @@ def atualizar_consulta(
         if pet:
             pet.peso = body.peso_consulta
 
+    db.commit()
+    db.refresh(c)
+    return _consulta_to_dict(c)
+
+
+@router.put("/consultas/{consulta_id}/rascunho-itens", response_model=ConsultaResponse)
+def sincronizar_rascunho_itens_consulta(
+    consulta_id: int,
+    body: ConsultaRascunhoItensSync,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    c = _consulta_or_404(db, consulta_id, tenant_id)
+
+    if c.status == "finalizada":
+        raise HTTPException(400, "Consulta finalizada nao pode receber rascunho")
+
+    c.prescricao_rascunho = _sanitizar_prescricao_rascunho(body.prescricao_itens)
+    c.procedimentos_rascunho = _sanitizar_procedimentos_rascunho(body.procedimentos_realizados)
     db.commit()
     db.refresh(c)
     return _consulta_to_dict(c)

@@ -40,6 +40,9 @@ export function buildAgendarRetornoConsultaLink({
   const baseMotivo = limitarResumo(resumoClinico(form));
   params.set("abrir_novo", "1");
   params.set("tipo", "retorno");
+  if (consultaIdAtual || params.get("consulta_id")) {
+    params.set("return_to", `/veterinario/consultas/${consultaIdAtual || params.get("consulta_id")}`);
+  }
   params.set(
     "motivo",
     baseMotivo

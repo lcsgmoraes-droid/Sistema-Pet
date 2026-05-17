@@ -17,4 +17,5 @@ export {
   buildInsumoProcedimentoPayload,
   buildItensPrescricao,
   buildNovoExamePayload,
+  buildRascunhoItensConsultaPayload,
 } from "./consultaFormPayloads";

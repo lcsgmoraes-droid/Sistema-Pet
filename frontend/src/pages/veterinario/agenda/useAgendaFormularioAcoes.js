@@ -15,7 +15,9 @@ export function useAgendaFormularioAcoes({
   conflitoHorarioSelecionado,
   dataRef,
   formNovo,
+  navigate,
   petSelecionadoModal,
+  returnToQuery,
   setAgendaDiaModal,
   setAgendamentoEditandoId,
   setAgendamentoSelecionado,
@@ -35,6 +37,14 @@ export function useAgendaFormularioAcoes({
   tutorSelecionado,
   consultorioInlineForm,
 }) {
+  function voltarParaOrigemSeExistir() {
+    if (returnToQuery && String(returnToQuery).startsWith("/veterinario/consultas/")) {
+      navigate(returnToQuery, { replace: true });
+      return true;
+    }
+    return false;
+  }
+
   const abrirModalNovo = useCallback(
     (dataBase = dataRef, agendamentoBase = null) => {
       setErro(null);
@@ -127,6 +137,7 @@ export function useAgendaFormularioAcoes({
       setAgendaDiaModal([]);
       setFormNovo(FORM_NOVO_INICIAL);
       await carregar();
+      voltarParaOrigemSeExistir();
     } catch (e) {
       setErroNovo(e?.response?.data?.detail ?? "Erro ao criar agendamento.");
     } finally {
@@ -139,7 +150,9 @@ export function useAgendaFormularioAcoes({
     carregar,
     conflitoHorarioSelecionado,
     formNovo,
+    navigate,
     petSelecionadoModal?.cliente_id,
+    returnToQuery,
     setAgendaDiaModal,
     setAgendamentoEditandoId,
     setConsultorioInlineAberto,
@@ -165,7 +178,10 @@ export function useAgendaFormularioAcoes({
     setPetsDoTutor([]);
     setAgendaDiaModal([]);
     setFormNovo(FORM_NOVO_INICIAL);
+    voltarParaOrigemSeExistir();
   }, [
+    navigate,
+    returnToQuery,
     setAgendaDiaModal,
     setAgendamentoEditandoId,
     setConsultorioInlineAberto,

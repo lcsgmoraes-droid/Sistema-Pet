@@ -70,6 +70,7 @@ export default function useVetConsultaFormController() {
     form: state.form,
     setForm: state.setForm,
     medicamentosCatalogo,
+    petSelecionado: selecaoTutorPet.petSelecionado,
     procedimentosCatalogo,
     setErro: state.setErro,
   });
