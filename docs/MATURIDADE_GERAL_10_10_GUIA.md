@@ -338,7 +338,7 @@ Proxima acao concreta:
 | #88 | Estrutura geral | Definition of Done para refatoracao modular |
 | #89 | Estrutura geral | Primeira fatia piloto de Produtos sem mudar contrato |
 | #90 | Estrutura geral | Segunda fatia piloto de Produtos para validade/listagem |
-| PR atual | Estrutura geral | Terceira fatia piloto de Produtos para racao/classificacao |
+| #91 | Estrutura geral | Terceira fatia piloto de Produtos para racao/classificacao |
 
 ## Criterio para declarar 10/10 geral
 
