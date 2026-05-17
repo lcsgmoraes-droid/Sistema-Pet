@@ -358,6 +358,7 @@ Para manter 10/10:
 | #38 | Produto/docs | Checklist pos-deploy do Plano Basico atualizado |
 | #67 | Documentacao | Docs enterprise/UI/refatoracao consolidados |
 | #68 | Documentacao/governanca | Plano mestre de maturidade geral criado |
+| #112 | Documentacao | Fechamento 10/10 com README limpo, indice oficial e padrao de evidencia |
 | #69 | Observabilidade/auditoria | `request_id` seguro e log HTTP estruturado |
 | #70 | Observabilidade/auditoria | Auditoria de negocio para cupom, desconto manual e reabertura |
 | #71 | Observabilidade/auditoria | Auditoria de acesso, login e configuracoes sensiveis |
