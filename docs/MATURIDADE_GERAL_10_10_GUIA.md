@@ -17,7 +17,7 @@ Regra de uso:
 |---|---:|---:|---:|---|
 | MCP Frontend | 5,5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
 | MCP Ops/API | 3,5/10 | 10/10 | 10/10 | Fechado para uso interno profissional |
-| Estrutura geral | 5/10 | 7,8/10 | 10/10 | Em andamento |
+| Estrutura geral | 5/10 | 8,5/10 | 10/10 | Em andamento |
 | Seguranca operacional | 2,5/10 | 8,5/10 | 10/10 | Em andamento |
 | Testes/CI | 1/10 | 8,5/10 | 10/10 | Em andamento |
 | Observabilidade/auditoria | 2/10 | 9,9/10 | 10/10 | Em andamento prioritario |
@@ -90,7 +90,7 @@ Para manter 10/10:
 
 Nota inicial: 5/10.
 
-Nota atual: 7,8/10.
+Nota atual: 8,5/10.
 
 Referencia principal: `docs/EVOLUCAO_ENTERPRISE_UI_REFATORACAO.md`.
 
@@ -103,20 +103,21 @@ Ja feito:
 - [x] Inventario de estrutura geral criado em `docs/auditorias/estrutura-geral-inventario.md`.
 - [x] Top 10 arquivos de maior risco definidos com primeira fatia recomendada.
 - [x] Definition of Done de refatoracao modular criada em `docs/auditorias/estrutura-geral-definition-of-done.md`.
+- [x] Primeira fatia piloto de Produtos extrai helpers de busca para `backend/app/produtos/search.py` sem mudar endpoints.
 
 Falta para 10/10:
 
 - [x] Inventariar arquivos frontend e backend mais longos e mais alterados.
 - [x] Definir top 10 arquivos de maior risco para quebra gradual.
 - [x] Criar padrao de modulo: rotas, services, schemas, testes e docs.
-- [ ] Quebrar 1 modulo piloto sem mudar comportamento.
+- [x] Quebrar 1 modulo piloto sem mudar comportamento.
 - [ ] Repetir o padrao em PDV/vendas, campanhas/cupons, produtos/estoque e financeiro.
 - [ ] Remover duplicacao de regras de negocio em telas quando houver service central.
 - [x] Registrar Definition of Done para refatoracao segura.
 
 Proxima acao concreta:
 
-- [ ] Quebrar a primeira fatia piloto de Produtos: consultas/listagens puras fora de `backend/app/produtos_routes.py`, sem mudar contrato HTTP.
+- [ ] Repetir o padrao em uma segunda fatia de Produtos/Estoque ou iniciar extracao controlada de filtros/listagem no frontend de Produtos.
 
 ## 4. Seguranca operacional
 
@@ -333,6 +334,7 @@ Proxima acao concreta:
 | #86 | Portabilidade/configuracao | Fluxo de segundo PC e diagnostico de portas locais |
 | #87 | Estrutura geral | Inventario de hotspots e primeira fatia de refatoracao |
 | #88 | Estrutura geral | Definition of Done para refatoracao modular |
+| #89 | Estrutura geral | Primeira fatia piloto de Produtos sem mudar contrato |
 
 ## Criterio para declarar 10/10 geral
 
