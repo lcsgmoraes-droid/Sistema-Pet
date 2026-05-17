@@ -312,7 +312,7 @@ Proxima acao concreta:
 | #76 | Observabilidade/auditoria | Correlacao para jobs criticos do scheduler Bling |
 | #77 | Observabilidade/auditoria | Correlacao para WhatsApp, SEFAZ e e-mail |
 | #78 | Observabilidade/auditoria | Logs estruturados de eventos de negocio |
-| PR atual | Observabilidade/auditoria/seguranca operacional | Linha do tempo auditavel das etapas sensiveis do deploy |
+| #79 | Observabilidade/auditoria/seguranca operacional | Linha do tempo auditavel das etapas sensiveis do deploy |
 
 ## Criterio para declarar 10/10 geral
 
