@@ -22,6 +22,7 @@ from __future__ import annotations
 import argparse
 from datetime import date, datetime, timedelta
 from decimal import Decimal
+from uuid import UUID
 
 from sqlalchemy.orm import Session
 
@@ -37,6 +38,7 @@ from app.veterinario_models import (
     ExameVet,
     VacinaRegistro,
 )
+from app.tenancy.context import clear_tenant_context, set_tenant_context
 from app.utils.logger import logger
 
 
@@ -471,20 +473,25 @@ def run_seed(tenant_id: str | None, with_test_launches: bool) -> None:
         total_tests = 0
 
         for tenant in tenants:
-            user = _primary_user_for_tenant(db, tenant.id)
-            if not user:
-                logger.warning(f"Tenant {tenant.id} sem usuario ativo; seed ignorado.")
-                continue
+            tenant_id = UUID(str(tenant.id))
+            set_tenant_context(tenant_id)
+            try:
+                user = _primary_user_for_tenant(db, tenant.id)
+                if not user:
+                    logger.warning(f"Tenant {tenant.id} sem usuario ativo; seed ignorado.")
+                    continue
 
-            materiais = _upsert_materiais(db, tenant.id, user.id)
-            _upsert_medicamentos(db, tenant.id)
-            _upsert_protocolos(db, tenant.id)
-            _upsert_procedimentos(db, tenant.id, materiais)
+                materiais = _upsert_materiais(db, tenant.id, user.id)
+                _upsert_medicamentos(db, tenant.id)
+                _upsert_protocolos(db, tenant.id)
+                _upsert_procedimentos(db, tenant.id, materiais)
 
-            if with_test_launches:
-                total_tests += _seed_test_launches(db, tenant.id, user.id)
+                if with_test_launches:
+                    total_tests += _seed_test_launches(db, tenant.id, user.id)
 
-            total_tenants += 1
+                total_tenants += 1
+            finally:
+                clear_tenant_context()
 
         db.commit()
         logger.info(f"Seed veterinario concluido. Tenants processados: {total_tenants}.")
