@@ -244,14 +244,15 @@ Ja feito:
 - [x] Script `scripts/test_ops_alert_webhook.py` valida disparo controlado do notifier sem imprimir a URL secreta do webhook.
 - [x] `docker-compose.prod.yml` repassa `OPS_ALERT_*` para o container backend quando o secret existir no `.env` seguro do servidor.
 - [x] PR #108 deployado em producao no commit `9ca4f5dd`; container backend recebeu as chaves `OPS_ALERT_*`, health publico `ok` e watchdog `healthy`.
+- [x] Notifier Ops passa a aceitar e-mail operacional via `OPS_ALERT_EMAIL_TO` quando nao houver webhook configurado.
 
 Falta para 10/10:
 
-- [ ] Configurar a URL real do canal em `OPS_ALERT_WEBHOOK_URL` no `.env` seguro de producao e testar disparo controlado sem expor secrets.
+- [ ] Configurar canal real em `OPS_ALERT_EMAIL_TO` ou `OPS_ALERT_WEBHOOK_URL` no `.env` seguro de producao e testar disparo controlado sem expor secrets.
 
 Proxima acao concreta:
 
-- [ ] Obter a URL real do webhook operacional, configurar no servidor e validar `scripts/test_ops_alert_webhook.py`.
+- [ ] Configurar `OPS_ALERT_EMAIL_TO=prohubml@gmail.com` no servidor e validar `scripts/test_ops_alert_webhook.py`.
 
 ## 7. Portabilidade/configuracao
 
