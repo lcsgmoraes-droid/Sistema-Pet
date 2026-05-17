@@ -381,6 +381,7 @@ Proxima acao concreta:
 | #104 | Testes/CI | Suite E2E longa do Plano Basico com skip seguro por ambiente |
 | #105 | Testes/CI | Smoke E2E controlado do Plano Basico em tenant de teste |
 | #106 | Testes/CI | Migration Smoke no Backend CI com Postgres descartavel |
+| #107 | Testes/CI | Fechamento 10/10 com matriz de cobertura critica e workflow E2E longo |
 
 ## Criterio para declarar 10/10 geral
 
