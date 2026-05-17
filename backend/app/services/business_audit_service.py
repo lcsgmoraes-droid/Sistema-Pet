@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.audit_log import log_action
 from app.middlewares.request_context import get_request_id
+from app.utils.logger import logger as structured_logger
 
 
 _REDACTED = "***REDACTED***"
@@ -182,17 +183,20 @@ def log_business_event(
     details: str | None = None,
     commit: bool = False,
 ):
+    action = _audit_action(event)
+    request_id = get_request_id()
+    redacted_metadata = _redact(metadata or {})
     payload = {
         "event": event,
-        "request_id": get_request_id(),
+        "request_id": request_id,
         "occurred_at": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
-        "metadata": _redact(metadata or {}),
+        "metadata": redacted_metadata,
     }
 
-    return log_action(
+    audit_row = log_action(
         db=db,
         user_id=user_id,
-        action=_audit_action(event),
+        action=action,
         entity_type=entity_type,
         entity_id=entity_id,
         old_value=_redact(old_value or {}) or None,
@@ -201,3 +205,20 @@ def log_business_event(
         tenant_id=tenant_id,
         commit=commit,
     )
+    try:
+        structured_logger.info(
+            "business_event",
+            "Business audit event recorded",
+            business_event=event,
+            request_id=request_id,
+            tenant_id=_to_serializable_id(tenant_id),
+            user_id=user_id,
+            entity_type=entity_type,
+            entity_id=entity_id,
+            action=action,
+            metadata=redacted_metadata,
+            commit=commit,
+        )
+    except Exception:
+        pass
+    return audit_row
