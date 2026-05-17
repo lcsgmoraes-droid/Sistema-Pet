@@ -109,7 +109,7 @@ $env:E2E_TENANT_ID="<tenant-local-ou-staging>"
 .\backend\.venv\Scripts\python.exe -m pytest backend/tests/test_plano_basico_e2e.py -m e2e_long -q
 ```
 
-5. Depois de estabilizar local/staging, criar workflow agendado separado.
+5. Criar workflow agendado separado para a suite longa.
 
 ## Implementacao inicial
 
@@ -121,6 +121,8 @@ Status:
   `E2E_TENANT_ID`, a suite pula com mensagem clara.
 - Contra `mlprohub.com.br`, a suite tambem exige `E2E_ALLOW_PRODUCTION=true`
   para evitar escrita acidental em producao.
+- Workflow manual/agendado criado em `.github/workflows/e2e-long.yml`, fora dos
+  checks obrigatorios de PR.
 
 ## Evidencia de smoke controlado
 
