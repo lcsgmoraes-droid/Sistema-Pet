@@ -26,7 +26,7 @@ test("buildAgendarRetornoConsultaLink monta deep link com pet, tutor, consulta e
   assert.equal(url.searchParams.get("tutor_nome"), "Lucas Guerra");
   assert.equal(url.searchParams.get("tipo"), "retorno");
   assert.equal(url.searchParams.get("motivo"), "Retorno - Inflamacao no intestino");
-  assert.equal(url.searchParams.get("return_to"), "/veterinario/consultas/16");
+  assert.equal(url.searchParams.get("return_to"), "/veterinario/consultas/16?etapa=2");
 });
 
 test("buildAgendarRetornoConsultaLink devolve null sem pet salvo", () => {

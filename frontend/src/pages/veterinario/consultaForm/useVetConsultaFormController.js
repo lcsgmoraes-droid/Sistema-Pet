@@ -1,5 +1,5 @@
-import { useMemo } from "react";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useEffect, useMemo } from "react";
+import { useLocation, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import useCalculadoraDoseConsulta from "./useCalculadoraDoseConsulta";
 import useConsultaAssinatura from "./useConsultaAssinatura";
@@ -11,9 +11,11 @@ import useConsultaPdfDownloads from "./useConsultaPdfDownloads";
 import useConsultaTimeline from "./useConsultaTimeline";
 import usePrescricaoProcedimentosConsulta from "./usePrescricaoProcedimentosConsulta";
 import useTutorPetSelection from "./useTutorPetSelection";
+import { normalizarEtapaConsultaQuery } from "./consultaEtapaQuery";
 
 export default function useVetConsultaFormController() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { consultaId } = useParams();
   const [searchParams] = useSearchParams();
   const isEdicao = Boolean(consultaId);
@@ -23,6 +25,7 @@ export default function useVetConsultaFormController() {
   const tipoQuery = searchParams.get("tipo") || "consulta";
   const tutorIdQuery = searchParams.get("tutor_id") || "";
   const tutorNomeQuery = searchParams.get("tutor_nome") || "";
+  const etapaQuery = searchParams.get("etapa") || "";
   const state = useConsultaFormState(consultaId);
 
   const { pets, setPets, veterinarios, medicamentosCatalogo, procedimentosCatalogo } = useConsultaCatalogos();
@@ -39,6 +42,22 @@ export default function useVetConsultaFormController() {
     : isEdicao
       ? "Continuar consulta"
       : "Nova consulta";
+
+  useEffect(() => {
+    const etapaDestino = normalizarEtapaConsultaQuery(etapaQuery);
+    if (etapaDestino == null) return;
+
+    state.setEtapa(etapaDestino);
+    const params = new URLSearchParams(location.search);
+    params.delete("etapa");
+    navigate(
+      {
+        pathname: location.pathname,
+        search: params.toString() ? `?${params.toString()}` : "",
+      },
+      { replace: true },
+    );
+  }, [consultaId, etapaQuery, location.pathname, location.search, navigate, state.setEtapa]);
 
   const selecaoTutorPet = useTutorPetSelection({
     pets,

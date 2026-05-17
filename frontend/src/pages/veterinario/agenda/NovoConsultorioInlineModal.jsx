@@ -1,8 +1,10 @@
+import { useEffect } from "react";
 import { DoorOpen, X } from "lucide-react";
 
 import ActionButton from "../../../components/ui/ActionButton";
 import IconActionButton from "../../../components/ui/IconActionButton";
 import { TextField } from "../../../components/ui/FormField";
+import { shouldCloseModalWithKeyboardEvent } from "./modalKeyboardUtils";
 
 export default function NovoConsultorioInlineModal({
   erro,
@@ -13,6 +15,19 @@ export default function NovoConsultorioInlineModal({
   onSubmit,
   salvando,
 }) {
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    function handleKeyDown(event) {
+      if (shouldCloseModalWithKeyboardEvent(event)) {
+        onClose();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   function handleSubmit(event) {

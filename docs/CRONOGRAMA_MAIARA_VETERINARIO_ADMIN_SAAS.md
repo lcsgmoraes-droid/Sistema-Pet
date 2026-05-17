@@ -146,6 +146,11 @@ entrar no cronograma sem se perderem.
       com opcao de alterar o retorno.
 - [x] Preservar o horario escolhido na agenda ao exibir retorno dentro da
       consulta, evitando deslocamento de fuso nos agendamentos veterinarios.
+- [x] Corrigir falso conflito de horario livre na agenda quando um retorno
+      gravado pelo banco vinha com timezone e era convertido para outro horario.
+- [x] Ao concluir/cancelar o agendamento de retorno, voltar para a consulta na
+      etapa `Diagnostico / Prescricao`, permitindo continuar o atendimento.
+- [x] Permitir fechar os modais da agenda veterinaria com `Esc`.
 - [x] Se ja existir retorno pendente para a consulta, novo agendamento de
       retorno atualiza o retorno pendente em vez de criar duplicado.
 - [x] Diferenciar visualmente agendamentos do tipo `retorno` na agenda para

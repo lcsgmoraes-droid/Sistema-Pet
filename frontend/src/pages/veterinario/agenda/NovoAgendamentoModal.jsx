@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import { AlertCircle } from "lucide-react";
 
 import NovoAgendamentoAgendaDiaSection from "./NovoAgendamentoAgendaDiaSection";
@@ -5,6 +6,7 @@ import NovoAgendamentoFormSection from "./NovoAgendamentoFormSection";
 import NovoConsultorioInlineModal from "./NovoConsultorioInlineModal";
 import NovoAgendamentoModalFooter from "./NovoAgendamentoModalFooter";
 import NovoAgendamentoModalHeader from "./NovoAgendamentoModalHeader";
+import { shouldCloseModalWithKeyboardEvent } from "./modalKeyboardUtils";
 
 export default function NovoAgendamentoModal({
   isOpen,
@@ -45,6 +47,19 @@ export default function NovoAgendamentoModal({
   onOpenAgendamento,
   onConfirm,
 }) {
+  useEffect(() => {
+    if (!isOpen || consultorioInlineAberto) return undefined;
+
+    function handleKeyDown(event) {
+      if (shouldCloseModalWithKeyboardEvent(event)) {
+        onClose();
+      }
+    }
+
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [consultorioInlineAberto, isOpen, onClose]);
+
   if (!isOpen) return null;
 
   function atualizarCampo(campo, valor) {
