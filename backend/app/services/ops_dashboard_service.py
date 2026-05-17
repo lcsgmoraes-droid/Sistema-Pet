@@ -110,6 +110,47 @@ def _alert_tone(severity: str) -> str:
     return "blue"
 
 
+def _summary_count(summary: dict[str, Any], key: str, names: set[str]) -> int:
+    total = 0
+    for item in summary.get(key) or []:
+        if not item:
+            continue
+        if isinstance(item, (list, tuple)):
+            name = str(item[0] if item else "").lower()
+            value = item[1] if len(item) > 1 else 0
+        elif isinstance(item, dict):
+            name = str(item.get("name", "")).lower()
+            value = item.get("count", 0)
+        else:
+            name = str(item).lower()
+            value = 1
+        if name in names:
+            total += int(value or 0)
+    return total
+
+
+def _event_payload_value(event: dict[str, Any] | None, key: str) -> Any:
+    if not event:
+        return None
+    if key in event:
+        return event.get(key)
+    payload = event.get("payload")
+    if isinstance(payload, dict):
+        return payload.get(key)
+    return None
+
+
+def _event_time_text(event: dict[str, Any] | None) -> str | None:
+    if not event:
+        return None
+    return (
+        str(_event_payload_value(event, "created_at") or "")
+        or str(event.get("started_at") or "")
+        or str(event.get("last_seen_at") or "")
+        or None
+    )
+
+
 def _tenant_names(db: Session, tenant_ids: set[str]) -> dict[str, str]:
     real_ids = {tenant_id for tenant_id in tenant_ids if tenant_id and tenant_id != "sem_tenant"}
     if not real_ids:
@@ -209,6 +250,14 @@ def _build_actionable_alerts(
     route_error_threshold = _env_int("OPS_ALERT_ROUTE_5XX_CRITICAL", 2)
     route_slow_threshold = _env_int("OPS_ALERT_ROUTE_SLOW_WARNING", 4)
     watchdog_recoveries = int(watchdog_summary.get("recoveries") or 0)
+    watchdog_problem_statuses = {"warning", "cooldown", "restart_loop_guard", "failed", "unhealthy"}
+    watchdog_failure_threshold = _env_int("OPS_ALERT_WATCHDOG_FAILURE_WARNING", 2)
+    watchdog_failures = _summary_count(watchdog_summary, "by_status", watchdog_problem_statuses)
+    latest_watchdog_event = (watchdog_summary.get("latest") or [None])[0]
+    latest_watchdog_status = str(_event_payload_value(latest_watchdog_event, "status") or "unknown")
+    latest_watchdog_message = str(_event_payload_value(latest_watchdog_event, "message") or "")
+    latest_watchdog_at = _event_time_text(latest_watchdog_event)
+    worker_health = str(_event_payload_value(latest_watchdog_event, "worker_health") or "").lower()
 
     if watchdog.get("status") != "healthy":
         alerts.append(
@@ -222,6 +271,40 @@ def _build_actionable_alerts(
                 "detail": "O health operacional indica problema no banco, pool ou resposta interna.",
                 "action": "Checar pool do banco, rotas lentas recentes e reinicios do backend antes de novas alteracoes.",
                 "score": 1000,
+            }
+        )
+
+    if watchdog_failures >= watchdog_failure_threshold:
+        alerts.append(
+            {
+                "id": "system:watchdog:recurrent_failures",
+                "scope": "system",
+                "kind": "watchdog_recurrent_failure",
+                "severity": "warning",
+                "tone": "amber",
+                "title": f"{watchdog_failures} falha(s) recorrente(s) do watchdog externo",
+                "detail": latest_watchdog_message or f"Ultimo status: {latest_watchdog_status}",
+                "action": "Abrir eventos do watchdog externo e corrigir a causa recorrente antes que vire restart em loop.",
+                "latest_at": latest_watchdog_at,
+                "total": watchdog_failures,
+                "score": 760 + watchdog_failures,
+            }
+        )
+
+    if worker_health and worker_health not in {"healthy", "running"}:
+        alerts.append(
+            {
+                "id": "system:job:worker_bling_unhealthy",
+                "scope": "system",
+                "kind": "worker_bling_unhealthy",
+                "severity": "critical",
+                "tone": "red",
+                "title": "Worker Bling degradado",
+                "detail": f"Health do worker: {worker_health}. {latest_watchdog_message}".strip(),
+                "action": "Checar container worker-bling, heartbeat e jobs Bling antes de aceitar novos eventos.",
+                "latest_at": latest_watchdog_at,
+                "total": 1,
+                "score": 880,
             }
         )
 
