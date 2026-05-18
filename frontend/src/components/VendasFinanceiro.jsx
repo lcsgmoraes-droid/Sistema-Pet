@@ -21,6 +21,7 @@ import {
   ajustarVendaImposto,
   arredondarMoeda,
   arredondarPercentual,
+  calcularAnaliseInteligenteVendas,
   calcularPeriodoComparacao,
   calcularPeriodoFiltroRapido,
   calcularValorRecebidoVenda,
@@ -1015,145 +1016,18 @@ export default function VendasFinanceiro() {
     }
   };
 
-  // Função para calcular análise inteligente
   const calcularAnaliseInteligente = () => {
-    if (!produtosAnalise || produtosAnalise.length === 0) {
-      setProdutosMaisLucrativos([]);
-      setProdutosPorCategoria({});
-      setAlertasInteligentesVendas([]);
-      setPrevisaoProximos7Dias(0);
-      return;
-    }
-
-    // Calcular produtos mais lucrativos com margem
-    const produtosComMargem = produtosAnalise.map((produto) => {
-      const custo = sanitizarNumero(produto.custo_total);
-      const preco = sanitizarNumero(produto.valor_total);
-      const quantidade = sanitizarNumero(produto.quantidade) || 1;
-      const lucro = preco - custo;
-      const margem = custo > 0 ? (lucro / custo) * 100 : 0;
-
-      return {
-        nome: produto.nome || produto.produto || "Produto sem nome",
-        marca: produto.marca || "-",
-        quantidade: quantidade,
-        custo: sanitizarNumero(custo / quantidade),
-        preco: sanitizarNumero(preco / quantidade),
-        lucro_total: sanitizarNumero(lucro),
-        margem: sanitizarNumero(margem),
-        categoria: produto.categoria || "Sem Categoria",
-      };
+    const resultado = calcularAnaliseInteligenteVendas({
+      produtosAnalise,
+      resumo,
+      resumoComparacao,
+      vendasPorData,
     });
 
-    // Ordenar por lucro total decrescente
-    const produtosOrdenadosPorLucro = [...produtosComMargem];
-    produtosOrdenadosPorLucro.sort((a, b) => b.lucro_total - a.lucro_total);
-    const topProdutos = produtosOrdenadosPorLucro.slice(0, 20);
-
-    setProdutosMaisLucrativos(topProdutos);
-
-    // Agrupar por categoria
-    const porCategoria = {};
-    produtosComMargem.forEach((produto) => {
-      const cat = produto.categoria || "Sem Categoria";
-      if (!porCategoria[cat]) {
-        porCategoria[cat] = {
-          quantidade: 0,
-          total: 0,
-          margens: [],
-        };
-      }
-      porCategoria[cat].quantidade += produto.quantidade;
-      porCategoria[cat].total += produto.preco * produto.quantidade;
-      porCategoria[cat].margens.push(produto.margem);
-    });
-
-    // Calcular margem média por categoria
-    Object.keys(porCategoria).forEach((cat) => {
-      const margens = porCategoria[cat].margens;
-      const somaMargens = margens.reduce(
-        (a, b) => sanitizarNumero(a) + sanitizarNumero(b),
-        0,
-      );
-      porCategoria[cat].margem_media = sanitizarNumero(
-        margens.length > 0 ? somaMargens / margens.length : 0,
-      );
-      delete porCategoria[cat].margens;
-    });
-
-    setProdutosPorCategoria(porCategoria);
-
-    const alertas = [];
-
-    const qtdAtual = sanitizarNumero(resumo.quantidade_vendas);
-    const qtdAnterior = sanitizarNumero(resumoComparacao.quantidade_vendas);
-    if (qtdAnterior > 0 && qtdAtual < qtdAnterior) {
-      const queda = Number((((qtdAnterior - qtdAtual) / qtdAnterior) * 100).toFixed(1));
-      alertas.push({
-        id: "queda-vendas",
-        tipo: "critico",
-        titulo: "Queda de volume de vendas",
-        mensagem: `As vendas cairam ${queda}% em relacao ao periodo comparativo.`,
-        recomendacao:
-          "Revise campanhas, produtos de entrada e politica de descontos para recuperar volume.",
-      });
-    }
-
-    const liquidoAtual = sanitizarNumero(resumo.venda_liquida);
-    const emAberto = sanitizarNumero(resumo.em_aberto);
-    if (liquidoAtual > 0) {
-      const percAberto = Number(((emAberto / liquidoAtual) * 100).toFixed(1));
-      if (percAberto >= 20) {
-        alertas.push({
-          id: "recebiveis-abertos",
-          tipo: "atencao",
-          titulo: "Recebimento em aberto elevado",
-          mensagem: `${percAberto}% da venda liquida ainda esta em aberto no periodo.`,
-          recomendacao:
-            "Priorize cobranca e revise condicoes de pagamento com maior prazo.",
-        });
-      }
-    }
-
-    const baixaMargem = produtosComMargem.filter((produto) => produto.margem < 20).length;
-    if (baixaMargem >= 5) {
-      alertas.push({
-        id: "mix-baixa-margem",
-        tipo: "atencao",
-        titulo: "Muitos produtos com baixa margem",
-        mensagem: `${baixaMargem} produtos vendidos estao com margem abaixo de 20%.`,
-        recomendacao:
-          "Reprecifique itens de baixo giro/margem e renegocie compra com fornecedor.",
-      });
-    }
-
-    const altaMargemBaixoVolume = produtosComMargem
-      .filter((produto) => produto.margem >= 45 && produto.quantidade <= 3)
-      .slice(0, 3);
-    if (altaMargemBaixoVolume.length > 0) {
-      alertas.push({
-        id: "oportunidade-upsell",
-        tipo: "oportunidade",
-        titulo: "Oportunidade de crescimento",
-        mensagem: `Produtos com alta margem e baixo volume: ${altaMargemBaixoVolume.map((p) => p.nome).join(", ")}.`,
-        recomendacao:
-          "Destacar esses itens no atendimento e criar combo promocional para aumentar giro.",
-      });
-    }
-
-    const basePrevisao = (vendasPorData || []).slice(-14);
-    if (basePrevisao.length > 0) {
-      const mediaDiaria =
-        basePrevisao.reduce(
-          (soma, item) => soma + sanitizarNumero(item.valor_liquido),
-          0,
-        ) / basePrevisao.length;
-      setPrevisaoProximos7Dias(sanitizarNumero(mediaDiaria * 7));
-    } else {
-      setPrevisaoProximos7Dias(0);
-    }
-
-    setAlertasInteligentesVendas(alertas);
+    setProdutosMaisLucrativos(resultado.produtosMaisLucrativos);
+    setProdutosPorCategoria(resultado.produtosPorCategoria);
+    setAlertasInteligentesVendas(resultado.alertasInteligentesVendas);
+    setPrevisaoProximos7Dias(resultado.previsaoProximos7Dias);
   };
 
   // Recalcular análise quando produtos mudarem

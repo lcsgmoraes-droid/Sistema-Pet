@@ -272,6 +272,145 @@ export function sanitizarNumero(valor) {
   return valor;
 }
 
+export function calcularAnaliseInteligenteVendas({
+  produtosAnalise = [],
+  resumo = {},
+  resumoComparacao = {},
+  vendasPorData = [],
+}) {
+  if (!produtosAnalise || produtosAnalise.length === 0) {
+    return {
+      produtosMaisLucrativos: [],
+      produtosPorCategoria: {},
+      alertasInteligentesVendas: [],
+      previsaoProximos7Dias: 0,
+    };
+  }
+
+  const produtosComMargem = produtosAnalise.map((produto) => {
+    const custo = sanitizarNumero(produto.custo_total);
+    const preco = sanitizarNumero(produto.valor_total);
+    const quantidade = sanitizarNumero(produto.quantidade) || 1;
+    const lucro = preco - custo;
+    const margem = custo > 0 ? (lucro / custo) * 100 : 0;
+
+    return {
+      nome: produto.nome || produto.produto || "Produto sem nome",
+      marca: produto.marca || "-",
+      quantidade,
+      custo: sanitizarNumero(custo / quantidade),
+      preco: sanitizarNumero(preco / quantidade),
+      lucro_total: sanitizarNumero(lucro),
+      margem: sanitizarNumero(margem),
+      categoria: produto.categoria || "Sem Categoria",
+    };
+  });
+
+  const produtosOrdenadosPorLucro = [...produtosComMargem];
+  produtosOrdenadosPorLucro.sort((a, b) => b.lucro_total - a.lucro_total);
+
+  const produtosPorCategoria = {};
+  produtosComMargem.forEach((produto) => {
+    const cat = produto.categoria || "Sem Categoria";
+    if (!produtosPorCategoria[cat]) {
+      produtosPorCategoria[cat] = {
+        quantidade: 0,
+        total: 0,
+        margens: [],
+      };
+    }
+    produtosPorCategoria[cat].quantidade += produto.quantidade;
+    produtosPorCategoria[cat].total += produto.preco * produto.quantidade;
+    produtosPorCategoria[cat].margens.push(produto.margem);
+  });
+
+  Object.keys(produtosPorCategoria).forEach((cat) => {
+    const margens = produtosPorCategoria[cat].margens;
+    const somaMargens = margens.reduce(
+      (a, b) => sanitizarNumero(a) + sanitizarNumero(b),
+      0,
+    );
+    produtosPorCategoria[cat].margem_media = sanitizarNumero(
+      margens.length > 0 ? somaMargens / margens.length : 0,
+    );
+    delete produtosPorCategoria[cat].margens;
+  });
+
+  const alertas = [];
+  const qtdAtual = sanitizarNumero(resumo.quantidade_vendas);
+  const qtdAnterior = sanitizarNumero(resumoComparacao.quantidade_vendas);
+  if (qtdAnterior > 0 && qtdAtual < qtdAnterior) {
+    const queda = Number((((qtdAnterior - qtdAtual) / qtdAnterior) * 100).toFixed(1));
+    alertas.push({
+      id: "queda-vendas",
+      tipo: "critico",
+      titulo: "Queda de volume de vendas",
+      mensagem: `As vendas cairam ${queda}% em relacao ao periodo comparativo.`,
+      recomendacao:
+        "Revise campanhas, produtos de entrada e politica de descontos para recuperar volume.",
+    });
+  }
+
+  const liquidoAtual = sanitizarNumero(resumo.venda_liquida);
+  const emAberto = sanitizarNumero(resumo.em_aberto);
+  if (liquidoAtual > 0) {
+    const percAberto = Number(((emAberto / liquidoAtual) * 100).toFixed(1));
+    if (percAberto >= 20) {
+      alertas.push({
+        id: "recebiveis-abertos",
+        tipo: "atencao",
+        titulo: "Recebimento em aberto elevado",
+        mensagem: `${percAberto}% da venda liquida ainda esta em aberto no periodo.`,
+        recomendacao:
+          "Priorize cobranca e revise condicoes de pagamento com maior prazo.",
+      });
+    }
+  }
+
+  const baixaMargem = produtosComMargem.filter((produto) => produto.margem < 20).length;
+  if (baixaMargem >= 5) {
+    alertas.push({
+      id: "mix-baixa-margem",
+      tipo: "atencao",
+      titulo: "Muitos produtos com baixa margem",
+      mensagem: `${baixaMargem} produtos vendidos estao com margem abaixo de 20%.`,
+      recomendacao:
+        "Reprecifique itens de baixo giro/margem e renegocie compra com fornecedor.",
+    });
+  }
+
+  const altaMargemBaixoVolume = produtosComMargem
+    .filter((produto) => produto.margem >= 45 && produto.quantidade <= 3)
+    .slice(0, 3);
+  if (altaMargemBaixoVolume.length > 0) {
+    alertas.push({
+      id: "oportunidade-upsell",
+      tipo: "oportunidade",
+      titulo: "Oportunidade de crescimento",
+      mensagem: `Produtos com alta margem e baixo volume: ${altaMargemBaixoVolume.map((p) => p.nome).join(", ")}.`,
+      recomendacao:
+        "Destacar esses itens no atendimento e criar combo promocional para aumentar giro.",
+    });
+  }
+
+  const basePrevisao = (vendasPorData || []).slice(-14);
+  const previsaoProximos7Dias = basePrevisao.length > 0
+    ? sanitizarNumero(
+        (basePrevisao.reduce(
+          (soma, item) => soma + sanitizarNumero(item.valor_liquido),
+          0,
+        ) / basePrevisao.length) * 7,
+      )
+    : 0;
+
+  return {
+    produtosMaisLucrativos: produtosOrdenadosPorLucro.slice(0, 20),
+    produtosPorCategoria,
+    alertasInteligentesVendas: alertas,
+    previsaoProximos7Dias,
+  };
+}
+
 function adicionarDias(data, dias) {
   const proxima = new Date(data);
   proxima.setDate(proxima.getDate() + dias);
