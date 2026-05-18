@@ -1,4 +1,4 @@
-import { Bed, CalendarPlus, Lock, Save } from "lucide-react";
+import { ArrowRight, Bed, CalendarPlus, Lock, Save } from "lucide-react";
 
 export default function ConsultaActionsFooter({
   modoSomenteLeitura,
@@ -56,8 +56,8 @@ export default function ConsultaActionsFooter({
                 disabled={salvando}
                 className="flex items-center gap-2 px-5 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60 transition-colors"
               >
-                <Save size={14} />
-                {salvando ? "Salvando..." : "Salvar e continuar"}
+                {salvando ? <Save size={14} /> : <ArrowRight size={14} />}
+                {salvando ? "Salvando..." : "Proximo"}
               </button>
             ) : (
               <div className="flex flex-wrap justify-end gap-2">

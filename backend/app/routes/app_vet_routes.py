@@ -8,15 +8,21 @@ from datetime import date, datetime, time, timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from sqlalchemy import func, or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.db import get_session
-from app.models import Cliente, User
+from app.models import Cliente, Pet, User
 from app.routes.ecommerce_auth import _activate_user_tenant_context, _get_current_ecommerce_user
-from app.veterinario_agendamentos import _agendamento_to_dict
-from app.veterinario_core import _serializar_datetime_vet, _vet_now
+from app.veterinario_agendamentos import (
+    _agendamento_to_dict,
+    _garantir_sem_conflitos_agendamento,
+    _validar_consultorio_agendamento,
+)
+from app.veterinario_clinico import _upsert_lembretes_push_agendamento
+from app.veterinario_core import _normalizar_datetime_local_brasilia, _serializar_datetime_vet, _vet_now
+from app.veterinario_core import _all_accessible_tenant_ids
 from app.veterinario_internacao import (
     _separar_evolucoes_e_procedimentos,
     _serializar_procedimento_agenda_internacao,
@@ -29,12 +35,24 @@ from app.veterinario_models import (
     InternacaoVet,
     MedicamentoCatalogo,
 )
+from app.veterinario_schemas import ProcedimentoAgendaInternacaoCreate
 
 router = APIRouter(prefix="/app/vet", tags=["App Mobile - Veterinario"])
 
 
 class ConcluirProcedimentoMobilePayload(BaseModel):
     observacao_execucao: Optional[str] = None
+
+
+class CriarAgendamentoConsultaMobilePayload(BaseModel):
+    pet_id: int
+    data_hora: datetime
+    duracao_minutos: int = Field(default=30, ge=5, le=480)
+    tipo: str = "consulta"
+    motivo: Optional[str] = None
+    consultorio_id: Optional[int] = None
+    is_emergencia: bool = False
+    observacoes: Optional[str] = None
 
 
 def _get_mobile_veterinario_or_403(db: Session, current_user: User) -> tuple[Cliente, str]:
@@ -138,6 +156,23 @@ def _medicamento_mobile_dict(medicamento: MedicamentoCatalogo) -> dict:
     }
 
 
+def _pet_mobile_dict(pet: Pet) -> dict:
+    cliente = pet.cliente
+    return {
+        "id": pet.id,
+        "codigo": pet.codigo,
+        "cliente_id": pet.cliente_id,
+        "nome": pet.nome,
+        "especie": pet.especie,
+        "raca": pet.raca,
+        "peso": pet.peso,
+        "foto_url": pet.foto_url,
+        "cliente_nome": cliente.nome if cliente else None,
+        "cliente_telefone": getattr(cliente, "telefone", None) if cliente else None,
+        "cliente_celular": getattr(cliente, "celular", None) if cliente else None,
+    }
+
+
 @router.get("/resumo")
 def resumo_veterinario_mobile(
     data: Optional[date] = Query(None),
@@ -175,6 +210,68 @@ def resumo_veterinario_mobile(
     }
 
 
+@router.get("/pets")
+def listar_pets_vet_mobile(
+    busca: Optional[str] = Query(default=None),
+    limit: int = Query(default=80, ge=1, le=200),
+    db: Session = Depends(get_session),
+    current_user: User = Depends(_get_current_ecommerce_user),
+):
+    _, tenant_id = _get_mobile_veterinario_or_403(db, current_user)
+    tenant_ids = _all_accessible_tenant_ids(db, tenant_id)
+
+    query = (
+        db.query(Pet)
+        .join(Cliente, Cliente.id == Pet.cliente_id)
+        .options(joinedload(Pet.cliente))
+        .filter(
+            Cliente.tenant_id.in_(tenant_ids),
+            Pet.ativo == True,  # noqa: E712
+        )
+    )
+
+    if busca:
+        termo = f"%{busca.strip()}%"
+        query = query.filter(
+            or_(
+                Pet.nome.ilike(termo),
+                Pet.codigo.ilike(termo),
+                Pet.raca.ilike(termo),
+                Cliente.nome.ilike(termo),
+            )
+        )
+
+    pets = query.order_by(Pet.nome.asc()).limit(limit).all()
+    return [_pet_mobile_dict(pet) for pet in pets]
+
+
+@router.get("/consultorios")
+def listar_consultorios_vet_mobile(
+    db: Session = Depends(get_session),
+    current_user: User = Depends(_get_current_ecommerce_user),
+):
+    from app.veterinario_models import ConsultorioVet
+
+    _, tenant_id = _get_mobile_veterinario_or_403(db, current_user)
+    consultorios = (
+        db.query(ConsultorioVet)
+        .filter(
+            ConsultorioVet.tenant_id == tenant_id,
+            ConsultorioVet.ativo == True,  # noqa: E712
+        )
+        .order_by(ConsultorioVet.ordem.asc(), ConsultorioVet.nome.asc())
+        .all()
+    )
+    return [
+        {
+            "id": item.id,
+            "nome": item.nome,
+            "descricao": item.descricao,
+        }
+        for item in consultorios
+    ]
+
+
 @router.get("/agendamentos")
 def listar_agendamentos_vet_mobile(
     data: Optional[date] = Query(None),
@@ -187,6 +284,69 @@ def listar_agendamentos_vet_mobile(
     inicio, fim = _range_bounds(data, data_inicio, data_fim)
     agendamentos = _query_agendamentos(db, tenant_id, veterinario.id, inicio, fim).all()
     return [_agendamento_mobile_dict(ag) for ag in agendamentos]
+
+
+@router.post("/agendamentos", status_code=201)
+def criar_agendamento_consulta_vet_mobile(
+    body: CriarAgendamentoConsultaMobilePayload,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(_get_current_ecommerce_user),
+):
+    veterinario, tenant_id = _get_mobile_veterinario_or_403(db, current_user)
+    tenant_ids = _all_accessible_tenant_ids(db, tenant_id)
+    pet = (
+        db.query(Pet)
+        .join(Cliente, Cliente.id == Pet.cliente_id)
+        .options(joinedload(Pet.cliente))
+        .filter(
+            Pet.id == body.pet_id,
+            Cliente.tenant_id.in_(tenant_ids),
+            Pet.ativo == True,  # noqa: E712
+        )
+        .first()
+    )
+    if not pet:
+        raise HTTPException(status_code=404, detail="Pet nao encontrado para este veterinario")
+
+    tipo = (body.tipo or "consulta").strip().lower()
+    if tipo not in {"consulta", "retorno", "vacina", "exame"}:
+        raise HTTPException(status_code=422, detail="Tipo de agendamento invalido para o app mobile")
+
+    _validar_consultorio_agendamento(db, tenant_id, body.consultorio_id)
+    _garantir_sem_conflitos_agendamento(
+        db,
+        tenant_id=tenant_id,
+        data_hora=body.data_hora,
+        duracao_minutos=body.duracao_minutos,
+        veterinario_id=veterinario.id,
+        consultorio_id=body.consultorio_id,
+    )
+
+    agendamento = AgendamentoVet(
+        tenant_id=tenant_id,
+        user_id=current_user.id,
+        pet_id=pet.id,
+        cliente_id=pet.cliente_id,
+        veterinario_id=veterinario.id,
+        consultorio_id=body.consultorio_id,
+        data_hora=body.data_hora,
+        duracao_minutos=body.duracao_minutos,
+        tipo=tipo,
+        motivo=(body.motivo or "").strip() or None,
+        is_emergencia=bool(body.is_emergencia),
+        observacoes=(body.observacoes or "").strip() or None,
+        status="agendado",
+    )
+    db.add(agendamento)
+    db.flush()
+    _upsert_lembretes_push_agendamento(db, agendamento, tenant_id)
+    db.commit()
+    db.refresh(agendamento)
+
+    agendamento.pet = pet
+    agendamento.cliente = pet.cliente
+    agendamento.veterinario = veterinario
+    return _agendamento_mobile_dict(agendamento)
 
 
 @router.get("/internacoes")
@@ -264,6 +424,52 @@ def listar_procedimentos_agenda_vet_mobile(
     veterinario, tenant_id = _get_mobile_veterinario_or_403(db, current_user)
     procedimentos = _query_procedimentos_agenda(db, tenant_id, veterinario.id).limit(50).all()
     return [_serializar_procedimento_agenda_internacao(item) for item in procedimentos]
+
+
+@router.post("/internacoes/{internacao_id}/procedimentos-agenda", status_code=201)
+def criar_procedimento_agenda_vet_mobile(
+    internacao_id: int,
+    body: ProcedimentoAgendaInternacaoCreate,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(_get_current_ecommerce_user),
+):
+    veterinario, tenant_id = _get_mobile_veterinario_or_403(db, current_user)
+    internacao = _query_internacoes(db, tenant_id, veterinario.id).filter(
+        InternacaoVet.id == internacao_id,
+    ).first()
+    if not internacao:
+        raise HTTPException(status_code=404, detail="Internacao ativa nao encontrada para este veterinario")
+
+    medicamento = (body.medicamento or "").strip()
+    if not medicamento:
+        raise HTTPException(status_code=422, detail="Medicamento/procedimento e obrigatorio")
+
+    horario_agendado = _normalizar_datetime_local_brasilia(body.horario_agendado)
+    if not horario_agendado:
+        raise HTTPException(status_code=422, detail="Horario agendado e obrigatorio")
+
+    item = InternacaoProcedimentoAgenda(
+        tenant_id=tenant_id,
+        user_id=current_user.id,
+        internacao_id=internacao.id,
+        pet_id=internacao.pet_id,
+        horario_agendado=horario_agendado,
+        medicamento=medicamento,
+        dose=(body.dose or "").strip() or None,
+        via=(body.via or "").strip() or None,
+        quantidade_prevista=body.quantidade_prevista,
+        unidade_quantidade=(body.unidade_quantidade or "").strip() or None,
+        lembrete_minutos=body.lembrete_min if body.lembrete_min is not None else 30,
+        observacoes_agenda=(body.observacoes_agenda or "").strip() or None,
+        status="agendado",
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+
+    item.internacao = internacao
+    item.pet = internacao.pet
+    return _serializar_procedimento_agenda_internacao(item)
 
 
 @router.patch("/procedimentos-agenda/{agenda_id}/concluir")
