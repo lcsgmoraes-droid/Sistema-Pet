@@ -196,6 +196,19 @@ entrar no cronograma sem se perderem.
       internacao ja vinculado, preservando a sequencia chegada -> consulta ->
       internacao -> alta. O link ja abre a nova internacao com pet, tutor,
       consulta e motivo inicial preenchidos.
+- [x] Configurar a Clinica Veterinaria Sao Jose para aparecer no app mobile:
+      slug `clinica-veterinaria-sao-jose`, cidade `Presidente Prudente`, UF `SP`
+      e CEP provisorio `19010-000`.
+- [x] Registrar guia operacional para habilitar app por tenant em
+      `docs/GUIA_HABILITAR_APP_MOBILE_TENANT.md`.
+- [x] Ajustar calculadora de dose do app veterinario para pesquisar medicamento
+      por autocomplete sem abrir a lista inteira ao entrar na tela.
+- [x] Tornar internacoes do app veterinario clicaveis, com detalhe rapido de
+      resumo, agenda de cuidados, procedimentos realizados e evolucoes clinicas.
+- [ ] Parametrizar visibilidade do veterinario no app e no web:
+      proprietario/veterinario geral pode ver todos os pacientes da clinica;
+      veterinario comum ve apenas pacientes, agenda, internacoes e procedimentos
+      vinculados a ele.
 
 ## Frente 2 - Padronizacao visual do Veterinario
 

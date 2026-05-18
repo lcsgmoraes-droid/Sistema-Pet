@@ -18,6 +18,7 @@ def test_app_vet_router_exposes_mobile_veterinary_mvp_routes():
     assert ("/app/vet/resumo", "GET") in routes
     assert ("/app/vet/agendamentos", "GET") in routes
     assert ("/app/vet/internacoes", "GET") in routes
+    assert ("/app/vet/internacoes/{internacao_id}", "GET") in routes
     assert ("/app/vet/procedimentos-agenda", "GET") in routes
     assert ("/app/vet/procedimentos-agenda/{agenda_id}/concluir", "PATCH") in routes
     assert ("/app/vet/catalogo/medicamentos", "GET") in routes

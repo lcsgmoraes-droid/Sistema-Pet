@@ -507,6 +507,21 @@ const BASE_CONHECIMENTO = [
         ],
       },
       {
+        titulo: "Como habilitar o app mobile para uma loja",
+        tags: ["app", "mobile", "loja", "tenant", "entregador", "veterinario"],
+        conteudo: [
+          "Para o app encontrar uma loja, o tenant precisa estar ativo e com codigo publico configurado.",
+          "**Passo a passo:**",
+          "1. Acesse as configuracoes da empresa/loja.",
+          "2. Preencha nome da empresa, cidade, UF e CEP.",
+          "3. Configure um codigo publico da loja, tambem chamado de slug. Exemplo: clinica-veterinaria-sao-jose.",
+          "4. Ative a loja/app/e-commerce para que ela apareca na busca do aplicativo.",
+          "5. Cadastre os usuarios e vincule cada perfil correto: cliente, entregador, veterinario ou admin.",
+          "6. No app, a pessoa digita ou escaneia o codigo da loja e depois faz login com o e-mail dela.",
+          "Se o mesmo e-mail existir em mais de uma loja, a loja selecionada no app define qual tenant sera usado.",
+        ],
+      },
+      {
         titulo: "Operadoras de Cartão — como cadastrar",
         tags: ["operadora", "cartão", "cielo", "stone", "rede", "taxa"],
         conteudo: [

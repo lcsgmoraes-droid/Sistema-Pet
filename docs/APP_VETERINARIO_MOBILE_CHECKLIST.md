@@ -8,7 +8,7 @@ Objetivo: criar uma experiencia de veterinario dentro do app mobile atual, reapr
 - [x] Branch criada: `feat/20260517-2135-app-veterinario-mobile`.
 - [x] MVP pronto para teste do Lucas no app.
 - [x] PR aberto e validado.
-- [ ] Producao atualizada apos aprovacao.
+- [x] Producao atualizada apos aprovacao.
 
 ## Sequencia de execucao
 
@@ -41,9 +41,13 @@ Objetivo: criar uma experiencia de veterinario dentro do app mobile atual, reapr
 
 - [x] Agenda do dia com horarios, pet, tutor e tipo.
 - [x] Internados com situacao e proximos cuidados.
+- [x] Internados clicaveis com detalhe rapido de resumo, agenda de cuidados,
+      procedimentos realizados e evolucoes clinicas.
 - [x] Procedimentos/medicacoes com marcar como feito.
 - [x] Calculadora de dose com peso do pet e medicamento pre-cadastrado.
-- [ ] Tela de detalhes rapida para o evento selecionado.
+- [x] Busca da calculadora por autocomplete: medicamentos aparecem apenas apos
+      digitar, evitando lista inicial gigante.
+- [x] Tela de detalhes rapida para o evento selecionado.
 
 ### 5. Lembretes e alarmes
 
@@ -59,6 +63,26 @@ Objetivo: criar uma experiencia de veterinario dentro do app mobile atual, reapr
 - [x] App mobile: `npm run typecheck` passando.
 - [ ] Teste manual com usuario veterinario da Maiara.
 - [x] Checklist atualizado com o que ficou pronto e o que ficou para fase 2.
+
+## Habilitacao de tenant no app
+
+- [x] Guia operacional criado em `docs/GUIA_HABILITAR_APP_MOBILE_TENANT.md`.
+- [x] Central de Ajuda recebeu artigo com o passo a passo para habilitar app
+      mobile por loja/tenant.
+- [x] Clinica Veterinaria Sao Jose configurada em producao com codigo publico
+      `clinica-veterinaria-sao-jose`, cidade `Presidente Prudente`, UF `SP` e
+      CEP provisorio `19010-000`.
+- [ ] Criar tela administrativa para o dono do sistema validar e corrigir slug,
+      cidade, UF, CEP, app ativo e vinculos de perfil sem acessar banco.
+
+## Controle de visibilidade veterinaria
+
+- [ ] Parametrizar se o veterinario ve todos os dados clinicos do tenant ou
+      apenas pacientes vinculados a ele.
+- [ ] Criar permissao/flag para proprietario clinico ou veterinario geral ver
+      internacoes, agenda e procedimentos de todos.
+- [ ] Manter padrao restritivo para veterinario comum: ver apenas pacientes,
+      agenda e internacoes vinculados ao proprio veterinario.
 
 ## Fora do MVP inicial
 

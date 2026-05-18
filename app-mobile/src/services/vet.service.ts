@@ -57,6 +57,46 @@ export interface VetProcedimentoAgenda {
   feito?: boolean;
 }
 
+export interface VetEvolucaoInternacao {
+  id: number;
+  data_hora?: string | null;
+  temperatura?: number | null;
+  freq_cardiaca?: number | null;
+  freq_respiratoria?: number | null;
+  nivel_dor?: number | null;
+  pressao_sistolica?: number | null;
+  glicemia?: number | null;
+  peso?: number | null;
+  observacoes?: string | null;
+}
+
+export interface VetProcedimentoRealizado {
+  id: number;
+  data_hora?: string | null;
+  status?: string | null;
+  tipo_registro?: string | null;
+  horario_agendado?: string | null;
+  medicamento?: string | null;
+  dose?: string | null;
+  via?: string | null;
+  quantidade_prevista?: number | null;
+  quantidade_executada?: number | null;
+  unidade_quantidade?: string | null;
+  executado_por?: string | null;
+  horario_execucao?: string | null;
+  observacao_execucao?: string | null;
+  observacoes_agenda?: string | null;
+}
+
+export interface VetInternacaoDetalhe extends VetInternacao {
+  tutor_id?: number | null;
+  tutor_nome?: string | null;
+  pet_raca?: string | null;
+  evolucoes: VetEvolucaoInternacao[];
+  procedimentos_realizados: VetProcedimentoRealizado[];
+  procedimentos_agenda: VetProcedimentoAgenda[];
+}
+
 export interface VetMedicamento {
   id: number;
   nome: string;
@@ -96,6 +136,11 @@ export async function listarAgendamentosVet(data?: string): Promise<VetAgendamen
 
 export async function listarInternacoesVet(): Promise<VetInternacao[]> {
   const { data } = await api.get<VetInternacao[]>("/app/vet/internacoes");
+  return data;
+}
+
+export async function obterInternacaoVet(id: number): Promise<VetInternacaoDetalhe> {
+  const { data } = await api.get<VetInternacaoDetalhe>(`/app/vet/internacoes/${id}`);
   return data;
 }
 
