@@ -3,7 +3,14 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { isoDate } from "../agenda/agendaUtils";
 import { filtrarAgendamentosClinicosAbertos } from "../fluxoConsultaAgendamentoUtils";
 import { vetApi } from "../vetApi";
-import { CONSULTAS_POR_PAGINA, filtrarConsultas } from "./consultasUtils";
+import {
+  CONSULTAS_POR_PAGINA,
+  filtrarConsultas,
+  removerConsultasSelecionadas,
+  todasConsultasVisiveisSelecionadas,
+  toggleConsultaSelecionada,
+  toggleTodasConsultasSelecionadas,
+} from "./consultasUtils";
 
 export function useVetConsultas() {
   const [consultas, setConsultas] = useState([]);
@@ -16,6 +23,9 @@ export function useVetConsultas() {
   const [erroAgendaHoje, setErroAgendaHoje] = useState(null);
   const [busca, setBusca] = useState("");
   const [filtroStatus, setFiltroStatus] = useState("");
+  const [consultasSelecionadas, setConsultasSelecionadas] = useState([]);
+  const [excluindoConsultas, setExcluindoConsultas] = useState(false);
+  const [erroExclusao, setErroExclusao] = useState(null);
 
   const carregar = useCallback(async () => {
     try {
@@ -31,9 +41,12 @@ export function useVetConsultas() {
       if (Array.isArray(data)) {
         setConsultas(data);
         setTotal(data.length);
+        setConsultasSelecionadas((atuais) => atuais.filter((id) => data.some((consulta) => Number(consulta.id) === id)));
       } else {
-        setConsultas(data.items ?? []);
+        const items = data.items ?? [];
+        setConsultas(items);
         setTotal(data.total ?? 0);
+        setConsultasSelecionadas((atuais) => atuais.filter((id) => items.some((consulta) => Number(consulta.id) === id)));
       }
     } catch {
       setErro("Nao foi possivel carregar as consultas.");
@@ -69,11 +82,50 @@ export function useVetConsultas() {
     [busca, consultas]
   );
   const totalPaginas = Math.ceil(total / CONSULTAS_POR_PAGINA);
+  const todasSelecionadas = useMemo(
+    () => todasConsultasVisiveisSelecionadas(consultasSelecionadas, consultasFiltradas),
+    [consultasFiltradas, consultasSelecionadas]
+  );
 
   function alterarStatus(status) {
     setFiltroStatus(status);
     setPagina(1);
+    setConsultasSelecionadas([]);
   }
+
+  function alternarConsultaSelecionada(consultaId) {
+    setConsultasSelecionadas((atuais) => toggleConsultaSelecionada(atuais, consultaId));
+  }
+
+  function alternarTodasConsultasSelecionadas() {
+    setConsultasSelecionadas((atuais) => toggleTodasConsultasSelecionadas(atuais, consultasFiltradas));
+  }
+
+  const excluirConsultasSelecionadas = useCallback(async () => {
+    if (consultasSelecionadas.length === 0) return;
+
+    const totalSelecionado = consultasSelecionadas.length;
+    const confirmado = window.confirm(
+      `Deseja excluir ${totalSelecionado} consulta${totalSelecionado > 1 ? "s" : ""} selecionada${totalSelecionado > 1 ? "s" : ""}?`
+    );
+    if (!confirmado) return;
+
+    try {
+      setExcluindoConsultas(true);
+      setErroExclusao(null);
+      const idsParaExcluir = [...consultasSelecionadas];
+      await Promise.all(idsParaExcluir.map((id) => vetApi.removerConsulta(id)));
+      setConsultas((atuais) => removerConsultasSelecionadas(atuais, idsParaExcluir));
+      setTotal((atual) => Math.max((atual ?? 0) - idsParaExcluir.length, 0));
+      setConsultasSelecionadas([]);
+      await carregar();
+      await carregarAgendamentosHoje();
+    } catch (error) {
+      setErroExclusao(error?.response?.data?.detail ?? "Nao foi possivel excluir as consultas selecionadas.");
+    } finally {
+      setExcluindoConsultas(false);
+    }
+  }, [carregar, carregarAgendamentosHoje, consultasSelecionadas]);
 
   return {
     alterarStatus,
@@ -82,14 +134,21 @@ export function useVetConsultas() {
     carregando,
     carregandoAgendaHoje,
     consultasFiltradas,
+    consultasSelecionadas,
     erro,
     erroAgendaHoje,
+    erroExclusao,
+    excluindoConsultas,
+    excluirConsultasSelecionadas,
     filtroStatus,
     pagina,
     recarregarAgendaHoje: carregarAgendamentosHoje,
     recarregarConsultas: carregar,
+    selecionarConsulta: alternarConsultaSelecionada,
+    selecionarTodasConsultas: alternarTodasConsultasSelecionadas,
     setBusca,
     setPagina,
+    todasSelecionadas,
     total,
     totalPaginas,
   };

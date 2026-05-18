@@ -1,4 +1,4 @@
-import { AlertCircle, FileText } from "lucide-react";
+import { AlertCircle, FileText, Trash2 } from "lucide-react";
 import PetIdentity from "../../../components/ui/PetIdentity";
 
 import {
@@ -8,9 +8,45 @@ import {
   STATUS_LABEL,
 } from "./consultasUtils";
 
-export default function ConsultasTableCard({ carregando, consultas, erro, onAbrirConsulta }) {
+export default function ConsultasTableCard({
+  carregando,
+  consultas,
+  consultasSelecionadas = [],
+  erro,
+  erroExclusao,
+  excluindoConsultas = false,
+  onAbrirConsulta,
+  onExcluirSelecionadas,
+  onSelecionarConsulta,
+  onSelecionarTodas,
+  todasSelecionadas = false,
+}) {
+  const totalSelecionadas = consultasSelecionadas.length;
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+      {totalSelecionadas > 0 && (
+        <div className="flex flex-col gap-3 border-b border-red-100 bg-red-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+          <span className="text-sm font-medium text-red-700">
+            {totalSelecionadas} consulta{totalSelecionadas > 1 ? "s" : ""} selecionada{totalSelecionadas > 1 ? "s" : ""}
+          </span>
+          <button
+            type="button"
+            onClick={onExcluirSelecionadas}
+            disabled={excluindoConsultas}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Trash2 size={16} />
+            {excluindoConsultas ? "Excluindo..." : "Excluir selecionadas"}
+          </button>
+        </div>
+      )}
+      {erroExclusao && (
+        <div className="flex items-center gap-2 border-b border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
+          <AlertCircle size={16} />
+          <span>{erroExclusao}</span>
+        </div>
+      )}
       {carregando ? (
         <div className="flex items-center justify-center h-48">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500" />
@@ -29,6 +65,15 @@ export default function ConsultasTableCard({ carregando, consultas, erro, onAbri
         <table className="w-full text-sm">
           <thead className="bg-gray-50 border-b border-gray-100">
             <tr>
+              <th className="w-12 px-4 py-3">
+                <input
+                  type="checkbox"
+                  checked={todasSelecionadas}
+                  onChange={onSelecionarTodas}
+                  aria-label="Selecionar todas as consultas"
+                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                />
+              </th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Codigo</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Data</th>
               <th className="text-left px-4 py-3 font-medium text-gray-600">Pet</th>
@@ -44,7 +89,9 @@ export default function ConsultasTableCard({ carregando, consultas, erro, onAbri
               <ConsultaTableRow
                 key={consulta.id}
                 consulta={consulta}
+                selecionada={consultasSelecionadas.includes(Number(consulta.id))}
                 onAbrirConsulta={onAbrirConsulta}
+                onSelecionarConsulta={onSelecionarConsulta}
               />
             ))}
           </tbody>
@@ -54,7 +101,7 @@ export default function ConsultasTableCard({ carregando, consultas, erro, onAbri
   );
 }
 
-function ConsultaTableRow({ consulta, onAbrirConsulta }) {
+function ConsultaTableRow({ consulta, onAbrirConsulta, onSelecionarConsulta, selecionada }) {
   const dataAtendimento = consulta.inicio_atendimento || consulta.created_at;
 
   return (
@@ -62,6 +109,15 @@ function ConsultaTableRow({ consulta, onAbrirConsulta }) {
       className="hover:bg-blue-50 transition-colors cursor-pointer"
       onClick={() => onAbrirConsulta(consulta.id)}
     >
+      <td className="px-4 py-3" onClick={(event) => event.stopPropagation()}>
+        <input
+          type="checkbox"
+          checked={selecionada}
+          onChange={() => onSelecionarConsulta(consulta.id)}
+          aria-label={`Selecionar consulta #${consulta.id}`}
+          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+        />
+      </td>
       <td className="px-4 py-3 whitespace-nowrap">
         <div className="font-semibold text-gray-800">#{consulta.id}</div>
         <div className="text-[11px] text-gray-400">Consulta</div>
