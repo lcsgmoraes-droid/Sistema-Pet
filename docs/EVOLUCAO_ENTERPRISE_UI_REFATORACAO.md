@@ -186,7 +186,7 @@ Maiores arquivos mapeados em 2026-05-04:
 | 4844 | `backend/app/produtos_routes.py` | Critico |
 | 4169 | `frontend/src/components/EntradaXML.jsx` | Critico |
 | 4064 | `backend/app/estoque_routes.py` | Critico |
-| 1980 | `frontend/src/components/VendasFinanceiro.jsx` | Critico |
+| 1468 | `frontend/src/components/VendasFinanceiro.jsx` | Prioridade |
 | 3411 | `backend/app/notas_entrada_routes.py` | Critico |
 | 3295 | `backend/app/campaigns/routes.py` | Critico |
 | 3225 | `frontend/src/components/PedidosCompra.jsx` | Critico |
@@ -593,7 +593,7 @@ Para cada dominio sensivel:
 | Arquivo | Linhas aprox. | Risco |
 | --- | ---: | --- |
 | `frontend/src/components/EntradaXML.jsx` | 2486 | Muito alto |
-| `frontend/src/components/VendasFinanceiro.jsx` | 1980 | Alto |
+| `frontend/src/components/VendasFinanceiro.jsx` | 1468 | Medio |
 | `frontend/src/components/PedidosCompra.jsx` | 3225 | Alto |
 | `frontend/src/pages/ecommerce/EcommerceMVP.jsx` | 2229 | Alto |
 | `frontend/src/pages/EstoqueTransferenciaParceiro.jsx` | 2418 | Alto |
@@ -911,6 +911,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-09: `VendasFinanceiro` extraiu cabecalho/filtros/abas para `VendasFinanceiroHeader`, graficos do resumo para `VendasFinanceiroGraficosResumo` e painel de promocoes para `VendasPromocoesResumoPanel`, reduzindo o arquivo principal para 3177 linhas com build validado.
 - 2026-05-10: `VendasFinanceiro` extraiu o painel de dias uteis para `DiasUteisResumoPanel` e o modal de relatorio personalizado para `VendasRelatorioPersonalizadoModal`, reduzindo o arquivo principal para 2988 linhas com build validado.
 - 2026-05-10: `VendasFinanceiro` extraiu blocos visuais de composicao, resumo, lista, comparacao e analise inteligente para componentes dedicados, reduzindo o arquivo principal para 1980 linhas com build validado.
+- 2026-05-18: `VendasFinanceiro` moveu helpers puros de Excel, datas, feriados, status, formatacao, arredondamento e imposto para `vendasFinanceiroUtils`, reduzindo o arquivo principal de 1821 para 1468 linhas e tirando a tela da faixa critica acima de 1500 linhas. Proximo passo: avaliar extracao de hooks de dados/comparacao ou iniciar outra tela critica.
 - 2026-05-10: `EntradaXML` iniciou a quebra segura dos modais operacionais, extraindo historico de precos, revisao de precos, resultado de lote e rascunho de devolucao para `components/entrada-xml`, reduzindo o arquivo principal para 4420 linhas com build validado.
 - 2026-05-12: `EstoqueFullNF` passou a usar `PageHeader`, `ModuleTabs`, `Panel`, `ActionButton`, `IconActionButton`, `EmptyState` e `DataTable`; o badge de canal foi centralizado em `ChannelBadges` com suporte a Amazon, Mercado Livre, Shopee e FULL.
 - 2026-05-12: criado `CatalogoProdutoSelectors` para centralizar autocomplete de categoria e marca de produtos, aplicado em filtros de produtos, edicao em lote, cadastro/edicao de produto, balanco, valorizacao e validade proxima.
