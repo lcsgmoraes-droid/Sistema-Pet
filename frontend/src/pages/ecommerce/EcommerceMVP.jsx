@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import ecommerceApi from '../../services/ecommerceApi';
 import { api } from '../../services/api';
+import EcommerceCatalogProductCard from './EcommerceCatalogProductCard';
 import {
   trackPageView,
   trackViewItem,
@@ -1658,80 +1659,20 @@ export default function EcommerceMVP() {
 
             {/* Grid */}
             <div style={{ ...S.grid, gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(200px, 1fr))', gap: isMobile ? 10 : 16 }}>
-              {filteredProducts.map((product) => {
-                const stock = resolveProductStock(product);
-                const outOfStock = isProductOutOfStock(product);
-                const wished = wishlist.includes(product.id);
-                const productImage = getProductImages(product)[0];
-                const isHovered = hoveredCard === product.id;
-
-                return (
-                  <div
-                    role="button"
-                    tabIndex={0}
-                    key={product.id}
-                    onClick={() => openProductDetails(product)}
-                    onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openProductDetails(product); } }}
-                    onMouseEnter={() => setHoveredCard(product.id)}
-                    onMouseLeave={() => setHoveredCard(null)}
-                    style={S.card(isHovered)}
-                  >
-                    {/* Imagem */}
-                    <div style={S.cardImgWrap}>
-                      {productImage ? (
-                        <img src={productImage} alt={product.nome} style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 12, background: '#fff' }} />
-                      ) : (
-                        <div style={{ color: '#d1d5db', fontSize: 12, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
-                          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                          <span>Sem imagem</span>
-                        </div>
-                      )}
-                      {outOfStock
-                        ? <div style={S.unavailBadge}>Indisponível</div>
-                        : Number.isFinite(stock) && stock > 0 && stock < 9999
-                          ? <div style={{ position: 'absolute', top: 8, left: 8, background: '#dcfce7', color: '#166534', borderRadius: 6, padding: '3px 8px', fontSize: 10, fontWeight: 700, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>Estoque {stock}</div>
-                          : null
-                      }
-                      <button
-                        onClick={(e) => { e.stopPropagation(); toggleWishlist(product.id); }}
-                        title={wished ? 'Remover da lista de desejos' : 'Adicionar à lista de desejos'}
-                        style={S.wishBtn}
-                      >{wished ? '❤️' : '🤍'}</button>
-                    </div>
-
-                    {/* Info */}
-                    <div style={S.cardBody}>
-                      <div style={S.cardName}>{product.nome}</div>
-                      <div style={S.cardCat}>{product?.categoria_nome || product?.categoria || 'Sem categoria'}</div>
-                      <div style={S.cardSku}>SKU: {product?.codigo || '-'}</div>
-                      <div style={S.cardPrice}>{formatCurrency(resolveProductPrice(product))}</div>
-                      {hasPromotionalPrice(product) && (
-                        <div style={{ fontSize: 12, color: '#94a3b8', textDecoration: 'line-through', marginTop: 2 }}>
-                          {formatCurrency(resolveOriginalProductPrice(product))}
-                        </div>
-                      )}
-                      {resolveValidityPromotionText(product) && (
-                        <div style={{ marginTop: 6, fontSize: 11, fontWeight: 700, color: '#166534', lineHeight: 1.35 }}>
-                          {resolveValidityPromotionText(product)}
-                        </div>
-                      )}
-
-                      <button
-                        disabled={outOfStock}
-                        style={S.addBtn(outOfStock)}
-                        onClick={(e) => { e.stopPropagation(); addToCart(product); }}
-                      >
-                        {outOfStock ? 'Indisponível' : '🛒 Adicionar'}
-                      </button>
-                      {outOfStock && (
-                        <button onClick={(e) => { e.stopPropagation(); registerNotifyMe(product); }} style={S.notifyBtn}>
-                          🔔 Avise-me quando chegar
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                );
-              })}
+              {filteredProducts.map((product) => (
+                <EcommerceCatalogProductCard
+                  key={product.id}
+                  product={product}
+                  isHovered={hoveredCard === product.id}
+                  wished={wishlist.includes(product.id)}
+                  styles={S}
+                  onAddToCart={addToCart}
+                  onHover={setHoveredCard}
+                  onNotifyMe={registerNotifyMe}
+                  onOpen={openProductDetails}
+                  onToggleWishlist={toggleWishlist}
+                />
+              ))}
               {!loading && filteredProducts.length === 0 && (
                 <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '60px 0', color: '#9ca3af' }}>
                   <div style={{ fontSize: 48, marginBottom: 12 }}>🔍</div>
