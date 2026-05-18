@@ -7,6 +7,7 @@ import { formatBRL, formatMoneyBRL, formatPercent } from '../utils/formatters';
 import CardFiscal from './CardFiscal';
 import ExportActionButton from './ui/ExportActionButton';
 import TooltipComposicao from './TooltipComposicao';
+import EntradaXmlCriarProdutoModal from './entrada-xml/EntradaXmlCriarProdutoModal';
 import EntradaXmlHistoricoPrecosModal from './entrada-xml/EntradaXmlHistoricoPrecosModal';
 import EntradaXmlHeader from './entrada-xml/EntradaXmlHeader';
 import EntradaXmlMetricas from './entrada-xml/EntradaXmlMetricas';
@@ -3494,277 +3495,25 @@ const EntradaXML = () => {
         </div>
       )}
 
-      {/* Modal de Criar Produto */}
-      {mostrarModalCriarProduto && itemSelecionadoParaCriar && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-              <div>
-                <h2 className="text-xl font-bold">Criar Novo Produto</h2>
-                <p className="text-sm text-gray-600">A partir do item da NF-e</p>
-              </div>
-              <button
-                onClick={() => {
-                  setMostrarModalCriarProduto(false);
-                  setItemSelecionadoParaCriar(null);
-                  setSugestaoSku(null);
-                }}
-                className="text-gray-500 hover:text-gray-700 text-2xl"
-              >
-                X
-              </button>
-            </div>
-
-            <div className="px-6 py-4">
-              {carregandoSugestao ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                  <p className="text-gray-600">Gerando sugestoes de SKU...</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* Informações do Item da NF-e */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <div className="font-semibold text-blue-900 mb-2">Dados da NF-e:</div>
-                    <div className="text-sm space-y-1 text-blue-800">
-                      <div><strong>Descricao:</strong> {itemSelecionadoParaCriar.descricao}</div>
-                      <div><strong>Codigo Fornecedor:</strong> {itemSelecionadoParaCriar.codigo_produto}</div>
-                      <div><strong>NCM:</strong> {itemSelecionadoParaCriar.ncm}</div>
-                      {itemSelecionadoParaCriar.ean && (
-                        <div><strong>EAN:</strong> {itemSelecionadoParaCriar.ean}</div>
-                      )}
-                      <div><strong>Valor Unitario NF:</strong> R$ {itemSelecionadoParaCriar.valor_unitario.toFixed(2)}</div>
-                      <div><strong>Custo de Aquisicao:</strong> R$ {formatarValorFiscal(obterCustoAquisicaoItem(itemSelecionadoParaCriar), 4)}</div>
-                    </div>
-                  </div>
-
-                  {/* Alerta de SKU existente */}
-                  {sugestaoSku?.ja_existe && (
-                    <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4">
-                      <div className="flex items-start gap-3">
-                        <span className="text-2xl">⚠️</span>
-                        <div className="flex-1">
-                          <div className="font-semibold text-yellow-900 mb-2">
-                            Codigo do fornecedor "{sugestaoSku.sku_proposto}" ja está em uso!
-                          </div>
-                          <div className="text-sm text-yellow-800 mb-3">
-                            Produto existente: <strong>{sugestaoSku.produto_existente.nome}</strong><br/>
-                            <span className="text-xs">Um SKU alternativo foi sugerido automaticamente. Você pode alterar se preferir.</span>
-                          </div>
-                          <div className="text-sm text-yellow-800 mb-2 font-semibold">
-                            Outras opcoes de SKU disponíveis:
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {sugestaoSku.sugestoes.map(sug => (
-                              <button
-                                key={sug.sku}
-                                onClick={() => setFormProduto({ ...formProduto, sku: sug.sku })}
-                                className={`px-3 py-1 rounded-lg text-sm font-semibold transition-all ${
-                                  formProduto.sku === sug.sku
-                                    ? 'bg-blue-600 text-white shadow-md'
-                                    : 'bg-white border border-blue-300 text-blue-700 hover:bg-blue-50'
-                                } ${sug.padrao ? 'ring-2 ring-yellow-400' : ''}`}
-                              >
-                                {sug.sku} {sug.padrao && '⭐'}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Sucesso - SKU disponivel */}
-                  {sugestaoSku && !sugestaoSku.ja_existe && (
-                    <div className="bg-green-50 border border-green-300 rounded-lg p-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl">OK</span>
-                        <div className="text-sm text-green-800">
-                          <strong>SKU disponivel!</strong> O codigo do fornecedor pode ser usado diretamente.
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Formulario */}
-                  <div className="space-y-4">
-                    {/* SKU */}
-                    <div>
-                      <label htmlFor="novo-produto-sku" className="block text-sm font-semibold text-gray-700 mb-1">
-                        SKU / Codigo do Produto *
-                        <span className="text-xs text-gray-500 font-normal ml-2">(Baseado no codigo do fornecedor)</span>
-                      </label>
-                      <input
-                        id="novo-produto-sku"
-                        type="text"
-                        value={formProduto.sku}
-                        onChange={(e) => setFormProduto({ ...formProduto, sku: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono"
-                        placeholder="Ex: MGZ-12345"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Voce pode editar o SKU se preferir</p>
-                    </div>
-
-                    {/* Nome */}
-                    <div>
-                      <label htmlFor="novo-produto-nome" className="block text-sm font-semibold text-gray-700 mb-1">
-                        Nome do Produto *
-                      </label>
-                      <input
-                        id="novo-produto-nome"
-                        type="text"
-                        value={formProduto.nome}
-                        onChange={(e) => setFormProduto({ ...formProduto, nome: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        placeholder="Nome completo do produto"
-                      />
-                    </div>
-
-                    {/* Descricao */}
-                    <div>
-                      <label htmlFor="novo-produto-descricao" className="block text-sm font-semibold text-gray-700 mb-1">
-                        Descricao
-                      </label>
-                      <textarea
-                        id="novo-produto-descricao"
-                        value={formProduto.descricao}
-                        onChange={(e) => setFormProduto({ ...formProduto, descricao: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        rows="2"
-                        placeholder="Descricao detalhada (opcional)"
-                      />
-                    </div>
-
-                    {/* Precos */}
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label htmlFor="novo-produto-preco-custo" className="block text-sm font-semibold text-gray-700 mb-1">
-                          Preco de Custo *
-                        </label>
-                        <input
-                          id="novo-produto-preco-custo"
-                          type="number"
-                          step="0.01"
-                          value={formProduto.preco_custo}
-                          onChange={(e) => {
-                            const custo = e.target.value;
-                            const margem = Number.parseFloat(formProduto.margem_lucro) || 0;
-                            setFormProduto({ 
-                              ...formProduto, 
-                              preco_custo: custo,
-                              preco_venda: custo ? calcularPrecoVenda(Number.parseFloat(custo), margem) : ''
-                            });
-                          }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor="novo-produto-margem" className="block text-sm font-semibold text-gray-700 mb-1">
-                          Margem (%) *
-                        </label>
-                        <input
-                          id="novo-produto-margem"
-                          type="number"
-                          step="0.01"
-                          value={formProduto.margem_lucro}
-                          onChange={(e) => {
-                            const margem = e.target.value;
-                            const custo = Number.parseFloat(formProduto.preco_custo) || 0;
-                            setFormProduto({ 
-                              ...formProduto, 
-                              margem_lucro: margem,
-                              preco_venda: custo && margem ? calcularPrecoVenda(custo, Number.parseFloat(margem)) : ''
-                            });
-                          }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor="novo-produto-preco-venda" className="block text-sm font-semibold text-gray-700 mb-1">
-                          Preco de Venda *
-                        </label>
-                        <input
-                          id="novo-produto-preco-venda"
-                          type="number"
-                          step="0.01"
-                          value={formProduto.preco_venda}
-                          onChange={(e) => {
-                            const venda = e.target.value;
-                            const custo = Number.parseFloat(formProduto.preco_custo) || 0;
-                            setFormProduto({ 
-                              ...formProduto, 
-                              preco_venda: venda,
-                              margem_lucro: custo && venda ? calcularMargemLucro(custo, Number.parseFloat(venda)) : ''
-                            });
-                          }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Estoque */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label htmlFor="novo-produto-estoque-minimo" className="block text-sm font-semibold text-gray-700 mb-1">
-                          Estoque Minimo
-                        </label>
-                        <input
-                          id="novo-produto-estoque-minimo"
-                          type="number"
-                          value={formProduto.estoque_minimo}
-                          onChange={(e) => setFormProduto({ ...formProduto, estoque_minimo: Number.parseInt(e.target.value) })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor="novo-produto-estoque-maximo" className="block text-sm font-semibold text-gray-700 mb-1">
-                          Estoque Maximo
-                        </label>
-                        <input
-                          id="novo-produto-estoque-maximo"
-                          type="number"
-                          value={formProduto.estoque_maximo}
-                          onChange={(e) => setFormProduto({ ...formProduto, estoque_maximo: Number.parseInt(e.target.value) })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Rodapé */}
-            <div className="sticky bottom-0 bg-white border-t px-6 py-4 flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  setMostrarModalCriarProduto(false);
-                  setItemSelecionadoParaCriar(null);
-                  setSugestaoSku(null);
-                }}
-                className="px-6 py-2 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={criarProdutoNovo}
-                disabled={
-                  loading || 
-                  !formProduto.sku || 
-                  !formProduto.nome || 
-                  !formProduto.preco_custo || 
-                  Number.parseFloat(formProduto.preco_custo) <= 0 || 
-                  !formProduto.preco_venda || 
-                  Number.parseFloat(formProduto.preco_venda) <= 0
-                }
-                className="px-6 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-              >
-                {loading ? 'Criando...' : 'Criar e Vincular Produto'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <EntradaXmlCriarProdutoModal
+        aberto={mostrarModalCriarProduto}
+        calcularMargemLucro={calcularMargemLucro}
+        calcularPrecoVenda={calcularPrecoVenda}
+        carregandoSugestao={carregandoSugestao}
+        criarProdutoNovo={criarProdutoNovo}
+        formProduto={formProduto}
+        formatarValorFiscal={formatarValorFiscal}
+        itemSelecionadoParaCriar={itemSelecionadoParaCriar}
+        loading={loading}
+        obterCustoAquisicaoItem={obterCustoAquisicaoItem}
+        onClose={() => {
+          setMostrarModalCriarProduto(false);
+          setItemSelecionadoParaCriar(null);
+          setSugestaoSku(null);
+        }}
+        setFormProduto={setFormProduto}
+        sugestaoSku={sugestaoSku}
+      />
       <EntradaXmlVisualizacaoNotaModal
         aberto={mostrarVisualizacao}
         notaSelecionada={notaSelecionada}
