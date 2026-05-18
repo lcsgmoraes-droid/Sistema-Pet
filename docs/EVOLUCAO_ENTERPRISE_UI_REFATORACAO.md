@@ -923,7 +923,8 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-18: `EntradaXML` extraiu a listagem principal de notas para `EntradaXmlNotasTable`, migrando filtros para `SegmentedControl`, acoes para `ActionButton`, status para `StatusBadge` e tabela para `DataTable`; o arquivo principal caiu de 3717 para 3561 linhas com build validado.
 - 2026-05-18: `EntradaXML` extraiu o modal de criacao de produto para `EntradaXmlCriarProdutoModal`, mantendo callbacks da pagina e padronizando carregamento/acoes com `LoadingState`, `IconActionButton` e `ActionButton`; o arquivo principal caiu de 3561 para 3319 linhas com build validado. Faltam blocos internos de itens da nota.
 - 2026-05-18: `EntradaXML` extraiu o modal de detalhes/conferencia para `EntradaXmlDetalhesModal`, preservando callbacks da pagina e reduzindo o arquivo principal de 3319 para 2486 linhas com build validado.
-- 2026-05-18: `EntradaXmlDetalhesModal` extraiu o card de item para `EntradaXmlDetalhesItemCard`, reduzindo o modal de 957 para 464 linhas e padronizando acoes internas claras com `ActionButton`/`IconActionButton` por funcao. Proximo passo: quebrar rodape/rateio e avancar na padronizacao dos botoes restantes.
+- 2026-05-18: `EntradaXmlDetalhesModal` extraiu o card de item para `EntradaXmlDetalhesItemCard`, reduzindo o modal de 957 para 464 linhas e padronizando acoes internas claras com `ActionButton`/`IconActionButton` por funcao.
+- 2026-05-18: `EntradaXmlDetalhesModal` extraiu o rodape/rateio para `EntradaXmlDetalhesFooter`, reduzindo o modal de 464 para 357 linhas e padronizando acoes de rateio/processamento/exclusao com `ActionButton` por funcao. Proximo passo: revisar botoes restantes do cabecalho/resumo de conferencia e avaliar se esta fatia ja vira PR.
 
 ### Nao fazer nesta onda
 
@@ -2074,7 +2075,7 @@ Atualizacao de 2026-04-24: iniciada a trilha de hardening para liberar o app e o
 
 - [ ] `frontend/src/pages/ecommerce/EcommerceMVP.jsx`: separar vitrine, carrinho, conta, checkout, pedidos, analytics e estilos
 - [ ] `app-mobile/src/screens/entregador/DetalheEntregaScreen.tsx`: separar GPS, acoes de parada, recebimento, venda/modal e finalizacao de rota
-- [ ] `frontend/src/components/EntradaXML.jsx`: continuar quebra do fluxo de importacao/validacao/conferencia para reduzir bundle e risco de regressao; ja foram extraidos modais operacionais, cabecalho, metricas, paineis SEFAZ, listagem principal, modal de criacao de produto, modal de detalhes/conferencia e card de item da NF
+- [ ] `frontend/src/components/EntradaXML.jsx`: continuar quebra do fluxo de importacao/validacao/conferencia para reduzir bundle e risco de regressao; ja foram extraidos modais operacionais, cabecalho, metricas, paineis SEFAZ, listagem principal, modal de criacao de produto, modal de detalhes/conferencia, card de item da NF e rodape/rateio da conferencia
 - [ ] `backend/app/routes/ecommerce_checkout.py`: extrair servico de checkout e preparar orquestracao `Pedido -> Venda`
 - [ ] `backend/app/routes/ecommerce_cart.py`: revisar reserva de estoque com protecao contra corrida em checkout simultaneo
 - [ ] `backend/app/api/endpoints/rotas_entrega.py`: separar sincronizacao de venda/rota/parada em servico de dominio testavel

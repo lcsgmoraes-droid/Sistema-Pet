@@ -1,4 +1,5 @@
 import { X } from 'lucide-react';
+import EntradaXmlDetalhesFooter from './EntradaXmlDetalhesFooter';
 import EntradaXmlDetalhesItemCard from './EntradaXmlDetalhesItemCard';
 import ActionButton from '../ui/ActionButton';
 import IconActionButton from '../ui/IconActionButton';
@@ -344,128 +345,18 @@ function EntradaXmlDetalhesModal({
               </div>
             </div>
 
-            {/* Rodape com Acoes */}
-            {notaSelecionada.status === 'pendente' && (
-              <div className="sticky bottom-0 bg-white border-t px-6 py-4 space-y-3">
-                {/* Secao de Rateio - ANTES de processar */}
-                <div className="bg-gray-50 border border-gray-200 rounded p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-sm font-medium text-gray-700">
-                      Distribuicao (informativo para relatorios)
-                    </h4>
-                    <div className="text-xs text-gray-500">
-                      Estoque unificado - Classificacao apenas para analises
-                    </div>
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => salvarTipoRateio(notaSelecionada.id, 'loja')}
-                      disabled={loading}
-                      className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-                        tipoRateio === 'loja'
-                          ? 'bg-gray-800 text-white'
-                          : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-100'
-                      } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      Loja
-                    </button>
-                    <button
-                      onClick={() => salvarTipoRateio(notaSelecionada.id, 'online')}
-                      disabled={loading}
-                      className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-                        tipoRateio === 'online'
-                          ? 'bg-gray-800 text-white'
-                          : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-100'
-                      } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      Online
-                    </button>
-                    <button
-                      onClick={() => salvarTipoRateio(notaSelecionada.id, 'parcial')}
-                      disabled={loading}
-                      className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-                        tipoRateio === 'parcial'
-                          ? 'bg-gray-800 text-white'
-                          : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-100'
-                      } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      Parcial
-                    </button>
-                    
-                    {(notaSelecionada.percentual_online > 0 || notaSelecionada.tipo_rateio) && (
-                      <div className="ml-auto flex gap-3 text-xs text-gray-600">
-                        <span>Online: {(notaSelecionada.percentual_online || 0).toFixed(0)}%</span>
-                        <span>Loja: {(notaSelecionada.percentual_loja || 100).toFixed(0)}%</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {tipoRateio === 'parcial' && (
-                    <div className="mt-2 text-xs text-gray-600 bg-gray-100 rounded p-2">
-                      Defina a quantidade destinada ao <strong>estoque online</strong> em cada produto acima. O sistema calcula automaticamente a % baseado nos valores.
-                    </div>
-                  )}
-                </div>
-
-                {/* Barra de Status e Botoes de Acao */}
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-gray-600">
-                    {notaSelecionada.itens.filter(i => i.produto_id).length} de {notaSelecionada.itens.length} produtos vinculados
-                  </div>
-                  <div className="flex gap-3">
-                    {notaSelecionada.entrada_estoque_realizada ? (
-                      <button
-                        onClick={() => reverterNota(notaSelecionada.id, notaSelecionada.numero_nota)}
-                        disabled={loading}
-                        className="px-6 py-2 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 disabled:bg-gray-400"
-                      >
-                        {loading ? 'Revertendo...' : 'Reverter Entrada'}
-                      </button>
-                    ) : (
-                      <>
-                        {!notaSelecionada.entrada_estoque_realizada && (
-                          <button
-                            onClick={() => excluirNota(notaSelecionada.id, notaSelecionada.numero_nota)}
-                            disabled={loading}
-                            className="px-6 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 disabled:bg-gray-400"
-                          >
-                            Excluir Nota
-                          </button>
-                        )}
-                        {notaSelecionada.itens.some(i => i.produto_id) && (
-                          <>
-                            <button
-                              onClick={() => carregarPreviewProcessamento(notaSelecionada.id)}
-                              disabled={loading}
-                              className="px-6 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 disabled:bg-gray-400"
-                            >
-                              Ajuste de custo
-                            </button>
-                            <button
-                              onClick={() => processarNota(notaSelecionada.id)}
-                              disabled={loading}
-                              className="px-6 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-400"
-                            >
-                              {loading ? 'Processando...' : 'Processar Nota'}
-                            </button>
-                          </>
-                        )}
-                      </>
-                    )}
-                    <button
-                      onClick={() => {
-                        setMostrarDetalhes(false);
-                        setNotaSelecionada(null);
-                      }}
-                      className="px-6 py-2 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50"
-                    >
-                      Fechar
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
+            <EntradaXmlDetalhesFooter
+              carregarPreviewProcessamento={carregarPreviewProcessamento}
+              excluirNota={excluirNota}
+              loading={loading}
+              notaSelecionada={notaSelecionada}
+              processarNota={processarNota}
+              reverterNota={reverterNota}
+              salvarTipoRateio={salvarTipoRateio}
+              setMostrarDetalhes={setMostrarDetalhes}
+              setNotaSelecionada={setNotaSelecionada}
+              tipoRateio={tipoRateio}
+            />
           </div>
         </div>
       )}
