@@ -6,7 +6,7 @@ from typing import Optional
 
 from sqlalchemy.orm import Session
 
-from .utils.timezone import to_brasilia
+from .utils.timezone import BRASILIA_TZ, to_brasilia
 from .veterinario_models import VetPartnerLink
 
 
@@ -29,6 +29,15 @@ def _normalizar_datetime_vet(value: Optional[datetime]) -> Optional[datetime]:
         except Exception:
             return value.replace(tzinfo=None)
     return value
+
+
+def _normalizar_datetime_local_brasilia(value: Optional[datetime]) -> Optional[datetime]:
+    """Interpreta datetime digitado sem fuso como horario local de Brasilia."""
+    if value is None:
+        return None
+    if getattr(value, "tzinfo", None):
+        return to_brasilia(value)
+    return value.replace(tzinfo=BRASILIA_TZ)
 
 
 def _serializar_datetime_vet(value: Optional[datetime]) -> Optional[datetime]:

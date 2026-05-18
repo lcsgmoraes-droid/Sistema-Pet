@@ -186,6 +186,12 @@ entrar no cronograma sem se perderem.
 - [x] Melhorar a agenda de procedimentos da internacao com labels acima dos
       campos, nomes mais claros, busca em catalogos de medicamentos/procedimentos
       e preenchimento inicial de dose/referencia quando houver catalogo.
+- [x] Refinar a agenda de procedimentos da internacao para usar campo unico
+      digitavel/autocomplete, sem duplicar o medicamento selecionado, com botao
+      `Novo` para ir ao catalogo.
+- [x] Corrigir o fuso dos procedimentos agendados de internacao: horario digitado
+      em `datetime-local` passa a ser interpretado como horario de Brasilia
+      antes de persistir.
 - [ ] Evoluir prescricao e internacao para agenda de horarios sugeridos por
       posologia, por exemplo a cada 8h/12h gerando os proximos horarios
       operacionais automaticamente.
@@ -205,6 +211,7 @@ entrar no cronograma sem se perderem.
       por autocomplete sem abrir a lista inteira ao entrar na tela.
 - [x] Tornar internacoes do app veterinario clicaveis, com detalhe rapido de
       resumo, agenda de cuidados, procedimentos realizados e evolucoes clinicas.
+- [x] Ampliar a agenda do app veterinario para visualizacao de dia, semana e mes.
 - [ ] Parametrizar visibilidade do veterinario no app e no web:
       proprietario/veterinario geral pode ver todos os pacientes da clinica;
       veterinario comum ve apenas pacientes, agenda, internacoes e procedimentos

@@ -37,9 +37,10 @@ Objetivo: criar uma experiencia de veterinario dentro do app mobile atual, reapr
 - [x] Catalogo de medicamentos/procedimentos para consulta rapida.
 - [x] Testes backend dos endpoints principais.
 
-### 4. Telas MVP
+### 4. Telas MVP e refinamentos
 
 - [x] Agenda do dia com horarios, pet, tutor e tipo.
+- [x] Agenda mobile com visao de dia, semana e mes.
 - [x] Internados com situacao e proximos cuidados.
 - [x] Internados clicaveis com detalhe rapido de resumo, agenda de cuidados,
       procedimentos realizados e evolucoes clinicas.
@@ -48,6 +49,11 @@ Objetivo: criar uma experiencia de veterinario dentro do app mobile atual, reapr
 - [x] Busca da calculadora por autocomplete: medicamentos aparecem apenas apos
       digitar, evitando lista inicial gigante.
 - [x] Tela de detalhes rapida para o evento selecionado.
+- [x] Agenda de procedimentos da internacao com autocomplete digitavel para
+      medicamento/procedimento e labels mais claros de dose, quantidade,
+      unidade e via.
+- [x] Correcao do horario digitado em procedimentos de internacao para preservar
+      o horario de Brasilia escolhido na tela.
 
 ### 5. Lembretes e alarmes
 

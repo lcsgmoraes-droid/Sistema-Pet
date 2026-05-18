@@ -68,6 +68,22 @@ def _day_bounds(data: Optional[date]) -> tuple[datetime, datetime]:
     return datetime.combine(dia, time.min), datetime.combine(dia, time.max)
 
 
+def _range_bounds(
+    data: Optional[date],
+    data_inicio: Optional[date],
+    data_fim: Optional[date],
+) -> tuple[datetime, datetime]:
+    if data:
+        return _day_bounds(data)
+
+    inicio_dia = data_inicio or date.today()
+    fim_dia = data_fim or inicio_dia
+    if fim_dia < inicio_dia:
+        inicio_dia, fim_dia = fim_dia, inicio_dia
+
+    return datetime.combine(inicio_dia, time.min), datetime.combine(fim_dia, time.max)
+
+
 def _agendamento_mobile_dict(ag: AgendamentoVet) -> dict:
     item = _agendamento_to_dict(ag)
     item.update({
@@ -162,11 +178,13 @@ def resumo_veterinario_mobile(
 @router.get("/agendamentos")
 def listar_agendamentos_vet_mobile(
     data: Optional[date] = Query(None),
+    data_inicio: Optional[date] = Query(None),
+    data_fim: Optional[date] = Query(None),
     db: Session = Depends(get_session),
     current_user: User = Depends(_get_current_ecommerce_user),
 ):
     veterinario, tenant_id = _get_mobile_veterinario_or_403(db, current_user)
-    inicio, fim = _day_bounds(data)
+    inicio, fim = _range_bounds(data, data_inicio, data_fim)
     agendamentos = _query_agendamentos(db, tenant_id, veterinario.id, inicio, fim).all()
     return [_agendamento_mobile_dict(ag) for ag in agendamentos]
 

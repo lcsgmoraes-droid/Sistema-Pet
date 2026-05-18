@@ -24,6 +24,15 @@ def test_app_vet_router_exposes_mobile_veterinary_mvp_routes():
     assert ("/app/vet/catalogo/medicamentos", "GET") in routes
 
 
+def test_app_vet_agendamentos_accepts_day_and_range_filters():
+    route = next(route for route in router.routes if route.path == "/app/vet/agendamentos")
+    dependant = getattr(route, "dependant", None)
+
+    query_params = {param.name for param in dependant.query_params}
+
+    assert {"data", "data_inicio", "data_fim"}.issubset(query_params)
+
+
 def test_app_vet_router_is_registered_in_main_app():
     from app.main import app
 
