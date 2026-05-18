@@ -5,6 +5,33 @@ export function montarNomeXml(dados) {
   return `nfe_${numero || '0'}_${serie || '1'}_${chave || 'xml'}.xml`;
 }
 
+export function extrairMensagemErroApi(error, fallback = 'Erro ao processar solicitacao') {
+  const detail = error?.response?.data?.detail ?? error?.response?.data?.message;
+
+  if (typeof detail === 'string') {
+    return detail;
+  }
+
+  if (Array.isArray(detail)) {
+    return detail
+      .map((item) => item?.message || item?.msg || item?.detail || String(item))
+      .join(' | ');
+  }
+
+  if (detail && typeof detail === 'object') {
+    return (
+      detail.message ||
+      detail.mensagem ||
+      detail.error ||
+      detail.erro ||
+      detail.motivo ||
+      fallback
+    );
+  }
+
+  return error?.message || fallback;
+}
+
 export function formatarOpcaoProduto(produto) {
   const sku = produto?.codigo || 'Sem SKU';
   const ean = produto?.codigo_barras || produto?.gtin_ean || produto?.gtin_ean_tributario || 'Sem EAN';

@@ -32,6 +32,7 @@ import {
   obterConfiguracaoPackItem,
   obterCustoAquisicaoItem,
   detectarDivergencias,
+  extrairMensagemErroApi,
 } from './entrada-xml/entradaXmlUtils';
 
 const EntradaXML = () => {
@@ -140,7 +141,7 @@ const EntradaXML = () => {
       console.error('  - Response:', error.response?.data);
       console.error('  - Status:', error.response?.status);
       console.error('  - Stack:', error.stack);
-      toast.error(`Erro ao carregar dados: ${error.response?.data?.detail || error.message}`);
+      toast.error(`Erro ao carregar dados: ${extrairMensagemErroApi(error)}`);
     }
   };
 
@@ -353,7 +354,7 @@ const EntradaXML = () => {
       
       carregarDados();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao excluir nota');
+      toast.error(extrairMensagemErroApi(error, 'Erro ao excluir nota'));
     } finally {
       setLoading(false);
     }
@@ -383,7 +384,7 @@ const EntradaXML = () => {
       
       carregarDados();
     } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao reverter entrada');
+      toast.error(extrairMensagemErroApi(error, 'Erro ao reverter entrada'));
     } finally {
       setLoading(false);
     }
@@ -474,7 +475,7 @@ const EntradaXML = () => {
 
       <EntradaXmlDetalhesModal
         acaoConferenciaOpcoes={ACAO_CONFERENCIA_OPCOES}
-        aberto={aberto}
+        aberto={mostrarDetalhes}
         abrirModalCriarProduto={abrirModalCriarProduto}
         aplicarMultiplicadorPackAoItem={aplicarMultiplicadorPackAoItem}
         atualizarCampoConferenciaItem={atualizarCampoConferenciaItem}
