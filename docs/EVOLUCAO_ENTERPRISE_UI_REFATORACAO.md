@@ -194,7 +194,7 @@ Maiores arquivos mapeados em 2026-05-04:
 | 2724 | `backend/app/clientes_routes.py` | Critico |
 | 2599 | `backend/app/bling_sync_routes.py` | Critico |
 | 2550 | `backend/app/pedidos_compra_routes.py` | Critico |
-| 2542 | `frontend/src/pages/ecommerce/EcommerceMVP.jsx` | Critico |
+| 2483 | `frontend/src/pages/ecommerce/EcommerceMVP.jsx` | Critico |
 | 2418 | `frontend/src/pages/EstoqueTransferenciaParceiro.jsx` | Critico |
 | 2280 | `backend/app/nfe_routes.py` | Critico |
 | 2181 | `backend/app/vendas_routes.py` | Critico |
@@ -595,7 +595,7 @@ Para cada dominio sensivel:
 | `frontend/src/components/EntradaXML.jsx` | 2486 | Muito alto |
 | `frontend/src/components/VendasFinanceiro.jsx` | 1980 | Alto |
 | `frontend/src/components/PedidosCompra.jsx` | 3225 | Alto |
-| `frontend/src/pages/ecommerce/EcommerceMVP.jsx` | 2542 | Alto |
+| `frontend/src/pages/ecommerce/EcommerceMVP.jsx` | 2483 | Alto |
 | `frontend/src/pages/EstoqueTransferenciaParceiro.jsx` | 2418 | Alto |
 | `frontend/src/components/ModalPagamento.jsx` | 1760 | Medio/alto |
 | `frontend/src/pages/ProdutosForm.jsx` | 1670 | Medio/alto |
@@ -926,7 +926,8 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-18: `EntradaXmlDetalhesModal` extraiu o card de item para `EntradaXmlDetalhesItemCard`, reduzindo o modal de 957 para 464 linhas e padronizando acoes internas claras com `ActionButton`/`IconActionButton` por funcao.
 - 2026-05-18: `EntradaXmlDetalhesModal` extraiu o rodape/rateio para `EntradaXmlDetalhesFooter`, reduzindo o modal de 464 para 357 linhas e padronizando acoes de rateio/processamento/exclusao com `ActionButton` por funcao.
 - 2026-05-18: `EntradaXmlDetalhesModal` extraiu o painel de conferencia para `EntradaXmlDetalhesConferenciaPanel`, reduzindo o modal de 357 para 266 linhas e padronizando as acoes de conferencia, tratativas, pendencia e devolucao com `ActionButton` por funcao. Proximo passo: avaliar PR/smoke ou seguir com pequenas limpezas de cabecalho/listagem do modal.
-- 2026-05-18: `EcommerceMVP` iniciou a quebra do storefront extraindo utilitarios de carrinho convidado, endereco, midia, estoque, banners e mensagens de erro para `ecommerceMvpUtils`, reduzindo a pagina de 2816 para 2542 linhas e usando `formatMoneyBRL` como base de moeda. Proximo passo: separar vitrine/catalogo em componente visual e padronizar botoes/estados por funcao.
+- 2026-05-18: `EcommerceMVP` iniciou a quebra do storefront extraindo utilitarios de carrinho convidado, endereco, midia, estoque, banners e mensagens de erro para `ecommerceMvpUtils`, reduzindo a pagina de 2816 para 2542 linhas e usando `formatMoneyBRL` como base de moeda.
+- 2026-05-18: `EcommerceMVP` extraiu o card de produto da vitrine para `EcommerceCatalogProductCard`, substituindo icones soltos por `lucide-react`, mantendo acoes de desejo/carrinho/aviso e reduzindo a pagina principal de 2542 para 2483 linhas. Proximo passo: separar filtros/metricas e sidebar do carrinho da vitrine.
 
 ### Nao fazer nesta onda
 
@@ -2075,7 +2076,7 @@ Atualizacao de 2026-04-24: iniciada a trilha de hardening para liberar o app e o
 
 ### 11.3 Refatoracoes prioritarias desta nova fase
 
-- [ ] `frontend/src/pages/ecommerce/EcommerceMVP.jsx`: separar vitrine, carrinho, conta, checkout, pedidos, analytics e estilos; utilitarios de carrinho/endereco/midia/estoque ja foram extraidos para `ecommerceMvpUtils`
+- [ ] `frontend/src/pages/ecommerce/EcommerceMVP.jsx`: separar vitrine, carrinho, conta, checkout, pedidos, analytics e estilos; utilitarios de carrinho/endereco/midia/estoque ja foram extraidos para `ecommerceMvpUtils` e o card de produto da vitrine ja foi movido para `EcommerceCatalogProductCard`
 - [ ] `app-mobile/src/screens/entregador/DetalheEntregaScreen.tsx`: separar GPS, acoes de parada, recebimento, venda/modal e finalizacao de rota
 - [ ] `frontend/src/components/EntradaXML.jsx`: continuar quebra do fluxo de importacao/validacao/conferencia para reduzir bundle e risco de regressao; ja foram extraidos modais operacionais, cabecalho, metricas, paineis SEFAZ, listagem principal, modal de criacao de produto, modal de detalhes/conferencia, card de item da NF, rodape/rateio da conferencia e painel de resumo/conferencia
 - [ ] `backend/app/routes/ecommerce_checkout.py`: extrair servico de checkout e preparar orquestracao `Pedido -> Venda`
