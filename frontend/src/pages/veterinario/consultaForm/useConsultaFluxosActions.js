@@ -34,6 +34,7 @@ export default function useConsultaFluxosActions({
   setSalvandoInsumoRapido,
   setSalvandoNovoExame,
   setSucesso,
+  salvarRascunhoAtual,
 }) {
   function abrirModalInsumoRapido() {
     if (!consultaIdAtual) {
@@ -58,11 +59,24 @@ export default function useConsultaFluxosActions({
     navigate(`${pathname}?${params.toString()}`);
   }
 
-  function agendarRetornoConsulta() {
+  async function salvarAntesDeAbrirFluxo() {
+    if (!salvarRascunhoAtual) return true;
+
+    const resultado = await salvarRascunhoAtual({
+      avancarEtapa: false,
+      exibirFeedback: false,
+    });
+    return Boolean(resultado?.ok);
+  }
+
+  async function agendarRetornoConsulta() {
     if (!consultaIdAtual) {
       setErro("Salve a consulta em rascunho antes de agendar o retorno.");
       return;
     }
+
+    const rascunhoSalvo = await salvarAntesDeAbrirFluxo();
+    if (!rascunhoSalvo) return;
 
     const link = buildAgendarRetornoConsultaLink({
       contextoConsultaParams,
@@ -77,11 +91,14 @@ export default function useConsultaFluxosActions({
     navigate(link);
   }
 
-  function abrirInternacaoConsulta() {
+  async function abrirInternacaoConsulta() {
     if (!consultaIdAtual) {
       setErro("Salve a consulta em rascunho antes de abrir a internacao.");
       return;
     }
+
+    const rascunhoSalvo = await salvarAntesDeAbrirFluxo();
+    if (!rascunhoSalvo) return;
 
     const link = buildInternacaoConsultaLink({
       contextoConsultaParams,

@@ -96,9 +96,16 @@ def test_get_current_ecommerce_user_sets_tenant_context_from_token():
 def test_cart_and_checkout_identity_use_validated_ecommerce_user():
     tenant_id = uuid4()
     user = SimpleNamespace(id=123, tenant_id=tenant_id, is_active=True)
+    clear_current_tenant()
+
     cart_identity = cart_current_identity(current_user=user)
+
+    assert get_current_tenant() == tenant_id
+    clear_current_tenant()
+
     checkout_identity = checkout_current_identity(current_user=user)
 
+    assert get_current_tenant() == tenant_id
     assert cart_identity.user_id == user.id
     assert cart_identity.tenant_id == str(tenant_id)
     assert checkout_identity.user_id == user.id

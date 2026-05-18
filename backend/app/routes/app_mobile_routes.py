@@ -13,7 +13,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel
-from sqlalchemy import func, or_, text
+from sqlalchemy import case, func, or_, text
 from sqlalchemy.orm import Session
 
 from app.db import get_session
@@ -444,7 +444,8 @@ def buscar_produto_barcode(
     """
     Busca produto pelo código de barras (EAN/GTIN).
     Tenta `codigo_barras` e depois `gtin_ean`.
-    Retorna apenas produtos ativos do tenant.
+    Retorna apenas produtos ativos, vendaveis e disponiveis para o app.
+    Se houver cadastros duplicados para o mesmo codigo, prioriza item com estoque.
     """
     tenant_id = _activate_user_tenant_context(current_user)
     barcode = (barcode or "").strip()
@@ -468,14 +469,19 @@ def buscar_produto_barcode(
             Produto.codigos_barras_alternativos.ilike(f"%{barcode_digits}%"),
         ])
 
+    prioridade_estoque = case((func.coalesce(Produto.estoque_atual, 0) > 0, 0), else_=1)
+
     produto = (
         db.query(Produto)
         .filter(
             Produto.tenant_id == tenant_id,
-            Produto.situacao == True,
+            Produto.ativo == True,
+            Produto.situacao.is_not(False),
+            Produto.is_sellable == True,
+            Produto.anunciar_app == True,
             or_(*filtros_codigo),
         )
-        .order_by(Produto.is_parent.asc(), Produto.id.asc())
+        .order_by(prioridade_estoque.asc(), Produto.is_parent.asc(), Produto.id.asc())
         .first()
     )
 

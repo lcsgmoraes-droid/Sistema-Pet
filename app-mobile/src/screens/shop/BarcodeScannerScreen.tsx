@@ -18,6 +18,12 @@ import { Produto } from '../../types';
 import { CORES, ESPACO, FONTE, RAIO } from '../../theme';
 import { formatarMoeda } from '../../utils/format';
 
+function mensagemErroApi(error: any, fallback: string) {
+  const detail = error?.response?.data?.detail;
+  if (typeof detail === 'string' && detail.trim()) return detail;
+  return fallback;
+}
+
 export default function BarcodeScannerScreen({ navigation }: any) {
   const isFocused = useIsFocused();
   const [permission, requestPermission] = useCameraPermissions();
@@ -26,6 +32,7 @@ export default function BarcodeScannerScreen({ navigation }: any) {
   const [produtoEncontrado, setProdutoEncontrado] = useState<Produto | null>(null);
   const ultimoScan = useRef<string>('');
   const { adicionar } = useCartStore();
+  const produtoSemEstoque = !!produtoEncontrado && Number(produtoEncontrado.estoque ?? 0) <= 0;
 
   useEffect(() => {
     if (!permission?.granted) {
@@ -60,8 +67,8 @@ export default function BarcodeScannerScreen({ navigation }: any) {
           ]
         );
       }
-    } catch {
-      Alert.alert('Erro', 'Não foi possível buscar o produto.', [
+    } catch (error: any) {
+      Alert.alert('Erro', mensagemErroApi(error, 'Não foi possível buscar o produto.'), [
         { text: 'Tentar novamente', onPress: () => { ultimoScan.current = ''; setScanAtivo(true); } },
       ]);
     } finally {
@@ -71,6 +78,10 @@ export default function BarcodeScannerScreen({ navigation }: any) {
 
   async function adicionarAoCarrinho() {
     if (!produtoEncontrado) return;
+    if (Number(produtoEncontrado.estoque ?? 0) <= 0) {
+      Alert.alert('Sem estoque', 'Este produto está sem estoque disponível no app.');
+      return;
+    }
     try {
       await adicionar(produtoEncontrado, 1);
       Alert.alert(
@@ -81,8 +92,8 @@ export default function BarcodeScannerScreen({ navigation }: any) {
           { text: 'Ver carrinho', onPress: () => navigation.navigate('Carrinho') },
         ]
       );
-    } catch {
-      Alert.alert('Erro', 'Não foi possível adicionar ao carrinho.');
+    } catch (error: any) {
+      Alert.alert('Erro', mensagemErroApi(error, 'Não foi possível adicionar ao carrinho.'));
     }
   }
 
@@ -191,6 +202,9 @@ export default function BarcodeScannerScreen({ navigation }: any) {
                   : produtoEncontrado.preco
               )}
             </Text>
+            {produtoSemEstoque ? (
+              <Text style={styles.produtoEstoqueIndisponivel}>Sem estoque no momento</Text>
+            ) : null}
           </View>
           <View style={styles.produtoAcoes}>
             <TouchableOpacity
@@ -203,9 +217,13 @@ export default function BarcodeScannerScreen({ navigation }: any) {
             >
               <Ionicons name="scan-outline" size={18} color={CORES.primario} />
             </TouchableOpacity>
-            <TouchableOpacity style={styles.botaoAdicionar} onPress={adicionarAoCarrinho}>
+            <TouchableOpacity
+              style={[styles.botaoAdicionar, produtoSemEstoque && styles.botaoAdicionarDesabilitado]}
+              onPress={adicionarAoCarrinho}
+              disabled={produtoSemEstoque}
+            >
               <Ionicons name="cart" size={18} color="#fff" />
-              <Text style={styles.botaoAdicionarTexto}>Adicionar</Text>
+              <Text style={styles.botaoAdicionarTexto}>{produtoSemEstoque ? 'Sem estoque' : 'Adicionar'}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -282,6 +300,7 @@ const styles = StyleSheet.create({
   produtoNome: { fontSize: FONTE.normal, fontWeight: '600', color: CORES.texto },
   produtoPrecoOriginal: { fontSize: FONTE.pequena, color: CORES.textoClaro, textDecorationLine: 'line-through', marginTop: 4 },
   produtoPreco: { fontSize: FONTE.grande, fontWeight: 'bold', color: CORES.primario, marginTop: 4 },
+  produtoEstoqueIndisponivel: { fontSize: FONTE.pequena, color: CORES.erro, fontWeight: '600', marginTop: 4 },
   produtoAcoes: { flexDirection: 'row', gap: ESPACO.sm, alignItems: 'center' },
   botaoEscanear: {
     width: 42,
@@ -301,6 +320,7 @@ const styles = StyleSheet.create({
     paddingVertical: ESPACO.sm + 4,
     gap: 6,
   },
+  botaoAdicionarDesabilitado: { backgroundColor: CORES.textoClaro },
   botaoAdicionarTexto: { color: '#fff', fontWeight: 'bold', fontSize: FONTE.normal },
   // Sem permissão
   semPermissao: {

@@ -90,6 +90,7 @@ export default function useConsultaFormActions({
     setSalvandoInsumoRapido,
     setSalvandoNovoExame,
     setSucesso,
+    salvarRascunhoAtual: rascunhoAcoes.salvarRascunho,
   });
 
   return {

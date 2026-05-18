@@ -10,7 +10,7 @@ from app.db import get_session
 from app.models import User
 from app.pedido_models import Pedido, PedidoItem
 from app.produtos_models import Produto
-from app.routes.ecommerce_auth import _get_current_ecommerce_user
+from app.routes.ecommerce_auth import _activate_user_tenant_context, _get_current_ecommerce_user
 from app.services.validade_campanha_service import (
     mapear_ofertas_validade_por_produto,
     resolver_preco_publico_produto,
@@ -61,7 +61,8 @@ def _produto_disponivel_no_canal(produto: Produto, canal: str) -> bool:
 
 
 def _current_identity(current_user: User = Depends(_get_current_ecommerce_user)) -> EcommerceIdentity:
-    return EcommerceIdentity(user_id=current_user.id, tenant_id=str(UUID(str(current_user.tenant_id))))
+    tenant_id = _activate_user_tenant_context(current_user)
+    return EcommerceIdentity(user_id=current_user.id, tenant_id=str(UUID(str(tenant_id))))
 
 
 def _find_or_create_carrinho(db: Session, identity: EcommerceIdentity) -> Pedido:
@@ -194,6 +195,13 @@ def _formatar_quantidade_promocional(valor: float) -> str:
     return f"{numero:.2f}".replace(".", ",")
 
 
+def _formatar_quantidade_estoque(valor: float) -> str:
+    numero = float(valor or 0)
+    if numero.is_integer():
+        return str(int(numero))
+    return f"{numero:.2f}".replace(".", ",")
+
+
 def _resolver_precificacao_produto(db: Session, produto: Produto, canal: str):
     oferta_validade = mapear_ofertas_validade_por_produto(db, [produto], canal).get(produto.id)
     return resolver_preco_publico_produto(
@@ -284,9 +292,20 @@ def adicionar_item_carrinho(
     disponivel_para_carrinho = max(estoque_disponivel - reservado_outros, 0.0)
 
     if float(nova_quantidade) > disponivel_para_carrinho:
+        if item:
+            detail = (
+                "Voce ja tem "
+                f"{_formatar_quantidade_estoque(item.quantidade)} unidade(s) desse produto no carrinho. "
+                f"Estoque disponivel: {_formatar_quantidade_estoque(disponivel_para_carrinho)}."
+            )
+        else:
+            detail = (
+                "Quantidade indisponivel em estoque. "
+                f"Estoque disponivel: {_formatar_quantidade_estoque(disponivel_para_carrinho)}."
+            )
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Quantidade indisponível em estoque (reserva ativa)",
+            detail=detail,
         )
 
     _validar_limite_promocao_validade(pricing, nova_quantidade)

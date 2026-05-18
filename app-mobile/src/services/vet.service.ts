@@ -23,6 +23,37 @@ export interface VetAgendamento {
   consulta_id?: number | null;
 }
 
+export interface VetPetResumo {
+  id: number;
+  codigo?: string | null;
+  cliente_id: number;
+  nome: string;
+  especie?: string | null;
+  raca?: string | null;
+  peso?: number | null;
+  foto_url?: string | null;
+  cliente_nome?: string | null;
+  cliente_telefone?: string | null;
+  cliente_celular?: string | null;
+}
+
+export interface VetConsultorio {
+  id: number;
+  nome: string;
+  descricao?: string | null;
+}
+
+export interface VetAgendamentoPayload {
+  pet_id: number;
+  data_hora: string;
+  duracao_minutos?: number;
+  tipo?: string;
+  motivo?: string | null;
+  consultorio_id?: number | null;
+  is_emergencia?: boolean;
+  observacoes?: string | null;
+}
+
 export interface VetInternacao {
   id: number;
   pet_id: number;
@@ -55,6 +86,17 @@ export interface VetProcedimentoAgenda {
   observacoes?: string | null;
   status?: string | null;
   feito?: boolean;
+}
+
+export interface VetProcedimentoAgendaPayload {
+  horario_agendado: string;
+  medicamento: string;
+  dose?: string | null;
+  via?: string | null;
+  quantidade_prevista?: number | null;
+  unidade_quantidade?: string | null;
+  lembrete_min?: number | null;
+  observacoes_agenda?: string | null;
 }
 
 export interface VetEvolucaoInternacao {
@@ -133,12 +175,29 @@ export async function obterResumoVet(data?: string): Promise<VetResumo> {
   return response;
 }
 
+export async function listarPetsVet(busca?: string): Promise<VetPetResumo[]> {
+  const { data } = await api.get<VetPetResumo[]>("/app/vet/pets", {
+    params: busca ? { busca } : undefined,
+  });
+  return data;
+}
+
+export async function listarConsultoriosVet(): Promise<VetConsultorio[]> {
+  const { data } = await api.get<VetConsultorio[]>("/app/vet/consultorios");
+  return data;
+}
+
 export async function listarAgendamentosVet(filtros?: string | VetAgendaFiltros): Promise<VetAgendamento[]> {
   const params = typeof filtros === "string" ? { data: filtros } : filtros;
   const { data: response } = await api.get<VetAgendamento[]>("/app/vet/agendamentos", {
     params,
   });
   return response;
+}
+
+export async function criarAgendamentoVet(payload: VetAgendamentoPayload): Promise<VetAgendamento> {
+  const { data } = await api.post<VetAgendamento>("/app/vet/agendamentos", payload);
+  return data;
 }
 
 export async function listarInternacoesVet(): Promise<VetInternacao[]> {
@@ -158,6 +217,17 @@ export async function listarProcedimentosVet(): Promise<VetProcedimentoAgenda[]>
 
 export async function concluirProcedimentoVet(id: number): Promise<VetProcedimentoAgenda> {
   const { data } = await api.patch<VetProcedimentoAgenda>(`/app/vet/procedimentos-agenda/${id}/concluir`, {});
+  return data;
+}
+
+export async function criarProcedimentoAgendaVet(
+  internacaoId: number,
+  payload: VetProcedimentoAgendaPayload,
+): Promise<VetProcedimentoAgenda> {
+  const { data } = await api.post<VetProcedimentoAgenda>(
+    `/app/vet/internacoes/${internacaoId}/procedimentos-agenda`,
+    payload,
+  );
   return data;
 }
 

@@ -39,7 +39,9 @@ export default function useConsultaRascunhoActions({
     setSucesso(mensagem);
   }
 
-  async function salvarRascunho() {
+  async function salvarRascunho(opcoes = {}) {
+    const { avancarEtapa = true, exibirFeedback = true } = opcoes;
+
     setSalvando(true);
     setErro(null);
     setSucesso(null);
@@ -49,7 +51,7 @@ export default function useConsultaRascunhoActions({
       if (!petSelecionadoAtual?.cliente_id) {
         setErro("Selecione um pet valido vinculado a um tutor.");
         window.scrollTo({ top: 0, behavior: "smooth" });
-        return;
+        return { ok: false, consultaId: null };
       }
 
       const payload = buildConsultaPayload({
@@ -77,15 +79,19 @@ export default function useConsultaRascunhoActions({
         buildRascunhoItensConsultaPayload(form)
       );
 
-      const mensagem = buildMensagemRascunhoSalvo({ etapa, totalEtapas: ETAPAS.length });
-      setSucesso(mensagem);
-      setRascunhoSalvoMensagem(mensagem);
-      setModalRascunhoSalvoAberto(true);
+      if (exibirFeedback) {
+        const mensagem = buildMensagemRascunhoSalvo({ etapa, totalEtapas: ETAPAS.length });
+        setSucesso(mensagem);
+        setRascunhoSalvoMensagem(mensagem);
+        setModalRascunhoSalvoAberto(true);
+      }
 
-      if (etapa < ETAPAS.length - 1) setEtapa((etapaAtual) => etapaAtual + 1);
+      if (avancarEtapa && etapa < ETAPAS.length - 1) setEtapa((etapaAtual) => etapaAtual + 1);
+      return { ok: true, consultaId: consultaIdParaSalvar };
     } catch (error) {
       setErro(error?.response?.data?.detail ?? "Erro ao salvar. Tente novamente.");
       window.scrollTo({ top: 0, behavior: "smooth" });
+      return { ok: false, consultaId: null };
     } finally {
       setSalvando(false);
     }
