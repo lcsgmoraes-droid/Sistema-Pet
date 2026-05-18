@@ -9,6 +9,7 @@ import Constants from "expo-constants";
 import * as Notifications from "expo-notifications";
 import { useEffect, useRef } from "react";
 import { Platform } from "react-native";
+import { navigateWhenReady } from "../navigation/navigationRef";
 import { registerPushToken } from "../services/auth.service";
 
 // Detecta se está rodando no Expo Go (SDK 53+ não suporta push remoto no Expo Go)
@@ -87,8 +88,14 @@ export function usePushNotifications(isAuthenticated: boolean) {
 
     // Listener: usuário tocou na notificação
     responseListener.current =
-      Notifications.addNotificationResponseReceivedListener((_response) => {
-        // Espaço para futura navegação ao tocar na notificação
+      Notifications.addNotificationResponseReceivedListener((response) => {
+        const data = response.notification.request.content.data || {};
+        if (data.source !== "app-vet") return;
+        if (data.kind === "procedimento") {
+          navigateWhenReady("VetProcedimentos");
+        } else if (data.kind === "agendamento") {
+          navigateWhenReady("VetAgenda");
+        }
       });
 
     return () => {

@@ -16,6 +16,7 @@ from app.routes.ecommerce_auth import (
     _extract_tenant_id_from_request,
     _get_current_ecommerce_user,
     _get_or_create_cliente_for_user,
+    _serialize_profile,
 )
 from app.routes.ecommerce_cart import _current_identity as cart_current_identity
 from app.routes.ecommerce_checkout import _current_identity as checkout_current_identity
@@ -173,6 +174,40 @@ def test_get_or_create_cliente_for_user_sets_tenant_context_before_query():
 
     assert result is cliente
     assert get_current_tenant() == tenant_id
+
+
+def test_serialize_profile_marks_veterinario_as_mobile_operational_profile():
+    user = SimpleNamespace(
+        id=123,
+        email="vet@example.com",
+        email_verified=True,
+        nome="Dra Teste",
+        telefone=None,
+        cpf_cnpj=None,
+    )
+    cliente = SimpleNamespace(
+        id=456,
+        tipo_cadastro="veterinario",
+        ativo=True,
+        is_entregador=True,
+        telefone=None,
+        cpf=None,
+        cep=None,
+        endereco=None,
+        numero=None,
+        complemento=None,
+        bairro=None,
+        cidade=None,
+        estado=None,
+        endereco_entrega=None,
+        enderecos_adicionais=None,
+    )
+
+    profile = _serialize_profile(user, cliente)
+
+    assert profile["is_veterinario"] is True
+    assert profile["veterinario_id"] == cliente.id
+    assert profile["perfil_operacional"] == "veterinario"
 
 
 def test_get_active_public_tenant_sets_tenant_context():
