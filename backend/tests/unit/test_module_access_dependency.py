@@ -1,7 +1,8 @@
 from types import SimpleNamespace
 
 import pytest
-from fastapi import HTTPException
+from fastapi import Depends, FastAPI, HTTPException
+from fastapi.testclient import TestClient
 
 from app.security import module_access
 
@@ -17,6 +18,17 @@ def _user(**overrides):
 
 def _credentials():
     return SimpleNamespace(credentials="token-teste")
+
+
+def _client_com_modulo_bling(path: str) -> TestClient:
+    app = FastAPI()
+    app.dependency_overrides[module_access.get_session] = lambda: object()
+
+    @app.post(path, dependencies=[Depends(module_access.require_active_module("bling"))])
+    def endpoint_teste():
+        return {"status": "ok"}
+
+    return TestClient(app)
 
 
 def _patch_auth(monkeypatch, user, tenant_id):
@@ -98,6 +110,25 @@ async def test_require_active_module_rejects_missing_credentials():
 
     assert exc.value.status_code == 403
     assert exc.value.detail == "Not authenticated"
+
+
+@pytest.mark.parametrize("path", ["/integracoes/bling/pedido", "/integracoes/bling/nf"])
+def test_require_active_module_allows_public_bling_webhooks_without_credentials(path):
+    client = _client_com_modulo_bling(path)
+
+    response = client.post(path)
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_require_active_module_keeps_other_bling_routes_private_without_credentials():
+    client = _client_com_modulo_bling("/integracoes/bling/pedidos")
+
+    response = client.post("/integracoes/bling/pedidos")
+
+    assert response.status_code == 403
+    assert response.json()["detail"] == "Not authenticated"
 
 
 def test_require_active_module_rejects_unknown_module():

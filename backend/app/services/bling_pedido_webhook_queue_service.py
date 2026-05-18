@@ -184,6 +184,7 @@ def enqueue_bling_pedido_webhook(db: Session, payload: dict) -> dict[str, Any]:
 def _claim_next_event(db: Session) -> BlingPedidoWebhookEvent | None:
     now = _utcnow()
     stale_after = now - timedelta(seconds=_env_int("BLING_PEDIDO_WEBHOOK_PROCESSING_TIMEOUT_SECONDS", 10 * 60))
+    _mark_exhausted_processing_events_dead(db, stale_after=stale_after, now=now)
 
     event = (
         db.query(BlingPedidoWebhookEvent)
@@ -213,6 +214,29 @@ def _claim_next_event(db: Session) -> BlingPedidoWebhookEvent | None:
     db.commit()
     db.refresh(event)
     return event
+
+
+def _mark_exhausted_processing_events_dead(db: Session, *, stale_after: datetime, now: datetime) -> int:
+    updated = (
+        db.query(BlingPedidoWebhookEvent)
+        .filter(
+            BlingPedidoWebhookEvent.status == STATUS_PROCESSING,
+            BlingPedidoWebhookEvent.started_at < stale_after,
+            BlingPedidoWebhookEvent.attempts >= BlingPedidoWebhookEvent.max_attempts,
+        )
+        .update(
+            {
+                "status": STATUS_DEAD,
+                "next_attempt_at": now,
+                "updated_at": now,
+                "last_error": "Evento ficou em processing apos atingir max_attempts; marcado como dead para revisao/reprocessamento.",
+            },
+            synchronize_session=False,
+        )
+    )
+    if updated:
+        db.commit()
+    return int(updated or 0)
 
 
 def _mark_processed(db: Session, event_id: int, response: Any) -> None:

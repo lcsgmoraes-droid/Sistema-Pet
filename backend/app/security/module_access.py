@@ -3,7 +3,7 @@
 from datetime import datetime, timezone
 from typing import Callable
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
@@ -16,6 +16,13 @@ from app.models import AssinaturaModulo, Tenant, User
 from app.routes.modulos_routes import MODULOS_PREMIUM, _resolver_modulos_ativos
 
 optional_security = HTTPBearer(auto_error=False)
+
+PUBLIC_BLING_WEBHOOK_PATHS = frozenset(
+    {
+        "/integracoes/bling/pedido",
+        "/integracoes/bling/nf",
+    }
+)
 
 
 def _is_ecommerce_customer_token(credentials: HTTPAuthorizationCredentials | None) -> bool:
@@ -51,12 +58,21 @@ def _load_active_modules(db: Session, tenant_id: str, agora: datetime | None = N
     )
 
 
+def _is_public_bling_webhook(modulo: str, request: Request | None) -> bool:
+    if modulo != "bling" or request is None:
+        return False
+
+    path = str(request.url.path or "").rstrip("/") or "/"
+    return request.method.upper() == "POST" and path in PUBLIC_BLING_WEBHOOK_PATHS
+
+
 def require_active_module(modulo: str, *, allow_ecommerce_customer: bool = False) -> Callable:
     """Bloqueia rotas de modulo premium quando o tenant nao tem acesso."""
     if modulo not in MODULOS_PREMIUM:
         raise ValueError(f"Modulo comercial desconhecido: {modulo}")
 
     async def dependency(
+        request: Request = None,
         credentials: HTTPAuthorizationCredentials | None = Depends(optional_security),
         db: Session = Depends(get_session),
     ) -> None:
@@ -64,6 +80,8 @@ def require_active_module(modulo: str, *, allow_ecommerce_customer: bool = False
             return
 
         if not credentials:
+            if _is_public_bling_webhook(modulo, request):
+                return
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authenticated")
 
         current_user = get_current_user(credentials=credentials, session=db)

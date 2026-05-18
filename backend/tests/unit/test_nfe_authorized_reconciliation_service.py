@@ -2,6 +2,7 @@ from types import SimpleNamespace
 
 from app.services.nfe_authorized_reconciliation_service import (
     executar_reconciliacao_automatica_nfes_autorizadas,
+    listar_tenants_com_nfes_autorizadas_recentes,
     reconciliar_nf_autorizada_cache,
 )
 from app.middlewares.request_context import clear_request_context, get_request_id
@@ -217,3 +218,26 @@ def test_executar_reconciliacao_automatica_nfes_autorizadas_inclui_correlacao(mo
 
     assert resultado["correlation_id"].startswith("job.nfe-authorized-reconciliation-")
     assert get_request_id() is None
+
+
+def test_listar_tenants_com_nfes_autorizadas_recentes_usa_sql_global_autorizado(monkeypatch):
+    import app.services.nfe_authorized_reconciliation_service as service
+
+    chamadas = []
+
+    def fake_execute(db, sql, params=None, **kwargs):
+        chamadas.append({"db": db, "sql": sql, "params": params or {}, **kwargs})
+        return [("tenant-a",), ("tenant-b",)]
+
+    monkeypatch.setattr(service, "_garantir_registry_sqlalchemy_reconciliacao", lambda: None)
+    monkeypatch.setattr(service, "execute_tenant_safe_all", fake_execute, raising=False)
+
+    db = object()
+    resultado = listar_tenants_com_nfes_autorizadas_recentes(db, dias=5)
+
+    assert resultado == ["tenant-a", "tenant-b"]
+    assert chamadas[0]["db"] is db
+    assert "bling_notas_fiscais_cache" in chamadas[0]["sql"]
+    assert chamadas[0]["require_tenant"] is False
+    assert chamadas[0]["allow_global"] is True
+    assert chamadas[0]["global_reason"]

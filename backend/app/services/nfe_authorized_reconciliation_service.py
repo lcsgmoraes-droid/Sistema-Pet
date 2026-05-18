@@ -10,6 +10,7 @@ from app.pedido_integrado_item_models import PedidoIntegradoItem
 from app.pedido_integrado_models import PedidoIntegrado
 from app.produtos_models import EstoqueMovimentacao
 from app.services.pedido_integrado_consolidation_service import localizar_pedido_por_bling_id
+from app.utils.tenant_safe_sql import execute_tenant_safe_all
 from app.utils.correlation import current_correlation_id, operation_correlation_context
 from app.utils.logger import logger
 
@@ -91,19 +92,21 @@ def _deduplicar_registros_nfe_por_pedido(registros: list[BlingNotaFiscalCache]) 
 
 def listar_tenants_com_nfes_autorizadas_recentes(db: Session, *, dias: int) -> list:
     _garantir_registry_sqlalchemy_reconciliacao()
-    return [
-        tenant_id
-        for (tenant_id,) in (
-            db.query(BlingNotaFiscalCache.tenant_id)
-            .filter(
-                BlingNotaFiscalCache.data_emissao.isnot(None),
-                BlingNotaFiscalCache.data_emissao >= _limite_data_recentes(dias),
-                func.lower(BlingNotaFiscalCache.status).in_(_NFE_STATUS_AUTORIZADAS),
-            )
-            .distinct()
-            .all()
-        )
-    ]
+    rows = execute_tenant_safe_all(
+        db,
+        """
+        SELECT DISTINCT tenant_id
+        FROM bling_notas_fiscais_cache
+        WHERE data_emissao IS NOT NULL
+          AND data_emissao >= :data_limite
+          AND lower(status) IN ('autorizada')
+        """,
+        {"data_limite": _limite_data_recentes(dias)},
+        require_tenant=False,
+        allow_global=True,
+        global_reason="Job global de reconciliacao de NFs autorizadas precisa descobrir tenants com notas recentes.",
+    )
+    return [tenant_id for (tenant_id,) in rows]
 
 
 def _extrair_referencias_nf_cache(registro: BlingNotaFiscalCache) -> dict:
