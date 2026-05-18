@@ -15,6 +15,7 @@ import EntradaXmlRevisaoPrecosModal from './entrada-xml/EntradaXmlRevisaoPrecosM
 import EntradaXmlResultadoLoteModal from './entrada-xml/EntradaXmlResultadoLoteModal';
 import EntradaXmlSefazPanels from './entrada-xml/EntradaXmlSefazPanels';
 import EntradaXmlVisualizacaoNotaModal from './entrada-xml/EntradaXmlVisualizacaoNotaModal';
+import useEntradaXmlSefaz from './entrada-xml/useEntradaXmlSefaz';
 import {
   exportarRelatorioCustosMaioresCSV as exportarRelatorioCustosMaioresCSVArquivo,
   exportarRelatorioCustosMaioresPDF as exportarRelatorioCustosMaioresPDFArquivo,
@@ -31,7 +32,6 @@ import {
   formatarOpcaoProduto,
   formatarValorFiscal,
   montarConferenciaState,
-  montarNomeXml,
   normalizarProdutoPreview,
   normalizarNumeroConferencia,
   obterConfiguracaoPackItem,
@@ -330,32 +330,6 @@ const EntradaXML = () => {
       setCriandoPendenciaFornecedor(false);
     }
   };
-
-  // Painel de busca SEFAZ embutido
-  const [mostrarPainelSefaz, setMostrarPainelSefaz] = useState(false);
-  const [mostrarConfigSefaz, setMostrarConfigSefaz] = useState(false);
-  const [chaveSefaz, setChaveSefaz] = useState('');
-  const [consultasSefaz, setConsultasSefaz] = useState([]);
-  const [consultaExpandidaId, setConsultaExpandidaId] = useState(null);
-  const [importandoConsultaId, setImportandoConsultaId] = useState(null);
-  const [erroSefaz, setErroSefaz] = useState('');
-  const [avisoConectorSefaz, setAvisoConectorSefaz] = useState('');
-  const [loadingSefaz, setLoadingSefaz] = useState(false);
-  const [configSefazLoading, setConfigSefazLoading] = useState(false);
-  const [salvandoRotina, setSalvandoRotina] = useState(false);
-  const [sincronizando, setSincronizando] = useState(false);
-  const [mensagemRotina, setMensagemRotina] = useState('');
-  const [diagnosticando, setDiagnosticando] = useState(false);
-  const [resultadoDiagnostico, setResultadoDiagnostico] = useState(null);
-  const [nsuStatus, setNsuStatus] = useState(null);
-  const [carregandoNsu, setCarregandoNsu] = useState(false);
-  const [resetandoNsu, setResetandoNsu] = useState(false);
-  const [cfgSefaz, setCfgSefaz] = useState({
-    enabled: false, modo: 'mock', ambiente: 'homologacao', uf: 'SP', cnpj: '',
-    importacao_automatica: false, importacao_intervalo_min: 60, cert_ok: false,
-    ultimo_sync_status: 'nunca', ultimo_sync_mensagem: 'Ainda nao sincronizado.',
-    ultimo_sync_at: null, ultimo_sync_documentos: 0,
-  });
 
   useEffect(() => {
     console.log('🔄 [EntradaXML] Componente montado, iniciando carregamento...');
@@ -658,6 +632,35 @@ const EntradaXML = () => {
       toast.error('Erro ao carregar detalhes da nota');
     }
   };
+
+  const {
+    avisoConectorSefaz,
+    chaveSefaz,
+    cfgSefaz,
+    configSefazLoading,
+    consultaExpandidaId,
+    consultasSefaz,
+    consultarSefaz,
+    erroSefaz,
+    importandoConsultaId,
+    loadingSefaz,
+    mensagemRotina,
+    mostrarConfigSefaz,
+    mostrarPainelSefaz,
+    salvarRotinaSefaz,
+    salvandoRotina,
+    setCfgSefaz,
+    setChaveSefaz,
+    setConsultaExpandidaId,
+    usarNaEntrada,
+    alternarConfigSefaz,
+    alternarPainelSefaz,
+  } = useEntradaXmlSefaz({
+    api,
+    abrirDetalhes,
+    carregarDados,
+    toast,
+  });
 
   const abrirVisualizacao = async (notaId) => {
     try {
@@ -1536,172 +1539,6 @@ const EntradaXML = () => {
     return ((venda - custo) / custo * 100).toFixed(2);
   };
 
-  const carregarConfigSefaz = async () => {
-    try {
-      setConfigSefazLoading(true);
-      const { data } = await api.get('/sefaz/config');
-      setCfgSefaz(prev => ({
-        ...prev,
-        enabled: Boolean(data.enabled),
-        modo: data.modo || 'mock',
-        ambiente: data.ambiente || 'homologacao',
-        uf: data.uf || 'SP',
-        cnpj: data.cnpj || '',
-        importacao_automatica: Boolean(data.importacao_automatica),
-        importacao_intervalo_min: Number(data.importacao_intervalo_min || 15),
-        cert_ok: Boolean(data.cert_ok),
-        ultimo_sync_status: data.ultimo_sync_status || 'nunca',
-        ultimo_sync_mensagem: data.ultimo_sync_mensagem || 'Ainda nao sincronizado.',
-        ultimo_sync_at: data.ultimo_sync_at || null,
-        ultimo_sync_documentos: Number(data.ultimo_sync_documentos || 0),
-      }));
-    } catch {
-      setMensagemRotina('Nao foi possivel carregar a configuracao da SEFAZ.');
-    } finally {
-      setConfigSefazLoading(false);
-    }
-  };
-
-  const salvarRotinaSefaz = async () => {
-    setMensagemRotina('');
-    try {
-      setSalvandoRotina(true);
-      await api.post('/sefaz/config', {
-        enabled: cfgSefaz.enabled,
-        modo: cfgSefaz.modo,
-        ambiente: cfgSefaz.ambiente,
-        uf: cfgSefaz.uf,
-        cnpj: cfgSefaz.cnpj,
-        importacao_automatica: cfgSefaz.importacao_automatica,
-        importacao_intervalo_min: Number(cfgSefaz.importacao_intervalo_min || 15),
-      });
-      setMensagemRotina('Rotina automatica salva com sucesso.');
-      await carregarConfigSefaz();
-    } catch (err) {
-      setMensagemRotina(err?.response?.data?.detail || 'Erro ao salvar rotina automatica.');
-    } finally {
-      setSalvandoRotina(false);
-    }
-  };
-
-  const sincronizarAgoraSefaz = async () => {
-    setMensagemRotina('');
-    try {
-      setSincronizando(true);
-      const { data } = await api.post('/sefaz/sync-now');
-      setMensagemRotina(data?.mensagem || 'Sincronizacao solicitada.');
-      await carregarConfigSefaz();
-    } catch (err) {
-      setMensagemRotina(err?.response?.data?.detail || 'Erro ao sincronizar agora.');
-    } finally {
-      setSincronizando(false);
-    }
-  };
-
-  const diagnosticarEmLote = async () => {
-    setResultadoDiagnostico(null);
-    setDiagnosticando(true);
-    try {
-      const { data } = await api.post('/sefaz/sync-diagnostico?max_lotes=5');
-      setResultadoDiagnostico(data);
-      await carregarConfigSefaz();
-      await carregarDados();
-    } catch (err) {
-      setResultadoDiagnostico({ erro: err?.response?.data?.detail || 'Erro ao executar diagnostico em lote.' });
-    } finally {
-      setDiagnosticando(false);
-    }
-  };
-
-  const verificarNsuStatus = async () => {
-    setCarregandoNsu(true);
-    try {
-      const { data } = await api.get('/sefaz/nsu-status');
-      setNsuStatus(data);
-      await carregarConfigSefaz();
-    } catch (err) {
-      setNsuStatus({ erro: err?.response?.data?.detail || 'Erro ao consultar NSU.' });
-    } finally {
-      setCarregandoNsu(false);
-    }
-  };
-
-  const resetarNsu = async () => {
-    if (!window.confirm('Isso vai redefinir o ponto de partida da busca para o ZERO (início de tudo). As notas já importadas não serão duplicadas, mas a sincronização vai precisar paginar por todos os documentos históricos da SEFAZ.\n\nConfirma?')) return;
-    setResetandoNsu(true);
-    try {
-      await api.post('/sefaz/reset-nsu', { nsu: '000000000000000' });
-      setNsuStatus(null);
-      setMensagemRotina('NSU zerado. Próxima sincronização vai buscar todos os documentos disponíveis na SEFAZ.');
-      await carregarConfigSefaz();
-    } catch (err) {
-      setMensagemRotina(err?.response?.data?.detail || 'Erro ao resetar NSU.');
-    } finally {
-      setResetandoNsu(false);
-    }
-  };
-
-  const consultarSefaz = async (e) => {
-    e.preventDefault();
-    setErroSefaz('');
-    setAvisoConectorSefaz('');
-    if (chaveSefaz.length !== 44) {
-      setErroSefaz('A chave de acesso deve ter exatamente 44 digitos.');
-      return;
-    }
-    try {
-      setLoadingSefaz(true);
-      const resp = await api.post('/sefaz/consultar', { chave_acesso: chaveSefaz });
-      const novaConsulta = {
-        id: `${Date.now()}-${resp.data.chave_acesso}`,
-        criadoEm: new Date().toISOString(),
-        dados: resp.data,
-      };
-      setConsultasSefaz(prev => [novaConsulta, ...prev]);
-      setConsultaExpandidaId(null);
-    } catch (err) {
-      const msg = err?.response?.data?.detail || 'Erro ao consultar a SEFAZ.';
-      const httpStatus = Number(err?.response?.status || 0);
-      if (httpStatus === 501 && msg.toLowerCase().includes('conector')) {
-        setAvisoConectorSefaz(msg);
-      } else {
-        setErroSefaz(msg);
-      }
-    } finally {
-      setLoadingSefaz(false);
-    }
-  };
-
-  const usarNaEntrada = async (consulta) => {
-    const xmlNfe = consulta?.dados?.xml_nfe;
-    if (!xmlNfe) {
-      toast.error('Esta consulta nao trouxe XML completo. Tente outra chave ou rode sincronizacao real.');
-      return;
-    }
-    try {
-      setImportandoConsultaId(consulta.id);
-      const fileName = montarNomeXml(consulta.dados);
-      const blob = new Blob([xmlNfe], { type: 'application/xml;charset=utf-8' });
-      const file = new File([blob], fileName, { type: 'text/xml' });
-      const formData = new FormData();
-      formData.append('file', file);
-      const { data } = await api.post('/notas-entrada/upload', formData, {
-        headers: { 'Content-Type': 'multipart/form-data' },
-      });
-      toast.success('NF-e importada com sucesso!');
-      await carregarDados();
-      const notaIdCriada = data?.nota_id;
-      if (notaIdCriada) {
-        await abrirDetalhes(notaIdCriada);
-      }
-    } catch (err) {
-      const msg = err?.response?.data?.detail || 'Falha ao importar NF-e.';
-      toast.error(msg);
-    } finally {
-      setImportandoConsultaId(null);
-    }
-  };
-
   const getConfiancaBadge = (confianca) => {
     if (!confianca) return <span className="text-gray-400 text-sm">Nao vinculado</span>;
 
@@ -1745,17 +1582,8 @@ const EntradaXML = () => {
       <EntradaXmlHeader
         mostrarConfigSefaz={mostrarConfigSefaz}
         mostrarPainelSefaz={mostrarPainelSefaz}
-        onTogglePainelSefaz={() => {
-          setMostrarPainelSefaz((visivel) => !visivel);
-          setMostrarConfigSefaz(false);
-        }}
-        onToggleConfigSefaz={() => {
-          setMostrarConfigSefaz((visivel) => !visivel);
-          if (!mostrarConfigSefaz) {
-            carregarConfigSefaz();
-          }
-          setMostrarPainelSefaz(false);
-        }}
+        onTogglePainelSefaz={alternarPainelSefaz}
+        onToggleConfigSefaz={alternarConfigSefaz}
         onUploadXml={handleFileUpload}
         onUploadLote={handleMultipleFilesUpload}
         uploadingFile={uploadingFile}
