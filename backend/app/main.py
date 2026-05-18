@@ -160,6 +160,7 @@ from app.routes.ecommerce_checkout import router as ecommerce_checkout_router
 from app.routes.app_banho_tosa_routes import router as app_banho_tosa_router
 from app.routes.app_mobile_routes import router as app_mobile_router
 from app.routes.app_privacy_routes import router as app_privacy_router
+from app.routes.app_vet_routes import router as app_vet_router
 from app.routes.ecommerce_webhooks import router as ecommerce_webhooks_router
 from app.routes.ecommerce_aparencia_routes import router as ecommerce_aparencia_router
 from app.routes.ecommerce_config_routes import router as ecommerce_config_router
@@ -949,6 +950,7 @@ app.include_router(ecommerce_analytics_router, dependencies=_module_dependencies
 app.include_router(ecommerce_drive_router, dependencies=_module_dependencies("ecommerce"))     # Drive pickup — PDV + cliente
 app.include_router(sefaz_router, dependencies=_module_dependencies("compras"))  # SEFAZ — consulta NF-e por chave
 app.include_router(app_mobile_router)  # App Mobile - Rotas dos clientes
+app.include_router(app_vet_router)  # App Mobile - Veterinario operacional
 app.include_router(app_privacy_router)  # App Mobile - Privacidade/LGPD
 app.include_router(app_banho_tosa_router)  # App Mobile - Banho & Tosa
 app.include_router(campaigns_router, dependencies=_module_dependencies("campanhas"))   # Motor de Campanhas

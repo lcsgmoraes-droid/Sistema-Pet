@@ -5,16 +5,23 @@ import { AuthResponse, EcommerceUser } from "../types";
 
 const ROLE_CACHE_KEY_PREFIX = "ecommerce_role_cache_";
 
-async function cacheEntregadorRole(user: EcommerceUser | null): Promise<void> {
+async function cacheOperationalRole(user: EcommerceUser | null): Promise<void> {
   if (!user?.id) return;
 
   const cacheKey = `${ROLE_CACHE_KEY_PREFIX}${user.id}`;
-  if (user.is_entregador) {
+  if (user.is_veterinario || user.is_entregador) {
     await SecureStore.setItemAsync(
       cacheKey,
       JSON.stringify({
-        is_entregador: true,
+        is_veterinario: user.is_veterinario ?? false,
+        veterinario_id: user.veterinario_id ?? null,
+        is_entregador: user.is_entregador ?? false,
         funcionario_id: user.funcionario_id ?? null,
+        perfil_operacional: user.is_veterinario
+          ? "veterinario"
+          : user.is_entregador
+            ? "entregador"
+            : user.perfil_operacional ?? "cliente",
       }),
     );
   } else {
@@ -22,10 +29,10 @@ async function cacheEntregadorRole(user: EcommerceUser | null): Promise<void> {
   }
 }
 
-async function applyCachedEntregadorRole(
+async function applyCachedOperationalRole(
   user: EcommerceUser,
 ): Promise<EcommerceUser> {
-  if (!user?.id || user.is_entregador) return user;
+  if (!user?.id || user.is_veterinario || user.is_entregador) return user;
 
   const cacheKey = `${ROLE_CACHE_KEY_PREFIX}${user.id}`;
   const raw = await SecureStore.getItemAsync(cacheKey);
@@ -33,14 +40,20 @@ async function applyCachedEntregadorRole(
 
   try {
     const cached = JSON.parse(raw) as {
+      is_veterinario?: boolean;
+      veterinario_id?: number | null;
       is_entregador?: boolean;
       funcionario_id?: number | null;
+      perfil_operacional?: "cliente" | "entregador" | "veterinario";
     };
-    if (cached?.is_entregador) {
+    if (cached?.is_veterinario || cached?.is_entregador) {
       return {
         ...user,
-        is_entregador: true,
+        is_veterinario: cached.is_veterinario ?? user.is_veterinario ?? false,
+        veterinario_id: cached.veterinario_id ?? user.veterinario_id ?? null,
+        is_entregador: cached.is_entregador ?? user.is_entregador ?? false,
         funcionario_id: cached.funcionario_id ?? user.funcionario_id ?? null,
+        perfil_operacional: cached.perfil_operacional ?? user.perfil_operacional,
       };
     }
   } catch {
@@ -79,7 +92,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
 
   login: async (email, password) => {
     const { user } = await AuthService.login(email, password);
-    await cacheEntregadorRole(user);
+    await cacheOperationalRole(user);
     set({ isAuthenticated: true, user });
   },
 
@@ -90,7 +103,7 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       set({ isAuthenticated: false, user: null });
       return response;
     }
-    await cacheEntregadorRole(user);
+    await cacheOperationalRole(user);
     set({ isAuthenticated: true, user });
     return response;
   },
@@ -106,8 +119,8 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       const token = await AuthService.getStoredToken();
       if (token) {
         const freshUser = await AuthService.getProfile();
-        const user = await applyCachedEntregadorRole(freshUser);
-        await cacheEntregadorRole(user);
+        const user = await applyCachedOperationalRole(freshUser);
+        await cacheOperationalRole(user);
         set({ isAuthenticated: true, user, isLoading: false });
       } else {
         set({ isAuthenticated: false, user: null, isLoading: false });

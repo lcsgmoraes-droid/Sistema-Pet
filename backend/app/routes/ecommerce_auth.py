@@ -683,6 +683,13 @@ def _ensure_active_store_access(db: Session, user: User, tenant_id: str) -> User
 
 def _serialize_profile(user: User, cliente: Cliente | None) -> dict:
     delivery = _extract_ecommerce_delivery_details(cliente)
+    is_entregador = bool(getattr(cliente, "is_entregador", False)) if cliente else False
+    is_veterinario = bool(
+        cliente
+        and getattr(cliente, "tipo_cadastro", None) == "veterinario"
+        and getattr(cliente, "ativo", True) is not False
+    )
+    perfil_operacional = "veterinario" if is_veterinario else ("entregador" if is_entregador else "cliente")
     return {
         "id": user.id,
         "email": user.email,
@@ -711,8 +718,11 @@ def _serialize_profile(user: User, cliente: Cliente | None) -> dict:
         },
         "cliente_id": cliente.id if cliente else None,
         # Perfil entregador — usado pelo app mobile para mostrar interface correta
-        "is_entregador": cliente.is_entregador if cliente else False,
-        "funcionario_id": cliente.id if (cliente and cliente.is_entregador) else None,
+        "is_entregador": is_entregador,
+        "funcionario_id": cliente.id if (cliente and is_entregador) else None,
+        "is_veterinario": is_veterinario,
+        "veterinario_id": cliente.id if (cliente and is_veterinario) else None,
+        "perfil_operacional": perfil_operacional,
     }
 
 

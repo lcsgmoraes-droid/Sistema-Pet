@@ -11,6 +11,8 @@ import { CORES } from '../theme';
 import AuthNavigator from './AuthNavigator';
 import EntregadorNavigator from './EntregadorNavigator';
 import MainNavigator from './MainNavigator';
+import VeterinarioNavigator from './VeterinarioNavigator';
+import { navigationRef } from './navigationRef';
 
 // Tela de seleção de loja
 import SelecionarLojaScreen from '../screens/SelecionarLojaScreen';
@@ -54,6 +56,8 @@ export default function AppNavigator() {
   let activeNav: React.ReactNode;
   if (!isAuthenticated) {
     activeNav = <AuthNavigator />;
+  } else if (user?.is_veterinario || user?.perfil_operacional === "veterinario") {
+    activeNav = <VeterinarioNavigator />;
   } else if (user?.is_entregador) {
     activeNav = <EntregadorNavigator />;
   } else {
@@ -61,7 +65,7 @@ export default function AppNavigator() {
   }
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       {activeNav}
     </NavigationContainer>
   );
