@@ -1,4 +1,5 @@
 import { X } from 'lucide-react';
+import EntradaXmlDetalhesConferenciaPanel from './EntradaXmlDetalhesConferenciaPanel';
 import EntradaXmlDetalhesFooter from './EntradaXmlDetalhesFooter';
 import EntradaXmlDetalhesItemCard from './EntradaXmlDetalhesItemCard';
 import ActionButton from '../ui/ActionButton';
@@ -129,126 +130,24 @@ function EntradaXmlDetalhesModal({
               </div>
             )}
 
-            {resumoConferenciaAtual && (
-              <div className="px-6 py-4 border-b bg-emerald-50/40">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div className="space-y-3">
-                    <div className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${metaConferenciaAtual?.cls || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
-                      {metaConferenciaAtual?.label || 'Nao conferida'}
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                      <div className="rounded-lg border border-white/70 bg-white/80 p-3">
-                        <div className="text-gray-500 text-xs uppercase tracking-wide">Itens OK</div>
-                        <div className="font-bold text-lg text-emerald-700">{resumoConferenciaAtual.itens_ok}</div>
-                      </div>
-                      <div className="rounded-lg border border-white/70 bg-white/80 p-3">
-                        <div className="text-gray-500 text-xs uppercase tracking-wide">Divergencias</div>
-                        <div className="font-bold text-lg text-orange-700">{resumoConferenciaAtual.itens_com_divergencia}</div>
-                      </div>
-                      <div className="rounded-lg border border-white/70 bg-white/80 p-3">
-                        <div className="text-gray-500 text-xs uppercase tracking-wide">Qtd recebida</div>
-                        <div className="text-[11px] text-gray-500 mt-1">Entra no estoque</div>
-                        <div className="font-bold text-lg text-slate-800">{formatarValorFiscal(resumoConferenciaAtual.quantidade_total_conferida, 2)}</div>
-                      </div>
-                      <div className="rounded-lg border border-white/70 bg-white/80 p-3">
-                        <div className="text-gray-500 text-xs uppercase tracking-wide">Falta + Avaria</div>
-                        <div className="font-bold text-lg text-rose-700">
-                          {formatarValorFiscal(resumoConferenciaAtual.quantidade_total_faltante + resumoConferenciaAtual.quantidade_total_avariada, 2)}
-                        </div>
-                      </div>
-                    </div>
-                    <p className="text-sm text-gray-700 max-w-3xl">
-                      {notaSelecionada.status === 'pendente'
-                        ? (
-                          <>
-                            A conferência nasce assumindo tudo certo. Se a carga estiver perfeita, basta clicar em <strong>Conferido</strong>. Só mexa nos itens com falta ou avaria.
-                          </>
-                        )
-                        : 'Conferencia ja salva. Use as acoes de divergencia para gerar a tratativa sem precisar reverter a entrada.'}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    {notaSelecionada.status === 'pendente' && (
-                      <>
-                        <button
-                          onClick={() => setMostrarCamposConferencia((prev) => !prev)}
-                          className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg font-semibold hover:bg-slate-100"
-                        >
-                          {mostrarCamposConferencia ? 'Ocultar ajuste manual' : 'Editar quantidades e avarias'}
-                        </button>
-                        <button
-                          onClick={() => salvarConferenciaAtual()}
-                          disabled={salvandoConferencia || desfazendoConferencia}
-                          className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 disabled:opacity-60"
-                        >
-                          {salvandoConferencia
-                            ? 'Salvando...'
-                            : (resumoConferenciaAtual.status === 'nao_iniciada' ? 'Conferido' : 'Atualizar conferencia')}
-                        </button>
-                      </>
-                    )}
-                    {notaSelecionada.status === 'pendente' && resumoConferenciaAtual.status !== 'nao_iniciada' && (
-                      <button
-                        onClick={desfazerConferenciaAtual}
-                        disabled={desfazendoConferencia || salvandoConferencia || Boolean(notaSelecionada?.entrada_estoque_realizada)}
-                        className="px-4 py-2 border border-amber-300 bg-amber-50 text-amber-800 rounded-lg font-semibold hover:bg-amber-100 disabled:opacity-60"
-                      >
-                        {desfazendoConferencia ? 'Desfazendo...' : 'Desfazer conferencia'}
-                      </button>
-                    )}
-                    {notaSelecionada.status !== 'pendente' && resumoConferenciaAtual.itens_com_divergencia > 0 && (
-                      <>
-                        <button
-                          onClick={() => setMostrarCamposConferencia((prev) => !prev)}
-                          className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg font-semibold hover:bg-slate-100"
-                        >
-                          {mostrarCamposConferencia ? 'Ocultar tratativas' : 'Abrir tratativas'}
-                        </button>
-                        <button
-                          onClick={() => salvarConferenciaAtual()}
-                          disabled={salvandoConferencia || desfazendoConferencia}
-                          className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 disabled:opacity-60"
-                        >
-                          {salvandoConferencia ? 'Salvando...' : 'Salvar tratativas'}
-                        </button>
-                      </>
-                    )}
-                    {resumoConferenciaAtual.itens_com_divergencia > 0 && (
-                      <>
-                        <button
-                          onClick={gerarPendenciaFornecedor}
-                          disabled={criandoPendenciaFornecedor || salvandoConferencia || desfazendoConferencia}
-                          className="px-4 py-2 border border-blue-200 bg-blue-50 text-blue-700 rounded-lg font-semibold hover:bg-blue-100 disabled:opacity-60"
-                        >
-                          {criandoPendenciaFornecedor ? 'Gerando...' : 'Gerar pendencia fornecedor'}
-                        </button>
-                        <button
-                          onClick={gerarRascunhoDevolucao}
-                          disabled={gerandoRascunhoDevolucao || salvandoConferencia || desfazendoConferencia}
-                          className="px-4 py-2 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 disabled:opacity-60"
-                        >
-                          {gerandoRascunhoDevolucao ? 'Gerando...' : 'NF Devolucao das Divergencias'}
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {mostrarCamposConferencia && (
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Observacao geral da conferencia</label>
-                    <textarea
-                      value={conferenciaObservacaoGeral}
-                      onChange={(e) => setConferenciaObservacaoGeral(e.target.value)}
-                      rows="2"
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500"
-                      placeholder="Ex.: faltou 1 unidade do item X e 2 vieram avariadas."
-                    />
-                  </div>
-                )}
-              </div>
-            )}
+            <EntradaXmlDetalhesConferenciaPanel
+              conferenciaObservacaoGeral={conferenciaObservacaoGeral}
+              criandoPendenciaFornecedor={criandoPendenciaFornecedor}
+              desfazendoConferencia={desfazendoConferencia}
+              desfazerConferenciaAtual={desfazerConferenciaAtual}
+              formatarValorFiscal={formatarValorFiscal}
+              gerarPendenciaFornecedor={gerarPendenciaFornecedor}
+              gerarRascunhoDevolucao={gerarRascunhoDevolucao}
+              gerandoRascunhoDevolucao={gerandoRascunhoDevolucao}
+              metaConferenciaAtual={metaConferenciaAtual}
+              mostrarCamposConferencia={mostrarCamposConferencia}
+              notaSelecionada={notaSelecionada}
+              resumoConferenciaAtual={resumoConferenciaAtual}
+              salvandoConferencia={salvandoConferencia}
+              salvarConferenciaAtual={salvarConferenciaAtual}
+              setConferenciaObservacaoGeral={setConferenciaObservacaoGeral}
+              setMostrarCamposConferencia={setMostrarCamposConferencia}
+            />
 
             {/* Itens da Nota */}
             <div className="px-6 py-4">
