@@ -194,7 +194,7 @@ Maiores arquivos mapeados em 2026-05-04:
 | 2724 | `backend/app/clientes_routes.py` | Critico |
 | 2599 | `backend/app/bling_sync_routes.py` | Critico |
 | 2550 | `backend/app/pedidos_compra_routes.py` | Critico |
-| 1418 | `frontend/src/pages/ecommerce/EcommerceMVP.jsx` | Medio |
+| 1412 | `frontend/src/pages/ecommerce/EcommerceMVP.jsx` | Medio |
 | 2418 | `frontend/src/pages/EstoqueTransferenciaParceiro.jsx` | Critico |
 | 2280 | `backend/app/nfe_routes.py` | Critico |
 | 2181 | `backend/app/vendas_routes.py` | Critico |
@@ -595,7 +595,7 @@ Para cada dominio sensivel:
 | `frontend/src/components/EntradaXML.jsx` | 2486 | Muito alto |
 | `frontend/src/components/VendasFinanceiro.jsx` | 1980 | Alto |
 | `frontend/src/components/PedidosCompra.jsx` | 3225 | Alto |
-| `frontend/src/pages/ecommerce/EcommerceMVP.jsx` | 1418 | Medio |
+| `frontend/src/pages/ecommerce/EcommerceMVP.jsx` | 1412 | Medio |
 | `frontend/src/pages/EstoqueTransferenciaParceiro.jsx` | 2418 | Alto |
 | `frontend/src/components/ModalPagamento.jsx` | 1760 | Medio/alto |
 | `frontend/src/pages/ProdutosForm.jsx` | 1670 | Medio/alto |
@@ -935,6 +935,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-18: `EcommerceMVP` extraiu a tela de conta/autenticacao para `EcommerceAccountPage`, preservando handlers de login, cadastro, perfil e recuperacao de senha na pagina e padronizando acoes com `lucide-react`; a pagina principal caiu de 1868 para 1680 linhas com build validado. Proximo passo: separar analytics/estilos e modais restantes.
 - 2026-05-18: `EcommerceMVP` extraiu a moldura publica da loja para `EcommerceStorefrontShell`, incluindo topo, busca, banner, navegacao, alertas, modal de avise-me e rodape; a pagina principal caiu de 1680 para 1503 linhas com build validado. Proximo passo: avaliar extracao dos estilos internos ou iniciar outra tela critica.
 - 2026-05-18: `EcommerceMVP` moveu os estilos internos para `ecommerceMvpStyles`, mantendo a API `styles={S}` dos componentes extraidos e reduzindo a pagina principal de 1503 para 1418 linhas com build validado; a tela saiu da faixa critica de arquivos acima de 1500 linhas. Proximo passo: iniciar outra tela critica ou avaliar extracao fina de analytics/hooks.
+- 2026-05-18: `EcommerceMVP` extraiu os eventos de analytics para `useEcommerceStoreAnalytics`, preservando os gatilhos de page view, carrinho, detalhe de produto, add-to-cart, inicio de checkout e compra; a pagina principal caiu de 1418 para 1412 linhas. Proximo passo: iniciar outra tela critica em branch/PR propria ou avaliar hooks restantes de estado/API.
 
 ### Nao fazer nesta onda
 
@@ -2083,7 +2084,7 @@ Atualizacao de 2026-04-24: iniciada a trilha de hardening para liberar o app e o
 
 ### 11.3 Refatoracoes prioritarias desta nova fase
 
-- [ ] `frontend/src/pages/ecommerce/EcommerceMVP.jsx`: avaliar extracao fina de analytics/hooks; utilitarios de carrinho/endereco/midia/estoque ja foram extraidos para `ecommerceMvpUtils`, estilos movidos para `ecommerceMvpStyles`, card de produto da vitrine movido para `EcommerceCatalogProductCard`, resumo/filtros movidos para `EcommerceCatalogControls`, sidebar/tela do carrinho movidos para `EcommerceCartPanels`, modal de detalhe movido para `EcommerceProductDetailModal`, checkout movido para `EcommerceCheckoutPage`, pedidos movidos para `EcommerceOrdersPage`, conta/autenticacao movida para `EcommerceAccountPage` e moldura publica movida para `EcommerceStorefrontShell`
+- [ ] `frontend/src/pages/ecommerce/EcommerceMVP.jsx`: avaliar hooks restantes de estado/API; analytics foi movido para `useEcommerceStoreAnalytics`, utilitarios de carrinho/endereco/midia/estoque ja foram extraidos para `ecommerceMvpUtils`, estilos movidos para `ecommerceMvpStyles`, card de produto da vitrine movido para `EcommerceCatalogProductCard`, resumo/filtros movidos para `EcommerceCatalogControls`, sidebar/tela do carrinho movidos para `EcommerceCartPanels`, modal de detalhe movido para `EcommerceProductDetailModal`, checkout movido para `EcommerceCheckoutPage`, pedidos movidos para `EcommerceOrdersPage`, conta/autenticacao movida para `EcommerceAccountPage` e moldura publica movida para `EcommerceStorefrontShell`
 - [ ] `app-mobile/src/screens/entregador/DetalheEntregaScreen.tsx`: separar GPS, acoes de parada, recebimento, venda/modal e finalizacao de rota
 - [ ] `frontend/src/components/EntradaXML.jsx`: continuar quebra do fluxo de importacao/validacao/conferencia para reduzir bundle e risco de regressao; ja foram extraidos modais operacionais, cabecalho, metricas, paineis SEFAZ, listagem principal, modal de criacao de produto, modal de detalhes/conferencia, card de item da NF, rodape/rateio da conferencia e painel de resumo/conferencia
 - [ ] `backend/app/routes/ecommerce_checkout.py`: extrair servico de checkout e preparar orquestracao `Pedido -> Venda`

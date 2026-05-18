@@ -11,14 +11,7 @@ import EcommerceOrdersPage from './EcommerceOrdersPage';
 import EcommerceProductDetailModal from './EcommerceProductDetailModal';
 import EcommerceStorefrontShell from './EcommerceStorefrontShell';
 import { ecommerceMvpStyles as S } from './ecommerceMvpStyles';
-import {
-  trackPageView,
-  trackViewItem,
-  trackAddToCart,
-  trackBeginCheckout,
-  trackPurchase,
-  trackViewCart,
-} from '../../services/analytics';
+import { useEcommerceStoreAnalytics } from './useEcommerceStoreAnalytics';
 import {
   BANNERS,
   EMPTY_CART,
@@ -72,11 +65,6 @@ export default function EcommerceMVP() {
     return () => window.removeEventListener('resize', handler);
   }, []);
 
-  // Rastreia no Google Analytics sempre que o cliente muda de tela
-  useEffect(() => {
-    trackPageView(view);
-    if (view === 'carrinho') trackViewCart(cart);
-  }, [view]);
   const [bannerSlide, setBannerSlide] = useState(0);
   const [hoveredCard, setHoveredCard] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -144,6 +132,12 @@ export default function EcommerceMVP() {
   });
 
   const [cart, setCart] = useState(() => getGuestCart());
+  const {
+    trackProductView,
+    trackProductAdded,
+    trackCheckoutStarted,
+    trackCheckoutCompleted,
+  } = useEcommerceStoreAnalytics({ view, cart });
   const [cupom, setCupom] = useState('');
   const [cupomResult, setCupomResult] = useState(null);
 
@@ -1000,7 +994,7 @@ export default function EcommerceMVP() {
         return recalculateGuestCart(nextItems);
       });
       setSuccess('Produto adicionado ao carrinho. Faça login no checkout para finalizar.');
-      trackAddToCart(product);
+      trackProductAdded(product);
       return;
     }
 
@@ -1013,7 +1007,7 @@ export default function EcommerceMVP() {
       );
       setCart(response.data);
       setSuccess('Produto adicionado ao carrinho.');
-      trackAddToCart(product);
+      trackProductAdded(product);
     } catch (err) {
       setError(extractApiErrorMessage(err, 'Erro ao adicionar no carrinho'));
     }
@@ -1185,7 +1179,7 @@ export default function EcommerceMVP() {
 
       const result = response.data;
       setCheckoutResult(result);
-      trackPurchase(result, cart);
+      trackCheckoutCompleted(result);
       setCart({ pedido_id: null, itens: [], subtotal: 0, total: 0 });
       setCheckoutResumo(null);
       setCupomResult(null);
@@ -1267,7 +1261,7 @@ export default function EcommerceMVP() {
       return;
     }
     setView('checkout');
-    trackBeginCheckout(cart);
+    trackCheckoutStarted();
   }
 
   function openProductDetails(product) {
@@ -1275,7 +1269,7 @@ export default function EcommerceMVP() {
     setSelectedProduct(product);
     setActiveProductImage(images[0] || '');
     navigate(`${location.pathname}?produto=${product.id}`, { replace: true });
-    trackViewItem(product);
+    trackProductView(product);
   }
 
   function closeProductModal() {
