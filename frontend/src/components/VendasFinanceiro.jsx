@@ -2,7 +2,6 @@
 import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
-import api from "../api";
 import { useAuth } from "../contexts/AuthContext";
 import HistoricoVendasClienteTab from "../pages/Financeiro/HistoricoVendasClienteTab";
 import DiasUteisResumoPanel from "./financeiro/DiasUteisResumoPanel";
@@ -16,6 +15,11 @@ import VendasPromocoesResumoPanel from "./financeiro/VendasPromocoesResumoPanel"
 import VendasRelatorioPersonalizadoModal from "./financeiro/VendasRelatorioPersonalizadoModal";
 import VendasResultadoComposicaoPanel from "./financeiro/VendasResultadoComposicaoPanel";
 import VendasResumoTabelasPanel from "./financeiro/VendasResumoTabelasPanel";
+import {
+  exportarRelatorioListaVendasFinanceiro,
+  exportarVendasFinanceiroExcel,
+  exportarVendasFinanceiroPdf,
+} from "./financeiro/vendasFinanceiroExportadores";
 import useVendasFinanceiroData from "./financeiro/useVendasFinanceiroData";
 import {
   CORES_GRAFICOS_VENDAS,
@@ -35,9 +39,7 @@ import {
   carregarConfigDiasUteis,
   carregarFeriadosCustomizados,
   consolidarFormasRecebimento,
-  exportarPlanilhasExcel,
   filtrarHorariosComMovimento,
-  filtrarVendasParaRelatorio,
   formatarData,
   formatarDataLocal,
   getDiasUteisStorageKey,
@@ -45,7 +47,6 @@ import {
   getStatusVendaMeta,
   montarCardsTotalizadoresLista,
   obterTextoComparacao,
-  ordenarVendasRelatorio,
   sanitizarNumero,
   selecionarMelhorPorValorLiquido,
   vendaEstaEmAberto,
@@ -160,55 +161,17 @@ export default function VendasFinanceiro() {
     [listaVendas, mostrarImpostoTodasVendas],
   );
 
-  const exportarRelatorioListaVendas = async ({ escopo }) => {
-    const dadosFiltrados = filtrarVendasParaRelatorio({
+  const exportarRelatorioListaVendas = ({ escopo }) =>
+    exportarRelatorioListaVendasFinanceiro({
+      colunasRelatorio,
       escopo,
-      vendas: listaVendasComImpostoAjustado,
-      filtroFuncionario,
-      filtroFormaPagamento,
       filtroCategoria,
+      filtroFormaPagamento,
+      filtroFuncionario,
       filtroStatusLista,
+      listaVendas: listaVendasComImpostoAjustado,
+      ordenacaoRelatorio,
     });
-
-    if (!dadosFiltrados.length) {
-      toast.error("Nao ha vendas para exportar neste relatorio.");
-      return;
-    }
-
-    const dadosOrdenados = ordenarVendasRelatorio(dadosFiltrados, ordenacaoRelatorio);
-    const chaves = colunasRelatorio;
-    const colunas = COLUNAS_RELATORIO_VENDAS.filter((coluna) => chaves.includes(coluna.key));
-
-    if (!colunas.length) {
-      toast.error("Selecione pelo menos uma coluna para exportar.");
-      return;
-    }
-
-    const linhas = dadosOrdenados.map((venda) =>
-      colunas.map((coluna) => {
-        const bruto = coluna.value(venda);
-        return coluna.key === "data_venda" ? formatarData(bruto) : bruto;
-      }),
-    );
-
-    const dataArquivo = new Date().toISOString().slice(0, 10);
-    const sufixo = escopo === "geral" ? "geral" : "filtrado";
-    try {
-      await exportarPlanilhasExcel(
-        [
-          {
-            sheet: "Lista de Vendas",
-            linhas: [colunas.map((coluna) => coluna.label), ...linhas],
-          },
-        ],
-        `vendas_${sufixo}_${dataArquivo}.xlsx`,
-      );
-      toast.success(`Relatorio gerado com ${linhas.length} venda(s).`);
-    } catch (error) {
-      console.error("Erro ao exportar relatorio de vendas:", error);
-      toast.error("Nao foi possivel gerar o arquivo Excel.");
-    }
-  };
 
   const toggleColunaRelatorio = (key) => {
     setColunasRelatorio((prev) =>
@@ -370,131 +333,23 @@ export default function VendasFinanceiro() {
   );
   const getTextoComparacao = () => textoComparacao;
 
-  const exportarParaPDF = async () => {
-    if (!dataInicio || !dataFim) {
-      toast.error("Selecione um período para gerar o relatório");
-      return;
-    }
+  const exportarParaPDF = () =>
+    exportarVendasFinanceiroPdf({
+      dataFim,
+      dataInicio,
+      filtroCategoria,
+      filtroFormaPagamento,
+      filtroFuncionario,
+    });
 
-    try {
-      toast.loading("Gerando PDF...", { id: "pdf" });
-
-      const params = new URLSearchParams({
-        data_inicio: dataInicio,
-        data_fim: dataFim,
-      });
-
-      if (filtroFuncionario) params.append("funcionario", filtroFuncionario);
-      if (filtroFormaPagamento)
-        params.append("forma_pagamento", filtroFormaPagamento);
-      if (filtroCategoria) params.append("categoria", filtroCategoria);
-
-      const response = await api.get(
-        `/relatorios/vendas/export/pdf?${params.toString()}`,
-        {
-          responseType: "blob",
-        },
-      );
-
-      const url = globalThis.URL.createObjectURL(new Blob([response.data]));
-      const link = document.createElement("a");
-      link.href = url;
-      link.setAttribute(
-        "download",
-        `relatorio_vendas_${dataInicio}_${dataFim}.pdf`,
-      );
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-
-      toast.success("📄 PDF exportado com sucesso!", { id: "pdf" });
-    } catch (error) {
-      console.error("Erro ao exportar PDF:", error);
-      toast.error("Erro ao exportar PDF", { id: "pdf" });
-    }
-  };
-
-  const exportarParaExcel = async () => {
-    // Aba Resumo
-    const resumoData = [
-      ["RELATÓRIO DE VENDAS"],
-      ["Período:", `${formatarData(dataInicio)} até ${formatarData(dataFim)}`],
-      [""],
-      ["Métrica", "Valor"],
-      ["Venda Bruta", resumo.venda_bruta],
-      ["Taxa de Entrega", resumo.taxa_entrega],
-      ["Desconto", resumo.desconto],
-      ["Venda Líquida", resumo.venda_liquida],
-      ["Em Aberto", resumo.em_aberto],
-      ["Quantidade de Vendas", resumo.quantidade_vendas],
-    ];
-    const planilhas = [
-      {
-        sheet: "Resumo",
-        linhas: resumoData,
-      },
-    ];
-
-    // Aba Vendas por Data
-    if (vendasPorDataCalendario.length > 0) {
-      const vendasData = [
-        [
-          "Data",
-          "Dia",
-          "Qtd",
-          "Tkt. Médio",
-          "Vl. bruto",
-          "Taxa entrega",
-          "Desconto",
-          "(%)",
-          "Vl. líquido",
-          "Vl. recebido",
-          "Saldo aberto",
-        ],
-        ...vendasPorDataCalendario.map((v) => [
-          formatarData(v.data),
-          v.feriado_nome || v.dia_semana,
-          v.quantidade,
-          v.ticket_medio,
-          v.valor_bruto,
-          v.taxa_entrega,
-          v.desconto,
-          v.percentual_desconto,
-          v.valor_liquido,
-          v.valor_recebido,
-          v.saldo_aberto,
-        ]),
-      ];
-      planilhas.push({
-        sheet: "Vendas por Data",
-        linhas: vendasData,
-      });
-    }
-
-    // Aba Formas de Recebimento
-    if (formasRecebimentoFiltradas.length > 0) {
-      const formasData = [
-        ["Forma", "Valor pago"],
-        ...formasRecebimentoFiltradas.map((f) => [
-          f.forma_pagamento,
-          f.valor_total,
-        ]),
-      ];
-      planilhas.push({
-        sheet: "Formas Pagamento",
-        linhas: formasData,
-      });
-    }
-
-    const fileName = `relatorio_vendas_${dataInicio}_${dataFim}.xlsx`;
-    try {
-      await exportarPlanilhasExcel(planilhas, fileName);
-      toast.success("Excel exportado com sucesso!");
-    } catch (error) {
-      console.error("Erro ao exportar Excel:", error);
-      toast.error("Erro ao exportar Excel");
-    }
-  };
+  const exportarParaExcel = () =>
+    exportarVendasFinanceiroExcel({
+      dataFim,
+      dataInicio,
+      formasRecebimentoFiltradas,
+      resumo,
+      vendasPorDataCalendario,
+    });
 
   const aplicarFiltroRapido = (filtro) => {
     const periodo = calcularPeriodoFiltroRapido(filtro);
