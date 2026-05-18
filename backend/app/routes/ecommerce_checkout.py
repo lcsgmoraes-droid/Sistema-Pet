@@ -16,7 +16,7 @@ from app.financeiro_models import FormaPagamento
 from app.idempotency_models import IdempotencyKey
 from app.models import Cliente, User
 from app.pedido_models import Pedido, PedidoItem
-from app.routes.ecommerce_auth import _get_current_ecommerce_user
+from app.routes.ecommerce_auth import _activate_user_tenant_context, _get_current_ecommerce_user
 from app.utils.timezone import now_brasilia
 
 
@@ -66,7 +66,8 @@ class CheckoutFinalizarRequest(BaseModel):
 
 
 def _current_identity(current_user: User = Depends(_get_current_ecommerce_user)) -> EcommerceIdentity:
-    return EcommerceIdentity(user_id=current_user.id, tenant_id=str(UUID(str(current_user.tenant_id))))
+    tenant_id = _activate_user_tenant_context(current_user)
+    return EcommerceIdentity(user_id=current_user.id, tenant_id=str(UUID(str(tenant_id))))
 
 
 def _normalize_text(value: str | None) -> str:

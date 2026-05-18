@@ -10,7 +10,7 @@ from app.db import get_session
 from app.models import User
 from app.pedido_models import Pedido, PedidoItem
 from app.produtos_models import Produto
-from app.routes.ecommerce_auth import _get_current_ecommerce_user
+from app.routes.ecommerce_auth import _activate_user_tenant_context, _get_current_ecommerce_user
 from app.services.validade_campanha_service import (
     mapear_ofertas_validade_por_produto,
     resolver_preco_publico_produto,
@@ -61,7 +61,8 @@ def _produto_disponivel_no_canal(produto: Produto, canal: str) -> bool:
 
 
 def _current_identity(current_user: User = Depends(_get_current_ecommerce_user)) -> EcommerceIdentity:
-    return EcommerceIdentity(user_id=current_user.id, tenant_id=str(UUID(str(current_user.tenant_id))))
+    tenant_id = _activate_user_tenant_context(current_user)
+    return EcommerceIdentity(user_id=current_user.id, tenant_id=str(UUID(str(tenant_id))))
 
 
 def _find_or_create_carrinho(db: Session, identity: EcommerceIdentity) -> Pedido:
