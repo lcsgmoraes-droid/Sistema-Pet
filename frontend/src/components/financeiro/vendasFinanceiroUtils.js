@@ -73,6 +73,50 @@ export async function exportarPlanilhasExcel(planilhas, nomeArquivo) {
   ).toFile(nomeArquivo);
 }
 
+export function filtrarVendasParaRelatorio({
+  escopo,
+  vendas,
+  filtroFuncionario,
+  filtroFormaPagamento,
+  filtroCategoria,
+  filtroStatusLista,
+}) {
+  const lista = Array.isArray(vendas) ? vendas : [];
+  if (escopo === "geral") return [...lista];
+
+  return lista.filter((venda) => {
+    const funcionario = String(venda.funcionario_nome || venda.funcionario || "");
+    const formaPagamento = String(venda.forma_pagamento || venda.pagamento_principal || "");
+    const categoria = String(venda.categoria || "");
+
+    const okFuncionario = !filtroFuncionario || funcionario === filtroFuncionario;
+    const okForma = !filtroFormaPagamento || formaPagamento === filtroFormaPagamento;
+    const okCategoria = !filtroCategoria || categoria === filtroCategoria;
+    const okStatus = filtroStatusLista !== "em_aberto" || vendaEstaEmAberto(venda);
+
+    return okFuncionario && okForma && okCategoria && okStatus;
+  });
+}
+
+export function ordenarVendasRelatorio(lista, ordenacao) {
+  const copia = [...(Array.isArray(lista) ? lista : [])];
+  switch (ordenacao) {
+    case "data_asc":
+      return copia.sort((a, b) => parseDataLocal(a.data_venda) - parseDataLocal(b.data_venda));
+    case "bruta_desc":
+      return copia.sort((a, b) => Number(b.venda_bruta || 0) - Number(a.venda_bruta || 0));
+    case "bruta_asc":
+      return copia.sort((a, b) => Number(a.venda_bruta || 0) - Number(b.venda_bruta || 0));
+    case "lucro_desc":
+      return copia.sort((a, b) => Number(b.lucro || 0) - Number(a.lucro || 0));
+    case "lucro_asc":
+      return copia.sort((a, b) => Number(a.lucro || 0) - Number(b.lucro || 0));
+    case "data_desc":
+    default:
+      return copia.sort((a, b) => parseDataLocal(b.data_venda) - parseDataLocal(a.data_venda));
+  }
+}
+
 export function parseDataLocal(valor) {
   if (!valor) return null;
 
@@ -232,6 +276,125 @@ function adicionarDias(data, dias) {
   const proxima = new Date(data);
   proxima.setDate(proxima.getDate() + dias);
   return proxima;
+}
+
+function formatarDataIsoLocal(data) {
+  const ano = data.getFullYear();
+  const mes = String(data.getMonth() + 1).padStart(2, "0");
+  const dia = String(data.getDate()).padStart(2, "0");
+  return `${ano}-${mes}-${dia}`;
+}
+
+export function calcularPeriodoFiltroRapido(filtro, agora = new Date()) {
+  const ano = agora.getFullYear();
+  const mes = String(agora.getMonth() + 1).padStart(2, "0");
+  const hoje = formatarDataIsoLocal(agora);
+
+  let inicio;
+  let fim;
+
+  switch (filtro) {
+    case "hoje":
+      inicio = fim = hoje;
+      break;
+    case "ontem": {
+      const dataOntem = new Date(agora);
+      dataOntem.setDate(agora.getDate() - 1);
+      inicio = fim = formatarDataIsoLocal(dataOntem);
+      break;
+    }
+    case "esta_semana": {
+      const diaSemana = agora.getDay();
+      const diasDesdeSegunda = diaSemana === 0 ? 6 : diaSemana - 1;
+      const primeiroDia = new Date(agora);
+      primeiroDia.setDate(agora.getDate() - diasDesdeSegunda);
+      inicio = formatarDataIsoLocal(primeiroDia);
+      fim = hoje;
+      break;
+    }
+    case "este_mes":
+      inicio = `${ano}-${mes}-01`;
+      fim = hoje;
+      break;
+    case "mes_anterior": {
+      const mesPassado = new Date(agora.getFullYear(), agora.getMonth() - 1, 1);
+      const ultimoDia = new Date(agora.getFullYear(), agora.getMonth(), 0);
+      inicio = `${mesPassado.getFullYear()}-${String(mesPassado.getMonth() + 1).padStart(2, "0")}-01`;
+      fim = formatarDataIsoLocal(ultimoDia);
+      break;
+    }
+    case "ultimos_7_dias": {
+      const sete = new Date(agora);
+      sete.setDate(agora.getDate() - 7);
+      inicio = formatarDataIsoLocal(sete);
+      fim = hoje;
+      break;
+    }
+    case "ultimos_30_dias": {
+      const trinta = new Date(agora);
+      trinta.setDate(agora.getDate() - 30);
+      inicio = formatarDataIsoLocal(trinta);
+      fim = hoje;
+      break;
+    }
+    case "este_ano":
+      inicio = `${ano}-01-01`;
+      fim = hoje;
+      break;
+    default:
+      return null;
+  }
+
+  return { inicio, fim };
+}
+
+export function calcularPeriodoComparacao({ dataInicio, dataFim, periodoComparacao }) {
+  const [anoIni, mesIni, diaIni] = dataInicio.split("-").map(Number);
+  const [anoFim, mesFim, diaFim] = dataFim.split("-").map(Number);
+
+  const inicio = new Date(anoIni, mesIni - 1, diaIni);
+  const fim = new Date(anoFim, mesFim - 1, diaFim);
+  const diffDias = Math.floor((fim - inicio) / (1000 * 60 * 60 * 24)) + 1;
+
+  let inicioComp;
+  let fimComp;
+
+  switch (periodoComparacao) {
+    case "periodo_anterior":
+      inicioComp = new Date(inicio);
+      inicioComp.setDate(inicio.getDate() - diffDias);
+      fimComp = new Date(inicio);
+      fimComp.setDate(inicio.getDate() - 1);
+      break;
+    case "mes_anterior":
+      inicioComp = new Date(inicio);
+      inicioComp.setMonth(inicio.getMonth() - 1);
+      fimComp = new Date(fim);
+      fimComp.setMonth(fim.getMonth() - 1);
+      break;
+    case "ano_anterior":
+      inicioComp = new Date(inicio);
+      inicioComp.setFullYear(inicio.getFullYear() - 1);
+      fimComp = new Date(fim);
+      fimComp.setFullYear(fim.getFullYear() - 1);
+      break;
+    default:
+      return { data_inicio: "", data_fim: "" };
+  }
+
+  return {
+    data_inicio: formatarDataIsoLocal(inicioComp),
+    data_fim: formatarDataIsoLocal(fimComp),
+  };
+}
+
+export function calcularVariacao(valorAtual, valorAnterior) {
+  if (!valorAnterior || valorAnterior === 0) {
+    return { valor: 0, percentual: 0 };
+  }
+  const diff = valorAtual - valorAnterior;
+  const perc = ((diff / valorAnterior) * 100).toFixed(1);
+  return { valor: diff, percentual: Number.parseFloat(perc) };
 }
 
 export function listarDiasPeriodo(dataInicio, dataFim) {

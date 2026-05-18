@@ -21,11 +21,15 @@ import {
   ajustarVendaImposto,
   arredondarMoeda,
   arredondarPercentual,
+  calcularPeriodoComparacao,
+  calcularPeriodoFiltroRapido,
   calcularValorRecebidoVenda,
+  calcularVariacao,
   carregarConfigDiasUteis,
   carregarFeriadosCustomizados,
   dataKeyLocal,
   exportarPlanilhasExcel,
+  filtrarVendasParaRelatorio,
   formatarData,
   formatarDataLocal,
   formatarMoeda,
@@ -38,8 +42,8 @@ import {
   listarDiasPeriodo,
   montarFeriadosPadrao,
   normalizarFormaPagamentoLabel,
+  ordenarVendasRelatorio,
   parseDataHoraLocal,
-  parseDataLocal,
   sanitizarNumero,
   vendaEstaEmAberto,
   vendaTemNotaFiscal,
@@ -171,44 +175,15 @@ export default function VendasFinanceiro() {
     [listaVendas, mostrarImpostoTodasVendas],
   );
 
-  const filtrarVendasParaRelatorio = (escopo) => {
-    if (escopo === "geral") return [...listaVendasComImpostoAjustado];
-
-    return listaVendasComImpostoAjustado.filter((venda) => {
-      const funcionario = String(venda.funcionario_nome || venda.funcionario || "");
-      const formaPagamento = String(venda.forma_pagamento || venda.pagamento_principal || "");
-      const categoria = String(venda.categoria || "");
-
-      const okFuncionario = !filtroFuncionario || funcionario === filtroFuncionario;
-      const okForma = !filtroFormaPagamento || formaPagamento === filtroFormaPagamento;
-      const okCategoria = !filtroCategoria || categoria === filtroCategoria;
-      const okStatus = filtroStatusLista !== "em_aberto" || vendaEstaEmAberto(venda);
-
-      return okFuncionario && okForma && okCategoria && okStatus;
-    });
-  };
-
-  const ordenarVendasRelatorio = (lista, ordenacao) => {
-    const copia = [...lista];
-    switch (ordenacao) {
-      case "data_asc":
-        return copia.sort((a, b) => parseDataLocal(a.data_venda) - parseDataLocal(b.data_venda));
-      case "bruta_desc":
-        return copia.sort((a, b) => Number(b.venda_bruta || 0) - Number(a.venda_bruta || 0));
-      case "bruta_asc":
-        return copia.sort((a, b) => Number(a.venda_bruta || 0) - Number(b.venda_bruta || 0));
-      case "lucro_desc":
-        return copia.sort((a, b) => Number(b.lucro || 0) - Number(a.lucro || 0));
-      case "lucro_asc":
-        return copia.sort((a, b) => Number(a.lucro || 0) - Number(b.lucro || 0));
-      case "data_desc":
-      default:
-        return copia.sort((a, b) => parseDataLocal(b.data_venda) - parseDataLocal(a.data_venda));
-    }
-  };
-
   const exportarRelatorioListaVendas = async ({ escopo }) => {
-    const dadosFiltrados = filtrarVendasParaRelatorio(escopo);
+    const dadosFiltrados = filtrarVendasParaRelatorio({
+      escopo,
+      vendas: listaVendasComImpostoAjustado,
+      filtroFuncionario,
+      filtroFormaPagamento,
+      filtroCategoria,
+      filtroStatusLista,
+    });
 
     if (!dadosFiltrados.length) {
       toast.error("Nao ha vendas para exportar neste relatorio.");
@@ -978,151 +953,12 @@ export default function VendasFinanceiro() {
   };
 
   const aplicarFiltroRapido = (filtro) => {
-    // Obter data atual sem conversão de timezone
-    const agora = new Date();
-    const ano = agora.getFullYear();
-    const mes = String(agora.getMonth() + 1).padStart(2, "0");
-    const dia = String(agora.getDate()).padStart(2, "0");
-    const hoje = `${ano}-${mes}-${dia}`;
+    const periodo = calcularPeriodoFiltroRapido(filtro);
+    if (!periodo) return;
 
-    let inicio, fim;
-
-    switch (filtro) {
-      case "hoje":
-        inicio = fim = hoje;
-        break;
-      case "ontem": {
-        const dataOntem = new Date(agora);
-        dataOntem.setDate(agora.getDate() - 1);
-        const anoOntem = dataOntem.getFullYear();
-        const mesOntem = String(dataOntem.getMonth() + 1).padStart(2, "0");
-        const diaOntem = String(dataOntem.getDate()).padStart(2, "0");
-        inicio = fim = `${anoOntem}-${mesOntem}-${diaOntem}`;
-        break;
-      }
-      case "esta_semana": {
-        const diaSemana = agora.getDay(); // 0=domingo, 1=segunda, ..., 6=sábado
-        const diasDesdeSegunda = diaSemana === 0 ? 6 : diaSemana - 1; // Se domingo, volta 6 dias; senão volta (dia-1)
-        const primeiroDia = new Date(agora);
-        primeiroDia.setDate(agora.getDate() - diasDesdeSegunda);
-        const anoPri = primeiroDia.getFullYear();
-        const mesPri = String(primeiroDia.getMonth() + 1).padStart(2, "0");
-        const diaPri = String(primeiroDia.getDate()).padStart(2, "0");
-        inicio = `${anoPri}-${mesPri}-${diaPri}`;
-        fim = hoje;
-        break;
-      }
-      case "este_mes":
-        inicio = `${ano}-${mes}-01`;
-        fim = hoje;
-        break;
-      case "mes_anterior": {
-        const mesPassado = new Date(
-          agora.getFullYear(),
-          agora.getMonth() - 1,
-          1,
-        );
-        const ultimoDia = new Date(agora.getFullYear(), agora.getMonth(), 0);
-        const anoMesPass = mesPassado.getFullYear();
-        const numeroMesPass = String(mesPassado.getMonth() + 1).padStart(
-          2,
-          "0",
-        );
-        const anoUltDia = ultimoDia.getFullYear();
-        const mesUltDia = String(ultimoDia.getMonth() + 1).padStart(2, "0");
-        const diaUltDia = String(ultimoDia.getDate()).padStart(2, "0");
-        inicio = `${anoMesPass}-${numeroMesPass}-01`;
-        fim = `${anoUltDia}-${mesUltDia}-${diaUltDia}`;
-        break;
-      }
-      case "ultimos_7_dias": {
-        const sete = new Date(agora);
-        sete.setDate(agora.getDate() - 7);
-        const anoSete = sete.getFullYear();
-        const mesSete = String(sete.getMonth() + 1).padStart(2, "0");
-        const diaSete = String(sete.getDate()).padStart(2, "0");
-        inicio = `${anoSete}-${mesSete}-${diaSete}`;
-        fim = hoje;
-        break;
-      }
-      case "ultimos_30_dias": {
-        const trinta = new Date(agora);
-        trinta.setDate(agora.getDate() - 30);
-        const anoTrinta = trinta.getFullYear();
-        const mesTrinta = String(trinta.getMonth() + 1).padStart(2, "0");
-        const diaTrinta = String(trinta.getDate()).padStart(2, "0");
-        inicio = `${anoTrinta}-${mesTrinta}-${diaTrinta}`;
-        fim = hoje;
-        break;
-      }
-      case "este_ano":
-        inicio = `${ano}-01-01`;
-        fim = hoje;
-        break;
-      default:
-        return;
-    }
-
-    setDataInicio(inicio);
-    setDataFim(fim);
+    setDataInicio(periodo.inicio);
+    setDataFim(periodo.fim);
     setFiltroSelecionado(filtro);
-  };
-
-  const calcularPeriodoComparacao = () => {
-    // Parse manual das datas para evitar problemas de timezone
-    const [anoIni, mesIni, diaIni] = dataInicio.split("-").map(Number);
-    const [anoFim, mesFim, diaFim] = dataFim.split("-").map(Number);
-
-    const inicio = new Date(anoIni, mesIni - 1, diaIni);
-    const fim = new Date(anoFim, mesFim - 1, diaFim);
-    const diffDias = Math.floor((fim - inicio) / (1000 * 60 * 60 * 24)) + 1;
-
-    let inicioComp, fimComp;
-
-    switch (periodoComparacao) {
-      case "periodo_anterior":
-        inicioComp = new Date(inicio);
-        inicioComp.setDate(inicio.getDate() - diffDias);
-        fimComp = new Date(inicio);
-        fimComp.setDate(inicio.getDate() - 1);
-        break;
-      case "mes_anterior":
-        inicioComp = new Date(inicio);
-        inicioComp.setMonth(inicio.getMonth() - 1);
-        fimComp = new Date(fim);
-        fimComp.setMonth(fim.getMonth() - 1);
-        break;
-      case "ano_anterior":
-        inicioComp = new Date(inicio);
-        inicioComp.setFullYear(inicio.getFullYear() - 1);
-        fimComp = new Date(fim);
-        fimComp.setFullYear(fim.getFullYear() - 1);
-        break;
-      default:
-        return { data_inicio: "", data_fim: "" };
-    }
-
-    // Formatar manualmente para evitar problemas de timezone
-    const anoIniComp = inicioComp.getFullYear();
-    const mesIniComp = String(inicioComp.getMonth() + 1).padStart(2, "0");
-    const diaIniComp = String(inicioComp.getDate()).padStart(2, "0");
-
-    const anoFimComp = fimComp.getFullYear();
-    const mesFimComp = String(fimComp.getMonth() + 1).padStart(2, "0");
-    const diaFimComp = String(fimComp.getDate()).padStart(2, "0");
-
-    return {
-      data_inicio: `${anoIniComp}-${mesIniComp}-${diaIniComp}`,
-      data_fim: `${anoFimComp}-${mesFimComp}-${diaFimComp}`,
-    };
-  };
-
-  const calcularVariacao = (valorAtual, valorAnterior) => {
-    if (!valorAnterior || valorAnterior === 0)
-      return { valor: 0, percentual: 0 };
-    const diff = valorAtual - valorAnterior;
-    const perc = ((diff / valorAnterior) * 100).toFixed(1);
-    return { valor: diff, percentual: Number.parseFloat(perc) };
   };
 
   const carregarDados = async () => {
@@ -1148,7 +984,7 @@ export default function VendasFinanceiro() {
       setListaVendas(data.lista_vendas || []);
 
       if (modoComparacao || abaAtiva === "comparacao") {
-        const periodoComp = calcularPeriodoComparacao();
+        const periodoComp = calcularPeriodoComparacao({ dataInicio, dataFim, periodoComparacao });
         const responseComp = await api.get("/relatorios/vendas/relatorio", {
           params: periodoComp,
         });
