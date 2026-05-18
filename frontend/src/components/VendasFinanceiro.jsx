@@ -16,16 +16,15 @@ import VendasPromocoesResumoPanel from "./financeiro/VendasPromocoesResumoPanel"
 import VendasRelatorioPersonalizadoModal from "./financeiro/VendasRelatorioPersonalizadoModal";
 import VendasResultadoComposicaoPanel from "./financeiro/VendasResultadoComposicaoPanel";
 import VendasResumoTabelasPanel from "./financeiro/VendasResumoTabelasPanel";
+import useVendasFinanceiroData from "./financeiro/useVendasFinanceiroData";
 import {
   CORES_GRAFICOS_VENDAS,
   COLUNAS_RELATORIO_VENDAS,
   aplicarFiltrosVendasFinanceiro,
   ajustarVendaImposto,
-  calcularAnaliseInteligenteVendas,
   calcularAnalisePromocoes,
   calcularFeriadosPorData,
   calcularFluxoResultadoCards,
-  calcularPeriodoComparacao,
   calcularPeriodoFiltroRapido,
   calcularResumoDiasPeriodo,
   calcularTotalizadoresListaVendas,
@@ -58,7 +57,6 @@ export default function VendasFinanceiro() {
   const userPermissions = user?.permissions || [];
   const podeVerFinanceiroCompleto =
     user?.is_admin === true || userPermissions.includes("relatorios.financeiro");
-  const [loading, setLoading] = useState(false);
   const [abaAtiva, setAbaAtiva] = useState("resumo");
   const [dataInicio, setDataInicio] = useState("");
   const [dataFim, setDataFim] = useState("");
@@ -73,51 +71,35 @@ export default function VendasFinanceiro() {
   const [mostrarGraficos, setMostrarGraficos] = useState(true);
   const [tipoComparacao, setTipoComparacao] = useState("financeiro"); // financeiro, formas_pagamento, produtos, funcionarios
 
-  // Estados dos dados
-  const [resumo, setResumo] = useState({
-    venda_bruta: 0,
-    taxa_entrega: 0,
-    desconto: 0,
-    venda_liquida: 0,
-    valor_recebido: 0,
-    em_aberto: 0,
-    quantidade_vendas: 0,
-  });
-
-  const [resumoComparacao, setResumoComparacao] = useState({
-    venda_bruta: 0,
-    taxa_entrega: 0,
-    desconto: 0,
-    venda_liquida: 0,
-    valor_recebido: 0,
-    em_aberto: 0,
-    quantidade_vendas: 0,
-  });
-
-  const [vendasPorData, setVendasPorData] = useState([]);
-  const [formasRecebimento, setFormasRecebimento] = useState([]);
-  const [vendasPorFuncionario, setVendasPorFuncionario] = useState([]);
-  const [vendasPorTipo, setVendasPorTipo] = useState([]);
-  const [vendasPorGrupo, setVendasPorGrupo] = useState([]);
-  const [produtosDetalhados, setProdutosDetalhados] = useState([]);
-  const [listaVendas, setListaVendas] = useState([]);
   const [vendasExpandidas, setVendasExpandidas] = useState(new Set());
 
-  // Dados de comparação estendidos
-  const [formasRecebimentoComparacao, setFormasRecebimentoComparacao] =
-    useState([]);
-  const [vendasPorGrupoComparacao, setVendasPorGrupoComparacao] = useState([]);
-  const [vendasPorFuncionarioComparacao, setVendasPorFuncionarioComparacao] =
-    useState([]);
+  const {
+    alertasInteligentesVendas,
+    formasRecebimento,
+    formasRecebimentoComparacao,
+    listaVendas,
+    loading,
+    previsaoProximos7Dias,
+    produtosDetalhados,
+    produtosMaisLucrativos,
+    produtosPorCategoria,
+    resumo,
+    resumoComparacao,
+    vendasPorData,
+    vendasPorFuncionario,
+    vendasPorFuncionarioComparacao,
+    vendasPorGrupo,
+    vendasPorGrupoComparacao,
+    vendasPorTipo,
+  } = useVendasFinanceiroData({
+    abaAtiva,
+    dataFim,
+    dataInicio,
+    modoComparacao,
+    periodoComparacao,
+    podeVerFinanceiroCompleto,
+  });
 
-  // Estados para Análise Inteligente
-  const [produtosMaisLucrativos, setProdutosMaisLucrativos] = useState([]);
-  const [produtosPorCategoria, setProdutosPorCategoria] = useState({});
-  const [produtosAnalise, setProdutosAnalise] = useState([]);
-  const [alertasInteligentesVendas, setAlertasInteligentesVendas] = useState(
-    [],
-  );
-  const [previsaoProximos7Dias, setPrevisaoProximos7Dias] = useState(0);
   const menuRelatoriosRef = useRef(null);
   const [menuRelatoriosAberto, setMenuRelatoriosAberto] = useState(false);
   const [modalRelatorioAberto, setModalRelatorioAberto] = useState(false);
@@ -522,94 +504,6 @@ export default function VendasFinanceiro() {
     setDataFim(periodo.fim);
     setFiltroSelecionado(filtro);
   };
-
-  const carregarDados = async () => {
-    if (!podeVerFinanceiroCompleto) return;
-    if (!dataInicio || !dataFim) return;
-
-    setLoading(true);
-
-    try {
-      const response = await api.get("/relatorios/vendas/relatorio", {
-        params: { data_inicio: dataInicio, data_fim: dataFim },
-      });
-      const data = response.data;
-
-      setResumo(data.resumo || {});
-      setVendasPorData(data.vendas_por_data || []);
-      setFormasRecebimento(data.formas_recebimento || []);
-      setVendasPorFuncionario(data.vendas_por_funcionario || []);
-      setVendasPorTipo(data.vendas_por_tipo || []);
-      setVendasPorGrupo(data.vendas_por_grupo || []);
-      setProdutosDetalhados(data.produtos_detalhados || []);
-      setProdutosAnalise(data.produtos_analise || []);
-      setListaVendas(data.lista_vendas || []);
-
-      if (modoComparacao || abaAtiva === "comparacao") {
-        const periodoComp = calcularPeriodoComparacao({ dataInicio, dataFim, periodoComparacao });
-        const responseComp = await api.get("/relatorios/vendas/relatorio", {
-          params: periodoComp,
-        });
-        setResumoComparacao(responseComp.data.resumo || {});
-        setFormasRecebimentoComparacao(
-          responseComp.data.formas_recebimento || [],
-        );
-        setVendasPorGrupoComparacao(responseComp.data.vendas_por_grupo || []);
-        setVendasPorFuncionarioComparacao(
-          responseComp.data.vendas_por_funcionario || [],
-        );
-      } else {
-        // Limpar dados de comparação quando desativado
-        setResumoComparacao({
-          venda_bruta: 0,
-          taxa_entrega: 0,
-          desconto: 0,
-          venda_liquida: 0,
-          valor_recebido: 0,
-          em_aberto: 0,
-          quantidade_vendas: 0,
-        });
-      }
-    } catch (error) {
-      console.error("Erro ao carregar relatório:", error);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const calcularAnaliseInteligente = () => {
-    const resultado = calcularAnaliseInteligenteVendas({
-      produtosAnalise,
-      resumo,
-      resumoComparacao,
-      vendasPorData,
-    });
-
-    setProdutosMaisLucrativos(resultado.produtosMaisLucrativos);
-    setProdutosPorCategoria(resultado.produtosPorCategoria);
-    setAlertasInteligentesVendas(resultado.alertasInteligentesVendas);
-    setPrevisaoProximos7Dias(resultado.previsaoProximos7Dias);
-  };
-
-  // Recalcular análise quando produtos mudarem
-  useEffect(() => {
-    if (abaAtiva === "analise") {
-      calcularAnaliseInteligente();
-    }
-  }, [produtosAnalise, abaAtiva, resumo, resumoComparacao, vendasPorData]);
-
-  useEffect(() => {
-    if (podeVerFinanceiroCompleto) {
-      carregarDados();
-    }
-  }, [
-    dataInicio,
-    dataFim,
-    modoComparacao,
-    periodoComparacao,
-    abaAtiva,
-    podeVerFinanceiroCompleto,
-  ]);
 
   useEffect(() => {
     if (!podeVerFinanceiroCompleto) {
