@@ -592,7 +592,7 @@ Para cada dominio sensivel:
 
 | Arquivo | Linhas aprox. | Risco |
 | --- | ---: | --- |
-| `frontend/src/components/EntradaXML.jsx` | 3717 | Muito alto |
+| `frontend/src/components/EntradaXML.jsx` | 3561 | Muito alto |
 | `frontend/src/components/VendasFinanceiro.jsx` | 1980 | Alto |
 | `frontend/src/components/PedidosCompra.jsx` | 3225 | Alto |
 | `frontend/src/pages/ecommerce/EcommerceMVP.jsx` | 2533 | Alto |
@@ -919,7 +919,8 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-10: `EntradaXML` extraiu o modal de visualizacao da NF para `EntradaXmlVisualizacaoNotaModal`, preservando os callbacks da pagina e reduzindo o arquivo principal para 4169 linhas com build validado.
 - 2026-05-15: cadastros basicos de `Departamentos` e `Tipos de Despesa` iniciaram a padronizacao de acoes com `ActionButton`, `IconActionButton`, `LoadingState` e `EmptyState`, mantendo comportamento e endpoints iguais.
 - 2026-05-17: `/clientes` foi realinhada com a fundacao visual: `PageHeader`, `Panel`, `LoadingState`, `EmptyState`, `ActionButton` e `IconActionButton`; `Novo` voltou para a cor semantica de criacao.
-- 2026-05-18: `EntradaXML` extraiu cabecalho/acoes de upload para `EntradaXmlHeader`, metricas para `EntradaXmlMetricas` e paineis SEFAZ para `EntradaXmlSefazPanels`, usando `PageHeader`, `ActionButton`, `Panel`, `MetricGrid`/`MetricCard` e `StatusBadge`; o arquivo principal caiu de 3871 para 3717 linhas com build validado. Faltam lista de notas, modal de detalhes/conferencia e modal de criacao de produto.
+- 2026-05-18: `EntradaXML` extraiu cabecalho/acoes de upload para `EntradaXmlHeader`, metricas para `EntradaXmlMetricas` e paineis SEFAZ para `EntradaXmlSefazPanels`, usando `PageHeader`, `ActionButton`, `Panel`, `MetricGrid`/`MetricCard` e `StatusBadge`; o arquivo principal caiu de 3871 para 3717 linhas com build validado. Faltam modal de detalhes/conferencia e modal de criacao de produto.
+- 2026-05-18: `EntradaXML` extraiu a listagem principal de notas para `EntradaXmlNotasTable`, migrando filtros para `SegmentedControl`, acoes para `ActionButton`, status para `StatusBadge` e tabela para `DataTable`; o arquivo principal caiu de 3717 para 3561 linhas com build validado.
 
 ### Nao fazer nesta onda
 

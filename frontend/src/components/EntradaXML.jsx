@@ -10,13 +10,13 @@ import TooltipComposicao from './TooltipComposicao';
 import EntradaXmlHistoricoPrecosModal from './entrada-xml/EntradaXmlHistoricoPrecosModal';
 import EntradaXmlHeader from './entrada-xml/EntradaXmlHeader';
 import EntradaXmlMetricas from './entrada-xml/EntradaXmlMetricas';
+import EntradaXmlNotasTable from './entrada-xml/EntradaXmlNotasTable';
 import EntradaXmlRascunhoDevolucaoModal from './entrada-xml/EntradaXmlRascunhoDevolucaoModal';
 import EntradaXmlRevisaoPrecosModal from './entrada-xml/EntradaXmlRevisaoPrecosModal';
 import EntradaXmlResultadoLoteModal from './entrada-xml/EntradaXmlResultadoLoteModal';
 import EntradaXmlSefazPanels from './entrada-xml/EntradaXmlSefazPanels';
 import EntradaXmlVisualizacaoNotaModal from './entrada-xml/EntradaXmlVisualizacaoNotaModal';
 import SegmentedControl from './ui/SegmentedControl';
-import StatusBadge from './ui/StatusBadge';
 
 function montarNomeXml(dados) {
   const numero = String(dados?.numero_nf || '0').replaceAll(/\D/g, '');
@@ -2476,25 +2476,6 @@ const EntradaXML = () => {
     }
   };
 
-  const getStatusBadge = (status) => {
-    const statusMeta = {
-      pendente: { label: 'Pendente', intent: 'warning' },
-      processada: { label: 'Conciliada', intent: 'success' },
-      cancelada: { label: 'Cancelada', intent: 'danger' },
-      erro: { label: 'Erro', intent: 'danger' },
-    };
-    const meta = statusMeta[status] || {
-      label: String(status || '-').toUpperCase(),
-      intent: 'neutral',
-    };
-
-    return (
-      <StatusBadge intent={meta.intent} size="md">
-        {meta.label}
-      </StatusBadge>
-    );
-  };
-
   const getConfiancaBadge = (confianca) => {
     if (!confianca) return <span className="text-gray-400 text-sm">Nao vinculado</span>;
 
@@ -2584,156 +2565,17 @@ const EntradaXML = () => {
         onFiltroStatus={setFiltroStatus}
       />
 
-      {/* Lista de Notas */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="px-6 py-4 border-b bg-gray-50 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">Notas Fiscais de Entrada</h2>
-          <div className="flex flex-wrap gap-1">
-            {[
-              { v: 'todos', label: 'Todas' },
-              { v: 'pendente', label: 'Pendentes' },
-              { v: 'processada', label: 'Conciliadas' },
-              { v: 'erro', label: 'Com Erro' },
-            ].map(({ v, label }) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => setFiltroStatus(v)}
-                className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${filtroStatus === v ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-sm font-semibold">NF / Chave</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Fornecedor</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Data Emissao</th>
-                <th className="px-4 py-3 text-right text-sm font-semibold">Valor</th>
-                <th className="px-4 py-3 text-center text-sm font-semibold">Itens</th>
-                <th className="px-4 py-3 text-center text-sm font-semibold">Status</th>
-                <th className="px-4 py-3 text-center text-sm font-semibold">Acoes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(() => {
-                const notas = filtroStatus === 'todos' ? notasEntrada : notasEntrada.filter(n => n.status === filtroStatus);
-                if (notas.length === 0) {
-                  return (
-                    <tr>
-                      <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
-                        {notasEntrada.length === 0
-                          ? 'Nenhuma nota fiscal importada. Importe um XML ou busque pela SEFAZ.'
-                          : `Nenhuma nota com status "${filtroStatus}".`}
-                      </td>
-                    </tr>
-                  );
-                }
-                return notas.map((nota) => {
-                  const conferenciaMeta = CONFERENCIA_STATUS_META[nota.conferencia_status || 'nao_iniciada'];
-                  const exibirBotaoConferir = nota.status === 'pendente' && (nota.conferencia_status || 'nao_iniciada') === 'nao_iniciada';
-                  const divergenciasCount = Number(nota.divergencias_count || 0);
-                  const podeAbrirDivergencia = divergenciasCount > 0 || nota.conferencia_status === 'com_divergencia';
-                  const conferenciaLabel = (
-                    <>
-                      {conferenciaMeta?.label || 'Nao conferida'}
-                      {divergenciasCount > 0 ? ` • ${divergenciasCount} divergencia(s)` : ''}
-                    </>
-                  );
-                  return (
-                    <tr
-                      key={nota.id}
-                      onClick={() => abrirVisualizacao(nota.id)}
-                      className="border-t hover:bg-blue-50 cursor-pointer transition-colors"
-                    >
-                      <td className="px-4 py-3">
-                        <div className="font-semibold text-gray-900">NF {nota.numero_nota || '-'}</div>
-                        <div className="font-mono text-[11px] text-gray-500">{nota.chave_acesso.substring(0, 20)}...</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="font-semibold">{nota.fornecedor_nome}</div>
-                        <div className="text-xs text-gray-500">{nota.fornecedor_cnpj}</div>
-                      </td>
-                      <td className="px-4 py-3">{new Date(nota.data_emissao).toLocaleDateString()}</td>
-                      <td className="px-4 py-3 text-right font-semibold">{formatMoneyBRL(nota.valor_total || 0)}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-semibold">
-                          {nota.produtos_vinculados + nota.produtos_nao_vinculados} itens
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="space-y-2">
-                          <div>{getStatusBadge(nota.status)}</div>
-                          {podeAbrirDivergencia ? (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                abrirDetalhes(nota.id, { abrirConferencia: true });
-                              }}
-                              className={`inline-flex items-center rounded-full border px-2 py-1 text-[11px] font-semibold transition-colors hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-orange-300 ${conferenciaMeta?.cls || 'bg-gray-100 text-gray-700 border-gray-200'}`}
-                              title="Abrir conferencia e tratar divergencias"
-                            >
-                              {conferenciaLabel}
-                            </button>
-                          ) : (
-                            <div className={`inline-flex items-center rounded-full border px-2 py-1 text-[11px] font-semibold ${conferenciaMeta?.cls || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
-                              {conferenciaLabel}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex gap-2 justify-center">
-                          {nota.status === 'pendente' && (
-                            <button
-                              onClick={() => abrirDetalhes(nota.id)}
-                              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold text-sm"
-                              title="Vincular produtos"
-                            >
-                              Vincular
-                            </button>
-                          )}
-                          {exibirBotaoConferir && (
-                            <button
-                              onClick={() => abrirDetalhes(nota.id, { abrirConferencia: true })}
-                              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-semibold text-sm"
-                              title="Conferir entrada da nota"
-                            >
-                              Conferir
-                            </button>
-                          )}
-                          {nota.entrada_estoque_realizada ? (
-                            <button
-                              onClick={() => reverterNota(nota.id, nota.numero_nota)}
-                              className="text-orange-600 hover:text-orange-800 font-semibold text-sm"
-                              title="Reverter entrada no estoque"
-                            >
-                              Reverter
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => excluirNota(nota.id, nota.numero_nota)}
-                              className="text-red-600 hover:text-red-800 font-semibold text-sm"
-                              title="Excluir nota"
-                            >
-                              Excluir
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                });
-              })()}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <EntradaXmlNotasTable
+        abrirDetalhes={abrirDetalhes}
+        abrirVisualizacao={abrirVisualizacao}
+        conferenciaStatusMeta={CONFERENCIA_STATUS_META}
+        excluirNota={excluirNota}
+        filtroStatus={filtroStatus}
+        formatMoneyBRL={formatMoneyBRL}
+        notasEntrada={notasEntrada}
+        reverterNota={reverterNota}
+        setFiltroStatus={setFiltroStatus}
+      />
 
       {/* Modal de Detalhes */}
       {mostrarDetalhes && notaSelecionada && (
