@@ -4,6 +4,7 @@ import ecommerceApi from '../../services/ecommerceApi';
 import { api } from '../../services/api';
 import EcommerceCatalogControls, { EcommerceCatalogSummary } from './EcommerceCatalogControls';
 import EcommerceCatalogProductCard from './EcommerceCatalogProductCard';
+import { EcommerceCartOrderSummary, EcommerceCartSidebar } from './EcommerceCartPanels';
 import {
   trackPageView,
   trackViewItem,
@@ -1598,51 +1599,16 @@ export default function EcommerceMVP() {
             </div>
 
             {/* SIDEBAR CARRINHO */}
-            <aside style={{ ...S.sidebar, display: isMobile ? 'none' : 'block' }}>
-            <div style={S.sidebarTitle}>
-              <span>🛒 Seu carrinho</span>
-              {cart?.itens?.length > 0 && <span style={S.sidebarBadge}>{cart.itens.length}</span>}
-            </div>
-            {cart?.itens?.length ? (
-              <div style={{ display: 'grid', gap: 8 }}>
-                {cart.itens.slice(0, 5).map((item) => {
-                  const prod = productMap[item.produto_id];
-                  const img = prod ? getProductImages(prod)[0] : null;
-                  return (
-                    <div key={item.item_id} style={S.miniItem}>
-                      <div style={S.miniImg}>
-                        {img ? <img src={img} alt={item.nome} style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 2 }} /> : <span style={{ fontSize: 16 }}>📦</span>}
-                      </div>
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1a1a2e' }}>{item.nome}</div>
-                        <div style={{ fontSize: 11, color: '#f97316', fontWeight: 600 }}>{item.quantidade}× {formatCurrency(item.preco_unitario)}</div>
-                      </div>
-                    </div>
-                  );
-                })}
-                {cart.itens.length > 5 && (
-                  <div style={{ fontSize: 12, color: '#9ca3af', textAlign: 'center' }}>+ {cart.itens.length - 5} item(ns) a mais</div>
-                )}
-                <div style={S.subtotalBox}>
-                  <span style={{ fontWeight: 600, fontSize: 14, color: '#374151' }}>Subtotal</span>
-                  <span style={{ fontWeight: 800, fontSize: 17, color: '#1a1a2e' }}>{formatCurrency(cartTotal)}</span>
-                </div>
-                <button style={S.checkoutBig} onClick={handleCheckoutFromLoja}>
-                  Finalizar compra →
-                </button>
-                <button style={S.viewCartBtn} onClick={() => setView('carrinho')}>Ver / Editar carrinho</button>
-                {!customerToken && (
-                  <div style={{ fontSize: 11, color: '#9ca3af', textAlign: 'center' }}>🔒 Login solicitado apenas no fechamento</div>
-                )}
-              </div>
-            ) : (
-              <div style={{ color: '#c4c4d4', textAlign: 'center', padding: '28px 0', fontSize: 13 }}>
-                <div style={{ fontSize: 34, marginBottom: 8 }}>🛒</div>
-                <div style={{ fontWeight: 600, color: '#9ca3af' }}>Carrinho vazio</div>
-                <div style={{ fontSize: 12, marginTop: 4 }}>Adicione produtos para começar</div>
-              </div>
-            )}
-          </aside>
+            <EcommerceCartSidebar
+              cart={cart}
+              cartTotal={cartTotal}
+              customerToken={customerToken}
+              isMobile={isMobile}
+              productMap={productMap}
+              styles={S}
+              onCheckout={handleCheckoutFromLoja}
+              onViewCart={() => setView('carrinho')}
+            />
         </div>
         </>
       )}
@@ -1786,25 +1752,13 @@ export default function EcommerceMVP() {
               </div>
 
               {/* Resumo lateral */}
-              <div style={{ background: '#fff', border: '1px solid #e7e5e4', borderRadius: 16, padding: 20, boxShadow: '0 2px 12px rgba(0,0,0,0.06)' }}>
-                <div style={{ fontWeight: 700, fontSize: 16, color: '#1c1917', marginBottom: 14 }}>Resumo do pedido</div>
-                {cart.itens.map((item) => (
-                  <div key={item.item_id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#6b7280', marginBottom: 6 }}>
-                    <span>{item.nome} × {item.quantidade}</span>
-                    <span>{formatCurrency(item.preco_unitario * item.quantidade)}</span>
-                  </div>
-                ))}
-                <div style={S.cartTotalRow}>
-                  <span>Total</span>
-                  <span>{formatCurrency(cartTotal)}</span>
-                </div>
-                <button onClick={handleCheckoutFromLoja} style={{ ...S.checkoutBig, width: '100%', marginTop: 14 }}>
-                  Ir para o checkout →
-                </button>
-                <button onClick={() => setView('loja')} style={{ width: '100%', marginTop: 8, background: 'transparent', border: '1.5px solid #e5e7eb', color: '#6b7280', borderRadius: 10, padding: '10px 0', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
-                  Continuar comprando
-                </button>
-              </div>
+              <EcommerceCartOrderSummary
+                cart={cart}
+                cartTotal={cartTotal}
+                styles={S}
+                onCheckout={handleCheckoutFromLoja}
+                onContinueShopping={() => setView('loja')}
+              />
             </div>
           ) : (
             <div style={{ textAlign: 'center', padding: '48px 0', display: 'grid', gap: 12, justifyItems: 'center' }}>
