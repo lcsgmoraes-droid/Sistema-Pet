@@ -592,7 +592,7 @@ Para cada dominio sensivel:
 
 | Arquivo | Linhas aprox. | Risco |
 | --- | ---: | --- |
-| `frontend/src/components/EntradaXML.jsx` | 4169 | Muito alto |
+| `frontend/src/components/EntradaXML.jsx` | 2486 | Muito alto |
 | `frontend/src/components/VendasFinanceiro.jsx` | 1980 | Alto |
 | `frontend/src/components/PedidosCompra.jsx` | 3225 | Alto |
 | `frontend/src/pages/ecommerce/EcommerceMVP.jsx` | 2533 | Alto |
@@ -919,6 +919,13 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-10: `EntradaXML` extraiu o modal de visualizacao da NF para `EntradaXmlVisualizacaoNotaModal`, preservando os callbacks da pagina e reduzindo o arquivo principal para 4169 linhas com build validado.
 - 2026-05-15: cadastros basicos de `Departamentos` e `Tipos de Despesa` iniciaram a padronizacao de acoes com `ActionButton`, `IconActionButton`, `LoadingState` e `EmptyState`, mantendo comportamento e endpoints iguais.
 - 2026-05-17: `/clientes` foi realinhada com a fundacao visual: `PageHeader`, `Panel`, `LoadingState`, `EmptyState`, `ActionButton` e `IconActionButton`; `Novo` voltou para a cor semantica de criacao.
+- 2026-05-18: `EntradaXML` extraiu cabecalho/acoes de upload para `EntradaXmlHeader`, metricas para `EntradaXmlMetricas` e paineis SEFAZ para `EntradaXmlSefazPanels`, usando `PageHeader`, `ActionButton`, `Panel`, `MetricGrid`/`MetricCard` e `StatusBadge`; o arquivo principal caiu de 3871 para 3717 linhas com build validado. Faltam blocos internos de itens da nota.
+- 2026-05-18: `EntradaXML` extraiu a listagem principal de notas para `EntradaXmlNotasTable`, migrando filtros para `SegmentedControl`, acoes para `ActionButton`, status para `StatusBadge` e tabela para `DataTable`; o arquivo principal caiu de 3717 para 3561 linhas com build validado.
+- 2026-05-18: `EntradaXML` extraiu o modal de criacao de produto para `EntradaXmlCriarProdutoModal`, mantendo callbacks da pagina e padronizando carregamento/acoes com `LoadingState`, `IconActionButton` e `ActionButton`; o arquivo principal caiu de 3561 para 3319 linhas com build validado. Faltam blocos internos de itens da nota.
+- 2026-05-18: `EntradaXML` extraiu o modal de detalhes/conferencia para `EntradaXmlDetalhesModal`, preservando callbacks da pagina e reduzindo o arquivo principal de 3319 para 2486 linhas com build validado.
+- 2026-05-18: `EntradaXmlDetalhesModal` extraiu o card de item para `EntradaXmlDetalhesItemCard`, reduzindo o modal de 957 para 464 linhas e padronizando acoes internas claras com `ActionButton`/`IconActionButton` por funcao.
+- 2026-05-18: `EntradaXmlDetalhesModal` extraiu o rodape/rateio para `EntradaXmlDetalhesFooter`, reduzindo o modal de 464 para 357 linhas e padronizando acoes de rateio/processamento/exclusao com `ActionButton` por funcao.
+- 2026-05-18: `EntradaXmlDetalhesModal` extraiu o painel de conferencia para `EntradaXmlDetalhesConferenciaPanel`, reduzindo o modal de 357 para 266 linhas e padronizando as acoes de conferencia, tratativas, pendencia e devolucao com `ActionButton` por funcao. Proximo passo: avaliar PR/smoke ou seguir com pequenas limpezas de cabecalho/listagem do modal.
 
 ### Nao fazer nesta onda
 
@@ -2069,7 +2076,7 @@ Atualizacao de 2026-04-24: iniciada a trilha de hardening para liberar o app e o
 
 - [ ] `frontend/src/pages/ecommerce/EcommerceMVP.jsx`: separar vitrine, carrinho, conta, checkout, pedidos, analytics e estilos
 - [ ] `app-mobile/src/screens/entregador/DetalheEntregaScreen.tsx`: separar GPS, acoes de parada, recebimento, venda/modal e finalizacao de rota
-- [ ] `frontend/src/components/EntradaXML.jsx`: quebrar fluxo de importacao/validacao/conferencia para reduzir bundle e risco de regressao
+- [ ] `frontend/src/components/EntradaXML.jsx`: continuar quebra do fluxo de importacao/validacao/conferencia para reduzir bundle e risco de regressao; ja foram extraidos modais operacionais, cabecalho, metricas, paineis SEFAZ, listagem principal, modal de criacao de produto, modal de detalhes/conferencia, card de item da NF, rodape/rateio da conferencia e painel de resumo/conferencia
 - [ ] `backend/app/routes/ecommerce_checkout.py`: extrair servico de checkout e preparar orquestracao `Pedido -> Venda`
 - [ ] `backend/app/routes/ecommerce_cart.py`: revisar reserva de estoque com protecao contra corrida em checkout simultaneo
 - [ ] `backend/app/api/endpoints/rotas_entrega.py`: separar sincronizacao de venda/rota/parada em servico de dominio testavel

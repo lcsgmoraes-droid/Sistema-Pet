@@ -1,22 +1,21 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../api';
 import { getAccessToken } from '../auth/tokenStorage';
 import { toast } from 'react-hot-toast';
-import { formatBRL, formatMoneyBRL, formatPercent } from '../utils/formatters';
-import CardFiscal from './CardFiscal';
+import { formatBRL, formatMoneyBRL } from '../utils/formatters';
 import ExportActionButton from './ui/ExportActionButton';
-import TooltipComposicao from './TooltipComposicao';
+import EntradaXmlCriarProdutoModal from './entrada-xml/EntradaXmlCriarProdutoModal';
+import EntradaXmlDetalhesModal from './entrada-xml/EntradaXmlDetalhesModal';
 import EntradaXmlHistoricoPrecosModal from './entrada-xml/EntradaXmlHistoricoPrecosModal';
+import EntradaXmlHeader from './entrada-xml/EntradaXmlHeader';
+import EntradaXmlMetricas from './entrada-xml/EntradaXmlMetricas';
+import EntradaXmlNotasTable from './entrada-xml/EntradaXmlNotasTable';
 import EntradaXmlRascunhoDevolucaoModal from './entrada-xml/EntradaXmlRascunhoDevolucaoModal';
 import EntradaXmlRevisaoPrecosModal from './entrada-xml/EntradaXmlRevisaoPrecosModal';
 import EntradaXmlResultadoLoteModal from './entrada-xml/EntradaXmlResultadoLoteModal';
+import EntradaXmlSefazPanels from './entrada-xml/EntradaXmlSefazPanels';
 import EntradaXmlVisualizacaoNotaModal from './entrada-xml/EntradaXmlVisualizacaoNotaModal';
-import SegmentedControl from './ui/SegmentedControl';
-
-function formatarChaveAcesso(valor) {
-  return String(valor).replaceAll(/\D/g, '').slice(0, 44);
-}
 
 function montarNomeXml(dados) {
   const numero = String(dados?.numero_nf || '0').replaceAll(/\D/g, '');
@@ -2476,26 +2475,6 @@ const EntradaXML = () => {
     }
   };
 
-  const getStatusBadge = (status) => {
-    const styles = {
-      pendente: 'bg-yellow-200 text-yellow-800',
-      processada: 'bg-green-200 text-green-800',
-      cancelada: 'bg-red-200 text-red-800',
-      erro: 'bg-red-300 text-red-900'
-    };
-    const labels = {
-      pendente: 'Pendente',
-      processada: 'Conciliada',
-      cancelada: 'Cancelada',
-      erro: 'Erro',
-    };
-    return (
-      <span className={`px-3 py-1 rounded-full text-sm font-semibold ${styles[status] || 'bg-gray-200'}`}>
-        {labels[status] || status.toUpperCase()}
-      </span>
-    );
-  };
-
   const getConfiancaBadge = (confianca) => {
     if (!confianca) return <span className="text-gray-400 text-sm">Nao vinculado</span>;
 
@@ -2536,1549 +2515,146 @@ const EntradaXML = () => {
 
   return (
     <div className="p-6">
-      {/* Cabecalho + Acoes */}
-      <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Central NF-e Entradas</h1>
-          <p className="text-gray-600 text-sm mt-1">Gerencie todas as notas fiscais de entrada — via upload ou direto da SEFAZ</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <label className="inline-block">
-            <input type="file" accept=".xml" onChange={handleFileUpload} disabled={uploadingFile || uploadingLote} className="hidden" />
-            <span className={`px-4 py-2 rounded-lg font-semibold cursor-pointer inline-block text-sm ${(uploadingFile || uploadingLote) ? 'bg-gray-300 cursor-not-allowed text-gray-500' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}>
-              {uploadingFile ? 'Processando...' : 'Importar XML'}
-            </span>
-          </label>
-          <label className="inline-block">
-            <input type="file" accept=".xml" multiple onChange={handleMultipleFilesUpload} disabled={uploadingFile || uploadingLote} className="hidden" />
-            <span className={`px-4 py-2 rounded-lg font-semibold cursor-pointer inline-block text-sm ${(uploadingFile || uploadingLote) ? 'bg-gray-300 cursor-not-allowed text-gray-500' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}>
-              {uploadingLote ? 'Processando lote...' : 'Importar Varios XML'}
-            </span>
-          </label>
-          <button
-            type="button"
-            onClick={() => { setMostrarPainelSefaz(v => !v); setMostrarConfigSefaz(false); }}
-            className={`px-4 py-2 rounded-lg font-semibold text-sm transition-colors ${mostrarPainelSefaz ? 'bg-emerald-700 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}`}
-          >
-            Buscar pela SEFAZ
-          </button>
-          <button
-            type="button"
-            onClick={() => { setMostrarConfigSefaz(v => !v); if (!mostrarConfigSefaz) { carregarConfigSefaz(); } setMostrarPainelSefaz(false); }}
-            className={`px-4 py-2 rounded-lg font-semibold text-sm transition-colors ${mostrarConfigSefaz ? 'bg-gray-700 text-white' : 'bg-gray-600 hover:bg-gray-700 text-white'}`}
-          >
-            Configurar SEFAZ
-          </button>
-        </div>
-      </div>
+      <EntradaXmlHeader
+        mostrarConfigSefaz={mostrarConfigSefaz}
+        mostrarPainelSefaz={mostrarPainelSefaz}
+        onTogglePainelSefaz={() => {
+          setMostrarPainelSefaz((visivel) => !visivel);
+          setMostrarConfigSefaz(false);
+        }}
+        onToggleConfigSefaz={() => {
+          setMostrarConfigSefaz((visivel) => !visivel);
+          if (!mostrarConfigSefaz) {
+            carregarConfigSefaz();
+          }
+          setMostrarPainelSefaz(false);
+        }}
+        onUploadXml={handleFileUpload}
+        onUploadLote={handleMultipleFilesUpload}
+        uploadingFile={uploadingFile}
+        uploadingLote={uploadingLote}
+      />
 
-      {/* Painel: Buscar pela SEFAZ */}
-      {mostrarPainelSefaz && (
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6 border-l-4 border-emerald-500">
-          <h2 className="text-lg font-bold text-gray-800 mb-4">Buscar NF-e pela SEFAZ</h2>
-          <form onSubmit={consultarSefaz} className="flex gap-3 mb-2">
-            <input
-              type="text"
-              value={chaveSefaz}
-              onChange={e => setChaveSefaz(formatarChaveAcesso(e.target.value))}
-              onPaste={e => { e.preventDefault(); setChaveSefaz(formatarChaveAcesso(e.clipboardData?.getData('text') || '')); }}
-              placeholder="Chave de acesso (44 digitos)"
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-              maxLength={80}
-            />
-            <button
-              type="submit"
-              disabled={loadingSefaz || chaveSefaz.length !== 44}
-              className="px-5 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50"
-            >
-              {loadingSefaz ? 'Consultando...' : 'Consultar'}
-            </button>
-          </form>
-          <p className="text-xs text-gray-400 mb-3">{chaveSefaz.length}/44 digitos</p>
-          {erroSefaz && <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{erroSefaz}</div>}
-          {avisoConectorSefaz && (
-            <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
-              <strong>Integracao validada, etapa final pendente:</strong> {avisoConectorSefaz}
-            </div>
-          )}
-          {consultasSefaz.length > 0 && (
-            <div className="space-y-3 mt-4">
-              <p className="text-sm font-semibold text-gray-700">Consultas desta sessao ({consultasSefaz.length}):</p>
-              {consultasSefaz.map(consulta => {
-                const exp = consultaExpandidaId === consulta.id;
-                const d = consulta.dados;
-                return (
-                  <div key={consulta.id} className="border border-gray-200 rounded-lg overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={() => setConsultaExpandidaId(exp ? null : consulta.id)}
-                      className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="text-sm font-semibold text-gray-800">NF {d.numero_nf}/{d.serie} — {d.emitente_nome}</span>
-                        <span className="text-xs text-gray-500">{d.itens?.length || 0} itens · {formatMoneyBRL(d.valor_total_nf)}</span>
-                      </div>
-                    </button>
-                    <div className="px-4 pb-3 bg-gray-50 border-t border-gray-100 flex flex-wrap gap-2 items-center pt-2">
-                      <button
-                        type="button"
-                        onClick={() => usarNaEntrada(consulta)}
-                        disabled={importandoConsultaId === consulta.id}
-                        className="px-3 py-2 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 disabled:opacity-60"
-                      >
-                        {importandoConsultaId === consulta.id ? 'Importando...' : 'Usar esta NF na Entrada'}
-                      </button>
-                    </div>
-                    {exp && d.itens?.length > 0 && (
-                      <div className="p-4 border-t border-gray-100 overflow-x-auto">
-                        <table className="w-full text-xs">
-                          <thead>
-                            <tr className="bg-gray-50 text-gray-600 uppercase">
-                              <th className="text-left px-2 py-1">Cod.</th>
-                              <th className="text-left px-2 py-1">Descricao</th>
-                              <th className="text-right px-2 py-1">Qtd</th>
-                              <th className="text-right px-2 py-1">Unit.</th>
-                              <th className="text-right px-2 py-1">Total</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100">
-                            {d.itens.map(item => (
-                              <tr key={item.numero_item} className="hover:bg-gray-50">
-                                <td className="px-2 py-1 font-mono">{item.codigo_produto}</td>
-                                <td className="px-2 py-1">{item.descricao}</td>
-                                <td className="px-2 py-1 text-right">{item.quantidade}</td>
-                                <td className="px-2 py-1 text-right">{formatMoneyBRL(item.valor_unitario)}</td>
-                                <td className="px-2 py-1 text-right font-semibold">{formatMoneyBRL(item.valor_total)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
+      <EntradaXmlSefazPanels
+        avisoConectorSefaz={avisoConectorSefaz}
+        chaveSefaz={chaveSefaz}
+        cfgSefaz={cfgSefaz}
+        configSefazLoading={configSefazLoading}
+        consultaExpandidaId={consultaExpandidaId}
+        consultasSefaz={consultasSefaz}
+        consultarSefaz={consultarSefaz}
+        erroSefaz={erroSefaz}
+        formatMoneyBRL={formatMoneyBRL}
+        importandoConsultaId={importandoConsultaId}
+        loadingSefaz={loadingSefaz}
+        mensagemRotina={mensagemRotina}
+        mostrarConfigSefaz={mostrarConfigSefaz}
+        mostrarPainelSefaz={mostrarPainelSefaz}
+        salvarRotinaSefaz={salvarRotinaSefaz}
+        salvandoRotina={salvandoRotina}
+        setCfgSefaz={setCfgSefaz}
+        setChaveSefaz={setChaveSefaz}
+        setConsultaExpandidaId={setConsultaExpandidaId}
+        usarNaEntrada={usarNaEntrada}
+      />
 
-      {/* Painel: Configurar SEFAZ */}
-      {mostrarConfigSefaz && (
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6 border-l-4 border-gray-500">
-          <h2 className="text-lg font-bold text-gray-800 mb-1">Configurar SEFAZ</h2>
-          <p className="text-sm text-gray-500 mb-4">
-            Certificado digital e parametros ficam em{' '}
-            <Link to="/configuracoes/integracoes" className="text-indigo-600 font-semibold">Configuracoes &gt; Integracoes</Link>.
-            Aqui configure apenas a rotina automatica.
-          </p>
-          {configSefazLoading ? (
-            <p className="text-sm text-gray-500">Carregando configuracao...</p>
-          ) : (
-            <>
-              {(!cfgSefaz.enabled || !cfgSefaz.cert_ok) && (
-                <div className="p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm mb-4">
-                  Integracao ainda nao esta pronta para rotina automatica. Finalize em Configuracoes &gt; Integracoes.
-                </div>
-              )}
-              <div className="mb-4">
-                <label className="flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={cfgSefaz.importacao_automatica}
-                    onChange={e => setCfgSefaz(prev => ({ ...prev, importacao_automatica: e.target.checked }))}
-                  />
-                  <span>Ativar importacao automatica</span>
-                </label>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
-                <div>Ultima sincronizacao: <strong>{cfgSefaz.ultimo_sync_at ? new Date(cfgSefaz.ultimo_sync_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '-'}</strong></div>
-                <div>Status: <strong>{cfgSefaz.ultimo_sync_status}</strong></div>
-                <div>Documentos trazidos: <strong>{cfgSefaz.ultimo_sync_documentos}</strong></div>
-                <div>Modo atual: <strong>{cfgSefaz.modo}</strong></div>
-                <div className="sm:col-span-2">Mensagem: <strong>{cfgSefaz.ultimo_sync_mensagem}</strong></div>
-              </div>
+      <EntradaXmlMetricas
+        notasEntrada={notasEntrada}
+        formatMoneyBRL={formatMoneyBRL}
+        onFiltroStatus={setFiltroStatus}
+      />
 
-              {mensagemRotina && (
-                <div className="text-sm bg-gray-50 border border-gray-200 rounded-lg p-3 text-gray-700 mb-4">{mensagemRotina}</div>
-              )}
-              <div className="flex flex-wrap gap-3">
-                <button type="button" onClick={salvarRotinaSefaz} disabled={salvandoRotina} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60">
-                  {salvandoRotina ? 'Salvando...' : 'Salvar configuracao'}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      )}
+      <EntradaXmlNotasTable
+        abrirDetalhes={abrirDetalhes}
+        abrirVisualizacao={abrirVisualizacao}
+        conferenciaStatusMeta={CONFERENCIA_STATUS_META}
+        excluirNota={excluirNota}
+        filtroStatus={filtroStatus}
+        formatMoneyBRL={formatMoneyBRL}
+        notasEntrada={notasEntrada}
+        reverterNota={reverterNota}
+        setFiltroStatus={setFiltroStatus}
+      />
 
-      {/* Estatisticas */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setFiltroStatus('todos')}>
-          <div className="text-2xl font-bold text-blue-600">
-            {notasEntrada.length}
-          </div>
-          <div className="text-sm text-gray-600">Total de Notas</div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setFiltroStatus('pendente')}>
-          <div className="text-2xl font-bold text-yellow-600">
-            {notasEntrada.filter(n => n.status === 'pendente').length}
-          </div>
-          <div className="text-sm text-gray-600">Pendentes</div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setFiltroStatus('processada')}>
-          <div className="text-2xl font-bold text-green-600">
-            {notasEntrada.filter(n => n.status === 'processada').length}
-          </div>
-          <div className="text-sm text-gray-600">Conciliadas</div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-2xl font-bold text-purple-600">
-            {formatMoneyBRL(notasEntrada.filter(n => n.status === 'processada').reduce((sum, n) => sum + (n.valor_total || 0), 0))}
-          </div>
-          <div className="text-sm text-gray-600">Valor Conciliado</div>
-        </div>
-      </div>
+      <EntradaXmlDetalhesModal
+        acaoConferenciaOpcoes={ACAO_CONFERENCIA_OPCOES}
+        aberto={aberto}
+        abrirModalCriarProduto={abrirModalCriarProduto}
+        aplicarMultiplicadorPackAoItem={aplicarMultiplicadorPackAoItem}
+        atualizarCampoConferenciaItem={atualizarCampoConferenciaItem}
+        atualizarFiltroProduto={atualizarFiltroProduto}
+        buscandoProduto={buscandoProduto}
+        calcularConferenciaItem={calcularConferenciaItem}
+        carregarPreviewProcessamento={carregarPreviewProcessamento}
+        conferenciaItens={conferenciaItens}
+        conferenciaObservacaoGeral={conferenciaObservacaoGeral}
+        criandoPendenciaFornecedor={criandoPendenciaFornecedor}
+        criarTodosProdutosNaoVinculados={criarTodosProdutosNaoVinculados}
+        desfazendoConferencia={desfazendoConferencia}
+        desfazerConferenciaAtual={desfazerConferenciaAtual}
+        desvincularProduto={desvincularProduto}
+        detectarDivergencias={detectarDivergencias}
+        excluirNota={excluirNota}
+        filtroItensNota={filtroItensNota}
+        filtroProduto={filtroProduto}
+        formatarOpcaoProduto={formatarOpcaoProduto}
+        formatarValorFiscal={formatarValorFiscal}
+        gerandoRascunhoDevolucao={gerandoRascunhoDevolucao}
+        gerarPendenciaFornecedor={gerarPendenciaFornecedor}
+        gerarRascunhoDevolucao={gerarRascunhoDevolucao}
+        getConfiancaBadge={getConfiancaBadge}
+        itensComDivergenciaDetalhe={itensComDivergenciaDetalhe}
+        itensExibidosNota={itensExibidosNota}
+        itensNotaDetalhe={itensNotaDetalhe}
+        loading={loading}
+        metaConferenciaAtual={metaConferenciaAtual}
+        mostrarCamposConferencia={mostrarCamposConferencia}
+        multiplicadoresPack={multiplicadoresPack}
+        navigate={navigate}
+        notaSelecionada={notaSelecionada}
+        obterConfiguracaoPackItem={obterConfiguracaoPackItem}
+        obterCustoAquisicaoItem={obterCustoAquisicaoItem}
+        processarNota={processarNota}
+        quantidadesOnline={quantidadesOnline}
+        resultadosBuscaProduto={resultadosBuscaProduto}
+        resumoConferenciaAtual={resumoConferenciaAtual}
+        reverterNota={reverterNota}
+        salvandoConferencia={salvandoConferencia}
+        salvarConferenciaAtual={salvarConferenciaAtual}
+        salvarQuantidadeOnlineItem={salvarQuantidadeOnlineItem}
+        salvarTipoRateio={salvarTipoRateio}
+        setConferenciaObservacaoGeral={setConferenciaObservacaoGeral}
+        setFiltroItensNota={setFiltroItensNota}
+        setFiltroProduto={setFiltroProduto}
+        setMostrarCamposConferencia={setMostrarCamposConferencia}
+        setMostrarDetalhes={setMostrarDetalhes}
+        setMultiplicadoresPack={setMultiplicadoresPack}
+        setNotaSelecionada={setNotaSelecionada}
+        setQuantidadesOnline={setQuantidadesOnline}
+        setResultadosBuscaProduto={setResultadosBuscaProduto}
+        tipoRateio={tipoRateio}
+        vincularProduto={vincularProduto}
+      />
 
-      {/* Lista de Notas */}
-      <div className="bg-white rounded-lg shadow-md overflow-hidden">
-        <div className="px-6 py-4 border-b bg-gray-50 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold">Notas Fiscais de Entrada</h2>
-          <div className="flex flex-wrap gap-1">
-            {[
-              { v: 'todos', label: 'Todas' },
-              { v: 'pendente', label: 'Pendentes' },
-              { v: 'processada', label: 'Conciliadas' },
-              { v: 'erro', label: 'Com Erro' },
-            ].map(({ v, label }) => (
-              <button
-                key={v}
-                type="button"
-                onClick={() => setFiltroStatus(v)}
-                className={`px-3 py-1 rounded-full text-xs font-semibold transition-colors ${filtroStatus === v ? 'bg-blue-600 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'}`}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-4 py-3 text-left text-sm font-semibold">NF / Chave</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Fornecedor</th>
-                <th className="px-4 py-3 text-left text-sm font-semibold">Data Emissao</th>
-                <th className="px-4 py-3 text-right text-sm font-semibold">Valor</th>
-                <th className="px-4 py-3 text-center text-sm font-semibold">Itens</th>
-                <th className="px-4 py-3 text-center text-sm font-semibold">Status</th>
-                <th className="px-4 py-3 text-center text-sm font-semibold">Acoes</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(() => {
-                const notas = filtroStatus === 'todos' ? notasEntrada : notasEntrada.filter(n => n.status === filtroStatus);
-                if (notas.length === 0) {
-                  return (
-                    <tr>
-                      <td colSpan="7" className="px-4 py-8 text-center text-gray-500">
-                        {notasEntrada.length === 0
-                          ? 'Nenhuma nota fiscal importada. Importe um XML ou busque pela SEFAZ.'
-                          : `Nenhuma nota com status "${filtroStatus}".`}
-                      </td>
-                    </tr>
-                  );
-                }
-                return notas.map((nota) => {
-                  const conferenciaMeta = CONFERENCIA_STATUS_META[nota.conferencia_status || 'nao_iniciada'];
-                  const exibirBotaoConferir = nota.status === 'pendente' && (nota.conferencia_status || 'nao_iniciada') === 'nao_iniciada';
-                  const divergenciasCount = Number(nota.divergencias_count || 0);
-                  const podeAbrirDivergencia = divergenciasCount > 0 || nota.conferencia_status === 'com_divergencia';
-                  const conferenciaLabel = (
-                    <>
-                      {conferenciaMeta?.label || 'Nao conferida'}
-                      {divergenciasCount > 0 ? ` • ${divergenciasCount} divergencia(s)` : ''}
-                    </>
-                  );
-                  return (
-                    <tr
-                      key={nota.id}
-                      onClick={() => abrirVisualizacao(nota.id)}
-                      className="border-t hover:bg-blue-50 cursor-pointer transition-colors"
-                    >
-                      <td className="px-4 py-3">
-                        <div className="font-semibold text-gray-900">NF {nota.numero_nota || '-'}</div>
-                        <div className="font-mono text-[11px] text-gray-500">{nota.chave_acesso.substring(0, 20)}...</div>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="font-semibold">{nota.fornecedor_nome}</div>
-                        <div className="text-xs text-gray-500">{nota.fornecedor_cnpj}</div>
-                      </td>
-                      <td className="px-4 py-3">{new Date(nota.data_emissao).toLocaleDateString()}</td>
-                      <td className="px-4 py-3 text-right font-semibold">{formatMoneyBRL(nota.valor_total || 0)}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="inline-block bg-blue-100 text-blue-800 px-2 py-1 rounded text-xs font-semibold">
-                          {nota.produtos_vinculados + nota.produtos_nao_vinculados} itens
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <div className="space-y-2">
-                          <div>{getStatusBadge(nota.status)}</div>
-                          {podeAbrirDivergencia ? (
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                abrirDetalhes(nota.id, { abrirConferencia: true });
-                              }}
-                              className={`inline-flex items-center rounded-full border px-2 py-1 text-[11px] font-semibold transition-colors hover:brightness-95 focus:outline-none focus:ring-2 focus:ring-orange-300 ${conferenciaMeta?.cls || 'bg-gray-100 text-gray-700 border-gray-200'}`}
-                              title="Abrir conferencia e tratar divergencias"
-                            >
-                              {conferenciaLabel}
-                            </button>
-                          ) : (
-                            <div className={`inline-flex items-center rounded-full border px-2 py-1 text-[11px] font-semibold ${conferenciaMeta?.cls || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
-                              {conferenciaLabel}
-                            </div>
-                          )}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-center" onClick={(e) => e.stopPropagation()}>
-                        <div className="flex gap-2 justify-center">
-                          {nota.status === 'pendente' && (
-                            <button
-                              onClick={() => abrirDetalhes(nota.id)}
-                              className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded font-semibold text-sm"
-                              title="Vincular produtos"
-                            >
-                              Vincular
-                            </button>
-                          )}
-                          {exibirBotaoConferir && (
-                            <button
-                              onClick={() => abrirDetalhes(nota.id, { abrirConferencia: true })}
-                              className="px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded font-semibold text-sm"
-                              title="Conferir entrada da nota"
-                            >
-                              Conferir
-                            </button>
-                          )}
-                          {nota.entrada_estoque_realizada ? (
-                            <button
-                              onClick={() => reverterNota(nota.id, nota.numero_nota)}
-                              className="text-orange-600 hover:text-orange-800 font-semibold text-sm"
-                              title="Reverter entrada no estoque"
-                            >
-                              Reverter
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => excluirNota(nota.id, nota.numero_nota)}
-                              className="text-red-600 hover:text-red-800 font-semibold text-sm"
-                              title="Excluir nota"
-                            >
-                              Excluir
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                });
-              })()}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* Modal de Detalhes */}
-      {mostrarDetalhes && notaSelecionada && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-6xl w-full max-h-[90vh] overflow-y-auto">
-            {/* Cabecalho */}
-            <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-              <div>
-                <h2 className="text-xl font-bold">Detalhes da NF-e</h2>
-                <p className="text-sm text-gray-600">Chave: {notaSelecionada.chave_acesso}</p>
-              </div>
-              <button
-                onClick={() => {
-                  setMostrarDetalhes(false);
-                  setNotaSelecionada(null);
-                }}
-                className="text-gray-500 hover:text-gray-700 text-2xl"
-              >
-                X
-              </button>
-            </div>
-
-            {/* Informacoes da Nota */}
-            <div className="px-6 py-4 border-b bg-gray-50">
-              <div className="grid grid-cols-3 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-600">Fornecedor:</span>
-                  <div className="font-semibold">{notaSelecionada.fornecedor_nome}</div>
-                  <div className="text-xs text-gray-500">{notaSelecionada.fornecedor_cnpj}</div>
-                  {notaSelecionada.fornecedor_id && (
-                    <div className="text-xs text-green-600 mt-1">Cadastrado</div>
-                  )}
-                </div>
-                <div>
-                  <span className="text-gray-600">Data Emissao:</span>
-                  <div className="font-semibold">{new Date(notaSelecionada.data_emissao).toLocaleDateString()}</div>
-                </div>
-                <div>
-                  <span className="text-gray-600">Valor Total:</span>
-                  <div className="font-bold text-lg text-green-600">R$ {(notaSelecionada.valor_total || 0).toFixed(2)}</div>
-                </div>
-              </div>
-            </div>
-
-            {/* Alerta de Fornecedor Novo - Versao Compacta */}
-            {notaSelecionada.fornecedor_id && notaSelecionada.fornecedor_criado_automaticamente && (
-              <div className="px-6 py-2 bg-blue-50 border-b border-blue-200">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-blue-800">
-                    <strong>{notaSelecionada.fornecedor_nome}</strong> foi cadastrado automaticamente.
-                  </div>
-                  <button
-                    onClick={() => navigate(`/clientes/${notaSelecionada.fornecedor_id}`)}
-                    className="px-3 py-1 bg-blue-600 text-white rounded font-medium hover:bg-blue-700 text-xs"
-                  >
-                    Completar Cadastro
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {resumoConferenciaAtual && (
-              <div className="px-6 py-4 border-b bg-emerald-50/40">
-                <div className="flex flex-wrap items-start justify-between gap-4">
-                  <div className="space-y-3">
-                    <div className={`inline-flex items-center rounded-full border px-3 py-1 text-xs font-semibold ${metaConferenciaAtual?.cls || 'bg-gray-100 text-gray-700 border-gray-200'}`}>
-                      {metaConferenciaAtual?.label || 'Nao conferida'}
-                    </div>
-                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
-                      <div className="rounded-lg border border-white/70 bg-white/80 p-3">
-                        <div className="text-gray-500 text-xs uppercase tracking-wide">Itens OK</div>
-                        <div className="font-bold text-lg text-emerald-700">{resumoConferenciaAtual.itens_ok}</div>
-                      </div>
-                      <div className="rounded-lg border border-white/70 bg-white/80 p-3">
-                        <div className="text-gray-500 text-xs uppercase tracking-wide">Divergencias</div>
-                        <div className="font-bold text-lg text-orange-700">{resumoConferenciaAtual.itens_com_divergencia}</div>
-                      </div>
-                      <div className="rounded-lg border border-white/70 bg-white/80 p-3">
-                        <div className="text-gray-500 text-xs uppercase tracking-wide">Qtd recebida</div>
-                        <div className="text-[11px] text-gray-500 mt-1">Entra no estoque</div>
-                        <div className="font-bold text-lg text-slate-800">{formatarValorFiscal(resumoConferenciaAtual.quantidade_total_conferida, 2)}</div>
-                      </div>
-                      <div className="rounded-lg border border-white/70 bg-white/80 p-3">
-                        <div className="text-gray-500 text-xs uppercase tracking-wide">Falta + Avaria</div>
-                        <div className="font-bold text-lg text-rose-700">
-                          {formatarValorFiscal(resumoConferenciaAtual.quantidade_total_faltante + resumoConferenciaAtual.quantidade_total_avariada, 2)}
-                        </div>
-                      </div>
-                    </div>
-                    <p className="text-sm text-gray-700 max-w-3xl">
-                      {notaSelecionada.status === 'pendente'
-                        ? (
-                          <>
-                            A conferência nasce assumindo tudo certo. Se a carga estiver perfeita, basta clicar em <strong>Conferido</strong>. Só mexa nos itens com falta ou avaria.
-                          </>
-                        )
-                        : 'Conferencia ja salva. Use as acoes de divergencia para gerar a tratativa sem precisar reverter a entrada.'}
-                    </p>
-                  </div>
-
-                  <div className="flex flex-wrap gap-2">
-                    {notaSelecionada.status === 'pendente' && (
-                      <>
-                        <button
-                          onClick={() => setMostrarCamposConferencia((prev) => !prev)}
-                          className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg font-semibold hover:bg-slate-100"
-                        >
-                          {mostrarCamposConferencia ? 'Ocultar ajuste manual' : 'Editar quantidades e avarias'}
-                        </button>
-                        <button
-                          onClick={() => salvarConferenciaAtual()}
-                          disabled={salvandoConferencia || desfazendoConferencia}
-                          className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 disabled:opacity-60"
-                        >
-                          {salvandoConferencia
-                            ? 'Salvando...'
-                            : (resumoConferenciaAtual.status === 'nao_iniciada' ? 'Conferido' : 'Atualizar conferencia')}
-                        </button>
-                      </>
-                    )}
-                    {notaSelecionada.status === 'pendente' && resumoConferenciaAtual.status !== 'nao_iniciada' && (
-                      <button
-                        onClick={desfazerConferenciaAtual}
-                        disabled={desfazendoConferencia || salvandoConferencia || Boolean(notaSelecionada?.entrada_estoque_realizada)}
-                        className="px-4 py-2 border border-amber-300 bg-amber-50 text-amber-800 rounded-lg font-semibold hover:bg-amber-100 disabled:opacity-60"
-                      >
-                        {desfazendoConferencia ? 'Desfazendo...' : 'Desfazer conferencia'}
-                      </button>
-                    )}
-                    {notaSelecionada.status !== 'pendente' && resumoConferenciaAtual.itens_com_divergencia > 0 && (
-                      <>
-                        <button
-                          onClick={() => setMostrarCamposConferencia((prev) => !prev)}
-                          className="px-4 py-2 border border-slate-300 text-slate-700 rounded-lg font-semibold hover:bg-slate-100"
-                        >
-                          {mostrarCamposConferencia ? 'Ocultar tratativas' : 'Abrir tratativas'}
-                        </button>
-                        <button
-                          onClick={() => salvarConferenciaAtual()}
-                          disabled={salvandoConferencia || desfazendoConferencia}
-                          className="px-4 py-2 bg-emerald-600 text-white rounded-lg font-semibold hover:bg-emerald-700 disabled:opacity-60"
-                        >
-                          {salvandoConferencia ? 'Salvando...' : 'Salvar tratativas'}
-                        </button>
-                      </>
-                    )}
-                    {resumoConferenciaAtual.itens_com_divergencia > 0 && (
-                      <>
-                        <button
-                          onClick={gerarPendenciaFornecedor}
-                          disabled={criandoPendenciaFornecedor || salvandoConferencia || desfazendoConferencia}
-                          className="px-4 py-2 border border-blue-200 bg-blue-50 text-blue-700 rounded-lg font-semibold hover:bg-blue-100 disabled:opacity-60"
-                        >
-                          {criandoPendenciaFornecedor ? 'Gerando...' : 'Gerar pendencia fornecedor'}
-                        </button>
-                        <button
-                          onClick={gerarRascunhoDevolucao}
-                          disabled={gerandoRascunhoDevolucao || salvandoConferencia || desfazendoConferencia}
-                          className="px-4 py-2 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 disabled:opacity-60"
-                        >
-                          {gerandoRascunhoDevolucao ? 'Gerando...' : 'NF Devolucao das Divergencias'}
-                        </button>
-                      </>
-                    )}
-                  </div>
-                </div>
-
-                {mostrarCamposConferencia && (
-                  <div className="mt-4">
-                    <label className="block text-sm font-medium text-gray-700 mb-1">Observacao geral da conferencia</label>
-                    <textarea
-                      value={conferenciaObservacaoGeral}
-                      onChange={(e) => setConferenciaObservacaoGeral(e.target.value)}
-                      rows="2"
-                      className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500"
-                      placeholder="Ex.: faltou 1 unidade do item X e 2 vieram avariadas."
-                    />
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Itens da Nota */}
-            <div className="px-6 py-4">
-              <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-                <div>
-                  <h3 className="font-bold text-xl text-gray-800">
-                    Produtos da Nota ({itensExibidosNota.length}
-                    {filtroItensNota === 'divergencias' ? ` de ${itensNotaDetalhe.length}` : ''})
-                  </h3>
-                  {itensComDivergenciaDetalhe.length > 0 && (
-                    <p className="mt-1 text-xs text-orange-700">
-                      {itensComDivergenciaDetalhe.length} item(ns) com divergencia ou tratativa pendente.
-                    </p>
-                  )}
-                </div>
-                
-                <div className="flex flex-wrap items-center gap-2">
-                  {itensComDivergenciaDetalhe.length > 0 && (
-                    <SegmentedControl
-                      ariaLabel="Filtrar itens da nota"
-                      size="md"
-                      value={filtroItensNota}
-                      onChange={setFiltroItensNota}
-                      options={[
-                        { value: 'todos', label: 'Todos' },
-                        {
-                          value: 'divergencias',
-                          label: `Com divergencia (${itensComDivergenciaDetalhe.length})`,
-                          activeClassName: 'bg-orange-100 text-orange-800 shadow-sm',
-                          onSelect: () => setMostrarCamposConferencia(true),
-                        },
-                      ]}
-                    />
-                  )}
-
-                  {notaSelecionada.status === 'pendente' &&
-                   notaSelecionada.itens.some(item => !item.produto_id) && (
-                    <button
-                      onClick={criarTodosProdutosNaoVinculados}
-                      disabled={loading}
-                      className="px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 disabled:bg-gray-400 flex items-center gap-2 text-sm"
-                      title="Cria automaticamente todos os produtos nao vinculados com os padrões: Estoque mín: 10, máx: 100, Margem: 50%"
-                    >
-                      <span>Criar Todos Nao Vinculados</span>
-                      <span className="text-xs bg-purple-800 px-2 py-0.5 rounded">
-                        {notaSelecionada.itens.filter(i => !i.produto_id).length}
-                      </span>
-                    </button>
-                  )}
-                </div>
-              </div>
-              
-              <div className="space-y-3">
-                {itensExibidosNota.length === 0 && (
-                  <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 px-4 py-8 text-center text-sm text-slate-500">
-                    Nenhum produto encontrado para este filtro.
-                  </div>
-                )}
-                {itensExibidosNota.map(item => {
-                  const divergencias = detectarDivergencias(item);
-                  const temDivergencia = divergencias.length > 0;
-                  const itemAjustado = aplicarMultiplicadorPackAoItem(item, multiplicadoresPack);
-                  const packConfig = obterConfiguracaoPackItem(item, multiplicadoresPack);
-                  const conferenciaItem = calcularConferenciaItem(item, conferenciaItens[item.id]);
-                  const mostrarTratativaItem = mostrarCamposConferencia && (
-                    notaSelecionada.status === 'pendente' ||
-                    conferenciaItem.temDivergencia ||
-                    Boolean(item.tem_divergencia)
-                  );
-                  const podeEditarQuantidadesItem = notaSelecionada.status === 'pendente';
-                  
-                  return (
-                    <div key={item.id} className="border-2 border-gray-400 rounded-lg overflow-hidden bg-white shadow-sm">
-                      {/* Grade de 2 Colunas: NF-e (esquerda) | Conexão | Produto Sistema (direita) */}
-                      <div className="grid grid-cols-[1fr_auto_1fr] gap-0">
-                        {/* COLUNA ESQUERDA: Dados da NF-e */}
-                        <div className="bg-blue-50 border-r-2 border-gray-300 p-4">
-                          <div className="flex items-center gap-2 mb-3">
-                            <div className="bg-blue-600 text-white px-2 py-1 rounded text-xs font-bold">NF-e</div>
-                            {getConfiancaBadge(item.confianca_vinculo)}
-                          </div>
-                          
-                          <div className="font-semibold text-base mb-2 text-blue-900">{item.descricao}</div>
-                          
-                          <div className="space-y-1.5 text-sm">
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Codigo:</span>
-                              <span className="font-mono font-semibold">{item.codigo_produto}</span>
-                            </div>
-                            {item.ean && item.ean !== 'SEM GTIN' && (
-                              <div className="flex justify-between">
-                                <span className="text-gray-600">EAN:</span>
-                                <span className="font-mono font-semibold">{item.ean}</span>
-                              </div>
-                            )}
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">NCM:</span>
-                              <span className="font-mono font-semibold">{item.ncm}</span>
-                            </div>
-                            <div className="flex justify-between border-t pt-1.5 mt-1.5">
-                              <span className="text-gray-600">Qtd:</span>
-                              <span className="font-semibold">{item.quantidade}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Valor Unit.:</span>
-                              <span className="font-semibold">R$ {item.valor_unitario.toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Custo Aquisição:</span>
-                              <span className="font-semibold text-amber-700">R$ {formatarValorFiscal(obterCustoAquisicaoItem(itemAjustado), 4)}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">Total:</span>
-                              <span className="font-semibold text-green-600">R$ {item.valor_total.toFixed(2)}</span>
-                            </div>
-                            <div className="flex justify-between">
-                              <span className="text-gray-600">CFOP:</span>
-                              <span className="font-semibold">{item.cfop}</span>
-                            </div>
-
-                            {/* Pack / Caixa: multiplicador manual ou auto-detectado */}
-                            {notaSelecionada.status === 'pendente' && (
-                              <div className="mt-2 pt-2 border-t border-blue-200">
-                                <div className="flex items-center justify-between gap-2 mb-1 flex-wrap">
-                                  <span className="text-gray-600 text-xs font-semibold">Pack (unid./caixa):</span>
-                                  <div className="flex items-center gap-1.5 flex-wrap justify-end">
-                                    {packConfig.packDetectadoAutomatico && (
-                                      <span className="text-xs bg-green-100 text-green-700 px-1.5 py-0.5 rounded font-semibold">📦 auto</span>
-                                    )}
-                                    {packConfig.sugestaoAutomaticaDiferenteDoPadrao && (
-                                      <span className="text-xs bg-amber-100 text-amber-800 px-2 py-0.5 rounded font-semibold">
-                                        Conferir sugestão x{packConfig.multiplicadorDetectado}
-                                      </span>
-                                    )}
-                                    {packConfig.overrideManual && (
-                                      <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded font-semibold">
-                                        Usando x{packConfig.multiplicador} digitado
-                                      </span>
-                                    )}
-                                  </div>
-                                </div>
-                                <div className="flex items-center gap-2">
-                                  <input
-                                    type="number"
-                                    min="1"
-                                    max="200"
-                                    value={packConfig.multiplicador}
-                                    onChange={(e) => {
-                                      const v = Math.max(1, Math.min(200, Number.parseInt(e.target.value) || 1));
-                                      setMultiplicadoresPack(prev => ({ ...prev, [item.id]: v }));
-                                    }}
-                                    className={`w-20 px-2 py-1 border-2 rounded text-sm text-right font-semibold focus:ring-2 ${
-                                      packConfig.overrideManual
-                                        ? 'border-blue-400 bg-blue-50 text-blue-900 focus:ring-blue-500'
-                                        : packConfig.sugestaoAutomaticaDiferenteDoPadrao
-                                          ? 'border-amber-400 bg-amber-50 text-amber-900 focus:ring-amber-500'
-                                          : 'border-blue-300 focus:ring-blue-500'
-                                    }`}
-                                  />
-                                  <span className="text-xs text-gray-500">unid. por caixa</span>
-                                </div>
-                                {(packConfig.sugestaoAutomaticaDiferenteDoPadrao || packConfig.overrideManual) && (
-                                  <div
-                                    className={`mt-1.5 rounded p-2 text-xs space-y-0.5 border ${
-                                      packConfig.overrideManual
-                                        ? 'bg-blue-50 border-blue-200 text-blue-800'
-                                        : 'bg-amber-50 border-amber-200 text-amber-800'
-                                    }`}
-                                  >
-                                    <div>
-                                      {packConfig.overrideManual
-                                        ? '✏️ Valor digitado considerado nos cálculos.'
-                                        : '🤖 Sugestão automática aplicada nos cálculos.'}
-                                    </div>
-                                    <div>
-                                      🔢 Qtd efetiva: <strong>{itemAjustado.quantidade_efetiva}</strong> unid. ({item.quantidade} cx × {packConfig.multiplicador})
-                                    </div>
-                                    <div>
-                                      💰 Custo unit.: <strong>R$ {obterCustoAquisicaoItem(itemAjustado).toFixed(4)}</strong>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-
-                            <CardFiscal nota={notaSelecionada} item={itemAjustado} composicao={itemAjustado.composicao_custo} />
-                          </div>
-
-                          {/* Lote e Validade */}
-                          {(item.lote || item.data_validade) && (
-                            <div className="mt-3 pt-3 border-t space-y-2">
-                              {item.lote && (
-                                <div className="text-xs">
-                                  <span className="text-gray-600">Lote:</span>
-                                  <div className="font-semibold text-purple-800">{item.lote}</div>
-                                </div>
-                              )}
-                              {item.data_validade && (
-                                <div className="text-xs">
-                                  <span className="text-gray-600">Validade:</span>
-                                  <div className="font-semibold text-orange-800">
-                                    {new Date(item.data_validade).toLocaleDateString('pt-BR')}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* COLUNA CENTRAL: Ícone de Conexão + Alerta de Divergência */}
-                        <div className="flex flex-col items-center justify-center bg-gray-100 px-2 py-4">
-                          {item.produto_id ? (
-                            <>
-                              <button
-                                onClick={() => desvincularProduto(notaSelecionada.id, item.id)}
-                                className="text-3xl text-green-600 hover:text-red-600 transition-colors mb-2"
-                                title="Vinculado - Clique para desvincular"
-                              >
-                                V
-                              </button>
-                              {temDivergencia && (
-                                <div className="bg-red-100 border-2 border-red-500 rounded-lg p-2 max-w-[200px]">
-                                  <div className="text-center">
-                                    <div className="text-2xl mb-1">⚠️</div>
-                                    <div className="font-bold text-red-700 text-xs mb-1">
-                                      DIVERGÊNCIA!
-                                    </div>
-                                    <div className="text-[10px] text-red-600 space-y-0.5">
-                                      {divergencias.map((div) => (
-                                        <div key={`${item.id}-${div}`}>• {div}</div>
-                                      ))}
-                                    </div>
-                                  </div>
-                                </div>
-                              )}
-                            </>
-                          ) : (
-                            <div className="text-3xl text-gray-400" title="❌ Não vinculado">
-                              X
-                            </div>
-                          )}
-                        </div>
-
-                        {/* COLUNA DIREITA: Produto do Sistema */}
-                        <div className={`p-4 ${item.produto_id ? 'bg-green-50' : 'bg-gray-50'}`}>
-
-                        {/* COLUNA DIREITA: Produto do Sistema */}
-                        <div className={`p-4 ${item.produto_id ? 'bg-green-50' : 'bg-gray-50'}`}>
-                          {notaSelecionada.status === 'pendente' ? (
-                            <>
-                              {item.produto_id ? (
-                                <>
-                                  <div className="flex items-center gap-2 mb-3">
-                                    <div className="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold">
-                                      PRODUTO SISTEMA
-                                    </div>
-                                  </div>
-                                  
-                                  <div className="font-semibold text-base mb-3 text-green-900">
-                                    {item.produto_nome}
-                                  </div>
-
-                                  <div className="mb-3 rounded border border-green-200 bg-white/80 p-2 text-xs space-y-1">
-                                    <div className="flex items-center justify-between gap-2">
-                                      <span className="font-semibold text-gray-600">SKU:</span>
-                                      <span className="font-mono text-gray-900">
-                                        {item.produto_codigo || 'Nao informado'}
-                                      </span>
-                                    </div>
-                                    <div className="flex items-center justify-between gap-2">
-                                      <span className="font-semibold text-gray-600">EAN:</span>
-                                      <span className="font-mono text-gray-900">
-                                        {item.produto_ean || 'Nao informado'}
-                                      </span>
-                                    </div>
-                                    {item.origem_vinculo_automatico && item.referencia_vinculo && (
-                                      <div className="mt-2 rounded border border-emerald-200 bg-emerald-50 p-2 text-emerald-800">
-                                        Match automatico por <strong>{item.origem_vinculo_automatico === 'codigo_barras' ? 'codigo de barras' : 'SKU'}</strong>: <strong>{item.referencia_vinculo}</strong>
-                                      </div>
-                                    )}
-                                  </div>
-
-                                  <div className="text-xs text-green-700 mb-3 italic">
-                                    Para alterar o vinculo, selecione outro produto ou clique no V para desvincular
-                                  </div>
-
-                                  <input
-                                    type="text"
-                                    placeholder="Pesquisar outro produto para trocar..."
-                                    value={filtroProduto[item.id] || ''}
-                                    onChange={(e) => atualizarFiltroProduto(item.id, e.target.value)}
-                                    className="w-full px-3 py-2 border-2 border-green-300 rounded focus:ring-2 focus:ring-green-500 text-sm mb-2"
-                                  />
-
-                                  {/* Select para trocar produto */}
-                                  <select
-                                    value={item.produto_id}
-                                    onChange={(e) => {
-                                      if (e.target.value && e.target.value != item.produto_id) {
-                                        vincularProduto(notaSelecionada.id, item.id, e.target.value);
-                                      }
-                                    }}
-                                    className="w-full px-3 py-2 border-2 border-green-400 rounded text-sm focus:ring-2 focus:ring-green-500"
-                                  >
-                                    <option value={item.produto_id}>
-                                      {`${item.produto_codigo || 'Sem SKU'} | EAN: ${item.produto_ean || 'Sem EAN'} | ${item.produto_nome}`}
-                                    </option>
-                                    {(resultadosBuscaProduto[item.id] || [])
-                                      .filter(p => p.id !== item.produto_id)
-                                      .map(p => (
-                                        <option key={p.id} value={p.id}>
-                                          {formatarOpcaoProduto(p)}
-                                        </option>
-                                      ))}
-                                  </select>
-                                </>
-                              ) : (
-                                <>
-                                  <div className="flex items-center gap-2 mb-3">
-                                    <div className="bg-orange-600 text-white px-2 py-1 rounded text-xs font-bold">
-                                      ⚠️ NÃO VINCULADO
-                                    </div>
-                                  </div>
-                                  
-                                  <div className="space-y-3">
-                                    {/* Campo de pesquisa */}
-                                    <div>
-                                      <div className="block text-xs font-semibold text-gray-700 mb-1">
-                                        Pesquisar produto existente:
-                                      </div>
-                                      <input
-                                        type="text"
-                                        placeholder="Digite nome ou SKU..."
-                                        value={filtroProduto[item.id] || ''}
-                                        onChange={(e) => atualizarFiltroProduto(item.id, e.target.value)}
-                                        className="w-full px-3 py-2 border-2 border-gray-400 rounded focus:ring-2 focus:ring-blue-500 text-sm"
-                                      />
-                                    </div>
-                                    
-                                    {/* Lista de produtos filtrados */}
-                                    {filtroProduto[item.id] && filtroProduto[item.id].length >= 2 && (
-                                      <div className="border-2 border-gray-300 rounded max-h-48 overflow-y-auto bg-white">
-                                        {(() => {
-                                          const filtrados = resultadosBuscaProduto[item.id] || [];
-                                          if (buscandoProduto[item.id]) {
-                                            return (
-                                              <div className="px-3 py-4 text-center text-gray-500 text-xs">
-                                                Buscando produtos...
-                                              </div>
-                                            );
-                                          }
-                                          if (filtrados.length === 0) {
-                                            return (
-                                              <div className="px-3 py-4 text-center text-gray-500 text-xs">
-                                                ❌ Nenhum produto encontrado
-                                              </div>
-                                            );
-                                          }
-                                          return filtrados.map(p => (
-                                            <button
-                                              key={`produto-${item.id}-${p.id}`}
-                                              type="button"
-                                              onClick={() => {
-                                                vincularProduto(notaSelecionada.id, item.id, p.id);
-                                                setFiltroProduto(prev => ({ ...prev, [item.id]: '' }));
-                                                setResultadosBuscaProduto(prev => ({ ...prev, [item.id]: [] }));
-                                              }}
-                                              className={`w-full text-left px-3 py-2 hover:bg-blue-50 border-b border-gray-200 last:border-b-0 text-xs ${!p.ativo ? 'text-red-600 font-bold' : ''}`}
-                                            >
-                                              {!p.ativo && '[INATIVO] '}{p.codigo || 'Sem SKU'} - {p.nome}
-                                              <span className="text-gray-500 ml-1">| EAN: {p.codigo_barras || p.gtin_ean || p.gtin_ean_tributario || 'Sem EAN'}</span>
-                                              <span className="text-gray-500 ml-1">(Est: {p.estoque_atual || 0})</span>
-                                            </button>
-                                          ));
-                                        })()}
-                                      </div>
-                                    )}
-                                    
-                                    <div className="flex items-center gap-2">
-                                      <div className="flex-1 border-t border-gray-300"></div>
-                                      <span className="text-xs text-gray-500">ou</span>
-                                      <div className="flex-1 border-t border-gray-300"></div>
-                                    </div>
-
-                                    <button
-                                      onClick={() => abrirModalCriarProduto(item)}
-                                      className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 text-sm"
-                                    >
-                                      ➕ Criar Novo Produto
-                                    </button>
-                                  </div>
-                                </>
-                              )}
-                            </>
-                          ) : (
-                            // Nota ja processada - apenas visualizacao
-                            <div>
-                              {item.produto_id ? (
-                                <>
-                                  <div className="bg-green-600 text-white px-2 py-1 rounded text-xs font-bold inline-block mb-2">
-                                    VINCULADO
-                                  </div>
-                                  <div className="font-semibold text-base text-green-900">
-                                    {item.produto_nome}
-                                  </div>
-                                </>
-                              ) : (
-                                <div className="bg-gray-600 text-white px-2 py-1 rounded text-xs font-bold inline-block">
-                                  ⚠️ NÃO VINCULADO
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Rateio de Estoque (se modo PARCIAL) - Expande por toda a largura */}
-                      {notaSelecionada.status === 'pendente' && 
-                       tipoRateio === 'parcial' && 
-                       item.produto_id && (
-                        <div className="col-span-3 p-4 border-t-2 border-gray-300 bg-gradient-to-r from-blue-50 via-gray-50 to-green-50">
-                          <h4 className="font-medium text-gray-700 mb-3 flex items-center text-sm">
-                            Quantidade destinada ao estoque online
-                          </h4>
-                          
-                          <div className="grid grid-cols-3 gap-4">
-                            <div>
-                              <div className="block text-xs font-medium text-gray-600 mb-1">Total NF</div>
-                              <input
-                                type="number"
-                                value={item.quantidade}
-                                disabled
-                                className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-100 text-base font-semibold"
-                              />
-                            </div>
-                            
-                            <div>
-                              <div className="block text-xs font-medium text-gray-700 mb-1">Online</div>
-                              <input
-                                type="number"
-                                min="0"
-                                max={item.quantidade}
-                                step="0.01"
-                                value={quantidadesOnline[item.id] ?? item.quantidade_online ?? 0}
-                                onChange={(e) => {
-                                  const valor = Number.parseFloat(e.target.value) || 0;
-                                  setQuantidadesOnline({
-                                    ...quantidadesOnline,
-                                    [item.id]: Math.min(valor, item.quantidade)
-                                  });
-                                }}
-                                className="w-full px-3 py-2 border-2 border-blue-400 rounded focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base font-semibold"
-                                placeholder="0"
-                              />
-                            </div>
-                            
-                            <div>
-                              <div className="block text-xs font-medium text-gray-600 mb-1">Loja</div>
-                              <input
-                                type="number"
-                                value={(item.quantidade - (quantidadesOnline[item.id] ?? item.quantidade_online ?? 0)).toFixed(2)}
-                                disabled
-                                className="w-full px-3 py-2 border border-gray-300 rounded bg-gray-100 text-base font-semibold"
-                              />
-                            </div>
-                          </div>
-                          
-                          <div className="mt-3 text-sm text-gray-700 bg-white rounded-lg p-3 border border-gray-300 font-medium">
-                            Valor online: R$ {((quantidadesOnline[item.id] ?? item.quantidade_online ?? 0) * item.valor_unitario).toFixed(2)}
-                          </div>
-                          
-                          {(quantidadesOnline[item.id] !== undefined && 
-                            quantidadesOnline[item.id] !== item.quantidade_online) ? (
-                            <button
-                              onClick={() => salvarQuantidadeOnlineItem(
-                                notaSelecionada.id, 
-                                item.id, 
-                                quantidadesOnline[item.id]
-                              )}
-                              className="w-full px-4 py-2 bg-blue-600 text-white rounded-lg font-semibold hover:bg-blue-700 mt-3 text-sm"
-                            >
-                              Salvar Distribuicao
-                            </button>
-                          ) : (
-                            item.quantidade_online !== null && item.quantidade_online !== undefined && (
-                              <div className="mt-3 text-sm text-green-700 bg-green-50 rounded-lg p-3 border border-green-200 flex items-center justify-center font-medium">
-                                Salvo: {item.quantidade_online} online / {(item.quantidade - item.quantidade_online).toFixed(2)} loja
-                              </div>
-                            )
-                          )}
-                        </div>
-                      )}
-
-                      {mostrarTratativaItem && (
-                        <div className="border-t border-emerald-200 bg-emerald-50/60 p-4">
-                          <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-                            <div>
-                              <h4 className="font-semibold text-emerald-900">Conferencia fisica</h4>
-                              <p className="text-xs text-emerald-800">
-                                {podeEditarQuantidadesItem
-                                  ? 'Ajuste apenas o que realmente entrou, o que faltou e o que veio avariado.'
-                                  : 'Quantidade ja lancada no estoque. Ajuste aqui a tratativa e a observacao da divergencia.'}
-                              </p>
-                            </div>
-                            <span className={`inline-flex items-center rounded-full border px-2 py-1 text-xs font-semibold ${
-                              conferenciaItem.temDivergencia
-                                ? 'bg-orange-100 text-orange-800 border-orange-200'
-                                : 'bg-green-100 text-green-800 border-green-200'
-                            }`}>
-                              {conferenciaItem.temDivergencia ? `Divergencia: ${conferenciaItem.statusConferencia}` : 'OK'}
-                            </span>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">Qtd NF</label>
-                              <input
-                                type="number"
-                                value={conferenciaItem.quantidadeNF}
-                                disabled
-                                className="w-full rounded border border-gray-300 bg-gray-100 px-3 py-2 text-sm font-semibold"
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">Qtd recebida</label>
-                              <input
-                                type="number"
-                                min="0"
-                                max={conferenciaItem.quantidadeNF}
-                                step="0.01"
-                                disabled={!podeEditarQuantidadesItem}
-                                value={conferenciaItens[item.id]?.quantidade_conferida ?? conferenciaItem.quantidadeConferida}
-                                onChange={(e) => atualizarCampoConferenciaItem(item, 'quantidade_conferida', e.target.value)}
-                                className={`w-full rounded border px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-emerald-500 ${
-                                  podeEditarQuantidadesItem
-                                    ? 'border-emerald-300'
-                                    : 'border-gray-300 bg-gray-100 text-gray-600'
-                                }`}
-                              />
-                              <div className="mt-1 text-[11px] text-emerald-700 font-medium">Entra no estoque</div>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">Qtd avariada</label>
-                              <input
-                                type="number"
-                                min="0"
-                                max={Math.max(0, conferenciaItem.quantidadeNF - conferenciaItem.quantidadeConferida)}
-                                step="0.01"
-                                disabled={!podeEditarQuantidadesItem}
-                                value={conferenciaItens[item.id]?.quantidade_avariada ?? conferenciaItem.quantidadeAvariada}
-                                onChange={(e) => atualizarCampoConferenciaItem(item, 'quantidade_avariada', e.target.value)}
-                                className={`w-full rounded border px-3 py-2 text-sm font-semibold focus:ring-2 focus:ring-orange-500 ${
-                                  podeEditarQuantidadesItem
-                                    ? 'border-orange-300'
-                                    : 'border-gray-300 bg-gray-100 text-gray-600'
-                                }`}
-                              />
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-600 mb-1">Qtd faltante</label>
-                              <input
-                                type="number"
-                                value={conferenciaItem.quantidadeFaltante.toFixed(2)}
-                                disabled
-                                className="w-full rounded border border-gray-300 bg-gray-100 px-3 py-2 text-sm font-semibold"
-                              />
-                            </div>
-                          </div>
-
-                          <div className="grid grid-cols-1 md:grid-cols-[220px_1fr] gap-3 mt-3">
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">Tratativa sugerida</label>
-                              <select
-                                value={conferenciaItens[item.id]?.acao_sugerida ?? conferenciaItem.acaoSugerida}
-                                onChange={(e) => atualizarCampoConferenciaItem(item, 'acao_sugerida', e.target.value)}
-                                className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500"
-                              >
-                                {ACAO_CONFERENCIA_OPCOES.map((opcao) => (
-                                  <option key={opcao.value} value={opcao.value}>
-                                    {opcao.label}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                            <div>
-                              <label className="block text-xs font-medium text-gray-700 mb-1">Observacao</label>
-                              <input
-                                type="text"
-                                value={conferenciaItens[item.id]?.observacao_conferencia ?? conferenciaItem.observacaoConferencia}
-                                onChange={(e) => atualizarCampoConferenciaItem(item, 'observacao_conferencia', e.target.value)}
-                                className="w-full rounded border border-gray-300 px-3 py-2 text-sm focus:ring-2 focus:ring-emerald-500"
-                                placeholder="Ex.: faltou 1 unidade, embalagem avariada, solicitar reposicao..."
-                              />
-                            </div>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {notaSelecionada.status === 'processada' && item.produto_id && (
-                      <div className="mt-3 pt-3 border-t bg-blue-50 border border-blue-200 rounded-lg p-3">
-                        <span className="text-blue-800 font-semibold">Lancado no estoque:</span>
-                        <span className="ml-2">{item.produto_nome}</span>
-                      </div>
-                    )}
-                  </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Rodape com Acoes */}
-            {notaSelecionada.status === 'pendente' && (
-              <div className="sticky bottom-0 bg-white border-t px-6 py-4 space-y-3">
-                {/* Secao de Rateio - ANTES de processar */}
-                <div className="bg-gray-50 border border-gray-200 rounded p-3">
-                  <div className="flex items-center justify-between mb-2">
-                    <h4 className="text-sm font-medium text-gray-700">
-                      Distribuicao (informativo para relatorios)
-                    </h4>
-                    <div className="text-xs text-gray-500">
-                      Estoque unificado - Classificacao apenas para analises
-                    </div>
-                  </div>
-                  
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => salvarTipoRateio(notaSelecionada.id, 'loja')}
-                      disabled={loading}
-                      className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-                        tipoRateio === 'loja'
-                          ? 'bg-gray-800 text-white'
-                          : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-100'
-                      } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      Loja
-                    </button>
-                    <button
-                      onClick={() => salvarTipoRateio(notaSelecionada.id, 'online')}
-                      disabled={loading}
-                      className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-                        tipoRateio === 'online'
-                          ? 'bg-gray-800 text-white'
-                          : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-100'
-                      } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      Online
-                    </button>
-                    <button
-                      onClick={() => salvarTipoRateio(notaSelecionada.id, 'parcial')}
-                      disabled={loading}
-                      className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
-                        tipoRateio === 'parcial'
-                          ? 'bg-gray-800 text-white'
-                          : 'bg-white border border-gray-300 text-gray-600 hover:bg-gray-100'
-                      } ${loading ? 'opacity-50 cursor-not-allowed' : ''}`}
-                    >
-                      Parcial
-                    </button>
-                    
-                    {(notaSelecionada.percentual_online > 0 || notaSelecionada.tipo_rateio) && (
-                      <div className="ml-auto flex gap-3 text-xs text-gray-600">
-                        <span>Online: {(notaSelecionada.percentual_online || 0).toFixed(0)}%</span>
-                        <span>Loja: {(notaSelecionada.percentual_loja || 100).toFixed(0)}%</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {tipoRateio === 'parcial' && (
-                    <div className="mt-2 text-xs text-gray-600 bg-gray-100 rounded p-2">
-                      Defina a quantidade destinada ao <strong>estoque online</strong> em cada produto acima. O sistema calcula automaticamente a % baseado nos valores.
-                    </div>
-                  )}
-                </div>
-
-                {/* Barra de Status e Botoes de Acao */}
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-gray-600">
-                    {notaSelecionada.itens.filter(i => i.produto_id).length} de {notaSelecionada.itens.length} produtos vinculados
-                  </div>
-                  <div className="flex gap-3">
-                    {notaSelecionada.entrada_estoque_realizada ? (
-                      <button
-                        onClick={() => reverterNota(notaSelecionada.id, notaSelecionada.numero_nota)}
-                        disabled={loading}
-                        className="px-6 py-2 bg-orange-600 text-white rounded-lg font-semibold hover:bg-orange-700 disabled:bg-gray-400"
-                      >
-                        {loading ? 'Revertendo...' : 'Reverter Entrada'}
-                      </button>
-                    ) : (
-                      <>
-                        {!notaSelecionada.entrada_estoque_realizada && (
-                          <button
-                            onClick={() => excluirNota(notaSelecionada.id, notaSelecionada.numero_nota)}
-                            disabled={loading}
-                            className="px-6 py-2 bg-red-600 text-white rounded-lg font-semibold hover:bg-red-700 disabled:bg-gray-400"
-                          >
-                            Excluir Nota
-                          </button>
-                        )}
-                        {notaSelecionada.itens.some(i => i.produto_id) && (
-                          <>
-                            <button
-                              onClick={() => carregarPreviewProcessamento(notaSelecionada.id)}
-                              disabled={loading}
-                              className="px-6 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 disabled:bg-gray-400"
-                            >
-                              Ajuste de custo
-                            </button>
-                            <button
-                              onClick={() => processarNota(notaSelecionada.id)}
-                              disabled={loading}
-                              className="px-6 py-2 bg-green-600 text-white rounded-lg font-semibold hover:bg-green-700 disabled:bg-gray-400"
-                            >
-                              {loading ? 'Processando...' : 'Processar Nota'}
-                            </button>
-                          </>
-                        )}
-                      </>
-                    )}
-                    <button
-                      onClick={() => {
-                        setMostrarDetalhes(false);
-                        setNotaSelecionada(null);
-                      }}
-                      className="px-6 py-2 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50"
-                    >
-                      Fechar
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Modal de Criar Produto */}
-      {mostrarModalCriarProduto && itemSelecionadoParaCriar && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-lg max-w-3xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
-              <div>
-                <h2 className="text-xl font-bold">Criar Novo Produto</h2>
-                <p className="text-sm text-gray-600">A partir do item da NF-e</p>
-              </div>
-              <button
-                onClick={() => {
-                  setMostrarModalCriarProduto(false);
-                  setItemSelecionadoParaCriar(null);
-                  setSugestaoSku(null);
-                }}
-                className="text-gray-500 hover:text-gray-700 text-2xl"
-              >
-                X
-              </button>
-            </div>
-
-            <div className="px-6 py-4">
-              {carregandoSugestao ? (
-                <div className="text-center py-8">
-                  <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-                  <p className="text-gray-600">Gerando sugestoes de SKU...</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {/* Informações do Item da NF-e */}
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                    <div className="font-semibold text-blue-900 mb-2">Dados da NF-e:</div>
-                    <div className="text-sm space-y-1 text-blue-800">
-                      <div><strong>Descricao:</strong> {itemSelecionadoParaCriar.descricao}</div>
-                      <div><strong>Codigo Fornecedor:</strong> {itemSelecionadoParaCriar.codigo_produto}</div>
-                      <div><strong>NCM:</strong> {itemSelecionadoParaCriar.ncm}</div>
-                      {itemSelecionadoParaCriar.ean && (
-                        <div><strong>EAN:</strong> {itemSelecionadoParaCriar.ean}</div>
-                      )}
-                      <div><strong>Valor Unitario NF:</strong> R$ {itemSelecionadoParaCriar.valor_unitario.toFixed(2)}</div>
-                      <div><strong>Custo de Aquisicao:</strong> R$ {formatarValorFiscal(obterCustoAquisicaoItem(itemSelecionadoParaCriar), 4)}</div>
-                    </div>
-                  </div>
-
-                  {/* Alerta de SKU existente */}
-                  {sugestaoSku?.ja_existe && (
-                    <div className="bg-yellow-50 border border-yellow-300 rounded-lg p-4">
-                      <div className="flex items-start gap-3">
-                        <span className="text-2xl">⚠️</span>
-                        <div className="flex-1">
-                          <div className="font-semibold text-yellow-900 mb-2">
-                            Codigo do fornecedor "{sugestaoSku.sku_proposto}" ja está em uso!
-                          </div>
-                          <div className="text-sm text-yellow-800 mb-3">
-                            Produto existente: <strong>{sugestaoSku.produto_existente.nome}</strong><br/>
-                            <span className="text-xs">Um SKU alternativo foi sugerido automaticamente. Você pode alterar se preferir.</span>
-                          </div>
-                          <div className="text-sm text-yellow-800 mb-2 font-semibold">
-                            Outras opcoes de SKU disponíveis:
-                          </div>
-                          <div className="flex flex-wrap gap-2">
-                            {sugestaoSku.sugestoes.map(sug => (
-                              <button
-                                key={sug.sku}
-                                onClick={() => setFormProduto({ ...formProduto, sku: sug.sku })}
-                                className={`px-3 py-1 rounded-lg text-sm font-semibold transition-all ${
-                                  formProduto.sku === sug.sku
-                                    ? 'bg-blue-600 text-white shadow-md'
-                                    : 'bg-white border border-blue-300 text-blue-700 hover:bg-blue-50'
-                                } ${sug.padrao ? 'ring-2 ring-yellow-400' : ''}`}
-                              >
-                                {sug.sku} {sug.padrao && '⭐'}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Sucesso - SKU disponivel */}
-                  {sugestaoSku && !sugestaoSku.ja_existe && (
-                    <div className="bg-green-50 border border-green-300 rounded-lg p-3">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xl">OK</span>
-                        <div className="text-sm text-green-800">
-                          <strong>SKU disponivel!</strong> O codigo do fornecedor pode ser usado diretamente.
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Formulario */}
-                  <div className="space-y-4">
-                    {/* SKU */}
-                    <div>
-                      <label htmlFor="novo-produto-sku" className="block text-sm font-semibold text-gray-700 mb-1">
-                        SKU / Codigo do Produto *
-                        <span className="text-xs text-gray-500 font-normal ml-2">(Baseado no codigo do fornecedor)</span>
-                      </label>
-                      <input
-                        id="novo-produto-sku"
-                        type="text"
-                        value={formProduto.sku}
-                        onChange={(e) => setFormProduto({ ...formProduto, sku: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 font-mono"
-                        placeholder="Ex: MGZ-12345"
-                      />
-                      <p className="text-xs text-gray-500 mt-1">Voce pode editar o SKU se preferir</p>
-                    </div>
-
-                    {/* Nome */}
-                    <div>
-                      <label htmlFor="novo-produto-nome" className="block text-sm font-semibold text-gray-700 mb-1">
-                        Nome do Produto *
-                      </label>
-                      <input
-                        id="novo-produto-nome"
-                        type="text"
-                        value={formProduto.nome}
-                        onChange={(e) => setFormProduto({ ...formProduto, nome: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        placeholder="Nome completo do produto"
-                      />
-                    </div>
-
-                    {/* Descricao */}
-                    <div>
-                      <label htmlFor="novo-produto-descricao" className="block text-sm font-semibold text-gray-700 mb-1">
-                        Descricao
-                      </label>
-                      <textarea
-                        id="novo-produto-descricao"
-                        value={formProduto.descricao}
-                        onChange={(e) => setFormProduto({ ...formProduto, descricao: e.target.value })}
-                        className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        rows="2"
-                        placeholder="Descricao detalhada (opcional)"
-                      />
-                    </div>
-
-                    {/* Precos */}
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label htmlFor="novo-produto-preco-custo" className="block text-sm font-semibold text-gray-700 mb-1">
-                          Preco de Custo *
-                        </label>
-                        <input
-                          id="novo-produto-preco-custo"
-                          type="number"
-                          step="0.01"
-                          value={formProduto.preco_custo}
-                          onChange={(e) => {
-                            const custo = e.target.value;
-                            const margem = Number.parseFloat(formProduto.margem_lucro) || 0;
-                            setFormProduto({ 
-                              ...formProduto, 
-                              preco_custo: custo,
-                              preco_venda: custo ? calcularPrecoVenda(Number.parseFloat(custo), margem) : ''
-                            });
-                          }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor="novo-produto-margem" className="block text-sm font-semibold text-gray-700 mb-1">
-                          Margem (%) *
-                        </label>
-                        <input
-                          id="novo-produto-margem"
-                          type="number"
-                          step="0.01"
-                          value={formProduto.margem_lucro}
-                          onChange={(e) => {
-                            const margem = e.target.value;
-                            const custo = Number.parseFloat(formProduto.preco_custo) || 0;
-                            setFormProduto({ 
-                              ...formProduto, 
-                              margem_lucro: margem,
-                              preco_venda: custo && margem ? calcularPrecoVenda(custo, Number.parseFloat(margem)) : ''
-                            });
-                          }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor="novo-produto-preco-venda" className="block text-sm font-semibold text-gray-700 mb-1">
-                          Preco de Venda *
-                        </label>
-                        <input
-                          id="novo-produto-preco-venda"
-                          type="number"
-                          step="0.01"
-                          value={formProduto.preco_venda}
-                          onChange={(e) => {
-                            const venda = e.target.value;
-                            const custo = Number.parseFloat(formProduto.preco_custo) || 0;
-                            setFormProduto({ 
-                              ...formProduto, 
-                              preco_venda: venda,
-                              margem_lucro: custo && venda ? calcularMargemLucro(custo, Number.parseFloat(venda)) : ''
-                            });
-                          }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                    </div>
-
-                    {/* Estoque */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label htmlFor="novo-produto-estoque-minimo" className="block text-sm font-semibold text-gray-700 mb-1">
-                          Estoque Minimo
-                        </label>
-                        <input
-                          id="novo-produto-estoque-minimo"
-                          type="number"
-                          value={formProduto.estoque_minimo}
-                          onChange={(e) => setFormProduto({ ...formProduto, estoque_minimo: Number.parseInt(e.target.value) })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                      <div>
-                        <label htmlFor="novo-produto-estoque-maximo" className="block text-sm font-semibold text-gray-700 mb-1">
-                          Estoque Maximo
-                        </label>
-                        <input
-                          id="novo-produto-estoque-maximo"
-                          type="number"
-                          value={formProduto.estoque_maximo}
-                          onChange={(e) => setFormProduto({ ...formProduto, estoque_maximo: Number.parseInt(e.target.value) })}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                        />
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-
-            {/* Rodapé */}
-            <div className="sticky bottom-0 bg-white border-t px-6 py-4 flex justify-end gap-3">
-              <button
-                onClick={() => {
-                  setMostrarModalCriarProduto(false);
-                  setItemSelecionadoParaCriar(null);
-                  setSugestaoSku(null);
-                }}
-                className="px-6 py-2 border border-gray-300 rounded-lg font-semibold hover:bg-gray-50"
-              >
-                Cancelar
-              </button>
-              <button
-                onClick={criarProdutoNovo}
-                disabled={
-                  loading || 
-                  !formProduto.sku || 
-                  !formProduto.nome || 
-                  !formProduto.preco_custo || 
-                  Number.parseFloat(formProduto.preco_custo) <= 0 || 
-                  !formProduto.preco_venda || 
-                  Number.parseFloat(formProduto.preco_venda) <= 0
-                }
-                className="px-6 py-2 bg-purple-600 text-white rounded-lg font-semibold hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
-              >
-                {loading ? 'Criando...' : 'Criar e Vincular Produto'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <EntradaXmlCriarProdutoModal
+        aberto={mostrarModalCriarProduto}
+        calcularMargemLucro={calcularMargemLucro}
+        calcularPrecoVenda={calcularPrecoVenda}
+        carregandoSugestao={carregandoSugestao}
+        criarProdutoNovo={criarProdutoNovo}
+        formProduto={formProduto}
+        formatarValorFiscal={formatarValorFiscal}
+        itemSelecionadoParaCriar={itemSelecionadoParaCriar}
+        loading={loading}
+        obterCustoAquisicaoItem={obterCustoAquisicaoItem}
+        onClose={() => {
+          setMostrarModalCriarProduto(false);
+          setItemSelecionadoParaCriar(null);
+          setSugestaoSku(null);
+        }}
+        setFormProduto={setFormProduto}
+        sugestaoSku={sugestaoSku}
+      />
       <EntradaXmlVisualizacaoNotaModal
         aberto={mostrarVisualizacao}
         notaSelecionada={notaSelecionada}
