@@ -592,7 +592,7 @@ Para cada dominio sensivel:
 
 | Arquivo | Linhas aprox. | Risco |
 | --- | ---: | --- |
-| `frontend/src/components/EntradaXML.jsx` | 4169 | Muito alto |
+| `frontend/src/components/EntradaXML.jsx` | 3717 | Muito alto |
 | `frontend/src/components/VendasFinanceiro.jsx` | 1980 | Alto |
 | `frontend/src/components/PedidosCompra.jsx` | 3225 | Alto |
 | `frontend/src/pages/ecommerce/EcommerceMVP.jsx` | 2533 | Alto |
@@ -919,6 +919,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-10: `EntradaXML` extraiu o modal de visualizacao da NF para `EntradaXmlVisualizacaoNotaModal`, preservando os callbacks da pagina e reduzindo o arquivo principal para 4169 linhas com build validado.
 - 2026-05-15: cadastros basicos de `Departamentos` e `Tipos de Despesa` iniciaram a padronizacao de acoes com `ActionButton`, `IconActionButton`, `LoadingState` e `EmptyState`, mantendo comportamento e endpoints iguais.
 - 2026-05-17: `/clientes` foi realinhada com a fundacao visual: `PageHeader`, `Panel`, `LoadingState`, `EmptyState`, `ActionButton` e `IconActionButton`; `Novo` voltou para a cor semantica de criacao.
+- 2026-05-18: `EntradaXML` extraiu cabecalho/acoes de upload para `EntradaXmlHeader`, metricas para `EntradaXmlMetricas` e paineis SEFAZ para `EntradaXmlSefazPanels`, usando `PageHeader`, `ActionButton`, `Panel`, `MetricGrid`/`MetricCard` e `StatusBadge`; o arquivo principal caiu de 3871 para 3717 linhas com build validado. Faltam lista de notas, modal de detalhes/conferencia e modal de criacao de produto.
 
 ### Nao fazer nesta onda
 
@@ -2069,7 +2070,7 @@ Atualizacao de 2026-04-24: iniciada a trilha de hardening para liberar o app e o
 
 - [ ] `frontend/src/pages/ecommerce/EcommerceMVP.jsx`: separar vitrine, carrinho, conta, checkout, pedidos, analytics e estilos
 - [ ] `app-mobile/src/screens/entregador/DetalheEntregaScreen.tsx`: separar GPS, acoes de parada, recebimento, venda/modal e finalizacao de rota
-- [ ] `frontend/src/components/EntradaXML.jsx`: quebrar fluxo de importacao/validacao/conferencia para reduzir bundle e risco de regressao
+- [ ] `frontend/src/components/EntradaXML.jsx`: continuar quebra do fluxo de importacao/validacao/conferencia para reduzir bundle e risco de regressao; ja foram extraidos modais operacionais, cabecalho, metricas e paineis SEFAZ
 - [ ] `backend/app/routes/ecommerce_checkout.py`: extrair servico de checkout e preparar orquestracao `Pedido -> Venda`
 - [ ] `backend/app/routes/ecommerce_cart.py`: revisar reserva de estoque com protecao contra corrida em checkout simultaneo
 - [ ] `backend/app/api/endpoints/rotas_entrega.py`: separar sincronizacao de venda/rota/parada em servico de dominio testavel

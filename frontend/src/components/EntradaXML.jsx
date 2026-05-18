@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect, useRef } from 'react';
-import { useNavigate, useSearchParams, Link } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../api';
 import { getAccessToken } from '../auth/tokenStorage';
 import { toast } from 'react-hot-toast';
@@ -8,15 +8,15 @@ import CardFiscal from './CardFiscal';
 import ExportActionButton from './ui/ExportActionButton';
 import TooltipComposicao from './TooltipComposicao';
 import EntradaXmlHistoricoPrecosModal from './entrada-xml/EntradaXmlHistoricoPrecosModal';
+import EntradaXmlHeader from './entrada-xml/EntradaXmlHeader';
+import EntradaXmlMetricas from './entrada-xml/EntradaXmlMetricas';
 import EntradaXmlRascunhoDevolucaoModal from './entrada-xml/EntradaXmlRascunhoDevolucaoModal';
 import EntradaXmlRevisaoPrecosModal from './entrada-xml/EntradaXmlRevisaoPrecosModal';
 import EntradaXmlResultadoLoteModal from './entrada-xml/EntradaXmlResultadoLoteModal';
+import EntradaXmlSefazPanels from './entrada-xml/EntradaXmlSefazPanels';
 import EntradaXmlVisualizacaoNotaModal from './entrada-xml/EntradaXmlVisualizacaoNotaModal';
 import SegmentedControl from './ui/SegmentedControl';
-
-function formatarChaveAcesso(valor) {
-  return String(valor).replaceAll(/\D/g, '').slice(0, 44);
-}
+import StatusBadge from './ui/StatusBadge';
 
 function montarNomeXml(dados) {
   const numero = String(dados?.numero_nf || '0').replaceAll(/\D/g, '');
@@ -2477,22 +2477,21 @@ const EntradaXML = () => {
   };
 
   const getStatusBadge = (status) => {
-    const styles = {
-      pendente: 'bg-yellow-200 text-yellow-800',
-      processada: 'bg-green-200 text-green-800',
-      cancelada: 'bg-red-200 text-red-800',
-      erro: 'bg-red-300 text-red-900'
+    const statusMeta = {
+      pendente: { label: 'Pendente', intent: 'warning' },
+      processada: { label: 'Conciliada', intent: 'success' },
+      cancelada: { label: 'Cancelada', intent: 'danger' },
+      erro: { label: 'Erro', intent: 'danger' },
     };
-    const labels = {
-      pendente: 'Pendente',
-      processada: 'Conciliada',
-      cancelada: 'Cancelada',
-      erro: 'Erro',
+    const meta = statusMeta[status] || {
+      label: String(status || '-').toUpperCase(),
+      intent: 'neutral',
     };
+
     return (
-      <span className={`px-3 py-1 rounded-full text-sm font-semibold ${styles[status] || 'bg-gray-200'}`}>
-        {labels[status] || status.toUpperCase()}
-      </span>
+      <StatusBadge intent={meta.intent} size="md">
+        {meta.label}
+      </StatusBadge>
     );
   };
 
@@ -2536,209 +2535,54 @@ const EntradaXML = () => {
 
   return (
     <div className="p-6">
-      {/* Cabecalho + Acoes */}
-      <div className="flex flex-wrap items-start justify-between gap-4 mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-800">Central NF-e Entradas</h1>
-          <p className="text-gray-600 text-sm mt-1">Gerencie todas as notas fiscais de entrada — via upload ou direto da SEFAZ</p>
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <label className="inline-block">
-            <input type="file" accept=".xml" onChange={handleFileUpload} disabled={uploadingFile || uploadingLote} className="hidden" />
-            <span className={`px-4 py-2 rounded-lg font-semibold cursor-pointer inline-block text-sm ${(uploadingFile || uploadingLote) ? 'bg-gray-300 cursor-not-allowed text-gray-500' : 'bg-blue-600 hover:bg-blue-700 text-white'}`}>
-              {uploadingFile ? 'Processando...' : 'Importar XML'}
-            </span>
-          </label>
-          <label className="inline-block">
-            <input type="file" accept=".xml" multiple onChange={handleMultipleFilesUpload} disabled={uploadingFile || uploadingLote} className="hidden" />
-            <span className={`px-4 py-2 rounded-lg font-semibold cursor-pointer inline-block text-sm ${(uploadingFile || uploadingLote) ? 'bg-gray-300 cursor-not-allowed text-gray-500' : 'bg-blue-500 hover:bg-blue-600 text-white'}`}>
-              {uploadingLote ? 'Processando lote...' : 'Importar Varios XML'}
-            </span>
-          </label>
-          <button
-            type="button"
-            onClick={() => { setMostrarPainelSefaz(v => !v); setMostrarConfigSefaz(false); }}
-            className={`px-4 py-2 rounded-lg font-semibold text-sm transition-colors ${mostrarPainelSefaz ? 'bg-emerald-700 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}`}
-          >
-            Buscar pela SEFAZ
-          </button>
-          <button
-            type="button"
-            onClick={() => { setMostrarConfigSefaz(v => !v); if (!mostrarConfigSefaz) { carregarConfigSefaz(); } setMostrarPainelSefaz(false); }}
-            className={`px-4 py-2 rounded-lg font-semibold text-sm transition-colors ${mostrarConfigSefaz ? 'bg-gray-700 text-white' : 'bg-gray-600 hover:bg-gray-700 text-white'}`}
-          >
-            Configurar SEFAZ
-          </button>
-        </div>
-      </div>
+      <EntradaXmlHeader
+        mostrarConfigSefaz={mostrarConfigSefaz}
+        mostrarPainelSefaz={mostrarPainelSefaz}
+        onTogglePainelSefaz={() => {
+          setMostrarPainelSefaz((visivel) => !visivel);
+          setMostrarConfigSefaz(false);
+        }}
+        onToggleConfigSefaz={() => {
+          setMostrarConfigSefaz((visivel) => !visivel);
+          if (!mostrarConfigSefaz) {
+            carregarConfigSefaz();
+          }
+          setMostrarPainelSefaz(false);
+        }}
+        onUploadXml={handleFileUpload}
+        onUploadLote={handleMultipleFilesUpload}
+        uploadingFile={uploadingFile}
+        uploadingLote={uploadingLote}
+      />
 
-      {/* Painel: Buscar pela SEFAZ */}
-      {mostrarPainelSefaz && (
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6 border-l-4 border-emerald-500">
-          <h2 className="text-lg font-bold text-gray-800 mb-4">Buscar NF-e pela SEFAZ</h2>
-          <form onSubmit={consultarSefaz} className="flex gap-3 mb-2">
-            <input
-              type="text"
-              value={chaveSefaz}
-              onChange={e => setChaveSefaz(formatarChaveAcesso(e.target.value))}
-              onPaste={e => { e.preventDefault(); setChaveSefaz(formatarChaveAcesso(e.clipboardData?.getData('text') || '')); }}
-              placeholder="Chave de acesso (44 digitos)"
-              className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-sm font-mono focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-              maxLength={80}
-            />
-            <button
-              type="submit"
-              disabled={loadingSefaz || chaveSefaz.length !== 44}
-              className="px-5 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold hover:bg-emerald-700 disabled:opacity-50"
-            >
-              {loadingSefaz ? 'Consultando...' : 'Consultar'}
-            </button>
-          </form>
-          <p className="text-xs text-gray-400 mb-3">{chaveSefaz.length}/44 digitos</p>
-          {erroSefaz && <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">{erroSefaz}</div>}
-          {avisoConectorSefaz && (
-            <div className="mb-3 p-3 bg-amber-50 border border-amber-200 rounded-lg text-amber-800 text-sm">
-              <strong>Integracao validada, etapa final pendente:</strong> {avisoConectorSefaz}
-            </div>
-          )}
-          {consultasSefaz.length > 0 && (
-            <div className="space-y-3 mt-4">
-              <p className="text-sm font-semibold text-gray-700">Consultas desta sessao ({consultasSefaz.length}):</p>
-              {consultasSefaz.map(consulta => {
-                const exp = consultaExpandidaId === consulta.id;
-                const d = consulta.dados;
-                return (
-                  <div key={consulta.id} className="border border-gray-200 rounded-lg overflow-hidden">
-                    <button
-                      type="button"
-                      onClick={() => setConsultaExpandidaId(exp ? null : consulta.id)}
-                      className="w-full text-left px-4 py-3 hover:bg-gray-50 transition-colors"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="text-sm font-semibold text-gray-800">NF {d.numero_nf}/{d.serie} — {d.emitente_nome}</span>
-                        <span className="text-xs text-gray-500">{d.itens?.length || 0} itens · {formatMoneyBRL(d.valor_total_nf)}</span>
-                      </div>
-                    </button>
-                    <div className="px-4 pb-3 bg-gray-50 border-t border-gray-100 flex flex-wrap gap-2 items-center pt-2">
-                      <button
-                        type="button"
-                        onClick={() => usarNaEntrada(consulta)}
-                        disabled={importandoConsultaId === consulta.id}
-                        className="px-3 py-2 bg-emerald-600 text-white rounded-lg text-xs font-semibold hover:bg-emerald-700 disabled:opacity-60"
-                      >
-                        {importandoConsultaId === consulta.id ? 'Importando...' : 'Usar esta NF na Entrada'}
-                      </button>
-                    </div>
-                    {exp && d.itens?.length > 0 && (
-                      <div className="p-4 border-t border-gray-100 overflow-x-auto">
-                        <table className="w-full text-xs">
-                          <thead>
-                            <tr className="bg-gray-50 text-gray-600 uppercase">
-                              <th className="text-left px-2 py-1">Cod.</th>
-                              <th className="text-left px-2 py-1">Descricao</th>
-                              <th className="text-right px-2 py-1">Qtd</th>
-                              <th className="text-right px-2 py-1">Unit.</th>
-                              <th className="text-right px-2 py-1">Total</th>
-                            </tr>
-                          </thead>
-                          <tbody className="divide-y divide-gray-100">
-                            {d.itens.map(item => (
-                              <tr key={item.numero_item} className="hover:bg-gray-50">
-                                <td className="px-2 py-1 font-mono">{item.codigo_produto}</td>
-                                <td className="px-2 py-1">{item.descricao}</td>
-                                <td className="px-2 py-1 text-right">{item.quantidade}</td>
-                                <td className="px-2 py-1 text-right">{formatMoneyBRL(item.valor_unitario)}</td>
-                                <td className="px-2 py-1 text-right font-semibold">{formatMoneyBRL(item.valor_total)}</td>
-                              </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-      )}
+      <EntradaXmlSefazPanels
+        avisoConectorSefaz={avisoConectorSefaz}
+        chaveSefaz={chaveSefaz}
+        cfgSefaz={cfgSefaz}
+        configSefazLoading={configSefazLoading}
+        consultaExpandidaId={consultaExpandidaId}
+        consultasSefaz={consultasSefaz}
+        consultarSefaz={consultarSefaz}
+        erroSefaz={erroSefaz}
+        formatMoneyBRL={formatMoneyBRL}
+        importandoConsultaId={importandoConsultaId}
+        loadingSefaz={loadingSefaz}
+        mensagemRotina={mensagemRotina}
+        mostrarConfigSefaz={mostrarConfigSefaz}
+        mostrarPainelSefaz={mostrarPainelSefaz}
+        salvarRotinaSefaz={salvarRotinaSefaz}
+        salvandoRotina={salvandoRotina}
+        setCfgSefaz={setCfgSefaz}
+        setChaveSefaz={setChaveSefaz}
+        setConsultaExpandidaId={setConsultaExpandidaId}
+        usarNaEntrada={usarNaEntrada}
+      />
 
-      {/* Painel: Configurar SEFAZ */}
-      {mostrarConfigSefaz && (
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6 border-l-4 border-gray-500">
-          <h2 className="text-lg font-bold text-gray-800 mb-1">Configurar SEFAZ</h2>
-          <p className="text-sm text-gray-500 mb-4">
-            Certificado digital e parametros ficam em{' '}
-            <Link to="/configuracoes/integracoes" className="text-indigo-600 font-semibold">Configuracoes &gt; Integracoes</Link>.
-            Aqui configure apenas a rotina automatica.
-          </p>
-          {configSefazLoading ? (
-            <p className="text-sm text-gray-500">Carregando configuracao...</p>
-          ) : (
-            <>
-              {(!cfgSefaz.enabled || !cfgSefaz.cert_ok) && (
-                <div className="p-3 rounded-lg border border-amber-200 bg-amber-50 text-amber-800 text-sm mb-4">
-                  Integracao ainda nao esta pronta para rotina automatica. Finalize em Configuracoes &gt; Integracoes.
-                </div>
-              )}
-              <div className="mb-4">
-                <label className="flex items-center gap-2 text-sm text-gray-700">
-                  <input
-                    type="checkbox"
-                    checked={cfgSefaz.importacao_automatica}
-                    onChange={e => setCfgSefaz(prev => ({ ...prev, importacao_automatica: e.target.checked }))}
-                  />
-                  <span>Ativar importacao automatica</span>
-                </label>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-lg p-3 mb-4">
-                <div>Ultima sincronizacao: <strong>{cfgSefaz.ultimo_sync_at ? new Date(cfgSefaz.ultimo_sync_at).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' }) : '-'}</strong></div>
-                <div>Status: <strong>{cfgSefaz.ultimo_sync_status}</strong></div>
-                <div>Documentos trazidos: <strong>{cfgSefaz.ultimo_sync_documentos}</strong></div>
-                <div>Modo atual: <strong>{cfgSefaz.modo}</strong></div>
-                <div className="sm:col-span-2">Mensagem: <strong>{cfgSefaz.ultimo_sync_mensagem}</strong></div>
-              </div>
-
-              {mensagemRotina && (
-                <div className="text-sm bg-gray-50 border border-gray-200 rounded-lg p-3 text-gray-700 mb-4">{mensagemRotina}</div>
-              )}
-              <div className="flex flex-wrap gap-3">
-                <button type="button" onClick={salvarRotinaSefaz} disabled={salvandoRotina} className="px-4 py-2 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-60">
-                  {salvandoRotina ? 'Salvando...' : 'Salvar configuracao'}
-                </button>
-              </div>
-            </>
-          )}
-        </div>
-      )}
-
-      {/* Estatisticas */}
-      <div className="grid grid-cols-4 gap-4 mb-6">
-        <div className="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setFiltroStatus('todos')}>
-          <div className="text-2xl font-bold text-blue-600">
-            {notasEntrada.length}
-          </div>
-          <div className="text-sm text-gray-600">Total de Notas</div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setFiltroStatus('pendente')}>
-          <div className="text-2xl font-bold text-yellow-600">
-            {notasEntrada.filter(n => n.status === 'pendente').length}
-          </div>
-          <div className="text-sm text-gray-600">Pendentes</div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4 cursor-pointer hover:shadow-md transition-shadow" onClick={() => setFiltroStatus('processada')}>
-          <div className="text-2xl font-bold text-green-600">
-            {notasEntrada.filter(n => n.status === 'processada').length}
-          </div>
-          <div className="text-sm text-gray-600">Conciliadas</div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-2xl font-bold text-purple-600">
-            {formatMoneyBRL(notasEntrada.filter(n => n.status === 'processada').reduce((sum, n) => sum + (n.valor_total || 0), 0))}
-          </div>
-          <div className="text-sm text-gray-600">Valor Conciliado</div>
-        </div>
-      </div>
+      <EntradaXmlMetricas
+        notasEntrada={notasEntrada}
+        formatMoneyBRL={formatMoneyBRL}
+        onFiltroStatus={setFiltroStatus}
+      />
 
       {/* Lista de Notas */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
