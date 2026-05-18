@@ -1,5 +1,4 @@
 ﻿import React, { useEffect, useMemo, useRef, useState } from "react";
-import toast from "react-hot-toast";
 import { useNavigate } from "react-router-dom";
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useAuth } from "../contexts/AuthContext";
@@ -20,6 +19,7 @@ import {
   exportarVendasFinanceiroExcel,
   exportarVendasFinanceiroPdf,
 } from "./financeiro/vendasFinanceiroExportadores";
+import useVendasFinanceiroConfiguracoes from "./financeiro/useVendasFinanceiroConfiguracoes";
 import useVendasFinanceiroData from "./financeiro/useVendasFinanceiroData";
 import {
   CORES_GRAFICOS_VENDAS,
@@ -36,14 +36,10 @@ import {
   calcularVendasPorDataCalendario,
   calcularVendasPorDiaSemanaResumo,
   calcularVendasPorHorarioResumo,
-  carregarConfigDiasUteis,
-  carregarFeriadosCustomizados,
   consolidarFormasRecebimento,
   filtrarHorariosComMovimento,
   formatarData,
   formatarDataLocal,
-  getDiasUteisStorageKey,
-  getFeriadosStorageKey,
   getStatusVendaMeta,
   montarCardsTotalizadoresLista,
   obterTextoComparacao,
@@ -106,24 +102,23 @@ export default function VendasFinanceiro() {
   const [modalRelatorioAberto, setModalRelatorioAberto] = useState(false);
   const [filtroStatusLista, setFiltroStatusLista] = useState("");
   const [mostrarImpostoTodasVendas, setMostrarImpostoTodasVendas] = useState(true);
-  const [mostrarConfigFeriados, setMostrarConfigFeriados] = useState(false);
-  const [feriadosCustomizados, setFeriadosCustomizados] = useState(
-    carregarFeriadosCustomizados,
-  );
-  const [configDiasUteis, setConfigDiasUteis] = useState(carregarConfigDiasUteis);
-  const [novoFeriadoData, setNovoFeriadoData] = useState("");
-  const [novoFeriadoNome, setNovoFeriadoNome] = useState("");
-  const [ordenacaoRelatorio, setOrdenacaoRelatorio] = useState("data_desc");
-  const [colunasRelatorio, setColunasRelatorio] = useState([
-    "data_venda",
-    "numero_venda",
-    "cliente_nome",
-    "venda_bruta",
-    "venda_liquida",
-    "valor_recebido",
-    "lucro",
-    "status",
-  ]);
+  const {
+    adicionarFeriadoCustomizado,
+    colunasRelatorio,
+    configDiasUteis,
+    feriadosCustomizados,
+    mostrarConfigFeriados,
+    novoFeriadoData,
+    novoFeriadoNome,
+    ordenacaoRelatorio,
+    removerFeriadoCustomizado,
+    setConfigDiasUteis,
+    setMostrarConfigFeriados,
+    setNovoFeriadoData,
+    setNovoFeriadoNome,
+    setOrdenacaoRelatorio,
+    toggleColunaRelatorio,
+  } = useVendasFinanceiroConfiguracoes();
 
   const abasVendasFinanceiro = useMemo(() => {
     const tabsRestritas = [{ id: "historico-cliente", label: "Historico por Cliente" }];
@@ -173,12 +168,6 @@ export default function VendasFinanceiro() {
       ordenacaoRelatorio,
     });
 
-  const toggleColunaRelatorio = (key) => {
-    setColunasRelatorio((prev) =>
-      prev.includes(key) ? prev.filter((item) => item !== key) : [...prev, key],
-    );
-  };
-
   const abrirVendasEmAberto = () => {
     setFiltroStatusLista("em_aberto");
     setAbaAtiva("lista");
@@ -186,31 +175,6 @@ export default function VendasFinanceiro() {
 
   const limparFiltroStatusLista = () => {
     setFiltroStatusLista("");
-  };
-
-  const adicionarFeriadoCustomizado = () => {
-    if (!novoFeriadoData) {
-      toast.error("Informe a data do feriado.");
-      return;
-    }
-
-    setFeriadosCustomizados((prev) => {
-      const semDuplicado = prev.filter((feriado) => feriado.data !== novoFeriadoData);
-      return [
-        ...semDuplicado,
-        {
-          data: novoFeriadoData,
-          nome: novoFeriadoNome.trim() || "Feriado local",
-        },
-      ].sort((a, b) => a.data.localeCompare(b.data));
-    });
-    setNovoFeriadoData("");
-    setNovoFeriadoNome("");
-    toast.success("Feriado salvo para a contagem de dias úteis.");
-  };
-
-  const removerFeriadoCustomizado = (data) => {
-    setFeriadosCustomizados((prev) => prev.filter((feriado) => feriado.data !== data));
   };
 
   const filtrosAvancados = {
@@ -366,20 +330,6 @@ export default function VendasFinanceiro() {
       setModoComparacao(false);
     }
   }, [podeVerFinanceiroCompleto]);
-
-  useEffect(() => {
-    window.localStorage.setItem(
-      getFeriadosStorageKey(),
-      JSON.stringify(feriadosCustomizados),
-    );
-  }, [feriadosCustomizados]);
-
-  useEffect(() => {
-    window.localStorage.setItem(
-      getDiasUteisStorageKey(),
-      JSON.stringify(configDiasUteis),
-    );
-  }, [configDiasUteis]);
 
   useEffect(() => {
     const fecharMenuAoClicarFora = (event) => {
