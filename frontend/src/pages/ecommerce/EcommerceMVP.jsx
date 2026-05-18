@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import ecommerceApi from '../../services/ecommerceApi';
 import { api } from '../../services/api';
+import EcommerceCatalogControls, { EcommerceCatalogSummary } from './EcommerceCatalogControls';
 import EcommerceCatalogProductCard from './EcommerceCatalogProductCard';
 import {
   trackPageView,
@@ -1539,155 +1540,65 @@ export default function EcommerceMVP() {
 
       {view === 'loja' && (
         <>
-          {/* Cabeçalho catálogo — fora do grid para não afetar alinhamento da sidebar */}
-          <div style={{ maxWidth: 1280, margin: '0 auto', padding: isMobile ? '16px 12px 0' : '24px 20px 0' }}>
-            <h2 style={{ margin: 0, fontSize: isMobile ? 18 : 22, fontWeight: 800, color: '#1c1917' }}>Catálogo da loja</h2>
-            <p style={{ margin: '4px 0 0', color: '#9ca3af', fontSize: 13 }}>{filteredProducts.length} produto{filteredProducts.length !== 1 ? 's' : ''} encontrado{filteredProducts.length !== 1 ? 's' : ''}</p>
-          </div>
+          <EcommerceCatalogSummary
+            catalogMetrics={catalogMetrics}
+            isMobile={isMobile}
+            productCount={filteredProducts.length}
+          />
 
-          <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 20px' }}>
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
-              {[
-                { label: 'Prontos para vender', value: catalogMetrics.prontos, color: '#16a34a', border: '#bbf7d0', bg: '#f0fdf4' },
-                { label: 'Com estoque', value: catalogMetrics.emEstoque, color: '#2563eb', border: '#bfdbfe', bg: '#eff6ff' },
-                { label: 'Com foto', value: catalogMetrics.comImagem, color: '#ea580c', border: '#fed7aa', bg: '#fff7ed' },
-              ].map((item) => (
-                <div
-                  key={item.label}
-                  style={{
-                    minWidth: isMobile ? 'calc(50% - 8px)' : 180,
-                    background: item.bg,
-                    color: item.color,
-                    border: `1px solid ${item.border}`,
-                    borderRadius: 14,
-                    padding: '10px 14px',
-                  }}
-                >
-                  <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4 }}>{item.label}</div>
-                  <div style={{ fontSize: 20, fontWeight: 800, marginTop: 2 }}>{item.value}</div>
-                </div>
-              ))}
-            </div>
-          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) 300px', gap: 24, maxWidth: 1280, margin: '0 auto', padding: isMobile ? '12px 12px 28px' : '16px 20px 28px' }}>
+            {/* PRODUTOS */}
+            <div>
+              <EcommerceCatalogControls
+                categories={categorias}
+                category={categoria}
+                isMobile={isMobile}
+                loading={loading}
+                order={ordenacaoCatalogo}
+                search={search}
+                showOnlyInStock={somenteComEstoque}
+                showOnlyWithImage={somenteComImagem}
+                styles={S}
+                onCategoryChange={setCategoria}
+                onClearFilters={clearCatalogFilters}
+                onImageFilterChange={() => setSomenteComImagem((value) => !value)}
+                onOrderChange={setOrdenacaoCatalogo}
+                onRefresh={loadProducts}
+                onSearchChange={setSearch}
+                onStockFilterChange={() => setSomenteComEstoque((value) => !value)}
+              />
 
-        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) 300px', gap: 24, maxWidth: 1280, margin: '0 auto', padding: isMobile ? '12px 12px 28px' : '16px 20px 28px' }}>
-          {/* PRODUTOS */}
-          <div>
-
-            {/* Buscas e filtro */}
-            <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap', flexDirection: isMobile ? 'column' : 'row' }}>
-              <div style={{ flex: 1, minWidth: 220, position: 'relative' }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <input
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                  placeholder="O que seu pet precisa?"
-                  style={{ ...S.formInput, paddingLeft: 36 }}
-                />
-              </div>
-              <select value={categoria} onChange={(e) => setCategoria(e.target.value)} style={{ ...S.formInput, width: 'auto', paddingRight: 30 }}>
-                {categorias.map((item) => (
-                  <option key={item} value={item}>{item === 'todas' ? 'Todas as categorias' : item}</option>
+              {/* Grid */}
+              <div style={{ ...S.grid, gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(200px, 1fr))', gap: isMobile ? 10 : 16 }}>
+                {filteredProducts.map((product) => (
+                  <EcommerceCatalogProductCard
+                    key={product.id}
+                    product={product}
+                    isHovered={hoveredCard === product.id}
+                    wished={wishlist.includes(product.id)}
+                    styles={S}
+                    onAddToCart={addToCart}
+                    onHover={setHoveredCard}
+                    onNotifyMe={registerNotifyMe}
+                    onOpen={openProductDetails}
+                    onToggleWishlist={toggleWishlist}
+                  />
                 ))}
-              </select>
-              <select value={ordenacaoCatalogo} onChange={(e) => setOrdenacaoCatalogo(e.target.value)} style={{ ...S.formInput, width: 'auto', minWidth: 190, paddingRight: 30 }}>
-                <option value="prontos">Mais prontos para vender</option>
-                <option value="nome">Ordem alfabética</option>
-                <option value="menor_preco">Menor preço</option>
-                <option value="maior_preco">Maior preço</option>
-              </select>
-              <button onClick={loadProducts} disabled={loading} style={{ padding: '10px 16px', border: '1.5px solid #e7e5e4', borderRadius: 9, fontSize: 13, fontWeight: 600, background: '#fff', color: '#f97316', cursor: 'pointer' }}>
-                {loading ? '...' : '↺ Atualizar'}
-              </button>
-            </div>
-
-            {/* Chips de categorias */}
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
-              {[
-                { label: 'Somente com estoque', active: somenteComEstoque, onClick: () => setSomenteComEstoque((value) => !value) },
-                { label: 'Somente com foto', active: somenteComImagem, onClick: () => setSomenteComImagem((value) => !value) },
-              ].map((item) => (
-                <button
-                  key={item.label}
-                  onClick={item.onClick}
-                  style={{
-                    padding: '8px 14px',
-                    borderRadius: 999,
-                    border: item.active ? '1.5px solid #16a34a' : '1.5px solid #e7e5e4',
-                    background: item.active ? '#f0fdf4' : '#fff',
-                    color: item.active ? '#166534' : '#57534e',
-                    fontSize: 12,
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                  }}
-                >
-                  {item.label}
-                </button>
-              ))}
-              {(somenteComEstoque || somenteComImagem || ordenacaoCatalogo !== 'prontos' || categoria !== 'todas' || search) && (
-                <button
-                  onClick={clearCatalogFilters}
-                  style={{
-                    padding: '8px 14px',
-                    borderRadius: 999,
-                    border: '1.5px solid #fed7aa',
-                    background: '#fff7ed',
-                    color: '#c2410c',
-                    fontSize: 12,
-                    fontWeight: 700,
-                    cursor: 'pointer',
-                  }}
-                >
-                  Limpar filtros
-                </button>
-              )}
-            </div>
-
-            {categorias.length > 2 && (
-              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 20, justifyContent: 'space-between' }}>
-                {categorias.map((cat) => (
-                  <button
-                    key={cat}
-                    onClick={() => setCategoria(cat)}
-                    style={{ flex: '1 1 auto', textAlign: 'center', padding: '6px 14px', borderRadius: 20, border: categoria === cat ? '1.5px solid #f97316' : '1.5px solid #e7e5e4', background: categoria === cat ? '#fff7ed' : '#fff', color: categoria === cat ? '#ea580c' : '#78716c', fontWeight: categoria === cat ? 700 : 500, fontSize: 12, cursor: 'pointer', transition: 'all 0.15s' }}
-                  >
-                    {cat === 'todas' ? 'Todas' : cat}
-                  </button>
-                ))}
+                {!loading && filteredProducts.length === 0 && (
+                  <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '60px 0', color: '#9ca3af' }}>
+                    <div style={{ fontSize: 48, marginBottom: 12 }}>🔍</div>
+                    <div style={{ fontWeight: 800, fontSize: 18, color: '#374151' }}>Nenhum produto encontrado</div>
+                    <div style={{ fontSize: 13, marginTop: 4 }}>Tente buscar por outro termo ou categoria</div>
+                    <button onClick={clearCatalogFilters} style={{ marginTop: 16, padding: '8px 20px', borderRadius: 20, border: '1.5px solid #e7e5e4', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#f97316' }}>
+                      Limpar filtros
+                    </button>
+                  </div>
+                )}
               </div>
-            )}
-
-            {/* Grid */}
-            <div style={{ ...S.grid, gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(200px, 1fr))', gap: isMobile ? 10 : 16 }}>
-              {filteredProducts.map((product) => (
-                <EcommerceCatalogProductCard
-                  key={product.id}
-                  product={product}
-                  isHovered={hoveredCard === product.id}
-                  wished={wishlist.includes(product.id)}
-                  styles={S}
-                  onAddToCart={addToCart}
-                  onHover={setHoveredCard}
-                  onNotifyMe={registerNotifyMe}
-                  onOpen={openProductDetails}
-                  onToggleWishlist={toggleWishlist}
-                />
-              ))}
-              {!loading && filteredProducts.length === 0 && (
-                <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '60px 0', color: '#9ca3af' }}>
-                  <div style={{ fontSize: 48, marginBottom: 12 }}>🔍</div>
-                  <div style={{ fontWeight: 800, fontSize: 18, color: '#374151' }}>Nenhum produto encontrado</div>
-                  <div style={{ fontSize: 13, marginTop: 4 }}>Tente buscar por outro termo ou categoria</div>
-                  <button onClick={clearCatalogFilters} style={{ marginTop: 16, padding: '8px 20px', borderRadius: 20, border: '1.5px solid #e7e5e4', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#f97316' }}>
-                    Limpar filtros
-                  </button>
-                </div>
-              )}
             </div>
-          </div>
 
-          {/* SIDEBAR CARRINHO */}
-          <aside style={{ ...S.sidebar, display: isMobile ? 'none' : 'block' }}>
+            {/* SIDEBAR CARRINHO */}
+            <aside style={{ ...S.sidebar, display: isMobile ? 'none' : 'block' }}>
             <div style={S.sidebarTitle}>
               <span>🛒 Seu carrinho</span>
               {cart?.itens?.length > 0 && <span style={S.sidebarBadge}>{cart.itens.length}</span>}
