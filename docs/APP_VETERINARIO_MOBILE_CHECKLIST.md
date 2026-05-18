@@ -7,7 +7,7 @@ Objetivo: criar uma experiencia de veterinario dentro do app mobile atual, reapr
 - [x] Producao checada antes de iniciar: `/`, `/api/health` e `/health/watchdog` responderam HTTP 200 em menos de 500 ms.
 - [x] Branch criada: `feat/20260517-2135-app-veterinario-mobile`.
 - [x] MVP pronto para teste do Lucas no app.
-- [ ] PR aberto e validado.
+- [x] PR aberto e validado.
 - [ ] Producao atualizada apos aprovacao.
 
 ## Sequencia de execucao
