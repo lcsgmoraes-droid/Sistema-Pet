@@ -200,6 +200,55 @@ export function normalizarFormaPagamentoLabel(valor) {
   return mapa[lower] || texto || "Nao informado";
 }
 
+export function consolidarFormasRecebimento(lista) {
+  const mapa = new Map();
+  (lista || []).forEach((item) => {
+    const forma = normalizarFormaPagamentoLabel(item.forma_pagamento);
+    const atual = mapa.get(forma) || {
+      ...item,
+      forma_pagamento: forma,
+      valor_total: 0,
+    };
+    atual.valor_total += Number(item.valor_total || 0);
+    mapa.set(forma, atual);
+  });
+  return Array.from(mapa.values()).sort(
+    (a, b) => Number(b.valor_total || 0) - Number(a.valor_total || 0),
+  );
+}
+
+export function aplicarFiltrosVendasFinanceiro({
+  dados,
+  tipo,
+  filtroFuncionario,
+  filtroFormaPagamento,
+  filtroCategoria,
+}) {
+  if (!dados || dados.length === 0) return dados;
+
+  let dadosFiltrados = [...dados];
+
+  if (filtroFuncionario && tipo === "funcionario") {
+    dadosFiltrados = dadosFiltrados.filter(
+      (item) => item.funcionario === filtroFuncionario,
+    );
+  }
+
+  if (filtroFormaPagamento && tipo === "formaPagamento") {
+    dadosFiltrados = dadosFiltrados.filter(
+      (item) => item.forma_pagamento === filtroFormaPagamento,
+    );
+  }
+
+  if (filtroCategoria && tipo === "categoria") {
+    dadosFiltrados = dadosFiltrados.filter(
+      (item) => item.categoria === filtroCategoria,
+    );
+  }
+
+  return dadosFiltrados;
+}
+
 export function formatarMoeda(valor) {
   return formatMoneyCellValue(valor);
 }
@@ -214,6 +263,242 @@ export function formatarMoedaComSinalOuTraco(valor, sinal) {
 
 export function formatarPercentualOuTraco(valor) {
   return isZeroMoneyValue(valor) ? "-" : `${valor}%`;
+}
+
+export const CORES_GRAFICOS_VENDAS = [
+  "#3B82F6",
+  "#10B981",
+  "#F59E0B",
+  "#EF4444",
+  "#8B5CF6",
+  "#EC4899",
+  "#14B8A6",
+  "#F97316",
+];
+
+export function calcularFluxoResultadoCards(resumo = {}) {
+  const taxaLoja = Number(resumo.taxa_loja_total || 0);
+  const repasseEntrega = Number(
+    resumo.taxa_entrega_repasse_total ?? resumo.taxa_entrega ?? 0,
+  );
+  const taxaOperacional = Number(resumo.taxa_operacional_total || 0);
+  const custoOperacional = repasseEntrega + taxaOperacional;
+  const taxasCartao = Number(resumo.taxa_cartao_total || 0);
+  const comissao = Number(resumo.comissao_total || 0);
+  const imposto = Number(resumo.imposto_total || 0);
+  const campanhas = Number(resumo.custo_campanha_total || 0);
+  const custoProdutos = Number(resumo.custo_total || 0);
+
+  return [
+    {
+      sinal: "",
+      titulo: "Venda Bruta",
+      valor: Number(resumo.venda_bruta || 0),
+      detalhe: "Produtos e servicos antes das deducoes.",
+      cor: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    },
+    {
+      sinal: "+",
+      titulo: "Tx Loja",
+      valor: taxaLoja,
+      detalhe: "Parte da entrega que fica como receita da loja.",
+      cor: "border-blue-200 bg-blue-50 text-blue-800",
+    },
+    {
+      sinal: "-",
+      titulo: "Descontos",
+      valor: Number(resumo.desconto || 0),
+      detalhe: "Descontos de venda e itens.",
+      cor: "border-amber-200 bg-amber-50 text-amber-800",
+    },
+    {
+      sinal: "-",
+      titulo: "Operacional",
+      valor: custoOperacional,
+      detalhe: "Repasse de entrega e custos operacionais.",
+      cor: "border-orange-200 bg-orange-50 text-orange-800",
+    },
+    {
+      sinal: "-",
+      titulo: "Cartao",
+      valor: taxasCartao,
+      detalhe: "Taxas das operadoras de cartao.",
+      cor: "border-purple-200 bg-purple-50 text-purple-800",
+    },
+    {
+      sinal: "-",
+      titulo: "Comissao",
+      valor: comissao,
+      detalhe: "Comissoes rateadas nas vendas.",
+      cor: "border-indigo-200 bg-indigo-50 text-indigo-800",
+    },
+    {
+      sinal: "-",
+      titulo: "Impostos",
+      valor: imposto,
+      detalhe: "Imposto usado na rentabilidade.",
+      cor: "border-rose-200 bg-rose-50 text-rose-800",
+    },
+    {
+      sinal: "-",
+      titulo: "Campanhas",
+      valor: campanhas,
+      detalhe: "Cashback, cupons e beneficios resgatados.",
+      cor: "border-cyan-200 bg-cyan-50 text-cyan-800",
+    },
+    {
+      sinal: "=",
+      titulo: "Venda Liquida",
+      valor: Number(resumo.venda_liquida || 0),
+      detalhe: "Resultado antes do custo dos produtos.",
+      cor: "border-sky-200 bg-sky-50 text-sky-800",
+    },
+    {
+      sinal: "R$",
+      titulo: "Valor Recebido",
+      valor: Number(resumo.valor_recebido || 0),
+      detalhe: "Total efetivamente baixado/recebido no periodo.",
+      cor: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    },
+    {
+      sinal: "!",
+      titulo: "Em Aberto",
+      valor: Number(resumo.em_aberto || 0),
+      detalhe: "Vendas pendentes de baixa no periodo.",
+      cor: "border-red-200 bg-red-50 text-red-800",
+      acao: "vendas_em_aberto",
+    },
+    {
+      sinal: "-",
+      titulo: "Custo Produtos",
+      valor: custoProdutos,
+      detalhe: "CMV dos produtos vendidos.",
+      cor: "border-slate-200 bg-slate-50 text-slate-800",
+    },
+    {
+      sinal: "=",
+      titulo: "Lucro",
+      valor: Number(resumo.lucro_total || 0),
+      detalhe: "Venda liquida menos custo dos produtos.",
+      cor:
+        Number(resumo.lucro_total || 0) >= 0
+          ? "border-green-200 bg-green-50 text-green-800"
+          : "border-red-200 bg-red-50 text-red-800",
+    },
+    {
+      sinal: "%",
+      titulo: "Margem",
+      valor: Number(resumo.margem_media || 0),
+      detalhe: "Lucro sobre a venda liquida.",
+      percentual: true,
+      cor: "border-teal-200 bg-teal-50 text-teal-800",
+    },
+  ];
+}
+
+export function montarCardsTotalizadoresLista(totalizadoresListaVendas = {}) {
+  const formatarDeducaoTotalizador = (valor) => formatarMoedaComSinalOuTraco(valor, "-");
+
+  return [
+    {
+      label: "Vendas",
+      value: Number(totalizadoresListaVendas.quantidade || 0).toLocaleString("pt-BR"),
+      intent: "slate",
+    },
+    {
+      label: "Com NF",
+      value: Number(totalizadoresListaVendas.com_nf || 0).toLocaleString("pt-BR"),
+      intent: "blue",
+    },
+    {
+      label: "Venda Bruta",
+      value: formatarMoedaOuTraco(totalizadoresListaVendas.venda_bruta),
+      intent: "emerald",
+    },
+    {
+      label: "Tx Loja",
+      value: formatarMoedaComSinalOuTraco(totalizadoresListaVendas.taxa_loja, "+"),
+      intent: "emerald",
+    },
+    {
+      label: "Desconto",
+      value: formatarDeducaoTotalizador(totalizadoresListaVendas.desconto),
+      intent: "amber",
+    },
+    {
+      label: "Tx. Entrega",
+      value: formatarDeducaoTotalizador(totalizadoresListaVendas.taxa_entrega),
+      intent: "blue",
+    },
+    {
+      label: "Tx. Operac.",
+      value: formatarDeducaoTotalizador(totalizadoresListaVendas.taxa_operacional),
+      intent: "amber",
+    },
+    {
+      label: "Tx. Cartao",
+      value: formatarDeducaoTotalizador(totalizadoresListaVendas.taxa_cartao),
+      intent: "violet",
+    },
+    {
+      label: "Comissao",
+      value: formatarDeducaoTotalizador(totalizadoresListaVendas.comissao),
+      intent: "blue",
+    },
+    {
+      label: "Imposto",
+      value: formatarDeducaoTotalizador(totalizadoresListaVendas.imposto),
+      intent: "red",
+    },
+    {
+      label: "Custo Camp.",
+      value: formatarDeducaoTotalizador(totalizadoresListaVendas.custo_campanha),
+      intent: "cyan",
+    },
+    {
+      label: "Liquida",
+      value: formatarMoedaOuTraco(totalizadoresListaVendas.venda_liquida),
+      intent: "blue",
+    },
+    {
+      label: "Valor Recebido",
+      value: formatarMoedaOuTraco(totalizadoresListaVendas.valor_recebido),
+      intent: "emerald",
+    },
+    {
+      label: "Custo",
+      value: formatarDeducaoTotalizador(totalizadoresListaVendas.custo_produtos),
+      intent: "amber",
+    },
+    {
+      label: "Lucro",
+      value: formatarMoedaOuTraco(totalizadoresListaVendas.lucro),
+      intent: Number(totalizadoresListaVendas.lucro || 0) >= 0 ? "emerald" : "red",
+    },
+    {
+      label: "MG Venda",
+      value: formatarPercentualOuTraco(totalizadoresListaVendas.margem_sobre_venda),
+      intent: "slate",
+    },
+    {
+      label: "MG Custo",
+      value: formatarPercentualOuTraco(totalizadoresListaVendas.margem_sobre_custo),
+      intent: "slate",
+    },
+  ];
+}
+
+export function obterTextoComparacao(periodoComparacao) {
+  switch (periodoComparacao) {
+    case "periodo_anterior":
+      return "mesmo período anterior";
+    case "mes_anterior":
+      return "mesmo período do mês anterior";
+    case "ano_anterior":
+      return "mesmo período do ano anterior";
+    default:
+      return "período anterior";
+  }
 }
 
 export function formatarDataLocal(valor, opcoes = {}) {
@@ -408,6 +693,300 @@ export function calcularAnaliseInteligenteVendas({
     produtosPorCategoria,
     alertasInteligentesVendas: alertas,
     previsaoProximos7Dias,
+  };
+}
+
+export function calcularFeriadosPorData({ dataInicio, dataFim, feriadosCustomizados = [] }) {
+  const anos = new Set(
+    listarDiasPeriodo(dataInicio, dataFim).map((dia) => dia.getFullYear()),
+  );
+  const feriados = montarFeriadosPadrao(Array.from(anos));
+
+  feriadosCustomizados.forEach((feriado) => {
+    if (feriado?.data) {
+      feriados[feriado.data] = feriado.nome?.trim() || "Feriado cadastrado";
+    }
+  });
+
+  return feriados;
+}
+
+export function calcularVendasPorDataCalendario({
+  vendasPorData = [],
+  dataInicio,
+  dataFim,
+  feriadosPorData = {},
+  considerarSabadoDiaUtil = false,
+}) {
+  const vendasMap = new Map(
+    (vendasPorData || []).map((item) => [dataKeyLocal(item.data), item]),
+  );
+
+  return listarDiasPeriodo(dataInicio, dataFim).map((dia) => {
+    const key = dataKeyLocal(dia);
+    const item = vendasMap.get(key) || {};
+    const diaSemana = dia.getDay();
+    const feriadoNome = feriadosPorData[key] || "";
+
+    const quantidade = Number(item.quantidade || 0);
+    const valorBruto = Number(item.valor_bruto || 0);
+    const valorLiquido = Number(item.valor_liquido || 0);
+    const temMovimento = quantidade > 0 || valorBruto > 0 || valorLiquido > 0;
+    const sabado = diaSemana === 6;
+    const domingo = diaSemana === 0;
+    const sabadoUtil = sabado && considerarSabadoDiaUtil;
+    const feriadoAberto = Boolean(feriadoNome && temMovimento);
+    const fimDeSemana = domingo || (sabado && !sabadoUtil);
+    const diaUtilBase = !domingo && (!sabado || sabadoUtil);
+    const diaUtil = feriadoAberto || (diaUtilBase && !feriadoNome);
+
+    return {
+      data: key,
+      quantidade,
+      valor_bruto: valorBruto,
+      taxa_entrega: Number(item.taxa_entrega || 0),
+      desconto: Number(item.desconto || 0),
+      percentual_desconto: Number(item.percentual_desconto || 0),
+      valor_liquido: valorLiquido,
+      valor_recebido: Number(item.valor_recebido || 0),
+      saldo_aberto: Number(item.saldo_aberto || 0),
+      ticket_medio: quantidade > 0 ? Number(item.ticket_medio || valorBruto / quantidade) : 0,
+      dia_semana: formatarDataLocal(key, { weekday: "long" }),
+      sabado,
+      fim_de_semana: fimDeSemana,
+      feriado_nome: feriadoNome,
+      feriado_aberto: feriadoAberto,
+      dia_util: diaUtil,
+      sem_movimento: quantidade === 0 && valorLiquido === 0,
+    };
+  });
+}
+
+export function calcularResumoDiasPeriodo(vendasPorDataCalendario) {
+  const calendario = Array.isArray(vendasPorDataCalendario) ? vendasPorDataCalendario : [];
+  const diasUteis = calendario.filter((item) => item.dia_util);
+  const diasTrabalhados = diasUteis.filter((item) => !item.sem_movimento);
+  const diasUteisSemVenda = diasUteis.filter((item) => item.sem_movimento);
+  const totalLiquidoDiasUteis = diasUteis.reduce(
+    (sum, item) => sum + Number(item.valor_liquido || 0),
+    0,
+  );
+  const totalLiquidoDiasTrabalhados = diasTrabalhados.reduce(
+    (sum, item) => sum + Number(item.valor_liquido || 0),
+    0,
+  );
+
+  return {
+    totalDias: calendario.length,
+    diasUteis: diasUteis.length,
+    diasTrabalhados: diasTrabalhados.length,
+    diasUteisSemVenda: diasUteisSemVenda.length,
+    finsDeSemana: calendario.filter((item) => item.fim_de_semana).length,
+    feriados: calendario.filter((item) => item.feriado_nome).length,
+    mediaDiaUtil: diasUteis.length > 0 ? totalLiquidoDiasUteis / diasUteis.length : 0,
+    mediaDiaTrabalhado: diasTrabalhados.length > 0 ? totalLiquidoDiasTrabalhados / diasTrabalhados.length : 0,
+  };
+}
+
+export function calcularVendasPorDiaSemanaResumo(vendasResumoPeriodo) {
+  const dias = [
+    { chave: 1, nome: "Segunda", curto: "Seg" },
+    { chave: 2, nome: "Terca", curto: "Ter" },
+    { chave: 3, nome: "Quarta", curto: "Qua" },
+    { chave: 4, nome: "Quinta", curto: "Qui" },
+    { chave: 5, nome: "Sexta", curto: "Sex" },
+    { chave: 6, nome: "Sabado", curto: "Sab" },
+    { chave: 0, nome: "Domingo", curto: "Dom" },
+  ];
+  const mapa = new Map(
+    dias.map((dia, ordem) => [
+      dia.chave,
+      {
+        ...dia,
+        ordem,
+        quantidade: 0,
+        valor_bruto: 0,
+        valor_liquido: 0,
+        ticket_medio: 0,
+      },
+    ]),
+  );
+
+  vendasResumoPeriodo.forEach((venda) => {
+    const data = parseDataHoraLocal(venda.data_venda);
+    if (!data) return;
+    const item = mapa.get(data.getDay());
+    if (!item) return;
+    item.quantidade += 1;
+    item.valor_bruto += Number(venda.venda_bruta || 0);
+    item.valor_liquido += Number(venda.venda_liquida || 0);
+  });
+
+  return Array.from(mapa.values()).map((item) => ({
+    ...item,
+    ticket_medio: item.quantidade > 0 ? item.valor_liquido / item.quantidade : 0,
+  }));
+}
+
+export function calcularVendasPorHorarioResumo(vendasResumoPeriodo) {
+  const horas = Array.from({ length: 24 }, (_, hora) => ({
+    hora,
+    faixa: `${String(hora).padStart(2, "0")}h`,
+    quantidade: 0,
+    valor_bruto: 0,
+    valor_liquido: 0,
+    ticket_medio: 0,
+  }));
+
+  vendasResumoPeriodo.forEach((venda) => {
+    const data = parseDataHoraLocal(venda.data_venda);
+    if (!data) return;
+    const item = horas[data.getHours()];
+    item.quantidade += 1;
+    item.valor_bruto += Number(venda.venda_bruta || 0);
+    item.valor_liquido += Number(venda.venda_liquida || 0);
+  });
+
+  return horas.map((item) => ({
+    ...item,
+    ticket_medio: item.quantidade > 0 ? item.valor_liquido / item.quantidade : 0,
+  }));
+}
+
+export function filtrarHorariosComMovimento(vendasPorHorarioResumo) {
+  return vendasPorHorarioResumo.filter((item) => item.quantidade > 0);
+}
+
+export function selecionarMelhorPorValorLiquido(lista) {
+  return [...lista].sort(
+    (a, b) => Number(b.valor_liquido || 0) - Number(a.valor_liquido || 0),
+  )[0];
+}
+
+export function calcularAnalisePromocoes(vendasResumoPeriodo) {
+  const topProdutos = new Map();
+  let vendasPromocao = 0;
+  let vendasNormais = 0;
+  let valorVendasPromocao = 0;
+  let valorVendasNormais = 0;
+  let valorItensPromocionais = 0;
+  let descontoPromocional = 0;
+
+  vendasResumoPeriodo.forEach((venda) => {
+    const itens = Array.isArray(venda.itens) ? venda.itens : [];
+    const itensPromo = itens.filter((item) => item?.em_promocao);
+    const vendaTemPromocao = Boolean(venda.tem_promocao || itensPromo.length > 0);
+    const valorVenda = Number(venda.venda_liquida || venda.venda_bruta || 0);
+
+    if (vendaTemPromocao) {
+      vendasPromocao += 1;
+      valorVendasPromocao += valorVenda;
+    } else {
+      vendasNormais += 1;
+      valorVendasNormais += valorVenda;
+    }
+
+    itensPromo.forEach((item) => {
+      const chave = item.produto_id || item.produto_nome;
+      const atual = topProdutos.get(chave) || {
+        produto_nome: item.produto_nome || "Produto removido",
+        quantidade: 0,
+        valor: 0,
+        desconto: 0,
+        origens: new Set(),
+      };
+      const valorItem = Number(
+        item.valor_liquido || item.valor_promocional || item.venda_bruta || 0,
+      );
+      const descontoItem = Number(item.desconto_promocional || 0);
+
+      atual.quantidade += Number(item.quantidade || 0);
+      atual.valor += valorItem;
+      atual.desconto += descontoItem;
+      String(item.promocao_origem || "")
+        .split(",")
+        .map((origem) => origem.trim())
+        .filter(Boolean)
+        .forEach((origem) => atual.origens.add(origem));
+
+      valorItensPromocionais += valorItem;
+      descontoPromocional += descontoItem;
+      topProdutos.set(chave, atual);
+    });
+  });
+
+  const totalVendas = vendasPromocao + vendasNormais;
+  return {
+    totalVendas,
+    vendasPromocao,
+    vendasNormais,
+    valorVendasPromocao,
+    valorVendasNormais,
+    valorItensPromocionais,
+    descontoPromocional,
+    percentualPromocao:
+      totalVendas > 0 ? arredondarPercentual((vendasPromocao / totalVendas) * 100) : 0,
+    comparativo: [
+      { tipo: "Normais", quantidade: vendasNormais, valor: valorVendasNormais },
+      { tipo: "Preco promocional", quantidade: vendasPromocao, valor: valorVendasPromocao },
+    ],
+    topProdutos: Array.from(topProdutos.values())
+      .map((item) => ({
+        ...item,
+        origens: Array.from(item.origens),
+        valor: arredondarMoeda(item.valor),
+        desconto: arredondarMoeda(item.desconto),
+      }))
+      .sort((a, b) => b.valor - a.valor)
+      .slice(0, 8),
+  };
+}
+
+export function calcularTotalizadoresListaVendas(listaVendasFiltrada) {
+  const totais = listaVendasFiltrada.reduce(
+    (acc, venda) => {
+      acc.quantidade += 1;
+      acc.venda_bruta += Number(venda.venda_bruta || 0);
+      acc.taxa_loja += Number(venda.taxa_loja || 0);
+      acc.desconto += Number(venda.desconto || 0);
+      acc.taxa_entrega += Number(venda.taxa_entrega || 0);
+      acc.taxa_operacional += Number(venda.taxa_operacional || 0);
+      acc.taxa_cartao += Number(venda.taxa_cartao || 0);
+      acc.comissao += Number(venda.comissao || 0);
+      acc.imposto += Number(venda.imposto || 0);
+      acc.custo_campanha += Number(venda.custo_campanha || 0);
+      acc.venda_liquida += Number(venda.venda_liquida || 0);
+      acc.valor_recebido += calcularValorRecebidoVenda(venda);
+      acc.custo_produtos += Number(venda.custo_produtos || 0);
+      acc.lucro += Number(venda.lucro || 0);
+      if (vendaTemNotaFiscal(venda)) acc.com_nf += 1;
+      return acc;
+    },
+    {
+      quantidade: 0,
+      venda_bruta: 0,
+      taxa_loja: 0,
+      desconto: 0,
+      taxa_entrega: 0,
+      taxa_operacional: 0,
+      taxa_cartao: 0,
+      comissao: 0,
+      imposto: 0,
+      custo_campanha: 0,
+      venda_liquida: 0,
+      valor_recebido: 0,
+      custo_produtos: 0,
+      lucro: 0,
+      com_nf: 0,
+    },
+  );
+
+  return {
+    ...totais,
+    margem_sobre_venda:
+      totais.venda_bruta > 0 ? arredondarPercentual((totais.lucro / totais.venda_bruta) * 100) : 0,
+    margem_sobre_custo:
+      totais.custo_produtos > 0 ? arredondarPercentual((totais.lucro / totais.custo_produtos) * 100) : 0,
   };
 }
 
