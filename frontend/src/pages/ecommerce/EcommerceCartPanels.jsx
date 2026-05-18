@@ -1,4 +1,4 @@
-import { Lock, Package, ShoppingCart } from 'lucide-react';
+import { Lock, Package, ShoppingCart, Trash2 } from 'lucide-react';
 import { formatCurrency, getProductImages } from './ecommerceMvpUtils';
 
 function MiniCartItem({ item, productMap, styles: S }) {
@@ -38,6 +38,39 @@ function CartSummaryRows({ items }) {
         </div>
       ))}
     </>
+  );
+}
+
+function CartPageItem({ item, productMap, styles: S, onUpdateItem }) {
+  const product = productMap[item.produto_id];
+  const image = product ? getProductImages(product)[0] : null;
+
+  return (
+    <div style={S.cartItem}>
+      <div style={S.cartItemImg}>
+        {image ? (
+          <img src={image} alt={item.nome} style={{ width: '100%', height: '100%', objectFit: 'contain', padding: 4 }} />
+        ) : (
+          <Package size={28} color="#a8a29e" />
+        )}
+      </div>
+      <div style={{ flex: 1, minWidth: 0, display: 'grid', gap: 4 }}>
+        <div style={{ fontWeight: 700, fontSize: 14, lineHeight: 1.3, color: '#1a1a2e' }}>{item.nome}</div>
+        <div style={{ fontSize: 13, color: '#f97316', fontWeight: 700 }}>{formatCurrency(item.preco_unitario)} / un</div>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 4, flexWrap: 'wrap' }}>
+          <button onClick={() => onUpdateItem(item.item_id, item.quantidade - 1)} style={S.qtyBtn} aria-label={`Reduzir quantidade de ${item.nome}`}>-</button>
+          <span style={{ fontWeight: 700, fontSize: 14, minWidth: 26, textAlign: 'center' }}>{item.quantidade}</span>
+          <button onClick={() => onUpdateItem(item.item_id, item.quantidade + 1)} style={S.qtyBtn} aria-label={`Aumentar quantidade de ${item.nome}`}>+</button>
+          <button onClick={() => onUpdateItem(item.item_id, 0)} style={{ ...S.removeBtn, display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+            <Trash2 size={13} />
+            Remover
+          </button>
+        </div>
+      </div>
+      <div style={{ fontWeight: 800, fontSize: 16, color: '#1a1a2e', flexShrink: 0 }}>
+        {formatCurrency(item.preco_unitario * item.quantidade)}
+      </div>
+    </div>
   );
 }
 
@@ -126,6 +159,72 @@ export function EcommerceCartOrderSummary({
       <button onClick={onContinueShopping} style={{ width: '100%', marginTop: 8, background: 'transparent', border: '1.5px solid #e5e7eb', color: '#6b7280', borderRadius: 10, padding: '10px 0', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
         Continuar comprando
       </button>
+    </div>
+  );
+}
+
+export function EcommerceCartPage({
+  cart,
+  cartLoading,
+  cartTotal,
+  cupom,
+  cupomResult,
+  productMap,
+  styles: S,
+  onApplyCoupon,
+  onCheckout,
+  onContinueShopping,
+  onCouponChange,
+  onUpdateItem,
+}) {
+  const items = Array.isArray(cart?.itens) ? cart.itens : [];
+  const itemCount = items.length;
+
+  return (
+    <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 16px', minHeight: 200 }}>
+      <h2 style={{ margin: '0 0 20px', fontSize: 26, fontWeight: 800, color: '#1c1917' }}>
+        Carrinho ({itemCount} {itemCount === 1 ? 'item' : 'itens'})
+      </h2>
+
+      {cartLoading ? (
+        <div style={{ textAlign: 'center', color: '#64748b', padding: 40 }}>Carregando carrinho...</div>
+      ) : itemCount ? (
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20, alignItems: 'start' }}>
+          <div style={{ display: 'grid', gap: 12 }}>
+            {items.map((item) => (
+              <CartPageItem key={item.item_id} item={item} productMap={productMap} styles={S} onUpdateItem={onUpdateItem} />
+            ))}
+
+            <form onSubmit={onApplyCoupon} style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+              <input value={cupom} onChange={(event) => onCouponChange(event.target.value)} placeholder="Codigo de cupom" style={{ ...S.formInput, flex: 1 }} />
+              <button type="submit" style={{ background: '#f1f5f9', border: '1.5px solid #e5e7eb', color: '#374151', borderRadius: 10, padding: '0 18px', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
+                Aplicar
+              </button>
+            </form>
+
+            {cupomResult && (
+              <div style={{ fontSize: 13, color: '#065f46', background: '#ecfdf5', borderRadius: 8, padding: '8px 12px', fontWeight: 600 }}>
+                Cupom {cupomResult.codigo}: -{formatCurrency(cupomResult.desconto)}
+              </div>
+            )}
+          </div>
+
+          <EcommerceCartOrderSummary
+            cart={cart}
+            cartTotal={cartTotal}
+            styles={S}
+            onCheckout={onCheckout}
+            onContinueShopping={onContinueShopping}
+          />
+        </div>
+      ) : (
+        <div style={{ textAlign: 'center', padding: '48px 0', display: 'grid', gap: 12, justifyItems: 'center' }}>
+          <ShoppingCart size={52} color="#d6d3d1" />
+          <div style={{ fontSize: 18, fontWeight: 700, color: '#1a1a2e' }}>{'Seu carrinho est\u00e1 vazio'}</div>
+          <div style={{ fontSize: 14, color: '#9ca3af' }}>Explore nossa loja e adicione produtos!</div>
+          <button onClick={onContinueShopping} style={{ ...S.checkoutBig, width: 'auto', padding: '12px 28px' }}>Ver produtos</button>
+        </div>
+      )}
     </div>
   );
 }
