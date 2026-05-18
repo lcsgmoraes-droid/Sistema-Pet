@@ -168,6 +168,8 @@ entrar no cronograma sem se perderem.
 - [x] Trocar os campos de selecao do fluxo de consulta veterinaria por
       autocomplete digitavel: veterinario, sinais vitais, prognostico, exames,
       medicamentos, via, procedimentos e calculadora de dose.
+- [x] Adicionar checkbox na lista de consultas/prontuarios e permitir excluir
+      consultas selecionadas que ainda nao foram finalizadas/assinadas.
 - [ ] Ampliar a base padrao de procedimentos veterinarios e seus insumos.
 - [ ] Revisar padrao de horario do modulo veterinario e do sistema: usar
       Brasilia na exibicao e/ou UTC persistido de forma consistente, com foco em

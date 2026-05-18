@@ -68,9 +68,16 @@ export default function VetConsultas() {
 
       <ConsultasTableCard
         carregando={consultas.carregando}
+        consultasSelecionadas={consultas.consultasSelecionadas}
         consultas={consultas.consultasFiltradas}
         erro={consultas.erro}
+        erroExclusao={consultas.erroExclusao}
+        excluindoConsultas={consultas.excluindoConsultas}
         onAbrirConsulta={abrirConsulta}
+        onExcluirSelecionadas={consultas.excluirConsultasSelecionadas}
+        onSelecionarConsulta={consultas.selecionarConsulta}
+        onSelecionarTodas={consultas.selecionarTodasConsultas}
+        todasSelecionadas={consultas.todasSelecionadas}
       />
 
       <ConsultasPaginacao

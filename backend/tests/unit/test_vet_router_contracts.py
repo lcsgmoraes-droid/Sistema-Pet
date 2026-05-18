@@ -24,6 +24,7 @@ def test_vet_router_preserva_endpoints_movidos():
     assert ("/vet/internacoes/procedimentos-agenda", "GET") in routes
     assert ("/vet/consultas", "GET") in routes
     assert ("/vet/consultas", "POST") in routes
+    assert ("/vet/consultas/{consulta_id}", "DELETE") in routes
     assert ("/vet/consultas/{consulta_id}/timeline", "GET") in routes
     assert ("/vet/consultas/{consulta_id}/prescricoes", "GET") in routes
     assert ("/vet/prescricoes", "POST") in routes

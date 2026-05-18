@@ -3,8 +3,9 @@ import hashlib
 from datetime import date, datetime
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import func
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from .auth.dependencies import get_current_user_and_tenant
@@ -197,6 +198,64 @@ def obter_consulta(
     payload = _consulta_to_dict(c)
     payload["retorno_agendado"] = _retorno_agendado_consulta(db, c, tenant_id)
     return payload
+
+
+@router.delete("/consultas/{consulta_id}", status_code=204)
+def remover_consulta(
+    consulta_id: int,
+    db: Session = Depends(get_session),
+    current=Depends(get_current_user_and_tenant),
+):
+    _, tenant_id = _get_tenant(current)
+    consulta = _consulta_or_404(db, consulta_id, tenant_id)
+
+    if consulta.status == "finalizada" or consulta.finalizado_em or consulta.hash_prontuario:
+        raise HTTPException(
+            status_code=409,
+            detail="Consulta finalizada ou assinada nao pode ser excluida.",
+        )
+
+    agendamentos_vinculados = db.query(AgendamentoVet).filter(
+        AgendamentoVet.tenant_id == tenant_id,
+        AgendamentoVet.consulta_id == consulta.id,
+    ).all()
+    for agendamento in agendamentos_vinculados:
+        agendamento.consulta_id = None
+        if agendamento.status in {"em_atendimento", "finalizado"}:
+            agendamento.status = "agendado"
+        _sincronizar_marcos_agendamento(agendamento)
+
+    db.query(AgendamentoVet).filter(
+        AgendamentoVet.tenant_id == tenant_id,
+        AgendamentoVet.consulta_origem_id == consulta.id,
+    ).update({AgendamentoVet.consulta_origem_id: None}, synchronize_session=False)
+
+    db.query(PesoRegistro).filter(
+        PesoRegistro.tenant_id == tenant_id,
+        PesoRegistro.consulta_id == consulta.id,
+    ).delete(synchronize_session=False)
+
+    db.query(VacinaRegistro).filter(
+        VacinaRegistro.tenant_id == tenant_id,
+        VacinaRegistro.consulta_id == consulta.id,
+    ).update({VacinaRegistro.consulta_id: None}, synchronize_session=False)
+
+    db.query(InternacaoVet).filter(
+        InternacaoVet.tenant_id == tenant_id,
+        InternacaoVet.consulta_id == consulta.id,
+    ).update({InternacaoVet.consulta_id: None}, synchronize_session=False)
+
+    try:
+        db.delete(consulta)
+        db.commit()
+    except IntegrityError:
+        db.rollback()
+        raise HTTPException(
+            status_code=409,
+            detail="Nao foi possivel excluir essa consulta porque existem registros vinculados.",
+        )
+
+    return Response(status_code=204)
 
 
 @router.get("/consultas/{consulta_id}/timeline")

@@ -30,6 +30,7 @@ export const vetApi = {
   obterTimelineConsulta: (id) => api.get(`${BASE}/consultas/${id}/timeline`),
   criarConsulta: (data) => api.post(`${BASE}/consultas`, data),
   atualizarConsulta: (id, data) => api.patch(`${BASE}/consultas/${id}`, data),
+  removerConsulta: (id) => api.delete(`${BASE}/consultas/${id}`),
   sincronizarRascunhoConsulta: (id, data) => api.put(`${BASE}/consultas/${id}/rascunho-itens`, data),
   finalizarConsulta: (id) => api.post(`${BASE}/consultas/${id}/finalizar`),
   validarAssinaturaConsulta: (id) => api.get(`${BASE}/consultas/${id}/assinatura`),

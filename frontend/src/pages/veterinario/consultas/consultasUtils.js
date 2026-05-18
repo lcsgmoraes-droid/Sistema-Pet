@@ -35,3 +35,43 @@ export function filtrarConsultas(consultas, busca) {
     (consulta.diagnostico ?? "").toLowerCase().includes(texto)
   ));
 }
+
+export function toggleConsultaSelecionada(selecionadas, consultaId) {
+  const id = Number(consultaId);
+  if (!Number.isFinite(id)) return selecionadas;
+
+  if (selecionadas.includes(id)) {
+    return selecionadas.filter((selecionadaId) => selecionadaId !== id);
+  }
+  return [...selecionadas, id];
+}
+
+export function idsConsultasVisiveis(consultas) {
+  return (consultas ?? [])
+    .map((consulta) => Number(consulta?.id))
+    .filter((id) => Number.isFinite(id));
+}
+
+export function toggleTodasConsultasSelecionadas(selecionadas, consultas) {
+  const idsVisiveis = idsConsultasVisiveis(consultas);
+  if (idsVisiveis.length === 0) return selecionadas;
+
+  const visiveisSet = new Set(idsVisiveis);
+  const todasVisiveisSelecionadas = idsVisiveis.every((id) => selecionadas.includes(id));
+
+  if (todasVisiveisSelecionadas) {
+    return selecionadas.filter((id) => !visiveisSet.has(id));
+  }
+
+  return Array.from(new Set([...selecionadas, ...idsVisiveis]));
+}
+
+export function removerConsultasSelecionadas(consultas, selecionadas) {
+  const selecionadasSet = new Set((selecionadas ?? []).map((id) => Number(id)));
+  return (consultas ?? []).filter((consulta) => !selecionadasSet.has(Number(consulta?.id)));
+}
+
+export function todasConsultasVisiveisSelecionadas(selecionadas, consultas) {
+  const idsVisiveis = idsConsultasVisiveis(consultas);
+  return idsVisiveis.length > 0 && idsVisiveis.every((id) => selecionadas.includes(id));
+}
