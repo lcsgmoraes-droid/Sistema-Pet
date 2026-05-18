@@ -120,6 +120,12 @@ export interface VetResumo {
   procedimentos_pendentes: VetProcedimentoAgenda[];
 }
 
+export interface VetAgendaFiltros {
+  data?: string;
+  data_inicio?: string;
+  data_fim?: string;
+}
+
 export async function obterResumoVet(data?: string): Promise<VetResumo> {
   const { data: response } = await api.get<VetResumo>("/app/vet/resumo", {
     params: data ? { data } : undefined,
@@ -127,9 +133,10 @@ export async function obterResumoVet(data?: string): Promise<VetResumo> {
   return response;
 }
 
-export async function listarAgendamentosVet(data?: string): Promise<VetAgendamento[]> {
+export async function listarAgendamentosVet(filtros?: string | VetAgendaFiltros): Promise<VetAgendamento[]> {
+  const params = typeof filtros === "string" ? { data: filtros } : filtros;
   const { data: response } = await api.get<VetAgendamento[]>("/app/vet/agendamentos", {
-    params: data ? { data } : undefined,
+    params,
   });
   return response;
 }

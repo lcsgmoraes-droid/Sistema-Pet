@@ -9,7 +9,12 @@ from sqlalchemy.orm import Session, joinedload
 from .auth.dependencies import get_current_user_and_tenant
 from .db import get_session
 from .models import Pet
-from .veterinario_core import _get_tenant, _normalizar_datetime_vet, _serializar_datetime_vet, _vet_now
+from .veterinario_core import (
+    _get_tenant,
+    _normalizar_datetime_local_brasilia,
+    _serializar_datetime_vet,
+    _vet_now,
+)
 from .veterinario_financeiro import _aplicar_baixa_estoque_itens, _as_float, _enriquecer_insumos_com_custos
 from .veterinario_internacao import (
     _build_payload_procedimento_agenda_internacao,
@@ -230,7 +235,7 @@ def criar_procedimento_agenda_internacao(
     if not medicamento:
         raise HTTPException(status_code=422, detail="Medicamento/procedimento e obrigatorio")
 
-    horario_agendado = _normalizar_datetime_vet(body.horario_agendado)
+    horario_agendado = _normalizar_datetime_local_brasilia(body.horario_agendado)
     if not horario_agendado:
         raise HTTPException(status_code=422, detail="Horario agendado e obrigatorio")
 
@@ -294,7 +299,7 @@ def concluir_procedimento_agenda_internacao(
     if not executado_por:
         raise HTTPException(status_code=422, detail="Campo 'executado_por' e obrigatorio")
 
-    horario_execucao = _normalizar_datetime_vet(body.horario_execucao)
+    horario_execucao = _normalizar_datetime_local_brasilia(body.horario_execucao)
     if not horario_execucao:
         raise HTTPException(status_code=422, detail="Campo 'horario_execucao' e obrigatorio")
 
@@ -546,7 +551,7 @@ def criar_internacao(
         user_id=user_id,
         tenant_id=tenant_id,
         motivo=_pack_motivo_baia(motivo, box),
-        data_entrada=_normalizar_datetime_vet(body.data_entrada) or _vet_now(),
+        data_entrada=_normalizar_datetime_local_brasilia(body.data_entrada) if body.data_entrada else _vet_now(),
         status="internado",
     )
     db.add(i)
@@ -644,8 +649,8 @@ def registrar_procedimento_internacao(
         if not body.horario_execucao:
             raise HTTPException(status_code=422, detail="Campo 'horario_execucao' é obrigatório para procedimento concluído")
 
-    horario_agendado = _normalizar_datetime_vet(body.horario_agendado)
-    horario_execucao = _normalizar_datetime_vet(body.horario_execucao)
+    horario_agendado = _normalizar_datetime_local_brasilia(body.horario_agendado)
+    horario_execucao = _normalizar_datetime_local_brasilia(body.horario_execucao)
     quantidade_prevista = _as_float(body.quantidade_prevista)
     quantidade_executada = _as_float(body.quantidade_executada)
     quantidade_desperdicio = _as_float(body.quantidade_desperdicio) or 0.0

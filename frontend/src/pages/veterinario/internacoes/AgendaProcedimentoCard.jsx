@@ -39,11 +39,11 @@ export default function AgendaProcedimentoCard({
         </p>
         <div className="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
           <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 border border-emerald-200 font-semibold">
-            Dose: {item.dose || "-"}
+            Dose indicada: {item.dose || "-"}
           </span>
           {(item.quantidade_prevista || item.unidade_quantidade) && (
             <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-700 border border-blue-200">
-              Previsto: {formatQuantity(item.quantidade_prevista, item.unidade_quantidade)}
+              Quantidade: {formatQuantity(item.quantidade_prevista, item.unidade_quantidade)}
             </span>
           )}
           <span className="px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">

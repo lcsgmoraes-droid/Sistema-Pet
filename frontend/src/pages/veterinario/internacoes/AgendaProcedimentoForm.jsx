@@ -1,10 +1,24 @@
+import { useNavigate } from "react-router-dom";
+
+import CatalogoClinicoAutocomplete from "../../../components/veterinario/CatalogoClinicoAutocomplete";
+
 const inputClass = "border border-gray-200 rounded-lg px-3 py-2 text-sm bg-white";
 const labelClass = "text-xs font-medium text-gray-600";
 
-function Campo({ label, children, className = "" }) {
+function Campo({ ajuda, label, children, className = "" }) {
   return (
     <label className={`flex flex-col gap-1 ${className}`}>
-      <span className={labelClass}>{label}</span>
+      <span className={labelClass}>
+        {label}
+        {ajuda ? (
+          <span
+            className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full bg-slate-100 text-[10px] text-slate-500"
+            title={ajuda}
+          >
+            ?
+          </span>
+        ) : null}
+      </span>
       {children}
     </label>
   );
@@ -31,16 +45,18 @@ export default function AgendaProcedimentoForm({
   onAdicionarProcedimentoAgenda,
   onAbrirInsumoRapido,
 }) {
-  function selecionarCatalogo(valor) {
-    if (!valor) return;
-    const [tipo, id] = valor.split(":");
+  const navigate = useNavigate();
+
+  function selecionarCatalogo(opcao) {
+    if (!opcao?.valor) return;
+    const [tipo, id] = opcao.valor.split(":");
 
     if (tipo === "med") {
       const medicamento = medicamentosCatalogo.find((item) => String(item.id) === String(id));
       if (!medicamento) return;
       setAgendaForm((prev) => ({
         ...prev,
-        medicamento: medicamento.nome || prev.medicamento,
+        medicamento: medicamento.nome || opcao.label || prev.medicamento,
         dose: prev.dose || doseReferenciaMedicamento(medicamento),
         via: prev.via || medicamento.via_administracao || "oral",
         unidade_quantidade: prev.unidade_quantidade || medicamento.forma_farmaceutica || "",
@@ -52,7 +68,7 @@ export default function AgendaProcedimentoForm({
     if (!procedimento) return;
     setAgendaForm((prev) => ({
       ...prev,
-      medicamento: procedimento.nome || prev.medicamento,
+      medicamento: procedimento.nome || opcao.label || prev.medicamento,
       dose: prev.dose || procedimento.descricao || "",
       unidade_quantidade: prev.unidade_quantidade || "un",
     }));
@@ -64,8 +80,8 @@ export default function AgendaProcedimentoForm({
         <div>
           <p className="text-sm font-semibold text-gray-700">Novo procedimento / lembrete</p>
           <p className="mt-1 text-xs text-gray-500">
-            Agende medicacoes e procedimentos previstos para o internado. Use quantidade para o que sera aplicado
-            ou baixado do estoque em cada execucao.
+            Agende medicacoes e procedimentos previstos para o internado. O campo principal e digitavel:
+            busque no catalogo ou mantenha um texto manual quando ainda nao houver cadastro.
           </p>
         </div>
         <button
@@ -103,44 +119,22 @@ export default function AgendaProcedimentoForm({
           />
         </Campo>
 
-        <Campo label="Buscar no catalogo">
-          <select
-            value=""
-            onChange={(event) => selecionarCatalogo(event.target.value)}
-            className={inputClass}
-          >
-            <option value="">Medicamento ou procedimento...</option>
-            {medicamentosCatalogo.length > 0 && (
-              <optgroup label="Medicamentos">
-                {medicamentosCatalogo.map((medicamento) => (
-                  <option key={`med-${medicamento.id}`} value={`med:${medicamento.id}`}>
-                    {medicamento.nome}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-            {procedimentosCatalogo.length > 0 && (
-              <optgroup label="Procedimentos">
-                {procedimentosCatalogo.map((procedimento) => (
-                  <option key={`proc-${procedimento.id}`} value={`proc:${procedimento.id}`}>
-                    {procedimento.nome}
-                  </option>
-                ))}
-              </optgroup>
-            )}
-          </select>
-        </Campo>
-
-        <Campo label="Medicamento/procedimento escolhido">
-          <input
-            type="text"
+        <div>
+          <CatalogoClinicoAutocomplete
             value={agendaForm.medicamento}
-            onChange={(event) => setAgendaForm((prev) => ({ ...prev, medicamento: event.target.value }))}
-            className={inputClass}
+            onTextChange={(medicamento) => setAgendaForm((prev) => ({ ...prev, medicamento }))}
+            onSelect={selecionarCatalogo}
+            onCreate={() => navigate("/veterinario/catalogo")}
+            medicamentos={medicamentosCatalogo}
+            procedimentos={procedimentosCatalogo}
+            placeholder="Digite medicamento, procedimento ou principio ativo..."
           />
-        </Campo>
+        </div>
 
-        <Campo label="Dose clinica por execucao">
+        <Campo
+          label="Dose indicada / orientacao clinica"
+          ajuda="Use este campo para a dose de bula ou a orientacao clinica, por exemplo: 12,5 mg/kg a cada 12h."
+        >
           <input
             type="text"
             value={agendaForm.dose}
@@ -149,7 +143,10 @@ export default function AgendaProcedimentoForm({
           />
         </Campo>
 
-        <Campo label="Quantidade a aplicar/baixar por execucao">
+        <Campo
+          label="Quantidade por aplicacao"
+          ajuda="Quantidade aplicada ou baixada do estoque a cada execucao, por exemplo: 1 comprimido ou 0,5 mL."
+        >
           <input
             type="number"
             min="0"
@@ -160,7 +157,7 @@ export default function AgendaProcedimentoForm({
           />
         </Campo>
 
-        <Campo label="Unidade da quantidade">
+        <Campo label="Unidade">
           <input
             type="text"
             value={agendaForm.unidade_quantidade}
