@@ -444,7 +444,7 @@ def buscar_produto_barcode(
     """
     Busca produto pelo código de barras (EAN/GTIN).
     Tenta `codigo_barras` e depois `gtin_ean`.
-    Retorna apenas produtos ativos do tenant.
+    Retorna apenas produtos ativos, vendaveis e disponiveis para o app.
     """
     tenant_id = _activate_user_tenant_context(current_user)
     barcode = (barcode or "").strip()
@@ -472,7 +472,11 @@ def buscar_produto_barcode(
         db.query(Produto)
         .filter(
             Produto.tenant_id == tenant_id,
-            Produto.situacao == True,
+            Produto.ativo == True,
+            Produto.situacao.is_not(False),
+            Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
+            Produto.is_sellable == True,
+            Produto.anunciar_app == True,
             or_(*filtros_codigo),
         )
         .order_by(Produto.is_parent.asc(), Produto.id.asc())
