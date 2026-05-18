@@ -184,7 +184,7 @@ Maiores arquivos mapeados em 2026-05-04:
 | Linhas | Arquivo | Prioridade |
 | --- | --- | --- |
 | 4844 | `backend/app/produtos_routes.py` | Critico |
-| 2249 | `frontend/src/components/EntradaXML.jsx` | Critico |
+| 2248 | `frontend/src/components/EntradaXML.jsx` | Critico |
 | 4064 | `backend/app/estoque_routes.py` | Critico |
 | 1980 | `frontend/src/components/VendasFinanceiro.jsx` | Critico |
 | 3411 | `backend/app/notas_entrada_routes.py` | Critico |
@@ -592,7 +592,7 @@ Para cada dominio sensivel:
 
 | Arquivo | Linhas aprox. | Risco |
 | --- | ---: | --- |
-| `frontend/src/components/EntradaXML.jsx` | 2249 | Muito alto |
+| `frontend/src/components/EntradaXML.jsx` | 2248 | Muito alto |
 | `frontend/src/components/VendasFinanceiro.jsx` | 1980 | Alto |
 | `frontend/src/components/PedidosCompra.jsx` | 3225 | Alto |
 | `frontend/src/pages/ecommerce/EcommerceMVP.jsx` | 2229 | Alto |
@@ -926,7 +926,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-18: `EntradaXmlDetalhesModal` extraiu o card de item para `EntradaXmlDetalhesItemCard`, reduzindo o modal de 957 para 464 linhas e padronizando acoes internas claras com `ActionButton`/`IconActionButton` por funcao.
 - 2026-05-18: `EntradaXmlDetalhesModal` extraiu o rodape/rateio para `EntradaXmlDetalhesFooter`, reduzindo o modal de 464 para 357 linhas e padronizando acoes de rateio/processamento/exclusao com `ActionButton` por funcao.
 - 2026-05-18: `EntradaXmlDetalhesModal` extraiu o painel de conferencia para `EntradaXmlDetalhesConferenciaPanel`, reduzindo o modal de 357 para 266 linhas e padronizando as acoes de conferencia, tratativas, pendencia e devolucao com `ActionButton` por funcao. Proximo passo: avaliar PR/smoke ou seguir com pequenas limpezas de cabecalho/listagem do modal.
-- 2026-05-18: `EntradaXML` extraiu helpers puros de XML, packs, conferencia, custo, relatorio e divergencias para `entradaXmlUtils`, reduzindo o arquivo principal de 2743 para 2249 linhas com build validado. Proximo passo: extrair carregamento/acoes SEFAZ ou exportadores de relatorio.
+- 2026-05-18: `EntradaXML` extraiu helpers puros de XML, packs, conferencia, custo, relatorio e divergencias para `entradaXmlUtils`, reduzindo o arquivo principal de 2743 para 2248 linhas com build validado. Proximo passo: extrair carregamento/acoes SEFAZ ou exportadores de relatorio.
 - 2026-05-18: `EcommerceMVP` iniciou a quebra do storefront extraindo utilitarios de carrinho convidado, endereco, midia, estoque, banners e mensagens de erro para `ecommerceMvpUtils`, reduzindo a pagina de 2816 para 2542 linhas e usando `formatMoneyBRL` como base de moeda.
 - 2026-05-18: `EcommerceMVP` extraiu o card de produto da vitrine para `EcommerceCatalogProductCard`, substituindo icones soltos por `lucide-react`, mantendo acoes de desejo/carrinho/aviso e reduzindo a pagina principal de 2542 para 2483 linhas.
 - 2026-05-18: `EcommerceMVP` extraiu resumo, metricas e filtros da vitrine para `EcommerceCatalogControls`, preservando a composicao com sidebar e usando icones `lucide-react` para busca, atualizar e limpar filtros; a pagina principal caiu de 2483 para 2394 linhas. Proximo passo: separar a sidebar/resumo do carrinho da vitrine.
