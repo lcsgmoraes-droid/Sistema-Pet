@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import api from '../api';
 import { getAccessToken } from '../auth/tokenStorage';
 import { toast } from 'react-hot-toast';
-import { formatBRL, formatMoneyBRL } from '../utils/formatters';
+import { formatMoneyBRL } from '../utils/formatters';
 import EntradaXmlCriarProdutoModal from './entrada-xml/EntradaXmlCriarProdutoModal';
 import EntradaXmlDetalhesModal from './entrada-xml/EntradaXmlDetalhesModal';
 import EntradaXmlHistoricoPrecosModal from './entrada-xml/EntradaXmlHistoricoPrecosModal';
@@ -15,28 +15,21 @@ import EntradaXmlRevisaoPrecosModal from './entrada-xml/EntradaXmlRevisaoPrecosM
 import EntradaXmlResultadoLoteModal from './entrada-xml/EntradaXmlResultadoLoteModal';
 import EntradaXmlSefazPanels from './entrada-xml/EntradaXmlSefazPanels';
 import EntradaXmlVisualizacaoNotaModal from './entrada-xml/EntradaXmlVisualizacaoNotaModal';
+import useEntradaXmlRevisaoPrecos from './entrada-xml/useEntradaXmlRevisaoPrecos';
 import useEntradaXmlSefaz from './entrada-xml/useEntradaXmlSefaz';
 import useEntradaXmlUpload from './entrada-xml/useEntradaXmlUpload';
 import {
-  exportarRelatorioCustosMaioresCSV as exportarRelatorioCustosMaioresCSVArquivo,
-  exportarRelatorioCustosMaioresPDF as exportarRelatorioCustosMaioresPDFArquivo,
-} from './entrada-xml/entradaXmlRelatorioCustos';
-import {
   ACAO_CONFERENCIA_OPCOES,
-  BASE_CALCULO_MARGEM_OPCOES,
   CONFERENCIA_STATUS_META,
   aplicarMultiplicadorPackAoItem,
-  aplicarOverridesPackNoPreview,
   calcularConferenciaItem,
   calcularResumoConferencia,
   detectarDivergencias,
   formatarOpcaoProduto,
   formatarValorFiscal,
   montarConferenciaState,
-  normalizarProdutoPreview,
   normalizarNumeroConferencia,
   obterConfiguracaoPackItem,
-  obterCustoBasePreviewItem,
   obterCustoAquisicaoItem,
   obterDraftConferenciaItem,
 } from './entrada-xml/entradaXmlUtils';
@@ -66,17 +59,6 @@ const EntradaXML = () => {
   const [historicoPrecos, setHistoricoPrecos] = useState([]);
   const [produtoHistorico, setProdutoHistorico] = useState(null);
   const [carregandoHistorico, setCarregandoHistorico] = useState(false);
-  
-  // Estados para revisao de precos
-  const [mostrarRevisaoPrecos, setMostrarRevisaoPrecos] = useState(false);
-  const [previewProcessamento, setPreviewProcessamento] = useState(null);
-  const [custosAjustados, setCustosAjustados] = useState({});
-  const [inputsRevisaoCustos, setInputsRevisaoCustos] = useState({});
-  const [precosAjustados, setPrecosAjustados] = useState({});
-  const [inputsRevisaoPrecos, setInputsRevisaoPrecos] = useState({});
-  const [filtroCusto, setFiltroCusto] = useState('todos'); // 'todos', 'aumentou', 'diminuiu', 'igual'
-  const [gerandoRelatorioCustos, setGerandoRelatorioCustos] = useState(false);
-  const [baseCalculoMargem, setBaseCalculoMargem] = useState('nf');
   
   // Estados para rateio (APENAS informativo - estoque e UNIFICADO)
   const [tipoRateio, setTipoRateio] = useState('loja'); // 'online', 'loja', 'parcial'
@@ -327,7 +309,7 @@ const EntradaXML = () => {
   };
 
   useEffect(() => {
-    console.log('🔄 [EntradaXML] Componente montado, iniciando carregamento...');
+    console.log('?? [EntradaXML] Componente montado, iniciando carregamento...');
     carregarDados();
   }, []);
 
@@ -357,25 +339,25 @@ const EntradaXML = () => {
   }, [searchParams, setSearchParams]);
 
   const carregarDados = async () => {
-    console.log('📊 [EntradaXML] Carregando dados...');
+    console.log('?? [EntradaXML] Carregando dados...');
     try {
       const token = getAccessToken();
-      console.log('🔑 [EntradaXML] Token obtido:', token ? 'SIM' : 'NAO');
+      console.log('?? [EntradaXML] Token obtido:', token ? 'SIM' : 'NAO');
       const headers = { Authorization: `Bearer ${token}` };
 
-      console.log('🌐 [EntradaXML] Fazendo requisicoes para:', {
+      console.log('?? [EntradaXML] Fazendo requisicoes para:', {
         notasEntrada: `/notas-entrada/`
       });
 
       const notasRes = await api.get(`/notas-entrada/`, { headers });
 
-      console.log('✅ [EntradaXML] Dados carregados:', {
+      console.log('? [EntradaXML] Dados carregados:', {
         notasEntrada: notasRes.data?.length || 0
       });
 
       setNotasEntrada(notasRes.data);
     } catch (error) {
-      console.error('❌ [EntradaXML] ERRO ao carregar dados:');
+      console.error('? [EntradaXML] ERRO ao carregar dados:');
       console.error('  - Mensagem:', error.message);
       console.error('  - Response:', error.response?.data);
       console.error('  - Status:', error.response?.status);
@@ -530,6 +512,44 @@ const EntradaXML = () => {
     toast,
   });
 
+  const {
+    atualizarCustoSistema,
+    atualizarMargem,
+    atualizarPrecoVenda,
+    baseCalculoMargem,
+    baseCalculoMargemOpcoes,
+    calcularPrecoVenda,
+    carregarPreviewProcessamento,
+    confirmarProcessamento,
+    exportarRelatorioCustosMaioresCSV,
+    exportarRelatorioCustosMaioresPDF,
+    filtroCusto,
+    gerandoRelatorioCustos,
+    inputsRevisaoCustos,
+    inputsRevisaoPrecos,
+    mostrarRevisaoPrecos,
+    normalizarCamposRevisaoCustos,
+    normalizarCamposRevisaoPrecos,
+    obterResumoCustoItem,
+    precosAjustados,
+    previewProcessamento,
+    processarNota,
+    setBaseCalculoMargem,
+    setFiltroCusto,
+    voltarParaVisualizacao,
+  } = useEntradaXmlRevisaoPrecos({
+    api,
+    carregarDados,
+    multiplicadoresPack,
+    notaSelecionada,
+    salvarConferenciaAtual,
+    setLoading,
+    setMostrarDetalhes,
+    setMostrarVisualizacao,
+    setNotaSelecionada,
+    toast,
+  });
+
   const abrirVisualizacao = async (notaId) => {
     try {
       const response = await api.get(`/notas-entrada/${notaId}`);
@@ -548,13 +568,13 @@ const EntradaXML = () => {
         `/notas-entrada/${notaId}/itens/${itemId}/vincular?produto_id=${Number.parseInt(produtoId)}`
       );
       
-      toast.success('✅ Produto vinculado com sucesso!');
+      toast.success('? Produto vinculado com sucesso!');
       
       // Recarregar detalhes
       const response = await api.get(`/notas-entrada/${notaId}`);
       aplicarNotaSelecionada(response.data);
     } catch (error) {
-      console.error('❌ Erro ao vincular produto:', error);
+      console.error('? Erro ao vincular produto:', error);
       toast.error(error.response?.data?.detail || 'Erro ao vincular produto');
     }
   };
@@ -575,7 +595,7 @@ const EntradaXML = () => {
       const response = await api.get(`/notas-entrada/${notaId}`);
       aplicarNotaSelecionada(response.data);
     } catch (error) {
-      console.error('❌ Erro ao salvar tipo de rateio:', error);
+      console.error('? Erro ao salvar tipo de rateio:', error);
       toast.error(error.response?.data?.detail || 'Erro ao salvar tipo de rateio');
     }
   };
@@ -586,7 +606,7 @@ const EntradaXML = () => {
         quantidade_online: Number.parseFloat(quantidadeOnline) || 0  // Permitir 0
       });
       
-      toast.success('📊 Quantidade online configurada!');
+      toast.success('?? Quantidade online configurada!');
       
       // Mostrar totais da nota
       const totais = response.data.nota_totais;
@@ -615,495 +635,10 @@ const EntradaXML = () => {
         [itemId]: Number.parseFloat(quantidadeOnline) || 0
       }));
     } catch (error) {
-      console.error('❌ Erro ao salvar quantidade online:', error);
+      console.error('? Erro ao salvar quantidade online:', error);
       toast.error(error.response?.data?.detail || 'Erro ao salvar');
     }
   };
-
-  const processarNota = async (notaId) => {
-    try {
-      if (notaSelecionada?.id === notaId) {
-        const conferenciaSalva = await salvarConferenciaAtual({ silencioso: true });
-        if (!conferenciaSalva) {
-          return;
-        }
-      }
-
-      const response = await api.get(
-        `/notas-entrada/${notaId}/preview-processamento`
-      );
-
-      const previewComOverrides = aplicarOverridesPackNoPreview(response.data, multiplicadoresPack);
-
-      setBaseCalculoMargem('nf');
-      setPreviewProcessamento(previewComOverrides);
-      setMostrarRevisaoPrecos(true);
-      
-                      // FECHAR o modal de detalhes quando abrir o de revisão
-      setMostrarDetalhes(false);
-      
-      // Inicializar precos ajustados com valores atuais (adaptar para nova estrutura)
-      const custosIniciais = {};
-      const inputsCustosIniciais = {};
-      const precosIniciais = {};
-      const inputsIniciais = {};
-      previewComOverrides.itens.forEach(item => {
-        const itemId = item.item_id ?? item.id;
-        const custoBase = obterCustoBasePreviewItem(item);
-        const custoExistente = Number(custosAjustados[itemId] ?? custosAjustados[String(itemId)]);
-        const custoInicial = Number.isFinite(custoExistente) && custoExistente > 0
-          ? custoExistente
-          : custoBase;
-
-        custosIniciais[itemId] = custoInicial;
-        inputsCustosIniciais[itemId] = formatBRL(custoInicial);
-
-        if (item.produto_vinculado) {
-          const margemProjetada = Number(
-            item.produto_vinculado.margem_projetada_custo_novo ??
-            calcularMargem(item.produto_vinculado.preco_venda_atual, custoInicial)
-          );
-          precosIniciais[item.produto_vinculado.produto_id] = {
-            preco_venda: item.produto_vinculado.preco_venda_atual,
-            margem: margemProjetada
-          };
-          inputsIniciais[item.produto_vinculado.produto_id] = {
-            preco_venda: formatBRL(item.produto_vinculado.preco_venda_atual),
-            margem: formatBRL(margemProjetada),
-          };
-        }
-      });
-      setCustosAjustados(custosIniciais);
-      setInputsRevisaoCustos(inputsCustosIniciais);
-      setPrecosAjustados(precosIniciais);
-      setInputsRevisaoPrecos(inputsIniciais);
-      
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao carregar preview');
-    }
-  };
-
-  // Alias para melhor semântica
-  const carregarPreviewProcessamento = processarNota;
-
-  const confirmarProcessamento = async () => {
-    setLoading(true);
-    try {
-      // Atualizar precos se houver alterações (adaptar para nova estrutura)
-      const precosParaAtualizar = [];
-      Object.entries(precosAjustados).forEach(([produtoId, dados]) => {
-        const itemOriginal = previewProcessamento.itens.find(i => 
-          i.produto_vinculado && i.produto_vinculado.produto_id == produtoId
-        );
-        if (itemOriginal && itemOriginal.produto_vinculado && 
-            dados.preco_venda !== itemOriginal.produto_vinculado.preco_venda_atual) {
-          precosParaAtualizar.push({
-            produto_id: Number.parseInt(produtoId),
-            preco_venda: dados.preco_venda
-          });
-        }
-      });
-      
-      if (precosParaAtualizar.length > 0) {
-        await api.post(
-          `/notas-entrada/${previewProcessamento.nota_id}/atualizar-precos`,
-          precosParaAtualizar
-        );
-      }
-      
-      // Processar a nota (enviar overrides de multiplicador manual quando existirem)
-      const overridesNaoDefault = Object.fromEntries(
-        Object.entries(multiplicadoresPack).flatMap(([itemId, valor]) => {
-          const multiplicador = Number.parseInt(valor, 10);
-
-          if (!Number.isInteger(multiplicador) || multiplicador < 1 || multiplicador > 200) {
-            return [];
-          }
-
-          return [[itemId, multiplicador]];
-        })
-      );
-      const custosOverride = Object.fromEntries(
-        (previewProcessamento.itens || []).flatMap((item) => {
-          const itemId = item.item_id ?? item.id;
-          const custoBase = obterCustoBasePreviewItem(item);
-          const custoSistema = Number(custosAjustados[itemId] ?? custosAjustados[String(itemId)]);
-
-          if (!Number.isFinite(custoSistema) || custoSistema <= 0) {
-            return [];
-          }
-
-          if (Math.abs(custoSistema - custoBase) < 0.0001) {
-            return [];
-          }
-
-          return [[itemId, Number(custoSistema.toFixed(4))]];
-        })
-      );
-      const response = await api.post(
-        `/notas-entrada/${previewProcessamento.nota_id}/processar`,
-        {
-          ...(Object.keys(overridesNaoDefault).length > 0 ? { multiplicadores_override: overridesNaoDefault } : {}),
-          ...(Object.keys(custosOverride).length > 0 ? { custos_override: custosOverride } : {}),
-        }
-      );
-
-      toast.success(
-        `✅ Nota processada! ${response.data.itens_processados} itens lançados no estoque`,
-        { duration: 5000 }
-      );
-      
-      setMostrarDetalhes(false);
-      setNotaSelecionada(null);
-      setMostrarRevisaoPrecos(false);
-      setPreviewProcessamento(null);
-      setBaseCalculoMargem('nf');
-      setCustosAjustados({});
-      setInputsRevisaoCustos({});
-      setInputsRevisaoPrecos({});
-      carregarDados();
-    } catch (error) {
-      toast.error(error.response?.data?.detail || 'Erro ao processar nota');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const calcularPrecoVenda = (custoNovo, margemDesejada) => {
-    // Margem = (Preço Venda - Custo) / Preço Venda * 100
-    // Preço Venda = Custo / (1 - Margem/100)
-    if (margemDesejada >= 100) return custoNovo * 2;
-    return custoNovo / (1 - margemDesejada / 100);
-  };
-
-  const parseNumeroFlexivel = (valor) => {
-    if (typeof valor === 'number') {
-      return Number.isFinite(valor) ? valor : 0;
-    }
-
-    let texto = String(valor || '').trim();
-    if (!texto) return 0;
-
-    texto = texto.replaceAll(/\s+/g, '');
-    texto = texto.replaceAll(/[^\d,.-]/g, '');
-
-    if (texto.includes(',') && texto.includes('.')) {
-      if (texto.lastIndexOf(',') > texto.lastIndexOf('.')) {
-        texto = texto.replaceAll('.', '').replace(',', '.');
-      } else {
-        texto = texto.replaceAll(',', '');
-      }
-    } else if (texto.includes(',')) {
-      texto = texto.replaceAll('.', '').replace(',', '.');
-    }
-
-    const numero = Number.parseFloat(texto);
-    return Number.isFinite(numero) ? numero : 0;
-  };
-
-  const calcularMargem = (precoVenda, custoNovo) => {
-    // Margem = (Preço Venda - Custo) / Preço Venda * 100
-    if (precoVenda <= 0) return 0;
-    return ((precoVenda - custoNovo) / precoVenda) * 100;
-  };
-
-  const atualizarPrecoVenda = (produtoId, novoPrecoEntrada, custoNovo) => {
-    const novoPreco = parseNumeroFlexivel(novoPrecoEntrada);
-    const novaMargem = calcularMargem(novoPreco, custoNovo);
-    setPrecosAjustados(prev => ({
-      ...prev,
-      [produtoId]: {
-        preco_venda: novoPreco,
-        margem: novaMargem
-      }
-    }));
-    setInputsRevisaoPrecos(prev => ({
-      ...prev,
-      [produtoId]: {
-        preco_venda: String(novoPrecoEntrada ?? ''),
-        margem: formatBRL(novaMargem),
-      }
-    }));
-  };
-
-  const atualizarMargem = (produtoId, novaMargemEntrada, custoNovo) => {
-    const novaMargem = parseNumeroFlexivel(novaMargemEntrada);
-    const novoPreco = calcularPrecoVenda(custoNovo, novaMargem);
-    setPrecosAjustados(prev => ({
-      ...prev,
-      [produtoId]: {
-        preco_venda: novoPreco,
-        margem: novaMargem
-      }
-    }));
-    setInputsRevisaoPrecos(prev => ({
-      ...prev,
-      [produtoId]: {
-        preco_venda: formatBRL(novoPreco),
-        margem: String(novaMargemEntrada ?? ''),
-      }
-    }));
-  };
-
-  const normalizarCamposRevisaoPrecos = (produtoId) => {
-    const dados = precosAjustados[produtoId];
-    if (!dados) return;
-
-    setInputsRevisaoPrecos(prev => ({
-      ...prev,
-      [produtoId]: {
-        preco_venda: formatBRL(dados.preco_venda),
-        margem: formatBRL(dados.margem),
-      }
-    }));
-  };
-
-  const atualizarCustoSistema = (item, novoCustoEntrada) => {
-    const itemId = item?.item_id ?? item?.id;
-    const custoBase = obterCustoBasePreviewItem(item);
-    const custoDigitado = parseNumeroFlexivel(novoCustoEntrada);
-    const custoAplicado = custoDigitado > 0 ? custoDigitado : 0;
-
-    setCustosAjustados((prev) => ({
-      ...prev,
-      [itemId]: custoAplicado,
-    }));
-    setInputsRevisaoCustos((prev) => ({
-      ...prev,
-      [itemId]: String(novoCustoEntrada ?? ''),
-    }));
-
-    const produto = normalizarProdutoPreview(item);
-    if (!produto?.produto_id) {
-      return;
-    }
-
-    const precoAtual = Number(
-      precosAjustados[produto.produto_id]?.preco_venda ??
-      produto.preco_venda_atual ??
-      0
-    );
-    const baseMargem = obterInfoBaseCalculoMargem({
-      custoNF: custoBase,
-      custoSistema: custoAplicado || custoBase,
-    });
-    const margemAtualizada = calcularMargem(precoAtual, baseMargem.valor);
-
-    setPrecosAjustados((prev) => ({
-      ...prev,
-      [produto.produto_id]: {
-        preco_venda: precoAtual,
-        margem: margemAtualizada,
-      }
-    }));
-    setInputsRevisaoPrecos((prev) => ({
-      ...prev,
-      [produto.produto_id]: {
-        preco_venda: prev?.[produto.produto_id]?.preco_venda ?? formatBRL(precoAtual),
-        margem: formatBRL(margemAtualizada),
-      }
-    }));
-  };
-
-  const normalizarCamposRevisaoCustos = (item) => {
-    const itemId = item?.item_id ?? item?.id;
-    const custoBase = obterCustoBasePreviewItem(item);
-    const custoAtual = Number(custosAjustados[itemId] ?? custosAjustados[String(itemId)]);
-    const custoNormalizado = Number.isFinite(custoAtual) && custoAtual > 0 ? custoAtual : custoBase;
-
-    setCustosAjustados((prev) => ({
-      ...prev,
-      [itemId]: custoNormalizado,
-    }));
-    setInputsRevisaoCustos((prev) => ({
-      ...prev,
-      [itemId]: formatBRL(custoNormalizado),
-    }));
-
-    const produto = normalizarProdutoPreview(item);
-    if (!produto?.produto_id) {
-      return;
-    }
-
-    const precoAtual = Number(
-      precosAjustados[produto.produto_id]?.preco_venda ??
-      produto.preco_venda_atual ??
-      0
-    );
-    const baseMargem = obterInfoBaseCalculoMargem({
-      custoNF: custoBase,
-      custoSistema: custoNormalizado,
-    });
-    const margemAtualizada = calcularMargem(precoAtual, baseMargem.valor);
-    setPrecosAjustados((prev) => ({
-      ...prev,
-      [produto.produto_id]: {
-        preco_venda: precoAtual,
-        margem: margemAtualizada,
-      }
-    }));
-    setInputsRevisaoPrecos((prev) => ({
-      ...prev,
-      [produto.produto_id]: {
-        preco_venda: prev?.[produto.produto_id]?.preco_venda ?? formatBRL(precoAtual),
-        margem: formatBRL(margemAtualizada),
-      }
-    }));
-  };
-
-  const obterCustoSistemaItem = (item) => {
-    const itemId = item?.item_id ?? item?.id;
-    const overrideRaw = custosAjustados[itemId] ?? custosAjustados[String(itemId)];
-    const override = Number(overrideRaw);
-    if (Number.isFinite(override) && override > 0) {
-      return override;
-    }
-    return obterCustoBasePreviewItem(item);
-  };
-
-  const obterInfoBaseCalculoMargem = ({ custoNF = 0, custoSistema = 0 }) => {
-    const custoNFNormalizado = Number(custoNF || 0);
-    const custoSistemaNormalizado = Number(custoSistema || 0);
-
-    if (baseCalculoMargem === 'sistema') {
-      return {
-        value: 'sistema',
-        label: 'Custo no sistema',
-        valor: custoSistemaNormalizado > 0 ? custoSistemaNormalizado : custoNFNormalizado,
-        fallback: !(custoSistemaNormalizado > 0),
-        descricao: custoSistemaNormalizado > 0
-          ? 'Calculando sobre o custo informado no sistema.'
-          : 'Sem custo informado no sistema; usando o custo da NF.',
-      };
-    }
-
-    return {
-      value: 'nf',
-      label: 'Custo da NF',
-      valor: custoNFNormalizado,
-      fallback: false,
-      descricao: 'Calculando sobre o custo fiscal da NF.',
-    };
-  };
-
-  const obterResumoCustoItem = (item) => {
-    const produto = normalizarProdutoPreview(item);
-    const custoAnterior = Number(produto.custo_anterior || 0);
-    const custoNF = obterCustoBasePreviewItem(item);
-    const custoSistema = obterCustoSistemaItem(item);
-    const precoVendaAtual = Number(produto.preco_venda_atual || 0);
-    const baseMargem = obterInfoBaseCalculoMargem({ custoNF, custoSistema });
-    const variacaoCustoPercentual = custoAnterior > 0
-      ? Number((((custoSistema - custoAnterior) / custoAnterior) * 100).toFixed(2))
-      : 0;
-    const margemReferencia = Number(
-      produto.margem_atual ??
-      calcularMargem(precoVendaAtual, custoAnterior)
-    );
-    const margemProjetada = calcularMargem(precoVendaAtual, baseMargem.valor);
-
-    return {
-      produto,
-      custoAnterior,
-      custoNF,
-      custoSistema,
-      baseMargem,
-      custoManual: Math.abs(custoSistema - custoNF) > 0.0001,
-      variacaoCustoPercentual,
-      precoVendaAtual,
-      margemReferencia,
-      margemProjetada,
-    };
-  };
-
-  useEffect(() => {
-    if (!mostrarRevisaoPrecos || !previewProcessamento?.itens?.length) {
-      return;
-    }
-
-    setPrecosAjustados((prev) => {
-      let mudou = false;
-      const proximo = { ...prev };
-
-      previewProcessamento.itens.forEach((item) => {
-        const produto = normalizarProdutoPreview(item);
-        if (!produto?.produto_id) return;
-
-        const resumoCusto = obterResumoCustoItem(item);
-        const precoAtual = Number(
-          prev[produto.produto_id]?.preco_venda ??
-          produto.preco_venda_atual ??
-          0
-        );
-        const margemAtualizada = calcularMargem(precoAtual, resumoCusto.baseMargem.valor);
-        const atual = prev[produto.produto_id];
-
-        if (
-          !atual ||
-          Math.abs(Number(atual.preco_venda || 0) - precoAtual) > 0.0001 ||
-          Math.abs(Number(atual.margem || 0) - margemAtualizada) > 0.0001
-        ) {
-          proximo[produto.produto_id] = {
-            preco_venda: precoAtual,
-            margem: margemAtualizada,
-          };
-          mudou = true;
-        }
-      });
-
-      return mudou ? proximo : prev;
-    });
-
-    setInputsRevisaoPrecos((prev) => {
-      let mudou = false;
-      const proximo = { ...prev };
-
-      previewProcessamento.itens.forEach((item) => {
-        const produto = normalizarProdutoPreview(item);
-        if (!produto?.produto_id) return;
-
-        const resumoCusto = obterResumoCustoItem(item);
-        const precoAtual = Number(
-          precosAjustados[produto.produto_id]?.preco_venda ??
-          produto.preco_venda_atual ??
-          0
-        );
-        const margemAtualizada = calcularMargem(precoAtual, resumoCusto.baseMargem.valor);
-        const precoTextoAtual = prev?.[produto.produto_id]?.preco_venda ?? formatBRL(precoAtual);
-        const margemTextoAtual = formatBRL(margemAtualizada);
-
-        if (
-          !prev?.[produto.produto_id] ||
-          prev[produto.produto_id].preco_venda !== precoTextoAtual ||
-          prev[produto.produto_id].margem !== margemTextoAtual
-        ) {
-          proximo[produto.produto_id] = {
-            preco_venda: precoTextoAtual,
-            margem: margemTextoAtual,
-          };
-          mudou = true;
-        }
-      });
-
-      return mudou ? proximo : prev;
-    });
-  }, [baseCalculoMargem, mostrarRevisaoPrecos, previewProcessamento]);
-
-  const exportarRelatorioCustosMaioresCSV = () => exportarRelatorioCustosMaioresCSVArquivo({
-    api,
-    obterResumoCustoItem,
-    previewProcessamento,
-    setGerandoRelatorioCustos,
-    toast,
-  });
-
-  const exportarRelatorioCustosMaioresPDF = () => exportarRelatorioCustosMaioresPDFArquivo({
-    api,
-    obterResumoCustoItem,
-    previewProcessamento,
-    setGerandoRelatorioCustos,
-    toast,
-  });
 
   const excluirNota = async (notaId, numeroNota) => {
     if (!confirm(`Tem certeza que deseja excluir a nota ${numeroNota}?`)) {
@@ -1114,7 +649,7 @@ const EntradaXML = () => {
     try {
             await api.delete(`/notas-entrada/${notaId}`);
 
-      toast.success('🗑️ Nota excluída com sucesso!');
+      toast.success('??? Nota excluída com sucesso!');
       
       if (mostrarDetalhes) {
         setMostrarDetalhes(false);
@@ -1149,7 +684,7 @@ const EntradaXML = () => {
   };
 
   const reverterNota = async (notaId, numeroNota) => {
-    if (!confirm(`⚠️ Tem certeza que deseja REVERTER a entrada da nota ${numeroNota}?\n\nIsso ira:\n• Remover as quantidades do estoque\n• Excluir os lotes criados\n• Estornar as contas a pagar lançadas\n• Restaurar o status da nota para pendente`)) {
+    if (!confirm(`?? Tem certeza que deseja REVERTER a entrada da nota ${numeroNota}?\n\nIsso ira:\n• Remover as quantidades do estoque\n• Excluir os lotes criados\n• Estornar as contas a pagar lançadas\n• Restaurar o status da nota para pendente`)) {
       return;
     }
 
@@ -1161,7 +696,7 @@ const EntradaXML = () => {
       );
 
       toast.success(
-        `✅ Entrada revertida! ${response.data.itens_revertidos} produtos ajustados`,
+        `? Entrada revertida! ${response.data.itens_revertidos} produtos ajustados`,
         { duration: 5000 }
       );
       
@@ -1182,7 +717,7 @@ const EntradaXML = () => {
     try {
       await api.post(`/notas-entrada/${notaId}/itens/${itemId}/desvincular`);
       
-      toast.success('✅ Produto desvinculado!');
+      toast.success('? Produto desvinculado!');
       
       // Recarregar detalhes da nota
       const response = await api.get(`/notas-entrada/${notaId}`);
@@ -1221,7 +756,7 @@ const EntradaXML = () => {
       // Determinar qual SKU usar
       let skuParaUsar = response.data.sku_proposto || itemAjustado.codigo_produto || 'PROD-' + itemAjustado.id;
       
-      // Se o SKU ja existe, usar a primeira sugestao alternativa (a recomendada com ⭐)
+      // Se o SKU ja existe, usar a primeira sugestao alternativa (a recomendada com ?)
       if (response.data.ja_existe && response.data.sugestoes && response.data.sugestoes.length > 0) {
         const sugestaoRecomendada = response.data.sugestoes.find(s => s.padrao) || response.data.sugestoes[0];
         skuParaUsar = sugestaoRecomendada.sku;
@@ -1240,7 +775,7 @@ const EntradaXML = () => {
         estoque_maximo: 100
       });
       
-      console.log('✅ Formulário preenchido:', {
+      console.log('? Formulário preenchido:', {
         sku: skuParaUsar,
         nome: itemAjustado.descricao,
         preco_custo: custoBase
@@ -1286,7 +821,7 @@ const EntradaXML = () => {
       );
       
       toast.success(
-        response.data.message || `✅ Produto ${response.data.produto.codigo} criado e vinculado!`
+        response.data.message || `? Produto ${response.data.produto.codigo} criado e vinculado!`
       );
       
       // Fechar modal
@@ -1335,7 +870,7 @@ const EntradaXML = () => {
       let sucessos = 0;
       let erros = 0;
       
-      const loadingToast = toast.loading(`📦 Criando ${itensNaoVinculados.length} produtos...`);
+      const loadingToast = toast.loading(`?? Criando ${itensNaoVinculados.length} produtos...`);
       
       for (const item of itensNaoVinculados) {
         try {
@@ -1380,11 +915,11 @@ const EntradaXML = () => {
       toast.dismiss(loadingToast);
       
       if (sucessos > 0) {
-        toast.success(`✅ ${sucessos} produto(s) criado(s) com sucesso!`);
+        toast.success(`? ${sucessos} produto(s) criado(s) com sucesso!`);
       }
       
       if (erros > 0) {
-        toast.error(`❌ ${erros} erro(s) ao criar produtos`);
+        toast.error(`? ${erros} erro(s) ao criar produtos`);
       }
       
       // Recarregar dados
@@ -1616,7 +1151,7 @@ const EntradaXML = () => {
         gerandoRelatorioCustos={gerandoRelatorioCustos}
         baseCalculoMargem={baseCalculoMargem}
         setBaseCalculoMargem={setBaseCalculoMargem}
-        baseCalculoMargemOpcoes={BASE_CALCULO_MARGEM_OPCOES}
+        baseCalculoMargemOpcoes={baseCalculoMargemOpcoes}
         precosAjustados={precosAjustados}
         inputsRevisaoPrecos={inputsRevisaoPrecos}
         inputsRevisaoCustos={inputsRevisaoCustos}
@@ -1628,15 +1163,7 @@ const EntradaXML = () => {
         atualizarMargem={atualizarMargem}
         confirmarProcessamento={confirmarProcessamento}
         loading={loading}
-        onVoltar={() => {
-          setMostrarRevisaoPrecos(false);
-          setPreviewProcessamento(null);
-          setInputsRevisaoPrecos({});
-          setBaseCalculoMargem('nf');
-          if (notaSelecionada) {
-            setMostrarVisualizacao(true);
-          }
-        }}
+        onVoltar={voltarParaVisualizacao}
       />
       <EntradaXmlHistoricoPrecosModal
         aberto={mostrarHistoricoPrecos}
