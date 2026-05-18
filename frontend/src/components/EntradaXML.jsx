@@ -16,7 +16,9 @@ import EntradaXmlResultadoLoteModal from './entrada-xml/EntradaXmlResultadoLoteM
 import EntradaXmlSefazPanels from './entrada-xml/EntradaXmlSefazPanels';
 import EntradaXmlVisualizacaoNotaModal from './entrada-xml/EntradaXmlVisualizacaoNotaModal';
 import useEntradaXmlConferencia from './entrada-xml/useEntradaXmlConferencia';
+import useEntradaXmlHistoricoPrecos from './entrada-xml/useEntradaXmlHistoricoPrecos';
 import useEntradaXmlProdutos from './entrada-xml/useEntradaXmlProdutos';
+import useEntradaXmlRateio from './entrada-xml/useEntradaXmlRateio';
 import useEntradaXmlRevisaoPrecos from './entrada-xml/useEntradaXmlRevisaoPrecos';
 import useEntradaXmlSefaz from './entrada-xml/useEntradaXmlSefaz';
 import useEntradaXmlUpload from './entrada-xml/useEntradaXmlUpload';
@@ -41,19 +43,19 @@ const EntradaXML = () => {
   const [mostrarDetalhes, setMostrarDetalhes] = useState(false);
   const [mostrarVisualizacao, setMostrarVisualizacao] = useState(false);
   
-  // Estados para historico de precos
-  const [mostrarHistoricoPrecos, setMostrarHistoricoPrecos] = useState(false);
-  const [historicoPrecos, setHistoricoPrecos] = useState([]);
-  const [produtoHistorico, setProdutoHistorico] = useState(null);
-  const [carregandoHistorico, setCarregandoHistorico] = useState(false);
-  
-  // Estados para rateio (APENAS informativo - estoque e UNIFICADO)
-  const [tipoRateio, setTipoRateio] = useState('loja'); // 'online', 'loja', 'parcial'
-  const [quantidadesOnline, setQuantidadesOnline] = useState({}); // {item_id: quantidade_online}
-  const [multiplicadoresPack, setMultiplicadoresPack] = useState({}); // {item_id: multiplicador} para override manual
-
   // Filtro de status da tabela
   const [filtroStatus, setFiltroStatus] = useState('todos');
+
+  const {
+    multiplicadoresPack,
+    quantidadesOnline,
+    salvarQuantidadeOnlineItem: salvarQuantidadeOnlineItemRateio,
+    salvarTipoRateio: salvarTipoRateioRateio,
+    setMultiplicadoresPack,
+    setQuantidadesOnline,
+    setTipoRateio,
+    tipoRateio,
+  } = useEntradaXmlRateio({ api, toast });
 
 
   const sincronizarNotaNaLista = (dadosNota) => {
@@ -141,6 +143,15 @@ const EntradaXML = () => {
       toast.error(`Erro ao carregar dados: ${error.response?.data?.detail || error.message}`);
     }
   };
+
+  const {
+    buscarHistoricoPrecos,
+    carregandoHistorico,
+    fecharHistoricoPrecos,
+    historicoPrecos,
+    mostrarHistoricoPrecos,
+    produtoHistorico,
+  } = useEntradaXmlHistoricoPrecos({ api, toast });
 
   const {
     aplicarNotaSelecionada,
@@ -305,6 +316,14 @@ const EntradaXML = () => {
     toast,
   });
 
+  const salvarTipoRateio = (notaId, tipo) => (
+    salvarTipoRateioRateio(notaId, tipo, aplicarNotaSelecionada)
+  );
+
+  const salvarQuantidadeOnlineItem = (notaId, itemId, quantidadeOnline) => (
+    salvarQuantidadeOnlineItemRateio(notaId, itemId, quantidadeOnline, setNotaSelecionada)
+  );
+
   const abrirVisualizacao = async (notaId) => {
     try {
       const response = await api.get(`/notas-entrada/${notaId}`);
@@ -316,69 +335,6 @@ const EntradaXML = () => {
       toast.error('Erro ao carregar nota');
     }
   };
-
-
-
-  const salvarTipoRateio = async (notaId, tipo) => {
-    try {
-      await api.post(`/notas-entrada/${notaId}/rateio`, {
-        tipo_rateio: tipo
-      });
-
-      let descricaoTipo = 'Rateio Parcial';
-      if (tipo === 'online') descricaoTipo = '100% Online';
-      if (tipo === 'loja') descricaoTipo = '100% Loja Fisica';
-      toast.success(`Nota configurada: ${descricaoTipo}`);
-      
-      // Recarregar detalhes
-      const response = await api.get(`/notas-entrada/${notaId}`);
-      aplicarNotaSelecionada(response.data);
-    } catch (error) {
-      console.error('? Erro ao salvar tipo de rateio:', error);
-      toast.error(error.response?.data?.detail || 'Erro ao salvar tipo de rateio');
-    }
-  };
-
-  const salvarQuantidadeOnlineItem = async (notaId, itemId, quantidadeOnline) => {
-    try {
-      const response = await api.post(`/notas-entrada/${notaId}/itens/${itemId}/rateio`, {
-        quantidade_online: Number.parseFloat(quantidadeOnline) || 0  // Permitir 0
-      });
-      
-      toast.success('?? Quantidade online configurada!');
-      
-      // Mostrar totais da nota
-      const totais = response.data.nota_totais;
-      toast.success(
-        `Nota: ${totais.percentual_online.toFixed(1)}% Online (R$ ${totais.valor_online.toFixed(2)}) | ` +
-        `${totais.percentual_loja.toFixed(1)}% Loja (R$ ${totais.valor_loja.toFixed(2)})`
-      );
-      
-      // Atualizar apenas o item especifico e os totais da nota, sem recarregar tudo
-      setNotaSelecionada(prev => ({
-        ...prev,
-        percentual_online: totais.percentual_online,
-        percentual_loja: totais.percentual_loja,
-        valor_online: totais.valor_online,
-        valor_loja: totais.valor_loja,
-        itens: prev.itens.map(i => 
-          i.id === itemId 
-            ? { ...i, quantidade_online: Number.parseFloat(quantidadeOnline) || 0 }
-            : i
-        )
-      }));
-      
-      // Sincronizar estado local com valor salvo
-      setQuantidadesOnline(prev => ({
-        ...prev,
-        [itemId]: Number.parseFloat(quantidadeOnline) || 0
-      }));
-    } catch (error) {
-      console.error('? Erro ao salvar quantidade online:', error);
-      toast.error(error.response?.data?.detail || 'Erro ao salvar');
-    }
-  };
-
   const excluirNota = async (notaId, numeroNota) => {
     if (!confirm(`Tem certeza que deseja excluir a nota ${numeroNota}?`)) {
       return;
@@ -400,25 +356,6 @@ const EntradaXML = () => {
       toast.error(error.response?.data?.detail || 'Erro ao excluir nota');
     } finally {
       setLoading(false);
-    }
-  };
-
-  const buscarHistoricoPrecos = async (produtoId, produtoNome) => {
-    setCarregandoHistorico(true);
-    setProdutoHistorico({ id: produtoId, nome: produtoNome });
-    setMostrarHistoricoPrecos(true);
-    
-    try {
-            const response = await api.get(
-        `/produtos/${produtoId}/historico-precos`
-      );
-      
-      setHistoricoPrecos(response.data);
-    } catch (error) {
-      toast.error('Erro ao carregar historico de precos');
-      setMostrarHistoricoPrecos(false);
-    } finally {
-      setCarregandoHistorico(false);
     }
   };
 
@@ -667,11 +604,7 @@ const EntradaXML = () => {
         carregandoHistorico={carregandoHistorico}
         historicoPrecos={historicoPrecos}
         produtoHistorico={produtoHistorico}
-        onClose={() => {
-          setMostrarHistoricoPrecos(false);
-          setHistoricoPrecos([]);
-          setProdutoHistorico(null);
-        }}
+        onClose={fecharHistoricoPrecos}
       />
 
       <EntradaXmlResultadoLoteModal

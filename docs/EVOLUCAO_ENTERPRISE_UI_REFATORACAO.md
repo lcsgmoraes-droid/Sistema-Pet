@@ -184,7 +184,7 @@ Maiores arquivos mapeados em 2026-05-04:
 | Linhas | Arquivo | Prioridade |
 | --- | --- | --- |
 | 4844 | `backend/app/produtos_routes.py` | Critico |
-| 687 | `frontend/src/components/EntradaXML.jsx` | Critico |
+| 620 | `frontend/src/components/EntradaXML.jsx` | Atencao |
 | 4064 | `backend/app/estoque_routes.py` | Critico |
 | 1980 | `frontend/src/components/VendasFinanceiro.jsx` | Critico |
 | 3411 | `backend/app/notas_entrada_routes.py` | Critico |
@@ -592,7 +592,7 @@ Para cada dominio sensivel:
 
 | Arquivo | Linhas aprox. | Risco |
 | --- | ---: | --- |
-| `frontend/src/components/EntradaXML.jsx` | 687 | Muito alto |
+| `frontend/src/components/EntradaXML.jsx` | 620 | Medio/alto |
 | `frontend/src/components/VendasFinanceiro.jsx` | 1980 | Alto |
 | `frontend/src/components/PedidosCompra.jsx` | 3225 | Alto |
 | `frontend/src/pages/ecommerce/EcommerceMVP.jsx` | 2229 | Alto |
@@ -933,6 +933,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-18: `EntradaXML` extraiu preview/processamento, calculos de margem/custo, confirmacao e exportacao da revisao de precos para `useEntradaXmlRevisaoPrecos`, reduzindo o arquivo principal de 1663 para 1190 linhas com build validado. Proximo passo: extrair busca/vinculacao/criacao de produtos da NF.
 - 2026-05-18: `EntradaXML` extraiu busca com debounce, vinculacao/desvinculacao e criacao individual/em lote de produtos da NF para `useEntradaXmlProdutos`, reduzindo o arquivo principal de 1190 para 859 linhas com build validado. Proximo passo: avaliar rateio/conferencia residual ou PR/smoke.
 - 2026-05-18: `EntradaXML` extraiu estado, salvamento/desfazer, rascunho de devolucao, pendencia de fornecedor e itens derivados de conferencia para `useEntradaXmlConferencia`, reduzindo o arquivo principal de 859 para 687 linhas com build validado. Proximo passo: avaliar rateio/historico ou preparar smoke do PR.
+- 2026-05-18: `EntradaXML` extraiu estado/carregamento do historico de precos para `useEntradaXmlHistoricoPrecos` e estado/acoes de rateio e pack para `useEntradaXmlRateio`, reduzindo o arquivo principal de 687 para 620 linhas com build validado. Proximo passo: smoke visual do PR ou escolher o proximo arquivo grande.
 - 2026-05-18: `EcommerceMVP` iniciou a quebra do storefront extraindo utilitarios de carrinho convidado, endereco, midia, estoque, banners e mensagens de erro para `ecommerceMvpUtils`, reduzindo a pagina de 2816 para 2542 linhas e usando `formatMoneyBRL` como base de moeda.
 - 2026-05-18: `EcommerceMVP` extraiu o card de produto da vitrine para `EcommerceCatalogProductCard`, substituindo icones soltos por `lucide-react`, mantendo acoes de desejo/carrinho/aviso e reduzindo a pagina principal de 2542 para 2483 linhas.
 - 2026-05-18: `EcommerceMVP` extraiu resumo, metricas e filtros da vitrine para `EcommerceCatalogControls`, preservando a composicao com sidebar e usando icones `lucide-react` para busca, atualizar e limpar filtros; a pagina principal caiu de 2483 para 2394 linhas. Proximo passo: separar a sidebar/resumo do carrinho da vitrine.
@@ -2088,7 +2089,7 @@ Atualizacao de 2026-04-24: iniciada a trilha de hardening para liberar o app e o
 
 - [ ] `frontend/src/pages/ecommerce/EcommerceMVP.jsx`: separar vitrine, carrinho, conta, checkout, pedidos, analytics e estilos; utilitarios de carrinho/endereco/midia/estoque ja foram extraidos para `ecommerceMvpUtils`, card de produto da vitrine movido para `EcommerceCatalogProductCard`, resumo/filtros movidos para `EcommerceCatalogControls`, sidebar/tela do carrinho movidos para `EcommerceCartPanels` e modal de detalhe movido para `EcommerceProductDetailModal`
 - [ ] `app-mobile/src/screens/entregador/DetalheEntregaScreen.tsx`: separar GPS, acoes de parada, recebimento, venda/modal e finalizacao de rota
-- [ ] `frontend/src/components/EntradaXML.jsx`: continuar quebra do fluxo de importacao/validacao/conferencia para reduzir bundle e risco de regressao; ja foram extraidos modais operacionais, cabecalho, metricas, paineis SEFAZ, listagem principal, modal de criacao de produto, modal de detalhes/conferencia, card de item da NF, rodape/rateio da conferencia, painel de resumo/conferencia, helpers puros em `entradaXmlUtils`, exportadores de relatorio em `entradaXmlRelatorioCustos`, estado/acoes SEFAZ em `useEntradaXmlSefaz`, upload/lote em `useEntradaXmlUpload`, revisao de precos/processamento em `useEntradaXmlRevisaoPrecos`, busca/vinculacao/criacao de produtos em `useEntradaXmlProdutos` e conferencia em `useEntradaXmlConferencia`
+- [ ] `frontend/src/components/EntradaXML.jsx`: continuar quebra do fluxo de importacao/validacao/conferencia para reduzir bundle e risco de regressao; ja foram extraidos modais operacionais, cabecalho, metricas, paineis SEFAZ, listagem principal, modal de criacao de produto, modal de detalhes/conferencia, card de item da NF, rodape/rateio da conferencia, painel de resumo/conferencia, helpers puros em `entradaXmlUtils`, exportadores de relatorio em `entradaXmlRelatorioCustos`, estado/acoes SEFAZ em `useEntradaXmlSefaz`, upload/lote em `useEntradaXmlUpload`, revisao de precos/processamento em `useEntradaXmlRevisaoPrecos`, busca/vinculacao/criacao de produtos em `useEntradaXmlProdutos`, conferencia em `useEntradaXmlConferencia`, historico de precos em `useEntradaXmlHistoricoPrecos` e rateio/pack em `useEntradaXmlRateio`
 - [ ] `backend/app/routes/ecommerce_checkout.py`: extrair servico de checkout e preparar orquestracao `Pedido -> Venda`
 - [ ] `backend/app/routes/ecommerce_cart.py`: revisar reserva de estoque com protecao contra corrida em checkout simultaneo
 - [ ] `backend/app/api/endpoints/rotas_entrega.py`: separar sincronizacao de venda/rota/parada em servico de dominio testavel
