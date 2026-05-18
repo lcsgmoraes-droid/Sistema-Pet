@@ -9,6 +9,7 @@ import { EcommerceCartPage, EcommerceCartSidebar } from './EcommerceCartPanels';
 import EcommerceCheckoutPage from './EcommerceCheckoutPage';
 import EcommerceOrdersPage from './EcommerceOrdersPage';
 import EcommerceProductDetailModal from './EcommerceProductDetailModal';
+import EcommerceStorefrontShell from './EcommerceStorefrontShell';
 import {
   trackPageView,
   trackViewItem,
@@ -30,7 +31,6 @@ import {
   buildIdempotencyKey,
   extractApiErrorMessage,
   fetchAddressByCep,
-  formatCurrency,
   getGuestCart,
   getProductImages,
   getStoredAddressFields,
@@ -39,7 +39,6 @@ import {
   isProductOutOfStock,
   normalizeProductPayload,
   recalculateGuestCart,
-  resolveMediaUrl,
   resolveProductPrice,
   resolveProductStock,
   resolveValidityPromotionLimit,
@@ -1391,153 +1390,30 @@ export default function EcommerceMVP() {
   };
 
   return (
-    <div style={S.page}>
-      {/* TOPBAR */}
-      <div style={S.topbar}>
-        <div style={S.topbarInner}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-            <span>{cart?.itens?.length > 0 ? `${cart.itens.length} item(ns) no carrinho` : 'Carrinho vazio'}</span>
-          </div>
-          <span>{cart?.itens?.length > 0 ? `${formatCurrency(cartTotal)} →` : 'Frete grátis acima de R$ 199'}</span>
-        </div>
-      </div>
-
-      {/* HEADER */}
-      <div style={S.header}>
-        <div style={S.headerInner}>
-          {/* Logo */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={S.logo} onClick={() => setView('loja')}>
-              <span style={{ fontSize: 42, lineHeight: 1, flexShrink: 0 }}>🐾</span>
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: '#1c1917', lineHeight: 1.1 }}>{storeDisplayName}</div>
-                {(tenantContext?.cidade || tenantContext?.uf) && (
-                  <div style={{ fontSize: 11, color: '#a8a29e', fontWeight: 400, marginTop: 1 }}>
-                    📍 {tenantContext?.cidade || ''}{tenantContext?.uf ? ` - ${tenantContext.uf}` : ''}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Search (desktop) */}
-          <div style={{ flex: 1, maxWidth: 440, display: isMobile ? 'none' : 'flex' }} className="eco-search-wrap">
-            <div style={{ position: 'relative', width: '100%' }}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar produtos para o seu pet..."
-                style={{ ...S.formInput, paddingLeft: 36, borderRadius: 24, fontSize: 13 }}
-              />
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div style={S.headerActions}>
-            {/* Wishlist */}
-            <button onClick={() => setView('conta')} style={S.headerWishBtn} title={`Lista de desejos${wishlist.length > 0 ? ` (${wishlist.length})` : ''}`}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill={wishlist.length > 0 ? '#f97316' : 'none'} stroke={wishlist.length > 0 ? '#f97316' : 'currentColor'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-            </button>
-            {/* Login/Conta */}
-            {customerDisplayName ? (
-              <button onClick={() => setView('conta')} style={S.avatarBtn}>
-                <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#f97316', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800 }}>{customerDisplayName.charAt(0).toUpperCase()}</span>
-                {customerDisplayName.split(' ')[0]}
-              </button>
-            ) : (
-              <button onClick={() => setView('conta')} style={{ ...S.loginBtn, gap: 6, padding: isMobile ? '7px 10px' : '7px 16px' }}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                {!isMobile && 'Entrar'}
-              </button>
-            )}
-            {/* Carrinho */}
-            <button onClick={() => setView('carrinho')} style={{ ...S.cartBtn, padding: isMobile ? '0 12px' : '0 18px' }}>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-              {isMobile ? (cart?.itens?.length > 0 ? `(${cart.itens.length})` : '') : `Carrinho${cart?.itens?.length > 0 ? ` (${cart.itens.length})` : ''}`}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* BANNER (só na aba loja) */}
-      {view === 'loja' && (
-        <div style={{ padding: '16px 20px 0', boxSizing: 'border-box' }}>
-          <div style={{ ...S.bannerWrap, borderRadius: isMobile ? 12 : 16, maxWidth: 1280, margin: '0 auto', height: isMobile ? 180 : 260 }}>
-            {activeBanners.map((b, i) => (
-              <div key={i} style={{ position: 'absolute', inset: 0, opacity: bannerSlide === i ? 1 : 0, transition: 'opacity 0.8s ease', pointerEvents: bannerSlide === i ? 'auto' : 'none' }}>
-                {b.type === 'image' ? (
-                  <img src={resolveMediaUrl(b.url)} alt={`Banner ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                ) : (
-                  <div style={{ background: b.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 48px', gap: 24, height: '100%' }}>
-                    <span style={{ fontSize: 72, flexShrink: 0, filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.25))' }}>{b.emoji}</span>
-                    <div>
-                      <div style={{ color: '#fff', fontWeight: 800, fontSize: 34, lineHeight: 1.2, textShadow: '0 2px 12px rgba(0,0,0,0.2)' }}>{b.title}</div>
-                      <div style={{ color: 'rgba(255,255,255,0.88)', fontSize: 16, marginTop: 8 }}>{b.sub}</div>
-                      <button onClick={() => setView('loja')} style={{ marginTop: 16, background: '#fff', color: '#f97316', border: 'none', borderRadius: 24, padding: '10px 24px', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
-                        Ver produtos →
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-            <div style={S.bannerDots}>
-              {activeBanners.map((_, i) => (
-                <button key={i} onClick={() => setBannerSlide(i)} style={S.bannerDot(bannerSlide === i)} />
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* BARRA APP */}
-      {view === 'loja' && !isMobile && (
-        <div style={S.appBar}>
-          <div style={S.appBarInner}>
-            <span style={{ background: '#16a34a', borderRadius: 8, width: 28, height: 28, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-            </span>
-            Baixe nosso <strong>APP</strong> para notificações de pedidos, promoções e aviso de reposição de estoque.
-          </div>
-        </div>
-      )}
-
-      {/* NAV TABS */}
-      <div style={{ ...S.navWrap, overflowX: isMobile ? 'auto' : 'visible' }}>
-        <div style={S.navInner}>
-          {[
-            { id: 'loja', label: 'Loja', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
-            { id: 'carrinho', label: cart?.itens?.length ? `Carrinho (${cart.itens.length})` : 'Carrinho', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg> },
-            { id: 'pedidos', label: 'Pedidos', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg> },
-            { id: 'conta', label: 'Conta', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
-          ].map(({ id, label, icon }) => (
-            <button key={id} onClick={() => setView(id)} style={{ ...S.navTab(view === id), display: 'flex', alignItems: 'center', gap: 5 }}>
-              {icon}
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-
-
-      {!tenantRef && (
-        <div style={{ background: '#fef2f2', color: '#991b1b', padding: '10px 20px', fontSize: 13, borderBottom: '1px solid #fecaca' }}>
-          ⚠️ Use a URL no formato: /slug-da-loja
-        </div>
-      )}
-
-      {/* ALERTAS */}
-      {(error || success) && (
-        <div style={{ padding: '0 20px' }}>
-          <div style={{ maxWidth: 1280, margin: '0 auto' }}>
-            {error && <div style={S.alertError}>⚠️ {error}</div>}
-            {success && <div style={S.alertSuccess}>✓ {success}</div>}
-          </div>
-        </div>
-      )}
+    <EcommerceStorefrontShell
+      activeBanners={activeBanners}
+      bannerSlide={bannerSlide}
+      cart={cart}
+      cartTotal={cartTotal}
+      customerDisplayName={customerDisplayName}
+      error={error}
+      isMobile={isMobile}
+      notifyMeModal={notifyMeModal}
+      search={search}
+      storeDisplayName={storeDisplayName}
+      styles={S}
+      success={success}
+      tenantContext={tenantContext}
+      tenantRef={tenantRef}
+      view={view}
+      wishlistCount={wishlist.length}
+      onBannerSlideChange={setBannerSlide}
+      onNotifyMeClose={() => setNotifyMeModal({ open: false, product: null, email: '', loading: false })}
+      onNotifyMeEmailChange={(email) => setNotifyMeModal((prev) => ({ ...prev, email }))}
+      onNotifyMeSubmit={submitNotifyMe}
+      onSearchChange={setSearch}
+      onViewChange={setView}
+    >
 
       {view === 'loja' && (
         <>
@@ -1748,70 +1624,6 @@ export default function EcommerceMVP() {
         />
       )}
 
-      {/* ── Modal Avise-me ── */}
-      {notifyMeModal.open && (
-        <div
-          role="dialog"
-          aria-modal="true"
-          style={{ position: 'fixed', inset: 0, background: 'rgba(15,23,42,0.6)', zIndex: 9999, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
-          onClick={() => setNotifyMeModal({ open: false, product: null, email: '', loading: false })}
-        >
-          <div
-            style={{ background: '#fff', borderRadius: 18, padding: 28, maxWidth: 380, width: '100%', boxShadow: '0 24px 80px rgba(0,0,0,0.25)', border: '1px solid #e5e7eb' }}
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div style={{ fontSize: 32, marginBottom: 8 }}>🔔</div>
-            <h3 style={{ margin: '0 0 8px', fontSize: 18, fontWeight: 800, color: '#1c1917' }}>Avise-me quando chegar</h3>
-            <p style={{ margin: '0 0 18px', fontSize: 14, color: '#6b7280' }}>
-              <strong>{notifyMeModal.product?.nome}</strong> está sem estoque agora. Informe seu email e te avisamos quando voltar!
-            </p>
-            <form onSubmit={submitNotifyMe} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-              <input type="email" required placeholder="seu@email.com" value={notifyMeModal.email} autoFocus onChange={(e) => setNotifyMeModal((prev) => ({ ...prev, email: e.target.value }))} style={S.formInput} />
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button type="button" onClick={() => setNotifyMeModal({ open: false, product: null, email: '', loading: false })} style={{ flex: 1, padding: '10px 0', borderRadius: 10, border: '1.5px solid #e5e7eb', background: '#fff', color: '#374151', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>Cancelar</button>
-                <button type="submit" disabled={notifyMeModal.loading} style={{ flex: 2, padding: '10px 0', borderRadius: 10, border: 'none', background: 'linear-gradient(135deg, #f97316 0%, #fb923c 100%)', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: notifyMeModal.loading ? 0.7 : 1 }}>
-                  {notifyMeModal.loading ? 'Registrando…' : '🔔 Me avise!'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* ── Footer ── */}
-      <footer style={S.footer}>
-        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 28 }}>
-          <div>
-            <div style={{ fontWeight: 800, fontSize: 20, color: '#fff', marginBottom: 8 }}>
-              🐾 {tenantContext?.nome_fantasia || tenantContext?.nome || 'Pet Store'}
-            </div>
-            <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.65)', lineHeight: 1.6 }}>
-              Produtos de qualidade para o seu pet com carinho e dedicação. Compre online com facilidade!
-            </div>
-          </div>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.85)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 }}>Navegação</div>
-            {[{ l: '🛍️ Loja', v: 'loja' }, { l: '🛒 Carrinho', v: 'carrinho' }, { l: '📦 Pedidos', v: 'pedidos' }, { l: '👤 Conta', v: 'conta' }].map(({ l, v }) => (
-              <button key={v} onClick={() => setView(v)} style={{ display: 'block', background: 'none', border: 'none', color: 'rgba(255,255,255,0.65)', fontSize: 13, cursor: 'pointer', padding: '3px 0', textAlign: 'left' }}>{l}</button>
-            ))}
-          </div>
-          <div>
-            <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.85)', marginBottom: 10, textTransform: 'uppercase', letterSpacing: 1 }}>Contato</div>
-            {tenantContext?.whatsapp && (
-              <a href={`https://wa.me/55${tenantContext.whatsapp.replace(/\D/g, '')}`} target="_blank" rel="noreferrer" style={{ display: 'block', color: 'rgba(255,255,255,0.65)', fontSize: 13, textDecoration: 'none', marginBottom: 4 }}>📱 WhatsApp</a>
-            )}
-            {tenantContext?.email && (
-              <a href={`mailto:${tenantContext.email}`} style={{ display: 'block', color: 'rgba(255,255,255,0.65)', fontSize: 13, textDecoration: 'none' }}>✉️ {tenantContext.email}</a>
-            )}
-            {tenantContext?.cidade && (
-              <div style={{ color: 'rgba(255,255,255,0.5)', fontSize: 12, marginTop: 8 }}>📍 {tenantContext.cidade}{tenantContext.uf ? `, ${tenantContext.uf}` : ''}</div>
-            )}
-          </div>
-        </div>
-        <div style={{ maxWidth: 1100, margin: '20px auto 0', paddingTop: 16, borderTop: '1px solid rgba(255,255,255,0.1)', fontSize: 12, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>
-          © {new Date().getFullYear()} {tenantContext?.nome_fantasia || tenantContext?.nome || 'Pet Store'}. Todos os direitos reservados.
-        </div>
-      </footer>
-    </div>
+    </EcommerceStorefrontShell>
   );
 }
