@@ -24,18 +24,34 @@ export default function VetCalculadoraScreen() {
   const [dose, setDose] = useState("");
   const [medicamentos, setMedicamentos] = useState<VetMedicamento[]>([]);
   const [selecionado, setSelecionado] = useState<VetMedicamento | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     let mounted = true;
+    const termo = busca.trim();
+
+    if (selecionado && termo === selecionado.nome) {
+      setMedicamentos([]);
+      setLoading(false);
+      return () => {
+        mounted = false;
+      };
+    }
+
+    if (termo.length < 2) {
+      setMedicamentos([]);
+      setLoading(false);
+      return () => {
+        mounted = false;
+      };
+    }
+
     async function carregar() {
+      setLoading(true);
       try {
-        const data = await listarMedicamentosVet(busca || undefined);
+        const data = await listarMedicamentosVet(termo);
         if (!mounted) return;
         setMedicamentos(data);
-        if (!selecionado && data[0]) {
-          selecionar(data[0]);
-        }
       } catch {
         Alert.alert("Erro", "Nao foi possivel carregar medicamentos.");
       } finally {
@@ -47,10 +63,12 @@ export default function VetCalculadoraScreen() {
       mounted = false;
       clearTimeout(timeout);
     };
-  }, [busca]);
+  }, [busca, selecionado]);
 
   function selecionar(medicamento: VetMedicamento) {
     setSelecionado(medicamento);
+    setBusca(medicamento.nome);
+    setMedicamentos([]);
     const doseMin = medicamento.dose_min_mgkg;
     const doseMax = medicamento.dose_max_mgkg;
     if (doseMin && doseMax) {
@@ -86,16 +104,30 @@ export default function VetCalculadoraScreen() {
         <Text style={styles.label}>Buscar medicamento</Text>
         <TextInput
           value={busca}
-          onChangeText={setBusca}
-          placeholder="Digite para buscar"
+          onChangeText={(texto) => {
+            setBusca(texto);
+            if (selecionado && texto !== selecionado.nome) {
+              setSelecionado(null);
+            }
+          }}
+          placeholder="Digite ao menos 2 letras"
           style={styles.input}
         />
+        {!!selecionado && (
+          <View style={styles.selectedMed}>
+            <Text style={styles.selectedTitle}>Selecionado</Text>
+            <Text style={styles.selectedName}>{selecionado.nome}</Text>
+            {!!selecionado.posologia_referencia && (
+              <Text style={styles.selectedHint}>{selecionado.posologia_referencia}</Text>
+            )}
+          </View>
+        )}
 
         {loading ? (
           <ActivityIndicator color={CORES.primario} />
-        ) : (
+        ) : busca.trim().length >= 2 && medicamentos.length > 0 ? (
           <View style={styles.list}>
-            {medicamentos.slice(0, 8).map((item) => (
+            {medicamentos.slice(0, 6).map((item) => (
               <TouchableOpacity
                 key={item.id}
                 style={[styles.medItem, selecionado?.id === item.id && styles.medItemActive]}
@@ -107,8 +139,11 @@ export default function VetCalculadoraScreen() {
                 </Text>
               </TouchableOpacity>
             ))}
-            {!medicamentos.length && <Text style={styles.empty}>Nenhum medicamento encontrado.</Text>}
           </View>
+        ) : busca.trim().length >= 2 && !selecionado ? (
+          <Text style={styles.empty}>Nenhum medicamento encontrado.</Text>
+        ) : (
+          <Text style={styles.helper}>Digite para localizar um medicamento do catalogo.</Text>
         )}
 
         <Text style={styles.label}>Dose escolhida (mg/kg)</Text>
@@ -167,6 +202,18 @@ const styles = StyleSheet.create({
   medName: { color: CORES.texto, fontWeight: "800" },
   medHint: { color: CORES.textoSecundario, fontSize: FONTE.pequena, marginTop: 2 },
   empty: { color: CORES.textoSecundario, textAlign: "center", padding: ESPACO.md },
+  helper: { color: CORES.textoSecundario, fontSize: FONTE.pequena, marginTop: ESPACO.sm },
+  selectedMed: {
+    borderWidth: 1,
+    borderColor: "#bae6fd",
+    backgroundColor: "#f0f9ff",
+    borderRadius: RAIO.sm,
+    padding: ESPACO.sm,
+    marginTop: ESPACO.sm,
+  },
+  selectedTitle: { color: "#0369a1", fontSize: FONTE.pequena, fontWeight: "800", textTransform: "uppercase" },
+  selectedName: { color: CORES.texto, fontWeight: "800", marginTop: 2 },
+  selectedHint: { color: CORES.textoSecundario, fontSize: FONTE.pequena, marginTop: 2 },
   result: {
     backgroundColor: "#ecfeff",
     borderRadius: RAIO.md,

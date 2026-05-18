@@ -17,9 +17,14 @@ from app.models import Cliente, User
 from app.routes.ecommerce_auth import _activate_user_tenant_context, _get_current_ecommerce_user
 from app.veterinario_agendamentos import _agendamento_to_dict
 from app.veterinario_core import _serializar_datetime_vet, _vet_now
-from app.veterinario_internacao import _serializar_procedimento_agenda_internacao, _split_motivo_baia
+from app.veterinario_internacao import (
+    _separar_evolucoes_e_procedimentos,
+    _serializar_procedimento_agenda_internacao,
+    _split_motivo_baia,
+)
 from app.veterinario_models import (
     AgendamentoVet,
+    EvolucaoInternacao,
     InternacaoProcedimentoAgenda,
     InternacaoVet,
     MedicamentoCatalogo,
@@ -174,6 +179,63 @@ def listar_internacoes_vet_mobile(
     veterinario, tenant_id = _get_mobile_veterinario_or_403(db, current_user)
     internacoes = _query_internacoes(db, tenant_id, veterinario.id).all()
     return [_internacao_mobile_dict(item) for item in internacoes]
+
+
+@router.get("/internacoes/{internacao_id}")
+def obter_internacao_vet_mobile(
+    internacao_id: int,
+    db: Session = Depends(get_session),
+    current_user: User = Depends(_get_current_ecommerce_user),
+):
+    veterinario, tenant_id = _get_mobile_veterinario_or_403(db, current_user)
+    internacao = (
+        _query_internacoes(db, tenant_id, veterinario.id)
+        .filter(InternacaoVet.id == internacao_id)
+        .first()
+    )
+    if not internacao:
+        raise HTTPException(status_code=404, detail="Internacao nao encontrada")
+
+    evolucoes = (
+        db.query(EvolucaoInternacao)
+        .filter(
+            EvolucaoInternacao.tenant_id == tenant_id,
+            EvolucaoInternacao.internacao_id == internacao_id,
+        )
+        .order_by(EvolucaoInternacao.data_hora.desc())
+        .all()
+    )
+    evolucoes_formatadas, procedimentos_realizados = _separar_evolucoes_e_procedimentos(evolucoes)
+
+    procedimentos_agenda = (
+        db.query(InternacaoProcedimentoAgenda)
+        .options(
+            joinedload(InternacaoProcedimentoAgenda.internacao),
+            joinedload(InternacaoProcedimentoAgenda.pet),
+        )
+        .filter(
+            InternacaoProcedimentoAgenda.tenant_id == tenant_id,
+            InternacaoProcedimentoAgenda.internacao_id == internacao_id,
+        )
+        .order_by(InternacaoProcedimentoAgenda.horario_agendado.asc())
+        .all()
+    )
+
+    pet = internacao.pet
+    tutor = getattr(pet, "cliente", None) if pet else None
+    payload = _internacao_mobile_dict(internacao)
+    payload.update({
+        "tutor_id": getattr(tutor, "id", None),
+        "tutor_nome": getattr(tutor, "nome", None),
+        "pet_raca": getattr(pet, "raca", None) if pet else None,
+        "evolucoes": evolucoes_formatadas,
+        "procedimentos_realizados": procedimentos_realizados,
+        "procedimentos_agenda": [
+            _serializar_procedimento_agenda_internacao(item)
+            for item in procedimentos_agenda
+        ],
+    })
+    return payload
 
 
 @router.get("/procedimentos-agenda")
