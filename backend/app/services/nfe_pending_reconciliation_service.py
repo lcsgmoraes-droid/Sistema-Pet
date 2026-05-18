@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 from app.nfe_cache_models import BlingNotaFiscalCache
 from app.utils.correlation import current_correlation_id, operation_correlation_context
 from app.utils.logger import logger
+from app.utils.tenant_safe_sql import execute_tenant_safe_all
 
 
 _NFE_STATUSS_PENDENTES = ("pendente", "emitida danfe")
@@ -85,19 +86,21 @@ def _executar_sync_incremental(
 
 
 def listar_tenants_com_nfes_pendentes_recentes(db: Session, *, dias: int) -> list:
-    return [
-        tenant_id
-        for (tenant_id,) in (
-            db.query(BlingNotaFiscalCache.tenant_id)
-            .filter(
-                BlingNotaFiscalCache.data_emissao.isnot(None),
-                BlingNotaFiscalCache.data_emissao >= _limite_data_recentes(dias),
-                func.lower(BlingNotaFiscalCache.status).in_(_NFE_STATUSS_PENDENTES),
-            )
-            .distinct()
-            .all()
-        )
-    ]
+    rows = execute_tenant_safe_all(
+        db,
+        """
+        SELECT DISTINCT tenant_id
+        FROM bling_notas_fiscais_cache
+        WHERE data_emissao IS NOT NULL
+          AND data_emissao >= :data_limite
+          AND lower(status) IN ('pendente', 'emitida danfe')
+        """,
+        {"data_limite": _limite_data_recentes(dias)},
+        require_tenant=False,
+        allow_global=True,
+        global_reason="Job global de reconciliacao de NFs pendentes precisa descobrir tenants com notas recentes.",
+    )
+    return [tenant_id for (tenant_id,) in rows]
 
 
 def reconciliar_nfes_pendentes_recentes(

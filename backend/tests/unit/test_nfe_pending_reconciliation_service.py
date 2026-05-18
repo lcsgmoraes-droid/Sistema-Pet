@@ -77,3 +77,23 @@ def test_executar_reconciliacao_automatica_nfes_pendentes_inclui_correlacao(monk
 
     assert resultado["correlation_id"].startswith("job.nfe-pending-reconciliation-")
     assert get_request_id() is None
+
+
+def test_listar_tenants_com_nfes_pendentes_recentes_usa_sql_global_autorizado(monkeypatch):
+    chamadas = []
+
+    def fake_execute(db, sql, params=None, **kwargs):
+        chamadas.append({"db": db, "sql": sql, "params": params or {}, **kwargs})
+        return [("tenant-a",), ("tenant-b",)]
+
+    monkeypatch.setattr(service, "execute_tenant_safe_all", fake_execute)
+
+    db = object()
+    resultado = service.listar_tenants_com_nfes_pendentes_recentes(db, dias=5)
+
+    assert resultado == ["tenant-a", "tenant-b"]
+    assert chamadas[0]["db"] is db
+    assert "bling_notas_fiscais_cache" in chamadas[0]["sql"]
+    assert chamadas[0]["require_tenant"] is False
+    assert chamadas[0]["allow_global"] is True
+    assert chamadas[0]["global_reason"]

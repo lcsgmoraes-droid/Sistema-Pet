@@ -1,4 +1,6 @@
+import app.services.bling_sync_service as bling_sync_service
 from app.services.bling_sync_service import (
+    BlingSyncService,
     _cooldown_rate_limit_segundos,
     _mensagem_rate_limit_bling,
     _secondary_jobs_defer_reason,
@@ -63,3 +65,33 @@ def test_secondary_jobs_do_not_defer_without_pressure():
     )
 
     assert reason is None
+
+
+def test_get_pending_queue_snapshot_uses_global_safe_sql(monkeypatch):
+    chamadas = []
+
+    def fake_execute(db, sql, params=None, **kwargs):
+        chamadas.append({"db": db, "sql": sql, "params": params or {}, **kwargs})
+        return {
+            "total_pending": 7,
+            "ready_pending": 2,
+            "forced_pending": 1,
+            "processing": 3,
+        }
+
+    monkeypatch.setattr(bling_sync_service, "execute_tenant_safe_one", fake_execute, raising=False)
+
+    db = object()
+    resultado = BlingSyncService.get_pending_queue_snapshot(db=db)
+
+    assert resultado == {
+        "total_pending": 7,
+        "ready_pending": 2,
+        "forced_pending": 1,
+        "processing": 3,
+    }
+    assert chamadas[0]["db"] is db
+    assert "produto_bling_sync_queue" in chamadas[0]["sql"]
+    assert chamadas[0]["require_tenant"] is False
+    assert chamadas[0]["allow_global"] is True
+    assert chamadas[0]["global_reason"]

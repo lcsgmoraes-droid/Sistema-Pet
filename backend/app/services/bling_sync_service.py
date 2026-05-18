@@ -22,6 +22,7 @@ from app.db import SessionLocal
 from app.models import Tenant
 from app.produtos_models import Produto, ProdutoBlingSync, ProdutoBlingSyncQueue
 from app.tenancy.context import clear_current_tenant, set_current_tenant
+from app.utils.tenant_safe_sql import execute_tenant_safe_one
 
 logger = logging.getLogger(__name__)
 
@@ -403,44 +404,30 @@ class BlingSyncService:
         db_session = db or SessionLocal()
         now = utc_now()
         try:
-            total_pending = int(
-                db_session.query(func.count(ProdutoBlingSyncQueue.id))
-                .filter(
-                    ProdutoBlingSyncQueue.status.in_(["pendente", "erro", "processando"]),
-                )
-                .scalar()
-                or 0
+            row = execute_tenant_safe_one(
+                db_session,
+                """
+                SELECT
+                    COALESCE(SUM(CASE WHEN status IN ('pendente', 'erro', 'processando') THEN 1 ELSE 0 END), 0) AS total_pending,
+                    COALESCE(SUM(CASE WHEN status IN ('pendente', 'erro')
+                        AND proxima_tentativa_em IS NOT NULL
+                        AND proxima_tentativa_em <= :now THEN 1 ELSE 0 END), 0) AS ready_pending,
+                    COALESCE(SUM(CASE WHEN status IN ('pendente', 'erro', 'processando')
+                        AND forcar_sync IS TRUE THEN 1 ELSE 0 END), 0) AS forced_pending,
+                    COALESCE(SUM(CASE WHEN status = 'processando' THEN 1 ELSE 0 END), 0) AS processing
+                FROM produto_bling_sync_queue
+                """,
+                {"now": now},
+                require_tenant=False,
+                allow_global=True,
+                global_reason="Guard global do worker Bling precisa medir backlog de sincronizacao de estoque.",
             )
-            ready_pending = int(
-                db_session.query(func.count(ProdutoBlingSyncQueue.id))
-                .filter(
-                    ProdutoBlingSyncQueue.status.in_(["pendente", "erro"]),
-                    ProdutoBlingSyncQueue.proxima_tentativa_em.isnot(None),
-                    ProdutoBlingSyncQueue.proxima_tentativa_em <= now,
-                )
-                .scalar()
-                or 0
-            )
-            forced_pending = int(
-                db_session.query(func.count(ProdutoBlingSyncQueue.id))
-                .filter(
-                    ProdutoBlingSyncQueue.status.in_(["pendente", "erro", "processando"]),
-                    ProdutoBlingSyncQueue.forcar_sync.is_(True),
-                )
-                .scalar()
-                or 0
-            )
-            processing = int(
-                db_session.query(func.count(ProdutoBlingSyncQueue.id))
-                .filter(ProdutoBlingSyncQueue.status == "processando")
-                .scalar()
-                or 0
-            )
+            mapping = row if isinstance(row, dict) else getattr(row, "_mapping", {})
             return {
-                "total_pending": total_pending,
-                "ready_pending": ready_pending,
-                "forced_pending": forced_pending,
-                "processing": processing,
+                "total_pending": int(mapping.get("total_pending", 0) or 0),
+                "ready_pending": int(mapping.get("ready_pending", 0) or 0),
+                "forced_pending": int(mapping.get("forced_pending", 0) or 0),
+                "processing": int(mapping.get("processing", 0) or 0),
             }
         finally:
             if own_session:
