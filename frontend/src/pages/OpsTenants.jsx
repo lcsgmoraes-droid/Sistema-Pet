@@ -3,8 +3,10 @@ import {
   FiAlertTriangle,
   FiBox,
   FiCheckCircle,
+  FiCreditCard,
   FiDatabase,
   FiDownloadCloud,
+  FiHardDrive,
   FiRefreshCw,
   FiSearch,
   FiShield,
@@ -12,6 +14,12 @@ import {
 } from "react-icons/fi";
 
 import api from "../api";
+import {
+  OPS_TENANT_TABS,
+  buildOpsTenantTabSummaries,
+  formatStorageMb,
+  isBillingAttention,
+} from "./opsTenantsUtils";
 
 const STATUS_OPTIONS = [
   { value: "", label: "Todos" },
@@ -109,6 +117,53 @@ function MetricCard({ icon: Icon, label, value, detail, tone = "slate" }) {
       <div className="mt-3 text-2xl font-bold">{value}</div>
       <div className="mt-1 text-xs text-slate-500">{detail}</div>
     </div>
+  );
+}
+
+function TabButton({ tab, active, badge, onClick }) {
+  return (
+    <button
+      type="button"
+      onClick={() => onClick(tab.id)}
+      className={[
+        "inline-flex h-10 items-center gap-2 rounded-lg border px-3 text-sm font-semibold transition",
+        active
+          ? "border-blue-600 bg-blue-600 text-white shadow-sm"
+          : "border-slate-200 bg-white text-slate-600 hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700",
+      ].join(" ")}
+    >
+      <span>{tab.label}</span>
+      {badge ? (
+        <span className={active ? "rounded-full bg-white/20 px-2 py-0.5 text-xs" : "rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-500"}>
+          {badge}
+        </span>
+      ) : null}
+    </button>
+  );
+}
+
+function TabsNav({ activeTab, summaries, onChange }) {
+  const badges = {
+    tenants: `${formatNumber(summaries.tenants.active)}/${formatNumber(summaries.tenants.total)}`,
+    catalog: summaries.catalog.pending ? `${formatNumber(summaries.catalog.pending)} pend.` : "ok",
+    billing: summaries.billing.attention ? `${formatNumber(summaries.billing.attention)} atencao` : "ok",
+    usage: summaries.usage.imageStorage,
+  };
+
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-2 shadow-sm">
+      <div className="flex flex-wrap gap-2">
+        {OPS_TENANT_TABS.map((tab) => (
+          <TabButton
+            key={tab.id}
+            tab={tab}
+            active={activeTab === tab.id}
+            badge={badges[tab.id]}
+            onClick={onChange}
+          />
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -274,10 +329,10 @@ function TenantRow({
       <td className="px-4 py-3 align-top">
         <div className="grid min-w-[260px] grid-cols-5 gap-2 text-xs">
           <span>Prod <b>{formatNumber(counts.produtos)}</b></span>
+          <span>Img <b>{formatNumber(counts.produto_imagens)}</b></span>
           <span>Cli <b>{formatNumber(counts.clientes)}</b></span>
           <span>Pets <b>{formatNumber(counts.pets)}</b></span>
           <span>Vendas <b>{formatNumber(counts.vendas)}</b></span>
-          <span>Users <b>{formatNumber(counts.usuarios)}</b></span>
         </div>
       </td>
       <td className="px-4 py-3 align-top">
@@ -321,11 +376,159 @@ function TenantRow({
   );
 }
 
+function BillingTab({ items, loading }) {
+  return (
+    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+      <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+        <div>
+          <h2 className="text-base font-bold text-slate-900">Planos e pagamentos</h2>
+          <p className="text-sm text-slate-500">Status comercial dos tenants ativos no filtro atual.</p>
+        </div>
+        {loading ? (
+          <Badge className="border-blue-200 bg-blue-50 text-blue-700">carregando</Badge>
+        ) : (
+          <Badge className="border-slate-200 bg-slate-50 text-slate-700">{items.length} exibido(s)</Badge>
+        )}
+      </div>
+
+      <div className="overflow-x-auto">
+        <table className="min-w-[980px] w-full divide-y divide-slate-200 text-left">
+          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+            <tr>
+              <th className="px-4 py-3 font-bold">Tenant</th>
+              <th className="px-4 py-3 font-bold">Plano</th>
+              <th className="px-4 py-3 font-bold">Pagamento</th>
+              <th className="px-4 py-3 font-bold">Origem</th>
+              <th className="px-4 py-3 font-bold">Usuario principal</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {items.length === 0 && !loading ? (
+              <tr>
+                <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-500">
+                  Nenhum tenant encontrado para o filtro atual.
+                </td>
+              </tr>
+            ) : (
+              items.map((tenant) => {
+                const attention = isBillingAttention(tenant.billing_status);
+                return (
+                  <tr key={tenant.id} className={attention ? "bg-amber-50" : "bg-white hover:bg-slate-50"}>
+                    <td className="px-4 py-3">
+                      <div className="text-sm font-bold text-slate-900">{tenant.name}</div>
+                      <div className="mt-1 font-mono text-[11px] text-slate-500">{shortId(tenant.id)}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge className="border-blue-200 bg-blue-50 text-blue-700">{tenant.plan || "free"}</Badge>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge className={attention ? "border-amber-200 bg-amber-100 text-amber-800" : billingBadge(tenant.billing_status)}>
+                        {tenant.billing_status || "active"}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3 text-sm text-slate-600">
+                      <div>{tenant.subscription_source || "manual"}</div>
+                      <div className="mt-1 text-xs text-slate-500">{formatDate(tenant.subscription_activated_at || tenant.created_at)}</div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="max-w-[260px] truncate text-sm font-semibold text-slate-800">
+                        {tenant.principal_user?.nome || tenant.principal_user?.email || "-"}
+                      </div>
+                      <div className="mt-1 max-w-[260px] truncate text-xs text-slate-500">
+                        {tenant.principal_user?.email || "sem usuario principal"}
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })
+            )}
+          </tbody>
+        </table>
+      </div>
+    </section>
+  );
+}
+
+function UsageTab({ items, summaries, loading }) {
+  return (
+    <div className="space-y-4">
+      <div className="grid gap-3 md:grid-cols-3">
+        <MetricCard icon={FiDatabase} label="Registros" value={formatNumber(summaries.usage.recordsTotal)} detail="Cadastros somados no filtro" tone="slate" />
+        <MetricCard icon={FiBox} label="Imagens" value={formatNumber(items.reduce((total, item) => total + Number(item?.usage?.image_count || 0), 0))} detail="Produto_imagens registradas" tone="blue" />
+        <MetricCard icon={FiHardDrive} label="Uso imagens" value={summaries.usage.imageStorage} detail="Somatorio do campo tamanho" tone="amber" />
+      </div>
+
+      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">Uso e cadastros</h2>
+            <p className="text-sm text-slate-500">Volume operacional por tenant dentro do filtro atual.</p>
+          </div>
+          {loading ? (
+            <Badge className="border-blue-200 bg-blue-50 text-blue-700">carregando</Badge>
+          ) : (
+            <Badge className="border-slate-200 bg-slate-50 text-slate-700">{items.length} exibido(s)</Badge>
+          )}
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="min-w-[1100px] w-full divide-y divide-slate-200 text-left">
+            <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+              <tr>
+                <th className="px-4 py-3 font-bold">Tenant</th>
+                <th className="px-4 py-3 font-bold">Registros</th>
+                <th className="px-4 py-3 font-bold">Produtos</th>
+                <th className="px-4 py-3 font-bold">Clientes</th>
+                <th className="px-4 py-3 font-bold">Pets</th>
+                <th className="px-4 py-3 font-bold">Vendas</th>
+                <th className="px-4 py-3 font-bold">Usuarios</th>
+                <th className="px-4 py-3 font-bold">Imagens</th>
+                <th className="px-4 py-3 font-bold">Uso imagens</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {items.length === 0 && !loading ? (
+                <tr>
+                  <td colSpan={9} className="px-4 py-10 text-center text-sm text-slate-500">
+                    Nenhum tenant encontrado para o filtro atual.
+                  </td>
+                </tr>
+              ) : (
+                items.map((tenant) => {
+                  const counts = tenant.counts || {};
+                  const usage = tenant.usage || {};
+                  return (
+                    <tr key={tenant.id} className="bg-white hover:bg-slate-50">
+                      <td className="px-4 py-3">
+                        <div className="text-sm font-bold text-slate-900">{tenant.name}</div>
+                        <div className="mt-1 font-mono text-[11px] text-slate-500">{shortId(tenant.id)}</div>
+                      </td>
+                      <td className="px-4 py-3 text-sm font-bold text-slate-900">{formatNumber(usage.records_total)}</td>
+                      <td className="px-4 py-3 text-sm text-slate-700">{formatNumber(counts.produtos)}</td>
+                      <td className="px-4 py-3 text-sm text-slate-700">{formatNumber(counts.clientes)}</td>
+                      <td className="px-4 py-3 text-sm text-slate-700">{formatNumber(counts.pets)}</td>
+                      <td className="px-4 py-3 text-sm text-slate-700">{formatNumber(counts.vendas)}</td>
+                      <td className="px-4 py-3 text-sm text-slate-700">{formatNumber(counts.usuarios)}</td>
+                      <td className="px-4 py-3 text-sm text-slate-700">{formatNumber(usage.image_count)}</td>
+                      <td className="px-4 py-3 text-sm font-semibold text-slate-900">{formatStorageMb(usage.image_bytes)}</td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  );
+}
+
 export default function OpsTenants() {
   const [items, setItems] = useState([]);
   const [summary, setSummary] = useState(null);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
+  const [activeTab, setActiveTab] = useState("tenants");
   const [selectedTenantId, setSelectedTenantId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -375,6 +578,8 @@ export default function OpsTenants() {
     }),
     [items, summary],
   );
+  const tabSummaries = useMemo(() => buildOpsTenantTabSummaries(items, summary), [items, summary]);
+  const showTenantTable = activeTab === "tenants" || activeTab === "catalog";
 
   async function handlePreview(tenant) {
     setBusyKey(`preview:${tenant.id}`);
@@ -448,12 +653,15 @@ export default function OpsTenants() {
           </div>
         ) : null}
 
-        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+        <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-5">
           <MetricCard icon={FiUsers} label="Tenants" value={formatNumber(totals.tenants)} detail="Resultado do filtro atual" tone="slate" />
           <MetricCard icon={FiCheckCircle} label="Ativos" value={formatNumber(totals.active)} detail="Clientes liberados para uso" tone="green" />
           <MetricCard icon={FiBox} label="Com catalogo base" value={formatNumber(totals.withCatalog)} detail="Ja receberam o pacote padrao" tone="blue" />
           <MetricCard icon={FiDatabase} label="Produtos somados" value={formatNumber(totals.products)} detail="Total visivel nesta lista" tone="amber" />
+          <MetricCard icon={FiCreditCard} label="Atencao cobranca" value={formatNumber(tabSummaries.billing.attention)} detail="Status pendente no filtro" tone={tabSummaries.billing.attention ? "amber" : "green"} />
         </div>
+
+        <TabsNav activeTab={activeTab} summaries={tabSummaries} onChange={setActiveTab} />
 
         <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
           <div className="flex flex-wrap items-center gap-3">
@@ -481,12 +689,17 @@ export default function OpsTenants() {
           </div>
         </section>
 
+        {showTenantTable ? (
         <div className="grid gap-4 xl:grid-cols-[1fr_410px]">
           <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
             <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
               <div>
-                <h2 className="text-base font-bold text-slate-900">Tenants</h2>
-                <p className="text-sm text-slate-500">Contagens basicas, cobranca e importacao do cadastro padrao.</p>
+                <h2 className="text-base font-bold text-slate-900">
+                  {activeTab === "catalog" ? "Importacao de catalogo base" : "Tenants"}
+                </h2>
+                <p className="text-sm text-slate-500">
+                  {activeTab === "catalog" ? "Simulacao e aplicacao controlada por tenant." : "Contagens basicas, cobranca e cadastro padrao."}
+                </p>
               </div>
               {loading ? (
                 <Badge className="border-blue-200 bg-blue-50 text-blue-700">carregando</Badge>
@@ -555,6 +768,10 @@ export default function OpsTenants() {
             </section>
           </div>
         </div>
+        ) : null}
+
+        {activeTab === "billing" ? <BillingTab items={items} loading={loading} /> : null}
+        {activeTab === "usage" ? <UsageTab items={items} summaries={tabSummaries} loading={loading} /> : null}
       </div>
     </div>
   );
