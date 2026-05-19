@@ -23,6 +23,6 @@ def test_mobile_new_consultation_date_uses_br_calendar_picker():
 
     assert "formatarDataIsoParaBr(form.data)" in source
     assert 'placeholder="dd/mm/aaaa"' in source
-    assert "setCalendarioAberto(true)" in source
+    assert "setCalendarioAberto((aberto) => !aberto);" in source
     assert "calendarioDias" in source
     assert 'placeholder="AAAA-MM-DD"' not in source

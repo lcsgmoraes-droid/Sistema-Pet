@@ -310,7 +310,7 @@ export default function VetAgendaScreen() {
 
   function abrirCalendario() {
     setCalendarioReferencia(form.data || isoDate(new Date()));
-    setCalendarioAberto(true);
+    setCalendarioAberto((aberto) => !aberto);
   }
 
   function navegarMesCalendario(delta: number) {

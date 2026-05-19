@@ -21,6 +21,10 @@ cd app-mobile
 npm run check
 ```
 
+Para app mobile com EAS, seguir tambem `docs/GUIA_RELEASE_APP_MOBILE_EAS.md`.
+Antes de publicar OTA, confirmar se o APK instalado esta no canal `preview` ou
+`production`.
+
 ## 2. Contrato de pagamento temporario
 
 Enquanto a intermediadora nao estiver integrada:
@@ -75,4 +79,5 @@ Bloqueie release se acontecer qualquer um destes pontos:
 - tag "Entregue" nao aparecer no PDV apos entrega;
 - aba Beneficios quebrar, ficar em loading infinito ou nao abrir cashback/cupons;
 - app mobile apontar para ambiente errado;
+- update EAS publicado em canal diferente do APK instalado;
 - build/typecheck/teste obrigatorio falhar.

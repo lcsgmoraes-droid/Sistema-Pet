@@ -1,6 +1,6 @@
 # Indice operacional do Sistema Pet
 
-Atualizado em: 2026-05-17
+Atualizado em: 2026-05-19
 
 Este e o ponto de entrada oficial da documentacao. Se houver conflito entre este
 indice e um documento historico, use este indice e o guia mestre de maturidade.
@@ -27,6 +27,7 @@ Guia mestre:
 | Demo Veterinario | `docs/GUIA_DEMO_VETERINARIO_CLINICA.md` | Roteiro de demo e limites de piloto |
 | Maiara/Vet/Admin SaaS | `docs/CRONOGRAMA_MAIARA_VETERINARIO_ADMIN_SAAS.md` | Preparacao de demo, padronizacao Vet e admin global |
 | Habilitar app mobile por tenant | `docs/GUIA_HABILITAR_APP_MOBILE_TENANT.md` | Checklist de slug, cidade, perfil e modulos |
+| Release app mobile com EAS | `docs/GUIA_RELEASE_APP_MOBILE_EAS.md` | Canal `preview`/`production`, runtime e verificacao OTA |
 | Base oficial de dados | `docs/CRONOGRAMA_BASE_DADOS_OFICIAL.md` | Produtos, imagens, cadastros iniciais e atualizacoes |
 | Plano Basico | `docs/auditorias/plano-basico-tenant-checklist.md` | E2E longo controlado |
 | Produto/roadmap | `docs/ROADMAP_MASTER.md` | Checklist da frente especifica |
@@ -45,6 +46,7 @@ Guia mestre:
 | Demo/Piloto Veterinario | `docs/GUIA_DEMO_VETERINARIO_CLINICA.md` |
 | Maiara, Veterinario e Admin SaaS | `docs/CRONOGRAMA_MAIARA_VETERINARIO_ADMIN_SAAS.md` |
 | App mobile por tenant | `docs/GUIA_HABILITAR_APP_MOBILE_TENANT.md` |
+| Release app mobile com EAS | `docs/GUIA_RELEASE_APP_MOBILE_EAS.md` |
 | Base oficial de dados | `docs/CRONOGRAMA_BASE_DADOS_OFICIAL.md` |
 | Evidencias | `docs/PADRAO_EVIDENCIA.md` |
 
