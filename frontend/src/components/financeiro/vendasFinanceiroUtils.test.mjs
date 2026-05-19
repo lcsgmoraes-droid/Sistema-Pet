@@ -3,8 +3,10 @@ import { test } from "node:test";
 import {
   ajustarVendaImposto,
   calcularAnaliseInteligenteVendas,
+  calcularAnalisePromocoesFinanceiro,
   calcularFiltroRapidoPeriodoVendas,
   calcularResumoDiasPeriodoFinanceiro,
+  calcularTotalizadoresListaVendasFinanceiro,
   calcularPeriodoComparacaoFinanceiro,
   calcularVariacaoFinanceira,
   calcularValorRecebidoVenda,
@@ -301,6 +303,118 @@ test("filtra e ordena vendas para relatorio personalizado", () => {
   assert.deepEqual(ordenarVendasRelatorio(vendas, "bruta_asc").map((venda) => venda.id), [1, 2]);
   assert.deepEqual(ordenarVendasRelatorio(vendas, "lucro_desc").map((venda) => venda.id), [2, 1]);
   assert.deepEqual(ordenarVendasRelatorio(vendas, "data_desc").map((venda) => venda.id), [2, 1]);
+});
+
+test("calcula totalizadores da lista de vendas financeiras", () => {
+  const totalizadores = calcularTotalizadoresListaVendasFinanceiro([
+    {
+      status: "finalizada",
+      nf_emitida: true,
+      venda_bruta: 100,
+      taxa_loja: 2,
+      desconto: 5,
+      taxa_entrega: 4,
+      taxa_operacional: 1,
+      taxa_cartao: 3,
+      comissao: 6,
+      imposto: 7,
+      custo_campanha: 8,
+      venda_liquida: 80,
+      custo_produtos: 40,
+      lucro: 20,
+    },
+    {
+      status: "aberta",
+      valor_recebido: 15,
+      venda_bruta: 50,
+      taxa_loja: 1,
+      desconto: 2,
+      taxa_entrega: 3,
+      taxa_operacional: 4,
+      taxa_cartao: 5,
+      comissao: 6,
+      imposto: 7,
+      custo_campanha: 8,
+      venda_liquida: 30,
+      custo_produtos: 30,
+      lucro: -10,
+    },
+  ]);
+
+  assert.deepEqual(totalizadores, {
+    quantidade: 2,
+    venda_bruta: 150,
+    taxa_loja: 3,
+    desconto: 7,
+    taxa_entrega: 7,
+    taxa_operacional: 5,
+    taxa_cartao: 8,
+    comissao: 12,
+    imposto: 14,
+    custo_campanha: 16,
+    venda_liquida: 110,
+    valor_recebido: 115,
+    custo_produtos: 70,
+    lucro: 10,
+    com_nf: 1,
+    margem_sobre_venda: 6.7,
+    margem_sobre_custo: 14.3,
+  });
+});
+
+test("calcula analise financeira de promocoes", () => {
+  const analise = calcularAnalisePromocoesFinanceiro([
+    {
+      tem_promocao: true,
+      venda_liquida: 100,
+      itens: [
+        {
+          produto_id: 1,
+          produto_nome: "Defenza",
+          em_promocao: true,
+          quantidade: 2,
+          valor_liquido: 60,
+          desconto_promocional: 5,
+          promocao_origem: "campanha, cupom",
+        },
+        {
+          produto_id: 1,
+          produto_nome: "Defenza",
+          em_promocao: true,
+          quantidade: 1,
+          valor_promocional: 20,
+          desconto_promocional: 2,
+          promocao_origem: "campanha",
+        },
+      ],
+    },
+    {
+      venda_bruta: 80,
+      itens: [{ produto_nome: "Sem promocao", quantidade: 1, venda_bruta: 80 }],
+    },
+  ]);
+
+  assert.equal(analise.totalVendas, 2);
+  assert.equal(analise.vendasPromocao, 1);
+  assert.equal(analise.vendasNormais, 1);
+  assert.equal(analise.valorVendasPromocao, 100);
+  assert.equal(analise.valorVendasNormais, 80);
+  assert.equal(analise.valorItensPromocionais, 80);
+  assert.equal(analise.descontoPromocional, 7);
+  assert.equal(analise.percentualPromocao, 50);
+  assert.deepEqual(analise.comparativo, [
+    { tipo: "Normais", quantidade: 1, valor: 80 },
+    { tipo: "Preco promocional", quantidade: 1, valor: 100 },
+  ]);
+  assert.deepEqual(analise.topProdutos, [
+    {
+      produto_nome: "Defenza",
+      quantidade: 3,
+      valor: 80,
+      desconto: 7,
+      origens: ["campanha", "cupom"],
+    },
+  ]);
 });
 
 test("descreve periodo de comparacao financeiro", () => {
