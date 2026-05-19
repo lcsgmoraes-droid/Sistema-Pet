@@ -46,9 +46,15 @@ export function listarSugestoesEspecies(pets) {
   );
 }
 
+export const MIN_TUTOR_SEARCH_LENGTH = 2;
+
+export function deveBuscarTutores(termoBusca) {
+  return termoBusca.trim().length >= MIN_TUTOR_SEARCH_LENGTH;
+}
+
 export function filtrarTutoresPorTermo(tutoresIndex, termoBusca) {
   const termo = termoBusca.trim();
-  if (!termo) return [];
+  if (!deveBuscarTutores(termo)) return [];
 
   const termoLower = termo.toLowerCase();
   const termoDigitos = termo.replaceAll(/\D/g, "");
