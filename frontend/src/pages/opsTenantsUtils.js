@@ -69,3 +69,23 @@ export function buildOpsTenantTabSummaries(items = [], summary = {}) {
     },
   };
 }
+
+export function buildOpsTenantCommercialForm(tenant = {}) {
+  return {
+    status: String(tenant?.status || "active").trim().toLowerCase(),
+    plan: String(tenant?.plan || "basico").trim().toLowerCase(),
+    billing_status: String(tenant?.billing_status || "active").trim().toLowerCase(),
+    subscription_source: String(tenant?.subscription_source || "manual").trim().toLowerCase(),
+  };
+}
+
+export function buildOpsTenantCommercialPayload(current = {}, next = {}) {
+  return ["status", "plan", "billing_status", "subscription_source"].reduce((payload, field) => {
+    const currentValue = String(current?.[field] || "").trim().toLowerCase();
+    const nextValue = String(next?.[field] || "").trim().toLowerCase();
+    if (nextValue && nextValue !== currentValue) {
+      payload[field] = nextValue;
+    }
+    return payload;
+  }, {});
+}

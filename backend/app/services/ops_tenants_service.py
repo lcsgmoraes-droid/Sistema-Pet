@@ -21,6 +21,33 @@ COUNT_TABLES = {
     "produto_imagens": "produto_imagens",
 }
 
+COMMERCIAL_STATE_OPTIONS = {
+    "status": {"active", "trial", "inactive", "suspended"},
+    "plan": {"free", "basico", "basic", "premium", "enterprise", "legacy", "completo"},
+    "billing_status": {
+        "active",
+        "trial",
+        "paid",
+        "ok",
+        "em_dia",
+        "past_due",
+        "overdue",
+        "late",
+        "inadimplente",
+        "blocked",
+        "canceled",
+        "expired",
+    },
+    "subscription_source": {"manual", "admin", "trial", "stripe", "asaas", "mercado_pago", "bling", "external"},
+}
+
+COMMERCIAL_STATE_LABELS = {
+    "status": "Status",
+    "plan": "Plano",
+    "billing_status": "Status de cobranca",
+    "subscription_source": "Origem da assinatura",
+}
+
 
 class OpsTenantActionError(RuntimeError):
     pass
@@ -215,6 +242,24 @@ def _tenant_row_to_item(db: Session, row: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def _fetch_tenant_item(db: Session, tenant_id: str) -> dict[str, Any]:
+    row = db.execute(
+        text(
+            """
+            SELECT id, name, status, plan, billing_status, subscription_source,
+                   subscription_activated_at, organization_type, created_at, updated_at
+            FROM tenants
+            WHERE CAST(id AS TEXT) = :tenant_id
+            LIMIT 1
+            """
+        ),
+        {"tenant_id": tenant_id},
+    ).mappings().first()
+    if not row:
+        raise OpsTenantActionError(f"Tenant nao encontrado: {tenant_id}.")
+    return _tenant_row_to_item(db, dict(row))
+
+
 def list_ops_tenants(
     db: Session,
     *,
@@ -258,6 +303,48 @@ def list_ops_tenants(
         "image_bytes": sum(int(item.get("usage", {}).get("image_bytes") or 0) for item in items),
     }
     return {"items": items, "summary": summary}
+
+
+def _normalize_commercial_value(field: str, value: Any) -> str:
+    normalized = str(value or "").strip().lower()
+    if not normalized:
+        raise OpsTenantActionError(f"{COMMERCIAL_STATE_LABELS[field]} nao pode ficar vazio.")
+    if normalized not in COMMERCIAL_STATE_OPTIONS[field]:
+        allowed = ", ".join(sorted(COMMERCIAL_STATE_OPTIONS[field]))
+        raise OpsTenantActionError(f"{COMMERCIAL_STATE_LABELS[field]} invalido. Use um destes valores: {allowed}.")
+    return normalized
+
+
+def update_ops_tenant_commercial_state(
+    db: Session,
+    *,
+    tenant_id: str,
+    changes: dict[str, Any],
+) -> dict[str, Any]:
+    target_tenant_id = str(tenant_id).strip()
+    _ensure_target_tenant(db, target_tenant_id)
+
+    normalized: dict[str, str] = {}
+    for field in COMMERCIAL_STATE_OPTIONS:
+        if field in changes and changes[field] is not None:
+            normalized[field] = _normalize_commercial_value(field, changes[field])
+
+    if not normalized:
+        raise OpsTenantActionError("Nenhuma alteracao comercial informada.")
+
+    assignments = ", ".join(f"{field} = :{field}" for field in normalized)
+    params: dict[str, Any] = {"tenant_id": target_tenant_id, **normalized}
+    db.execute(
+        text(
+            f"""
+            UPDATE tenants
+            SET {assignments}
+            WHERE CAST(id AS TEXT) = :tenant_id
+            """
+        ),
+        params,
+    )
+    return _fetch_tenant_item(db, target_tenant_id)
 
 
 def _resolve_source_tenant_id(db: Session, source_email: str = DEFAULT_BASE_CATALOG_SOURCE_EMAIL) -> str:

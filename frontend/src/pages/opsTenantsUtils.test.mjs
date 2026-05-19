@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 
 import {
+  buildOpsTenantCommercialForm,
+  buildOpsTenantCommercialPayload,
   buildOpsTenantTabSummaries,
   formatStorageMb,
   isBillingAttention,
@@ -56,5 +58,43 @@ test("buildOpsTenantTabSummaries resume tenants por aba do MVP Ops", () => {
     recordsTotal: 20,
     imageBytes: 1572864,
     imageStorage: "1,50 MB",
+  });
+});
+
+test("buildOpsTenantCommercialForm monta formulario editavel com valores atuais", () => {
+  const form = buildOpsTenantCommercialForm({
+    status: "active",
+    plan: "basico",
+    billing_status: "trial",
+    subscription_source: "manual",
+  });
+
+  assert.deepEqual(form, {
+    status: "active",
+    plan: "basico",
+    billing_status: "trial",
+    subscription_source: "manual",
+  });
+});
+
+test("buildOpsTenantCommercialPayload envia somente campos alterados", () => {
+  const payload = buildOpsTenantCommercialPayload(
+    {
+      status: "active",
+      plan: "basico",
+      billing_status: "trial",
+      subscription_source: "manual",
+    },
+    {
+      status: "active",
+      plan: "premium",
+      billing_status: " active ",
+      subscription_source: "manual",
+    },
+  );
+
+  assert.deepEqual(payload, {
+    plan: "premium",
+    billing_status: "active",
   });
 });

@@ -14,6 +14,7 @@ from app.services.ops_tenants_service import (
     apply_base_catalog_import,
     list_ops_tenants,
     preview_base_catalog_import,
+    update_ops_tenant_commercial_state,
 )
 
 
@@ -22,6 +23,13 @@ router = APIRouter(prefix="/admin/tenants", tags=["Admin - Tenants"])
 
 class CatalogImportApplyRequest(BaseModel):
     confirm: bool = False
+
+
+class CommercialStateRequest(BaseModel):
+    status: str | None = None
+    plan: str | None = None
+    billing_status: str | None = None
+    subscription_source: str | None = None
 
 
 @router.get("")
@@ -33,6 +41,29 @@ def listar_tenants_ops(
     db: Session = Depends(get_session),
 ) -> dict[str, Any]:
     return list_ops_tenants(db, search=search, status=status, limit=limit)
+
+
+@router.patch("/{tenant_id}/commercial")
+def atualizar_estado_comercial_tenant(
+    tenant_id: str,
+    payload: CommercialStateRequest,
+    _current_user: User = Depends(require_admin),
+    db: Session = Depends(get_session),
+) -> dict[str, Any]:
+    try:
+        result = update_ops_tenant_commercial_state(
+            db,
+            tenant_id=tenant_id,
+            changes=payload.model_dump(exclude_unset=True),
+        )
+        db.commit()
+        return result
+    except OpsTenantActionError as exc:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception:
+        db.rollback()
+        raise
 
 
 @router.post("/{tenant_id}/catalog-import/preview")

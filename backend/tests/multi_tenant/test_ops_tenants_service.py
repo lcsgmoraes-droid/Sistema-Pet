@@ -198,6 +198,55 @@ def test_apply_base_catalog_import_requires_explicit_confirmation(ops_tenants_se
         )
 
 
+def test_update_ops_tenant_commercial_state_changes_safe_fields(ops_tenants_session):
+    from app.services.ops_tenants_service import update_ops_tenant_commercial_state
+
+    tenant = update_ops_tenant_commercial_state(
+        ops_tenants_session,
+        tenant_id=TARGET_TENANT,
+        changes={
+            "status": "suspended",
+            "plan": "premium",
+            "billing_status": "past_due",
+            "subscription_source": "manual",
+        },
+    )
+
+    assert tenant["id"] == TARGET_TENANT
+    assert tenant["status"] == "suspended"
+    assert tenant["plan"] == "premium"
+    assert tenant["billing_status"] == "past_due"
+    assert tenant["subscription_source"] == "manual"
+
+    row = ops_tenants_session.execute(
+        text(
+            """
+            SELECT status, plan, billing_status, subscription_source
+            FROM tenants
+            WHERE id = :tenant_id
+            """
+        ),
+        {"tenant_id": TARGET_TENANT},
+    ).mappings().first()
+    assert dict(row) == {
+        "status": "suspended",
+        "plan": "premium",
+        "billing_status": "past_due",
+        "subscription_source": "manual",
+    }
+
+
+def test_update_ops_tenant_commercial_state_rejects_invalid_values(ops_tenants_session):
+    from app.services.ops_tenants_service import OpsTenantActionError, update_ops_tenant_commercial_state
+
+    with pytest.raises(OpsTenantActionError, match="Plano invalido"):
+        update_ops_tenant_commercial_state(
+            ops_tenants_session,
+            tenant_id=TARGET_TENANT,
+            changes={"plan": "plano sem cadastro"},
+        )
+
+
 def test_preview_base_catalog_import_uses_lucas_store_as_source(ops_tenants_session, monkeypatch):
     from app.services import ops_tenants_service
 

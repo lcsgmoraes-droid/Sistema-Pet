@@ -6,6 +6,7 @@ import {
   FiCreditCard,
   FiDatabase,
   FiDownloadCloud,
+  FiEdit3,
   FiHardDrive,
   FiRefreshCw,
   FiSearch,
@@ -16,6 +17,8 @@ import {
 import api from "../api";
 import {
   OPS_TENANT_TABS,
+  buildOpsTenantCommercialForm,
+  buildOpsTenantCommercialPayload,
   buildOpsTenantTabSummaries,
   formatStorageMb,
   isBillingAttention,
@@ -27,6 +30,42 @@ const STATUS_OPTIONS = [
   { value: "inactive", label: "Inativos" },
   { value: "trial", label: "Trial" },
   { value: "suspended", label: "Suspensos" },
+];
+
+const TENANT_STATUS_EDIT_OPTIONS = [
+  { value: "active", label: "Ativo" },
+  { value: "trial", label: "Trial" },
+  { value: "inactive", label: "Inativo" },
+  { value: "suspended", label: "Suspenso" },
+];
+
+const PLAN_EDIT_OPTIONS = [
+  { value: "basico", label: "Basico" },
+  { value: "premium", label: "Premium" },
+  { value: "enterprise", label: "Enterprise" },
+  { value: "free", label: "Free legado" },
+  { value: "legacy", label: "Legacy" },
+  { value: "completo", label: "Completo" },
+];
+
+const BILLING_EDIT_OPTIONS = [
+  { value: "trial", label: "Trial" },
+  { value: "active", label: "Ativo / em dia" },
+  { value: "past_due", label: "Pendente" },
+  { value: "overdue", label: "Atrasado" },
+  { value: "blocked", label: "Bloqueado" },
+  { value: "canceled", label: "Cancelado" },
+  { value: "expired", label: "Expirado" },
+];
+
+const SOURCE_EDIT_OPTIONS = [
+  { value: "manual", label: "Manual" },
+  { value: "admin", label: "Admin" },
+  { value: "trial", label: "Trial" },
+  { value: "asaas", label: "Asaas" },
+  { value: "stripe", label: "Stripe" },
+  { value: "mercado_pago", label: "Mercado Pago" },
+  { value: "external", label: "Externo" },
 ];
 
 function formatNumber(value) {
@@ -376,76 +415,199 @@ function TenantRow({
   );
 }
 
-function BillingTab({ items, loading }) {
+function SelectField({ label, value, onChange, options }) {
   return (
-    <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
-      <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
-        <div>
-          <h2 className="text-base font-bold text-slate-900">Planos e pagamentos</h2>
-          <p className="text-sm text-slate-500">Status comercial dos tenants ativos no filtro atual.</p>
+    <label className="block">
+      <span className="text-xs font-bold uppercase tracking-wide text-slate-500">{label}</span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        className="mt-1 h-10 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm font-semibold text-slate-700 outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
+function CommercialEditPanel({
+  tenant,
+  form,
+  error,
+  success,
+  saving,
+  onChange,
+  onSubmit,
+}) {
+  if (!tenant) {
+    return (
+      <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <div className="text-sm text-slate-500">Selecione um tenant para editar plano e cobranca.</div>
+      </section>
+    );
+  }
+
+  const original = buildOpsTenantCommercialForm(tenant);
+  const payload = buildOpsTenantCommercialPayload(original, form);
+  const hasChanges = Object.keys(payload).length > 0;
+
+  return (
+    <section className="rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2 text-sm font-bold text-slate-900">
+            <FiEdit3 className="h-4 w-4 text-blue-600" />
+            Manutencao comercial
+          </div>
+          <p className="mt-1 text-sm text-slate-500">
+            Ajuste status, plano e cobranca sem entrar no tenant do cliente.
+          </p>
         </div>
-        {loading ? (
-          <Badge className="border-blue-200 bg-blue-50 text-blue-700">carregando</Badge>
-        ) : (
-          <Badge className="border-slate-200 bg-slate-50 text-slate-700">{items.length} exibido(s)</Badge>
-        )}
+        <Badge className={billingBadge(tenant.billing_status)}>{tenant.billing_status || "active"}</Badge>
       </div>
 
-      <div className="overflow-x-auto">
-        <table className="min-w-[980px] w-full divide-y divide-slate-200 text-left">
-          <thead className="bg-slate-50 text-xs uppercase text-slate-500">
-            <tr>
-              <th className="px-4 py-3 font-bold">Tenant</th>
-              <th className="px-4 py-3 font-bold">Plano</th>
-              <th className="px-4 py-3 font-bold">Pagamento</th>
-              <th className="px-4 py-3 font-bold">Origem</th>
-              <th className="px-4 py-3 font-bold">Usuario principal</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {items.length === 0 && !loading ? (
-              <tr>
-                <td colSpan={5} className="px-4 py-10 text-center text-sm text-slate-500">
-                  Nenhum tenant encontrado para o filtro atual.
-                </td>
-              </tr>
-            ) : (
-              items.map((tenant) => {
-                const attention = isBillingAttention(tenant.billing_status);
-                return (
-                  <tr key={tenant.id} className={attention ? "bg-amber-50" : "bg-white hover:bg-slate-50"}>
-                    <td className="px-4 py-3">
-                      <div className="text-sm font-bold text-slate-900">{tenant.name}</div>
-                      <div className="mt-1 font-mono text-[11px] text-slate-500">{shortId(tenant.id)}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge className="border-blue-200 bg-blue-50 text-blue-700">{tenant.plan || "free"}</Badge>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Badge className={attention ? "border-amber-200 bg-amber-100 text-amber-800" : billingBadge(tenant.billing_status)}>
-                        {tenant.billing_status || "active"}
-                      </Badge>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-slate-600">
-                      <div>{tenant.subscription_source || "manual"}</div>
-                      <div className="mt-1 text-xs text-slate-500">{formatDate(tenant.subscription_activated_at || tenant.created_at)}</div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="max-w-[260px] truncate text-sm font-semibold text-slate-800">
-                        {tenant.principal_user?.nome || tenant.principal_user?.email || "-"}
-                      </div>
-                      <div className="mt-1 max-w-[260px] truncate text-xs text-slate-500">
-                        {tenant.principal_user?.email || "sem usuario principal"}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })
-            )}
-          </tbody>
-        </table>
+      <div className="mt-4 rounded-lg border border-slate-200 bg-slate-50 px-3 py-3">
+        <div className="truncate text-sm font-bold text-slate-900">{tenant.name}</div>
+        <div className="mt-1 truncate text-xs text-slate-500">{tenant.principal_user?.email || tenant.id}</div>
       </div>
+
+      <form onSubmit={onSubmit} className="mt-4 space-y-3">
+        <SelectField label="Status tenant" value={form.status} options={TENANT_STATUS_EDIT_OPTIONS} onChange={(value) => onChange("status", value)} />
+        <SelectField label="Plano" value={form.plan} options={PLAN_EDIT_OPTIONS} onChange={(value) => onChange("plan", value)} />
+        <SelectField label="Cobranca" value={form.billing_status} options={BILLING_EDIT_OPTIONS} onChange={(value) => onChange("billing_status", value)} />
+        <SelectField label="Origem" value={form.subscription_source} options={SOURCE_EDIT_OPTIONS} onChange={(value) => onChange("subscription_source", value)} />
+
+        {error ? (
+          <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-sm text-rose-700">{error}</div>
+        ) : null}
+        {success ? (
+          <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{success}</div>
+        ) : null}
+
+        <button
+          type="submit"
+          disabled={!hasChanges || saving}
+          className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-blue-600 px-4 text-sm font-semibold text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <FiCheckCircle className={`h-4 w-4 ${saving ? "animate-pulse" : ""}`} />
+          Salvar manutencao
+        </button>
+      </form>
     </section>
+  );
+}
+
+function BillingTab({
+  items,
+  loading,
+  selectedTenant,
+  editForm,
+  editError,
+  editSuccess,
+  saving,
+  onSelectTenant,
+  onEditChange,
+  onEditSubmit,
+}) {
+  return (
+    <div className="grid gap-4 xl:grid-cols-[1fr_360px]">
+      <section className="overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm">
+        <div className="flex items-center justify-between gap-3 border-b border-slate-200 px-4 py-3">
+          <div>
+            <h2 className="text-base font-bold text-slate-900">Planos e pagamentos</h2>
+            <p className="text-sm text-slate-500">Status comercial dos tenants ativos no filtro atual.</p>
+          </div>
+          {loading ? (
+            <Badge className="border-blue-200 bg-blue-50 text-blue-700">carregando</Badge>
+          ) : (
+            <Badge className="border-slate-200 bg-slate-50 text-slate-700">{items.length} exibido(s)</Badge>
+          )}
+        </div>
+
+        <div className="overflow-x-auto">
+          <table className="min-w-[1080px] w-full divide-y divide-slate-200 text-left">
+            <thead className="bg-slate-50 text-xs uppercase text-slate-500">
+              <tr>
+                <th className="px-4 py-3 font-bold">Tenant</th>
+                <th className="px-4 py-3 font-bold">Plano</th>
+                <th className="px-4 py-3 font-bold">Pagamento</th>
+                <th className="px-4 py-3 font-bold">Origem</th>
+                <th className="px-4 py-3 font-bold">Usuario principal</th>
+                <th className="px-4 py-3 font-bold">Acao</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
+              {items.length === 0 && !loading ? (
+                <tr>
+                  <td colSpan={6} className="px-4 py-10 text-center text-sm text-slate-500">
+                    Nenhum tenant encontrado para o filtro atual.
+                  </td>
+                </tr>
+              ) : (
+                items.map((tenant) => {
+                  const attention = isBillingAttention(tenant.billing_status);
+                  const selected = selectedTenant?.id === tenant.id;
+                  return (
+                    <tr key={tenant.id} className={selected ? "bg-blue-50" : attention ? "bg-amber-50" : "bg-white hover:bg-slate-50"}>
+                      <td className="px-4 py-3">
+                        <button type="button" onClick={() => onSelectTenant(tenant.id)} className="block text-left">
+                          <div className="text-sm font-bold text-slate-900">{tenant.name}</div>
+                          <div className="mt-1 font-mono text-[11px] text-slate-500">{shortId(tenant.id)}</div>
+                        </button>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge className="border-blue-200 bg-blue-50 text-blue-700">{tenant.plan || "free"}</Badge>
+                      </td>
+                      <td className="px-4 py-3">
+                        <Badge className={attention ? "border-amber-200 bg-amber-100 text-amber-800" : billingBadge(tenant.billing_status)}>
+                          {tenant.billing_status || "active"}
+                        </Badge>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-slate-600">
+                        <div>{tenant.subscription_source || "manual"}</div>
+                        <div className="mt-1 text-xs text-slate-500">{formatDate(tenant.subscription_activated_at || tenant.created_at)}</div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="max-w-[260px] truncate text-sm font-semibold text-slate-800">
+                          {tenant.principal_user?.nome || tenant.principal_user?.email || "-"}
+                        </div>
+                        <div className="mt-1 max-w-[260px] truncate text-xs text-slate-500">
+                          {tenant.principal_user?.email || "sem usuario principal"}
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          type="button"
+                          onClick={() => onSelectTenant(tenant.id)}
+                          className="inline-flex h-9 items-center gap-2 rounded-lg border border-slate-300 bg-white px-3 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+                        >
+                          <FiEdit3 className="h-4 w-4" />
+                          Editar
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <CommercialEditPanel
+        tenant={selectedTenant}
+        form={editForm}
+        error={editError}
+        success={editSuccess}
+        saving={saving}
+        onChange={onEditChange}
+        onSubmit={onEditSubmit}
+      />
+    </div>
   );
 }
 
@@ -529,6 +691,10 @@ export default function OpsTenants() {
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("");
   const [activeTab, setActiveTab] = useState("tenants");
+  const [commercialForm, setCommercialForm] = useState(buildOpsTenantCommercialForm());
+  const [commercialError, setCommercialError] = useState("");
+  const [commercialSuccess, setCommercialSuccess] = useState("");
+  const [commercialSaving, setCommercialSaving] = useState(false);
   const [selectedTenantId, setSelectedTenantId] = useState("");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -568,6 +734,14 @@ export default function OpsTenants() {
     () => items.find((item) => item.id === selectedTenantId) || items[0] || null,
     [items, selectedTenantId],
   );
+
+  useEffect(() => {
+    if (selectedTenant) {
+      setCommercialForm(buildOpsTenantCommercialForm(selectedTenant));
+      setCommercialError("");
+      setCommercialSuccess("");
+    }
+  }, [selectedTenant?.id]);
 
   const totals = useMemo(
     () => ({
@@ -619,6 +793,42 @@ export default function OpsTenants() {
       setActionError(extractError(err, "Nao foi possivel aplicar a importacao."));
     } finally {
       setBusyKey("");
+    }
+  }
+
+  function handleCommercialChange(field, value) {
+    setCommercialForm((current) => ({ ...current, [field]: value }));
+    setCommercialError("");
+    setCommercialSuccess("");
+  }
+
+  async function handleCommercialSubmit(event) {
+    event.preventDefault();
+    if (!selectedTenant) {
+      setCommercialError("Selecione um tenant antes de salvar.");
+      return;
+    }
+
+    const original = buildOpsTenantCommercialForm(selectedTenant);
+    const payload = buildOpsTenantCommercialPayload(original, commercialForm);
+    if (Object.keys(payload).length === 0) {
+      setCommercialSuccess("Nenhuma alteracao para salvar.");
+      return;
+    }
+
+    setCommercialSaving(true);
+    setCommercialError("");
+    setCommercialSuccess("");
+    try {
+      const response = await api.patch(`/admin/tenants/${selectedTenant.id}/commercial`, payload);
+      setItems((current) => current.map((item) => (item.id === selectedTenant.id ? response.data : item)));
+      setCommercialSuccess("Manutencao salva.");
+      await loadTenants();
+      setSelectedTenantId(response.data.id);
+    } catch (err) {
+      setCommercialError(extractError(err, "Nao foi possivel salvar a manutencao comercial."));
+    } finally {
+      setCommercialSaving(false);
     }
   }
 
@@ -770,7 +980,20 @@ export default function OpsTenants() {
         </div>
         ) : null}
 
-        {activeTab === "billing" ? <BillingTab items={items} loading={loading} /> : null}
+        {activeTab === "billing" ? (
+          <BillingTab
+            items={items}
+            loading={loading}
+            selectedTenant={selectedTenant}
+            editForm={commercialForm}
+            editError={commercialError}
+            editSuccess={commercialSuccess}
+            saving={commercialSaving}
+            onSelectTenant={setSelectedTenantId}
+            onEditChange={handleCommercialChange}
+            onEditSubmit={handleCommercialSubmit}
+          />
+        ) : null}
         {activeTab === "usage" ? <UsageTab items={items} summaries={tabSummaries} loading={loading} /> : null}
       </div>
     </div>
