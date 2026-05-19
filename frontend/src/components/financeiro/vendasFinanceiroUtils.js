@@ -854,6 +854,89 @@ export function calcularTotalizadoresListaVendasFinanceiro(vendas = []) {
   };
 }
 
+export function montarCardsTotalizadoresListaVendasFinanceiro(
+  totalizadores = {},
+  {
+    formatarMoedaOuTraco = (valor) => String(Number(valor || 0)),
+    formatarMoedaComSinalOuTraco = (valor, sinal) => `${sinal}${Number(valor || 0)}`,
+    formatarPercentualOuTraco = (valor) => String(Number(valor || 0)),
+  } = {},
+) {
+  const formatarDeducao = (valor) => formatarMoedaComSinalOuTraco(valor, "-");
+
+  return [
+    {
+      label: "Vendas",
+      value: Number(totalizadores.quantidade || 0).toLocaleString("pt-BR"),
+      intent: "slate",
+    },
+    {
+      label: "Com NF",
+      value: Number(totalizadores.com_nf || 0).toLocaleString("pt-BR"),
+      intent: "blue",
+    },
+    {
+      label: "Venda Bruta",
+      value: formatarMoedaOuTraco(totalizadores.venda_bruta),
+      intent: "emerald",
+    },
+    {
+      label: "Tx Loja",
+      value: formatarMoedaComSinalOuTraco(totalizadores.taxa_loja, "+"),
+      intent: "emerald",
+    },
+    { label: "Desconto", value: formatarDeducao(totalizadores.desconto), intent: "amber" },
+    {
+      label: "Tx. Entrega",
+      value: formatarDeducao(totalizadores.taxa_entrega),
+      intent: "blue",
+    },
+    {
+      label: "Tx. Operac.",
+      value: formatarDeducao(totalizadores.taxa_operacional),
+      intent: "amber",
+    },
+    {
+      label: "Tx. Cartao",
+      value: formatarDeducao(totalizadores.taxa_cartao),
+      intent: "violet",
+    },
+    { label: "Comissao", value: formatarDeducao(totalizadores.comissao), intent: "blue" },
+    { label: "Imposto", value: formatarDeducao(totalizadores.imposto), intent: "red" },
+    {
+      label: "Custo Camp.",
+      value: formatarDeducao(totalizadores.custo_campanha),
+      intent: "cyan",
+    },
+    {
+      label: "Liquida",
+      value: formatarMoedaOuTraco(totalizadores.venda_liquida),
+      intent: "blue",
+    },
+    {
+      label: "Valor Recebido",
+      value: formatarMoedaOuTraco(totalizadores.valor_recebido),
+      intent: "emerald",
+    },
+    { label: "Custo", value: formatarDeducao(totalizadores.custo_produtos), intent: "amber" },
+    {
+      label: "Lucro",
+      value: formatarMoedaOuTraco(totalizadores.lucro),
+      intent: Number(totalizadores.lucro || 0) >= 0 ? "emerald" : "red",
+    },
+    {
+      label: "MG Venda",
+      value: formatarPercentualOuTraco(totalizadores.margem_sobre_venda),
+      intent: "slate",
+    },
+    {
+      label: "MG Custo",
+      value: formatarPercentualOuTraco(totalizadores.margem_sobre_custo),
+      intent: "slate",
+    },
+  ];
+}
+
 export function calcularDistribuicaoTemporalVendasFinanceiro(vendas = []) {
   const dias = [
     { chave: 1, nome: "Segunda", curto: "Seg" },

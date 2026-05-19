@@ -39,6 +39,7 @@ import {
   getFeriadosStorageKey,
   getStatusVendaMeta,
   getTextoComparacaoPeriodo,
+  montarCardsTotalizadoresListaVendasFinanceiro,
   montarFluxoResultadoCardsFinanceiro,
   montarFeriadosPeriodoFinanceiro,
   montarVendasPorDataCalendarioFinanceiro,
@@ -387,32 +388,20 @@ export default function VendasFinanceiro() {
     [listaVendasFiltrada],
   );
 
-  const formatarDeducaoTotalizador = (valor) =>
-    formatarMoedaComSinalOuTraco(valor, "-");
-
-  const cardsTotalizadoresLista = [
-    { label: "Vendas", value: totalizadoresListaVendas.quantidade.toLocaleString("pt-BR"), intent: "slate" },
-    { label: "Com NF", value: totalizadoresListaVendas.com_nf.toLocaleString("pt-BR"), intent: "blue" },
-    { label: "Venda Bruta", value: formatarMoedaOuTraco(totalizadoresListaVendas.venda_bruta), intent: "emerald" },
-    { label: "Tx Loja", value: formatarMoedaComSinalOuTraco(totalizadoresListaVendas.taxa_loja, "+"), intent: "emerald" },
-    { label: "Desconto", value: formatarDeducaoTotalizador(totalizadoresListaVendas.desconto), intent: "amber" },
-    { label: "Tx. Entrega", value: formatarDeducaoTotalizador(totalizadoresListaVendas.taxa_entrega), intent: "blue" },
-    { label: "Tx. Operac.", value: formatarDeducaoTotalizador(totalizadoresListaVendas.taxa_operacional), intent: "amber" },
-    { label: "Tx. Cartao", value: formatarDeducaoTotalizador(totalizadoresListaVendas.taxa_cartao), intent: "violet" },
-    { label: "Comissao", value: formatarDeducaoTotalizador(totalizadoresListaVendas.comissao), intent: "blue" },
-    { label: "Imposto", value: formatarDeducaoTotalizador(totalizadoresListaVendas.imposto), intent: "red" },
-    { label: "Custo Camp.", value: formatarDeducaoTotalizador(totalizadoresListaVendas.custo_campanha), intent: "cyan" },
-    { label: "Liquida", value: formatarMoedaOuTraco(totalizadoresListaVendas.venda_liquida), intent: "blue" },
-    { label: "Valor Recebido", value: formatarMoedaOuTraco(totalizadoresListaVendas.valor_recebido), intent: "emerald" },
-    { label: "Custo", value: formatarDeducaoTotalizador(totalizadoresListaVendas.custo_produtos), intent: "amber" },
-    {
-      label: "Lucro",
-      value: formatarMoedaOuTraco(totalizadoresListaVendas.lucro),
-      intent: Number(totalizadoresListaVendas.lucro || 0) >= 0 ? "emerald" : "red",
-    },
-    { label: "MG Venda", value: formatarPercentualOuTraco(totalizadoresListaVendas.margem_sobre_venda), intent: "slate" },
-    { label: "MG Custo", value: formatarPercentualOuTraco(totalizadoresListaVendas.margem_sobre_custo), intent: "slate" },
-  ];
+  const cardsTotalizadoresLista = useMemo(
+    () =>
+      montarCardsTotalizadoresListaVendasFinanceiro(totalizadoresListaVendas, {
+        formatarMoedaOuTraco,
+        formatarMoedaComSinalOuTraco,
+        formatarPercentualOuTraco,
+      }),
+    [
+      totalizadoresListaVendas,
+      formatarMoedaOuTraco,
+      formatarMoedaComSinalOuTraco,
+      formatarPercentualOuTraco,
+    ],
+  );
 
   const getTextoComparacao = () => getTextoComparacaoPeriodo(periodoComparacao);
 
