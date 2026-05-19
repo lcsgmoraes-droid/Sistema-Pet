@@ -947,6 +947,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-19: `VendasFinanceiro` extraiu feriados do periodo, calendario de vendas por dia e resumo de dias uteis para `vendasFinanceiroUtils`, reduzindo o arquivo principal de 1282 para 1220 linhas e ampliando os testes Node para 15 casos. Proximo passo: avaliar se vale extrair totalizadores/promocoes restantes ou migrar a refatoracao para outro arquivo critico.
 - 2026-05-19: `VendasFinanceiro` extraiu totalizadores da lista e analise de promocoes para `vendasFinanceiroUtils`, reduzindo o arquivo principal de 1220 para 1104 linhas e ampliando os testes Node para 17 casos. Proximo passo: extrair rankings por dia/horario ou encerrar a frente do financeiro e escolher outro arquivo critico.
 - 2026-05-19: `VendasFinanceiro` extraiu distribuicao temporal por dia da semana/horario e selecao de melhores periodos para `vendasFinanceiroUtils`, reduzindo o arquivo principal de 1104 para 1029 linhas e ampliando os testes Node para 18 casos. Proximo passo: extrair composicao dos cards/totalizadores restantes ou escolher o proximo arquivo critico.
+- 2026-05-19: `VendasFinanceiro` moveu a composicao dos cards do resultado financeiro para `vendasFinanceiroUtils`, reduzindo o arquivo principal de 1029 para 915 linhas e ampliando os testes Node para 19 casos. Proximo passo: extrair cards totalizadores da lista ou encerrar esta frente por ja estar abaixo de 1000 linhas.
 
 ### Nao fazer nesta onda
 
