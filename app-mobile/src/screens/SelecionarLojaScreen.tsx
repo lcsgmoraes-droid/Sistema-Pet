@@ -17,6 +17,20 @@ import KeyboardSafeScrollView from "../components/KeyboardSafeScrollView";
 import { extractStoreSlug, TenantInfo, useTenantStore } from "../store/tenant.store";
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from "../theme";
 
+const LOCATION_LOOKUP_TIMEOUT_MS = 6500;
+const GEOCODE_LOOKUP_TIMEOUT_MS = 4500;
+const LAST_POSITION_MAX_AGE_MS = 10 * 60 * 1000;
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, message: string): Promise<T> {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), timeoutMs);
+    promise
+      .then(resolve)
+      .catch(reject)
+      .finally(() => clearTimeout(timer));
+  });
+}
+
 export default function SelecionarLojaScreen() {
   const { buscarPorSlug, buscarPorLocalidade, confirmarTenant } = useTenantStore();
 
@@ -72,10 +86,24 @@ export default function SelecionarLojaScreen() {
         return;
       }
 
-      const posicao = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.Balanced,
-      });
-      const geocode = await Location.reverseGeocodeAsync(posicao.coords);
+      const localizacao =
+        (await Location.getLastKnownPositionAsync({
+          maxAge: LAST_POSITION_MAX_AGE_MS,
+          requiredAccuracy: 5000,
+        }).catch(() => null)) ||
+        (await withTimeout(
+          Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Low,
+          }),
+          LOCATION_LOOKUP_TIMEOUT_MS,
+          "Tempo excedido ao obter localizacao.",
+        ));
+
+      const geocode = await withTimeout(
+        Location.reverseGeocodeAsync(localizacao.coords),
+        GEOCODE_LOOKUP_TIMEOUT_MS,
+        "Tempo excedido ao identificar cidade.",
+      );
       const endereco = geocode[0];
       const cidadeAtual = endereco?.city || endereco?.subregion || endereco?.district;
 

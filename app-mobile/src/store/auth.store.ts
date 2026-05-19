@@ -5,34 +5,43 @@ import { AuthResponse, EcommerceUser } from "../types";
 
 const ROLE_CACHE_KEY_PREFIX = "ecommerce_role_cache_";
 
+async function clearOperationalRoleCache(user: EcommerceUser | null): Promise<void> {
+  if (!user?.id) return;
+  await SecureStore.deleteItemAsync(`${ROLE_CACHE_KEY_PREFIX}${user.id}`);
+}
+
 async function cacheOperationalRole(user: EcommerceUser | null): Promise<void> {
   if (!user?.id) return;
+  if (!user.is_veterinario && !user.is_entregador) {
+    await clearOperationalRoleCache(user);
+    return;
+  }
 
   const cacheKey = `${ROLE_CACHE_KEY_PREFIX}${user.id}`;
-  if (user.is_veterinario || user.is_entregador) {
-    await SecureStore.setItemAsync(
-      cacheKey,
-      JSON.stringify({
-        is_veterinario: user.is_veterinario ?? false,
-        veterinario_id: user.veterinario_id ?? null,
-        is_entregador: user.is_entregador ?? false,
-        funcionario_id: user.funcionario_id ?? null,
-        perfil_operacional: user.is_veterinario
-          ? "veterinario"
-          : user.is_entregador
-            ? "entregador"
-            : user.perfil_operacional ?? "cliente",
-      }),
-    );
-  } else {
-    // Não sobrescreve cache positivo com valor falso para evitar regressão intermitente.
-  }
+  await SecureStore.setItemAsync(
+    cacheKey,
+    JSON.stringify({
+      is_veterinario: user.is_veterinario ?? false,
+      veterinario_id: user.veterinario_id ?? null,
+      is_entregador: user.is_entregador ?? false,
+      funcionario_id: user.funcionario_id ?? null,
+      perfil_operacional: user.is_veterinario
+        ? "veterinario"
+        : user.is_entregador
+          ? "entregador"
+          : user.perfil_operacional ?? "cliente",
+    }),
+  );
 }
 
 async function applyCachedOperationalRole(
   user: EcommerceUser,
 ): Promise<EcommerceUser> {
   if (!user?.id || user.is_veterinario || user.is_entregador) return user;
+  if (user.perfil_operacional === "cliente") {
+    await clearOperationalRoleCache(user);
+    return user;
+  }
 
   const cacheKey = `${ROLE_CACHE_KEY_PREFIX}${user.id}`;
   const raw = await SecureStore.getItemAsync(cacheKey);
@@ -119,6 +128,13 @@ export const useAuthStore = create<AuthState>()((set, get) => ({
       const token = await AuthService.getStoredToken();
       if (token) {
         const freshUser = await AuthService.getProfile();
+        if (
+          freshUser.perfil_operacional === "cliente" &&
+          !freshUser.is_veterinario &&
+          !freshUser.is_entregador
+        ) {
+          await clearOperationalRoleCache(freshUser);
+        }
         const user = await applyCachedOperationalRole(freshUser);
         await cacheOperationalRole(user);
         set({ isAuthenticated: true, user, isLoading: false });
