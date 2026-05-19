@@ -2,6 +2,9 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   ajustarVendaImposto,
+  calcularAnaliseInteligenteVendas,
+  calcularPeriodoComparacaoFinanceiro,
+  calcularVariacaoFinanceira,
   calcularValorRecebidoVenda,
   dataKeyLocal,
   filtrarVendasRelatorio,
@@ -131,4 +134,102 @@ test("descreve periodo de comparacao financeiro", () => {
   assert.equal(getTextoComparacaoPeriodo("mes_anterior"), "mesmo período do mês anterior");
   assert.equal(getTextoComparacaoPeriodo("ano_anterior"), "mesmo período do ano anterior");
   assert.equal(getTextoComparacaoPeriodo("x"), "período anterior");
+});
+
+test("calcula intervalo comparativo preservando datas locais", () => {
+  assert.deepEqual(
+    calcularPeriodoComparacaoFinanceiro({
+      dataInicio: "2026-05-10",
+      dataFim: "2026-05-19",
+      periodoComparacao: "periodo_anterior",
+    }),
+    { data_inicio: "2026-04-30", data_fim: "2026-05-09" },
+  );
+
+  assert.deepEqual(
+    calcularPeriodoComparacaoFinanceiro({
+      dataInicio: "2026-05-10",
+      dataFim: "2026-05-19",
+      periodoComparacao: "mes_anterior",
+    }),
+    { data_inicio: "2026-04-10", data_fim: "2026-04-19" },
+  );
+
+  assert.deepEqual(
+    calcularPeriodoComparacaoFinanceiro({
+      dataInicio: "2026-05-10",
+      dataFim: "2026-05-19",
+      periodoComparacao: "ano_anterior",
+    }),
+    { data_inicio: "2025-05-10", data_fim: "2025-05-19" },
+  );
+
+  assert.deepEqual(
+    calcularPeriodoComparacaoFinanceiro({
+      dataInicio: "2026-05-10",
+      dataFim: "2026-05-19",
+      periodoComparacao: "desconhecido",
+    }),
+    { data_inicio: "", data_fim: "" },
+  );
+});
+
+test("calcula variacao financeira com percentual arredondado", () => {
+  assert.deepEqual(calcularVariacaoFinanceira(150, 100), { valor: 50, percentual: 50 });
+  assert.deepEqual(calcularVariacaoFinanceira(80, 100), { valor: -20, percentual: -20 });
+  assert.deepEqual(calcularVariacaoFinanceira(10, 3), {
+    valor: 7,
+    percentual: 233.3,
+  });
+  assert.deepEqual(calcularVariacaoFinanceira(100, 0), { valor: 0, percentual: 0 });
+});
+
+test("calcula analise inteligente de produtos e alertas de vendas", () => {
+  const produtosAnalise = [
+    {
+      nome: "Produto alta margem",
+      marca: "Marca A",
+      quantidade: 2,
+      custo_total: 50,
+      valor_total: 100,
+      categoria: "Racao",
+    },
+    ...Array.from({ length: 5 }, (_, indice) => ({
+      nome: `Produto baixa margem ${indice + 1}`,
+      quantidade: 1,
+      custo_total: 90,
+      valor_total: 100,
+      categoria: "Medicamentos",
+    })),
+  ];
+
+  const analise = calcularAnaliseInteligenteVendas({
+    produtosAnalise,
+    resumo: { quantidade_vendas: 8, venda_liquida: 1000, em_aberto: 250 },
+    resumoComparacao: { quantidade_vendas: 10 },
+    vendasPorData: [{ valor_liquido: 100 }, { valor_liquido: 200 }],
+  });
+
+  assert.equal(analise.produtosMaisLucrativos[0].nome, "Produto alta margem");
+  assert.equal(analise.produtosMaisLucrativos[0].lucro_total, 50);
+  assert.equal(analise.produtosPorCategoria.Racao.quantidade, 2);
+  assert.equal(analise.produtosPorCategoria.Racao.total, 100);
+  assert.equal(analise.produtosPorCategoria.Racao.margem_media, 100);
+  assert.equal(analise.previsaoProximos7Dias, 1050);
+  assert.deepEqual(
+    analise.alertasInteligentesVendas.map((alerta) => alerta.id),
+    [
+      "queda-vendas",
+      "recebiveis-abertos",
+      "mix-baixa-margem",
+      "oportunidade-upsell",
+    ],
+  );
+
+  assert.deepEqual(calcularAnaliseInteligenteVendas({ produtosAnalise: [] }), {
+    produtosMaisLucrativos: [],
+    produtosPorCategoria: {},
+    alertasInteligentesVendas: [],
+    previsaoProximos7Dias: 0,
+  });
 });
