@@ -18,7 +18,10 @@ from app.routes.ecommerce_auth import (
     _get_or_create_cliente_for_user,
     _serialize_profile,
 )
-from app.routes.ecommerce_cart import _current_identity as cart_current_identity
+from app.routes.ecommerce_cart import (
+    _activate_cart_tenant_context,
+    _current_identity as cart_current_identity,
+)
 from app.routes.ecommerce_checkout import _current_identity as checkout_current_identity
 from app.routes.ecommerce_entregador import _get_entregador_cliente
 from app.routes.ecommerce_entregador import obter_rota_entregador
@@ -110,6 +113,17 @@ def test_cart_and_checkout_identity_use_validated_ecommerce_user():
     assert cart_identity.tenant_id == str(tenant_id)
     assert checkout_identity.user_id == user.id
     assert checkout_identity.tenant_id == str(tenant_id)
+
+
+def test_cart_routes_can_reactivate_tenant_context_from_identity():
+    tenant_id = uuid4()
+    identity = SimpleNamespace(user_id=123, tenant_id=str(tenant_id))
+    clear_current_tenant()
+
+    resolved_tenant = _activate_cart_tenant_context(identity)
+
+    assert resolved_tenant == str(tenant_id)
+    assert get_current_tenant() == tenant_id
 
 
 def test_get_entregador_cliente_uses_validated_ecommerce_user_context():

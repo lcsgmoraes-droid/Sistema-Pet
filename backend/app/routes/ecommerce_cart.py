@@ -15,6 +15,7 @@ from app.services.validade_campanha_service import (
     mapear_ofertas_validade_por_produto,
     resolver_preco_publico_produto,
 )
+from app.tenancy.context import set_current_tenant
 
 
 router = APIRouter(prefix="/carrinho", tags=["ecommerce-cart"])
@@ -45,6 +46,12 @@ class EcommerceIdentity(BaseModel):
     tenant_id: str
 
 
+def _activate_cart_tenant_context(identity: EcommerceIdentity) -> str:
+    tenant_uuid = UUID(str(identity.tenant_id))
+    set_current_tenant(tenant_uuid)
+    return str(tenant_uuid)
+
+
 def _normalize_sales_channel(raw_channel: str | None) -> str:
     value = str(raw_channel or "ecommerce").strip().lower()
     if value in {"app", "app_movel", "mobile", "aplicativo"}:
@@ -66,13 +73,14 @@ def _current_identity(current_user: User = Depends(_get_current_ecommerce_user))
 
 
 def _find_or_create_carrinho(db: Session, identity: EcommerceIdentity) -> Pedido:
-    _expirar_reservas_automaticamente(db, identity.tenant_id)
+    tenant_id = _activate_cart_tenant_context(identity)
+    _expirar_reservas_automaticamente(db, tenant_id)
 
     carrinho = (
         db.query(Pedido)
         .filter(
             Pedido.cliente_id == identity.user_id,
-            Pedido.tenant_id == identity.tenant_id,
+            Pedido.tenant_id == tenant_id,
             Pedido.status == "carrinho",
         )
         .order_by(Pedido.id.desc())
@@ -85,7 +93,7 @@ def _find_or_create_carrinho(db: Session, identity: EcommerceIdentity) -> Pedido
     carrinho = Pedido(
         pedido_id=str(uuid4()),
         cliente_id=identity.user_id,
-        tenant_id=identity.tenant_id,
+        tenant_id=tenant_id,
         total=0.0,
         origem="web",
         status="carrinho",
@@ -233,13 +241,14 @@ def adicionar_item_carrinho(
     identity: EcommerceIdentity = Depends(_current_identity),
     db: Session = Depends(get_session),
 ):
-    _expirar_reservas_automaticamente(db, identity.tenant_id)
+    tenant_id = _activate_cart_tenant_context(identity)
+    _expirar_reservas_automaticamente(db, tenant_id)
 
     produto = (
         db.query(Produto)
         .filter(
             Produto.id == payload.produto_id,
-            Produto.tenant_id == identity.tenant_id,
+            Produto.tenant_id == tenant_id,
             Produto.situacao.is_not(False),  # aceita True e NULL (produtos importados)
         )
         .first()
@@ -266,7 +275,7 @@ def adicionar_item_carrinho(
         .filter(
             PedidoItem.pedido_id == carrinho.pedido_id,
             PedidoItem.produto_id == payload.produto_id,
-            PedidoItem.tenant_id == identity.tenant_id,
+            PedidoItem.tenant_id == tenant_id,
         )
         .first()
     )
@@ -285,7 +294,7 @@ def adicionar_item_carrinho(
 
     reservado_outros = _quantidade_reservada_produto(
         db,
-        tenant_id=identity.tenant_id,
+        tenant_id=tenant_id,
         produto_id=produto.id,
         excluir_pedido_id=carrinho.pedido_id,
     )
@@ -322,7 +331,7 @@ def adicionar_item_carrinho(
             quantidade=payload.quantidade,
             preco_unitario=preco_unitario,
             subtotal=round(payload.quantidade * preco_unitario, 2),
-            tenant_id=identity.tenant_id,
+            tenant_id=tenant_id,
         )
         db.add(item)
 
@@ -339,7 +348,8 @@ def atualizar_item_carrinho(
     identity: EcommerceIdentity = Depends(_current_identity),
     db: Session = Depends(get_session),
 ):
-    _expirar_reservas_automaticamente(db, identity.tenant_id)
+    tenant_id = _activate_cart_tenant_context(identity)
+    _expirar_reservas_automaticamente(db, tenant_id)
 
     carrinho = _find_or_create_carrinho(db, identity)
 
@@ -348,7 +358,7 @@ def atualizar_item_carrinho(
         .filter(
             PedidoItem.produto_id == payload.produto_id,
             PedidoItem.pedido_id == carrinho.pedido_id,
-            PedidoItem.tenant_id == identity.tenant_id,
+            PedidoItem.tenant_id == tenant_id,
         )
         .first()
     )
@@ -360,7 +370,7 @@ def atualizar_item_carrinho(
         db.query(Produto)
         .filter(
             Produto.id == item.produto_id,
-            Produto.tenant_id == identity.tenant_id,
+            Produto.tenant_id == tenant_id,
             Produto.situacao.is_not(False),  # aceita True e NULL (produtos importados)
         )
         .first()
@@ -375,7 +385,7 @@ def atualizar_item_carrinho(
     estoque_disponivel = float(produto.estoque_atual or 0.0)
     reservado_outros = _quantidade_reservada_produto(
         db,
-        tenant_id=identity.tenant_id,
+        tenant_id=tenant_id,
         produto_id=item.produto_id,
         excluir_pedido_id=carrinho.pedido_id,
     )
@@ -412,13 +422,14 @@ def limpar_carrinho(
     db: Session = Depends(get_session),
 ):
     """Remove todos os itens do carrinho ativo."""
-    _expirar_reservas_automaticamente(db, identity.tenant_id)
+    tenant_id = _activate_cart_tenant_context(identity)
+    _expirar_reservas_automaticamente(db, tenant_id)
 
     carrinho = (
         db.query(Pedido)
         .filter(
             Pedido.cliente_id == identity.user_id,
-            Pedido.tenant_id == identity.tenant_id,
+            Pedido.tenant_id == tenant_id,
             Pedido.status == "carrinho",
         )
         .order_by(Pedido.id.desc())
@@ -439,7 +450,8 @@ def remover_item_carrinho(
     identity: EcommerceIdentity = Depends(_current_identity),
     db: Session = Depends(get_session),
 ):
-    _expirar_reservas_automaticamente(db, identity.tenant_id)
+    tenant_id = _activate_cart_tenant_context(identity)
+    _expirar_reservas_automaticamente(db, tenant_id)
 
     carrinho = _find_or_create_carrinho(db, identity)
 
@@ -448,7 +460,7 @@ def remover_item_carrinho(
         .filter(
             PedidoItem.produto_id == produto_id,
             PedidoItem.pedido_id == carrinho.pedido_id,
-            PedidoItem.tenant_id == identity.tenant_id,
+            PedidoItem.tenant_id == tenant_id,
         )
         .first()
     )
@@ -468,13 +480,14 @@ def obter_carrinho(
     identity: EcommerceIdentity = Depends(_current_identity),
     db: Session = Depends(get_session),
 ):
-    _expirar_reservas_automaticamente(db, identity.tenant_id)
+    tenant_id = _activate_cart_tenant_context(identity)
+    _expirar_reservas_automaticamente(db, tenant_id)
 
     carrinho = (
         db.query(Pedido)
         .filter(
             Pedido.cliente_id == identity.user_id,
-            Pedido.tenant_id == identity.tenant_id,
+            Pedido.tenant_id == tenant_id,
             Pedido.status == "carrinho",
         )
         .order_by(Pedido.id.desc())
@@ -498,13 +511,14 @@ def aplicar_cupom(
     identity: EcommerceIdentity = Depends(_current_identity),
     db: Session = Depends(get_session),
 ):
-    _expirar_reservas_automaticamente(db, identity.tenant_id)
+    tenant_id = _activate_cart_tenant_context(identity)
+    _expirar_reservas_automaticamente(db, tenant_id)
 
     carrinho = (
         db.query(Pedido)
         .filter(
             Pedido.cliente_id == identity.user_id,
-            Pedido.tenant_id == identity.tenant_id,
+            Pedido.tenant_id == tenant_id,
             Pedido.status == "carrinho",
         )
         .order_by(Pedido.id.desc())
