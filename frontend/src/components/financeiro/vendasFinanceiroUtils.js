@@ -130,6 +130,59 @@ export function dataKeyLocal(valor) {
   return `${ano}-${mes}-${dia}`;
 }
 
+export function calcularFiltroRapidoPeriodoVendas(filtro, dataBase = new Date()) {
+  const agora = parseDataLocal(dataBase);
+  if (!agora) return null;
+
+  const ano = agora.getFullYear();
+  const mes = String(agora.getMonth() + 1).padStart(2, "0");
+  const hoje = dataKeyLocal(agora);
+
+  switch (filtro) {
+    case "hoje":
+      return { inicio: hoje, fim: hoje };
+    case "ontem": {
+      const ontem = new Date(agora);
+      ontem.setDate(agora.getDate() - 1);
+      const dataOntem = dataKeyLocal(ontem);
+      return { inicio: dataOntem, fim: dataOntem };
+    }
+    case "esta_semana": {
+      const diaSemana = agora.getDay();
+      const diasDesdeSegunda = diaSemana === 0 ? 6 : diaSemana - 1;
+      const primeiroDia = new Date(agora);
+      primeiroDia.setDate(agora.getDate() - diasDesdeSegunda);
+      return { inicio: dataKeyLocal(primeiroDia), fim: hoje };
+    }
+    case "este_mes":
+      return { inicio: `${ano}-${mes}-01`, fim: hoje };
+    case "mes_anterior": {
+      const mesPassado = new Date(ano, agora.getMonth() - 1, 1);
+      const ultimoDia = new Date(ano, agora.getMonth(), 0);
+      const anoMesPassado = mesPassado.getFullYear();
+      const numeroMesPassado = String(mesPassado.getMonth() + 1).padStart(2, "0");
+      return {
+        inicio: `${anoMesPassado}-${numeroMesPassado}-01`,
+        fim: dataKeyLocal(ultimoDia),
+      };
+    }
+    case "ultimos_7_dias": {
+      const seteDias = new Date(agora);
+      seteDias.setDate(agora.getDate() - 7);
+      return { inicio: dataKeyLocal(seteDias), fim: hoje };
+    }
+    case "ultimos_30_dias": {
+      const trintaDias = new Date(agora);
+      trintaDias.setDate(agora.getDate() - 30);
+      return { inicio: dataKeyLocal(trintaDias), fim: hoje };
+    }
+    case "este_ano":
+      return { inicio: `${ano}-01-01`, fim: hoje };
+    default:
+      return null;
+  }
+}
+
 export function normalizarFormaPagamentoLabel(valor) {
   const texto = String(valor || "").trim();
   const lower = texto.toLowerCase();
@@ -153,6 +206,49 @@ export function normalizarFormaPagamentoLabel(valor) {
   };
 
   return mapa[lower] || texto || "Nao informado";
+}
+
+export function consolidarFormasRecebimentoFinanceiro(formasRecebimento = []) {
+  const mapa = new Map();
+  (formasRecebimento || []).forEach((item) => {
+    const forma = normalizarFormaPagamentoLabel(item.forma_pagamento);
+    const atual = mapa.get(forma) || {
+      ...item,
+      forma_pagamento: forma,
+      valor_total: 0,
+    };
+    atual.valor_total += Number(item.valor_total || 0);
+    mapa.set(forma, atual);
+  });
+
+  return Array.from(mapa.values()).sort(
+    (a, b) => Number(b.valor_total || 0) - Number(a.valor_total || 0),
+  );
+}
+
+export function filtrarDadosFinanceiroVendas(dados, tipo, filtros = {}) {
+  if (!dados || dados.length === 0) return dados;
+
+  let dadosFiltrados = [...dados];
+  const { filtroFuncionario, filtroFormaPagamento, filtroCategoria } = filtros;
+
+  if (filtroFuncionario && tipo === "funcionario") {
+    dadosFiltrados = dadosFiltrados.filter(
+      (item) => item.funcionario === filtroFuncionario,
+    );
+  }
+
+  if (filtroFormaPagamento && tipo === "formaPagamento") {
+    dadosFiltrados = dadosFiltrados.filter(
+      (item) => item.forma_pagamento === filtroFormaPagamento,
+    );
+  }
+
+  if (filtroCategoria && tipo === "categoria") {
+    dadosFiltrados = dadosFiltrados.filter((item) => item.categoria === filtroCategoria);
+  }
+
+  return dadosFiltrados;
 }
 
 export function formatarDataLocal(valor, opcoes = {}) {

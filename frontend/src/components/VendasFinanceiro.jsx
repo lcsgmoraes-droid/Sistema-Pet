@@ -19,14 +19,17 @@ import VendasResumoTabelasPanel from "./financeiro/VendasResumoTabelasPanel";
 import {
   ajustarVendaImposto,
   calcularAnaliseInteligenteVendas,
+  calcularFiltroRapidoPeriodoVendas,
   calcularPeriodoComparacaoFinanceiro,
   calcularVariacaoFinanceira,
   calcularValorRecebidoVenda,
   carregarConfigDiasUteis,
   carregarFeriadosCustomizados,
   COLUNAS_RELATORIO_VENDAS,
+  consolidarFormasRecebimentoFinanceiro,
   dataKeyLocal,
   exportarPlanilhasExcel,
+  filtrarDadosFinanceiroVendas,
   filtrarVendasRelatorio,
   formatarDataVendaFinanceiro,
   formatarDataLocal,
@@ -36,7 +39,6 @@ import {
   getTextoComparacaoPeriodo,
   listarDiasPeriodo,
   montarFeriadosPadrao,
-  normalizarFormaPagamentoLabel,
   ordenarVendasRelatorio,
   parseDataHoraLocal,
   sanitizarNumero,
@@ -291,81 +293,32 @@ export default function VendasFinanceiro() {
     "#F97316",
   ];
 
-  // Funções de filtragem
-  const aplicarFiltros = (dados, tipo) => {
-    if (!dados || dados.length === 0) return dados;
+  const filtrosFinanceiros = { filtroFuncionario, filtroFormaPagamento, filtroCategoria };
 
-    let dadosFiltrados = [...dados];
+  const formasRecebimentoConsolidadas = useMemo(
+    () => consolidarFormasRecebimentoFinanceiro(formasRecebimento),
+    [formasRecebimento],
+  );
 
-    // Filtro por funcionário
-    if (filtroFuncionario && tipo === "funcionario") {
-      dadosFiltrados = dadosFiltrados.filter(
-        (item) => item.funcionario === filtroFuncionario,
-      );
-    }
+  const formasRecebimentoComparacaoConsolidadas = useMemo(
+    () => consolidarFormasRecebimentoFinanceiro(formasRecebimentoComparacao),
+    [formasRecebimentoComparacao],
+  );
 
-    // Filtro por forma de pagamento
-    if (filtroFormaPagamento && tipo === "formaPagamento") {
-      dadosFiltrados = dadosFiltrados.filter(
-        (item) => item.forma_pagamento === filtroFormaPagamento,
-      );
-    }
-
-    // Filtro por categoria
-    if (filtroCategoria && tipo === "categoria") {
-      dadosFiltrados = dadosFiltrados.filter(
-        (item) => item.categoria === filtroCategoria,
-      );
-    }
-
-    return dadosFiltrados;
-  };
-
-  const formasRecebimentoConsolidadas = useMemo(() => {
-    const mapa = new Map();
-    (formasRecebimento || []).forEach((item) => {
-      const forma = normalizarFormaPagamentoLabel(item.forma_pagamento);
-      const atual = mapa.get(forma) || {
-        ...item,
-        forma_pagamento: forma,
-        valor_total: 0,
-      };
-      atual.valor_total += Number(item.valor_total || 0);
-      mapa.set(forma, atual);
-    });
-    return Array.from(mapa.values()).sort(
-      (a, b) => Number(b.valor_total || 0) - Number(a.valor_total || 0),
-    );
-  }, [formasRecebimento]);
-
-  const formasRecebimentoComparacaoConsolidadas = useMemo(() => {
-    const mapa = new Map();
-    (formasRecebimentoComparacao || []).forEach((item) => {
-      const forma = normalizarFormaPagamentoLabel(item.forma_pagamento);
-      const atual = mapa.get(forma) || {
-        ...item,
-        forma_pagamento: forma,
-        valor_total: 0,
-      };
-      atual.valor_total += Number(item.valor_total || 0);
-      mapa.set(forma, atual);
-    });
-    return Array.from(mapa.values()).sort(
-      (a, b) => Number(b.valor_total || 0) - Number(a.valor_total || 0),
-    );
-  }, [formasRecebimentoComparacao]);
-
-  const formasRecebimentoFiltradas = aplicarFiltros(
+  const formasRecebimentoFiltradas = filtrarDadosFinanceiroVendas(
     formasRecebimentoConsolidadas,
     "formaPagamento",
+    filtrosFinanceiros,
   );
-  const vendasPorFuncionarioFiltradas = aplicarFiltros(
+  const vendasPorFuncionarioFiltradas = filtrarDadosFinanceiroVendas(
     vendasPorFuncionario,
     "funcionario",
+    filtrosFinanceiros,
   );
-  const produtosDetalhadosFiltrados = aplicarFiltros(
+  const produtosDetalhadosFiltrados = filtrarDadosFinanceiroVendas(
     produtosDetalhados,
     "categoria",
+    filtrosFinanceiros,
   );
 
   const feriadosPorData = useMemo(() => {
@@ -957,93 +910,11 @@ export default function VendasFinanceiro() {
   };
 
   const aplicarFiltroRapido = (filtro) => {
-    // Obter data atual sem conversão de timezone
-    const agora = new Date();
-    const ano = agora.getFullYear();
-    const mes = String(agora.getMonth() + 1).padStart(2, "0");
-    const dia = String(agora.getDate()).padStart(2, "0");
-    const hoje = `${ano}-${mes}-${dia}`;
+    const periodo = calcularFiltroRapidoPeriodoVendas(filtro);
+    if (!periodo) return;
 
-    let inicio, fim;
-
-    switch (filtro) {
-      case "hoje":
-        inicio = fim = hoje;
-        break;
-      case "ontem": {
-        const dataOntem = new Date(agora);
-        dataOntem.setDate(agora.getDate() - 1);
-        const anoOntem = dataOntem.getFullYear();
-        const mesOntem = String(dataOntem.getMonth() + 1).padStart(2, "0");
-        const diaOntem = String(dataOntem.getDate()).padStart(2, "0");
-        inicio = fim = `${anoOntem}-${mesOntem}-${diaOntem}`;
-        break;
-      }
-      case "esta_semana": {
-        const diaSemana = agora.getDay(); // 0=domingo, 1=segunda, ..., 6=sábado
-        const diasDesdeSegunda = diaSemana === 0 ? 6 : diaSemana - 1; // Se domingo, volta 6 dias; senão volta (dia-1)
-        const primeiroDia = new Date(agora);
-        primeiroDia.setDate(agora.getDate() - diasDesdeSegunda);
-        const anoPri = primeiroDia.getFullYear();
-        const mesPri = String(primeiroDia.getMonth() + 1).padStart(2, "0");
-        const diaPri = String(primeiroDia.getDate()).padStart(2, "0");
-        inicio = `${anoPri}-${mesPri}-${diaPri}`;
-        fim = hoje;
-        break;
-      }
-      case "este_mes":
-        inicio = `${ano}-${mes}-01`;
-        fim = hoje;
-        break;
-      case "mes_anterior": {
-        const mesPassado = new Date(
-          agora.getFullYear(),
-          agora.getMonth() - 1,
-          1,
-        );
-        const ultimoDia = new Date(agora.getFullYear(), agora.getMonth(), 0);
-        const anoMesPass = mesPassado.getFullYear();
-        const numeroMesPass = String(mesPassado.getMonth() + 1).padStart(
-          2,
-          "0",
-        );
-        const anoUltDia = ultimoDia.getFullYear();
-        const mesUltDia = String(ultimoDia.getMonth() + 1).padStart(2, "0");
-        const diaUltDia = String(ultimoDia.getDate()).padStart(2, "0");
-        inicio = `${anoMesPass}-${numeroMesPass}-01`;
-        fim = `${anoUltDia}-${mesUltDia}-${diaUltDia}`;
-        break;
-      }
-      case "ultimos_7_dias": {
-        const sete = new Date(agora);
-        sete.setDate(agora.getDate() - 7);
-        const anoSete = sete.getFullYear();
-        const mesSete = String(sete.getMonth() + 1).padStart(2, "0");
-        const diaSete = String(sete.getDate()).padStart(2, "0");
-        inicio = `${anoSete}-${mesSete}-${diaSete}`;
-        fim = hoje;
-        break;
-      }
-      case "ultimos_30_dias": {
-        const trinta = new Date(agora);
-        trinta.setDate(agora.getDate() - 30);
-        const anoTrinta = trinta.getFullYear();
-        const mesTrinta = String(trinta.getMonth() + 1).padStart(2, "0");
-        const diaTrinta = String(trinta.getDate()).padStart(2, "0");
-        inicio = `${anoTrinta}-${mesTrinta}-${diaTrinta}`;
-        fim = hoje;
-        break;
-      }
-      case "este_ano":
-        inicio = `${ano}-01-01`;
-        fim = hoje;
-        break;
-      default:
-        return;
-    }
-
-    setDataInicio(inicio);
-    setDataFim(fim);
+    setDataInicio(periodo.inicio);
+    setDataFim(periodo.fim);
     setFiltroSelecionado(filtro);
   };
 
