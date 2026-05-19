@@ -128,6 +128,24 @@ Padrao atual:
 - produtos importados pertencem ao tenant;
 - editar produto importado nao altera template nem outro tenant.
 
+## Catalogo Base Administrativo
+
+O catalogo base da loja `admin@mlprohub.com.br` pode ser importado por acao administrativa
+para novos tenants que quiserem iniciar com uma lista pronta de produtos.
+
+Regras obrigatorias:
+
+- a importacao e opcional e deve ter `dry-run` antes de `apply`;
+- a fonte padrao e a loja do Lucas, mas o destino recebe copias proprias;
+- copiar departamentos/grupos, categorias, marcas, cadastros auxiliares de racao,
+  produtos e imagens;
+- nao copiar Bling, filas, IDs externos, fornecedores, lotes, historico de preco,
+  movimentacoes, estoque, custo, margem, preco de venda, preco app ou preco ecommerce;
+- todo produto importado deve entrar com estoque e precos zerados;
+- uma nova execucao nao deve sobrescrever produtos ja importados nem duplicar registros;
+- a idempotencia deve usar `tenant_template_installs` e `tenant_template_item_installs`
+  com `bundle_code = catalogo-base-loja-lucas`.
+
 ## Migracoes
 
 Antes de aplicar migration em ambiente real:
