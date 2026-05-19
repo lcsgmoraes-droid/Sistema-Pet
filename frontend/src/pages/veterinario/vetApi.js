@@ -76,6 +76,12 @@ export const vetApi = {
   adicionarProcedimento: (data) => api.post(`${BASE}/procedimentos`, data),
   diagnosticoPushAgendamento: (agendamentoId) => api.get(`${BASE}/agendamentos/${agendamentoId}/push-diagnostico`),
 
+  // Orçamentos
+  listarOrcamentos: (params) => api.get(`${BASE}/orcamentos`, { params }),
+  criarOrcamento: (data) => api.post(`${BASE}/orcamentos`, data),
+  obterOrcamento: (id) => api.get(`${BASE}/orcamentos/${id}`),
+  atualizarOrcamento: (id, data) => api.patch(`${BASE}/orcamentos/${id}`, data),
+
   // Internações
   listarInternacoes: (statusOrParams) => {
     const params = (statusOrParams && typeof statusOrParams === "object")

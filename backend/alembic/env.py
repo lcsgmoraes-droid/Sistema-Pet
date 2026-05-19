@@ -56,6 +56,7 @@ import app.ops_models
 import app.compras_pendencias_models
 import app.bling_pedido_webhook_queue_models
 import app.template_models
+import app.veterinario_models
 
 # Stone (pagamentos)
 import app.stone_models

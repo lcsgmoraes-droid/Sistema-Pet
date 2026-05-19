@@ -10,6 +10,7 @@ from .veterinario_exames_routes import router as exames_router
 from .veterinario_ia_routes import router as ia_router
 from .veterinario_internacao_routes import router as internacao_router
 from .veterinario_parcerias_routes import router as parcerias_router
+from .veterinario_orcamentos_routes import router as orcamentos_router
 from .veterinario_relatorios_routes import router as relatorios_router
 
 router = APIRouter(prefix="/vet", tags=["Veterinario"])
@@ -20,5 +21,6 @@ router.include_router(ia_router)
 router.include_router(consultas_router)
 router.include_router(exames_router)
 router.include_router(catalogo_router)
+router.include_router(orcamentos_router)
 router.include_router(relatorios_router)
 router.include_router(parcerias_router)

@@ -73,6 +73,7 @@ export default function InternacoesConteudo({
           expandida={expandida}
           evolucoes={evolucoes}
           procedimentosInternacao={procedimentosInternacao}
+          procedimentosCatalogo={procedimentosCatalogo}
           onAbrirDetalhe={onAbrirDetalhe}
           onAbrirInsumoRapido={onAbrirInsumoRapido}
           onAbrirEvolucao={onAbrirEvolucao}
