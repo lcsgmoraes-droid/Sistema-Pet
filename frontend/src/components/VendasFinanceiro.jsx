@@ -19,11 +19,12 @@ import VendasResumoTabelasPanel from "./financeiro/VendasResumoTabelasPanel";
 import {
   ajustarVendaImposto,
   calcularAnaliseInteligenteVendas,
+  calcularAnalisePromocoesFinanceiro,
   calcularFiltroRapidoPeriodoVendas,
   calcularPeriodoComparacaoFinanceiro,
   calcularResumoDiasPeriodoFinanceiro,
+  calcularTotalizadoresListaVendasFinanceiro,
   calcularVariacaoFinanceira,
-  calcularValorRecebidoVenda,
   carregarConfigDiasUteis,
   carregarFeriadosCustomizados,
   COLUNAS_RELATORIO_VENDAS,
@@ -565,132 +566,15 @@ export default function VendasFinanceiro() {
     [vendasPorHorarioComMovimento],
   );
 
-  const analisePromocoes = useMemo(() => {
-    const topProdutos = new Map();
-    let vendasPromocao = 0;
-    let vendasNormais = 0;
-    let valorVendasPromocao = 0;
-    let valorVendasNormais = 0;
-    let valorItensPromocionais = 0;
-    let descontoPromocional = 0;
+  const analisePromocoes = useMemo(
+    () => calcularAnalisePromocoesFinanceiro(vendasResumoPeriodo),
+    [vendasResumoPeriodo],
+  );
 
-    vendasResumoPeriodo.forEach((venda) => {
-      const itens = Array.isArray(venda.itens) ? venda.itens : [];
-      const itensPromo = itens.filter((item) => item?.em_promocao);
-      const vendaTemPromocao = Boolean(venda.tem_promocao || itensPromo.length > 0);
-      const valorVenda = Number(venda.venda_liquida || venda.venda_bruta || 0);
-
-      if (vendaTemPromocao) {
-        vendasPromocao += 1;
-        valorVendasPromocao += valorVenda;
-      } else {
-        vendasNormais += 1;
-        valorVendasNormais += valorVenda;
-      }
-
-      itensPromo.forEach((item) => {
-        const chave = item.produto_id || item.produto_nome;
-        const atual = topProdutos.get(chave) || {
-          produto_nome: item.produto_nome || "Produto removido",
-          quantidade: 0,
-          valor: 0,
-          desconto: 0,
-          origens: new Set(),
-        };
-        const valorItem = Number(
-          item.valor_liquido || item.valor_promocional || item.venda_bruta || 0,
-        );
-        const descontoItem = Number(item.desconto_promocional || 0);
-
-        atual.quantidade += Number(item.quantidade || 0);
-        atual.valor += valorItem;
-        atual.desconto += descontoItem;
-        String(item.promocao_origem || "")
-          .split(",")
-          .map((origem) => origem.trim())
-          .filter(Boolean)
-          .forEach((origem) => atual.origens.add(origem));
-
-        valorItensPromocionais += valorItem;
-        descontoPromocional += descontoItem;
-        topProdutos.set(chave, atual);
-      });
-    });
-
-    const totalVendas = vendasPromocao + vendasNormais;
-    return {
-      totalVendas,
-      vendasPromocao,
-      vendasNormais,
-      valorVendasPromocao,
-      valorVendasNormais,
-      valorItensPromocionais,
-      descontoPromocional,
-      percentualPromocao:
-        totalVendas > 0 ? arredondarPercentual((vendasPromocao / totalVendas) * 100) : 0,
-      comparativo: [
-        { tipo: "Normais", quantidade: vendasNormais, valor: valorVendasNormais },
-        { tipo: "Preco promocional", quantidade: vendasPromocao, valor: valorVendasPromocao },
-      ],
-      topProdutos: Array.from(topProdutos.values())
-        .map((item) => ({
-          ...item,
-          origens: Array.from(item.origens),
-          valor: arredondarMoeda(item.valor),
-          desconto: arredondarMoeda(item.desconto),
-        }))
-        .sort((a, b) => b.valor - a.valor)
-        .slice(0, 8),
-    };
-  }, [vendasResumoPeriodo]);
-
-  const totalizadoresListaVendas = useMemo(() => {
-    const totais = listaVendasFiltrada.reduce(
-      (acc, venda) => {
-        acc.quantidade += 1;
-        acc.venda_bruta += Number(venda.venda_bruta || 0);
-        acc.taxa_loja += Number(venda.taxa_loja || 0);
-        acc.desconto += Number(venda.desconto || 0);
-        acc.taxa_entrega += Number(venda.taxa_entrega || 0);
-        acc.taxa_operacional += Number(venda.taxa_operacional || 0);
-        acc.taxa_cartao += Number(venda.taxa_cartao || 0);
-        acc.comissao += Number(venda.comissao || 0);
-        acc.imposto += Number(venda.imposto || 0);
-        acc.custo_campanha += Number(venda.custo_campanha || 0);
-        acc.venda_liquida += Number(venda.venda_liquida || 0);
-        acc.valor_recebido += calcularValorRecebidoVenda(venda);
-        acc.custo_produtos += Number(venda.custo_produtos || 0);
-        acc.lucro += Number(venda.lucro || 0);
-        if (vendaTemNotaFiscal(venda)) acc.com_nf += 1;
-        return acc;
-      },
-      {
-        quantidade: 0,
-        venda_bruta: 0,
-        taxa_loja: 0,
-        desconto: 0,
-        taxa_entrega: 0,
-        taxa_operacional: 0,
-        taxa_cartao: 0,
-        comissao: 0,
-        imposto: 0,
-        custo_campanha: 0,
-        venda_liquida: 0,
-        valor_recebido: 0,
-        custo_produtos: 0,
-        lucro: 0,
-        com_nf: 0,
-      },
-    );
-
-    return {
-      ...totais,
-      margem_sobre_venda:
-        totais.venda_bruta > 0 ? arredondarPercentual((totais.lucro / totais.venda_bruta) * 100) : 0,
-      margem_sobre_custo:
-        totais.custo_produtos > 0 ? arredondarPercentual((totais.lucro / totais.custo_produtos) * 100) : 0,
-    };
-  }, [listaVendasFiltrada]);
+  const totalizadoresListaVendas = useMemo(
+    () => calcularTotalizadoresListaVendasFinanceiro(listaVendasFiltrada),
+    [listaVendasFiltrada],
+  );
 
   const formatarDeducaoTotalizador = (valor) =>
     formatarMoedaComSinalOuTraco(valor, "-");
