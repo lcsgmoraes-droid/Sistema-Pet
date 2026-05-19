@@ -10,6 +10,8 @@ def test_ops_tenants_routes_are_admin_only_and_expose_import_actions():
     assert 'prefix="/admin/tenants"' in source
     assert "require_admin" in source
     assert '@router.get("")' in source
+    assert '@router.patch("/{tenant_id}/commercial")' in source
     assert '"/{tenant_id}/catalog-import/preview"' in source
     assert '"/{tenant_id}/catalog-import/apply"' in source
+    assert "CommercialStateRequest" in source
     assert "confirm" in source
