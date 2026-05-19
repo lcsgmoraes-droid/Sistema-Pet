@@ -940,6 +940,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-18: `EcommerceMVP` extraiu resumo, metricas e filtros da vitrine para `EcommerceCatalogControls`, preservando a composicao com sidebar e usando icones `lucide-react` para busca, atualizar e limpar filtros; a pagina principal caiu de 2483 para 2394 linhas. Proximo passo: separar a sidebar/resumo do carrinho da vitrine.
 - 2026-05-18: `EcommerceMVP` extraiu a sidebar da loja e o resumo lateral do carrinho para `EcommerceCartPanels`, mantendo handlers de checkout/navegacao na pagina e trocando icones soltos por `lucide-react`; a pagina principal caiu de 2394 para 2349 linhas. Proximo passo: separar lista de itens do carrinho/checkout.
 - 2026-05-18: `EcommerceMVP` ampliou a quebra do storefront extraindo a tela completa do carrinho para `EcommerceCartPanels` e o modal de detalhe do produto para `EcommerceProductDetailModal`, mantendo estado e handlers na pagina; a pagina principal caiu de 2349 para 2229 linhas. Proximo passo: separar checkout e pedidos em componentes de tela.
+- 2026-05-19: `VendasFinanceiro` retomou a Onda 1 extraindo utilitarios puros de data, feriados, status, Excel e ajuste de imposto para `frontend/src/components/financeiro/vendasFinanceiroUtils.js`, com teste dedicado em Node; o arquivo principal caiu de 2013 para 1671 linhas. Proximo passo: extrair filtros/periodos ou banner de comparacao para componentes menores.
 
 ### Nao fazer nesta onda
 
