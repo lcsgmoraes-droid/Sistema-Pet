@@ -18,6 +18,7 @@ import {
   formatarDataVendaFinanceiro,
   getStatusVendaMeta,
   getTextoComparacaoPeriodo,
+  montarCardsTotalizadoresListaVendasFinanceiro,
   montarFluxoResultadoCardsFinanceiro,
   montarFeriadosPeriodoFinanceiro,
   montarFeriadosPadrao,
@@ -362,6 +363,65 @@ test("calcula totalizadores da lista de vendas financeiras", () => {
     margem_sobre_venda: 6.7,
     margem_sobre_custo: 14.3,
   });
+});
+
+test("monta cards dos totalizadores da lista de vendas financeiras", () => {
+  const cards = montarCardsTotalizadoresListaVendasFinanceiro(
+    {
+      quantidade: 2,
+      com_nf: 1,
+      venda_bruta: 150,
+      taxa_loja: 3,
+      desconto: 7,
+      taxa_entrega: 7,
+      taxa_operacional: 5,
+      taxa_cartao: 8,
+      comissao: 12,
+      imposto: 14,
+      custo_campanha: 16,
+      venda_liquida: 110,
+      valor_recebido: 115,
+      custo_produtos: 70,
+      lucro: -10,
+      margem_sobre_venda: 6.7,
+      margem_sobre_custo: 14.3,
+    },
+    {
+      formatarMoedaOuTraco: (valor) => `money:${valor}`,
+      formatarMoedaComSinalOuTraco: (valor, sinal) => `${sinal}:${valor}`,
+      formatarPercentualOuTraco: (valor) => `pct:${valor}`,
+    },
+  );
+
+  assert.deepEqual(cards, [
+    { label: "Vendas", value: "2", intent: "slate" },
+    { label: "Com NF", value: "1", intent: "blue" },
+    { label: "Venda Bruta", value: "money:150", intent: "emerald" },
+    { label: "Tx Loja", value: "+:3", intent: "emerald" },
+    { label: "Desconto", value: "-:7", intent: "amber" },
+    { label: "Tx. Entrega", value: "-:7", intent: "blue" },
+    { label: "Tx. Operac.", value: "-:5", intent: "amber" },
+    { label: "Tx. Cartao", value: "-:8", intent: "violet" },
+    { label: "Comissao", value: "-:12", intent: "blue" },
+    { label: "Imposto", value: "-:14", intent: "red" },
+    { label: "Custo Camp.", value: "-:16", intent: "cyan" },
+    { label: "Liquida", value: "money:110", intent: "blue" },
+    { label: "Valor Recebido", value: "money:115", intent: "emerald" },
+    { label: "Custo", value: "-:70", intent: "amber" },
+    { label: "Lucro", value: "money:-10", intent: "red" },
+    { label: "MG Venda", value: "pct:6.7", intent: "slate" },
+    { label: "MG Custo", value: "pct:14.3", intent: "slate" },
+  ]);
+
+  const cardsLucroPositivo = montarCardsTotalizadoresListaVendasFinanceiro(
+    { lucro: 1 },
+    {
+      formatarMoedaOuTraco: (valor) => `money:${valor}`,
+      formatarMoedaComSinalOuTraco: (valor, sinal) => `${sinal}:${valor}`,
+      formatarPercentualOuTraco: (valor) => `pct:${valor}`,
+    },
+  );
+  assert.equal(cardsLucroPositivo.find((card) => card.label === "Lucro").intent, "emerald");
 });
 
 test("calcula analise financeira de promocoes", () => {
