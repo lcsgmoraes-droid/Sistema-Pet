@@ -2,11 +2,17 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   ajustarVendaImposto,
+  calcularValorRecebidoVenda,
   dataKeyLocal,
+  filtrarVendasRelatorio,
+  formatarDataVendaFinanceiro,
   getStatusVendaMeta,
+  getTextoComparacaoPeriodo,
   montarFeriadosPadrao,
   normalizarFormaPagamentoLabel,
+  ordenarVendasRelatorio,
   parseDataLocal,
+  sanitizarNumero,
   vendaEstaEmAberto,
 } from "./vendasFinanceiroUtils.js";
 
@@ -64,4 +70,65 @@ test("ajustarVendaImposto remove imposto de venda sem nota e preserva venda fisc
   const vendaComNota = ajustarVendaImposto({ status: "pago_nf", imposto: 18 }, false);
   assert.equal(vendaComNota.imposto_aplicado, true);
   assert.equal(vendaComNota.imposto_original, 18);
+});
+
+test("calcula valor recebido visual conforme status da venda", () => {
+  assert.equal(calcularValorRecebidoVenda({ valor_recebido: 12.5, status: "aberta" }), 12.5);
+  assert.equal(calcularValorRecebidoVenda({ status: "finalizada", venda_bruta: 100 }), 100);
+  assert.equal(calcularValorRecebidoVenda({ status: "aberta", venda_bruta: 100 }), 0);
+});
+
+test("formata datas e sanitiza numeros para os paineis financeiros", () => {
+  assert.equal(formatarDataVendaFinanceiro("2026-05-19T23:14:22-03:00"), "19/05/2026");
+  assert.equal(formatarDataVendaFinanceiro("invalida"), "N/A");
+  assert.equal(sanitizarNumero(null), 0);
+  assert.equal(sanitizarNumero(Number.POSITIVE_INFINITY), 0);
+  assert.equal(sanitizarNumero("12.5"), "12.5");
+});
+
+test("filtra e ordena vendas para relatorio personalizado", () => {
+  const vendas = [
+    {
+      id: 1,
+      data_venda: "2026-05-18",
+      funcionario_nome: "Ana",
+      forma_pagamento: "Pix",
+      categoria: "Racao",
+      status: "finalizada",
+      venda_bruta: 50,
+      lucro: 12,
+    },
+    {
+      id: 2,
+      data_venda: "2026-05-19",
+      funcionario: "Bia",
+      pagamento_principal: "Cartao Credito",
+      categoria: "Medicamento",
+      status: "aberta",
+      venda_bruta: 100,
+      lucro: 30,
+    },
+  ];
+
+  assert.deepEqual(
+    filtrarVendasRelatorio(vendas, {
+      escopo: "filtrado",
+      filtroFuncionario: "Bia",
+      filtroFormaPagamento: "Cartao Credito",
+      filtroCategoria: "Medicamento",
+      filtroStatusLista: "em_aberto",
+    }).map((venda) => venda.id),
+    [2],
+  );
+
+  assert.deepEqual(ordenarVendasRelatorio(vendas, "bruta_asc").map((venda) => venda.id), [1, 2]);
+  assert.deepEqual(ordenarVendasRelatorio(vendas, "lucro_desc").map((venda) => venda.id), [2, 1]);
+  assert.deepEqual(ordenarVendasRelatorio(vendas, "data_desc").map((venda) => venda.id), [2, 1]);
+});
+
+test("descreve periodo de comparacao financeiro", () => {
+  assert.equal(getTextoComparacaoPeriodo("periodo_anterior"), "mesmo período anterior");
+  assert.equal(getTextoComparacaoPeriodo("mes_anterior"), "mesmo período do mês anterior");
+  assert.equal(getTextoComparacaoPeriodo("ano_anterior"), "mesmo período do ano anterior");
+  assert.equal(getTextoComparacaoPeriodo("x"), "período anterior");
 });

@@ -268,6 +268,114 @@ export function vendaEstaEmAberto(venda) {
   return !["finalizada", "pago_nf", "baixada", "paga", "cancelada"].includes(status);
 }
 
+export function calcularValorRecebidoVenda(venda) {
+  const valorInformado = Number(venda?.valor_recebido || 0);
+  if (valorInformado > 0) return valorInformado;
+
+  const status = String(venda?.status || "").toLowerCase();
+  if (["finalizada", "pago_nf", "baixada", "paga"].includes(status)) {
+    return Number(venda?.venda_bruta || venda?.venda_liquida || 0);
+  }
+
+  return 0;
+}
+
+export function sanitizarNumero(valor) {
+  if (
+    valor === null ||
+    valor === undefined ||
+    Number.isNaN(Number(valor)) ||
+    !Number.isFinite(Number(valor))
+  ) {
+    return 0;
+  }
+  return valor;
+}
+
+export function formatarDataVendaFinanceiro(dataStr) {
+  if (!dataStr) return "N/A";
+  const dataLocal = parseDataLocal(dataStr);
+  if (dataLocal) return dataLocal.toLocaleDateString("pt-BR");
+  try {
+    if (dataStr instanceof Date) {
+      return dataStr.toLocaleDateString("pt-BR");
+    }
+
+    if (typeof dataStr === "string" && dataStr.includes("T")) {
+      const dateOnly = dataStr.split("T")[0];
+      const [year, month, day] = dateOnly.split("-");
+      return `${day}/${month}/${year}`;
+    }
+
+    const data = new Date(dataStr);
+    if (Number.isNaN(data.getTime())) {
+      return "N/A";
+    }
+
+    return data.toLocaleDateString("pt-BR");
+  } catch {
+    return "N/A";
+  }
+}
+
+export function filtrarVendasRelatorio(
+  vendas,
+  {
+    escopo = "filtrado",
+    filtroFuncionario = "",
+    filtroFormaPagamento = "",
+    filtroCategoria = "",
+    filtroStatusLista = "",
+  } = {},
+) {
+  if (escopo === "geral") return [...(vendas || [])];
+
+  return (vendas || []).filter((venda) => {
+    const funcionario = String(venda.funcionario_nome || venda.funcionario || "");
+    const formaPagamento = String(venda.forma_pagamento || venda.pagamento_principal || "");
+    const categoria = String(venda.categoria || "");
+
+    const okFuncionario = !filtroFuncionario || funcionario === filtroFuncionario;
+    const okForma = !filtroFormaPagamento || formaPagamento === filtroFormaPagamento;
+    const okCategoria = !filtroCategoria || categoria === filtroCategoria;
+    const okStatus = filtroStatusLista !== "em_aberto" || vendaEstaEmAberto(venda);
+
+    return okFuncionario && okForma && okCategoria && okStatus;
+  });
+}
+
+export function ordenarVendasRelatorio(lista, ordenacao) {
+  const copia = [...(lista || [])];
+  switch (ordenacao) {
+    case "data_asc":
+      return copia.sort((a, b) => parseDataLocal(a.data_venda) - parseDataLocal(b.data_venda));
+    case "bruta_desc":
+      return copia.sort((a, b) => Number(b.venda_bruta || 0) - Number(a.venda_bruta || 0));
+    case "bruta_asc":
+      return copia.sort((a, b) => Number(a.venda_bruta || 0) - Number(b.venda_bruta || 0));
+    case "lucro_desc":
+      return copia.sort((a, b) => Number(b.lucro || 0) - Number(a.lucro || 0));
+    case "lucro_asc":
+      return copia.sort((a, b) => Number(a.lucro || 0) - Number(b.lucro || 0));
+    case "data_desc":
+    default:
+      return copia.sort((a, b) => parseDataLocal(b.data_venda) - parseDataLocal(a.data_venda));
+  }
+}
+
+export function getTextoComparacaoPeriodo(periodoComparacao) {
+  switch (periodoComparacao) {
+    case "periodo_anterior":
+      return "mesmo período anterior";
+    case "mes_anterior":
+      return "mesmo período do mês anterior";
+    case "ano_anterior":
+      return "mesmo período do ano anterior";
+    default:
+      return "período anterior";
+  }
+}
+
 export function getStatusVendaMeta(status) {
   const statusNormalizado = String(status || "").toLowerCase();
   if (statusNormalizado === "finalizada") {

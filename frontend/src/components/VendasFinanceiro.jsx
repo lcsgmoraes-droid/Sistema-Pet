@@ -18,20 +18,25 @@ import VendasResultadoComposicaoPanel from "./financeiro/VendasResultadoComposic
 import VendasResumoTabelasPanel from "./financeiro/VendasResumoTabelasPanel";
 import {
   ajustarVendaImposto,
+  calcularValorRecebidoVenda,
   carregarConfigDiasUteis,
   carregarFeriadosCustomizados,
   COLUNAS_RELATORIO_VENDAS,
   dataKeyLocal,
   exportarPlanilhasExcel,
+  filtrarVendasRelatorio,
+  formatarDataVendaFinanceiro,
   formatarDataLocal,
   getDiasUteisStorageKey,
   getFeriadosStorageKey,
   getStatusVendaMeta,
+  getTextoComparacaoPeriodo,
   listarDiasPeriodo,
   montarFeriadosPadrao,
   normalizarFormaPagamentoLabel,
-  parseDataLocal,
+  ordenarVendasRelatorio,
   parseDataHoraLocal,
+  sanitizarNumero,
   vendaEstaEmAberto,
 } from "./financeiro/vendasFinanceiroUtils";
 import MoneyCell, { formatMoneyCellValue, isZeroMoneyValue } from "./ui/MoneyCell";
@@ -173,103 +178,21 @@ export default function VendasFinanceiro() {
   const formatarPercentualOuTraco = (valor) =>
     valorEhZeroVisual(valor) ? "-" : `${valor}%`;
 
-  const calcularValorRecebidoVenda = (venda) => {
-    const valorInformado = Number(venda?.valor_recebido || 0);
-    if (valorInformado > 0) return valorInformado;
-
-    const status = String(venda?.status || "").toLowerCase();
-    if (["finalizada", "pago_nf", "baixada", "paga"].includes(status)) {
-      return Number(venda?.venda_bruta || venda?.venda_liquida || 0);
-    }
-
-    return 0;
-  };
-
-  // Helper para garantir números válidos
-  const sanitizarNumero = (valor) => {
-    if (
-      valor === null ||
-      valor === undefined ||
-      Number.isNaN(Number(valor)) ||
-      !Number.isFinite(Number(valor))
-    ) {
-      return 0;
-    }
-    return valor;
-  };
-
-  const formatarData = (dataStr) => {
-    if (!dataStr) return "N/A";
-    const dataLocal = parseDataLocal(dataStr);
-    if (dataLocal) return dataLocal.toLocaleDateString("pt-BR");
-    try {
-      // Se já é um objeto Date
-      if (dataStr instanceof Date) {
-        return dataStr.toLocaleDateString("pt-BR");
-      }
-
-      // Se é string ISO (ex: 2026-02-13T23:14:22-03:00)
-      // Extrair apenas a parte da data sem fazer conversões de timezone
-      if (typeof dataStr === "string" && dataStr.includes("T")) {
-        const dateOnly = dataStr.split("T")[0]; // "2026-02-13"
-        const [year, month, day] = dateOnly.split("-");
-        return `${day}/${month}/${year}`;
-      }
-
-      // Tentar parse de ISO string ou formato YYYY-MM-DD
-      const data = new Date(dataStr);
-
-      // Verificar se é uma data válida
-      if (Number.isNaN(data.getTime())) {
-        return "N/A";
-      }
-
-      return data.toLocaleDateString("pt-BR");
-    } catch {
-      return "N/A";
-    }
-  };
+  const formatarData = formatarDataVendaFinanceiro;
 
   const listaVendasComImpostoAjustado = useMemo(
     () => listaVendas.map((venda) => ajustarVendaImposto(venda, mostrarImpostoTodasVendas)),
     [listaVendas, mostrarImpostoTodasVendas],
   );
 
-  const filtrarVendasParaRelatorio = (escopo) => {
-    if (escopo === "geral") return [...listaVendasComImpostoAjustado];
-
-    return listaVendasComImpostoAjustado.filter((venda) => {
-      const funcionario = String(venda.funcionario_nome || venda.funcionario || "");
-      const formaPagamento = String(venda.forma_pagamento || venda.pagamento_principal || "");
-      const categoria = String(venda.categoria || "");
-
-      const okFuncionario = !filtroFuncionario || funcionario === filtroFuncionario;
-      const okForma = !filtroFormaPagamento || formaPagamento === filtroFormaPagamento;
-      const okCategoria = !filtroCategoria || categoria === filtroCategoria;
-      const okStatus = filtroStatusLista !== "em_aberto" || vendaEstaEmAberto(venda);
-
-      return okFuncionario && okForma && okCategoria && okStatus;
+  const filtrarVendasParaRelatorio = (escopo) =>
+    filtrarVendasRelatorio(listaVendasComImpostoAjustado, {
+      escopo,
+      filtroFuncionario,
+      filtroFormaPagamento,
+      filtroCategoria,
+      filtroStatusLista,
     });
-  };
-
-  const ordenarVendasRelatorio = (lista, ordenacao) => {
-    const copia = [...lista];
-    switch (ordenacao) {
-      case "data_asc":
-        return copia.sort((a, b) => parseDataLocal(a.data_venda) - parseDataLocal(b.data_venda));
-      case "bruta_desc":
-        return copia.sort((a, b) => Number(b.venda_bruta || 0) - Number(a.venda_bruta || 0));
-      case "bruta_asc":
-        return copia.sort((a, b) => Number(a.venda_bruta || 0) - Number(b.venda_bruta || 0));
-      case "lucro_desc":
-        return copia.sort((a, b) => Number(b.lucro || 0) - Number(a.lucro || 0));
-      case "lucro_asc":
-        return copia.sort((a, b) => Number(a.lucro || 0) - Number(b.lucro || 0));
-      case "data_desc":
-      default:
-        return copia.sort((a, b) => parseDataLocal(b.data_venda) - parseDataLocal(a.data_venda));
-    }
-  };
 
   const exportarRelatorioListaVendas = async ({ escopo }) => {
     const dadosFiltrados = filtrarVendasParaRelatorio(escopo);
@@ -902,18 +825,7 @@ export default function VendasFinanceiro() {
     { label: "MG Custo", value: formatarPercentualOuTraco(totalizadoresListaVendas.margem_sobre_custo), intent: "slate" },
   ];
 
-  const getTextoComparacao = () => {
-    switch (periodoComparacao) {
-      case "periodo_anterior":
-        return "mesmo período anterior";
-      case "mes_anterior":
-        return "mesmo período do mês anterior";
-      case "ano_anterior":
-        return "mesmo período do ano anterior";
-      default:
-        return "período anterior";
-    }
-  };
+  const getTextoComparacao = () => getTextoComparacaoPeriodo(periodoComparacao);
 
   const exportarParaPDF = async () => {
     if (!dataInicio || !dataFim) {
