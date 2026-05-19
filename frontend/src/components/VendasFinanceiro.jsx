@@ -20,6 +20,7 @@ import {
   ajustarVendaImposto,
   calcularAnaliseInteligenteVendas,
   calcularAnalisePromocoesFinanceiro,
+  calcularDistribuicaoTemporalVendasFinanceiro,
   calcularFiltroRapidoPeriodoVendas,
   calcularPeriodoComparacaoFinanceiro,
   calcularResumoDiasPeriodoFinanceiro,
@@ -41,7 +42,6 @@ import {
   montarFeriadosPeriodoFinanceiro,
   montarVendasPorDataCalendarioFinanceiro,
   ordenarVendasRelatorio,
-  parseDataHoraLocal,
   sanitizarNumero,
   vendaEstaEmAberto,
 } from "./financeiro/vendasFinanceiroUtils";
@@ -480,91 +480,16 @@ export default function VendasFinanceiro() {
     ];
   }, [resumo]);
 
-  const vendasPorDiaSemanaResumo = useMemo(() => {
-    const dias = [
-      { chave: 1, nome: "Segunda", curto: "Seg" },
-      { chave: 2, nome: "Terca", curto: "Ter" },
-      { chave: 3, nome: "Quarta", curto: "Qua" },
-      { chave: 4, nome: "Quinta", curto: "Qui" },
-      { chave: 5, nome: "Sexta", curto: "Sex" },
-      { chave: 6, nome: "Sabado", curto: "Sab" },
-      { chave: 0, nome: "Domingo", curto: "Dom" },
-    ];
-    const mapa = new Map(
-      dias.map((dia, ordem) => [
-        dia.chave,
-        {
-          ...dia,
-          ordem,
-          quantidade: 0,
-          valor_bruto: 0,
-          valor_liquido: 0,
-          ticket_medio: 0,
-        },
-      ]),
-    );
-
-    vendasResumoPeriodo.forEach((venda) => {
-      const data = parseDataHoraLocal(venda.data_venda);
-      if (!data) return;
-      const item = mapa.get(data.getDay());
-      if (!item) return;
-      item.quantidade += 1;
-      item.valor_bruto += Number(venda.venda_bruta || 0);
-      item.valor_liquido += Number(venda.venda_liquida || 0);
-    });
-
-    return Array.from(mapa.values()).map((item) => ({
-      ...item,
-      ticket_medio: item.quantidade > 0 ? item.valor_liquido / item.quantidade : 0,
-    }));
-  }, [vendasResumoPeriodo]);
-
-  const vendasPorHorarioResumo = useMemo(() => {
-    const horas = Array.from({ length: 24 }, (_, hora) => ({
-      hora,
-      faixa: `${String(hora).padStart(2, "0")}h`,
-      quantidade: 0,
-      valor_bruto: 0,
-      valor_liquido: 0,
-      ticket_medio: 0,
-    }));
-
-    vendasResumoPeriodo.forEach((venda) => {
-      const data = parseDataHoraLocal(venda.data_venda);
-      if (!data) return;
-      const item = horas[data.getHours()];
-      item.quantidade += 1;
-      item.valor_bruto += Number(venda.venda_bruta || 0);
-      item.valor_liquido += Number(venda.venda_liquida || 0);
-    });
-
-    return horas.map((item) => ({
-      ...item,
-      ticket_medio: item.quantidade > 0 ? item.valor_liquido / item.quantidade : 0,
-    }));
-  }, [vendasResumoPeriodo]);
-
-  const vendasPorHorarioComMovimento = useMemo(
-    () => vendasPorHorarioResumo.filter((item) => item.quantidade > 0),
-    [vendasPorHorarioResumo],
+  const distribuicaoTemporalVendas = useMemo(
+    () => calcularDistribuicaoTemporalVendasFinanceiro(vendasResumoPeriodo),
+    [vendasResumoPeriodo],
   );
-
-  const melhorDiaSemana = useMemo(
-    () =>
-      [...vendasPorDiaSemanaResumo].sort(
-        (a, b) => Number(b.valor_liquido || 0) - Number(a.valor_liquido || 0),
-      )[0],
-    [vendasPorDiaSemanaResumo],
-  );
-
-  const melhorHorario = useMemo(
-    () =>
-      [...vendasPorHorarioComMovimento].sort(
-        (a, b) => Number(b.valor_liquido || 0) - Number(a.valor_liquido || 0),
-      )[0],
-    [vendasPorHorarioComMovimento],
-  );
+  const {
+    vendasPorDiaSemanaResumo,
+    vendasPorHorarioComMovimento,
+    melhorDiaSemana,
+    melhorHorario,
+  } = distribuicaoTemporalVendas;
 
   const analisePromocoes = useMemo(
     () => calcularAnalisePromocoesFinanceiro(vendasResumoPeriodo),

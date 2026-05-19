@@ -4,6 +4,7 @@ import {
   ajustarVendaImposto,
   calcularAnaliseInteligenteVendas,
   calcularAnalisePromocoesFinanceiro,
+  calcularDistribuicaoTemporalVendasFinanceiro,
   calcularFiltroRapidoPeriodoVendas,
   calcularResumoDiasPeriodoFinanceiro,
   calcularTotalizadoresListaVendasFinanceiro,
@@ -415,6 +416,69 @@ test("calcula analise financeira de promocoes", () => {
       origens: ["campanha", "cupom"],
     },
   ]);
+});
+
+test("calcula distribuicao temporal financeira por dia e horario", () => {
+  const analise = calcularDistribuicaoTemporalVendasFinanceiro([
+    {
+      data_venda: "2026-05-18T09:15:00",
+      venda_bruta: 100,
+      venda_liquida: 80,
+    },
+    {
+      data_venda: "2026-05-18T09:45:00",
+      venda_bruta: 50,
+      venda_liquida: 40,
+    },
+    {
+      data_venda: "2026-05-19T15:30:00",
+      venda_bruta: 200,
+      venda_liquida: 150,
+    },
+    {
+      data_venda: "data-invalida",
+      venda_bruta: 999,
+      venda_liquida: 999,
+    },
+  ]);
+
+  assert.equal(analise.vendasPorDiaSemanaResumo.length, 7);
+  assert.deepEqual(
+    analise.vendasPorDiaSemanaResumo.map((dia) => dia.curto),
+    ["Seg", "Ter", "Qua", "Qui", "Sex", "Sab", "Dom"],
+  );
+
+  const segunda = analise.vendasPorDiaSemanaResumo[0];
+  assert.equal(segunda.nome, "Segunda");
+  assert.equal(segunda.quantidade, 2);
+  assert.equal(segunda.valor_bruto, 150);
+  assert.equal(segunda.valor_liquido, 120);
+  assert.equal(segunda.ticket_medio, 60);
+
+  const terca = analise.vendasPorDiaSemanaResumo[1];
+  assert.equal(terca.quantidade, 1);
+  assert.equal(terca.valor_liquido, 150);
+  assert.equal(terca.ticket_medio, 150);
+
+  assert.equal(analise.vendasPorHorarioResumo.length, 24);
+  assert.deepEqual(
+    analise.vendasPorHorarioComMovimento.map((hora) => ({
+      faixa: hora.faixa,
+      quantidade: hora.quantidade,
+      valor_liquido: hora.valor_liquido,
+      ticket_medio: hora.ticket_medio,
+    })),
+    [
+      { faixa: "09h", quantidade: 2, valor_liquido: 120, ticket_medio: 60 },
+      { faixa: "15h", quantidade: 1, valor_liquido: 150, ticket_medio: 150 },
+    ],
+  );
+  assert.equal(analise.melhorDiaSemana.nome, "Terca");
+  assert.equal(analise.melhorHorario.faixa, "15h");
+
+  const vazio = calcularDistribuicaoTemporalVendasFinanceiro([]);
+  assert.equal(vazio.melhorDiaSemana.nome, "Segunda");
+  assert.equal(vazio.melhorHorario, undefined);
 });
 
 test("descreve periodo de comparacao financeiro", () => {

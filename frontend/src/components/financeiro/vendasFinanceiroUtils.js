@@ -854,6 +854,82 @@ export function calcularTotalizadoresListaVendasFinanceiro(vendas = []) {
   };
 }
 
+export function calcularDistribuicaoTemporalVendasFinanceiro(vendas = []) {
+  const dias = [
+    { chave: 1, nome: "Segunda", curto: "Seg" },
+    { chave: 2, nome: "Terca", curto: "Ter" },
+    { chave: 3, nome: "Quarta", curto: "Qua" },
+    { chave: 4, nome: "Quinta", curto: "Qui" },
+    { chave: 5, nome: "Sexta", curto: "Sex" },
+    { chave: 6, nome: "Sabado", curto: "Sab" },
+    { chave: 0, nome: "Domingo", curto: "Dom" },
+  ];
+  const mapaDias = new Map(
+    dias.map((dia, ordem) => [
+      dia.chave,
+      {
+        ...dia,
+        ordem,
+        quantidade: 0,
+        valor_bruto: 0,
+        valor_liquido: 0,
+        ticket_medio: 0,
+      },
+    ]),
+  );
+  const horas = Array.from({ length: 24 }, (_, hora) => ({
+    hora,
+    faixa: `${String(hora).padStart(2, "0")}h`,
+    quantidade: 0,
+    valor_bruto: 0,
+    valor_liquido: 0,
+    ticket_medio: 0,
+  }));
+
+  (vendas || []).forEach((venda) => {
+    const data = parseDataHoraLocal(venda.data_venda);
+    if (!data) return;
+
+    const dia = mapaDias.get(data.getDay());
+    if (dia) {
+      dia.quantidade += 1;
+      dia.valor_bruto += Number(venda.venda_bruta || 0);
+      dia.valor_liquido += Number(venda.venda_liquida || 0);
+    }
+
+    const hora = horas[data.getHours()];
+    if (hora) {
+      hora.quantidade += 1;
+      hora.valor_bruto += Number(venda.venda_bruta || 0);
+      hora.valor_liquido += Number(venda.venda_liquida || 0);
+    }
+  });
+
+  const vendasPorDiaSemanaResumo = Array.from(mapaDias.values()).map((item) => ({
+    ...item,
+    ticket_medio: item.quantidade > 0 ? item.valor_liquido / item.quantidade : 0,
+  }));
+  const vendasPorHorarioResumo = horas.map((item) => ({
+    ...item,
+    ticket_medio: item.quantidade > 0 ? item.valor_liquido / item.quantidade : 0,
+  }));
+  const vendasPorHorarioComMovimento = vendasPorHorarioResumo.filter(
+    (item) => item.quantidade > 0,
+  );
+
+  return {
+    vendasPorDiaSemanaResumo,
+    vendasPorHorarioResumo,
+    vendasPorHorarioComMovimento,
+    melhorDiaSemana: [...vendasPorDiaSemanaResumo].sort(
+      (a, b) => Number(b.valor_liquido || 0) - Number(a.valor_liquido || 0),
+    )[0],
+    melhorHorario: [...vendasPorHorarioComMovimento].sort(
+      (a, b) => Number(b.valor_liquido || 0) - Number(a.valor_liquido || 0),
+    )[0],
+  };
+}
+
 export function calcularAnalisePromocoesFinanceiro(vendas = []) {
   const topProdutos = new Map();
   let vendasPromocao = 0;
