@@ -930,6 +930,127 @@ export function calcularDistribuicaoTemporalVendasFinanceiro(vendas = []) {
   };
 }
 
+export function montarFluxoResultadoCardsFinanceiro(resumo = {}) {
+  const taxaLoja = Number(resumo.taxa_loja_total || 0);
+  const repasseEntrega = Number(
+    resumo.taxa_entrega_repasse_total ?? resumo.taxa_entrega ?? 0,
+  );
+  const taxaOperacional = Number(resumo.taxa_operacional_total || 0);
+  const custoOperacional = repasseEntrega + taxaOperacional;
+  const taxasCartao = Number(resumo.taxa_cartao_total || 0);
+  const comissao = Number(resumo.comissao_total || 0);
+  const imposto = Number(resumo.imposto_total || 0);
+  const campanhas = Number(resumo.custo_campanha_total || 0);
+  const custoProdutos = Number(resumo.custo_total || 0);
+  const lucro = Number(resumo.lucro_total || 0);
+
+  return [
+    {
+      sinal: "",
+      titulo: "Venda Bruta",
+      valor: Number(resumo.venda_bruta || 0),
+      detalhe: "Produtos e servicos antes das deducoes.",
+      cor: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    },
+    {
+      sinal: "+",
+      titulo: "Tx Loja",
+      valor: taxaLoja,
+      detalhe: "Parte da entrega que fica como receita da loja.",
+      cor: "border-blue-200 bg-blue-50 text-blue-800",
+    },
+    {
+      sinal: "-",
+      titulo: "Descontos",
+      valor: Number(resumo.desconto || 0),
+      detalhe: "Descontos de venda e itens.",
+      cor: "border-amber-200 bg-amber-50 text-amber-800",
+    },
+    {
+      sinal: "-",
+      titulo: "Operacional",
+      valor: custoOperacional,
+      detalhe: "Repasse de entrega e custos operacionais.",
+      cor: "border-orange-200 bg-orange-50 text-orange-800",
+    },
+    {
+      sinal: "-",
+      titulo: "Cartao",
+      valor: taxasCartao,
+      detalhe: "Taxas das operadoras de cartao.",
+      cor: "border-purple-200 bg-purple-50 text-purple-800",
+    },
+    {
+      sinal: "-",
+      titulo: "Comissao",
+      valor: comissao,
+      detalhe: "Comissoes rateadas nas vendas.",
+      cor: "border-indigo-200 bg-indigo-50 text-indigo-800",
+    },
+    {
+      sinal: "-",
+      titulo: "Impostos",
+      valor: imposto,
+      detalhe: "Imposto usado na rentabilidade.",
+      cor: "border-rose-200 bg-rose-50 text-rose-800",
+    },
+    {
+      sinal: "-",
+      titulo: "Campanhas",
+      valor: campanhas,
+      detalhe: "Cashback, cupons e beneficios resgatados.",
+      cor: "border-cyan-200 bg-cyan-50 text-cyan-800",
+    },
+    {
+      sinal: "=",
+      titulo: "Venda Liquida",
+      valor: Number(resumo.venda_liquida || 0),
+      detalhe: "Resultado antes do custo dos produtos.",
+      cor: "border-sky-200 bg-sky-50 text-sky-800",
+    },
+    {
+      sinal: "R$",
+      titulo: "Valor Recebido",
+      valor: Number(resumo.valor_recebido || 0),
+      detalhe: "Total efetivamente baixado/recebido no periodo.",
+      cor: "border-emerald-200 bg-emerald-50 text-emerald-800",
+    },
+    {
+      sinal: "!",
+      titulo: "Em Aberto",
+      valor: Number(resumo.em_aberto || 0),
+      detalhe: "Vendas pendentes de baixa no periodo.",
+      cor: "border-red-200 bg-red-50 text-red-800",
+      acao: "vendas_em_aberto",
+    },
+    {
+      sinal: "-",
+      titulo: "Custo Produtos",
+      valor: custoProdutos,
+      detalhe: "CMV dos produtos vendidos.",
+      cor: "border-slate-200 bg-slate-50 text-slate-800",
+    },
+    {
+      sinal: "=",
+      titulo: "Lucro",
+      valor: lucro,
+      detalhe: "Venda liquida menos custo dos produtos.",
+      cor:
+        lucro >= 0
+          ? "border-green-200 bg-green-50 text-green-800"
+          : "border-red-200 bg-red-50 text-red-800",
+    },
+    {
+      sinal: "%",
+      titulo: "Margem",
+      valor: Number(resumo.margem_media || 0),
+      detalhe: "Lucro sobre a venda liquida.",
+      percentual: true,
+      cor: "border-teal-200 bg-teal-50 text-teal-800",
+    },
+  ];
+}
+
 export function calcularAnalisePromocoesFinanceiro(vendas = []) {
   const topProdutos = new Map();
   let vendasPromocao = 0;

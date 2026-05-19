@@ -18,6 +18,7 @@ import {
   formatarDataVendaFinanceiro,
   getStatusVendaMeta,
   getTextoComparacaoPeriodo,
+  montarFluxoResultadoCardsFinanceiro,
   montarFeriadosPeriodoFinanceiro,
   montarFeriadosPadrao,
   montarVendasPorDataCalendarioFinanceiro,
@@ -479,6 +480,63 @@ test("calcula distribuicao temporal financeira por dia e horario", () => {
   const vazio = calcularDistribuicaoTemporalVendasFinanceiro([]);
   assert.equal(vazio.melhorDiaSemana.nome, "Segunda");
   assert.equal(vazio.melhorHorario, undefined);
+});
+
+test("monta cards de composicao do resultado financeiro", () => {
+  const cards = montarFluxoResultadoCardsFinanceiro({
+    venda_bruta: 300,
+    taxa_loja_total: 12,
+    taxa_entrega: 20,
+    taxa_operacional_total: 5,
+    desconto: 15,
+    taxa_cartao_total: 7,
+    comissao_total: 11,
+    imposto_total: 9,
+    custo_campanha_total: 4,
+    venda_liquida: 250,
+    valor_recebido: 220,
+    em_aberto: 30,
+    custo_total: 140,
+    lucro_total: -10,
+    margem_media: -4,
+  });
+
+  assert.deepEqual(
+    cards.map(({ sinal, titulo, valor, percentual, acao }) => ({
+      sinal,
+      titulo,
+      valor,
+      percentual,
+      acao,
+    })),
+    [
+      { sinal: "", titulo: "Venda Bruta", valor: 300, percentual: undefined, acao: undefined },
+      { sinal: "+", titulo: "Tx Loja", valor: 12, percentual: undefined, acao: undefined },
+      { sinal: "-", titulo: "Descontos", valor: 15, percentual: undefined, acao: undefined },
+      { sinal: "-", titulo: "Operacional", valor: 25, percentual: undefined, acao: undefined },
+      { sinal: "-", titulo: "Cartao", valor: 7, percentual: undefined, acao: undefined },
+      { sinal: "-", titulo: "Comissao", valor: 11, percentual: undefined, acao: undefined },
+      { sinal: "-", titulo: "Impostos", valor: 9, percentual: undefined, acao: undefined },
+      { sinal: "-", titulo: "Campanhas", valor: 4, percentual: undefined, acao: undefined },
+      { sinal: "=", titulo: "Venda Liquida", valor: 250, percentual: undefined, acao: undefined },
+      { sinal: "R$", titulo: "Valor Recebido", valor: 220, percentual: undefined, acao: undefined },
+      { sinal: "!", titulo: "Em Aberto", valor: 30, percentual: undefined, acao: "vendas_em_aberto" },
+      { sinal: "-", titulo: "Custo Produtos", valor: 140, percentual: undefined, acao: undefined },
+      { sinal: "=", titulo: "Lucro", valor: -10, percentual: undefined, acao: undefined },
+      { sinal: "%", titulo: "Margem", valor: -4, percentual: true, acao: undefined },
+    ],
+  );
+  assert.equal(cards.find((card) => card.titulo === "Lucro").cor, "border-red-200 bg-red-50 text-red-800");
+  assert.equal(cards.find((card) => card.titulo === "Operacional").detalhe, "Repasse de entrega e custos operacionais.");
+
+  const cardsComRepasseExplicito = montarFluxoResultadoCardsFinanceiro({
+    taxa_entrega: 20,
+    taxa_entrega_repasse_total: 8,
+    taxa_operacional_total: 5,
+    lucro_total: 1,
+  });
+  assert.equal(cardsComRepasseExplicito.find((card) => card.titulo === "Operacional").valor, 13);
+  assert.equal(cardsComRepasseExplicito.find((card) => card.titulo === "Lucro").cor, "border-green-200 bg-green-50 text-green-800");
 });
 
 test("descreve periodo de comparacao financeiro", () => {
