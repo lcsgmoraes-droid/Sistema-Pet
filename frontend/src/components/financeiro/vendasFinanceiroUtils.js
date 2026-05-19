@@ -376,6 +376,204 @@ export function getTextoComparacaoPeriodo(periodoComparacao) {
   }
 }
 
+export function calcularPeriodoComparacaoFinanceiro({
+  dataInicio,
+  dataFim,
+  periodoComparacao,
+}) {
+  const inicio = parseDataLocal(dataInicio);
+  const fim = parseDataLocal(dataFim);
+  if (!inicio || !fim) return { data_inicio: "", data_fim: "" };
+
+  const diffDias = Math.floor((fim - inicio) / (1000 * 60 * 60 * 24)) + 1;
+  let inicioComp;
+  let fimComp;
+
+  switch (periodoComparacao) {
+    case "periodo_anterior":
+      inicioComp = new Date(inicio);
+      inicioComp.setDate(inicio.getDate() - diffDias);
+      fimComp = new Date(inicio);
+      fimComp.setDate(inicio.getDate() - 1);
+      break;
+    case "mes_anterior":
+      inicioComp = new Date(inicio);
+      inicioComp.setMonth(inicio.getMonth() - 1);
+      fimComp = new Date(fim);
+      fimComp.setMonth(fim.getMonth() - 1);
+      break;
+    case "ano_anterior":
+      inicioComp = new Date(inicio);
+      inicioComp.setFullYear(inicio.getFullYear() - 1);
+      fimComp = new Date(fim);
+      fimComp.setFullYear(fim.getFullYear() - 1);
+      break;
+    default:
+      return { data_inicio: "", data_fim: "" };
+  }
+
+  return {
+    data_inicio: dataKeyLocal(inicioComp),
+    data_fim: dataKeyLocal(fimComp),
+  };
+}
+
+export function calcularVariacaoFinanceira(valorAtual, valorAnterior) {
+  if (!valorAnterior || valorAnterior === 0) {
+    return { valor: 0, percentual: 0 };
+  }
+
+  const diff = valorAtual - valorAnterior;
+  const percentual = Number.parseFloat(((diff / valorAnterior) * 100).toFixed(1));
+  return { valor: diff, percentual };
+}
+
+export function calcularAnaliseInteligenteVendas({
+  produtosAnalise = [],
+  resumo = {},
+  resumoComparacao = {},
+  vendasPorData = [],
+} = {}) {
+  if (!produtosAnalise || produtosAnalise.length === 0) {
+    return {
+      produtosMaisLucrativos: [],
+      produtosPorCategoria: {},
+      alertasInteligentesVendas: [],
+      previsaoProximos7Dias: 0,
+    };
+  }
+
+  const produtosComMargem = produtosAnalise.map((produto) => {
+    const custo = sanitizarNumero(produto.custo_total);
+    const preco = sanitizarNumero(produto.valor_total);
+    const quantidade = sanitizarNumero(produto.quantidade) || 1;
+    const lucro = preco - custo;
+    const margem = custo > 0 ? (lucro / custo) * 100 : 0;
+
+    return {
+      nome: produto.nome || produto.produto || "Produto sem nome",
+      marca: produto.marca || "-",
+      quantidade,
+      custo: sanitizarNumero(custo / quantidade),
+      preco: sanitizarNumero(preco / quantidade),
+      lucro_total: sanitizarNumero(lucro),
+      margem: sanitizarNumero(margem),
+      categoria: produto.categoria || "Sem Categoria",
+    };
+  });
+
+  const produtosMaisLucrativos = [...produtosComMargem]
+    .sort((a, b) => b.lucro_total - a.lucro_total)
+    .slice(0, 20);
+
+  const produtosPorCategoria = {};
+  produtosComMargem.forEach((produto) => {
+    const categoria = produto.categoria || "Sem Categoria";
+    if (!produtosPorCategoria[categoria]) {
+      produtosPorCategoria[categoria] = {
+        quantidade: 0,
+        total: 0,
+        margens: [],
+      };
+    }
+    produtosPorCategoria[categoria].quantidade += produto.quantidade;
+    produtosPorCategoria[categoria].total += produto.preco * produto.quantidade;
+    produtosPorCategoria[categoria].margens.push(produto.margem);
+  });
+
+  Object.keys(produtosPorCategoria).forEach((categoria) => {
+    const margens = produtosPorCategoria[categoria].margens;
+    const somaMargens = margens.reduce(
+      (total, margem) => sanitizarNumero(total) + sanitizarNumero(margem),
+      0,
+    );
+    produtosPorCategoria[categoria].margem_media = sanitizarNumero(
+      margens.length > 0 ? somaMargens / margens.length : 0,
+    );
+    delete produtosPorCategoria[categoria].margens;
+  });
+
+  const alertasInteligentesVendas = [];
+
+  const qtdAtual = sanitizarNumero(resumo.quantidade_vendas);
+  const qtdAnterior = sanitizarNumero(resumoComparacao.quantidade_vendas);
+  if (qtdAnterior > 0 && qtdAtual < qtdAnterior) {
+    const queda = Number((((qtdAnterior - qtdAtual) / qtdAnterior) * 100).toFixed(1));
+    alertasInteligentesVendas.push({
+      id: "queda-vendas",
+      tipo: "critico",
+      titulo: "Queda de volume de vendas",
+      mensagem: `As vendas cairam ${queda}% em relacao ao periodo comparativo.`,
+      recomendacao:
+        "Revise campanhas, produtos de entrada e politica de descontos para recuperar volume.",
+    });
+  }
+
+  const liquidoAtual = sanitizarNumero(resumo.venda_liquida);
+  const emAberto = sanitizarNumero(resumo.em_aberto);
+  if (liquidoAtual > 0) {
+    const percAberto = Number(((emAberto / liquidoAtual) * 100).toFixed(1));
+    if (percAberto >= 20) {
+      alertasInteligentesVendas.push({
+        id: "recebiveis-abertos",
+        tipo: "atencao",
+        titulo: "Recebimento em aberto elevado",
+        mensagem: `${percAberto}% da venda liquida ainda esta em aberto no periodo.`,
+        recomendacao:
+          "Priorize cobranca e revise condicoes de pagamento com maior prazo.",
+      });
+    }
+  }
+
+  const baixaMargem = produtosComMargem.filter((produto) => produto.margem < 20).length;
+  if (baixaMargem >= 5) {
+    alertasInteligentesVendas.push({
+      id: "mix-baixa-margem",
+      tipo: "atencao",
+      titulo: "Muitos produtos com baixa margem",
+      mensagem: `${baixaMargem} produtos vendidos estao com margem abaixo de 20%.`,
+      recomendacao:
+        "Reprecifique itens de baixo giro/margem e renegocie compra com fornecedor.",
+    });
+  }
+
+  const altaMargemBaixoVolume = produtosComMargem
+    .filter((produto) => produto.margem >= 45 && produto.quantidade <= 3)
+    .slice(0, 3);
+  if (altaMargemBaixoVolume.length > 0) {
+    alertasInteligentesVendas.push({
+      id: "oportunidade-upsell",
+      tipo: "oportunidade",
+      titulo: "Oportunidade de crescimento",
+      mensagem: `Produtos com alta margem e baixo volume: ${altaMargemBaixoVolume
+        .map((produto) => produto.nome)
+        .join(", ")}.`,
+      recomendacao:
+        "Destacar esses itens no atendimento e criar combo promocional para aumentar giro.",
+    });
+  }
+
+  const basePrevisao = (vendasPorData || []).slice(-14);
+  const previsaoProximos7Dias =
+    basePrevisao.length > 0
+      ? sanitizarNumero(
+          (basePrevisao.reduce(
+            (soma, item) => soma + sanitizarNumero(item.valor_liquido),
+            0,
+          ) /
+            basePrevisao.length) *
+            7,
+        )
+      : 0;
+
+  return {
+    produtosMaisLucrativos,
+    produtosPorCategoria,
+    alertasInteligentesVendas,
+    previsaoProximos7Dias,
+  };
+}
+
 export function getStatusVendaMeta(status) {
   const statusNormalizado = String(status || "").toLowerCase();
   if (statusNormalizado === "finalizada") {
