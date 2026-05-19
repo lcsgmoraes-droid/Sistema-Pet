@@ -1,3 +1,4 @@
+import AgendaDateInputField from "./AgendaDateInputField";
 import AgendaInputField from "./AgendaInputField";
 import { TIPO_OPTIONS } from "./agendaUtils";
 
@@ -25,9 +26,8 @@ export default function NovoAgendamentoTipoDataSection({
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <AgendaInputField
+        <AgendaDateInputField
           label="Data*"
-          type="date"
           value={formNovo.data}
           onChange={(valor) => onChangeCampo("data", valor)}
         />
