@@ -3,11 +3,14 @@ import { test } from "node:test";
 import {
   ajustarVendaImposto,
   calcularAnaliseInteligenteVendas,
+  calcularFiltroRapidoPeriodoVendas,
   calcularPeriodoComparacaoFinanceiro,
   calcularVariacaoFinanceira,
   calcularValorRecebidoVenda,
+  consolidarFormasRecebimentoFinanceiro,
   dataKeyLocal,
   filtrarVendasRelatorio,
+  filtrarDadosFinanceiroVendas,
   formatarDataVendaFinanceiro,
   getStatusVendaMeta,
   getTextoComparacaoPeriodo,
@@ -30,6 +33,41 @@ test("normaliza formas de pagamento consolidadas", () => {
   assert.equal(normalizarFormaPagamentoLabel("cartao_credito"), "Cartao Credito");
   assert.equal(normalizarFormaPagamentoLabel("5"), "Cartao Credito");
   assert.equal(normalizarFormaPagamentoLabel(""), "Nao informado");
+});
+
+test("consolida e filtra dados financeiros de vendas", () => {
+  const formas = consolidarFormasRecebimentoFinanceiro([
+    { forma_pagamento: "pix", valor_total: 10 },
+    { forma_pagamento: "2", valor_total: 5 },
+    { forma_pagamento: "dinheiro", valor_total: 7 },
+  ]);
+
+  assert.deepEqual(
+    formas.map((item) => [item.forma_pagamento, item.valor_total]),
+    [
+      ["Pix", 15],
+      ["Dinheiro", 7],
+    ],
+  );
+
+  const dados = [
+    { funcionario: "Ana", forma_pagamento: "Pix", categoria: "Racao" },
+    { funcionario: "Bia", forma_pagamento: "Dinheiro", categoria: "Medicamento" },
+  ];
+
+  assert.deepEqual(
+    filtrarDadosFinanceiroVendas(dados, "funcionario", { filtroFuncionario: "Bia" }),
+    [dados[1]],
+  );
+  assert.deepEqual(
+    filtrarDadosFinanceiroVendas(dados, "formaPagamento", { filtroFormaPagamento: "Pix" }),
+    [dados[0]],
+  );
+  assert.deepEqual(
+    filtrarDadosFinanceiroVendas(dados, "categoria", { filtroCategoria: "Medicamento" }),
+    [dados[1]],
+  );
+  assert.deepEqual(filtrarDadosFinanceiroVendas(dados, "categoria", {}), dados);
 });
 
 test("identifica status de venda para filtros e badges", () => {
@@ -172,6 +210,44 @@ test("calcula intervalo comparativo preservando datas locais", () => {
     }),
     { data_inicio: "", data_fim: "" },
   );
+});
+
+test("calcula periodos dos filtros rapidos de vendas", () => {
+  const baseDate = "2026-05-19";
+
+  assert.deepEqual(calcularFiltroRapidoPeriodoVendas("hoje", baseDate), {
+    inicio: "2026-05-19",
+    fim: "2026-05-19",
+  });
+  assert.deepEqual(calcularFiltroRapidoPeriodoVendas("ontem", baseDate), {
+    inicio: "2026-05-18",
+    fim: "2026-05-18",
+  });
+  assert.deepEqual(calcularFiltroRapidoPeriodoVendas("esta_semana", baseDate), {
+    inicio: "2026-05-18",
+    fim: "2026-05-19",
+  });
+  assert.deepEqual(calcularFiltroRapidoPeriodoVendas("este_mes", baseDate), {
+    inicio: "2026-05-01",
+    fim: "2026-05-19",
+  });
+  assert.deepEqual(calcularFiltroRapidoPeriodoVendas("mes_anterior", baseDate), {
+    inicio: "2026-04-01",
+    fim: "2026-04-30",
+  });
+  assert.deepEqual(calcularFiltroRapidoPeriodoVendas("ultimos_7_dias", baseDate), {
+    inicio: "2026-05-12",
+    fim: "2026-05-19",
+  });
+  assert.deepEqual(calcularFiltroRapidoPeriodoVendas("ultimos_30_dias", baseDate), {
+    inicio: "2026-04-19",
+    fim: "2026-05-19",
+  });
+  assert.deepEqual(calcularFiltroRapidoPeriodoVendas("este_ano", baseDate), {
+    inicio: "2026-01-01",
+    fim: "2026-05-19",
+  });
+  assert.equal(calcularFiltroRapidoPeriodoVendas("desconhecido", baseDate), null);
 });
 
 test("calcula variacao financeira com percentual arredondado", () => {
