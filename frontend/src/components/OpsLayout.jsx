@@ -9,6 +9,7 @@ import {
   FiLogOut,
   FiServer,
   FiShield,
+  FiUsers,
 } from "react-icons/fi";
 
 import { useAuth } from "../contexts/AuthContext";
@@ -26,6 +27,12 @@ const navItems = [
     label: "Incidentes",
     description: "Tenant, rota e request",
     icon: FiAlertTriangle,
+  },
+  {
+    to: "/ops/tenants",
+    label: "Tenants",
+    description: "Clientes e catalogo",
+    icon: FiUsers,
   },
   {
     to: "/ops/observabilidade",
