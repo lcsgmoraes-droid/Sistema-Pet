@@ -1,4 +1,5 @@
 import AutocompleteSelect from "../../../components/ui/AutocompleteSelect";
+import { deveBuscarTutores } from "./tutorPetSelectionUtils";
 
 export default function TutorVeterinarioFields({
   isEdicao,
@@ -45,7 +46,7 @@ export default function TutorVeterinarioFields({
             </button>
           )}
 
-          {!isEdicao && buscaTutor.trim().length >= 1 && !tutorSelecionado && tutoresSugeridos.length > 0 && (
+          {!isEdicao && deveBuscarTutores(buscaTutor) && !tutorSelecionado && tutoresSugeridos.length > 0 && (
             <div className="absolute z-20 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-56 overflow-y-auto">
               {tutoresSugeridos.map((tutor) => (
                 <button
