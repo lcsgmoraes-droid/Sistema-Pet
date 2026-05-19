@@ -18,6 +18,7 @@ COUNT_TABLES = {
     "clientes": "clientes",
     "pets": "pets",
     "vendas": "vendas",
+    "produto_imagens": "produto_imagens",
 }
 
 
@@ -153,8 +154,49 @@ def _tenant_counts(db: Session, tenant_id: str) -> dict[str, int]:
     return counts
 
 
+def _image_bytes(db: Session, tenant_id: str) -> int:
+    if not _table_exists(db, "produto_imagens"):
+        return 0
+    return int(
+        db.execute(
+            text(
+                """
+                SELECT COALESCE(SUM(COALESCE(tamanho, 0)), 0)
+                FROM produto_imagens
+                WHERE CAST(tenant_id AS TEXT) = :tenant_id
+                """
+            ),
+            {"tenant_id": tenant_id},
+        ).scalar()
+        or 0
+    )
+
+
+def _tenant_usage(db: Session, tenant_id: str, counts: dict[str, int]) -> dict[str, Any]:
+    image_bytes = _image_bytes(db, tenant_id)
+    return {
+        "records_total": sum(int(value or 0) for value in counts.values()),
+        "image_count": int(counts.get("produto_imagens") or 0),
+        "image_bytes": image_bytes,
+        "image_mb": round(image_bytes / 1024 / 1024, 2),
+    }
+
+
+def _is_billing_attention(status: str | None) -> bool:
+    return str(status or "").strip().lower() in {
+        "past_due",
+        "overdue",
+        "late",
+        "inadimplente",
+        "suspended",
+        "blocked",
+        "bloqueado",
+    }
+
+
 def _tenant_row_to_item(db: Session, row: dict[str, Any]) -> dict[str, Any]:
     tenant_id = str(row["id"])
+    counts = _tenant_counts(db, tenant_id)
     return {
         "id": tenant_id,
         "name": row["name"],
@@ -167,7 +209,8 @@ def _tenant_row_to_item(db: Session, row: dict[str, Any]) -> dict[str, Any]:
         "created_at": row.get("created_at"),
         "updated_at": row.get("updated_at"),
         "principal_user": _principal_user(db, tenant_id),
-        "counts": _tenant_counts(db, tenant_id),
+        "counts": counts,
+        "usage": _tenant_usage(db, tenant_id, counts),
         "base_catalog": _base_catalog_status(db, tenant_id),
     }
 
@@ -210,6 +253,9 @@ def list_ops_tenants(
         "total": len(items),
         "active": sum(1 for item in items if str(item.get("status") or "").lower() in {"active", "ativo"}),
         "with_base_catalog": sum(1 for item in items if item["base_catalog"]["installed"]),
+        "billing_attention": sum(1 for item in items if _is_billing_attention(item.get("billing_status"))),
+        "records_total": sum(int(item.get("usage", {}).get("records_total") or 0) for item in items),
+        "image_bytes": sum(int(item.get("usage", {}).get("image_bytes") or 0) for item in items),
     }
     return {"items": items, "summary": summary}
 

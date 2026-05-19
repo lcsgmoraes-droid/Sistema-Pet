@@ -57,6 +57,7 @@ def ops_tenants_session():
         "CREATE TABLE clientes (id INTEGER PRIMARY KEY, tenant_id TEXT NOT NULL)",
         "CREATE TABLE pets (id INTEGER PRIMARY KEY, tenant_id TEXT NOT NULL)",
         "CREATE TABLE vendas (id INTEGER PRIMARY KEY, tenant_id TEXT NOT NULL, total REAL)",
+        "CREATE TABLE produto_imagens (id INTEGER PRIMARY KEY, tenant_id TEXT NOT NULL, tamanho INTEGER)",
         """
         CREATE TABLE tenant_template_installs (
             id INTEGER PRIMARY KEY,
@@ -123,6 +124,15 @@ def ops_tenants_session():
     session.execute(
         text(
             """
+            INSERT INTO produto_imagens (id, tenant_id, tamanho)
+            VALUES (1, :target, 1048576), (2, :target, 524288)
+            """
+        ),
+        {"target": TARGET_TENANT},
+    )
+    session.execute(
+        text(
+            """
             INSERT INTO tenant_template_installs (
                 id, tenant_id, bundle_code, bundle_version, status, dry_run,
                 created_by_user_id, summary, created_at, updated_at
@@ -160,8 +170,18 @@ def test_list_ops_tenants_returns_counts_and_catalog_status(ops_tenants_session)
         "clientes": 2,
         "pets": 4,
         "vendas": 5,
+        "produto_imagens": 2,
         "usuarios": 2,
     }
+    assert tenant["usage"] == {
+        "records_total": 18,
+        "image_count": 2,
+        "image_bytes": 1572864,
+        "image_mb": 1.5,
+    }
+    assert result["summary"]["billing_attention"] == 1
+    assert result["summary"]["records_total"] == 18
+    assert result["summary"]["image_bytes"] == 1572864
     assert tenant["base_catalog"]["installed"] is True
     assert tenant["base_catalog"]["status"] == "completed"
 
