@@ -319,6 +319,102 @@ export function montarFeriadosPadrao(anos) {
   return feriados;
 }
 
+export function montarFeriadosPeriodoFinanceiro({
+  dataInicio,
+  dataFim,
+  feriadosCustomizados = [],
+}) {
+  const anos = new Set(
+    listarDiasPeriodo(dataInicio, dataFim).map((dia) => dia.getFullYear()),
+  );
+  const feriados = montarFeriadosPadrao(Array.from(anos));
+
+  feriadosCustomizados.forEach((feriado) => {
+    if (feriado?.data) {
+      feriados[feriado.data] = feriado.nome?.trim() || "Feriado cadastrado";
+    }
+  });
+
+  return feriados;
+}
+
+export function montarVendasPorDataCalendarioFinanceiro({
+  dataInicio,
+  dataFim,
+  vendasPorData = [],
+  feriadosPorData = {},
+  considerarSabadoDiaUtil = false,
+}) {
+  const vendasMap = new Map(
+    (vendasPorData || []).map((item) => [dataKeyLocal(item.data), item]),
+  );
+
+  return listarDiasPeriodo(dataInicio, dataFim).map((dia) => {
+    const key = dataKeyLocal(dia);
+    const item = vendasMap.get(key) || {};
+    const diaSemana = dia.getDay();
+    const feriadoNome = feriadosPorData[key] || "";
+
+    const quantidade = Number(item.quantidade || 0);
+    const valorBruto = Number(item.valor_bruto || 0);
+    const valorLiquido = Number(item.valor_liquido || 0);
+    const temMovimento = quantidade > 0 || valorBruto > 0 || valorLiquido > 0;
+    const sabado = diaSemana === 6;
+    const domingo = diaSemana === 0;
+    const sabadoUtil = sabado && considerarSabadoDiaUtil;
+    const feriadoAberto = Boolean(feriadoNome && temMovimento);
+    const fimDeSemana = domingo || (sabado && !sabadoUtil);
+    const diaUtilBase = !domingo && (!sabado || sabadoUtil);
+    const diaUtil = feriadoAberto || (diaUtilBase && !feriadoNome);
+
+    return {
+      data: key,
+      quantidade,
+      valor_bruto: valorBruto,
+      taxa_entrega: Number(item.taxa_entrega || 0),
+      desconto: Number(item.desconto || 0),
+      percentual_desconto: Number(item.percentual_desconto || 0),
+      valor_liquido: valorLiquido,
+      valor_recebido: Number(item.valor_recebido || 0),
+      saldo_aberto: Number(item.saldo_aberto || 0),
+      ticket_medio: quantidade > 0 ? Number(item.ticket_medio || valorBruto / quantidade) : 0,
+      dia_semana: formatarDataLocal(key, { weekday: "long" }),
+      sabado,
+      fim_de_semana: fimDeSemana,
+      feriado_nome: feriadoNome,
+      feriado_aberto: feriadoAberto,
+      dia_util: diaUtil,
+      sem_movimento: quantidade === 0 && valorLiquido === 0,
+    };
+  });
+}
+
+export function calcularResumoDiasPeriodoFinanceiro(vendasPorDataCalendario = []) {
+  const diasUteis = vendasPorDataCalendario.filter((item) => item.dia_util);
+  const diasTrabalhados = diasUteis.filter((item) => !item.sem_movimento);
+  const diasUteisSemVenda = diasUteis.filter((item) => item.sem_movimento);
+  const totalLiquidoDiasUteis = diasUteis.reduce(
+    (sum, item) => sum + Number(item.valor_liquido || 0),
+    0,
+  );
+  const totalLiquidoDiasTrabalhados = diasTrabalhados.reduce(
+    (sum, item) => sum + Number(item.valor_liquido || 0),
+    0,
+  );
+
+  return {
+    totalDias: vendasPorDataCalendario.length,
+    diasUteis: diasUteis.length,
+    diasTrabalhados: diasTrabalhados.length,
+    diasUteisSemVenda: diasUteisSemVenda.length,
+    finsDeSemana: vendasPorDataCalendario.filter((item) => item.fim_de_semana).length,
+    feriados: vendasPorDataCalendario.filter((item) => item.feriado_nome).length,
+    mediaDiaUtil: diasUteis.length > 0 ? totalLiquidoDiasUteis / diasUteis.length : 0,
+    mediaDiaTrabalhado:
+      diasTrabalhados.length > 0 ? totalLiquidoDiasTrabalhados / diasTrabalhados.length : 0,
+  };
+}
+
 export function getFeriadosStorageKey() {
   try {
     const tenant = JSON.parse(window.localStorage.getItem("selectedTenant") || "{}");

@@ -4,6 +4,7 @@ import {
   ajustarVendaImposto,
   calcularAnaliseInteligenteVendas,
   calcularFiltroRapidoPeriodoVendas,
+  calcularResumoDiasPeriodoFinanceiro,
   calcularPeriodoComparacaoFinanceiro,
   calcularVariacaoFinanceira,
   calcularValorRecebidoVenda,
@@ -14,7 +15,9 @@ import {
   formatarDataVendaFinanceiro,
   getStatusVendaMeta,
   getTextoComparacaoPeriodo,
+  montarFeriadosPeriodoFinanceiro,
   montarFeriadosPadrao,
+  montarVendasPorDataCalendarioFinanceiro,
   normalizarFormaPagamentoLabel,
   ordenarVendasRelatorio,
   parseDataLocal,
@@ -84,6 +87,139 @@ test("monta feriados padrao com datas fixas e moveis", () => {
   assert.equal(feriados["2026-02-16"], "Carnaval");
   assert.equal(feriados["2026-04-03"], "Sexta-feira Santa");
   assert.equal(feriados["2026-06-04"], "Corpus Christi");
+});
+
+test("monta calendario financeiro com feriados e resumo de dias uteis", () => {
+  const feriados = montarFeriadosPeriodoFinanceiro({
+    dataInicio: "2026-05-18",
+    dataFim: "2026-05-24",
+    feriadosCustomizados: [{ data: "2026-05-20", nome: "Feriado local" }],
+  });
+
+  assert.equal(feriados["2026-05-20"], "Feriado local");
+
+  const calendario = montarVendasPorDataCalendarioFinanceiro({
+    dataInicio: "2026-05-18",
+    dataFim: "2026-05-24",
+    vendasPorData: [
+      {
+        data: "2026-05-18",
+        quantidade: 2,
+        valor_bruto: 120,
+        valor_liquido: 100,
+        valor_recebido: 80,
+        saldo_aberto: 20,
+      },
+      {
+        data: "2026-05-20",
+        quantidade: 1,
+        valor_bruto: 60,
+        valor_liquido: 50,
+      },
+      {
+        data: "2026-05-23",
+        quantidade: 1,
+        valor_bruto: 40,
+        valor_liquido: 40,
+      },
+    ],
+    feriadosPorData: feriados,
+    considerarSabadoDiaUtil: false,
+  });
+
+  assert.equal(calendario.length, 7);
+  assert.deepEqual(
+    calendario.map((dia) => ({
+      data: dia.data,
+      dia_util: dia.dia_util,
+      fim_de_semana: dia.fim_de_semana,
+      feriado_nome: dia.feriado_nome,
+      feriado_aberto: dia.feriado_aberto,
+      sem_movimento: dia.sem_movimento,
+    })),
+    [
+      {
+        data: "2026-05-18",
+        dia_util: true,
+        fim_de_semana: false,
+        feriado_nome: "",
+        feriado_aberto: false,
+        sem_movimento: false,
+      },
+      {
+        data: "2026-05-19",
+        dia_util: true,
+        fim_de_semana: false,
+        feriado_nome: "",
+        feriado_aberto: false,
+        sem_movimento: true,
+      },
+      {
+        data: "2026-05-20",
+        dia_util: true,
+        fim_de_semana: false,
+        feriado_nome: "Feriado local",
+        feriado_aberto: true,
+        sem_movimento: false,
+      },
+      {
+        data: "2026-05-21",
+        dia_util: true,
+        fim_de_semana: false,
+        feriado_nome: "",
+        feriado_aberto: false,
+        sem_movimento: true,
+      },
+      {
+        data: "2026-05-22",
+        dia_util: true,
+        fim_de_semana: false,
+        feriado_nome: "",
+        feriado_aberto: false,
+        sem_movimento: true,
+      },
+      {
+        data: "2026-05-23",
+        dia_util: false,
+        fim_de_semana: true,
+        feriado_nome: "",
+        feriado_aberto: false,
+        sem_movimento: false,
+      },
+      {
+        data: "2026-05-24",
+        dia_util: false,
+        fim_de_semana: true,
+        feriado_nome: "",
+        feriado_aberto: false,
+        sem_movimento: true,
+      },
+    ],
+  );
+
+  assert.equal(calendario[0].ticket_medio, 60);
+  assert.equal(calendario[2].dia_semana, "quarta-feira");
+
+  assert.deepEqual(calcularResumoDiasPeriodoFinanceiro(calendario), {
+    totalDias: 7,
+    diasUteis: 5,
+    diasTrabalhados: 2,
+    diasUteisSemVenda: 3,
+    finsDeSemana: 2,
+    feriados: 1,
+    mediaDiaUtil: 30,
+    mediaDiaTrabalhado: 75,
+  });
+
+  const calendarioComSabadoUtil = montarVendasPorDataCalendarioFinanceiro({
+    dataInicio: "2026-05-23",
+    dataFim: "2026-05-23",
+    vendasPorData: [],
+    feriadosPorData: {},
+    considerarSabadoDiaUtil: true,
+  });
+  assert.equal(calendarioComSabadoUtil[0].dia_util, true);
+  assert.equal(calendarioComSabadoUtil[0].fim_de_semana, false);
 });
 
 test("ajustarVendaImposto remove imposto de venda sem nota e preserva venda fiscal", () => {
