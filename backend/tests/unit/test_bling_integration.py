@@ -1,4 +1,5 @@
 import requests
+from types import SimpleNamespace
 
 from app.bling_integration import BlingAPI
 
@@ -22,7 +23,38 @@ def _make_api():
     api.base_url = "https://api.bling.com.br/Api/v3"
     api.access_token = "token-antigo"
     api.enable_jwt = "1"
+    api.ambiente = "producao"
     return api
+
+
+def _make_venda_nfce():
+    produto = SimpleNamespace(
+        id=10,
+        codigo="DEFENZA-TESTE",
+        codigo_barras="7890000000000",
+        nome="Defenza teste",
+        unidade="UN",
+        ncm="30049099",
+        origem="0",
+        cfop="5102",
+    )
+    item = SimpleNamespace(
+        id=20,
+        produto=produto,
+        preco_unitario=100,
+        desconto_item=0,
+        quantidade=1,
+    )
+    return SimpleNamespace(
+        id=30,
+        tenant_id="tenant-1",
+        itens=[item],
+        cliente=None,
+        desconto_valor=0,
+        taxa_entrega_total=0,
+        tem_entrega=False,
+        data_venda=None,
+    )
 
 
 def test_request_renova_token_e_repete_quando_bling_retorna_invalid_token(monkeypatch):
@@ -92,3 +124,13 @@ def test_request_nao_renova_para_erro_diferente_de_invalid_token(monkeypatch):
         assert "429" in str(exc)
 
     assert renovacoes == []
+
+
+def test_payload_nfce_usa_serie_3_e_deixa_numero_para_sequencia_do_bling():
+    api = _make_api()
+    payload = api._montar_payload(_make_venda_nfce(), "nfce")
+
+    assert payload["modelo"] == 65
+    assert payload["tipo"] == 1
+    assert payload["serie"] == 3
+    assert payload["numero"] is None

@@ -21,6 +21,8 @@ from app.produtos_models import Produto
 
 # Configurações da API Bling
 BLING_API_BASE_URL = "https://api.bling.com.br/Api/v3"
+BLING_NFE_SERIE_PADRAO = 1
+BLING_NFCE_SERIE_PADRAO = 3
 
 # Arquivo para controle de expiração do token
 TOKEN_CONTROL_FILE = Path("bling_token_control.json")
@@ -696,7 +698,7 @@ class BlingAPI:
         
         # Modelo e série (modelo deve ser número inteiro, não string!)
         modelo = 55 if tipo_nota == "nfe" else 65
-        serie = 1 if tipo_nota == "nfe" else 2
+        serie = BLING_NFE_SERIE_PADRAO if tipo_nota == "nfe" else BLING_NFCE_SERIE_PADRAO
         
         # Contato: NF-e exige documento; NFC-e pode identificar apenas pelo nome.
         contato = None
@@ -792,6 +794,7 @@ class BlingAPI:
             "situacao": situacao,
             "finalidade": finalidade,
             "serie": serie,
+            # Numero em branco deixa o Bling aplicar a proxima sequencia configurada.
             "numero": None,
             "dataEmissao": datetime.now().strftime("%Y-%m-%d"),
             "dataOperacao": venda.data_venda.strftime("%Y-%m-%d") if venda.data_venda else datetime.now().strftime("%Y-%m-%d"),
