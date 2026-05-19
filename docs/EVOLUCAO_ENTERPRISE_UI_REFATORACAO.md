@@ -70,6 +70,7 @@ Separacao operacional iniciada:
 - Watchdog passou a registrar eventos em `logs/watchdog_events.jsonl`, permitindo auditar quando o sistema tentou se recuperar sozinho.
 - Painel de suporte em `/ops/incidentes`, com drilldown por tenant, rota e request_id para investigar producao sem depender apenas de relato do cliente.
 - Alertas acionaveis por tenant/rota em `/ops/incidentes`, com severidade, filtro em um clique e sugestao de correcao para erro repetido, lentidao recorrente e recuperacao automatica.
+- Ops/tenants: MVP tecnico integrado em `/ops/tenants`, com lista de tenants, plano/cobranca, contagens, uso, manutencao comercial e simulacao/aplicacao controlada do catalogo base. Pendencia operacional: Lucas confirmar a tela em producao e validar uma simulacao real antes de qualquer aplicacao em cliente.
 - Incidentes operacionais passaram a ter persistencia em banco (`ops_error_events`, `ops_alerts`, `ops_recovery_actions`), mantendo os `.jsonl` apenas como fallback/backfill.
 - Deploy seguro agora aplica Alembic automaticamente antes das validacoes finais, para evitar producao com codigo novo e banco antigo.
 - Watchdog ganhou registro de recuperacao de health e guarda contra loop de restart em janela curta.
@@ -979,7 +980,8 @@ Ao retomar, antes de abrir nova frente grande, fazer uma rodada curta de go-live
 3. Testar permissoes por perfil real (`admin`, `vendedor`, `financeiro`, `entregador`) nas telas criticas.
 4. Validar webhooks publicos/externos com segredo, assinatura ou token quando o provedor permitir.
 5. Confirmar onboarding de novo tenant: cadastro, confirmacao de e-mail, aceite LGPD/termos, primeiro login e selecao de tenant.
-6. Depois disso, voltar para a refatoracao visual/padronizacao da Onda 1.
+6. Confirmar manualmente `/ops/tenants` em producao e rodar somente simulacao do catalogo base para um tenant real antes de liberar aplicacao.
+7. Depois disso, voltar para a refatoracao visual/padronizacao da Onda 1.
 
 Continuar a **Onda 1** com uma destas frentes, conforme prioridade operacional:
 
