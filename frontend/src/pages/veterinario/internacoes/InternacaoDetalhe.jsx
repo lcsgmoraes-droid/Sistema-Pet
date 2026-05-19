@@ -1,6 +1,7 @@
 import CurvaEvolucaoInternacao from "./CurvaEvolucaoInternacao";
 import EvolucoesResumoInternacao from "./EvolucoesResumoInternacao";
 import ProcedimentosResumoInternacao from "./ProcedimentosResumoInternacao";
+import ExtratoAtendimentoPanel from "../extratos/ExtratoAtendimentoPanel";
 import OrcamentoMvpPanel from "../orcamentos/OrcamentoMvpPanel";
 
 export default function InternacaoDetalhe({ internacao, evolucoes, procedimentos, procedimentosCatalogo }) {
@@ -29,6 +30,12 @@ export default function InternacaoDetalhe({ internacao, evolucoes, procedimentos
           }}
           procedimentosCatalogo={procedimentosCatalogo}
           titulo="Orçamento da internação"
+        />
+      </div>
+      <div className="mt-4">
+        <ExtratoAtendimentoPanel
+          contexto={{ internacaoId: internacao.id }}
+          titulo="Extrato da internação"
         />
       </div>
     </div>
