@@ -81,6 +81,11 @@ export const vetApi = {
   criarOrcamento: (data) => api.post(`${BASE}/orcamentos`, data),
   obterOrcamento: (id) => api.get(`${BASE}/orcamentos/${id}`),
   atualizarOrcamento: (id, data) => api.patch(`${BASE}/orcamentos/${id}`, data),
+  obterExtratoAtendimento: (params) => api.get(`${BASE}/extratos/atendimento`, { params }),
+  exportarExtratoAtendimentoPdf: (params) =>
+    api.get(`${BASE}/extratos/atendimento/export.pdf`, { params, responseType: "blob" }),
+  exportarExtratoAtendimentoExcel: (params) =>
+    api.get(`${BASE}/extratos/atendimento/export.xlsx`, { params, responseType: "blob" }),
 
   // Internações
   listarInternacoes: (statusOrParams) => {

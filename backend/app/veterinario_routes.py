@@ -7,6 +7,7 @@ from .veterinario_agenda_routes import router as agenda_router
 from .veterinario_catalogo_routes import router as catalogo_router
 from .veterinario_consultas_routes import router as consultas_router
 from .veterinario_exames_routes import router as exames_router
+from .veterinario_extratos_routes import router as extratos_router
 from .veterinario_ia_routes import router as ia_router
 from .veterinario_internacao_routes import router as internacao_router
 from .veterinario_parcerias_routes import router as parcerias_router
@@ -22,5 +23,6 @@ router.include_router(consultas_router)
 router.include_router(exames_router)
 router.include_router(catalogo_router)
 router.include_router(orcamentos_router)
+router.include_router(extratos_router)
 router.include_router(relatorios_router)
 router.include_router(parcerias_router)

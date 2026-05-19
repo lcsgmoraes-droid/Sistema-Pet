@@ -9,6 +9,7 @@ import ConsultaSteps from "./consultaForm/ConsultaSteps";
 import { campo } from "./consultaForm/consultaCampo";
 import { ETAPAS, css } from "./consultaForm/consultaFormUtils";
 import useVetConsultaFormController from "./consultaForm/useVetConsultaFormController";
+import ExtratoAtendimentoPanel from "./extratos/ExtratoAtendimentoPanel";
 import OrcamentoMvpPanel from "./orcamentos/OrcamentoMvpPanel";
 
 export default function VetConsultaForm() {
@@ -77,6 +78,13 @@ export default function VetConsultaForm() {
           procedimentosCatalogo={consulta.procedimentosCatalogo}
           modoSomenteLeitura={consulta.modoSomenteLeitura}
           titulo="Orçamento da consulta"
+        />
+      )}
+
+      {consulta.consultaIdAtual && (
+        <ExtratoAtendimentoPanel
+          contexto={{ consultaId: consulta.consultaIdAtual }}
+          titulo="Extrato da consulta"
         />
       )}
 
