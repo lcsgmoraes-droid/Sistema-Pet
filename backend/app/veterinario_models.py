@@ -469,6 +469,78 @@ class InternacaoProcedimentoAgenda(BaseTenantModel):
 
 
 # ==============================================================
+# ORCAMENTOS VETERINARIOS
+# ==============================================================
+
+class OrcamentoVet(BaseTenantModel):
+    """Orcamento estimado de consulta/internacao, sem movimentar estoque."""
+    __tablename__ = "vet_orcamentos"
+    __table_args__ = (
+        Index("ix_vet_orcamentos_tenant_status", "tenant_id", "status"),
+        Index("ix_vet_orcamentos_tenant_consulta", "tenant_id", "consulta_id"),
+        Index("ix_vet_orcamentos_tenant_internacao", "tenant_id", "internacao_id"),
+    )
+
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    consulta_id = Column(Integer, ForeignKey("vet_consultas.id"), nullable=True, index=True)
+    internacao_id = Column(Integer, ForeignKey("vet_internacoes.id"), nullable=True, index=True)
+    pet_id = Column(Integer, ForeignKey("pets.id"), nullable=True, index=True)
+    cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=True, index=True)
+    veterinario_id = Column(Integer, ForeignKey("clientes.id"), nullable=True, index=True)
+
+    titulo = Column(String(255), nullable=False, default="Orcamento veterinario")
+    status = Column(String(30), nullable=False, default="rascunho", index=True)
+    previsao_dias_internacao = Column(Integer, nullable=True)
+    observacoes = Column(Text, nullable=True)
+
+    custo_total_estimado = Column(DECIMAL(12, 2), nullable=False, default=0)
+    preco_total = Column(DECIMAL(12, 2), nullable=False, default=0)
+    margem_valor = Column(DECIMAL(12, 2), nullable=False, default=0)
+    margem_percentual = Column(Float, nullable=False, default=0)
+
+    itens = relationship("OrcamentoVetItem", back_populates="orcamento", cascade="all, delete-orphan")
+    consulta = relationship("ConsultaVet", foreign_keys=[consulta_id])
+    internacao = relationship("InternacaoVet", foreign_keys=[internacao_id])
+    pet = relationship("Pet", foreign_keys=[pet_id])
+    cliente = relationship("Cliente", foreign_keys=[cliente_id])
+    veterinario = relationship("Cliente", foreign_keys=[veterinario_id])
+
+
+class OrcamentoVetItem(BaseTenantModel):
+    """Item estimado de orcamento veterinario."""
+    __tablename__ = "vet_orcamento_itens"
+    __table_args__ = (
+        Index("ix_vet_orcamento_itens_tenant_orcamento", "tenant_id", "orcamento_id"),
+    )
+
+    orcamento_id = Column(Integer, ForeignKey("vet_orcamentos.id"), nullable=False, index=True)
+    catalogo_id = Column(Integer, ForeignKey("vet_catalogo_procedimentos.id"), nullable=True, index=True)
+    produto_id = Column(Integer, ForeignKey("produtos.id"), nullable=True, index=True)
+
+    origem = Column(String(30), nullable=False, default="manual")
+    ordem = Column(Integer, nullable=False, default=0)
+    nome = Column(String(255), nullable=False)
+    descricao = Column(Text, nullable=True)
+    unidade = Column(String(50), nullable=True)
+    quantidade = Column(Float, nullable=False, default=1)
+
+    custo_unitario_estimado = Column(DECIMAL(12, 2), nullable=False, default=0)
+    preco_unitario_sugerido = Column(DECIMAL(12, 2), nullable=False, default=0)
+    preco_unitario = Column(DECIMAL(12, 2), nullable=False, default=0)
+    custo_total_estimado = Column(DECIMAL(12, 2), nullable=False, default=0)
+    preco_total = Column(DECIMAL(12, 2), nullable=False, default=0)
+    margem_valor = Column(DECIMAL(12, 2), nullable=False, default=0)
+    margem_percentual = Column(Float, nullable=False, default=0)
+
+    insumos = Column(JSON, nullable=True)
+    observacoes = Column(Text, nullable=True)
+
+    orcamento = relationship("OrcamentoVet", back_populates="itens")
+    catalogo = relationship("CatalogoProcedimento", foreign_keys=[catalogo_id])
+    produto = relationship("Produto", foreign_keys=[produto_id])
+
+
+# ==============================================================
 # REGISTRO DE PESO (curva de peso ao longo do tempo)
 # ==============================================================
 

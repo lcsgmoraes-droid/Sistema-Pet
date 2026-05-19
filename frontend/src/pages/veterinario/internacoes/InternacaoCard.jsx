@@ -16,6 +16,7 @@ export default function InternacaoCard({
   onAbrirHistoricoPet,
   onAbrirInsumoRapido,
   procedimentos,
+  procedimentosCatalogo,
 }) {
   const estaAtiva = internacao.status === "ativa" || internacao.status === "internado";
 
@@ -47,7 +48,14 @@ export default function InternacaoCard({
         )}
       </div>
 
-      {aberta && <InternacaoDetalhe internacao={internacao} evolucoes={evolucoes} procedimentos={procedimentos} />}
+      {aberta && (
+        <InternacaoDetalhe
+          internacao={internacao}
+          evolucoes={evolucoes}
+          procedimentos={procedimentos}
+          procedimentosCatalogo={procedimentosCatalogo}
+        />
+      )}
     </div>
   );
 }

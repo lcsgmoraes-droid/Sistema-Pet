@@ -216,6 +216,7 @@ def listar_produtos_estoque(
             "unidade": produto.unidade,
             "estoque_atual": float(produto.estoque_atual or 0),
             "preco_custo": _round_money(produto.preco_custo),
+            "preco_venda": _round_money(produto.preco_venda),
         }
         for produto in produtos
     ]

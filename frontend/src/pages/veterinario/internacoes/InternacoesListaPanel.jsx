@@ -6,6 +6,7 @@ export default function InternacoesListaPanel({
   expandida,
   evolucoes,
   procedimentosInternacao,
+  procedimentosCatalogo,
   onAbrirDetalhe,
   onAbrirInsumoRapido,
   onAbrirEvolucao,
@@ -31,6 +32,7 @@ export default function InternacoesListaPanel({
           aberta={expandida === internacao.id}
           evolucoes={evolucoes[internacao.id] ?? []}
           procedimentos={procedimentosInternacao[internacao.id] ?? []}
+          procedimentosCatalogo={procedimentosCatalogo}
           onAbrirDetalhe={onAbrirDetalhe}
           onAbrirInsumoRapido={onAbrirInsumoRapido}
           onAbrirEvolucao={onAbrirEvolucao}

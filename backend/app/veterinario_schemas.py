@@ -363,6 +363,70 @@ class ProcedimentoResponse(BaseModel):
         from_attributes = True
 
 
+class OrcamentoItemIn(BaseModel):
+    origem: str = "manual"
+    catalogo_id: Optional[int] = None
+    produto_id: Optional[int] = None
+    nome: Optional[str] = None
+    descricao: Optional[str] = None
+    unidade: Optional[str] = None
+    quantidade: float = Field(default=1, gt=0)
+    custo_unitario_estimado: Optional[float] = None
+    preco_unitario_sugerido: Optional[float] = None
+    preco_unitario: Optional[float] = None
+    insumos: list[dict] = Field(default_factory=list)
+    observacoes: Optional[str] = None
+
+
+class OrcamentoCreate(BaseModel):
+    consulta_id: Optional[int] = None
+    internacao_id: Optional[int] = None
+    pet_id: Optional[int] = None
+    cliente_id: Optional[int] = None
+    veterinario_id: Optional[int] = None
+    titulo: Optional[str] = None
+    status: str = "rascunho"
+    previsao_dias_internacao: Optional[int] = Field(default=None, ge=1, le=365)
+    observacoes: Optional[str] = None
+    itens: List[OrcamentoItemIn] = Field(default_factory=list)
+
+
+class OrcamentoUpdate(BaseModel):
+    consulta_id: Optional[int] = None
+    internacao_id: Optional[int] = None
+    pet_id: Optional[int] = None
+    cliente_id: Optional[int] = None
+    veterinario_id: Optional[int] = None
+    titulo: Optional[str] = None
+    status: Optional[str] = None
+    previsao_dias_internacao: Optional[int] = Field(default=None, ge=1, le=365)
+    observacoes: Optional[str] = None
+    itens: Optional[List[OrcamentoItemIn]] = None
+
+
+class OrcamentoResponse(BaseModel):
+    id: int
+    consulta_id: Optional[int] = None
+    internacao_id: Optional[int] = None
+    pet_id: Optional[int] = None
+    cliente_id: Optional[int] = None
+    veterinario_id: Optional[int] = None
+    titulo: str
+    status: str
+    previsao_dias_internacao: Optional[int] = None
+    observacoes: Optional[str] = None
+    custo_total_estimado: float = 0
+    preco_total: float = 0
+    margem_valor: float = 0
+    margem_percentual: float = 0
+    itens: list[dict] = Field(default_factory=list)
+    created_at: datetime
+    updated_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
 class CatalogoCreate(BaseModel):
     nome: str
     descricao: Optional[str] = None
