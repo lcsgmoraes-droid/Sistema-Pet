@@ -1,4 +1,5 @@
 import { useFocusEffect } from "@react-navigation/native";
+import { Ionicons } from "@expo/vector-icons";
 import React, { useCallback, useMemo, useState } from "react";
 import {
   ActivityIndicator,
@@ -24,6 +25,9 @@ import {
 } from "../../services/vet.service";
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from "../../theme";
 
+const MIN_CARACTERES_BUSCA_PET = 2;
+const DIAS_SEMANA = ["D", "S", "T", "Q", "Q", "S", "S"];
+
 function formatHora(value?: string | null) {
   if (!value) return "--:--";
   return new Date(value).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
@@ -45,6 +49,30 @@ function isoDate(date: Date) {
   return `${year}-${month}-${day}`;
 }
 
+function dateFromIso(value?: string | null) {
+  const [yearRaw, monthRaw, dayRaw] = String(value || "").split("-").map(Number);
+  const year = Number.isFinite(yearRaw) ? yearRaw : NaN;
+  const month = Number.isFinite(monthRaw) ? monthRaw - 1 : NaN;
+  const day = Number.isFinite(dayRaw) ? dayRaw : NaN;
+  const parsed = new Date(year, month, day);
+  if (
+    !Number.isFinite(year) ||
+    !Number.isFinite(month) ||
+    !Number.isFinite(day) ||
+    parsed.getFullYear() !== year ||
+    parsed.getMonth() !== month ||
+    parsed.getDate() !== day
+  ) {
+    return new Date();
+  }
+  return parsed;
+}
+
+function formatarDataIsoParaBr(value?: string | null) {
+  const date = dateFromIso(value);
+  return date.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric" });
+}
+
 function addDays(date: Date, days: number) {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
@@ -63,6 +91,31 @@ function startOfWeek(date: Date) {
 
 function endOfMonth(date: Date) {
   return new Date(date.getFullYear(), date.getMonth() + 1, 0);
+}
+
+function gerarCalendarioDias(mesReferenciaIso: string, selecionadaIso: string) {
+  const mesReferencia = dateFromIso(mesReferenciaIso);
+  const selecionada = dateFromIso(selecionadaIso);
+  const hojeIso = isoDate(new Date());
+  const inicioMes = new Date(mesReferencia.getFullYear(), mesReferencia.getMonth(), 1);
+  const inicioGrade = addDays(inicioMes, -inicioMes.getDay());
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const data = addDays(inicioGrade, index);
+    const dataIso = isoDate(data);
+    return {
+      key: dataIso,
+      data: dataIso,
+      dia: data.getDate(),
+      foraMes: data.getMonth() !== mesReferencia.getMonth(),
+      selecionado: data.toDateString() === selecionada.toDateString(),
+      hoje: dataIso === hojeIso,
+    };
+  });
+}
+
+function mesAnoCalendario(value: string) {
+  return dateFromIso(value).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
 }
 
 function gerarHorariosBase() {
@@ -146,9 +199,15 @@ export default function VetAgendaScreen() {
   const [salvandoNovo, setSalvandoNovo] = useState(false);
   const [carregandoApoios, setCarregandoApoios] = useState(false);
   const [form, setForm] = useState(() => formInicialAgendamento());
+  const [calendarioAberto, setCalendarioAberto] = useState(false);
+  const [calendarioReferencia, setCalendarioReferencia] = useState(() => formInicialAgendamento().data);
 
   const periodo = useMemo(() => periodoAgenda(modo, referencia), [modo, referencia]);
   const horariosBase = useMemo(() => gerarHorariosBase(), []);
+  const calendarioDias = useMemo(
+    () => gerarCalendarioDias(calendarioReferencia, form.data),
+    [calendarioReferencia, form.data],
+  );
 
   const grupos = useMemo(() => {
     const mapa = new Map<string, VetAgendamento[]>();
@@ -174,7 +233,7 @@ export default function VetAgendaScreen() {
 
   const petsFiltrados = useMemo(() => {
     const termo = buscaPet.trim().toLowerCase();
-    if (!termo) return pets.slice(0, 30);
+    if (termo.length < MIN_CARACTERES_BUSCA_PET) return [];
     return pets
       .filter((pet) => {
         const texto = [
@@ -236,6 +295,8 @@ export default function VetAgendaScreen() {
     const data = dataReferenciaModal(referencia);
     setBuscaPet("");
     setForm(formInicialAgendamento(data, sugerirHorarioLivre(data)));
+    setCalendarioAberto(false);
+    setCalendarioReferencia(data);
     setModalAberto(true);
     carregarApoiosAgendamento();
   }
@@ -245,6 +306,21 @@ export default function VetAgendaScreen() {
       if (campo !== "data") return { ...atual, [campo]: valor };
       return { ...atual, data: valor, hora: sugerirHorarioLivre(valor) };
     });
+  }
+
+  function abrirCalendario() {
+    setCalendarioReferencia(form.data || isoDate(new Date()));
+    setCalendarioAberto(true);
+  }
+
+  function navegarMesCalendario(delta: number) {
+    setCalendarioReferencia((atual) => isoDate(addMonths(dateFromIso(atual), delta)));
+  }
+
+  function selecionarDataCalendario(data: string) {
+    atualizarCampo("data", data);
+    setCalendarioReferencia(data);
+    setCalendarioAberto(false);
   }
 
   async function salvarAgendamento() {
@@ -390,6 +466,9 @@ export default function VetAgendaScreen() {
 
               <View style={styles.petList}>
                 {carregandoApoios && <Text style={styles.emptyInline}>Carregando pets...</Text>}
+                {!carregandoApoios && buscaPet.trim().length < MIN_CARACTERES_BUSCA_PET && (
+                  <Text style={styles.emptyInline}>Digite pelo menos 2 caracteres para buscar o pet.</Text>
+                )}
                 {!carregandoApoios && petsFiltrados.map((pet) => {
                   const ativo = String(pet.id) === form.pet_id;
                   return (
@@ -407,7 +486,7 @@ export default function VetAgendaScreen() {
                     </TouchableOpacity>
                   );
                 })}
-                {!carregandoApoios && !petsFiltrados.length && (
+                {!carregandoApoios && buscaPet.trim().length >= MIN_CARACTERES_BUSCA_PET && !petsFiltrados.length && (
                   <Text style={styles.emptyInline}>Nenhum pet encontrado.</Text>
                 )}
               </View>
@@ -435,13 +514,66 @@ export default function VetAgendaScreen() {
               </ScrollView>
 
               <Text style={styles.label}>Data</Text>
-              <TextInput
-                value={form.data}
-                onChangeText={(value) => atualizarCampo("data", value)}
-                placeholder="AAAA-MM-DD"
-                placeholderTextColor={CORES.textoSecundario}
-                style={styles.input}
-              />
+              <TouchableOpacity style={styles.dateInputWrap} onPress={abrirCalendario} activeOpacity={0.85}>
+                <TextInput
+                  value={formatarDataIsoParaBr(form.data)}
+                  placeholder="dd/mm/aaaa"
+                  placeholderTextColor={CORES.textoSecundario}
+                  style={styles.dateInputText}
+                  editable={false}
+                  pointerEvents="none"
+                />
+                <Ionicons name="calendar-outline" size={20} color={CORES.primario} />
+              </TouchableOpacity>
+
+              {calendarioAberto && (
+                <View style={styles.calendarCard}>
+                  <View style={styles.calendarHeader}>
+                    <TouchableOpacity style={styles.calendarNavButton} onPress={() => navegarMesCalendario(-1)}>
+                      <Ionicons name="chevron-back" size={20} color={CORES.primario} />
+                    </TouchableOpacity>
+                    <Text style={styles.calendarTitle}>{mesAnoCalendario(calendarioReferencia)}</Text>
+                    <TouchableOpacity style={styles.calendarNavButton} onPress={() => navegarMesCalendario(1)}>
+                      <Ionicons name="chevron-forward" size={20} color={CORES.primario} />
+                    </TouchableOpacity>
+                  </View>
+                  <View style={styles.calendarWeekRow}>
+                    {DIAS_SEMANA.map((dia, index) => (
+                      <Text key={`${dia}-${index}`} style={styles.calendarWeekText}>{dia}</Text>
+                    ))}
+                  </View>
+                  <View style={styles.calendarGrid}>
+                    {calendarioDias.map((dia) => (
+                      <TouchableOpacity
+                        key={dia.key}
+                        style={[
+                          styles.calendarDay,
+                          dia.foraMes && styles.calendarDayOutside,
+                          dia.hoje && styles.calendarDayToday,
+                          dia.selecionado && styles.calendarDaySelected,
+                        ]}
+                        onPress={() => selecionarDataCalendario(dia.data)}
+                      >
+                        <Text
+                          style={[
+                            styles.calendarDayText,
+                            dia.foraMes && styles.calendarDayOutsideText,
+                            dia.selecionado && styles.calendarDaySelectedText,
+                          ]}
+                        >
+                          {dia.dia}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                  <TouchableOpacity
+                    style={styles.calendarTodayButton}
+                    onPress={() => selecionarDataCalendario(isoDate(new Date()))}
+                  >
+                    <Text style={styles.calendarTodayText}>Hoje</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
 
               <Text style={styles.label}>Horario</Text>
               <View style={styles.slotsGrid}>
@@ -606,6 +738,84 @@ const styles = StyleSheet.create({
     paddingVertical: ESPACO.sm,
     color: CORES.texto,
   },
+  dateInputWrap: {
+    backgroundColor: CORES.superficie,
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    borderRadius: RAIO.sm,
+    paddingRight: ESPACO.md,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  dateInputText: {
+    flex: 1,
+    paddingHorizontal: ESPACO.md,
+    paddingVertical: ESPACO.sm,
+    color: CORES.texto,
+    fontWeight: "800",
+  },
+  calendarCard: {
+    backgroundColor: CORES.superficie,
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    borderRadius: RAIO.sm,
+    padding: ESPACO.sm,
+    gap: ESPACO.sm,
+  },
+  calendarHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  calendarNavButton: {
+    width: 36,
+    height: 36,
+    borderRadius: RAIO.sm,
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  calendarTitle: {
+    color: CORES.texto,
+    fontWeight: "900",
+    textTransform: "capitalize",
+  },
+  calendarWeekRow: {
+    flexDirection: "row",
+  },
+  calendarWeekText: {
+    width: `${100 / 7}%`,
+    textAlign: "center",
+    color: CORES.textoSecundario,
+    fontWeight: "900",
+    fontSize: FONTE.pequena,
+  },
+  calendarGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+  },
+  calendarDay: {
+    width: `${100 / 7}%`,
+    aspectRatio: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: RAIO.sm,
+    borderWidth: 1,
+    borderColor: "transparent",
+  },
+  calendarDayOutside: { opacity: 0.45 },
+  calendarDayToday: { borderColor: CORES.primario },
+  calendarDaySelected: { backgroundColor: CORES.primario, borderColor: CORES.primario },
+  calendarDayText: { color: CORES.texto, fontWeight: "800" },
+  calendarDayOutsideText: { color: CORES.textoSecundario },
+  calendarDaySelectedText: { color: "#FFFFFF" },
+  calendarTodayButton: {
+    alignSelf: "flex-start",
+    paddingHorizontal: ESPACO.sm,
+    paddingVertical: ESPACO.xs,
+  },
+  calendarTodayText: { color: CORES.primario, fontWeight: "900" },
   textArea: { minHeight: 76, textAlignVertical: "top" },
   petList: { gap: ESPACO.xs },
   petOption: {
