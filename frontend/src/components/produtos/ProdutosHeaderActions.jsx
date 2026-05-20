@@ -18,6 +18,9 @@ export default function ProdutosHeaderActions({
   onToggleMenuRelatorios,
   selecionadosCount,
 }) {
+  const actionClassName = "w-full shadow-sm hover:shadow-md sm:w-auto";
+  const secondaryActionClassName = "w-full bg-white shadow-sm hover:shadow-md sm:w-auto";
+
   const actions = (
     <>
       {selecionadosCount > 0 && (
@@ -28,7 +31,7 @@ export default function ProdutosHeaderActions({
             tone="solid"
             size="md"
             icon={Pencil}
-            className="shadow-sm hover:shadow-md"
+            className={actionClassName}
           >
             Editar em Lote ({selecionadosCount})
           </ActionButton>
@@ -39,7 +42,7 @@ export default function ProdutosHeaderActions({
               tone="solid"
               size="md"
               icon={GitMerge}
-              className="shadow-sm hover:shadow-md"
+              className={actionClassName}
             >
               Fundir Produtos
             </ActionButton>
@@ -50,7 +53,7 @@ export default function ProdutosHeaderActions({
             tone="solid"
             size="md"
             icon={Trash2}
-            className="shadow-sm hover:shadow-md"
+            className={actionClassName}
           >
             Excluir Selecionados ({selecionadosCount})
           </ActionButton>
@@ -63,7 +66,7 @@ export default function ProdutosHeaderActions({
         tone="solid"
         size="md"
         icon={UploadCloud}
-        className="shadow-sm hover:shadow-md"
+        className={actionClassName}
       >
         Importar Excel
       </ActionButton>
@@ -73,19 +76,19 @@ export default function ProdutosHeaderActions({
         tone="soft"
         size="md"
         icon={Settings}
-        className="bg-white shadow-sm hover:shadow-md"
+        className={secondaryActionClassName}
         title="Configurar colunas visiveis"
       >
         Colunas
       </ActionButton>
-      <div className="relative" ref={menuRelatoriosRef}>
+      <div className="relative w-full sm:w-auto" ref={menuRelatoriosRef}>
         <ActionButton
           onClick={onToggleMenuRelatorios}
           intent="neutral"
           tone="soft"
           size="md"
           icon={FileText}
-          className="bg-white shadow-sm hover:shadow-md"
+          className={secondaryActionClassName}
         >
           Relatorios
         </ActionButton>
@@ -120,7 +123,7 @@ export default function ProdutosHeaderActions({
         tone="solid"
         size="md"
         icon={Plus}
-        className="shadow-sm hover:shadow-md"
+        className={actionClassName}
       >
         Novo Produto
       </ActionButton>

@@ -95,8 +95,8 @@ export default function ProdutosFiltrosPanel({
           </select>
         </div>
 
-        <div className="flex gap-4 items-center flex-wrap md:col-span-2">
-          <label className="flex items-center gap-2 cursor-pointer">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 md:col-span-2">
+          <label className="flex min-h-10 items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 cursor-pointer">
             <input
               type="checkbox"
               checked={filtros.estoque_baixo}
@@ -106,7 +106,7 @@ export default function ProdutosFiltrosPanel({
             <span className="text-sm text-gray-700">Estoque Baixo</span>
           </label>
 
-          <label className="flex items-center gap-2 cursor-pointer">
+          <label className="flex min-h-10 items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 cursor-pointer">
             <input
               type="checkbox"
               checked={filtros.em_promocao}
@@ -116,7 +116,7 @@ export default function ProdutosFiltrosPanel({
             <span className="text-sm text-gray-700">Em Promocao</span>
           </label>
 
-          <label className="flex items-center gap-2 cursor-pointer">
+          <label className="flex min-h-10 items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 cursor-pointer sm:col-span-2">
             <input
               type="checkbox"
               checked={filtros.mostrarPaisVariacoes}
@@ -129,7 +129,7 @@ export default function ProdutosFiltrosPanel({
           </label>
 
           <label
-            className="flex items-center gap-2 cursor-pointer px-2 py-1 rounded-md border border-gray-200 bg-gray-50"
+            className="flex min-h-10 items-center gap-2 cursor-pointer rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 sm:col-span-2"
             title="Quando ligado, a busca fica salva ao sair e voltar para a lista"
           >
             <input

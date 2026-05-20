@@ -301,7 +301,7 @@ export default function ProdutosTabelaSection({
                             </h3>
                             <div className="mt-1 flex flex-wrap gap-1 text-[11px] text-gray-500">
                               {codigo && (
-                                <span className="rounded-full bg-gray-100 px-2 py-0.5">
+                                <span className="max-w-full break-all rounded-full bg-gray-100 px-2 py-0.5">
                                   Cod: {codigo}
                                 </span>
                               )}
