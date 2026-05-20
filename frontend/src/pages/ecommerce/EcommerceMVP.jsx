@@ -12,9 +12,9 @@ import EcommerceProductDetailModal from './EcommerceProductDetailModal';
 import EcommerceStorePage from './EcommerceStorePage';
 import EcommerceStorefrontChrome from './EcommerceStorefrontChrome';
 import useEcommerceCatalog from './useEcommerceCatalog';
+import useEcommerceProductModal from './useEcommerceProductModal';
 import {
   trackPageView,
-  trackViewItem,
   trackAddToCart,
   trackBeginCheckout,
   trackPurchase,
@@ -36,7 +36,6 @@ import {
   extractApiErrorMessage,
   fetchAddressByCep,
   getGuestCart,
-  getProductImages,
   getStoredAddressFields,
   isCustomerProfileComplete,
   isProductOutOfStock,
@@ -102,7 +101,13 @@ export default function EcommerceMVP() {
     productMap,
     clearCatalogFilters,
   } = useEcommerceCatalog();
-  const [selectedProduct, setSelectedProduct] = useState(null);
+  const {
+    selectedProduct,
+    activeProductImage,
+    setActiveProductImage,
+    openProductDetails,
+    closeProductModal,
+  } = useEcommerceProductModal({ products, location, navigate });
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
   const [showRecoveryPassword, setShowRecoveryPassword] = useState(false);
@@ -173,7 +178,6 @@ export default function EcommerceMVP() {
   const [pagamentoTipo, setPagamentoTipo] = useState(''); // 'pix'|'debito'|'credito'
   const [pagamentoBandeira, setPagamentoBandeira] = useState('Visa');
   const [pagamentoParcelas, setPagamentoParcelas] = useState(1);
-  const [activeProductImage, setActiveProductImage] = useState('');
 
   const [orderIds, setOrderIds] = useState(() => {
     try {
@@ -1129,39 +1133,6 @@ export default function EcommerceMVP() {
     setView('checkout');
     trackBeginCheckout(cart);
   }
-
-  function openProductDetails(product) {
-    const images = getProductImages(product);
-    setSelectedProduct(product);
-    setActiveProductImage(images[0] || '');
-    navigate(`${location.pathname}?produto=${product.id}`, { replace: true });
-    trackViewItem(product);
-  }
-
-  function closeProductModal() {
-    setSelectedProduct(null);
-    navigate(location.pathname, { replace: true });
-  }
-
-  // Fecha o modal com ESC
-  useEffect(() => {
-    if (!selectedProduct) return;
-    function handleKeyDown(e) {
-      if (e.key === 'Escape') closeProductModal();
-    }
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedProduct]);
-
-  // Abre produto automaticamente pelo link direto (?produto=ID)
-  useEffect(() => {
-    if (!products.length) return;
-    const searchParams = new URLSearchParams(location.search);
-    const prodIdFromUrl = searchParams.get('produto');
-    if (!prodIdFromUrl || selectedProduct) return;
-    const found = products.find((p) => String(p.id) === String(prodIdFromUrl));
-    if (found) openProductDetails(found);
-  }, [products.length, location.search]);
 
   /* ─────────────── ESTILOS INTERNOS ─────────────── */
   const S = {

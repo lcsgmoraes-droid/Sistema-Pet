@@ -961,6 +961,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-20: `EcommerceMVP.jsx` extraiu topbar, header, banner, barra do app e abas para `frontend/src/pages/ecommerce/EcommerceStorefrontChrome.jsx`, mantendo busca, navegacao e destaque visual como apresentacao, reduzindo a tela principal para 1408 linhas. Proximo passo: extrair a composicao da vitrine ou iniciar hooks de carrinho/autenticacao.
 - 2026-05-20: `EcommerceMVP.jsx` extraiu a aba Loja para `frontend/src/pages/ecommerce/EcommerceStorePage.jsx`, mantendo resumo, filtros, grid de produtos e sidebar do carrinho como apresentacao, reduzindo a tela principal para 1372 linhas. Proximo passo: iniciar hooks de carrinho/autenticacao ou escolher outro hotspot acima de 1000 linhas.
 - 2026-05-20: `EcommerceMVP.jsx` iniciou a extracao de hooks movendo estado, filtros, metricas e derivados do catalogo para `frontend/src/pages/ecommerce/useEcommerceCatalog.js`, reduzindo a tela principal para 1359 linhas. Proximo passo: extrair modal de produto ou carrinho em hooks menores.
+- 2026-05-20: `EcommerceMVP.jsx` extraiu o estado do modal de produto para `frontend/src/pages/ecommerce/useEcommerceProductModal.js`, mantendo abertura por link direto, ESC, imagem ativa e analytics fora da tela principal, reduzindo o arquivo para 1334 linhas. Proximo passo: separar estados/efeitos de autenticacao ou carrinho.
 
 ### Nao fazer nesta onda
 
