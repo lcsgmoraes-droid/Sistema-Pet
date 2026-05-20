@@ -3,14 +3,13 @@ import { useLocation, useNavigate, useParams } from 'react-router-dom';
 import ecommerceApi from '../../services/ecommerceApi';
 import { api } from '../../services/api';
 import EcommerceAccountPage from './EcommerceAccountPage';
-import EcommerceCatalogControls, { EcommerceCatalogSummary } from './EcommerceCatalogControls';
-import EcommerceCatalogProductCard from './EcommerceCatalogProductCard';
-import { EcommerceCartPage, EcommerceCartSidebar } from './EcommerceCartPanels';
+import { EcommerceCartPage } from './EcommerceCartPanels';
 import EcommerceCheckoutPage from './EcommerceCheckoutPage';
 import EcommerceFooter from './EcommerceFooter';
 import EcommerceNotifyMeModal from './EcommerceNotifyMeModal';
 import EcommerceOrdersPage from './EcommerceOrdersPage';
 import EcommerceProductDetailModal from './EcommerceProductDetailModal';
+import EcommerceStorePage from './EcommerceStorePage';
 import EcommerceStorefrontChrome from './EcommerceStorefrontChrome';
 import {
   trackPageView,
@@ -1305,77 +1304,39 @@ export default function EcommerceMVP() {
       )}
 
       {view === 'loja' && (
-        <>
-          <EcommerceCatalogSummary
-            catalogMetrics={catalogMetrics}
-            isMobile={isMobile}
-            productCount={filteredProducts.length}
-          />
-
-          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) 300px', gap: 24, maxWidth: 1280, margin: '0 auto', padding: isMobile ? '12px 12px 28px' : '16px 20px 28px' }}>
-            {/* PRODUTOS */}
-            <div>
-              <EcommerceCatalogControls
-                categories={categorias}
-                category={categoria}
-                isMobile={isMobile}
-                loading={loading}
-                order={ordenacaoCatalogo}
-                search={search}
-                showOnlyInStock={somenteComEstoque}
-                showOnlyWithImage={somenteComImagem}
-                styles={S}
-                onCategoryChange={setCategoria}
-                onClearFilters={clearCatalogFilters}
-                onImageFilterChange={() => setSomenteComImagem((value) => !value)}
-                onOrderChange={setOrdenacaoCatalogo}
-                onRefresh={loadProducts}
-                onSearchChange={setSearch}
-                onStockFilterChange={() => setSomenteComEstoque((value) => !value)}
-              />
-
-              {/* Grid */}
-              <div style={{ ...S.grid, gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(200px, 1fr))', gap: isMobile ? 10 : 16 }}>
-                {filteredProducts.map((product) => (
-                  <EcommerceCatalogProductCard
-                    key={product.id}
-                    product={product}
-                    isHovered={hoveredCard === product.id}
-                    wished={wishlist.includes(product.id)}
-                    styles={S}
-                    onAddToCart={addToCart}
-                    onHover={setHoveredCard}
-                    onNotifyMe={registerNotifyMe}
-                    onOpen={openProductDetails}
-                    onToggleWishlist={toggleWishlist}
-                  />
-                ))}
-                {!loading && filteredProducts.length === 0 && (
-                  <div style={{ gridColumn: '1/-1', textAlign: 'center', padding: '60px 0', color: '#9ca3af' }}>
-                    <div style={{ fontSize: 48, marginBottom: 12 }}>🔍</div>
-                    <div style={{ fontWeight: 800, fontSize: 18, color: '#374151' }}>Nenhum produto encontrado</div>
-                    <div style={{ fontSize: 13, marginTop: 4 }}>Tente buscar por outro termo ou categoria</div>
-                    <button onClick={clearCatalogFilters} style={{ marginTop: 16, padding: '8px 20px', borderRadius: 20, border: '1.5px solid #e7e5e4', background: '#fff', cursor: 'pointer', fontSize: 13, fontWeight: 600, color: '#f97316' }}>
-                      Limpar filtros
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* SIDEBAR CARRINHO */}
-            <EcommerceCartSidebar
-              cart={cart}
-              cartTotal={cartTotal}
-              customerToken={customerToken}
-              isMobile={isMobile}
-              productMap={productMap}
-              styles={S}
-              onCheckout={handleCheckoutFromLoja}
-              onViewCart={() => setView('carrinho')}
-            />
-        </div>
-        </>
+        <EcommerceStorePage
+          cart={cart}
+          cartTotal={cartTotal}
+          catalogMetrics={catalogMetrics}
+          categories={categorias}
+          category={categoria}
+          customerToken={customerToken}
+          filteredProducts={filteredProducts}
+          hoveredCard={hoveredCard}
+          isMobile={isMobile}
+          loading={loading}
+          order={ordenacaoCatalogo}
+          productMap={productMap}
+          search={search}
+          showOnlyInStock={somenteComEstoque}
+          showOnlyWithImage={somenteComImagem}
+          styles={S}
+          wishlist={wishlist}
+          onAddToCart={addToCart}
+          onCategoryChange={setCategoria}
+          onCheckout={handleCheckoutFromLoja}
+          onClearFilters={clearCatalogFilters}
+          onHoverProduct={setHoveredCard}
+          onImageFilterChange={() => setSomenteComImagem((value) => !value)}
+          onNotifyMe={registerNotifyMe}
+          onOpenProduct={openProductDetails}
+          onOrderChange={setOrdenacaoCatalogo}
+          onRefresh={loadProducts}
+          onSearchChange={setSearch}
+          onStockFilterChange={() => setSomenteComEstoque((value) => !value)}
+          onToggleWishlist={toggleWishlist}
+          onViewCart={() => setView('carrinho')}
+        />
       )}
 
       {selectedProduct && (
