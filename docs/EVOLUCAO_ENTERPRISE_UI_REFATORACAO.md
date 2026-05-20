@@ -954,6 +954,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-20: `EcommerceMVP.jsx` iniciou a proxima frente extraindo categorias, metricas e filtros/ordenacao do catalogo para `ecommerceMvpUtils`, com teste Node dedicado em `ecommerceMvpUtils.test.mjs`, reduzindo a tela para 2168 linhas. Proximo passo: extrair cabecalho/banner ou pedidos/conta em componente de apresentacao.
 - 2026-05-20: `EcommerceMVP.jsx` moveu banners ativos, nome exibido da loja, mapa de produtos, validacao de perfil completo e mapeamento de endereco/cadastro do cliente para `ecommerceMvpUtils`, ampliando o teste Node para 9 casos e reduzindo a tela para 2105 linhas. Proximo passo: extrair pedidos ou conta em componente de apresentacao.
 - 2026-05-20: `EcommerceMVP.jsx` extraiu a aba de pedidos para `frontend/src/pages/ecommerce/EcommerceOrdersPage.jsx`, preservando listagem, status, senha de retirada, fluxo drive e itens, reduzindo a tela principal para 2027 linhas. Proximo passo: extrair conta/login ou checkout em componentes de apresentacao.
+- 2026-05-20: `EcommerceMVP.jsx` extraiu a aba de conta/login para `frontend/src/pages/ecommerce/EcommerceAccountPage.jsx`, mantendo cadastro, login, recuperacao de senha e perfil do cliente como apresentacao, reduzindo a tela principal para 1692 linhas. Proximo passo: extrair checkout ou modal avise-me.
 
 ### Nao fazer nesta onda
 
