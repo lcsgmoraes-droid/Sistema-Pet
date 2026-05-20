@@ -116,6 +116,7 @@ Tela piloto:
 - Financeiro/Vendas: a tabela de itens promocionais foi extraida para `ProdutosPromocionaisTable`, reaproveitando celulas numericas e monetarias globais.
 - Financeiro/Vendas: o ranking de top produtos por lucro foi extraido para `TopProdutosLucroTable`, padronizando ranking, margem e valores.
 - Financeiro/Vendas: acoes superiores de relatorios/exportacoes foram alinhadas em altura e densidade, mantendo cor compacta por referencia sem competir com a tela.
+- Estoque/Transferencia Parceiro: helpers de documento/cupom, seletor de colunas, modal de documento e cards/badges locais foram extraidos para modulos dedicados, com teste unitario para as regras de colunas, cupom e busca por codigo.
 - Financeiro/Fluxo de Caixa: cabecalho passou para `PageHeader` e o Chat IA existente foi conectado ao modal padrao.
 - Financeiro/Contas: estados de carregamento de contas a pagar/receber passaram para `LoadingState` global.
 - Financeiro/DRE e Fluxo de Caixa: carregamentos iniciais passaram para `LoadingState`; botoes PDF/Excel da DRE ganharam referencia visual compacta no padrao de acoes.
