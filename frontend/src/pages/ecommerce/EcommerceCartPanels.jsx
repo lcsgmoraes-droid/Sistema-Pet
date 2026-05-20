@@ -14,8 +14,8 @@ function MiniCartItem({ item, productMap, styles: S }) {
           <Package size={16} color="#a8a29e" />
         )}
       </div>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1a1a2e' }}>
+      <div style={{ flex: '1 1 0%', minWidth: 0, maxWidth: '100%', overflow: 'hidden' }}>
+        <div style={{ fontSize: 12, fontWeight: 600, lineHeight: 1.3, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#1a1a2e', maxWidth: '100%' }}>
           {item.nome}
         </div>
         <div style={{ fontSize: 11, color: '#f97316', fontWeight: 600 }}>
@@ -97,7 +97,7 @@ export function EcommerceCartSidebar({
       </div>
 
       {items.length ? (
-        <div style={{ display: 'grid', gap: 8 }}>
+        <div style={{ display: 'grid', gap: 8, width: '100%', minWidth: 0, maxWidth: '100%', overflow: 'hidden' }}>
           {items.slice(0, 5).map((item) => (
             <MiniCartItem key={item.item_id} item={item} productMap={productMap} styles={S} />
           ))}
@@ -169,6 +169,7 @@ export function EcommerceCartPage({
   cartTotal,
   cupom,
   cupomResult,
+  isMobile,
   productMap,
   styles: S,
   onApplyCoupon,
@@ -189,13 +190,13 @@ export function EcommerceCartPage({
       {cartLoading ? (
         <div style={{ textAlign: 'center', color: '#64748b', padding: 40 }}>Carregando carrinho...</div>
       ) : itemCount ? (
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 20, alignItems: 'start' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'minmax(0, 1fr)' : 'minmax(0, 1fr) 340px', gap: 20, alignItems: 'start' }}>
           <div style={{ display: 'grid', gap: 12 }}>
             {items.map((item) => (
               <CartPageItem key={item.item_id} item={item} productMap={productMap} styles={S} onUpdateItem={onUpdateItem} />
             ))}
 
-            <form onSubmit={onApplyCoupon} style={{ display: 'flex', gap: 8, marginTop: 4 }}>
+            <form onSubmit={onApplyCoupon} style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 8, marginTop: 4 }}>
               <input value={cupom} onChange={(event) => onCouponChange(event.target.value)} placeholder="Codigo de cupom" style={{ ...S.formInput, flex: 1 }} />
               <button type="submit" style={{ background: '#f1f5f9', border: '1.5px solid #e5e7eb', color: '#374151', borderRadius: 10, padding: '0 18px', fontWeight: 600, fontSize: 13, cursor: 'pointer' }}>
                 Aplicar
