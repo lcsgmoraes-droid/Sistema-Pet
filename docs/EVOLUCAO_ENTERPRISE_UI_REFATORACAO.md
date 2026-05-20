@@ -950,6 +950,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-19: `VendasFinanceiro` moveu a composicao dos cards do resultado financeiro para `vendasFinanceiroUtils`, reduzindo o arquivo principal de 1029 para 915 linhas e ampliando os testes Node para 19 casos. Proximo passo: extrair cards totalizadores da lista ou encerrar esta frente por ja estar abaixo de 1000 linhas.
 - 2026-05-19: `VendasFinanceiro` extraiu os cards totalizadores da lista para `vendasFinanceiroUtils`, reduzindo o arquivo principal de 915 para 904 linhas e ampliando os testes Node para 20 casos. Proximo passo: encerrar esta frente ou escolher outro arquivo critico acima de 1000 linhas.
 - 2026-05-20: `Layout.jsx` iniciou a proxima frente de refatoracao extraindo a configuracao de menu para `frontend/src/components/layout/menuConfig.js`, reduzindo o componente principal de 1484 para 873 linhas e cobrindo o contrato basico do menu com teste Node dedicado. Proximo passo: extrair a renderizacao dos itens da sidebar ou escolher outro hotspot acima de 1000 linhas.
+- 2026-05-20: `Layout.jsx` extraiu a renderizacao dos itens da sidebar para `frontend/src/components/layout/SidebarMenu.jsx`, mantendo os estados premium/dev e reduzindo o componente principal para 694 linhas. Proximo passo: acompanhar os checks do PR e, se seguir verde, escolher outro hotspot acima de 1000 linhas.
 
 ### Nao fazer nesta onda
 

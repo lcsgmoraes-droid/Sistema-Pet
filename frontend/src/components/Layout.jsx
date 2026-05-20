@@ -1,15 +1,11 @@
 import { CalendarDays, FlaskConical, PawPrint, Stethoscope, Syringe } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
-  FiChevronDown,
-  FiChevronRight,
   FiCreditCard,
   FiFileText,
   FiHelpCircle,
-  FiLock,
   FiLogOut,
   FiMenu,
-  FiUnlock,
   FiX,
 } from "react-icons/fi";
 import { Link, Outlet, useLocation } from "react-router-dom";
@@ -19,8 +15,8 @@ import { api } from "../services/api";
 import { isVeterinarioProfile } from "../utils/veterinarioPerfil";
 import FloatingCalculatorButton from "./FloatingCalculatorButton";
 import { createLayoutMenuItems } from "./layout/menuConfig";
+import SidebarMenu from "./layout/SidebarMenu";
 import ModalCalculadoraUniversal from "./ModalCalculadoraUniversal";
-import TooltipPremium from "./TooltipPremium";
 
 const Layout = () => {
   const location = useLocation();
@@ -236,6 +232,13 @@ const Layout = () => {
     if (isMobile) {
       setSidebarOpen(false);
     }
+  };
+
+  const handleToggleSubmenu = (path) => {
+    setSubmenusOpen((prev) => ({
+      ...prev,
+      [path]: !prev[path],
+    }));
   };
 
   const toggleSidebarMobile = () => {
@@ -520,200 +523,18 @@ const Layout = () => {
             )}
           </div>
 
-          {/* Menu Items */}
-          <nav className="flex-1 py-2 md:py-4 overflow-y-auto overflow-x-hidden">
-            {Array.isArray(menuItems) &&
-              menuItems.map((item) => (
-                <div key={item.path}>
-                  {item.submenu ? (
-                    <>
-                      <button
-                        onClick={() => {
-                          setSubmenusOpen((prev) => ({
-                            ...prev,
-                            [item.path]: !prev[item.path],
-                          }));
-                        }}
-                        className={`w-full flex items-center justify-between gap-2 md:gap-3 px-3 md:px-4 py-2.5 md:py-3 mx-1 md:mx-2 rounded-lg transition-all text-sm md:text-base ${
-                          location.pathname.startsWith(item.path)
-                            ? "bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 shadow-sm"
-                            : "text-gray-700 hover:bg-white/60"
-                        }`}
-                      >
-                        <div className="flex items-center gap-2 md:gap-3">
-                          <item.icon className="text-base md:text-lg flex-shrink-0" />
-                          {sidebarOpen && (
-                            <span className="font-medium text-xs md:text-sm">
-                              {item.label}
-                            </span>
-                          )}
-                        </div>
-                        {sidebarOpen &&
-                          (item.modulo && devControlesAtivos ? (
-                            <span
-                              role="button"
-                              tabIndex={0}
-                              onClick={(event) =>
-                                onToggleModuloDev(event, item.modulo)
-                              }
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter" || event.key === " ")
-                                  onToggleModuloDev(event, item.modulo);
-                              }}
-                              className="p-1 rounded hover:bg-white/70 cursor-pointer"
-                              title="DEV: clicar para travar/destravar modulo"
-                            >
-                              {moduloAtivo(item.modulo) ? (
-                                <FiUnlock className="text-xs md:text-sm text-green-500 flex-shrink-0" />
-                              ) : (
-                                <FiLock className="text-xs md:text-sm text-amber-400 flex-shrink-0" />
-                              )}
-                            </span>
-                          ) : item.modulo && !moduloAtivo(item.modulo) ? (
-                            <TooltipPremium
-                              modulo={item.modulo}
-                              placement="right"
-                            >
-                              <FiLock
-                                className="text-xs md:text-sm text-amber-400 flex-shrink-0"
-                                aria-label="Módulo premium"
-                              />
-                            </TooltipPremium>
-                          ) : submenusOpen[item.path] ? (
-                            <FiChevronDown className="text-xs md:text-sm text-gray-400" />
-                          ) : (
-                            <FiChevronRight className="text-xs md:text-sm text-gray-400" />
-                          ))}
-                      </button>
-                      {submenusOpen[item.path] && sidebarOpen && (
-                        <div className="mt-1 mb-2 space-y-0.5 md:space-y-1">
-                          {Array.isArray(item.submenu) &&
-                            item.submenu.map((subitem) => (
-                              <Link
-                                key={subitem.path}
-                                to={subitem.path}
-                                onClick={handleMenuClick}
-                                className={`flex items-center gap-2 md:gap-3 px-3 md:px-4 py-1.5 md:py-2 mx-1 md:mx-2 ml-8 md:ml-12 rounded-lg transition-all text-xs md:text-sm ${
-                                  isActive(subitem.path)
-                                    ? "bg-white text-indigo-600 shadow-sm font-medium"
-                                    : "text-gray-600 hover:bg-white/50"
-                                }`}
-                              >
-                                {sidebarOpen && <span>{subitem.label}</span>}
-                                {!sidebarOpen && (
-                                  <span className="sr-only">
-                                    {subitem.label}
-                                  </span>
-                                )}
-                                {subitem.modulo &&
-                                  sidebarOpen &&
-                                  (devControlesAtivos ? (
-                                    <span
-                                      role="button"
-                                      tabIndex={0}
-                                      onClick={(event) =>
-                                        onToggleModuloDev(event, subitem.modulo)
-                                      }
-                                      onKeyDown={(event) => {
-                                        if (
-                                          event.key === "Enter" ||
-                                          event.key === " "
-                                        )
-                                          onToggleModuloDev(
-                                            event,
-                                            subitem.modulo,
-                                          );
-                                      }}
-                                      className="p-1 rounded hover:bg-white/80 ml-auto cursor-pointer"
-                                      title="DEV: clicar para travar/destravar modulo"
-                                    >
-                                      {moduloAtivo(subitem.modulo) ? (
-                                        <FiUnlock className="w-3 h-3 text-green-500 flex-shrink-0" />
-                                      ) : (
-                                        <FiLock className="w-3 h-3 text-amber-400 flex-shrink-0" />
-                                      )}
-                                    </span>
-                                  ) : (
-                                    !moduloAtivo(subitem.modulo) && (
-                                      <TooltipPremium
-                                        modulo={subitem.modulo}
-                                        placement="right"
-                                      >
-                                        <FiLock
-                                          className="w-3 h-3 text-amber-400 flex-shrink-0 ml-auto"
-                                          aria-label="Módulo premium"
-                                        />
-                                      </TooltipPremium>
-                                    )
-                                  ))}
-                              </Link>
-                            ))}
-                        </div>
-                      )}
-                    </>
-                  ) : (
-                    <Link
-                      to={item.path}
-                      onClick={handleMenuClick}
-                      className={`flex items-center gap-2 md:gap-3 px-3 md:px-4 py-2.5 md:py-3 mx-1 md:mx-2 my-0.5 md:my-1 rounded-lg transition-all text-sm md:text-base ${
-                        isActive(item.path)
-                          ? "bg-gradient-to-r from-indigo-100 to-purple-100 text-indigo-700 shadow-sm"
-                          : "text-gray-700 hover:bg-white/60"
-                      }`}
-                      title={!sidebarOpen ? item.label : ""}
-                    >
-                      <item.icon className="text-base md:text-lg flex-shrink-0" />
-                      {sidebarOpen && (
-                        <div className="flex items-center justify-between flex-1">
-                          <span className="font-medium text-xs md:text-sm">
-                            {item.label}
-                          </span>
-                          {item.modulo && devControlesAtivos ? (
-                            <span
-                              role="button"
-                              tabIndex={0}
-                              onClick={(event) =>
-                                onToggleModuloDev(event, item.modulo)
-                              }
-                              onKeyDown={(event) => {
-                                if (event.key === "Enter" || event.key === " ")
-                                  onToggleModuloDev(event, item.modulo);
-                              }}
-                              className="p-1 rounded hover:bg-white/80 cursor-pointer"
-                              title="DEV: clicar para travar/destravar modulo"
-                            >
-                              {moduloAtivo(item.modulo) ? (
-                                <FiUnlock
-                                  className="w-3 h-3 text-green-500 flex-shrink-0"
-                                  title="Modulo liberado em DEV"
-                                />
-                              ) : (
-                                <FiLock
-                                  className="w-3 h-3 text-amber-400 flex-shrink-0"
-                                  title="Modulo bloqueado"
-                                />
-                              )}
-                            </span>
-                          ) : item.modulo && !moduloAtivo(item.modulo) ? (
-                            <TooltipPremium
-                              modulo={item.modulo}
-                              placement="right"
-                            >
-                              <FiLock
-                                className="w-3 h-3 text-amber-400 flex-shrink-0"
-                                aria-label="Módulo premium"
-                              />
-                            </TooltipPremium>
-                          ) : item.badge ? (
-                            <span className="w-2 h-2 bg-orange-400 rounded-full animate-pulse"></span>
-                          ) : null}
-                        </div>
-                      )}
-                    </Link>
-                  )}
-                </div>
-              ))}
-          </nav>
+          <SidebarMenu
+            menuItems={menuItems}
+            sidebarOpen={sidebarOpen}
+            submenusOpen={submenusOpen}
+            currentPath={location.pathname}
+            isActive={isActive}
+            onToggleSubmenu={handleToggleSubmenu}
+            onMenuClick={handleMenuClick}
+            devControlesAtivos={devControlesAtivos}
+            moduloAtivo={moduloAtivo}
+            onToggleModuloDev={onToggleModuloDev}
+          />
 
           {/* Bottom Actions */}
           <div className="border-t border-indigo-100 bg-white/30">
