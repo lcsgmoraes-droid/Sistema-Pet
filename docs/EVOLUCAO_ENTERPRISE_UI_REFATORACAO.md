@@ -964,6 +964,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-20: `EcommerceMVP.jsx` extraiu o estado do modal de produto para `frontend/src/pages/ecommerce/useEcommerceProductModal.js`, mantendo abertura por link direto, ESC, imagem ativa e analytics fora da tela principal, reduzindo o arquivo para 1334 linhas. Proximo passo: separar estados/efeitos de autenticacao ou carrinho.
 - 2026-05-20: `EcommerceMVP.jsx` extraiu wishlist e avise-me para `frontend/src/pages/ecommerce/useEcommerceEngagement.js`, mantendo persistencia local, modal de aviso e chamada de registro fora da tela principal, reduzindo o arquivo para 1289 linhas. Proximo passo: separar estados/efeitos de autenticacao ou carrinho.
 - 2026-05-20: `EcommerceMVP.jsx` extraiu pedidos recentes e drive-cheguei para `frontend/src/pages/ecommerce/useEcommerceOrders.js`, mantendo recarga da aba Pedidos, persistencia dos IDs e atualizacao apos checkout em hook dedicado, reduzindo o arquivo para 1254 linhas. Proximo passo: separar carrinho/checkout ou autenticacao em hooks menores.
+- 2026-05-20: `EcommerceMVP.jsx` extraiu estado e operacoes do carrinho para `frontend/src/pages/ecommerce/useEcommerceCart.js`, mantendo carrinho visitante, sincronizacao apos login, adicionar/atualizar itens e total calculado em hook dedicado, reduzindo o arquivo para 1130 linhas. Proximo passo: separar checkout/pagamento ou autenticacao/perfil.
 
 ### Nao fazer nesta onda
 

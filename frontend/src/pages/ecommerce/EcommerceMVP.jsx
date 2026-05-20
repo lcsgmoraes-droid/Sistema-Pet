@@ -11,21 +11,19 @@ import EcommerceOrdersPage from './EcommerceOrdersPage';
 import EcommerceProductDetailModal from './EcommerceProductDetailModal';
 import EcommerceStorePage from './EcommerceStorePage';
 import EcommerceStorefrontChrome from './EcommerceStorefrontChrome';
+import useEcommerceCart from './useEcommerceCart';
 import useEcommerceCatalog from './useEcommerceCatalog';
 import useEcommerceEngagement from './useEcommerceEngagement';
 import useEcommerceOrders from './useEcommerceOrders';
 import useEcommerceProductModal from './useEcommerceProductModal';
 import {
   trackPageView,
-  trackAddToCart,
   trackBeginCheckout,
   trackPurchase,
   trackViewCart,
 } from '../../services/analytics';
 import {
-  EMPTY_CART,
   STORAGE_ADDRESS_KEY,
-  STORAGE_GUEST_CART_KEY,
   STORAGE_TOKEN_KEY,
   buildActiveBanners,
   buildCustomerAddressFields,
@@ -34,16 +32,11 @@ import {
   buildIdempotencyKey,
   extractApiErrorMessage,
   fetchAddressByCep,
-  getGuestCart,
   getStoredAddressFields,
   isCustomerProfileComplete,
   isProductOutOfStock,
   normalizeProductPayload,
-  recalculateGuestCart,
-  resolveProductPrice,
-  resolveProductStock,
   resolveStoreDisplayName,
-  resolveValidityPromotionLimit,
 } from './ecommerceMvpUtils';
 
 export default function EcommerceMVP() {
@@ -114,7 +107,6 @@ export default function EcommerceMVP() {
 
   const [authLoading, setAuthLoading] = useState(false);
   const [checkoutLoading, setCheckoutLoading] = useState(false);
-  const [cartLoading, setCartLoading] = useState(false);
   const [recoveryLoading, setRecoveryLoading] = useState(false);
 
   const [customerToken, setCustomerToken] = useState(localStorage.getItem(STORAGE_TOKEN_KEY) || '');
@@ -163,7 +155,6 @@ export default function EcommerceMVP() {
     confirmarSenha: '',
   });
 
-  const [cart, setCart] = useState(() => getGuestCart());
   const [cupom, setCupom] = useState('');
   const [cupomResult, setCupomResult] = useState(null);
 
@@ -213,6 +204,24 @@ export default function EcommerceMVP() {
   const storeDisplayName = useMemo(() => {
     return resolveStoreDisplayName({ tenantContext, storefrontRef });
   }, [tenantContext, storefrontRef]);
+
+  const {
+    cart,
+    cartLoading,
+    cartTotal,
+    addToCart,
+    clearCart,
+    loadCart,
+    restoreGuestCart,
+    syncGuestCartToServer,
+    updateCartItem,
+  } = useEcommerceCart({
+    authHeaders,
+    customerToken,
+    productMap,
+    onError: setError,
+    onSuccess: setSuccess,
+  });
 
   const {
     wishlist,
@@ -310,12 +319,6 @@ export default function EcommerceMVP() {
   }, [tenantContext?.cidade, cidadeDestino]);
 
   useEffect(() => {
-    if (!customerToken) {
-      localStorage.setItem(STORAGE_GUEST_CART_KEY, JSON.stringify(cart || EMPTY_CART));
-    }
-  }, [cart, customerToken]);
-
-  useEffect(() => {
     const total = activeBanners.length;
     const timer = setInterval(() => setBannerSlide((prev) => (prev + 1) % total), 4000);
     return () => clearInterval(timer);
@@ -391,7 +394,7 @@ export default function EcommerceMVP() {
       setCustomer(null);
       setCustomerToken('');
       localStorage.removeItem(STORAGE_TOKEN_KEY);
-      setCart(getGuestCart());
+      restoreGuestCart();
     }
   }
 
@@ -481,40 +484,6 @@ export default function EcommerceMVP() {
       cidade: data.cidade || prev.cidade,
       estado: data.estado || prev.estado,
     }));
-  }
-
-  async function loadCart(customHeaders = authHeaders) {
-    if (!customHeaders?.Authorization) return;
-    setCartLoading(true);
-    try {
-      const response = await ecommerceApi.get('/api/carrinho', { headers: customHeaders });
-      setCart(response.data || { ...EMPTY_CART });
-    } catch (err) {
-      setError(extractApiErrorMessage(err, 'Erro ao carregar carrinho'));
-    } finally {
-      setCartLoading(false);
-    }
-  }
-
-  async function syncGuestCartToServer(token) {
-    const guestCart = getGuestCart();
-    if (!guestCart?.itens?.length) return;
-
-    const headers = { Authorization: `Bearer ${token}` };
-
-    for (const item of guestCart.itens) {
-      await ecommerceApi.post(
-        '/api/carrinho/adicionar',
-        {
-          produto_id: item.produto_id,
-          quantidade: item.quantidade,
-        },
-        { headers }
-      );
-    }
-
-    await loadCart(headers);
-    localStorage.removeItem(STORAGE_GUEST_CART_KEY);
   }
 
   function clearRecoveryParamsFromUrl() {
@@ -769,116 +738,11 @@ export default function EcommerceMVP() {
   function logoutCustomer() {
     setCustomer(null);
     setCustomerToken('');
-    setCart({ ...EMPTY_CART });
+    clearCart();
     setCheckoutResumo(null);
     setCheckoutResult(null);
     localStorage.removeItem(STORAGE_TOKEN_KEY);
     setSuccess('Sessão encerrada.');
-  }
-
-  async function addToCart(product) {
-    const availableStock = resolveProductStock(product);
-    if (availableStock <= 0) {
-      setError('Produto indisponível no momento. Volto em breve.');
-      return;
-    }
-
-    if (!customerToken) {
-      const limiteValidade = resolveValidityPromotionLimit(product);
-      const quantidadeAtual = Array.isArray(cart?.itens)
-        ? Number(cart.itens.find((item) => item.produto_id === product.id)?.quantidade || 0)
-        : 0;
-      if (limiteValidade && quantidadeAtual + 1 > limiteValidade) {
-        setError(`Oferta de validade disponivel para ate ${limiteValidade} unidade(s) nesse preco.`);
-        return;
-      }
-      setError('');
-      const price = resolveProductPrice(product);
-      setCart((previousCart) => {
-        const currentItems = Array.isArray(previousCart?.itens) ? previousCart.itens : [];
-        const existing = currentItems.find((item) => item.produto_id === product.id);
-
-        const nextItems = existing
-          ? currentItems.map((item) =>
-              item.produto_id === product.id
-                ? { ...item, quantidade: Number(item.quantidade || 0) + 1 }
-                : item
-            )
-          : [
-              ...currentItems,
-              {
-                item_id: `guest-${product.id}`,
-                produto_id: product.id,
-                nome: product.nome,
-                preco_unitario: price,
-                quantidade: 1,
-              },
-            ];
-
-        return recalculateGuestCart(nextItems);
-      });
-      setSuccess('Produto adicionado ao carrinho. Faça login no checkout para finalizar.');
-      trackAddToCart(product);
-      return;
-    }
-
-    setError('');
-    try {
-      const response = await ecommerceApi.post(
-        '/api/carrinho/adicionar',
-        { produto_id: product.id, quantidade: 1 },
-        { headers: authHeaders }
-      );
-      setCart(response.data);
-      setSuccess('Produto adicionado ao carrinho.');
-      trackAddToCart(product);
-    } catch (err) {
-      setError(extractApiErrorMessage(err, 'Erro ao adicionar no carrinho'));
-    }
-  }
-
-  async function updateCartItem(itemId, quantidade) {
-    if (!customerToken) {
-      const itemAtual = Array.isArray(cart?.itens)
-        ? cart.itens.find((item) => item.item_id === itemId)
-        : null;
-      const produtoAtual = itemAtual ? productMap[itemAtual.produto_id] : null;
-      const limiteValidade = resolveValidityPromotionLimit(produtoAtual);
-      if (limiteValidade && quantidade > limiteValidade) {
-        setError(`Oferta de validade disponivel para ate ${limiteValidade} unidade(s) nesse preco.`);
-        return;
-      }
-      setCart((previousCart) => {
-        const currentItems = Array.isArray(previousCart?.itens) ? previousCart.itens : [];
-
-        if (quantidade <= 0) {
-          const nextItems = currentItems.filter((item) => item.item_id !== itemId);
-          return recalculateGuestCart(nextItems);
-        }
-
-        const nextItems = currentItems.map((item) =>
-          item.item_id === itemId ? { ...item, quantidade } : item
-        );
-        return recalculateGuestCart(nextItems);
-      });
-      return;
-    }
-    setError('');
-    try {
-      if (quantidade <= 0) {
-        const response = await ecommerceApi.delete(`/api/carrinho/remover/${itemId}`, { headers: authHeaders });
-        setCart(response.data);
-        return;
-      }
-      const response = await ecommerceApi.put(
-        `/api/carrinho/atualizar/${itemId}`,
-        { quantidade },
-        { headers: authHeaders }
-      );
-      setCart(response.data);
-    } catch (err) {
-      setError(extractApiErrorMessage(err, 'Erro ao atualizar carrinho'));
-    }
   }
 
   async function applyCupom(e) {
@@ -1004,7 +868,7 @@ export default function EcommerceMVP() {
       const result = response.data;
       setCheckoutResult(result);
       trackPurchase(result, cart);
-      setCart({ pedido_id: null, itens: [], subtotal: 0, total: 0 });
+      clearCart();
       setCheckoutResumo(null);
       setCupomResult(null);
       setCupom('');
@@ -1024,8 +888,6 @@ export default function EcommerceMVP() {
       setCheckoutLoading(false);
     }
   }
-
-  const cartTotal = Number(cart?.total || 0);
 
   function handleCheckoutFromLoja() {
     if (!cart?.itens?.length) {
