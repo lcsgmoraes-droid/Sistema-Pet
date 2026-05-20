@@ -33,15 +33,15 @@ export default function BanhoTosaAgendaCriacaoPanel({
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4"
+      className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 p-0 sm:items-center sm:p-4"
       onClick={onClose}
     >
       <div
-        className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl"
+        className="max-h-[94dvh] w-full max-w-5xl overflow-y-auto rounded-t-2xl bg-white p-4 shadow-xl sm:max-h-[92vh] sm:rounded-2xl sm:p-6"
         onClick={(event) => event.stopPropagation()}
       >
-        <div className="flex items-start justify-between gap-4">
-          <div>
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
             <h2 className="text-lg font-semibold text-slate-900">Novo agendamento</h2>
             <p className="mt-1 text-sm text-slate-500">
               Escolha tutor, pet e servico, veja a agenda do dia e selecione um horario livre.
@@ -57,7 +57,7 @@ export default function BanhoTosaAgendaCriacaoPanel({
           </button>
         </div>
 
-        <div className="mt-5 grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
+        <div className="mt-5 grid gap-4 lg:grid-cols-[1.1fr_0.9fr] lg:gap-6">
           <BanhoTosaAgendaForm
             dataRef={dataRef}
             form={form}
@@ -91,7 +91,7 @@ export default function BanhoTosaAgendaCriacaoPanel({
           />
         </div>
 
-        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+        <div className="sticky bottom-0 -mx-4 mt-5 grid gap-3 border-t border-slate-100 bg-white/95 px-4 py-3 sm:static sm:mx-0 sm:grid-cols-2 sm:border-0 sm:bg-transparent sm:p-0">
           <ActionButton intent="neutral" onClick={onClose} size="md" tone="soft">
             Cancelar
           </ActionButton>

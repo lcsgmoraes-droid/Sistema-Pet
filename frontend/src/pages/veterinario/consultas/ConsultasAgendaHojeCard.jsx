@@ -16,19 +16,19 @@ export default function ConsultasAgendaHojeCard({
 }) {
   return (
     <section className="rounded-xl border border-blue-100 bg-blue-50/60 p-4 shadow-sm">
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div className="min-w-0">
           <h2 className="flex items-center gap-2 text-sm font-semibold text-slate-800">
             <CalendarClock size={17} className="text-blue-600" />
             Agendamentos de hoje
           </h2>
           <p className="mt-1 text-xs text-slate-500">Pacientes agendados para atendimento clinico nesta data.</p>
         </div>
-        <div className="flex flex-wrap gap-2">
+        <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 md:w-auto">
           <button
             type="button"
             onClick={onRecarregar}
-            className="inline-flex items-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-50"
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-blue-200 bg-white px-3 py-2 text-xs font-medium text-blue-700 hover:bg-blue-50"
           >
             <RefreshCw size={14} />
             Atualizar

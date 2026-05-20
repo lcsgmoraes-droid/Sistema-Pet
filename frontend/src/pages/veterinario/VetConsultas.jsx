@@ -42,7 +42,7 @@ export default function VetConsultas() {
   }
 
   return (
-    <div className="p-6 space-y-5">
+    <div className="space-y-5 p-3 sm:p-4 lg:p-6">
       <ConsultasHeader
         onNovaConsulta={() => navigate("/veterinario/consultas/nova")}
         total={consultas.total}

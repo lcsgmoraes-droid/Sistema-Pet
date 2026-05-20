@@ -102,7 +102,7 @@ export default function BanhoTosaDashboardView({
           subtitle="Cada etapa alimenta tempo, consumo, mao de obra e margem."
           title="Fluxo operacional"
         >
-          <div className="grid gap-3 md:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {[
               "Agendado",
               "Check-in",
@@ -127,17 +127,17 @@ export default function BanhoTosaDashboardView({
 
         <Panel title="Base de precificacao">
           <dl className="space-y-3 text-sm">
-            <div className="flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3">
+            <div className="flex flex-col gap-1 rounded-lg bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <dt className="text-slate-500">Servicos ativos</dt>
               <dd className="font-semibold text-slate-900">
                 {dashboard?.servicos_ativos ?? 0}
               </dd>
             </div>
-            <div className="flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3">
+            <div className="flex flex-col gap-1 rounded-lg bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <dt className="text-slate-500">Portes ativos</dt>
               <dd className="font-semibold text-slate-900">{parametrosAtivos}</dd>
             </div>
-            <div className="flex items-center justify-between rounded-lg bg-slate-50 px-4 py-3">
+            <div className="flex flex-col gap-1 rounded-lg bg-slate-50 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
               <dt className="text-slate-500">Horario base</dt>
               <dd className="font-semibold text-slate-900">
                 {config?.horario_inicio || "08:00"} - {config?.horario_fim || "18:00"}

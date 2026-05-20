@@ -5,13 +5,13 @@ import { STATUS_AGENDAMENTO_COLOR, STATUS_AGENDAMENTO_LABEL } from "./dashboardC
 
 export default function AgendaHojeCard({ agendamentos, onAbrirAgenda, onAbrirAgendamento }) {
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-gray-100">
-        <h2 className="font-semibold text-gray-700 flex items-center gap-2">
+    <div className="overflow-hidden rounded-xl border border-gray-200 bg-white shadow-sm">
+      <div className="flex flex-col gap-2 border-b border-gray-100 px-4 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+        <h2 className="flex items-center gap-2 font-semibold text-gray-700">
           <Calendar size={16} />
           Agenda de hoje
         </h2>
-        <button onClick={onAbrirAgenda} className="text-sm text-blue-600 hover:underline">
+        <button onClick={onAbrirAgenda} className="self-start text-sm text-blue-600 hover:underline sm:self-auto">
           Ver completa →
         </button>
       </div>
@@ -26,13 +26,13 @@ export default function AgendaHojeCard({ agendamentos, onAbrirAgenda, onAbrirAge
             <button
               key={agendamento.id}
               type="button"
-              className="flex w-full items-center gap-4 px-5 py-3 text-left hover:bg-gray-50 transition-colors"
+              className="flex w-full flex-col gap-2 px-4 py-3 text-left transition-colors hover:bg-gray-50 sm:flex-row sm:items-center sm:gap-4 sm:px-5"
               onClick={() => onAbrirAgendamento(agendamento)}
             >
-              <span className="text-sm font-mono text-gray-500 w-12">
+              <span className="w-full text-sm font-mono text-gray-500 sm:w-12">
                 {agendamento.data_hora?.slice(11, 16)}
               </span>
-              <div className="flex-1 min-w-0">
+              <div className="min-w-0 flex-1">
                 <p className="text-sm font-medium text-gray-800 truncate">
                   <PetIdentity
                     copyable={false}

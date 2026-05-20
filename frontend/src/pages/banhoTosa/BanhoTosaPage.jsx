@@ -165,15 +165,15 @@ export default function BanhoTosaPage({ view = "dashboard" }) {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 px-4 py-5 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-slate-50 px-3 py-4 sm:px-6 lg:px-8">
       <div className="mx-auto max-w-7xl space-y-4">
-        <header className="overflow-hidden rounded-lg border border-slate-200 bg-white p-4 shadow-sm">
+        <header className="overflow-hidden rounded-lg border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
           <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
             <div>
               <span className="inline-flex rounded-full bg-blue-50 px-2.5 py-1 text-xs font-semibold text-blue-700">
                 Central operacional
               </span>
-              <h1 className="mt-3 text-2xl font-semibold tracking-tight text-slate-950">
+              <h1 className="mt-3 text-xl font-semibold tracking-tight text-slate-950 sm:text-2xl">
                 Banho & Tosa
               </h1>
               <p className="mt-1 max-w-3xl text-sm text-slate-600">
@@ -185,14 +185,14 @@ export default function BanhoTosaPage({ view = "dashboard" }) {
               type="button"
               onClick={() => carregarDados(true)}
               disabled={refreshing}
-              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60"
+              className="inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg border border-slate-200 bg-white px-3.5 text-sm font-medium text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-60 sm:w-auto"
             >
               <FiRefreshCw className={refreshing ? "animate-spin" : ""} />
               Atualizar
             </button>
           </div>
 
-          <nav className="mt-4 flex gap-2 overflow-x-auto pb-1">
+          <nav className="-mx-1 mt-4 flex gap-2 overflow-x-auto px-1 pb-1">
             {navItems.map((item) => {
               const active = item.view === view;
               return (
