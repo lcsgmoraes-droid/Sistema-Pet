@@ -6,6 +6,7 @@ import EcommerceAccountPage from './EcommerceAccountPage';
 import EcommerceCatalogControls, { EcommerceCatalogSummary } from './EcommerceCatalogControls';
 import EcommerceCatalogProductCard from './EcommerceCatalogProductCard';
 import { EcommerceCartPage, EcommerceCartSidebar } from './EcommerceCartPanels';
+import EcommerceCheckoutPage from './EcommerceCheckoutPage';
 import EcommerceFooter from './EcommerceFooter';
 import EcommerceNotifyMeModal from './EcommerceNotifyMeModal';
 import EcommerceOrdersPage from './EcommerceOrdersPage';
@@ -1532,170 +1533,35 @@ export default function EcommerceMVP() {
       )}
 
       {view === 'checkout' && (
-        <div style={{ maxWidth: 1100, margin: '0 auto', padding: '28px 16px' }}>
-          <h2 style={{ margin: '0 0 20px', fontSize: 26, fontWeight: 800, color: '#1c1917' }}>Checkout</h2>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 360px', gap: 20, alignItems: 'start' }}>
-
-            {/* Formulário */}
-            <div style={{ display: 'grid', gap: 16 }}>
-              {/* Entrega ou Retirada */}
-              <div style={S.formCard}>
-                <div style={{ fontWeight: 700, fontSize: 15, color: '#1a1a2e', marginBottom: 12 }}>📦 Como quer receber?</div>
-                <form onSubmit={calcularResumoCheckout} style={{ display: 'grid', gap: 10 }}>
-                  <div style={{ display: 'flex', gap: 10 }}>
-                    {[{ v: 'entrega', l: '🚚 Entrega' }, { v: 'retirada', l: '🏪 Retirada na loja' }].map(({ v, l }) => (
-                      <label key={v} style={deliveryMode === v ? S.radioLabelActive : S.radioLabel}>
-                        <input type="radio" name="deliveryMode" value={v} checked={deliveryMode === v} onChange={() => setDeliveryMode(v)} style={{ display: 'none' }} />
-                        {l}
-                      </label>
-                    ))}
-                  </div>
-
-                  {deliveryMode === 'retirada' && (
-                    <div style={{ background: '#faf7f4', border: '1px solid #e7e5e4', borderRadius: 10, padding: 14, display: 'grid', gap: 8 }}>
-                      <div style={{ fontWeight: 600, fontSize: 13, color: '#374151' }}>Quem vai retirar?</div>
-                      {[{ v: 'proprio', l: '🙋 Eu mesmo(a)' }, { v: 'terceiro', l: '🤝 Outra pessoa por mim' }].map(({ v, l }) => (
-                        <label key={v} style={tipoRetirada === v ? S.radioLabelActive : S.radioLabel}>
-                          <input type="radio" name="tipoRetirada" value={v} checked={tipoRetirada === v} onChange={() => setTipoRetirada(v)} style={{ display: 'none' }} />
-                          {l}
-                        </label>
-                      ))}
-                      {tipoRetirada === 'terceiro' && (
-                        <div style={{ background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: 10, fontSize: 12, color: '#92400e' }}>
-                          ℹ️ Uma <strong>senha secreta de retirada</strong> será gerada. Compartilhe com quem vai buscar.
-                        </div>
-                      )}
-                      {tipoRetirada === 'proprio' && (
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', padding: '10px 12px', background: isDrive ? '#fff7ed' : '#f8fafc', border: `1.5px solid ${isDrive ? '#f97316' : '#e5e7eb'}`, borderRadius: 10 }}>
-                          <input type="checkbox" checked={isDrive} onChange={(e) => setIsDrive(e.target.checked)} style={{ width: 18, height: 18, cursor: 'pointer' }} />
-                          <div>
-                            <div style={{ fontWeight: 700, fontSize: 13, color: '#1a1a2e' }}>🚗 Quero usar o Drive</div>
-                            <div style={{ fontSize: 11, color: '#6b7280', marginTop: 2 }}>Avise pela loja quando chegar no estacionamento — sem sair do carro!</div>
-                          </div>
-                        </label>
-                      )}
-                    </div>
-                  )}
-
-                  <input value={tenantContext?.cidade || cidadeDestino} onChange={(e) => setCidadeDestino(e.target.value)} placeholder="Cidade da loja" disabled={Boolean(tenantContext?.cidade)} style={{ ...S.formInput, background: tenantContext?.cidade ? '#f8fafc' : '#fff' }} />
-
-                  {deliveryMode === 'entrega' && (
-                    <>
-                      <input value={addressFields.cep} onChange={(e) => setAddressFields((prev) => ({ ...prev, cep: e.target.value }))} onBlur={handleCheckoutCepBlur} placeholder="CEP" style={S.formInput} />
-                      <input value={addressFields.endereco} onChange={(e) => setAddressFields((prev) => ({ ...prev, endereco: e.target.value }))} placeholder="Rua / Avenida" style={S.formInput} />
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                        <input value={addressFields.numero} onChange={(e) => setAddressFields((prev) => ({ ...prev, numero: e.target.value }))} placeholder="Número" style={S.formInput} />
-                        <input value={addressFields.complemento} onChange={(e) => setAddressFields((prev) => ({ ...prev, complemento: e.target.value }))} placeholder="Complemento" style={S.formInput} />
-                      </div>
-                      <input value={addressFields.bairro} onChange={(e) => setAddressFields((prev) => ({ ...prev, bairro: e.target.value }))} placeholder="Bairro" style={S.formInput} />
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: 8 }}>
-                        <input value={addressFields.cidade || tenantContext?.cidade || ''} onChange={(e) => setAddressFields((prev) => ({ ...prev, cidade: e.target.value }))} placeholder="Cidade" disabled={Boolean(tenantContext?.cidade)} style={{ ...S.formInput, background: tenantContext?.cidade ? '#f8fafc' : '#fff' }} />
-                        <input value={addressFields.estado || tenantContext?.uf || ''} onChange={(e) => setAddressFields((prev) => ({ ...prev, estado: e.target.value }))} placeholder="UF" style={S.formInput} />
-                      </div>
-                    </>
-                  )}
-                  <button type="submit" style={S.payBtn(true)}>Calcular resumo</button>
-                </form>
-              </div>
-
-              {/* Pagamento */}
-              <div style={S.formCard}>
-                <div style={{ fontWeight: 700, fontSize: 15, color: '#1a1a2e', marginBottom: 12 }}>💳 Como vai pagar?</div>
-                {(() => {
-                  const opcs = [{ key: 'pix', label: 'PIX', icon: '📱' }, { key: 'debito', label: 'Débito', icon: '💳' }, { key: 'credito', label: 'Crédito', icon: '💳' }];
-                  const bandeiras = ['Visa', 'Mastercard', 'Elo', 'Outra'];
-                  return (
-                    <div style={{ display: 'grid', gap: 10 }}>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        {opcs.map((o) => (
-                          <label key={o.key} style={pagamentoTipo === o.key ? S.radioLabelActive : S.radioLabel}>
-                            <input type="radio" name="pagamentoTipo" value={o.key} checked={pagamentoTipo === o.key} onChange={() => setPagamentoTipo(o.key)} style={{ display: 'none' }} />
-                            {o.icon} {o.label}
-                          </label>
-                        ))}
-                      </div>
-                      {(pagamentoTipo === 'debito' || pagamentoTipo === 'credito') && (
-                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
-                          <span style={{ fontSize: 13, color: '#6b7280' }}>Bandeira:</span>
-                          {bandeiras.map((b) => (
-                            <label key={b} style={pagamentoBandeira === b ? S.radioLabelActive : { ...S.radioLabel, padding: '6px 12px', fontSize: 12 }}>
-                              <input type="radio" checked={pagamentoBandeira === b} onChange={() => setPagamentoBandeira(b)} style={{ display: 'none' }} /> {b}
-                            </label>
-                          ))}
-                        </div>
-                      )}
-                      {pagamentoTipo === 'credito' && (
-                        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                          <span style={{ fontSize: 13, color: '#6b7280' }}>Parcelas:</span>
-                          {[1, 2, 3].map((p) => (
-                            <label key={p} style={pagamentoParcelas === p ? S.radioLabelActive : { ...S.radioLabel, padding: '6px 14px' }}>
-                              <input type="radio" checked={pagamentoParcelas === p} onChange={() => setPagamentoParcelas(p)} style={{ display: 'none' }} /> {p}x
-                            </label>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })()}
-                <div style={{ marginTop: 10, fontSize: 12, color: '#92400e', background: '#fff7ed', border: '1px solid #fed7aa', borderRadius: 8, padding: '8px 10px' }}>
-                  O carrinho ainda nao e pedido. O pedido so sera liberado apos aprovacao do pagamento online.
-                </div>
-              </div>
-            </div>
-
-            {/* Resumo lateral */}
-            <div style={S.resumoBox}>
-              <div style={{ fontWeight: 700, fontSize: 16, color: '#1c1917', marginBottom: 14 }}>Resumo do pedido</div>
-              {checkoutResumo ? (
-                <div style={{ display: 'grid', gap: 8 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#6b7280' }}><span>Itens ({checkoutResumo.itens_count})</span><span>{formatCurrency(checkoutResumo.subtotal)}</span></div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#6b7280' }}><span>Frete</span><span>{formatCurrency(checkoutResumo?.frete?.valor_frete)}</span></div>
-                  {checkoutResumo?.cupom?.desconto > 0 && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#065f46' }}><span>Desconto</span><span>-{formatCurrency(checkoutResumo.cupom.desconto)}</span></div>
-                  )}
-                  <div style={S.cartTotalRow}><span>Total</span><span>{formatCurrency(checkoutResumo.total)}</span></div>
-                </div>
-              ) : (
-                cart?.itens?.length ? (
-                  <div>
-                    {cart.itens.map((item) => (
-                      <div key={item.item_id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#6b7280', marginBottom: 6 }}>
-                        <span>{item.nome} × {item.quantidade}</span>
-                        <span>{formatCurrency(item.preco_unitario * item.quantidade)}</span>
-                      </div>
-                    ))}
-                    <div style={S.cartTotalRow}><span>Total estimado</span><span>{formatCurrency(cartTotal)}</span></div>
-                  </div>
-                ) : null
-              )}
-
-              <button onClick={finalizarCheckout} disabled={checkoutLoading || !(tenantContext?.cidade || cidadeDestino) || !cart?.itens?.length || !isProfileComplete} style={S.finalizarBtn(checkoutLoading || !(tenantContext?.cidade || cidadeDestino) || !cart?.itens?.length || !isProfileComplete)}>
-                {checkoutLoading ? 'Abrindo pagamento...' : 'Ir para pagamento'}
-              </button>
-
-              {!isProfileComplete && (
-                <div style={{ fontSize: 12, color: '#b45309', background: '#fffbeb', borderRadius: 8, padding: '8px 10px', marginTop: 6 }}>
-                  ⚠️ Complete seu cadastro (nome, telefone, CPF e endereço) na aba Conta para finalizar.
-                </div>
-              )}
-
-              {checkoutResult?.pedido_id && (
-                <div style={{ background: '#ecfdf5', border: '1.5px solid #6ee7b7', borderRadius: 12, padding: 14, marginTop: 8, display: 'grid', gap: 6 }}>
-                  <div style={{ fontWeight: 700, color: '#065f46', fontSize: 14 }}>Pagamento em analise</div>
-                  <div style={{ fontSize: 13, color: '#374151' }}>Número: <strong>{checkoutResult.pedido_id}</strong></div>
-                  <div style={{ fontSize: 12, color: '#047857' }}>O pedido sera liberado para a loja apos aprovacao do pagamento.</div>
-                  {checkoutResult.palavra_chave_retirada && (
-                    <div style={{ background: '#fff7ed', border: '2px solid #f97316', borderRadius: 10, padding: 12, textAlign: 'center', marginTop: 4 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: '#7c2d12', marginBottom: 4 }}>🔑 SENHA DE RETIRADA</div>
-                      <div style={{ fontSize: 24, fontWeight: 800, letterSpacing: 3, color: '#ea580c' }}>{checkoutResult.palavra_chave_retirada}</div>
-                      <div style={{ fontSize: 11, color: '#92400e', marginTop: 4 }}>Compartilhe com quem vai retirar</div>
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
+        <EcommerceCheckoutPage
+          addressFields={addressFields}
+          cart={cart}
+          cartTotal={cartTotal}
+          checkoutLoading={checkoutLoading}
+          checkoutResumo={checkoutResumo}
+          checkoutResult={checkoutResult}
+          cidadeDestino={cidadeDestino}
+          deliveryMode={deliveryMode}
+          isDrive={isDrive}
+          isProfileComplete={isProfileComplete}
+          pagamentoBandeira={pagamentoBandeira}
+          pagamentoParcelas={pagamentoParcelas}
+          pagamentoTipo={pagamentoTipo}
+          setAddressFields={setAddressFields}
+          styles={S}
+          tenantContext={tenantContext}
+          tipoRetirada={tipoRetirada}
+          onCalculateSummary={calcularResumoCheckout}
+          onCheckoutCepBlur={handleCheckoutCepBlur}
+          onCidadeDestinoChange={setCidadeDestino}
+          onDeliveryModeChange={setDeliveryMode}
+          onFinalizeCheckout={finalizarCheckout}
+          onIsDriveChange={setIsDrive}
+          onPagamentoBandeiraChange={setPagamentoBandeira}
+          onPagamentoParcelasChange={setPagamentoParcelas}
+          onPagamentoTipoChange={setPagamentoTipo}
+          onTipoRetiradaChange={setTipoRetirada}
+        />
       )}
 
       {view === 'pedidos' && (
