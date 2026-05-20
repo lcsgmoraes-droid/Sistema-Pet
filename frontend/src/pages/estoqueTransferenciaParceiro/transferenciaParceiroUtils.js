@@ -75,6 +75,150 @@ export function extrairObservacaoManualTransferencia(valor) {
   return texto.trim();
 }
 
+export function criarFormTransferencia(overrides = {}) {
+  return {
+    parceiro_id: "",
+    data_vencimento: fimDoMesIso(),
+    documento: "",
+    observacao: "",
+    ...overrides,
+  };
+}
+
+export function criarFormBaixaTransferencia(overrides = {}) {
+  return {
+    valor_recebido: "",
+    data_recebimento: hojeIso(),
+    modo_baixa: "recebimento",
+    forma_pagamento_id: "",
+    compensacoes: {},
+    observacao: "",
+    ...overrides,
+    compensacoes: overrides.compensacoes || {},
+  };
+}
+
+export function criarFiltrosHistoricoTransferencia(overrides = {}) {
+  return {
+    busca: "",
+    status_filtro: "",
+    data_inicio: "",
+    data_fim: "",
+    parceiro_id: "",
+    ...overrides,
+  };
+}
+
+export function criarHistoricoTransferenciasVazio(overrides = {}) {
+  const { totais, ...rest } = overrides;
+  return {
+    items: [],
+    total: 0,
+    page: 1,
+    page_size: 20,
+    pages: 0,
+    totais: {
+      total_registros: 0,
+      valor_total: 0,
+      valor_recebido: 0,
+      saldo_aberto: 0,
+      pendentes: 0,
+      recebidas: 0,
+      vencidas: 0,
+      ...(totais || {}),
+    },
+    ...rest,
+  };
+}
+
+export function criarItemTransferencia(produto, timestamp = Date.now()) {
+  const custoUnitario = Number(produto?.preco_custo || 0);
+  return {
+    uid: `${produto.id}-${timestamp}`,
+    produto_id: produto.id,
+    produto_nome: produto.nome,
+    codigo: produto.codigo,
+    codigo_barras: produto.codigo_barras,
+    estoque_atual: Number(produto?.estoque_atual || 0),
+    custo_unitario: custoUnitario,
+    quantidade: 1,
+    total_item: custoUnitario,
+  };
+}
+
+export function incrementarItemTransferencia(item, produto) {
+  const novaQuantidade = Number(item.quantidade || 0) + 1;
+  return {
+    ...item,
+    quantidade: novaQuantidade,
+    total_item: novaQuantidade * Number(item.custo_unitario || 0),
+    estoque_atual: Number(produto?.estoque_atual || item.estoque_atual || 0),
+  };
+}
+
+export function criarItensEdicaoTransferencia(registro, timestamp = Date.now()) {
+  return (Array.isArray(registro?.itens) ? registro.itens : []).map((item, index) => ({
+    uid: `edit-${registro.conta_receber_id}-${item.produto_id}-${index}-${timestamp}`,
+    produto_id: item.produto_id,
+    produto_nome: item.produto_nome,
+    codigo: item.codigo,
+    codigo_barras: item.codigo_barras,
+    estoque_atual: Number(item.estoque_atual || 0),
+    custo_unitario: Number(item.custo_unitario || 0),
+    quantidade: Number(item.quantidade || 0),
+    total_item: Number(item.valor_total || 0),
+  }));
+}
+
+export function montarPayloadTransferencia(parceiroId, form, itens) {
+  return {
+    parceiro_id: Number(parceiroId),
+    data_vencimento: form.data_vencimento || undefined,
+    documento: form.documento.trim() || undefined,
+    observacao: form.observacao.trim() || undefined,
+    itens: itens.map((item) => ({
+      produto_id: Number(item.produto_id),
+      quantidade: Number(item.quantidade),
+      custo_unitario: Number(item.custo_unitario || 0),
+      valor_total: Number(item.total_item || 0),
+    })),
+  };
+}
+
+export function montarCompensacoesBaixaPayload(compensacoes = {}) {
+  return Object.entries(compensacoes)
+    .map(([contaPagarId, valor]) => ({
+      conta_pagar_id: Number(contaPagarId),
+      valor_compensado: normalizarNumero(valor),
+    }))
+    .filter(
+      (item) =>
+        Number.isFinite(item.valor_compensado) &&
+        item.valor_compensado > 0 &&
+        item.conta_pagar_id > 0,
+    );
+}
+
+export function distribuirCompensacaoAutomatica(valorBase, contas = []) {
+  let restante = normalizarNumero(valorBase);
+  const proximaCompensacao = {};
+
+  contas.forEach((conta) => {
+    if (restante <= 0) {
+      proximaCompensacao[conta.conta_pagar_id] = "";
+      return;
+    }
+
+    const saldo = Number(conta.saldo_aberto || 0);
+    const valorAplicado = Math.min(restante, saldo);
+    proximaCompensacao[conta.conta_pagar_id] =
+      valorAplicado > 0 ? valorAplicado.toFixed(2) : "";
+    restante = Number((restante - valorAplicado).toFixed(2));
+  });
+
+  return proximaCompensacao;
+}
+
 export function baixarArquivoBlob(blob, nomeArquivo) {
   const url = window.URL.createObjectURL(blob);
   const link = document.createElement("a");
