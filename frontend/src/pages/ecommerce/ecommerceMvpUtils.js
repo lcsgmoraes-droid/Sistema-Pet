@@ -1,4 +1,4 @@
-import { formatMoneyBRL } from '../../utils/formatters';
+import { formatMoneyBRL } from '../../utils/formatters.js';
 
 export const STORAGE_TOKEN_KEY = 'ecommerce_customer_token';
 export const STORAGE_ORDERS_KEY = 'ecommerce_customer_orders';
@@ -7,7 +7,7 @@ export const STORAGE_GUEST_CART_KEY = 'ecommerce_guest_cart';
 export const STORAGE_WISHLIST_KEY = 'ecommerce_wishlist_products';
 export const STORAGE_NOTIFY_KEY = 'ecommerce_notify_requests';
 
-const configuredApiUrl = import.meta.env.VITE_API_URL;
+const configuredApiUrl = import.meta.env?.VITE_API_URL;
 
 export const EMPTY_CART = { pedido_id: null, itens: [], subtotal: 0, total: 0 };
 
@@ -154,8 +154,12 @@ export function resolveMediaUrl(url) {
     return `${backendBase}${normalizedPath}`;
   }
 
-  if (import.meta.env.DEV) {
+  if (import.meta.env?.DEV) {
     return `http://127.0.0.1:8000${normalizedPath}`;
+  }
+
+  if (typeof window === 'undefined') {
+    return normalizedPath;
   }
 
   return `${window.location.origin}${normalizedPath}`;
@@ -167,6 +171,97 @@ export function normalizeProductPayload(payload) {
   if (Array.isArray(payload?.itens)) return payload.itens;
   if (Array.isArray(payload?.produtos)) return payload.produtos;
   return [];
+}
+
+export function buildCatalogCategories(products) {
+  const all = products
+    .map((item) => item?.categoria_nome || item?.categoria || 'Sem categoria')
+    .filter(Boolean);
+
+  return ['todas', ...Array.from(new Set(all))];
+}
+
+export function calculateCatalogMetrics(products) {
+  return products.reduce(
+    (acc, item) => {
+      const hasImage = getProductImages(item).length > 0;
+      const inStock = !isProductOutOfStock(item);
+
+      if (hasImage) acc.comImagem += 1;
+      if (inStock) acc.emEstoque += 1;
+      if (hasImage && inStock) acc.prontos += 1;
+
+      return acc;
+    },
+    {
+      total: products.length,
+      comImagem: 0,
+      emEstoque: 0,
+      prontos: 0,
+    }
+  );
+}
+
+export function filterCatalogProducts(
+  products,
+  {
+    search = '',
+    categoria = 'todas',
+    somenteComEstoque = false,
+    somenteComImagem = false,
+    ordenacaoCatalogo = 'prontos',
+  } = {}
+) {
+  const query = search.trim().toLowerCase();
+  const sorted = products
+    .filter((item) => {
+      const nome = String(item?.nome || '').toLowerCase();
+      const codigo = String(item?.codigo || '').toLowerCase();
+      const categoriaNome = item?.categoria_nome || item?.categoria || 'Sem categoria';
+      const hasImage = getProductImages(item).length > 0;
+      const inStock = !isProductOutOfStock(item);
+      const matchesSearch = !query || nome.includes(query) || codigo.includes(query);
+      const matchesCategoria = categoria === 'todas' || categoriaNome === categoria;
+      const matchesStock = !somenteComEstoque || inStock;
+      const matchesImage = !somenteComImagem || hasImage;
+      return matchesSearch && matchesCategoria && matchesStock && matchesImage;
+    })
+    .slice();
+
+  sorted.sort((left, right) => {
+    const leftName = String(left?.nome || '');
+    const rightName = String(right?.nome || '');
+    const leftPrice = resolveProductPrice(left);
+    const rightPrice = resolveProductPrice(right);
+    const leftStock = resolveProductStock(left);
+    const rightStock = resolveProductStock(right);
+    const leftHasImage = getProductImages(left).length > 0;
+    const rightHasImage = getProductImages(right).length > 0;
+    const leftInStock = !isProductOutOfStock(left);
+    const rightInStock = !isProductOutOfStock(right);
+    const leftReadyScore = Number(leftInStock) * 2 + Number(leftHasImage);
+    const rightReadyScore = Number(rightInStock) * 2 + Number(rightHasImage);
+
+    if (ordenacaoCatalogo === 'menor_preco') {
+      return leftPrice - rightPrice || leftName.localeCompare(rightName, 'pt-BR');
+    }
+
+    if (ordenacaoCatalogo === 'maior_preco') {
+      return rightPrice - leftPrice || leftName.localeCompare(rightName, 'pt-BR');
+    }
+
+    if (ordenacaoCatalogo === 'nome') {
+      return leftName.localeCompare(rightName, 'pt-BR');
+    }
+
+    return (
+      rightReadyScore - leftReadyScore ||
+      Number(rightStock || 0) - Number(leftStock || 0) ||
+      leftName.localeCompare(rightName, 'pt-BR')
+    );
+  });
+
+  return sorted;
 }
 
 export function getGuestCart() {

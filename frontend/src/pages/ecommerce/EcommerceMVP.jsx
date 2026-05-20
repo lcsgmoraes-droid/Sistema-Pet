@@ -23,10 +23,13 @@ import {
   STORAGE_ORDERS_KEY,
   STORAGE_TOKEN_KEY,
   STORAGE_WISHLIST_KEY,
+  buildCatalogCategories,
   buildAddressText,
   buildIdempotencyKey,
+  calculateCatalogMetrics,
   extractApiErrorMessage,
   fetchAddressByCep,
+  filterCatalogProducts,
   formatCurrency,
   formatDateTime,
   getGuestCart,
@@ -223,84 +226,21 @@ export default function EcommerceMVP() {
   }, [customerToken]);
 
   const categorias = useMemo(() => {
-    const all = products
-      .map((item) => item?.categoria_nome || item?.categoria || 'Sem categoria')
-      .filter(Boolean);
-    return ['todas', ...Array.from(new Set(all))];
+    return buildCatalogCategories(products);
   }, [products]);
 
   const catalogMetrics = useMemo(() => {
-    return products.reduce(
-      (acc, item) => {
-        const hasImage = getProductImages(item).length > 0;
-        const inStock = !isProductOutOfStock(item);
-
-        if (hasImage) acc.comImagem += 1;
-        if (inStock) acc.emEstoque += 1;
-        if (hasImage && inStock) acc.prontos += 1;
-
-        return acc;
-      },
-      {
-        total: products.length,
-        comImagem: 0,
-        emEstoque: 0,
-        prontos: 0,
-      }
-    );
+    return calculateCatalogMetrics(products);
   }, [products]);
 
   const filteredProducts = useMemo(() => {
-    const query = search.trim().toLowerCase();
-    const sorted = products
-      .filter((item) => {
-        const nome = String(item?.nome || '').toLowerCase();
-        const codigo = String(item?.codigo || '').toLowerCase();
-        const categoriaNome = item?.categoria_nome || item?.categoria || 'Sem categoria';
-        const hasImage = getProductImages(item).length > 0;
-        const inStock = !isProductOutOfStock(item);
-        const matchesSearch = !query || nome.includes(query) || codigo.includes(query);
-        const matchesCategoria = categoria === 'todas' || categoriaNome === categoria;
-        const matchesStock = !somenteComEstoque || inStock;
-        const matchesImage = !somenteComImagem || hasImage;
-        return matchesSearch && matchesCategoria && matchesStock && matchesImage;
-      })
-      .slice();
-
-    sorted.sort((left, right) => {
-      const leftName = String(left?.nome || '');
-      const rightName = String(right?.nome || '');
-      const leftPrice = resolveProductPrice(left);
-      const rightPrice = resolveProductPrice(right);
-      const leftStock = resolveProductStock(left);
-      const rightStock = resolveProductStock(right);
-      const leftHasImage = getProductImages(left).length > 0;
-      const rightHasImage = getProductImages(right).length > 0;
-      const leftInStock = !isProductOutOfStock(left);
-      const rightInStock = !isProductOutOfStock(right);
-      const leftReadyScore = Number(leftInStock) * 2 + Number(leftHasImage);
-      const rightReadyScore = Number(rightInStock) * 2 + Number(rightHasImage);
-
-      if (ordenacaoCatalogo === 'menor_preco') {
-        return leftPrice - rightPrice || leftName.localeCompare(rightName, 'pt-BR');
-      }
-
-      if (ordenacaoCatalogo === 'maior_preco') {
-        return rightPrice - leftPrice || leftName.localeCompare(rightName, 'pt-BR');
-      }
-
-      if (ordenacaoCatalogo === 'nome') {
-        return leftName.localeCompare(rightName, 'pt-BR');
-      }
-
-      return (
-        rightReadyScore - leftReadyScore ||
-        Number(rightStock || 0) - Number(leftStock || 0) ||
-        leftName.localeCompare(rightName, 'pt-BR')
-      );
+    return filterCatalogProducts(products, {
+      search,
+      categoria,
+      somenteComEstoque,
+      somenteComImagem,
+      ordenacaoCatalogo,
     });
-
-    return sorted;
   }, [products, search, categoria, somenteComEstoque, somenteComImagem, ordenacaoCatalogo]);
 
   const productMap = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p])), [products]);
