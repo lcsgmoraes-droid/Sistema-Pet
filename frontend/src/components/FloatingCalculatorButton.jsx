@@ -16,6 +16,11 @@ export default function FloatingCalculatorButton({ onClick }) {
   const [hasDragged, setHasDragged] = useState(false);
   const [dragOffset, setDragOffset] = useState({ x: 0, y: 0 });
   const [dragStartPos, setDragStartPos] = useState({ x: 0, y: 0 });
+
+  const getMobilePosition = () => ({
+    x: Math.max(12, window.innerWidth - 64),
+    y: 132,
+  });
   
   // Detectar mudanças no tamanho da tela
   useEffect(() => {
@@ -41,7 +46,7 @@ export default function FloatingCalculatorButton({ onClick }) {
   const [position, setPosition] = useState(() => {
     // Em mobile, sempre fixo no topo direito
     if (window.innerWidth < 768) {
-      return { x: window.innerWidth - 70, y: 80 };
+      return getMobilePosition();
     }
     
     const saved = localStorage.getItem('calc_button_pos');
@@ -66,6 +71,7 @@ export default function FloatingCalculatorButton({ onClick }) {
   const [minimizado, setMinimizado] = useState(() => {
     return localStorage.getItem('calc_button_minimizado') === 'true';
   });
+  const efetivamenteMinimizado = isMobile || minimizado;
 
   const handleMouseDown = (e) => {
     // Desabilitar drag em mobile
@@ -171,7 +177,7 @@ export default function FloatingCalculatorButton({ onClick }) {
       
       // Se mudou para mobile, fixar no topo direito
       if (newIsMobile) {
-        setPosition({ x: window.innerWidth - 70, y: 80 });
+        setPosition(getMobilePosition());
       } else {
         const safePos = getSafePosition(position, minimizado);
         if (safePos.x !== position.x || safePos.y !== position.y) {
@@ -194,7 +200,7 @@ export default function FloatingCalculatorButton({ onClick }) {
       }}
     >
       {/* Versão Minimizada */}
-      {minimizado ? (
+      {efetivamenteMinimizado ? (
         <div 
           className={`relative group ${isMobile ? '' : 'cursor-move'}`}
           onMouseDown={isMobile ? undefined : handleMouseDown}
