@@ -13,6 +13,216 @@ import IconActionButton from "../ui/IconActionButton";
 import PaginationControls from "../ui/PaginationControls";
 import Panel from "../ui/Panel";
 
+function formatarDocumentoPessoa(cliente) {
+  if (cliente.tipo_pessoa === "PF") return cliente.cpf || "-";
+  return cliente.cnpj || "-";
+}
+
+function PessoaMobileCard({
+  cliente,
+  clienteDestacado,
+  clienteSelecionadoFusao,
+  expandedPets,
+  handleDelete,
+  handleDeletePet,
+  highlightedPetId,
+  openModal,
+  setExpandedPets,
+  setHighlightedPetId,
+  togglePessoaFusao,
+}) {
+  const pets = Array.isArray(cliente.pets) ? cliente.pets : [];
+  const petsAberto = Boolean(expandedPets[cliente.id]);
+
+  return (
+    <article
+      id={`cliente-${cliente.id}`}
+      onClick={() => openModal(cliente)}
+      className={`rounded-lg border bg-white p-3 shadow-sm transition-colors ${
+        clienteSelecionadoFusao
+          ? "border-amber-200 bg-amber-50"
+          : clienteDestacado
+            ? "border-emerald-200 bg-emerald-50"
+            : "border-slate-200"
+      }`}
+    >
+      <div className="flex items-start gap-3">
+        <input
+          type="checkbox"
+          checked={clienteSelecionadoFusao}
+          onClick={(event) => event.stopPropagation()}
+          onChange={() => togglePessoaFusao?.(cliente.id)}
+          className="mt-1 h-5 w-5 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+          aria-label={`Selecionar ${cliente.nome} para fusao`}
+        />
+
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500">
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 font-mono">
+              ID {cliente.codigo || "-"}
+            </span>
+            {cliente.tipo_pessoa ? (
+              <span className="rounded-full bg-slate-100 px-2 py-0.5">
+                {cliente.tipo_pessoa}
+              </span>
+            ) : null}
+            {clienteDestacado ? (
+              <span className="rounded-full bg-emerald-100 px-2 py-0.5 font-medium text-emerald-700">
+                Recem cadastrado
+              </span>
+            ) : null}
+          </div>
+
+          <h3 className="mt-2 text-sm font-semibold leading-5 text-slate-950">
+            {cliente.nome}
+          </h3>
+          {cliente.tipo_pessoa === "PJ" && cliente.razao_social ? (
+            <p className="mt-0.5 text-xs text-slate-500">{cliente.razao_social}</p>
+          ) : null}
+
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {cliente.parceiro_ativo ? (
+              <span className="inline-flex items-center gap-1 rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-700">
+                <DollarSign size={12} />
+                Parceiro
+              </span>
+            ) : null}
+            {cliente.de_parceiro ? (
+              <span className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-medium text-blue-700">
+                Pet Shop Parceiro
+              </span>
+            ) : null}
+          </div>
+        </div>
+      </div>
+
+      <dl className="mt-3 grid grid-cols-2 gap-2 text-xs">
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+          <dt className="font-semibold uppercase text-slate-500">Documento</dt>
+          <dd className="mt-1 break-words text-slate-800">
+            {formatarDocumentoPessoa(cliente)}
+          </dd>
+        </div>
+        <div className="rounded-lg border border-slate-200 bg-slate-50 p-2">
+          <dt className="font-semibold uppercase text-slate-500">Celular</dt>
+          <dd className="mt-1 break-words text-slate-800">{cliente.celular || "-"}</dd>
+        </div>
+      </dl>
+
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            setExpandedPets({
+              ...expandedPets,
+              [cliente.id]: !expandedPets[cliente.id],
+            });
+          }}
+          className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-700"
+        >
+          <PawPrint size={16} className="text-slate-400" />
+          {pets.length} pet{pets.length === 1 ? "" : "s"}
+          {pets.length > 0 ? (
+            <ArrowRight
+              size={14}
+              className={`transition-transform ${petsAberto ? "rotate-90" : ""}`}
+            />
+          ) : null}
+        </button>
+
+        <div className="ml-auto flex items-center gap-1.5" onClick={(event) => event.stopPropagation()}>
+          {cliente.celular ? (
+            <IconActionButton
+              onClick={() => {
+                const celular = cliente.celular.replace(/\D/g, "");
+                window.open(`https://wa.me/55${celular}`, "_blank");
+              }}
+              icon={MessageCircle}
+              intent="create"
+              tone="ghost"
+              title="Abrir WhatsApp"
+              aria-label="Abrir WhatsApp"
+            />
+          ) : null}
+          <IconActionButton
+            onClick={() => openModal(cliente)}
+            icon={Edit2}
+            intent="edit"
+            tone="ghost"
+            title="Editar"
+            aria-label="Editar"
+          />
+          {!cliente.de_parceiro ? (
+            <IconActionButton
+              onClick={() => handleDelete(cliente.id)}
+              icon={Trash2}
+              intent="delete"
+              tone="ghost"
+              title="Excluir"
+              aria-label="Excluir"
+            />
+          ) : null}
+        </div>
+      </div>
+
+      {petsAberto && pets.length > 0 ? (
+        <div className="mt-3 space-y-2 border-t border-slate-100 pt-3">
+          {pets.map((pet) => (
+            <div
+              key={pet.id}
+              className={`rounded-lg border p-3 ${
+                highlightedPetId === pet.id
+                  ? "border-blue-300 bg-blue-50"
+                  : "border-slate-200 bg-slate-50"
+              }`}
+              onClick={(event) => event.stopPropagation()}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-slate-900">{pet.nome}</p>
+                  <p className="mt-0.5 text-xs text-slate-500">
+                    {[pet.especie, pet.raca].filter(Boolean).join(" - ") || "Sem especie/raca"}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {pet.sexo || "-"} |{" "}
+                    {pet.data_nascimento
+                      ? new Date(pet.data_nascimento).toLocaleDateString("pt-BR")
+                      : "Sem nascimento"}
+                  </p>
+                </div>
+                <div className="flex shrink-0 gap-1">
+                  <IconActionButton
+                    onClick={() => {
+                      setHighlightedPetId(pet.id);
+                      openModal(cliente, null, pet.id);
+                    }}
+                    icon={Edit2}
+                    intent="edit"
+                    tone="ghost"
+                    size="xs"
+                    title="Editar pet"
+                    aria-label="Editar pet"
+                  />
+                  <IconActionButton
+                    onClick={() => handleDeletePet(pet.id)}
+                    icon={Trash2}
+                    intent="delete"
+                    tone="ghost"
+                    size="xs"
+                    title="Excluir pet"
+                    aria-label="Excluir pet"
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
 const ClientesNovoTabelaSection = ({
   loading,
   totalRegistros,
@@ -50,8 +260,30 @@ const ClientesNovoTabelaSection = ({
 
       <Panel className="overflow-hidden" padding="none">
         {filteredClientes.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200">
+          <>
+            <div className="space-y-3 bg-slate-50 p-3 md:hidden">
+              {filteredClientes.map((cliente) => (
+                <PessoaMobileCard
+                  key={cliente.id}
+                  cliente={cliente}
+                  clienteDestacado={highlightedClienteId === cliente.id}
+                  clienteSelecionadoFusao={pessoasSelecionadasFusao.includes(
+                    cliente.id,
+                  )}
+                  expandedPets={expandedPets}
+                  handleDelete={handleDelete}
+                  handleDeletePet={handleDeletePet}
+                  highlightedPetId={highlightedPetId}
+                  openModal={openModal}
+                  setExpandedPets={setExpandedPets}
+                  setHighlightedPetId={setHighlightedPetId}
+                  togglePessoaFusao={togglePessoaFusao}
+                />
+              ))}
+            </div>
+
+            <div className="hidden overflow-x-auto md:block">
+              <table className="min-w-full divide-y divide-slate-200">
               <thead className="bg-slate-50">
                 <tr>
                   <th className="w-12 px-4 py-3 text-left text-xs font-medium uppercase tracking-wider text-slate-500">
@@ -314,8 +546,9 @@ const ClientesNovoTabelaSection = ({
                   );
                 })}
               </tbody>
-            </table>
-          </div>
+              </table>
+            </div>
+          </>
         ) : (
           <EmptyState
             className="rounded-none border-0 shadow-none"
