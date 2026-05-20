@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../api";
 import { buscarClientes } from "../api/clientes";
-import { formatarMoeda, getProdutos } from "../api/produtos";
+import { getProdutos } from "../api/produtos";
 import {
   COLUNAS_DOCUMENTO_TRANSFERENCIA_COMPLETO,
   baixarArquivoBlob,
@@ -10,8 +10,6 @@ import {
   extrairObservacaoManualTransferencia,
   fimDoMesBaseIso,
   fimDoMesIso,
-  formatarData,
-  formatarQuantidade,
   hojeIso,
   inicioDoMesIso,
   montarCupomTransferencia,
@@ -21,10 +19,11 @@ import {
   produtoConfereCodigo,
 } from "./estoqueTransferenciaParceiro/transferenciaParceiroUtils";
 import ModalDocumentoTransferenciaParceiro from "./estoqueTransferenciaParceiro/ModalDocumentoTransferenciaParceiro";
-import {
-  ResumoTransferenciaCard,
-  StatusTransferenciaBadge,
-} from "./estoqueTransferenciaParceiro/transferenciaParceiroComponents";
+import CupomTransferenciaPrintArea from "./estoqueTransferenciaParceiro/CupomTransferenciaPrintArea";
+import TransferenciaParceiroHeader from "./estoqueTransferenciaParceiro/TransferenciaParceiroHeader";
+import LancamentoTransferenciaParceiro from "./estoqueTransferenciaParceiro/LancamentoTransferenciaParceiro";
+import HistoricoTransferenciaFilters from "./estoqueTransferenciaParceiro/HistoricoTransferenciaFilters";
+import HistoricoTransferenciaResults from "./estoqueTransferenciaParceiro/HistoricoTransferenciaResults";
 
 export default function EstoqueTransferenciaParceiro() {
   const parceiroRef = useRef(null);
@@ -1115,51 +1114,7 @@ export default function EstoqueTransferenciaParceiro() {
 
   return (
     <div className="space-y-6 p-6">
-      <style>{`
-        @media print {
-          body * {
-            visibility: hidden;
-          }
-
-          .transferencia-cupom-impressao,
-          .transferencia-cupom-impressao * {
-            visibility: visible;
-          }
-
-          .transferencia-cupom-impressao {
-            position: absolute;
-            left: 0;
-            top: 0;
-            width: 76mm;
-            margin: 0;
-            padding: 0 1mm;
-            color: #000 !important;
-            -webkit-print-color-adjust: exact;
-            print-color-adjust: exact;
-          }
-
-          @page {
-            size: 80mm auto;
-            margin: 2mm;
-          }
-        }
-      `}</style>
-      <pre
-        className="transferencia-cupom-impressao hidden print:block"
-        style={{
-          width: "76mm",
-          fontFamily: 'Consolas, "Courier New", monospace',
-          fontSize: "13px",
-          fontWeight: 800,
-          letterSpacing: "0.1px",
-          lineHeight: 1.28,
-          margin: 0,
-          padding: 0,
-          whiteSpace: "pre",
-        }}
-      >
-        {cupomTransferencia}
-      </pre>
+      <CupomTransferenciaPrintArea cupomTransferencia={cupomTransferencia} />
       <ModalDocumentoTransferenciaParceiro
         modal={modalDocumentoTransferencia}
         colunasSelecionadas={colunasDocumentoTransferencia}
@@ -1170,1193 +1125,104 @@ export default function EstoqueTransferenciaParceiro() {
         onConfirmar={() => void confirmarDocumentoTransferencia()}
         loading={loadingDocumentoTransferencia}
       />
-      <div className="flex flex-col gap-4 xl:flex-row xl:items-end xl:justify-between">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900">
-            Transferencia com Ressarcimento
-          </h1>
-          <p className="mt-2 max-w-4xl text-sm text-gray-600">
-            Use esta tela para baixar estoque pelo custo quando qualquer pessoa
-            ou parceiro levar produtos. O sistema nao cria venda no PDV e gera
-            um contas a receber separado para o ressarcimento, com baixa por
-            recebimento normal ou acerto.
-          </p>
-        </div>
-
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-          Nao entra em faturamento de vendas. Sai do estoque e fica pendente no
-          financeiro da pessoa responsavel pelo ressarcimento ate voce baixar.
-        </div>
-      </div>
-
-      {modoEdicao ? (
-        <div className="flex flex-col gap-3 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900 md:flex-row md:items-center md:justify-between">
-          <div>
-            <p className="font-semibold">
-              Editando {transferenciaEditando.documento || `transferencia #${transferenciaEditando.conta_receber_id}`}
-            </p>
-            <p className="mt-1">
-              Ao salvar, o sistema recalcula estoque e financeiro deste lancamento.
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={cancelarEdicaoTransferencia}
-            className="rounded-xl border border-amber-300 bg-white px-4 py-2 text-sm font-semibold text-amber-800 transition hover:bg-amber-100"
-          >
-            Cancelar edicao
-          </button>
-        </div>
-      ) : null}
-
-      <div className="flex flex-wrap gap-2 border-b border-gray-200">
-        <button
-          type="button"
-          onClick={() => setAbaAtiva("lancamento")}
-          className={`border-b-2 px-4 py-3 text-sm font-semibold transition ${
-            abaAtiva === "lancamento"
-              ? "border-blue-600 text-blue-700"
-              : "border-transparent text-gray-600 hover:text-gray-900"
-          }`}
-        >
-          Novo lancamento
-        </button>
-        <button
-          type="button"
-          onClick={() => setAbaAtiva("historico")}
-          className={`border-b-2 px-4 py-3 text-sm font-semibold transition ${
-            abaAtiva === "historico"
-              ? "border-blue-600 text-blue-700"
-              : "border-transparent text-gray-600 hover:text-gray-900"
-          }`}
-        >
-          Consultar historico
-          {historico.totais.total_registros ? (
-            <span className="ml-2 rounded-full bg-slate-100 px-2 py-0.5 text-xs text-slate-700">
-              {historico.totais.total_registros}
-            </span>
-          ) : null}
-        </button>
-      </div>
+      <TransferenciaParceiroHeader
+        modoEdicao={modoEdicao}
+        transferenciaEditando={transferenciaEditando}
+        onCancelarEdicao={cancelarEdicaoTransferencia}
+        abaAtiva={abaAtiva}
+        onChangeAba={setAbaAtiva}
+        totalRegistrosHistorico={historico.totais.total_registros}
+      />
 
       {abaAtiva === "lancamento" ? (
-        <div className="space-y-6">
-        <section className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-          <div className="flex items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">
-                1. Pessoa responsavel e dados da transferencia
-              </h2>
-              <p className="mt-1 text-sm text-gray-600">
-                Primeiro selecione quem vai ressarcir o custo desta saida.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-5 grid gap-4">
-            <div ref={parceiroRef} className="relative">
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                Pessoa / parceiro
-              </label>
-              {parceiroSelecionado ? (
-                <div className="flex items-start justify-between gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-4">
-                  <div>
-                    <p className="text-sm font-semibold text-blue-900">
-                      {parceiroSelecionado.nome}
-                    </p>
-                    <p className="mt-1 text-xs text-blue-800">
-                      Codigo: {parceiroSelecionado.codigo || "-"}
-                      {parceiroSelecionado.celular ? ` | Celular: ${parceiroSelecionado.celular}` : ""}
-                    </p>
-                    <p className="mt-1 text-xs text-blue-800">
-                      Tipo: {parceiroSelecionado.tipo_cadastro || "pessoa"}
-                      {parceiroSelecionado.parceiro_ativo ? " | Parceiro ativo" : ""}
-                    </p>
-                    {parceiroSelecionado.email ? (
-                      <p className="mt-1 text-xs text-blue-800">
-                        {parceiroSelecionado.email}
-                      </p>
-                    ) : null}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={limparParceiro}
-                    className="rounded-xl border border-blue-200 bg-white px-3 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100"
-                  >
-                    Trocar
-                  </button>
-                </div>
-              ) : (
-                <>
-                  <input
-                    type="text"
-                    value={buscaParceiro}
-                    onChange={(event) => setBuscaParceiro(event.target.value)}
-                    onFocus={() => setDropdownParceiroAberto(true)}
-                    placeholder="Buscar pessoa por nome, codigo, telefone ou email"
-                    className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                  />
-
-                  {dropdownParceiroAberto && (
-                    <div className="absolute z-20 mt-2 w-full rounded-2xl border border-gray-200 bg-white p-2 shadow-xl">
-                      {loadingParceiros ? (
-                        <p className="px-3 py-3 text-sm text-gray-500">
-                          Buscando pessoas...
-                        </p>
-                      ) : sugestoesParceiros.length > 0 ? (
-                        sugestoesParceiros.map((parceiro) => (
-                          <button
-                            key={parceiro.id}
-                            type="button"
-                            onClick={() => selecionarParceiro(parceiro)}
-                            className="flex w-full flex-col rounded-xl px-3 py-3 text-left transition-colors hover:bg-slate-50"
-                          >
-                            <span className="text-sm font-semibold text-gray-900">
-                              {parceiro.nome}
-                            </span>
-                            <span className="mt-1 text-xs text-gray-500">
-                              Codigo: {parceiro.codigo || "-"}
-                              {parceiro.celular ? ` | ${parceiro.celular}` : ""}
-                            </span>
-                            <span className="mt-1 text-xs text-gray-500">
-                              {parceiro.tipo_cadastro || "pessoa"}
-                              {parceiro.parceiro_ativo ? " | Parceiro ativo" : ""}
-                            </span>
-                          </button>
-                        ))
-                      ) : (
-                        <p className="px-3 py-3 text-sm text-gray-500">
-                          Nenhuma pessoa ativa encontrada para esta busca.
-                        </p>
-                      )}
-                    </div>
-                  )}
-                </>
-              )}
-            </div>
-
-            <div className="grid gap-4 md:grid-cols-2">
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Vencimento do ressarcimento
-                </label>
-                <input
-                  type="date"
-                  value={form.data_vencimento}
-                  onChange={(event) => atualizarCampo("data_vencimento", event.target.value)}
-                  className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                />
-              </div>
-
-              <div>
-                <label className="mb-2 block text-sm font-medium text-gray-700">
-                  Documento interno
-                </label>
-                <input
-                  type="text"
-                  value={form.documento}
-                  onChange={(event) => atualizarCampo("documento", event.target.value)}
-                  placeholder="Opcional. Se vazio, o sistema gera um codigo."
-                  className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="mb-2 block text-sm font-medium text-gray-700">
-                Observacao
-              </label>
-              <textarea
-                value={form.observacao}
-                onChange={(event) => atualizarCampo("observacao", event.target.value)}
-                rows={4}
-                placeholder="Ex.: itens enviados para reposicao da loja parceira, acerto no fim do mes."
-                className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-              />
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-3xl border border-gray-200 bg-white p-6 shadow-sm">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">
-              2. Produtos
-            </h2>
-            <p className="mt-1 text-sm text-gray-600">
-              Pesquise por nome, SKU, codigo ou codigo de barras e monte a
-              transferencia.
-            </p>
-          </div>
-
-          <div ref={produtoRef} className="relative mt-5">
-            <label className="mb-2 block text-sm font-medium text-gray-700">
-              Buscar produto
-            </label>
-            <input
-              ref={produtoInputRef}
-              type="text"
-              value={buscaProduto}
-              onChange={(event) => setBuscaProduto(event.target.value)}
-              onFocus={() => setDropdownProdutoAberto(true)}
-              onKeyDown={(event) => {
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  void adicionarProdutoPorBuscaAtual();
-                }
-              }}
-              placeholder="Digite nome, SKU ou codigo de barras"
-              className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-            />
-
-            {dropdownProdutoAberto && (
-              <div className="absolute z-20 mt-2 w-full rounded-2xl border border-gray-200 bg-white p-2 shadow-xl">
-                {loadingProdutos ? (
-                  <p className="px-3 py-3 text-sm text-gray-500">
-                    Buscando produtos...
-                  </p>
-                ) : sugestoesProdutos.length > 0 ? (
-                  sugestoesProdutos.map((produto) => (
-                    <button
-                      key={produto.id}
-                      type="button"
-                      onClick={() => adicionarProduto(produto)}
-                      className="flex w-full flex-col rounded-xl px-3 py-3 text-left transition-colors hover:bg-slate-50"
-                    >
-                      <span className="text-sm font-semibold text-gray-900">
-                        {produto.nome}
-                      </span>
-                      <span className="mt-1 text-xs text-gray-500">
-                        Codigo: {produto.codigo || "-"}
-                        {produto.codigo_barras ? ` | CB: ${produto.codigo_barras}` : ""}
-                      </span>
-                      <span className="mt-1 text-xs text-gray-500">
-                        Estoque: {formatarQuantidade(produto.estoque_atual)} | Custo: {formatarMoeda(produto.preco_custo || 0)}
-                      </span>
-                    </button>
-                  ))
-                ) : (
-                  <p className="px-3 py-3 text-sm text-gray-500">
-                    Nenhum produto encontrado para esta busca.
-                  </p>
-                )}
-              </div>
-            )}
-          </div>
-
-          <div className="mt-5 rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm text-blue-800">
-            Depois de selecionar o produto, confira quantidade e valores na
-            lista abaixo. O botao de registrar fica junto da conferencia final.
-          </div>
-        </section>
-
-      <section ref={itensRef} className="rounded-3xl border border-gray-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-3 border-b border-gray-100 px-6 py-5 lg:flex-row lg:items-center lg:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">
-              3. Itens da transferencia
-            </h2>
-            <p className="mt-1 text-sm text-gray-600">
-              Ajuste as quantidades e confira o total de ressarcimento antes de salvar.
-            </p>
-          </div>
-
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-            <div className="rounded-full bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700">
-              {itens.length} item(ns) | {formatarQuantidade(totalQuantidade)} un | {formatarMoeda(totalRessarcimento)}
-            </div>
-            <button
-              type="button"
-              onClick={registrarTransferencia}
-              disabled={salvando || itens.length === 0}
-              className="inline-flex items-center justify-center rounded-2xl bg-blue-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-blue-700 disabled:cursor-not-allowed disabled:bg-blue-300"
-            >
-              {salvando
-                ? modoEdicao
-                  ? "Salvando..."
-                  : "Registrando..."
-                : modoEdicao
-                  ? "Salvar edicao"
-                  : "Registrar transferencia"}
-            </button>
-          </div>
-        </div>
-
-        <div className="grid gap-3 border-b border-gray-100 px-6 py-4 md:grid-cols-2 xl:grid-cols-4">
-          <ResumoTransferenciaCard
-            titulo="Itens"
-            valor={String(itens.length)}
-            descricao="Linhas de produto conferidas."
-            destaque="slate"
-          />
-          <ResumoTransferenciaCard
-            titulo="Quantidade total"
-            valor={formatarQuantidade(totalQuantidade)}
-            descricao="Unidades que sairao do estoque."
-            destaque="blue"
-          />
-          <ResumoTransferenciaCard
-            titulo="Ressarcimento"
-            valor={formatarMoeda(totalRessarcimento)}
-            descricao="Total do acerto financeiro."
-            destaque="emerald"
-          />
-          <ResumoTransferenciaCard
-            titulo="Itens sem valor"
-            valor={String(itensSemValor)}
-            descricao="Precisam ser corrigidos antes de salvar."
-            destaque="amber"
-          />
-        </div>
-
-        {itens.length === 0 ? (
-          <div className="px-6 py-12 text-center">
-            <p className="text-base font-semibold text-gray-900">
-              Nenhum item adicionado ainda
-            </p>
-            <p className="mt-2 text-sm text-gray-500">
-              Use a busca acima para incluir os produtos que sairao para a pessoa responsavel.
-            </p>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-slate-50">
-                <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
-                  <th className="px-6 py-4">Produto</th>
-                  <th className="px-6 py-4">Estoque atual</th>
-                  <th className="px-6 py-4">Custo unit.</th>
-                  <th className="px-6 py-4">Quantidade</th>
-                  <th className="px-6 py-4">Total</th>
-                  <th className="px-6 py-4 text-right">Acoes</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-100 bg-white">
-                {itens.map((item) => {
-                  const semValor = Number(item.total_item || 0) <= 0;
-                  return (
-                    <tr key={item.uid} className="align-top">
-                      <td className="px-6 py-4">
-                        <p className="text-sm font-semibold text-gray-900">
-                          {item.produto_nome}
-                        </p>
-                        <p className="mt-1 text-xs text-gray-500">
-                          Codigo: {item.codigo || "-"}
-                          {item.codigo_barras ? ` | CB: ${item.codigo_barras}` : ""}
-                        </p>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-gray-700">
-                        {formatarQuantidade(item.estoque_atual)}
-                      </td>
-                      <td className="px-6 py-4">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={item.custo_unitario ?? ""}
-                          onChange={(event) =>
-                            atualizarCustoUnitario(item.uid, event.target.value)
-                          }
-                          className={`w-28 rounded-xl border px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 ${
-                            semValor ? "border-amber-300 bg-amber-50" : "border-gray-300"
-                          }`}
-                        />
-                      </td>
-                      <td className="px-6 py-4">
-                        <input
-                          type="number"
-                          min="0.001"
-                          step="0.001"
-                          value={item.quantidade ?? ""}
-                          onChange={(event) => atualizarQuantidade(item.uid, event.target.value)}
-                          className="w-28 rounded-xl border border-gray-300 px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-                        />
-                      </td>
-                      <td className="px-6 py-4">
-                        <input
-                          type="number"
-                          min="0"
-                          step="0.01"
-                          value={item.total_item ?? ""}
-                          onChange={(event) =>
-                            atualizarTotalItem(item.uid, event.target.value)
-                          }
-                          className={`w-32 rounded-xl border px-3 py-2 text-sm font-semibold text-gray-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100 ${
-                            semValor ? "border-amber-300 bg-amber-50" : "border-gray-300"
-                          }`}
-                        />
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <button
-                          type="button"
-                          onClick={() => removerItem(item.uid)}
-                          className="rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-sm font-medium text-rose-700 transition-colors hover:bg-rose-100"
-                        >
-                          Remover
-                        </button>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </section>
-        </div>
-      ) : (
-
-      <section className="rounded-3xl border border-gray-200 bg-white shadow-sm">
-        <div className="flex flex-col gap-4 border-b border-gray-100 px-6 py-5 xl:flex-row xl:items-start xl:justify-between">
-          <div>
-            <h2 className="text-lg font-semibold text-gray-900">
-              Historico de transferencias
-            </h2>
-            <p className="mt-1 text-sm text-gray-600">
-              Acompanhe o que saiu do estoque, quanto a pessoa ja ressarciu e o que segue em aberto.
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {parceiroSelecionado ? (
-              <button
-                type="button"
-                onClick={usarParceiroAtualNoHistorico}
-                className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100"
-              >
-                Filtrar pessoa atual
-              </button>
-            ) : null}
-            <button
-              type="button"
-              onClick={() => void carregarHistoricoTransferencias(filtrosHistoricoAplicados, paginaHistorico)}
-              className="rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
-            >
-              Atualizar historico
-            </button>
-          </div>
-        </div>
-
-        <div className="grid gap-4 border-b border-gray-100 px-6 py-5 md:grid-cols-2 xl:grid-cols-4">
-          <ResumoTransferenciaCard
-            titulo="Transferencias filtradas"
-            valor={String(historico.totais.total_registros || 0)}
-            descricao="Documentos localizados no historico atual."
-            destaque="slate"
-          />
-        <ResumoTransferenciaCard
-          titulo="Valor transferido"
-          valor={formatarMoeda(historico.totais.valor_total || 0)}
-          descricao="Total em custo enviado para pessoas com ressarcimento."
-          destaque="blue"
+        <LancamentoTransferenciaParceiro
+          parceiroRef={parceiroRef}
+          parceiroSelecionado={parceiroSelecionado}
+          limparParceiro={limparParceiro}
+          buscaParceiro={buscaParceiro}
+          setBuscaParceiro={setBuscaParceiro}
+          setDropdownParceiroAberto={setDropdownParceiroAberto}
+          dropdownParceiroAberto={dropdownParceiroAberto}
+          loadingParceiros={loadingParceiros}
+          sugestoesParceiros={sugestoesParceiros}
+          selecionarParceiro={selecionarParceiro}
+          form={form}
+          atualizarCampo={atualizarCampo}
+          produtoRef={produtoRef}
+          produtoInputRef={produtoInputRef}
+          buscaProduto={buscaProduto}
+          setBuscaProduto={setBuscaProduto}
+          setDropdownProdutoAberto={setDropdownProdutoAberto}
+          dropdownProdutoAberto={dropdownProdutoAberto}
+          adicionarProdutoPorBuscaAtual={adicionarProdutoPorBuscaAtual}
+          loadingProdutos={loadingProdutos}
+          sugestoesProdutos={sugestoesProdutos}
+          adicionarProduto={adicionarProduto}
+          itensRef={itensRef}
+          itens={itens}
+          totalQuantidade={totalQuantidade}
+          totalRessarcimento={totalRessarcimento}
+          registrarTransferencia={registrarTransferencia}
+          salvando={salvando}
+          modoEdicao={modoEdicao}
+          itensSemValor={itensSemValor}
+          atualizarCustoUnitario={atualizarCustoUnitario}
+          atualizarQuantidade={atualizarQuantidade}
+          atualizarTotalItem={atualizarTotalItem}
+          removerItem={removerItem}
         />
-          <ResumoTransferenciaCard
-            titulo="Saldo em aberto"
-            valor={formatarMoeda(historico.totais.saldo_aberto || 0)}
-            descricao={`${historico.totais.pendentes || 0} pendente(s) e ${historico.totais.vencidas || 0} vencida(s).`}
-            destaque="amber"
-          />
-          <ResumoTransferenciaCard
-            titulo="Valor recebido"
-            valor={formatarMoeda(historico.totais.valor_recebido || 0)}
-            descricao={`${historico.totais.recebidas || 0} transferencia(s) ja recebida(s).`}
-            destaque="emerald"
-          />
-        </div>
-
-        <form
+      ) : (
+      <section className="rounded-3xl border border-gray-200 bg-white shadow-sm">
+        <HistoricoTransferenciaFilters
+          parceiroSelecionado={parceiroSelecionado}
+          onUsarParceiroAtual={usarParceiroAtualNoHistorico}
+          onAtualizarHistorico={() =>
+            void carregarHistoricoTransferencias(filtrosHistoricoAplicados, paginaHistorico)
+          }
+          totais={historico.totais}
+          filtros={filtrosHistoricoForm}
+          atualizarFiltro={atualizarFiltroHistorico}
+          aplicarPeriodoRapido={aplicarPeriodoRapidoHistorico}
+          limparFiltros={limparFiltrosHistorico}
           onSubmit={aplicarFiltrosHistorico}
-          className="grid gap-4 border-b border-gray-100 px-6 py-5 md:grid-cols-2 xl:grid-cols-5"
-        >
-          <div className="xl:col-span-2">
-            <label className="mb-2 block text-sm font-medium text-gray-700">
-              Buscar documento ou pessoa
-            </label>
-            <input
-              type="text"
-              value={filtrosHistoricoForm.busca}
-              onChange={(event) => atualizarFiltroHistorico("busca", event.target.value)}
-              placeholder="Ex.: TRP-2026, nome da pessoa ou observacao"
-              className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-            />
-          </div>
+        />
 
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">
-              Status
-            </label>
-            <select
-              value={filtrosHistoricoForm.status_filtro}
-              onChange={(event) => atualizarFiltroHistorico("status_filtro", event.target.value)}
-              className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-            >
-              <option value="">Todos</option>
-              <option value="pendente">Pendente</option>
-              <option value="parcial">Parcial</option>
-              <option value="vencido">Vencida</option>
-              <option value="recebido">Recebida</option>
-              <option value="cancelado">Cancelada</option>
-            </select>
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">
-              Data inicial
-            </label>
-            <input
-              type="date"
-              value={filtrosHistoricoForm.data_inicio}
-              onChange={(event) => atualizarFiltroHistorico("data_inicio", event.target.value)}
-              className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-            />
-          </div>
-
-          <div>
-            <label className="mb-2 block text-sm font-medium text-gray-700">
-              Data final
-            </label>
-            <input
-              type="date"
-              value={filtrosHistoricoForm.data_fim}
-              onChange={(event) => atualizarFiltroHistorico("data_fim", event.target.value)}
-              className="w-full rounded-2xl border border-gray-300 px-4 py-3 text-sm text-gray-900 outline-none transition focus:border-blue-500 focus:ring-4 focus:ring-blue-100"
-            />
-          </div>
-
-          <div className="md:col-span-2 xl:col-span-5 flex flex-wrap justify-end gap-2">
-            <button
-              type="button"
-              onClick={() => aplicarPeriodoRapidoHistorico("mes_atual")}
-              className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100"
-            >
-              Mes atual
-            </button>
-            <button
-              type="button"
-              onClick={() => aplicarPeriodoRapidoHistorico("mes_anterior")}
-              className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100"
-            >
-              Mes anterior
-            </button>
-            <button
-              type="button"
-              onClick={limparFiltrosHistorico}
-              className="rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
-            >
-              Limpar filtros
-            </button>
-            <button
-              type="submit"
-              className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800"
-            >
-              Aplicar filtros
-            </button>
-          </div>
-        </form>
-
-        {loadingHistorico ? (
-          <div className="px-6 py-12 text-center text-sm text-gray-500">
-            Carregando historico de transferencias...
-          </div>
-        ) : historico.items.length === 0 ? (
-          <div className="px-6 py-12 text-center">
-            <p className="text-base font-semibold text-gray-900">
-              Nenhuma transferencia encontrada
-            </p>
-            <p className="mt-2 text-sm text-gray-500">
-              Ajuste os filtros acima ou registre uma nova transferencia para comecar o historico.
-            </p>
-          </div>
-        ) : (
-          <div className="space-y-4 px-6 py-5">
-            <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-4 lg:flex-row lg:items-center lg:justify-between">
-              <div>
-                <p className="text-sm font-semibold text-slate-900">
-                  PDF consolidado do acerto
-                </p>
-                <p className="mt-1 text-xs text-slate-600">
-                  Marque lancamentos especificos ou gere um PDF unico com todo o filtro atual.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <button
-                  type="button"
-                  onClick={alternarSelecaoPaginaHistorico}
-                  className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
-                >
-                  {todosPaginaSelecionados ? "Desmarcar pagina" : "Selecionar pagina"}
-                </button>
-                <button
-                  type="button"
-                  onClick={limparSelecaoHistorico}
-                  disabled={selecionadosHistorico.length === 0}
-                  className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  Limpar selecao
-                </button>
-                <button
-                  type="button"
-                  onClick={() => abrirModalDocumentoTransferencia(null, "pdf_consolidado")}
-                  disabled={gerandoPdfConsolidado}
-                  className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-semibold text-white transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:bg-slate-400"
-                >
-                  {gerandoPdfConsolidado
-                    ? "Gerando PDF consolidado..."
-                    : selecionadosHistorico.length > 0
-                      ? `Gerar PDF (${selecionadosHistorico.length} selecionado(s))`
-                      : "Gerar PDF do filtro atual"}
-                </button>
-              </div>
-            </div>
-
-            {historico.items.map((registro) => {
-              const expandido = historicoExpandidoIds.includes(registro.conta_receber_id);
-              const totalItensRegistro = registro.itens?.length || 0;
-              return (
-              <article
-                key={registro.conta_receber_id}
-                className="rounded-2xl border border-slate-200 bg-slate-50 p-5"
-              >
-                <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                  <div className="space-y-2">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <label className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700">
-                        <input
-                          type="checkbox"
-                          checked={selecionadosHistorico.includes(registro.conta_receber_id)}
-                          onChange={() => alternarSelecaoHistorico(registro.conta_receber_id)}
-                          className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
-                        />
-                        Selecionar
-                      </label>
-                      <h3 className="text-base font-semibold text-gray-900">
-                        {registro.documento || `Transferencia #${registro.conta_receber_id}`}
-                      </h3>
-                      <StatusTransferenciaBadge
-                        status={registro.status}
-                        label={registro.status_label}
-                      />
-                    </div>
-                    <p className="text-sm text-gray-700">
-                      {registro.parceiro_nome}
-                      {registro.parceiro_codigo ? ` | Codigo ${registro.parceiro_codigo}` : ""}
-                    </p>
-                    {registro.parceiro_email ? (
-                      <p className="text-xs text-gray-500">{registro.parceiro_email}</p>
-                    ) : null}
-                    <p className="text-xs text-gray-500">
-                      Emissao: {formatarData(registro.data_emissao)} | Vencimento: {formatarData(registro.data_vencimento)} | Recebimento: {formatarData(registro.data_recebimento)}
-                    </p>
-                    {registro.modo_baixa_label || registro.forma_pagamento_nome ? (
-                      <div className="flex flex-wrap gap-2">
-                        {registro.modo_baixa_label ? (
-                          <span className="inline-flex rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-700">
-                            {registro.modo_baixa_label}
-                          </span>
-                        ) : null}
-                        {registro.forma_pagamento_nome ? (
-                          <span className="inline-flex rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-medium text-slate-700">
-                            Forma: {registro.forma_pagamento_nome}
-                          </span>
-                        ) : null}
-                      </div>
-                    ) : null}
-                    {expandido && registro.observacoes ? (
-                      <p className="text-xs text-gray-500">{registro.observacoes}</p>
-                    ) : null}
-                  </div>
-
-                  <div className="min-w-0 space-y-3 xl:min-w-[460px]">
-                    <div className="grid min-w-0 gap-3 sm:grid-cols-3">
-                      <div className="min-w-0 rounded-2xl bg-white px-4 py-3 text-right shadow-sm">
-                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                          Valor
-                        </p>
-                        <p className="mt-1 break-words text-sm font-semibold text-gray-900 md:text-base">
-                          {formatarMoeda(registro.valor_original)}
-                        </p>
-                      </div>
-                      <div className="min-w-0 rounded-2xl bg-white px-4 py-3 text-right shadow-sm">
-                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                          Recebido
-                        </p>
-                        <p className="mt-1 break-words text-sm font-semibold text-emerald-700 md:text-base">
-                          {formatarMoeda(registro.valor_recebido)}
-                        </p>
-                      </div>
-                      <div className="min-w-0 rounded-2xl bg-white px-4 py-3 text-right shadow-sm">
-                        <p className="text-xs font-medium uppercase tracking-wide text-gray-500">
-                          Saldo
-                        </p>
-                        <p className="mt-1 break-words text-sm font-semibold text-amber-700 md:text-base">
-                          {formatarMoeda(registro.saldo_aberto)}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex justify-end">
-                      <button
-                        type="button"
-                        onClick={() => alternarExpansaoHistorico(registro.conta_receber_id)}
-                        className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-100"
-                      >
-                        {expandido ? "Fechar detalhes" : `Ver detalhes (${totalItensRegistro} item(ns))`}
-                      </button>
-                    </div>
-                  </div>
-                </div>
-
-                {expandido ? (
-                  <>
-                <div className="mt-4 flex flex-wrap justify-end gap-2">
-                  {registro.status !== "recebido" && registro.status !== "cancelado" ? (
-                    <button
-                      type="button"
-                      onClick={() => void abrirBaixaTransferencia(registro)}
-                      className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-medium text-emerald-700 transition-colors hover:bg-emerald-100"
-                    >
-                      Dar baixa
-                    </button>
-                  ) : null}
-                  <button
-                    type="button"
-                    onClick={() => iniciarEdicaoTransferencia(registro)}
-                    disabled={
-                      Number(registro.valor_recebido || 0) > 0 ||
-                      registro.status === "recebido" ||
-                      registro.status === "cancelado"
-                    }
-                    className="rounded-xl border border-amber-200 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-700 transition-colors hover:bg-amber-100 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    Editar lancamento
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => abrirModalDocumentoTransferencia(registro, "pdf")}
-                    disabled={contaGerandoPdf === registro.conta_receber_id}
-                    className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {contaGerandoPdf === registro.conta_receber_id ? "Gerando PDF..." : "Gerar PDF"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => abrirModalDocumentoTransferencia(registro, "cupom")}
-                    className="rounded-xl border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50"
-                  >
-                    Imprimir cupom
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => abrirModalDocumentoTransferencia(registro, "email")}
-                    disabled={
-                      contaEnviandoEmail === registro.conta_receber_id ||
-                      !registro.parceiro_email
-                    }
-                    className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-100 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {contaEnviandoEmail === registro.conta_receber_id
-                      ? "Enviando e-mail..."
-                      : registro.parceiro_email
-                        ? "Enviar por e-mail"
-                        : "Sem e-mail cadastrado"}
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => void excluirTransferencia(registro)}
-                    disabled={
-                      contaExcluindo === registro.conta_receber_id ||
-                      Number(registro.valor_recebido || 0) > 0
-                    }
-                    className="rounded-xl border border-rose-200 bg-rose-50 px-4 py-2 text-sm font-medium text-rose-700 transition-colors hover:bg-rose-100 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {contaExcluindo === registro.conta_receber_id
-                      ? "Excluindo..."
-                      : "Excluir lancamento"}
-                  </button>
-                </div>
-
-                {baixaAbertaId === registro.conta_receber_id ? (
-                  <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-                    <div className="grid gap-4 xl:grid-cols-[1.2fr_1fr]">
-                      <div className="space-y-4">
-                        <div>
-                          <label className="mb-2 block text-sm font-medium text-emerald-900">
-                            Tipo de baixa
-                          </label>
-                          <div className="grid gap-3 md:grid-cols-2">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setFormBaixa((prev) => ({
-                                  ...prev,
-                                  modo_baixa: "recebimento",
-                                  compensacoes: {},
-                                }))
-                              }
-                              className={`rounded-2xl border px-4 py-3 text-left transition ${
-                                formBaixa.modo_baixa === "recebimento"
-                                  ? "border-emerald-500 bg-white shadow-sm"
-                                  : "border-emerald-200 bg-emerald-50 hover:bg-white"
-                              }`}
-                            >
-                              <p className="text-sm font-semibold text-emerald-900">
-                                Recebimento normal
-                              </p>
-                              <p className="mt-1 text-xs text-emerald-800">
-                                Usa o contas a receber e pode vincular uma forma de pagamento.
-                              </p>
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                setFormBaixa((prev) => ({
-                                  ...prev,
-                                  modo_baixa: "acerto",
-                                  forma_pagamento_id: "",
-                                  compensacoes: prev.compensacoes || {},
-                                }))
-                              }
-                              className={`rounded-2xl border px-4 py-3 text-left transition ${
-                                formBaixa.modo_baixa === "acerto"
-                                  ? "border-amber-500 bg-white shadow-sm"
-                                  : "border-amber-200 bg-amber-50 hover:bg-white"
-                              }`}
-                            >
-                              <p className="text-sm font-semibold text-amber-900">
-                                Acerto / compensacao
-                              </p>
-                              <p className="mt-1 text-xs text-amber-800">
-                                Ideal para o mata quando a pessoa tambem tem contas com voce.
-                              </p>
-                            </button>
-                          </div>
-                        </div>
-
-                        {formBaixa.modo_baixa === "recebimento" ? (
-                          <div>
-                            <label className="mb-2 block text-sm font-medium text-emerald-900">
-                              Forma de pagamento
-                            </label>
-                            <select
-                              value={formBaixa.forma_pagamento_id}
-                              onChange={(event) =>
-                                setFormBaixa((prev) => ({
-                                  ...prev,
-                                  forma_pagamento_id: event.target.value,
-                                }))
-                              }
-                              className="w-full rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-                            >
-                              <option value="">
-                                {loadingFormasPagamento
-                                  ? "Carregando formas..."
-                                  : "Sem forma especifica"}
-                              </option>
-                              {formasPagamento.map((forma) => (
-                                <option key={forma.id} value={forma.id}>
-                                  {forma.nome}
-                                </option>
-                              ))}
-                            </select>
-                            <p className="mt-2 text-xs text-emerald-800">
-                              Opcional. Se nao informar, a baixa fica sem forma vinculada.
-                            </p>
-                          </div>
-                        ) : (
-                          <div className="space-y-3">
-                            <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-900">
-                              O sistema vai registrar esta baixa usando a forma de pagamento{" "}
-                              <span className="font-semibold">Acerto</span>.
-                            </div>
-
-                            <div className="rounded-2xl border border-amber-200 bg-white p-4">
-                              <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                                <div>
-                                  <p className="text-sm font-semibold text-amber-900">
-                                    Contas a pagar em aberto da mesma pessoa
-                                  </p>
-                                  <p className="mt-1 text-xs text-amber-800">
-                                    Se preencher valores aqui, o sistema baixa a transferencia e
-                                    tambem compensa esses titulos no contas a pagar.
-                                  </p>
-                                </div>
-                                <div className="flex flex-wrap gap-2">
-                                  <button
-                                    type="button"
-                                    onClick={preencherCompensacaoAutomatica}
-                                    className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-medium text-amber-700 transition hover:bg-amber-100"
-                                  >
-                                    Preencher automatico
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={limparCompensacoesBaixa}
-                                    className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-medium text-slate-700 transition hover:bg-slate-50"
-                                  >
-                                    Limpar compensacoes
-                                  </button>
-                                </div>
-                              </div>
-
-                              <div className="mt-3 grid gap-3 md:grid-cols-3">
-                                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                                    Total compensado
-                                  </p>
-                                  <p className="mt-1 text-lg font-bold text-slate-900">
-                                    {formatarMoeda(totalCompensadoBaixa)}
-                                  </p>
-                                </div>
-                                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                                    Valor da baixa
-                                  </p>
-                                  <p className="mt-1 text-lg font-bold text-slate-900">
-                                    {formatarMoeda(normalizarNumero(formBaixa.valor_recebido) || 0)}
-                                  </p>
-                                </div>
-                                <div className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3">
-                                  <p className="text-xs font-medium uppercase tracking-wide text-slate-500">
-                                    Diferenca
-                                  </p>
-                                  <p className="mt-1 text-lg font-bold text-amber-700">
-                                    {formatarMoeda(
-                                      Math.max(
-                                        (normalizarNumero(formBaixa.valor_recebido) || 0) -
-                                          totalCompensadoBaixa,
-                                        0,
-                                      ),
-                                    )}
-                                  </p>
-                                </div>
-                              </div>
-
-                              {loadingContasPagarCompensacao ? (
-                                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-600">
-                                  Carregando contas a pagar para compensacao...
-                                </div>
-                              ) : contasPagarCompensacao.length === 0 ? (
-                                <div className="mt-4 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-6 text-sm text-slate-600">
-                                  Essa pessoa nao possui contas a pagar em aberto para compensar no momento.
-                                </div>
-                              ) : (
-                                <div className="mt-4 space-y-3">
-                                  {contasPagarCompensacao.map((contaPagar) => (
-                                    <div
-                                      key={contaPagar.conta_pagar_id}
-                                      className="rounded-2xl border border-slate-200 bg-slate-50 p-4"
-                                    >
-                                      <div className="grid gap-3 xl:grid-cols-[1.6fr_0.8fr_0.8fr_0.9fr] xl:items-center">
-                                        <div>
-                                          <p className="text-sm font-semibold text-slate-900">
-                                            {contaPagar.documento || `Conta #${contaPagar.conta_pagar_id}`}
-                                          </p>
-                                          <p className="mt-1 text-sm text-slate-700">
-                                            {contaPagar.descricao}
-                                          </p>
-                                          <p className="mt-1 text-xs text-slate-500">
-                                            Vencimento: {formatarData(contaPagar.data_vencimento)} |{" "}
-                                            {contaPagar.status_label}
-                                          </p>
-                                        </div>
-                                        <div className="text-sm text-slate-700">
-                                          <p className="text-xs uppercase tracking-wide text-slate-500">
-                                            Saldo
-                                          </p>
-                                          <p className="mt-1 font-semibold text-slate-900">
-                                            {formatarMoeda(contaPagar.saldo_aberto)}
-                                          </p>
-                                        </div>
-                                        <div className="text-sm text-slate-700">
-                                          <p className="text-xs uppercase tracking-wide text-slate-500">
-                                            Ja pago
-                                          </p>
-                                          <p className="mt-1 font-semibold text-slate-900">
-                                            {formatarMoeda(contaPagar.valor_pago)}
-                                          </p>
-                                        </div>
-                                        <div>
-                                          <label className="mb-1 block text-xs font-medium uppercase tracking-wide text-slate-500">
-                                            Valor a compensar
-                                          </label>
-                                          <input
-                                            type="number"
-                                            min="0"
-                                            step="0.01"
-                                            value={formBaixa.compensacoes?.[contaPagar.conta_pagar_id] || ""}
-                                            onChange={(event) =>
-                                              atualizarValorCompensacao(
-                                                contaPagar.conta_pagar_id,
-                                                event.target.value,
-                                              )
-                                            }
-                                            className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-amber-500 focus:ring-4 focus:ring-amber-100"
-                                          />
-                                        </div>
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="rounded-2xl border border-emerald-200 bg-white px-4 py-3 text-sm text-emerald-900">
-                        <p className="font-semibold">Saldo atual</p>
-                        <p className="mt-1 text-lg font-bold">
-                          {formatarMoeda(registro.saldo_aberto)}
-                        </p>
-                        <p className="mt-2 text-xs text-emerald-700">
-                          Pode ser baixa total ou parcial, conforme o valor informado.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="mt-4 grid gap-4 md:grid-cols-2">
-                      <div>
-                        <label className="mb-2 block text-sm font-medium text-emerald-900">
-                          Valor recebido
-                        </label>
-                        <input
-                          type="number"
-                          min="0.01"
-                          step="0.01"
-                          value={formBaixa.valor_recebido}
-                          onChange={(event) =>
-                            setFormBaixa((prev) => ({
-                              ...prev,
-                              valor_recebido: event.target.value,
-                            }))
-                          }
-                          className="w-full rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-                        />
-                      </div>
-                      <div>
-                        <label className="mb-2 block text-sm font-medium text-emerald-900">
-                          Data do recebimento
-                        </label>
-                        <input
-                          type="date"
-                          value={formBaixa.data_recebimento}
-                          onChange={(event) =>
-                            setFormBaixa((prev) => ({
-                              ...prev,
-                              data_recebimento: event.target.value,
-                            }))
-                          }
-                          className="w-full rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-                        />
-                      </div>
-                    </div>
-
-                    <div className="mt-4">
-                      <label className="mb-2 block text-sm font-medium text-emerald-900">
-                        Observacao da baixa
-                      </label>
-                      <textarea
-                        rows={3}
-                        value={formBaixa.observacao}
-                        onChange={(event) =>
-                          setFormBaixa((prev) => ({
-                            ...prev,
-                            observacao: event.target.value,
-                          }))
-                        }
-                        placeholder="Opcional. Ex.: pix recebido hoje, acerto parcial da remessa."
-                        className="w-full rounded-xl border border-emerald-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none transition focus:border-emerald-500 focus:ring-4 focus:ring-emerald-100"
-                      />
-                    </div>
-
-                    <div className="mt-4 flex flex-wrap justify-end gap-2">
-                      <button
-                        type="button"
-                        onClick={fecharBaixaTransferencia}
-                        className="rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-700 transition-colors hover:bg-gray-50"
-                      >
-                        Cancelar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => registrarBaixaTransferencia(registro)}
-                        disabled={contaRecebendo === registro.conta_receber_id}
-                        className="rounded-xl bg-emerald-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-emerald-700 disabled:cursor-not-allowed disabled:bg-emerald-300"
-                      >
-                        {contaRecebendo === registro.conta_receber_id
-                          ? "Registrando baixa..."
-                          : "Confirmar baixa"}
-                      </button>
-                    </div>
-                  </div>
-                ) : null}
-
-                <div className="mt-4 overflow-x-auto rounded-2xl bg-white">
-                  <table className="min-w-full divide-y divide-gray-200">
-                    <thead className="bg-slate-100">
-                      <tr className="text-left text-xs font-semibold uppercase tracking-wide text-slate-600">
-                        <th className="px-4 py-3">Item</th>
-                        <th className="px-4 py-3 text-right">Qtd</th>
-                        <th className="px-4 py-3 text-right">Custo</th>
-                        <th className="px-4 py-3 text-right">Total</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-gray-100 bg-white">
-                      {(registro.itens || []).map((item, index) => (
-                        <tr key={`${registro.conta_receber_id}-${item.produto_id}-${index}`}>
-                          <td className="px-4 py-3">
-                            <p className="text-sm font-medium text-gray-900">
-                              {item.produto_nome}
-                            </p>
-                            <p className="mt-1 text-xs text-gray-500">
-                              Codigo: {item.codigo || "-"}
-                            </p>
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm text-gray-700">
-                            {formatarQuantidade(item.quantidade)}
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm text-gray-700">
-                            {formatarMoeda(item.custo_unitario)}
-                          </td>
-                          <td className="px-4 py-3 text-right text-sm font-semibold text-gray-900">
-                            {formatarMoeda(item.valor_total)}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-                  </>
-                ) : null}
-              </article>
-              );
-            })}
-
-            {totalPaginasHistorico > 1 ? (
-              <div className="flex items-center justify-end gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setPaginaHistorico((prev) => Math.max(prev - 1, 1))}
-                  disabled={paginaHistorico <= 1 || loadingHistorico}
-                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Anterior
-                </button>
-                <span className="text-sm text-gray-600">
-                  Pagina {historico.page || 1} de {totalPaginasHistorico}
-                </span>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setPaginaHistorico((prev) => Math.min(prev + 1, totalPaginasHistorico))
-                  }
-                  disabled={paginaHistorico >= totalPaginasHistorico || loadingHistorico}
-                  className="rounded-lg border border-gray-300 px-3 py-1.5 text-sm text-gray-700 transition-colors hover:bg-gray-50 disabled:cursor-not-allowed disabled:opacity-50"
-                >
-                  Proxima
-                </button>
-              </div>
-            ) : null}
-          </div>
-        )}
+        <HistoricoTransferenciaResults
+          loadingHistorico={loadingHistorico}
+          historico={historico}
+          selecionadosHistorico={selecionadosHistorico}
+          todosPaginaSelecionados={todosPaginaSelecionados}
+          gerandoPdfConsolidado={gerandoPdfConsolidado}
+          historicoExpandidoIds={historicoExpandidoIds}
+          baixaAbertaId={baixaAbertaId}
+          formBaixa={formBaixa}
+          setFormBaixa={setFormBaixa}
+          loadingFormasPagamento={loadingFormasPagamento}
+          formasPagamento={formasPagamento}
+          totalCompensadoBaixa={totalCompensadoBaixa}
+          loadingContasPagarCompensacao={loadingContasPagarCompensacao}
+          contasPagarCompensacao={contasPagarCompensacao}
+          contaRecebendo={contaRecebendo}
+          contaGerandoPdf={contaGerandoPdf}
+          contaEnviandoEmail={contaEnviandoEmail}
+          contaExcluindo={contaExcluindo}
+          totalPaginasHistorico={totalPaginasHistorico}
+          paginaHistorico={paginaHistorico}
+          onAlternarSelecaoPaginaHistorico={alternarSelecaoPaginaHistorico}
+          onLimparSelecaoHistorico={limparSelecaoHistorico}
+          onAbrirModalDocumentoTransferencia={abrirModalDocumentoTransferencia}
+          onAlternarSelecaoHistorico={alternarSelecaoHistorico}
+          onAlternarExpansaoHistorico={alternarExpansaoHistorico}
+          onAbrirBaixaTransferencia={abrirBaixaTransferencia}
+          onIniciarEdicaoTransferencia={iniciarEdicaoTransferencia}
+          onExcluirTransferencia={excluirTransferencia}
+          onPreencherCompensacaoAutomatica={preencherCompensacaoAutomatica}
+          onLimparCompensacoesBaixa={limparCompensacoesBaixa}
+          onAtualizarValorCompensacao={atualizarValorCompensacao}
+          onFecharBaixaTransferencia={fecharBaixaTransferencia}
+          onRegistrarBaixaTransferencia={registrarBaixaTransferencia}
+          onSetPaginaHistorico={setPaginaHistorico}
+        />
       </section>
       )}
     </div>
