@@ -952,6 +952,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-20: `Layout.jsx` iniciou a proxima frente de refatoracao extraindo a configuracao de menu para `frontend/src/components/layout/menuConfig.js`, reduzindo o componente principal de 1484 para 873 linhas e cobrindo o contrato basico do menu com teste Node dedicado. Proximo passo: extrair a renderizacao dos itens da sidebar ou escolher outro hotspot acima de 1000 linhas.
 - 2026-05-20: `Layout.jsx` extraiu a renderizacao dos itens da sidebar para `frontend/src/components/layout/SidebarMenu.jsx`, mantendo os estados premium/dev e reduzindo o componente principal para 694 linhas. Proximo passo: acompanhar os checks do PR e, se seguir verde, escolher outro hotspot acima de 1000 linhas.
 - 2026-05-20: `EcommerceMVP.jsx` iniciou a proxima frente extraindo categorias, metricas e filtros/ordenacao do catalogo para `ecommerceMvpUtils`, com teste Node dedicado em `ecommerceMvpUtils.test.mjs`, reduzindo a tela para 2168 linhas. Proximo passo: extrair cabecalho/banner ou pedidos/conta em componente de apresentacao.
+- 2026-05-20: `EcommerceMVP.jsx` moveu banners ativos, nome exibido da loja, mapa de produtos, validacao de perfil completo e mapeamento de endereco/cadastro do cliente para `ecommerceMvpUtils`, ampliando o teste Node para 9 casos e reduzindo a tela para 2105 linhas. Proximo passo: extrair pedidos ou conta em componente de apresentacao.
 
 ### Nao fazer nesta onda
 

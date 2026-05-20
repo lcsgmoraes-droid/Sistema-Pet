@@ -15,7 +15,6 @@ import {
   trackViewCart,
 } from '../../services/analytics';
 import {
-  BANNERS,
   EMPTY_CART,
   STORAGE_ADDRESS_KEY,
   STORAGE_GUEST_CART_KEY,
@@ -23,9 +22,13 @@ import {
   STORAGE_ORDERS_KEY,
   STORAGE_TOKEN_KEY,
   STORAGE_WISHLIST_KEY,
+  buildActiveBanners,
   buildCatalogCategories,
+  buildCustomerAddressFields,
+  buildCustomerProfileForm,
   buildAddressText,
   buildIdempotencyKey,
+  buildProductMap,
   calculateCatalogMetrics,
   extractApiErrorMessage,
   fetchAddressByCep,
@@ -35,14 +38,14 @@ import {
   getGuestCart,
   getProductImages,
   getStoredAddressFields,
-  humanizeSlug,
-  isLikelyCorruptedText,
+  isCustomerProfileComplete,
   isProductOutOfStock,
   normalizeProductPayload,
   recalculateGuestCart,
   resolveMediaUrl,
   resolveProductPrice,
   resolveProductStock,
+  resolveStoreDisplayName,
   resolveValidityPromotionLimit,
 } from './ecommerceMvpUtils';
 
@@ -191,22 +194,11 @@ export default function EcommerceMVP() {
 
   // Banners: usa URLs do tenant se configuradas, senão exibe os padrões
   const activeBanners = useMemo(() => {
-    const urls = [
-      tenantContext?.banner_1_url,
-      tenantContext?.banner_2_url,
-      tenantContext?.banner_3_url,
-    ].filter(Boolean);
-    if (urls.length > 0) return urls.map((url) => ({ type: 'image', url }));
-    return BANNERS.map((b) => ({ ...b, type: 'text' }));
-  }, [tenantContext?.banner_1_url, tenantContext?.banner_2_url, tenantContext?.banner_3_url]);
+    return buildActiveBanners(tenantContext);
+  }, [tenantContext]);
 
   const isProfileComplete = useMemo(() => {
-    const fullName = String(customer?.nome || '').trim();
-    const hasFullName = fullName.includes(' ');
-    const hasPhone = String(customer?.telefone || '').trim().length >= 8;
-    const hasCpf = String(customer?.cpf || '').replace(/\D+/g, '').length >= 11;
-    const hasAddress = String(customer?.endereco || '').trim().length > 3;
-    return hasFullName && hasPhone && hasCpf && hasAddress;
+    return isCustomerProfileComplete(customer);
   }, [customer]);
 
   const tenantRef = useMemo(() => {
@@ -243,20 +235,13 @@ export default function EcommerceMVP() {
     });
   }, [products, search, categoria, somenteComEstoque, somenteComImagem, ordenacaoCatalogo]);
 
-  const productMap = useMemo(() => Object.fromEntries(products.map((p) => [p.id, p])), [products]);
+  const productMap = useMemo(() => buildProductMap(products), [products]);
   const storefrontRef = tenantContext?.ecommerce_slug || tenantRef || '';
   const customerDisplayName = customer?.nome || customer?.email || '';
 
   const storeDisplayName = useMemo(() => {
-    const backendName = tenantContext?.name || '';
-    if (backendName && !isLikelyCorruptedText(backendName)) {
-      return backendName;
-    }
-    if (storefrontRef) {
-      return humanizeSlug(storefrontRef);
-    }
-    return 'Loja online';
-  }, [tenantContext?.name, storefrontRef]);
+    return resolveStoreDisplayName({ tenantContext, storefrontRef });
+  }, [tenantContext, storefrontRef]);
 
   // Ler ?busca= da URL (ex: link do email de avise-me) e pré-filtrar
   useEffect(() => {
@@ -343,60 +328,12 @@ export default function EcommerceMVP() {
 
   useEffect(() => {
     if (!customer) return;
-    const deliveryDetails = customer?.endereco_entrega_detalhado || {};
-    setProfileForm({
-      nome: customer?.nome || '',
-      telefone: customer?.telefone || '',
-      cpf: customer?.cpf || '',
-      cep: customer?.cep || '',
-      endereco: customer?.endereco || '',
-      numero: customer?.numero || '',
-      complemento: customer?.complemento || '',
-      bairro: customer?.bairro || '',
-      cidade: customer?.cidade || '',
-      estado: customer?.estado || '',
-      endereco_entrega: customer?.endereco_entrega || '',
-      usar_endereco_entrega_diferente: Boolean(customer?.usar_endereco_entrega_diferente),
-      entrega_nome: deliveryDetails?.entrega_nome || '',
-      entrega_cep: deliveryDetails?.entrega_cep || '',
-      entrega_endereco: deliveryDetails?.entrega_endereco || '',
-      entrega_numero: deliveryDetails?.entrega_numero || '',
-      entrega_complemento: deliveryDetails?.entrega_complemento || '',
-      entrega_bairro: deliveryDetails?.entrega_bairro || '',
-      entrega_cidade: deliveryDetails?.entrega_cidade || '',
-      entrega_estado: deliveryDetails?.entrega_estado || '',
-    });
+    setProfileForm(buildCustomerProfileForm(customer));
   }, [customer]);
 
   useEffect(() => {
     if (!customer) return;
-
-    const deliveryDetails = customer?.endereco_entrega_detalhado || {};
-    const useDeliveryAddress = Boolean(customer?.usar_endereco_entrega_diferente);
-
-    setAddressFields({
-      cep: useDeliveryAddress
-        ? (deliveryDetails?.entrega_cep || customer?.cep || '')
-        : (customer?.cep || ''),
-      endereco: useDeliveryAddress
-        ? (deliveryDetails?.entrega_endereco || customer?.endereco || '')
-        : (customer?.endereco || ''),
-      numero: useDeliveryAddress
-        ? (deliveryDetails?.entrega_numero || customer?.numero || '')
-        : (customer?.numero || ''),
-      complemento: useDeliveryAddress
-        ? (deliveryDetails?.entrega_complemento || customer?.complemento || '')
-        : (customer?.complemento || ''),
-      bairro: useDeliveryAddress
-        ? (deliveryDetails?.entrega_bairro || customer?.bairro || '')
-        : (customer?.bairro || ''),
-      cidade: useDeliveryAddress
-        ? (deliveryDetails?.entrega_cidade || customer?.cidade || '')
-        : (customer?.cidade || ''),
-      estado: useDeliveryAddress
-        ? (deliveryDetails?.entrega_estado || customer?.estado || '')
-        : (customer?.estado || ''),
-    });
+    setAddressFields(buildCustomerAddressFields(customer));
   }, [customer]);
 
   async function loadTenantContext() {

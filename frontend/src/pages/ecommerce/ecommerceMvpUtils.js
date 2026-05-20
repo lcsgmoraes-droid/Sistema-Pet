@@ -264,6 +264,97 @@ export function filterCatalogProducts(
   return sorted;
 }
 
+export function buildActiveBanners(tenantContext) {
+  const urls = [
+    tenantContext?.banner_1_url,
+    tenantContext?.banner_2_url,
+    tenantContext?.banner_3_url,
+  ].filter(Boolean);
+
+  if (urls.length > 0) return urls.map((url) => ({ type: 'image', url }));
+  return BANNERS.map((banner) => ({ ...banner, type: 'text' }));
+}
+
+export function isCustomerProfileComplete(customer) {
+  const fullName = String(customer?.nome || '').trim();
+  const hasFullName = fullName.includes(' ');
+  const hasPhone = String(customer?.telefone || '').trim().length >= 8;
+  const hasCpf = String(customer?.cpf || '').replace(/\D+/g, '').length >= 11;
+  const hasAddress = String(customer?.endereco || '').trim().length > 3;
+  return hasFullName && hasPhone && hasCpf && hasAddress;
+}
+
+export function buildProductMap(products) {
+  return Object.fromEntries(products.map((product) => [product.id, product]));
+}
+
+export function resolveStoreDisplayName({ tenantContext, storefrontRef }) {
+  const backendName = tenantContext?.name || '';
+  if (backendName && !isLikelyCorruptedText(backendName)) {
+    return backendName;
+  }
+  if (storefrontRef) {
+    return humanizeSlug(storefrontRef);
+  }
+  return 'Loja online';
+}
+
+export function buildCustomerProfileForm(customer) {
+  const deliveryDetails = customer?.endereco_entrega_detalhado || {};
+
+  return {
+    nome: customer?.nome || '',
+    telefone: customer?.telefone || '',
+    cpf: customer?.cpf || '',
+    cep: customer?.cep || '',
+    endereco: customer?.endereco || '',
+    numero: customer?.numero || '',
+    complemento: customer?.complemento || '',
+    bairro: customer?.bairro || '',
+    cidade: customer?.cidade || '',
+    estado: customer?.estado || '',
+    endereco_entrega: customer?.endereco_entrega || '',
+    usar_endereco_entrega_diferente: Boolean(customer?.usar_endereco_entrega_diferente),
+    entrega_nome: deliveryDetails?.entrega_nome || '',
+    entrega_cep: deliveryDetails?.entrega_cep || '',
+    entrega_endereco: deliveryDetails?.entrega_endereco || '',
+    entrega_numero: deliveryDetails?.entrega_numero || '',
+    entrega_complemento: deliveryDetails?.entrega_complemento || '',
+    entrega_bairro: deliveryDetails?.entrega_bairro || '',
+    entrega_cidade: deliveryDetails?.entrega_cidade || '',
+    entrega_estado: deliveryDetails?.entrega_estado || '',
+  };
+}
+
+export function buildCustomerAddressFields(customer) {
+  const deliveryDetails = customer?.endereco_entrega_detalhado || {};
+  const useDeliveryAddress = Boolean(customer?.usar_endereco_entrega_diferente);
+
+  return {
+    cep: useDeliveryAddress
+      ? (deliveryDetails?.entrega_cep || customer?.cep || '')
+      : (customer?.cep || ''),
+    endereco: useDeliveryAddress
+      ? (deliveryDetails?.entrega_endereco || customer?.endereco || '')
+      : (customer?.endereco || ''),
+    numero: useDeliveryAddress
+      ? (deliveryDetails?.entrega_numero || customer?.numero || '')
+      : (customer?.numero || ''),
+    complemento: useDeliveryAddress
+      ? (deliveryDetails?.entrega_complemento || customer?.complemento || '')
+      : (customer?.complemento || ''),
+    bairro: useDeliveryAddress
+      ? (deliveryDetails?.entrega_bairro || customer?.bairro || '')
+      : (customer?.bairro || ''),
+    cidade: useDeliveryAddress
+      ? (deliveryDetails?.entrega_cidade || customer?.cidade || '')
+      : (customer?.cidade || ''),
+    estado: useDeliveryAddress
+      ? (deliveryDetails?.entrega_estado || customer?.estado || '')
+      : (customer?.estado || ''),
+  };
+}
+
 export function getGuestCart() {
   try {
     const raw = localStorage.getItem(STORAGE_GUEST_CART_KEY);
