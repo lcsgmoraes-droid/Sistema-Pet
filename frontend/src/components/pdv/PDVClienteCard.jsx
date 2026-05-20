@@ -65,9 +65,9 @@ function ClienteLookup({
 }) {
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
         <PessoaSelector
-          className="flex-1"
+          className="w-full sm:flex-1"
           disabled={modoVisualizacao}
           minChars={0}
           onChange={onBuscarClienteChange}
@@ -93,7 +93,7 @@ function ClienteLookup({
           icon={Plus}
           intent="create"
           size="md"
-          className="whitespace-nowrap"
+          className="w-full whitespace-nowrap sm:w-auto"
         >
           <span>Novo</span>
         </ActionButton>
@@ -286,11 +286,10 @@ function ClienteAcoesResumo({
   vendasEmAbertoInfo,
 }) {
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-col gap-2 md:flex-row md:items-center">
       {totalVendasAbertas > 0 ? (
         <div
-          className="flex min-h-[46px] min-w-0 flex-none items-center justify-between gap-3 rounded-lg border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs text-amber-800"
-          style={{ width: "560px", maxWidth: "calc(100% - 300px)" }}
+          className="flex min-h-[46px] w-full min-w-0 flex-col gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 sm:flex-row sm:items-center sm:justify-between md:w-auto md:flex-none"
         >
           <div className="flex min-w-0 items-center gap-2">
             <AlertTriangle className="h-5 w-5 flex-shrink-0 text-amber-600" />
@@ -307,7 +306,7 @@ function ClienteAcoesResumo({
             onClick={onAbrirVendasEmAberto}
             intent="warning"
             size="sm"
-            className="min-w-[128px]"
+            className="w-full sm:w-auto sm:min-w-[128px]"
           >
             Ver Vendas
           </ActionButton>
@@ -316,16 +315,16 @@ function ClienteAcoesResumo({
         <div />
       )}
 
-      <div className="min-w-0 flex-1" />
+      <div className="hidden min-w-0 flex-1 md:block" />
 
-      <div className="flex min-h-[46px] flex-none items-center justify-end gap-2">
+      <div className="grid min-h-[46px] w-full grid-cols-1 gap-2 sm:grid-cols-2 md:flex md:w-auto md:flex-none md:items-center md:justify-end">
         <ActionButton
           onClick={onAbrirHistoricoCliente}
           icon={History}
           intent="neutral"
           tone="soft"
           size="sm"
-          className="min-w-[132px]"
+          className="w-full md:w-auto md:min-w-[132px]"
         >
           Historico
         </ActionButton>
@@ -335,7 +334,7 @@ function ClienteAcoesResumo({
             icon={Wallet}
             intent="create"
             size="sm"
-            className="min-w-[150px]"
+            className="w-full md:w-auto md:min-w-[150px]"
           >
             Inserir Credito
           </ActionButton>
