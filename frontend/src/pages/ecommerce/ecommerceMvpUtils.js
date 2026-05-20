@@ -1,4 +1,4 @@
-import { formatMoneyBRL } from '../../utils/formatters';
+import { formatMoneyBRL } from '../../utils/formatters.js';
 
 export const STORAGE_TOKEN_KEY = 'ecommerce_customer_token';
 export const STORAGE_ORDERS_KEY = 'ecommerce_customer_orders';
@@ -7,7 +7,7 @@ export const STORAGE_GUEST_CART_KEY = 'ecommerce_guest_cart';
 export const STORAGE_WISHLIST_KEY = 'ecommerce_wishlist_products';
 export const STORAGE_NOTIFY_KEY = 'ecommerce_notify_requests';
 
-const configuredApiUrl = import.meta.env.VITE_API_URL;
+const configuredApiUrl = import.meta.env?.VITE_API_URL;
 
 export const EMPTY_CART = { pedido_id: null, itens: [], subtotal: 0, total: 0 };
 
@@ -154,8 +154,12 @@ export function resolveMediaUrl(url) {
     return `${backendBase}${normalizedPath}`;
   }
 
-  if (import.meta.env.DEV) {
+  if (import.meta.env?.DEV) {
     return `http://127.0.0.1:8000${normalizedPath}`;
+  }
+
+  if (typeof window === 'undefined') {
+    return normalizedPath;
   }
 
   return `${window.location.origin}${normalizedPath}`;
@@ -167,6 +171,188 @@ export function normalizeProductPayload(payload) {
   if (Array.isArray(payload?.itens)) return payload.itens;
   if (Array.isArray(payload?.produtos)) return payload.produtos;
   return [];
+}
+
+export function buildCatalogCategories(products) {
+  const all = products
+    .map((item) => item?.categoria_nome || item?.categoria || 'Sem categoria')
+    .filter(Boolean);
+
+  return ['todas', ...Array.from(new Set(all))];
+}
+
+export function calculateCatalogMetrics(products) {
+  return products.reduce(
+    (acc, item) => {
+      const hasImage = getProductImages(item).length > 0;
+      const inStock = !isProductOutOfStock(item);
+
+      if (hasImage) acc.comImagem += 1;
+      if (inStock) acc.emEstoque += 1;
+      if (hasImage && inStock) acc.prontos += 1;
+
+      return acc;
+    },
+    {
+      total: products.length,
+      comImagem: 0,
+      emEstoque: 0,
+      prontos: 0,
+    }
+  );
+}
+
+export function filterCatalogProducts(
+  products,
+  {
+    search = '',
+    categoria = 'todas',
+    somenteComEstoque = false,
+    somenteComImagem = false,
+    ordenacaoCatalogo = 'prontos',
+  } = {}
+) {
+  const query = search.trim().toLowerCase();
+  const sorted = products
+    .filter((item) => {
+      const nome = String(item?.nome || '').toLowerCase();
+      const codigo = String(item?.codigo || '').toLowerCase();
+      const categoriaNome = item?.categoria_nome || item?.categoria || 'Sem categoria';
+      const hasImage = getProductImages(item).length > 0;
+      const inStock = !isProductOutOfStock(item);
+      const matchesSearch = !query || nome.includes(query) || codigo.includes(query);
+      const matchesCategoria = categoria === 'todas' || categoriaNome === categoria;
+      const matchesStock = !somenteComEstoque || inStock;
+      const matchesImage = !somenteComImagem || hasImage;
+      return matchesSearch && matchesCategoria && matchesStock && matchesImage;
+    })
+    .slice();
+
+  sorted.sort((left, right) => {
+    const leftName = String(left?.nome || '');
+    const rightName = String(right?.nome || '');
+    const leftPrice = resolveProductPrice(left);
+    const rightPrice = resolveProductPrice(right);
+    const leftStock = resolveProductStock(left);
+    const rightStock = resolveProductStock(right);
+    const leftHasImage = getProductImages(left).length > 0;
+    const rightHasImage = getProductImages(right).length > 0;
+    const leftInStock = !isProductOutOfStock(left);
+    const rightInStock = !isProductOutOfStock(right);
+    const leftReadyScore = Number(leftInStock) * 2 + Number(leftHasImage);
+    const rightReadyScore = Number(rightInStock) * 2 + Number(rightHasImage);
+
+    if (ordenacaoCatalogo === 'menor_preco') {
+      return leftPrice - rightPrice || leftName.localeCompare(rightName, 'pt-BR');
+    }
+
+    if (ordenacaoCatalogo === 'maior_preco') {
+      return rightPrice - leftPrice || leftName.localeCompare(rightName, 'pt-BR');
+    }
+
+    if (ordenacaoCatalogo === 'nome') {
+      return leftName.localeCompare(rightName, 'pt-BR');
+    }
+
+    return (
+      rightReadyScore - leftReadyScore ||
+      Number(rightStock || 0) - Number(leftStock || 0) ||
+      leftName.localeCompare(rightName, 'pt-BR')
+    );
+  });
+
+  return sorted;
+}
+
+export function buildActiveBanners(tenantContext) {
+  const urls = [
+    tenantContext?.banner_1_url,
+    tenantContext?.banner_2_url,
+    tenantContext?.banner_3_url,
+  ].filter(Boolean);
+
+  if (urls.length > 0) return urls.map((url) => ({ type: 'image', url }));
+  return BANNERS.map((banner) => ({ ...banner, type: 'text' }));
+}
+
+export function isCustomerProfileComplete(customer) {
+  const fullName = String(customer?.nome || '').trim();
+  const hasFullName = fullName.includes(' ');
+  const hasPhone = String(customer?.telefone || '').trim().length >= 8;
+  const hasCpf = String(customer?.cpf || '').replace(/\D+/g, '').length >= 11;
+  const hasAddress = String(customer?.endereco || '').trim().length > 3;
+  return hasFullName && hasPhone && hasCpf && hasAddress;
+}
+
+export function buildProductMap(products) {
+  return Object.fromEntries(products.map((product) => [product.id, product]));
+}
+
+export function resolveStoreDisplayName({ tenantContext, storefrontRef }) {
+  const backendName = tenantContext?.name || '';
+  if (backendName && !isLikelyCorruptedText(backendName)) {
+    return backendName;
+  }
+  if (storefrontRef) {
+    return humanizeSlug(storefrontRef);
+  }
+  return 'Loja online';
+}
+
+export function buildCustomerProfileForm(customer) {
+  const deliveryDetails = customer?.endereco_entrega_detalhado || {};
+
+  return {
+    nome: customer?.nome || '',
+    telefone: customer?.telefone || '',
+    cpf: customer?.cpf || '',
+    cep: customer?.cep || '',
+    endereco: customer?.endereco || '',
+    numero: customer?.numero || '',
+    complemento: customer?.complemento || '',
+    bairro: customer?.bairro || '',
+    cidade: customer?.cidade || '',
+    estado: customer?.estado || '',
+    endereco_entrega: customer?.endereco_entrega || '',
+    usar_endereco_entrega_diferente: Boolean(customer?.usar_endereco_entrega_diferente),
+    entrega_nome: deliveryDetails?.entrega_nome || '',
+    entrega_cep: deliveryDetails?.entrega_cep || '',
+    entrega_endereco: deliveryDetails?.entrega_endereco || '',
+    entrega_numero: deliveryDetails?.entrega_numero || '',
+    entrega_complemento: deliveryDetails?.entrega_complemento || '',
+    entrega_bairro: deliveryDetails?.entrega_bairro || '',
+    entrega_cidade: deliveryDetails?.entrega_cidade || '',
+    entrega_estado: deliveryDetails?.entrega_estado || '',
+  };
+}
+
+export function buildCustomerAddressFields(customer) {
+  const deliveryDetails = customer?.endereco_entrega_detalhado || {};
+  const useDeliveryAddress = Boolean(customer?.usar_endereco_entrega_diferente);
+
+  return {
+    cep: useDeliveryAddress
+      ? (deliveryDetails?.entrega_cep || customer?.cep || '')
+      : (customer?.cep || ''),
+    endereco: useDeliveryAddress
+      ? (deliveryDetails?.entrega_endereco || customer?.endereco || '')
+      : (customer?.endereco || ''),
+    numero: useDeliveryAddress
+      ? (deliveryDetails?.entrega_numero || customer?.numero || '')
+      : (customer?.numero || ''),
+    complemento: useDeliveryAddress
+      ? (deliveryDetails?.entrega_complemento || customer?.complemento || '')
+      : (customer?.complemento || ''),
+    bairro: useDeliveryAddress
+      ? (deliveryDetails?.entrega_bairro || customer?.bairro || '')
+      : (customer?.bairro || ''),
+    cidade: useDeliveryAddress
+      ? (deliveryDetails?.entrega_cidade || customer?.cidade || '')
+      : (customer?.cidade || ''),
+    estado: useDeliveryAddress
+      ? (deliveryDetails?.entrega_estado || customer?.estado || '')
+      : (customer?.estado || ''),
+  };
 }
 
 export function getGuestCart() {
