@@ -11,6 +11,7 @@ import EcommerceFooter from './EcommerceFooter';
 import EcommerceNotifyMeModal from './EcommerceNotifyMeModal';
 import EcommerceOrdersPage from './EcommerceOrdersPage';
 import EcommerceProductDetailModal from './EcommerceProductDetailModal';
+import EcommerceStorefrontChrome from './EcommerceStorefrontChrome';
 import {
   trackPageView,
   trackViewItem,
@@ -38,7 +39,6 @@ import {
   extractApiErrorMessage,
   fetchAddressByCep,
   filterCatalogProducts,
-  formatCurrency,
   getGuestCart,
   getProductImages,
   getStoredAddressFields,
@@ -46,7 +46,6 @@ import {
   isProductOutOfStock,
   normalizeProductPayload,
   recalculateGuestCart,
-  resolveMediaUrl,
   resolveProductPrice,
   resolveProductStock,
   resolveStoreDisplayName,
@@ -1271,136 +1270,23 @@ export default function EcommerceMVP() {
 
   return (
     <div style={S.page}>
-      {/* TOPBAR */}
-      <div style={S.topbar}>
-        <div style={S.topbarInner}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-            <span>{cart?.itens?.length > 0 ? `${cart.itens.length} item(ns) no carrinho` : 'Carrinho vazio'}</span>
-          </div>
-          <span>{cart?.itens?.length > 0 ? `${formatCurrency(cartTotal)} →` : 'Frete grátis acima de R$ 199'}</span>
-        </div>
-      </div>
-
-      {/* HEADER */}
-      <div style={S.header}>
-        <div style={S.headerInner}>
-          {/* Logo */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
-            <div style={S.logo} onClick={() => setView('loja')}>
-              <span style={{ fontSize: 42, lineHeight: 1, flexShrink: 0 }}>🐾</span>
-              <div>
-                <div style={{ fontSize: 18, fontWeight: 800, color: '#1c1917', lineHeight: 1.1 }}>{storeDisplayName}</div>
-                {(tenantContext?.cidade || tenantContext?.uf) && (
-                  <div style={{ fontSize: 11, color: '#a8a29e', fontWeight: 400, marginTop: 1 }}>
-                    📍 {tenantContext?.cidade || ''}{tenantContext?.uf ? ` - ${tenantContext.uf}` : ''}
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-
-          {/* Search (desktop) */}
-          <div style={{ flex: 1, maxWidth: 440, display: isMobile ? 'none' : 'flex' }} className="eco-search-wrap">
-            <div style={{ position: 'relative', width: '100%' }}>
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#9ca3af" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Buscar produtos para o seu pet..."
-                style={{ ...S.formInput, paddingLeft: 36, borderRadius: 24, fontSize: 13 }}
-              />
-            </div>
-          </div>
-
-          {/* Actions */}
-          <div style={S.headerActions}>
-            {/* Wishlist */}
-            <button onClick={() => setView('conta')} style={S.headerWishBtn} title={`Lista de desejos${wishlist.length > 0 ? ` (${wishlist.length})` : ''}`}>
-              <svg width="20" height="20" viewBox="0 0 24 24" fill={wishlist.length > 0 ? '#f97316' : 'none'} stroke={wishlist.length > 0 ? '#f97316' : 'currentColor'} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-            </button>
-            {/* Login/Conta */}
-            {customerDisplayName ? (
-              <button onClick={() => setView('conta')} style={S.avatarBtn}>
-                <span style={{ width: 22, height: 22, borderRadius: '50%', background: '#f97316', color: '#fff', display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 800 }}>{customerDisplayName.charAt(0).toUpperCase()}</span>
-                {customerDisplayName.split(' ')[0]}
-              </button>
-            ) : (
-              <button onClick={() => setView('conta')} style={{ ...S.loginBtn, gap: 6, padding: isMobile ? '7px 10px' : '7px 16px' }}>
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
-                {!isMobile && 'Entrar'}
-              </button>
-            )}
-            {/* Carrinho */}
-            <button onClick={() => setView('carrinho')} style={{ ...S.cartBtn, padding: isMobile ? '0 12px' : '0 18px' }}>
-              <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg>
-              {isMobile ? (cart?.itens?.length > 0 ? `(${cart.itens.length})` : '') : `Carrinho${cart?.itens?.length > 0 ? ` (${cart.itens.length})` : ''}`}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* BANNER (só na aba loja) */}
-      {view === 'loja' && (
-        <div style={{ padding: '16px 20px 0', boxSizing: 'border-box' }}>
-          <div style={{ ...S.bannerWrap, borderRadius: isMobile ? 12 : 16, maxWidth: 1280, margin: '0 auto', height: isMobile ? 180 : 260 }}>
-            {activeBanners.map((b, i) => (
-              <div key={i} style={{ position: 'absolute', inset: 0, opacity: bannerSlide === i ? 1 : 0, transition: 'opacity 0.8s ease', pointerEvents: bannerSlide === i ? 'auto' : 'none' }}>
-                {b.type === 'image' ? (
-                  <img src={resolveMediaUrl(b.url)} alt={`Banner ${i + 1}`} style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }} />
-                ) : (
-                  <div style={{ background: b.bg, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '0 48px', gap: 24, height: '100%' }}>
-                    <span style={{ fontSize: 72, flexShrink: 0, filter: 'drop-shadow(0 4px 12px rgba(0,0,0,0.25))' }}>{b.emoji}</span>
-                    <div>
-                      <div style={{ color: '#fff', fontWeight: 800, fontSize: 34, lineHeight: 1.2, textShadow: '0 2px 12px rgba(0,0,0,0.2)' }}>{b.title}</div>
-                      <div style={{ color: 'rgba(255,255,255,0.88)', fontSize: 16, marginTop: 8 }}>{b.sub}</div>
-                      <button onClick={() => setView('loja')} style={{ marginTop: 16, background: '#fff', color: '#f97316', border: 'none', borderRadius: 24, padding: '10px 24px', fontWeight: 700, fontSize: 14, cursor: 'pointer' }}>
-                        Ver produtos →
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))}
-            <div style={S.bannerDots}>
-              {activeBanners.map((_, i) => (
-                <button key={i} onClick={() => setBannerSlide(i)} style={S.bannerDot(bannerSlide === i)} />
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* BARRA APP */}
-      {view === 'loja' && !isMobile && (
-        <div style={S.appBar}>
-          <div style={S.appBarInner}>
-            <span style={{ background: '#16a34a', borderRadius: 8, width: 28, height: 28, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="5" y="2" width="14" height="20" rx="2" ry="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
-            </span>
-            Baixe nosso <strong>APP</strong> para notificações de pedidos, promoções e aviso de reposição de estoque.
-          </div>
-        </div>
-      )}
-
-      {/* NAV TABS */}
-      <div style={{ ...S.navWrap, overflowX: isMobile ? 'auto' : 'visible' }}>
-        <div style={S.navInner}>
-          {[
-            { id: 'loja', label: 'Loja', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg> },
-            { id: 'carrinho', label: cart?.itens?.length ? `Carrinho (${cart.itens.length})` : 'Carrinho', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/></svg> },
-            { id: 'pedidos', label: 'Pedidos', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg> },
-            { id: 'conta', label: 'Conta', icon: <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg> },
-          ].map(({ id, label, icon }) => (
-            <button key={id} onClick={() => setView(id)} style={{ ...S.navTab(view === id), display: 'flex', alignItems: 'center', gap: 5 }}>
-              {icon}
-              {label}
-            </button>
-          ))}
-        </div>
-      </div>
-
-
+      <EcommerceStorefrontChrome
+        activeBanners={activeBanners}
+        bannerSlide={bannerSlide}
+        cart={cart}
+        cartTotal={cartTotal}
+        customerDisplayName={customerDisplayName}
+        isMobile={isMobile}
+        search={search}
+        storeDisplayName={storeDisplayName}
+        styles={S}
+        tenantContext={tenantContext}
+        view={view}
+        wishlist={wishlist}
+        onBannerSlideChange={setBannerSlide}
+        onNavigate={setView}
+        onSearchChange={setSearch}
+      />
 
       {!tenantRef && (
         <div style={{ background: '#fef2f2', color: '#991b1b', padding: '10px 20px', fontSize: 13, borderBottom: '1px solid #fecaca' }}>
