@@ -686,7 +686,7 @@ export default function VendasFinanceiro() {
   }
 
   return (
-    <div className="p-6 bg-gray-50 min-h-screen">
+    <div className="min-h-screen bg-gray-50 p-3 sm:p-4 lg:p-6">
       <VendasFinanceiroHeader
         abaAtiva={abaAtiva}
         abasVendasFinanceiro={abasVendasFinanceiro}
@@ -729,10 +729,10 @@ export default function VendasFinanceiro() {
         <div>
           {/* Banner de Comparação */}
           {modoComparacao && (
-            <div className="bg-blue-50 border-l-4 border-blue-500 p-4 mb-6 rounded">
-              <div className="flex items-center gap-2">
+            <div className="mb-6 rounded border-l-4 border-blue-500 bg-blue-50 p-4">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                 <svg
-                  className="w-5 h-5 text-blue-500"
+                  className="h-5 w-5 shrink-0 text-blue-500"
                   fill="currentColor"
                   viewBox="0 0 20 20"
                 >
@@ -746,7 +746,7 @@ export default function VendasFinanceiro() {
                   <span className="font-semibold text-blue-800">
                     Modo Comparação Ativo:
                   </span>
-                  <span className="text-blue-700 ml-2">
+                  <span className="text-blue-700 sm:ml-2">
                     Comparando{" "}
                     <span className="font-medium">
                       {formatarData(dataInicio)} até {formatarData(dataFim)}

@@ -19,16 +19,16 @@ export default function VendasListaPanel({
   vendasExpandidas,
 }) {
   return (
-    <div className="bg-white rounded-lg shadow">
-      <div className="bg-gray-600 text-white px-4 py-2 rounded-t-lg font-semibold">
+    <div className="rounded-lg bg-white shadow">
+      <div className="rounded-t-lg bg-gray-600 px-3 py-2 font-semibold text-white sm:px-4">
         Lista de Vendas com Analise de Rentabilidade
       </div>
-      <div className="flex flex-col gap-3 border-b border-gray-100 px-4 py-3 md:flex-row md:items-center md:justify-between">
-        <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-col gap-3 border-b border-gray-100 px-3 py-3 lg:flex-row lg:items-center lg:justify-between sm:px-4">
+        <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center lg:w-auto">
           <button
             type="button"
             onClick={limparFiltroStatusLista}
-            className={`rounded-full px-3 py-1 text-sm font-semibold transition ${
+            className={`w-full rounded-full px-3 py-2 text-sm font-semibold transition sm:w-auto sm:py-1 ${
               filtroStatusLista === ""
                 ? "bg-blue-600 text-white"
                 : "bg-slate-100 text-slate-700 hover:bg-slate-200"
@@ -39,7 +39,7 @@ export default function VendasListaPanel({
           <button
             type="button"
             onClick={() => setFiltroStatusLista("em_aberto")}
-            className={`rounded-full px-3 py-1 text-sm font-semibold transition ${
+            className={`w-full rounded-full px-3 py-2 text-sm font-semibold transition sm:w-auto sm:py-1 ${
               filtroStatusLista === "em_aberto"
                 ? "bg-red-600 text-white"
                 : "bg-red-50 text-red-700 hover:bg-red-100"
@@ -48,7 +48,7 @@ export default function VendasListaPanel({
             Em aberto
           </button>
           <label
-            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-1 text-sm font-semibold text-slate-700 shadow-sm"
+            className="col-span-2 inline-flex min-h-[44px] w-full items-center justify-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-sm font-semibold text-slate-700 shadow-sm sm:w-auto sm:py-1"
             title="Marcado: mostra imposto estimado em todas as vendas. Desmarcado: mostra imposto somente em vendas com NF/NFC-e vinculada."
           >
             <input
@@ -60,11 +60,11 @@ export default function VendasListaPanel({
             Mostrar TUDO com imposto
           </label>
         </div>
-        <div className="text-sm text-slate-500">
+        <div className="text-xs text-slate-500 sm:text-sm">
           Mostrando {listaVendasFiltrada.length} de {listaVendasVisiveis.length} venda(s)
         </div>
       </div>
-      <MetricGrid className="border-b border-gray-100 bg-slate-50 px-4 py-3 sm:grid-cols-2 md:grid-cols-4 xl:grid-cols-8">
+      <MetricGrid className="border-b border-gray-100 bg-slate-50 px-3 py-3 sm:grid-cols-2 sm:px-4 md:grid-cols-4 xl:grid-cols-8">
         {cardsTotalizadoresLista.map((card) => (
           <MetricCard
             key={card.label}
