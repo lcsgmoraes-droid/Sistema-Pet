@@ -117,6 +117,8 @@ Tela piloto:
 - Financeiro/Vendas: o ranking de top produtos por lucro foi extraido para `TopProdutosLucroTable`, padronizando ranking, margem e valores.
 - Financeiro/Vendas: acoes superiores de relatorios/exportacoes foram alinhadas em altura e densidade, mantendo cor compacta por referencia sem competir com a tela.
 - Estoque/Transferencia Parceiro: helpers de documento/cupom, seletor de colunas, modal de documento e cards/badges locais foram extraidos para modulos dedicados, com teste unitario para as regras de colunas, cupom e busca por codigo.
+- Estoque/Transferencia Parceiro: cupom de impressao, cabecalho/abas, formulario de lancamento e filtros/resumo do historico foram extraidos para componentes dedicados, reduzindo o arquivo principal e mantendo as regras de estado e APIs concentradas na pagina.
+- Estoque/Transferencia Parceiro: resultados do historico, cards de transferencia, tabela de itens e painel de baixa/compensacao foram isolados em `HistoricoTransferenciaResults`, deixando a pagina principal focada em estado, efeitos e chamadas de backend.
 - Financeiro/Fluxo de Caixa: cabecalho passou para `PageHeader` e o Chat IA existente foi conectado ao modal padrao.
 - Financeiro/Contas: estados de carregamento de contas a pagar/receber passaram para `LoadingState` global.
 - Financeiro/DRE e Fluxo de Caixa: carregamentos iniciais passaram para `LoadingState`; botoes PDF/Excel da DRE ganharam referencia visual compacta no padrao de acoes.
