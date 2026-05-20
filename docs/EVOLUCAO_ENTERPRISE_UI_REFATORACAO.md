@@ -966,6 +966,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-20: `EcommerceMVP.jsx` extraiu pedidos recentes e drive-cheguei para `frontend/src/pages/ecommerce/useEcommerceOrders.js`, mantendo recarga da aba Pedidos, persistencia dos IDs e atualizacao apos checkout em hook dedicado, reduzindo o arquivo para 1254 linhas. Proximo passo: separar carrinho/checkout ou autenticacao em hooks menores.
 - 2026-05-20: `EcommerceMVP.jsx` extraiu estado e operacoes do carrinho para `frontend/src/pages/ecommerce/useEcommerceCart.js`, mantendo carrinho visitante, sincronizacao apos login, adicionar/atualizar itens e total calculado em hook dedicado, reduzindo o arquivo para 1130 linhas. Proximo passo: separar checkout/pagamento ou autenticacao/perfil.
 - 2026-05-20: `EcommerceMVP.jsx` extraiu estado e operacoes de checkout/pagamento para `frontend/src/pages/ecommerce/useEcommerceCheckout.js`, mantendo cupom, endereco, resumo, idempotencia, tracking e finalizacao em hook dedicado, reduzindo o arquivo para 983 linhas. Proximo passo: separar autenticacao/perfil ou finalizar esta rodada para merge controlado.
+- 2026-05-20: `EcommerceMVP.jsx` extraiu autenticacao, perfil e recuperacao de senha para `frontend/src/pages/ecommerce/useEcommerceCustomer.js`, mantendo login, cadastro, sessao, CEPs do perfil e sincronizacao do carrinho apos autenticar em hook dedicado, reduzindo o arquivo para 637 linhas. Proximo passo: revisar o PR para merge/deploy controlado ou escolher outro hotspot.
 
 ### Nao fazer nesta onda
 

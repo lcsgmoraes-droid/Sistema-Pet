@@ -14,6 +14,7 @@ import EcommerceStorefrontChrome from './EcommerceStorefrontChrome';
 import useEcommerceCart from './useEcommerceCart';
 import useEcommerceCatalog from './useEcommerceCatalog';
 import useEcommerceCheckout from './useEcommerceCheckout';
+import useEcommerceCustomer from './useEcommerceCustomer';
 import useEcommerceEngagement from './useEcommerceEngagement';
 import useEcommerceOrders from './useEcommerceOrders';
 import useEcommerceProductModal from './useEcommerceProductModal';
@@ -24,10 +25,7 @@ import {
 import {
   STORAGE_TOKEN_KEY,
   buildActiveBanners,
-  buildCustomerProfileForm,
   extractApiErrorMessage,
-  fetchAddressByCep,
-  isCustomerProfileComplete,
   isProductOutOfStock,
   normalizeProductPayload,
   resolveStoreDisplayName,
@@ -94,59 +92,7 @@ export default function EcommerceMVP() {
     openProductDetails,
     closeProductModal,
   } = useEcommerceProductModal({ products, location, navigate });
-  const [showRegisterPassword, setShowRegisterPassword] = useState(false);
-  const [showLoginPassword, setShowLoginPassword] = useState(false);
-  const [showRecoveryPassword, setShowRecoveryPassword] = useState(false);
-  const [showRecoveryConfirmPassword, setShowRecoveryConfirmPassword] = useState(false);
-
-  const [authLoading, setAuthLoading] = useState(false);
-  const [recoveryLoading, setRecoveryLoading] = useState(false);
-
   const [customerToken, setCustomerToken] = useState(localStorage.getItem(STORAGE_TOKEN_KEY) || '');
-  const [customer, setCustomer] = useState(null);
-  const [profileSaving, setProfileSaving] = useState(false);
-  const [profileForm, setProfileForm] = useState({
-    nome: '',
-    telefone: '',
-    cpf: '',
-    cep: '',
-    endereco: '',
-    numero: '',
-    complemento: '',
-    bairro: '',
-    cidade: '',
-    estado: '',
-    endereco_entrega: '',
-    usar_endereco_entrega_diferente: false,
-    entrega_nome: '',
-    entrega_cep: '',
-    entrega_endereco: '',
-    entrega_numero: '',
-    entrega_complemento: '',
-    entrega_bairro: '',
-    entrega_cidade: '',
-    entrega_estado: '',
-  });
-
-  const [registerForm, setRegisterForm] = useState({
-    email: '',
-    password: '',
-    nome: '',
-    cpf: '',
-    telefone: '',
-    accepted_terms: false,
-    accepted_privacy: false,
-  });
-  const [loginForm, setLoginForm] = useState({ email: '', password: '' });
-  const [passwordRecoveryMode, setPasswordRecoveryMode] = useState(false);
-  const [recoveryStep, setRecoveryStep] = useState('request');
-  const [recoveryTokenFromLink, setRecoveryTokenFromLink] = useState(false);
-  const [recoveryForm, setRecoveryForm] = useState({
-    email: '',
-    token: '',
-    novaSenha: '',
-    confirmarSenha: '',
-  });
 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -156,10 +102,6 @@ export default function EcommerceMVP() {
   const activeBanners = useMemo(() => {
     return buildActiveBanners(tenantContext);
   }, [tenantContext]);
-
-  const isProfileComplete = useMemo(() => {
-    return isCustomerProfileComplete(customer);
-  }, [customer]);
 
   const tenantRef = useMemo(() => {
     const query = new URLSearchParams(location.search);
@@ -178,7 +120,6 @@ export default function EcommerceMVP() {
   }, [customerToken]);
 
   const storefrontRef = tenantContext?.ecommerce_slug || tenantRef || '';
-  const customerDisplayName = customer?.nome || customer?.email || '';
 
   const storeDisplayName = useMemo(() => {
     return resolveStoreDisplayName({ tenantContext, storefrontRef });
@@ -198,6 +139,60 @@ export default function EcommerceMVP() {
     authHeaders,
     customerToken,
     productMap,
+    onError: setError,
+    onSuccess: setSuccess,
+  });
+
+  const {
+    authLoading,
+    clearCustomerSession,
+    closePasswordRecovery,
+    customer,
+    customerDisplayName,
+    handleDeliveryCepBlur,
+    handleLogin,
+    handlePasswordRecoveryRequest,
+    handlePasswordRecoveryReset,
+    handleProfileCepBlur,
+    handleRegister,
+    isProfileComplete,
+    loginForm,
+    openPasswordRecovery,
+    passwordRecoveryMode,
+    profileForm,
+    profileSaving,
+    recoveryForm,
+    recoveryLoading,
+    recoveryStep,
+    recoveryTokenFromLink,
+    registerForm,
+    saveProfile,
+    setLoginForm,
+    setProfileForm,
+    setRecoveryForm,
+    setRecoveryStep,
+    setRecoveryTokenFromLink,
+    setRegisterForm,
+    setShowLoginPassword,
+    setShowRecoveryConfirmPassword,
+    setShowRecoveryPassword,
+    setShowRegisterPassword,
+    showLoginPassword,
+    showRecoveryConfirmPassword,
+    showRecoveryPassword,
+    showRegisterPassword,
+  } = useEcommerceCustomer({
+    authHeaders,
+    customerToken,
+    loadCart,
+    location,
+    navigate,
+    restoreGuestCart,
+    setCustomerToken,
+    setView,
+    syncGuestCartToServer,
+    tenantContext,
+    tenantHeaders,
     onError: setError,
     onSuccess: setSuccess,
   });
@@ -287,27 +282,6 @@ export default function EcommerceMVP() {
   }, [location.search]);
 
   useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const recoveryFlag = params.get('recovery');
-    const emailParam = params.get('email') || '';
-    const tokenParam = params.get('token') || '';
-
-    if (recoveryFlag !== '1' && !emailParam && !tokenParam) {
-      return;
-    }
-
-    setView('conta');
-    setPasswordRecoveryMode(true);
-    setRecoveryStep(tokenParam ? 'reset' : 'request');
-    setRecoveryTokenFromLink(Boolean(tokenParam));
-    setRecoveryForm((prev) => ({
-      ...prev,
-      email: emailParam || prev.email,
-      token: tokenParam || prev.token,
-    }));
-  }, [location.search]);
-
-  useEffect(() => {
     // Sem slug = acesso pelo painel (usuario logado) → carrega via API autenticada
     loadTenantContext();
     if (tenantRef) {
@@ -328,22 +302,10 @@ export default function EcommerceMVP() {
   }, [tenantContext?.id]);
 
   useEffect(() => {
-    if (customerToken) {
-      loadMe();
-      loadCart();
-    }
-  }, [customerToken]);
-
-  useEffect(() => {
     const total = activeBanners.length;
     const timer = setInterval(() => setBannerSlide((prev) => (prev + 1) % total), 4000);
     return () => clearInterval(timer);
   }, [activeBanners.length]);
-
-  useEffect(() => {
-    if (!customer) return;
-    setProfileForm(buildCustomerProfileForm(customer));
-  }, [customer]);
 
   async function loadTenantContext() {
     try {
@@ -396,350 +358,11 @@ export default function EcommerceMVP() {
     }
   }
 
-  async function loadMe() {
-    if (!customerToken) return;
-    try {
-      const response = await ecommerceApi.get('/api/ecommerce/auth/perfil', { headers: authHeaders });
-      setCustomer(response.data);
-    } catch {
-      setCustomer(null);
-      setCustomerToken('');
-      localStorage.removeItem(STORAGE_TOKEN_KEY);
-      restoreGuestCart();
-    }
-  }
-
-  async function saveProfile(e) {
-    e.preventDefault();
-    if (!customerToken) {
-      setError('Faça login para atualizar seus dados.');
-      return;
-    }
-
-    const fullName = String(profileForm.nome || '').trim();
-    if (!fullName || !fullName.includes(' ')) {
-      setError('Informe nome completo (nome e sobrenome).');
-      return;
-    }
-
-    const phoneDigits = String(profileForm.telefone || '').replace(/\D/g, '');
-    if (phoneDigits.length < 10) {
-      setError('Informe um telefone/celular valido.');
-      return;
-    }
-
-    if (profileForm.usar_endereco_entrega_diferente) {
-      const requiredDelivery = [
-        profileForm.entrega_nome,
-        profileForm.entrega_endereco,
-        profileForm.entrega_numero,
-        profileForm.entrega_bairro,
-        profileForm.entrega_cidade,
-        profileForm.entrega_estado,
-      ].every((item) => String(item || '').trim());
-
-      if (!requiredDelivery) {
-        setError('Preencha o endereço de entrega completo para continuar.');
-        return;
-      }
-    }
-
-    setProfileSaving(true);
-    setError('');
-    setSuccess('');
-    try {
-      const response = await ecommerceApi.put('/api/ecommerce/auth/perfil', profileForm, { headers: authHeaders });
-      setCustomer(response.data);
-      setSuccess('Dados cadastrais atualizados com sucesso.');
-    } catch (err) {
-      setError(extractApiErrorMessage(err, 'Erro ao salvar dados cadastrais'));
-    } finally {
-      setProfileSaving(false);
-    }
-  }
-
-  async function handleProfileCepBlur() {
-    const data = await fetchAddressByCep(profileForm.cep);
-    if (!data) return;
-    setProfileForm((prev) => ({
-      ...prev,
-      cep: data.cep || prev.cep,
-      endereco: data.endereco || prev.endereco,
-      bairro: data.bairro || prev.bairro,
-      cidade: data.cidade || prev.cidade,
-      estado: data.estado || prev.estado,
-    }));
-  }
-
-  async function handleDeliveryCepBlur() {
-    const data = await fetchAddressByCep(profileForm.entrega_cep);
-    if (!data) return;
-    setProfileForm((prev) => ({
-      ...prev,
-      entrega_cep: data.cep || prev.entrega_cep,
-      entrega_endereco: data.endereco || prev.entrega_endereco,
-      entrega_bairro: data.bairro || prev.entrega_bairro,
-      entrega_cidade: data.cidade || prev.entrega_cidade,
-      entrega_estado: data.estado || prev.entrega_estado,
-    }));
-  }
-
-  function clearRecoveryParamsFromUrl() {
-    const params = new URLSearchParams(location.search);
-    params.delete('recovery');
-    params.delete('email');
-    params.delete('token');
-    const nextSearch = params.toString();
-    navigate(`${location.pathname}${nextSearch ? `?${nextSearch}` : ''}`, { replace: true });
-  }
-
-  function openPasswordRecovery(nextStep = 'request') {
-    setView('conta');
-    setPasswordRecoveryMode(true);
-    setRecoveryStep(nextStep);
-    setRecoveryTokenFromLink(false);
-    setError('');
-    setSuccess('');
-    setRecoveryForm((prev) => ({
-      ...prev,
-      email: prev.email || loginForm.email || registerForm.email || customer?.email || '',
-      token: nextStep === 'request' ? '' : prev.token,
-      novaSenha: '',
-      confirmarSenha: '',
-    }));
-  }
-
-  function closePasswordRecovery() {
-    setPasswordRecoveryMode(false);
-    setRecoveryStep('request');
-    setRecoveryTokenFromLink(false);
-    setShowRecoveryPassword(false);
-    setShowRecoveryConfirmPassword(false);
-    setRecoveryForm((prev) => ({
-      ...prev,
-      token: '',
-      novaSenha: '',
-      confirmarSenha: '',
-    }));
-    clearRecoveryParamsFromUrl();
-  }
-
-  async function handlePasswordRecoveryRequest(e) {
-    e.preventDefault();
-    if (!tenantContext?.id) {
-      setError('Loja não identificada na URL.');
-      return;
-    }
-
-    const normalizedEmail = recoveryForm.email.trim().toLowerCase();
-    if (!normalizedEmail) {
-      setError('Informe o e-mail da conta para continuar.');
-      return;
-    }
-
-    setRecoveryLoading(true);
-    setError('');
-    setSuccess('');
-    try {
-      const response = await ecommerceApi.post(
-        '/api/ecommerce/auth/esqueci-senha',
-        { email: normalizedEmail, canal: 'site' },
-        { headers: tenantHeaders }
-      );
-      const minutes = response?.data?.expires_in_minutes;
-      setRecoveryStep('request');
-      setRecoveryForm((prev) => ({
-        ...prev,
-        email: normalizedEmail,
-        token: '',
-        novaSenha: '',
-        confirmarSenha: '',
-      }));
-      setRecoveryTokenFromLink(false);
-      setSuccess(
-        minutes
-          ? `Se o e-mail existir, enviamos um link e um codigo de recuperacao. Abra o ultimo e-mail recebido ou clique em "Ja tenho o codigo". Eles expiram em ${minutes} minutos.`
-          : 'Se o e-mail existir, enviamos as instruções de recuperação.'
-      );
-    } catch (err) {
-      setError(extractApiErrorMessage(err, 'Não foi possível iniciar a recuperação agora.'));
-    } finally {
-      setRecoveryLoading(false);
-    }
-  }
-
-  async function handlePasswordRecoveryReset(e) {
-    e.preventDefault();
-    if (!tenantContext?.id) {
-      setError('Loja não identificada na URL.');
-      return;
-    }
-
-    const normalizedEmail = recoveryForm.email.trim().toLowerCase();
-    const token = recoveryForm.token.trim();
-
-    if (!normalizedEmail || !token) {
-      setError(recoveryTokenFromLink ? 'Link de recuperacao invalido. Solicite um novo link.' : 'Preencha o e-mail e o codigo recebido.');
-      return;
-    }
-
-    if ((recoveryForm.novaSenha || '').length < 8) {
-      setError('A nova senha deve ter pelo menos 8 caracteres.');
-      return;
-    }
-
-    if (recoveryForm.novaSenha !== recoveryForm.confirmarSenha) {
-      setError('A confirmação da senha não confere.');
-      return;
-    }
-
-    setRecoveryLoading(true);
-    setError('');
-    setSuccess('');
-    try {
-      await ecommerceApi.post(
-        '/api/ecommerce/auth/resetar-senha',
-        {
-          email: normalizedEmail,
-          token,
-          nova_senha: recoveryForm.novaSenha,
-        },
-        { headers: tenantHeaders }
-      );
-      setLoginForm({ email: normalizedEmail, password: '' });
-      setRecoveryForm({
-        email: normalizedEmail,
-        token: '',
-        novaSenha: '',
-        confirmarSenha: '',
-      });
-      setPasswordRecoveryMode(false);
-      setRecoveryStep('request');
-      setRecoveryTokenFromLink(false);
-      setShowRecoveryPassword(false);
-      setShowRecoveryConfirmPassword(false);
-      clearRecoveryParamsFromUrl();
-      setSuccess('Senha atualizada com sucesso. Agora é só entrar com a nova senha.');
-    } catch (err) {
-      setError(extractApiErrorMessage(err, 'Não foi possível redefinir a senha.'));
-    } finally {
-      setRecoveryLoading(false);
-    }
-  }
-
-  async function handleRegister(e) {
-    e.preventDefault();
-    if (!tenantContext?.id) {
-      setError('Loja não identificada na URL.');
-      return;
-    }
-    const cpfDigits = (registerForm.cpf || '').replace(/\D/g, '');
-    if (cpfDigits.length !== 11) {
-      setError('Informe um CPF válido com 11 dígitos.');
-      return;
-    }
-    const phoneDigits = (registerForm.telefone || '').replace(/\D/g, '');
-    if (phoneDigits.length < 10) {
-      setError('Informe um telefone/celular valido.');
-      return;
-    }
-    if ((registerForm.password || '').length < 8) {
-      setError('A senha deve ter pelo menos 8 caracteres.');
-      return;
-    }
-    if (!registerForm.accepted_terms || !registerForm.accepted_privacy) {
-      setError('Aceite os Termos de Uso e a Politica de Privacidade para criar a conta.');
-      return;
-    }
-    setAuthLoading(true);
-    setError('');
-    setSuccess('');
-    try {
-      const response = await ecommerceApi.post('/api/ecommerce/auth/registrar', registerForm, { headers: tenantHeaders });
-      if (response?.data?.requires_email_verification) {
-        setRegisterForm({
-          email: '',
-          password: '',
-          nome: '',
-          cpf: '',
-          telefone: '',
-          accepted_terms: false,
-          accepted_privacy: false,
-        });
-        setPasswordRecoveryMode(false);
-        setRecoveryStep('request');
-        clearRecoveryParamsFromUrl();
-        setSuccess('Cadastro realizado. Enviamos um link de confirmacao para o seu e-mail antes do primeiro acesso.');
-        return;
-      }
-      const token = response?.data?.access_token;
-      if (!token) throw new Error('Token não retornado');
-      if (response?.data?.user) {
-        setCustomer(response.data.user);
-      }
-      localStorage.setItem(STORAGE_TOKEN_KEY, token);
-      setCustomerToken(token);
-      await syncGuestCartToServer(token);
-      setRegisterForm({
-        email: '',
-        password: '',
-        nome: '',
-        cpf: '',
-        telefone: '',
-        accepted_terms: false,
-        accepted_privacy: false,
-      });
-      setPasswordRecoveryMode(false);
-      setRecoveryStep('request');
-      clearRecoveryParamsFromUrl();
-      setSuccess('Cadastro realizado com sucesso!');
-      setView('conta');
-    } catch (err) {
-      setError(extractApiErrorMessage(err, 'Erro ao cadastrar cliente'));
-    } finally {
-      setAuthLoading(false);
-    }
-  }
-
-  async function handleLogin(e) {
-    e.preventDefault();
-    if (!tenantContext?.id) {
-      setError('Loja não identificada na URL.');
-      return;
-    }
-    setAuthLoading(true);
-    setError('');
-    setSuccess('');
-    try {
-      const response = await ecommerceApi.post('/api/ecommerce/auth/login', loginForm, { headers: tenantHeaders });
-      const token = response?.data?.access_token;
-      if (!token) throw new Error('Token não retornado');
-      if (response?.data?.user) {
-        setCustomer(response.data.user);
-      }
-      localStorage.setItem(STORAGE_TOKEN_KEY, token);
-      setCustomerToken(token);
-      await syncGuestCartToServer(token);
-      setLoginForm({ email: '', password: '' });
-      setPasswordRecoveryMode(false);
-      setRecoveryStep('request');
-      clearRecoveryParamsFromUrl();
-      setSuccess('Login realizado com sucesso. Confira seus dados cadastrais.');
-      setView('conta');
-    } catch (err) {
-      setError(extractApiErrorMessage(err, 'Erro ao realizar login'));
-    } finally {
-      setAuthLoading(false);
-    }
-  }
-
   function logoutCustomer() {
-    setCustomer(null);
-    setCustomerToken('');
+    clearCustomerSession();
     clearCart();
     resetCheckoutStatus();
-    localStorage.removeItem(STORAGE_TOKEN_KEY);
-    setSuccess('Sessão encerrada.');
+    setSuccess('Sess\u00e3o encerrada.');
   }
 
   /* ─────────────── ESTILOS INTERNOS ─────────────── */
