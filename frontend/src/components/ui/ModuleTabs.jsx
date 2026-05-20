@@ -14,8 +14,8 @@ export default function ModuleTabs({
   const sizeClasses = SIZE_CLASSES[size] || SIZE_CLASSES.md;
 
   return (
-    <div className={["border-b border-slate-200", className].filter(Boolean).join(" ")}>
-      <div role="tablist" aria-label={ariaLabel} className="flex gap-1 overflow-x-auto">
+    <div className={["erp-module-tabs border-b border-slate-200", className].filter(Boolean).join(" ")}>
+      <div role="tablist" aria-label={ariaLabel} className="erp-module-tablist flex gap-1 overflow-x-auto">
         {tabs.map((tab) => {
           const isActive = active === tab.id;
 

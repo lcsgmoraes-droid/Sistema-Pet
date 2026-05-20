@@ -28,6 +28,7 @@ export default function PageHeader({
   return (
     <div
       className={[
+        "erp-page-header",
         "flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between",
         className,
       ]
@@ -67,7 +68,7 @@ export default function PageHeader({
       </div>
 
       {actions ? (
-        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+        <div className="erp-page-header-actions flex flex-wrap items-center gap-2 lg:justify-end">
           {actions}
         </div>
       ) : null}

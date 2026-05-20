@@ -84,7 +84,7 @@ export default function DataTable({
   const colSpan = Math.max(columns.length, 1);
 
   return (
-    <div className="overflow-x-auto">
+    <div className="erp-data-table-wrap overflow-x-auto">
       <table
         className={[
           "w-full border-collapse text-sm",
