@@ -470,6 +470,7 @@ export default function EcommerceMVP() {
           cartTotal={cartTotal}
           cupom={cupom}
           cupomResult={cupomResult}
+          isMobile={isMobile}
           productMap={productMap}
           styles={S}
           onApplyCoupon={applyCupom}

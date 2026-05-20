@@ -126,6 +126,7 @@ Tela piloto:
 
 Proxima varredura recomendada:
 
+- Criar trilha continua de responsividade do ERP no celular/app: revisar tela por tela em largura mobile, priorizando fluxos diarios de PDV, Produtos, Pessoas/Pets, Financeiro, Veterinario, Estoque e Ops.
 - Finalizar PDV cliente/produtos/modais.
 - Depois aplicar o mesmo padrao em Financeiro/Vendas, DRE, Produtos, Pessoas, Pets, Veterinario, Banho & Tosa, Campanhas e demais modulos.
 
