@@ -422,7 +422,7 @@ const Layout = () => {
   const isActive = (path) => location.pathname === path;
 
   return (
-    <div className="erp-shell flex h-screen bg-gray-50">
+    <div className="erp-shell flex h-screen min-w-0 bg-gray-50">
       {/* Backdrop para mobile */}
       {isMobile && sidebarOpen && effectiveSidebarVisible && (
         <div
@@ -436,7 +436,7 @@ const Layout = () => {
         <aside
           className={`${
             isMobile
-              ? `erp-mobile-sidebar fixed inset-y-0 left-0 z-50 w-64 transform transition-transform duration-300 ${
+              ? `erp-mobile-sidebar fixed inset-y-0 left-0 z-50 w-64 max-w-[calc(100vw-24px)] transform overflow-hidden transition-transform duration-300 ${
                   sidebarOpen ? "translate-x-0" : "-translate-x-full"
                 }`
               : `${sidebarOpen ? "w-64" : "w-20"} transition-all duration-300`
@@ -584,9 +584,9 @@ const Layout = () => {
       )}
 
       {/* Main Content */}
-      <div className="erp-main-column flex-1 flex flex-col overflow-hidden">
+      <div className="erp-main-column flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Header */}
-        <header className="erp-topbar bg-white border-b border-gray-200 px-3 md:px-6 py-3 md:py-4 flex items-center justify-between">
+        <header className="erp-topbar flex shrink-0 items-center justify-between gap-2 border-b border-gray-200 bg-white px-3 py-3 md:px-6 md:py-4">
           {/* Menu Hamburguer (Mobile) */}
           {isMobile && effectiveSidebarVisible && (
             <button
