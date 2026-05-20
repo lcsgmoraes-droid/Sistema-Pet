@@ -13,6 +13,7 @@ import EcommerceStorePage from './EcommerceStorePage';
 import EcommerceStorefrontChrome from './EcommerceStorefrontChrome';
 import useEcommerceCatalog from './useEcommerceCatalog';
 import useEcommerceEngagement from './useEcommerceEngagement';
+import useEcommerceOrders from './useEcommerceOrders';
 import useEcommerceProductModal from './useEcommerceProductModal';
 import {
   trackPageView,
@@ -25,7 +26,6 @@ import {
   EMPTY_CART,
   STORAGE_ADDRESS_KEY,
   STORAGE_GUEST_CART_KEY,
-  STORAGE_ORDERS_KEY,
   STORAGE_TOKEN_KEY,
   buildActiveBanners,
   buildCustomerAddressFields,
@@ -178,16 +178,6 @@ export default function EcommerceMVP() {
   const [pagamentoBandeira, setPagamentoBandeira] = useState('Visa');
   const [pagamentoParcelas, setPagamentoParcelas] = useState(1);
 
-  const [orderIds, setOrderIds] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem(STORAGE_ORDERS_KEY) || '[]');
-    } catch {
-      return [];
-    }
-  });
-  const [ordersDetailed, setOrdersDetailed] = useState([]);
-  const [ordersLoading, setOrdersLoading] = useState(false);
-
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [tenantContext, setTenantContext] = useState(null);
@@ -241,6 +231,19 @@ export default function EcommerceMVP() {
     tenantRef,
     onError: setError,
     onSuccess: setSuccess,
+  });
+
+  const {
+    ordersDetailed,
+    ordersLoading,
+    loadOrdersDetailed,
+    avisarCheguei,
+    recordOrderId,
+  } = useEcommerceOrders({
+    authHeaders,
+    customerToken,
+    view,
+    onError: setError,
   });
 
   // Ler ?busca= da URL (ex: link do email de avise-me) e pré-filtrar
@@ -1010,10 +1013,7 @@ export default function EcommerceMVP() {
       }
 
       if (result?.pedido_id) {
-        const updated = Array.from(new Set([result.pedido_id, ...orderIds]));
-        setOrderIds(updated);
-        localStorage.setItem(STORAGE_ORDERS_KEY, JSON.stringify(updated));
-        await loadOrdersDetailed();
+        await recordOrderId(result.pedido_id);
       }
 
       setSuccess('Pagamento enviado para analise. O pedido sera liberado apos aprovacao.');
@@ -1022,45 +1022,6 @@ export default function EcommerceMVP() {
       setError(extractApiErrorMessage(err, 'Erro ao finalizar checkout'));
     } finally {
       setCheckoutLoading(false);
-    }
-  }
-
-  async function loadOrdersDetailed() {
-    if (!customerToken) return;
-    setOrdersLoading(true);
-    try {
-      const response = await ecommerceApi.get('/api/checkout/pedidos', {
-        headers: authHeaders,
-        params: { limit: 20 },
-      });
-      const pedidos = Array.isArray(response?.data?.pedidos) ? response.data.pedidos : [];
-      setOrdersDetailed(pedidos);
-
-      if (pedidos.length) {
-        const ids = pedidos.map((pedido) => pedido?.pedido_id).filter(Boolean);
-        const updated = Array.from(new Set([...ids, ...orderIds]));
-        setOrderIds(updated);
-        localStorage.setItem(STORAGE_ORDERS_KEY, JSON.stringify(updated));
-      }
-    } catch (err) {
-      setOrdersDetailed([]);
-      setError(extractApiErrorMessage(err, 'Erro ao carregar detalhes dos pedidos'));
-    } finally {
-      setOrdersLoading(false);
-    }
-  }
-
-  useEffect(() => {
-    if (!customerToken || view !== 'pedidos') return;
-    loadOrdersDetailed();
-  }, [view, customerToken]);
-
-  async function avisarCheguei(pedidoId) {
-    try {
-      await ecommerceApi.post(`/api/checkout/pedido/${pedidoId}/drive-cheguei`, {}, { headers: authHeaders });
-      await loadOrdersDetailed();
-    } catch (err) {
-      setError(extractApiErrorMessage(err, 'Erro ao avisar chegada'));
     }
   }
 
