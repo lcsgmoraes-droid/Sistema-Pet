@@ -40,9 +40,9 @@ export default function VendasFinanceiroGraficosResumo({
   if (!mostrarGraficos) return null;
 
   return (
-    <div className="grid grid-cols-2 gap-6 mb-6">
-      <div className="bg-white rounded-lg shadow p-4">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">
+    <div className="mb-6 grid grid-cols-1 gap-4 xl:grid-cols-2 xl:gap-6">
+      <div className="rounded-lg bg-white p-3 shadow sm:p-4">
+        <h3 className="mb-4 text-base font-semibold text-gray-800 sm:text-lg">
           Vendas no Periodo
         </h3>
         <ResponsiveContainer width="100%" height={300}>
@@ -80,8 +80,8 @@ export default function VendasFinanceiroGraficosResumo({
         </ResponsiveContainer>
       </div>
 
-      <div className="bg-white rounded-lg shadow p-4">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">
+      <div className="rounded-lg bg-white p-3 shadow sm:p-4">
+        <h3 className="mb-4 text-base font-semibold text-gray-800 sm:text-lg">
           Formas de Pagamento
         </h3>
         <ResponsiveContainer width="100%" height={350}>
@@ -138,8 +138,8 @@ export default function VendasFinanceiroGraficosResumo({
         </ResponsiveContainer>
       </div>
 
-      <div className="bg-white rounded-lg shadow p-4 col-span-2">
-        <h3 className="text-lg font-semibold text-gray-800 mb-4">
+      <div className="rounded-lg bg-white p-3 shadow sm:p-4 xl:col-span-2">
+        <h3 className="mb-4 text-base font-semibold text-gray-800 sm:text-lg">
           Top 10 Categorias de Produtos
         </h3>
         <ResponsiveContainer width="100%" height={300}>
@@ -156,9 +156,9 @@ export default function VendasFinanceiroGraficosResumo({
         </ResponsiveContainer>
       </div>
 
-      <div className="bg-white rounded-lg shadow p-4">
+      <div className="rounded-lg bg-white p-3 shadow sm:p-4">
         <div className="mb-4">
-          <h3 className="text-lg font-semibold text-gray-800">
+          <h3 className="text-base font-semibold text-gray-800 sm:text-lg">
             Vendas por dia da semana
           </h3>
           <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
@@ -210,9 +210,9 @@ export default function VendasFinanceiroGraficosResumo({
         </ResponsiveContainer>
       </div>
 
-      <div className="bg-white rounded-lg shadow p-4">
+      <div className="rounded-lg bg-white p-3 shadow sm:p-4">
         <div className="mb-4">
-          <h3 className="text-lg font-semibold text-gray-800">
+          <h3 className="text-base font-semibold text-gray-800 sm:text-lg">
             Vendas por horario
           </h3>
           <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">

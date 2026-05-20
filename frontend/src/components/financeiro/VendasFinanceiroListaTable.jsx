@@ -63,10 +63,11 @@ function ItensVendaDetalhes({ colSpan, formatarMoeda, venda }) {
 
   return (
     <tr className="bg-blue-50">
-      <td colSpan={colSpan} className="px-4 py-3">
-        <div className="pl-8">
+      <td colSpan={colSpan} className="px-2 py-3 sm:px-4">
+        <div className="pl-0 sm:pl-8">
           <div className="mb-2 font-semibold text-slate-700">Produtos desta venda:</div>
-          <table className="w-full text-xs">
+          <div className="overflow-x-auto">
+            <table className="w-full min-w-[1280px] text-xs">
             <thead className="bg-blue-100">
               <tr>
                 <th className="px-1 py-1 text-left">Produto</th>
@@ -192,7 +193,8 @@ function ItensVendaDetalhes({ colSpan, formatarMoeda, venda }) {
                 </tr>
               ))}
             </tbody>
-          </table>
+            </table>
+          </div>
         </div>
       </td>
     </tr>

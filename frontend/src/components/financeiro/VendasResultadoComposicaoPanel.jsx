@@ -17,7 +17,7 @@ export default function VendasResultadoComposicaoPanel({
             Sequencia da venda bruta ate o lucro do periodo filtrado.
           </p>
         </div>
-        <div className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+        <div className="self-start rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600 sm:self-auto">
           {formatarMoeda(resumo.venda_liquida || 0)} liquido antes do CMV
         </div>
       </div>

@@ -45,6 +45,7 @@ export default function DiasUteisResumoPanel({
             Sabado conta como dia util
           </label>
           <ActionButton
+            className="w-full justify-center sm:w-auto"
             icon={Calendar}
             intent="edit"
             onClick={() => setMostrarConfigFeriados((prev) => !prev)}
@@ -127,6 +128,7 @@ export default function DiasUteisResumoPanel({
                 intent: "create",
                 tone: "solid",
                 size: "sm",
+                className: "w-full justify-center md:w-auto",
               })}
             >
               Salvar feriado

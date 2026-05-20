@@ -63,16 +63,20 @@ export default function VendasFinanceiroHeader({
       : "Selecione um periodo";
 
   return (
-    <div className="mb-6 bg-white p-4 rounded-lg shadow">
-      <div className="mb-4 flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
-        <h1 className="text-2xl font-bold text-gray-800">
+    <div className="mb-6 rounded-lg bg-white p-3 shadow sm:p-4">
+      <div className="mb-4 flex flex-col gap-3 2xl:flex-row 2xl:items-start 2xl:justify-between">
+        <h1 className="text-xl font-bold text-gray-800 sm:text-2xl">
           Consulta de Vendas
         </h1>
 
         {podeVerFinanceiroCompleto ? (
-          <div className="flex flex-wrap items-center gap-3 xl:justify-end">
-            <div className="relative" ref={menuRelatoriosRef}>
+          <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-2 lg:flex lg:flex-wrap lg:items-center lg:justify-end 2xl:w-auto">
+            <div
+              className="relative w-full sm:col-span-2 lg:col-span-1 lg:w-auto"
+              ref={menuRelatoriosRef}
+            >
               <ExportActionButton
+                className="w-full justify-center lg:w-auto"
                 type="report"
                 onClick={() => setMenuRelatoriosAberto((prev) => !prev)}
                 title="Abrir relatorios do periodo"
@@ -81,7 +85,7 @@ export default function VendasFinanceiroHeader({
               </ExportActionButton>
 
               {menuRelatoriosAberto && (
-                <div className="absolute right-0 mt-2 w-72 bg-white rounded-lg shadow-lg border border-gray-200 z-40">
+                <div className="absolute left-0 z-40 mt-2 w-[calc(100vw_-_2rem)] max-w-sm rounded-lg border border-gray-200 bg-white shadow-lg sm:left-auto sm:right-0 sm:w-80">
                   <button
                     onClick={() => {
                       setMenuRelatoriosAberto(false);
@@ -114,6 +118,7 @@ export default function VendasFinanceiroHeader({
             </div>
 
             <ExportActionButton
+              className="w-full justify-center lg:w-auto"
               type="pdf"
               onClick={exportarParaPDF}
               disabled={!dataInicio || !dataFim}
@@ -123,6 +128,7 @@ export default function VendasFinanceiroHeader({
             </ExportActionButton>
 
             <ExportActionButton
+              className="w-full justify-center lg:w-auto"
               type="excel"
               onClick={exportarParaExcel}
               disabled={!dataInicio || !dataFim}
@@ -131,7 +137,7 @@ export default function VendasFinanceiroHeader({
               Excel
             </ExportActionButton>
 
-            <label className="flex items-center gap-2 cursor-pointer">
+            <label className="flex min-h-[44px] w-full cursor-pointer items-center gap-2 rounded-lg border border-slate-200 px-3 py-2 sm:col-span-2 lg:min-h-0 lg:w-auto lg:border-0 lg:px-0 lg:py-0">
               <input
                 type="checkbox"
                 checked={modoComparacao}
@@ -147,7 +153,7 @@ export default function VendasFinanceiroHeader({
               <select
                 value={periodoComparacao}
                 onChange={(event) => setPeriodoComparacao(event.target.value)}
-                className="border rounded px-3 py-2 text-sm bg-blue-50 font-medium"
+                className="h-11 w-full min-w-0 rounded-md border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-medium lg:h-9 lg:w-auto lg:max-w-xs"
               >
                 <option value="periodo_anterior">
                   Periodo imediatamente anterior (mesmo numero de dias)
@@ -171,7 +177,7 @@ export default function VendasFinanceiroHeader({
       )}
 
       {podeVerFinanceiroCompleto && (
-        <div className="flex flex-wrap gap-2 mb-4">
+        <div className="-mx-1 mb-4 flex gap-2 overflow-x-auto px-1 pb-1 sm:flex-wrap sm:overflow-visible">
           {FILTROS_RAPIDOS.map((filtro) => (
             <button
               key={filtro.id}
@@ -183,7 +189,7 @@ export default function VendasFinanceiroHeader({
 
                 aplicarFiltroRapido(filtro.id);
               }}
-              className={`px-3 py-1 rounded text-sm font-medium transition-colors ${
+              className={`shrink-0 rounded px-3 py-2 text-sm font-medium transition-colors sm:py-1 ${
                 filtroSelecionado === filtro.id
                   ? "bg-blue-600 text-white"
                   : "bg-gray-100 text-gray-700 hover:bg-gray-200"
@@ -196,21 +202,27 @@ export default function VendasFinanceiroHeader({
       )}
 
       {podeVerFinanceiroCompleto && filtroSelecionado === "personalizado" && (
-        <div className="flex gap-2 items-center mb-4 p-3 bg-gray-50 rounded">
-          <Calendar className="w-5 h-5 text-gray-500" />
-          <input
-            type="date"
-            value={dataInicio}
-            onChange={(event) => setDataInicio(event.target.value)}
-            className="border rounded px-3 py-2"
-          />
-          <span className="text-gray-600">ate</span>
-          <input
-            type="date"
-            value={dataFim}
-            onChange={(event) => setDataFim(event.target.value)}
-            className="border rounded px-3 py-2"
-          />
+        <div className="mb-4 rounded bg-gray-50 p-3">
+          <div className="mb-2 flex items-center gap-2 text-sm font-medium text-gray-600 sm:mb-0 sm:hidden">
+            <Calendar className="h-5 w-5 text-gray-500" />
+            Periodo personalizado
+          </div>
+          <div className="grid w-full grid-cols-1 gap-2 sm:grid-cols-[auto_minmax(0,180px)_auto_minmax(0,180px)] sm:items-center">
+            <Calendar className="hidden h-5 w-5 text-gray-500 sm:block" />
+            <input
+              type="date"
+              value={dataInicio}
+              onChange={(event) => setDataInicio(event.target.value)}
+              className="w-full rounded border px-3 py-2"
+            />
+            <span className="text-center text-sm text-gray-600 sm:text-left">ate</span>
+            <input
+              type="date"
+              value={dataFim}
+              onChange={(event) => setDataFim(event.target.value)}
+              className="w-full rounded border px-3 py-2"
+            />
+          </div>
         </div>
       )}
 
@@ -220,8 +232,8 @@ export default function VendasFinanceiroHeader({
           onSubmit={(event) => event.preventDefault()}
           padding="sm"
         >
-          <FilterRow className="items-center">
-            <div className="inline-flex items-center gap-2 text-sm font-medium text-slate-700">
+          <FilterRow className="items-stretch lg:items-center">
+            <div className="flex w-full items-center gap-2 text-sm font-medium text-slate-700 lg:w-auto">
               <Filter className="h-5 w-5 text-blue-600" />
               <span>Filtros avancados:</span>
             </div>
@@ -229,7 +241,7 @@ export default function VendasFinanceiroHeader({
             <select
               value={filtroFuncionario}
               onChange={(event) => setFiltroFuncionario(event.target.value)}
-              className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm"
+              className="h-11 w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 text-sm sm:min-w-[220px] sm:flex-1 lg:h-9 lg:w-auto lg:min-w-[180px] lg:flex-none"
             >
               <option value="">Todos os funcionarios</option>
               {vendasPorFuncionario.map((funcionario) => (
@@ -245,7 +257,7 @@ export default function VendasFinanceiroHeader({
             <select
               value={filtroFormaPagamento}
               onChange={(event) => setFiltroFormaPagamento(event.target.value)}
-              className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm"
+              className="h-11 w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 text-sm sm:min-w-[220px] sm:flex-1 lg:h-9 lg:w-auto lg:min-w-[180px] lg:flex-none"
             >
               <option value="">Todas as formas</option>
               {formasRecebimentoConsolidadas.map((forma) => (
@@ -261,7 +273,7 @@ export default function VendasFinanceiroHeader({
             <select
               value={filtroCategoria}
               onChange={(event) => setFiltroCategoria(event.target.value)}
-              className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm"
+              className="h-11 w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 text-sm sm:min-w-[220px] sm:flex-1 lg:h-9 lg:w-auto lg:min-w-[180px] lg:flex-none"
             >
               <option value="">Todas as categorias</option>
               {produtosDetalhados.map((categoria) => (
@@ -278,6 +290,7 @@ export default function VendasFinanceiroHeader({
               intent="neutral"
               tone="soft"
               size="md"
+              className="w-full justify-center sm:w-auto sm:flex-1 lg:w-auto lg:flex-none"
               onClick={() => {
                 setFiltroFuncionario("");
                 setFiltroFormaPagamento("");
@@ -292,7 +305,7 @@ export default function VendasFinanceiroHeader({
               intent="edit"
               size="md"
               icon={BarChart3}
-              className="ml-auto"
+              className="w-full justify-center sm:w-auto sm:flex-1 lg:ml-auto lg:w-auto lg:flex-none"
             >
               {mostrarGraficos ? "Ocultar" : "Mostrar"} graficos
             </ActionButton>

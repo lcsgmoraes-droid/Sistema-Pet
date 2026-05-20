@@ -23,23 +23,23 @@ export default function VendasResumoTabelasPanel({
         />
       </div>
 
-      <div className="grid grid-cols-2 gap-6">
-        <div className="bg-white rounded-lg shadow">
-          <div className="bg-gray-600 text-white px-4 py-2 rounded-t-lg font-semibold">
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2 xl:gap-6">
+        <div className="rounded-lg bg-white shadow">
+          <div className="rounded-t-lg bg-gray-600 px-4 py-2 font-semibold text-white">
             Formas de recebimento
           </div>
           <FormasRecebimentoTable linhas={formasRecebimentoConsolidadas} />
         </div>
 
-        <div className="bg-white rounded-lg shadow">
-          <div className="bg-gray-600 text-white px-4 py-2 rounded-t-lg font-semibold">
+        <div className="rounded-lg bg-white shadow">
+          <div className="rounded-t-lg bg-gray-600 px-4 py-2 font-semibold text-white">
             Funcionario
           </div>
           <VendasPorFuncionarioTable linhas={vendasPorFuncionarioFiltradas} />
         </div>
 
-        <div className="bg-white rounded-lg shadow">
-          <div className="bg-gray-600 text-white px-4 py-2 rounded-t-lg font-semibold">
+        <div className="rounded-lg bg-white shadow">
+          <div className="rounded-t-lg bg-gray-600 px-4 py-2 font-semibold text-white">
             Tipo
           </div>
           <VendasResumoAgregadoTable
@@ -52,8 +52,8 @@ export default function VendasResumoTabelasPanel({
           />
         </div>
 
-        <div className="bg-white rounded-lg shadow">
-          <div className="bg-gray-600 text-white px-4 py-2 rounded-t-lg font-semibold">
+        <div className="rounded-lg bg-white shadow">
+          <div className="rounded-t-lg bg-gray-600 px-4 py-2 font-semibold text-white">
             Grupo de produto
           </div>
           <VendasResumoAgregadoTable
