@@ -153,7 +153,7 @@ export default function MenuCaixa({
 
   if (loading) {
     return (
-      <div className="flex h-10 min-w-[138px] items-center rounded-lg bg-slate-100 px-3 shadow-sm">
+      <div className="flex h-10 w-full min-w-[138px] items-center rounded-lg bg-slate-100 px-3 shadow-sm sm:w-auto">
         <div className="h-5 w-full animate-pulse rounded-lg bg-slate-200"></div>
       </div>
     );
@@ -163,7 +163,7 @@ export default function MenuCaixa({
     return (
       <button
         onClick={handleCaixaAberto}
-        className="inline-flex h-10 min-w-[138px] items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700"
+        className="inline-flex h-10 w-full min-w-[138px] items-center justify-center gap-2 rounded-lg bg-emerald-600 px-3.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-emerald-700 sm:w-auto"
       >
         <DollarSign className="h-4 w-4" />
         <span>Abrir Caixa</span>
@@ -173,10 +173,10 @@ export default function MenuCaixa({
 
   return (
     <>
-      <div className="relative">
+      <div className="relative w-full sm:w-auto">
         <button
           onClick={() => setMenuAberto(!menuAberto)}
-          className="inline-flex h-10 min-w-[150px] items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 text-sm font-semibold text-slate-800 shadow-sm transition-colors hover:border-emerald-300 hover:bg-white"
+          className="inline-flex h-10 w-full min-w-[150px] items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 text-sm font-semibold text-slate-800 shadow-sm transition-colors hover:border-emerald-300 hover:bg-white sm:w-auto"
         >
           <div className="flex items-center gap-2">
             <div className="h-2.5 w-2.5 rounded-full bg-green-500"></div>
@@ -196,7 +196,7 @@ export default function MenuCaixa({
             />
 
             {/* Menu Dropdown */}
-            <div className="absolute right-0 mt-2 w-80 bg-white rounded-lg shadow-xl border border-gray-200 z-50">
+            <div className="absolute right-0 z-50 mt-2 w-[calc(100vw-2rem)] max-w-80 rounded-lg border border-gray-200 bg-white shadow-xl">
               {/* Header do Menu */}
               <div className="p-4 border-b bg-gradient-to-r from-green-50 to-blue-50">
                 <div className="flex items-center justify-between mb-3">

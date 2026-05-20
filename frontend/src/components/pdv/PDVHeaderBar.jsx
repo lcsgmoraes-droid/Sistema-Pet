@@ -53,7 +53,7 @@ export default function PDVHeaderBar({
   });
 
   return (
-    <div className="border-b bg-white px-5 py-3">
+    <div className="border-b bg-white px-4 py-3 md:px-5">
       {(destaqueAbrirCaixa || destaqueVenda) && (
         <div className="mb-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-2 text-sm text-amber-900">
           {destaqueAbrirCaixa
@@ -72,7 +72,7 @@ export default function PDVHeaderBar({
             tourTitle="Ver tour guiado do PDV"
           />
 
-          <div className="flex w-full max-w-lg items-center gap-2">
+          <div className="flex w-full max-w-lg flex-col gap-2 sm:flex-row sm:items-center">
             <div className="relative flex-1">
               <input
                 type="text"
@@ -93,14 +93,14 @@ export default function PDVHeaderBar({
               disabled={!searchVendaQuery.trim() || loading}
               intent="edit"
               size="lg"
-              className="min-w-[86px]"
+              className="w-full sm:w-auto sm:min-w-[86px]"
             >
               Buscar
             </ActionButton>
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-end gap-2 xl:max-w-[54rem] xl:self-end">
+        <div className="flex w-full flex-wrap items-center justify-start gap-2 sm:justify-end xl:max-w-[54rem] xl:self-end">
           {vendaAtual.cliente && (
             <IconActionButton
               onClick={onAbrirPendenciasEstoque}
@@ -139,7 +139,9 @@ export default function PDVHeaderBar({
 
           <div
             className={
-              destaqueAbrirCaixa ? `rounded-lg ${caixaGuiaClasses.action}` : ""
+              destaqueAbrirCaixa
+                ? `w-full rounded-lg sm:w-auto ${caixaGuiaClasses.action}`
+                : "w-full sm:w-auto"
             }
           >
             <MenuCaixa
@@ -156,7 +158,7 @@ export default function PDVHeaderBar({
             intent="neutral"
             tone="soft"
             size="lg"
-            className="min-w-[120px]"
+            className="w-full sm:w-auto sm:min-w-[120px]"
             title="Ver historico de caixas"
           >
             <span>Meus Caixas</span>
@@ -171,7 +173,7 @@ export default function PDVHeaderBar({
                 intent="neutral"
                 tone="soft"
                 size="lg"
-                className="min-w-[138px]"
+                className="w-full sm:w-auto sm:min-w-[138px]"
               >
                 <span>Cancelar Edicao</span>
               </ActionButton>
@@ -182,7 +184,7 @@ export default function PDVHeaderBar({
                 intent="delete"
                 tone="soft"
                 size="lg"
-                className="min-w-[96px]"
+                className="w-full sm:w-auto sm:min-w-[96px]"
               >
                 <span>Excluir</span>
               </ActionButton>
@@ -196,7 +198,7 @@ export default function PDVHeaderBar({
             intent="edit"
             tone="solid"
             size="lg"
-            className="min-w-[96px]"
+            className="w-full sm:w-auto sm:min-w-[96px]"
             title={
               !temCaixaAberto
                 ? "Caixa fechado - Abra o caixa para salvar vendas"
@@ -218,7 +220,7 @@ export default function PDVHeaderBar({
             icon={CreditCard}
             intent="create"
             size="lg"
-            className="min-w-[190px]"
+            className="w-full sm:w-auto sm:min-w-[190px]"
             title={
               !temCaixaAberto
                 ? "Caixa fechado - Abra o caixa para registrar recebimentos"

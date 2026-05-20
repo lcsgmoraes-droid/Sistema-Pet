@@ -67,7 +67,7 @@ function ProdutoSugestaoPDV({
       onClick={() => onSelecionarProdutoSugerido(produto)}
       className="w-full border-b px-4 py-3 text-left last:border-b-0 hover:bg-gray-50"
     >
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-start gap-3">
           {imagemSugestao ? (
             <img
@@ -115,7 +115,7 @@ function ProdutoSugestaoPDV({
             </div>
           </div>
         </div>
-        <div className="flex flex-col items-end gap-1">
+        <div className="flex flex-row items-center justify-between gap-2 sm:flex-col sm:items-end sm:justify-start">
           {promocaoAtiva && precoOriginal > precoPDV && (
             <span className="text-xs text-gray-400 line-through">
               {formatMoneyBRL(precoOriginal)}
@@ -237,7 +237,7 @@ export default function PDVProdutosCard({
                 className="space-y-2.5 rounded-lg border border-gray-200 bg-gray-50 p-3 transition-colors hover:border-blue-400"
               >
                 <div
-                  className="flex items-center justify-between cursor-pointer"
+                  className="flex cursor-pointer flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
                   onClick={() =>
                     !modoVisualizacao && onAbrirModalDescontoItem(item)
                   }
@@ -365,10 +365,10 @@ export default function PDVProdutosCard({
                   </div>
 
                   <div
-                    className="flex items-center space-x-4"
+                    className="flex flex-wrap items-center justify-between gap-2 sm:flex-nowrap sm:justify-end"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div className="flex items-center space-x-2 bg-white border border-gray-300 rounded-lg">
+                    <div className="flex items-center rounded-lg border border-gray-300 bg-white">
                       <button
                         type="button"
                         onClick={() => onAlterarQuantidade(index, -1)}
@@ -446,10 +446,10 @@ export default function PDVProdutosCard({
 
                 {vendaAtual.cliente?.pets && vendaAtual.cliente.pets.length > 0 && (
                   <div
-                    className="flex items-center space-x-2"
+                    className="flex flex-col gap-2 sm:flex-row sm:items-center"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <label className="text-sm font-medium text-gray-600 w-16">
+                    <label className="text-sm font-medium text-gray-600 sm:w-16">
                       Pet:
                     </label>
                     <select
