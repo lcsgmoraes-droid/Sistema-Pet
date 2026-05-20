@@ -6,14 +6,23 @@ import { getProdutos } from "../api/produtos";
 import {
   COLUNAS_DOCUMENTO_TRANSFERENCIA_COMPLETO,
   baixarArquivoBlob,
+  criarFiltrosHistoricoTransferencia,
+  criarFormBaixaTransferencia,
+  criarFormTransferencia,
+  criarHistoricoTransferenciasVazio,
+  criarItemTransferencia,
+  criarItensEdicaoTransferencia,
   extrairListaProdutos,
   extrairObservacaoManualTransferencia,
   fimDoMesBaseIso,
-  fimDoMesIso,
+  distribuirCompensacaoAutomatica,
   hojeIso,
+  incrementarItemTransferencia,
   inicioDoMesIso,
+  montarCompensacoesBaixaPayload,
   montarCupomTransferencia,
   montarParametrosDocumentoTransferencia,
+  montarPayloadTransferencia,
   normalizarColunasDocumentoTransferencia,
   normalizarNumero,
   produtoConfereCodigo,
@@ -31,12 +40,7 @@ export default function EstoqueTransferenciaParceiro() {
   const produtoInputRef = useRef(null);
   const itensRef = useRef(null);
 
-  const [form, setForm] = useState({
-    parceiro_id: "",
-    data_vencimento: fimDoMesIso(),
-    documento: "",
-    observacao: "",
-  });
+  const [form, setForm] = useState(() => criarFormTransferencia());
   const [parceiroSelecionado, setParceiroSelecionado] = useState(null);
   const [buscaParceiro, setBuscaParceiro] = useState("");
   const [sugestoesParceiros, setSugestoesParceiros] = useState([]);
@@ -69,50 +73,20 @@ export default function EstoqueTransferenciaParceiro() {
   const [selecionadosHistorico, setSelecionadosHistorico] = useState([]);
   const [historicoExpandidoIds, setHistoricoExpandidoIds] = useState([]);
   const [baixaAbertaId, setBaixaAbertaId] = useState(null);
-  const [formBaixa, setFormBaixa] = useState({
-    valor_recebido: "",
-    data_recebimento: hojeIso(),
-    modo_baixa: "recebimento",
-    forma_pagamento_id: "",
-    compensacoes: {},
-    observacao: "",
-  });
+  const [formBaixa, setFormBaixa] = useState(() => criarFormBaixaTransferencia());
   const [formasPagamento, setFormasPagamento] = useState([]);
   const [loadingFormasPagamento, setLoadingFormasPagamento] = useState(false);
   const [contasPagarCompensacao, setContasPagarCompensacao] = useState([]);
   const [loadingContasPagarCompensacao, setLoadingContasPagarCompensacao] = useState(false);
   const [paginaHistorico, setPaginaHistorico] = useState(1);
   const [loadingHistorico, setLoadingHistorico] = useState(false);
-  const [filtrosHistoricoForm, setFiltrosHistoricoForm] = useState({
-    busca: "",
-    status_filtro: "",
-    data_inicio: "",
-    data_fim: "",
-    parceiro_id: "",
-  });
-  const [filtrosHistoricoAplicados, setFiltrosHistoricoAplicados] = useState({
-    busca: "",
-    status_filtro: "",
-    data_inicio: "",
-    data_fim: "",
-    parceiro_id: "",
-  });
-  const [historico, setHistorico] = useState({
-    items: [],
-    total: 0,
-    page: 1,
-    page_size: 20,
-    pages: 0,
-    totais: {
-      total_registros: 0,
-      valor_total: 0,
-      valor_recebido: 0,
-      saldo_aberto: 0,
-      pendentes: 0,
-      recebidas: 0,
-      vencidas: 0,
-    },
-  });
+  const [filtrosHistoricoForm, setFiltrosHistoricoForm] = useState(() =>
+    criarFiltrosHistoricoTransferencia(),
+  );
+  const [filtrosHistoricoAplicados, setFiltrosHistoricoAplicados] = useState(() =>
+    criarFiltrosHistoricoTransferencia(),
+  );
+  const [historico, setHistorico] = useState(() => criarHistoricoTransferenciasVazio());
 
   useEffect(() => {
     const termo = buscaParceiro.trim();
@@ -302,24 +276,9 @@ export default function EstoqueTransferenciaParceiro() {
       return;
     }
 
-    let restante = valorBase;
-    const proximaCompensacao = {};
-
-    contasPagarCompensacao.forEach((conta) => {
-      if (restante <= 0) {
-        proximaCompensacao[conta.conta_pagar_id] = "";
-        return;
-      }
-      const saldo = Number(conta.saldo_aberto || 0);
-      const valorAplicado = Math.min(restante, saldo);
-      proximaCompensacao[conta.conta_pagar_id] =
-        valorAplicado > 0 ? valorAplicado.toFixed(2) : "";
-      restante = Number((restante - valorAplicado).toFixed(2));
-    });
-
     setFormBaixa((prev) => ({
       ...prev,
-      compensacoes: proximaCompensacao,
+      compensacoes: distribuirCompensacaoAutomatica(valorBase, contasPagarCompensacao),
     }));
   };
 
@@ -351,22 +310,7 @@ export default function EstoqueTransferenciaParceiro() {
     } catch (error) {
       console.error("Erro ao carregar historico de transferencias:", error);
       toast.error("Nao foi possivel carregar o historico de transferencias.");
-      setHistorico({
-        items: [],
-        total: 0,
-        page: 1,
-        page_size: 20,
-        pages: 0,
-        totais: {
-          total_registros: 0,
-          valor_total: 0,
-          valor_recebido: 0,
-          saldo_aberto: 0,
-          pendentes: 0,
-          recebidas: 0,
-          vencidas: 0,
-        },
-      });
+      setHistorico(criarHistoricoTransferenciasVazio());
     } finally {
       setLoadingHistorico(false);
     }
@@ -419,20 +363,8 @@ export default function EstoqueTransferenciaParceiro() {
   const limparFiltrosHistorico = () => {
     setPaginaHistorico(1);
     setSelecionadosHistorico([]);
-    setFiltrosHistoricoForm({
-      busca: "",
-      status_filtro: "",
-      data_inicio: "",
-      data_fim: "",
-      parceiro_id: "",
-    });
-    setFiltrosHistoricoAplicados({
-      busca: "",
-      status_filtro: "",
-      data_inicio: "",
-      data_fim: "",
-      parceiro_id: "",
-    });
+    setFiltrosHistoricoForm(criarFiltrosHistoricoTransferencia());
+    setFiltrosHistoricoAplicados(criarFiltrosHistoricoTransferencia());
   };
 
   const usarParceiroAtualNoHistorico = () => {
@@ -472,36 +404,16 @@ export default function EstoqueTransferenciaParceiro() {
   };
 
   const adicionarProduto = (produto, options = {}) => {
-    const custoUnitario = Number(produto?.preco_custo || 0);
     setItens((prev) => {
       const indiceExistente = prev.findIndex((item) => item.produto_id === produto.id);
       if (indiceExistente >= 0) {
         return prev.map((item, index) => {
           if (index !== indiceExistente) return item;
-          const novaQuantidade = Number(item.quantidade || 0) + 1;
-          return {
-            ...item,
-            quantidade: novaQuantidade,
-            total_item: novaQuantidade * Number(item.custo_unitario || 0),
-            estoque_atual: Number(produto?.estoque_atual || item.estoque_atual || 0),
-          };
+          return incrementarItemTransferencia(item, produto);
         });
       }
 
-      return [
-        ...prev,
-        {
-          uid: `${produto.id}-${Date.now()}`,
-          produto_id: produto.id,
-          produto_nome: produto.nome,
-          codigo: produto.codigo,
-          codigo_barras: produto.codigo_barras,
-          estoque_atual: Number(produto?.estoque_atual || 0),
-          custo_unitario: custoUnitario,
-          quantidade: 1,
-          total_item: custoUnitario,
-        },
-      ];
+      return [...prev, criarItemTransferencia(produto)];
     });
 
     setBuscaProduto("");
@@ -688,25 +600,14 @@ export default function EstoqueTransferenciaParceiro() {
     setBuscaParceiro("");
     setSugestoesParceiros([]);
     setDropdownParceiroAberto(false);
-    setForm({
+    setForm(criarFormTransferencia({
       parceiro_id: registro.parceiro_id ? String(registro.parceiro_id) : "",
-      data_vencimento: registro.data_vencimento || fimDoMesIso(),
+      data_vencimento:
+        registro.data_vencimento || criarFormTransferencia().data_vencimento,
       documento: registro.documento || "",
       observacao: extrairObservacaoManualTransferencia(registro.observacoes),
-    });
-    setItens(
-      (Array.isArray(registro.itens) ? registro.itens : []).map((item, index) => ({
-        uid: `edit-${registro.conta_receber_id}-${item.produto_id}-${index}-${Date.now()}`,
-        produto_id: item.produto_id,
-        produto_nome: item.produto_nome,
-        codigo: item.codigo,
-        codigo_barras: item.codigo_barras,
-        estoque_atual: Number(item.estoque_atual || 0),
-        custo_unitario: Number(item.custo_unitario || 0),
-        quantidade: Number(item.quantidade || 0),
-        total_item: Number(item.valor_total || 0),
-      })),
-    );
+    }));
+    setItens(criarItensEdicaoTransferencia(registro));
     setBuscaProduto("");
     setSugestoesProdutos([]);
     setDropdownProdutoAberto(false);
@@ -744,18 +645,7 @@ export default function EstoqueTransferenciaParceiro() {
 
     try {
       setSalvando(true);
-      const payload = {
-        parceiro_id: Number(parceiroSelecionado.id),
-        data_vencimento: form.data_vencimento || undefined,
-        documento: form.documento.trim() || undefined,
-        observacao: form.observacao.trim() || undefined,
-        itens: itens.map((item) => ({
-          produto_id: Number(item.produto_id),
-          quantidade: Number(item.quantidade),
-          custo_unitario: Number(item.custo_unitario || 0),
-          valor_total: Number(item.total_item || 0),
-        })),
-      };
+      const payload = montarPayloadTransferencia(parceiroSelecionado.id, form, itens);
 
       const response = transferenciaEditando?.conta_receber_id
         ? await api.put(
@@ -980,28 +870,16 @@ export default function EstoqueTransferenciaParceiro() {
         ? prev
         : [...prev, registro.conta_receber_id],
     );
-    setFormBaixa({
+    setFormBaixa(criarFormBaixaTransferencia({
       valor_recebido: Number(registro.saldo_aberto || 0).toFixed(2),
-      data_recebimento: hojeIso(),
-      modo_baixa: "recebimento",
-      forma_pagamento_id: "",
-      compensacoes: {},
-      observacao: "",
-    });
+    }));
     await carregarContasPagarCompensacao(registro.conta_receber_id);
   };
 
   const fecharBaixaTransferencia = () => {
     setBaixaAbertaId(null);
     setContasPagarCompensacao([]);
-    setFormBaixa({
-      valor_recebido: "",
-      data_recebimento: hojeIso(),
-      modo_baixa: "recebimento",
-      forma_pagamento_id: "",
-      compensacoes: {},
-      observacao: "",
-    });
+    setFormBaixa(criarFormBaixaTransferencia());
   };
 
   const registrarBaixaTransferencia = async (registro) => {
@@ -1011,17 +889,7 @@ export default function EstoqueTransferenciaParceiro() {
       return;
     }
 
-    const compensacoesPayload = Object.entries(formBaixa.compensacoes || {})
-      .map(([contaPagarId, valor]) => ({
-        conta_pagar_id: Number(contaPagarId),
-        valor_compensado: normalizarNumero(valor),
-      }))
-      .filter(
-        (item) =>
-          Number.isFinite(item.valor_compensado) &&
-          item.valor_compensado > 0 &&
-          item.conta_pagar_id > 0,
-      );
+    const compensacoesPayload = montarCompensacoesBaixaPayload(formBaixa.compensacoes);
 
     const totalCompensado = compensacoesPayload.reduce(
       (acumulado, item) => acumulado + Number(item.valor_compensado || 0),
