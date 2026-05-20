@@ -13,26 +13,20 @@ import EcommerceStorePage from './EcommerceStorePage';
 import EcommerceStorefrontChrome from './EcommerceStorefrontChrome';
 import useEcommerceCart from './useEcommerceCart';
 import useEcommerceCatalog from './useEcommerceCatalog';
+import useEcommerceCheckout from './useEcommerceCheckout';
 import useEcommerceEngagement from './useEcommerceEngagement';
 import useEcommerceOrders from './useEcommerceOrders';
 import useEcommerceProductModal from './useEcommerceProductModal';
 import {
   trackPageView,
-  trackBeginCheckout,
-  trackPurchase,
   trackViewCart,
 } from '../../services/analytics';
 import {
-  STORAGE_ADDRESS_KEY,
   STORAGE_TOKEN_KEY,
   buildActiveBanners,
-  buildCustomerAddressFields,
   buildCustomerProfileForm,
-  buildAddressText,
-  buildIdempotencyKey,
   extractApiErrorMessage,
   fetchAddressByCep,
-  getStoredAddressFields,
   isCustomerProfileComplete,
   isProductOutOfStock,
   normalizeProductPayload,
@@ -106,7 +100,6 @@ export default function EcommerceMVP() {
   const [showRecoveryConfirmPassword, setShowRecoveryConfirmPassword] = useState(false);
 
   const [authLoading, setAuthLoading] = useState(false);
-  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [recoveryLoading, setRecoveryLoading] = useState(false);
 
   const [customerToken, setCustomerToken] = useState(localStorage.getItem(STORAGE_TOKEN_KEY) || '');
@@ -154,20 +147,6 @@ export default function EcommerceMVP() {
     novaSenha: '',
     confirmarSenha: '',
   });
-
-  const [cupom, setCupom] = useState('');
-  const [cupomResult, setCupomResult] = useState(null);
-
-  const [cidadeDestino, setCidadeDestino] = useState('');
-  const [deliveryMode, setDeliveryMode] = useState('entrega');
-  const [tipoRetirada, setTipoRetirada] = useState('proprio'); // 'proprio' | 'terceiro'
-  const [isDrive, setIsDrive] = useState(false); // cliente quer drive pickup
-  const [addressFields, setAddressFields] = useState(() => getStoredAddressFields());
-  const [checkoutResumo, setCheckoutResumo] = useState(null);
-  const [checkoutResult, setCheckoutResult] = useState(null);
-  const [pagamentoTipo, setPagamentoTipo] = useState(''); // 'pix'|'debito'|'credito'
-  const [pagamentoBandeira, setPagamentoBandeira] = useState('Visa');
-  const [pagamentoParcelas, setPagamentoParcelas] = useState(1);
 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -255,6 +234,49 @@ export default function EcommerceMVP() {
     onError: setError,
   });
 
+  const {
+    addressFields,
+    checkoutLoading,
+    checkoutResumo,
+    checkoutResult,
+    cidadeDestino,
+    cupom,
+    cupomResult,
+    deliveryMode,
+    isDrive,
+    pagamentoBandeira,
+    pagamentoParcelas,
+    pagamentoTipo,
+    tipoRetirada,
+    applyCupom,
+    calcularResumoCheckout,
+    finalizarCheckout,
+    handleCheckoutCepBlur,
+    handleCheckoutFromLoja,
+    resetCheckoutStatus,
+    setAddressFields,
+    setCidadeDestino,
+    setCupom,
+    setDeliveryMode,
+    setIsDrive,
+    setPagamentoBandeira,
+    setPagamentoParcelas,
+    setPagamentoTipo,
+    setTipoRetirada,
+  } = useEcommerceCheckout({
+    authHeaders,
+    cart,
+    clearCart,
+    customer,
+    customerToken,
+    isProfileComplete,
+    recordOrderId,
+    setView,
+    tenantContext,
+    onError: setError,
+    onSuccess: setSuccess,
+  });
+
   // Ler ?busca= da URL (ex: link do email de avise-me) e pré-filtrar
   useEffect(() => {
     const params = new URLSearchParams(location.search);
@@ -313,12 +335,6 @@ export default function EcommerceMVP() {
   }, [customerToken]);
 
   useEffect(() => {
-    if (tenantContext?.cidade && !cidadeDestino) {
-      setCidadeDestino(tenantContext.cidade);
-    }
-  }, [tenantContext?.cidade, cidadeDestino]);
-
-  useEffect(() => {
     const total = activeBanners.length;
     const timer = setInterval(() => setBannerSlide((prev) => (prev + 1) % total), 4000);
     return () => clearInterval(timer);
@@ -327,11 +343,6 @@ export default function EcommerceMVP() {
   useEffect(() => {
     if (!customer) return;
     setProfileForm(buildCustomerProfileForm(customer));
-  }, [customer]);
-
-  useEffect(() => {
-    if (!customer) return;
-    setAddressFields(buildCustomerAddressFields(customer));
   }, [customer]);
 
   async function loadTenantContext() {
@@ -470,19 +481,6 @@ export default function EcommerceMVP() {
       entrega_bairro: data.bairro || prev.entrega_bairro,
       entrega_cidade: data.cidade || prev.entrega_cidade,
       entrega_estado: data.estado || prev.entrega_estado,
-    }));
-  }
-
-  async function handleCheckoutCepBlur() {
-    const data = await fetchAddressByCep(addressFields.cep);
-    if (!data) return;
-    setAddressFields((prev) => ({
-      ...prev,
-      cep: data.cep || prev.cep,
-      endereco: data.endereco || prev.endereco,
-      bairro: data.bairro || prev.bairro,
-      cidade: data.cidade || prev.cidade,
-      estado: data.estado || prev.estado,
     }));
   }
 
@@ -739,173 +737,9 @@ export default function EcommerceMVP() {
     setCustomer(null);
     setCustomerToken('');
     clearCart();
-    setCheckoutResumo(null);
-    setCheckoutResult(null);
+    resetCheckoutStatus();
     localStorage.removeItem(STORAGE_TOKEN_KEY);
     setSuccess('Sessão encerrada.');
-  }
-
-  async function applyCupom(e) {
-    e.preventDefault();
-    if (!customerToken) {
-      setError('Faça login para aplicar cupom.');
-      setView('conta');
-      return;
-    }
-    if (!cupom.trim()) return;
-    setError('');
-    try {
-      const response = await ecommerceApi.post(
-        '/api/carrinho/aplicar-cupom',
-        { codigo: cupom.trim() },
-        { headers: authHeaders }
-      );
-      setCupomResult(response.data);
-      setSuccess('Cupom validado.');
-    } catch (err) {
-      setCupomResult(null);
-      setError(extractApiErrorMessage(err, 'Cupom inválido'));
-    }
-  }
-
-  async function calcularResumoCheckout(e) {
-    e.preventDefault();
-    if (!customerToken) {
-      setError('Faça login para continuar no checkout.');
-      setView('conta');
-      return;
-    }
-    if (!cart?.itens?.length) {
-      setError('Adicione itens no carrinho antes de calcular o checkout.');
-      return;
-    }
-
-    const cidadeFinal = (tenantContext?.cidade || cidadeDestino || addressFields.cidade || '').trim();
-    if (!cidadeFinal || cidadeFinal.length < 2) {
-      setError('Cidade da loja não configurada para checkout.');
-      return;
-    }
-
-    setError('');
-    setCheckoutResumo(null);
-    try {
-      const response = await ecommerceApi.get('/api/checkout/resumo', {
-        headers: authHeaders,
-        params: {
-          cidade_destino: cidadeFinal,
-          cupom: cupomResult?.codigo || undefined,
-        },
-      });
-      setCheckoutResumo(response.data);
-      setSuccess('Resumo de checkout calculado.');
-    } catch (err) {
-      setError(extractApiErrorMessage(err, 'Erro ao calcular resumo do checkout'));
-    }
-  }
-
-
-
-  async function finalizarCheckout() {
-    if (!customerToken) {
-      setError('Faça login para finalizar o pedido.');
-      setView('conta');
-      return;
-    }
-    if (!isProfileComplete) {
-      setError('Complete seu cadastro antes de finalizar o pedido.');
-      setView('conta');
-      return;
-    }
-    const cidadeFinal = (tenantContext?.cidade || cidadeDestino || addressFields.cidade || '').trim();
-    if (!cidadeFinal || cidadeFinal.length < 2) {
-      setError('Cidade da loja não configurada para checkout.');
-      return;
-    }
-
-    const enderecoFormatado =
-      deliveryMode === 'retirada'
-        ? 'RETIRADA NA LOJA'
-        : buildAddressText(addressFields);
-
-    if (deliveryMode === 'entrega' && !enderecoFormatado) {
-      setError('Informe o endereço de entrega.');
-      return;
-    }
-    if (!pagamentoTipo) {
-      setError('Escolha PIX, debito ou credito para continuar para o pagamento.');
-      return;
-    }
-
-    setCheckoutLoading(true);
-    setError('');
-    setSuccess('');
-    setCheckoutResult(null);
-
-    try {
-      const response = await ecommerceApi.post(
-        '/api/checkout/finalizar',
-        {
-          cidade_destino: cidadeFinal,
-          endereco_entrega: enderecoFormatado || null,
-          cupom: cupomResult?.codigo || null,
-          tipo_retirada: deliveryMode === 'retirada' ? tipoRetirada : null,
-          is_drive: deliveryMode === 'retirada' && tipoRetirada === 'proprio' ? isDrive : false,
-          forma_pagamento_nome: (() => {
-            if (pagamentoTipo === 'pix') return 'PIX';
-            if (pagamentoTipo === 'debito') return `Débito ${pagamentoBandeira}`;
-            if (pagamentoTipo === 'credito') return `Crédito ${pagamentoBandeira} ${pagamentoParcelas}x`;
-            return null;
-          })(),
-        },
-        {
-          headers: {
-            ...authHeaders,
-            'Idempotency-Key': buildIdempotencyKey(),
-          },
-        }
-      );
-
-      const result = response.data;
-      setCheckoutResult(result);
-      trackPurchase(result, cart);
-      clearCart();
-      setCheckoutResumo(null);
-      setCupomResult(null);
-      setCupom('');
-      if (deliveryMode === 'entrega') {
-        localStorage.setItem(STORAGE_ADDRESS_KEY, JSON.stringify(addressFields));
-      }
-
-      if (result?.pedido_id) {
-        await recordOrderId(result.pedido_id);
-      }
-
-      setSuccess('Pagamento enviado para analise. O pedido sera liberado apos aprovacao.');
-      setView('pedidos');
-    } catch (err) {
-      setError(extractApiErrorMessage(err, 'Erro ao finalizar checkout'));
-    } finally {
-      setCheckoutLoading(false);
-    }
-  }
-
-  function handleCheckoutFromLoja() {
-    if (!cart?.itens?.length) {
-      setError('Adicione itens no carrinho antes de finalizar.');
-      return;
-    }
-    if (!customerToken) {
-      setError('Faça login para finalizar o pedido.');
-      setView('conta');
-      return;
-    }
-    if (!isProfileComplete) {
-      setError('Complete seu cadastro (nome completo, telefone, CPF e endereço) antes de finalizar.');
-      setView('conta');
-      return;
-    }
-    setView('checkout');
-    trackBeginCheckout(cart);
   }
 
   /* ─────────────── ESTILOS INTERNOS ─────────────── */
