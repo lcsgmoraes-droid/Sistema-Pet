@@ -12,6 +12,7 @@ import EcommerceProductDetailModal from './EcommerceProductDetailModal';
 import EcommerceStorePage from './EcommerceStorePage';
 import EcommerceStorefrontChrome from './EcommerceStorefrontChrome';
 import useEcommerceCatalog from './useEcommerceCatalog';
+import useEcommerceEngagement from './useEcommerceEngagement';
 import useEcommerceProductModal from './useEcommerceProductModal';
 import {
   trackPageView,
@@ -24,10 +25,8 @@ import {
   EMPTY_CART,
   STORAGE_ADDRESS_KEY,
   STORAGE_GUEST_CART_KEY,
-  STORAGE_NOTIFY_KEY,
   STORAGE_ORDERS_KEY,
   STORAGE_TOKEN_KEY,
-  STORAGE_WISHLIST_KEY,
   buildActiveBanners,
   buildCustomerAddressFields,
   buildCustomerProfileForm,
@@ -188,21 +187,6 @@ export default function EcommerceMVP() {
   });
   const [ordersDetailed, setOrdersDetailed] = useState([]);
   const [ordersLoading, setOrdersLoading] = useState(false);
-  const [wishlist, setWishlist] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem(STORAGE_WISHLIST_KEY) || '[]');
-    } catch {
-      return [];
-    }
-  });
-  const [notifyRequests, setNotifyRequests] = useState(() => {
-    try {
-      return JSON.parse(localStorage.getItem(STORAGE_NOTIFY_KEY) || '[]');
-    } catch {
-      return [];
-    }
-  });
-  const [notifyMeModal, setNotifyMeModal] = useState({ open: false, product: null, email: '', loading: false });
 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -239,6 +223,25 @@ export default function EcommerceMVP() {
   const storeDisplayName = useMemo(() => {
     return resolveStoreDisplayName({ tenantContext, storefrontRef });
   }, [tenantContext, storefrontRef]);
+
+  const {
+    wishlist,
+    notifyRequests,
+    notifyMeModal,
+    setNotifyMeModal,
+    toggleWishlist,
+    registerNotifyMe,
+    submitNotifyMe,
+  } = useEcommerceEngagement({
+    customer,
+    loginEmail: loginForm.email,
+    registerEmail: registerForm.email,
+    storefrontRef,
+    tenantContext,
+    tenantRef,
+    onError: setError,
+    onSuccess: setSuccess,
+  });
 
   // Ler ?busca= da URL (ex: link do email de avise-me) e pré-filtrar
   useEffect(() => {
@@ -308,14 +311,6 @@ export default function EcommerceMVP() {
       localStorage.setItem(STORAGE_GUEST_CART_KEY, JSON.stringify(cart || EMPTY_CART));
     }
   }, [cart, customerToken]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_WISHLIST_KEY, JSON.stringify(wishlist));
-  }, [wishlist]);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_NOTIFY_KEY, JSON.stringify(notifyRequests));
-  }, [notifyRequests]);
 
   useEffect(() => {
     const total = activeBanners.length;
@@ -776,50 +771,6 @@ export default function EcommerceMVP() {
     setCheckoutResult(null);
     localStorage.removeItem(STORAGE_TOKEN_KEY);
     setSuccess('Sessão encerrada.');
-  }
-
-  function toggleWishlist(productId) {
-    setWishlist((prev) => {
-      if (prev.includes(productId)) {
-        setSuccess('Produto removido da sua lista de desejos.');
-        return prev.filter((id) => id !== productId);
-      }
-      setSuccess('Produto adicionado à sua lista de desejos.');
-      return [...prev, productId];
-    });
-  }
-
-  function registerNotifyMe(product) {
-    const fallbackEmail = customer?.email || registerForm.email || loginForm.email || '';
-    setNotifyMeModal({ open: true, product, email: fallbackEmail, loading: false });
-  }
-
-  async function submitNotifyMe(e) {
-    e.preventDefault();
-    const { product, email } = notifyMeModal;
-    if (!email.trim() || !product) return;
-    setNotifyMeModal((prev) => ({ ...prev, loading: true }));
-    const tenantParam = tenantContext?.id || storefrontRef || tenantRef;
-    try {
-      await ecommerceApi.post('/api/ecommerce-notify/registrar', {
-        email: email.trim(),
-        product_id: product.id,
-        product_name: product.nome,
-        tenant_id: tenantParam,
-      });
-      setNotifyMeModal({ open: false, product: null, email: '', loading: false });
-      setSuccess('Perfeito! Te avisaremos por e-mail quando o produto voltar ao estoque. 📧');
-      setNotifyRequests((prev) => {
-        const exists = prev.some(
-          (item) => item.productId === product.id && String(item.email || '').toLowerCase() === email.trim().toLowerCase()
-        );
-        if (exists) return prev;
-        return [...prev, { productId: product.id, productName: product.nome, email: email.trim(), createdAt: new Date().toISOString() }];
-      });
-    } catch {
-      setNotifyMeModal((prev) => ({ ...prev, loading: false }));
-      setError('Não foi possível registrar o aviso. Tente novamente.');
-    }
   }
 
   async function addToCart(product) {
