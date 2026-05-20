@@ -190,7 +190,7 @@ const GerenciamentoPets = () => {
   }
 
   return (
-    <div className="space-y-6 p-6">
+    <div className="space-y-6 p-4 md:p-6">
       <PageHeader
         icon={PawPrint}
         title="Gerenciamento de Pets"
@@ -215,7 +215,7 @@ const GerenciamentoPets = () => {
       <FilterBar onSubmit={handleBusca}>
           {/* Busca principal */}
           <FilterRow className="items-stretch">
-            <div className="flex-1 relative">
+            <div className="relative w-full md:min-w-64 md:flex-1">
               <PessoaSelector
                 minChars={0}
                 onChange={(value) => {
@@ -233,7 +233,7 @@ const GerenciamentoPets = () => {
               />
             </div>
 
-            <div className="flex-1 relative">
+            <div className="relative w-full md:min-w-64 md:flex-1">
               <Search size={18} className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
               <input
                 type="text"
@@ -247,6 +247,7 @@ const GerenciamentoPets = () => {
             <ActionButton
               type="submit"
               intent="neutral"
+              className="w-full md:w-auto"
               size="md"
             >
               Buscar
@@ -257,6 +258,7 @@ const GerenciamentoPets = () => {
               intent="neutral"
               tone="soft"
               icon={Filter}
+              className="w-full md:w-auto"
               size="md"
             >
               Filtros
@@ -265,7 +267,7 @@ const GerenciamentoPets = () => {
 
           {/* Filtros avançados */}
           {mostrarFiltros && (
-            <FilterAdvanced className="grid grid-cols-3 gap-4">
+            <FilterAdvanced className="grid grid-cols-1 gap-4 md:grid-cols-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
                   Cliente (Tutor)
@@ -328,13 +330,14 @@ const GerenciamentoPets = () => {
                 </select>
               </div>
 
-              <div className="col-span-3 flex justify-end">
+              <div className="flex justify-end md:col-span-3">
                 <ActionButton
                   type="button"
                   onClick={limparFiltros}
                   intent="neutral"
                   tone="ghost"
                   icon={X}
+                  className="w-full md:w-auto"
                   size="sm"
                 >
                   Limpar filtros
@@ -447,8 +450,9 @@ const GerenciamentoPets = () => {
                       <CustomerIdentity
                         codeLabel="Cod. tutor"
                         fallback={`Tutor #${pet.cliente_id || "-"}`}
-                        layout="inline"
+                        className="w-full max-w-full"
                         nameClassName="font-medium text-blue-600"
+                        nameWrapperClassName="max-w-full"
                         record={pet}
                       />
                     )}
