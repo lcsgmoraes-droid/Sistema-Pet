@@ -11,6 +11,7 @@ import EcommerceOrdersPage from './EcommerceOrdersPage';
 import EcommerceProductDetailModal from './EcommerceProductDetailModal';
 import EcommerceStorePage from './EcommerceStorePage';
 import EcommerceStorefrontChrome from './EcommerceStorefrontChrome';
+import useEcommerceCatalog from './useEcommerceCatalog';
 import {
   trackPageView,
   trackViewItem,
@@ -28,16 +29,12 @@ import {
   STORAGE_TOKEN_KEY,
   STORAGE_WISHLIST_KEY,
   buildActiveBanners,
-  buildCatalogCategories,
   buildCustomerAddressFields,
   buildCustomerProfileForm,
   buildAddressText,
   buildIdempotencyKey,
-  buildProductMap,
-  calculateCatalogMetrics,
   extractApiErrorMessage,
   fetchAddressByCep,
-  filterCatalogProducts,
   getGuestCart,
   getProductImages,
   getStoredAddressFields,
@@ -86,12 +83,25 @@ export default function EcommerceMVP() {
   const [bannerSlide, setBannerSlide] = useState(0);
   const [hoveredCard, setHoveredCard] = useState(null);
   const [loading, setLoading] = useState(false);
-  const [products, setProducts] = useState([]);
-  const [search, setSearch] = useState('');
-  const [categoria, setCategoria] = useState('todas');
-  const [somenteComEstoque, setSomenteComEstoque] = useState(false);
-  const [somenteComImagem, setSomenteComImagem] = useState(false);
-  const [ordenacaoCatalogo, setOrdenacaoCatalogo] = useState('prontos');
+  const {
+    products,
+    setProducts,
+    search,
+    setSearch,
+    categoria,
+    setCategoria,
+    somenteComEstoque,
+    setSomenteComEstoque,
+    somenteComImagem,
+    setSomenteComImagem,
+    ordenacaoCatalogo,
+    setOrdenacaoCatalogo,
+    categorias,
+    catalogMetrics,
+    filteredProducts,
+    productMap,
+    clearCatalogFilters,
+  } = useEcommerceCatalog();
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [showRegisterPassword, setShowRegisterPassword] = useState(false);
   const [showLoginPassword, setShowLoginPassword] = useState(false);
@@ -219,25 +229,6 @@ export default function EcommerceMVP() {
     return { Authorization: `Bearer ${customerToken}` };
   }, [customerToken]);
 
-  const categorias = useMemo(() => {
-    return buildCatalogCategories(products);
-  }, [products]);
-
-  const catalogMetrics = useMemo(() => {
-    return calculateCatalogMetrics(products);
-  }, [products]);
-
-  const filteredProducts = useMemo(() => {
-    return filterCatalogProducts(products, {
-      search,
-      categoria,
-      somenteComEstoque,
-      somenteComImagem,
-      ordenacaoCatalogo,
-    });
-  }, [products, search, categoria, somenteComEstoque, somenteComImagem, ordenacaoCatalogo]);
-
-  const productMap = useMemo(() => buildProductMap(products), [products]);
   const storefrontRef = tenantContext?.ecommerce_slug || tenantRef || '';
   const customerDisplayName = customer?.nome || customer?.email || '';
 
@@ -387,14 +378,6 @@ export default function EcommerceMVP() {
     } finally {
       setLoading(false);
     }
-  }
-
-  function clearCatalogFilters() {
-    setSearch('');
-    setCategoria('todas');
-    setSomenteComEstoque(false);
-    setSomenteComImagem(false);
-    setOrdenacaoCatalogo('prontos');
   }
 
   async function loadMe() {
