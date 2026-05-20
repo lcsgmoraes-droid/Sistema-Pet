@@ -280,10 +280,21 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
       <Panel
         actions={
           <>
-            <ActionButton icon={RefreshCw} intent="neutral" onClick={carregarAgenda} tone="soft">
+            <ActionButton
+              className="w-full justify-center sm:w-auto"
+              icon={RefreshCw}
+              intent="neutral"
+              onClick={carregarAgenda}
+              tone="soft"
+            >
               Atualizar
             </ActionButton>
-            <ActionButton icon={Plus} intent="create" onClick={abrirNovoAgendamento}>
+            <ActionButton
+              className="w-full justify-center sm:w-auto"
+              icon={Plus}
+              intent="create"
+              onClick={abrirNovoAgendamento}
+            >
               Agendar
             </ActionButton>
           </>
@@ -291,12 +302,12 @@ export default function BanhoTosaAgendaView({ recursos = [], servicos, onChanged
         subtitle="Acompanhe o dia antes de abrir um novo cadastro."
         title="Agenda de Banho & Tosa"
       >
-        <div className="mb-3 max-w-xs">
+        <div className="mb-3 max-w-xs sm:max-w-sm">
           <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
             Data da agenda
           </label>
           <input
-            className="h-9 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
+            className="h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-sm text-slate-900 outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100 sm:h-9"
             onChange={(event) => setDataRef(event.target.value)}
             type="date"
             value={dataRef}

@@ -36,7 +36,7 @@ export default function VetDashboard() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="space-y-5 p-3 sm:p-4 lg:p-6">
       <DashboardHeader
         exportando={exportando}
         onExportar={exportarCsvRelatorio}
@@ -64,7 +64,7 @@ export default function VetDashboard() {
         onCopiarLink={copiarLinkCalendario}
       />
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <FinanceiroProcedimentosCard dados={dados} />
         <TopListCard
           title="Top diagnósticos (30d)"

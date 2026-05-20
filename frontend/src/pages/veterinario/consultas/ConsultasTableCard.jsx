@@ -62,40 +62,42 @@ export default function ConsultasTableCard({
           <p className="text-gray-400 text-sm">Nenhuma consulta encontrada.</p>
         </div>
       ) : (
-        <table className="w-full text-sm">
-          <thead className="bg-gray-50 border-b border-gray-100">
-            <tr>
-              <th className="w-12 px-4 py-3">
-                <input
-                  type="checkbox"
-                  checked={todasSelecionadas}
-                  onChange={onSelecionarTodas}
-                  aria-label="Selecionar todas as consultas"
-                  className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+        <div className="erp-data-table-wrap overflow-x-auto">
+          <table className="w-full min-w-[920px] text-sm">
+            <thead className="border-b border-gray-100 bg-gray-50">
+              <tr>
+                <th className="w-12 px-4 py-3">
+                  <input
+                    type="checkbox"
+                    checked={todasSelecionadas}
+                    onChange={onSelecionarTodas}
+                    aria-label="Selecionar todas as consultas"
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                  />
+                </th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Codigo</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Data</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Pet</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Veterinario</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Motivo</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Diagnostico</th>
+                <th className="px-4 py-3 text-left font-medium text-gray-600">Status</th>
+                <th className="px-4 py-3" />
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-gray-50">
+              {consultas.map((consulta) => (
+                <ConsultaTableRow
+                  key={consulta.id}
+                  consulta={consulta}
+                  selecionada={consultasSelecionadas.includes(Number(consulta.id))}
+                  onAbrirConsulta={onAbrirConsulta}
+                  onSelecionarConsulta={onSelecionarConsulta}
                 />
-              </th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Codigo</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Data</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Pet</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Veterinario</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Motivo</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Diagnostico</th>
-              <th className="text-left px-4 py-3 font-medium text-gray-600">Status</th>
-              <th className="px-4 py-3" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-gray-50">
-            {consultas.map((consulta) => (
-              <ConsultaTableRow
-                key={consulta.id}
-                consulta={consulta}
-                selecionada={consultasSelecionadas.includes(Number(consulta.id))}
-                onAbrirConsulta={onAbrirConsulta}
-                onSelecionarConsulta={onSelecionarConsulta}
-              />
-            ))}
-          </tbody>
-        </table>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </div>
   );
