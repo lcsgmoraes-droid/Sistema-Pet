@@ -77,6 +77,12 @@ function parseNumeroInput(valor) {
   return Number.isFinite(numero) ? numero : 0;
 }
 
+function dataAtualIsoLocal() {
+  const agora = new Date();
+  const local = new Date(agora.getTime() - agora.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
+
 function extrairMensagemErroApi(error, fallback) {
   const detalhe = error?.response?.data?.detail ?? error?.response?.data?.message;
   if (typeof detalhe === 'string') return detalhe;
@@ -131,7 +137,11 @@ export default function MovimentacoesProduto() {
     observacao: '',
     lote: '',
     data_validade: '',
-    data_fabricacao: ''
+    data_fabricacao: '',
+    motivo_saida: 'saida_manual',
+    gerar_despesa_uso_interno: false,
+    descricao_despesa: '',
+    data_competencia: dataAtualIsoLocal(),
   });
   const produtoEhGranel = Boolean(produto?.e_granel) || (produto?.nome || '').toLowerCase().includes('granel');
   const pesoPacoteOrigem = parseNumeroInput(produto?.peso_embalagem);
@@ -441,7 +451,11 @@ export default function MovimentacoesProduto() {
         observacao: movimentacao.observacao || '',
         lote: movimentacao.lote_id || '',
         data_validade: '',
-        data_fabricacao: ''
+        data_fabricacao: '',
+        motivo_saida: movimentacao.motivo || 'saida_manual',
+        gerar_despesa_uso_interno: false,
+        descricao_despesa: '',
+        data_competencia: dataAtualIsoLocal(),
       });
     } else {
       // Modo novo
@@ -452,7 +466,11 @@ export default function MovimentacoesProduto() {
         lote: '',
         data_validade: '',
         data_fabricacao: '',
-        retornar_componentes: false  // Padrão: não retornar componentes
+        retornar_componentes: false,  // Padrão: não retornar componentes
+        motivo_saida: 'saida_manual',
+        gerar_despesa_uso_interno: tipo === 'saida',
+        descricao_despesa: produto?.nome ? `Material de uso interno - ${produto.nome}` : 'Material de uso interno',
+        data_competencia: dataAtualIsoLocal(),
       });
     }
     setShowModal(true);
@@ -560,9 +578,14 @@ export default function MovimentacoesProduto() {
       } else if (tipoLancamento === 'saida') {
         endpoint += 'saida';
         payload.tipo = 'saida';
-        payload.motivo = 'saida_manual';
+        payload.motivo = formData.motivo_saida || 'saida_manual';
         payload.numero_lote = formData.lote || null;
         payload.data_validade = formData.data_validade || null;
+        if (payload.motivo === 'uso_interno') {
+          payload.gerar_despesa_uso_interno = formData.gerar_despesa_uso_interno === true;
+          payload.descricao_despesa = formData.descricao_despesa || `Material de uso interno - ${produto?.nome || 'Produto'}`;
+          payload.data_competencia = formData.data_competencia || dataAtualIsoLocal();
+        }
         // Adicionar campo retornar_componentes para KIT FÍSICO
         if (produto?.tipo_produto === 'KIT' && produto?.tipo_kit === 'FISICO') {
           payload.retornar_componentes = formData.retornar_componentes === true;
@@ -660,6 +683,11 @@ export default function MovimentacoesProduto() {
       saida_manual: 'Saída Manual',
       devolucao: 'Devolução',
       perda: 'Perda',
+      avaria: 'Avaria',
+      roubo: 'Roubo/Furto',
+      amostra: 'Amostra',
+      uso_interno: 'Uso interno',
+      devolucao_fornecedor: 'Devolucao ao fornecedor',
       transferencia: 'Transferência',
       balanco: 'Balanço'
     };
@@ -695,7 +723,7 @@ export default function MovimentacoesProduto() {
     }
     // Se for SAÍDA Manual - vermelho
     if (mov.tipo === 'saida') {
-      return { texto: 'Saída Manual', icone: 'manual', cor: 'text-red-600', link: null };
+      return { texto: getMotivoLabel(mov.motivo), icone: 'manual', cor: 'text-red-600', link: null };
     }
     // Se for entrada por XML (chave NFe com 44 dígitos)
     if (mov.tipo === 'entrada' && mov.documento && mov.documento.length === 44) {
