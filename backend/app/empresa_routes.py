@@ -11,6 +11,7 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.models import Tenant
 from app.db import get_session
 from app.empresa_config_fiscal_models import EmpresaConfigFiscal
+from app.estoque_validade_service import EstoqueValidadeService
 from app.security.permissions_decorator import require_any_permission, require_permission
 from app.utils.logger import logger
 
@@ -383,6 +384,29 @@ def atualizar_config_estoque(
     
     db.commit()
     db.refresh(tenant)
+
+    if tenant.protecao_validade_ativa:
+        try:
+            resultado_validade = EstoqueValidadeService.processar_lotes_em_risco(
+                db=db,
+                tenant=tenant,
+                user_id=getattr(_current_user, "id", None),
+                origem="configuracao",
+            )
+            db.commit()
+            db.refresh(tenant)
+            processados = int(resultado_validade.get("processados") or 0)
+            if processados:
+                logger.info(
+                    f"Validade processada apos ativar configuracao - Tenant: {tenant.name}, "
+                    f"Lotes: {processados}"
+                )
+        except Exception as exc:
+            db.rollback()
+            logger.warning(
+                f"Nao foi possivel processar lotes por validade apos salvar configuracao "
+                f"- Tenant: {tenant.name}, erro: {exc}"
+            )
     
     logger.info(
         f"âœ… ConfiguraÃ§Ã£o de estoque atualizada - Tenant: {tenant.name}, "

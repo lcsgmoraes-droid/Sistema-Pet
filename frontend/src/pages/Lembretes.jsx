@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { FiBell, FiCheckCircle, FiRefreshCw, FiPackage, FiTrash2 } from "react-icons/fi";
+import { FiAlertTriangle, FiBell, FiCheckCircle, FiRefreshCw, FiPackage, FiTrash2 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import api from "../api";
 import CustomerIdentity from "../components/ui/CustomerIdentity";
@@ -17,6 +17,12 @@ export default function Lembretes() {
   const [dresPendentes, setDresPendentes] = useState(0);
   const [autocadastrosBling, setAutocadastrosBling] = useState({ total: 0, items: [] });
   const [validadePendencias, setValidadePendencias] = useState([]);
+  const [validadeConfig, setValidadeConfig] = useState({
+    carregado: false,
+    ativa: null,
+    dias: 15,
+  });
+  const [processandoValidade, setProcessandoValidade] = useState(false);
   const navigate = useNavigate();
   const campanhasAtivo = moduloAtivo("campanhas");
   const financeiroErpAtivo = moduloAtivo("financeiro_erp");
@@ -30,7 +36,7 @@ export default function Lembretes() {
     else setDresPendentes(0);
     if (blingAtivo) carregarAutocadastrosBling();
     else setAutocadastrosBling({ total: 0, items: [] });
-    carregarValidadePendencias();
+    carregarValidadePendencias({ processar: true });
     // Atualizar a cada 1 minuto
     const interval = setInterval(() => {
       carregarLembretes();
@@ -72,7 +78,47 @@ export default function Lembretes() {
     }
   };
 
-  const carregarValidadePendencias = async () => {
+  const carregarValidadePendencias = async ({ processar = false, mostrarToast = false } = {}) => {
+    let configAtual = { carregado: false, ativa: null, dias: 15 };
+
+    try {
+      const configRes = await api.get("/empresa/config-estoque");
+      configAtual = {
+        carregado: true,
+        ativa: Boolean(configRes.data?.protecao_validade_ativa),
+        dias: Number(configRes.data?.dias_alerta_validade || 15),
+      };
+      setValidadeConfig(configAtual);
+    } catch {
+      setValidadeConfig((prev) => ({
+        ...prev,
+        carregado: false,
+        ativa: null,
+      }));
+    }
+
+    if (processar && configAtual.ativa === true) {
+      setProcessandoValidade(true);
+      try {
+        const processRes = await api.post("/estoque/validade/processar");
+        const processados = Number(processRes.data?.processados || 0);
+        if (mostrarToast) {
+          toast.success(
+            processados > 0
+              ? `${processados} lote(s) removido(s) do estoque vendavel`
+              : "Nenhum lote novo em risco encontrado"
+          );
+        }
+      } catch (error) {
+        console.error("Erro ao processar validade:", error);
+        if (mostrarToast) toast.error("Nao foi possivel verificar validade agora");
+      } finally {
+        setProcessandoValidade(false);
+      }
+    } else if (processar && mostrarToast && configAtual.ativa === false) {
+      toast("Ative a protecao por validade nas configuracoes de estoque.");
+    }
+
     try {
       const res = await api.get("/estoque/validade/pendencias");
       setValidadePendencias(Array.isArray(res.data?.items) ? res.data.items : []);
@@ -156,6 +202,9 @@ export default function Lembretes() {
   const proximosEmBreve = lembretes.filter((l) => l.dias_restantes <= 7);
   const vencidos = lembretes.filter((l) => l.dias_restantes < 0);
   const semPendencias = lembretes.length === 0 && validadePendencias.length === 0;
+  const validadeInativa = validadeConfig.carregado && validadeConfig.ativa === false;
+  const validadeAtivaSemPendencias =
+    validadeConfig.ativa === true && validadePendencias.length === 0;
 
   return (
     <div className="lembretes-container">
@@ -614,6 +663,7 @@ export default function Lembretes() {
               alignItems: "center",
               justifyContent: "space-between",
               gap: "10px",
+              flexWrap: "wrap",
             }}
           >
             <span style={{ fontWeight: "700", color: "#166534", fontSize: "14px" }}>
@@ -736,6 +786,77 @@ export default function Lembretes() {
         </div>
       )}
 
+      {validadeInativa && (
+        <div
+          style={{
+            marginBottom: "20px",
+            borderRadius: "12px",
+            border: "1px solid #fed7aa",
+            background: "#fff7ed",
+            padding: "14px 20px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "14px",
+            flexWrap: "wrap",
+          }}
+        >
+          <div style={{ display: "flex", gap: "12px", alignItems: "flex-start" }}>
+            <FiAlertTriangle style={{ color: "#c2410c", marginTop: "3px" }} />
+            <div>
+              <p style={{ margin: "0 0 4px", fontWeight: 700, color: "#9a3412" }}>
+                Protecao por validade desativada
+              </p>
+              <p style={{ margin: 0, color: "#7c2d12", fontSize: "13px" }}>
+                Ative a protecao para retirar automaticamente os lotes que vencem em ate{" "}
+                {validadeConfig.dias || 15} dia(s) e gerar pendencias aqui.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            className="btn btn-primary"
+            onClick={() => navigate("/configuracoes/estoque")}
+          >
+            Abrir configuracoes
+          </button>
+        </div>
+      )}
+
+      {validadeAtivaSemPendencias && (
+        <div
+          style={{
+            marginBottom: "20px",
+            borderRadius: "12px",
+            border: "1px solid #bfdbfe",
+            background: "#eff6ff",
+            padding: "14px 20px",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: "14px",
+            flexWrap: "wrap",
+          }}
+        >
+          <div>
+            <p style={{ margin: "0 0 4px", fontWeight: 700, color: "#1d4ed8" }}>
+              Protecao por validade ativa
+            </p>
+            <p style={{ margin: 0, color: "#1e40af", fontSize: "13px" }}>
+              A busca automatica considera lotes que vencem em ate {validadeConfig.dias || 15} dia(s).
+            </p>
+          </div>
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={processandoValidade}
+            onClick={() => carregarValidadePendencias({ processar: true, mostrarToast: true })}
+          >
+            <FiRefreshCw /> {processandoValidade ? "Verificando..." : "Verificar validade agora"}
+          </button>
+        </div>
+      )}
+
       {validadePendencias.length > 0 && (
         <div
           style={{
@@ -763,6 +884,14 @@ export default function Lembretes() {
             <span style={{ fontWeight: "700", color: "#92400e", fontSize: "14px" }}>
               {validadePendencias.length}
             </span>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={processandoValidade}
+              onClick={() => carregarValidadePendencias({ processar: true, mostrarToast: true })}
+            >
+              <FiRefreshCw /> {processandoValidade ? "Verificando..." : "Verificar validade agora"}
+            </button>
           </div>
           <div style={{ padding: "14px 20px", display: "grid", gap: "10px" }}>
             {validadePendencias.map((item) => (
