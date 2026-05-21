@@ -12,9 +12,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
 from app.ia.aba7_models import DREPeriodo
-from app.empresa_config_fiscal_models import EmpresaConfigFiscal
 from app.models import Cliente
 from app.cargo_models import Cargo
+from app.services.remuneracao_service import calcular_composicao_remuneracao
 
 import logging
 logger = logging.getLogger(__name__)
@@ -72,11 +72,14 @@ def gerar_provisao_trabalhista_mensal(
     detalhes_funcionarios = []
     
     for func, cargo in funcionarios:
-        salario = Decimal(str(cargo.salario_base))
-        inss = (salario * Decimal(str(cargo.inss_patronal_percentual)) / Decimal(100)).quantize(Decimal("0.01"))
-        fgts = (salario * Decimal(str(cargo.fgts_percentual)) / Decimal(100)).quantize(Decimal("0.01"))
+        composicao = calcular_composicao_remuneracao(cargo, func)
+        salario = Decimal(str(composicao["salario_base"]))
+        complemento = Decimal(str(composicao["complemento_interno"]))
+        folha = (salario + complemento).quantize(Decimal("0.01"))
+        inss = Decimal(str(composicao["inss_patronal"]))
+        fgts = Decimal(str(composicao["fgts_empresa"]))
         
-        folha_total += salario
+        folha_total += folha
         inss_total += inss
         fgts_total += fgts
         
@@ -84,8 +87,13 @@ def gerar_provisao_trabalhista_mensal(
             "nome": func.nome,
             "cargo": cargo.nome,
             "salario": float(salario),
+            "complemento": float(complemento),
+            "liquido_holerite": float(Decimal(str(composicao["liquido_holerite"]))),
+            "liquido_combinado": float(Decimal(str(composicao["liquido_combinado"]))),
             "inss": float(inss),
-            "fgts": float(fgts)
+            "fgts": float(fgts),
+            "total_folha": float(folha),
+            "custo_total_empresa": float(Decimal(str(composicao["custo_total_empresa"])))
         })
     
     total_provisoes = folha_total + inss_total + fgts_total
@@ -176,7 +184,9 @@ Baseada em {len(funcionarios)} funcionário(s) ativo(s)
     
     for det in detalhes_funcionarios:
         novo_detalhamento += f"{det['nome']:30s} ({det['cargo']})\n"
-        novo_detalhamento += f"   Salário: R$ {det['salario']:>10,.2f}\n"
+        novo_detalhamento += f"   Salario base:   R$ {det['salario']:>10,.2f}\n"
+        novo_detalhamento += f"   Complemento:    R$ {det['complemento']:>10,.2f}\n"
+        novo_detalhamento += f"   Folha gerencial:R$ {det['total_folha']:>10,.2f}\n"
         novo_detalhamento += f"   INSS:    R$ {det['inss']:>10,.2f}\n"
         novo_detalhamento += f"   FGTS:    R$ {det['fgts']:>10,.2f}\n"
         novo_detalhamento += f"   ───────────────────────────────────────\n"

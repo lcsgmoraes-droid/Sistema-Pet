@@ -7,6 +7,38 @@ export default function Cargos() {
   const [form, setForm] = useState(null);
   const [loading, setLoading] = useState(true);
 
+  const cargoPadrao = () => ({
+    nome: "",
+    descricao: "",
+    salario_base: "",
+    regime_remuneracao: "clt",
+    gera_encargos: true,
+    inss_patronal_percentual: 20,
+    fgts_percentual: 8,
+    inss_funcionario_percentual: 0,
+    inss_funcionario_valor: 0,
+    desconto_transporte_valor: 0,
+    outros_descontos_valor: 0,
+    gera_ferias: true,
+    gera_decimo_terceiro: true,
+    ativo: true,
+  });
+
+  const prepararCargo = (dados) => ({
+    ...dados,
+    salario_base: Number(dados.salario_base || 0),
+    inss_patronal_percentual: Number(dados.inss_patronal_percentual || 0),
+    fgts_percentual: Number(dados.fgts_percentual || 0),
+    inss_funcionario_percentual: Number(dados.inss_funcionario_percentual || 0),
+    inss_funcionario_valor: Number(dados.inss_funcionario_valor || 0),
+    desconto_transporte_valor: Number(dados.desconto_transporte_valor || 0),
+    outros_descontos_valor: Number(dados.outros_descontos_valor || 0),
+  });
+
+  const editarCargo = (cargo) => {
+    setForm({ ...cargoPadrao(), ...cargo });
+  };
+
   const carregarCargos = async () => {
     try {
       setLoading(true);
@@ -25,16 +57,7 @@ export default function Cargos() {
   }, []);
 
   const novoCargo = () => {
-    setForm({
-      nome: "",
-      descricao: "",
-      salario_base: "",
-      inss_patronal_percentual: 20,
-      fgts_percentual: 8,
-      gera_ferias: true,
-      gera_decimo_terceiro: true,
-      ativo: true,
-    });
+    setForm(cargoPadrao());
   };
 
   const salvarCargo = async () => {
@@ -44,11 +67,12 @@ export default function Cargos() {
     }
 
     try {
+      const payload = prepararCargo(form);
       if (form.id) {
-        await api.put(`/cargos/${form.id}`, form);
+        await api.put(`/cargos/${form.id}`, payload);
         toast.success("Cargo atualizado com sucesso!");
       } else {
-        await api.post("/cargos", form);
+        await api.post("/cargos", payload);
         toast.success("Cargo cadastrado com sucesso!");
       }
 
@@ -118,6 +142,9 @@ export default function Cargos() {
                 Salário Base
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Regime
+              </th>
+              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                 INSS %
               </th>
               <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -149,6 +176,12 @@ export default function Cargos() {
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium text-green-600">
                   {formatarMoeda(c.salario_base)}
                 </td>
+                <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                  <div className="font-medium uppercase">{c.regime_remuneracao || "clt"}</div>
+                  <div className="text-xs text-gray-400">
+                    {c.gera_encargos ? "Com encargos" : "Sem encargos"}
+                  </div>
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                   {Number(c.inss_patronal_percentual).toFixed(2)}%
                 </td>
@@ -179,7 +212,7 @@ export default function Cargos() {
                 <td className="px-6 py-4 whitespace-nowrap text-center text-sm font-medium">
                   <button
                     className="text-indigo-600 hover:text-indigo-900 mr-4"
-                    onClick={() => setForm(c)}
+                    onClick={() => editarCargo(c)}
                   >
                     Editar
                   </button>
@@ -254,6 +287,50 @@ export default function Cargos() {
               />
             </div>
 
+            <div className="md:col-span-2 border-t border-gray-200 pt-4 mt-2">
+              <h3 className="text-sm font-semibold text-gray-800 uppercase tracking-wide">
+                Composicao de remuneracao
+              </h3>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Regime
+              </label>
+              <select
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                value={form.regime_remuneracao || "clt"}
+                onChange={(e) => {
+                  const regime = e.target.value;
+                  setForm({
+                    ...form,
+                    regime_remuneracao: regime,
+                    gera_encargos: regime === "clt" ? form.gera_encargos : false,
+                    gera_ferias: regime === "clt" ? form.gera_ferias : false,
+                    gera_decimo_terceiro: regime === "clt" ? form.gera_decimo_terceiro : false,
+                  });
+                }}
+              >
+                <option value="clt">CLT</option>
+                <option value="sem_encargos">Simples sem encargos</option>
+                <option value="estagio">Estagio</option>
+                <option value="informal">Informal</option>
+              </select>
+            </div>
+
+            <div className="flex items-center pt-6">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={!!form.gera_encargos}
+                  onChange={(e) => setForm({ ...form, gera_encargos: e.target.checked })}
+                  className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  disabled={(form.regime_remuneracao || "clt") !== "clt"}
+                />
+                <span className="text-sm text-gray-700">Considera encargos e descontos</span>
+              </label>
+            </div>
+
             {/* INSS */}
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -283,6 +360,63 @@ export default function Cargos() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 value={form.fgts_percentual}
                 onChange={(e) => setForm({ ...form, fgts_percentual: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                INSS Funcionario (%)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                max="100"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                value={form.inss_funcionario_percentual}
+                onChange={(e) => setForm({ ...form, inss_funcionario_percentual: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                INSS Funcionario (R$)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                value={form.inss_funcionario_valor}
+                onChange={(e) => setForm({ ...form, inss_funcionario_valor: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Desconto transporte (R$)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                value={form.desconto_transporte_valor}
+                onChange={(e) => setForm({ ...form, desconto_transporte_valor: e.target.value })}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                Outros descontos (R$)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                value={form.outros_descontos_valor}
+                onChange={(e) => setForm({ ...form, outros_descontos_valor: e.target.value })}
               />
             </div>
 

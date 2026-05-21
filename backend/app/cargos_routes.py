@@ -22,8 +22,14 @@ class CargoCreate(BaseModel):
     nome: str = Field(..., min_length=1, max_length=100)
     descricao: Optional[str] = None
     salario_base: Decimal = Field(..., gt=0)
+    regime_remuneracao: str = Field(default="clt", pattern="^(clt|sem_encargos|estagio|informal)$")
+    gera_encargos: bool = True
     inss_patronal_percentual: Optional[Decimal] = Field(default=Decimal("20.00"), ge=0, le=100)
     fgts_percentual: Optional[Decimal] = Field(default=Decimal("8.00"), ge=0, le=100)
+    inss_funcionario_percentual: Optional[Decimal] = Field(default=Decimal("0.00"), ge=0, le=100)
+    inss_funcionario_valor: Optional[Decimal] = Field(default=Decimal("0.00"), ge=0)
+    desconto_transporte_valor: Optional[Decimal] = Field(default=Decimal("0.00"), ge=0)
+    outros_descontos_valor: Optional[Decimal] = Field(default=Decimal("0.00"), ge=0)
     gera_ferias: bool = True
     gera_decimo_terceiro: bool = True
     ativo: bool = True
@@ -35,8 +41,14 @@ class CargoUpdate(BaseModel):
     nome: Optional[str] = Field(None, min_length=1, max_length=100)
     descricao: Optional[str] = None
     salario_base: Optional[Decimal] = Field(None, gt=0)
+    regime_remuneracao: Optional[str] = Field(None, pattern="^(clt|sem_encargos|estagio|informal)$")
+    gera_encargos: Optional[bool] = None
     inss_patronal_percentual: Optional[Decimal] = Field(None, ge=0, le=100)
     fgts_percentual: Optional[Decimal] = Field(None, ge=0, le=100)
+    inss_funcionario_percentual: Optional[Decimal] = Field(None, ge=0, le=100)
+    inss_funcionario_valor: Optional[Decimal] = Field(None, ge=0)
+    desconto_transporte_valor: Optional[Decimal] = Field(None, ge=0)
+    outros_descontos_valor: Optional[Decimal] = Field(None, ge=0)
     gera_ferias: Optional[bool] = None
     gera_decimo_terceiro: Optional[bool] = None
     ativo: Optional[bool] = None
@@ -50,14 +62,42 @@ class CargoResponse(BaseModel):
     nome: str
     descricao: Optional[str]
     salario_base: Decimal
+    regime_remuneracao: str
+    gera_encargos: bool
     inss_patronal_percentual: Decimal
     fgts_percentual: Decimal
+    inss_funcionario_percentual: Decimal
+    inss_funcionario_valor: Decimal
+    desconto_transporte_valor: Decimal
+    outros_descontos_valor: Decimal
     gera_ferias: bool
     gera_decimo_terceiro: bool
     ativo: bool
     total_funcionarios: int = 0
 
     model_config = {"from_attributes": True}
+
+
+def _cargo_response_dict(cargo: Cargo, total_funcionarios: int = 0) -> dict:
+    return {
+        "id": cargo.id,
+        "tenant_id": cargo.tenant_id,
+        "nome": cargo.nome,
+        "descricao": cargo.descricao,
+        "salario_base": cargo.salario_base,
+        "regime_remuneracao": cargo.regime_remuneracao,
+        "gera_encargos": cargo.gera_encargos,
+        "inss_patronal_percentual": cargo.inss_patronal_percentual,
+        "fgts_percentual": cargo.fgts_percentual,
+        "inss_funcionario_percentual": cargo.inss_funcionario_percentual,
+        "inss_funcionario_valor": cargo.inss_funcionario_valor,
+        "desconto_transporte_valor": cargo.desconto_transporte_valor,
+        "outros_descontos_valor": cargo.outros_descontos_valor,
+        "gera_ferias": cargo.gera_ferias,
+        "gera_decimo_terceiro": cargo.gera_decimo_terceiro,
+        "ativo": cargo.ativo,
+        "total_funcionarios": total_funcionarios,
+    }
 
 
 # Endpoints
@@ -94,20 +134,7 @@ async def listar_cargos(
     
     cargos_response = []
     for cargo, total_func in result:
-        cargo_dict = {
-            "id": cargo.id,
-            "tenant_id": cargo.tenant_id,
-            "nome": cargo.nome,
-            "descricao": cargo.descricao,
-            "salario_base": cargo.salario_base,
-            "inss_patronal_percentual": cargo.inss_patronal_percentual,
-            "fgts_percentual": cargo.fgts_percentual,
-            "gera_ferias": cargo.gera_ferias,
-            "gera_decimo_terceiro": cargo.gera_decimo_terceiro,
-            "ativo": cargo.ativo,
-            "total_funcionarios": total_func
-        }
-        cargos_response.append(CargoResponse(**cargo_dict))
+        cargos_response.append(CargoResponse(**_cargo_response_dict(cargo, total_func)))
     
     return cargos_response
 
@@ -140,19 +167,7 @@ async def obter_cargo(
         Cliente.ativo == True
     ).count()
     
-    cargo_dict = {
-        "id": cargo.id,
-        "tenant_id": cargo.tenant_id,
-        "nome": cargo.nome,
-        "descricao": cargo.descricao,
-        "salario_base": cargo.salario_base,
-        "inss_patronal_percentual": cargo.inss_patronal_percentual,
-        "fgts_percentual": cargo.fgts_percentual,
-        "ativo": cargo.ativo,
-        "total_funcionarios": total_funcionarios
-    }
-    
-    return CargoResponse(**cargo_dict)
+    return CargoResponse(**_cargo_response_dict(cargo, total_funcionarios))
 
 
 @router.post("", response_model=CargoResponse, status_code=201)
@@ -185,8 +200,14 @@ async def criar_cargo(
         nome=cargo_data.nome.strip(),
         descricao=cargo_data.descricao.strip() if cargo_data.descricao else None,
         salario_base=cargo_data.salario_base,
+        regime_remuneracao=cargo_data.regime_remuneracao,
+        gera_encargos=cargo_data.gera_encargos,
         inss_patronal_percentual=cargo_data.inss_patronal_percentual,
         fgts_percentual=cargo_data.fgts_percentual,
+        inss_funcionario_percentual=cargo_data.inss_funcionario_percentual,
+        inss_funcionario_valor=cargo_data.inss_funcionario_valor,
+        desconto_transporte_valor=cargo_data.desconto_transporte_valor,
+        outros_descontos_valor=cargo_data.outros_descontos_valor,
         gera_ferias=cargo_data.gera_ferias,
         gera_decimo_terceiro=cargo_data.gera_decimo_terceiro,
         ativo=cargo_data.ativo
@@ -196,21 +217,7 @@ async def criar_cargo(
     db.commit()
     db.refresh(cargo)
     
-    cargo_dict = {
-        "id": cargo.id,
-        "tenant_id": cargo.tenant_id,
-        "nome": cargo.nome,
-        "descricao": cargo.descricao,
-        "salario_base": cargo.salario_base,
-        "inss_patronal_percentual": cargo.inss_patronal_percentual,
-        "fgts_percentual": cargo.fgts_percentual,
-        "gera_ferias": cargo.gera_ferias,
-        "gera_decimo_terceiro": cargo.gera_decimo_terceiro,
-        "ativo": cargo.ativo,
-        "total_funcionarios": 0
-    }
-    
-    return CargoResponse(**cargo_dict)
+    return CargoResponse(**_cargo_response_dict(cargo, 0))
 
 
 @router.put("/{cargo_id}", response_model=CargoResponse)
@@ -270,21 +277,7 @@ async def atualizar_cargo(
         Cliente.ativo == True
     ).count()
     
-    cargo_dict = {
-        "id": cargo.id,
-        "tenant_id": cargo.tenant_id,
-        "nome": cargo.nome,
-        "descricao": cargo.descricao,
-        "salario_base": cargo.salario_base,
-        "inss_patronal_percentual": cargo.inss_patronal_percentual,
-        "fgts_percentual": cargo.fgts_percentual,
-        "gera_ferias": cargo.gera_ferias,
-        "gera_decimo_terceiro": cargo.gera_decimo_terceiro,
-        "ativo": cargo.ativo,
-        "total_funcionarios": total_funcionarios
-    }
-    
-    return CargoResponse(**cargo_dict)
+    return CargoResponse(**_cargo_response_dict(cargo, total_funcionarios))
 
 
 @router.patch("/{cargo_id}/status")

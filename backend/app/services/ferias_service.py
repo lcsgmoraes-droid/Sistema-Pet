@@ -22,6 +22,7 @@ from app.ia.aba7_dre_detalhada_models import DREDetalheCanal
 from app.financeiro_models import CategoriaFinanceira, ContaPagar
 from app.models import Cliente
 from app.cargo_models import Cargo
+from app.services.remuneracao_service import calcular_composicao_remuneracao
 
 import logging
 logger = logging.getLogger(__name__)
@@ -104,7 +105,8 @@ def conceder_ferias(
     )
 
     # 2️⃣ Calcular valor real das férias
-    salario = Decimal(str(cargo.salario_base))
+    composicao = calcular_composicao_remuneracao(cargo, funcionario)
+    salario = Decimal(str(composicao["salario_base"]))
 
     # Proporcional aos dias
     valor_ferias = (salario / Decimal("30")) * Decimal(str(dias_ferias))
@@ -167,7 +169,7 @@ def conceder_ferias(
     if meses_aquisitivos == 0 and delta_dias >= 1:
         meses_aquisitivos = 1
 
-    if cargo.gera_ferias:
+    if bool(composicao["usa_encargos"]) and cargo.gera_ferias:
         prov_ferias = (salario / 12 * meses_aquisitivos).quantize(Decimal("0.01"))
         prov_terco = (prov_ferias / 3).quantize(Decimal("0.01"))
     else:

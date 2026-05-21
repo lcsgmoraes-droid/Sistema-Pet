@@ -4,11 +4,10 @@ Utiliza a tabela 'clientes' com tipo_cadastro='funcionario'
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_
 from typing import List, Optional
 from decimal import Decimal
 from pydantic import BaseModel, EmailStr, Field
-from datetime import date, datetime
+from datetime import date
 
 from app.db import get_session
 from app.models import Cliente
@@ -16,7 +15,7 @@ from app.cargo_models import Cargo
 from app.auth.dependencies import get_current_user_and_tenant
 from app.services.ferias_service import conceder_ferias
 from app.services.decimo_terceiro_service import pagar_decimo_terceiro
-from app.ia.aba7_dre_detalhada_models import DREDetalheCanal
+from app.services.remuneracao_service import calcular_composicao_remuneracao
 
 router = APIRouter(prefix="/funcionarios", tags=["RH - Funcionários"])
 
@@ -30,6 +29,11 @@ class FuncionarioCreate(BaseModel):
     cargo_id: int
     ativo: bool = True
     data_fechamento_comissao: Optional[int] = Field(None, ge=1, le=31, description="Dia do mês para fechamento de comissão (1-31)")
+    salario_base_override: Optional[Decimal] = Field(None, ge=0)
+    liquido_combinado: Optional[Decimal] = Field(None, ge=0)
+    complemento_modo: str = Field(default="automatico", pattern="^(automatico|manual|nenhum)$")
+    complemento_fixo_valor: Decimal = Field(default=Decimal("0.00"), ge=0)
+    remuneracao_observacoes: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -42,6 +46,11 @@ class FuncionarioUpdate(BaseModel):
     cargo_id: Optional[int] = None
     ativo: Optional[bool] = None
     data_fechamento_comissao: Optional[int] = Field(None, ge=1, le=31, description="Dia do mês para fechamento de comissão (1-31)")
+    salario_base_override: Optional[Decimal] = Field(None, ge=0)
+    liquido_combinado: Optional[Decimal] = Field(None, ge=0)
+    complemento_modo: Optional[str] = Field(None, pattern="^(automatico|manual|nenhum)$")
+    complemento_fixo_valor: Optional[Decimal] = Field(None, ge=0)
+    remuneracao_observacoes: Optional[str] = None
 
     model_config = {"from_attributes": True}
 
@@ -50,6 +59,31 @@ class CargoSimples(BaseModel):
     id: int
     nome: str
     salario_base: Decimal
+    regime_remuneracao: str = "clt"
+
+    model_config = {"from_attributes": True}
+
+
+class RemuneracaoResponse(BaseModel):
+    regime_remuneracao: str
+    usa_encargos: bool
+    salario_base: Decimal
+    inss_funcionario: Decimal
+    desconto_transporte: Decimal
+    outros_descontos: Decimal
+    descontos_funcionario_total: Decimal
+    liquido_holerite: Decimal
+    liquido_combinado: Decimal
+    complemento_modo: str
+    complemento_interno: Decimal
+    inss_patronal: Decimal
+    fgts_empresa: Decimal
+    encargos_empresa_total: Decimal
+    provisao_ferias: Decimal
+    provisao_terco_ferias: Decimal
+    provisao_13: Decimal
+    provisoes_total: Decimal
+    custo_total_empresa: Decimal
 
     model_config = {"from_attributes": True}
 
@@ -64,8 +98,54 @@ class FuncionarioResponse(BaseModel):
     cargo: Optional[CargoSimples]
     ativo: bool
     data_fechamento_comissao: Optional[int]
+    salario_base_override: Optional[Decimal]
+    liquido_combinado: Optional[Decimal]
+    complemento_modo: str
+    complemento_fixo_valor: Decimal
+    remuneracao_observacoes: Optional[str]
+    remuneracao: Optional[RemuneracaoResponse] = None
 
     model_config = {"from_attributes": True}
+
+
+def _cargo_dict(cargo: Optional[Cargo]) -> Optional[dict]:
+    if not cargo:
+        return None
+    return {
+        "id": cargo.id,
+        "nome": cargo.nome,
+        "salario_base": cargo.salario_base,
+        "regime_remuneracao": cargo.regime_remuneracao,
+    }
+
+
+def _funcionario_response_dict(funcionario: Cliente, cargo: Optional[Cargo]) -> dict:
+    return {
+        "id": funcionario.id,
+        "codigo": funcionario.codigo,
+        "nome": funcionario.nome,
+        "email": funcionario.email,
+        "telefone": funcionario.telefone,
+        "cpf": funcionario.cpf,
+        "cargo": _cargo_dict(cargo),
+        "ativo": funcionario.ativo,
+        "data_fechamento_comissao": funcionario.data_fechamento_comissao,
+        "salario_base_override": funcionario.salario_base_override,
+        "liquido_combinado": funcionario.liquido_combinado,
+        "complemento_modo": funcionario.complemento_modo or "automatico",
+        "complemento_fixo_valor": funcionario.complemento_fixo_valor or Decimal("0.00"),
+        "remuneracao_observacoes": funcionario.remuneracao_observacoes,
+        "remuneracao": calcular_composicao_remuneracao(cargo, funcionario) if cargo else None,
+    }
+
+
+def _buscar_cargo_funcionario(db: Session, tenant_id, cargo_id: Optional[int]) -> Optional[Cargo]:
+    if not cargo_id:
+        return None
+    return db.query(Cargo).filter(
+        Cargo.id == cargo_id,
+        Cargo.tenant_id == tenant_id
+    ).first()
 
 
 # Schemas para Eventos RH
@@ -139,32 +219,19 @@ async def listar_funcionarios(
     query = query.order_by(Cliente.nome)
     funcionarios = query.all()
 
-    result = []
-    for func in funcionarios:
-        cargo_dict = None
-        if func.cargo_id:
-            cargo = db.query(Cargo).filter(Cargo.id == func.cargo_id).first()
-            if cargo:
-                cargo_dict = {
-                    "id": cargo.id,
-                    "nome": cargo.nome,
-                    "salario_base": cargo.salario_base
-                }
+    cargo_ids = {func.cargo_id for func in funcionarios if func.cargo_id}
+    cargos_por_id = {}
+    if cargo_ids:
+        cargos = db.query(Cargo).filter(
+            Cargo.tenant_id == tenant_id,
+            Cargo.id.in_(cargo_ids)
+        ).all()
+        cargos_por_id = {cargo.id: cargo for cargo in cargos}
 
-        func_dict = {
-            "id": func.id,
-            "codigo": func.codigo,
-            "nome": func.nome,
-            "email": func.email,
-            "telefone": func.telefone,
-            "cpf": func.cpf,
-            "cargo": cargo_dict,
-            "ativo": func.ativo,
-            "data_fechamento_comissao": func.data_fechamento_comissao
-        }
-        result.append(FuncionarioResponse(**func_dict))
-
-    return result
+    return [
+        FuncionarioResponse(**_funcionario_response_dict(func, cargos_por_id.get(func.cargo_id)))
+        for func in funcionarios
+    ]
 
 
 @router.get("/{funcionario_id}", response_model=FuncionarioResponse)
@@ -187,28 +254,35 @@ async def obter_funcionario(
     if not funcionario:
         raise HTTPException(status_code=404, detail="Funcionário não encontrado")
 
-    cargo_dict = None
-    if funcionario.cargo_id:
-        cargo = db.query(Cargo).filter(Cargo.id == funcionario.cargo_id).first()
-        if cargo:
-            cargo_dict = {
-                "id": cargo.id,
-                "nome": cargo.nome,
-                "salario_base": cargo.salario_base
-            }
+    cargo = _buscar_cargo_funcionario(db, tenant_id, funcionario.cargo_id)
+    return FuncionarioResponse(**_funcionario_response_dict(funcionario, cargo))
 
-    func_dict = {
-        "id": funcionario.id,
-        "codigo": funcionario.codigo,
-        "nome": funcionario.nome,
-        "email": funcionario.email,
-        "telefone": funcionario.telefone,
-        "cpf": funcionario.cpf,
-        "cargo": cargo_dict,
-        "ativo": funcionario.ativo
-    }
 
-    return FuncionarioResponse(**func_dict)
+@router.get("/{funcionario_id}/remuneracao", response_model=RemuneracaoResponse)
+async def obter_remuneracao_funcionario(
+    funcionario_id: int,
+    db: Session = Depends(get_session),
+    current_user_and_tenant=Depends(get_current_user_and_tenant)
+):
+    """
+    Retorna a composicao gerencial mensal de remuneracao do funcionario.
+    """
+    user, tenant_id = current_user_and_tenant
+
+    funcionario = db.query(Cliente).filter(
+        Cliente.id == funcionario_id,
+        Cliente.tenant_id == tenant_id,
+        Cliente.tipo_cadastro == "funcionario"
+    ).first()
+
+    if not funcionario:
+        raise HTTPException(status_code=404, detail="Funcionário não encontrado")
+
+    cargo = _buscar_cargo_funcionario(db, tenant_id, funcionario.cargo_id)
+    if not cargo:
+        raise HTTPException(status_code=400, detail="Funcionário não possui cargo definido")
+
+    return RemuneracaoResponse(**calcular_composicao_remuneracao(cargo, funcionario))
 
 
 @router.post("", response_model=FuncionarioResponse, status_code=201)
@@ -261,6 +335,12 @@ async def criar_funcionario(
         tipo_cadastro="funcionario",
         tipo_pessoa="PF",
         cargo_id=funcionario_data.cargo_id,
+        data_fechamento_comissao=funcionario_data.data_fechamento_comissao,
+        salario_base_override=funcionario_data.salario_base_override,
+        liquido_combinado=funcionario_data.liquido_combinado,
+        complemento_modo=funcionario_data.complemento_modo,
+        complemento_fixo_valor=funcionario_data.complemento_fixo_valor,
+        remuneracao_observacoes=funcionario_data.remuneracao_observacoes.strip() if funcionario_data.remuneracao_observacoes else None,
         ativo=funcionario_data.ativo
     )
 
@@ -268,24 +348,7 @@ async def criar_funcionario(
     db.commit()
     db.refresh(funcionario)
 
-    cargo_dict = {
-        "id": cargo.id,
-        "nome": cargo.nome,
-        "salario_base": cargo.salario_base
-    }
-
-    func_dict = {
-        "id": funcionario.id,
-        "codigo": funcionario.codigo,
-        "nome": funcionario.nome,
-        "email": funcionario.email,
-        "telefone": funcionario.telefone,
-        "cpf": funcionario.cpf,
-        "cargo": cargo_dict,
-        "ativo": funcionario.ativo
-    }
-
-    return FuncionarioResponse(**func_dict)
+    return FuncionarioResponse(**_funcionario_response_dict(funcionario, cargo))
 
 
 @router.put("/{funcionario_id}", response_model=FuncionarioResponse)
@@ -339,35 +402,18 @@ async def atualizar_funcionario(
     for field, value in update_data.items():
         if field == "nome" and value:
             setattr(funcionario, field, value.strip())
+        elif field == "remuneracao_observacoes" and value:
+            setattr(funcionario, field, value.strip())
+        elif field == "complemento_fixo_valor" and value is None:
+            setattr(funcionario, field, Decimal("0.00"))
         else:
             setattr(funcionario, field, value)
 
     db.commit()
     db.refresh(funcionario)
 
-    # Buscar cargo atualizado
-    cargo_dict = None
-    if funcionario.cargo_id:
-        cargo = db.query(Cargo).filter(Cargo.id == funcionario.cargo_id).first()
-        if cargo:
-            cargo_dict = {
-                "id": cargo.id,
-                "nome": cargo.nome,
-                "salario_base": cargo.salario_base
-            }
-
-    func_dict = {
-        "id": funcionario.id,
-        "codigo": funcionario.codigo,
-        "nome": funcionario.nome,
-        "email": funcionario.email,
-        "telefone": funcionario.telefone,
-        "cpf": funcionario.cpf,
-        "cargo": cargo_dict,
-        "ativo": funcionario.ativo
-    }
-
-    return FuncionarioResponse(**func_dict)
+    cargo = _buscar_cargo_funcionario(db, tenant_id, funcionario.cargo_id)
+    return FuncionarioResponse(**_funcionario_response_dict(funcionario, cargo))
 
 
 @router.delete("/{funcionario_id}")
@@ -554,10 +600,13 @@ async def api_obter_provisoes_funcionario(
             detail="Cargo do funcionário não encontrado"
         )
 
+    composicao = calcular_composicao_remuneracao(cargo, funcionario)
+    salario = Decimal(str(composicao["salario_base"]))
+    usa_encargos = bool(composicao["usa_encargos"])
+
     # Calcular provisões individuais do funcionário com base no salário e tempo trabalhado.
     # A tabela dre_detalhe_canais não tem funcionario_id (é agregada por período),
     # portanto calculamos diretamente: salário/12 × meses acumulados.
-    salario = Decimal(str(cargo.salario_base or 0))
 
     hoje = date.today()
     data_contratacao = funcionario.created_at.date() if funcionario.created_at else hoje
@@ -580,7 +629,7 @@ async def api_obter_provisoes_funcionario(
         meses_no_ano = 1
 
     # Provisão de férias = salário/12 × meses do ciclo aquisitivo
-    if cargo.gera_ferias:
+    if usa_encargos and cargo.gera_ferias:
         prov_ferias = (salario / 12 * meses_aquisitivos).quantize(Decimal("0.01"))
         prov_terco = (prov_ferias / 3).quantize(Decimal("0.01"))
     else:
@@ -588,7 +637,7 @@ async def api_obter_provisoes_funcionario(
         prov_terco = Decimal("0.00")
 
     # Provisão de 13º = salário/12 × meses no ano corrente
-    if cargo.gera_decimo_terceiro:
+    if usa_encargos and cargo.gera_decimo_terceiro:
         prov_13 = (salario / 12 * meses_no_ano).quantize(Decimal("0.01"))
     else:
         prov_13 = Decimal("0.00")
@@ -599,7 +648,7 @@ async def api_obter_provisoes_funcionario(
         funcionario_id=funcionario.id,
         funcionario_nome=funcionario.nome,
         cargo_nome=cargo.nome,
-        salario_base=cargo.salario_base,
+        salario_base=salario,
         provisao_ferias=prov_ferias,
         provisao_terco_ferias=prov_terco,
         provisao_13_salario=prov_13,

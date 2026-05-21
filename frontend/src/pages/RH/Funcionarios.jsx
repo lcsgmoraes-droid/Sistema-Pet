@@ -1,6 +1,31 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import api from "../../api";
 import EventosFuncionario from "./components/EventosFuncionario";
+
+const funcionarioPadrao = () => ({
+  nome: "",
+  cpf: "",
+  email: "",
+  telefone: "",
+  cargo_id: "",
+  ativo: true,
+  salario_base_override: "",
+  liquido_combinado: "",
+  complemento_modo: "automatico",
+  complemento_fixo_valor: 0,
+  remuneracao_observacoes: "",
+});
+
+const valorOuNull = (valor) => {
+  if (valor === "" || valor === null || valor === undefined) return null;
+  return Number(valor);
+};
+
+const formatarMoeda = (valor) =>
+  new Intl.NumberFormat("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  }).format(Number(valor || 0));
 
 export default function Funcionarios() {
   const [funcionarios, setFuncionarios] = useState([]);
@@ -26,23 +51,28 @@ export default function Funcionarios() {
   }, []);
 
   const novoFuncionario = () => {
+    setForm(funcionarioPadrao());
+  };
+
+  const editarFuncionario = (funcionario) => {
     setForm({
-      nome: "",
-      cpf: "",
-      email: "",
-      telefone: "",
-      cargo_id: "",
-      ativo: true,
+      ...funcionarioPadrao(),
+      ...funcionario,
+      cargo_id: funcionario.cargo?.id || "",
+      salario_base_override: funcionario.salario_base_override ?? "",
+      liquido_combinado: funcionario.liquido_combinado ?? "",
+      complemento_modo: funcionario.complemento_modo || "automatico",
+      complemento_fixo_valor: funcionario.complemento_fixo_valor ?? 0,
+      remuneracao_observacoes: funcionario.remuneracao_observacoes || "",
     });
   };
 
   const salvar = async () => {
     if (!form.nome || !form.cargo_id) {
-      alert("Nome e cargo são obrigatórios");
+      alert("Nome e cargo sao obrigatorios");
       return;
     }
 
-    // Preparar payload corrigindo campos vazios para null
     const payload = {
       nome: form.nome,
       cargo_id: Number(form.cargo_id),
@@ -50,6 +80,11 @@ export default function Funcionarios() {
       email: form.email?.trim() || null,
       telefone: form.telefone?.trim() || null,
       cpf: form.cpf?.trim() || null,
+      salario_base_override: valorOuNull(form.salario_base_override),
+      liquido_combinado: valorOuNull(form.liquido_combinado),
+      complemento_modo: form.complemento_modo || "automatico",
+      complemento_fixo_valor: Number(form.complemento_fixo_valor || 0),
+      remuneracao_observacoes: form.remuneracao_observacoes?.trim() || null,
     };
 
     try {
@@ -62,13 +97,13 @@ export default function Funcionarios() {
       setForm(null);
       carregar();
     } catch (error) {
-      console.error("Erro ao salvar funcionário:", error);
-      alert(error.response?.data?.detail || "Erro ao salvar funcionário");
+      console.error("Erro ao salvar funcionario:", error);
+      alert(error.response?.data?.detail || "Erro ao salvar funcionario");
     }
   };
 
   const inativar = async (id) => {
-    if (!window.confirm("Deseja inativar este funcionário?")) return;
+    if (!window.confirm("Deseja inativar este funcionario?")) return;
     await api.delete(`/funcionarios/${id}`);
     carregar();
   };
@@ -86,9 +121,56 @@ export default function Funcionarios() {
     return matchBusca && matchStatus;
   });
 
+  const cargoSelecionado = useMemo(() => {
+    if (!form?.cargo_id) return null;
+    return cargos.find((cargo) => Number(cargo.id) === Number(form.cargo_id)) || null;
+  }, [cargos, form?.cargo_id]);
+
+  const resumoForm = useMemo(() => {
+    if (!form || !cargoSelecionado) return null;
+
+    const salario = Number(form.salario_base_override || cargoSelecionado.salario_base || 0);
+    const usaEncargos =
+      (cargoSelecionado.regime_remuneracao || "clt") === "clt" &&
+      cargoSelecionado.gera_encargos !== false;
+    const inssFuncionarioFixo = Number(cargoSelecionado.inss_funcionario_valor || 0);
+    const inssFuncionario =
+      usaEncargos && inssFuncionarioFixo > 0
+        ? inssFuncionarioFixo
+        : usaEncargos
+          ? salario * Number(cargoSelecionado.inss_funcionario_percentual || 0) / 100
+          : 0;
+    const descontos =
+      inssFuncionario +
+      (usaEncargos ? Number(cargoSelecionado.desconto_transporte_valor || 0) : 0) +
+      (usaEncargos ? Number(cargoSelecionado.outros_descontos_valor || 0) : 0);
+    const liquidoHolerite = Math.max(0, salario - descontos);
+    const liquidoCombinado = Number(form.liquido_combinado || 0);
+    const complemento =
+      form.complemento_modo === "manual"
+        ? Number(form.complemento_fixo_valor || 0)
+        : form.complemento_modo === "nenhum"
+          ? 0
+          : Math.max(0, liquidoCombinado - liquidoHolerite);
+    const inssPatronal = usaEncargos
+      ? salario * Number(cargoSelecionado.inss_patronal_percentual || 0) / 100
+      : 0;
+    const fgts = usaEncargos ? salario * Number(cargoSelecionado.fgts_percentual || 0) / 100 : 0;
+    const ferias = usaEncargos && cargoSelecionado.gera_ferias ? salario / 12 : 0;
+    const tercoFerias = usaEncargos && cargoSelecionado.gera_ferias ? salario / 36 : 0;
+    const decimo = usaEncargos && cargoSelecionado.gera_decimo_terceiro ? salario / 12 : 0;
+
+    return {
+      salario,
+      liquidoHolerite,
+      complemento,
+      custoTotal: salario + complemento + inssPatronal + fgts + ferias + tercoFerias + decimo,
+    };
+  }, [cargoSelecionado, form]);
+
   return (
     <div className="p-6">
-      <h2 className="text-xl font-semibold mb-4">Funcionários</h2>
+      <h2 className="text-xl font-semibold mb-4">Funcionarios</h2>
 
       <div className="flex justify-between items-center mb-4 gap-4">
         <div className="flex gap-2">
@@ -114,7 +196,7 @@ export default function Funcionarios() {
           onClick={novoFuncionario}
           className="bg-blue-600 text-white px-4 py-2 rounded"
         >
-          + Novo Funcionário
+          + Novo Funcionario
         </button>
       </div>
 
@@ -124,9 +206,10 @@ export default function Funcionarios() {
             <tr>
               <th className="px-4 py-3 text-left font-semibold">Nome</th>
               <th className="px-4 py-3 text-left font-semibold">Cargo</th>
-              <th className="px-4 py-3 text-left font-semibold">Salário</th>
+              <th className="px-4 py-3 text-left font-semibold">Salario</th>
+              <th className="px-4 py-3 text-left font-semibold">Custo mensal</th>
               <th className="px-4 py-3 text-center font-semibold">Status</th>
-              <th className="px-4 py-3 text-center font-semibold">Ações</th>
+              <th className="px-4 py-3 text-center font-semibold">Acoes</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100">
@@ -137,9 +220,23 @@ export default function Funcionarios() {
                   {f.cargo ? f.cargo.nome : <span className="text-gray-400 italic">Sem cargo</span>}
                 </td>
                 <td className="px-4 py-3 text-gray-600">
-                  {f.cargo
-                    ? `R$ ${Number(f.cargo.salario_base).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`
+                  {f.remuneracao
+                    ? formatarMoeda(f.remuneracao.salario_base)
                     : <span className="text-gray-400">-</span>}
+                </td>
+                <td className="px-4 py-3 text-gray-600">
+                  {f.remuneracao ? (
+                    <div>
+                      <div className="font-medium text-gray-800">
+                        {formatarMoeda(f.remuneracao.custo_total_empresa)}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        Complemento {formatarMoeda(f.remuneracao.complemento_interno)}
+                      </div>
+                    </div>
+                  ) : (
+                    <span className="text-gray-400">-</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-center">
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
@@ -158,7 +255,7 @@ export default function Funcionarios() {
                     </button>
                     <button
                       className="px-3 py-1.5 text-xs font-medium rounded-md bg-blue-50 text-blue-700 hover:bg-blue-100 border border-blue-200 transition-colors"
-                      onClick={() => setForm({ ...f, cargo_id: f.cargo?.id })}
+                      onClick={() => editarFuncionario(f)}
                     >
                       Editar
                     </button>
@@ -176,8 +273,8 @@ export default function Funcionarios() {
             ))}
             {listaFiltrada.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-4 py-8 text-center text-gray-400 italic">
-                  Nenhum funcionário encontrado.
+                <td colSpan={6} className="px-4 py-8 text-center text-gray-400 italic">
+                  Nenhum funcionario encontrado.
                 </td>
               </tr>
             )}
@@ -186,12 +283,12 @@ export default function Funcionarios() {
       </div>
 
       {form && (
-        <div className="border rounded p-4 mt-6">
+        <div className="border rounded p-4 mt-6 bg-white">
           <h3 className="font-semibold mb-3">
-            {form.id ? "Editar Funcionário" : "Novo Funcionário"}
+            {form.id ? "Editar Funcionario" : "Novo Funcionario"}
           </h3>
 
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <input
               className="border p-2"
               placeholder="Nome"
@@ -217,17 +314,13 @@ export default function Funcionarios() {
               className="border p-2"
               placeholder="Telefone"
               value={form.telefone || ""}
-              onChange={(e) =>
-                setForm({ ...form, telefone: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, telefone: e.target.value })}
             />
 
             <select
-              className="border p-2 col-span-2"
+              className="border p-2 md:col-span-2"
               value={form.cargo_id}
-              onChange={(e) =>
-                setForm({ ...form, cargo_id: e.target.value })
-              }
+              onChange={(e) => setForm({ ...form, cargo_id: e.target.value })}
             >
               <option value="">Selecione o cargo</option>
               {cargos.map((c) => (
@@ -236,6 +329,92 @@ export default function Funcionarios() {
                 </option>
               ))}
             </select>
+
+            <div className="md:col-span-2 border-t pt-4">
+              <h4 className="font-semibold text-gray-800 mb-3">Composicao de remuneracao</h4>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label className="text-sm text-gray-700">
+                  Salario base especifico
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="border p-2 w-full mt-1"
+                    placeholder="Usa o salario do cargo"
+                    value={form.salario_base_override}
+                    onChange={(e) => setForm({ ...form, salario_base_override: e.target.value })}
+                  />
+                </label>
+
+                <label className="text-sm text-gray-700">
+                  Liquido combinado
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="border p-2 w-full mt-1"
+                    placeholder="Ex: 2800.00"
+                    value={form.liquido_combinado}
+                    onChange={(e) => setForm({ ...form, liquido_combinado: e.target.value })}
+                  />
+                </label>
+
+                <label className="text-sm text-gray-700">
+                  Complemento interno
+                  <select
+                    className="border p-2 w-full mt-1"
+                    value={form.complemento_modo}
+                    onChange={(e) => setForm({ ...form, complemento_modo: e.target.value })}
+                  >
+                    <option value="automatico">Automatico pelo liquido combinado</option>
+                    <option value="manual">Manual</option>
+                    <option value="nenhum">Sem complemento</option>
+                  </select>
+                </label>
+
+                <label className="text-sm text-gray-700">
+                  Complemento manual (R$)
+                  <input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    className="border p-2 w-full mt-1"
+                    disabled={form.complemento_modo !== "manual"}
+                    value={form.complemento_fixo_valor}
+                    onChange={(e) => setForm({ ...form, complemento_fixo_valor: e.target.value })}
+                  />
+                </label>
+
+                <textarea
+                  className="border p-2 md:col-span-2"
+                  rows={3}
+                  placeholder="Observacoes internas sobre acordo, extra ou regra de pagamento"
+                  value={form.remuneracao_observacoes || ""}
+                  onChange={(e) => setForm({ ...form, remuneracao_observacoes: e.target.value })}
+                />
+              </div>
+            </div>
+
+            {resumoForm && (
+              <div className="md:col-span-2 grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div className="rounded border bg-gray-50 p-3">
+                  <div className="text-xs text-gray-500">Base holerite</div>
+                  <div className="font-semibold">{formatarMoeda(resumoForm.salario)}</div>
+                </div>
+                <div className="rounded border bg-gray-50 p-3">
+                  <div className="text-xs text-gray-500">Liquido holerite</div>
+                  <div className="font-semibold">{formatarMoeda(resumoForm.liquidoHolerite)}</div>
+                </div>
+                <div className="rounded border bg-blue-50 p-3">
+                  <div className="text-xs text-blue-700">Complemento interno</div>
+                  <div className="font-semibold text-blue-800">{formatarMoeda(resumoForm.complemento)}</div>
+                </div>
+                <div className="rounded border bg-green-50 p-3">
+                  <div className="text-xs text-green-700">Custo total mensal</div>
+                  <div className="font-semibold text-green-800">{formatarMoeda(resumoForm.custoTotal)}</div>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="mt-4 space-x-2">
