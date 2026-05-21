@@ -1,6 +1,8 @@
 import os
 from types import SimpleNamespace
 
+import pytest
+
 os.environ["DATABASE_URL"] = os.environ.get("DATABASE_URL") or "sqlite:///./test.db"
 os.environ["DEBUG"] = "false"
 
@@ -68,7 +70,7 @@ def _nota_com_item(valor_unitario=10.0, valor_total=100.0):
     return nota
 
 
-def test_confronto_usa_custo_final_da_nf_no_item_vinculado(monkeypatch):
+def _aplicar_composicao_custo_final(monkeypatch):
     def _composicao(_nota):
         return {
             101: {
@@ -78,6 +80,16 @@ def test_confronto_usa_custo_final_da_nf_no_item_vinculado(monkeypatch):
         }
 
     monkeypatch.setattr(notas_entrada_routes, "calcular_composicao_custos_nota", _composicao)
+
+
+def _assert_custo_final_nf(item, confronto):
+    assert item["preco_nf"] == pytest.approx(12.0)
+    assert item["valor_nf"] == pytest.approx(120.0)
+    assert confronto["resumo"]["total_nf"] == pytest.approx(120.0)
+
+
+def test_confronto_usa_custo_final_da_nf_no_item_vinculado(monkeypatch):
+    _aplicar_composicao_custo_final(monkeypatch)
 
     confronto = routes._realizar_confronto(
         _pedido_com_item(),
@@ -87,23 +99,13 @@ def test_confronto_usa_custo_final_da_nf_no_item_vinculado(monkeypatch):
     )
 
     item = confronto["itens"][0]
-    assert item["preco_nf"] == 12.0
-    assert item["valor_nf"] == 120.0
-    assert item["dif_preco_unit"] == 0.0
+    _assert_custo_final_nf(item, confronto)
+    assert item["dif_preco_unit"] == pytest.approx(0.0)
     assert item["status"] == "ok"
-    assert confronto["resumo"]["total_nf"] == 120.0
 
 
 def test_confronto_usa_custo_final_da_nf_em_item_nao_pedido(monkeypatch):
-    def _composicao(_nota):
-        return {
-            101: {
-                "custo_aquisicao_total": 120.0,
-                "custo_aquisicao_unitario": 12.0,
-            }
-        }
-
-    monkeypatch.setattr(notas_entrada_routes, "calcular_composicao_custos_nota", _composicao)
+    _aplicar_composicao_custo_final(monkeypatch)
 
     pedido = SimpleNamespace(itens=[], valor_frete=0.0, valor_desconto=0.0)
     confronto = routes._realizar_confronto(
@@ -114,8 +116,6 @@ def test_confronto_usa_custo_final_da_nf_em_item_nao_pedido(monkeypatch):
     )
 
     item = confronto["itens"][0]
-    assert item["preco_nf"] == 12.0
-    assert item["valor_nf"] == 120.0
-    assert item["dif_valor"] == 120.0
+    _assert_custo_final_nf(item, confronto)
+    assert item["dif_valor"] == pytest.approx(120.0)
     assert item["status"] == "nao_pedido"
-    assert confronto["resumo"]["total_nf"] == 120.0
