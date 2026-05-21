@@ -49,9 +49,9 @@ def test_estoque_routes_nao_define_mais_helpers_de_contexto_movimentacoes():
         assert f"def {nome}(" not in source
 
 
-def test_estoque_routes_importa_helpers_de_contexto_movimentacoes():
-    source = _source("app/estoque_routes.py")
+def test_router_de_consulta_importa_helpers_de_contexto_movimentacoes():
+    source = _source("app/estoque_movimentacoes_consulta_routes.py")
 
-    assert "from .estoque_movimentacoes_context import (" in source
+    assert "from app.estoque_movimentacoes_context import (" in source
     assert "_contexto_venda_pedido_integrado" in source
     assert "_detalhar_reservas_ativas_produto" in source
