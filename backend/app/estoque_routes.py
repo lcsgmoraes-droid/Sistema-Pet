@@ -2913,15 +2913,6 @@ def atualizar_canal_saida_full_por_nf(
     }
 
 
-class TransferenciaEstoqueRequest(BaseModel):
-    """Transferência entre estoques"""
-    produto_id: int
-    quantidade: float = Field(gt=0)
-    estoque_origem: str = Field(default="fisico")  # fisico, ecommerce, consignado
-    estoque_destino: str
-    motivo: Optional[str] = "transferencia"
-    observacao: Optional[str] = None
-
 class MovimentacaoResponse(BaseModel):
     id: int
     produto_id: int
@@ -4727,91 +4718,6 @@ async def parse_saida_full_xml(
     except Exception as e:
         logger.error(f"Erro ao interpretar XML FULL NF: {e}")
         raise HTTPException(status_code=500, detail=f"Erro ao interpretar XML: {str(e)}")
-
-# ============================================================================
-# TRANSFERÊNCIA ENTRE ESTOQUES
-# ============================================================================
-
-@router.post("/transferencia", status_code=status.HTTP_201_CREATED)
-def transferencia_estoque(
-    transf: TransferenciaEstoqueRequest,
-    db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
-):
-    """
-    Transferência entre estoques
-    
-    Tipos de estoque:
-    - fisico: Estoque físico da loja
-    - ecommerce: Estoque online (marketplace)
-    - consignado: Produtos em consignação
-    """
-    current_user, tenant_id = user_and_tenant
-    logger.info(f"🔄 Transferência - Produto {transf.produto_id}: {transf.estoque_origem} → {transf.estoque_destino}")
-    
-    if transf.estoque_origem == transf.estoque_destino:
-        raise HTTPException(status_code=400, detail="Origem e destino não podem ser iguais")
-    
-    # Buscar produto
-    produto = db.query(Produto).filter(Produto.id == transf.produto_id, Produto.tenant_id == tenant_id).first()
-    if not produto:
-        raise HTTPException(status_code=404, detail="Produto não encontrado")
-    
-    estoque_anterior = produto.estoque_atual or 0
-    
-    # Validar estoque origem
-    # TODO: Implementar controle de estoques separados por tipo
-    # Por enquanto, valida apenas o estoque_atual total
-    if estoque_anterior < transf.quantidade:
-        raise HTTPException(
-            status_code=400,
-            detail=f"Estoque insuficiente em '{transf.estoque_origem}'"
-        )
-    
-    # Gerar código de transferência
-    codigo_transf = f"TRF-{datetime.now().strftime('%Y%m%d%H%M%S')}"
-    
-    # Movimentação de SAÍDA (origem)
-    mov_saida = EstoqueMovimentacao(
-        produto_id=produto.id,
-        tipo='transferencia',
-        motivo='transferencia_enviada',
-        quantidade=transf.quantidade,
-        quantidade_anterior=estoque_anterior,
-        quantidade_nova=estoque_anterior,  # Não altera total ainda
-        estoque_origem=transf.estoque_origem,
-        estoque_destino=transf.estoque_destino,
-        documento=codigo_transf,
-        observacao=transf.observacao,
-        user_id=current_user.id, tenant_id=tenant_id
-    )
-    db.add(mov_saida)
-    
-    # Movimentação de ENTRADA (destino)
-    mov_entrada = EstoqueMovimentacao(
-        produto_id=produto.id,
-        tipo='transferencia',
-        motivo='transferencia_recebida',
-        quantidade=transf.quantidade,
-        quantidade_anterior=estoque_anterior,
-        quantidade_nova=estoque_anterior,  # Não altera total
-        estoque_origem=transf.estoque_origem,
-        estoque_destino=transf.estoque_destino,
-        documento=codigo_transf,
-        observacao=transf.observacao,
-        user_id=current_user.id, tenant_id=tenant_id
-    )
-    db.add(mov_entrada)
-    
-    db.commit()
-    
-    logger.info(f"✅ Transferência registrada: {codigo_transf}")
-    
-    return {
-        "message": "Transferência registrada com sucesso",
-        "codigo": codigo_transf,
-        "movimentacoes": [mov_saida.id, mov_entrada.id]
-    }
 
 # ============================================================================
 # ALERTAS DE ESTOQUE
