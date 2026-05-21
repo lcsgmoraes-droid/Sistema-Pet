@@ -46,6 +46,8 @@ from app.caixa_routes import router as caixa_router
 from app.nfe_routes import router as nfe_router
 from app.estoque_routes import router as estoque_router
 from app.estoque_movimentacoes_manuais_routes import router as estoque_movimentacoes_manuais_router
+from app.estoque_entrada_manual_routes import router as estoque_entrada_manual_router
+from app.estoque_saida_manual_routes import router as estoque_saida_manual_router
 from app.estoque_granel_routes import router as estoque_granel_router
 from app.estoque_transferencia_routes import router as estoque_transferencia_router
 from app.estoque_transferencia_parceiro_routes import router as estoque_transferencia_parceiro_router
@@ -858,6 +860,8 @@ app.include_router(caixa_router, tags=["Controle de Caixa"])
 app.include_router(nfe_router, tags=["Nota Fiscal Eletrônica (NF-e)"], dependencies=_module_dependencies("fiscal"))
 app.include_router(estoque_router, tags=["Gestão de Estoque"])
 app.include_router(estoque_movimentacoes_manuais_router, tags=["Estoque - Movimentacoes Manuais"])
+app.include_router(estoque_entrada_manual_router, tags=["Estoque - Entrada Manual"])
+app.include_router(estoque_saida_manual_router, tags=["Estoque - Saida Manual"])
 app.include_router(estoque_granel_router, tags=["Estoque - Granel"])
 app.include_router(estoque_transferencia_router, tags=["Estoque - Transferencia"])
 app.include_router(estoque_transferencia_parceiro_router, tags=["Estoque - Transferencia Parceiro"])
