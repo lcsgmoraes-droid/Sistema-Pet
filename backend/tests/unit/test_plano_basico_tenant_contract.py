@@ -62,6 +62,15 @@ def test_config_estoque_expoe_parametros_de_validade():
     assert "bloquear_validade_integracoes_online" in source
 
 
+def test_ecommerce_consulta_saldo_vendavel_oficial_do_produto():
+    cart_source = _source("backend/app/routes/ecommerce_cart.py")
+    public_source = _source("backend/app/routes/ecommerce_public.py")
+
+    assert "produto.estoque_atual" in cart_source
+    assert "Produto.estoque_atual" in public_source
+    assert "quantidade_disponivel" not in cart_source
+
+
 def test_racao_calculadora_uses_tenant_selected_in_token():
     assert _depends_on_selected_tenant(racao_calculadora_routes.calcular_consumo_racao)
 

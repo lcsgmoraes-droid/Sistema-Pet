@@ -50,6 +50,9 @@ def _serializar(item: EstoqueValidadeBloqueio) -> dict:
         "lote_nome": item.lote.nome_lote if item.lote else None,
         "status": item.status,
         "decisao": item.decisao,
+        "origem": item.origem,
+        "created_at": item.created_at.isoformat() if item.created_at else None,
+        "decidido_em": item.decidido_em.isoformat() if item.decidido_em else None,
         "data_validade": item.data_validade.isoformat() if item.data_validade else None,
         "quantidade_bloqueada": float(item.quantidade_bloqueada or 0),
         "quantidade_resolvida": float(item.quantidade_resolvida or 0),
@@ -185,6 +188,7 @@ def alertas_pdv(
 def relatorio_perdas(
     data_inicio: Optional[datetime] = None,
     data_fim: Optional[datetime] = None,
+    incluir_todos_status: bool = False,
     user_and_tenant=Depends(get_current_user_and_tenant),
     db: Session = Depends(get_session),
 ):
@@ -194,11 +198,16 @@ def relatorio_perdas(
         .options(joinedload(EstoqueValidadeBloqueio.produto), joinedload(EstoqueValidadeBloqueio.lote))
         .filter(
             EstoqueValidadeBloqueio.tenant_id == tenant_id,
-            EstoqueValidadeBloqueio.status.in_(
-                ["descartado", "trocado_fornecedor", "retornado_vendavel", "pendente"]
-            ),
         )
     )
+    if incluir_todos_status:
+        query = query.filter(
+            EstoqueValidadeBloqueio.status.in_(
+                ["descartado", "trocado_fornecedor", "retornado_vendavel", "pendente"]
+            )
+        )
+    else:
+        query = query.filter(EstoqueValidadeBloqueio.status == "descartado")
     if data_inicio:
         query = query.filter(EstoqueValidadeBloqueio.created_at >= data_inicio)
     if data_fim:
