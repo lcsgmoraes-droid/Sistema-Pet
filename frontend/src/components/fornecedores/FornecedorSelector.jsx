@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { Building2, ChevronDown, Plus, Search, X } from "lucide-react";
 import { buscarClientes, criarCliente } from "../../api/clientes";
 import ActionButton from "../ui/ActionButton";
@@ -61,6 +62,7 @@ function NovoFornecedorRapidoModal({
 
   const handleSubmit = async (event) => {
     event.preventDefault();
+    event.stopPropagation();
     const nome = formData.nome.trim();
 
     if (!nome) {
@@ -251,6 +253,7 @@ export default function FornecedorSelector({
   const [aberto, setAberto] = useState(false);
   const [buscando, setBuscando] = useState(false);
   const [modalNovoAberto, setModalNovoAberto] = useState(false);
+  const portalRoot = typeof document !== "undefined" ? document.body : null;
 
   useEffect(() => {
     if (value !== undefined) {
@@ -562,12 +565,13 @@ export default function FornecedorSelector({
         </div>
       ) : null}
 
-      {modalNovoAberto ? (
+      {modalNovoAberto && portalRoot ? createPortal(
         <NovoFornecedorRapidoModal
           nomeInicial={termo}
           onClose={() => setModalNovoAberto(false)}
           onCreated={handleFornecedorCriado}
-        />
+        />,
+        portalRoot,
       ) : null}
     </div>
   );
