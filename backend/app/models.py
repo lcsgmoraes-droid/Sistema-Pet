@@ -622,6 +622,11 @@ class Tenant(Base):
 
     # Configurações operacionais
     permite_estoque_negativo = Column(Boolean, nullable=False, server_default='false')
+    protecao_validade_ativa = Column(Boolean, nullable=False, server_default='false')
+    dias_alerta_validade = Column(Integer, nullable=False, server_default='15')
+    bloquear_validade_pdv = Column(Boolean, nullable=False, server_default='true')
+    bloquear_validade_ecommerce = Column(Boolean, nullable=False, server_default='true')
+    bloquear_validade_integracoes_online = Column(Boolean, nullable=False, server_default='false')
     ecommerce_slug = Column(String(80), nullable=True, unique=True, index=True)
 
     # Configurações da loja virtual

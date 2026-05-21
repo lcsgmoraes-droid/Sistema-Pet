@@ -52,6 +52,25 @@ def test_basic_plan_route_files_use_selected_tenant_dependency():
     assert offenders == []
 
 
+def test_config_estoque_expoe_parametros_de_validade():
+    source = _source("backend/app/empresa_routes.py")
+
+    assert "protecao_validade_ativa" in source
+    assert "dias_alerta_validade" in source
+    assert "bloquear_validade_pdv" in source
+    assert "bloquear_validade_ecommerce" in source
+    assert "bloquear_validade_integracoes_online" in source
+
+
+def test_ecommerce_consulta_saldo_vendavel_oficial_do_produto():
+    cart_source = _source("backend/app/routes/ecommerce_cart.py")
+    public_source = _source("backend/app/routes/ecommerce_public.py")
+
+    assert "produto.estoque_atual" in cart_source
+    assert "Produto.estoque_atual" in public_source
+    assert "quantidade_disponivel" not in cart_source
+
+
 def test_racao_calculadora_uses_tenant_selected_in_token():
     assert _depends_on_selected_tenant(racao_calculadora_routes.calcular_consumo_racao)
 
@@ -301,7 +320,10 @@ def test_protected_route_enforces_any_of_permissions():
 
 
 def test_basic_finance_sales_menu_matches_direct_route_permissions():
-    layout_source = _source("frontend/src/components/Layout.jsx")
+    layout_source = (
+        _source("frontend/src/components/Layout.jsx")
+        + _source("frontend/src/components/layout/menuConfig.js")
+    )
     app_source = _source("frontend/src/App.jsx")
 
     assert "const itemLiberadoPorPermissao = (item) => {" in layout_source
@@ -379,7 +401,10 @@ def test_rh_simulation_page_is_module_gated_on_direct_url():
 
 def test_basic_direct_urls_apply_same_frontend_permissions_as_menu():
     app_source = _source("frontend/src/App.jsx")
-    layout_source = _source("frontend/src/components/Layout.jsx")
+    layout_source = (
+        _source("frontend/src/components/Layout.jsx")
+        + _source("frontend/src/components/layout/menuConfig.js")
+    )
 
     expected_route_guards = [
         'path="pets" element={<ProtectedRoute permission="clientes.visualizar"><GerenciamentoPets /></ProtectedRoute>}',
@@ -409,7 +434,10 @@ def test_basic_direct_urls_apply_same_frontend_permissions_as_menu():
 def test_financial_chat_ia_is_not_available_in_basic_without_premium_module():
     main_source = _source("backend/app/main.py")
     app_source = _source("frontend/src/App.jsx")
-    layout_source = _source("frontend/src/components/Layout.jsx")
+    layout_source = (
+        _source("frontend/src/components/Layout.jsx")
+        + _source("frontend/src/components/layout/menuConfig.js")
+    )
     modulo_bloqueado_source = _source("frontend/src/components/ModuloBloqueado.jsx")
 
     assert (
@@ -477,7 +505,10 @@ def test_ia_fluxo_caixa_uses_selected_tenant_context():
 
 def test_product_catalog_auxiliary_pages_are_basic_catalog_not_premium_modules():
     app_source = _source("frontend/src/App.jsx")
-    layout_source = _source("frontend/src/components/Layout.jsx")
+    layout_source = (
+        _source("frontend/src/components/Layout.jsx")
+        + _source("frontend/src/components/layout/menuConfig.js")
+    )
 
     assert 'path="cadastros/departamentos" element={<ProtectedRoute permission="cadastros.categorias_produtos"><Departamentos /></ProtectedRoute>}' in app_source
     assert 'path="cadastros/marcas" element={<ProtectedRoute permission="cadastros.categorias_produtos"><Marcas /></ProtectedRoute>}' in app_source
