@@ -158,3 +158,110 @@ class EstoqueValidadeService:
         bloqueio.observacao = observacao
         db.flush()
         return bloqueio
+
+    @staticmethod
+    def processar_lotes_em_risco(
+        *,
+        db: Session,
+        tenant,
+        user_id: int | None,
+        agora: datetime | None = None,
+    ) -> dict:
+        agora = agora or _agora_utc()
+        if not bool(getattr(tenant, "protecao_validade_ativa", False)):
+            return {"processados": 0, "bloqueios": []}
+
+        from datetime import timedelta
+
+        limite = agora + timedelta(days=int(getattr(tenant, "dias_alerta_validade", 15) or 15))
+        lotes = (
+            db.query(ProdutoLote)
+            .join(Produto, Produto.id == ProdutoLote.produto_id)
+            .filter(
+                ProdutoLote.tenant_id == tenant.id,
+                ProdutoLote.status == "ativo",
+                ProdutoLote.quantidade_disponivel > 0,
+                ProdutoLote.data_validade.isnot(None),
+                ProdutoLote.data_validade <= limite,
+                Produto.situacao.isnot(False),
+            )
+            .all()
+        )
+
+        bloqueios = []
+        for lote in lotes:
+            existente = (
+                db.query(EstoqueValidadeBloqueio)
+                .filter(
+                    EstoqueValidadeBloqueio.tenant_id == tenant.id,
+                    EstoqueValidadeBloqueio.lote_id == lote.id,
+                    EstoqueValidadeBloqueio.status.in_(list(STATUS_ABERTOS)),
+                )
+                .first()
+            )
+            if existente:
+                continue
+            bloqueios.append(
+                EstoqueValidadeService.bloquear_lote(
+                    db=db,
+                    tenant_id=tenant.id,
+                    user_id=user_id,
+                    produto=lote.produto,
+                    lote=lote,
+                    agora=agora,
+                    origem="rotina",
+                )
+            )
+
+        return {"processados": len(bloqueios), "bloqueios": bloqueios}
+
+    @staticmethod
+    def trocar_com_fornecedor(
+        *,
+        db: Session,
+        tenant_id: str,
+        user_id: int,
+        bloqueio: EstoqueValidadeBloqueio,
+        observacao: str | None = None,
+        agora: datetime | None = None,
+    ) -> EstoqueValidadeBloqueio:
+        agora = agora or _agora_utc()
+        lote = bloqueio.lote
+        lote.quantidade_disponivel = 0
+        lote.status = "trocado_fornecedor"
+
+        bloqueio.status = "trocado_fornecedor"
+        bloqueio.decisao = "trocado_fornecedor"
+        bloqueio.quantidade_resolvida = _to_float(bloqueio.quantidade_bloqueada)
+        bloqueio.decidido_por_user_id = user_id
+        bloqueio.decidido_em = agora
+        bloqueio.observacao = observacao
+        db.flush()
+        return bloqueio
+
+    @staticmethod
+    def retornar_ao_vendavel(
+        *,
+        db: Session,
+        tenant_id: str,
+        user_id: int,
+        bloqueio: EstoqueValidadeBloqueio,
+        observacao: str | None = None,
+        agora: datetime | None = None,
+    ) -> EstoqueValidadeBloqueio:
+        agora = agora or _agora_utc()
+        produto = bloqueio.produto
+        lote = bloqueio.lote
+        quantidade = max(_to_float(bloqueio.quantidade_bloqueada) - _to_float(bloqueio.quantidade_resolvida), 0)
+
+        produto.estoque_atual = _to_float(getattr(produto, "estoque_atual", 0)) + quantidade
+        lote.status = "ativo"
+
+        bloqueio.status = "retornado_vendavel"
+        bloqueio.decisao = "retornado_vendavel"
+        bloqueio.quantidade_resolvida = _to_float(bloqueio.quantidade_bloqueada)
+        bloqueio.decidido_por_user_id = user_id
+        bloqueio.decidido_em = agora
+        bloqueio.observacao = observacao
+        db.flush()
+        return bloqueio

@@ -46,6 +46,7 @@ from app.caixa_routes import router as caixa_router
 from app.nfe_routes import router as nfe_router
 from app.estoque_routes import router as estoque_router
 from app.estoque_alertas_routes import router as estoque_alertas_router
+from app.estoque_validade_routes import router as estoque_validade_router
 from app.bling_sync_routes import router as bling_sync_router
 from app.pedidos_compra_routes import router as pedidos_compra_router
 from app.fornecedor_grupos_routes import router as fornecedor_grupos_router
@@ -843,6 +844,7 @@ app.include_router(vendas_router, tags=["Vendas & PDV"])
 app.include_router(caixa_router, tags=["Controle de Caixa"])
 app.include_router(nfe_router, tags=["Nota Fiscal Eletrônica (NF-e)"], dependencies=_module_dependencies("fiscal"))
 app.include_router(estoque_router, tags=["Gestão de Estoque"])
+app.include_router(estoque_validade_router, tags=["Estoque - Validade"])
 app.include_router(estoque_alertas_router, tags=["Estoque - Alertas Negativo"])
 app.include_router(bling_sync_router, tags=["Sincronização Bling"], dependencies=_module_dependencies("bling"))
 app.include_router(fornecedor_grupos_router, tags=["Grupos de Fornecedores"])
