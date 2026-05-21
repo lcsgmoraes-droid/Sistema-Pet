@@ -1,5 +1,6 @@
 import { AlertCircle } from "lucide-react";
 import SaleReference from "../ui/SaleReference";
+import { buildValidadePdvMessage } from "./pdvValidadeAlertUtils";
 
 function formatarDataVenda(dataVenda) {
   if (!dataVenda) {
@@ -19,7 +20,10 @@ export default function PDVInfoBanners({
   temCaixaAberto,
   modoVisualizacao,
   vendaAtual,
+  validadeAlertas = [],
 }) {
+  const mensagemValidade = buildValidadePdvMessage(validadeAlertas);
+
   return (
     <>
       {!temCaixaAberto && !modoVisualizacao && (
@@ -31,6 +35,17 @@ export default function PDVInfoBanners({
               <span className="text-sm">
                 - e necessario abrir o caixa para registrar vendas e recebimentos
               </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {mensagemValidade && (
+        <div className="border-b border-amber-200 bg-amber-50 px-6 py-3">
+          <div className="mx-auto flex max-w-5xl items-center justify-center">
+            <div className="flex items-center gap-2 text-amber-900">
+              <AlertCircle className="h-5 w-5 shrink-0" />
+              <span className="text-sm font-semibold">{mensagemValidade}</span>
             </div>
           </div>
         </div>

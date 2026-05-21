@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import PDVAcoesFooterCard from "./PDVAcoesFooterCard";
 import PDVClienteCard from "./PDVClienteCard";
 import PDVComissaoCard from "./PDVComissaoCard";
@@ -8,6 +9,11 @@ import PDVModoVisualizacaoBanner from "./PDVModoVisualizacaoBanner";
 import PDVObservacoesCard from "./PDVObservacoesCard";
 import PDVProdutosCard from "./PDVProdutosCard";
 import PDVResumoFinanceiroCard from "./PDVResumoFinanceiroCard";
+import api from "../../api";
+import {
+  buildValidadePdvQuery,
+  extractProdutoIdsCarrinho,
+} from "./pdvValidadeAlertUtils";
 
 export default function PDVMainArea(props) {
   const {
@@ -114,6 +120,40 @@ export default function PDVMainArea(props) {
     onNovaVenda,
   } = props;
 
+  const [validadeAlertas, setValidadeAlertas] = useState([]);
+  const validadeQuery = buildValidadePdvQuery(
+    extractProdutoIdsCarrinho(vendaAtual.itens)
+  );
+
+  useEffect(() => {
+    let cancelado = false;
+
+    async function carregarAlertasValidade() {
+      if (!validadeQuery || modoVisualizacao) {
+        setValidadeAlertas([]);
+        return;
+      }
+
+      try {
+        const res = await api.get(`/estoque/validade/pdv-alertas?${validadeQuery}`);
+        if (!cancelado) {
+          const items = res.data?.items || res.data?.alertas || [];
+          setValidadeAlertas(Array.isArray(items) ? items : []);
+        }
+      } catch {
+        if (!cancelado) {
+          setValidadeAlertas([]);
+        }
+      }
+    }
+
+    carregarAlertasValidade();
+
+    return () => {
+      cancelado = true;
+    };
+  }, [validadeQuery, modoVisualizacao]);
+
   const selecionarClienteEFocarProduto = async (cliente) => {
     await onSelecionarCliente(cliente);
     setTimeout(() => inputProdutoRef.current?.focus(), 80);
@@ -154,6 +194,7 @@ export default function PDVMainArea(props) {
         temCaixaAberto={temCaixaAberto}
         modoVisualizacao={modoVisualizacao}
         vendaAtual={vendaAtual}
+        validadeAlertas={validadeAlertas}
       />
 
       <PDVModoVisualizacaoBanner

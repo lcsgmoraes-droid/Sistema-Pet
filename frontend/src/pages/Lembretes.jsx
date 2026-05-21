@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
-import { FiBell, FiCheckCircle, FiRefreshCw, FiTrash2 } from "react-icons/fi";
+import { FiBell, FiCheckCircle, FiRefreshCw, FiPackage, FiTrash2 } from "react-icons/fi";
 import { useNavigate } from "react-router-dom";
 import api from "../api";
 import CustomerIdentity from "../components/ui/CustomerIdentity";
@@ -16,6 +16,7 @@ export default function Lembretes() {
   const [alertasCampanhas, setAlertasCampanhas] = useState(null);
   const [dresPendentes, setDresPendentes] = useState(0);
   const [autocadastrosBling, setAutocadastrosBling] = useState({ total: 0, items: [] });
+  const [validadePendencias, setValidadePendencias] = useState([]);
   const navigate = useNavigate();
   const campanhasAtivo = moduloAtivo("campanhas");
   const financeiroErpAtivo = moduloAtivo("financeiro_erp");
@@ -29,10 +30,12 @@ export default function Lembretes() {
     else setDresPendentes(0);
     if (blingAtivo) carregarAutocadastrosBling();
     else setAutocadastrosBling({ total: 0, items: [] });
+    carregarValidadePendencias();
     // Atualizar a cada 1 minuto
     const interval = setInterval(() => {
       carregarLembretes();
       if (blingAtivo) carregarAutocadastrosBling();
+      carregarValidadePendencias();
     }, 60000);
     return () => clearInterval(interval);
   }, [campanhasAtivo, financeiroErpAtivo, blingAtivo]);
@@ -66,6 +69,15 @@ export default function Lembretes() {
       setDresPendentes(res.data?.total_pendentes || 0);
     } catch {
       // silencioso
+    }
+  };
+
+  const carregarValidadePendencias = async () => {
+    try {
+      const res = await api.get("/estoque/validade/pendencias");
+      setValidadePendencias(Array.isArray(res.data?.items) ? res.data.items : []);
+    } catch {
+      setValidadePendencias([]);
     }
   };
 
@@ -114,8 +126,36 @@ export default function Lembretes() {
     }
   };
 
+  const resolverValidade = async (item, acao) => {
+    const endpoints = {
+      descartar: "descartar",
+      trocar: "trocar-fornecedor",
+      retornar: "retornar-vendavel",
+    };
+    const mensagens = {
+      descartar: "Registrar este lote como descartado e prejuizo?",
+      trocar: "Registrar este lote como trocado com o fornecedor?",
+      retornar: "Retornar este lote para o estoque vendavel?",
+    };
+
+    if (!endpoints[acao]) return;
+    if (!window.confirm(mensagens[acao])) return;
+
+    try {
+      await api.post(`/estoque/validade/${item.id}/${endpoints[acao]}`, {
+        observacao: null,
+      });
+      toast.success("Pendencia de validade atualizada");
+      carregarValidadePendencias();
+    } catch (error) {
+      console.error("Erro ao resolver pendencia de validade:", error);
+      toast.error("Erro ao atualizar pendencia de validade");
+    }
+  };
+
   const proximosEmBreve = lembretes.filter((l) => l.dias_restantes <= 7);
   const vencidos = lembretes.filter((l) => l.dias_restantes < 0);
+  const semPendencias = lembretes.length === 0 && validadePendencias.length === 0;
 
   return (
     <div className="lembretes-container">
@@ -696,9 +736,97 @@ export default function Lembretes() {
         </div>
       )}
 
+      {validadePendencias.length > 0 && (
+        <div
+          style={{
+            marginBottom: "20px",
+            borderRadius: "12px",
+            border: "1px solid #fbbf24",
+            overflow: "hidden",
+            background: "#fff",
+          }}
+        >
+          <div
+            style={{
+              background: "#fffbeb",
+              padding: "12px 20px",
+              borderBottom: "1px solid #fbbf24",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              gap: "10px",
+            }}
+          >
+            <span style={{ fontWeight: "700", color: "#92400e", fontSize: "14px" }}>
+              Produtos removidos por validade
+            </span>
+            <span style={{ fontWeight: "700", color: "#92400e", fontSize: "14px" }}>
+              {validadePendencias.length}
+            </span>
+          </div>
+          <div style={{ padding: "14px 20px", display: "grid", gap: "10px" }}>
+            {validadePendencias.map((item) => (
+              <div
+                key={item.id}
+                style={{
+                  border: "1px solid #fde68a",
+                  borderRadius: "10px",
+                  background: "#fffbeb",
+                  padding: "12px",
+                  display: "grid",
+                  gap: "10px",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
+                  <div>
+                    <p style={{ margin: "0 0 4px", color: "#78350f", fontWeight: 700 }}>
+                      {item.produto_nome || "Produto sem nome"}
+                    </p>
+                    <p style={{ margin: 0, color: "#92400e", fontSize: "13px" }}>
+                      Lote {item.lote_nome || item.lote_id} - vence em {formatarDataValidade(item.data_validade)}
+                    </p>
+                  </div>
+                  <div style={{ textAlign: "right" }}>
+                    <p style={{ margin: "0 0 4px", color: "#78350f", fontWeight: 700 }}>
+                      {Number(item.quantidade_bloqueada || 0).toLocaleString("pt-BR")} un.
+                    </p>
+                    <p style={{ margin: 0, color: "#92400e", fontSize: "13px" }}>
+                      Custo estimado: {formatarMoeda(item.custo_total_estimado)}
+                    </p>
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={() => resolverValidade(item, "descartar")}
+                    className="btn btn-danger"
+                  >
+                    <FiTrash2 /> Descartado
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => resolverValidade(item, "trocar")}
+                    className="btn btn-primary"
+                  >
+                    <FiPackage /> Trocado
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => resolverValidade(item, "retornar")}
+                    className="btn btn-success"
+                  >
+                    <FiRefreshCw /> Retornar ao estoque
+                  </button>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {loading && <div className="loading">Carregando lembretes...</div>}
 
-      {lembretes.length === 0 ? (
+      {semPendencias ? (
         <div className="empty-state">
           <FiBell size={48} />
           <h2>Nenhum lembrete pendente</h2>
@@ -760,6 +888,18 @@ export default function Lembretes() {
       )}
     </div>
   );
+}
+
+function formatarDataValidade(data) {
+  if (!data) return "sem data";
+  return new Date(data).toLocaleDateString("pt-BR");
+}
+
+function formatarMoeda(valor) {
+  return Number(valor || 0).toLocaleString("pt-BR", {
+    style: "currency",
+    currency: "BRL",
+  });
 }
 
 function LembretCard({ lembrete, onCompletar, onRenovar, onCancelar }) {
