@@ -27,10 +27,16 @@ class Cargo(BaseTenantModel):
     nome = Column(String(100), nullable=False, index=True)
     descricao = Column(Text, nullable=True)
     salario_base = Column(Numeric, nullable=False)
+    regime_remuneracao = Column(String(30), nullable=False, default="clt", server_default="clt")
     
     # Encargos trabalhistas
+    gera_encargos = Column(Boolean, nullable=False, default=True, server_default="1")
     inss_patronal_percentual = Column(Numeric, nullable=False, default=20)
     fgts_percentual = Column(Numeric, nullable=False, default=8)
+    inss_funcionario_percentual = Column(Numeric, nullable=False, default=0, server_default="0")
+    inss_funcionario_valor = Column(Numeric, nullable=False, default=0, server_default="0")
+    desconto_transporte_valor = Column(Numeric, nullable=False, default=0, server_default="0")
+    outros_descontos_valor = Column(Numeric, nullable=False, default=0, server_default="0")
     
     # Provisões automáticas
     gera_ferias = Column(Boolean, nullable=False, default=True)

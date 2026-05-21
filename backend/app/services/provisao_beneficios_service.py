@@ -20,6 +20,7 @@ from app.ia.aba7_dre_detalhada_models import DREDetalheCanal
 from app.financeiro_models import CategoriaFinanceira
 from app.models import Cliente
 from app.cargo_models import Cargo
+from app.services.remuneracao_service import calcular_composicao_remuneracao
 
 import logging
 logger = logging.getLogger(__name__)
@@ -97,12 +98,14 @@ def gerar_provisao_ferias_e_13_mensal(
     detalhes_funcionarios = []
     
     for funcionario, cargo in funcionarios:
-        salario = Decimal(str(cargo.salario_base))
+        composicao = calcular_composicao_remuneracao(cargo, funcionario)
+        salario = Decimal(str(composicao["salario_base"]))
+        usa_encargos = bool(composicao["usa_encargos"])
         
         # Provisão mensal = salário / 12
-        ferias_mensal = salario / Decimal("12")
-        terco_mensal = ferias_mensal / Decimal("3")  # 1/3 das férias
-        decimo_mensal = salario / Decimal("12")
+        ferias_mensal = salario / Decimal("12") if usa_encargos and cargo.gera_ferias else Decimal("0.00")
+        terco_mensal = ferias_mensal / Decimal("3") if ferias_mensal > 0 else Decimal("0.00")
+        decimo_mensal = salario / Decimal("12") if usa_encargos and cargo.gera_decimo_terceiro else Decimal("0.00")
         
         total_ferias += ferias_mensal
         total_terco += terco_mensal

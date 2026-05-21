@@ -23,6 +23,7 @@ from app.ia.aba7_dre_detalhada_models import DREDetalheCanal
 from app.financeiro_models import CategoriaFinanceira, ContaPagar
 from app.models import Cliente
 from app.cargo_models import Cargo
+from app.services.remuneracao_service import calcular_composicao_remuneracao
 
 import logging
 logger = logging.getLogger(__name__)
@@ -107,7 +108,8 @@ def pagar_decimo_terceiro(
     )
 
     # 2️⃣ Calcular valor real do 13º
-    salario = Decimal(str(cargo.salario_base))
+    composicao = calcular_composicao_remuneracao(cargo, funcionario)
+    salario = Decimal(str(composicao["salario_base"]))
     percentual_decimal = Decimal(str(percentual)) / Decimal("100")
     valor_real = (salario * percentual_decimal).quantize(Decimal("0.01"))
 
@@ -157,7 +159,7 @@ def pagar_decimo_terceiro(
     if (hoje - data_contratacao).days >= 1 and meses_no_ano == 0:
         meses_no_ano = 1
 
-    if cargo.gera_decimo_terceiro:
+    if bool(composicao["usa_encargos"]) and cargo.gera_decimo_terceiro:
         provisao_13 = (salario / 12 * meses_no_ano).quantize(Decimal("0.01"))
     else:
         provisao_13 = Decimal("0.00")

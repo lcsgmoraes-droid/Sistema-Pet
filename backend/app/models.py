@@ -229,6 +229,11 @@ class Cliente(BaseTenantModel):
     # 👔 RH - FUNCIONÁRIOS (novo)
     # cargo_id = Column(Integer, ForeignKey("cargos.id"), nullable=True, index=True)  # FK para tabela cargos
     cargo_id = Column(Integer, nullable=True, index=True)  # FK temporária sem constraint (tabela cargos não existe ainda)
+    salario_base_override = Column(Numeric(10, 2), nullable=True)
+    liquido_combinado = Column(Numeric(10, 2), nullable=True)
+    complemento_modo = Column(String(20), nullable=False, default="automatico", server_default="automatico")
+    complemento_fixo_valor = Column(Numeric(10, 2), nullable=False, default=0, server_default="0")
+    remuneracao_observacoes = Column(Text, nullable=True)
 
     # 💰 CONFIGURAÇÃO DE COMISSÕES
     data_fechamento_comissao = Column(Integer, nullable=True)  # Dia do mês (1-31) para fechamento de comissão
