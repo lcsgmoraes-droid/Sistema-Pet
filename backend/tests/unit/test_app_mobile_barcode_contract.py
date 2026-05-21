@@ -34,3 +34,6 @@ def test_barcode_scanner_price_card_does_not_wrap_price():
     assert "adjustsFontSizeToFit" in source
     assert "minimumFontScale={0.75}" in source
     assert "produtoInfo: { flex: 1, minWidth: 0 }" in source
+    assert "formatarMoedaScanner" in source
+    assert ".replace(/\\s+/g, '\\u00A0')" in source
+    assert "maxWidth: 112" in source

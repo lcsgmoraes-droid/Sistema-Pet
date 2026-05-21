@@ -24,6 +24,10 @@ function mensagemErroApi(error: any, fallback: string) {
   return fallback;
 }
 
+function formatarMoedaScanner(valor: number | null | undefined) {
+  return formatarMoeda(valor).replace(/\s+/g, '\u00A0');
+}
+
 export default function BarcodeScannerScreen({ navigation }: any) {
   const isFocused = useIsFocused();
   const [permission, requestPermission] = useCameraPermissions();
@@ -213,7 +217,7 @@ export default function BarcodeScannerScreen({ navigation }: any) {
             <View style={styles.produtoPrecoWrap}>
               {produtoEncontrado.promocao_ativa && produtoEncontrado.preco_promocional ? (
                 <Text style={styles.produtoPrecoOriginal} numberOfLines={1}>
-                  {formatarMoeda(produtoEncontrado.preco)}
+                  {formatarMoedaScanner(produtoEncontrado.preco)}
                 </Text>
               ) : null}
               <Text
@@ -222,7 +226,7 @@ export default function BarcodeScannerScreen({ navigation }: any) {
                 adjustsFontSizeToFit
                 minimumFontScale={0.75}
               >
-                {formatarMoeda(
+                {formatarMoedaScanner(
                   produtoEncontrado.promocao_ativa && produtoEncontrado.preco_promocional
                     ? produtoEncontrado.preco_promocional
                     : produtoEncontrado.preco
@@ -320,7 +324,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: ESPACO.md,
   },
-  produtoPrecoWrap: { flex: 1, minWidth: 0, paddingRight: ESPACO.sm },
+  produtoPrecoWrap: { flexShrink: 1, minWidth: 88, maxWidth: 112, paddingRight: ESPACO.xs },
   produtoPrecoOriginal: { fontSize: FONTE.pequena, color: CORES.textoClaro, textDecorationLine: 'line-through', marginBottom: 2 },
   produtoPreco: { fontSize: FONTE.grande, fontWeight: 'bold', color: CORES.primario },
   botaoEscanear: {
