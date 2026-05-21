@@ -1,6 +1,11 @@
 import { useEffect, useState } from "react";
 import api from "../../api";
 import toast from "react-hot-toast";
+import {
+  normalizarCamposRemuneracao,
+  numeroCampoParaFloat,
+  sincronizarCampoRemuneracao,
+} from "./cargosRemuneracaoUtils";
 
 export default function Cargos() {
   const [cargos, setCargos] = useState([]);
@@ -14,7 +19,9 @@ export default function Cargos() {
     regime_remuneracao: "clt",
     gera_encargos: true,
     inss_patronal_percentual: 20,
+    inss_patronal_valor: 0,
     fgts_percentual: 8,
+    fgts_valor: 0,
     inss_funcionario_percentual: 0,
     inss_funcionario_valor: 0,
     desconto_transporte_valor: 0,
@@ -24,19 +31,22 @@ export default function Cargos() {
     ativo: true,
   });
 
-  const prepararCargo = (dados) => ({
-    ...dados,
-    salario_base: Number(dados.salario_base || 0),
-    inss_patronal_percentual: Number(dados.inss_patronal_percentual || 0),
-    fgts_percentual: Number(dados.fgts_percentual || 0),
-    inss_funcionario_percentual: Number(dados.inss_funcionario_percentual || 0),
-    inss_funcionario_valor: Number(dados.inss_funcionario_valor || 0),
-    desconto_transporte_valor: Number(dados.desconto_transporte_valor || 0),
-    outros_descontos_valor: Number(dados.outros_descontos_valor || 0),
-  });
+  const prepararCargo = (dados) => {
+    const { inss_patronal_valor, fgts_valor, ...dadosPersistiveis } = dados;
+    return {
+      ...dadosPersistiveis,
+      salario_base: numeroCampoParaFloat(dados.salario_base),
+      inss_patronal_percentual: numeroCampoParaFloat(dados.inss_patronal_percentual),
+      fgts_percentual: numeroCampoParaFloat(dados.fgts_percentual),
+      inss_funcionario_percentual: numeroCampoParaFloat(dados.inss_funcionario_percentual),
+      inss_funcionario_valor: numeroCampoParaFloat(dados.inss_funcionario_valor),
+      desconto_transporte_valor: numeroCampoParaFloat(dados.desconto_transporte_valor),
+      outros_descontos_valor: numeroCampoParaFloat(dados.outros_descontos_valor),
+    };
+  };
 
   const editarCargo = (cargo) => {
-    setForm({ ...cargoPadrao(), ...cargo });
+    setForm(normalizarCamposRemuneracao({ ...cargoPadrao(), ...cargo }));
   };
 
   const carregarCargos = async () => {
@@ -57,7 +67,11 @@ export default function Cargos() {
   }, []);
 
   const novoCargo = () => {
-    setForm(cargoPadrao());
+    setForm(normalizarCamposRemuneracao(cargoPadrao()));
+  };
+
+  const atualizarCampoRemuneracao = (campo, valor) => {
+    setForm((formAtual) => sincronizarCampoRemuneracao(formAtual, campo, valor));
   };
 
   const salvarCargo = async () => {
@@ -283,7 +297,7 @@ export default function Cargos() {
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 placeholder="0.00"
                 value={form.salario_base}
-                onChange={(e) => setForm({ ...form, salario_base: e.target.value })}
+                onChange={(e) => atualizarCampoRemuneracao("salario_base", e.target.value)}
               />
             </div>
 
@@ -343,7 +357,21 @@ export default function Cargos() {
                 max="100"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 value={form.inss_patronal_percentual}
-                onChange={(e) => setForm({ ...form, inss_patronal_percentual: e.target.value })}
+                onChange={(e) => atualizarCampoRemuneracao("inss_patronal_percentual", e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                INSS Patronal (R$)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                value={form.inss_patronal_valor}
+                onChange={(e) => atualizarCampoRemuneracao("inss_patronal_valor", e.target.value)}
               />
             </div>
 
@@ -359,7 +387,21 @@ export default function Cargos() {
                 max="100"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 value={form.fgts_percentual}
-                onChange={(e) => setForm({ ...form, fgts_percentual: e.target.value })}
+                onChange={(e) => atualizarCampoRemuneracao("fgts_percentual", e.target.value)}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">
+                FGTS (R$)
+              </label>
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                value={form.fgts_valor}
+                onChange={(e) => atualizarCampoRemuneracao("fgts_valor", e.target.value)}
               />
             </div>
 
@@ -374,7 +416,7 @@ export default function Cargos() {
                 max="100"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 value={form.inss_funcionario_percentual}
-                onChange={(e) => setForm({ ...form, inss_funcionario_percentual: e.target.value })}
+                onChange={(e) => atualizarCampoRemuneracao("inss_funcionario_percentual", e.target.value)}
               />
             </div>
 
@@ -388,7 +430,7 @@ export default function Cargos() {
                 min="0"
                 className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
                 value={form.inss_funcionario_valor}
-                onChange={(e) => setForm({ ...form, inss_funcionario_valor: e.target.value })}
+                onChange={(e) => atualizarCampoRemuneracao("inss_funcionario_valor", e.target.value)}
               />
             </div>
 
