@@ -48,6 +48,7 @@ from app.estoque_routes import router as estoque_router
 from app.estoque_granel_routes import router as estoque_granel_router
 from app.estoque_transferencia_routes import router as estoque_transferencia_router
 from app.estoque_transferencia_parceiro_routes import router as estoque_transferencia_parceiro_router
+from app.estoque_saida_full_routes import router as estoque_saida_full_router
 from app.estoque_alertas_routes import router as estoque_alertas_router
 from app.estoque_validade_routes import router as estoque_validade_router
 from app.bling_sync_routes import router as bling_sync_router
@@ -854,6 +855,7 @@ app.include_router(estoque_router, tags=["Gestão de Estoque"])
 app.include_router(estoque_granel_router, tags=["Estoque - Granel"])
 app.include_router(estoque_transferencia_router, tags=["Estoque - Transferencia"])
 app.include_router(estoque_transferencia_parceiro_router, tags=["Estoque - Transferencia Parceiro"])
+app.include_router(estoque_saida_full_router, tags=["Estoque - Saida FULL"])
 app.include_router(estoque_validade_router, tags=["Estoque - Validade"])
 app.include_router(estoque_alertas_router, tags=["Estoque - Alertas Negativo"])
 app.include_router(bling_sync_router, tags=["Sincronização Bling"], dependencies=_module_dependencies("bling"))
