@@ -28,7 +28,7 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_, func, desc
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel, Field
 from collections import defaultdict
@@ -2808,6 +2808,54 @@ def _gerar_observacao(
 # CONFRONTO PEDIDO x NF-e
 # ============================================================================
 
+def _float_confronto(value: Any, default: float = 0.0) -> float:
+    try:
+        if value is None:
+            return default
+        return float(value)
+    except (TypeError, ValueError):
+        return default
+
+
+def _calcular_composicoes_custo_confronto(notas: List) -> Dict[int, Dict[str, Any]]:
+    """Reaproveita o custo final calculado na entrada da NF para o confronto."""
+    try:
+        from . import notas_entrada_routes
+    except ImportError:
+        logger.exception("Nao foi possivel importar composicao de custos da NF para confronto")
+        return {}
+
+    composicoes: Dict[int, Dict[str, Any]] = {}
+    for nota in notas:
+        try:
+            composicoes.update(notas_entrada_routes.calcular_composicao_custos_nota(nota) or {})
+        except Exception:
+            logger.exception(
+                "Falha ao calcular custo final da NF no confronto pedido x nota",
+                extra={"nota_entrada_id": getattr(nota, "id", None)},
+            )
+    return composicoes
+
+
+def _valor_custo_final_item_nf(item_nf: Any, composicoes_custo: Dict[int, Dict[str, Any]]) -> float:
+    composicao = composicoes_custo.get(getattr(item_nf, "id", None)) or {}
+    if composicao.get("custo_aquisicao_total") is not None:
+        return _float_confronto(composicao.get("custo_aquisicao_total"))
+    return _float_confronto(getattr(item_nf, "valor_total", 0))
+
+
+def _preco_custo_final_item_nf(item_nf: Any, composicoes_custo: Dict[int, Dict[str, Any]]) -> float:
+    valor_total = _valor_custo_final_item_nf(item_nf, composicoes_custo)
+    quantidade = _float_confronto(getattr(item_nf, "quantidade", 0))
+    if quantidade:
+        return valor_total / quantidade
+
+    composicao = composicoes_custo.get(getattr(item_nf, "id", None)) or {}
+    if composicao.get("custo_aquisicao_unitario") is not None:
+        return _float_confronto(composicao.get("custo_aquisicao_unitario"))
+    return _float_confronto(getattr(item_nf, "valor_unitario", 0))
+
+
 def _realizar_confronto_legado(pedido: PedidoCompra, nota, db: Session, tenant_id: int) -> dict:
     """Gera o confronto completo entre pedido e NF-e."""
     from .produtos_models import NotaEntrada, NotaEntradaItem
@@ -2817,6 +2865,7 @@ def _realizar_confronto_legado(pedido: PedidoCompra, nota, db: Session, tenant_i
     total_nf = 0.0
     tem_divergencia_qtd = False
     tem_divergencia_preco = False
+    composicoes_custo = _calcular_composicoes_custo_confronto([nota])
 
     for item_pedido in pedido.itens:
         produto = db.query(Produto).filter(
@@ -2852,8 +2901,8 @@ def _realizar_confronto_legado(pedido: PedidoCompra, nota, db: Session, tenant_i
 
         if item_nf:
             qtd_nf = item_nf.quantidade
-            preco_nf = item_nf.valor_unitario
-            valor_nf = item_nf.valor_total
+            valor_nf = _valor_custo_final_item_nf(item_nf, composicoes_custo)
+            preco_nf = _preco_custo_final_item_nf(item_nf, composicoes_custo)
             total_nf += valor_nf
 
             dif_qtd = qtd_nf - qtd_pedida
@@ -2920,7 +2969,10 @@ def _realizar_confronto_legado(pedido: PedidoCompra, nota, db: Session, tenant_i
     ids_pedido_produto = {i.produto_id for i in pedido.itens}
     for it in nota.itens:
         if it.produto_id and it.produto_id not in ids_pedido_produto:
-            total_nf += it.valor_total
+            qtd_nf = _float_confronto(it.quantidade)
+            valor_nf = _valor_custo_final_item_nf(it, composicoes_custo)
+            preco_nf = _preco_custo_final_item_nf(it, composicoes_custo)
+            total_nf += valor_nf
             itens_confronto.append({
                 "produto_id": it.produto_id,
                 "produto_nome": it.descricao,
@@ -2928,15 +2980,15 @@ def _realizar_confronto_legado(pedido: PedidoCompra, nota, db: Session, tenant_i
                 "item_pedido_id": None,
                 "item_nf_id": it.id,
                 "qtd_pedida": 0,
-                "qtd_nf": it.quantidade,
-                "dif_qtd": it.quantidade,
+                "qtd_nf": qtd_nf,
+                "dif_qtd": qtd_nf,
                 "preco_pedido": 0,
-                "preco_nf": round(it.valor_unitario, 4),
+                "preco_nf": round(preco_nf, 4),
                 "dif_preco_unit": None,
                 "dif_preco_pct": 0,
                 "valor_pedido": 0,
-                "valor_nf": round(it.valor_total, 2),
-                "dif_valor": round(it.valor_total, 2),
+                "valor_nf": round(valor_nf, 2),
+                "dif_valor": round(valor_nf, 2),
                 "status": "nao_pedido",
                 "encontrado_na_nf": True,
             })
@@ -3000,6 +3052,7 @@ def _realizar_confronto(pedido: PedidoCompra, nota_ou_notas, db: Session, tenant
     """Gera o confronto completo entre pedido e uma ou mais NF-e."""
     notas = _normalizar_notas_confronto(nota_ou_notas)
     itens_nf = [item for nota in notas for item in (nota.itens or [])]
+    composicoes_custo = _calcular_composicoes_custo_confronto(notas)
 
     itens_confronto = []
     total_pedido = 0.0
@@ -3060,8 +3113,8 @@ def _realizar_confronto(pedido: PedidoCompra, nota_ou_notas, db: Session, tenant
                 itens_nf_usados.add(it.id)
 
             qtd_nf = sum(float(it.quantidade or 0) for it in itens_match)
-            valor_nf = sum(float(it.valor_total or 0) for it in itens_match)
-            preco_nf = (valor_nf / qtd_nf) if qtd_nf else float(itens_match[0].valor_unitario or 0)
+            valor_nf = sum(_valor_custo_final_item_nf(it, composicoes_custo) for it in itens_match)
+            preco_nf = (valor_nf / qtd_nf) if qtd_nf else _preco_custo_final_item_nf(itens_match[0], composicoes_custo)
             total_nf += valor_nf
 
             dif_qtd = qtd_nf - qtd_pedida
@@ -3130,7 +3183,10 @@ def _realizar_confronto(pedido: PedidoCompra, nota_ou_notas, db: Session, tenant
     for it in itens_nf:
         if it.id in itens_nf_usados:
             continue
-        total_nf += float(it.valor_total or 0)
+        qtd_nf = _float_confronto(it.quantidade)
+        valor_nf = _valor_custo_final_item_nf(it, composicoes_custo)
+        preco_nf = _preco_custo_final_item_nf(it, composicoes_custo)
+        total_nf += valor_nf
         itens_confronto.append({
             "produto_id": it.produto_id,
             "produto_nome": it.descricao,
@@ -3140,15 +3196,15 @@ def _realizar_confronto(pedido: PedidoCompra, nota_ou_notas, db: Session, tenant
             "item_nf_ids": [it.id],
             "nota_entrada_ids": [it.nota_entrada_id] if it.nota_entrada_id else [],
             "qtd_pedida": 0,
-            "qtd_nf": it.quantidade,
-            "dif_qtd": it.quantidade,
+            "qtd_nf": qtd_nf,
+            "dif_qtd": qtd_nf,
             "preco_pedido": 0,
-            "preco_nf": round(it.valor_unitario, 4),
+            "preco_nf": round(preco_nf, 4),
             "dif_preco_unit": None,
             "dif_preco_pct": 0,
             "valor_pedido": 0,
-            "valor_nf": round(it.valor_total, 2),
-            "dif_valor": round(it.valor_total, 2),
+            "valor_nf": round(valor_nf, 2),
+            "dif_valor": round(valor_nf, 2),
             "status": "nao_pedido",
             "encontrado_na_nf": True,
         })
