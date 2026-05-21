@@ -307,6 +307,31 @@ export default function Cargos() {
               </h3>
             </div>
 
+            <div className="md:col-span-2 border-l-4 border-indigo-400 bg-indigo-50 px-4 py-3">
+              <div className="flex items-start gap-3">
+                <div className="mt-0.5 inline-flex h-6 w-6 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100 text-xs font-bold text-indigo-700">
+                  i
+                </div>
+                <div>
+                  <h4 className="text-sm font-semibold text-indigo-950">Guia rapido da folha</h4>
+                  <div className="mt-2 grid grid-cols-1 gap-2 text-xs leading-5 text-indigo-900 md:grid-cols-2">
+                    <p>
+                      <strong>Salario base:</strong> use o valor bruto do holerite ou contrato. Ele alimenta provisoes, DRE e encargos.
+                    </p>
+                    <p>
+                      <strong>INSS patronal e FGTS:</strong> sao custos da empresa calculados sobre o salario base.
+                    </p>
+                    <p>
+                      <strong>INSS funcionario:</strong> e desconto do colaborador e reduz o liquido da folha.
+                    </p>
+                    <p>
+                      <strong>Regimes sem encargos:</strong> use quando nao houver calculo de ferias, 13o, FGTS ou INSS patronal.
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">
                 Regime
