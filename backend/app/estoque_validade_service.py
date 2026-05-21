@@ -166,6 +166,7 @@ class EstoqueValidadeService:
         tenant,
         user_id: int | None,
         agora: datetime | None = None,
+        origem: str = "rotina",
     ) -> dict:
         agora = agora or _agora_utc()
         if not bool(getattr(tenant, "protecao_validade_ativa", False)):
@@ -209,7 +210,7 @@ class EstoqueValidadeService:
                     produto=lote.produto,
                     lote=lote,
                     agora=agora,
-                    origem="rotina",
+                    origem=origem,
                 )
             )
 

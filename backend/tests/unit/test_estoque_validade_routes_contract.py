@@ -61,3 +61,11 @@ def test_relatorio_perdas_filtra_descartados_por_padrao():
     source = inspect.getsource(estoque_validade_routes.relatorio_perdas)
 
     assert 'EstoqueValidadeBloqueio.status == "descartado"' in source
+
+
+def test_startup_registra_job_automatico_de_validade():
+    main_source = open("backend/app/main.py", "r", encoding="utf-8").read()
+
+    assert "_loop_estoque_validade" in main_source
+    assert "EstoqueValidadeService.processar_lotes_em_risco" in main_source
+    assert "Tenant.protecao_validade_ativa.is_(True)" in main_source

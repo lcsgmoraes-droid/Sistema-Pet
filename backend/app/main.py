@@ -238,6 +238,10 @@ _expirar_reservas_stop_event = threading.Event()
 _expirar_reservas_thread: Optional[threading.Thread] = None
 EXPIRAR_RESERVAS_INTERVALO_SEGUNDOS = 30 * 60  # 30 minutos
 
+_estoque_validade_stop_event = threading.Event()
+_estoque_validade_thread: Optional[threading.Thread] = None
+ESTOQUE_VALIDADE_INTERVALO_SEGUNDOS = 6 * 60 * 60  # 6 horas
+
 # SEFAZ — sincronização automática de NF-e por NSU
 _sefaz_sync_stop_event = threading.Event()
 _sefaz_sync_thread: Optional[threading.Thread] = None
@@ -1114,6 +1118,18 @@ def on_startup():
         _expirar_reservas_thread.start()
 
         # Iniciar job de sincronização automática SEFAZ
+        if _env_bool("ESTOQUE_VALIDADE_SCHEDULER_ENABLED", True):
+            global _estoque_validade_thread
+            _estoque_validade_stop_event.clear()
+            _estoque_validade_thread = threading.Thread(
+                target=_loop_estoque_validade,
+                name="estoque-validade",
+                daemon=True,
+            )
+            _estoque_validade_thread.start()
+        else:
+            logger.info("[JOBS] Protecao de estoque por validade desativada neste processo.")
+
         global _sefaz_sync_thread
         _sefaz_sync_stop_event.clear()
         _sefaz_sync_thread = threading.Thread(
@@ -1174,6 +1190,12 @@ def on_shutdown():
         if _expirar_reservas_thread and _expirar_reservas_thread.is_alive():
             _expirar_reservas_thread.join(timeout=2)
         _expirar_reservas_thread = None
+
+        global _estoque_validade_thread
+        _estoque_validade_stop_event.set()
+        if _estoque_validade_thread and _estoque_validade_thread.is_alive():
+            _estoque_validade_thread.join(timeout=2)
+        _estoque_validade_thread = None
 
         _release_background_jobs_leader()
 
@@ -1277,3 +1299,76 @@ def get_racas(especie: Optional[str] = None):
         return racas_gato
     else:
         return racas_cao + racas_gato
+
+
+def _loop_estoque_validade():
+    """Job em background para retirar lotes em risco do estoque vendavel."""
+    import os as _os
+    from uuid import UUID
+
+    worker_pid = _os.getpid()
+    logger.info(
+        "[VALIDADE] Job de protecao de estoque iniciado (PID %s, intervalo: 6h)",
+        worker_pid,
+    )
+
+    _estoque_validade_stop_event.wait(180)
+
+    while not _estoque_validade_stop_event.is_set():
+        try:
+            from app.db import SessionLocal
+            from app.estoque_validade_service import EstoqueValidadeService
+            from app.models import Tenant
+            from app.tenancy.context import clear_current_tenant, set_current_tenant
+
+            db = SessionLocal()
+            try:
+                tenants = (
+                    db.query(Tenant)
+                    .filter(
+                        Tenant.status == "active",
+                        Tenant.protecao_validade_ativa.is_(True),
+                    )
+                    .all()
+                )
+                total_bloqueios = 0
+
+                for tenant in tenants:
+                    try:
+                        set_current_tenant(UUID(str(tenant.id)))
+                    except (TypeError, ValueError):
+                        clear_current_tenant()
+
+                    try:
+                        resultado = EstoqueValidadeService.processar_lotes_em_risco(
+                            db=db,
+                            tenant=tenant,
+                            user_id=None,
+                            origem="scheduler",
+                        )
+                        total_bloqueios += int(resultado.get("processados") or 0)
+                        db.commit()
+                    except Exception as exc_tenant:
+                        db.rollback()
+                        logger.warning(
+                            "[VALIDADE] Erro ao processar tenant %s: %s",
+                            str(getattr(tenant, "id", ""))[:8],
+                            exc_tenant,
+                        )
+                    finally:
+                        clear_current_tenant()
+
+                if total_bloqueios:
+                    logger.info(
+                        "[VALIDADE] %s lote(s) retirado(s) do estoque vendavel",
+                        total_bloqueios,
+                    )
+            finally:
+                clear_current_tenant()
+                db.close()
+        except Exception as exc:
+            logger.warning("[VALIDADE] Falha geral no job de validade: %s", exc)
+
+        _estoque_validade_stop_event.wait(ESTOQUE_VALIDADE_INTERVALO_SEGUNDOS)
+
+    logger.info("[VALIDADE] Job de protecao de estoque finalizado (PID %s)", worker_pid)
