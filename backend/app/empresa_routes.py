@@ -295,6 +295,11 @@ def atualizar_dados_cadastrais(
 
 class ConfigEstoqueResponse(BaseModel):
     permite_estoque_negativo: bool
+    protecao_validade_ativa: bool = False
+    dias_alerta_validade: int = 15
+    bloquear_validade_pdv: bool = True
+    bloquear_validade_ecommerce: bool = True
+    bloquear_validade_integracoes_online: bool = False
     
     class Config:
         from_attributes = True
@@ -302,6 +307,24 @@ class ConfigEstoqueResponse(BaseModel):
 
 class ConfigEstoqueUpdate(BaseModel):
     permite_estoque_negativo: bool
+    protecao_validade_ativa: bool = False
+    dias_alerta_validade: int = 15
+    bloquear_validade_pdv: bool = True
+    bloquear_validade_ecommerce: bool = True
+    bloquear_validade_integracoes_online: bool = False
+
+
+def _config_estoque_response(tenant: Tenant) -> ConfigEstoqueResponse:
+    return ConfigEstoqueResponse(
+        permite_estoque_negativo=tenant.permite_estoque_negativo,
+        protecao_validade_ativa=bool(getattr(tenant, "protecao_validade_ativa", False)),
+        dias_alerta_validade=int(getattr(tenant, "dias_alerta_validade", 15) or 15),
+        bloquear_validade_pdv=bool(getattr(tenant, "bloquear_validade_pdv", True)),
+        bloquear_validade_ecommerce=bool(getattr(tenant, "bloquear_validade_ecommerce", True)),
+        bloquear_validade_integracoes_online=bool(
+            getattr(tenant, "bloquear_validade_integracoes_online", False)
+        ),
+    )
 
 
 @router.get("/config-estoque", response_model=ConfigEstoqueResponse)
@@ -323,9 +346,7 @@ def buscar_config_estoque(
             detail="Empresa nÃ£o encontrada"
         )
     
-    return ConfigEstoqueResponse(
-        permite_estoque_negativo=tenant.permite_estoque_negativo
-    )
+    return _config_estoque_response(tenant)
 
 
 @router.put("/config-estoque", response_model=ConfigEstoqueResponse)
@@ -354,6 +375,11 @@ def atualizar_config_estoque(
     
     # Atualizar configuraÃ§Ã£o
     tenant.permite_estoque_negativo = config.permite_estoque_negativo
+    tenant.protecao_validade_ativa = config.protecao_validade_ativa
+    tenant.dias_alerta_validade = max(1, min(int(config.dias_alerta_validade or 15), 365))
+    tenant.bloquear_validade_pdv = config.bloquear_validade_pdv
+    tenant.bloquear_validade_ecommerce = config.bloquear_validade_ecommerce
+    tenant.bloquear_validade_integracoes_online = config.bloquear_validade_integracoes_online
     
     db.commit()
     db.refresh(tenant)
@@ -363,6 +389,4 @@ def atualizar_config_estoque(
         f"Permite Estoque Negativo: {tenant.permite_estoque_negativo}"
     )
     
-    return ConfigEstoqueResponse(
-        permite_estoque_negativo=tenant.permite_estoque_negativo
-    )
+    return _config_estoque_response(tenant)

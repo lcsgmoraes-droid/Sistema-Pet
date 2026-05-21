@@ -52,6 +52,16 @@ def test_basic_plan_route_files_use_selected_tenant_dependency():
     assert offenders == []
 
 
+def test_config_estoque_expoe_parametros_de_validade():
+    source = _source("backend/app/empresa_routes.py")
+
+    assert "protecao_validade_ativa" in source
+    assert "dias_alerta_validade" in source
+    assert "bloquear_validade_pdv" in source
+    assert "bloquear_validade_ecommerce" in source
+    assert "bloquear_validade_integracoes_online" in source
+
+
 def test_racao_calculadora_uses_tenant_selected_in_token():
     assert _depends_on_selected_tenant(racao_calculadora_routes.calcular_consumo_racao)
 
