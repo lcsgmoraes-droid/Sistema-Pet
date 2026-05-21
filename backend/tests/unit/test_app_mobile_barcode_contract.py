@@ -21,3 +21,19 @@ def test_cart_stock_error_explains_existing_cart_quantity():
     assert "Voce ja tem " in source
     assert "unidade(s) desse produto no carrinho" in source
     assert "Estoque disponivel" in source
+
+
+def test_barcode_scanner_price_card_does_not_wrap_price():
+    repo_root = BACKEND_ROOT.parent
+    source = (repo_root / "app-mobile/src/screens/shop/BarcodeScannerScreen.tsx").read_text(encoding="utf-8")
+
+    assert "produtoResumoRow" in source
+    assert "produtoCompraRow" in source
+    assert "produtoPrecoWrap" in source
+    assert "numberOfLines={1}" in source
+    assert "adjustsFontSizeToFit" in source
+    assert "minimumFontScale={0.75}" in source
+    assert "produtoInfo: { flex: 1, minWidth: 0 }" in source
+    assert "formatarMoedaScanner" in source
+    assert ".replace(/\\s+/g, '\\u00A0')" in source
+    assert "maxWidth: 112" in source

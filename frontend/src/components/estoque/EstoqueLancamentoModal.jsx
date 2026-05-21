@@ -19,6 +19,16 @@ const TIPO_LANCAMENTO = {
   },
 };
 
+const MOTIVOS_SAIDA = [
+  { value: "saida_manual", label: "Saida manual" },
+  { value: "uso_interno", label: "Uso interno" },
+  { value: "perda", label: "Perda" },
+  { value: "avaria", label: "Avaria" },
+  { value: "amostra", label: "Amostra" },
+  { value: "devolucao_fornecedor", label: "Devolucao ao fornecedor" },
+  { value: "ajuste", label: "Ajuste" },
+];
+
 function TipoButton({ active, disabled = false, onClick, tipo }) {
   const config = TIPO_LANCAMENTO[tipo];
   const className = disabled
@@ -53,6 +63,19 @@ export default function EstoqueLancamentoModal({
 }) {
   const updateFormData = (campo, valor) => {
     setFormData({ ...formData, [campo]: valor });
+  };
+
+  const handleMotivoSaidaChange = (valor) => {
+    setFormData({
+      ...formData,
+      motivo_saida: valor,
+      gerar_despesa_uso_interno:
+        valor === "uso_interno" ? true : formData.gerar_despesa_uso_interno,
+      descricao_despesa:
+        valor === "uso_interno" && !formData.descricao_despesa
+          ? `Material de uso interno - ${produto?.nome || "Produto"}`
+          : formData.descricao_despesa,
+    });
   };
 
   const produtoEhKitFisico = produto?.tipo_produto === "KIT" && produto?.tipo_kit === "FISICO";
@@ -188,6 +211,61 @@ export default function EstoqueLancamentoModal({
 
           {tipoLancamento === "saida" ? (
             <>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-slate-700">Motivo da saida *</label>
+                <select
+                  value={formData.motivo_saida || "saida_manual"}
+                  onChange={(event) => handleMotivoSaidaChange(event.target.value)}
+                  className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                  required
+                >
+                  {MOTIVOS_SAIDA.map((motivo) => (
+                    <option key={motivo.value} value={motivo.value}>
+                      {motivo.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {formData.motivo_saida === "uso_interno" ? (
+                <div className="space-y-3 rounded-lg border border-amber-200 bg-amber-50 p-4">
+                  <label className="flex cursor-pointer items-start gap-3 text-sm font-semibold text-slate-900">
+                    <input
+                      type="checkbox"
+                      checked={formData.gerar_despesa_uso_interno === true}
+                      onChange={(event) => updateFormData("gerar_despesa_uso_interno", event.target.checked)}
+                      className="mt-1 h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                    />
+                    <span>Lancar custo no financeiro/DRE</span>
+                  </label>
+
+                  {formData.gerar_despesa_uso_interno === true ? (
+                    <>
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">Data de competencia</label>
+                        <input
+                          type="date"
+                          value={formData.data_competencia || ""}
+                          onChange={(event) => updateFormData("data_competencia", event.target.value)}
+                          className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="mb-1 block text-sm font-medium text-slate-700">Descricao da despesa</label>
+                        <input
+                          type="text"
+                          value={formData.descricao_despesa || ""}
+                          onChange={(event) => updateFormData("descricao_despesa", event.target.value)}
+                          className="w-full rounded-lg border border-slate-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"
+                          placeholder="Material de uso interno"
+                        />
+                      </div>
+                    </>
+                  ) : null}
+                </div>
+              ) : null}
+
               {produtoEhKitFisico ? (
                 <div className="rounded-lg border-2 border-yellow-300 bg-yellow-50 p-4">
                   <div className="flex items-start gap-3">

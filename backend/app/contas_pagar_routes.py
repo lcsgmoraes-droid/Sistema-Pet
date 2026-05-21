@@ -37,6 +37,8 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/contas-pagar", tags=["Contas a Pagar"])
 
+RECORRENCIA_JANELA_MESES_PADRAO = 12
+
 # ============================================================================
 # SCHEMAS
 # ============================================================================
@@ -245,6 +247,113 @@ def calcular_proxima_recorrencia(data_base: date, tipo_recorrencia: str, interva
         raise ValueError(f"Tipo de recorrência inválido: {tipo_recorrencia}")
 
 
+def adicionar_meses(data_base: date, meses_adicionar: int) -> date:
+    mes = data_base.month + meses_adicionar
+    ano = data_base.year
+    while mes > 12:
+        mes -= 12
+        ano += 1
+
+    try:
+        return data_base.replace(year=ano, month=mes)
+    except ValueError:
+        import calendar
+        ultimo_dia = calendar.monthrange(ano, mes)[1]
+        return date(ano, mes, ultimo_dia)
+
+
+def calcular_limite_janela_recorrencia(
+    hoje: date,
+    meses: int = RECORRENCIA_JANELA_MESES_PADRAO,
+) -> date:
+    return adicionar_meses(hoje, meses)
+
+
+def _gerar_contas_recorrentes_ate_janela(
+    db: Session,
+    tenant_id,
+    conta_origem: ContaPagar,
+    limite_recorrencia: date,
+) -> List[ContaPagar]:
+    contas_criadas: List[ContaPagar] = []
+
+    while conta_origem.proxima_recorrencia and conta_origem.proxima_recorrencia <= limite_recorrencia:
+        nova_data_vencimento = conta_origem.proxima_recorrencia
+
+        if conta_origem.data_fim_recorrencia and nova_data_vencimento > conta_origem.data_fim_recorrencia:
+            break
+
+        if conta_origem.numero_repeticoes:
+            count_geradas = db.query(func.count(ContaPagar.id)).filter(
+                ContaPagar.conta_recorrencia_origem_id == conta_origem.id
+            ).scalar()
+            if count_geradas >= conta_origem.numero_repeticoes:
+                logger.info(
+                    f"Conta #{conta_origem.id} atingiu o numero maximo de repeticoes ({conta_origem.numero_repeticoes})"
+                )
+                break
+
+        conta_existente = db.query(ContaPagar).filter(
+            ContaPagar.conta_recorrencia_origem_id == conta_origem.id,
+            ContaPagar.data_vencimento == nova_data_vencimento,
+        ).first()
+        if conta_existente:
+            conta_origem.proxima_recorrencia = calcular_proxima_recorrencia(
+                nova_data_vencimento,
+                conta_origem.tipo_recorrencia,
+                conta_origem.intervalo_dias,
+            )
+            continue
+
+        nova_conta = ContaPagar(
+            descricao=f"{conta_origem.descricao} (Recorrencia {nova_data_vencimento.strftime('%m/%Y')})",
+            fornecedor_id=conta_origem.fornecedor_id,
+            categoria_id=conta_origem.categoria_id,
+            dre_subcategoria_id=conta_origem.dre_subcategoria_id,
+            canal=conta_origem.canal,
+            tipo_despesa_id=conta_origem.tipo_despesa_id,
+            valor_original=conta_origem.valor_original,
+            valor_final=conta_origem.valor_original,
+            data_emissao=nova_data_vencimento,
+            data_vencimento=nova_data_vencimento,
+            status='pendente',
+            nota_entrada_id=conta_origem.nota_entrada_id,
+            documento=conta_origem.documento,
+            observacoes=f"Gerada automaticamente da recorrencia #{conta_origem.id}",
+            conta_recorrencia_origem_id=conta_origem.id,
+            user_id=conta_origem.user_id,
+            tenant_id=tenant_id,
+        )
+
+        db.add(nova_conta)
+        contas_criadas.append(nova_conta)
+
+        lancamento = LancamentoManual(
+            tipo='saida',
+            valor=nova_conta.valor_original,
+            descricao=nova_conta.descricao,
+            data_lancamento=nova_conta.data_vencimento,
+            data_competencia=nova_conta.data_vencimento,
+            categoria_id=nova_conta.categoria_id,
+            status='previsto',
+            documento=nova_conta.documento,
+            observacoes=f"Gerado automaticamente da recorrencia #{conta_origem.id}",
+            gerado_automaticamente=True,
+            user_id=conta_origem.user_id,
+            tenant_id=tenant_id,
+        )
+        db.add(lancamento)
+
+        conta_origem.proxima_recorrencia = calcular_proxima_recorrencia(
+            nova_data_vencimento,
+            conta_origem.tipo_recorrencia,
+            conta_origem.intervalo_dias,
+        )
+        db.flush()
+
+    return contas_criadas
+
+
 # ============================================================================
 # CRIAR CONTA A PAGAR
 # ============================================================================
@@ -388,6 +497,18 @@ async def criar_conta_pagar(
             
             db.add(nova_conta)
             contas_criadas.append(nova_conta)
+
+            if nova_conta.eh_recorrente and nova_conta.tipo_recorrencia and nova_conta.proxima_recorrencia:
+                db.flush()
+                limite_recorrencia = calcular_limite_janela_recorrencia(date.today())
+                contas_criadas.extend(
+                    _gerar_contas_recorrentes_ate_janela(
+                        db=db,
+                        tenant_id=tenant_id,
+                        conta_origem=nova_conta,
+                        limite_recorrencia=limite_recorrencia,
+                    )
+                )
         
         db.commit()
         
@@ -1179,13 +1300,14 @@ async def processar_recorrencias_contas_pagar(
     """
     current_user, tenant_id = user_and_tenant
     hoje = date.today()
+    limite_recorrencia = calcular_limite_janela_recorrencia(hoje)
     contas_criadas = []
     
-    # Buscar contas recorrentes que precisam gerar nova conta
+    # Buscar contas recorrentes que precisam manter a janela futura preenchida
     contas_recorrentes = db.query(ContaPagar).filter(
         and_(
             ContaPagar.eh_recorrente == True,
-            ContaPagar.proxima_recorrencia <= hoje,
+            ContaPagar.proxima_recorrencia <= limite_recorrencia,
             or_(
                 ContaPagar.data_fim_recorrencia.is_(None),
                 ContaPagar.data_fim_recorrencia >= hoje
@@ -1195,69 +1317,33 @@ async def processar_recorrencias_contas_pagar(
     
     for conta_origem in contas_recorrentes:
         try:
-            # Verificar se já atingiu o número máximo de repetições
-            if conta_origem.numero_repeticoes:
-                # Contar quantas contas já foram geradas
-                count_geradas = db.query(func.count(ContaPagar.id)).filter(
-                    ContaPagar.conta_recorrencia_origem_id == conta_origem.id
-                ).scalar()
-                
-                if count_geradas >= conta_origem.numero_repeticoes:
-                    logger.info(f"📅 Conta #{conta_origem.id} atingiu o número máximo de repetições ({conta_origem.numero_repeticoes})")
-                    continue
-            
-            # Criar nova conta baseada na recorrência
-            nova_data_vencimento = conta_origem.proxima_recorrencia
-            
-            nova_conta = ContaPagar(
-                descricao=f"{conta_origem.descricao} (Recorrência {nova_data_vencimento.strftime('%m/%Y')})",
-                fornecedor_id=conta_origem.fornecedor_id,
-                categoria_id=conta_origem.categoria_id,
-                valor_original=conta_origem.valor_original,
-                valor_final=conta_origem.valor_original,
-                data_emissao=hoje,
-                data_vencimento=nova_data_vencimento,
-                status='pendente',
-                documento=conta_origem.documento,
-                observacoes=f"Gerada automaticamente da recorrência #{conta_origem.id}",
-                conta_recorrencia_origem_id=conta_origem.id,
-                user_id=conta_origem.user_id
+            novas_contas = _gerar_contas_recorrentes_ate_janela(
+                db=db,
+                tenant_id=tenant_id,
+                conta_origem=conta_origem,
+                limite_recorrencia=limite_recorrencia,
             )
-            
-            db.add(nova_conta)
-            contas_criadas.append(nova_conta)
-            
-            # Atualizar próxima recorrência da conta origem
-            conta_origem.proxima_recorrencia = calcular_proxima_recorrencia(
-                nova_data_vencimento,
-                conta_origem.tipo_recorrencia,
-                conta_origem.intervalo_dias
-            )
-            
-            # Criar lançamento no fluxo de caixa
-            try:
-                lancamento = LancamentoManual(
-                    tipo='saida',
-                    valor=nova_conta.valor_original,
-                    descricao=nova_conta.descricao,
-                    data_lancamento=hoje,
-                    data_prevista=nova_data_vencimento,
-                    data_efetivacao=None,
-                    categoria_id=nova_conta.categoria_id,
-                    status='previsto',
-                    observacoes=f"Gerado automaticamente da recorrência #{conta_origem.id}",
-                    gerado_automaticamente=True
-                )
-                db.add(lancamento)
-            except Exception as e:
-                logger.warning(f"⚠️  Erro ao criar lançamento para conta recorrente: {e}")
-            
-            logger.info(f"✅ Nova conta recorrente criada: #{nova_conta.id} - Vencimento: {nova_data_vencimento}")
+            contas_criadas.extend(novas_contas)
+            logger.info(f"Recorrencia #{conta_origem.id}: {len(novas_contas)} conta(s) gerada(s)")
             
         except Exception as e:
-            logger.error(f"❌ Erro ao processar recorrência da conta #{conta_origem.id}: {e}")
+            logger.error(f"Erro ao processar recorrencia da conta #{conta_origem.id}: {e}")
             continue
     
+    for conta_criada in contas_criadas:
+        try:
+            atualizar_dre_por_lancamento(
+                db=db,
+                tenant_id=tenant_id,
+                dre_subcategoria_id=conta_criada.dre_subcategoria_id,
+                canal=conta_criada.canal,
+                valor=conta_criada.valor_original,
+                data_lancamento=conta_criada.data_vencimento,
+                tipo_movimentacao='DESPESA'
+            )
+        except Exception as e:
+            logger.warning(f"Erro ao atualizar DRE para conta recorrente #{conta_criada.id}: {e}")
+
     db.commit()
     
     return {

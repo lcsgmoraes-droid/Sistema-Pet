@@ -21,10 +21,13 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import Optional
 from pydantic import BaseModel, Field
+from datetime import date
+from decimal import Decimal, ROUND_HALF_UP
 import json
 
 from .db import get_session
 from .auth.dependencies import get_current_user_and_tenant
+from .financeiro_models import ContaPagar
 from .produtos_models import (
     Produto,
     ProdutoLote,
@@ -49,6 +52,13 @@ class SaidaEstoqueRequest(BaseModel):
     observacao: Optional[str] = None
     # Para KIT FÍSICO: se True, desmontou o kit e volta os componentes ao estoque
     retornar_componentes: bool = False
+    # Uso interno: reclassifica custo do estoque para despesa do mes, sem movimentar banco/caixa
+    gerar_despesa_uso_interno: bool = False
+    descricao_despesa: Optional[str] = None
+    data_competencia: Optional[date] = None
+    categoria_id: Optional[int] = None
+    dre_subcategoria_id: Optional[int] = None
+    tipo_despesa_id: Optional[int] = None
 
 # ============================================================================
 # SAÍDA DE ESTOQUE
@@ -165,8 +175,52 @@ def saida_estoque(
         user_id=current_user.id, tenant_id=tenant_id
     )
     db.add(movimentacao)
+
+    conta_pagar_uso_interno = None
+    if saida.motivo == "uso_interno" and saida.gerar_despesa_uso_interno:
+        db.flush()
+
+        valor_total_despesa = Decimal(str(movimentacao.valor_total or 0)).quantize(
+            Decimal("0.01"),
+            rounding=ROUND_HALF_UP,
+        )
+        data_competencia = saida.data_competencia or date.today()
+        descricao_despesa = (
+            saida.descricao_despesa
+            or f"Material de uso interno - {produto.nome}"
+        ).strip()
+        observacoes_uso_interno = (
+            "Baixa de estoque para uso interno, sem desembolso financeiro. "
+            f"Movimentacao de estoque #{movimentacao.id}."
+        )
+        if saida.observacao:
+            observacoes_uso_interno = f"{observacoes_uso_interno}\nObservacao: {saida.observacao}"
+
+        conta_pagar_uso_interno = ContaPagar(
+            descricao=descricao_despesa,
+            fornecedor_id=None,
+            categoria_id=saida.categoria_id,
+            dre_subcategoria_id=saida.dre_subcategoria_id,
+            canal="loja_fisica",
+            tipo_despesa_id=saida.tipo_despesa_id,
+            valor_original=valor_total_despesa,
+            valor_pago=valor_total_despesa,
+            valor_final=valor_total_despesa,
+            data_emissao=data_competencia,
+            data_vencimento=data_competencia,
+            data_pagamento=data_competencia,
+            status="pago",
+            documento=saida.documento or f"USO-EST-{movimentacao.id}",
+            observacoes=observacoes_uso_interno,
+            user_id=current_user.id,
+            tenant_id=tenant_id,
+        )
+        db.add(conta_pagar_uso_interno)
+
     db.commit()
     db.refresh(movimentacao)
+    if conta_pagar_uso_interno:
+        db.refresh(conta_pagar_uso_interno)
 
     logger.info(f"✅ Saída registrada - Estoque: {estoque_anterior} → {produto.estoque_atual}")
 
@@ -254,6 +308,11 @@ def saida_estoque(
         "user_id": movimentacao.user_id,
         "user_nome": current_user.nome,
         "created_at": movimentacao.created_at,
+        "despesa_uso_interno": {
+            "conta_pagar_id": conta_pagar_uso_interno.id,
+            "valor": float(conta_pagar_uso_interno.valor_original),
+            "data_competencia": conta_pagar_uso_interno.data_emissao,
+        } if conta_pagar_uso_interno else None,
         "componentes_sensibilizados": componentes_sensibilizados if componentes_sensibilizados else None
     }
 
