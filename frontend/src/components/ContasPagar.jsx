@@ -15,6 +15,48 @@ import StatusBadge from './ui/StatusBadge';
 import FornecedorSelector from './fornecedores/FornecedorSelector';
 import FornecedorIdentity from './ui/FornecedorIdentity';
 
+const PERIODOS_RAPIDOS_CONTAS_PAGAR = [
+  { value: 'hoje', label: 'Hoje' },
+  { value: 'amanha', label: 'Amanha' },
+  { value: 'semana', label: 'Semana' },
+  { value: 'mes', label: 'Mes' },
+];
+
+function formatarDataISO(data) {
+  const local = new Date(data.getTime() - data.getTimezoneOffset() * 60000);
+  return local.toISOString().slice(0, 10);
+}
+
+function calcularIntervaloPeriodoRapido(periodo) {
+  const hoje = new Date();
+  hoje.setHours(0, 0, 0, 0);
+
+  const inicio = new Date(hoje);
+  const fim = new Date(hoje);
+
+  if (periodo === 'amanha') {
+    inicio.setDate(inicio.getDate() + 1);
+    fim.setDate(fim.getDate() + 1);
+  }
+
+  if (periodo === 'semana') {
+    const diaSemana = hoje.getDay();
+    const diffSegunda = diaSemana === 0 ? -6 : 1 - diaSemana;
+    inicio.setDate(hoje.getDate() + diffSegunda);
+    fim.setDate(inicio.getDate() + 6);
+  }
+
+  if (periodo === 'mes') {
+    inicio.setDate(1);
+    fim.setMonth(hoje.getMonth() + 1, 0);
+  }
+
+  return {
+    data_inicio: formatarDataISO(inicio),
+    data_fim: formatarDataISO(fim),
+  };
+}
+
 const ContasPagar = () => {
   const navigate = useNavigate();
   const [contas, setContas] = useState([]);
@@ -32,7 +74,8 @@ const ContasPagar = () => {
     busca: '',
     data_campo: 'vencimento',
     fornecedor_busca: '',
-    tipo_despesa_id: ''
+    tipo_despesa_id: '',
+    periodo_rapido: ''
   });
   
   const [fornecedores, setFornecedores] = useState([]);
@@ -151,7 +194,8 @@ const ContasPagar = () => {
     busca: '',
     data_campo: 'vencimento',
     fornecedor_busca: '',
-    tipo_despesa_id: ''
+    tipo_despesa_id: '',
+    periodo_rapido: ''
   };
 
   const aplicarFiltros = async (filtrosParaAplicar = filtros) => {
@@ -195,6 +239,20 @@ const ContasPagar = () => {
     };
     setFiltros(filtrosCaixa);
     aplicarFiltros(filtrosCaixa);
+  };
+
+  const aplicarPeriodoRapido = (periodo) => {
+    const intervalo = calcularIntervaloPeriodoRapido(periodo);
+    const novosFiltros = {
+      ...filtros,
+      ...intervalo,
+      periodo_rapido: periodo,
+      apenas_vencidas: false,
+      apenas_vencer: false,
+    };
+
+    setFiltros(novosFiltros);
+    aplicarFiltros(novosFiltros);
   };
 
   const limparFiltros = () => {
@@ -681,7 +739,7 @@ const ContasPagar = () => {
               type="date"
               className="w-full border border-gray-300 rounded px-3 py-2"
               value={filtros.data_inicio}
-              onChange={(e) => setFiltros({...filtros, data_inicio: e.target.value})}
+              onChange={(e) => setFiltros({...filtros, data_inicio: e.target.value, periodo_rapido: ''})}
             />
           </div>
 
@@ -691,8 +749,32 @@ const ContasPagar = () => {
               type="date"
               className="w-full border border-gray-300 rounded px-3 py-2"
               value={filtros.data_fim}
-              onChange={(e) => setFiltros({...filtros, data_fim: e.target.value})}
+              onChange={(e) => setFiltros({...filtros, data_fim: e.target.value, periodo_rapido: ''})}
             />
+          </div>
+
+          <div className="md:col-span-4">
+            <label className="block text-sm font-medium mb-1">Periodo rapido</label>
+            <div className="flex flex-wrap gap-2">
+              {PERIODOS_RAPIDOS_CONTAS_PAGAR.map((periodo) => {
+                const ativo = filtros.periodo_rapido === periodo.value;
+
+                return (
+                  <button
+                    key={periodo.value}
+                    type="button"
+                    onClick={() => aplicarPeriodoRapido(periodo.value)}
+                    className={`rounded-md border px-3 py-2 text-sm font-semibold transition ${
+                      ativo
+                        ? 'border-blue-600 bg-blue-600 text-white shadow-sm'
+                        : 'border-gray-300 bg-white text-gray-700 hover:border-blue-400 hover:text-blue-700'
+                    }`}
+                  >
+                    {periodo.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
           <div className="md:col-span-3 flex items-end gap-4">
