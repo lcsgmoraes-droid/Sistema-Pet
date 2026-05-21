@@ -1,20 +1,9 @@
-import React, { useEffect } from 'react'
+import React from 'react'
 import { FiX, FiDollarSign, FiTrendingDown, FiBarChart2, FiAlertCircle, FiCheckCircle, FiInfo } from 'react-icons/fi'
+import { useEscapeToClose } from '../utils/modalEscape'
 
 const AnaliseVendaDrawer = ({ mostrar, onFechar, dados, carregando }) => {
-  // Fechar com tecla ESC
-  useEffect(() => {
-    const handleEsc = (e) => {
-      if (e.key === 'Escape' && mostrar) {
-        onFechar()
-      }
-    }
-    
-    if (mostrar) {
-      window.addEventListener('keydown', handleEsc)
-      return () => window.removeEventListener('keydown', handleEsc)
-    }
-  }, [mostrar, onFechar])
+  useEscapeToClose({ isOpen: mostrar, onClose: onFechar })
 
   if (!mostrar) return null
 

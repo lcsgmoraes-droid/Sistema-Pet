@@ -1,5 +1,5 @@
-import { useEffect } from "react";
 import { X } from "lucide-react";
+import { useEscapeToClose } from "../../../utils/modalEscape";
 
 export default function ConsultaModalShell({
   isOpen,
@@ -10,18 +10,7 @@ export default function ConsultaModalShell({
   maxWidthClass = "max-w-2xl",
   children,
 }) {
-  useEffect(() => {
-    if (!isOpen) return undefined;
-
-    function handleKeyDown(event) {
-      if (event.key === "Escape") {
-        onClose?.();
-      }
-    }
-
-    window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [isOpen, onClose]);
+  useEscapeToClose({ isOpen, onClose });
 
   if (!isOpen) return null;
 

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'react-hot-toast';
 import api from '../../api';
+import { useEscapeToClose } from '../../utils/modalEscape';
 import {
   clonarItensPedido,
   consolidarItensPedido,
@@ -300,23 +301,17 @@ export default function usePedidosCompraSugestao({
     setModoAplicacaoSugestao('merge');
   };
 
-  useEffect(() => {
-    if (!mostrarSugestao) return undefined;
-
-    const handleKeyDown = (e) => {
-      if (e.key !== 'Escape') return;
-
+  useEscapeToClose({
+    isOpen: mostrarSugestao,
+    onClose: () => {
       if (mostrarFiltroMarcas) {
         setMostrarFiltroMarcas(false);
         return;
       }
 
       fecharModalSugestao();
-    };
-
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [mostrarSugestao, mostrarFiltroMarcas]);
+    },
+  });
 
   useEffect(() => {
     if (!mostrarSugestao || !mostrarFiltroMarcas) {

@@ -1,8 +1,8 @@
-import { useEffect } from "react";
 import AnaliseVendaDrawer from "../AnaliseVendaDrawer";
 import ModalAbrirCaixa from "../ModalAbrirCaixa";
 import ModalAdicionarCredito from "../ModalAdicionarCredito";
 import ModalPagamento from "../ModalPagamento";
+import { useEscapeToClose } from "../../utils/modalEscape";
 import HistoricoCliente from "./HistoricoCliente";
 import ModalCadastroCliente from "./ModalCadastroCliente";
 import ModalCalculadoraRacaoPDV from "./ModalCalculadoraRacaoPDV";
@@ -69,63 +69,25 @@ export default function PDVModalsLayer({
 }) {
   const clienteAtual = vendaAtual.cliente;
 
-  useEffect(() => {
-    const modalCloseStack = [
-      mostrarModalPagamento && onCloseModalPagamento,
-      mostrarModalDescontoTotal && onCloseModalDescontoTotal,
-      mostrarModalDescontoItem && onCloseModalDescontoItem,
-      mostrarModalEndereco && onCloseModalEndereco,
-      mostrarModalCliente && onCloseModalCliente,
-      mostrarModalAdicionarCredito && onCloseModalAdicionarCredito,
-      mostrarVendasEmAberto && onCloseVendasEmAberto,
-      mostrarHistoricoCliente && onCloseHistoricoCliente,
-      mostrarPendenciasEstoque && onClosePendenciasEstoque,
-      mostrarCalculadoraRacao && onCloseCalculadoraRacao,
-      mostrarModalAbrirCaixa && onCloseModalAbrirCaixa,
-      mostrarAnaliseVenda && onCloseAnalise,
-    ].filter(Boolean);
+  const modalCloseStack = [
+    mostrarModalPagamento && onCloseModalPagamento,
+    mostrarModalDescontoTotal && onCloseModalDescontoTotal,
+    mostrarModalDescontoItem && onCloseModalDescontoItem,
+    mostrarModalEndereco && onCloseModalEndereco,
+    mostrarModalCliente && onCloseModalCliente,
+    mostrarModalAdicionarCredito && onCloseModalAdicionarCredito,
+    mostrarVendasEmAberto && onCloseVendasEmAberto,
+    mostrarHistoricoCliente && onCloseHistoricoCliente,
+    mostrarPendenciasEstoque && onClosePendenciasEstoque,
+    mostrarCalculadoraRacao && onCloseCalculadoraRacao,
+    mostrarModalAbrirCaixa && onCloseModalAbrirCaixa,
+    mostrarAnaliseVenda && onCloseAnalise,
+  ].filter(Boolean);
 
-    if (modalCloseStack.length === 0) {
-      return undefined;
-    }
-
-    const handleEscape = (event) => {
-      if (event.key !== "Escape") {
-        return;
-      }
-
-      event.preventDefault();
-      modalCloseStack[0]?.();
-    };
-
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [
-    mostrarModalPagamento,
-    onCloseModalPagamento,
-    mostrarModalDescontoTotal,
-    onCloseModalDescontoTotal,
-    mostrarModalDescontoItem,
-    onCloseModalDescontoItem,
-    mostrarModalEndereco,
-    onCloseModalEndereco,
-    mostrarModalCliente,
-    onCloseModalCliente,
-    mostrarModalAdicionarCredito,
-    onCloseModalAdicionarCredito,
-    mostrarVendasEmAberto,
-    onCloseVendasEmAberto,
-    mostrarHistoricoCliente,
-    onCloseHistoricoCliente,
-    mostrarPendenciasEstoque,
-    onClosePendenciasEstoque,
-    mostrarCalculadoraRacao,
-    onCloseCalculadoraRacao,
-    mostrarModalAbrirCaixa,
-    onCloseModalAbrirCaixa,
-    mostrarAnaliseVenda,
-    onCloseAnalise,
-  ]);
+  useEscapeToClose({
+    isOpen: modalCloseStack.length > 0,
+    onClose: modalCloseStack[0],
+  });
 
   return (
     <>

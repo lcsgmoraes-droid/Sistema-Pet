@@ -12,6 +12,7 @@ import { Link, Outlet, useLocation } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 import { useModulos } from "../contexts/ModulosContext";
 import { api } from "../services/api";
+import { useEscapeFallbackForVisibleModals } from "../utils/modalEscape";
 import { isVeterinarioProfile } from "../utils/veterinarioPerfil";
 import FloatingCalculatorButton from "./FloatingCalculatorButton";
 import { createLayoutMenuItems } from "./layout/menuConfig";
@@ -19,6 +20,8 @@ import SidebarMenu from "./layout/SidebarMenu";
 import ModalCalculadoraUniversal from "./ModalCalculadoraUniversal";
 
 const Layout = () => {
+  useEscapeFallbackForVisibleModals();
+
   const location = useLocation();
   const isBradescoOrganizerRoute = location.pathname === "/organizador-bradesco";
   const { user, logout } = useAuth();

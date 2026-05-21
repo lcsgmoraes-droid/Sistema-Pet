@@ -3,6 +3,7 @@ import { X, TrendingUp, TrendingDown, Receipt, ArrowRightLeft, RotateCcw, AlertC
 import { adicionarMovimentacao, obterCaixaAberto } from '../api/caixa';
 import api from '../api';
 import FornecedorSelector from './fornecedores/FornecedorSelector';
+import { useEscapeToClose } from '../utils/modalEscape';
 
 const validarCaixaAtual = async (caixaIdEsperado) => {
   const caixaAtual = await obterCaixaAberto();
@@ -476,6 +477,8 @@ export function ModalDespesa({ caixaId, onClose, onSucesso }) {
  * Modal Base - Componente reutilizável para os modais
  */
 function ModalBase({ titulo, icone: Icone, corIcone, children, onClose, erro }) {
+  useEscapeToClose({ isOpen: true, onClose });
+
   const coresIcone = {
     green: 'bg-green-100 text-green-600',
     orange: 'bg-orange-100 text-orange-600',
