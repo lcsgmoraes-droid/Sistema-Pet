@@ -15,7 +15,7 @@ export function getFornecedorNome(fornecedor) {
 }
 
 function getFornecedorMeta(fornecedor) {
-  return [fornecedor?.cnpj, fornecedor?.telefone || fornecedor?.celular]
+  return [fornecedor?.cpf || fornecedor?.cnpj, fornecedor?.telefone || fornecedor?.celular]
     .filter(Boolean)
     .join(" - ");
 }
@@ -53,10 +53,12 @@ function NovoFornecedorRapidoModal({
 }) {
   const [formData, setFormData] = useState({
     nome: nomeInicial || "",
+    cpf: "",
     cnpj: "",
     telefone: "",
     email: "",
   });
+  const [tipoPessoa, setTipoPessoa] = useState("PF");
   const [erro, setErro] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -70,17 +72,23 @@ function NovoFornecedorRapidoModal({
       return;
     }
 
+    if (tipoPessoa === "PJ" && !formData.cnpj.trim()) {
+      setErro("Informe o CNPJ para pessoa jurídica.");
+      return;
+    }
+
     setLoading(true);
     setErro("");
 
     try {
       const fornecedor = await criarCliente({
         tipo_cadastro: "fornecedor",
-        tipo_pessoa: "PJ",
+        tipo_pessoa: tipoPessoa,
         nome,
-        razao_social: nome,
-        nome_fantasia: nome,
-        cnpj: formData.cnpj || null,
+        razao_social: tipoPessoa === "PJ" ? nome : null,
+        nome_fantasia: tipoPessoa === "PJ" ? nome : null,
+        cpf: tipoPessoa === "PF" ? formData.cpf.trim() || null : null,
+        cnpj: tipoPessoa === "PJ" ? formData.cnpj.trim() || null : null,
         telefone: formData.telefone || null,
         email: formData.email || null,
       });
@@ -110,7 +118,7 @@ function NovoFornecedorRapidoModal({
                 Novo fornecedor
               </h3>
               <p className="text-xs text-slate-500">
-                Cadastro rapido para continuar o fluxo.
+                Cadastro rápido para continuar o fluxo.
               </p>
             </div>
           </div>
@@ -145,17 +153,50 @@ function NovoFornecedorRapidoModal({
             />
           </div>
 
+          <div>
+            <label className="mb-2 block text-sm font-medium text-slate-700">
+              Tipo de pessoa
+            </label>
+            <div className="grid grid-cols-2 gap-2 rounded-lg bg-slate-100 p-1">
+              {[
+                { value: "PF", label: "Pessoa Física" },
+                { value: "PJ", label: "Pessoa Jurídica" },
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => {
+                    setTipoPessoa(option.value);
+                    setErro("");
+                  }}
+                  className={[
+                    "rounded-md px-3 py-2 text-sm font-medium transition",
+                    tipoPessoa === option.value
+                      ? "bg-white text-emerald-700 shadow-sm"
+                      : "text-slate-600 hover:bg-white/70",
+                  ].join(" ")}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-sm font-medium text-slate-700">
-                CNPJ
+                {tipoPessoa === "PF" ? "CPF" : "CNPJ *"}
               </label>
               <input
                 type="text"
-                value={formData.cnpj}
+                value={tipoPessoa === "PF" ? formData.cpf : formData.cnpj}
                 onChange={(event) =>
-                  setFormData((prev) => ({ ...prev, cnpj: event.target.value }))
+                  setFormData((prev) => ({
+                    ...prev,
+                    [tipoPessoa === "PF" ? "cpf" : "cnpj"]: event.target.value,
+                  }))
                 }
+                placeholder={tipoPessoa === "PF" ? "CPF do fornecedor" : "CNPJ do fornecedor"}
                 className="h-10 w-full rounded-lg border border-slate-300 px-3 text-sm focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-100"
               />
             </div>
@@ -233,7 +274,7 @@ export default function FornecedorSelector({
   onKeyDown,
   onSelect,
   onSelectGrupo,
-  placeholder = "Digite o nome, CNPJ ou telefone...",
+  placeholder = "Digite o nome, CPF, CNPJ ou telefone...",
   required = false,
   searchRemote = true,
   showLabel = true,
@@ -326,6 +367,7 @@ export default function FornecedorSelector({
           fornecedor?.nome,
           fornecedor?.razao_social,
           fornecedor?.nome_fantasia,
+          fornecedor?.cpf,
           fornecedor?.cnpj,
           fornecedor?.telefone,
           fornecedor?.celular,

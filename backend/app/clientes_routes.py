@@ -565,14 +565,14 @@ def create_cliente(
             if existing:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail=f"JÃ¡ existe um {cliente_data.tipo_cadastro} cadastrado com este CPF"
+                    detail=f"Já existe um {cliente_data.tipo_cadastro} cadastrado com este CPF"
                 )
     
     elif cliente_data.tipo_pessoa == "PJ":
         if not cliente_data.cnpj:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="CNPJ Ã© obrigatÃ³rio para Pessoa JurÃ­dica"
+                detail="CNPJ é obrigatório para Pessoa Jurídica"
             )
         # Verificar se CNPJ jÃ¡ existe
         existing = db.query(Cliente).filter(
@@ -583,7 +583,7 @@ def create_cliente(
         if existing:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"JÃ¡ existe um {cliente_data.tipo_cadastro} cadastrado com este CNPJ"
+                detail=f"Já existe um {cliente_data.tipo_cadastro} cadastrado com este CNPJ"
             )
     
     # Verificar se CRMV jÃ¡ existe (se fornecido e for veterinÃ¡rio)
@@ -596,7 +596,7 @@ def create_cliente(
         if existing_crmv:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="JÃ¡ existe um veterinÃ¡rio cadastrado com este CRMV"
+                detail="Já existe um veterinário cadastrado com este CRMV"
             )
     
     # Verificar se celular jÃ¡ existe (se fornecido)
@@ -609,7 +609,7 @@ def create_cliente(
         if existing_cel:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="JÃ¡ existe um cadastro com este celular"
+                detail="Já existe um cadastro com este celular"
             )
     
     # Verificar se telefone jÃ¡ existe (se fornecido)
@@ -622,7 +622,7 @@ def create_cliente(
         if existing_tel:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="JÃ¡ existe um cliente cadastrado com este telefone"
+                detail="Já existe um cliente cadastrado com este telefone"
             )
     
     # Gerar cÃ³digo usando a nova funÃ§Ã£o
