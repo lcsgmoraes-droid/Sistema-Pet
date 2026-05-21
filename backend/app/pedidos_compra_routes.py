@@ -2865,7 +2865,6 @@ def _realizar_confronto_legado(pedido: PedidoCompra, nota, db: Session, tenant_i
     total_nf = 0.0
     tem_divergencia_qtd = False
     tem_divergencia_preco = False
-    composicoes_custo = _calcular_composicoes_custo_confronto([nota])
 
     for item_pedido in pedido.itens:
         produto = db.query(Produto).filter(
@@ -2901,8 +2900,8 @@ def _realizar_confronto_legado(pedido: PedidoCompra, nota, db: Session, tenant_i
 
         if item_nf:
             qtd_nf = item_nf.quantidade
-            valor_nf = _valor_custo_final_item_nf(item_nf, composicoes_custo)
-            preco_nf = _preco_custo_final_item_nf(item_nf, composicoes_custo)
+            preco_nf = item_nf.valor_unitario
+            valor_nf = item_nf.valor_total
             total_nf += valor_nf
 
             dif_qtd = qtd_nf - qtd_pedida
@@ -2969,10 +2968,7 @@ def _realizar_confronto_legado(pedido: PedidoCompra, nota, db: Session, tenant_i
     ids_pedido_produto = {i.produto_id for i in pedido.itens}
     for it in nota.itens:
         if it.produto_id and it.produto_id not in ids_pedido_produto:
-            qtd_nf = _float_confronto(it.quantidade)
-            valor_nf = _valor_custo_final_item_nf(it, composicoes_custo)
-            preco_nf = _preco_custo_final_item_nf(it, composicoes_custo)
-            total_nf += valor_nf
+            total_nf += it.valor_total
             itens_confronto.append({
                 "produto_id": it.produto_id,
                 "produto_nome": it.descricao,
@@ -2980,15 +2976,15 @@ def _realizar_confronto_legado(pedido: PedidoCompra, nota, db: Session, tenant_i
                 "item_pedido_id": None,
                 "item_nf_id": it.id,
                 "qtd_pedida": 0,
-                "qtd_nf": qtd_nf,
-                "dif_qtd": qtd_nf,
+                "qtd_nf": it.quantidade,
+                "dif_qtd": it.quantidade,
                 "preco_pedido": 0,
-                "preco_nf": round(preco_nf, 4),
+                "preco_nf": round(it.valor_unitario, 4),
                 "dif_preco_unit": None,
                 "dif_preco_pct": 0,
                 "valor_pedido": 0,
-                "valor_nf": round(valor_nf, 2),
-                "dif_valor": round(valor_nf, 2),
+                "valor_nf": round(it.valor_total, 2),
+                "dif_valor": round(it.valor_total, 2),
                 "status": "nao_pedido",
                 "encontrado_na_nf": True,
             })
