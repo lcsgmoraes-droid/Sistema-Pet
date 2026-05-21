@@ -175,38 +175,28 @@ export default function BarcodeScannerScreen({ navigation }: any) {
       {/* Card do produto encontrado */}
       {produtoEncontrado && (
         <View style={styles.produtoCard}>
-          <TouchableOpacity
-            style={styles.produtoImagemWrap}
-            onPress={() => navigation.navigate('DetalhesProduto', { produto: produtoEncontrado })}
-            activeOpacity={0.85}
-          >
-            {produtoEncontrado.foto_url ? (
-              <Image source={{ uri: produtoEncontrado.foto_url }} style={styles.produtoImagem} resizeMode="contain" />
-            ) : (
-              <View style={[styles.produtoImagem, styles.produtoImagemPlaceholder]}>
-                <Ionicons name="image-outline" size={24} color={CORES.textoClaro} />
-              </View>
-            )}
-          </TouchableOpacity>
-          <View style={styles.produtoInfo}>
-            <TouchableOpacity onPress={() => navigation.navigate('DetalhesProduto', { produto: produtoEncontrado })}>
-              <Text style={styles.produtoNome} numberOfLines={2}>{produtoEncontrado.nome}</Text>
-            </TouchableOpacity>
-            {produtoEncontrado.promocao_ativa && produtoEncontrado.preco_promocional ? (
-              <Text style={styles.produtoPrecoOriginal}>{formatarMoeda(produtoEncontrado.preco)}</Text>
-            ) : null}
-            <Text style={styles.produtoPreco}>
-              {formatarMoeda(
-                produtoEncontrado.promocao_ativa && produtoEncontrado.preco_promocional
-                  ? produtoEncontrado.preco_promocional
-                  : produtoEncontrado.preco
+          <View style={styles.produtoResumoRow}>
+            <TouchableOpacity
+              style={styles.produtoImagemWrap}
+              onPress={() => navigation.navigate('DetalhesProduto', { produto: produtoEncontrado })}
+              activeOpacity={0.85}
+            >
+              {produtoEncontrado.foto_url ? (
+                <Image source={{ uri: produtoEncontrado.foto_url }} style={styles.produtoImagem} resizeMode="contain" />
+              ) : (
+                <View style={[styles.produtoImagem, styles.produtoImagemPlaceholder]}>
+                  <Ionicons name="image-outline" size={24} color={CORES.textoClaro} />
+                </View>
               )}
-            </Text>
-            {produtoSemEstoque ? (
-              <Text style={styles.produtoEstoqueIndisponivel}>Sem estoque no momento</Text>
-            ) : null}
-          </View>
-          <View style={styles.produtoAcoes}>
+            </TouchableOpacity>
+            <View style={styles.produtoInfo}>
+              <TouchableOpacity onPress={() => navigation.navigate('DetalhesProduto', { produto: produtoEncontrado })}>
+                <Text style={styles.produtoNome} numberOfLines={2}>{produtoEncontrado.nome}</Text>
+              </TouchableOpacity>
+              {produtoSemEstoque ? (
+                <Text style={styles.produtoEstoqueIndisponivel}>Sem estoque no momento</Text>
+              ) : null}
+            </View>
             <TouchableOpacity
               style={styles.botaoEscanear}
               onPress={() => {
@@ -217,6 +207,28 @@ export default function BarcodeScannerScreen({ navigation }: any) {
             >
               <Ionicons name="scan-outline" size={18} color={CORES.primario} />
             </TouchableOpacity>
+          </View>
+
+          <View style={styles.produtoCompraRow}>
+            <View style={styles.produtoPrecoWrap}>
+              {produtoEncontrado.promocao_ativa && produtoEncontrado.preco_promocional ? (
+                <Text style={styles.produtoPrecoOriginal} numberOfLines={1}>
+                  {formatarMoeda(produtoEncontrado.preco)}
+                </Text>
+              ) : null}
+              <Text
+                style={styles.produtoPreco}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.75}
+              >
+                {formatarMoeda(
+                  produtoEncontrado.promocao_ativa && produtoEncontrado.preco_promocional
+                    ? produtoEncontrado.preco_promocional
+                    : produtoEncontrado.preco
+                )}
+              </Text>
+            </View>
             <TouchableOpacity
               style={[styles.botaoAdicionar, produtoSemEstoque && styles.botaoAdicionarDesabilitado]}
               onPress={adicionarAoCarrinho}
@@ -287,21 +299,30 @@ const styles = StyleSheet.create({
   produtoCard: {
     backgroundColor: CORES.superficie,
     padding: ESPACO.lg,
-    flexDirection: 'row',
-    alignItems: 'center',
     borderTopLeftRadius: RAIO.lg,
     borderTopRightRadius: RAIO.lg,
+    gap: ESPACO.md,
+  },
+  produtoResumoRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: ESPACO.md,
   },
   produtoImagemWrap: { width: 72, height: 72, borderRadius: RAIO.md, overflow: 'hidden', backgroundColor: CORES.fundo },
   produtoImagem: { width: '100%', height: '100%' },
   produtoImagemPlaceholder: { alignItems: 'center', justifyContent: 'center' },
-  produtoInfo: { flex: 1 },
+  produtoInfo: { flex: 1, minWidth: 0 },
   produtoNome: { fontSize: FONTE.normal, fontWeight: '600', color: CORES.texto },
-  produtoPrecoOriginal: { fontSize: FONTE.pequena, color: CORES.textoClaro, textDecorationLine: 'line-through', marginTop: 4 },
-  produtoPreco: { fontSize: FONTE.grande, fontWeight: 'bold', color: CORES.primario, marginTop: 4 },
   produtoEstoqueIndisponivel: { fontSize: FONTE.pequena, color: CORES.erro, fontWeight: '600', marginTop: 4 },
-  produtoAcoes: { flexDirection: 'row', gap: ESPACO.sm, alignItems: 'center' },
+  produtoCompraRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: ESPACO.md,
+  },
+  produtoPrecoWrap: { flex: 1, minWidth: 0, paddingRight: ESPACO.sm },
+  produtoPrecoOriginal: { fontSize: FONTE.pequena, color: CORES.textoClaro, textDecorationLine: 'line-through', marginBottom: 2 },
+  produtoPreco: { fontSize: FONTE.grande, fontWeight: 'bold', color: CORES.primario },
   botaoEscanear: {
     width: 42,
     height: 42,
@@ -314,11 +335,13 @@ const styles = StyleSheet.create({
   botaoAdicionar: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     backgroundColor: CORES.primario,
     borderRadius: RAIO.md,
     paddingHorizontal: ESPACO.md,
     paddingVertical: ESPACO.sm + 4,
     gap: 6,
+    minWidth: 128,
   },
   botaoAdicionarDesabilitado: { backgroundColor: CORES.textoClaro },
   botaoAdicionarTexto: { color: '#fff', fontWeight: 'bold', fontSize: FONTE.normal },
