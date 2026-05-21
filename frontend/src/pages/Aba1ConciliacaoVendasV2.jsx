@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import api from '../api';
 import { getAccessToken } from '../auth/tokenStorage';
 import SaleReference from '../components/ui/SaleReference';
+import { useEscapeToClose } from '../utils/modalEscape';
 
 /**
  * ABA 1 V2: CONCILIAÇÃO DE VENDAS (Duas Colunas)
@@ -118,18 +119,14 @@ export default function Aba1ConciliacaoVendasV2({ onConcluida, status }) {
   }, [statusFiltro, vendasPDV, nsusStone]);
   
   // Suporte a ESC para fechar visualização de matches
-  useEffect(() => {
-    const handleEsc = (event) => {
-      if (event.key === 'Escape' && mostrarConfirmacao) {
-        setMostrarConfirmacao(false);
-        setMatches([]);
-        setModoBusca(false);
-      }
-    };
-    
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, [mostrarConfirmacao]);
+  useEscapeToClose({
+    isOpen: mostrarConfirmacao,
+    onClose: () => {
+      setMostrarConfirmacao(false);
+      setMatches([]);
+      setModoBusca(false);
+    },
+  });
   
   // Carregar NSUs Stone automaticamente ao selecionar operadora
   useEffect(() => {

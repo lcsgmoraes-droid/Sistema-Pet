@@ -1,4 +1,5 @@
 import { Loader2, Pencil, Trash2, X } from "lucide-react";
+import { useEscapeToClose } from "../../../utils/modalEscape";
 
 export function formatLista(lista) {
   if (!Array.isArray(lista) || lista.length === 0) return "-";
@@ -19,6 +20,8 @@ export function parseNumero(value) {
 }
 
 export function Modal({ titulo, subtitulo, onClose, onSave, salvando, children }) {
+  useEscapeToClose({ isOpen: true, onClose, disabled: salvando });
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" onClick={onClose}>
       <div

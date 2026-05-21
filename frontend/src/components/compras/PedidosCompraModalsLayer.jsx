@@ -6,6 +6,7 @@ import ModalExportacaoPedido from './ModalExportacaoPedido';
 import ModalGruposFornecedores from './ModalGruposFornecedores';
 import ModalRecebimento from './ModalRecebimento';
 import PedidosCompraSugestaoModal from './PedidosCompraSugestaoModal';
+import { useEscapeToClose } from '../../utils/modalEscape';
 
 export default function PedidosCompraModalsLayer({
   mostrarRecebimento,
@@ -107,15 +108,46 @@ export default function PedidosCompraModalsLayer({
   setProdutoEditandoQuantidade,
   adicionarSugestoesAoPedido,
 }) {
+  const fecharRecebimento = () => {
+    setMostrarRecebimento(false);
+    setPedidoSelecionado(null);
+  };
+
+  const fecharConfronto = () => {
+    setMostrarConfronto(false);
+    setPedidoConfronto(null);
+  };
+
+  const fecharSugestaoOuFiltro = () => {
+    if (mostrarFiltroMarcas) {
+      setMostrarFiltroMarcas(false);
+      return;
+    }
+
+    fecharModalSugestao();
+  };
+
+  const modalCloseStack = [
+    mostrarSugestao && fecharSugestaoOuFiltro,
+    mostrarModalGruposFornecedores && fecharModalGruposFornecedores,
+    mostrarModalRascunhoSugestao && fecharModalRascunho,
+    mostrarModalExportacao && fecharModalExportacao,
+    mostrarModalEnvio && (() => setMostrarModalEnvio(false)),
+    mostrarConfronto && fecharConfronto,
+    mostrarRecebimento && fecharRecebimento,
+  ].filter(Boolean);
+
+  useEscapeToClose({
+    isOpen: modalCloseStack.length > 0,
+    onClose: modalCloseStack[0],
+  });
+
   return (
     <>
       {mostrarRecebimento && pedidoSelecionado && (
         <ModalRecebimento
           pedido={pedidoSelecionado}
-          onClose={() => {
-            setMostrarRecebimento(false);
-            setPedidoSelecionado(null);
-          }}
+          onClose={fecharRecebimento}
           onReceber={receberPedido}
         />
       )}
@@ -123,10 +155,7 @@ export default function PedidosCompraModalsLayer({
       {mostrarConfronto && pedidoConfronto && (
         <ModalConfronto
           pedido={pedidoConfronto}
-          onClose={() => {
-            setMostrarConfronto(false);
-            setPedidoConfronto(null);
-          }}
+          onClose={fecharConfronto}
           onPedidoComplementarCriado={() => {
             carregarDados();
           }}

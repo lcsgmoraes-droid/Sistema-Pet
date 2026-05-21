@@ -11,6 +11,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../../api';
 import CopyableCode from '../../components/ui/CopyableCode';
 import SaleReference from '../../components/ui/SaleReference';
+import { useEscapeToClose } from '../../utils/modalEscape';
 
 const ComissaoDetalhe = ({ comissaoId, onClose }) => {
   const [comissao, setComissao] = useState(null);
@@ -23,16 +24,7 @@ const ComissaoDetalhe = ({ comissaoId, onClose }) => {
     }
   }, [comissaoId]);
 
-  // Fechar com ESC
-  useEffect(() => {
-    const handleEsc = (e) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
-    };
-    window.addEventListener('keydown', handleEsc);
-    return () => window.removeEventListener('keydown', handleEsc);
-  }, [onClose]);
+  useEscapeToClose({ isOpen: Boolean(comissaoId), onClose });
 
   const carregarDetalhe = async () => {
     try {

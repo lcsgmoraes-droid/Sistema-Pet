@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { trackViewItem } from '../../services/analytics';
+import { useEscapeToClose } from '../../utils/modalEscape';
 import { getProductImages } from './ecommerceMvpUtils';
 
 export default function useEcommerceProductModal({ products, location, navigate }) {
@@ -19,14 +20,7 @@ export default function useEcommerceProductModal({ products, location, navigate 
     navigate(location.pathname, { replace: true });
   }
 
-  useEffect(() => {
-    if (!selectedProduct) return;
-    function handleKeyDown(event) {
-      if (event.key === 'Escape') closeProductModal();
-    }
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [selectedProduct]);
+  useEscapeToClose({ isOpen: Boolean(selectedProduct), onClose: closeProductModal });
 
   useEffect(() => {
     if (!products.length) return;
