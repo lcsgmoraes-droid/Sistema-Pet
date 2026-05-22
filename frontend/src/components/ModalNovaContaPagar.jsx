@@ -24,7 +24,8 @@ const criarDadosPadraoContaPagar = () => ({
   intervalo_dias: null,
   data_inicio_recorrencia: null,
   data_fim_recorrencia: null,
-  numero_repeticoes: null
+  numero_repeticoes: null,
+  aplicar_recorrencia_futura: false
 });
 
 const normalizarDataContaPagar = (valor, fallback = '') => {
@@ -51,10 +52,12 @@ const montarDadosEdicaoContaPagar = (conta) => ({
   data_inicio_recorrencia: normalizarDataContaPagar(conta?.data_inicio_recorrencia),
   data_fim_recorrencia: normalizarDataContaPagar(conta?.data_fim_recorrencia),
   numero_repeticoes: conta?.numero_repeticoes || null,
+  aplicar_recorrencia_futura: false,
 });
 
 const ModalNovaContaPagar = ({ isOpen, onClose, onSave, contaEdicao = null }) => {
   const isEditando = Boolean(contaEdicao?.id);
+  const pertenceRecorrencia = Boolean(contaEdicao?.eh_recorrente || contaEdicao?.conta_recorrencia_origem_id);
   const [loading, setLoading] = useState(false);
   const [fornecedores, setFornecedores] = useState([]);
   const [categorias, setCategorias] = useState([]);
@@ -96,7 +99,8 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave, contaEdicao = null }) =>
     intervalo_dias: null,
     data_inicio_recorrencia: null,
     data_fim_recorrencia: null,
-    numero_repeticoes: null
+    numero_repeticoes: null,
+    aplicar_recorrencia_futura: false
   });
 
   const fornecedorSelecionado =
@@ -319,6 +323,7 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave, contaEdicao = null }) =>
           data_inicio_recorrencia: payload.eh_recorrente ? (payload.data_inicio_recorrencia || payload.data_vencimento) : null,
           data_fim_recorrencia: payload.eh_recorrente ? payload.data_fim_recorrencia : null,
           numero_repeticoes: payload.eh_recorrente ? payload.numero_repeticoes : null,
+          aplicar_recorrencia_futura: Boolean(payload.aplicar_recorrencia_futura),
         });
       } else {
         await api.post('/contas-pagar/', payload);
@@ -356,7 +361,8 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave, contaEdicao = null }) =>
       intervalo_dias: null,
       data_inicio_recorrencia: null,
       data_fim_recorrencia: null,
-      numero_repeticoes: null
+      numero_repeticoes: null,
+      aplicar_recorrencia_futura: false
     });
   };
 
@@ -657,7 +663,47 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave, contaEdicao = null }) =>
                     {isEditando && ' Na edicao, a janela futura sera ajustada sem alterar pagamentos ja registrados.'}
                   </p>
                 </div>
+
+                {isEditando && (
+                  <label className="flex items-start gap-3 rounded-lg border border-purple-200 bg-white p-3">
+                    <input
+                      type="checkbox"
+                      checked={Boolean(dados.aplicar_recorrencia_futura)}
+                      onChange={(e) => setDados({ ...dados, aplicar_recorrencia_futura: e.target.checked })}
+                      className="mt-1 h-4 w-4 rounded text-purple-600 focus:ring-purple-500"
+                    />
+                    <span>
+                      <span className="block text-sm font-semibold text-purple-900">
+                        Aplicar alterações aos próximos lançamentos
+                      </span>
+                      <span className="mt-1 block text-xs text-purple-700">
+                        Replica valor, fornecedor, categoria, DRE, tipo, canal, documento e observações para
+                        lançamentos futuros sem pagamento. As datas já geradas permanecem preservadas.
+                      </span>
+                    </span>
+                  </label>
+                )}
               </div>
+            )}
+
+            {isEditando && pertenceRecorrencia && !dados.eh_recorrente && (
+              <label className="ml-6 flex items-start gap-3 rounded-lg border border-purple-200 bg-purple-50 p-3">
+                <input
+                  type="checkbox"
+                  checked={Boolean(dados.aplicar_recorrencia_futura)}
+                  onChange={(e) => setDados({ ...dados, aplicar_recorrencia_futura: e.target.checked })}
+                  className="mt-1 h-4 w-4 rounded text-purple-600 focus:ring-purple-500"
+                />
+                <span>
+                  <span className="block text-sm font-semibold text-purple-900">
+                    Aplicar alterações aos próximos lançamentos desta recorrência
+                  </span>
+                  <span className="mt-1 block text-xs text-purple-700">
+                    Replica valor, fornecedor, categoria, DRE, tipo, canal, documento e observações para
+                    lançamentos futuros sem pagamento. As datas já geradas permanecem preservadas.
+                  </span>
+                </span>
+              </label>
             )}
           </div>
 

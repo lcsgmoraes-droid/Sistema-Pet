@@ -48,6 +48,58 @@ function MetricCard({ title, value, subtitle, tone = "slate", icon: Icon }) {
   );
 }
 
+function formatarDataBR(data) {
+  if (!data) return "-";
+  const [ano, mes, dia] = String(data).split("T")[0].split("-");
+  if (!ano || !mes || !dia) return data;
+  return `${dia}/${mes}/${ano}`;
+}
+
+function DetalheContasCard({ title, total, items = [], tone = "slate", emptyLabel = "Nenhum lancamento" }) {
+  const tones = {
+    slate: "border-slate-200",
+    amber: "border-amber-200",
+    blue: "border-blue-200",
+    red: "border-red-200",
+  };
+
+  return (
+    <div className={`rounded-lg border bg-white p-4 ${tones[tone] || tones.slate}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-bold text-slate-900">{title}</h3>
+          <p className="text-xs text-slate-500">Origem dos valores usados no calculo</p>
+        </div>
+        <span className="text-sm font-bold text-slate-900">{formatMoneyBRL(total || 0)}</span>
+      </div>
+
+      <div className="mt-3 max-h-72 overflow-y-auto divide-y divide-slate-100">
+        {items.length === 0 ? (
+          <p className="py-4 text-sm text-slate-500">{emptyLabel}</p>
+        ) : (
+          items.map((item) => (
+            <div key={`${title}-${item.id}`} className="py-3 text-sm">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-slate-900" title={item.descricao}>
+                    #{item.id} {item.descricao}
+                  </p>
+                  <p className="mt-1 text-xs text-slate-500">
+                    {formatarDataBR(item.data_vencimento)}
+                    {item.fornecedor_nome ? ` | ${item.fornecedor_nome}` : ""}
+                  </p>
+                  <p className="mt-1 text-xs text-blue-700">{item.origem_classificacao}</p>
+                </div>
+                <span className="shrink-0 font-bold text-slate-900">{formatMoneyBRL(item.valor || 0)}</span>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  );
+}
+
 const CANAIS = [
   { value: "", label: "Todos os canais" },
   { value: "loja_fisica", label: "Loja fisica" },
@@ -191,7 +243,8 @@ export default function PontoEquilibrio() {
           <p className="font-semibold">Formula usada</p>
           <p className="mt-1">
             Ponto de equilibrio = custos fixos / margem de contribuicao. A margem de contribuicao
-            considera faturamento menos CMV estimado e despesas variaveis.
+            considera faturamento menos CMV estimado e despesas variaveis operacionais. Compras de
+            estoque/produtos para revenda ficam fora das despesas variaveis para nao duplicar o CMV.
           </p>
         </div>
 
@@ -305,11 +358,53 @@ export default function PontoEquilibrio() {
                       {formatMoneyBRL(dados.despesas_sem_classificacao)}
                     </span>
                   </div>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-slate-600">Fora do PE: compras de estoque</span>
+                    <span className="font-semibold text-slate-700">
+                      {formatMoneyBRL(dados.despesas_estoque_excluidas || 0)}
+                    </span>
+                  </div>
                   <p className="rounded-md bg-slate-50 p-3 text-xs text-slate-600">
                     Para melhorar a precisao, classifique as contas a pagar em tipo de despesa
-                    fixo/variavel ou marque o campo de PE na subcategoria DRE.
+                    fixo/variavel ou marque o campo de PE na subcategoria DRE. Contas de produto
+                    para revenda aparecem separadas porque o custo entra pelo CMV quando o produto e vendido.
                   </p>
                 </div>
+              </div>
+            </div>
+
+            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
+              <h2 className="text-base font-semibold text-slate-900">Origem dos valores</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Use esta abertura para conferir o que entrou como despesa fixa, despesa variavel,
+                sem classificacao ou fora do ponto de equilibrio.
+              </p>
+              <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+                <DetalheContasCard
+                  title="Despesas fixas"
+                  total={dados.despesas_fixas}
+                  items={dados.detalhes_classificacao?.fixas || []}
+                  tone="amber"
+                />
+                <DetalheContasCard
+                  title="Despesas variaveis"
+                  total={dados.despesas_variaveis}
+                  items={dados.detalhes_classificacao?.variaveis || []}
+                  tone="blue"
+                />
+                <DetalheContasCard
+                  title="Sem classificacao"
+                  total={dados.despesas_sem_classificacao}
+                  items={dados.detalhes_classificacao?.sem_classificacao || []}
+                  tone="red"
+                />
+                <DetalheContasCard
+                  title="Fora do PE"
+                  total={dados.despesas_estoque_excluidas}
+                  items={dados.detalhes_classificacao?.estoque_excluido || []}
+                  tone="slate"
+                  emptyLabel="Nenhuma compra de estoque identificada"
+                />
               </div>
             </div>
 

@@ -23,6 +23,9 @@ def test_api_ponto_equilibrio_usa_formula_de_margem_de_contribuicao():
     assert "Produto.preco_custo" in source
     assert "TipoDespesa.e_custo_fixo" in source
     assert "DRESubcategoria.custo_pe" in source
+    assert "despesas_estoque_excluidas" in source
+    assert "_conta_eh_compra_estoque_para_pe" in source
+    assert "detalhes_classificacao" in source
 
 
 def test_frontend_tem_tela_financeira_de_ponto_equilibrio():
@@ -37,4 +40,8 @@ def test_frontend_tem_tela_financeira_de_ponto_equilibrio():
     assert 'label: "Ponto de Equilibrio"' in menu
     assert "Ponto de Equilibrio" in page
     assert "custos fixos / margem de contribuicao" in page
+    assert "Origem dos valores" in page
+    assert "Despesas fixas" in page
+    assert "Despesas variaveis" in page
+    assert "Fora do PE" in page
     assert "Ponto de Equilíbrio —" not in dashboard
