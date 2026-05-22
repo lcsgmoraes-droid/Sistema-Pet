@@ -179,6 +179,19 @@ const Layout = () => {
         return false;
       }
 
+      const modalBackdropFor = elementoOverlay.getAttribute("data-modal-backdrop-for");
+      if (modalBackdropFor) {
+        const painelModalAtivo = Array.from(
+          document.querySelectorAll("[data-modal-panel]"),
+        ).some(
+          (painel) => painel.getAttribute("data-modal-panel") === modalBackdropFor,
+        );
+
+        if (painelModalAtivo) {
+          return false;
+        }
+      }
+
       const estilo = window.getComputedStyle(elementoOverlay);
       const visivel =
         estilo.display !== "none" && estilo.visibility !== "hidden";
@@ -212,6 +225,14 @@ const Layout = () => {
     });
   };
 
+  const neutralizarOverlaysOrfaos = () => {
+    const overlaysOrfaos = encontrarOverlaysOrfaos();
+    overlaysOrfaos.forEach((elementoOverlay) =>
+      neutralizarOverlay(elementoOverlay),
+    );
+    overlaySuspeitoDesdeRef.current.clear();
+  };
+
   const destravarTela = (silencioso = false) => {
     setSidebarOpen(false);
     setCalculadoraAberta(false);
@@ -219,12 +240,7 @@ const Layout = () => {
     const eventoEscape = new KeyboardEvent("keydown", { key: "Escape" });
     window.dispatchEvent(eventoEscape);
 
-    const overlaysOrfaos = encontrarOverlaysOrfaos();
-    overlaysOrfaos.forEach((elementoOverlay) =>
-      neutralizarOverlay(elementoOverlay),
-    );
-
-    overlaySuspeitoDesdeRef.current.clear();
+    neutralizarOverlaysOrfaos();
     if (!silencioso) {
       setTelaBloqueadaSuspeita(false);
     }
@@ -299,14 +315,13 @@ const Layout = () => {
 
         if (agora - vistoDesde >= limiteMs) {
           precisaDestravarAutomaticamente = true;
-          neutralizarOverlay(elementoOverlay);
         }
       });
 
       setTelaBloqueadaSuspeita(overlaysOrfaos.length > 0);
 
       if (precisaDestravarAutomaticamente) {
-        destravarTela(true);
+        neutralizarOverlaysOrfaos();
       }
     };
 
