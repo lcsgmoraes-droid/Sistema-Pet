@@ -1,4 +1,7 @@
 import { Search } from "lucide-react";
+import { useRef } from "react";
+
+import useRevealFloatingPanel from "../../hooks/useRevealFloatingPanel";
 
 export default function ProdutoSelector({
   autoFocus = false,
@@ -19,11 +22,18 @@ export default function ProdutoSelector({
   suggestions = [],
   value = "",
 }) {
+  const panelRef = useRef(null);
   const searchValue = String(value || "");
   const shouldShowSuggestions =
     showSuggestions &&
     searchValue.trim().length >= minChars &&
     suggestions.length > 0;
+
+  useRevealFloatingPanel({
+    enabled: shouldShowSuggestions && !disabled,
+    panelRef,
+    refreshKey: `${searchValue}:${suggestions.length}`,
+  });
 
   return (
     <div id={id} ref={containerRef} className={`relative ${className}`.trim()}>
@@ -49,7 +59,10 @@ export default function ProdutoSelector({
       </div>
 
       {shouldShowSuggestions && (
-        <div className="absolute z-10 mt-2 max-h-60 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+        <div
+          ref={panelRef}
+          className="absolute z-10 mt-2 max-h-60 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg"
+        >
           {suggestions.map((produto, index) =>
             renderSuggestion ? (
               renderSuggestion(produto, index)

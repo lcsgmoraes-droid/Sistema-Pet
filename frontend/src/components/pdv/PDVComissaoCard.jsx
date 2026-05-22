@@ -1,4 +1,7 @@
 import { X } from "lucide-react";
+import { useRef } from "react";
+
+import useRevealFloatingPanel from "../../hooks/useRevealFloatingPanel";
 import Panel from "../ui/Panel";
 
 export default function PDVComissaoCard({
@@ -13,6 +16,16 @@ export default function PDVComissaoCard({
   onToggleVendaComissionada,
   vendaComissionada,
 }) {
+  const panelRef = useRef(null);
+  const mostrarSugestoes =
+    vendaComissionada && !funcionarioComissao && funcionariosSugeridos.length > 0;
+
+  useRevealFloatingPanel({
+    enabled: mostrarSugestoes && !modoVisualizacao,
+    panelRef,
+    refreshKey: `${buscaFuncionario}:${funcionariosSugeridos.length}`,
+  });
+
   return (
     <Panel padding="lg">
       <div className="flex items-center justify-between mb-4">
@@ -53,7 +66,10 @@ export default function PDVComissaoCard({
               />
 
               {funcionariosSugeridos.length > 0 && (
-                <div className="mt-2 border border-gray-200 rounded-lg max-h-48 overflow-y-auto">
+                <div
+                  ref={panelRef}
+                  className="mt-2 border border-gray-200 rounded-lg max-h-48 overflow-y-auto"
+                >
                   {funcionariosSugeridos.map((func) => (
                     <button
                       key={func.id}

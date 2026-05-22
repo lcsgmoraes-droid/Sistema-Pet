@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useCallback, useState, useEffect, useRef } from 'react';
 import {
   X,
   CreditCard,
@@ -36,6 +36,7 @@ import StatusMargemIndicador from './StatusMargemIndicador';
 import api from '../api';
 import CurrencyInput from './CurrencyInput';
 import ModalAdicionarCredito from './ModalAdicionarCredito';
+import useRevealFloatingPanel from '../hooks/useRevealFloatingPanel';
 import { formatBRL, formatMoneyBRL } from '../utils/formatters';
 import {
   emitirNotaFiscalAssistida,
@@ -111,8 +112,13 @@ export default function ModalPagamento({
   const [rankCliente, setRankCliente] = useState('bronze');
   const [loadingBeneficiosCampanha, setLoadingBeneficiosCampanha] = useState(false);
 
+  const modalPagamentoContentRef = useRef(null);
+
   // Ref para o container das opções de parcelamento
   const opcoesParcelamentoRef = useRef(null);
+  const statusMargemRef = useRef(null);
+  const justificativaRef = useRef(null);
+  const justificativaTextareaRef = useRef(null);
 
   // Carregar formas de pagamento do backend
   useEffect(() => {
@@ -251,6 +257,74 @@ export default function ModalPagamento({
     cupomParaFinalizar?.code && Number(cupomParaFinalizar?.discount_applied || 0) > 0
       ? `A margem ficou baixa por conta do cupom ${String(cupomParaFinalizar.code).toUpperCase()} (${formatMoneyBRL(cupomParaFinalizar.discount_applied)} de desconto).`
       : "";
+  const corParcelamentoAtual =
+    formaPagamentoSelecionada?.permite_parcelamento &&
+    simulacoesParcelamento[formaPagamentoSelecionada.id]?.[numeroParcelas]
+      ? simulacoesParcelamento[formaPagamentoSelecionada.id][numeroParcelas]?.cor ?? 'verde'
+      : 'verde';
+  const margemCriticaAtual =
+    statusMargem === 'vermelho' || corParcelamentoAtual === 'vermelho';
+  const mostrarCampoJustificativa =
+    margemCriticaAtual || Boolean(justificativaTexto && justificativaTexto.trim().length > 0);
+  const mostrarBotaoAdicionarRodape =
+    Boolean(formaPagamentoSelecionada) && valorRestante > 0.01;
+
+  const rolarElementoNoModal = useCallback((elemento, { focusElement } = {}) => {
+    if (!elemento) return;
+
+    const rolar = () => {
+      const container = modalPagamentoContentRef.current;
+
+      if (container && typeof elemento.getBoundingClientRect === 'function') {
+        const containerRect = container.getBoundingClientRect();
+        const elementoRect = elemento.getBoundingClientRect();
+        const destino =
+          container.scrollTop + elementoRect.top - containerRect.top - 24;
+        const limite = Math.max(0, container.scrollHeight - container.clientHeight);
+
+        container.scrollTo({
+          top: Math.max(0, Math.min(destino, limite)),
+          behavior: 'smooth',
+        });
+      } else if (typeof elemento.scrollIntoView === 'function') {
+        elemento.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }
+
+      if (focusElement && typeof window !== 'undefined') {
+        window.setTimeout(() => {
+          focusElement.focus?.({ preventScroll: true });
+        }, 250);
+      }
+    };
+
+    if (
+      typeof window !== 'undefined' &&
+      typeof window.requestAnimationFrame === 'function'
+    ) {
+      window.requestAnimationFrame(() => window.requestAnimationFrame(rolar));
+      return;
+    }
+
+    rolar();
+  }, []);
+
+  const revelarJustificativaObrigatoria = useCallback(() => {
+    rolarElementoNoModal(justificativaRef.current, {
+      focusElement: justificativaTextareaRef.current,
+    });
+  }, [rolarElementoNoModal]);
+
+  useRevealFloatingPanel({
+    enabled: Boolean(statusMargem === 'amarelo' || statusMargem === 'vermelho'),
+    panelRef: statusMargemRef,
+    refreshKey: `${statusMargem || ''}:${formaPagamentoSelecionada?.id || ''}:${numeroParcelas}`,
+  });
+
+  useEffect(() => {
+    if (erroJustificativa) {
+      revelarJustificativaObrigatoria();
+    }
+  }, [erroJustificativa, revelarJustificativaObrigatoria]);
 
   const valorBaseBeneficios = Number(venda.total || 0);
   const canalVendaBeneficios = venda.canal || venda.origem_canal_venda || 'loja_fisica';
@@ -674,23 +748,15 @@ export default function ModalPagamento({
     
     console.log('📤 DEBUG novoPagamento:', novoPagamento);
 
-    // 🆕 PASSO 4️⃣ - Verificar justificativa usando APENAS dados do BACKEND
-    let corParcelamento = 'verde'; // Default
-    
-    if (formaPagamentoSelecionada?.permite_parcelamento && simulacoesParcelamento[formaPagamentoSelecionada.id]) {
-      // ✅ Reutilizar COR que veio do BACKEND
-      const simulacao = simulacoesParcelamento[formaPagamentoSelecionada.id]?.[numeroParcelas];
-      corParcelamento = simulacao?.cor ?? 'verde';
-      console.log(`♻️ Reutilizando simulação do backend: ${numeroParcelas}x = cor ${corParcelamento}`);
-    }
-    
     // ✅ PASSO 5: Se margem crítica, EXIGIR justificativa (mas NÃO bloquear fluxo)
-    const margemCritica = statusMargem === 'vermelho' || corParcelamento === 'vermelho';
+    console.log(`♻️ Reutilizando simulação do backend: ${numeroParcelas}x = cor ${corParcelamentoAtual}`);
+    const margemCritica = margemCriticaAtual;
     
     if (margemCritica) {
       if (!justificativaTexto || justificativaTexto.trim().length < 10) {
         setErroJustificativa('⚠️ Justificativa obrigatória para margem crítica (mínimo 10 caracteres)');
         setErro('Por favor, preencha a justificativa abaixo');
+        revelarJustificativaObrigatoria();
         return;
       }
       
@@ -1072,7 +1138,7 @@ export default function ModalPagamento({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-6">
+        <div ref={modalPagamentoContentRef} className="flex-1 overflow-y-auto p-6">
           <div className="grid grid-cols-2 gap-6">
             {/* Coluna Esquerda - Seleção de Pagamentos */}
             <div className="space-y-6">
@@ -1715,10 +1781,12 @@ export default function ModalPagamento({
 
               {/* ✅ Indicador de Status de Margem Operacional (movido para cá) */}
               {statusMargem && (
-                <StatusMargemIndicador 
-                  status={statusMargem} 
-                  loading={loadingStatusMargem}
-                />
+                <div ref={statusMargemRef}>
+                  <StatusMargemIndicador
+                    status={statusMargem}
+                    loading={loadingStatusMargem}
+                  />
+                </div>
               )}
 
               {/* 💡 Sugestão PIX — aparece quando forma atual NÃO é PIX e há margem para oferecer desconto */}
@@ -1830,64 +1898,54 @@ export default function ModalPagamento({
               )}
 
               {/* 🆕 PASSO 5: Campo de Justificativa Inline (aparece AUTOMATICAMENTE quando margem vermelha) */}
-              {(() => {
-                // Detectar se precisa justificativa
-                let corParcelamento = 'verde';
-                if (formaPagamentoSelecionada?.permite_parcelamento && 
-                    simulacoesParcelamento[formaPagamentoSelecionada.id]?.[numeroParcelas]) {
-                  corParcelamento = simulacoesParcelamento[formaPagamentoSelecionada.id][numeroParcelas]?.cor ?? 'verde';
-                }
-                
-                const margemCritica = statusMargem === 'vermelho' || corParcelamento === 'vermelho';
-                
-                // ✅ Mostrar também se já tem texto de justificativa (para preservar após adicionar pagamento)
-                const mostrarCampo = margemCritica || (justificativaTexto && justificativaTexto.trim().length > 0);
-                
-                if (!mostrarCampo) return null;
-                
-                return (
-                  <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4">
-                    <div className="flex items-start space-x-3 mb-3">
-                      <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-red-900">⚠️ Justificativa Obrigatória</h4>
-                        <p className="text-sm text-red-700 mt-1">
-                          {descricaoCupomMargem || "Esta venda tem margem crítica. Informe o motivo para prosseguir."}
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <textarea
-                      value={justificativaTexto}
-                      onChange={(e) => {
-                        setJustificativaTexto(e.target.value);
-                        if (e.target.value.trim().length >= 10) {
-                          setErroJustificativa('');
-                        }
-                      }}
-                      placeholder={
-                        descricaoCupomMargem
-                          ? "Ex: cupom autorizado pela campanha de fidelidade."
-                          : "Ex: Cliente especial, promoção de lançamento, acordo comercial..."
-                      }
-                      className={`w-full px-3 py-2 border-2 rounded-lg focus:ring-2 focus:ring-red-500 resize-none ${
-                        erroJustificativa ? 'border-red-500' : 'border-red-300'
-                      }`}
-                      rows={3}
-                    />
-                    
-                    {erroJustificativa && (
-                      <p className="text-xs text-red-700 font-medium mt-2">
-                        {erroJustificativa}
+              {mostrarCampoJustificativa && (
+                <div
+                  ref={justificativaRef}
+                  data-testid="justificativa-margem-obrigatoria"
+                  className="bg-red-50 border-2 border-red-300 rounded-lg p-4 scroll-mt-6"
+                >
+                  <div className="flex items-start space-x-3 mb-3">
+                    <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-red-900">⚠️ Justificativa Obrigatória</h4>
+                      <p className="text-sm text-red-700 mt-1">
+                        {descricaoCupomMargem || "Esta venda tem margem crítica. Informe o motivo para prosseguir."}
                       </p>
-                    )}
-                    
-                    <p className="text-xs text-red-600 mt-2">
-                      💡 Mínimo 10 caracteres
-                    </p>
+                    </div>
                   </div>
-                );
-              })()}
+
+                  <textarea
+                    ref={justificativaTextareaRef}
+                    value={justificativaTexto}
+                    onChange={(e) => {
+                      setJustificativaTexto(e.target.value);
+                      if (e.target.value.trim().length >= 10) {
+                        setErroJustificativa('');
+                        setErro('');
+                      }
+                    }}
+                    placeholder={
+                      descricaoCupomMargem
+                        ? "Ex: cupom autorizado pela campanha de fidelidade."
+                        : "Ex: Cliente especial, promoção de lançamento, acordo comercial..."
+                    }
+                    className={`w-full px-3 py-2 border-2 rounded-lg focus:ring-2 focus:ring-red-500 resize-none ${
+                      erroJustificativa ? 'border-red-500' : 'border-red-300'
+                    }`}
+                    rows={3}
+                  />
+
+                  {erroJustificativa && (
+                    <p className="text-xs text-red-700 font-medium mt-2">
+                      {erroJustificativa}
+                    </p>
+                  )}
+
+                  <p className="text-xs text-red-600 mt-2">
+                    💡 Mínimo 10 caracteres. Depois use o botão "Adicionar Pagamento" no rodapé.
+                  </p>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -1901,7 +1959,7 @@ export default function ModalPagamento({
             </div>
           )}
 
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <button
               onClick={onClose}
               disabled={loading}
@@ -1910,23 +1968,38 @@ export default function ModalPagamento({
               Cancelar
             </button>
 
-            <button
-              onClick={handleFinalizar}
-              disabled={loading || !podeConfirmarFinalizacao}
-              className="flex items-center space-x-2 px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? (
-                <>
-                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                  <span>Processando...</span>
-                </>
-              ) : (
-                <>
+            <div className="flex items-center gap-3">
+              {mostrarBotaoAdicionarRodape && (
+                <button
+                  type="button"
+                  data-testid="modal-pagamento-footer-adicionar"
+                  onClick={adicionarPagamento}
+                  disabled={loading}
+                  className="flex items-center space-x-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
                   <CheckCircle className="w-5 h-5" />
-                  <span>{pagamentos.length === 0 ? 'Confirmar Ajustes' : 'Registrar Recebimento'}</span>
-                </>
+                  <span>Adicionar Pagamento</span>
+                </button>
               )}
-            </button>
+
+              <button
+                onClick={handleFinalizar}
+                disabled={loading || !podeConfirmarFinalizacao}
+                className="flex items-center space-x-2 px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {loading ? (
+                  <>
+                    <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <span>Processando...</span>
+                  </>
+                ) : (
+                  <>
+                    <CheckCircle className="w-5 h-5" />
+                    <span>{pagamentos.length === 0 ? 'Confirmar Ajustes' : 'Registrar Recebimento'}</span>
+                  </>
+                )}
+              </button>
+            </div>
           </div>
         </div>
       </div>

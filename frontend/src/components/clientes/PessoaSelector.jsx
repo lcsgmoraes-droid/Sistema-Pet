@@ -1,4 +1,7 @@
 import { Search } from "lucide-react";
+import { useRef } from "react";
+
+import useRevealFloatingPanel from "../../hooks/useRevealFloatingPanel";
 
 function defaultPessoaLabel(pessoa) {
   return pessoa?.nome || pessoa?.razao_social || pessoa?.fantasia || "Pessoa";
@@ -29,11 +32,18 @@ export default function PessoaSelector({
   suggestions = [],
   value = "",
 }) {
+  const panelRef = useRef(null);
   const searchValue = String(value || "");
   const shouldShowSuggestions =
     showSuggestions &&
     searchValue.trim().length >= minChars &&
     suggestions.length > 0;
+
+  useRevealFloatingPanel({
+    enabled: shouldShowSuggestions && !disabled,
+    panelRef,
+    refreshKey: `${searchValue}:${suggestions.length}`,
+  });
 
   return (
     <div className={`relative ${className}`.trim()}>
@@ -59,7 +69,10 @@ export default function PessoaSelector({
       <Search className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
 
       {shouldShowSuggestions && (
-        <div className="absolute z-10 mt-2 max-h-60 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg">
+        <div
+          ref={panelRef}
+          className="absolute z-10 mt-2 max-h-60 w-full overflow-y-auto rounded-lg border border-gray-200 bg-white shadow-lg"
+        >
           {suggestions.map((pessoa, index) =>
             renderSuggestion ? (
               renderSuggestion(pessoa, index)
