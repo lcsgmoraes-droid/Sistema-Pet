@@ -696,7 +696,8 @@ def gerar_comissoes_venda(
                     valor_base_original, valor_base_comissionada, percentual_aplicado,
                     valor_pago_referencia, parcela_numero, tenant_id,
                     taxa_cartao_item, impostos_item, taxa_entregador_item, custo_operacional_item, 
-                    receita_taxa_entrega_item, percentual_impostos, forma_pagamento
+                    receita_taxa_entrega_item, percentual_impostos, forma_pagamento,
+                    data_criacao
                 ) VALUES (
                     :venda_id, :venda_item_id, :funcionario_id, :produto_id,
                     :data_venda, :quantidade, :valor_venda, :valor_custo,
@@ -705,7 +706,8 @@ def gerar_comissoes_venda(
                     :valor_base_original, :valor_base_comissionada, :percentual_aplicado,
                     :valor_pago_referencia, :parcela_numero, :tenant_id,
                     :taxa_cartao_item, :impostos_item, :taxa_entregador_item, :custo_operacional_item, 
-                    :receita_taxa_entrega_item, :percentual_impostos, :forma_pagamento
+                    :receita_taxa_entrega_item, :percentual_impostos, :forma_pagamento,
+                    CURRENT_TIMESTAMP
                 )
             """, {
                 'venda_id': venda_id,
