@@ -31,10 +31,61 @@ def _require_tenant_id(tenant_id=None):
     return resolved_tenant_id
 
 
+def _buscar_comissionado(db: Session, funcionario_id: int, tenant_id: str):
+    result_cliente = execute_tenant_safe(db, """
+        SELECT nome, data_fechamento_comissao
+        FROM clientes
+        WHERE id = :funcionario_id
+          AND {tenant_filter}
+    """, {'funcionario_id': funcionario_id}, tenant_id=tenant_id)
+
+    cliente = result_cliente.fetchone()
+    if cliente:
+        return cliente
+
+    result_user = execute_tenant_safe(db, """
+        SELECT nome, data_fechamento_comissao
+        FROM users
+        WHERE id = :funcionario_id
+          AND {tenant_filter}
+    """, {'funcionario_id': funcionario_id}, tenant_id=tenant_id)
+    return result_user.fetchone()
+
+
+def _resolver_usuario_responsavel(db: Session, tenant_id: str, user_id: Optional[int] = None) -> int:
+    if user_id is not None:
+        result_user = execute_tenant_safe(db, """
+            SELECT id
+            FROM users
+            WHERE id = :user_id
+              AND {tenant_filter}
+            LIMIT 1
+        """, {'user_id': user_id}, tenant_id=tenant_id)
+        usuario = result_user.fetchone()
+        if usuario:
+            return usuario[0]
+
+    result_fallback = execute_tenant_safe(db, """
+        SELECT id
+        FROM users
+        WHERE {tenant_filter}
+        ORDER BY id
+        LIMIT 1
+    """, {}, tenant_id=tenant_id)
+    usuario_fallback = result_fallback.fetchone()
+    if usuario_fallback:
+        return usuario_fallback[0]
+
+    raise TenantSafeSQLError(
+        f"Nenhum usuario responsavel encontrado para provisionar comissoes do tenant {tenant_id}."
+    )
+
+
 def provisionar_comissoes_venda(
     venda_id: int,
     tenant_id: Optional[str] = None,
-    db: Optional[Session] = None
+    db: Optional[Session] = None,
+    user_id: Optional[int] = None,
 ) -> Dict:
     """
     Cria provisões (Contas a Pagar + DRE) para todas as comissões de uma venda.
@@ -74,6 +125,8 @@ def provisionar_comissoes_venda(
     tenant_id = _require_tenant_id(tenant_id)
 
     with transactional_session(db):
+        usuario_responsavel_id = _resolver_usuario_responsavel(db, tenant_id, user_id)
+
         # ============================================================
         # ETAPA 1: BUSCAR VENDA E VALIDAR
         # ============================================================
@@ -185,14 +238,7 @@ def provisionar_comissoes_venda(
             valor_comissao = Decimal(str(comissao[2]))
             
             # Buscar dados do funcionário
-            result_func = execute_tenant_safe(db, """
-                SELECT nome, data_fechamento_comissao
-                FROM users
-                WHERE id = :funcionario_id
-                  AND {tenant_filter}
-            """, {'funcionario_id': funcionario_id}, tenant_id=tenant_id)
-            
-            funcionario = result_func.fetchone()
+            funcionario = _buscar_comissionado(db, funcionario_id, tenant_id)
             funcionario_nome = funcionario[0] if funcionario else f"Funcionário #{funcionario_id}"
             
             # Calcular data de vencimento (baseado em data_fechamento_comissao ou padrão 30 dias)
@@ -275,7 +321,7 @@ def provisionar_comissoes_venda(
                 'data_vencimento': data_vencimento,
                 'documento': f"COMISSAO-VENDA-{venda_id}-{comissao_id}",
                 'observacoes': f"Provisão automática - Comissão venda {venda.numero_venda}",
-                'user_id': funcionario_id,  # Pode ser ajustado conforme lógica do sistema
+                'user_id': usuario_responsavel_id,
                 'tenant_id': tenant_id
             }, tenant_id=tenant_id, require_tenant=False)
             

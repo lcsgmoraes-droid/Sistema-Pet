@@ -339,7 +339,8 @@ export default function ModalPagamento({
           items: itemsFormatados,
           formas_pagamento: pagamentoSimuladoAVista,
           desconto: venda.desconto_valor || 0,
-          taxa_entrega: venda.entrega?.taxa_entrega_total || 0
+          taxa_entrega: venda.entrega?.taxa_entrega_total || 0,
+          vendedor_id: venda.funcionario_id || null
         }
       );
 
@@ -385,7 +386,8 @@ export default function ModalPagamento({
           items: itemsFormatados,
           formas_pagamento: todosPagamentos,
           desconto: venda.desconto_valor || 0,
-          taxa_entrega: venda.entrega?.taxa_entrega_total || 0
+          taxa_entrega: venda.entrega?.taxa_entrega_total || 0,
+          vendedor_id: venda.funcionario_id || null
         }
       );
 
@@ -489,7 +491,8 @@ export default function ModalPagamento({
               items: itemsFormatados,
               formas_pagamento: pagamentoSimulado,
               desconto: venda.desconto_valor || 0,
-              taxa_entrega: venda.entrega?.taxa_entrega_total || 0
+              taxa_entrega: venda.entrega?.taxa_entrega_total || 0,
+              vendedor_id: venda.funcionario_id || null
             }
           );
 

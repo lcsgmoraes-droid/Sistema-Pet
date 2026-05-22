@@ -92,6 +92,15 @@ def _create_schema(session):
         )
         """,
         """
+        CREATE TABLE clientes (
+            id INTEGER NOT NULL,
+            nome TEXT,
+            data_fechamento_comissao INTEGER,
+            parceiro_ativo BOOLEAN DEFAULT 0,
+            tenant_id TEXT NOT NULL
+        )
+        """,
+        """
         CREATE TABLE contas_pagar (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             descricao TEXT,
@@ -119,9 +128,9 @@ def _create_schema(session):
 
 
 def _seed_data(session):
-    for tenant_id, numero_venda, comissao_id, subcat_id, user_name, valor in (
-        (TENANT_A, "VA-900", 1, 10, "Alice Tenant A", 25),
-        (TENANT_B, "VB-900", 2, 20, "Bob Tenant B", 250),
+    for tenant_id, numero_venda, comissao_id, subcat_id, user_id, cliente_nome, valor in (
+        (TENANT_A, "VA-900", 1, 10, 1, "Parceiro Tenant A", 25),
+        (TENANT_B, "VB-900", 2, 20, 2, "Parceiro Tenant B", 250),
     ):
         session.execute(
             text("""
@@ -158,7 +167,14 @@ def _seed_data(session):
                 INSERT INTO users (id, nome, data_fechamento_comissao, tenant_id)
                 VALUES (:id, :nome, NULL, :tenant_id)
             """),
-            {"id": FUNCIONARIO_ID, "nome": user_name, "tenant_id": tenant_id},
+            {"id": user_id, "nome": f"Admin {tenant_id}", "tenant_id": tenant_id},
+        )
+        session.execute(
+            text("""
+                INSERT INTO clientes (id, nome, data_fechamento_comissao, parceiro_ativo, tenant_id)
+                VALUES (:id, :nome, 20, 1, :tenant_id)
+            """),
+            {"id": FUNCIONARIO_ID, "nome": cliente_nome, "tenant_id": tenant_id},
         )
     session.commit()
 
@@ -166,7 +182,7 @@ def _seed_data(session):
 def _contas(session):
     return session.execute(
         text("""
-            SELECT tenant_id, descricao, fornecedor_id, dre_subcategoria_id, valor_final
+            SELECT tenant_id, descricao, fornecedor_id, dre_subcategoria_id, valor_final, user_id
             FROM contas_pagar
             ORDER BY id
         """)
@@ -256,10 +272,11 @@ def test_dre_subcategoria_usada_pertence_ao_mesmo_tenant(db_session):
     assert contas[0].dre_subcategoria_id == 10
 
 
-def test_conta_pagar_nao_usa_funcionario_de_outro_tenant(db_session):
+def test_conta_pagar_usa_parceiro_cliente_e_usuario_responsavel_do_tenant(db_session):
     provisionar_comissoes_venda(VENDA_ID, TENANT_A, db_session)
 
     conta = _contas(db_session)[0]
-    assert "Alice Tenant A" in conta.descricao
-    assert "Bob Tenant B" not in conta.descricao
+    assert "Parceiro Tenant A" in conta.descricao
+    assert "Parceiro Tenant B" not in conta.descricao
     assert conta.fornecedor_id == FUNCIONARIO_ID
+    assert conta.user_id == 1
