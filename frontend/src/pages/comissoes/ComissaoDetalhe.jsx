@@ -132,11 +132,18 @@ const ComissaoDetalhe = ({ comissaoId, onClose }) => {
       {/* Overlay */}
       <div
         className="fixed inset-0 bg-black bg-opacity-50 z-40 transition-opacity"
+        data-modal-backdrop-for="comissao-detalhe"
+        aria-hidden="true"
         onClick={onClose}
       />
 
       {/* Drawer */}
-      <div className="fixed inset-y-0 right-0 w-full md:w-2/3 lg:w-1/2 bg-white shadow-xl z-50 overflow-hidden flex flex-col">
+      <div
+        className="fixed inset-y-0 right-0 w-full md:w-2/3 lg:w-1/2 bg-white shadow-xl z-50 overflow-hidden flex flex-col"
+        data-modal-panel="comissao-detalhe"
+        role="dialog"
+        aria-modal="true"
+      >
         {/* Header fixo */}
         <div className="bg-gradient-to-r from-blue-600 to-blue-700 text-white px-6 py-4 flex justify-between items-center">
           <div>
@@ -145,6 +152,8 @@ const ComissaoDetalhe = ({ comissaoId, onClose }) => {
           </div>
           <button
             onClick={onClose}
+            data-modal-close
+            aria-label="Fechar detalhes da comissão"
             className="text-white hover:bg-blue-500 rounded-full p-2 transition"
           >
             <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">

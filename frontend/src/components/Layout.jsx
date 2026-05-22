@@ -179,6 +179,19 @@ const Layout = () => {
         return false;
       }
 
+      const modalBackdropFor = elementoOverlay.getAttribute("data-modal-backdrop-for");
+      if (modalBackdropFor) {
+        const painelModalAtivo = Array.from(
+          document.querySelectorAll("[data-modal-panel]"),
+        ).some(
+          (painel) => painel.getAttribute("data-modal-panel") === modalBackdropFor,
+        );
+
+        if (painelModalAtivo) {
+          return false;
+        }
+      }
+
       const estilo = window.getComputedStyle(elementoOverlay);
       const visivel =
         estilo.display !== "none" && estilo.visibility !== "hidden";
