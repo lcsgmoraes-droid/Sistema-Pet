@@ -231,6 +231,75 @@ def test_serialize_profile_marks_veterinario_as_mobile_operational_profile():
     assert profile["perfil_operacional"] == "veterinario"
 
 
+def test_serialize_profile_marks_funcionario_as_mobile_operational_profile():
+    user = SimpleNamespace(
+        id=123,
+        email="funcionario@example.com",
+        email_verified=True,
+        nome="Funcionario Teste",
+        telefone=None,
+        cpf_cnpj=None,
+    )
+    cliente = SimpleNamespace(
+        id=456,
+        tipo_cadastro="funcionario",
+        ativo=True,
+        is_entregador=False,
+        telefone=None,
+        cpf=None,
+        cep=None,
+        endereco=None,
+        numero=None,
+        complemento=None,
+        bairro=None,
+        cidade=None,
+        estado=None,
+        endereco_entrega=None,
+        enderecos_adicionais=None,
+    )
+
+    profile = _serialize_profile(user, cliente)
+
+    assert profile["is_funcionario"] is True
+    assert profile["funcionario_id"] == cliente.id
+    assert profile["perfil_operacional"] == "funcionario"
+
+
+def test_serialize_profile_keeps_delivery_priority_over_funcionario():
+    user = SimpleNamespace(
+        id=123,
+        email="entregador@example.com",
+        email_verified=True,
+        nome="Entregador Teste",
+        telefone=None,
+        cpf_cnpj=None,
+    )
+    cliente = SimpleNamespace(
+        id=456,
+        tipo_cadastro="funcionario",
+        ativo=True,
+        is_entregador=True,
+        telefone=None,
+        cpf=None,
+        cep=None,
+        endereco=None,
+        numero=None,
+        complemento=None,
+        bairro=None,
+        cidade=None,
+        estado=None,
+        endereco_entrega=None,
+        enderecos_adicionais=None,
+    )
+
+    profile = _serialize_profile(user, cliente)
+
+    assert profile["is_funcionario"] is True
+    assert profile["is_entregador"] is True
+    assert profile["funcionario_id"] == cliente.id
+    assert profile["perfil_operacional"] == "entregador"
+
+
 def test_get_active_public_tenant_sets_tenant_context():
     tenant_id = uuid4()
     tenant = SimpleNamespace(id=tenant_id, status="active")
