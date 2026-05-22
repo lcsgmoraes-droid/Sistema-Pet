@@ -1,6 +1,9 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
-import { calcularImpactoPontoEquilibrio } from "./pontoEquilibrioImpactoUtils.js";
+import {
+  calcularImpactoPontoEquilibrio,
+  montarAnaliseCustosPontoEquilibrio,
+} from "./pontoEquilibrioImpactoUtils.js";
 
 test("calcula aumento de ponto de equilibrio para novo custo fixo", () => {
   const resultado = calcularImpactoPontoEquilibrio({
@@ -52,4 +55,72 @@ test("marca simulacao como indefinida quando margem nao permite calcular", () =>
   assert.equal(resultado.novoCustoFixo, 13000);
   assert.equal(resultado.impactoPontoEquilibrio, null);
   assert.equal(resultado.novoPontoEquilibrio, null);
+});
+
+test("projeta resultado do mes com faturamento informado e aumento de custo fixo", () => {
+  const resultado = calcularImpactoPontoEquilibrio({
+    despesasFixas: 10000,
+    pontoEquilibrio: 20000,
+    margemContribuicaoPercentual: 50,
+    faturamento: 18000,
+    faturamentoProjetado: 30000,
+    ticketMedio: 200,
+    impactoCustoFixo: 3000,
+  });
+
+  assert.equal(resultado.calculavel, true);
+  assert.equal(resultado.faturamentoProjetado, 30000);
+  assert.equal(resultado.margemContribuicaoProjetada, 15000);
+  assert.equal(resultado.resultadoProjetado, 2000);
+  assert.equal(resultado.saldoAposSimulacao, 4000);
+  assert.equal(resultado.novaFaltaFaturar, 0);
+});
+
+test("projeta prejuizo do mes quando faturamento simulado fica abaixo do novo ponto", () => {
+  const resultado = calcularImpactoPontoEquilibrio({
+    despesasFixas: 10000,
+    pontoEquilibrio: 20000,
+    margemContribuicaoPercentual: 50,
+    faturamento: 18000,
+    faturamentoProjetado: 22000,
+    ticketMedio: 200,
+    impactoCustoFixo: 3000,
+  });
+
+  assert.equal(resultado.calculavel, true);
+  assert.equal(resultado.margemContribuicaoProjetada, 11000);
+  assert.equal(resultado.resultadoProjetado, -2000);
+  assert.equal(resultado.saldoAposSimulacao, -4000);
+  assert.equal(resultado.novaFaltaFaturar, 4000);
+});
+
+test("monta analise de custos com grupos e pareceres percentuais", () => {
+  const analise = montarAnaliseCustosPontoEquilibrio({
+    dados: {
+      faturamento: 50000,
+      despesas_fixas: 21000,
+      detalhes_classificacao: {
+        fixas: [
+          { id: 1, descricao: "Aluguel", valor: 10000, origem_classificacao: "Categoria financeira: Aluguel" },
+          { id: 2, descricao: "Pro Labore Karine", valor: 3000, origem_classificacao: "Tipo de despesa: Salarios" },
+          { id: 3, descricao: "Salarios loja", valor: 7000, origem_classificacao: "Tipo de despesa: Salarios" },
+          { id: 4, descricao: "Internet e Telefone", valor: 500, origem_classificacao: "Categoria financeira: Internet" },
+          { id: 5, descricao: "Sistema", valor: 500, origem_classificacao: "Categoria financeira: Sistema" },
+        ],
+      },
+    },
+  });
+
+  const aluguel = analise.pareceres.find((item) => item.id === "aluguel");
+  const folha = analise.pareceres.find((item) => item.id === "folha");
+
+  assert.equal(analise.grupos.find((item) => item.id === "aluguel").valor, 10000);
+  assert.equal(analise.grupos.find((item) => item.id === "folha").valor, 10000);
+  assert.equal(aluguel.percentualFaturamento, 20);
+  assert.equal(aluguel.referenciaPercentual, 13);
+  assert.equal(aluguel.diferencaPercentual, 7);
+  assert.equal(aluguel.diferencaValor, 3500);
+  assert.equal(aluguel.status, "acima");
+  assert.equal(folha.percentualFaturamento, 20);
+  assert.equal(folha.status, "saudavel");
 });

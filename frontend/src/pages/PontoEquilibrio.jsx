@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   AlertTriangle,
+  BarChart3,
   Calculator,
   DollarSign,
   RefreshCcw,
@@ -8,9 +9,25 @@ import {
   Target,
   TrendingUp,
 } from "lucide-react";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  Pie,
+  PieChart as RePieChart,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
 import api from "../api";
+import ModuleTabs from "../components/ui/ModuleTabs";
 import { formatMoneyBRL, formatPercent } from "../utils/formatters";
-import { calcularImpactoPontoEquilibrio } from "./pontoEquilibrioImpactoUtils";
+import {
+  calcularImpactoPontoEquilibrio,
+  montarAnaliseCustosPontoEquilibrio,
+} from "./pontoEquilibrioImpactoUtils";
 
 function formatarDataInput(data) {
   const local = new Date(data.getTime() - data.getTimezoneOffset() * 60000);
@@ -112,10 +129,17 @@ const CANAIS = [
 ];
 
 const CENARIOS_RAPIDOS = [
-  { descricao: "Aumento aluguel", valor: "1000" },
-  { descricao: "Novo funcionario", valor: "3000" },
-  { descricao: "Reducao de custo", valor: "-500" },
+  { descricao: "Aumento aluguel", valor: "1000", faturamento: "" },
+  { descricao: "Novo funcionario", valor: "3000", faturamento: "" },
+  { descricao: "Reducao de custo", valor: "-500", faturamento: "" },
 ];
+
+const ABAS_PONTO_EQUILIBRIO = [
+  { id: "resumo", label: "Resumo" },
+  { id: "analise", label: "Analise dos custos" },
+];
+
+const CORES_GRAFICO_CUSTOS = ["#2563eb", "#059669", "#d97706", "#7c3aed", "#dc2626", "#0891b2", "#64748b"];
 
 function formatarImpactoMoeda(valor) {
   if (valor == null) return "-";
@@ -130,6 +154,308 @@ function formatarImpactoVendas(valor) {
   return String(valor);
 }
 
+function formatarVariacaoPercentual(valor) {
+  if (valor == null) return "-";
+  if (valor > 0) return `+${formatPercent(valor)}`;
+  return formatPercent(valor);
+}
+
+function TooltipMoeda({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+
+  return (
+    <div className="rounded-md border border-slate-200 bg-white p-2 text-xs shadow-sm">
+      <p className="font-semibold text-slate-900">{label}</p>
+      {payload.map((item) => (
+        <p key={item.name} className="text-slate-600">
+          {item.name}: {formatMoneyBRL(item.value)}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function TooltipPercentual({ active, payload, label }) {
+  if (!active || !payload?.length) return null;
+
+  return (
+    <div className="rounded-md border border-slate-200 bg-white p-2 text-xs shadow-sm">
+      <p className="font-semibold text-slate-900">{label}</p>
+      {payload.map((item) => (
+        <p key={item.name} className="text-slate-600">
+          {item.name}: {formatPercent(item.value)}
+        </p>
+      ))}
+    </div>
+  );
+}
+
+function statusParecerClasses(status) {
+  if (status === "saudavel") return "border-emerald-200 bg-emerald-50 text-emerald-800";
+  if (status === "atencao") return "border-amber-200 bg-amber-50 text-amber-800";
+  return "border-red-200 bg-red-50 text-red-800";
+}
+
+function statusParecerLabel(status) {
+  if (status === "saudavel") return "Saudavel";
+  if (status === "atencao") return "Atencao";
+  return "Acima do ideal";
+}
+
+function SimuladorImpactoPanel({ dados, impactoForm, impactoSimulado, impactoValor, setImpactoForm }) {
+  return (
+    <div className="rounded-lg border border-indigo-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+        <div>
+          <h2 className="text-base font-semibold text-slate-900">Calculadora de impacto</h2>
+          <p className="mt-1 text-sm text-slate-600">
+            Brinque com faturamento projetado e aumentos ou reducoes de custo fixo sem gravar nada.
+          </p>
+        </div>
+        <span className="w-fit rounded-md bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+          Simulador
+        </span>
+      </div>
+
+      <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(220px,1fr)_220px_220px]">
+        <div>
+          <label className="text-xs font-semibold text-slate-600">Descricao do cenario</label>
+          <input
+            type="text"
+            value={impactoForm.descricao}
+            onChange={(event) => setImpactoForm({ ...impactoForm, descricao: event.target.value })}
+            placeholder="Ex: aumento aluguel, novo funcionario"
+            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-slate-600">Faturamento projetado</label>
+          <input
+            type="number"
+            step="0.01"
+            value={impactoForm.faturamento}
+            onChange={(event) => setImpactoForm({ ...impactoForm, faturamento: event.target.value })}
+            placeholder={formatMoneyBRL(dados.faturamento)}
+            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          />
+        </div>
+        <div>
+          <label className="text-xs font-semibold text-slate-600">Impacto mensal no custo fixo</label>
+          <input
+            type="number"
+            step="0.01"
+            value={impactoForm.valor}
+            onChange={(event) => setImpactoForm({ ...impactoForm, valor: event.target.value })}
+            placeholder="Ex: 3000 ou -800"
+            className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+          />
+        </div>
+      </div>
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        {CENARIOS_RAPIDOS.map((cenario) => (
+          <button
+            key={cenario.descricao}
+            type="button"
+            onClick={() => setImpactoForm((prev) => ({ ...prev, ...cenario }))}
+            className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
+          >
+            {cenario.descricao} {formatarImpactoMoeda(Number(cenario.valor))}
+          </button>
+        ))}
+        <button
+          type="button"
+          onClick={() => setImpactoForm({ descricao: "", valor: "", faturamento: "" })}
+          className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+        >
+          Limpar
+        </button>
+      </div>
+
+      {impactoSimulado?.calculavel ? (
+        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-5">
+          <div className="rounded-md bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase text-slate-500">Faturamento simulado</p>
+            <p className="mt-1 text-xl font-bold text-slate-900">
+              {formatMoneyBRL(impactoSimulado.faturamentoProjetado)}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Atual: {formatMoneyBRL(dados.faturamento)}
+            </p>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase text-slate-500">Novo custo fixo</p>
+            <p className="mt-1 text-xl font-bold text-slate-900">
+              {formatMoneyBRL(impactoSimulado.novoCustoFixo)}
+            </p>
+            <p className={impactoValor >= 0 ? "mt-1 text-xs text-red-700" : "mt-1 text-xs text-emerald-700"}>
+              {formatarImpactoMoeda(impactoSimulado.impactoRealCustoFixo)}
+            </p>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase text-slate-500">Novo ponto minimo</p>
+            <p className="mt-1 text-xl font-bold text-slate-900">
+              {formatMoneyBRL(impactoSimulado.novoPontoEquilibrio)}
+            </p>
+            <p
+              className={
+                impactoSimulado.impactoPontoEquilibrio >= 0
+                  ? "mt-1 text-xs text-red-700"
+                  : "mt-1 text-xs text-emerald-700"
+              }
+            >
+              {formatarImpactoMoeda(impactoSimulado.impactoPontoEquilibrio)}
+            </p>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase text-slate-500">Resultado projetado do mes</p>
+            <p
+              className={
+                impactoSimulado.resultadoProjetado >= 0
+                  ? "mt-1 text-xl font-bold text-emerald-700"
+                  : "mt-1 text-xl font-bold text-red-700"
+              }
+            >
+              {impactoSimulado.resultadoProjetado >= 0
+                ? formatMoneyBRL(impactoSimulado.resultadoProjetado)
+                : formatarImpactoMoeda(impactoSimulado.resultadoProjetado)}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Margem projetada {formatMoneyBRL(impactoSimulado.margemContribuicaoProjetada)}
+            </p>
+          </div>
+          <div className="rounded-md bg-slate-50 p-3">
+            <p className="text-xs font-semibold uppercase text-slate-500">Vendas a mais/menos</p>
+            <p className="mt-1 text-xl font-bold text-slate-900">
+              {formatarImpactoVendas(impactoSimulado.vendasImpacto)}
+            </p>
+            <p className="mt-1 text-xs text-slate-500">
+              Falta/sobra vs PE: {formatarImpactoMoeda(impactoSimulado.saldoAposSimulacao)}
+            </p>
+          </div>
+        </div>
+      ) : (
+        <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+          A simulacao depende de margem de contribuicao positiva no periodo selecionado.
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ParecerCard({ parecer }) {
+  return (
+    <div className={`rounded-lg border p-4 ${statusParecerClasses(parecer.status)}`}>
+      <div className="flex items-start justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-bold text-slate-900">{parecer.titulo}</h3>
+          <p className="mt-1 text-xs text-slate-600">{parecer.descricao}</p>
+        </div>
+        <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-bold">
+          {statusParecerLabel(parecer.status)}
+        </span>
+      </div>
+      <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+        <div>
+          <p className="text-xs font-semibold uppercase text-slate-500">Atual</p>
+          <p className="font-bold text-slate-900">{formatPercent(parecer.percentualFaturamento)}</p>
+          <p className="text-xs text-slate-600">{formatMoneyBRL(parecer.valor)}</p>
+        </div>
+        <div>
+          <p className="text-xs font-semibold uppercase text-slate-500">Ideal</p>
+          <p className="font-bold text-slate-900">{formatPercent(parecer.referenciaPercentual)}</p>
+          <p className={parecer.diferencaValor > 0 ? "text-xs text-red-700" : "text-xs text-emerald-700"}>
+            {formatarVariacaoPercentual(parecer.diferencaPercentual)} ({formatarImpactoMoeda(parecer.diferencaValor)})
+          </p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function AnaliseCustosPanel({ analise }) {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border border-slate-200 bg-white p-4">
+        <div className="flex items-start gap-3">
+          <div className="rounded-lg bg-blue-100 p-2 text-blue-700">
+            <BarChart3 className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="text-base font-semibold text-slate-900">Analise dos custos</h2>
+            <p className="mt-1 text-sm text-slate-600">
+              Parecer gerencial com referencias percentuais para comparar Aluguel sobre faturamento,
+              Folha e pro-labore, utilidades, sistemas e custo fixo total.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <h3 className="text-sm font-bold text-slate-900">Composicao dos custos fixos</h3>
+          <div className="mt-4 h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <RePieChart>
+                <Pie
+                  data={analise.grupos}
+                  dataKey="valor"
+                  nameKey="label"
+                  innerRadius={62}
+                  outerRadius={95}
+                  paddingAngle={2}
+                >
+                  {analise.grupos.map((entry, index) => (
+                    <Cell key={entry.id} fill={CORES_GRAFICO_CUSTOS[index % CORES_GRAFICO_CUSTOS.length]} />
+                  ))}
+                </Pie>
+                <Tooltip content={<TooltipMoeda />} />
+              </RePieChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="rounded-lg border border-slate-200 bg-white p-4">
+          <h3 className="text-sm font-bold text-slate-900">% do faturamento vs ideal</h3>
+          <div className="mt-4 h-72">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={analise.comparativoPercentual} margin={{ left: -10, right: 10 }}>
+                <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                <XAxis dataKey="nome" tick={{ fontSize: 11 }} interval={0} angle={-12} textAnchor="end" height={70} />
+                <YAxis tickFormatter={(value) => `${value}%`} />
+                <Tooltip content={<TooltipPercentual />} />
+                <Bar dataKey="referencia" name="Ideal" fill="#94a3b8" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="atual" name="Atual" fill="#2563eb" radius={[4, 4, 0, 0]} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2 xl:grid-cols-3">
+        {analise.pareceres.map((parecer) => (
+          <ParecerCard key={parecer.id} parecer={parecer} />
+        ))}
+      </div>
+
+      <div className="rounded-lg border border-slate-200 bg-white p-4">
+        <h3 className="text-sm font-bold text-slate-900">Ranking dos maiores custos fixos</h3>
+        <div className="mt-3 divide-y divide-slate-100">
+          {analise.grupos.map((grupo) => (
+            <div key={grupo.id} className="flex items-center justify-between gap-4 py-3 text-sm">
+              <div className="min-w-0">
+                <p className="font-semibold text-slate-900">{grupo.label}</p>
+                <p className="text-xs text-slate-500">{formatPercent(grupo.percentualFaturamento)} do faturamento analisado</p>
+              </div>
+              <span className="shrink-0 font-bold text-slate-900">{formatMoneyBRL(grupo.valor)}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function PontoEquilibrio() {
   const [filtros, setFiltros] = useState({
     data_inicio: inicioMesAtual(),
@@ -139,7 +465,9 @@ export default function PontoEquilibrio() {
   const [impactoForm, setImpactoForm] = useState({
     descricao: "",
     valor: "",
+    faturamento: "",
   });
+  const [abaAtiva, setAbaAtiva] = useState("resumo");
   const [dados, setDados] = useState(null);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
@@ -153,10 +481,20 @@ export default function PontoEquilibrio() {
       pontoEquilibrio: dados.ponto_equilibrio,
       margemContribuicaoPercentual: dados.margem_contribuicao_percentual,
       faturamento: dados.faturamento,
+      faturamentoProjetado: impactoForm.faturamento,
       ticketMedio: dados.ticket_medio,
       impactoCustoFixo: impactoValor,
     });
-  }, [dados, impactoValor]);
+  }, [dados, impactoForm.faturamento, impactoValor]);
+  const analiseCustos = useMemo(() => {
+    if (!dados) return null;
+    return montarAnaliseCustosPontoEquilibrio({
+      dados,
+      faturamentoProjetado: impactoForm.faturamento,
+      impactoCustoFixo: impactoValor,
+      impactoDescricao: impactoForm.descricao,
+    });
+  }, [dados, impactoForm.descricao, impactoForm.faturamento, impactoValor]);
 
   const statusResumo = useMemo(() => {
     if (!dados) return null;
@@ -353,6 +691,23 @@ export default function PontoEquilibrio() {
               />
             </div>
 
+            <SimuladorImpactoPanel
+              dados={dados}
+              impactoForm={impactoForm}
+              impactoSimulado={impactoSimulado}
+              impactoValor={impactoValor}
+              setImpactoForm={setImpactoForm}
+            />
+
+            <ModuleTabs
+              active={abaAtiva}
+              ariaLabel="Abas do ponto de equilibrio"
+              onChange={setAbaAtiva}
+              tabs={ABAS_PONTO_EQUILIBRIO}
+            />
+
+            {abaAtiva === "resumo" && (
+              <>
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <div className="rounded-lg border border-slate-200 bg-white p-4">
                 <h2 className="text-base font-semibold text-slate-900">Composicao da margem</h2>
@@ -411,121 +766,6 @@ export default function PontoEquilibrio() {
               </div>
             </div>
 
-            <div className="rounded-lg border border-indigo-200 bg-white p-4">
-              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                <div>
-                  <h2 className="text-base font-semibold text-slate-900">Calculadora de impacto</h2>
-                  <p className="mt-1 text-sm text-slate-600">
-                    Simule aumento ou reducao mensal no custo fixo usando a margem e o ticket medio atuais.
-                  </p>
-                </div>
-                <span className="w-fit rounded-md bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
-                  Simulador
-                </span>
-              </div>
-
-              <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(220px,1fr)_220px]">
-                <div>
-                  <label className="text-xs font-semibold text-slate-600">Descricao do cenario</label>
-                  <input
-                    type="text"
-                    value={impactoForm.descricao}
-                    onChange={(event) => setImpactoForm({ ...impactoForm, descricao: event.target.value })}
-                    placeholder="Ex: aumento aluguel, novo funcionario"
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold text-slate-600">Impacto mensal no custo fixo</label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    value={impactoForm.valor}
-                    onChange={(event) => setImpactoForm({ ...impactoForm, valor: event.target.value })}
-                    placeholder="Ex: 3000 ou -800"
-                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
-                  />
-                </div>
-              </div>
-
-              <div className="mt-3 flex flex-wrap gap-2">
-                {CENARIOS_RAPIDOS.map((cenario) => (
-                  <button
-                    key={cenario.descricao}
-                    type="button"
-                    onClick={() => setImpactoForm(cenario)}
-                    className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
-                  >
-                    {cenario.descricao} {formatarImpactoMoeda(Number(cenario.valor))}
-                  </button>
-                ))}
-                <button
-                  type="button"
-                  onClick={() => setImpactoForm({ descricao: "", valor: "" })}
-                  className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
-                >
-                  Limpar
-                </button>
-              </div>
-
-              {impactoSimulado?.calculavel ? (
-                <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
-                  <div className="rounded-md bg-slate-50 p-3">
-                    <p className="text-xs font-semibold uppercase text-slate-500">Novo custo fixo</p>
-                    <p className="mt-1 text-xl font-bold text-slate-900">
-                      {formatMoneyBRL(impactoSimulado.novoCustoFixo)}
-                    </p>
-                    <p className={impactoValor >= 0 ? "mt-1 text-xs text-red-700" : "mt-1 text-xs text-emerald-700"}>
-                      {formatarImpactoMoeda(impactoSimulado.impactoRealCustoFixo)}
-                    </p>
-                  </div>
-                  <div className="rounded-md bg-slate-50 p-3">
-                    <p className="text-xs font-semibold uppercase text-slate-500">Novo ponto minimo</p>
-                    <p className="mt-1 text-xl font-bold text-slate-900">
-                      {formatMoneyBRL(impactoSimulado.novoPontoEquilibrio)}
-                    </p>
-                    <p
-                      className={
-                        impactoSimulado.impactoPontoEquilibrio >= 0
-                          ? "mt-1 text-xs text-red-700"
-                          : "mt-1 text-xs text-emerald-700"
-                      }
-                    >
-                      {formatarImpactoMoeda(impactoSimulado.impactoPontoEquilibrio)}
-                    </p>
-                  </div>
-                  <div className="rounded-md bg-slate-50 p-3">
-                    <p className="text-xs font-semibold uppercase text-slate-500">Vendas a mais/menos</p>
-                    <p className="mt-1 text-xl font-bold text-slate-900">
-                      {formatarImpactoVendas(impactoSimulado.vendasImpacto)}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">Pelo ticket medio atual</p>
-                  </div>
-                  <div className="rounded-md bg-slate-50 p-3">
-                    <p className="text-xs font-semibold uppercase text-slate-500">Falta/sobra projetada</p>
-                    <p
-                      className={
-                        impactoSimulado.saldoAposSimulacao >= 0
-                          ? "mt-1 text-xl font-bold text-emerald-700"
-                          : "mt-1 text-xl font-bold text-red-700"
-                      }
-                    >
-                      {impactoSimulado.saldoAposSimulacao >= 0
-                        ? formatMoneyBRL(impactoSimulado.saldoAposSimulacao)
-                        : formatarImpactoMoeda(impactoSimulado.saldoAposSimulacao)}
-                    </p>
-                    <p className="mt-1 text-xs text-slate-500">
-                      {impactoSimulado.saldoAposSimulacao >= 0 ? "Acima do ponto minimo" : "Ainda falta faturar"}
-                    </p>
-                  </div>
-                </div>
-              ) : (
-                <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
-                  A simulacao depende de margem de contribuicao positiva no periodo selecionado.
-                </div>
-              )}
-            </div>
-
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
               <h2 className="text-base font-semibold text-slate-900">Origem dos valores</h2>
               <p className="mt-1 text-sm text-slate-600">
@@ -560,6 +800,12 @@ export default function PontoEquilibrio() {
                 />
               </div>
             </div>
+              </>
+            )}
+
+            {abaAtiva === "analise" && analiseCustos && (
+              <AnaliseCustosPanel analise={analiseCustos} />
+            )}
 
             {(dados.produtos_sem_custo > 0 || dados.quantidade_contas_sem_classificacao > 0) && (
               <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">
