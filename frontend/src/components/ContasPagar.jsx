@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Plus, Wallet, X } from 'lucide-react';
+import { Edit3, Plus, Wallet, X } from 'lucide-react';
 import api from '../api';
 import { toast } from 'react-hot-toast';
 import ModalNovaContaPagar from './ModalNovaContaPagar';
@@ -85,6 +85,7 @@ const ContasPagar = () => {
   const [contaSelecionada, setContaSelecionada] = useState(null);
   const [mostrarModalPagamento, setMostrarModalPagamento] = useState(false);
   const [mostrarModalNovaConta, setMostrarModalNovaConta] = useState(false);
+  const [contaEdicao, setContaEdicao] = useState(null);
   const [mostrarModalClassificacao, setMostrarModalClassificacao] = useState(false);
   const [mostrarDetalhes, setMostrarDetalhes] = useState(false);
   const [formasPagamento, setFormasPagamento] = useState([]);
@@ -279,6 +280,30 @@ const ContasPagar = () => {
   const abrirDetalhes = (conta) => {
     setContaSelecionada(conta);
     setMostrarDetalhes(true);
+  };
+
+  const abrirModalEdicao = async (conta) => {
+    try {
+      const response = await api.get(`/contas-pagar/${conta.id}`);
+      setContaEdicao({
+        ...conta,
+        ...response.data,
+        fornecedor_id: response.data?.fornecedor?.id ?? conta.fornecedor_id ?? null,
+        categoria_id: response.data?.categoria_id ?? response.data?.categoria?.id ?? conta.categoria_id ?? null,
+        dre_subcategoria_id: response.data?.dre_subcategoria_id ?? conta.dre_subcategoria_id ?? null,
+        tipo_despesa_id: response.data?.tipo_despesa_id ?? conta.tipo_despesa_id ?? null,
+        canal: response.data?.canal ?? conta.canal ?? 'loja_fisica',
+        valor_original: response.data?.valores?.original ?? conta.valor_original,
+        data_emissao: response.data?.datas?.emissao ?? conta.data_emissao,
+        data_vencimento: response.data?.datas?.vencimento ?? conta.data_vencimento,
+        documento: response.data?.documento ?? conta.documento ?? '',
+        observacoes: response.data?.observacoes ?? conta.observacoes ?? '',
+      });
+      setMostrarModalNovaConta(true);
+    } catch (error) {
+      console.error('Erro ao abrir edicao:', error);
+      toast.error(error.response?.data?.detail || 'Erro ao carregar conta para edicao');
+    }
   };
 
   const precisaClassificacao = (conta) => {
@@ -544,6 +569,16 @@ const ContasPagar = () => {
       className: 'min-w-[190px]',
       render: (conta) => (
         <div className="flex flex-wrap items-center gap-2">
+          <ActionButton
+            intent="edit"
+            tone="soft"
+            size="xs"
+            icon={Edit3}
+            onClick={() => abrirModalEdicao(conta)}
+            title="Editar conta a pagar"
+          >
+            Editar
+          </ActionButton>
           {conta.status !== 'pago' && (
             <ActionButton
               intent="create"
@@ -591,7 +626,10 @@ const ContasPagar = () => {
       <PageHeader
         actions={
           <ActionButton
-            onClick={() => setMostrarModalNovaConta(true)}
+            onClick={() => {
+              setContaEdicao(null);
+              setMostrarModalNovaConta(true);
+            }}
             intent="create"
             size="md"
             icon={Plus}
@@ -1343,7 +1381,11 @@ const ContasPagar = () => {
       {/* Modal Nova Conta */}
       <ModalNovaContaPagar
         isOpen={mostrarModalNovaConta}
-        onClose={() => setMostrarModalNovaConta(false)}
+        contaEdicao={contaEdicao}
+        onClose={() => {
+          setMostrarModalNovaConta(false);
+          setContaEdicao(null);
+        }}
         onSave={carregarDados}
       />
     </div>

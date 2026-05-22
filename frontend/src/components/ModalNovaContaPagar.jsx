@@ -1,15 +1,59 @@
 import React, { useState, useEffect } from 'react';
 import api from '../api';
 import { toast } from 'react-hot-toast';
-import { X, Calendar, DollarSign, FileText, User, Tag, Repeat, Plus } from 'lucide-react';
+import { X, Calendar, DollarSign, FileText, User, Tag, Repeat, Plus, Edit3 } from 'lucide-react';
 import { safeArray } from '../utils/safeArray';
 import FornecedorSelector from './fornecedores/FornecedorSelector';
 
-const ModalNovaContaPagar = ({ isOpen, onClose, onSave }) => {
+const criarDadosPadraoContaPagar = () => ({
+  descricao: '',
+  fornecedor_id: null,
+  categoria_id: null,
+  dre_subcategoria_id: null,
+  tipo_despesa_id: null,
+  canal: 'loja_fisica',
+  valor_original: '',
+  data_emissao: new Date().toISOString().split('T')[0],
+  data_vencimento: new Date().toISOString().split('T')[0],
+  documento: '',
+  observacoes: '',
+  eh_parcelado: false,
+  total_parcelas: 1,
+  eh_recorrente: false,
+  tipo_recorrencia: 'mensal',
+  intervalo_dias: null,
+  data_inicio_recorrencia: null,
+  data_fim_recorrencia: null,
+  numero_repeticoes: null
+});
+
+const normalizarDataContaPagar = (valor, fallback = '') => {
+  if (!valor) return fallback;
+  return String(valor).split('T')[0];
+};
+
+const montarDadosEdicaoContaPagar = (conta) => ({
+  ...criarDadosPadraoContaPagar(),
+  descricao: conta?.descricao || '',
+  fornecedor_id: conta?.fornecedor_id || conta?.fornecedor?.id || null,
+  categoria_id: conta?.categoria_id || conta?.categoria?.id || null,
+  dre_subcategoria_id: conta?.dre_subcategoria_id || null,
+  tipo_despesa_id: conta?.tipo_despesa_id || null,
+  canal: conta?.canal || 'loja_fisica',
+  valor_original: String(conta?.valor_original ?? conta?.valores?.original ?? ''),
+  data_emissao: normalizarDataContaPagar(conta?.data_emissao || conta?.datas?.emissao, new Date().toISOString().split('T')[0]),
+  data_vencimento: normalizarDataContaPagar(conta?.data_vencimento || conta?.datas?.vencimento, new Date().toISOString().split('T')[0]),
+  documento: conta?.documento || '',
+  observacoes: conta?.observacoes || '',
+});
+
+const ModalNovaContaPagar = ({ isOpen, onClose, onSave, contaEdicao = null }) => {
+  const isEditando = Boolean(contaEdicao?.id);
   const [loading, setLoading] = useState(false);
   const [fornecedores, setFornecedores] = useState([]);
   const [categorias, setCategorias] = useState([]);
   const [subcategoriasDRE, setSubcategoriasDRE] = useState([]);
+  const [tiposDespesa, setTiposDespesa] = useState([]);
   const [previewParcelas, setPreviewParcelas] = useState([]);
   const [intervaloParcelas, setIntervaloParcelas] = useState(30); // dias entre parcelas
   const [showModalCategoria, setShowModalCategoria] = useState(false);
@@ -28,6 +72,8 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave }) => {
     fornecedor_id: null,
     categoria_id: null,
     dre_subcategoria_id: null,
+    tipo_despesa_id: null,
+    canal: 'loja_fisica',
     valor_original: '',
     data_emissao: new Date().toISOString().split('T')[0],
     data_vencimento: new Date().toISOString().split('T')[0],
@@ -55,15 +101,18 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave }) => {
   useEffect(() => {
     if (isOpen) {
       carregarDados();
+      setDados(isEditando ? montarDadosEdicaoContaPagar(contaEdicao) : criarDadosPadraoContaPagar());
+      setPreviewParcelas([]);
     }
-  }, [isOpen]);
+  }, [isOpen, contaEdicao?.id]);
 
   const carregarDados = async () => {
     try {
-      const [fornecedoresRes, categoriasRes, subcategoriasDRERes] = await Promise.all([
+      const [fornecedoresRes, categoriasRes, subcategoriasDRERes, tiposDespesaRes] = await Promise.all([
         api.get('/clientes/?tipo_cadastro=fornecedor'),
         api.get('/categorias-financeiras'),
-        api.get('/dre/subcategorias')
+        api.get('/dre/subcategorias'),
+        api.get('/cadastros/tipo-despesa/')
       ]);
       
       console.log('📦 Categorias recebidas:', categoriasRes.data);
@@ -85,6 +134,7 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave }) => {
       
       setCategorias(categoriasDespesa);
       setSubcategoriasDRE(safeArray(subcategoriasDRERes.data));
+      setTiposDespesa(safeArray(tiposDespesaRes.data));
       
       console.log('✅ Categorias de DESPESA setadas:', categoriasDespesa.length);
       console.log('📋 Lista completa:', categoriasDespesa);
@@ -236,21 +286,39 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave }) => {
     setLoading(true);
     
     try {
-      await api.post('/contas-pagar/', {
+      const payload = {
         ...dados,
         valor_original: parseFloat(dados.valor_original),
         total_parcelas: dados.eh_parcelado ? parseInt(dados.total_parcelas) : 1,
         intervalo_dias: dados.tipo_recorrencia === 'personalizado' ? parseInt(dados.intervalo_dias) : null,
         numero_repeticoes: dados.numero_repeticoes ? parseInt(dados.numero_repeticoes) : null
-      });
+      };
+
+      if (isEditando) {
+        await api.patch(`/contas-pagar/${contaEdicao.id}`, {
+          descricao: payload.descricao,
+          fornecedor_id: payload.fornecedor_id,
+          categoria_id: payload.categoria_id,
+          dre_subcategoria_id: payload.dre_subcategoria_id,
+          tipo_despesa_id: payload.tipo_despesa_id,
+          canal: payload.canal,
+          valor_original: payload.valor_original,
+          data_emissao: payload.data_emissao,
+          data_vencimento: payload.data_vencimento,
+          documento: payload.documento,
+          observacoes: payload.observacoes,
+        });
+      } else {
+        await api.post('/contas-pagar/', payload);
+      }
       
-      toast.success(dados.eh_recorrente ? 'Conta recorrente criada com sucesso!' : 'Conta criada com sucesso!');
+      toast.success(isEditando ? 'Conta atualizada com sucesso!' : dados.eh_recorrente ? 'Conta recorrente criada com sucesso!' : 'Conta criada com sucesso!');
       onSave();
       onClose();
       resetForm();
     } catch (error) {
-      console.error('Erro ao criar conta:', error);
-      toast.error(error.response?.data?.detail || 'Erro ao criar conta a pagar');
+      console.error('Erro ao salvar conta:', error);
+      toast.error(error.response?.data?.detail || 'Erro ao salvar conta a pagar');
     } finally {
       setLoading(false);
     }
@@ -261,6 +329,9 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave }) => {
       descricao: '',
       fornecedor_id: null,
       categoria_id: null,
+      dre_subcategoria_id: null,
+      tipo_despesa_id: null,
+      canal: 'loja_fisica',
       valor_original: '',
       data_emissao: new Date().toISOString().split('T')[0],
       data_vencimento: new Date().toISOString().split('T')[0],
@@ -285,8 +356,8 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave }) => {
         {/* Header */}
         <div className="flex justify-between items-center p-6 border-b sticky top-0 bg-white">
           <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-2">
-            <Plus className="text-red-600" />
-            Nova Conta a Pagar
+            {isEditando ? <Edit3 className="text-blue-600" /> : <Plus className="text-red-600" />}
+            {isEditando ? 'Editar Conta a Pagar' : 'Nova Conta a Pagar'}
           </h2>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
             <X size={24} />
@@ -411,6 +482,38 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave }) => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Tipo de despesa
+                </label>
+                <select
+                  value={dados.tipo_despesa_id || ''}
+                  onChange={(e) => setDados({...dados, tipo_despesa_id: e.target.value ? parseInt(e.target.value) : null})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="">Selecione...</option>
+                  {safeArray(tiposDespesa).map(tipo => (
+                    <option key={tipo.id} value={tipo.id}>{tipo.nome}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
+                  Canal
+                </label>
+                <select
+                  value={dados.canal || 'loja_fisica'}
+                  onChange={(e) => setDados({...dados, canal: e.target.value})}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
+                >
+                  <option value="loja_fisica">Loja Fisica</option>
+                  <option value="mercado_livre">Mercado Livre</option>
+                  <option value="shopee">Shopee</option>
+                  <option value="amazon">Amazon</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">
                   <DollarSign size={16} className="inline mr-1" />
                   Valor *
                 </label>
@@ -455,6 +558,7 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave }) => {
           </div>
 
           {/* Recorrência */}
+          {!isEditando && (
           <div className="space-y-4 border-t pt-4">
             <div className="flex items-center gap-2">
               <input
@@ -544,8 +648,10 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave }) => {
               </div>
             )}
           </div>
+          )}
 
           {/* Parcelamento */}
+          {!isEditando && (
           <div className="space-y-4 border-t pt-4">
             <div className="flex items-center gap-2">
               <input
@@ -650,6 +756,7 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave }) => {
               </div>
             )}
           </div>
+          )}
 
           {/* Observações */}
           <div>
@@ -679,7 +786,7 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave }) => {
               disabled={loading}
               className="px-6 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 disabled:opacity-50"
             >
-              {loading ? 'Salvando...' : 'Salvar Conta'}
+              {loading ? 'Salvando...' : isEditando ? 'Salvar Alteracoes' : 'Salvar Conta'}
             </button>
           </div>
         </form>
