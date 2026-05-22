@@ -91,3 +91,11 @@ def test_modal_conta_pagar_nao_envia_data_recorrencia_vazia():
     assert "normalizarDataOpcionalRecorrencia" in source
     assert "data_inicio_recorrencia: normalizarDataOpcionalRecorrencia(payload.data_inicio_recorrencia)" in source
     assert "data_fim_recorrencia: normalizarDataOpcionalRecorrencia(payload.data_fim_recorrencia)" in source
+
+
+def test_modal_conta_pagar_pergunta_antes_de_replicar_nome_recorrente():
+    source = (REPO_ROOT / "frontend/src/components/ModalNovaContaPagar.jsx").read_text(encoding="utf-8")
+
+    assert "confirmarReplicacaoDescricao" in source
+    assert "window.confirm" in source
+    assert "Deseja aplicar o novo nome aos próximos lançamentos desta recorrência?" in source

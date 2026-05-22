@@ -10,6 +10,8 @@ from typing import List, Optional
 from datetime import datetime, date, timedelta
 from pydantic import BaseModel, field_validator
 from decimal import Decimal
+import re
+import unicodedata
 
 from .db import get_session
 from .auth import get_current_user
@@ -38,6 +40,22 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/contas-pagar", tags=["Contas a Pagar"])
 
 RECORRENCIA_JANELA_MESES_PADRAO = 12
+BUSCA_ACENTOS = "áàâãäéèêëíìîïóòôõöúùûüç"
+BUSCA_SEM_ACENTOS = "aaaaaeeeeiiiiooooouuuuc"
+
+
+def _normalizar_texto_busca(valor: Optional[str]) -> str:
+    texto = str(valor or "").strip().lower()
+    texto = unicodedata.normalize("NFKD", texto)
+    texto = "".join(ch for ch in texto if not unicodedata.combining(ch))
+    texto = texto.replace("-", " ")
+    return re.sub(r"\s+", " ", texto).strip()
+
+
+def _expressao_texto_busca(coluna):
+    texto = func.coalesce(coluna, "")
+    texto = func.replace(func.lower(texto), "-", " ")
+    return func.translate(texto, BUSCA_ACENTOS, BUSCA_SEM_ACENTOS)
 
 # ============================================================================
 # SCHEMAS
@@ -918,17 +936,17 @@ def listar_contas_pagar(
         query = query.filter(ContaPagar.fornecedor_id == fornecedor_id)
     termo_fornecedor = (fornecedor_nome or "").strip()
     if termo_fornecedor:
-        fornecedor_pattern = f"%{termo_fornecedor}%"
+        fornecedor_pattern = f"%{_normalizar_texto_busca(termo_fornecedor)}%"
         fornecedores_match = (
             select(Cliente.id)
             .where(
                 Cliente.tenant_id == tenant_id,
                 or_(
-                    Cliente.nome.ilike(fornecedor_pattern),
-                    Cliente.nome_fantasia.ilike(fornecedor_pattern),
-                    Cliente.razao_social.ilike(fornecedor_pattern),
-                    Cliente.cnpj.ilike(fornecedor_pattern),
-                    Cliente.cpf.ilike(fornecedor_pattern),
+                    _expressao_texto_busca(Cliente.nome).like(fornecedor_pattern),
+                    _expressao_texto_busca(Cliente.nome_fantasia).like(fornecedor_pattern),
+                    _expressao_texto_busca(Cliente.razao_social).like(fornecedor_pattern),
+                    _expressao_texto_busca(Cliente.cnpj).like(fornecedor_pattern),
+                    _expressao_texto_busca(Cliente.cpf).like(fornecedor_pattern),
                 ),
             )
         )
@@ -952,20 +970,24 @@ def listar_contas_pagar(
 
     termo_busca = (busca or "").strip()
     if termo_busca:
-        busca_pattern = f"%{termo_busca}%"
+        busca_pattern = f"%{_normalizar_texto_busca(termo_busca)}%"
         fornecedores_match = (
             select(Cliente.id)
             .where(
                 Cliente.tenant_id == tenant_id,
-                Cliente.nome.ilike(busca_pattern),
+                or_(
+                    _expressao_texto_busca(Cliente.nome).like(busca_pattern),
+                    _expressao_texto_busca(Cliente.nome_fantasia).like(busca_pattern),
+                    _expressao_texto_busca(Cliente.razao_social).like(busca_pattern),
+                ),
             )
         )
         query = query.filter(
             or_(
-                ContaPagar.descricao.ilike(busca_pattern),
-                ContaPagar.documento.ilike(busca_pattern),
-                ContaPagar.nfe_numero.ilike(busca_pattern),
-                ContaPagar.observacoes.ilike(busca_pattern),
+                _expressao_texto_busca(ContaPagar.descricao).like(busca_pattern),
+                _expressao_texto_busca(ContaPagar.documento).like(busca_pattern),
+                _expressao_texto_busca(ContaPagar.nfe_numero).like(busca_pattern),
+                _expressao_texto_busca(ContaPagar.observacoes).like(busca_pattern),
                 ContaPagar.fornecedor_id.in_(fornecedores_match),
             )
         )
