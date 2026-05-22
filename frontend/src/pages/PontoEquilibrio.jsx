@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 import api from "../api";
 import { formatMoneyBRL, formatPercent } from "../utils/formatters";
+import { calcularImpactoPontoEquilibrio } from "./pontoEquilibrioImpactoUtils";
 
 function formatarDataInput(data) {
   const local = new Date(data.getTime() - data.getTimezoneOffset() * 60000);
@@ -110,17 +111,52 @@ const CANAIS = [
   { value: "site", label: "Site" },
 ];
 
+const CENARIOS_RAPIDOS = [
+  { descricao: "Aumento aluguel", valor: "1000" },
+  { descricao: "Novo funcionario", valor: "3000" },
+  { descricao: "Reducao de custo", valor: "-500" },
+];
+
+function formatarImpactoMoeda(valor) {
+  if (valor == null) return "-";
+  if (valor > 0) return `+ ${formatMoneyBRL(valor)}`;
+  if (valor < 0) return `- ${formatMoneyBRL(Math.abs(valor))}`;
+  return formatMoneyBRL(0);
+}
+
+function formatarImpactoVendas(valor) {
+  if (valor == null) return "-";
+  if (valor > 0) return `+${valor}`;
+  return String(valor);
+}
+
 export default function PontoEquilibrio() {
   const [filtros, setFiltros] = useState({
     data_inicio: inicioMesAtual(),
     data_fim: fimMesAtual(),
     canal: "",
   });
+  const [impactoForm, setImpactoForm] = useState({
+    descricao: "",
+    valor: "",
+  });
   const [dados, setDados] = useState(null);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
 
   const percentualAtingido = Math.min(Number(dados?.percentual_atingido || 0), 100);
+  const impactoValor = Number(impactoForm.valor || 0);
+  const impactoSimulado = useMemo(() => {
+    if (!dados) return null;
+    return calcularImpactoPontoEquilibrio({
+      despesasFixas: dados.despesas_fixas,
+      pontoEquilibrio: dados.ponto_equilibrio,
+      margemContribuicaoPercentual: dados.margem_contribuicao_percentual,
+      faturamento: dados.faturamento,
+      ticketMedio: dados.ticket_medio,
+      impactoCustoFixo: impactoValor,
+    });
+  }, [dados, impactoValor]);
 
   const statusResumo = useMemo(() => {
     if (!dados) return null;
@@ -373,6 +409,121 @@ export default function PontoEquilibrio() {
                   </p>
                 </div>
               </div>
+            </div>
+
+            <div className="rounded-lg border border-indigo-200 bg-white p-4">
+              <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+                <div>
+                  <h2 className="text-base font-semibold text-slate-900">Calculadora de impacto</h2>
+                  <p className="mt-1 text-sm text-slate-600">
+                    Simule aumento ou reducao mensal no custo fixo usando a margem e o ticket medio atuais.
+                  </p>
+                </div>
+                <span className="w-fit rounded-md bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700">
+                  Simulador
+                </span>
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 gap-3 lg:grid-cols-[minmax(220px,1fr)_220px]">
+                <div>
+                  <label className="text-xs font-semibold text-slate-600">Descricao do cenario</label>
+                  <input
+                    type="text"
+                    value={impactoForm.descricao}
+                    onChange={(event) => setImpactoForm({ ...impactoForm, descricao: event.target.value })}
+                    placeholder="Ex: aumento aluguel, novo funcionario"
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-slate-600">Impacto mensal no custo fixo</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={impactoForm.valor}
+                    onChange={(event) => setImpactoForm({ ...impactoForm, valor: event.target.value })}
+                    placeholder="Ex: 3000 ou -800"
+                    className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+                  />
+                </div>
+              </div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                {CENARIOS_RAPIDOS.map((cenario) => (
+                  <button
+                    key={cenario.descricao}
+                    type="button"
+                    onClick={() => setImpactoForm(cenario)}
+                    className="rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 transition-colors hover:border-indigo-200 hover:bg-indigo-50 hover:text-indigo-700"
+                  >
+                    {cenario.descricao} {formatarImpactoMoeda(Number(cenario.valor))}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  onClick={() => setImpactoForm({ descricao: "", valor: "" })}
+                  className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
+                >
+                  Limpar
+                </button>
+              </div>
+
+              {impactoSimulado?.calculavel ? (
+                <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-4">
+                  <div className="rounded-md bg-slate-50 p-3">
+                    <p className="text-xs font-semibold uppercase text-slate-500">Novo custo fixo</p>
+                    <p className="mt-1 text-xl font-bold text-slate-900">
+                      {formatMoneyBRL(impactoSimulado.novoCustoFixo)}
+                    </p>
+                    <p className={impactoValor >= 0 ? "mt-1 text-xs text-red-700" : "mt-1 text-xs text-emerald-700"}>
+                      {formatarImpactoMoeda(impactoSimulado.impactoRealCustoFixo)}
+                    </p>
+                  </div>
+                  <div className="rounded-md bg-slate-50 p-3">
+                    <p className="text-xs font-semibold uppercase text-slate-500">Novo ponto minimo</p>
+                    <p className="mt-1 text-xl font-bold text-slate-900">
+                      {formatMoneyBRL(impactoSimulado.novoPontoEquilibrio)}
+                    </p>
+                    <p
+                      className={
+                        impactoSimulado.impactoPontoEquilibrio >= 0
+                          ? "mt-1 text-xs text-red-700"
+                          : "mt-1 text-xs text-emerald-700"
+                      }
+                    >
+                      {formatarImpactoMoeda(impactoSimulado.impactoPontoEquilibrio)}
+                    </p>
+                  </div>
+                  <div className="rounded-md bg-slate-50 p-3">
+                    <p className="text-xs font-semibold uppercase text-slate-500">Vendas a mais/menos</p>
+                    <p className="mt-1 text-xl font-bold text-slate-900">
+                      {formatarImpactoVendas(impactoSimulado.vendasImpacto)}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">Pelo ticket medio atual</p>
+                  </div>
+                  <div className="rounded-md bg-slate-50 p-3">
+                    <p className="text-xs font-semibold uppercase text-slate-500">Falta/sobra projetada</p>
+                    <p
+                      className={
+                        impactoSimulado.saldoAposSimulacao >= 0
+                          ? "mt-1 text-xl font-bold text-emerald-700"
+                          : "mt-1 text-xl font-bold text-red-700"
+                      }
+                    >
+                      {impactoSimulado.saldoAposSimulacao >= 0
+                        ? formatMoneyBRL(impactoSimulado.saldoAposSimulacao)
+                        : formatarImpactoMoeda(impactoSimulado.saldoAposSimulacao)}
+                    </p>
+                    <p className="mt-1 text-xs text-slate-500">
+                      {impactoSimulado.saldoAposSimulacao >= 0 ? "Acima do ponto minimo" : "Ainda falta faturar"}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-4 rounded-md border border-red-200 bg-red-50 p-3 text-sm text-red-700">
+                  A simulacao depende de margem de contribuicao positiva no periodo selecionado.
+                </div>
+              )}
             </div>
 
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
