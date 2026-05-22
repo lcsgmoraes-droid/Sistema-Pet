@@ -44,3 +44,24 @@ def test_frontend_comissoes_salva_dia_fechamento_em_pessoa_parceira():
 
     assert "api.put(`/clientes/${funcionarioSel}`" in page
     assert "api.put(`/funcionarios/${funcionarioSel}`" not in page
+
+
+def test_backend_listagem_comissoes_mostra_todo_parceiro_ativo():
+    routes = _backend_source("app/comissoes_routes.py")
+
+    assert "WHERE c.parceiro_ativo = true" in routes
+    assert "c.tipo_cadastro IN ('funcionario', 'veterinario', 'outro')" not in routes
+
+
+def test_frontend_comissoes_nomeia_fluxo_como_parceiros():
+    page = _frontend_source("src/pages/Comissoes.jsx")
+
+    assert "Gerencie as comissões dos parceiros" in page
+    assert "Lista de Parceiros" in page
+    assert "Selecione um parceiro" in page
+    assert "Digite o ID do parceiro de destino:" in page
+    assert "Duplicar configuração para outro parceiro" in page
+    assert "Gerencie as comissões dos funcionários" not in page
+    assert "Lista de Funcionários" not in page
+    assert "Digite o ID do funcionário de destino:" not in page
+    assert "Duplicar configuração para outro funcionário" not in page

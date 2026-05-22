@@ -119,7 +119,7 @@ async def listar_funcionarios(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
-    Lista todos os usuários/funcionários do sistema
+    Lista todas as pessoas parceiras ativas que podem receber comissões
     """
     try:
         from .db import SessionLocal
@@ -159,10 +159,10 @@ async def listar_funcionarios(
             db.close()
         
     except Exception as e:
-        logger.error(f"Erro ao listar funcionários: {e}")
+        logger.error(f"Erro ao listar parceiros: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao listar funcionários: {str(e)}"
+            detail=f"Erro ao listar parceiros: {str(e)}"
         )
 
 
@@ -171,7 +171,7 @@ async def listar_funcionarios_com_comissao(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
-    Lista todos os funcionários/veterinários ativos (parceiros) com contagem de configurações
+    Lista todas as pessoas parceiras ativas com contagem de configurações
     """
     try:
         from .db import SessionLocal
@@ -187,7 +187,7 @@ async def listar_funcionarios_com_comissao(
         db = SessionLocal()
         try:
             ensure_comissoes_config_schema(db)
-            # Query que conta as configurações de cada funcionário
+            # Query que conta as configurações de cada parceiro ativo
             result = execute_tenant_safe(db, """
                 SELECT 
                     c.id,
@@ -202,7 +202,6 @@ async def listar_funcionarios_com_comissao(
                 FROM clientes c
                 LEFT JOIN comissoes_configuracao cc ON cc.funcionario_id = c.id AND cc.ativo = true AND cc.tenant_id = c.tenant_id
                 WHERE c.parceiro_ativo = true
-                AND c.tipo_cadastro IN ('funcionario', 'veterinario', 'outro')
                 AND c.{tenant_filter}
                 GROUP BY c.id, c.nome, c.email, c.tipo_cadastro
                 ORDER BY c.nome
@@ -230,10 +229,10 @@ async def listar_funcionarios_com_comissao(
             db.close()
         
     except Exception as e:
-        logger.error(f"Erro ao listar funcionários: {e}")
+        logger.error(f"Erro ao listar parceiros: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Erro ao listar funcionários: {str(e)}"
+            detail=f"Erro ao listar parceiros: {str(e)}"
         )
 
 
