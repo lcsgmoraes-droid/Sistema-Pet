@@ -24,3 +24,10 @@ def test_layout_nao_destrava_backdrop_com_painel_modal_ativo():
     assert 'getAttribute("data-modal-backdrop-for")' in layout
     assert 'querySelectorAll("[data-modal-panel]")' in layout
     assert 'getAttribute("data-modal-panel") === modalBackdropFor' in layout
+
+
+def test_layout_watchdog_nao_recolhe_sidebar_ao_neutralizar_overlay_automaticamente():
+    layout = _frontend_source("src/components/Layout.jsx")
+
+    assert "neutralizarOverlaysOrfaos" in layout
+    assert "destravarTela(true)" not in layout
