@@ -411,6 +411,12 @@ def gerar_comissoes_venda(
         total_venda = Decimal(str(venda['total']))
         taxa_entrega_cliente = Decimal(str(venda['taxa_entrega'] or 0))
         desconto_total_venda = Decimal(str(venda['desconto_valor'] or 0))
+        valor_pago_decimal = Decimal(str(valor_pago)) if valor_pago is not None else None
+        pagamento_parcial = (
+            valor_pago_decimal is not None
+            and valor_pago_decimal > Decimal('0')
+            and valor_pago_decimal < total_venda - Decimal('0.01')
+        )
         
         # Calcular soma total BRUTA (para ratear desconto)
         soma_valores_brutos = Decimal('0')
@@ -625,7 +631,7 @@ def gerar_comissoes_venda(
                 continue
             
             # Verificar se gera comissão em venda parcial
-            if valor_pago and not config.get('comissao_venda_parcial', True):
+            if pagamento_parcial and not config.get('comissao_venda_parcial', True):
                 logger.info(f"⏭️ Produto {item_norm['produto_id']} não gera comissão parcial")
                 continue
             
@@ -659,12 +665,12 @@ def gerar_comissoes_venda(
             valor_base_calculo_final = Decimal(str(calculo['base_calculo']))  # Base de cálculo (pode ser proporcional)
             percentual_proporcional = Decimal('100.00')
             
-            if valor_pago:
+            if valor_pago_decimal is not None and valor_pago_decimal > 0:
                 # Proporção do pagamento em relação ao total da venda
                 total_venda_decimal = Decimal(str(venda['total']))
                 if total_venda_decimal > 0:
-                    percentual_proporcional = (valor_pago / total_venda_decimal) * Decimal('100')
-                    proporcao_pagamento = valor_pago / total_venda_decimal
+                    percentual_proporcional = (valor_pago_decimal / total_venda_decimal) * Decimal('100')
+                    proporcao_pagamento = valor_pago_decimal / total_venda_decimal
                     
                     # Aplicar proporção na base de cálculo E na comissão
                     valor_base_calculo_final = Decimal(str(calculo['base_calculo'])) * proporcao_pagamento
@@ -673,7 +679,7 @@ def gerar_comissoes_venda(
                     
                     logger.info(f"💰 COMISSÃO PROPORCIONAL:")
                     logger.info(f"   Valor total venda: R$ {float(total_venda_decimal):.2f}")
-                    logger.info(f"   Valor pago: R$ {float(valor_pago):.2f}")
+                    logger.info(f"   Valor pago: R$ {float(valor_pago_decimal):.2f}")
                     logger.info(f"   Percentual aplicado: {float(percentual_proporcional):.2f}%")
                     logger.info(f"   Base original: R$ {calculo['base_calculo']:.2f}")
                     logger.info(f"   Base proporcional: R$ {float(valor_base_calculo_final):.2f}")
@@ -755,14 +761,14 @@ def gerar_comissoes_venda(
         )
         
         # 🔒 SPRINT 3 - PASSO 2: Log estruturado de sucesso (backward compatibility)
-        if valor_pago:
+        if pagamento_parcial:
             struct_logger.info(
                 "COMMISSION_PARTIAL_GENERATED",
                 "Comissão parcial gerada",
                 venda_id=venda_id,
                 funcionario_id=funcionario_id,
                 parcela=parcela_numero,
-                valor_pago=float(valor_pago),
+                valor_pago=float(valor_pago_decimal),
                 valor_comissao=float(total_comissao)
             )
         else:

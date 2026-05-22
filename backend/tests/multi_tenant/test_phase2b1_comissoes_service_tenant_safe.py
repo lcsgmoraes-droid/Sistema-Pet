@@ -385,6 +385,35 @@ def test_pagamento_parcial_mantem_parcela_numero(db_session):
     assert float(rows[0].valor_comissao_gerada) == pytest.approx(5.0)
 
 
+def test_pagamento_total_gera_comissao_mesmo_com_parcial_desativada(db_session):
+    set_current_tenant(TENANT_A)
+    db_session.execute(
+        text("""
+            UPDATE comissoes_configuracao
+            SET comissao_venda_parcial = 0
+            WHERE funcionario_id = :funcionario_id
+              AND tenant_id = :tenant_id
+        """),
+        {"funcionario_id": FUNCIONARIO_ID, "tenant_id": TENANT_A},
+    )
+    db_session.commit()
+
+    result = gerar_comissoes_venda(
+        venda_id=VENDA_ID,
+        funcionario_id=FUNCIONARIO_ID,
+        valor_pago=Decimal("100"),
+        forma_pagamento="Cartao",
+        parcela_numero=1,
+        db=db_session,
+    )
+
+    assert result["success"] is True
+    rows = _commission_rows(db_session)
+    assert len(rows) == 1
+    assert float(rows[0].valor_pago_referencia) == pytest.approx(100.0)
+    assert float(rows[0].valor_comissao_gerada) == pytest.approx(10.0)
+
+
 def test_reexecucao_nao_duplica_comissao_no_mesmo_tenant(db_session):
     set_current_tenant(TENANT_A)
 
