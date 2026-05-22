@@ -25,6 +25,7 @@ import api from "../api";
 import ModuleTabs from "../components/ui/ModuleTabs";
 import { formatMoneyBRL, formatPercent } from "../utils/formatters";
 import {
+  FAIXAS_PORTE_PETSHOP,
   calcularImpactoPontoEquilibrio,
   montarAnaliseCustosPontoEquilibrio,
 } from "./pontoEquilibrioImpactoUtils";
@@ -138,6 +139,9 @@ const ABAS_PONTO_EQUILIBRIO = [
   { id: "resumo", label: "Resumo" },
   { id: "analise", label: "Analise dos custos" },
 ];
+
+const TOOLTIP_FAIXAS_PORTE =
+  "Faixas gerenciais mensais: Pequeno ate R$ 80 mil/mes; Medio de R$ 80 mil a R$ 250 mil/mes; Grande acima de R$ 250 mil/mes. Use como parametro interno, nao como enquadramento fiscal.";
 
 const CORES_GRAFICO_CUSTOS = ["#2563eb", "#059669", "#d97706", "#7c3aed", "#dc2626", "#0891b2", "#64748b"];
 
@@ -373,19 +377,47 @@ function ParecerCard({ parecer }) {
   );
 }
 
-function AnaliseCustosPanel({ analise }) {
+function AnaliseCustosPanel({ analise, porteAnalise, setPorteAnalise }) {
   return (
     <div className="space-y-4">
       <div className="rounded-lg border border-slate-200 bg-white p-4">
-        <div className="flex items-start gap-3">
-          <div className="rounded-lg bg-blue-100 p-2 text-blue-700">
-            <BarChart3 className="h-5 w-5" />
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="rounded-lg bg-blue-100 p-2 text-blue-700">
+              <BarChart3 className="h-5 w-5" />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-slate-900">Analise dos custos</h2>
+              <p className="mt-1 text-sm text-slate-600">
+                Parecer gerencial com referencias percentuais para comparar Aluguel sobre faturamento,
+                Folha e pro-labore, utilidades, sistemas e custo fixo total.
+              </p>
+            </div>
           </div>
-          <div>
-            <h2 className="text-base font-semibold text-slate-900">Analise dos custos</h2>
-            <p className="mt-1 text-sm text-slate-600">
-              Parecer gerencial com referencias percentuais para comparar Aluguel sobre faturamento,
-              Folha e pro-labore, utilidades, sistemas e custo fixo total.
+
+          <div className="w-full rounded-lg border border-slate-200 bg-slate-50 p-3 lg:w-72">
+            <div className="flex items-center justify-between gap-2">
+              <label className="text-xs font-semibold uppercase text-slate-600">Porte do petshop</label>
+              <span
+                title={TOOLTIP_FAIXAS_PORTE}
+                className="cursor-help rounded-md bg-white px-2 py-1 text-[11px] font-semibold text-slate-600"
+              >
+                Faixas gerenciais mensais
+              </span>
+            </div>
+            <select
+              value={porteAnalise}
+              onChange={(event) => setPorteAnalise(event.target.value)}
+              className="mt-2 w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm"
+            >
+              {FAIXAS_PORTE_PETSHOP.map((porte) => (
+                <option key={porte.id} value={porte.id}>
+                  {porte.label}
+                </option>
+              ))}
+            </select>
+            <p className="mt-2 text-xs text-slate-600">
+              {analise.porte.faixaMensal}
             </p>
           </div>
         </div>
@@ -468,6 +500,7 @@ export default function PontoEquilibrio() {
     faturamento: "",
   });
   const [abaAtiva, setAbaAtiva] = useState("resumo");
+  const [porteAnalise, setPorteAnalise] = useState("pequeno");
   const [dados, setDados] = useState(null);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
@@ -490,11 +523,12 @@ export default function PontoEquilibrio() {
     if (!dados) return null;
     return montarAnaliseCustosPontoEquilibrio({
       dados,
+      porte: porteAnalise,
       faturamentoProjetado: impactoForm.faturamento,
       impactoCustoFixo: impactoValor,
       impactoDescricao: impactoForm.descricao,
     });
-  }, [dados, impactoForm.descricao, impactoForm.faturamento, impactoValor]);
+  }, [dados, impactoForm.descricao, impactoForm.faturamento, impactoValor, porteAnalise]);
 
   const statusResumo = useMemo(() => {
     if (!dados) return null;
@@ -804,7 +838,11 @@ export default function PontoEquilibrio() {
             )}
 
             {abaAtiva === "analise" && analiseCustos && (
-              <AnaliseCustosPanel analise={analiseCustos} />
+              <AnaliseCustosPanel
+                analise={analiseCustos}
+                porteAnalise={porteAnalise}
+                setPorteAnalise={setPorteAnalise}
+              />
             )}
 
             {(dados.produtos_sem_custo > 0 || dados.quantidade_contas_sem_classificacao > 0) && (

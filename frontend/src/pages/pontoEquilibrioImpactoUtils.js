@@ -83,7 +83,55 @@ const GRUPOS_CUSTOS_FIXOS = [
   },
 ];
 
-const REFERENCIAS_GERENCIAIS = {
+export const FAIXAS_PORTE_PETSHOP = [
+  {
+    id: "pequeno",
+    label: "Pequeno",
+    faixaMensal: "Ate R$ 80 mil/mes",
+    faixaAnual: "Ate R$ 960 mil/ano",
+    descricao: "Petshop de operacao mais enxuta, com menor escala para diluir custos fixos.",
+    referencias: {
+      aluguel: { referenciaPercentual: 14, limiteAtencaoPercentual: 16 },
+      folha: { referenciaPercentual: 30, limiteAtencaoPercentual: 36 },
+      utilidades: { referenciaPercentual: 6, limiteAtencaoPercentual: 8 },
+      tecnologia: { referenciaPercentual: 5, limiteAtencaoPercentual: 7 },
+      administrativo: { referenciaPercentual: 7, limiteAtencaoPercentual: 9 },
+      total_fixo: { referenciaPercentual: 34, limiteAtencaoPercentual: 40 },
+    },
+  },
+  {
+    id: "medio",
+    label: "Medio",
+    faixaMensal: "R$ 80 mil a R$ 250 mil/mes",
+    faixaAnual: "R$ 960 mil a R$ 3 mi/ano",
+    descricao: "Petshop com mais volume e alguma escala para diluir aluguel, sistemas e equipe.",
+    referencias: {
+      aluguel: { referenciaPercentual: 13, limiteAtencaoPercentual: 15 },
+      folha: { referenciaPercentual: 28, limiteAtencaoPercentual: 35 },
+      utilidades: { referenciaPercentual: 5, limiteAtencaoPercentual: 7 },
+      tecnologia: { referenciaPercentual: 4, limiteAtencaoPercentual: 6 },
+      administrativo: { referenciaPercentual: 6, limiteAtencaoPercentual: 8 },
+      total_fixo: { referenciaPercentual: 30, limiteAtencaoPercentual: 35 },
+    },
+  },
+  {
+    id: "grande",
+    label: "Grande",
+    faixaMensal: "Acima de R$ 250 mil/mes",
+    faixaAnual: "Acima de R$ 3 mi/ano",
+    descricao: "Petshop com escala maior, onde o custo fixo ideal tende a pesar menos no faturamento.",
+    referencias: {
+      aluguel: { referenciaPercentual: 10, limiteAtencaoPercentual: 13 },
+      folha: { referenciaPercentual: 25, limiteAtencaoPercentual: 32 },
+      utilidades: { referenciaPercentual: 4, limiteAtencaoPercentual: 6 },
+      tecnologia: { referenciaPercentual: 3, limiteAtencaoPercentual: 5 },
+      administrativo: { referenciaPercentual: 5, limiteAtencaoPercentual: 7 },
+      total_fixo: { referenciaPercentual: 26, limiteAtencaoPercentual: 32 },
+    },
+  },
+];
+
+const REFERENCIAS_GERENCIAIS_BASE = {
   aluguel: {
     titulo: "Aluguel sobre faturamento",
     referenciaPercentual: 13,
@@ -121,6 +169,22 @@ const REFERENCIAS_GERENCIAIS = {
     descricao: "Quanto menor, mais folga a margem tem para gerar lucro.",
   },
 };
+
+function obterPortePetshop(porte) {
+  return FAIXAS_PORTE_PETSHOP.find((item) => item.id === porte) || FAIXAS_PORTE_PETSHOP[1];
+}
+
+function montarReferenciasGerenciais(porte) {
+  const porteSelecionado = obterPortePetshop(porte);
+
+  return Object.entries(REFERENCIAS_GERENCIAIS_BASE).reduce((acc, [id, referencia]) => {
+    acc[id] = {
+      ...referencia,
+      ...(porteSelecionado.referencias[id] || {}),
+    };
+    return acc;
+  }, {});
+}
 
 function textoItemCusto(item) {
   return normalizarTexto([
@@ -244,10 +308,13 @@ export function calcularImpactoPontoEquilibrio({
 
 export function montarAnaliseCustosPontoEquilibrio({
   dados,
+  porte = "medio",
   faturamentoProjetado,
   impactoCustoFixo = 0,
   impactoDescricao = "",
 }) {
+  const porteSelecionado = obterPortePetshop(porte);
+  const referencias = montarReferenciasGerenciais(porteSelecionado.id);
   const faturamentoBase = numeroOuPadrao(faturamentoProjetado, dados?.faturamento || 0);
   const faturamentoSeguro = Math.max(0, faturamentoBase);
   const impacto = numeroSeguro(impactoCustoFixo);
@@ -294,41 +361,42 @@ export function montarAnaliseCustosPontoEquilibrio({
       id: "aluguel",
       valor: valorGrupo("aluguel"),
       faturamento: faturamentoSeguro,
-      referencia: REFERENCIAS_GERENCIAIS.aluguel,
+      referencia: referencias.aluguel,
     }),
     criarParecer({
       id: "folha",
       valor: valorGrupo("folha"),
       faturamento: faturamentoSeguro,
-      referencia: REFERENCIAS_GERENCIAIS.folha,
+      referencia: referencias.folha,
     }),
     criarParecer({
       id: "utilidades",
       valor: valorGrupo("utilidades"),
       faturamento: faturamentoSeguro,
-      referencia: REFERENCIAS_GERENCIAIS.utilidades,
+      referencia: referencias.utilidades,
     }),
     criarParecer({
       id: "tecnologia",
       valor: valorGrupo("tecnologia"),
       faturamento: faturamentoSeguro,
-      referencia: REFERENCIAS_GERENCIAIS.tecnologia,
+      referencia: referencias.tecnologia,
     }),
     criarParecer({
       id: "administrativo",
       valor: valorGrupo("administrativo"),
       faturamento: faturamentoSeguro,
-      referencia: REFERENCIAS_GERENCIAIS.administrativo,
+      referencia: referencias.administrativo,
     }),
     criarParecer({
       id: "total_fixo",
       valor: custoFixoProjetado,
       faturamento: faturamentoSeguro,
-      referencia: REFERENCIAS_GERENCIAIS.total_fixo,
+      referencia: referencias.total_fixo,
     }),
   ];
 
   return {
+    porte: porteSelecionado,
     faturamento: arredondarCentavos(faturamentoSeguro),
     custoFixoProjetado: arredondarCentavos(custoFixoProjetado),
     grupos,

@@ -57,6 +57,11 @@ def test_frontend_tem_tela_financeira_de_ponto_equilibrio():
     assert "Parecer gerencial" in page
     assert "Aluguel sobre faturamento" in page
     assert "Folha e pro-labore" in page
+    assert "Porte do petshop" in page
+    assert "Pequeno" in page
+    assert "Medio" in page
+    assert "Grande" in page
+    assert "Faixas gerenciais mensais" in page
     assert "fimMesAtual" in page
     assert "data_fim: fimMesAtual()" in page
     assert "Ponto de Equilíbrio —" not in dashboard

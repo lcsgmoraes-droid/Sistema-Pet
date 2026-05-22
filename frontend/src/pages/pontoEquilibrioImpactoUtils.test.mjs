@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
   calcularImpactoPontoEquilibrio,
+  FAIXAS_PORTE_PETSHOP,
   montarAnaliseCustosPontoEquilibrio,
 } from "./pontoEquilibrioImpactoUtils.js";
 
@@ -96,6 +97,7 @@ test("projeta prejuizo do mes quando faturamento simulado fica abaixo do novo po
 
 test("monta analise de custos com grupos e pareceres percentuais", () => {
   const analise = montarAnaliseCustosPontoEquilibrio({
+    porte: "medio",
     dados: {
       faturamento: 50000,
       despesas_fixas: 21000,
@@ -123,4 +125,35 @@ test("monta analise de custos com grupos e pareceres percentuais", () => {
   assert.equal(aluguel.status, "acima");
   assert.equal(folha.percentualFaturamento, 20);
   assert.equal(folha.status, "saudavel");
+});
+
+test("define faixas gerenciais mensais para porte do petshop", () => {
+  assert.deepEqual(
+    FAIXAS_PORTE_PETSHOP.map((porte) => [porte.id, porte.label, porte.faixaMensal]),
+    [
+      ["pequeno", "Pequeno", "Ate R$ 80 mil/mes"],
+      ["medio", "Medio", "R$ 80 mil a R$ 250 mil/mes"],
+      ["grande", "Grande", "Acima de R$ 250 mil/mes"],
+    ],
+  );
+});
+
+test("ajusta referencia de aluguel conforme porte selecionado", () => {
+  const dados = {
+    faturamento: 50000,
+    despesas_fixas: 10000,
+    detalhes_classificacao: {
+      fixas: [
+        { id: 1, descricao: "Aluguel", valor: 6500, origem_classificacao: "Categoria financeira: Aluguel" },
+      ],
+    },
+  };
+
+  const pequeno = montarAnaliseCustosPontoEquilibrio({ dados, porte: "pequeno" });
+  const grande = montarAnaliseCustosPontoEquilibrio({ dados, porte: "grande" });
+
+  assert.equal(pequeno.porte.id, "pequeno");
+  assert.equal(pequeno.pareceres.find((item) => item.id === "aluguel").referenciaPercentual, 14);
+  assert.equal(grande.porte.id, "grande");
+  assert.equal(grande.pareceres.find((item) => item.id === "aluguel").referenciaPercentual, 10);
 });
