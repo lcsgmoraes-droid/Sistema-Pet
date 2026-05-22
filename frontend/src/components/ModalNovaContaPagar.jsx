@@ -45,6 +45,12 @@ const montarDadosEdicaoContaPagar = (conta) => ({
   data_vencimento: normalizarDataContaPagar(conta?.data_vencimento || conta?.datas?.vencimento, new Date().toISOString().split('T')[0]),
   documento: conta?.documento || '',
   observacoes: conta?.observacoes || '',
+  eh_recorrente: Boolean(conta?.eh_recorrente),
+  tipo_recorrencia: conta?.tipo_recorrencia || 'mensal',
+  intervalo_dias: conta?.intervalo_dias || null,
+  data_inicio_recorrencia: normalizarDataContaPagar(conta?.data_inicio_recorrencia),
+  data_fim_recorrencia: normalizarDataContaPagar(conta?.data_fim_recorrencia),
+  numero_repeticoes: conta?.numero_repeticoes || null,
 });
 
 const ModalNovaContaPagar = ({ isOpen, onClose, onSave, contaEdicao = null }) => {
@@ -290,8 +296,8 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave, contaEdicao = null }) =>
         ...dados,
         valor_original: parseFloat(dados.valor_original),
         total_parcelas: dados.eh_parcelado ? parseInt(dados.total_parcelas) : 1,
-        intervalo_dias: dados.tipo_recorrencia === 'personalizado' ? parseInt(dados.intervalo_dias) : null,
-        numero_repeticoes: dados.numero_repeticoes ? parseInt(dados.numero_repeticoes) : null
+        intervalo_dias: dados.eh_recorrente && dados.tipo_recorrencia === 'personalizado' ? parseInt(dados.intervalo_dias) : null,
+        numero_repeticoes: dados.eh_recorrente && dados.numero_repeticoes ? parseInt(dados.numero_repeticoes) : null
       };
 
       if (isEditando) {
@@ -307,6 +313,12 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave, contaEdicao = null }) =>
           data_vencimento: payload.data_vencimento,
           documento: payload.documento,
           observacoes: payload.observacoes,
+          eh_recorrente: payload.eh_recorrente,
+          tipo_recorrencia: payload.eh_recorrente ? payload.tipo_recorrencia : null,
+          intervalo_dias: payload.eh_recorrente && payload.tipo_recorrencia === 'personalizado' ? payload.intervalo_dias : null,
+          data_inicio_recorrencia: payload.eh_recorrente ? (payload.data_inicio_recorrencia || payload.data_vencimento) : null,
+          data_fim_recorrencia: payload.eh_recorrente ? payload.data_fim_recorrencia : null,
+          numero_repeticoes: payload.eh_recorrente ? payload.numero_repeticoes : null,
         });
       } else {
         await api.post('/contas-pagar/', payload);
@@ -558,7 +570,6 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave, contaEdicao = null }) =>
           </div>
 
           {/* Recorrência */}
-          {!isEditando && (
           <div className="space-y-4 border-t pt-4">
             <div className="flex items-center gap-2">
               <input
@@ -643,12 +654,12 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave, contaEdicao = null }) =>
                   <p className="text-sm text-blue-800">
                     <strong>💡 Como funciona:</strong> Esta conta será criada agora e o sistema irá 
                     gerar automaticamente novas contas nos próximos períodos conforme a recorrência configurada.
+                    {isEditando && ' Na edicao, a janela futura sera ajustada sem alterar pagamentos ja registrados.'}
                   </p>
                 </div>
               </div>
             )}
           </div>
-          )}
 
           {/* Parcelamento */}
           {!isEditando && (

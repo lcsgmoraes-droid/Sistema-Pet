@@ -366,6 +366,12 @@ export function createLayoutMenuItems({ lembretesCount = 0 } = {}) {
           permission: "financeiro.dre",
         },
         {
+          path: "/financeiro/ponto-equilibrio",
+          label: "Ponto de Equilibrio",
+          modulo: "financeiro_erp",
+          permission: "relatorios.financeiro",
+        },
+        {
           path: "/financeiro/contas-pagar",
           label: "Contas a Pagar",
           modulo: "financeiro_erp",

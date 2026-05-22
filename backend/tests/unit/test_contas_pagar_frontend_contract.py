@@ -36,3 +36,26 @@ def test_modal_conta_pagar_suporta_modo_edicao():
     assert "api.patch(`/contas-pagar/${contaEdicao.id}`" in source
     assert "Editar Conta a Pagar" in source
     assert "Salvar Alteracoes" in source
+
+
+def test_contas_pagar_lista_edita_e_exclui_sem_botao_ver():
+    source = (REPO_ROOT / "frontend/src/components/ContasPagar.jsx").read_text(encoding="utf-8")
+
+    assert "excluirContaPagar" in source
+    assert "api.delete(`/contas-pagar/${conta.id}`)" in source
+    assert "Excluir" in source
+    assert "abrirDetalhes" not in source
+    assert "mostrarDetalhes" not in source
+    assert 'title="Ver Detalhes"' not in source
+
+
+def test_edicao_de_conta_pagar_expoe_recorrencia_no_modal():
+    source = (REPO_ROOT / "frontend/src/components/ModalNovaContaPagar.jsx").read_text(encoding="utf-8")
+
+    assert "eh_recorrente: Boolean(conta?.eh_recorrente)" in source
+    assert "tipo_recorrencia: conta?.tipo_recorrencia || 'mensal'" in source
+    assert "eh_recorrente: payload.eh_recorrente" in source
+    assert "tipo_recorrencia: payload.eh_recorrente ? payload.tipo_recorrencia : null" in source
+
+    trecho_recorrencia = source.split("{/* Recorr", 1)[1].split("{/* Parcelamento", 1)[0]
+    assert "!isEditando" not in trecho_recorrencia

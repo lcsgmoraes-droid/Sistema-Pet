@@ -100,6 +100,7 @@ const DashboardFinanceiro = lazy(preloadDashboardFinanceiro);
 const ContasBancarias = lazy(() => import("./components/ContasBancarias"));
 const ContasPagar = lazy(() => import("./components/ContasPagar"));
 const ContasReceber = lazy(() => import("./components/ContasReceber"));
+const PontoEquilibrio = lazy(() => import("./pages/PontoEquilibrio"));
 const ConciliacaoCartoesTabs = lazy(
   () => import("./pages/ConciliacaoCartoesTabs"),
 );
@@ -664,6 +665,16 @@ function App() {
                       <ProtectedRoute permission="relatorios.financeiro">
                         <RelatorioVendas />
                       </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="financeiro/ponto-equilibrio"
+                    element={
+                      <ModuleGate modulo="financeiro_erp">
+                        <ProtectedRoute permission="relatorios.financeiro">
+                          <PontoEquilibrio />
+                        </ProtectedRoute>
+                      </ModuleGate>
                     }
                   />
                   <Route
