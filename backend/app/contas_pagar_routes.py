@@ -354,6 +354,38 @@ def _gerar_contas_recorrentes_ate_janela(
     return contas_criadas
 
 
+def _garantir_janela_recorrencia_apos_pagamento(
+    db: Session,
+    tenant_id,
+    conta_paga: ContaPagar,
+    hoje: Optional[date] = None,
+) -> List[ContaPagar]:
+    conta_origem = conta_paga
+    if not conta_paga.eh_recorrente and conta_paga.conta_recorrencia_origem_id:
+        conta_origem = db.query(ContaPagar).filter(
+            ContaPagar.id == conta_paga.conta_recorrencia_origem_id,
+            ContaPagar.tenant_id == tenant_id,
+        ).first()
+
+    if not conta_origem:
+        return []
+
+    if not conta_origem.eh_recorrente or not conta_origem.tipo_recorrencia or not conta_origem.proxima_recorrencia:
+        return []
+
+    data_referencia = hoje or date.today()
+    if conta_origem.data_fim_recorrencia and conta_origem.data_fim_recorrencia < data_referencia:
+        return []
+
+    limite_recorrencia = calcular_limite_janela_recorrencia(data_referencia)
+    return _gerar_contas_recorrentes_ate_janela(
+        db=db,
+        tenant_id=tenant_id,
+        conta_origem=conta_origem,
+        limite_recorrencia=limite_recorrencia,
+    )
+
+
 # ============================================================================
 # CRIAR CONTA A PAGAR
 # ============================================================================
@@ -1186,6 +1218,29 @@ async def registrar_pagamento(
         lancamento.status = 'realizado'
         lancamento.realizado_em = datetime.now()
         logger.info(f"📊 Lançamento manual #{lancamento.id} atualizado para 'realizado'")
+
+    contas_recorrentes_criadas = []
+    if conta.status == 'pago':
+        contas_recorrentes_criadas = _garantir_janela_recorrencia_apos_pagamento(
+            db=db,
+            tenant_id=tenant_id,
+            conta_paga=conta,
+            hoje=date.today(),
+        )
+
+        for conta_recorrente in contas_recorrentes_criadas:
+            try:
+                atualizar_dre_por_lancamento(
+                    db=db,
+                    tenant_id=tenant_id,
+                    dre_subcategoria_id=conta_recorrente.dre_subcategoria_id,
+                    canal=conta_recorrente.canal,
+                    valor=conta_recorrente.valor_original,
+                    data_lancamento=conta_recorrente.data_vencimento,
+                    tipo_movimentacao='DESPESA'
+                )
+            except Exception as e:
+                logger.warning(f"Erro ao atualizar DRE para conta recorrente #{conta_recorrente.id}: {e}")
     
     db.commit()
     
@@ -1197,7 +1252,8 @@ async def registrar_pagamento(
         "status": conta.status,
         "valor_pago_total": float(conta.valor_pago),
         "valor_final": float(conta.valor_final),
-        "saldo_restante": float(conta.valor_final - conta.valor_pago)
+        "saldo_restante": float(conta.valor_final - conta.valor_pago),
+        "recorrencias_criadas": len(contas_recorrentes_criadas),
     }
 
 
