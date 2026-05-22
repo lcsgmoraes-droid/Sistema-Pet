@@ -468,30 +468,37 @@ const ContasPagar = () => {
     {
       key: 'descricao',
       header: 'Descricao',
-      className: 'min-w-[220px]',
+      className: 'min-w-[220px] max-w-[260px]',
+      cellStyle: { maxWidth: 260 },
       render: (conta) => (
-        <div>
-          {conta.descricao}
-          {conta.eh_parcelado && (
-            <span className="ml-2 px-2 py-1 text-xs rounded bg-gray-100 text-gray-700">
-              {conta.numero_parcela}/{conta.total_parcelas}
-            </span>
-          )}
-          {conta.e_custo_fixo === true && (
-            <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-orange-100 text-orange-700 font-semibold">Fixo</span>
-          )}
-          {conta.e_custo_fixo === false && (
-            <span className="ml-2 px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 font-semibold">Variavel</span>
-          )}
+        <div className="min-w-0 max-w-[260px]">
+          <div className="break-words text-sm font-medium text-slate-900" title={conta.descricao}>
+            {conta.descricao}
+          </div>
+          <div className="mt-1 flex flex-wrap gap-1">
+            {conta.eh_parcelado && (
+              <span className="px-2 py-1 text-xs rounded bg-gray-100 text-gray-700">
+                {conta.numero_parcela}/{conta.total_parcelas}
+              </span>
+            )}
+            {conta.e_custo_fixo === true && (
+              <span className="px-2 py-0.5 text-xs rounded-full bg-orange-100 text-orange-700 font-semibold">Fixo</span>
+            )}
+            {conta.e_custo_fixo === false && (
+              <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 font-semibold">Variavel</span>
+            )}
+          </div>
         </div>
       ),
     },
     {
       key: 'fornecedor',
       header: 'Fornecedor',
-      className: 'min-w-[150px]',
+      className: 'min-w-[240px] max-w-[340px]',
+      cellStyle: { maxWidth: 340 },
       render: (conta) => (
         <FornecedorIdentity
+          className="w-full max-w-[330px]"
           fallback=""
           nameClassName="font-medium text-slate-700"
           record={conta}
@@ -549,9 +556,10 @@ const ContasPagar = () => {
     {
       key: 'acoes',
       header: 'Acoes',
-      className: 'min-w-[230px]',
+      headerClassName: 'contas-pagar-actions-cell sticky right-0 z-20 w-[320px] min-w-[320px] bg-gray-50 text-right',
+      className: 'contas-pagar-actions-cell sticky right-0 z-10 w-[320px] min-w-[320px] border-l border-slate-100 bg-white',
       render: (conta) => (
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <ActionButton
             intent="edit"
             tone="soft"
@@ -860,7 +868,7 @@ const ContasPagar = () => {
           data={safeArray(contas)}
           emptyMessage="Nenhuma conta encontrada"
           getRowKey={(conta) => conta.id}
-          tableClassName="min-w-[1120px]"
+          tableClassName="min-w-[1500px]"
           theadClassName="bg-gray-50"
           tbodyClassName="divide-y divide-gray-200"
         />
