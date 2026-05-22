@@ -125,6 +125,61 @@ const ComissaoDetalhe = ({ comissaoId, onClose }) => {
     );
   };
 
+  const formatarValorLinhaDemonstrativo = (linha) => {
+    if (linha.tipo === 'percentual') {
+      return formatarPercentual(Number(linha.valor || 0));
+    }
+    return formatarMoeda(Number(linha.valor || 0));
+  };
+
+  const renderLinhaDemonstrativo = (linha) => {
+    const estilos = {
+      receita: 'text-green-700',
+      deducao: 'text-red-700',
+      informativo: 'text-gray-500',
+      resultado: 'text-blue-900 font-bold border-t-2 border-blue-300 pt-2 mt-2',
+      percentual: 'text-purple-800',
+      final: 'text-purple-950 font-bold border-t-2 border-purple-300 pt-2 mt-2',
+    };
+    const operador = linha.operador === 'i' ? 'info' : linha.operador;
+
+    return (
+      <div
+        key={linha.chave}
+        className={`flex justify-between gap-4 ${estilos[linha.tipo] || 'text-gray-700'}`}
+      >
+        <span className="min-w-0">
+          <span className="font-semibold">{operador}</span> {linha.label}
+          {linha.tipo === 'informativo' && (
+            <span className="ml-2 text-xs">(nao deduz esta regra)</span>
+          )}
+        </span>
+        <span className="font-semibold whitespace-nowrap">
+          {formatarValorLinhaDemonstrativo(linha)}
+        </span>
+      </div>
+    );
+  };
+
+  const linhasDemonstrativoBase = (comissao?.demonstrativo_calculo?.linhas || []).filter(
+    (linha) => ![
+      'percentual_comissao',
+      'comissao_total',
+      'percentual_aplicado',
+      'comissao_final',
+    ].includes(linha.chave),
+  );
+
+  const linhasDemonstrativoComissao = (comissao?.demonstrativo_calculo?.linhas || []).filter(
+    (linha) => [
+      'base_calculo',
+      'percentual_comissao',
+      'comissao_total',
+      'percentual_aplicado',
+      'comissao_final',
+    ].includes(linha.chave),
+  );
+
   if (!comissaoId) return null;
 
   return (
@@ -265,102 +320,18 @@ const ComissaoDetalhe = ({ comissaoId, onClose }) => {
                     Como chegamos na Base de Cálculo?
                   </h4>
                   <div className="space-y-2 text-sm font-mono bg-white p-4 rounded border border-blue-200">
-                    {/* Valor pago como ponto de partida */}
-                    <div className="flex justify-between pb-2 border-b border-gray-200">
-                      <span className="text-gray-700 font-semibold">
-                        Valor Pago (Parcela {comissao.parcela_numero || 1}):
-                      </span>
-                      <span className="font-bold text-blue-600">
-                        {formatarMoeda(comissao.pagamento?.valor_pago_referencia || comissao.valores_financeiros.valor_venda)}
-                      </span>
-                    </div>
-                    
-                    {/* RECEITA: Taxa de entrega */}
-                    {comissao.deducoes && comissao.deducoes.receita_taxa_entrega > 0 && (
-                      <div className="flex justify-between text-green-600 pl-4">
-                        <span>(+) Taxa de Entrega (Receita):</span>
-                        <span className="font-medium">+ {formatarMoeda(comissao.deducoes.receita_taxa_entrega)}</span>
-                      </div>
-                    )}
-                    
-                    {/* Deduções linha por linha */}
-                    {comissao.deducoes && (
-                      <>
-                        {comissao.deducoes.taxa_cartao > 0 && (
-                          <div className="flex justify-between text-red-600 pl-4">
-                            <span>
-                              (-) {(() => {
-                                // Montar label dinâmico da taxa de cartão
-                                const forma = comissao.deducoes.forma_pagamento || 'Cartão';
-                                const parcelas = comissao.deducoes.numero_parcelas || 1;
-                                let taxa_percentual = comissao.deducoes.taxa_percentual;
-                                
-                                // Se parcelado, buscar taxa específica do JSON
-                                if (parcelas > 1 && comissao.deducoes.taxas_por_parcela) {
-                                  try {
-                                    const taxas = JSON.parse(comissao.deducoes.taxas_por_parcela);
-                                    taxa_percentual = taxas[parcelas.toString()] || taxa_percentual;
-                                  } catch (e) {}
-                                }
-                                
-                                // Montar texto
-                                let texto = 'Taxa ';
-                                if (forma.includes('Crédito')) {
-                                  if (parcelas > 1) {
-                                    texto += `Cartão Crédito ${parcelas}x`;
-                                  } else {
-                                    texto += 'Cartão Crédito à Vista';
-                                  }
-                                } else if (forma.includes('Débito')) {
-                                  texto += 'Cartão Débito';
-                                } else {
-                                  texto += forma;
-                                }
-                                
-                                // Adicionar percentual se disponível
-                                if (taxa_percentual) {
-                                  texto += ` (${taxa_percentual}%)`;
-                                }
-                                
-                                return texto + ':';
-                              })()}
-                            </span>
-                            <span className="font-medium">- {formatarMoeda(comissao.deducoes.taxa_cartao)}</span>
-                          </div>
-                        )}
-                        {comissao.deducoes.imposto > 0 && (
-                          <div className="flex justify-between text-red-600 pl-4">
-                            <span>(-) Impostos ({comissao.deducoes.percentual_impostos ? comissao.deducoes.percentual_impostos.toFixed(1) + '%' : ''}):</span>
-                            <span className="font-medium">- {formatarMoeda(comissao.deducoes.imposto)}</span>
-                          </div>
-                        )}
-                        {comissao.deducoes.taxa_entregador > 0 && (
-                          <div className="flex justify-between text-red-600 pl-4">
-                            <span>(-) Taxa paga ao Entregador:</span>
-                            <span className="font-medium">- {formatarMoeda(comissao.deducoes.taxa_entregador)}</span>
-                          </div>
-                        )}
-                        {comissao.deducoes.custo_operacional > 0 && (
-                          <div className="flex justify-between text-red-600 pl-4">
-                            <span>(-) Custo Operacional de Entrega:</span>
-                            <span className="font-medium">- {formatarMoeda(comissao.deducoes.custo_operacional)}</span>
-                          </div>
-                        )}
-                        {comissao.deducoes.desconto > 0 && (
-                          <div className="flex justify-between text-red-600 pl-4">
-                            <span>(-) Desconto:</span>
-                            <span className="font-medium">- {formatarMoeda(comissao.deducoes.desconto)}</span>
-                          </div>
-                        )}
-                      </>
-                    )}
-                    
-                    {/* Resultado */}
-                    <div className="border-t-2 border-blue-400 pt-2 mt-2 flex justify-between font-bold">
-                      <span className="text-blue-900">(=) Base de Cálculo:</span>
-                      <span className="text-blue-900 text-lg">{formatarMoeda(comissao.calculo.valor_base_calculo)}</span>
-                    </div>
+                    {linhasDemonstrativoBase.map(renderLinhaDemonstrativo)}
                   </div>
+                  {comissao.demonstrativo_calculo?.observacao && (
+                    <p className="mt-3 text-xs text-blue-800">
+                      {comissao.demonstrativo_calculo.observacao}
+                    </p>
+                  )}
+                  {comissao.demonstrativo_calculo?.conferencia_ok === false && (
+                    <p className="mt-2 text-xs text-amber-700">
+                      A base exibida segue o snapshot salvo; ha diferenca de arredondamento ou regra historica na conferencia visual.
+                    </p>
+                  )}
                 </div>
               </Secao>
 
@@ -406,21 +377,8 @@ const ComissaoDetalhe = ({ comissaoId, onClose }) => {
                 {/* FÓRMULA DE CÁLCULO */}
                 <div className="mt-4 p-4 bg-purple-50 border border-purple-200 rounded-lg">
                   <h4 className="font-semibold text-purple-900 mb-3">📐 Fórmula Aplicada:</h4>
-                  <div className="space-y-2 text-sm font-mono">
-                    <div className="bg-white p-3 rounded border border-purple-200">
-                      <div className="text-gray-700 mb-2">Base de Cálculo × Percentual = Comissão</div>
-                      <div className="text-purple-900 font-bold">
-                        {formatarMoeda(comissao.calculo.valor_base_calculo)} × {formatarPercentual(comissao.calculo.percentual_comissao)} = {formatarMoeda(comissao.calculo.valor_comissao)}
-                      </div>
-                    </div>
-                    {comissao.calculo.percentual_aplicado < 100 && (
-                      <div className="bg-yellow-50 p-3 rounded border border-yellow-200">
-                        <div className="text-gray-700 mb-2">⚠️ Venda parcial - Comissão proporcional ao valor pago:</div>
-                        <div className="text-yellow-900 font-bold">
-                          {formatarMoeda(comissao.calculo.valor_comissao)} × {formatarPercentual(comissao.calculo.percentual_aplicado)} = {formatarMoeda(comissao.calculo.valor_comissao_gerada)}
-                        </div>
-                      </div>
-                    )}
+                  <div className="space-y-2 text-sm font-mono bg-white p-3 rounded border border-purple-200">
+                    {linhasDemonstrativoComissao.map(renderLinhaDemonstrativo)}
                   </div>
                 </div>
               </Secao>
@@ -509,10 +467,10 @@ const ComissaoDetalhe = ({ comissaoId, onClose }) => {
                 <div className="space-y-3 font-mono text-sm">
                   <div className="flex justify-between items-center border-b border-white/20 pb-2">
                     <span className="text-blue-100">
-                      Valor Pago (Parcela {comissao.parcela_numero || 1}):
+                      Preco de venda bruto:
                     </span>
                     <span className="font-bold text-lg">
-                      {formatarMoeda(comissao.pagamento?.valor_pago_referencia || comissao.valores_financeiros.valor_venda)}
+                      {formatarMoeda(comissao.deducoes?.valor_bruto || comissao.valores_financeiros.valor_venda)}
                     </span>
                   </div>
                   
@@ -577,6 +535,30 @@ const ComissaoDetalhe = ({ comissaoId, onClose }) => {
                         <div className="flex justify-between items-center pl-4 text-red-200">
                           <span>(-) Desconto:</span>
                           <span className="font-medium">- {formatarMoeda(comissao.deducoes.desconto)}</span>
+                        </div>
+                      )}
+                      {comissao.deducoes.beneficio > 0 && (
+                        <div className="flex justify-between items-center pl-4 text-red-200">
+                          <span>(-) Beneficio / cupom / cashback:</span>
+                          <span className="font-medium">- {formatarMoeda(comissao.deducoes.beneficio)}</span>
+                        </div>
+                      )}
+                      {comissao.deducoes.taxa_entregador > 0 && (
+                        <div className="flex justify-between items-center pl-4 text-red-200">
+                          <span>(-) Entrega - repasse ao entregador:</span>
+                          <span className="font-medium">- {formatarMoeda(comissao.deducoes.taxa_entregador)}</span>
+                        </div>
+                      )}
+                      {comissao.deducoes.custo_operacional > 0 && (
+                        <div className="flex justify-between items-center pl-4 text-red-200">
+                          <span>(-) Entrega - custo operacional:</span>
+                          <span className="font-medium">- {formatarMoeda(comissao.deducoes.custo_operacional)}</span>
+                        </div>
+                      )}
+                      {comissao.calculo.tipo_calculo === 'lucro' && comissao.valores_financeiros.valor_custo > 0 && (
+                        <div className="flex justify-between items-center pl-4 text-red-200">
+                          <span>(-) Custo do produto vendido:</span>
+                          <span className="font-medium">- {formatarMoeda(comissao.valores_financeiros.valor_custo)}</span>
                         </div>
                       )}
                     </>

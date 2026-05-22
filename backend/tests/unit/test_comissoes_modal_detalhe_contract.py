@@ -31,3 +31,11 @@ def test_layout_watchdog_nao_recolhe_sidebar_ao_neutralizar_overlay_automaticame
 
     assert "neutralizarOverlaysOrfaos" in layout
     assert "destravarTela(true)" not in layout
+
+
+def test_detalhe_comissao_renderiza_demonstrativo_completo_do_backend():
+    detalhe = _frontend_source("src/pages/comissoes/ComissaoDetalhe.jsx")
+
+    assert "demonstrativo_calculo" in detalhe
+    assert "renderLinhaDemonstrativo" in detalhe
+    assert "Custo do produto vendido" in detalhe
