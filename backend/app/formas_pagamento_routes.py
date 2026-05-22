@@ -264,6 +264,7 @@ def analisar_venda(
         # ===== 2. BUSCAR CUSTOS DOS PRODUTOS =====
         custos_total = 0
         detalhamento_comissoes = []
+        itens_para_comissao = []
         
         try:
             for item in dados.items:
@@ -279,24 +280,14 @@ def analisar_venda(
                 custo_item = item.custo if item.custo is not None else (produto.preco_custo or 0)
                 custos_total += custo_item * item.quantidade
                 
-                # TODO: Buscar configuração de comissão do produto
-                # Por enquanto, usar 10% como padrão
-                percentual_comissao = 10.0
-                valor_comissao_item = (item.preco_venda * item.quantidade) * (percentual_comissao / 100)
-                
-                detalhamento_comissoes.append(DetalhamentoComissao(
-                    produto=produto.nome,
-                    percentual=percentual_comissao,
-                    valor=float(valor_comissao_item)
-                ))
+                # Guardar os itens para calcular a comissão real depois que
+                # taxas, descontos e impostos da venda estiverem fechados.
+                itens_para_comissao.append((item, produto, custo_item))
         except Exception as e:
             logger.error(f"❌ Erro ao calcular custos e comissões: {e}")
             # Continuar com valores zerados em caso de erro
             custos_total = 0
             detalhamento_comissoes = []
-        
-        # ===== 3. CALCULAR COMISSÃO TOTAL =====
-        comissao_total = sum(d.valor for d in detalhamento_comissoes) if detalhamento_comissoes else 0
         
         # ===== 4. PROCESSAR FORMAS DE PAGAMENTO E CALCULAR TAXAS =====
         # Compatibilidade: se não enviou formas_pagamento, usar forma_pagamento_id/parcelas antigo
@@ -434,7 +425,92 @@ def analisar_venda(
             imposto_nome = "Sem imposto"
             imposto_origem = "erro"
         
-        # ===== 6. CALCULAR RESULTADO =====
+        # ===== 6. CALCULAR COMISSAO REAL DO VENDEDOR/PARCEIRO =====
+        comissao_total = 0
+        percentual_medio_comissao = 0
+
+        if dados.vendedor_id and itens_para_comissao:
+            try:
+                from app.comissoes_service import (
+                    buscar_configuracao_comissao,
+                    calcular_comissao_item,
+                )
+
+                soma_brutos = sum(
+                    Decimal(str(item.preco_venda)) * Decimal(str(item.quantidade))
+                    for item, _, _ in itens_para_comissao
+                )
+                desconto_total = Decimal(str(dados.desconto or 0))
+                soma_liquidos = Decimal("0")
+                itens_normalizados = []
+
+                for item, produto, custo_item in itens_para_comissao:
+                    valor_bruto = Decimal(str(item.preco_venda)) * Decimal(str(item.quantidade))
+                    desconto_item = (
+                        desconto_total * (valor_bruto / soma_brutos)
+                        if soma_brutos > 0
+                        else Decimal("0")
+                    )
+                    valor_liquido = valor_bruto - desconto_item
+                    soma_liquidos += valor_liquido
+                    itens_normalizados.append((item, produto, Decimal(str(custo_item)), valor_bruto, valor_liquido))
+
+                custos_rateados = {
+                    "taxa_cartao_produtos": float(taxa_cartao_valor),
+                    "impostos_produtos": float(imposto_valor),
+                    "taxa_paga_entregador": 0,
+                    "custo_operacional_entrega": 0,
+                    "taxa_entrega_receita": float(dados.taxa_entrega or 0),
+                    "percentual_impostos": float(imposto_percentual),
+                }
+
+                soma_percentuais = 0
+                itens_com_config = 0
+
+                for item, produto, custo_item, valor_bruto, valor_liquido in itens_normalizados:
+                    config = buscar_configuracao_comissao(
+                        db,
+                        dados.vendedor_id,
+                        item.produto_id,
+                        tenant_id=tenant_id,
+                    )
+                    if not config:
+                        continue
+
+                    proporcao_item = (
+                        valor_liquido / soma_liquidos
+                        if soma_liquidos > 0
+                        else Decimal("0")
+                    )
+                    calculo = calcular_comissao_item(
+                        config=config,
+                        valor_bruto_item=valor_bruto,
+                        valor_liquido_item=valor_liquido,
+                        custo_unitario=custo_item,
+                        quantidade=Decimal(str(item.quantidade)),
+                        proporcao_item=proporcao_item,
+                        custos_rateados=custos_rateados,
+                        tem_entrega=bool(dados.taxa_entrega),
+                    )
+
+                    comissao_total += float(calculo["valor_comissao"])
+                    soma_percentuais += float(calculo["percentual"])
+                    itens_com_config += 1
+                    detalhamento_comissoes.append(DetalhamentoComissao(
+                        produto=produto.nome,
+                        percentual=float(calculo["percentual"]),
+                        valor=float(calculo["valor_comissao"]),
+                    ))
+
+                if itens_com_config:
+                    percentual_medio_comissao = soma_percentuais / itens_com_config
+            except Exception as e:
+                logger.error(f"Erro ao calcular comissao real na analise do PDV: {e}", exc_info=True)
+                comissao_total = 0
+                percentual_medio_comissao = 0
+                detalhamento_comissoes = []
+
+        # ===== 7. CALCULAR RESULTADO =====
         total_deducoes = comissao_total + taxa_cartao_valor + imposto_valor + custos_total
         lucro_liquido = subtotal - total_deducoes
         margem_liquida = (lucro_liquido / subtotal * 100) if subtotal > 0 else 0
@@ -450,7 +526,7 @@ def analisar_venda(
         deducoes = {
             "comissao": {
                 "valor": float(comissao_total),
-                "percentual": 10.0,  # TODO: calcular média ponderada
+                "percentual": float(round(percentual_medio_comissao, 2)),
                 "tipo": "percentual"
             },
             "taxa_percentual": float(taxa_cartao_total),

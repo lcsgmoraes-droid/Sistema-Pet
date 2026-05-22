@@ -24,6 +24,10 @@ export function usePDVComissaoEstado({
     setVendaComissionada(checked);
     if (!checked) {
       setFuncionarioComissao(null);
+      setVendaAtual((prev) => ({
+        ...prev,
+        funcionario_id: null,
+      }));
       setBuscaFuncionario("");
       setFuncionariosSugeridos([]);
     }
@@ -42,18 +46,30 @@ export function usePDVComissaoEstado({
 
   const handleSelecionarFuncionarioComissao = (funcionario) => {
     setFuncionarioComissao(funcionario);
+    setVendaAtual((prev) => ({
+      ...prev,
+      funcionario_id: funcionario?.id || null,
+    }));
     setFuncionariosSugeridos([]);
     setBuscaFuncionario("");
   };
 
   const handleRemoverFuncionarioComissao = () => {
     setFuncionarioComissao(null);
+    setVendaAtual((prev) => ({
+      ...prev,
+      funcionario_id: null,
+    }));
     setBuscaFuncionario("");
   };
 
   const limparComissao = () => {
     setVendaComissionada(false);
     setFuncionarioComissao(null);
+    setVendaAtual((prev) => ({
+      ...prev,
+      funcionario_id: null,
+    }));
     setBuscaFuncionario("");
     setFuncionariosSugeridos([]);
   };

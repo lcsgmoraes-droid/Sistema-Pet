@@ -209,6 +209,15 @@ def _create_schema(session):
         )
         """,
         """
+        CREATE TABLE clientes (
+            id INTEGER NOT NULL,
+            nome TEXT,
+            data_fechamento_comissao INTEGER,
+            parceiro_ativo BOOLEAN DEFAULT 0,
+            tenant_id TEXT NOT NULL
+        )
+        """,
+        """
         CREATE TABLE contas_pagar (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             descricao TEXT,
@@ -342,6 +351,13 @@ def _seed_comissao_data(session):
         text("""
             INSERT INTO users (id, nome, data_fechamento_comissao, tenant_id)
             VALUES (77, 'Alice Tenant A', NULL, :tenant_id)
+        """),
+        {"tenant_id": _tenant_str(TENANT_A)},
+    )
+    session.execute(
+        text("""
+            INSERT INTO clientes (id, nome, data_fechamento_comissao, parceiro_ativo, tenant_id)
+            VALUES (77, 'Alice Tenant A', NULL, 1, :tenant_id)
         """),
         {"tenant_id": _tenant_str(TENANT_A)},
     )

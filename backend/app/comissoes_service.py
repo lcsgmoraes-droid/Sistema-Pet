@@ -15,6 +15,43 @@ logger = logging.getLogger(__name__)
 struct_logger = StructuredLogger(__name__)
 
 
+CONFIGURACAO_COMISSAO_COLUMNS = """
+            id,
+            funcionario_id,
+            tipo,
+            referencia_id,
+            tipo_calculo,
+            percentual,
+            percentual_loja,
+            desconta_taxa_cartao,
+            desconta_impostos,
+            desconta_custo_entrega,
+            comissao_venda_parcial,
+            permite_edicao_venda,
+            observacoes,
+            ativo
+"""
+
+
+def _configuracao_row_to_dict(config) -> Dict:
+    return {
+        'id': config[0],
+        'funcionario_id': config[1],
+        'tipo': config[2],
+        'referencia_id': config[3],
+        'tipo_calculo': config[4] or 'percentual',
+        'percentual': config[5],
+        'percentual_loja': config[6],
+        'desconta_taxa_cartao': config[7] if config[7] is not None else True,
+        'desconta_impostos': config[8] if config[8] is not None else True,
+        'desconta_custo_entrega': config[9] if config[9] is not None else False,
+        'comissao_venda_parcial': config[10] if config[10] is not None else True,
+        'permite_edicao_venda': config[11] if config[11] is not None else True,
+        'observacoes': config[12] or '',
+        'ativo': config[13],
+    }
+
+
 def _require_tenant_id(tenant_id=None):
     resolved_tenant_id = tenant_id if tenant_id is not None else get_current_tenant_id()
     if resolved_tenant_id is None or resolved_tenant_id == "":
@@ -43,32 +80,20 @@ def buscar_configuracao_comissao(
 
     try:
         # 1. Tentar buscar config de PRODUTO
-        result = execute_tenant_safe(db, """
-            SELECT * FROM comissoes_configuracao
+        result = execute_tenant_safe(db, f"""
+            SELECT {CONFIGURACAO_COMISSAO_COLUMNS}
+            FROM comissoes_configuracao
             WHERE funcionario_id = :func_id
               AND tipo = 'produto'
               AND referencia_id = :ref_id
               AND ativo = true
-              AND {tenant_filter}
+              AND {{tenant_filter}}
         """, {'func_id': funcionario_id, 'ref_id': produto_id}, tenant_id=tenant_id)
         
         config = result.fetchone()
         if config:
             logger.info(f"✅ Config encontrada: PRODUTO {produto_id}")
-            return {
-                'id': config[0],
-                'funcionario_id': config[1],
-                'tipo': config[2],
-                'referencia_id': config[3],
-                'percentual': config[5],
-                'ativo': config[14],
-                'tipo_calculo': config[4],
-                'desconta_taxa_cartao': config[7],
-                'desconta_impostos': config[8],
-                'desconta_custo_entrega': config[9],
-                'comissao_venda_parcial': config[10],
-                'percentual_loja': config[6]
-            }
+            return _configuracao_row_to_dict(config)
         
         # 2. Buscar categoria do produto
         result = execute_tenant_safe(db, """
@@ -91,32 +116,20 @@ def buscar_configuracao_comissao(
         
         while categoria_atual_id and depth < max_depth:
             # Tentar buscar config para esta categoria
-            result = execute_tenant_safe(db, """
-                SELECT * FROM comissoes_configuracao
+            result = execute_tenant_safe(db, f"""
+                SELECT {CONFIGURACAO_COMISSAO_COLUMNS}
+                FROM comissoes_configuracao
                 WHERE funcionario_id = :func_id
                   AND tipo = 'categoria'
                   AND referencia_id = :ref_id
                   AND ativo = true
-                  AND {tenant_filter}
+                  AND {{tenant_filter}}
             """, {'func_id': funcionario_id, 'ref_id': categoria_atual_id}, tenant_id=tenant_id)
             
             config = result.fetchone()
             if config:
                 logger.info(f"✅ Config encontrada: CATEGORIA {categoria_atual_id} (nível {depth})")
-                return {
-                    'id': config[0],
-                    'funcionario_id': config[1],
-                    'tipo': config[2],
-                    'referencia_id': config[3],
-                    'percentual': config[5],
-                    'ativo': config[14],
-                    'tipo_calculo': config[4],
-                    'desconta_taxa_cartao': config[7],
-                    'desconta_impostos': config[8],
-                    'desconta_custo_entrega': config[9],
-                    'comissao_venda_parcial': config[10],
-                    'percentual_loja': config[6]
-                }
+                return _configuracao_row_to_dict(config)
             
             # Buscar categoria pai
             result = execute_tenant_safe(db, """
@@ -131,32 +144,20 @@ def buscar_configuracao_comissao(
             depth += 1
 
         # 4. Usar regra geral do funcionario como fallback para todos os itens
-        result = execute_tenant_safe(db, """
-            SELECT * FROM comissoes_configuracao
+        result = execute_tenant_safe(db, f"""
+            SELECT {CONFIGURACAO_COMISSAO_COLUMNS}
+            FROM comissoes_configuracao
             WHERE funcionario_id = :func_id
               AND tipo = 'geral'
               AND referencia_id = 0
               AND ativo = true
-              AND {tenant_filter}
+              AND {{tenant_filter}}
         """, {'func_id': funcionario_id}, tenant_id=tenant_id)
 
         config = result.fetchone()
         if config:
             logger.info(f"✅ Config encontrada: REGRA GERAL para funcionario {funcionario_id}")
-            return {
-                'id': config[0],
-                'funcionario_id': config[1],
-                'tipo': config[2],
-                'referencia_id': config[3],
-                'percentual': config[5],
-                'ativo': config[14],
-                'tipo_calculo': config[4],
-                'desconta_taxa_cartao': config[7],
-                'desconta_impostos': config[8],
-                'desconta_custo_entrega': config[9],
-                'comissao_venda_parcial': config[10],
-                'percentual_loja': config[6]
-            }
+            return _configuracao_row_to_dict(config)
 
         logger.warning(f"⚠️ Nenhuma config encontrada para funcionário {funcionario_id} e produto {produto_id} (verificou {depth} níveis)")
         return None
