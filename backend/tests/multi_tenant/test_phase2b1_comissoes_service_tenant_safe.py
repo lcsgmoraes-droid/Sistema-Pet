@@ -178,7 +178,8 @@ def _create_schema(session):
             custo_operacional_item NUMERIC,
             receita_taxa_entrega_item NUMERIC,
             percentual_impostos NUMERIC,
-            forma_pagamento TEXT
+            forma_pagamento TEXT,
+            data_criacao TEXT NOT NULL
         )
         """,
         """
