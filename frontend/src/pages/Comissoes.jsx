@@ -392,9 +392,9 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
     setSalvando(true);
 
     try {
-      // 1️⃣ Atualizar data de fechamento do funcionário (se fornecida)
+      // Atualizar data de fechamento da pessoa parceira (se fornecida)
       if (dataFechamento) {
-        await api.put(`/funcionarios/${funcionarioSel}`, {
+        await api.put(`/clientes/${funcionarioSel}`, {
           data_fechamento_comissao: parseInt(dataFechamento)
         });
       }

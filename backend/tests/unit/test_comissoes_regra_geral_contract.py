@@ -37,3 +37,10 @@ def test_frontend_comissoes_exibe_opcao_de_regra_geral():
     assert "selecionarItem('geral', 0, 'Regra geral')" in page
     assert "temConfiguracao('geral', 0)" in page
     assert "Produto > Subcategoria > Categoria > Regra geral" in page
+
+
+def test_frontend_comissoes_salva_dia_fechamento_em_pessoa_parceira():
+    page = _frontend_source("src/pages/Comissoes.jsx")
+
+    assert "api.put(`/clientes/${funcionarioSel}`" in page
+    assert "api.put(`/funcionarios/${funcionarioSel}`" not in page
