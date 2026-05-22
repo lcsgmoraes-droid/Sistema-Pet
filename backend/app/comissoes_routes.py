@@ -19,6 +19,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/comissoes", tags=["comissoes"])
 _comissoes_schema_checked = False
+TIPOS_CONFIGURACAO_COMISSAO = {"categoria", "subcategoria", "produto", "geral"}
 
 
 def ensure_comissoes_config_schema(db) -> None:
@@ -50,7 +51,7 @@ def ensure_comissoes_config_schema(db) -> None:
 class ConfiguracaoComissaoCreate(BaseModel):
     """Schema para criar/atualizar uma configuração de comissão"""
     funcionario_id: int
-    tipo: str  # 'categoria', 'subcategoria', 'produto'
+    tipo: str  # 'categoria', 'subcategoria', 'produto', 'geral'
     referencia_id: int
     tipo_calculo: str  # 'percentual' ou 'lucro'
     percentual: float
@@ -101,6 +102,12 @@ class DuplicarConfiguracaoRequest(BaseModel):
     """Schema para duplicar configuração"""
     funcionario_origem_id: int
     funcionario_destino_id: int
+
+
+def _normalizar_configuracao_comissao(config: ConfiguracaoComissaoCreate) -> ConfiguracaoComissaoCreate:
+    if config.tipo == "geral":
+        config.referencia_id = 0
+    return config
 
 
 # ==========================================
@@ -190,7 +197,8 @@ async def listar_funcionarios_com_comissao(
                     COUNT(cc.id) as total_configuracoes,
                     COUNT(CASE WHEN cc.tipo = 'categoria' THEN 1 END) as categorias,
                     COUNT(CASE WHEN cc.tipo = 'subcategoria' THEN 1 END) as subcategorias,
-                    COUNT(CASE WHEN cc.tipo = 'produto' THEN 1 END) as produtos
+                    COUNT(CASE WHEN cc.tipo = 'produto' THEN 1 END) as produtos,
+                    COUNT(CASE WHEN cc.tipo = 'geral' THEN 1 END) as gerais
                 FROM clientes c
                 LEFT JOIN comissoes_configuracao cc ON cc.funcionario_id = c.id AND cc.ativo = true AND cc.tenant_id = c.tenant_id
                 WHERE c.parceiro_ativo = true
@@ -210,7 +218,8 @@ async def listar_funcionarios_com_comissao(
                     'total_configuracoes': row[4],
                     'categorias': row[5],
                     'subcategorias': row[6],
-                    'produtos': row[7]
+                    'produtos': row[7],
+                    'gerais': row[8]
                 })
             
             return {
@@ -267,6 +276,7 @@ async def buscar_configuracoes_funcionario(
                         WHEN cc.tipo = 'categoria' THEN c.nome
                         WHEN cc.tipo = 'subcategoria' THEN sc.nome
                         WHEN cc.tipo = 'produto' THEN p.nome
+                        WHEN cc.tipo = 'geral' THEN 'Regra geral'
                     END as nome_item
                 FROM comissoes_configuracao cc
                 LEFT JOIN categorias c ON cc.tipo = 'categoria' AND cc.referencia_id = c.id AND c.tenant_id = cc.tenant_id
@@ -346,12 +356,14 @@ async def criar_configuracao(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail="Somente parceiros podem ter comissão configurada."
                 )
+
+            config = _normalizar_configuracao_comissao(config)
             
             # Validações
-            if config.tipo not in ['categoria', 'subcategoria', 'produto']:
+            if config.tipo not in TIPOS_CONFIGURACAO_COMISSAO:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Tipo inválido. Use: categoria, subcategoria ou produto"
+                    detail="Tipo inválido. Use: categoria, subcategoria, produto ou geral"
                 )
             
             if config.percentual < 0 or config.percentual > 100:
@@ -499,8 +511,9 @@ async def criar_configuracoes_batch(
             
             # Processar todas as configurações (SessionLocal já tem transação ativa)
             for config in batch.configuracoes:
+                config = _normalizar_configuracao_comissao(config)
                 # Validações
-                if config.tipo not in ['categoria', 'subcategoria', 'produto']:
+                if config.tipo not in TIPOS_CONFIGURACAO_COMISSAO:
                     raise ValueError(f"Tipo inválido: {config.tipo}")
                 
                 if config.percentual < 0 or config.percentual > 100:
@@ -524,21 +537,53 @@ async def criar_configuracoes_batch(
                     # Atualizar
                     execute_tenant_safe(db, """
                         UPDATE comissoes_configuracao SET
-                            percentual = :p, ativo = true
+                            percentual = :p,
+                            percentual_loja = :pl,
+                            tipo_calculo = :tc,
+                            desconta_taxa_cartao = :dtc,
+                            desconta_impostos = :di,
+                            desconta_custo_entrega = :dce,
+                            comissao_venda_parcial = :cvp,
+                            permite_edicao_venda = :pev,
+                            observacoes = :obs,
+                            ativo = true
                             WHERE id = :id AND {tenant_filter}
-                    """, {"p": config.percentual, "id": result[0]}, tenant_id=tenant_id)
+                    """, {
+                        "p": config.percentual,
+                        "pl": config.percentual_loja,
+                        "tc": config.tipo_calculo,
+                        "dtc": config.desconta_taxa_cartao,
+                        "di": config.desconta_impostos,
+                        "dce": config.desconta_custo_entrega,
+                        "cvp": config.comissao_venda_parcial,
+                        "pev": config.permite_edicao_venda,
+                        "obs": config.observacoes or "",
+                        "id": result[0],
+                    }, tenant_id=tenant_id)
                     config_ids.append(result[0])
                 else:
                     # Criar
                     result = execute_tenant_safe(db, """
                         INSERT INTO comissoes_configuracao (
-                            funcionario_id, tipo, referencia_id, percentual, ativo, tenant_id
-                        ) VALUES (:f, :t, :r, :p, true, :tenant_id) RETURNING id
+                            funcionario_id, tipo, referencia_id, percentual, percentual_loja, tipo_calculo,
+                            desconta_taxa_cartao, desconta_impostos, desconta_custo_entrega,
+                            comissao_venda_parcial, permite_edicao_venda, observacoes, ativo, tenant_id
+                        ) VALUES (
+                            :f, :t, :r, :p, :pl, :tc, :dtc, :di, :dce, :cvp, :pev, :obs, true, :tenant_id
+                        ) RETURNING id
                     """, {
                         "f": config.funcionario_id, 
                         "t": config.tipo, 
                         "r": config.referencia_id, 
                         "p": config.percentual,
+                        "pl": config.percentual_loja,
+                        "tc": config.tipo_calculo,
+                        "dtc": config.desconta_taxa_cartao,
+                        "di": config.desconta_impostos,
+                        "dce": config.desconta_custo_entrega,
+                        "cvp": config.comissao_venda_parcial,
+                        "pev": config.permite_edicao_venda,
+                        "obs": config.observacoes or "",
                         "tenant_id": tenant_id
                     }, tenant_id=tenant_id, require_tenant=False)
                     config_ids.append(result.fetchone()[0])
