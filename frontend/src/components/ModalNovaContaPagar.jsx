@@ -308,12 +308,23 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave, contaEdicao = null }) =>
         intervalo_dias: dados.eh_recorrente && dados.tipo_recorrencia === 'personalizado' ? parseInt(dados.intervalo_dias) : null,
         numero_repeticoes: dados.eh_recorrente && dados.numero_repeticoes ? parseInt(dados.numero_repeticoes) : null
       };
+      const descricaoAnterior = (contaEdicao?.descricao || '').trim();
+      const descricaoAtual = (payload.descricao || '').trim();
+      const confirmarReplicacaoDescricao =
+        isEditando &&
+        pertenceRecorrencia &&
+        descricaoAtual &&
+        descricaoAnterior &&
+        descricaoAtual !== descricaoAnterior &&
+        !payload.aplicar_recorrencia_futura &&
+        window.confirm('Deseja aplicar o novo nome aos próximos lançamentos desta recorrência?');
       const recorrenciaPayload = {
         data_inicio_recorrencia: normalizarDataOpcionalRecorrencia(payload.data_inicio_recorrencia) || payload.data_vencimento,
         data_fim_recorrencia: normalizarDataOpcionalRecorrencia(payload.data_fim_recorrencia),
       };
       const payloadNormalizado = {
         ...payload,
+        aplicar_recorrencia_futura: Boolean(payload.aplicar_recorrencia_futura || confirmarReplicacaoDescricao),
         eh_recorrente: payload.eh_recorrente,
         tipo_recorrencia: payload.eh_recorrente ? payload.tipo_recorrencia : null,
         intervalo_dias: payload.eh_recorrente && payload.tipo_recorrencia === 'personalizado' ? payload.intervalo_dias : null,
