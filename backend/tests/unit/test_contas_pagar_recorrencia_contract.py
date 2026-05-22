@@ -43,3 +43,28 @@ def test_pagamento_de_recorrencia_reabastece_janela_de_12_meses():
 
     assert "if conta.status == 'pago':" in registrar_pagamento
     assert "_garantir_janela_recorrencia_apos_pagamento(" in registrar_pagamento
+
+
+def test_edicao_de_conta_pagar_pode_ativar_recorrencia():
+    source = _source("app/contas_pagar_routes.py")
+
+    update_model = source.split("class ContaPagarUpdate", 1)[1].split("class ContaPagarResponse", 1)[0]
+    for field in [
+        "eh_recorrente",
+        "tipo_recorrencia",
+        "intervalo_dias",
+        "data_inicio_recorrencia",
+        "data_fim_recorrencia",
+        "numero_repeticoes",
+    ]:
+        assert field in update_model
+
+    update_endpoint = source.split("def atualizar_conta_pagar", 1)[1].split(
+        "def buscar_conta_pagar",
+        1,
+    )[0]
+
+    assert "recorrencia_alterada" in update_endpoint
+    assert "conta.proxima_recorrencia = calcular_proxima_recorrencia(" in update_endpoint
+    assert "_gerar_contas_recorrentes_ate_janela(" in update_endpoint
+    assert "conta.eh_recorrente = False" in update_endpoint

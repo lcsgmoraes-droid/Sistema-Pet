@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Edit3, Plus, Wallet, X } from 'lucide-react';
+import { Edit3, Plus, Trash2, Wallet, X } from 'lucide-react';
 import api from '../api';
 import { toast } from 'react-hot-toast';
 import ModalNovaContaPagar from './ModalNovaContaPagar';
@@ -58,7 +57,6 @@ function calcularIntervaloPeriodoRapido(periodo) {
 }
 
 const ContasPagar = () => {
-  const navigate = useNavigate();
   const [contas, setContas] = useState([]);
   const [loading, setLoading] = useState(true);
   const [filtros, setFiltros] = useState({
@@ -87,7 +85,6 @@ const ContasPagar = () => {
   const [mostrarModalNovaConta, setMostrarModalNovaConta] = useState(false);
   const [contaEdicao, setContaEdicao] = useState(null);
   const [mostrarModalClassificacao, setMostrarModalClassificacao] = useState(false);
-  const [mostrarDetalhes, setMostrarDetalhes] = useState(false);
   const [formasPagamento, setFormasPagamento] = useState([]);
   const [contasBancarias, setContasBancarias] = useState([]);
   const [mostrarModalNovaForma, setMostrarModalNovaForma] = useState(false);
@@ -277,11 +274,6 @@ const ContasPagar = () => {
     setMostrarModalPagamento(true);
   };
 
-  const abrirDetalhes = (conta) => {
-    setContaSelecionada(conta);
-    setMostrarDetalhes(true);
-  };
-
   const abrirModalEdicao = async (conta) => {
     try {
       const response = await api.get(`/contas-pagar/${conta.id}`);
@@ -303,6 +295,22 @@ const ContasPagar = () => {
     } catch (error) {
       console.error('Erro ao abrir edicao:', error);
       toast.error(error.response?.data?.detail || 'Erro ao carregar conta para edicao');
+    }
+  };
+
+  const excluirContaPagar = async (conta) => {
+    const confirmado = window.confirm(
+      `Excluir a conta "${conta.descricao}"? Apenas contas sem pagamento registrado podem ser excluidas.`
+    );
+    if (!confirmado) return;
+
+    try {
+      await api.delete(`/contas-pagar/${conta.id}`);
+      toast.success('Conta excluida com sucesso');
+      carregarDados();
+    } catch (error) {
+      console.error('Erro ao excluir conta:', error);
+      toast.error(error.response?.data?.detail || 'Erro ao excluir conta a pagar');
     }
   };
 
@@ -341,31 +349,6 @@ const ContasPagar = () => {
       console.error('Erro ao classificar conta:', error);
       toast.error(error.response?.data?.detail || 'Erro ao classificar conta');
     }
-  };
-
-  const abrirNotaFiscal = (conta) => {
-    // Se tem nota_entrada_id, navegar para a página de compras/notas de entrada
-    if (conta.nota_entrada_id) {
-      navigate(`/compras?nota_id=${conta.nota_entrada_id}`);
-    } else if (conta.nfe_numero) {
-      // Se só tem o número, buscar por número
-      navigate(`/compras?numero=${conta.nfe_numero}`);
-    } else {
-      toast.error('Nota fiscal não encontrada');
-    }
-  };
-
-  const abrirFluxoDeCaixa = (conta) => {
-    // Redireciona para o fluxo de caixa com filtros da conta
-    const params = new URLSearchParams();
-    if (conta.fornecedor_nome) {
-      params.append('busca', conta.fornecedor_nome);
-    }
-    if (conta.documento) {
-      params.append('documento', conta.documento);
-    }
-    navigate(`/financeiro/fluxo-caixa?${params.toString()}`);
-    toast.success('Redirecionando para o Fluxo de Caixa...');
   };
 
   const handleFormaChange = (formaId) => {
@@ -566,7 +549,7 @@ const ContasPagar = () => {
     {
       key: 'acoes',
       header: 'Acoes',
-      className: 'min-w-[190px]',
+      className: 'min-w-[230px]',
       render: (conta) => (
         <div className="flex flex-wrap items-center gap-2">
           <ActionButton
@@ -600,13 +583,15 @@ const ContasPagar = () => {
             </ActionButton>
           )}
           <ActionButton
-            intent="neutral"
+            intent="delete"
             tone="soft"
             size="xs"
-            onClick={() => abrirDetalhes(conta)}
-            title="Ver Detalhes"
+            icon={Trash2}
+            onClick={() => excluirContaPagar(conta)}
+            disabled={Number(conta.valor_pago || 0) > 0 || conta.status === 'pago'}
+            title="Excluir conta sem pagamento"
           >
-            Ver
+            Excluir
           </ActionButton>
         </div>
       ),
@@ -1052,148 +1037,6 @@ const ContasPagar = () => {
               >
                 Confirmar Pagamento
               </ActionButton>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal Detalhes */}
-      {mostrarDetalhes && contaSelecionada && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <div className="bg-blue-600 text-white px-6 py-4 flex justify-between items-center sticky top-0">
-              <h3 className="text-xl font-semibold">Detalhes da Conta</h3>
-              <ActionButton
-                onClick={() => setMostrarDetalhes(false)}
-                intent="neutral"
-                tone="ghost"
-                size="sm"
-                icon={X}
-                className="text-white hover:bg-blue-700"
-                aria-label="Fechar detalhes"
-              />
-            </div>
-            
-            <div className="p-6 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Parcela</label>
-                  <p className="mt-1 text-lg">
-                    {contaSelecionada.numero_parcela && contaSelecionada.total_parcelas 
-                      ? `${contaSelecionada.numero_parcela}/${contaSelecionada.total_parcelas}`
-                      : contaSelecionada.documento || 'Única'}
-                  </p>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700">Fornecedor</label>
-                    <div className="mt-1 text-lg">
-                      <FornecedorIdentity
-                        fallback=""
-                        nameClassName="font-medium text-slate-900"
-                        record={contaSelecionada}
-                        showDocument={false}
-                      />
-                    </div>
-                  </div>
-                </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Origem</label>
-                  <div className="mt-1">{getOrigemBadge(contaSelecionada)}</div>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Tipo de despesa</label>
-                  <p className="mt-1">{contaSelecionada.tipo_despesa_nome || 'Não classificado'}</p>
-                </div>
-              </div>
-
-              {contaSelecionada.nfe_numero && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Nota Fiscal</label>
-                  <div className="flex gap-2">
-                    <ActionButton
-                      onClick={() => abrirNotaFiscal(contaSelecionada)}
-                      intent="edit"
-                      tone="soft"
-                      size="md"
-                      className="flex-1"
-                    >
-                      <span className="text-xl">📄</span>
-                      <span className="font-medium">{contaSelecionada.nfe_numero}</span>
-                    </ActionButton>
-                    <ActionButton
-                      onClick={() => abrirFluxoDeCaixa(contaSelecionada)}
-                      intent="create"
-                      tone="soft"
-                      size="md"
-                      title="Ver no Fluxo de Caixa"
-                    >
-                      <span className="text-xl">📈</span>
-                      <span className="text-sm">Fluxo</span>
-                    </ActionButton>
-                  </div>
-                </div>
-              )}
-
-              {!contaSelecionada.nfe_numero && (
-                <div>
-                  <ActionButton
-                    onClick={() => abrirFluxoDeCaixa(contaSelecionada)}
-                    intent="create"
-                    tone="soft"
-                    size="md"
-                    className="w-full"
-                  >
-                    <span className="text-xl">📈</span>
-                    <span className="font-medium">Ver no Fluxo de Caixa</span>
-                  </ActionButton>
-                </div>
-              )}
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Data de Emissão</label>
-                  <p className="mt-1">{formatarData(contaSelecionada.data_emissao)}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Data de Vencimento</label>
-                  <p className="mt-1">{formatarData(contaSelecionada.data_vencimento)}</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Valor Original</label>
-                  <p className="mt-1 text-lg font-semibold text-blue-600">{formatarMoeda(contaSelecionada.valor_final || contaSelecionada.valor_total || 0)}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Valor Pago</label>
-                  <p className="mt-1 text-lg font-semibold text-green-600">{formatarMoeda(contaSelecionada.valor_pago || 0)}</p>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Saldo Restante</label>
-                  <p className="mt-1 text-lg font-semibold text-red-600">
-                    {formatarMoeda((contaSelecionada.valor_final || contaSelecionada.valor_total || 0) - (contaSelecionada.valor_pago || 0))}
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Status</label>
-                  <p className="mt-1">
-                    <StatusBadge status={contaSelecionada.status === 'pago' ? 'pago' : contaSelecionada.status || 'pendente'} />
-                  </p>
-                </div>
-              </div>
-
-              {contaSelecionada.observacoes && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Observações</label>
-                  <p className="mt-1 text-gray-600">{contaSelecionada.observacoes}</p>
-                </div>
-              )}
             </div>
           </div>
         </div>

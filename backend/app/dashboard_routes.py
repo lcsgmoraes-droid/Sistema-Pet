@@ -5,10 +5,11 @@ Endpoints para dados consolidados do sistema
 
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, or_
-from datetime import datetime, timedelta
+from sqlalchemy import Float, cast, func, and_, or_
+from datetime import datetime, date, time, timedelta
 from typing import Optional
 import logging
+import math
 
 from uuid import UUID
 from .db import get_session
@@ -16,10 +17,11 @@ from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
 from .models import User
 from app.tenancy.context import get_current_tenant
-from .vendas_models import Venda, VendaPagamento
-from .financeiro_models import ContaReceber, ContaPagar
+from .vendas_models import Venda, VendaPagamento, VendaItem
+from .financeiro_models import ContaReceber, ContaPagar, CategoriaFinanceira, TipoDespesa
 from .caixa_models import Caixa
 from .produtos_models import Produto
+from .dre_plano_contas_models import DRESubcategoria
 from .utils.tenant_safe_sql import execute_tenant_safe
 
 logger = logging.getLogger(__name__)
@@ -29,6 +31,197 @@ router = APIRouter()
 
 def _dashboard_fetchone(db: Session, sql: str, tenant_id, params=None):
     return execute_tenant_safe(db, sql, params or {}, tenant_id=tenant_id).fetchone()
+
+
+def _round_money(value) -> float:
+    return round(float(value or 0), 2)
+
+
+@router.get("/financeiro/ponto-equilibrio")
+async def obter_ponto_equilibrio(
+    data_inicio: Optional[date] = None,
+    data_fim: Optional[date] = None,
+    canais: Optional[str] = None,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    """Calcula o ponto de equilibrio pela margem de contribuicao."""
+    _, tenant_id = user_and_tenant
+
+    hoje = datetime.now().date()
+    inicio = data_inicio or hoje.replace(day=1)
+    fim = data_fim or hoje
+    if fim < inicio:
+        raise HTTPException(status_code=422, detail="Data final deve ser maior ou igual a data inicial")
+
+    inicio_dt = datetime.combine(inicio, time.min)
+    fim_dt = datetime.combine(fim, time.max)
+    canais_lista = [canal.strip() for canal in (canais or "").split(",") if canal.strip()]
+
+    vendas_query = db.query(Venda).filter(
+        Venda.tenant_id == tenant_id,
+        Venda.status == "finalizada",
+        Venda.data_venda >= inicio_dt,
+        Venda.data_venda <= fim_dt,
+    )
+    if canais_lista:
+        vendas_query = vendas_query.filter(Venda.canal.in_(canais_lista))
+
+    vendas_agregado = vendas_query.with_entities(
+        func.count(Venda.id).label("quantidade"),
+        func.coalesce(func.sum(Venda.total), 0).label("faturamento"),
+        func.coalesce(func.avg(Venda.total), 0).label("ticket_medio"),
+    ).first()
+
+    faturamento = _round_money(vendas_agregado.faturamento if vendas_agregado else 0)
+    quantidade_vendas = int(vendas_agregado.quantidade or 0) if vendas_agregado else 0
+    ticket_medio = _round_money(vendas_agregado.ticket_medio if vendas_agregado else 0)
+
+    cmv_estimado = db.query(
+        func.coalesce(func.sum(cast(VendaItem.quantidade, Float) * func.coalesce(Produto.preco_custo, 0.0)), 0)
+    ).join(
+        Venda,
+        VendaItem.venda_id == Venda.id,
+    ).outerjoin(
+        Produto,
+        VendaItem.produto_id == Produto.id,
+    ).filter(
+        Venda.tenant_id == tenant_id,
+        Venda.status == "finalizada",
+        Venda.data_venda >= inicio_dt,
+        Venda.data_venda <= fim_dt,
+        VendaItem.tipo == "produto",
+    )
+    if canais_lista:
+        cmv_estimado = cmv_estimado.filter(Venda.canal.in_(canais_lista))
+    cmv_estimado = _round_money(cmv_estimado.scalar())
+
+    produtos_sem_custo = db.query(
+        func.count(func.distinct(VendaItem.produto_id))
+    ).join(
+        Venda,
+        VendaItem.venda_id == Venda.id,
+    ).outerjoin(
+        Produto,
+        VendaItem.produto_id == Produto.id,
+    ).filter(
+        Venda.tenant_id == tenant_id,
+        Venda.status == "finalizada",
+        Venda.data_venda >= inicio_dt,
+        Venda.data_venda <= fim_dt,
+        VendaItem.tipo == "produto",
+        VendaItem.produto_id.isnot(None),
+        or_(Produto.preco_custo.is_(None), Produto.preco_custo <= 0),
+    )
+    if canais_lista:
+        produtos_sem_custo = produtos_sem_custo.filter(Venda.canal.in_(canais_lista))
+    produtos_sem_custo = int(produtos_sem_custo.scalar() or 0)
+
+    contas_query = db.query(
+        ContaPagar,
+        TipoDespesa.e_custo_fixo.label("tipo_e_custo_fixo"),
+        CategoriaFinanceira.tipo_custo.label("categoria_tipo_custo"),
+        DRESubcategoria.custo_pe.label("dre_custo_pe"),
+    ).outerjoin(
+        TipoDespesa,
+        ContaPagar.tipo_despesa_id == TipoDespesa.id,
+    ).outerjoin(
+        CategoriaFinanceira,
+        ContaPagar.categoria_id == CategoriaFinanceira.id,
+    ).outerjoin(
+        DRESubcategoria,
+        ContaPagar.dre_subcategoria_id == DRESubcategoria.id,
+    ).filter(
+        ContaPagar.tenant_id == tenant_id,
+        ContaPagar.data_vencimento >= inicio,
+        ContaPagar.data_vencimento <= fim,
+        ContaPagar.status != "cancelado",
+    )
+    if canais_lista:
+        contas_query = contas_query.filter(
+            or_(ContaPagar.canal.in_(canais_lista), ContaPagar.canal.is_(None))
+        )
+
+    despesas_fixas = 0.0
+    despesas_variaveis = 0.0
+    despesas_sem_classificacao = 0.0
+    quantidade_contas_sem_classificacao = 0
+
+    for conta, tipo_e_custo_fixo, categoria_tipo_custo, dre_custo_pe in contas_query.all():
+        valor = float(conta.valor_final or conta.valor_original or 0)
+        classificacao = None
+
+        if tipo_e_custo_fixo is not None:
+            classificacao = "fixo" if bool(tipo_e_custo_fixo) else "variavel"
+        elif dre_custo_pe in {"fixo", "variavel"}:
+            classificacao = dre_custo_pe
+        elif categoria_tipo_custo in {"fixo", "variavel"}:
+            classificacao = categoria_tipo_custo
+
+        if classificacao == "fixo":
+            despesas_fixas += valor
+        elif classificacao == "variavel":
+            despesas_variaveis += valor
+        else:
+            despesas_sem_classificacao += valor
+            quantidade_contas_sem_classificacao += 1
+
+    despesas_fixas = _round_money(despesas_fixas)
+    despesas_variaveis = _round_money(despesas_variaveis)
+    despesas_sem_classificacao = _round_money(despesas_sem_classificacao)
+
+    custos_variaveis = cmv_estimado + despesas_variaveis
+    margem_contribuicao = faturamento - custos_variaveis
+    margem_contribuicao_percentual = (
+        margem_contribuicao / faturamento
+        if faturamento > 0
+        else 0
+    )
+
+    ponto_equilibrio = None
+    falta_faturar = None
+    percentual_atingido = 0
+    vendas_necessarias = None
+    status_pe = "sem_faturamento"
+
+    if faturamento > 0 and margem_contribuicao_percentual > 0:
+        ponto_equilibrio = despesas_fixas / margem_contribuicao_percentual
+        falta_faturar = max(0, ponto_equilibrio - faturamento)
+        percentual_atingido = (faturamento / ponto_equilibrio) * 100 if ponto_equilibrio > 0 else 100
+        vendas_necessarias = (
+            int(math.ceil(falta_faturar / ticket_medio))
+            if falta_faturar and ticket_medio > 0
+            else 0
+        )
+        status_pe = "atingido" if falta_faturar == 0 else "nao_atingido"
+    elif faturamento > 0:
+        status_pe = "margem_insuficiente"
+
+    return {
+        "periodo": {
+            "inicio": inicio,
+            "fim": fim,
+            "canais": canais_lista,
+        },
+        "formula": "ponto_equilibrio = custos fixos / margem de contribuicao",
+        "faturamento": faturamento,
+        "quantidade_vendas": quantidade_vendas,
+        "ticket_medio": ticket_medio,
+        "cmv_estimado": cmv_estimado,
+        "despesas_variaveis": despesas_variaveis,
+        "custos_variaveis": _round_money(custos_variaveis),
+        "despesas_fixas": despesas_fixas,
+        "despesas_sem_classificacao": despesas_sem_classificacao,
+        "quantidade_contas_sem_classificacao": quantidade_contas_sem_classificacao,
+        "margem_contribuicao": _round_money(margem_contribuicao),
+        "margem_contribuicao_percentual": round(margem_contribuicao_percentual * 100, 2),
+        "ponto_equilibrio": _round_money(ponto_equilibrio) if ponto_equilibrio is not None else None,
+        "falta_faturar": _round_money(falta_faturar) if falta_faturar is not None else None,
+        "percentual_atingido": round(percentual_atingido, 2),
+        "vendas_necessarias": vendas_necessarias,
+        "produtos_sem_custo": produtos_sem_custo,
+        "status": status_pe,
+    }
 
 
 @router.get("/dashboard/resumo")

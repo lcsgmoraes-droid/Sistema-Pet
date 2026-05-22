@@ -196,28 +196,6 @@ const DashboardFinanceiro = () => {
     };
   }
 
-  let statusPontoEquilibrio = 'Sem despesas registradas';
-  if (resumo.fluxo_periodo.saidas > 0) {
-    if (coberturaPE >= 100) {
-      statusPontoEquilibrio = '✅ Ponto de equilíbrio atingido';
-    } else {
-      statusPontoEquilibrio = `Faltam ${formatarMoeda(resumo.fluxo_periodo.saidas - resumo.fluxo_periodo.entradas)} para atingir o PE`;
-    }
-  }
-
-  let classeBarraCobertura = 'bg-orange-400';
-  if (coberturaPE >= 100) {
-    classeBarraCobertura = 'bg-green-500';
-  } else if (coberturaPE >= 70) {
-    classeBarraCobertura = 'bg-yellow-400';
-  }
-
-  let textoProjecaoPE = '✅ No lucro';
-  if (coberturaPE < 100) {
-    const sufixoPeriodo = periodoDias === 1 ? '' : ' do mês';
-    textoProjecaoPE = `PE no dia ~${Math.ceil(resumo.fluxo_periodo.saidas / (resumo.fluxo_periodo.entradas / periodoDias))}/${sufixoPeriodo}`;
-  }
-
   if (loading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -552,66 +530,6 @@ const DashboardFinanceiro = () => {
         <div id="tour-acoes-rapidas" className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
           <AlertasIA compacto />
         </div>
-      </div>
-
-      {/* Ponto de Equilíbrio */}
-      <div className="bg-white rounded-xl p-4 shadow-sm border border-gray-100">
-        <h2 className="text-sm font-semibold text-gray-700 mb-3">
-          📊 Ponto de Equilíbrio — {periodoDias === 1 ? "Hoje" : `últimos ${periodoDias} dias`}
-        </h2>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-          <div className="bg-red-50 rounded-xl p-3">
-            <p className="text-xs text-red-600 mb-1">💸 Despesas</p>
-            <p className="text-base font-bold text-red-800">{formatarMoeda(resumo.fluxo_periodo.saidas)}</p>
-            <p className="text-xs text-red-500">pagas no período</p>
-          </div>
-          <div className="bg-emerald-50 rounded-xl p-3">
-            <p className="text-xs text-emerald-600 mb-1">💰 Faturamento</p>
-            <p className="text-base font-bold text-emerald-800">{formatarMoeda(resumo.fluxo_periodo.entradas)}</p>
-            <p className="text-xs text-emerald-500">vendas finalizadas</p>
-          </div>
-          <div className={`rounded-xl p-3 ${coberturaPE >= 100 ? 'bg-green-50' : 'bg-orange-50'}`}>
-            <p className={`text-xs mb-1 ${coberturaPE >= 100 ? 'text-green-600' : 'text-orange-600'}`}>📈 Cobertura</p>
-            <p className={`text-base font-bold ${coberturaPE >= 100 ? 'text-green-800' : 'text-orange-800'}`}>{coberturaPE.toFixed(1)}%</p>
-            <p className={`text-xs ${coberturaPE >= 100 ? 'text-green-500' : 'text-orange-500'}`}>das despesas cobertas</p>
-          </div>
-          <div className={`rounded-xl p-3 ${resumo.fluxo_periodo.lucro >= 0 ? 'bg-blue-50' : 'bg-red-50'}`}>
-            <p className={`text-xs mb-1 ${resumo.fluxo_periodo.lucro >= 0 ? 'text-blue-600' : 'text-red-600'}`}>
-              {resumo.fluxo_periodo.lucro >= 0 ? '✅ Superávit' : '⚠️ Déficit'}
-            </p>
-            <p className={`text-base font-bold ${resumo.fluxo_periodo.lucro >= 0 ? 'text-blue-800' : 'text-red-800'}`}>
-              {formatarMoeda(Math.abs(resumo.fluxo_periodo.lucro))}
-            </p>
-            <p className={`text-xs ${resumo.fluxo_periodo.lucro >= 0 ? 'text-blue-500' : 'text-red-500'}`}>resultado líquido</p>
-          </div>
-        </div>
-        <div className="mb-1 flex justify-between text-xs text-gray-500">
-          <span>0%</span>
-          <span className={coberturaPE >= 100 ? 'text-green-600 font-semibold' : 'text-orange-500 font-semibold'}>
-            {statusPontoEquilibrio}
-          </span>
-          <span>100%</span>
-        </div>
-        <div className="w-full bg-gray-100 rounded-full h-5 overflow-hidden">
-          <div
-            className={`h-5 rounded-full transition-all duration-500 ${classeBarraCobertura}`}
-            style={{ width: `${Math.min(coberturaPE, 100)}%` }}
-          />
-        </div>
-        {periodoDias > 1 && resumo.fluxo_periodo.entradas > 0 && (
-          <div className="mt-3 p-3 bg-gray-50 rounded-lg text-xs text-gray-600">
-            <span className="font-semibold">📅 Projeção para 30 dias: </span>
-            Faturamento estimado{' '}
-            <span className="font-semibold text-emerald-700">{formatarMoeda((resumo.fluxo_periodo.entradas / periodoDias) * 30)}</span>
-            {' '}vs. Despesas estimadas{' '}
-            <span className="font-semibold text-red-600">{formatarMoeda((resumo.fluxo_periodo.saidas / periodoDias) * 30)}</span>
-            {resumo.fluxo_periodo.saidas > 0 && (
-              <span className="ml-2 font-semibold text-blue-700">
-                → {textoProjecaoPE}
-              </span>
-            )}
-          </div>
-        )}
       </div>
 
       {/* Contas Vencidas */}

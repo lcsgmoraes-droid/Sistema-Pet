@@ -87,6 +87,12 @@ class ContaPagarUpdate(BaseModel):
     data_vencimento: Optional[date] = None
     documento: Optional[str] = None
     observacoes: Optional[str] = None
+    eh_recorrente: Optional[bool] = None
+    tipo_recorrencia: Optional[str] = None
+    intervalo_dias: Optional[int] = None
+    data_inicio_recorrencia: Optional[date] = None
+    data_fim_recorrencia: Optional[date] = None
+    numero_repeticoes: Optional[int] = None
 
 
 class ContaPagarClassificacaoUpdate(BaseModel):
@@ -122,6 +128,14 @@ class ContaPagarResponse(BaseModel):
     status: str
     dias_vencimento: Optional[int] = None
     eh_parcelado: bool
+    eh_recorrente: bool = False
+    tipo_recorrencia: Optional[str] = None
+    intervalo_dias: Optional[int] = None
+    data_inicio_recorrencia: Optional[date] = None
+    data_fim_recorrencia: Optional[date] = None
+    numero_repeticoes: Optional[int] = None
+    proxima_recorrencia: Optional[date] = None
+    conta_recorrencia_origem_id: Optional[int] = None
     numero_parcela: Optional[int] = None
     total_parcelas: Optional[int] = None
     documento: Optional[str] = None
@@ -886,6 +900,14 @@ def listar_contas_pagar(
             "status": status_value,
             "dias_vencimento": dias_venc,
             "eh_parcelado": conta.eh_parcelado if conta.eh_parcelado is not None else False,
+            "eh_recorrente": conta.eh_recorrente if conta.eh_recorrente is not None else False,
+            "tipo_recorrencia": conta.tipo_recorrencia,
+            "intervalo_dias": conta.intervalo_dias,
+            "data_inicio_recorrencia": conta.data_inicio_recorrencia,
+            "data_fim_recorrencia": conta.data_fim_recorrencia,
+            "numero_repeticoes": conta.numero_repeticoes,
+            "proxima_recorrencia": conta.proxima_recorrencia,
+            "conta_recorrencia_origem_id": conta.conta_recorrencia_origem_id,
             "numero_parcela": conta.numero_parcela,
             "total_parcelas": conta.total_parcelas,
             "documento": conta.documento,
@@ -1024,6 +1046,15 @@ def atualizar_conta_pagar(
     """Atualiza dados operacionais de uma conta a pagar existente."""
     _, tenant_id = user_and_tenant
     campos = payload.model_fields_set
+    campos_recorrencia = {
+        "eh_recorrente",
+        "tipo_recorrencia",
+        "intervalo_dias",
+        "data_inicio_recorrencia",
+        "data_fim_recorrencia",
+        "numero_repeticoes",
+    }
+    recorrencia_alterada = bool(campos_recorrencia.intersection(campos))
 
     if not campos:
         raise HTTPException(status_code=422, detail="Informe pelo menos um campo para atualizar")
@@ -1116,6 +1147,74 @@ def atualizar_conta_pagar(
     if "observacoes" in campos:
         conta.observacoes = payload.observacoes
 
+    if recorrencia_alterada:
+        ativar_recorrencia = (
+            bool(payload.eh_recorrente)
+            if "eh_recorrente" in campos
+            else bool(conta.eh_recorrente)
+        )
+
+        if not ativar_recorrencia:
+            conta.eh_recorrente = False
+            conta.tipo_recorrencia = None
+            conta.intervalo_dias = None
+            conta.data_inicio_recorrencia = None
+            conta.data_fim_recorrencia = None
+            conta.numero_repeticoes = None
+            conta.proxima_recorrencia = None
+        else:
+            tipo_recorrencia = (
+                payload.tipo_recorrencia
+                if "tipo_recorrencia" in campos
+                else conta.tipo_recorrencia
+            ) or "mensal"
+            if tipo_recorrencia not in {"semanal", "quinzenal", "mensal", "personalizado"}:
+                raise HTTPException(status_code=422, detail="Tipo de recorrencia invalido")
+
+            intervalo_dias = (
+                payload.intervalo_dias
+                if "intervalo_dias" in campos
+                else conta.intervalo_dias
+            )
+            if tipo_recorrencia == "personalizado":
+                if not intervalo_dias or intervalo_dias < 1:
+                    raise HTTPException(status_code=422, detail="Intervalo em dias e obrigatorio para recorrencia personalizada")
+            else:
+                intervalo_dias = None
+
+            data_inicio_recorrencia = (
+                payload.data_inicio_recorrencia
+                if "data_inicio_recorrencia" in campos
+                else conta.data_inicio_recorrencia
+            ) or conta.data_vencimento
+            data_fim_recorrencia = (
+                payload.data_fim_recorrencia
+                if "data_fim_recorrencia" in campos
+                else conta.data_fim_recorrencia
+            )
+            numero_repeticoes = (
+                payload.numero_repeticoes
+                if "numero_repeticoes" in campos
+                else conta.numero_repeticoes
+            )
+
+            if data_fim_recorrencia and data_fim_recorrencia < data_inicio_recorrencia:
+                raise HTTPException(status_code=422, detail="Data final da recorrencia deve ser maior ou igual a data inicial")
+            if numero_repeticoes is not None and numero_repeticoes < 1:
+                raise HTTPException(status_code=422, detail="Numero de repeticoes deve ser maior que zero")
+
+            conta.eh_recorrente = True
+            conta.tipo_recorrencia = tipo_recorrencia
+            conta.intervalo_dias = intervalo_dias
+            conta.data_inicio_recorrencia = data_inicio_recorrencia
+            conta.data_fim_recorrencia = data_fim_recorrencia
+            conta.numero_repeticoes = numero_repeticoes
+            conta.proxima_recorrencia = calcular_proxima_recorrencia(
+                conta.data_vencimento,
+                conta.tipo_recorrencia,
+                conta.intervalo_dias,
+            )
+
     valor_original = conta.valor_original or Decimal("0")
     valor_juros = conta.valor_juros or Decimal("0")
     valor_multa = conta.valor_multa or Decimal("0")
@@ -1130,6 +1229,16 @@ def atualizar_conta_pagar(
         conta.status = "pago"
     else:
         conta.status = "parcial"
+
+    recorrencias_criadas = []
+    if recorrencia_alterada and conta.eh_recorrente and conta.proxima_recorrencia:
+        db.flush()
+        recorrencias_criadas = _gerar_contas_recorrentes_ate_janela(
+            db=db,
+            tenant_id=tenant_id,
+            conta_origem=conta,
+            limite_recorrencia=calcular_limite_janela_recorrencia(date.today()),
+        )
 
     db.commit()
     db.refresh(conta)
@@ -1151,6 +1260,70 @@ def atualizar_conta_pagar(
         "documento": conta.documento,
         "observacoes": conta.observacoes,
         "status": conta.status,
+        "eh_recorrente": conta.eh_recorrente,
+        "tipo_recorrencia": conta.tipo_recorrencia,
+        "intervalo_dias": conta.intervalo_dias,
+        "data_inicio_recorrencia": conta.data_inicio_recorrencia,
+        "data_fim_recorrencia": conta.data_fim_recorrencia,
+        "numero_repeticoes": conta.numero_repeticoes,
+        "proxima_recorrencia": conta.proxima_recorrencia,
+        "recorrencias_criadas": len(recorrencias_criadas),
+    }
+
+
+@router.delete("/{conta_id}")
+def excluir_conta_pagar(
+    conta_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Exclui uma conta a pagar sem pagamento registrado."""
+    _, tenant_id = user_and_tenant
+
+    conta = db.query(ContaPagar).options(
+        joinedload(ContaPagar.pagamentos)
+    ).filter(
+        ContaPagar.id == conta_id,
+        ContaPagar.tenant_id == tenant_id,
+    ).first()
+
+    if not conta:
+        raise HTTPException(status_code=404, detail="Conta nao encontrada")
+
+    valor_pago = conta.valor_pago or Decimal("0")
+    if conta.status == "pago" or valor_pago > 0 or conta.pagamentos:
+        raise HTTPException(
+            status_code=400,
+            detail="Conta com pagamento registrado nao pode ser excluida",
+        )
+
+    recorrencias_filhas = db.query(func.count(ContaPagar.id)).filter(
+        ContaPagar.tenant_id == tenant_id,
+        ContaPagar.conta_recorrencia_origem_id == conta.id,
+    ).scalar() or 0
+    if recorrencias_filhas:
+        raise HTTPException(
+            status_code=400,
+            detail="Conta recorrente com lancamentos futuros nao pode ser excluida individualmente",
+        )
+
+    parcelas_filhas = db.query(func.count(ContaPagar.id)).filter(
+        ContaPagar.tenant_id == tenant_id,
+        ContaPagar.conta_principal_id == conta.id,
+    ).scalar() or 0
+    if parcelas_filhas:
+        raise HTTPException(
+            status_code=400,
+            detail="Conta parcelada com parcelas futuras nao pode ser excluida individualmente",
+        )
+
+    db.delete(conta)
+    db.commit()
+
+    return {
+        "ok": True,
+        "mensagem": "Conta a pagar excluida com sucesso",
+        "conta_id": conta_id,
     }
 
 
@@ -1229,6 +1402,24 @@ def buscar_conta_pagar(
             "numero_parcela": conta.numero_parcela,
             "total_parcelas": conta.total_parcelas
         } if conta.eh_parcelado else None,
+        "eh_recorrente": conta.eh_recorrente if conta.eh_recorrente is not None else False,
+        "tipo_recorrencia": conta.tipo_recorrencia,
+        "intervalo_dias": conta.intervalo_dias,
+        "data_inicio_recorrencia": conta.data_inicio_recorrencia,
+        "data_fim_recorrencia": conta.data_fim_recorrencia,
+        "numero_repeticoes": conta.numero_repeticoes,
+        "proxima_recorrencia": conta.proxima_recorrencia,
+        "conta_recorrencia_origem_id": conta.conta_recorrencia_origem_id,
+        "recorrencia": {
+            "eh_recorrente": conta.eh_recorrente if conta.eh_recorrente is not None else False,
+            "tipo_recorrencia": conta.tipo_recorrencia,
+            "intervalo_dias": conta.intervalo_dias,
+            "data_inicio_recorrencia": conta.data_inicio_recorrencia,
+            "data_fim_recorrencia": conta.data_fim_recorrencia,
+            "numero_repeticoes": conta.numero_repeticoes,
+            "proxima_recorrencia": conta.proxima_recorrencia,
+            "conta_recorrencia_origem_id": conta.conta_recorrencia_origem_id,
+        },
         "nota_entrada": {
             "id": nota.id if nota else None,
             "numero": nota.numero_nota if nota else None,
