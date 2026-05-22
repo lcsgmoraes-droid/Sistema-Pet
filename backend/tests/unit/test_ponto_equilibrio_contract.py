@@ -62,6 +62,10 @@ def test_frontend_tem_tela_financeira_de_ponto_equilibrio():
     assert "Resultado projetado do mes" in page
     assert "Novo ponto minimo" in page
     assert "Vendas a mais/menos" in page
+    assert '{ id: "simulador", label: "Simulador" }' in page
+    assert '{ id: "graficos", label: "Graficos" }' in page
+    assert 'abaAtiva === "simulador"' in page
+    assert 'abaAtiva === "graficos"' in page
     assert "Analise dos custos" in page
     assert "Parecer gerencial" in page
     assert "Aluguel sobre faturamento" in page

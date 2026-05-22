@@ -145,7 +145,8 @@ const CENARIOS_RAPIDOS = [
 
 const ABAS_PONTO_EQUILIBRIO = [
   { id: "resumo", label: "Resumo" },
-  { id: "analise", label: "Analise dos custos" },
+  { id: "simulador", label: "Simulador" },
+  { id: "graficos", label: "Graficos" },
 ];
 
 const TOOLTIP_FAIXAS_PORTE =
@@ -721,6 +722,15 @@ export default function PontoEquilibrio() {
               </div>
             </div>
 
+            <ModuleTabs
+              active={abaAtiva}
+              ariaLabel="Abas do ponto de equilibrio"
+              onChange={setAbaAtiva}
+              tabs={ABAS_PONTO_EQUILIBRIO}
+            />
+
+            {abaAtiva === "resumo" && (
+              <>
             <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-4">
               <MetricCard
                 icon={Target}
@@ -752,23 +762,6 @@ export default function PontoEquilibrio() {
               />
             </div>
 
-            <SimuladorImpactoPanel
-              dados={dados}
-              impactoForm={impactoForm}
-              impactoSimulado={impactoSimulado}
-              impactoValor={impactoValor}
-              setImpactoForm={setImpactoForm}
-            />
-
-            <ModuleTabs
-              active={abaAtiva}
-              ariaLabel="Abas do ponto de equilibrio"
-              onChange={setAbaAtiva}
-              tabs={ABAS_PONTO_EQUILIBRIO}
-            />
-
-            {abaAtiva === "resumo" && (
-              <>
             <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
               <div className="rounded-lg border border-slate-200 bg-white p-4">
                 <h2 className="text-base font-semibold text-slate-900">Composicao da margem</h2>
@@ -868,7 +861,17 @@ export default function PontoEquilibrio() {
               </>
             )}
 
-            {abaAtiva === "analise" && analiseCustos && (
+            {abaAtiva === "simulador" && (
+              <SimuladorImpactoPanel
+                dados={dados}
+                impactoForm={impactoForm}
+                impactoSimulado={impactoSimulado}
+                impactoValor={impactoValor}
+                setImpactoForm={setImpactoForm}
+              />
+            )}
+
+            {abaAtiva === "graficos" && analiseCustos && (
               <AnaliseCustosPanel
                 analise={analiseCustos}
                 porteAnalise={porteAnalise}
