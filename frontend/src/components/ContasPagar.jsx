@@ -85,6 +85,13 @@ const ContasPagar = () => {
   const [mostrarModalNovaConta, setMostrarModalNovaConta] = useState(false);
   const [contaEdicao, setContaEdicao] = useState(null);
   const [mostrarModalClassificacao, setMostrarModalClassificacao] = useState(false);
+  const [modalExclusaoRecorrencia, setModalExclusaoRecorrencia] = useState({
+    aberto: false,
+    conta: null,
+    itens: [],
+    loading: false,
+  });
+  const [recorrenciasSelecionadasExclusao, setRecorrenciasSelecionadasExclusao] = useState([]);
   const [formasPagamento, setFormasPagamento] = useState([]);
   const [contasBancarias, setContasBancarias] = useState([]);
   const [mostrarModalNovaForma, setMostrarModalNovaForma] = useState(false);
@@ -298,7 +305,78 @@ const ContasPagar = () => {
     }
   };
 
+  const carregarRecorrenciaExclusao = async (conta) => {
+    setModalExclusaoRecorrencia({
+      aberto: true,
+      conta,
+      itens: [],
+      loading: true,
+    });
+    setRecorrenciasSelecionadasExclusao([]);
+
+    try {
+      const response = await api.get(`/contas-pagar/${conta.id}/recorrencia`);
+      const itens = safeArray(response.data?.itens);
+      setModalExclusaoRecorrencia({
+        aberto: true,
+        conta,
+        itens,
+        loading: false,
+      });
+      setRecorrenciasSelecionadasExclusao(
+        itens.filter((item) => item.pode_excluir).map((item) => item.id)
+      );
+    } catch (error) {
+      console.error('Erro ao carregar recorrencia:', error);
+      toast.error(error.response?.data?.detail || 'Erro ao carregar lancamentos recorrentes');
+      setModalExclusaoRecorrencia({
+        aberto: false,
+        conta: null,
+        itens: [],
+        loading: false,
+      });
+    }
+  };
+
+  const alternarRecorrenciaExclusao = (itemId) => {
+    setRecorrenciasSelecionadasExclusao((atuais) => (
+      atuais.includes(itemId)
+        ? atuais.filter((id) => id !== itemId)
+        : [...atuais, itemId]
+    ));
+  };
+
+  const confirmarExclusaoRecorrencia = async () => {
+    if (recorrenciasSelecionadasExclusao.length === 0) {
+      toast.error('Selecione pelo menos um lancamento para excluir');
+      return;
+    }
+
+    try {
+      await api.post('/contas-pagar/recorrencias/excluir', {
+        ids: recorrenciasSelecionadasExclusao,
+      });
+      toast.success('Lancamentos recorrentes excluidos com sucesso');
+      setModalExclusaoRecorrencia({
+        aberto: false,
+        conta: null,
+        itens: [],
+        loading: false,
+      });
+      setRecorrenciasSelecionadasExclusao([]);
+      carregarDados();
+    } catch (error) {
+      console.error('Erro ao excluir recorrencia:', error);
+      toast.error(error.response?.data?.detail || 'Erro ao excluir lancamentos recorrentes');
+    }
+  };
+
   const excluirContaPagar = async (conta) => {
+    if (conta.eh_recorrente || conta.conta_recorrencia_origem_id) {
+      await carregarRecorrenciaExclusao(conta);
+      return;
+    }
+
     const confirmado = window.confirm(
       `Excluir a conta "${conta.descricao}"? Apenas contas sem pagamento registrado podem ser excluidas.`
     );
@@ -1224,6 +1302,118 @@ const ContasPagar = () => {
               >
                 Salvar Classificação
               </ActionButton>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {modalExclusaoRecorrencia.aberto && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-3xl mx-4">
+            <div className="flex justify-between items-center border-b p-4">
+              <div>
+                <h5 className="text-xl font-bold">Lançamentos da recorrência</h5>
+                <p className="text-sm text-gray-500">
+                  Selecione quais lançamentos sem pagamento devem ser excluídos.
+                </p>
+              </div>
+              <ActionButton
+                intent="neutral"
+                tone="ghost"
+                size="sm"
+                icon={X}
+                aria-label="Fechar exclusao de recorrencia"
+                onClick={() => {
+                  setModalExclusaoRecorrencia({
+                    aberto: false,
+                    conta: null,
+                    itens: [],
+                    loading: false,
+                  });
+                  setRecorrenciasSelecionadasExclusao([]);
+                }}
+              />
+            </div>
+
+            <div className="max-h-[60vh] overflow-y-auto p-4">
+              {modalExclusaoRecorrencia.loading ? (
+                <p className="py-8 text-center text-gray-500">Carregando lançamentos...</p>
+              ) : (
+                <div className="space-y-2">
+                  {safeArray(modalExclusaoRecorrencia.itens).map((item) => {
+                    const selecionado = recorrenciasSelecionadasExclusao.includes(item.id);
+                    return (
+                      <label
+                        key={item.id}
+                        className={`flex items-center gap-3 rounded-lg border p-3 ${
+                          item.pode_excluir ? 'border-gray-200 bg-white' : 'border-gray-100 bg-gray-50 opacity-70'
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          disabled={!item.pode_excluir}
+                          checked={selecionado}
+                          onChange={() => alternarRecorrenciaExclusao(item.id)}
+                          className="h-4 w-4"
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-semibold text-gray-900">#{item.id}</span>
+                            {item.eh_origem && (
+                              <span className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-semibold text-purple-700">
+                                Origem
+                              </span>
+                            )}
+                            <span className="text-sm text-gray-500">{formatarData(item.data_vencimento)}</span>
+                            <span className="text-sm font-semibold text-gray-900">
+                              {formatarMoeda(item.valor_final)}
+                            </span>
+                          </div>
+                          <p className="mt-1 truncate text-sm text-gray-700" title={item.descricao}>
+                            {item.descricao}
+                          </p>
+                          {item.motivo_bloqueio && (
+                            <p className="mt-1 text-xs text-red-600">{item.motivo_bloqueio}</p>
+                          )}
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            <div className="flex flex-col gap-3 border-t p-4 md:flex-row md:items-center md:justify-between">
+              <p className="text-sm text-gray-500">
+                {recorrenciasSelecionadasExclusao.length} lançamento(s) selecionado(s)
+              </p>
+              <div className="flex justify-end gap-3">
+                <ActionButton
+                  intent="neutral"
+                  tone="soft"
+                  size="md"
+                  onClick={() => {
+                    setModalExclusaoRecorrencia({
+                      aberto: false,
+                      conta: null,
+                      itens: [],
+                      loading: false,
+                    });
+                    setRecorrenciasSelecionadasExclusao([]);
+                  }}
+                >
+                  Cancelar
+                </ActionButton>
+                <ActionButton
+                  intent="delete"
+                  size="md"
+                  icon={Trash2}
+                  disabled={recorrenciasSelecionadasExclusao.length === 0}
+                  onClick={confirmarExclusaoRecorrencia}
+                >
+                  Excluir selecionados
+                </ActionButton>
+              </div>
             </div>
           </div>
         </div>

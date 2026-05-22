@@ -93,6 +93,23 @@ class ContaPagarUpdate(BaseModel):
     data_inicio_recorrencia: Optional[date] = None
     data_fim_recorrencia: Optional[date] = None
     numero_repeticoes: Optional[int] = None
+    aplicar_recorrencia_futura: Optional[bool] = False
+
+
+class ContaPagarRecorrenciaBulkDelete(BaseModel):
+    ids: List[int]
+
+
+class ContaPagarRecorrenciaItemResponse(BaseModel):
+    id: int
+    descricao: str
+    data_vencimento: date
+    valor_final: float
+    valor_pago: float
+    status: str
+    eh_origem: bool = False
+    pode_excluir: bool = True
+    motivo_bloqueio: Optional[str] = None
 
 
 class ContaPagarClassificacaoUpdate(BaseModel):
@@ -401,6 +418,122 @@ def _garantir_janela_recorrencia_apos_pagamento(
         conta_origem=conta_origem,
         limite_recorrencia=limite_recorrencia,
     )
+
+
+def _obter_origem_recorrencia(
+    db: Session,
+    tenant_id,
+    conta: ContaPagar,
+) -> Optional[ContaPagar]:
+    if conta.conta_recorrencia_origem_id:
+        return db.query(ContaPagar).filter(
+            ContaPagar.id == conta.conta_recorrencia_origem_id,
+            ContaPagar.tenant_id == tenant_id,
+        ).first()
+    return conta if conta.eh_recorrente else None
+
+
+def _query_contas_recorrencia(db: Session, tenant_id, origem_id: int):
+    return db.query(ContaPagar).filter(
+        ContaPagar.tenant_id == tenant_id,
+        or_(
+            ContaPagar.id == origem_id,
+            ContaPagar.conta_recorrencia_origem_id == origem_id,
+        ),
+    )
+
+
+def _garantir_janela_recorrencia_conta(
+    db: Session,
+    tenant_id,
+    conta: ContaPagar,
+    hoje: Optional[date] = None,
+) -> List[ContaPagar]:
+    conta_origem = _obter_origem_recorrencia(db, tenant_id, conta)
+    if not conta_origem or not conta_origem.eh_recorrente or not conta_origem.tipo_recorrencia:
+        return []
+
+    if not conta_origem.proxima_recorrencia:
+        ultima_data = db.query(func.max(ContaPagar.data_vencimento)).filter(
+            ContaPagar.tenant_id == tenant_id,
+            ContaPagar.conta_recorrencia_origem_id == conta_origem.id,
+        ).scalar()
+        data_base = ultima_data or conta_origem.data_vencimento
+        conta_origem.proxima_recorrencia = calcular_proxima_recorrencia(
+            data_base,
+            conta_origem.tipo_recorrencia,
+            conta_origem.intervalo_dias,
+        )
+
+    data_referencia = hoje or date.today()
+    if conta_origem.data_fim_recorrencia and conta_origem.data_fim_recorrencia < data_referencia:
+        return []
+
+    return _gerar_contas_recorrentes_ate_janela(
+        db=db,
+        tenant_id=tenant_id,
+        conta_origem=conta_origem,
+        limite_recorrencia=calcular_limite_janela_recorrencia(data_referencia),
+    )
+
+
+def _aplicar_edicao_recorrencia_futura(
+    db: Session,
+    tenant_id,
+    conta: ContaPagar,
+    campos,
+) -> int:
+    conta_origem = _obter_origem_recorrencia(db, tenant_id, conta)
+    if not conta_origem:
+        return 0
+
+    campos_replicaveis = {
+        "descricao",
+        "fornecedor_id",
+        "categoria_id",
+        "dre_subcategoria_id",
+        "tipo_despesa_id",
+        "canal",
+        "valor_original",
+        "documento",
+        "observacoes",
+    }
+    if not campos_replicaveis.intersection(campos):
+        return 0
+
+    futuras = db.query(ContaPagar).filter(
+        ContaPagar.tenant_id == tenant_id,
+        ContaPagar.conta_recorrencia_origem_id == conta_origem.id,
+        ContaPagar.id != conta.id,
+        ContaPagar.data_vencimento > conta.data_vencimento,
+        ContaPagar.status != "pago",
+        func.coalesce(ContaPagar.valor_pago, 0) <= 0,
+    ).all()
+
+    atualizadas = 0
+    for futura in futuras:
+        if "descricao" in campos:
+            futura.descricao = f"{conta.descricao} (Recorrencia {futura.data_vencimento.strftime('%m/%Y')})"
+        if "fornecedor_id" in campos:
+            futura.fornecedor_id = conta.fornecedor_id
+        if "categoria_id" in campos:
+            futura.categoria_id = conta.categoria_id
+        if "dre_subcategoria_id" in campos:
+            futura.dre_subcategoria_id = conta.dre_subcategoria_id
+        if "tipo_despesa_id" in campos:
+            futura.tipo_despesa_id = conta.tipo_despesa_id
+        if "canal" in campos:
+            futura.canal = conta.canal
+        if "valor_original" in campos:
+            futura.valor_original = conta.valor_original
+            futura.valor_final = conta.valor_final
+        if "documento" in campos:
+            futura.documento = conta.documento
+        if "observacoes" in campos:
+            futura.observacoes = conta.observacoes
+        atualizadas += 1
+
+    return atualizadas
 
 
 # ============================================================================
@@ -1046,6 +1179,7 @@ def atualizar_conta_pagar(
     """Atualiza dados operacionais de uma conta a pagar existente."""
     _, tenant_id = user_and_tenant
     campos = payload.model_fields_set
+    campos_operacionais = set(campos) - {"aplicar_recorrencia_futura"}
     campos_recorrencia = {
         "eh_recorrente",
         "tipo_recorrencia",
@@ -1056,7 +1190,7 @@ def atualizar_conta_pagar(
     }
     recorrencia_alterada = bool(campos_recorrencia.intersection(campos))
 
-    if not campos:
+    if not campos_operacionais:
         raise HTTPException(status_code=422, detail="Informe pelo menos um campo para atualizar")
 
     conta = db.query(ContaPagar).filter(
@@ -1231,14 +1365,22 @@ def atualizar_conta_pagar(
         conta.status = "parcial"
 
     recorrencias_criadas = []
-    if recorrencia_alterada and conta.eh_recorrente and conta.proxima_recorrencia:
+    recorrencias_atualizadas = 0
+    deve_garantir_janela_recorrencia = bool(conta.eh_recorrente or conta.conta_recorrencia_origem_id)
+    if deve_garantir_janela_recorrencia:
         db.flush()
-        recorrencias_criadas = _gerar_contas_recorrentes_ate_janela(
+        recorrencias_criadas = _garantir_janela_recorrencia_conta(
             db=db,
             tenant_id=tenant_id,
-            conta_origem=conta,
-            limite_recorrencia=calcular_limite_janela_recorrencia(date.today()),
+            conta=conta,
         )
+        if payload.aplicar_recorrencia_futura:
+            recorrencias_atualizadas = _aplicar_edicao_recorrencia_futura(
+                db=db,
+                tenant_id=tenant_id,
+                conta=conta,
+                campos=campos,
+            )
 
     db.commit()
     db.refresh(conta)
@@ -1268,6 +1410,125 @@ def atualizar_conta_pagar(
         "numero_repeticoes": conta.numero_repeticoes,
         "proxima_recorrencia": conta.proxima_recorrencia,
         "recorrencias_criadas": len(recorrencias_criadas),
+        "recorrencias_atualizadas": recorrencias_atualizadas,
+    }
+
+
+@router.get("/{conta_id}/recorrencia")
+def listar_recorrencia_conta_pagar(
+    conta_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    """Lista a cadeia recorrente de uma conta para manutencao seletiva."""
+    _, tenant_id = user_and_tenant
+
+    conta = db.query(ContaPagar).filter(
+        ContaPagar.id == conta_id,
+        ContaPagar.tenant_id == tenant_id,
+    ).first()
+    if not conta:
+        raise HTTPException(status_code=404, detail="Conta nao encontrada")
+
+    conta_origem = _obter_origem_recorrencia(db, tenant_id, conta)
+    if not conta_origem:
+        conta_origem = conta
+
+    itens = _query_contas_recorrencia(db, tenant_id, conta_origem.id).order_by(
+        ContaPagar.data_vencimento.asc(),
+        ContaPagar.id.asc(),
+    ).all()
+
+    return {
+        "conta_origem_id": conta_origem.id,
+        "itens": [
+            {
+                "id": item.id,
+                "descricao": item.descricao,
+                "data_vencimento": item.data_vencimento,
+                "valor_final": float(item.valor_final or 0),
+                "valor_pago": float(item.valor_pago or 0),
+                "status": item.status,
+                "eh_origem": item.id == conta_origem.id,
+                "pode_excluir": not (
+                    item.status == "pago"
+                    or (item.valor_pago or Decimal("0")) > 0
+                    or bool(item.pagamentos)
+                ),
+                "motivo_bloqueio": (
+                    "Conta com pagamento registrado"
+                    if item.status == "pago"
+                    or (item.valor_pago or Decimal("0")) > 0
+                    or bool(item.pagamentos)
+                    else None
+                ),
+            }
+            for item in itens
+        ],
+    }
+
+
+@router.post("/recorrencias/excluir")
+def excluir_recorrencias_contas_pagar(
+    payload: ContaPagarRecorrenciaBulkDelete,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    """Exclui lancamentos recorrentes selecionados, desde que nao tenham pagamentos."""
+    _, tenant_id = user_and_tenant
+    ids = sorted({int(item_id) for item_id in payload.ids if item_id})
+    if not ids:
+        raise HTTPException(status_code=422, detail="Selecione pelo menos um lancamento para excluir")
+
+    contas = db.query(ContaPagar).options(
+        joinedload(ContaPagar.pagamentos)
+    ).filter(
+        ContaPagar.tenant_id == tenant_id,
+        ContaPagar.id.in_(ids),
+    ).all()
+    if len(contas) != len(ids):
+        raise HTTPException(status_code=404, detail="Uma ou mais contas nao foram encontradas")
+
+    contas_por_id = {conta.id: conta for conta in contas}
+    for conta in contas:
+        if conta.status == "pago" or (conta.valor_pago or Decimal("0")) > 0 or conta.pagamentos:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Conta #{conta.id} possui pagamento registrado e nao pode ser excluida",
+            )
+
+    ids_set = set(ids)
+    for conta in contas:
+        if not conta.eh_recorrente:
+            continue
+        filhas_nao_selecionadas = db.query(func.count(ContaPagar.id)).filter(
+            ContaPagar.tenant_id == tenant_id,
+            ContaPagar.conta_recorrencia_origem_id == conta.id,
+            ~ContaPagar.id.in_(ids_set),
+        ).scalar() or 0
+        if filhas_nao_selecionadas:
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    "Para excluir a conta origem da recorrencia, selecione tambem "
+                    "todos os lancamentos futuros sem pagamento."
+                ),
+            )
+
+    contas_para_excluir = sorted(
+        (contas_por_id[conta_id] for conta_id in ids),
+        key=lambda conta: 1 if conta.eh_recorrente else 0,
+    )
+    for conta in contas_para_excluir:
+        db.delete(conta)
+
+    db.commit()
+
+    return {
+        "ok": True,
+        "mensagem": "Lancamentos recorrentes excluidos com sucesso",
+        "ids": ids,
+        "total": len(ids),
     }
 
 

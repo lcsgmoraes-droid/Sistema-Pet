@@ -66,5 +66,30 @@ def test_edicao_de_conta_pagar_pode_ativar_recorrencia():
 
     assert "recorrencia_alterada" in update_endpoint
     assert "conta.proxima_recorrencia = calcular_proxima_recorrencia(" in update_endpoint
-    assert "_gerar_contas_recorrentes_ate_janela(" in update_endpoint
+    assert "_garantir_janela_recorrencia_conta(" in update_endpoint
     assert "conta.eh_recorrente = False" in update_endpoint
+
+
+def test_edicao_recorrente_garante_janela_mesmo_quando_ja_estava_marcada():
+    source = _source("app/contas_pagar_routes.py")
+
+    assert "_garantir_janela_recorrencia_conta(" in source
+    update_endpoint = source.split("def atualizar_conta_pagar", 1)[1].split(
+        "def buscar_conta_pagar",
+        1,
+    )[0]
+
+    assert "deve_garantir_janela_recorrencia" in update_endpoint
+    assert "_garantir_janela_recorrencia_conta(" in update_endpoint
+
+
+def test_recorrencia_tem_exclusao_seletiva_e_edicao_futura():
+    source = _source("app/contas_pagar_routes.py")
+
+    assert "class ContaPagarRecorrenciaBulkDelete" in source
+    assert "class ContaPagarRecorrenciaItemResponse" in source
+    assert '@router.get("/{conta_id}/recorrencia")' in source
+    assert '@router.post("/recorrencias/excluir")' in source
+    assert "class ContaPagarUpdate" in source
+    assert "aplicar_recorrencia_futura" in source
+    assert "_aplicar_edicao_recorrencia_futura(" in source

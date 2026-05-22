@@ -15,7 +15,7 @@ from uuid import UUID
 from .db import get_session
 from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
-from .models import User
+from .models import User, Cliente
 from app.tenancy.context import get_current_tenant
 from .vendas_models import Venda, VendaPagamento, VendaItem
 from .financeiro_models import ContaReceber, ContaPagar, CategoriaFinanceira, TipoDespesa
@@ -35,6 +35,40 @@ def _dashboard_fetchone(db: Session, sql: str, tenant_id, params=None):
 
 def _round_money(value) -> float:
     return round(float(value or 0), 2)
+
+
+def _conta_eh_compra_estoque_para_pe(conta: ContaPagar, tipo_nome: str = "", categoria_nome: str = "") -> bool:
+    texto = f"{tipo_nome or ''} {categoria_nome or ''} {conta.descricao or ''}".lower()
+    return bool(conta.nota_entrada_id) or (
+        "produto" in texto and "revenda" in texto
+    )
+
+
+def _detalhe_conta_pe(
+    conta: ContaPagar,
+    *,
+    valor: float,
+    classificacao: str,
+    origem_classificacao: str,
+    fornecedor_nome: Optional[str],
+    tipo_despesa_nome: Optional[str],
+    categoria_nome: Optional[str],
+    dre_subcategoria_nome: Optional[str],
+) -> dict:
+    return {
+        "id": conta.id,
+        "descricao": conta.descricao,
+        "valor": _round_money(valor),
+        "data_vencimento": conta.data_vencimento,
+        "fornecedor_nome": fornecedor_nome,
+        "canal": conta.canal,
+        "classificacao": classificacao,
+        "origem_classificacao": origem_classificacao,
+        "tipo_despesa_nome": tipo_despesa_nome,
+        "categoria_nome": categoria_nome,
+        "dre_subcategoria_nome": dre_subcategoria_nome,
+        "nota_entrada_id": conta.nota_entrada_id,
+    }
 
 
 @router.get("/financeiro/ponto-equilibrio")
@@ -120,8 +154,12 @@ async def obter_ponto_equilibrio(
     contas_query = db.query(
         ContaPagar,
         TipoDespesa.e_custo_fixo.label("tipo_e_custo_fixo"),
+        TipoDespesa.nome.label("tipo_despesa_nome"),
         CategoriaFinanceira.tipo_custo.label("categoria_tipo_custo"),
+        CategoriaFinanceira.nome.label("categoria_nome"),
         DRESubcategoria.custo_pe.label("dre_custo_pe"),
+        DRESubcategoria.nome.label("dre_subcategoria_nome"),
+        Cliente.nome.label("fornecedor_nome"),
     ).outerjoin(
         TipoDespesa,
         ContaPagar.tipo_despesa_id == TipoDespesa.id,
@@ -131,6 +169,9 @@ async def obter_ponto_equilibrio(
     ).outerjoin(
         DRESubcategoria,
         ContaPagar.dre_subcategoria_id == DRESubcategoria.id,
+    ).outerjoin(
+        Cliente,
+        and_(ContaPagar.fornecedor_id == Cliente.id, Cliente.tenant_id == tenant_id),
     ).filter(
         ContaPagar.tenant_id == tenant_id,
         ContaPagar.data_vencimento >= inicio,
@@ -145,30 +186,105 @@ async def obter_ponto_equilibrio(
     despesas_fixas = 0.0
     despesas_variaveis = 0.0
     despesas_sem_classificacao = 0.0
+    despesas_estoque_excluidas = 0.0
     quantidade_contas_sem_classificacao = 0
+    quantidade_contas_estoque_excluidas = 0
+    detalhes_classificacao = {
+        "fixas": [],
+        "variaveis": [],
+        "sem_classificacao": [],
+        "estoque_excluido": [],
+    }
 
-    for conta, tipo_e_custo_fixo, categoria_tipo_custo, dre_custo_pe in contas_query.all():
+    for (
+        conta,
+        tipo_e_custo_fixo,
+        tipo_despesa_nome,
+        categoria_tipo_custo,
+        categoria_nome,
+        dre_custo_pe,
+        dre_subcategoria_nome,
+        fornecedor_nome,
+    ) in contas_query.all():
         valor = float(conta.valor_final or conta.valor_original or 0)
         classificacao = None
+        origem_classificacao = "Sem classificacao"
+
+        if _conta_eh_compra_estoque_para_pe(conta, tipo_despesa_nome, categoria_nome):
+            despesas_estoque_excluidas += valor
+            quantidade_contas_estoque_excluidas += 1
+            detalhes_classificacao["estoque_excluido"].append(
+                _detalhe_conta_pe(
+                    conta,
+                    valor=valor,
+                    classificacao="estoque_excluido",
+                    origem_classificacao="Compra de estoque/Produto para Revenda (CMV ja cobre quando vendido)",
+                    fornecedor_nome=fornecedor_nome,
+                    tipo_despesa_nome=tipo_despesa_nome,
+                    categoria_nome=categoria_nome,
+                    dre_subcategoria_nome=dre_subcategoria_nome,
+                )
+            )
+            continue
 
         if tipo_e_custo_fixo is not None:
             classificacao = "fixo" if bool(tipo_e_custo_fixo) else "variavel"
+            origem_classificacao = f"Tipo de despesa: {tipo_despesa_nome or '-'}"
         elif dre_custo_pe in {"fixo", "variavel"}:
             classificacao = dre_custo_pe
+            origem_classificacao = f"Subcategoria DRE: {dre_subcategoria_nome or '-'}"
         elif categoria_tipo_custo in {"fixo", "variavel"}:
             classificacao = categoria_tipo_custo
+            origem_classificacao = f"Categoria financeira: {categoria_nome or '-'}"
 
         if classificacao == "fixo":
             despesas_fixas += valor
+            detalhes_classificacao["fixas"].append(
+                _detalhe_conta_pe(
+                    conta,
+                    valor=valor,
+                    classificacao="fixo",
+                    origem_classificacao=origem_classificacao,
+                    fornecedor_nome=fornecedor_nome,
+                    tipo_despesa_nome=tipo_despesa_nome,
+                    categoria_nome=categoria_nome,
+                    dre_subcategoria_nome=dre_subcategoria_nome,
+                )
+            )
         elif classificacao == "variavel":
             despesas_variaveis += valor
+            detalhes_classificacao["variaveis"].append(
+                _detalhe_conta_pe(
+                    conta,
+                    valor=valor,
+                    classificacao="variavel",
+                    origem_classificacao=origem_classificacao,
+                    fornecedor_nome=fornecedor_nome,
+                    tipo_despesa_nome=tipo_despesa_nome,
+                    categoria_nome=categoria_nome,
+                    dre_subcategoria_nome=dre_subcategoria_nome,
+                )
+            )
         else:
             despesas_sem_classificacao += valor
             quantidade_contas_sem_classificacao += 1
+            detalhes_classificacao["sem_classificacao"].append(
+                _detalhe_conta_pe(
+                    conta,
+                    valor=valor,
+                    classificacao="sem_classificacao",
+                    origem_classificacao=origem_classificacao,
+                    fornecedor_nome=fornecedor_nome,
+                    tipo_despesa_nome=tipo_despesa_nome,
+                    categoria_nome=categoria_nome,
+                    dre_subcategoria_nome=dre_subcategoria_nome,
+                )
+            )
 
     despesas_fixas = _round_money(despesas_fixas)
     despesas_variaveis = _round_money(despesas_variaveis)
     despesas_sem_classificacao = _round_money(despesas_sem_classificacao)
+    despesas_estoque_excluidas = _round_money(despesas_estoque_excluidas)
 
     custos_variaveis = cmv_estimado + despesas_variaveis
     margem_contribuicao = faturamento - custos_variaveis
@@ -212,7 +328,9 @@ async def obter_ponto_equilibrio(
         "custos_variaveis": _round_money(custos_variaveis),
         "despesas_fixas": despesas_fixas,
         "despesas_sem_classificacao": despesas_sem_classificacao,
+        "despesas_estoque_excluidas": despesas_estoque_excluidas,
         "quantidade_contas_sem_classificacao": quantidade_contas_sem_classificacao,
+        "quantidade_contas_estoque_excluidas": quantidade_contas_estoque_excluidas,
         "margem_contribuicao": _round_money(margem_contribuicao),
         "margem_contribuicao_percentual": round(margem_contribuicao_percentual * 100, 2),
         "ponto_equilibrio": _round_money(ponto_equilibrio) if ponto_equilibrio is not None else None,
@@ -220,6 +338,7 @@ async def obter_ponto_equilibrio(
         "percentual_atingido": round(percentual_atingido, 2),
         "vendas_necessarias": vendas_necessarias,
         "produtos_sem_custo": produtos_sem_custo,
+        "detalhes_classificacao": detalhes_classificacao,
         "status": status_pe,
     }
 

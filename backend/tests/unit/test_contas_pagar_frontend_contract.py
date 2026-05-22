@@ -69,3 +69,17 @@ def test_contas_pagar_mantem_acoes_visiveis_com_textos_longos():
     assert 'tableClassName="min-w-[1500px]"' in source
     assert 'cellStyle: { maxWidth: 260 }' in source
     assert 'cellStyle: { maxWidth: 340 }' in source
+
+
+def test_contas_pagar_frontend_trata_recorrencia_em_lote():
+    source = (REPO_ROOT / "frontend/src/components/ContasPagar.jsx").read_text(encoding="utf-8")
+    modal_source = (REPO_ROOT / "frontend/src/components/ModalNovaContaPagar.jsx").read_text(encoding="utf-8")
+
+    assert "carregarRecorrenciaExclusao" in source
+    assert "recorrenciasSelecionadasExclusao" in source
+    assert "confirmarExclusaoRecorrencia" in source
+    assert "api.post('/contas-pagar/recorrencias/excluir'" in source
+    assert "Lançamentos da recorrência" in source
+
+    assert "aplicar_recorrencia_futura" in modal_source
+    assert "Aplicar alterações aos próximos lançamentos" in modal_source
