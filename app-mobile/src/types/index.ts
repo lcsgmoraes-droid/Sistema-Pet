@@ -31,10 +31,12 @@ export interface EcommerceUser {
   // perfil entregador
   is_entregador?: boolean;
   funcionario_id?: number | null;
+  // perfil operacional funcionario
+  is_funcionario?: boolean;
   // perfil operacional veterinario
   is_veterinario?: boolean;
   veterinario_id?: number | null;
-  perfil_operacional?: "cliente" | "entregador" | "veterinario";
+  perfil_operacional?: "cliente" | "entregador" | "veterinario" | "funcionario";
 }
 
 // =====================

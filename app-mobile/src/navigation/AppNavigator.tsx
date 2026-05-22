@@ -10,6 +10,7 @@ import { CORES } from '../theme';
 // Navegadores
 import AuthNavigator from './AuthNavigator';
 import EntregadorNavigator from './EntregadorNavigator';
+import FuncionarioNavigator from './FuncionarioNavigator';
 import MainNavigator from './MainNavigator';
 import VeterinarioNavigator from './VeterinarioNavigator';
 import { navigationRef } from './navigationRef';
@@ -60,6 +61,8 @@ export default function AppNavigator() {
     activeNav = <VeterinarioNavigator />;
   } else if (user?.is_entregador) {
     activeNav = <EntregadorNavigator />;
+  } else if (user?.is_funcionario || user?.perfil_operacional === "funcionario") {
+    activeNav = <FuncionarioNavigator />;
   } else {
     activeNav = <MainNavigator />;
   }
