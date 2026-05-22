@@ -10,6 +10,9 @@ from datetime import datetime, date, time, timedelta
 from typing import Optional
 import logging
 import math
+import calendar
+import re
+import unicodedata
 
 from uuid import UUID
 from .db import get_session
@@ -21,7 +24,10 @@ from .vendas_models import Venda, VendaPagamento, VendaItem
 from .financeiro_models import ContaReceber, ContaPagar, CategoriaFinanceira, TipoDespesa
 from .caixa_models import Caixa
 from .produtos_models import Produto
+from .cargo_models import Cargo
 from .dre_plano_contas_models import DRESubcategoria
+from .ia.aba7_dre_detalhada_models import DREDetalheCanal
+from .services.remuneracao_service import calcular_composicao_remuneracao
 from .utils.tenant_safe_sql import execute_tenant_safe
 
 logger = logging.getLogger(__name__)
@@ -42,6 +48,229 @@ def _conta_eh_compra_estoque_para_pe(conta: ContaPagar, tipo_nome: str = "", cat
     return bool(conta.nota_entrada_id) or (
         "produto" in texto and "revenda" in texto
     )
+
+
+def _normalizar_texto_pe(valor: str) -> str:
+    texto = unicodedata.normalize("NFKD", str(valor or "").lower())
+    texto = "".join(ch for ch in texto if not unicodedata.combining(ch))
+    texto = texto.replace("-", " ")
+    return re.sub(r"\s+", " ", texto).strip()
+
+
+PE_TERMOS_FIXOS = (
+    "pro labore",
+    "prolabore",
+    "salario",
+    "salarios",
+    "folha",
+    "funcionario",
+    "funcionarios",
+    "encargo",
+    "fgts",
+    "inss",
+    "ferias",
+    "decimo",
+    "13o salario",
+    "13 salario",
+    "vale transporte",
+    "aluguel",
+    "condominio",
+    "iptu",
+    "agua",
+    "energia",
+    "eletrica",
+    "luz",
+    "internet",
+    "telefone",
+    "celular",
+    "escritorio",
+    "contabilidade",
+    "honorario",
+    "software",
+    "sistema",
+    "erp",
+    "licenca",
+    "plano odontologico",
+    "seguro",
+    "limpeza",
+    "material de uso interno",
+)
+
+PE_TERMOS_VARIAVEIS = (
+    "taxa credito",
+    "taxa debito",
+    "taxa cartao",
+    "cartao de credito",
+    "cartao de debito",
+    "tarifa envio",
+    "frete",
+    "entrega",
+    "envio",
+    "comissao",
+    "marketplace",
+    "abastecimento moto",
+    "combustivel",
+    "motoboy",
+    "pagarme",
+    "mercado livre",
+    "shopee",
+    "amazon",
+)
+
+PE_TERMOS_FOLHA = (
+    "salario",
+    "salarios",
+    "folha",
+    "funcionario",
+    "funcionarios",
+    "encargo",
+    "fgts",
+    "inss",
+    "ferias",
+    "decimo",
+    "13o salario",
+    "13 salario",
+)
+
+
+def _classificar_texto_ponto_equilibrio(texto: str) -> Optional[str]:
+    texto_normalizado = _normalizar_texto_pe(texto)
+    if not texto_normalizado:
+        return None
+    if any(termo in texto_normalizado for termo in PE_TERMOS_FIXOS):
+        return "fixo"
+    if any(termo in texto_normalizado for termo in PE_TERMOS_VARIAVEIS):
+        return "variavel"
+    return None
+
+
+def _normalizar_tipo_custo_dre(valor) -> str:
+    if valor is None:
+        return ""
+    tipo = getattr(valor, "value", valor)
+    return _normalizar_texto_pe(str(tipo).split(".")[-1])
+
+
+def _classificar_conta_ponto_equilibrio(
+    conta: ContaPagar,
+    *,
+    tipo_e_custo_fixo=None,
+    tipo_despesa_nome: Optional[str] = None,
+    categoria_tipo_custo: Optional[str] = None,
+    categoria_nome: Optional[str] = None,
+    dre_custo_pe: Optional[str] = None,
+    dre_subcategoria_nome: Optional[str] = None,
+    dre_tipo_custo=None,
+) -> tuple[Optional[str], str]:
+    dre_custo_pe_normalizado = _normalizar_texto_pe(dre_custo_pe)
+    if dre_custo_pe_normalizado in {"fixo", "variavel"}:
+        return dre_custo_pe_normalizado, f"PE na subcategoria DRE: {dre_subcategoria_nome or '-'}"
+
+    if tipo_e_custo_fixo is not None:
+        classificacao = "fixo" if bool(tipo_e_custo_fixo) else "variavel"
+        return classificacao, f"Tipo de despesa: {tipo_despesa_nome or '-'}"
+
+    categoria_tipo_normalizado = _normalizar_texto_pe(categoria_tipo_custo)
+    if categoria_tipo_normalizado in {"fixo", "variavel"}:
+        return categoria_tipo_normalizado, f"Categoria financeira: {categoria_nome or '-'}"
+
+    texto_lancamento = " ".join(
+        str(parte or "")
+        for parte in (conta.descricao, tipo_despesa_nome, categoria_nome)
+    )
+    classificacao_por_lancamento = _classificar_texto_ponto_equilibrio(texto_lancamento)
+    if classificacao_por_lancamento:
+        return classificacao_por_lancamento, "Classificacao automatica pelo lancamento"
+
+    dre_tipo_normalizado = _normalizar_tipo_custo_dre(dre_tipo_custo)
+    if dre_tipo_normalizado in {"corporativo", "indireto_rateavel", "indireto rateavel"}:
+        return "fixo", f"Tipo DRE: {dre_subcategoria_nome or '-'}"
+    if dre_tipo_normalizado == "direto":
+        return "variavel", f"Tipo DRE: {dre_subcategoria_nome or '-'}"
+
+    classificacao_por_dre = _classificar_texto_ponto_equilibrio(dre_subcategoria_nome or "")
+    if classificacao_por_dre:
+        return classificacao_por_dre, f"Subcategoria DRE: {dre_subcategoria_nome or '-'}"
+
+    return None, "Sem classificacao"
+
+
+def _conta_eh_folha_para_pe(
+    conta: ContaPagar,
+    tipo_despesa_nome: Optional[str],
+    categoria_nome: Optional[str],
+    dre_subcategoria_nome: Optional[str],
+) -> bool:
+    texto = _normalizar_texto_pe(
+        " ".join(
+            str(parte or "")
+            for parte in (conta.descricao, tipo_despesa_nome, categoria_nome, dre_subcategoria_nome)
+        )
+    )
+    return any(termo in texto for termo in PE_TERMOS_FOLHA)
+
+
+def _calcular_complemento_folha_gerencial(
+    *,
+    total_estimado,
+    total_lancado,
+    total_provisoes_dre,
+) -> float:
+    complemento = float(total_estimado or 0) - float(total_lancado or 0) - float(total_provisoes_dre or 0)
+    return _round_money(max(0, complemento))
+
+
+def _calcular_folha_gerencial_estimada(db: Session, tenant_id) -> dict:
+    funcionarios = (
+        db.query(Cliente, Cargo)
+        .join(Cargo, Cliente.cargo_id == Cargo.id)
+        .filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.tipo_cadastro == "funcionario",
+            Cliente.ativo.is_(True),
+            Cliente.cargo_id.isnot(None),
+            Cargo.tenant_id == tenant_id,
+            Cargo.ativo.is_(True),
+        )
+        .all()
+    )
+
+    total = 0.0
+    quantidade = 0
+    for funcionario, cargo in funcionarios:
+        composicao = calcular_composicao_remuneracao(cargo, funcionario)
+        total += float(composicao.get("custo_total_empresa") or 0)
+        quantidade += 1
+
+    return {
+        "total": _round_money(total),
+        "quantidade_funcionarios": quantidade,
+    }
+
+
+def _detalhe_sintetico_pe(
+    *,
+    item_id,
+    descricao: str,
+    valor: float,
+    data_vencimento: date,
+    classificacao: str,
+    origem_classificacao: str,
+) -> dict:
+    return {
+        "id": item_id,
+        "descricao": descricao,
+        "valor": _round_money(valor),
+        "data_vencimento": data_vencimento,
+        "fornecedor_nome": None,
+        "canal": None,
+        "classificacao": classificacao,
+        "origem_classificacao": origem_classificacao,
+        "tipo_despesa_nome": None,
+        "categoria_nome": None,
+        "dre_subcategoria_nome": None,
+        "nota_entrada_id": None,
+    }
 
 
 def _detalhe_conta_pe(
@@ -84,7 +313,8 @@ async def obter_ponto_equilibrio(
 
     hoje = datetime.now().date()
     inicio = data_inicio or hoje.replace(day=1)
-    fim = data_fim or hoje
+    fim_padrao = hoje.replace(day=calendar.monthrange(hoje.year, hoje.month)[1])
+    fim = data_fim or fim_padrao
     if fim < inicio:
         raise HTTPException(status_code=422, detail="Data final deve ser maior ou igual a data inicial")
 
@@ -158,6 +388,7 @@ async def obter_ponto_equilibrio(
         CategoriaFinanceira.tipo_custo.label("categoria_tipo_custo"),
         CategoriaFinanceira.nome.label("categoria_nome"),
         DRESubcategoria.custo_pe.label("dre_custo_pe"),
+        DRESubcategoria.tipo_custo.label("dre_tipo_custo"),
         DRESubcategoria.nome.label("dre_subcategoria_nome"),
         Cliente.nome.label("fornecedor_nome"),
     ).outerjoin(
@@ -187,6 +418,8 @@ async def obter_ponto_equilibrio(
     despesas_variaveis = 0.0
     despesas_sem_classificacao = 0.0
     despesas_estoque_excluidas = 0.0
+    folha_lancada_contas_pagar = 0.0
+    folha_provisoes_dre = 0.0
     quantidade_contas_sem_classificacao = 0
     quantidade_contas_estoque_excluidas = 0
     detalhes_classificacao = {
@@ -203,12 +436,11 @@ async def obter_ponto_equilibrio(
         categoria_tipo_custo,
         categoria_nome,
         dre_custo_pe,
+        dre_tipo_custo,
         dre_subcategoria_nome,
         fornecedor_nome,
     ) in contas_query.all():
         valor = float(conta.valor_final or conta.valor_original or 0)
-        classificacao = None
-        origem_classificacao = "Sem classificacao"
 
         if _conta_eh_compra_estoque_para_pe(conta, tipo_despesa_nome, categoria_nome):
             despesas_estoque_excluidas += valor
@@ -227,15 +459,19 @@ async def obter_ponto_equilibrio(
             )
             continue
 
-        if tipo_e_custo_fixo is not None:
-            classificacao = "fixo" if bool(tipo_e_custo_fixo) else "variavel"
-            origem_classificacao = f"Tipo de despesa: {tipo_despesa_nome or '-'}"
-        elif dre_custo_pe in {"fixo", "variavel"}:
-            classificacao = dre_custo_pe
-            origem_classificacao = f"Subcategoria DRE: {dre_subcategoria_nome or '-'}"
-        elif categoria_tipo_custo in {"fixo", "variavel"}:
-            classificacao = categoria_tipo_custo
-            origem_classificacao = f"Categoria financeira: {categoria_nome or '-'}"
+        if _conta_eh_folha_para_pe(conta, tipo_despesa_nome, categoria_nome, dre_subcategoria_nome):
+            folha_lancada_contas_pagar += valor
+
+        classificacao, origem_classificacao = _classificar_conta_ponto_equilibrio(
+            conta,
+            tipo_e_custo_fixo=tipo_e_custo_fixo,
+            tipo_despesa_nome=tipo_despesa_nome,
+            categoria_tipo_custo=categoria_tipo_custo,
+            categoria_nome=categoria_nome,
+            dre_custo_pe=dre_custo_pe,
+            dre_subcategoria_nome=dre_subcategoria_nome,
+            dre_tipo_custo=dre_tipo_custo,
+        )
 
         if classificacao == "fixo":
             despesas_fixas += valor
@@ -281,10 +517,82 @@ async def obter_ponto_equilibrio(
                 )
             )
 
+    provisoes_dre_query = db.query(DREDetalheCanal).filter(
+        DREDetalheCanal.tenant_id == tenant_id,
+        DREDetalheCanal.data_inicio <= fim,
+        DREDetalheCanal.data_fim >= inicio,
+        or_(
+            DREDetalheCanal.origem == "PROVISAO",
+            DREDetalheCanal.canal == "provisao",
+        ),
+    )
+    if canais_lista:
+        provisoes_dre_query = provisoes_dre_query.filter(
+            or_(DREDetalheCanal.canal.in_(canais_lista), DREDetalheCanal.canal == "provisao")
+        )
+
+    for provisao in provisoes_dre_query.all():
+        despesas_pessoal = float(provisao.despesas_pessoal or 0)
+        despesas_fixas_dre = (
+            despesas_pessoal
+            + float(provisao.despesas_administrativas or 0)
+            + float(provisao.despesas_financeiras or 0)
+            + float(provisao.outras_despesas or 0)
+        )
+        despesas_variaveis_dre = float(provisao.despesas_vendas or 0) + float(provisao.impostos or 0)
+
+        if despesas_fixas_dre > 0:
+            despesas_fixas += despesas_fixas_dre
+            folha_provisoes_dre += despesas_pessoal
+            detalhes_classificacao["fixas"].append(
+                _detalhe_sintetico_pe(
+                    item_id=f"dre-provisao-{provisao.id}-fixo",
+                    descricao=provisao.observacao or "Provisao DRE",
+                    valor=despesas_fixas_dre,
+                    data_vencimento=provisao.data_fim,
+                    classificacao="fixo",
+                    origem_classificacao="Provisao registrada na DRE",
+                )
+            )
+
+        if despesas_variaveis_dre > 0:
+            despesas_variaveis += despesas_variaveis_dre
+            detalhes_classificacao["variaveis"].append(
+                _detalhe_sintetico_pe(
+                    item_id=f"dre-provisao-{provisao.id}-variavel",
+                    descricao=provisao.observacao or "Provisao DRE",
+                    valor=despesas_variaveis_dre,
+                    data_vencimento=provisao.data_fim,
+                    classificacao="variavel",
+                    origem_classificacao="Provisao variavel registrada na DRE",
+                )
+            )
+
+    folha_gerencial = _calcular_folha_gerencial_estimada(db, tenant_id)
+    folha_complemento_gerencial = _calcular_complemento_folha_gerencial(
+        total_estimado=folha_gerencial["total"],
+        total_lancado=folha_lancada_contas_pagar,
+        total_provisoes_dre=folha_provisoes_dre,
+    )
+    if folha_complemento_gerencial > 0:
+        despesas_fixas += folha_complemento_gerencial
+        detalhes_classificacao["fixas"].append(
+            _detalhe_sintetico_pe(
+                item_id="folha-gerencial-estimada",
+                descricao="Complemento de folha gerencial estimada",
+                valor=folha_complemento_gerencial,
+                data_vencimento=fim,
+                classificacao="fixo",
+                origem_classificacao="Funcionarios ativos/cargos, descontando contas a pagar e provisoes DRE ja lancadas",
+            )
+        )
+
     despesas_fixas = _round_money(despesas_fixas)
     despesas_variaveis = _round_money(despesas_variaveis)
     despesas_sem_classificacao = _round_money(despesas_sem_classificacao)
     despesas_estoque_excluidas = _round_money(despesas_estoque_excluidas)
+    folha_lancada_contas_pagar = _round_money(folha_lancada_contas_pagar)
+    folha_provisoes_dre = _round_money(folha_provisoes_dre)
 
     custos_variaveis = cmv_estimado + despesas_variaveis
     margem_contribuicao = faturamento - custos_variaveis
@@ -331,6 +639,11 @@ async def obter_ponto_equilibrio(
         "despesas_estoque_excluidas": despesas_estoque_excluidas,
         "quantidade_contas_sem_classificacao": quantidade_contas_sem_classificacao,
         "quantidade_contas_estoque_excluidas": quantidade_contas_estoque_excluidas,
+        "folha_gerencial_estimada": folha_gerencial["total"],
+        "folha_lancada_contas_pagar": folha_lancada_contas_pagar,
+        "folha_provisoes_dre": folha_provisoes_dre,
+        "folha_complemento_gerencial": folha_complemento_gerencial,
+        "folha_funcionarios_ativos": folha_gerencial["quantidade_funcionarios"],
         "margem_contribuicao": _round_money(margem_contribuicao),
         "margem_contribuicao_percentual": round(margem_contribuicao_percentual * 100, 2),
         "ponto_equilibrio": _round_money(ponto_equilibrio) if ponto_equilibrio is not None else None,

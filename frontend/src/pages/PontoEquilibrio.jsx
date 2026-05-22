@@ -21,8 +21,9 @@ function inicioMesAtual() {
   return formatarDataInput(new Date(hoje.getFullYear(), hoje.getMonth(), 1));
 }
 
-function hojeInput() {
-  return formatarDataInput(new Date());
+function fimMesAtual() {
+  const hoje = new Date();
+  return formatarDataInput(new Date(hoje.getFullYear(), hoje.getMonth() + 1, 0));
 }
 
 function MetricCard({ title, value, subtitle, tone = "slate", icon: Icon }) {
@@ -112,7 +113,7 @@ const CANAIS = [
 export default function PontoEquilibrio() {
   const [filtros, setFiltros] = useState({
     data_inicio: inicioMesAtual(),
-    data_fim: hojeInput(),
+    data_fim: fimMesAtual(),
     canal: "",
   });
   const [dados, setDados] = useState(null);
@@ -365,9 +366,10 @@ export default function PontoEquilibrio() {
                     </span>
                   </div>
                   <p className="rounded-md bg-slate-50 p-3 text-xs text-slate-600">
-                    Para melhorar a precisao, classifique as contas a pagar em tipo de despesa
-                    fixo/variavel ou marque o campo de PE na subcategoria DRE. Contas de produto
-                    para revenda aparecem separadas porque o custo entra pelo CMV quando o produto e vendido.
+                    A base usa contas a pagar para os valores reais, DRE para a classificacao
+                    gerencial e provisoes, e complementa a folha pelos funcionarios ativos quando
+                    ainda nao houver lancamento suficiente. Compras de produto para revenda ficam
+                    separadas porque o custo entra pelo CMV quando o produto e vendido.
                   </p>
                 </div>
               </div>
