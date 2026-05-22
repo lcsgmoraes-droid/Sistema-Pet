@@ -21,3 +21,12 @@ def test_seletores_principais_usam_reveal_de_painel_flutuante():
         fonte = _frontend_source(arquivo)
         assert "useRevealFloatingPanel" in fonte
         assert "panelRef" in fonte
+
+
+def test_modal_pagamento_revela_alerta_margem_e_justificativa():
+    fonte = _frontend_source("components/ModalPagamento.jsx")
+
+    assert "useRevealFloatingPanel" in fonte
+    assert "statusMargemRef" in fonte
+    assert "justificativaRef" in fonte
+    assert "mostrarCampoJustificativa" in fonte

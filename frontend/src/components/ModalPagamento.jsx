@@ -36,6 +36,7 @@ import StatusMargemIndicador from './StatusMargemIndicador';
 import api from '../api';
 import CurrencyInput from './CurrencyInput';
 import ModalAdicionarCredito from './ModalAdicionarCredito';
+import useRevealFloatingPanel from '../hooks/useRevealFloatingPanel';
 import { formatBRL, formatMoneyBRL } from '../utils/formatters';
 import {
   emitirNotaFiscalAssistida,
@@ -113,6 +114,8 @@ export default function ModalPagamento({
 
   // Ref para o container das opções de parcelamento
   const opcoesParcelamentoRef = useRef(null);
+  const statusMargemRef = useRef(null);
+  const justificativaRef = useRef(null);
 
   // Carregar formas de pagamento do backend
   useEffect(() => {
@@ -251,6 +254,28 @@ export default function ModalPagamento({
     cupomParaFinalizar?.code && Number(cupomParaFinalizar?.discount_applied || 0) > 0
       ? `A margem ficou baixa por conta do cupom ${String(cupomParaFinalizar.code).toUpperCase()} (${formatMoneyBRL(cupomParaFinalizar.discount_applied)} de desconto).`
       : "";
+  const corParcelamentoAtual =
+    formaPagamentoSelecionada?.permite_parcelamento &&
+    simulacoesParcelamento[formaPagamentoSelecionada.id]?.[numeroParcelas]
+      ? simulacoesParcelamento[formaPagamentoSelecionada.id][numeroParcelas]?.cor ?? 'verde'
+      : 'verde';
+  const margemCriticaAtual =
+    statusMargem === 'vermelho' || corParcelamentoAtual === 'vermelho';
+  const mostrarCampoJustificativa =
+    margemCriticaAtual || Boolean(justificativaTexto && justificativaTexto.trim().length > 0);
+  const deveRevelarAlertaMargem = statusMargem === 'amarelo' || statusMargem === 'vermelho';
+
+  useRevealFloatingPanel({
+    enabled: Boolean(deveRevelarAlertaMargem),
+    panelRef: statusMargemRef,
+    refreshKey: `${statusMargem || ''}:${formaPagamentoSelecionada?.id || ''}:${numeroParcelas}:${pagamentos.length}`,
+  });
+
+  useRevealFloatingPanel({
+    enabled: Boolean(mostrarCampoJustificativa),
+    panelRef: justificativaRef,
+    refreshKey: `${statusMargem || ''}:${corParcelamentoAtual}:${erroJustificativa}:${justificativaTexto.length}`,
+  });
 
   const valorBaseBeneficios = Number(venda.total || 0);
   const canalVendaBeneficios = venda.canal || venda.origem_canal_venda || 'loja_fisica';
@@ -675,7 +700,7 @@ export default function ModalPagamento({
     console.log('📤 DEBUG novoPagamento:', novoPagamento);
 
     // 🆕 PASSO 4️⃣ - Verificar justificativa usando APENAS dados do BACKEND
-    let corParcelamento = 'verde'; // Default
+    let corParcelamento = corParcelamentoAtual; // Default
     
     if (formaPagamentoSelecionada?.permite_parcelamento && simulacoesParcelamento[formaPagamentoSelecionada.id]) {
       // ✅ Reutilizar COR que veio do BACKEND
@@ -685,7 +710,7 @@ export default function ModalPagamento({
     }
     
     // ✅ PASSO 5: Se margem crítica, EXIGIR justificativa (mas NÃO bloquear fluxo)
-    const margemCritica = statusMargem === 'vermelho' || corParcelamento === 'vermelho';
+    const margemCritica = margemCriticaAtual;
     
     if (margemCritica) {
       if (!justificativaTexto || justificativaTexto.trim().length < 10) {
@@ -1715,10 +1740,12 @@ export default function ModalPagamento({
 
               {/* ✅ Indicador de Status de Margem Operacional (movido para cá) */}
               {statusMargem && (
-                <StatusMargemIndicador 
-                  status={statusMargem} 
-                  loading={loadingStatusMargem}
-                />
+                <div ref={statusMargemRef}>
+                  <StatusMargemIndicador
+                    status={statusMargem}
+                    loading={loadingStatusMargem}
+                  />
+                </div>
               )}
 
               {/* 💡 Sugestão PIX — aparece quando forma atual NÃO é PIX e há margem para oferecer desconto */}
@@ -1830,23 +1857,11 @@ export default function ModalPagamento({
               )}
 
               {/* 🆕 PASSO 5: Campo de Justificativa Inline (aparece AUTOMATICAMENTE quando margem vermelha) */}
-              {(() => {
-                // Detectar se precisa justificativa
-                let corParcelamento = 'verde';
-                if (formaPagamentoSelecionada?.permite_parcelamento && 
-                    simulacoesParcelamento[formaPagamentoSelecionada.id]?.[numeroParcelas]) {
-                  corParcelamento = simulacoesParcelamento[formaPagamentoSelecionada.id][numeroParcelas]?.cor ?? 'verde';
-                }
-                
-                const margemCritica = statusMargem === 'vermelho' || corParcelamento === 'vermelho';
-                
-                // ✅ Mostrar também se já tem texto de justificativa (para preservar após adicionar pagamento)
-                const mostrarCampo = margemCritica || (justificativaTexto && justificativaTexto.trim().length > 0);
-                
-                if (!mostrarCampo) return null;
-                
-                return (
-                  <div className="bg-red-50 border-2 border-red-300 rounded-lg p-4">
+              {mostrarCampoJustificativa && (
+                <div
+                  ref={justificativaRef}
+                  className="bg-red-50 border-2 border-red-300 rounded-lg p-4"
+                >
                     <div className="flex items-start space-x-3 mb-3">
                       <AlertCircle className="w-5 h-5 text-red-600 mt-0.5" />
                       <div className="flex-1">
@@ -1886,8 +1901,7 @@ export default function ModalPagamento({
                       💡 Mínimo 10 caracteres
                     </p>
                   </div>
-                );
-              })()}
+              )}
             </div>
           </div>
         </div>
