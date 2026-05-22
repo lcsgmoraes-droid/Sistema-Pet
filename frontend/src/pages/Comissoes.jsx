@@ -27,8 +27,8 @@ const Comissoes = () => {
         setFuncionarios(response.data.data);
       }
     } catch (error) {
-      console.error('Erro ao carregar funcionários:', error);
-      setError('Erro ao carregar funcionários com comissões');
+      console.error('Erro ao carregar parceiros:', error);
+      setError('Erro ao carregar parceiros com comissões');
     } finally {
       setLoading(false);
     }
@@ -70,7 +70,7 @@ const Comissoes = () => {
   };
 
   const duplicarConfiguracao = async (funcionarioOrigemId) => {
-    const funcionarioDestinoId = prompt('Digite o ID do funcionário de destino:');
+    const funcionarioDestinoId = prompt('Digite o ID do parceiro de destino:');
     if (!funcionarioDestinoId) return;
 
     try {
@@ -101,7 +101,7 @@ const Comissoes = () => {
     <div className="p-6">
       {destacarComissoes && (
         <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-amber-900">
-          Etapa da introducao guiada: clique em <strong>Nova Comissao</strong> para definir funcionario e regras por categoria, subcategoria ou produto.
+          Etapa da introducao guiada: clique em <strong>Nova Comissao</strong> para definir parceiro e regras por categoria, subcategoria ou produto.
         </div>
       )}
 
@@ -110,7 +110,7 @@ const Comissoes = () => {
         <div className="flex justify-between items-center">
           <div>
             <h1 className="text-3xl font-bold text-gray-800">Cadastro de Comissões</h1>
-            <p className="text-gray-600 mt-1">Gerencie as comissões dos funcionários</p>
+            <p className="text-gray-600 mt-1">Gerencie as comissões dos parceiros</p>
           </div>
           <button
             onClick={() => abrirModal()}
@@ -133,7 +133,7 @@ const Comissoes = () => {
         </div>
       )}
 
-      {/* Lista de Funcionários */}
+      {/* Lista de Parceiros */}
       <div
         className={`bg-white rounded-lg shadow ${
           destacarComissoes ? guiaClasses.box : ''
@@ -196,7 +196,7 @@ const Comissoes = () => {
                         duplicarConfiguracao(funcionario.id);
                       }}
                       className="px-3 py-1 text-gray-600 hover:bg-gray-100 rounded"
-                      title="Duplicar configuração para outro funcionário"
+                      title="Duplicar configuração para outro parceiro"
                     >
                       Duplicar
                     </button>
@@ -278,7 +278,7 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
       if (response.data.success) {
         setFuncionarios(response.data.data);
         
-        // Se estiver editando, carregar data de fechamento do funcionário
+        // Se estiver editando, carregar data de fechamento do parceiro
         if (funcionarioId) {
           const funcionario = response.data.data.find(f => f.id === parseInt(funcionarioId));
           if (funcionario && funcionario.data_fechamento_comissao) {
@@ -287,7 +287,7 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
         }
       }
     } catch (error) {
-      console.error('Erro ao carregar funcionários:', error);
+      console.error('Erro ao carregar parceiros:', error);
     }
   };
 
@@ -316,7 +316,7 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
 
   const adicionarConfiguracao = () => {
     if (!funcionarioSel) {
-      alert('Selecione um funcionário');
+      alert('Selecione um parceiro');
       return;
     }
 
@@ -338,7 +338,7 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
     // Verificar conflitos de hierarquia
     if (itemSelecionado.tipo === 'geral' && (configuracoesParaSalvar.length > 0 || Object.keys(configuracao).length > 0)) {
       const confirma = confirm(
-        'A regra geral vale para todos os produtos e categorias deste funcionario.\n\n' +
+        'A regra geral vale para todos os produtos e categorias deste parceiro.\n\n' +
         'Regras especificas de produto, subcategoria ou categoria continuam com prioridade.\n\nDeseja adicionar mesmo assim?'
       );
       if (!confirma) return;
@@ -380,7 +380,7 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
 
   const salvarTodasConfiguracoes = async () => {
     if (!funcionarioSel) {
-      alert('Selecione um funcionário');
+      alert('Selecione um parceiro');
       return;
     }
 
@@ -446,7 +446,7 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
           }
         }
         
-        onSave(); // Fecha modal e recarrega lista de funcionários
+        onSave(); // Fecha modal e recarrega lista de parceiros
       }
     } catch (error) {
       console.error('Erro ao salvar configurações:', error);
@@ -462,7 +462,7 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
 
   const salvarItem = async () => {
     if (!funcionarioSel) {
-      alert('Selecione um funcionário');
+      alert('Selecione um parceiro');
       return;
     }
 
@@ -485,7 +485,7 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
         return;
       }
 
-      if (!confirm('Deseja atualizar as regras de cálculo em TODAS as configurações deste funcionário?')) {
+      if (!confirm('Deseja atualizar as regras de cálculo em TODAS as configurações deste parceiro?')) {
         return;
       }
 
@@ -716,10 +716,10 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
 
         {/* Body */}
         <div className="flex-1 overflow-y-auto p-6">
-          {/* Selecionar Funcionário */}
+          {/* Selecionar Parceiro */}
           <div className="mb-6">
             <label className="block text-sm font-medium text-gray-700 mb-2">
-              Funcionário
+              Parceiro
             </label>
             <select
               value={funcionarioSel}
@@ -727,7 +727,7 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
               className="w-full border rounded-lg px-3 py-2"
               disabled={!!funcionarioId}
             >
-              <option value="">Selecione um funcionário</option>
+              <option value="">Selecione um parceiro</option>
               {funcionarios.map(func => (
                 <option key={func.id} value={func.id}>
                   {func.nome} - {func.cargo}
@@ -942,7 +942,7 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
                     <div className="flex items-center justify-between gap-3">
                       <div>
                         <p className="font-semibold text-sm">Regra geral</p>
-                        <p className="text-xs text-gray-600">Todos os produtos e categorias deste funcionario</p>
+                        <p className="text-xs text-gray-600">Todos os produtos e categorias deste parceiro</p>
                       </div>
                       {temConfiguracao('geral', 0) ? (
                         <span className="text-xs font-medium text-green-700">Ja configurada</span>
@@ -1027,7 +1027,7 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
                       </label>
                       <div className="grid grid-cols-2 gap-4">
                         <div>
-                          <label className="text-xs text-gray-600">Funcionário</label>
+                          <label className="text-xs text-gray-600">Parceiro</label>
                           <div className="flex items-center gap-2 mt-1">
                             <input
                               type="number"
