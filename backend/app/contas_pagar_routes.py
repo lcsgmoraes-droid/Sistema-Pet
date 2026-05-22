@@ -77,12 +77,15 @@ class ContaPagarCreate(BaseModel):
 
 class ContaPagarUpdate(BaseModel):
     descricao: Optional[str] = None
+    fornecedor_id: Optional[int] = None
     categoria_id: Optional[int] = None
     dre_subcategoria_id: Optional[int] = None
     tipo_despesa_id: Optional[int] = None
     canal: Optional[str] = None
     valor_original: Optional[float] = None
+    data_emissao: Optional[date] = None
     data_vencimento: Optional[date] = None
+    documento: Optional[str] = None
     observacoes: Optional[str] = None
 
 
@@ -352,6 +355,38 @@ def _gerar_contas_recorrentes_ate_janela(
         db.flush()
 
     return contas_criadas
+
+
+def _garantir_janela_recorrencia_apos_pagamento(
+    db: Session,
+    tenant_id,
+    conta_paga: ContaPagar,
+    hoje: Optional[date] = None,
+) -> List[ContaPagar]:
+    conta_origem = conta_paga
+    if not conta_paga.eh_recorrente and conta_paga.conta_recorrencia_origem_id:
+        conta_origem = db.query(ContaPagar).filter(
+            ContaPagar.id == conta_paga.conta_recorrencia_origem_id,
+            ContaPagar.tenant_id == tenant_id,
+        ).first()
+
+    if not conta_origem:
+        return []
+
+    if not conta_origem.eh_recorrente or not conta_origem.tipo_recorrencia or not conta_origem.proxima_recorrencia:
+        return []
+
+    data_referencia = hoje or date.today()
+    if conta_origem.data_fim_recorrencia and conta_origem.data_fim_recorrencia < data_referencia:
+        return []
+
+    limite_recorrencia = calcular_limite_janela_recorrencia(data_referencia)
+    return _gerar_contas_recorrentes_ate_janela(
+        db=db,
+        tenant_id=tenant_id,
+        conta_origem=conta_origem,
+        limite_recorrencia=limite_recorrencia,
+    )
 
 
 # ============================================================================
@@ -838,6 +873,7 @@ def listar_contas_pagar(
         item = {
             "id": conta.id,
             "descricao": conta.descricao,
+            "fornecedor_id": conta.fornecedor_id,
             "fornecedor_nome": fornecedor_nome,
             "categoria_id": conta.categoria_id,
             "categoria_nome": conta.categoria.nome if conta.categoria else None,
@@ -978,6 +1014,146 @@ def classificar_conta_pagar(
 # BUSCAR CONTA ESPECÍFICA
 # ============================================================================
 
+@router.patch("/{conta_id}")
+def atualizar_conta_pagar(
+    conta_id: int,
+    payload: ContaPagarUpdate,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Atualiza dados operacionais de uma conta a pagar existente."""
+    _, tenant_id = user_and_tenant
+    campos = payload.model_fields_set
+
+    if not campos:
+        raise HTTPException(status_code=422, detail="Informe pelo menos um campo para atualizar")
+
+    conta = db.query(ContaPagar).filter(
+        ContaPagar.id == conta_id,
+        ContaPagar.tenant_id == tenant_id,
+    ).first()
+    if not conta:
+        raise HTTPException(status_code=404, detail="Conta nao encontrada")
+
+    if "descricao" in campos:
+        descricao = (payload.descricao or "").strip()
+        if not descricao:
+            raise HTTPException(status_code=422, detail="Descricao e obrigatoria")
+        conta.descricao = descricao
+
+    if "fornecedor_id" in campos:
+        if payload.fornecedor_id is None:
+            conta.fornecedor_id = None
+        else:
+            fornecedor = db.query(Cliente).filter(
+                Cliente.id == payload.fornecedor_id,
+                Cliente.tenant_id == tenant_id,
+            ).first()
+            if not fornecedor:
+                raise HTTPException(status_code=422, detail="Fornecedor invalido para este tenant")
+            conta.fornecedor_id = payload.fornecedor_id
+
+    if "categoria_id" in campos:
+        if payload.categoria_id is None:
+            conta.categoria_id = None
+        else:
+            categoria = db.query(CategoriaFinanceira).filter(
+                CategoriaFinanceira.id == payload.categoria_id,
+                CategoriaFinanceira.tenant_id == tenant_id,
+                CategoriaFinanceira.ativo.is_(True),
+            ).first()
+            if not categoria:
+                raise HTTPException(status_code=422, detail="Categoria financeira invalida para este tenant")
+            conta.categoria_id = payload.categoria_id
+
+    if "dre_subcategoria_id" in campos:
+        if payload.dre_subcategoria_id is None:
+            conta.dre_subcategoria_id = None
+        else:
+            sub = db.query(DRESubcategoria).filter(
+                DRESubcategoria.id == payload.dre_subcategoria_id,
+                DRESubcategoria.tenant_id == tenant_id,
+                DRESubcategoria.ativo.is_(True),
+            ).first()
+            if not sub:
+                raise HTTPException(status_code=422, detail="Subcategoria DRE invalida para este tenant")
+            conta.dre_subcategoria_id = payload.dre_subcategoria_id
+
+    if "tipo_despesa_id" in campos:
+        if payload.tipo_despesa_id is None:
+            conta.tipo_despesa_id = None
+        else:
+            tipo = db.query(TipoDespesa).filter(
+                TipoDespesa.id == payload.tipo_despesa_id,
+                TipoDespesa.tenant_id == tenant_id,
+                TipoDespesa.ativo.is_(True),
+            ).first()
+            if not tipo:
+                raise HTTPException(status_code=422, detail="Tipo de despesa invalido para este tenant")
+            conta.tipo_despesa_id = payload.tipo_despesa_id
+
+    if "canal" in campos:
+        conta.canal = payload.canal
+
+    if "valor_original" in campos:
+        if payload.valor_original is None or payload.valor_original <= 0:
+            raise HTTPException(status_code=422, detail="Valor original deve ser maior que zero")
+        conta.valor_original = Decimal(str(payload.valor_original))
+
+    if "data_emissao" in campos:
+        if payload.data_emissao is None:
+            raise HTTPException(status_code=422, detail="Data de emissao e obrigatoria")
+        conta.data_emissao = payload.data_emissao
+
+    if "data_vencimento" in campos:
+        if payload.data_vencimento is None:
+            raise HTTPException(status_code=422, detail="Data de vencimento e obrigatoria")
+        conta.data_vencimento = payload.data_vencimento
+
+    if "documento" in campos:
+        conta.documento = payload.documento
+
+    if "observacoes" in campos:
+        conta.observacoes = payload.observacoes
+
+    valor_original = conta.valor_original or Decimal("0")
+    valor_juros = conta.valor_juros or Decimal("0")
+    valor_multa = conta.valor_multa or Decimal("0")
+    valor_desconto = conta.valor_desconto or Decimal("0")
+    conta.valor_final = (valor_original + valor_juros + valor_multa - valor_desconto)
+
+    valor_pago = conta.valor_pago or Decimal("0")
+    if valor_pago <= 0:
+        conta.status = "pendente"
+        conta.data_pagamento = None
+    elif valor_pago >= conta.valor_final:
+        conta.status = "pago"
+    else:
+        conta.status = "parcial"
+
+    db.commit()
+    db.refresh(conta)
+
+    return {
+        "ok": True,
+        "mensagem": "Conta a pagar atualizada com sucesso",
+        "conta_id": conta.id,
+        "descricao": conta.descricao,
+        "fornecedor_id": conta.fornecedor_id,
+        "categoria_id": conta.categoria_id,
+        "dre_subcategoria_id": conta.dre_subcategoria_id,
+        "tipo_despesa_id": conta.tipo_despesa_id,
+        "canal": conta.canal,
+        "valor_original": float(conta.valor_original),
+        "valor_final": float(conta.valor_final),
+        "data_emissao": conta.data_emissao,
+        "data_vencimento": conta.data_vencimento,
+        "documento": conta.documento,
+        "observacoes": conta.observacoes,
+        "status": conta.status,
+    }
+
+
 @router.get("/{conta_id}")
 def buscar_conta_pagar(
     conta_id: int,
@@ -992,7 +1168,10 @@ def buscar_conta_pagar(
     conta = db.query(ContaPagar).options(
         joinedload(ContaPagar.categoria),
         joinedload(ContaPagar.pagamentos)
-    ).filter(ContaPagar.id == conta_id).first()
+    ).filter(
+        ContaPagar.id == conta_id,
+        ContaPagar.tenant_id == tenant_id,
+    ).first()
     
     if not conta:
         raise HTTPException(status_code=404, detail="Conta não encontrada")
@@ -1000,12 +1179,18 @@ def buscar_conta_pagar(
     # Buscar fornecedor
     fornecedor = None
     if conta.fornecedor_id:
-        fornecedor = db.query(Cliente).filter(Cliente.id == conta.fornecedor_id).first()
+        fornecedor = db.query(Cliente).filter(
+            Cliente.id == conta.fornecedor_id,
+            Cliente.tenant_id == tenant_id,
+        ).first()
     
     # Buscar nota de entrada se houver
     nota = None
     if conta.nota_entrada_id:
-        nota = db.query(NotaEntrada).filter(NotaEntrada.id == conta.nota_entrada_id).first()
+        nota = db.query(NotaEntrada).filter(
+            NotaEntrada.id == conta.nota_entrada_id,
+            NotaEntrada.tenant_id == tenant_id,
+        ).first()
     
     return {
         "id": conta.id,
@@ -1020,6 +1205,10 @@ def buscar_conta_pagar(
             "nome": conta.categoria.nome if conta.categoria else None,
             "cor": conta.categoria.cor if conta.categoria else None
         } if conta.categoria else None,
+        "categoria_id": conta.categoria_id,
+        "dre_subcategoria_id": conta.dre_subcategoria_id,
+        "tipo_despesa_id": conta.tipo_despesa_id,
+        "canal": conta.canal,
         "valores": {
             "original": float(conta.valor_original),
             "pago": float(conta.valor_pago),
@@ -1186,6 +1375,29 @@ async def registrar_pagamento(
         lancamento.status = 'realizado'
         lancamento.realizado_em = datetime.now()
         logger.info(f"📊 Lançamento manual #{lancamento.id} atualizado para 'realizado'")
+
+    contas_recorrentes_criadas = []
+    if conta.status == 'pago':
+        contas_recorrentes_criadas = _garantir_janela_recorrencia_apos_pagamento(
+            db=db,
+            tenant_id=tenant_id,
+            conta_paga=conta,
+            hoje=date.today(),
+        )
+
+        for conta_recorrente in contas_recorrentes_criadas:
+            try:
+                atualizar_dre_por_lancamento(
+                    db=db,
+                    tenant_id=tenant_id,
+                    dre_subcategoria_id=conta_recorrente.dre_subcategoria_id,
+                    canal=conta_recorrente.canal,
+                    valor=conta_recorrente.valor_original,
+                    data_lancamento=conta_recorrente.data_vencimento,
+                    tipo_movimentacao='DESPESA'
+                )
+            except Exception as e:
+                logger.warning(f"Erro ao atualizar DRE para conta recorrente #{conta_recorrente.id}: {e}")
     
     db.commit()
     
@@ -1197,7 +1409,8 @@ async def registrar_pagamento(
         "status": conta.status,
         "valor_pago_total": float(conta.valor_pago),
         "valor_final": float(conta.valor_final),
-        "saldo_restante": float(conta.valor_final - conta.valor_pago)
+        "saldo_restante": float(conta.valor_final - conta.valor_pago),
+        "recorrencias_criadas": len(contas_recorrentes_criadas),
     }
 
 

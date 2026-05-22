@@ -2,7 +2,19 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { api } from "../../services/api";
 import toast from "react-hot-toast";
-import { FiChevronLeft, FiAlertTriangle, FiSave, FiShield } from "react-icons/fi";
+import { FiChevronLeft, FiAlertTriangle, FiSave, FiShield, FiHelpCircle } from "react-icons/fi";
+
+const InfoTooltip = ({ text }) => (
+  <span
+    className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full align-middle text-gray-400 hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-1"
+    title={text}
+    aria-label={text}
+    tabIndex={0}
+    onClick={(event) => event.preventDefault()}
+  >
+    <FiHelpCircle className="h-3.5 w-3.5" aria-hidden="true" />
+  </span>
+);
 
 export default function ConfiguracaoEstoque() {
   const [loading, setLoading] = useState(true);
@@ -204,7 +216,10 @@ export default function ConfiguracaoEstoque() {
                   disabled={!protecaoValidadeAtiva}
                   className="mt-1 mr-3 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
                 />
-                <span className="text-sm font-medium text-gray-800">Alertar no PDV</span>
+                <span className="text-sm font-medium text-gray-800">
+                  Alertar no PDV
+                  <InfoTooltip text="Quando houver produto ou lote em risco de validade, o PDV mostra um alerta para o operador conferir antes de finalizar a venda." />
+                </span>
               </label>
 
               <label className="flex items-start p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
@@ -215,7 +230,10 @@ export default function ConfiguracaoEstoque() {
                   disabled={!protecaoValidadeAtiva}
                   className="mt-1 mr-3 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
                 />
-                <span className="text-sm font-medium text-gray-800">Bloquear ecommerce</span>
+                <span className="text-sm font-medium text-gray-800">
+                  Bloquear ecommerce
+                  <InfoTooltip text="Impede que produtos com lote vencido ou em risco continuem sendo vendidos na loja online enquanto a pendencia nao for resolvida." />
+                </span>
               </label>
 
               <label className="flex items-start p-3 border border-gray-200 rounded-lg cursor-pointer hover:bg-gray-50">
@@ -226,7 +244,10 @@ export default function ConfiguracaoEstoque() {
                   disabled={!protecaoValidadeAtiva}
                   className="mt-1 mr-3 text-blue-600 focus:ring-blue-500 disabled:opacity-50"
                 />
-                <span className="text-sm font-medium text-gray-800">Bloquear integracoes</span>
+                <span className="text-sm font-medium text-gray-800">
+                  Bloquear integracoes
+                  <InfoTooltip text="Bloqueia vendas enviadas por canais integrados, como Bling, marketplaces e automacoes, quando dependerem de itens com validade em risco." />
+                </span>
               </label>
             </div>
           </div>

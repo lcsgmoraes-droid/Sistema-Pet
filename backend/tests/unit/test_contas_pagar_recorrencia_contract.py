@@ -29,3 +29,17 @@ def test_recorrencia_gerada_preserva_classificacao_financeira_e_competencia():
     assert "data_emissao=nova_data_vencimento" in source
     assert "data_lancamento=nova_conta.data_vencimento" in source
     assert "ContaPagar.data_vencimento == nova_data_vencimento" in source
+
+
+def test_pagamento_de_recorrencia_reabastece_janela_de_12_meses():
+    source = _source("app/contas_pagar_routes.py")
+
+    assert "_garantir_janela_recorrencia_apos_pagamento(" in source
+
+    registrar_pagamento = source.split("async def registrar_pagamento(", 1)[1].split(
+        "# ============================================================================\n# DASHBOARD / RESUMO",
+        1,
+    )[0]
+
+    assert "if conta.status == 'pago':" in registrar_pagamento
+    assert "_garantir_janela_recorrencia_apos_pagamento(" in registrar_pagamento
