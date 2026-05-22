@@ -83,3 +83,11 @@ def test_contas_pagar_frontend_trata_recorrencia_em_lote():
 
     assert "aplicar_recorrencia_futura" in modal_source
     assert "Aplicar alterações aos próximos lançamentos" in modal_source
+
+
+def test_modal_conta_pagar_nao_envia_data_recorrencia_vazia():
+    source = (REPO_ROOT / "frontend/src/components/ModalNovaContaPagar.jsx").read_text(encoding="utf-8")
+
+    assert "normalizarDataOpcionalRecorrencia" in source
+    assert "data_inicio_recorrencia: normalizarDataOpcionalRecorrencia(payload.data_inicio_recorrencia)" in source
+    assert "data_fim_recorrencia: normalizarDataOpcionalRecorrencia(payload.data_fim_recorrencia)" in source

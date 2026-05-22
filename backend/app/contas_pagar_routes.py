@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_, func, desc, extract, select
 from typing import List, Optional
 from datetime import datetime, date, timedelta
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from decimal import Decimal
 
 from .db import get_session
@@ -74,6 +74,13 @@ class ContaPagarCreate(BaseModel):
     data_fim_recorrencia: Optional[date] = None  # OU
     numero_repeticoes: Optional[int] = None  # alternativa ao data_fim
 
+    @field_validator("data_inicio_recorrencia", "data_fim_recorrencia", mode="before")
+    @classmethod
+    def normalizar_datas_recorrencia_vazias(cls, valor):
+        if isinstance(valor, str) and not valor.strip():
+            return None
+        return valor
+
 
 class ContaPagarUpdate(BaseModel):
     descricao: Optional[str] = None
@@ -94,6 +101,13 @@ class ContaPagarUpdate(BaseModel):
     data_fim_recorrencia: Optional[date] = None
     numero_repeticoes: Optional[int] = None
     aplicar_recorrencia_futura: Optional[bool] = False
+
+    @field_validator("data_inicio_recorrencia", "data_fim_recorrencia", mode="before")
+    @classmethod
+    def normalizar_datas_recorrencia_vazias(cls, valor):
+        if isinstance(valor, str) and not valor.strip():
+            return None
+        return valor
 
 
 class ContaPagarRecorrenciaBulkDelete(BaseModel):
