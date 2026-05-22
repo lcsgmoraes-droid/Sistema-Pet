@@ -1,6 +1,7 @@
 import { ChevronDown, Search, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
+import useRevealFloatingPanel from "../../hooks/useRevealFloatingPanel";
 import { filtrarOpcoesAutocomplete } from "./autocompleteSelectUtils";
 
 export default function AutocompleteSelect({
@@ -23,6 +24,7 @@ export default function AutocompleteSelect({
   value,
 }) {
   const containerRef = useRef(null);
+  const panelRef = useRef(null);
   const [termo, setTermo] = useState("");
   const [aberto, setAberto] = useState(false);
 
@@ -65,6 +67,12 @@ export default function AutocompleteSelect({
       }),
     [getOptionLabel, getOptionMeta, getOptionSearchText, maxOptions, options, termo],
   );
+
+  useRevealFloatingPanel({
+    enabled: aberto && !disabled,
+    panelRef,
+    refreshKey: `${termo}:${opcoesFiltradas.length}`,
+  });
 
   const selecionar = (option) => {
     setTermo(getOptionLabel(option));
@@ -149,7 +157,10 @@ export default function AutocompleteSelect({
       </div>
 
       {aberto && !disabled ? (
-        <div className="absolute z-30 mt-2 max-h-72 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg">
+        <div
+          ref={panelRef}
+          className="absolute z-30 mt-2 max-h-72 w-full overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-lg"
+        >
           {opcoesFiltradas.length === 0 ? (
             <div className="px-4 py-3 text-sm text-slate-500">{emptyLabel}</div>
           ) : (
