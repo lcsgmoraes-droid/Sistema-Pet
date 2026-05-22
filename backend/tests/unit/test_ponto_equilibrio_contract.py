@@ -47,6 +47,10 @@ def test_frontend_tem_tela_financeira_de_ponto_equilibrio():
     assert "Despesas fixas" in page
     assert "Despesas variaveis" in page
     assert "Fora do PE" in page
+    assert "Calculadora de impacto" in page
+    assert "Impacto mensal no custo fixo" in page
+    assert "Novo ponto minimo" in page
+    assert "Vendas a mais/menos" in page
     assert "fimMesAtual" in page
     assert "data_fim: fimMesAtual()" in page
     assert "Ponto de Equilíbrio —" not in dashboard
