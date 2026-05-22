@@ -35,6 +35,7 @@ def buscar_configuracao_comissao(
     Busca configuração de comissão seguindo hierarquia:
     1. Produto (mais específico - prioridade)
     2. Categoria do produto (sobe recursivamente pela hierarquia)
+    3. Regra geral do funcionario
     
     Retorna: dict com config ou None
     """
@@ -80,9 +81,9 @@ def buscar_configuracao_comissao(
         row = result.fetchone()
         if not row or not row[0]:
             logger.warning(f"⚠️ Produto {produto_id} sem categoria")
-            return None
-        
-        categoria_atual_id = row[0]
+            categoria_atual_id = None
+        else:
+            categoria_atual_id = row[0]
         
         # 3. Subir recursivamente pela hierarquia de categorias até encontrar configuração
         max_depth = 10  # Proteção contra loops infinitos
@@ -128,7 +129,35 @@ def buscar_configuracao_comissao(
             row = result.fetchone()
             categoria_atual_id = row[0] if row else None
             depth += 1
-        
+
+        # 4. Usar regra geral do funcionario como fallback para todos os itens
+        result = execute_tenant_safe(db, """
+            SELECT * FROM comissoes_configuracao
+            WHERE funcionario_id = :func_id
+              AND tipo = 'geral'
+              AND referencia_id = 0
+              AND ativo = true
+              AND {tenant_filter}
+        """, {'func_id': funcionario_id}, tenant_id=tenant_id)
+
+        config = result.fetchone()
+        if config:
+            logger.info(f"✅ Config encontrada: REGRA GERAL para funcionario {funcionario_id}")
+            return {
+                'id': config[0],
+                'funcionario_id': config[1],
+                'tipo': config[2],
+                'referencia_id': config[3],
+                'percentual': config[5],
+                'ativo': config[14],
+                'tipo_calculo': config[4],
+                'desconta_taxa_cartao': config[7],
+                'desconta_impostos': config[8],
+                'desconta_custo_entrega': config[9],
+                'comissao_venda_parcial': config[10],
+                'percentual_loja': config[6]
+            }
+
         logger.warning(f"⚠️ Nenhuma config encontrada para funcionário {funcionario_id} e produto {produto_id} (verificou {depth} níveis)")
         return None
         

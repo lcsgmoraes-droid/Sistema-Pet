@@ -43,6 +43,16 @@ def _round_money(value) -> float:
     return round(float(value or 0), 2)
 
 
+MARGEM_PONTO_EQUILIBRIO_PADRAO = "media_12_meses_fechados"
+MARGEM_PONTO_EQUILIBRIO_OPCOES = {
+    "periodo_atual": {"label": "Periodo atual", "meses_fechados": 0},
+    "mes_anterior_fechado": {"label": "Mes anterior fechado", "meses_fechados": 1},
+    "media_3_meses_fechados": {"label": "Media 3 meses fechados", "meses_fechados": 3},
+    "media_6_meses_fechados": {"label": "Media 6 meses fechados", "meses_fechados": 6},
+    "media_12_meses_fechados": {"label": "Media 12 meses fechados", "meses_fechados": 12},
+}
+
+
 def _conta_eh_compra_estoque_para_pe(conta: ContaPagar, tipo_nome: str = "", categoria_nome: str = "") -> bool:
     texto = f"{tipo_nome or ''} {categoria_nome or ''} {conta.descricao or ''}".lower()
     return bool(conta.nota_entrada_id) or (
@@ -300,11 +310,217 @@ def _detalhe_conta_pe(
     }
 
 
+def _adicionar_meses(data_base: date, meses: int) -> date:
+    indice_mes = data_base.year * 12 + data_base.month - 1 + meses
+    ano = indice_mes // 12
+    mes = indice_mes % 12 + 1
+    dia = min(data_base.day, calendar.monthrange(ano, mes)[1])
+    return date(ano, mes, dia)
+
+
+def _periodo_meses_fechados_para_margem(data_referencia: date, meses: int) -> tuple[date, date]:
+    inicio_mes_referencia = data_referencia.replace(day=1)
+    fim = inicio_mes_referencia - timedelta(days=1)
+    inicio = _adicionar_meses(fim.replace(day=1), -(meses - 1))
+    return inicio, fim
+
+
+def _calcular_despesas_variaveis_margem_pe(
+    db: Session,
+    tenant_id,
+    inicio: date,
+    fim: date,
+    canais_lista: list[str],
+) -> float:
+    contas_query = db.query(
+        ContaPagar,
+        TipoDespesa.e_custo_fixo.label("tipo_e_custo_fixo"),
+        TipoDespesa.nome.label("tipo_despesa_nome"),
+        CategoriaFinanceira.tipo_custo.label("categoria_tipo_custo"),
+        CategoriaFinanceira.nome.label("categoria_nome"),
+        DRESubcategoria.custo_pe.label("dre_custo_pe"),
+        DRESubcategoria.tipo_custo.label("dre_tipo_custo"),
+        DRESubcategoria.nome.label("dre_subcategoria_nome"),
+    ).outerjoin(
+        TipoDespesa,
+        ContaPagar.tipo_despesa_id == TipoDespesa.id,
+    ).outerjoin(
+        CategoriaFinanceira,
+        ContaPagar.categoria_id == CategoriaFinanceira.id,
+    ).outerjoin(
+        DRESubcategoria,
+        ContaPagar.dre_subcategoria_id == DRESubcategoria.id,
+    ).filter(
+        ContaPagar.tenant_id == tenant_id,
+        ContaPagar.data_vencimento >= inicio,
+        ContaPagar.data_vencimento <= fim,
+        ContaPagar.status != "cancelado",
+    )
+    if canais_lista:
+        contas_query = contas_query.filter(
+            or_(ContaPagar.canal.in_(canais_lista), ContaPagar.canal.is_(None))
+        )
+
+    despesas_variaveis = 0.0
+    for (
+        conta,
+        tipo_e_custo_fixo,
+        tipo_despesa_nome,
+        categoria_tipo_custo,
+        categoria_nome,
+        dre_custo_pe,
+        dre_tipo_custo,
+        dre_subcategoria_nome,
+    ) in contas_query.all():
+        if _conta_eh_compra_estoque_para_pe(conta, tipo_despesa_nome, categoria_nome):
+            continue
+
+        classificacao, _ = _classificar_conta_ponto_equilibrio(
+            conta,
+            tipo_e_custo_fixo=tipo_e_custo_fixo,
+            tipo_despesa_nome=tipo_despesa_nome,
+            categoria_tipo_custo=categoria_tipo_custo,
+            categoria_nome=categoria_nome,
+            dre_custo_pe=dre_custo_pe,
+            dre_subcategoria_nome=dre_subcategoria_nome,
+            dre_tipo_custo=dre_tipo_custo,
+        )
+        if classificacao == "variavel":
+            despesas_variaveis += float(conta.valor_final or conta.valor_original or 0)
+
+    provisoes_dre_query = db.query(DREDetalheCanal).filter(
+        DREDetalheCanal.tenant_id == tenant_id,
+        DREDetalheCanal.data_inicio <= fim,
+        DREDetalheCanal.data_fim >= inicio,
+        or_(
+            DREDetalheCanal.origem == "PROVISAO",
+            DREDetalheCanal.canal == "provisao",
+        ),
+    )
+    if canais_lista:
+        provisoes_dre_query = provisoes_dre_query.filter(
+            or_(DREDetalheCanal.canal.in_(canais_lista), DREDetalheCanal.canal == "provisao")
+        )
+
+    for provisao in provisoes_dre_query.all():
+        despesas_variaveis += float(provisao.despesas_vendas or 0) + float(provisao.impostos or 0)
+
+    return _round_money(despesas_variaveis)
+
+
+def _calcular_margem_periodo_ponto_equilibrio(
+    db: Session,
+    tenant_id,
+    inicio: date,
+    fim: date,
+    canais_lista: list[str],
+) -> dict:
+    inicio_dt = datetime.combine(inicio, time.min)
+    fim_dt = datetime.combine(fim, time.max)
+
+    vendas_query = db.query(Venda).filter(
+        Venda.tenant_id == tenant_id,
+        Venda.status == "finalizada",
+        Venda.data_venda >= inicio_dt,
+        Venda.data_venda <= fim_dt,
+    )
+    if canais_lista:
+        vendas_query = vendas_query.filter(Venda.canal.in_(canais_lista))
+
+    vendas_agregado = vendas_query.with_entities(
+        func.count(Venda.id).label("quantidade"),
+        func.coalesce(func.sum(Venda.total), 0).label("faturamento"),
+        func.coalesce(func.avg(Venda.total), 0).label("ticket_medio"),
+    ).first()
+
+    faturamento = _round_money(vendas_agregado.faturamento if vendas_agregado else 0)
+    quantidade_vendas = int(vendas_agregado.quantidade or 0) if vendas_agregado else 0
+    ticket_medio = _round_money(vendas_agregado.ticket_medio if vendas_agregado else 0)
+
+    cmv_query = db.query(
+        func.coalesce(func.sum(cast(VendaItem.quantidade, Float) * func.coalesce(Produto.preco_custo, 0.0)), 0)
+    ).join(
+        Venda,
+        VendaItem.venda_id == Venda.id,
+    ).outerjoin(
+        Produto,
+        VendaItem.produto_id == Produto.id,
+    ).filter(
+        Venda.tenant_id == tenant_id,
+        Venda.status == "finalizada",
+        Venda.data_venda >= inicio_dt,
+        Venda.data_venda <= fim_dt,
+        VendaItem.tipo == "produto",
+    )
+    if canais_lista:
+        cmv_query = cmv_query.filter(Venda.canal.in_(canais_lista))
+
+    cmv_estimado = _round_money(cmv_query.scalar())
+    despesas_variaveis = _calcular_despesas_variaveis_margem_pe(
+        db,
+        tenant_id,
+        inicio,
+        fim,
+        canais_lista,
+    )
+    custos_variaveis = _round_money(cmv_estimado + despesas_variaveis)
+    margem_contribuicao = _round_money(faturamento - custos_variaveis)
+    margem_decimal = margem_contribuicao / faturamento if faturamento > 0 else 0
+
+    return {
+        "inicio": inicio,
+        "fim": fim,
+        "faturamento": faturamento,
+        "quantidade_vendas": quantidade_vendas,
+        "ticket_medio": ticket_medio,
+        "cmv_estimado": cmv_estimado,
+        "despesas_variaveis": despesas_variaveis,
+        "custos_variaveis": custos_variaveis,
+        "margem_contribuicao": margem_contribuicao,
+        "margem_contribuicao_percentual": round(margem_decimal * 100, 2),
+        "margem_decimal": margem_decimal,
+    }
+
+
+def _calcular_margem_referencia_ponto_equilibrio(
+    db: Session,
+    tenant_id,
+    inicio: date,
+    fim: date,
+    canais_lista: list[str],
+    fonte_margem: str,
+    margem_periodo: dict,
+) -> dict:
+    opcao = MARGEM_PONTO_EQUILIBRIO_OPCOES[fonte_margem]
+    if fonte_margem == "periodo_atual":
+        return {
+            **margem_periodo,
+            "fonte": fonte_margem,
+            "label": opcao["label"],
+        }
+
+    meses = opcao["meses_fechados"]
+    inicio_referencia, fim_referencia = _periodo_meses_fechados_para_margem(inicio, meses)
+    margem = _calcular_margem_periodo_ponto_equilibrio(
+        db,
+        tenant_id,
+        inicio_referencia,
+        fim_referencia,
+        canais_lista,
+    )
+    return {
+        **margem,
+        "fonte": fonte_margem,
+        "label": opcao["label"],
+    }
+
+
 @router.get("/financeiro/ponto-equilibrio")
 async def obter_ponto_equilibrio(
     data_inicio: Optional[date] = None,
     data_fim: Optional[date] = None,
     canais: Optional[str] = None,
+    fonte_margem: Optional[str] = MARGEM_PONTO_EQUILIBRIO_PADRAO,
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant),
 ):
@@ -321,6 +537,10 @@ async def obter_ponto_equilibrio(
     inicio_dt = datetime.combine(inicio, time.min)
     fim_dt = datetime.combine(fim, time.max)
     canais_lista = [canal.strip() for canal in (canais or "").split(",") if canal.strip()]
+    fonte_margem = (fonte_margem or MARGEM_PONTO_EQUILIBRIO_PADRAO).strip()
+    if fonte_margem not in MARGEM_PONTO_EQUILIBRIO_OPCOES:
+        opcoes = ", ".join(MARGEM_PONTO_EQUILIBRIO_OPCOES.keys())
+        raise HTTPException(status_code=422, detail=f"Fonte da margem invalida. Use: {opcoes}")
 
     vendas_query = db.query(Venda).filter(
         Venda.tenant_id == tenant_id,
@@ -601,6 +821,31 @@ async def obter_ponto_equilibrio(
         if faturamento > 0
         else 0
     )
+    margem_periodo = {
+        "inicio": inicio,
+        "fim": fim,
+        "faturamento": faturamento,
+        "quantidade_vendas": quantidade_vendas,
+        "ticket_medio": ticket_medio,
+        "cmv_estimado": cmv_estimado,
+        "despesas_variaveis": despesas_variaveis,
+        "custos_variaveis": _round_money(custos_variaveis),
+        "margem_contribuicao": _round_money(margem_contribuicao),
+        "margem_contribuicao_percentual": round(margem_contribuicao_percentual * 100, 2),
+        "margem_decimal": margem_contribuicao_percentual,
+    }
+    margem_referencia = _calcular_margem_referencia_ponto_equilibrio(
+        db,
+        tenant_id,
+        inicio,
+        fim,
+        canais_lista,
+        fonte_margem,
+        margem_periodo,
+    )
+    margem_usada_decimal = float(margem_referencia.get("margem_decimal") or 0)
+    margem_usada_percentual = round(margem_usada_decimal * 100, 2)
+    ticket_medio_usado = ticket_medio if ticket_medio > 0 else _round_money(margem_referencia.get("ticket_medio"))
 
     ponto_equilibrio = None
     falta_faturar = None
@@ -608,13 +853,13 @@ async def obter_ponto_equilibrio(
     vendas_necessarias = None
     status_pe = "sem_faturamento"
 
-    if faturamento > 0 and margem_contribuicao_percentual > 0:
-        ponto_equilibrio = despesas_fixas / margem_contribuicao_percentual
+    if margem_usada_decimal > 0:
+        ponto_equilibrio = despesas_fixas / margem_usada_decimal
         falta_faturar = max(0, ponto_equilibrio - faturamento)
         percentual_atingido = (faturamento / ponto_equilibrio) * 100 if ponto_equilibrio > 0 else 100
         vendas_necessarias = (
-            int(math.ceil(falta_faturar / ticket_medio))
-            if falta_faturar and ticket_medio > 0
+            int(math.ceil(falta_faturar / ticket_medio_usado))
+            if falta_faturar and ticket_medio_usado > 0
             else 0
         )
         status_pe = "atingido" if falta_faturar == 0 else "nao_atingido"
@@ -627,10 +872,14 @@ async def obter_ponto_equilibrio(
             "fim": fim,
             "canais": canais_lista,
         },
-        "formula": "ponto_equilibrio = custos fixos / margem de contribuicao",
+        "formula": "ponto_equilibrio = custos fixos / margem de contribuicao escolhida",
+        "fonte_margem": fonte_margem,
+        "opcoes_fonte_margem": MARGEM_PONTO_EQUILIBRIO_OPCOES,
         "faturamento": faturamento,
         "quantidade_vendas": quantidade_vendas,
         "ticket_medio": ticket_medio,
+        "ticket_medio_usado": ticket_medio_usado,
+        "ticket_medio_referencia": _round_money(margem_referencia.get("ticket_medio")),
         "cmv_estimado": cmv_estimado,
         "despesas_variaveis": despesas_variaveis,
         "custos_variaveis": _round_money(custos_variaveis),
@@ -646,6 +895,12 @@ async def obter_ponto_equilibrio(
         "folha_funcionarios_ativos": folha_gerencial["quantidade_funcionarios"],
         "margem_contribuicao": _round_money(margem_contribuicao),
         "margem_contribuicao_percentual": round(margem_contribuicao_percentual * 100, 2),
+        "margem_periodo_percentual": round(margem_contribuicao_percentual * 100, 2),
+        "margem_periodo_valor": _round_money(margem_contribuicao),
+        "margem_usada_percentual": margem_usada_percentual,
+        "margem_usada_valor": _round_money(margem_referencia.get("margem_contribuicao")),
+        "margem_usada_label": margem_referencia.get("label"),
+        "margem_referencia": margem_referencia,
         "ponto_equilibrio": _round_money(ponto_equilibrio) if ponto_equilibrio is not None else None,
         "falta_faturar": _round_money(falta_faturar) if falta_faturar is not None else None,
         "percentual_atingido": round(percentual_atingido, 2),

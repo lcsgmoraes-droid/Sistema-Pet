@@ -38,6 +38,7 @@ class ComissoesConfig:
                             WHEN cc.tipo = 'categoria' THEN c.nome
                             WHEN cc.tipo = 'subcategoria' THEN sc.nome
                             WHEN cc.tipo = 'produto' THEN p.nome
+                            WHEN cc.tipo = 'geral' THEN 'Regra geral'
                         END as nome_item
                     FROM comissoes_configuracao cc
                     LEFT JOIN categorias c ON cc.tipo = 'categoria' AND cc.referencia_id = c.id
@@ -62,7 +63,7 @@ class ComissoesConfig:
                            subcategoria_id: int = None) -> Optional[Dict[str, Any]]:
         """
         Busca configuração de comissão aplicável para um produto
-        Segue hierarquia: Produto > Subcategoria > Categoria
+        Segue hierarquia: Produto > Subcategoria > Categoria > Regra geral
         
         Args:
             funcionario_id: ID do funcionário
@@ -127,6 +128,23 @@ class ComissoesConfig:
                 config = result.fetchone()
                 if config:
                     return dict(config)
+
+            # 4. Tentar buscar regra geral do funcionario
+            result = db.execute(
+                text('''
+                    SELECT * FROM comissoes_configuracao
+                    WHERE funcionario_id = :funcionario_id
+                    AND tipo = 'geral'
+                    AND referencia_id = 0
+                    AND ativo = 1
+                    LIMIT 1
+                '''),
+                {"funcionario_id": funcionario_id}
+            )
+
+            config = result.fetchone()
+            if config:
+                return dict(config)
             
             return None
         finally:

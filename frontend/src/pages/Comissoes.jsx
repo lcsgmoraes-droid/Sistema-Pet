@@ -175,6 +175,9 @@ const Comissoes = () => {
                       <span>
                         <strong>{funcionario.produtos}</strong> produtos específicos
                       </span>
+                      <span>
+                        <strong>{funcionario.gerais || 0}</strong> regra geral
+                      </span>
                     </div>
                   </div>
                   <div className="flex gap-2">
@@ -333,6 +336,14 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
     }
 
     // Verificar conflitos de hierarquia
+    if (itemSelecionado.tipo === 'geral' && (configuracoesParaSalvar.length > 0 || Object.keys(configuracao).length > 0)) {
+      const confirma = confirm(
+        'A regra geral vale para todos os produtos e categorias deste funcionario.\n\n' +
+        'Regras especificas de produto, subcategoria ou categoria continuam com prioridade.\n\nDeseja adicionar mesmo assim?'
+      );
+      if (!confirma) return;
+    }
+
     if (itemSelecionado.tipo === 'categoria') {
       const temProdutosOuSubs = configuracoesParaSalvar.some(
         c => (c.tipo === 'subcategoria' || c.tipo === 'produto') && c.nome.includes(itemSelecionado.nome)
@@ -400,7 +411,7 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
         observacoes: config.observacoes || '',
         desconta_taxa_cartao: regras.desconta_taxa_cartao,
         desconta_impostos: regras.desconta_impostos,
-        desconta_taxa_entrega: regras.desconta_taxa_entrega,
+        desconta_custo_entrega: regras.desconta_taxa_entrega,
         comissao_venda_parcial: regras.comissao_venda_parcial,
       }));
 
@@ -783,9 +794,9 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
             <div className="mb-3 p-3 bg-blue-50 border border-blue-200 rounded text-sm">
               <div className="font-semibold text-blue-800 mb-1">📋 Hierarquia de Configurações</div>
               <div className="text-blue-700 text-xs">
-                <strong>Produto</strong> (prioridade máxima) → <strong>Subcategoria</strong> → <strong>Categoria</strong> (prioridade mínima)
+                <strong aria-label="Produto > Subcategoria > Categoria > Regra geral">Produto {'>'} Subcategoria {'>'} Categoria {'>'} Regra geral</strong>
                 <br />
-                <span className="text-blue-600">Ao vender um produto, o sistema busca a configuração mais específica.</span>
+                <span className="text-blue-600">Ao vender um produto, o sistema busca a configuração mais específica. A regra geral cobre tudo quando nao houver uma regra especifica.</span>
               </div>
             </div>
 
@@ -874,6 +885,7 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
                           {config.tipo === 'categoria' && '📦'}
                           {config.tipo === 'subcategoria' && '📂'}
                           {config.tipo === 'produto' && '📌'}
+                          {config.tipo === 'geral' && <span className="font-semibold text-blue-700">Todos</span>}
                           <span className="text-gray-700">{config.nome_item || 'Item'}</span>
                           <span className="text-green-600 font-medium ml-auto">
                             {config.tipo_calculo === 'percentual' ? `${config.percentual}%` : `Lucro ${config.percentual}%`}
@@ -913,6 +925,34 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
                 <div className="text-center py-8">Carregando...</div>
               ) : (
                 <div key={Object.keys(configuracao).length} className="border rounded-lg max-h-96 overflow-y-auto">
+                  <div
+                    className={`p-3 border-b cursor-pointer transition-colors ${
+                      temConfiguracao('geral', 0)
+                        ? 'bg-green-50 text-green-700 cursor-default'
+                        : itemJaAdicionado('geral', 0)
+                          ? 'bg-yellow-50'
+                          : 'bg-blue-50 hover:bg-blue-100'
+                    }`}
+                    onClick={() => {
+                      if (!temConfiguracao('geral', 0)) {
+                        selecionarItem('geral', 0, 'Regra geral');
+                      }
+                    }}
+                  >
+                    <div className="flex items-center justify-between gap-3">
+                      <div>
+                        <p className="font-semibold text-sm">Regra geral</p>
+                        <p className="text-xs text-gray-600">Todos os produtos e categorias deste funcionario</p>
+                      </div>
+                      {temConfiguracao('geral', 0) ? (
+                        <span className="text-xs font-medium text-green-700">Ja configurada</span>
+                      ) : itemJaAdicionado('geral', 0) ? (
+                        <span className="text-xs text-yellow-600">Na lista</span>
+                      ) : (
+                        <span className="text-xs font-medium text-blue-700">Selecionar tudo</span>
+                      )}
+                    </div>
+                  </div>
                   {arvoreProdutos.map(categoria => renderCategoria(categoria, 0))}
                 </div>
               )}
@@ -928,6 +968,7 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
                       {itemSelecionado.tipo === 'categoria' && '📦 '}
                       {itemSelecionado.tipo === 'subcategoria' && '📂 '}
                       {itemSelecionado.tipo === 'produto' && '📌 '}
+                      {itemSelecionado.tipo === 'geral' && 'Todos '}
                       {itemSelecionado.nome}
                     </h4>
                     <p className="text-xs text-gray-500 mt-1">
@@ -1065,7 +1106,7 @@ const ModalConfiguracao = ({ funcionarioId, configuracoes, arvoreProdutos, loadi
                 </div>
               ) : (
                 <div className="border rounded-lg p-8 text-center text-gray-500">
-                  <p>Selecione uma categoria, subcategoria ou produto ao lado para configurar</p>
+                  <p>Selecione a regra geral, uma categoria, subcategoria ou produto ao lado para configurar</p>
                 </div>
               )}
 

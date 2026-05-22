@@ -18,7 +18,12 @@ def test_api_ponto_equilibrio_usa_formula_de_margem_de_contribuicao():
 
     assert '@router.get("/financeiro/ponto-equilibrio")' in source
     assert "margem_contribuicao_percentual" in source
-    assert "ponto_equilibrio = despesas_fixas / margem_contribuicao_percentual" in source
+    assert "fonte_margem" in source
+    assert "MARGEM_PONTO_EQUILIBRIO_OPCOES" in source
+    assert "_calcular_margem_referencia_ponto_equilibrio" in source
+    assert "margem_usada_percentual" in source
+    assert "margem_periodo_percentual" in source
+    assert "ponto_equilibrio = despesas_fixas / margem_usada_decimal" in source
     assert "custos_variaveis = cmv_estimado + despesas_variaveis" in source
     assert "Produto.preco_custo" in source
     assert "TipoDespesa.e_custo_fixo" in source
@@ -42,6 +47,10 @@ def test_frontend_tem_tela_financeira_de_ponto_equilibrio():
     assert 'path: "/financeiro/ponto-equilibrio"' in menu
     assert 'label: "Ponto de Equilibrio"' in menu
     assert "Ponto de Equilibrio" in page
+    assert "Fonte da margem" in page
+    assert "fonte_margem" in page
+    assert "Media 12 meses fechados" in page
+    assert "margem_usada_percentual" in page
     assert "custos fixos / margem de contribuicao" in page
     assert "Origem dos valores" in page
     assert "Despesas fixas" in page

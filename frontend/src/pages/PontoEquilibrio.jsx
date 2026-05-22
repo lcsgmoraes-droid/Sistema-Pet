@@ -129,6 +129,14 @@ const CANAIS = [
   { value: "site", label: "Site" },
 ];
 
+const MARGEM_PONTO_EQUILIBRIO_OPCOES = [
+  { value: "media_12_meses_fechados", label: "Media 12 meses fechados" },
+  { value: "media_6_meses_fechados", label: "Media 6 meses fechados" },
+  { value: "media_3_meses_fechados", label: "Media 3 meses fechados" },
+  { value: "mes_anterior_fechado", label: "Mes anterior fechado" },
+  { value: "periodo_atual", label: "Periodo atual" },
+];
+
 const CENARIOS_RAPIDOS = [
   { descricao: "Aumento aluguel", valor: "1000", faturamento: "" },
   { descricao: "Novo funcionario", valor: "3000", faturamento: "" },
@@ -493,6 +501,7 @@ export default function PontoEquilibrio() {
     data_inicio: inicioMesAtual(),
     data_fim: fimMesAtual(),
     canal: "",
+    fonte_margem: "media_12_meses_fechados",
   });
   const [impactoForm, setImpactoForm] = useState({
     descricao: "",
@@ -506,16 +515,18 @@ export default function PontoEquilibrio() {
   const [erro, setErro] = useState("");
 
   const percentualAtingido = Math.min(Number(dados?.percentual_atingido || 0), 100);
+  const margemUsadaPercentual = Number(dados?.margem_usada_percentual ?? dados?.margem_contribuicao_percentual ?? 0);
+  const margemPeriodoPercentual = Number(dados?.margem_periodo_percentual ?? dados?.margem_contribuicao_percentual ?? 0);
   const impactoValor = Number(impactoForm.valor || 0);
   const impactoSimulado = useMemo(() => {
     if (!dados) return null;
     return calcularImpactoPontoEquilibrio({
       despesasFixas: dados.despesas_fixas,
       pontoEquilibrio: dados.ponto_equilibrio,
-      margemContribuicaoPercentual: dados.margem_contribuicao_percentual,
+      margemContribuicaoPercentual: dados.margem_usada_percentual ?? dados.margem_contribuicao_percentual,
       faturamento: dados.faturamento,
       faturamentoProjetado: impactoForm.faturamento,
-      ticketMedio: dados.ticket_medio,
+      ticketMedio: dados.ticket_medio_usado ?? dados.ticket_medio,
       impactoCustoFixo: impactoValor,
     });
   }, [dados, impactoForm.faturamento, impactoValor]);
@@ -543,7 +554,7 @@ export default function PontoEquilibrio() {
       return {
         tone: "amber",
         title: "Ainda falta faturar",
-        text: `Faltam ${formatMoneyBRL(dados.falta_faturar || 0)} para cobrir os custos fixos pela margem atual.`,
+        text: `Faltam ${formatMoneyBRL(dados.falta_faturar || 0)} para cobrir os custos fixos pela margem usada.`,
       };
     }
     if (dados.status === "margem_insuficiente") {
@@ -567,6 +578,7 @@ export default function PontoEquilibrio() {
       const params = new URLSearchParams({
         data_inicio: filtros.data_inicio,
         data_fim: filtros.data_fim,
+        fonte_margem: filtros.fonte_margem,
       });
       if (filtros.canal) {
         params.append("canais", filtros.canal);
@@ -597,13 +609,13 @@ export default function PontoEquilibrio() {
               <div>
                 <h1 className="text-2xl font-bold text-slate-900">Ponto de Equilibrio</h1>
                 <p className="text-sm text-slate-600">
-                  Quanto precisa vender para empatar os custos fixos pela margem de contribuicao atual.
+                  Quanto precisa vender para empatar os custos fixos pela margem de contribuicao escolhida.
                 </p>
               </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-white p-3 md:grid-cols-[160px_160px_180px_auto]">
+          <div className="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-white p-3 md:grid-cols-[160px_160px_180px_220px_auto]">
             <div>
               <label className="text-xs font-semibold text-slate-600">Inicio</label>
               <input
@@ -636,6 +648,20 @@ export default function PontoEquilibrio() {
                 ))}
               </select>
             </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600">Fonte da margem</label>
+              <select
+                value={filtros.fonte_margem}
+                onChange={(event) => setFiltros({ ...filtros, fonte_margem: event.target.value })}
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              >
+                {MARGEM_PONTO_EQUILIBRIO_OPCOES.map((opcao) => (
+                  <option key={opcao.value} value={opcao.value}>
+                    {opcao.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <button
               type="button"
               onClick={carregarDados}
@@ -652,8 +678,9 @@ export default function PontoEquilibrio() {
           <p className="font-semibold">Formula usada</p>
           <p className="mt-1">
             Ponto de equilibrio = custos fixos / margem de contribuicao. A margem de contribuicao
-            considera faturamento menos CMV estimado e despesas variaveis operacionais. Compras de
-            estoque/produtos para revenda ficam fora das despesas variaveis para nao duplicar o CMV.
+            pode vir do periodo atual ou de meses fechados. Ela considera faturamento menos CMV
+            estimado e despesas variaveis operacionais. Compras de estoque/produtos para revenda
+            ficam fora das despesas variaveis para nao duplicar o CMV.
           </p>
         </div>
 
@@ -711,16 +738,16 @@ export default function PontoEquilibrio() {
               />
               <MetricCard
                 icon={TrendingUp}
-                title="Margem de contribuicao"
-                value={formatPercent(dados.margem_contribuicao_percentual)}
-                subtitle={formatMoneyBRL(dados.margem_contribuicao)}
-                tone={dados.margem_contribuicao_percentual > 0 ? "green" : "red"}
+                title="Margem usada"
+                value={formatPercent(margemUsadaPercentual)}
+                subtitle={`${dados.margem_usada_label || "Fonte atual"} | Periodo: ${formatPercent(margemPeriodoPercentual)}`}
+                tone={margemUsadaPercentual > 0 ? "green" : "red"}
               />
               <MetricCard
                 icon={ShoppingCart}
                 title="Vendas necessarias"
                 value={dados.vendas_necessarias == null ? "-" : String(dados.vendas_necessarias)}
-                subtitle={`Ticket medio ${formatMoneyBRL(dados.ticket_medio)}`}
+                subtitle={`Ticket medio ${formatMoneyBRL(dados.ticket_medio_usado ?? dados.ticket_medio)}`}
                 tone="slate"
               />
             </div>
@@ -760,8 +787,12 @@ export default function PontoEquilibrio() {
                   </div>
                   <div className="border-t border-slate-100 pt-3">
                     <div className="flex justify-between gap-4">
-                      <span className="font-semibold text-slate-700">Margem de contribuicao</span>
+                      <span className="font-semibold text-slate-700">Margem de contribuicao do periodo</span>
                       <span className="font-bold text-emerald-700">{formatMoneyBRL(dados.margem_contribuicao)}</span>
+                    </div>
+                    <div className="mt-2 flex justify-between gap-4 text-xs text-slate-500">
+                      <span>Margem usada no calculo</span>
+                      <span>{formatPercent(margemUsadaPercentual)} ({dados.margem_usada_label || "Fonte atual"})</span>
                     </div>
                   </div>
                 </div>
