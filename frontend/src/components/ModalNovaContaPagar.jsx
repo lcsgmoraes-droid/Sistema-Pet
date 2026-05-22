@@ -33,6 +33,11 @@ const normalizarDataContaPagar = (valor, fallback = '') => {
   return String(valor).split('T')[0];
 };
 
+const normalizarDataOpcionalRecorrencia = (valor) => {
+  const dataNormalizada = normalizarDataContaPagar(valor, '');
+  return dataNormalizada || null;
+};
+
 const montarDadosEdicaoContaPagar = (conta) => ({
   ...criarDadosPadraoContaPagar(),
   descricao: conta?.descricao || '',
@@ -303,30 +308,43 @@ const ModalNovaContaPagar = ({ isOpen, onClose, onSave, contaEdicao = null }) =>
         intervalo_dias: dados.eh_recorrente && dados.tipo_recorrencia === 'personalizado' ? parseInt(dados.intervalo_dias) : null,
         numero_repeticoes: dados.eh_recorrente && dados.numero_repeticoes ? parseInt(dados.numero_repeticoes) : null
       };
+      const recorrenciaPayload = {
+        data_inicio_recorrencia: normalizarDataOpcionalRecorrencia(payload.data_inicio_recorrencia) || payload.data_vencimento,
+        data_fim_recorrencia: normalizarDataOpcionalRecorrencia(payload.data_fim_recorrencia),
+      };
+      const payloadNormalizado = {
+        ...payload,
+        eh_recorrente: payload.eh_recorrente,
+        tipo_recorrencia: payload.eh_recorrente ? payload.tipo_recorrencia : null,
+        intervalo_dias: payload.eh_recorrente && payload.tipo_recorrencia === 'personalizado' ? payload.intervalo_dias : null,
+        data_inicio_recorrencia: payload.eh_recorrente ? recorrenciaPayload.data_inicio_recorrencia : null,
+        data_fim_recorrencia: payload.eh_recorrente ? recorrenciaPayload.data_fim_recorrencia : null,
+        numero_repeticoes: payload.eh_recorrente ? payload.numero_repeticoes : null,
+      };
 
       if (isEditando) {
         await api.patch(`/contas-pagar/${contaEdicao.id}`, {
-          descricao: payload.descricao,
-          fornecedor_id: payload.fornecedor_id,
-          categoria_id: payload.categoria_id,
-          dre_subcategoria_id: payload.dre_subcategoria_id,
-          tipo_despesa_id: payload.tipo_despesa_id,
-          canal: payload.canal,
-          valor_original: payload.valor_original,
-          data_emissao: payload.data_emissao,
-          data_vencimento: payload.data_vencimento,
-          documento: payload.documento,
-          observacoes: payload.observacoes,
-          eh_recorrente: payload.eh_recorrente,
-          tipo_recorrencia: payload.eh_recorrente ? payload.tipo_recorrencia : null,
-          intervalo_dias: payload.eh_recorrente && payload.tipo_recorrencia === 'personalizado' ? payload.intervalo_dias : null,
-          data_inicio_recorrencia: payload.eh_recorrente ? (payload.data_inicio_recorrencia || payload.data_vencimento) : null,
-          data_fim_recorrencia: payload.eh_recorrente ? payload.data_fim_recorrencia : null,
-          numero_repeticoes: payload.eh_recorrente ? payload.numero_repeticoes : null,
-          aplicar_recorrencia_futura: Boolean(payload.aplicar_recorrencia_futura),
+          descricao: payloadNormalizado.descricao,
+          fornecedor_id: payloadNormalizado.fornecedor_id,
+          categoria_id: payloadNormalizado.categoria_id,
+          dre_subcategoria_id: payloadNormalizado.dre_subcategoria_id,
+          tipo_despesa_id: payloadNormalizado.tipo_despesa_id,
+          canal: payloadNormalizado.canal,
+          valor_original: payloadNormalizado.valor_original,
+          data_emissao: payloadNormalizado.data_emissao,
+          data_vencimento: payloadNormalizado.data_vencimento,
+          documento: payloadNormalizado.documento,
+          observacoes: payloadNormalizado.observacoes,
+          eh_recorrente: payloadNormalizado.eh_recorrente,
+          tipo_recorrencia: payloadNormalizado.eh_recorrente ? payloadNormalizado.tipo_recorrencia : null,
+          intervalo_dias: payloadNormalizado.eh_recorrente && payloadNormalizado.tipo_recorrencia === 'personalizado' ? payloadNormalizado.intervalo_dias : null,
+          data_inicio_recorrencia: payloadNormalizado.eh_recorrente ? payloadNormalizado.data_inicio_recorrencia : null,
+          data_fim_recorrencia: payloadNormalizado.eh_recorrente ? payloadNormalizado.data_fim_recorrencia : null,
+          numero_repeticoes: payloadNormalizado.eh_recorrente ? payloadNormalizado.numero_repeticoes : null,
+          aplicar_recorrencia_futura: Boolean(payloadNormalizado.aplicar_recorrencia_futura),
         });
       } else {
-        await api.post('/contas-pagar/', payload);
+        await api.post('/contas-pagar/', payloadNormalizado);
       }
       
       toast.success(isEditando ? 'Conta atualizada com sucesso!' : dados.eh_recorrente ? 'Conta recorrente criada com sucesso!' : 'Conta criada com sucesso!');
