@@ -18,17 +18,26 @@ const getLocalStorage = () => {
   }
 };
 
-const migrateLegacyToken = (key) => {
+const persistAccessToken = (token) => {
   const session = getSessionStorage();
   const local = getLocalStorage();
-  if (!session || !local) {
+
+  session?.setItem(ACCESS_TOKEN_KEY, token);
+  session?.removeItem(LEGACY_TOKEN_KEY);
+  local?.setItem(ACCESS_TOKEN_KEY, token);
+  local?.removeItem(LEGACY_TOKEN_KEY);
+};
+
+const hydrateTokenFromLocalStorage = (key) => {
+  const session = getSessionStorage();
+  const local = getLocalStorage();
+  if (!local) {
     return null;
   }
 
   const token = local.getItem(key);
   if (token) {
-    session.setItem(key, token);
-    local.removeItem(key);
+    persistAccessToken(token);
   }
   return token;
 };
@@ -37,23 +46,15 @@ export const getAccessToken = () => {
   const session = getSessionStorage();
   const token = session?.getItem(ACCESS_TOKEN_KEY) || session?.getItem(LEGACY_TOKEN_KEY);
   if (token) {
+    persistAccessToken(token);
     return token;
   }
 
-  return migrateLegacyToken(ACCESS_TOKEN_KEY) || migrateLegacyToken(LEGACY_TOKEN_KEY);
+  return hydrateTokenFromLocalStorage(ACCESS_TOKEN_KEY) || hydrateTokenFromLocalStorage(LEGACY_TOKEN_KEY);
 };
 
 export const setAccessToken = (token) => {
-  const session = getSessionStorage();
-  const local = getLocalStorage();
-  if (!session) {
-    return;
-  }
-
-  session.setItem(ACCESS_TOKEN_KEY, token);
-  session.removeItem(LEGACY_TOKEN_KEY);
-  local?.removeItem(ACCESS_TOKEN_KEY);
-  local?.removeItem(LEGACY_TOKEN_KEY);
+  persistAccessToken(token);
 };
 
 export const getTempToken = () => getSessionStorage()?.getItem(TEMP_TOKEN_KEY) || null;
