@@ -1,6 +1,6 @@
 import { useRef } from 'react';
 import PropTypes from 'prop-types';
-import { FileUp, Files, Search, Settings } from 'lucide-react';
+import { FileText, FileUp, Files, Search, Settings } from 'lucide-react';
 import ActionButton from '../ui/ActionButton';
 import PageHeader from '../ui/PageHeader';
 
@@ -64,12 +64,14 @@ export default function EntradaXmlHeader({
   mostrarPainelSefaz,
   onToggleConfigSefaz,
   onTogglePainelSefaz,
+  onUploadPdf,
   onUploadLote,
   onUploadXml,
   uploadingFile,
   uploadingLote,
+  uploadingPdf,
 }) {
-  const uploadBloqueado = uploadingFile || uploadingLote;
+  const uploadBloqueado = uploadingFile || uploadingLote || uploadingPdf;
 
   return (
     <PageHeader
@@ -87,6 +89,18 @@ export default function EntradaXmlHeader({
             disabled={uploadBloqueado}
             onChange={onUploadXml}
           />
+          <ActionButton
+            type="button"
+            icon={FileText}
+            intent="create"
+            tone="soft"
+            loading={uploadingPdf}
+            disabled={uploadBloqueado}
+            size="md"
+            onClick={onUploadPdf}
+          >
+            {uploadingPdf ? 'Processando PDF...' : 'Importar PDF'}
+          </ActionButton>
           <FileInputAction
             accept=".xml"
             icon={Files}
@@ -129,7 +143,9 @@ EntradaXmlHeader.propTypes = {
   onToggleConfigSefaz: PropTypes.func.isRequired,
   onTogglePainelSefaz: PropTypes.func.isRequired,
   onUploadLote: PropTypes.func.isRequired,
+  onUploadPdf: PropTypes.func.isRequired,
   onUploadXml: PropTypes.func.isRequired,
   uploadingFile: PropTypes.bool.isRequired,
   uploadingLote: PropTypes.bool.isRequired,
+  uploadingPdf: PropTypes.bool.isRequired,
 };

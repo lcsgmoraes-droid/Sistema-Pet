@@ -1,4 +1,4 @@
-import { X } from 'lucide-react';
+import { AlertTriangle, X } from 'lucide-react';
 import EntradaXmlDetalhesConferenciaPanel from './EntradaXmlDetalhesConferenciaPanel';
 import EntradaXmlDetalhesFooter from './EntradaXmlDetalhesFooter';
 import EntradaXmlDetalhesItemCard from './EntradaXmlDetalhesItemCard';
@@ -74,8 +74,12 @@ function EntradaXmlDetalhesModal({
             {/* Cabecalho */}
             <div className="sticky top-0 bg-white border-b px-6 py-4 flex justify-between items-center">
               <div>
-                <h2 className="text-xl font-bold">Detalhes da NF-e</h2>
-                <p className="text-sm text-gray-600">Chave: {notaSelecionada.chave_acesso}</p>
+                <h2 className="text-xl font-bold">
+                  {notaSelecionada.serie === 'PDF' ? 'Detalhes da entrada PDF' : 'Detalhes da NF-e'}
+                </h2>
+                <p className="text-sm text-gray-600">
+                  {notaSelecionada.serie === 'PDF' ? 'Identificador interno' : 'Chave'}: {notaSelecionada.chave_acesso}
+                </p>
               </div>
               <IconActionButton
                 aria-label="Fechar detalhes da nota"
@@ -126,6 +130,18 @@ function EntradaXmlDetalhesModal({
                   >
                     Completar Cadastro
                   </ActionButton>
+                </div>
+              </div>
+            )}
+
+            {notaSelecionada.serie === 'PDF' && (
+              <div className="border-b border-amber-200 bg-amber-50 px-6 py-3 text-sm text-amber-900">
+                <div className="flex items-start gap-2">
+                  <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+                  <div>
+                    <strong>Entrada importada por PDF.</strong> Revise vinculos, custos e dados fiscais antes de processar.
+                    O PDF nao traz chave NF-e real, CFOP, NCM, impostos, lotes ou validacao SEFAZ.
+                  </div>
                 </div>
               </div>
             )}

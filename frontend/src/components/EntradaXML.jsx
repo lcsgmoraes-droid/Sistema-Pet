@@ -6,6 +6,7 @@ import { toast } from 'react-hot-toast';
 import { formatMoneyBRL } from '../utils/formatters';
 import EntradaXmlCriarProdutoModal from './entrada-xml/EntradaXmlCriarProdutoModal';
 import EntradaXmlDetalhesModal from './entrada-xml/EntradaXmlDetalhesModal';
+import EntradaPdfUploadModal from './entrada-xml/EntradaPdfUploadModal';
 import EntradaXmlHistoricoPrecosModal from './entrada-xml/EntradaXmlHistoricoPrecosModal';
 import EntradaXmlHeader from './entrada-xml/EntradaXmlHeader';
 import EntradaXmlMetricas from './entrada-xml/EntradaXmlMetricas';
@@ -42,6 +43,7 @@ const EntradaXML = () => {
   const [notasEntrada, setNotasEntrada] = useState([]);
   const [loading, setLoading] = useState(false);
   const [mostrarDetalhes, setMostrarDetalhes] = useState(false);
+  const [mostrarUploadPdf, setMostrarUploadPdf] = useState(false);
   const [mostrarVisualizacao, setMostrarVisualizacao] = useState(false);
   
   // Filtro de status da tabela
@@ -239,10 +241,12 @@ const EntradaXML = () => {
     fecharResultadoLote,
     handleFileUpload,
     handleMultipleFilesUpload,
+    handlePdfUpload,
     mostrarModalLote,
     resultadoLote,
     uploadingFile,
     uploadingLote,
+    uploadingPdf,
   } = useEntradaXmlUpload({
     api,
     carregarDados,
@@ -426,10 +430,19 @@ const EntradaXML = () => {
         mostrarPainelSefaz={mostrarPainelSefaz}
         onTogglePainelSefaz={alternarPainelSefaz}
         onToggleConfigSefaz={alternarConfigSefaz}
+        onUploadPdf={() => setMostrarUploadPdf(true)}
         onUploadXml={handleFileUpload}
         onUploadLote={handleMultipleFilesUpload}
         uploadingFile={uploadingFile}
         uploadingLote={uploadingLote}
+        uploadingPdf={uploadingPdf}
+      />
+
+      <EntradaPdfUploadModal
+        aberto={mostrarUploadPdf}
+        loading={uploadingPdf}
+        onClose={() => setMostrarUploadPdf(false)}
+        onImportar={handlePdfUpload}
       />
 
       <EntradaXmlSefazPanels
