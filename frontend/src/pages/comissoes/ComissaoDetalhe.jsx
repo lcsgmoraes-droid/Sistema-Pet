@@ -11,6 +11,7 @@ import React, { useState, useEffect } from 'react';
 import api from '../../api';
 import CopyableCode from '../../components/ui/CopyableCode';
 import SaleReference from '../../components/ui/SaleReference';
+import { formatarDataHoraComissao } from '../../utils/comissoesDate';
 import { useEscapeToClose } from '../../utils/modalEscape';
 
 const ComissaoDetalhe = ({ comissaoId, onClose }) => {
@@ -48,15 +49,7 @@ const ComissaoDetalhe = ({ comissaoId, onClose }) => {
 
   // Formatar data
   const formatarData = (dataISO) => {
-    if (!dataISO) return '-';
-    const data = new Date(dataISO);
-    return data.toLocaleString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatarDataHoraComissao(dataISO);
   };
 
   // Formatar moeda

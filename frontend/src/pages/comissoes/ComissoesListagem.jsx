@@ -23,6 +23,7 @@ import MoneyCell, { formatMoneyCellValue } from '../../components/ui/MoneyCell';
 import NumberCell from '../../components/ui/NumberCell';
 import SaleReference from '../../components/ui/SaleReference';
 import StatusBadge from '../../components/ui/StatusBadge';
+import { formatarDataHoraComissao } from '../../utils/comissoesDate';
 import ComissaoDetalhe from './ComissaoDetalhe';
 
 const ComissoesListagem = () => {
@@ -281,15 +282,7 @@ const ComissoesListagem = () => {
 
   // Formatar data para exibição
   const formatarData = (dataISO) => {
-    if (!dataISO) return '-';
-    const data = new Date(dataISO);
-    return data.toLocaleString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
+    return formatarDataHoraComissao(dataISO);
   };
 
   // Formatar valor monetário

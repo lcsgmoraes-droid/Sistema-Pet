@@ -309,7 +309,7 @@ async def listar_comissoes(
                 ci.id,
                 ci.venda_id,
                 v.numero_venda,
-                ci.data_venda,
+                COALESCE(v.data_finalizacao, v.data_venda, ci.data_venda) as data_venda,
                 ci.funcionario_id,
                 ci.produto_id,
                 ci.parcela_numero,
@@ -334,11 +334,11 @@ async def listar_comissoes(
             params['funcionario_id'] = funcionario_id
         
         if data_inicio:
-            query += " AND data_venda >= :data_inicio"
+            query += " AND ci.data_venda >= :data_inicio"
             params['data_inicio'] = data_inicio
         
         if data_fim:
-            query += " AND data_venda <= :data_fim"
+            query += " AND ci.data_venda <= :data_fim"
             params['data_fim'] = data_fim
         
         if status:
@@ -350,7 +350,7 @@ async def listar_comissoes(
             params['venda_id'] = venda_id
         
         # Ordenar por mais recente
-        query += " ORDER BY data_venda DESC, id DESC"
+        query += " ORDER BY COALESCE(v.data_finalizacao, v.data_venda, ci.data_venda) DESC, ci.id DESC"
         
         result = execute_tenant_safe(db, query, params)
         rows = result.fetchall()
@@ -803,7 +803,7 @@ async def detalhe_comissao(
                 v.desconto_valor as desconto_total_venda,
                 v.cupom_discount_applied,
                 v.rentabilidade_snapshot,
-                ci.data_venda,
+                COALESCE(v.data_finalizacao, v.data_venda, ci.data_venda) as data_venda,
                 ci.funcionario_id,
                 ci.produto_id,
                 ci.venda_item_id,
