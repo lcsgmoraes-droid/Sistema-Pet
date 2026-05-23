@@ -73,7 +73,7 @@ export default function EntradaPdfUploadModal({
       >
         <div className="flex items-center justify-between border-b px-6 py-4">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-orange-50 text-orange-700">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-red-50 text-red-700">
               <FileText className="h-5 w-5" />
             </div>
             <div className="min-w-0">
@@ -175,7 +175,7 @@ export default function EntradaPdfUploadModal({
           <ActionButton
             type="submit"
             icon={Upload}
-            intent="create"
+            intent="pdf"
             loading={loading}
           >
             Importar PDF
