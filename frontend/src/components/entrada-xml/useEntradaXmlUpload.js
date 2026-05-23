@@ -7,6 +7,7 @@ export default function useEntradaXmlUpload({
 }) {
   const [uploadingFile, setUploadingFile] = useState(false);
   const [uploadingLote, setUploadingLote] = useState(false);
+  const [uploadingPdf, setUploadingPdf] = useState(false);
   const [mostrarModalLote, setMostrarModalLote] = useState(false);
   const [resultadoLote, setResultadoLote] = useState(null);
 
@@ -148,6 +149,57 @@ export default function useEntradaXmlUpload({
     }
   };
 
+  const handlePdfUpload = async ({ file, fornecedorId }) => {
+    if (!file) {
+      toast.error('Selecione um arquivo PDF');
+      throw new Error('PDF nao selecionado');
+    }
+
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      toast.error('Selecione um arquivo PDF valido');
+      throw new Error('Arquivo invalido');
+    }
+
+    if (!fornecedorId) {
+      toast.error('Selecione o fornecedor do pedido');
+      throw new Error('Fornecedor nao selecionado');
+    }
+
+    setUploadingPdf(true);
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append('fornecedor_id', fornecedorId);
+
+    try {
+      const response = await api.post('/notas-entrada/upload-pdf', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      const itensVinculados = response.data.produtos_vinculados || 0;
+      const totalItens = response.data.itens_total || 0;
+
+      toast.success(
+        `PDF ${response.data.numero_nota} importado. ${itensVinculados}/${totalItens} produtos vinculados automaticamente`,
+        { duration: 5000 },
+      );
+
+      if (Array.isArray(response.data.avisos) && response.data.avisos.length > 0) {
+        toast(response.data.avisos[0], { duration: 7000 });
+      }
+
+      carregarDados();
+      return response.data;
+    } catch (error) {
+      const errorMsg = error.response?.data?.detail || error.message || 'Erro ao processar PDF';
+      toast.error(errorMsg);
+      throw error;
+    } finally {
+      setUploadingPdf(false);
+    }
+  };
+
   const fecharResultadoLote = () => {
     setMostrarModalLote(false);
     setResultadoLote(null);
@@ -157,9 +209,11 @@ export default function useEntradaXmlUpload({
     fecharResultadoLote,
     handleFileUpload,
     handleMultipleFilesUpload,
+    handlePdfUpload,
     mostrarModalLote,
     resultadoLote,
     uploadingFile,
     uploadingLote,
+    uploadingPdf,
   };
 }

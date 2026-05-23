@@ -9,7 +9,7 @@ Funcionalidades:
 - Entrada automÃ¡tica no estoque
 - GestÃ£o de produtos nÃ£o vinculados
 """
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query
+from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query, Form
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_, func, desc
 from typing import List, Optional, Dict, Any
@@ -33,6 +33,12 @@ from .produtos_models import (
 )
 from .financeiro_models import ContaPagar, TipoDespesa
 from .fiscal_patterns import aplicar_inteligencia_fiscal, identificar_padrao_fiscal
+from .notas_entrada_pdf_parser import (
+    PDFEntradaFornecedor,
+    build_pdf_synthetic_nfe_xml,
+    extract_pdf_text,
+    parse_pedido_pdf_text,
+)
 from .services.produto_service import normalizar_sku_produto
 
 import logging
@@ -1066,6 +1072,49 @@ def criar_fornecedor_automatico(dados_xml: dict, db: Session, current_user, tena
     return (fornecedor, True)
 
 
+def _valor_preenchido(valor) -> bool:
+    if valor is None:
+        return False
+    if isinstance(valor, str):
+        return bool(valor.strip())
+    return True
+
+
+def _aplicar_dados_fiscais_item_no_produto(produto, item, sobrescrever: bool = False) -> bool:
+    """Atualiza dados fiscais somente quando o item realmente trouxe o campo."""
+    atualizou = False
+
+    def aplicar_texto(campo: str) -> None:
+        nonlocal atualizou
+        valor_item = getattr(item, campo, None)
+        if not _valor_preenchido(valor_item):
+            return
+        valor_produto = getattr(produto, campo, None)
+        if sobrescrever or not _valor_preenchido(valor_produto):
+            setattr(produto, campo, valor_item)
+            atualizou = True
+
+    def aplicar_aliquota(campo: str) -> None:
+        nonlocal atualizou
+        valor_item = getattr(item, campo, None)
+        if valor_item is None:
+            return
+        if not sobrescrever and float(valor_item or 0) == 0:
+            return
+        valor_produto = getattr(produto, campo, None)
+        if sobrescrever or valor_produto is None:
+            setattr(produto, campo, valor_item)
+            atualizou = True
+
+    for campo_texto in ("ncm", "cfop", "cest", "origem"):
+        aplicar_texto(campo_texto)
+
+    for campo_aliquota in ("aliquota_icms", "aliquota_pis", "aliquota_cofins"):
+        aplicar_aliquota(campo_aliquota)
+
+    return atualizou
+
+
 def gerar_sku_automatico(prefixo: str, db: Session, user_id: int) -> str:
     """
     Gera um SKU Ãºnico automaticamente para produtos sem cÃ³digo
@@ -1534,6 +1583,199 @@ async def upload_xml(
         logger.error(f"   - Stack: {e.__traceback__}")
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Erro ao processar XML: {str(e)}")
+
+
+# ============================================================================
+# UPLOAD DE PDF DE PEDIDO/ROMANEIO
+# ============================================================================
+
+@router.post("/upload-pdf")
+async def upload_pdf(
+    file: UploadFile = File(...),
+    fornecedor_id: int = Form(...),
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Upload de pedido/romaneio PDF e entrada pelo fluxo existente."""
+    current_user, tenant_id = user_and_tenant
+    filename = file.filename or ""
+
+    logger.info(f"Upload de PDF de entrada - Arquivo: {filename}")
+    logger.info(f"   - Fornecedor ID: {fornecedor_id}")
+    logger.info(f"   - Usuario: {current_user.email} (ID: {current_user.id})")
+
+    try:
+        if not filename.lower().endswith(".pdf"):
+            raise HTTPException(status_code=400, detail="Arquivo deve ser PDF")
+
+        fornecedor = db.query(Cliente).filter(
+            Cliente.id == fornecedor_id,
+            Cliente.tenant_id == tenant_id,
+            Cliente.tipo_cadastro == "fornecedor",
+            Cliente.ativo == True,
+        ).first()
+
+        if not fornecedor:
+            raise HTTPException(status_code=404, detail="Fornecedor ativo nao encontrado")
+
+        pdf_content = await file.read()
+        if not pdf_content:
+            raise HTTPException(status_code=400, detail="PDF vazio")
+
+        try:
+            pdf_text = extract_pdf_text(pdf_content)
+            pedido_pdf = parse_pedido_pdf_text(pdf_text)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+        fornecedor_pdf = PDFEntradaFornecedor(
+            id=fornecedor.id,
+            nome=fornecedor.razao_social or fornecedor.nome_fantasia or fornecedor.nome,
+            cnpj=fornecedor.cnpj or fornecedor.cpf or "",
+        )
+        xml_str = build_pdf_synthetic_nfe_xml(
+            pedido_pdf,
+            fornecedor_pdf,
+            tenant_id=tenant_id,
+        )
+        dados_nfe = parse_nfe_xml(xml_str)
+
+        nota_existente = db.query(NotaEntrada).filter(
+            NotaEntrada.chave_acesso == dados_nfe["chave_acesso"]
+        ).first()
+
+        if nota_existente:
+            raise HTTPException(
+                status_code=400,
+                detail=f"PDF ja importado como entrada (ID: {nota_existente.id})",
+            )
+
+        nota = NotaEntrada(
+            numero_nota=dados_nfe["numero_nota"],
+            serie=dados_nfe["serie"],
+            chave_acesso=dados_nfe["chave_acesso"],
+            fornecedor_cnpj=dados_nfe["fornecedor_cnpj"],
+            fornecedor_nome=dados_nfe["fornecedor_nome"],
+            fornecedor_id=fornecedor.id,
+            data_emissao=dados_nfe["data_emissao"],
+            data_entrada=datetime.utcnow(),
+            valor_produtos=dados_nfe["valor_produtos"],
+            valor_frete=dados_nfe["valor_frete"],
+            valor_desconto=dados_nfe["valor_desconto"],
+            valor_total=dados_nfe["valor_total"],
+            xml_content=xml_str,
+            status="pendente",
+            user_id=current_user.id,
+            tenant_id=tenant_id,
+        )
+
+        db.add(nota)
+        db.flush()
+
+        vinculados = 0
+        nao_vinculados = 0
+        produtos_reativados = 0
+
+        for item_data in dados_nfe["itens"]:
+            produto, confianca, foi_inativo, origem_vinculo, referencia_vinculo = encontrar_produto_similar(
+                item_data["descricao"],
+                item_data["codigo_produto"],
+                db,
+                tenant_id=tenant_id,
+                fornecedor_id=fornecedor.id,
+                ean=item_data.get("ean"),
+            )
+
+            if produto:
+                vinculados += 1
+                if foi_inativo:
+                    produtos_reativados += 1
+                produto_id = produto.id
+                vinculado = True
+                item_status = "vinculado"
+
+                if not produto.codigo or produto.codigo.strip() == "":
+                    novo_sku = gerar_sku_automatico("PROD", db, current_user.id)
+                    produto.codigo = novo_sku
+
+                detalhe_match = ""
+                if origem_vinculo and referencia_vinculo:
+                    detalhe_match = f" [match por {origem_vinculo}: {referencia_vinculo}]"
+                logger.info(
+                    f"PDF item vinculado: {item_data['descricao'][:50]} -> "
+                    f"{produto.nome} (confianca: {confianca:.0%}){detalhe_match}"
+                )
+            else:
+                nao_vinculados += 1
+                produto_id = None
+                vinculado = False
+                item_status = "nao_vinculado"
+                confianca = 0
+
+            item = NotaEntradaItem(
+                nota_entrada_id=nota.id,
+                numero_item=item_data["numero_item"],
+                codigo_produto=item_data.get("codigo_produto"),
+                descricao=item_data["descricao"],
+                ncm=item_data.get("ncm"),
+                cest=item_data.get("cest"),
+                cfop=item_data.get("cfop"),
+                origem=item_data.get("origem"),
+                aliquota_icms=item_data.get("aliquota_icms"),
+                aliquota_pis=item_data.get("aliquota_pis"),
+                aliquota_cofins=item_data.get("aliquota_cofins"),
+                unidade=item_data.get("unidade") or "UN",
+                quantidade=item_data["quantidade"],
+                valor_unitario=item_data["valor_unitario"],
+                valor_total=item_data["valor_total"],
+                ean=item_data.get("ean"),
+                lote=item_data.get("lote"),
+                data_validade=item_data.get("data_validade"),
+                produto_id=produto_id,
+                vinculado=vinculado,
+                confianca_vinculo=confianca,
+                status=item_status,
+                tenant_id=tenant_id,
+            )
+            db.add(item)
+
+        nota.produtos_vinculados = vinculados
+        nota.produtos_nao_vinculados = nao_vinculados
+
+        db.commit()
+        db.refresh(nota)
+
+        avisos = [
+            "PDF importado como pedido/romaneio; nao e NF-e validada pela SEFAZ.",
+            "O PDF nao traz chave fiscal real, CFOP, NCM, impostos ou lotes. Revise os produtos antes de processar.",
+            "Produtos ja cadastrados preservam os dados fiscais existentes quando o PDF nao trouxer essas informacoes.",
+        ]
+
+        return {
+            "message": "PDF processado com sucesso",
+            "origem_documento": "pdf",
+            "nota_id": nota.id,
+            "numero_nota": nota.numero_nota,
+            "chave_acesso": nota.chave_acesso,
+            "fornecedor": nota.fornecedor_nome,
+            "fornecedor_id": nota.fornecedor_id,
+            "fornecedor_criado_automaticamente": False,
+            "valor_total": nota.valor_total,
+            "itens_total": len(dados_nfe["itens"]),
+            "produtos_vinculados": vinculados,
+            "produtos_nao_vinculados": nao_vinculados,
+            "produtos_reativados": produtos_reativados,
+            "avisos": avisos,
+        }
+
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as e:
+        logger.error(f"Erro inesperado no upload PDF: {str(e)}")
+        logger.error(f"   - Tipo: {type(e).__name__}")
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Erro ao processar PDF: {str(e)}")
 
 
 # ============================================================================
@@ -2291,29 +2533,8 @@ def vincular_produto(
     item.confianca_vinculo = 1.0  # Manual = 100%
     item.status = 'vinculado'
     
-    # Atualizar dados fiscais do produto com informações do XML (se disponíveis e produto não tiver)
-    atualizar_fiscal = False
-    if not produto.ncm and item.ncm:
-        produto.ncm = item.ncm
-        atualizar_fiscal = True
-    if not produto.cfop and item.cfop:
-        produto.cfop = item.cfop
-        atualizar_fiscal = True
-    if not produto.cest and hasattr(item, 'cest') and item.cest:
-        produto.cest = item.cest
-        atualizar_fiscal = True
-    if not produto.origem and hasattr(item, 'origem') and item.origem:
-        produto.origem = item.origem
-        atualizar_fiscal = True
-    if produto.aliquota_icms is None and hasattr(item, 'aliquota_icms') and item.aliquota_icms is not None:
-        produto.aliquota_icms = item.aliquota_icms
-        atualizar_fiscal = True
-    if produto.aliquota_pis is None and hasattr(item, 'aliquota_pis') and item.aliquota_pis is not None:
-        produto.aliquota_pis = item.aliquota_pis
-        atualizar_fiscal = True
-    if produto.aliquota_cofins is None and hasattr(item, 'aliquota_cofins') and item.aliquota_cofins is not None:
-        produto.aliquota_cofins = item.aliquota_cofins
-        atualizar_fiscal = True
+    # Atualizar dados fiscais do produto com informacoes do XML/PDF quando disponiveis.
+    atualizar_fiscal = _aplicar_dados_fiscais_item_no_produto(produto, item)
     
     if atualizar_fiscal:
         logger.info(f"📋 Dados fiscais do produto {produto.id} atualizados com informações da NF")
@@ -2940,14 +3161,13 @@ def processar_entrada_estoque(
             produto.ativo = True
             logger.info(f"  â™»ï¸  Produto reativado: {produto.codigo} - {produto.nome}")
         
-        # âœ… ATUALIZAR dados fiscais do produto com informaÃ§Ãµes do XML
-        produto.ncm = item.ncm
-        produto.cfop = item.cfop
-        produto.cest = item.cest if hasattr(item, 'cest') else None
-        produto.origem = item.origem if hasattr(item, 'origem') else '0'
-        produto.aliquota_icms = item.aliquota_icms if hasattr(item, 'aliquota_icms') else 0
-        produto.aliquota_pis = item.aliquota_pis if hasattr(item, 'aliquota_pis') else 0
-        produto.aliquota_cofins = item.aliquota_cofins if hasattr(item, 'aliquota_cofins') else 0
+        # Atualizar dados fiscais do produto com informacoes do XML quando vierem preenchidas.
+        # Entradas PDF preservam o cadastro atual, pois o arquivo nao contem dados fiscais reais.
+        _aplicar_dados_fiscais_item_no_produto(
+            produto,
+            item,
+            sobrescrever=nota.serie != "PDF",
+        )
         
         # âœ… ATUALIZAR EAN se fornecido e vÃ¡lido
         if item.ean and item.ean != 'SEM GTIN' and item.ean.strip():
