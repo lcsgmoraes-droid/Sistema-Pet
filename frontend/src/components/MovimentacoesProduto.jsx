@@ -11,6 +11,10 @@ import EstoqueLancamentoModal from './estoque/EstoqueLancamentoModal';
 import GranelLancamentoModal from './estoque/GranelLancamentoModal';
 import MovimentacoesLancamentosTable from './estoque/MovimentacoesLancamentosTable';
 import MovimentacoesProdutoHeader from './estoque/MovimentacoesProdutoHeader';
+import {
+  resolverEstoqueAtualMovimentacoes,
+  resolverSaldoDisponivelMovimentacoes,
+} from './estoque/movimentacoesProdutoUtils';
 import ReservasAtivasModal from './estoque/ReservasAtivasModal';
 import VendasPorCanalPanel from './estoque/VendasPorCanalPanel';
 import { useModulos } from '../contexts/ModulosContext';
@@ -833,10 +837,10 @@ export default function MovimentacoesProduto() {
     );
   }
 
-  const estoqueAtual = produto.estoque_atual || 0;
+  const estoqueAtual = resolverEstoqueAtualMovimentacoes(produto);
   const estoqueMinimo = produto.estoque_minimo || 0;
   const estoqueReservado = produto.estoque_reservado || 0;
-  const saldoAposReserva = estoqueAtual - estoqueReservado;
+  const saldoAposReserva = resolverSaldoDisponivelMovimentacoes(produto);
   const unidade = produto.unidade || 'UN';
 
   const syncDisponivel = Boolean(syncProduto?.bling_produto_id);

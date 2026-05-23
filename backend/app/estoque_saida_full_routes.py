@@ -21,7 +21,8 @@ from .domain.dre.lancamento_dre_sync import atualizar_dre_por_lancamento
 from .dre_plano_contas_models import DRECategoria, DRESubcategoria, NaturezaDRE
 from .financeiro_models import CategoriaFinanceira, ContaPagar, LancamentoManual
 from .models import User
-from .produtos_models import EstoqueMovimentacao, Produto
+from .produtos_models import EstoqueMovimentacao, Produto, ProdutoKitComponente
+from .services.kit_estoque_service import KitEstoqueService
 
 
 logger = logging.getLogger(__name__)
@@ -136,6 +137,27 @@ def _canal_saida_full_por_observacao(observacao: Optional[str]) -> Optional[str]
 
 def _sku_produto(produto: Produto) -> Optional[str]:
     return getattr(produto, "sku", None) or getattr(produto, "codigo", None)
+
+
+def _produto_usa_estoque_virtual_full_nf(produto: Produto) -> bool:
+    return (
+        getattr(produto, "tipo_produto", None) in ("KIT", "VARIACAO")
+        and getattr(produto, "tipo_kit", None) == "VIRTUAL"
+    )
+
+
+def _estoque_disponivel_saida_full_nf(db: Session, tenant_id: int, produto: Produto) -> float:
+    if _produto_usa_estoque_virtual_full_nf(produto):
+        return float(
+            KitEstoqueService.calcular_estoque_virtual_kit(
+                db,
+                produto.id,
+                tenant_id=tenant_id,
+            )
+            or 0
+        )
+
+    return float(getattr(produto, "estoque_atual", 0) or 0)
 
 
 SKU_EXPLICITO_REGEX = re.compile(r"(?:SKU|C[ÓO]DIGO)\s*[:#-]?\s*([A-Z0-9._/-]+)", re.IGNORECASE)
@@ -261,6 +283,17 @@ def _processar_item_saida_full_nf(
             detail=f"Produto nao encontrado para item (produto_id={item.produto_id}, sku={item.sku})",
         )
 
+    if _produto_usa_estoque_virtual_full_nf(produto):
+        return _processar_item_kit_virtual_saida_full_nf(
+            db=db,
+            tenant_id=tenant_id,
+            produto=produto,
+            item=item,
+            numero_nf=numero_nf,
+            observacao_movimentacao=observacao_movimentacao,
+            current_user=current_user,
+        )
+
     estoque_anterior = float(produto.estoque_atual or 0)
     if estoque_anterior < item.quantidade:
         sku_label = _sku_produto(produto) or 'sem-sku'
@@ -300,6 +333,146 @@ def _processar_item_saida_full_nf(
     }
 
 
+def _processar_item_kit_virtual_saida_full_nf(
+    db: Session,
+    tenant_id: int,
+    produto: Produto,
+    item: SaidaFullNFItemRequest,
+    numero_nf: str,
+    observacao_movimentacao: str,
+    current_user: User,
+):
+    estoque_anterior = _estoque_disponivel_saida_full_nf(db, tenant_id, produto)
+    quantidade_kits = float(item.quantidade or 0)
+
+    if estoque_anterior < quantidade_kits:
+        sku_label = _sku_produto(produto) or 'sem-sku'
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Estoque insuficiente para {produto.nome} (SKU {sku_label}). "
+                f"Disponivel: {estoque_anterior}, solicitado: {quantidade_kits}"
+            ),
+        )
+
+    componentes = db.query(ProdutoKitComponente).filter(
+        ProdutoKitComponente.kit_id == produto.id
+    ).all()
+    if not componentes:
+        sku_label = _sku_produto(produto) or 'sem-sku'
+        raise HTTPException(
+            status_code=400,
+            detail=f"Kit virtual {produto.nome} (SKU {sku_label}) nao possui componentes cadastrados",
+        )
+
+    componentes_para_baixa = []
+    for componente in componentes:
+        produto_componente = db.query(Produto).filter(
+            Produto.id == componente.produto_componente_id,
+            Produto.tenant_id == tenant_id,
+        ).first()
+        if not produto_componente:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Componente #{componente.produto_componente_id} do kit {produto.nome} nao encontrado",
+            )
+
+        quantidade_componente = quantidade_kits * float(componente.quantidade or 0)
+        estoque_componente = float(produto_componente.estoque_atual or 0)
+        if estoque_componente < quantidade_componente:
+            sku_label = _sku_produto(produto_componente) or 'sem-sku'
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Estoque insuficiente no componente {produto_componente.nome} (SKU {sku_label}) "
+                    f"para baixar o kit {produto.nome}. Disponivel: {estoque_componente}, "
+                    f"solicitado: {quantidade_componente}"
+                ),
+            )
+
+        componentes_para_baixa.append({
+            "produto": produto_componente,
+            "quantidade": quantidade_componente,
+            "estoque_anterior": estoque_componente,
+        })
+
+    componentes_baixados = []
+    for baixa in componentes_para_baixa:
+        produto_componente = baixa["produto"]
+        quantidade_componente = baixa["quantidade"]
+        estoque_componente_anterior = baixa["estoque_anterior"]
+        estoque_componente_novo = estoque_componente_anterior - quantidade_componente
+        produto_componente.estoque_atual = estoque_componente_novo
+
+        movimentacao_componente = EstoqueMovimentacao(
+            produto_id=produto_componente.id,
+            tipo='saida',
+            motivo='full_nfe_saida',
+            quantidade=quantidade_componente,
+            quantidade_anterior=estoque_componente_anterior,
+            quantidade_nova=estoque_componente_novo,
+            custo_unitario=produto_componente.preco_custo,
+            valor_total=quantidade_componente * float(produto_componente.preco_custo or 0),
+            documento=numero_nf,
+            observacao=(
+                f"{observacao_movimentacao} | componente do kit virtual "
+                f"{_sku_produto(produto) or produto.nome} ({quantidade_kits:g} kit(s))"
+            ),
+            user_id=current_user.id,
+            tenant_id=tenant_id,
+        )
+        db.add(movimentacao_componente)
+
+        componentes_baixados.append({
+            "produto_id": produto_componente.id,
+            "sku": _sku_produto(produto_componente),
+            "nome": produto_componente.nome,
+            "quantidade": quantidade_componente,
+            "estoque_anterior": estoque_componente_anterior,
+            "estoque_novo": estoque_componente_novo,
+        })
+
+    estoque_novo = _estoque_disponivel_saida_full_nf(db, tenant_id, produto)
+    movimentacao_kit = EstoqueMovimentacao(
+        produto_id=produto.id,
+        tipo='saida',
+        motivo='full_nfe_saida',
+        quantidade=quantidade_kits,
+        quantidade_anterior=estoque_anterior,
+        quantidade_nova=estoque_novo,
+        custo_unitario=0,
+        valor_total=0,
+        documento=numero_nf,
+        observacao=f"{observacao_movimentacao} | kit virtual (baixa real nos componentes)",
+        user_id=current_user.id,
+        tenant_id=tenant_id,
+    )
+    db.add(movimentacao_kit)
+
+    return {
+        "produto_id": produto.id,
+        "sku": _sku_produto(produto),
+        "nome": produto.nome,
+        "quantidade": quantidade_kits,
+        "estoque_anterior": estoque_anterior,
+        "estoque_novo": estoque_novo,
+        "tipo_kit": "VIRTUAL",
+        "componentes_baixados": componentes_baixados,
+        "sync_itens": [
+            {
+                "produto_id": componente["produto_id"],
+                "estoque_novo": componente["estoque_novo"],
+            }
+            for componente in componentes_baixados
+        ] + [
+            {
+                "produto_id": produto.id,
+                "estoque_novo": estoque_novo,
+            }
+        ],
+    }
+
+
 def _problemas_estoque_saida_full_nf(
     db: Session,
     tenant_id: int,
@@ -326,13 +499,14 @@ def _problemas_estoque_saida_full_nf(
             })
             continue
 
-        estoque_anterior = float(produto.estoque_atual or 0)
+        estoque_anterior = _estoque_disponivel_saida_full_nf(db, tenant_id, produto)
         quantidade = float(item.quantidade or 0)
         if estoque_anterior < quantidade:
             sku_label = _sku_produto(produto) or entrada_sku or "sem-sku"
             faltante = max(quantidade - estoque_anterior, 0)
+            usa_estoque_virtual = _produto_usa_estoque_virtual_full_nf(produto)
             problemas.append({
-                "tipo": "estoque_insuficiente",
+                "tipo": "estoque_insuficiente_kit_virtual" if usa_estoque_virtual else "estoque_insuficiente",
                 "produto_id": produto.id,
                 "entrada_sku": entrada_sku,
                 "sku": sku_label,
@@ -344,7 +518,7 @@ def _problemas_estoque_saida_full_nf(
                     f"Estoque insuficiente para {produto.nome} (SKU {sku_label}). "
                     f"Disponivel: {estoque_anterior}, solicitado: {quantidade}"
                 ),
-                "url_correcao": f"/produtos/{produto.id}/movimentacoes",
+                "url_correcao": f"/produtos/{produto.id}/editar" if usa_estoque_virtual else f"/produtos/{produto.id}/movimentacoes",
             })
 
     return problemas
@@ -842,10 +1016,21 @@ def saida_full_por_nf(
         db.commit()
 
         for item in processados:
-            try:
-                sincronizar_bling_background(item["produto_id"], item["estoque_novo"], "saida_full_nfe")
-            except Exception as e_sync:
-                logger.warning(f"[BLING-SYNC] Erro ao agendar sync (saida-full-nf): {e_sync}")
+            sync_itens = item.get("sync_itens") or [
+                {
+                    "produto_id": item["produto_id"],
+                    "estoque_novo": item["estoque_novo"],
+                }
+            ]
+            for sync_item in sync_itens:
+                try:
+                    sincronizar_bling_background(
+                        sync_item["produto_id"],
+                        sync_item["estoque_novo"],
+                        "saida_full_nfe",
+                    )
+                except Exception as e_sync:
+                    logger.warning(f"[BLING-SYNC] Erro ao agendar sync (saida-full-nf): {e_sync}")
 
         return {
             "success": True,
