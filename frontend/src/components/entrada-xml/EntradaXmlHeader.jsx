@@ -92,8 +92,7 @@ export default function EntradaXmlHeader({
           <ActionButton
             type="button"
             icon={FileText}
-            intent="create"
-            tone="soft"
+            intent="pdf"
             loading={uploadingPdf}
             disabled={uploadBloqueado}
             size="md"

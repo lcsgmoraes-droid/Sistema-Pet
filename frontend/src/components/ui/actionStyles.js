@@ -29,6 +29,11 @@ const ACTION_INTENTS = {
     soft: "border-cyan-200 bg-cyan-50 text-cyan-700 hover:bg-cyan-100",
     ghost: "border-transparent bg-transparent text-cyan-700 hover:bg-cyan-50",
   },
+  pdf: {
+    solid: "border-red-600 bg-red-600 text-white hover:bg-red-700",
+    soft: "border-red-200 bg-red-50 text-red-700 hover:bg-red-100",
+    ghost: "border-transparent bg-transparent text-red-700 hover:bg-red-50",
+  },
 };
 
 const ACTION_SIZES = {
@@ -94,4 +99,5 @@ export const ACTION_COLOR_RULES = {
   delete: "Excluir/remover/cancelar destrutivo",
   neutral: "Navegar, fechar, limpar, atualizar sem risco",
   warning: "Atencao, conflito, pendencia ou acao reversivel sensivel",
+  pdf: "Importacao ou acao relacionada a PDF",
 };
