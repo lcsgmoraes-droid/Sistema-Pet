@@ -322,7 +322,6 @@ def _enriquecer_produto_listagem(
 
     if produto_composto and incluir_detalhes_composto:
         try:
-            from app.services.kit_estoque_service import KitEstoqueService
             from app.services.kit_custo_service import KitCustoService
 
             composicao = KitEstoqueService.obter_detalhes_composicao(
@@ -365,6 +364,23 @@ def _enriquecer_produto_listagem(
             logger.warning(f"Erro ao processar produto composto {produto.id}: {e}")
             produto.composicao_kit = []
             produto.estoque_virtual = int(produto.estoque_atual or 0)
+    elif produto_composto and produto.tipo_kit == "VIRTUAL":
+        produto.composicao_kit = []
+        try:
+            produto.estoque_virtual = int(
+                KitEstoqueService.calcular_estoque_virtual_kit(
+                    db,
+                    produto.id,
+                    tenant_id=tenant_produto,
+                    reservas_por_produto=reservas_por_produto if reservas_mesmo_tenant else None,
+                )
+            )
+        except Exception as e:
+            logger.warning(f"Erro ao calcular estoque virtual do produto composto {produto.id}: {e}")
+            produto.estoque_virtual = int(produto.estoque_atual or 0)
+    elif produto_composto:
+        produto.composicao_kit = []
+        produto.estoque_virtual = int(produto.estoque_atual or 0)
     else:
         produto.composicao_kit = []
         produto.estoque_virtual = int(produto.estoque_atual or 0)
