@@ -61,6 +61,39 @@ BOLETO 19/06/26 26/06/26 03/07/26
 REPRESENTANTE: EMPRESA PESO TOTAL: 455,200 Kg VALOR TOTAL: 2.220,97
 """
 
+PEDIDO_1_PDFPLUMBER_TEXT = """
+PEDIDO 117058 ROMANEIO DE CARGAS: 9541 22/05/2026
+CLIENTE LJ COMERCIO DE RACOES E PET SHOP LTDA CODIGO 2406
+ENDERECO AVENIDA BRASIL, 2550 BAIRRO VILA INDUSTRIAL
+CIDADE PRESIDENTE PRUDENTE FONE (18) 3928-9584
+CODIGO PRODUTO UNI QTDE UNITARIO VL TOTAL
+MRN00869 PIPICAT ULTRA DRY 4KG UN 48 32,05 1.538,40
+PAN01058 PIPICAT FLORAL SC 12KG SC 14 31,22 437,08
+MRN00916 PIPICAT BIO BUT CEREAIS 7SD 2,2KG UN 2 22,62 45,24
+0579 AGUA SANITARIA RAJJA 3 X 5L CX 1 30,01 30,01
+MRN00876 PIPICAT BIANCO ORIGINAL 1,8KG UN 60 9,60 576,00
+PAN01115 PIPICAT CLASSIC SC 20KG SC 10 34,08 340,80
+MRN00870 PIPICAT ULTRA CONTROL BUT 4KG UN 6 27,82 166,92
+3000055 BIRBO AD CARNE 25KG SC 1 115,90 115,90
+PAN01063 PIPICAT MULTICAT SC 12KG SC 3 25,02 75,06
+PAN01069 MITZI FD 6X4 KG FD 1 41,26 41,26
+1 de 2
+BOLETO 11/06/26 01/07/26 21/07/26
+20/40/60 1.178,27 1.178,26 1.178,26
+REPRESENTANTE: EMPRESA PESO TOTAL: 823,000 Kg VALOR TOTAL: 3.534,79
+PEDIDO 117058 ROMANEIO DE CARGAS: 9541 22/05/2026
+CLIENTE LJ COMERCIO DE RACOES E PET SHOP LTDA CODIGO 2406
+ENDERECO AVENIDA BRASIL, 2550 BAIRRO VILA INDUSTRIAL
+CIDADE PRESIDENTE PRUDENTE FONE (18) 3928-9584
+CODIGO PRODUTO UNI QTDE UNITARIO VL TOTAL
+MRN00877 PIPICAT BIANCO SENSITIVE 1,8KG UN 6 14,01 84,06
+MRN00889 PIPICAT BIANCO LAVANDA 1,8KG UN 6 14,01 84,06
+2 de 2
+BOLETO 11/06/26 01/07/26 21/07/26
+20/40/60 1.178,27 1.178,26 1.178,26
+REPRESENTANTE: EMPRESA PESO TOTAL: 823,000 Kg VALOR TOTAL: 3.534,79
+"""
+
 
 def test_parse_pedido_pdf_text_extracts_order_items_total_and_installments():
     pedido = parse_pedido_pdf_text(PEDIDO_2_TEXT)
@@ -99,6 +132,33 @@ def test_parse_pedido_pdf_text_accepts_pdfplumber_layout_from_real_file():
         (date(2026, 6, 19), pytest.approx(740.33)),
         (date(2026, 6, 26), pytest.approx(740.32)),
         (date(2026, 7, 3), pytest.approx(740.32)),
+    ]
+
+
+def test_parse_pedido_pdf_text_accepts_alphanumeric_and_multipage_items():
+    pedido = parse_pedido_pdf_text(PEDIDO_1_PDFPLUMBER_TEXT)
+
+    assert pedido.numero_pedido == "117058"
+    assert pedido.data_emissao == date(2026, 5, 22)
+    assert pedido.valor_total == pytest.approx(3534.79)
+    assert pedido.valor_produtos == pytest.approx(3534.79)
+    assert pedido.peso_total_kg == pytest.approx(823.0)
+
+    assert len(pedido.itens) == 12
+    assert pedido.itens[0].codigo == "MRN00869"
+    assert pedido.itens[0].descricao == "PIPICAT ULTRA DRY 4KG"
+    assert pedido.itens[0].unidade == "UN"
+    assert pedido.itens[0].quantidade == pytest.approx(48)
+    assert pedido.itens[0].valor_total == pytest.approx(1538.40)
+    assert pedido.itens[3].codigo == "0579"
+    assert pedido.itens[3].descricao == "AGUA SANITARIA RAJJA 3 X 5L"
+    assert pedido.itens[-1].codigo == "MRN00889"
+    assert pedido.itens[-1].valor_total == pytest.approx(84.06)
+
+    assert [(dup.vencimento, dup.valor) for dup in pedido.duplicatas] == [
+        (date(2026, 6, 11), pytest.approx(1178.27)),
+        (date(2026, 7, 1), pytest.approx(1178.26)),
+        (date(2026, 7, 21), pytest.approx(1178.26)),
     ]
 
 
