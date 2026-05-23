@@ -186,16 +186,18 @@ def _extrair_data_emissao(text: str) -> date:
 
 def _extrair_itens(text: str) -> list[PDFEntradaItem]:
     itens = []
+    codigo_pattern = r"([A-Z0-9][A-Z0-9._/-]{2,})"
+    valor_pattern = r"(\d{1,3}(?:\.\d{3})*,\d{2})"
     item_patterns = [
         re.compile(
-            r"^(\d{6,})\s+(.+?)\s+(\d+(?:[,.]\d+)?)\s+"
-            r"(\d{1,3}(?:\.\d{3})*,\d{2})\s+"
-            r"(\d{1,3}(?:\.\d{3})*,\d{2})([A-Za-z]{1,6})$"
+            rf"^{codigo_pattern}\s+(.+?)\s+(\d+(?:[,.]\d+)?)\s+"
+            rf"{valor_pattern}\s+{valor_pattern}([A-Za-z]{{1,6}})$",
+            flags=re.IGNORECASE,
         ),
         re.compile(
-            r"^(\d{6,})\s+(.+)\s+([A-Za-z]{1,6})\s+(\d+(?:[,.]\d+)?)\s+"
-            r"(\d{1,3}(?:\.\d{3})*,\d{2})\s+"
-            r"(\d{1,3}(?:\.\d{3})*,\d{2})$"
+            rf"^{codigo_pattern}\s+(.+)\s+([A-Za-z]{{1,6}})\s+(\d+(?:[,.]\d+)?)\s+"
+            rf"{valor_pattern}\s+{valor_pattern}$",
+            flags=re.IGNORECASE,
         ),
     ]
 
@@ -238,24 +240,56 @@ def _extrair_peso_total(text: str) -> Optional[float]:
 
 
 def _extrair_duplicatas(text: str) -> list[PDFEntradaDuplicata]:
-    boleto_index = text.upper().find("BOLETO")
-    if boleto_index < 0:
-        return []
+    lines = text.split("\n")
+    pares = []
+    vistos = set()
 
-    boleto_text = text[boleto_index:]
-    boleto_text = re.sub(
-        r"(\d{2}/\d{2}/\d{2})(?=\d{2}/\d{2})",
-        r"\1 ",
-        boleto_text,
-    )
-    datas = []
-    for value in re.findall(r"\d{2}/\d{2}/(?:\d{4}|\d{2})(?!\d)", boleto_text):
-        try:
-            datas.append(_parse_date(value))
-        except ValueError:
+    for index, line in enumerate(lines):
+        if "BOLETO" not in line.upper():
             continue
-    valores = [_parse_decimal(value) for value in re.findall(r"\d{1,3}(?:\.\d{3})*,\d{2}", boleto_text)]
-    pares = sorted(zip(datas, valores), key=lambda pair: pair[0])
+
+        linha_datas = re.sub(
+            r"(\d{2}/\d{2}/\d{2})(?=\d{2}/\d{2})",
+            r"\1 ",
+            line,
+        )
+        datas = []
+        for value in re.findall(r"\d{2}/\d{2}/(?:\d{4}|\d{2})(?!\d)", linha_datas):
+            try:
+                datas.append(_parse_date(value))
+            except ValueError:
+                continue
+
+        linhas_valores = []
+        for next_line in lines[index + 1 : index + 4]:
+            upper_line = next_line.upper()
+            if (
+                upper_line.startswith("PEDIDO ")
+                or upper_line.startswith("CODIGO PRODUTO")
+                or upper_line.startswith("CLIENTE ")
+                or "REPRESENTANTE" in upper_line
+                or "VALOR TOTAL" in upper_line
+                or "PESO TOTAL" in upper_line
+            ):
+                break
+            linhas_valores.append(next_line)
+
+        valores = [
+            _parse_decimal(value)
+            for value in re.findall(
+                r"\d{1,3}(?:\.\d{3})*,\d{2}",
+                "\n".join(linhas_valores),
+            )
+        ]
+
+        for vencimento, valor in zip(datas, valores):
+            chave = (vencimento, valor)
+            if chave in vistos:
+                continue
+            vistos.add(chave)
+            pares.append((vencimento, valor))
+
+    pares = sorted(pares, key=lambda pair: pair[0])
 
     duplicatas = []
     for idx, (vencimento, valor) in enumerate(pares, start=1):
