@@ -312,11 +312,43 @@ export interface FuncionarioPdvPagamentoPayload {
   troco?: number | null;
 }
 
+export interface FuncionarioPdvCupomDisponivel {
+  code: string;
+  coupon_type: string;
+  discount_value?: number | null;
+  discount_percent?: number | null;
+  discount_applied: number;
+  min_purchase_value?: number | null;
+  valid_until?: string | null;
+}
+
+export interface FuncionarioPdvBeneficiosPreviewPayload {
+  cliente_id?: number | null;
+  itens: FuncionarioPdvItemPayload[];
+  cupom_codigo?: string | null;
+  cashback_valor?: number | null;
+}
+
+export interface FuncionarioPdvBeneficiosPreview {
+  subtotal: number;
+  desconto_cupom: number;
+  cupom_code?: string | null;
+  cashback_disponivel: number;
+  cashback_valor: number;
+  total_venda: number;
+  valor_pagamento: number;
+  cupons_disponiveis: FuncionarioPdvCupomDisponivel[];
+  mensagens: string[];
+}
+
 export interface FuncionarioPdvFinalizarPayload {
   cliente_id?: number | null;
   itens: FuncionarioPdvItemPayload[];
   pagamento: FuncionarioPdvPagamentoPayload;
   observacoes?: string | null;
+  cupom_codigo?: string | null;
+  desconto_cupom?: number | null;
+  cashback_valor?: number | null;
 }
 
 export interface FuncionarioPdvFinalizarResponse {

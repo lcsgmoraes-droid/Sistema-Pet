@@ -74,3 +74,35 @@ def test_mobile_app_has_employee_pdv_navigation_service_and_screen():
     assert "/app/funcionario/pdv/vendas/finalizar" in service
     assert "CameraView" in screen
     assert "finalizarVendaPdv" in screen
+
+
+def test_funcionario_pdv_supports_campaign_benefits_preview_contract():
+    backend = read_repo("backend/app/routes/app_mobile_routes.py")
+    service = read_repo("app-mobile/src/services/funcionarioPdv.service.ts")
+    screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx")
+
+    assert '"/funcionario/pdv/beneficios/preview"' in backend
+    assert "preview_coupon_redemption" in backend
+    assert "CashbackTransaction" in backend
+    assert "FuncionarioPdvBeneficiosPreviewRequest" in backend
+    assert "FuncionarioPdvBeneficiosPreviewResponse" in backend
+
+    assert "/app/funcionario/pdv/beneficios/preview" in service
+    assert "previewBeneficiosPdv" in service
+    assert "beneficiosPreview" in screen
+    assert "cupomCodigo" in screen
+    assert "usarCashback" in screen
+
+
+def test_funcionario_pdv_finalization_passes_coupon_and_cashback_to_official_sale_flow():
+    source = read_repo("backend/app/routes/app_mobile_routes.py")
+    block = extract_block(source, "def finalizar_venda_funcionario_pdv")
+
+    assert "cupom_codigo" in block
+    assert "desconto_cupom" in block
+    assert "cashback_valor" in block
+    assert '"cupom_code": beneficios["cupom_code"]' in block
+    assert '"cupom_discount_applied": beneficios["desconto_cupom"]' in block
+    assert '"forma_pagamento": "Cashback"' in block
+    assert "cupom_code=beneficios[\"cupom_code\"]" in block
+    assert "cupom_discount_applied=beneficios[\"desconto_cupom\"]" in block

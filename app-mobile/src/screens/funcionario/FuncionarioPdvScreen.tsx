@@ -21,10 +21,12 @@ import {
   buscarProdutosPdv,
   finalizarVendaPdv,
   obterCaixaAbertoPdv,
+  previewBeneficiosPdv,
 } from "../../services/funcionarioPdv.service";
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from "../../theme";
 import {
   FuncionarioPdvCaixa,
+  FuncionarioPdvBeneficiosPreview,
   FuncionarioPdvCliente,
   FuncionarioPdvFormaPagamento,
   FuncionarioPdvProduto,
@@ -81,7 +83,14 @@ export default function FuncionarioPdvScreen() {
   const [caixa, setCaixa] = useState<FuncionarioPdvCaixa | null>(null);
   const [carregandoCaixa, setCarregandoCaixa] = useState(false);
   const [finalizando, setFinalizando] = useState(false);
+  const [beneficiosPreview, setBeneficiosPreview] = useState<FuncionarioPdvBeneficiosPreview | null>(null);
+  const [carregandoBeneficios, setCarregandoBeneficios] = useState(false);
+  const [erroBeneficios, setErroBeneficios] = useState<string | null>(null);
+  const [cupomCodigo, setCupomCodigo] = useState("");
+  const [usarCashback, setUsarCashback] = useState(false);
+  const [cashbackValor, setCashbackValor] = useState("");
   const ultimoScan = useRef("");
+  const previewSequencia = useRef(0);
 
   useEffect(() => {
     if (scannerAberto && !permission?.granted) {
@@ -102,12 +111,42 @@ export default function FuncionarioPdvScreen() {
       ),
     [carrinho],
   );
+  const itensPayload = useMemo(
+    () =>
+      carrinho.map((item) => ({
+        produto_id: item.produto.id,
+        quantidade: item.quantidade,
+        preco_unitario: Number(item.produto.preco_venda ?? 0),
+      })),
+    [carrinho],
+  );
+  const itensPreviewKey = useMemo(() => JSON.stringify(itensPayload), [itensPayload]);
+  const cashbackSolicitado = useMemo(
+    () => (usarCashback ? parseNumero(cashbackValor) ?? 0 : 0),
+    [cashbackValor, usarCashback],
+  );
+  const totalComBeneficios = beneficiosPreview?.total_venda ?? total;
+  const valorAPagar = beneficiosPreview?.valor_pagamento ?? totalComBeneficios;
   const valorRecebidoNumero = useMemo(() => parseNumero(valorRecebido) ?? 0, [valorRecebido]);
-  const troco = formaPagamento === "dinheiro" ? Math.max(0, valorRecebidoNumero - total) : 0;
+  const troco = formaPagamento === "dinheiro" ? Math.max(0, valorRecebidoNumero - valorAPagar) : 0;
   const totalItens = useMemo(
     () => carrinho.reduce((soma, item) => soma + item.quantidade, 0),
     [carrinho],
   );
+
+  useEffect(() => {
+    if (!isFocused || carrinho.length === 0) {
+      setBeneficiosPreview(null);
+      setErroBeneficios(null);
+      return;
+    }
+
+    const timer = setTimeout(() => {
+      carregarBeneficios();
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [isFocused, itensPreviewKey, cliente?.id, cupomCodigo, usarCashback, cashbackValor]);
 
   async function carregarCaixa() {
     setCarregandoCaixa(true);
@@ -117,6 +156,39 @@ export default function FuncionarioPdvScreen() {
       Alert.alert("Erro", mensagemErroApi(error, "Nao foi possivel consultar o caixa."));
     } finally {
       setCarregandoCaixa(false);
+    }
+  }
+
+  async function carregarBeneficios() {
+    if (!itensPayload.length) {
+      setBeneficiosPreview(null);
+      setErroBeneficios(null);
+      return;
+    }
+
+    const sequenciaAtual = previewSequencia.current + 1;
+    previewSequencia.current = sequenciaAtual;
+    setCarregandoBeneficios(true);
+    setErroBeneficios(null);
+    try {
+      const preview = await previewBeneficiosPdv({
+        cliente_id: cliente?.id ?? null,
+        itens: itensPayload,
+        cupom_codigo: cupomCodigo.trim() || null,
+        cashback_valor: cashbackSolicitado,
+      });
+      if (previewSequencia.current === sequenciaAtual) {
+        setBeneficiosPreview(preview);
+      }
+    } catch (error: any) {
+      if (previewSequencia.current === sequenciaAtual) {
+        setBeneficiosPreview(null);
+        setErroBeneficios(mensagemErroApi(error, "Nao foi possivel calcular os beneficios."));
+      }
+    } finally {
+      if (previewSequencia.current === sequenciaAtual) {
+        setCarregandoBeneficios(false);
+      }
     }
   }
 
@@ -212,31 +284,41 @@ export default function FuncionarioPdvScreen() {
       Alert.alert("Carrinho vazio", "Adicione ao menos um produto para finalizar.");
       return;
     }
-    if (total <= 0) {
-      Alert.alert("Total invalido", "O total da venda precisa ser maior que zero.");
-      return;
-    }
-    if (formaPagamento === "dinheiro" && valorRecebidoNumero + 0.01 < total) {
-      Alert.alert("Valor recebido", "Informe um valor recebido igual ou maior que o total.");
-      return;
-    }
-
     setFinalizando(true);
     try {
+      const previewAtual = await previewBeneficiosPdv({
+        cliente_id: cliente?.id ?? null,
+        itens: itensPayload,
+        cupom_codigo: cupomCodigo.trim() || null,
+        cashback_valor: cashbackSolicitado,
+      });
+      setBeneficiosPreview(previewAtual);
+      setErroBeneficios(null);
+
+      if (previewAtual.total_venda <= 0) {
+        Alert.alert("Total invalido", "O total da venda precisa ser maior que zero.");
+        return;
+      }
+
+      if (formaPagamento === "dinheiro" && previewAtual.valor_pagamento > 0 && valorRecebidoNumero + 0.01 < previewAtual.valor_pagamento) {
+        Alert.alert("Valor recebido", "Informe um valor recebido igual ou maior que o total.");
+        return;
+      }
+
+      const trocoFinal = formaPagamento === "dinheiro" ? Math.max(0, valorRecebidoNumero - previewAtual.valor_pagamento) : 0;
       const resposta = await finalizarVendaPdv({
         cliente_id: cliente?.id ?? null,
-        itens: carrinho.map((item) => ({
-          produto_id: item.produto.id,
-          quantidade: item.quantidade,
-          preco_unitario: Number(item.produto.preco_venda ?? 0),
-        })),
+        itens: itensPayload,
         pagamento: {
           forma_pagamento: formaPagamento,
-          valor: Number(total.toFixed(2)),
-          valor_recebido: formaPagamento === "dinheiro" ? Number(valorRecebidoNumero.toFixed(2)) : null,
-          troco: formaPagamento === "dinheiro" ? Number(troco.toFixed(2)) : null,
+          valor: Number(previewAtual.valor_pagamento.toFixed(2)),
+          valor_recebido: formaPagamento === "dinheiro" && previewAtual.valor_pagamento > 0 ? Number(valorRecebidoNumero.toFixed(2)) : null,
+          troco: formaPagamento === "dinheiro" && previewAtual.valor_pagamento > 0 ? Number(trocoFinal.toFixed(2)) : null,
         },
         observacoes: observacoes.trim() || null,
+        cupom_codigo: cupomCodigo.trim() || null,
+        desconto_cupom: previewAtual.desconto_cupom,
+        cashback_valor: previewAtual.cashback_valor,
       });
       Alert.alert("Venda registrada", `${resposta.numero_venda} - ${formatarMoeda(resposta.total)}`);
       setCarrinho([]);
@@ -245,6 +327,10 @@ export default function FuncionarioPdvScreen() {
       setClientesSugestoes([]);
       setValorRecebido("");
       setObservacoes("");
+      setCupomCodigo("");
+      setUsarCashback(false);
+      setCashbackValor("");
+      setBeneficiosPreview(null);
       carregarCaixa();
     } catch (error: any) {
       Alert.alert("Erro", mensagemErroApi(error, "Nao foi possivel finalizar a venda."));
@@ -424,7 +510,14 @@ export default function FuncionarioPdvScreen() {
                 <Text style={styles.clienteNome}>{cliente.nome}</Text>
                 <Text style={styles.clienteMeta}>Codigo {cliente.codigo || "-"}</Text>
               </View>
-              <TouchableOpacity style={styles.botaoLimpar} onPress={() => setCliente(null)}>
+              <TouchableOpacity
+                style={styles.botaoLimpar}
+                onPress={() => {
+                  setCliente(null);
+                  setUsarCashback(false);
+                  setCashbackValor("");
+                }}
+              >
                 <Ionicons name="close" size={18} color={CORES.erro} />
               </TouchableOpacity>
             </View>
@@ -451,6 +544,8 @@ export default function FuncionarioPdvScreen() {
                     setCliente(item);
                     setClientesSugestoes([]);
                     setClienteBusca("");
+                    setUsarCashback(false);
+                    setCashbackValor("");
                   }}
                 >
                   <View style={{ flex: 1 }}>
@@ -462,6 +557,122 @@ export default function FuncionarioPdvScreen() {
               ))}
             </>
           )}
+        </View>
+
+        <View style={styles.card}>
+          <View style={styles.linhaTitulo}>
+            <Text style={styles.secaoTitulo}>Beneficios e campanhas</Text>
+            {carregandoBeneficios ? <ActivityIndicator color={CORES.primario} /> : null}
+          </View>
+
+          <View style={styles.buscaLinha}>
+            <TextInput
+              value={cupomCodigo}
+              onChangeText={setCupomCodigo}
+              placeholder="Codigo do cupom"
+              autoCapitalize="characters"
+              style={styles.inputBusca}
+            />
+            <TouchableOpacity style={styles.botaoBusca} onPress={carregarBeneficios} disabled={!carrinho.length}>
+              <Ionicons name="ticket-outline" size={20} color="#fff" />
+            </TouchableOpacity>
+          </View>
+
+          {erroBeneficios ? (
+            <View style={styles.beneficioErro}>
+              <Ionicons name="alert-circle-outline" size={18} color={CORES.erro} />
+              <Text style={styles.beneficioErroTexto}>{erroBeneficios}</Text>
+            </View>
+          ) : null}
+
+          {beneficiosPreview?.cupons_disponiveis?.length ? (
+            <View style={styles.cuponsLista}>
+              {beneficiosPreview.cupons_disponiveis.slice(0, 3).map((cupom) => (
+                <TouchableOpacity
+                  key={cupom.code}
+                  style={styles.cupomChip}
+                  onPress={() => setCupomCodigo(cupom.code)}
+                >
+                  <Ionicons name="pricetag-outline" size={15} color={CORES.primario} />
+                  <Text style={styles.cupomChipTexto}>
+                    {cupom.code} - {formatarMoeda(cupom.discount_applied)}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : null}
+
+          {cliente ? (
+            <View style={styles.cashbackBox}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.cashbackTitulo}>Cashback disponivel</Text>
+                <Text style={styles.cashbackValor}>{formatarMoeda(beneficiosPreview?.cashback_disponivel ?? 0)}</Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.cashbackToggle, usarCashback && styles.cashbackToggleAtivo]}
+                onPress={() => {
+                  const saldo = beneficiosPreview?.cashback_disponivel ?? 0;
+                  const sugerido = Math.min(saldo, totalComBeneficios);
+                  setUsarCashback((atual) => !atual);
+                  if (!usarCashback && sugerido > 0) {
+                    setCashbackValor(String(sugerido.toFixed(2)).replace(".", ","));
+                  }
+                }}
+              >
+                <Ionicons
+                  name={usarCashback ? "checkmark-circle" : "ellipse-outline"}
+                  size={18}
+                  color={usarCashback ? "#fff" : CORES.primario}
+                />
+                <Text style={[styles.cashbackToggleTexto, usarCashback && styles.cashbackToggleTextoAtivo]}>
+                  Usar
+                </Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <View style={styles.beneficioInfo}>
+              <Ionicons name="person-circle-outline" size={18} color={CORES.textoSecundario} />
+              <Text style={styles.beneficioInfoTexto}>Selecione um cliente para ver cashback e cupons nominais.</Text>
+            </View>
+          )}
+
+          {usarCashback ? (
+            <>
+              <Text style={styles.label}>Valor de cashback</Text>
+              <TextInput
+                value={cashbackValor}
+                onChangeText={setCashbackValor}
+                placeholder="Ex: 10,00"
+                keyboardType="decimal-pad"
+                style={styles.input}
+              />
+            </>
+          ) : null}
+
+          {beneficiosPreview ? (
+            <View style={styles.beneficioResumo}>
+              <View style={styles.beneficioLinha}>
+                <Text style={styles.beneficioResumoLabel}>Subtotal</Text>
+                <Text style={styles.beneficioResumoValor}>{formatarMoeda(beneficiosPreview.subtotal)}</Text>
+              </View>
+              {beneficiosPreview.desconto_cupom > 0 ? (
+                <View style={styles.beneficioLinha}>
+                  <Text style={styles.beneficioResumoLabel}>Cupom</Text>
+                  <Text style={styles.beneficioResumoDesconto}>- {formatarMoeda(beneficiosPreview.desconto_cupom)}</Text>
+                </View>
+              ) : null}
+              {beneficiosPreview.cashback_valor > 0 ? (
+                <View style={styles.beneficioLinha}>
+                  <Text style={styles.beneficioResumoLabel}>Cashback</Text>
+                  <Text style={styles.beneficioResumoDesconto}>- {formatarMoeda(beneficiosPreview.cashback_valor)}</Text>
+                </View>
+              ) : null}
+              <View style={styles.beneficioLinha}>
+                <Text style={styles.beneficioResumoTotal}>A pagar</Text>
+                <Text style={styles.beneficioResumoTotal}>{formatarMoeda(valorAPagar)}</Text>
+              </View>
+            </View>
+          ) : null}
         </View>
 
         <View style={styles.card}>
@@ -511,8 +722,11 @@ export default function FuncionarioPdvScreen() {
 
         <View style={styles.resumo}>
           <View>
-            <Text style={styles.resumoLabel}>Total da venda</Text>
-            <Text style={styles.resumoValor}>{formatarMoeda(total)}</Text>
+            <Text style={styles.resumoLabel}>Total a pagar</Text>
+            <Text style={styles.resumoValor}>{formatarMoeda(valorAPagar)}</Text>
+            {valorAPagar !== total ? (
+              <Text style={styles.resumoSubvalor}>Venda {formatarMoeda(totalComBeneficios)}</Text>
+            ) : null}
           </View>
           <TouchableOpacity
             style={[styles.botaoFinalizar, (finalizando || !carrinho.length || !caixa?.aberto) && styles.botaoDesabilitado]}
@@ -705,6 +919,79 @@ const styles = StyleSheet.create({
   formaTexto: { color: CORES.textoSecundario, fontWeight: "800" },
   formaTextoAtivo: { color: CORES.primario },
   label: { fontSize: FONTE.normal, fontWeight: "700", color: CORES.texto, marginTop: ESPACO.xs },
+  beneficioErro: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ESPACO.xs,
+    backgroundColor: "#FEF2F2",
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    borderRadius: RAIO.md,
+    padding: ESPACO.sm,
+  },
+  beneficioErroTexto: { flex: 1, color: CORES.erro, fontSize: FONTE.pequena, fontWeight: "700" },
+  beneficioInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ESPACO.xs,
+    backgroundColor: CORES.fundo,
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    borderRadius: RAIO.md,
+    padding: ESPACO.sm,
+  },
+  beneficioInfoTexto: { flex: 1, color: CORES.textoSecundario, fontSize: FONTE.pequena },
+  cuponsLista: { gap: ESPACO.xs },
+  cupomChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ESPACO.xs,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    backgroundColor: "#EFF6FF",
+    borderRadius: RAIO.md,
+    paddingHorizontal: ESPACO.sm,
+    paddingVertical: ESPACO.xs,
+  },
+  cupomChipTexto: { flex: 1, color: CORES.primario, fontWeight: "800", fontSize: FONTE.pequena },
+  cashbackBox: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderColor: "#BBF7D0",
+    backgroundColor: "#ECFDF5",
+    borderRadius: RAIO.md,
+    padding: ESPACO.md,
+    gap: ESPACO.md,
+  },
+  cashbackTitulo: { color: CORES.textoSecundario, fontWeight: "700", fontSize: FONTE.pequena },
+  cashbackValor: { color: CORES.sucesso, fontWeight: "900", fontSize: FONTE.grande },
+  cashbackToggle: {
+    height: 40,
+    borderRadius: RAIO.md,
+    borderWidth: 1,
+    borderColor: CORES.primario,
+    paddingHorizontal: ESPACO.md,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: ESPACO.xs,
+    backgroundColor: "#fff",
+  },
+  cashbackToggleAtivo: { backgroundColor: CORES.primario },
+  cashbackToggleTexto: { color: CORES.primario, fontWeight: "900" },
+  cashbackToggleTextoAtivo: { color: "#fff" },
+  beneficioResumo: {
+    borderTopWidth: 1,
+    borderTopColor: CORES.borda,
+    paddingTop: ESPACO.sm,
+    gap: ESPACO.xs,
+  },
+  beneficioLinha: { flexDirection: "row", justifyContent: "space-between", alignItems: "center" },
+  beneficioResumoLabel: { color: CORES.textoSecundario, fontSize: FONTE.pequena },
+  beneficioResumoValor: { color: CORES.texto, fontWeight: "800" },
+  beneficioResumoDesconto: { color: CORES.sucesso, fontWeight: "900" },
+  beneficioResumoTotal: { color: CORES.texto, fontSize: FONTE.media, fontWeight: "900" },
   input: {
     minHeight: 48,
     borderWidth: 1,
@@ -732,6 +1019,7 @@ const styles = StyleSheet.create({
   },
   resumoLabel: { color: CORES.textoSecundario, fontSize: FONTE.pequena, fontWeight: "700" },
   resumoValor: { color: CORES.texto, fontSize: FONTE.titulo, fontWeight: "900", marginTop: 2 },
+  resumoSubvalor: { color: CORES.textoSecundario, fontSize: FONTE.pequena, marginTop: 2 },
   botaoFinalizar: {
     minWidth: 150,
     height: 52,

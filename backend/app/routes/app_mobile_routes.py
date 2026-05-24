@@ -8,7 +8,7 @@ Auth    : token JWT "ecommerce_customer" (mesmo fluxo do e-commerce)
 import json
 import secrets
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 
@@ -18,10 +18,16 @@ from sqlalchemy import case, func, or_, text
 from sqlalchemy.orm import Session
 
 from app.caixa_models import Caixa
+from app.campaigns.coupon_service import preview_coupon_redemption
+from app.campaigns.models import CashbackTransaction, Coupon, CouponChannelEnum, CouponStatusEnum
 from app.db import get_session
 from app.models import Cliente, Pet, User
 from app.produtos_models import EstoqueMovimentacao, Produto, ProdutoLote
-from app.routes.ecommerce_auth import _activate_user_tenant_context, _get_current_ecommerce_user
+from app.routes.ecommerce_auth import (
+    _activate_user_tenant_context,
+    _cashback_disponivel_clause,
+    _get_current_ecommerce_user,
+)
 from app.bling_estoque_sync import sincronizar_bling_background
 from app.services.validade_campanha_service import (
     mapear_ofertas_validade_por_produto,
@@ -158,7 +164,7 @@ class FuncionarioPdvItemRequest(BaseModel):
 
 class FuncionarioPdvPagamentoRequest(BaseModel):
     forma_pagamento: str
-    valor: float = Field(gt=0)
+    valor: float = Field(ge=0)
     valor_recebido: Optional[float] = None
     troco: Optional[float] = None
 
@@ -168,6 +174,38 @@ class FuncionarioPdvFinalizarRequest(BaseModel):
     itens: list[FuncionarioPdvItemRequest]
     pagamento: FuncionarioPdvPagamentoRequest
     observacoes: Optional[str] = None
+    cupom_codigo: Optional[str] = None
+    desconto_cupom: Optional[float] = Field(default=0, ge=0)
+    cashback_valor: Optional[float] = Field(default=0, ge=0)
+
+
+class FuncionarioPdvBeneficioCupomResponse(BaseModel):
+    code: str
+    coupon_type: str
+    discount_value: Optional[float] = None
+    discount_percent: Optional[float] = None
+    discount_applied: float = 0
+    min_purchase_value: Optional[float] = None
+    valid_until: Optional[str] = None
+
+
+class FuncionarioPdvBeneficiosPreviewRequest(BaseModel):
+    cliente_id: Optional[int] = None
+    itens: list[FuncionarioPdvItemRequest]
+    cupom_codigo: Optional[str] = None
+    cashback_valor: Optional[float] = Field(default=0, ge=0)
+
+
+class FuncionarioPdvBeneficiosPreviewResponse(BaseModel):
+    subtotal: float
+    desconto_cupom: float
+    cupom_code: Optional[str] = None
+    cashback_disponivel: float
+    cashback_valor: float
+    total_venda: float
+    valor_pagamento: float
+    cupons_disponiveis: list[FuncionarioPdvBeneficioCupomResponse] = Field(default_factory=list)
+    mensagens: list[str] = Field(default_factory=list)
 
 
 class FuncionarioPdvFinalizarResponse(BaseModel):
@@ -325,10 +363,239 @@ def _normalizar_forma_pagamento_pdv(forma_pagamento: str) -> str:
         "debito": "cartao_debito",
         "cartao_debito": "cartao_debito",
         "cartao de debito": "cartao_debito",
+        "cashback": "Cashback",
     }
     if forma not in mapa:
         raise HTTPException(status_code=400, detail="Forma de pagamento invalida para o PDV mobile.")
     return mapa[forma]
+
+
+def _round_money_funcionario_pdv(valor) -> float:
+    return round(float(valor or 0), 2)
+
+
+def _buscar_cliente_pdv_funcionario(db: Session, tenant_id: str, cliente_id: Optional[int]) -> Optional[Cliente]:
+    if not cliente_id:
+        return None
+    cliente = (
+        db.query(Cliente)
+        .filter(
+            Cliente.id == cliente_id,
+            Cliente.tenant_id == tenant_id,
+            Cliente.tipo_cadastro == "cliente",
+            Cliente.ativo == True,
+        )
+        .first()
+    )
+    if not cliente:
+        raise HTTPException(status_code=404, detail="Cliente nao encontrado.")
+    return cliente
+
+
+def _listar_cupons_disponiveis_funcionario_pdv(
+    db: Session,
+    *,
+    tenant_id: str,
+    cliente_id: Optional[int],
+    subtotal: float,
+) -> list[dict]:
+    filtros_cliente = [Coupon.customer_id.is_(None)]
+    if cliente_id:
+        filtros_cliente.append(Coupon.customer_id == cliente_id)
+
+    cupons = (
+        db.query(Coupon)
+        .filter(
+            Coupon.tenant_id == tenant_id,
+            Coupon.status == CouponStatusEnum.active,
+            Coupon.channel.in_([CouponChannelEnum.pdv, CouponChannelEnum.all]),
+            or_(*filtros_cliente),
+        )
+        .order_by(Coupon.created_at.desc())
+        .limit(20)
+        .all()
+    )
+
+    disponiveis = []
+    for cupom in cupons:
+        try:
+            preview = preview_coupon_redemption(
+                db,
+                tenant_id=tenant_id,
+                code=cupom.code,
+                venda_total=subtotal,
+                customer_id=cliente_id,
+            )
+        except HTTPException:
+            continue
+
+        disponiveis.append(
+            {
+                "code": preview["code"],
+                "coupon_type": preview["coupon_type"],
+                "discount_value": preview.get("discount_value"),
+                "discount_percent": preview.get("discount_percent"),
+                "discount_applied": _round_money_funcionario_pdv(preview.get("discount_applied")),
+                "min_purchase_value": (
+                    float(cupom.min_purchase_value) if cupom.min_purchase_value else None
+                ),
+                "valid_until": cupom.valid_until.isoformat() if cupom.valid_until else None,
+            }
+        )
+    return disponiveis
+
+
+def _saldo_cashback_funcionario_pdv(
+    db: Session,
+    *,
+    tenant_id: str,
+    cliente_id: Optional[int],
+) -> float:
+    if not cliente_id:
+        return 0.0
+    saldo_raw = (
+        db.query(func.sum(CashbackTransaction.amount))
+        .filter(
+            CashbackTransaction.tenant_id == tenant_id,
+            CashbackTransaction.customer_id == cliente_id,
+            _cashback_disponivel_clause(CashbackTransaction, datetime.now(timezone.utc)),
+        )
+        .scalar()
+    )
+    return max(0.0, _round_money_funcionario_pdv(saldo_raw))
+
+
+def _aplicar_desconto_cupom_nos_itens_funcionario_pdv(
+    itens_payload: list[dict],
+    desconto_total: float,
+) -> list[dict]:
+    desconto_total = min(_round_money_funcionario_pdv(desconto_total), sum(item["subtotal"] for item in itens_payload))
+    if desconto_total <= 0:
+        return itens_payload
+
+    total_bruto = sum(item["subtotal"] for item in itens_payload)
+    restante = desconto_total
+    itens_com_desconto = []
+    for indice, item in enumerate(itens_payload):
+        item_ajustado = dict(item)
+        if indice == len(itens_payload) - 1:
+            desconto_item = restante
+        else:
+            desconto_item = _round_money_funcionario_pdv(desconto_total * item["subtotal"] / total_bruto)
+            desconto_item = min(desconto_item, item["subtotal"], restante)
+            restante = _round_money_funcionario_pdv(restante - desconto_item)
+
+        item_ajustado["desconto_item"] = _round_money_funcionario_pdv(
+            float(item_ajustado.get("desconto_item") or 0) + desconto_item
+        )
+        item_ajustado["subtotal"] = _round_money_funcionario_pdv(item_ajustado["subtotal"] - desconto_item)
+        itens_com_desconto.append(item_ajustado)
+
+    return itens_com_desconto
+
+
+def _calcular_beneficios_funcionario_pdv(
+    db: Session,
+    *,
+    tenant_id: str,
+    cliente_id: Optional[int],
+    itens: list[FuncionarioPdvItemRequest],
+    cupom_codigo: Optional[str] = None,
+    cashback_valor: Optional[float] = None,
+) -> dict:
+    if not itens:
+        raise HTTPException(status_code=400, detail="Adicione ao menos um item para vender.")
+
+    _buscar_cliente_pdv_funcionario(db, tenant_id, cliente_id)
+
+    itens_payload = []
+    subtotal_bruto = 0.0
+    for item in itens:
+        produto = (
+            db.query(Produto)
+            .filter(
+                Produto.id == item.produto_id,
+                Produto.tenant_id == tenant_id,
+                Produto.ativo == True,
+                Produto.situacao.is_not(False),
+                Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
+            )
+            .first()
+        )
+        if not produto:
+            raise HTTPException(status_code=404, detail=f"Produto ID {item.produto_id} nao encontrado.")
+
+        preco_unitario = float(produto.preco_venda or item.preco_unitario or 0)
+        if preco_unitario <= 0:
+            raise HTTPException(status_code=400, detail=f"Produto '{produto.nome}' esta sem preco de venda.")
+
+        quantidade = float(item.quantidade)
+        subtotal_item = _round_money_funcionario_pdv(quantidade * preco_unitario)
+        subtotal_bruto = _round_money_funcionario_pdv(subtotal_bruto + subtotal_item)
+        itens_payload.append(
+            {
+                "tipo": "produto",
+                "produto_id": produto.id,
+                "quantidade": quantidade,
+                "preco_unitario": preco_unitario,
+                "desconto_item": 0,
+                "subtotal": subtotal_item,
+            }
+        )
+
+    cupom_code = None
+    desconto_cupom = 0.0
+    if cupom_codigo:
+        preview_cupom = preview_coupon_redemption(
+            db,
+            tenant_id=tenant_id,
+            code=cupom_codigo,
+            venda_total=subtotal_bruto,
+            customer_id=cliente_id,
+        )
+        cupom_code = preview_cupom["code"]
+        desconto_cupom = _round_money_funcionario_pdv(preview_cupom.get("discount_applied"))
+
+    itens_payload = _aplicar_desconto_cupom_nos_itens_funcionario_pdv(itens_payload, desconto_cupom)
+    total_venda = _round_money_funcionario_pdv(sum(item["subtotal"] for item in itens_payload))
+
+    cashback_disponivel = _saldo_cashback_funcionario_pdv(
+        db,
+        tenant_id=tenant_id,
+        cliente_id=cliente_id,
+    )
+    cashback_solicitado = _round_money_funcionario_pdv(cashback_valor)
+    mensagens: list[str] = []
+    if cashback_solicitado > 0 and not cliente_id:
+        raise HTTPException(status_code=400, detail="Selecione um cliente para usar cashback.")
+    if cashback_solicitado > cashback_disponivel + 0.01:
+        raise HTTPException(status_code=400, detail="Cashback solicitado maior que o saldo disponivel.")
+
+    cashback_usado = min(cashback_solicitado, total_venda)
+    if cashback_solicitado > total_venda:
+        mensagens.append("Cashback limitado ao total da venda apos descontos.")
+    cashback_usado = _round_money_funcionario_pdv(cashback_usado)
+    valor_pagamento = _round_money_funcionario_pdv(total_venda - cashback_usado)
+
+    cupons_disponiveis = _listar_cupons_disponiveis_funcionario_pdv(
+        db,
+        tenant_id=tenant_id,
+        cliente_id=cliente_id,
+        subtotal=subtotal_bruto,
+    )
+
+    return {
+        "itens_payload": itens_payload,
+        "subtotal": subtotal_bruto,
+        "desconto_cupom": desconto_cupom,
+        "cupom_code": cupom_code,
+        "cashback_disponivel": cashback_disponivel,
+        "cashback_valor": cashback_usado,
+        "total_venda": total_venda,
+        "valor_pagamento": valor_pagamento,
+        "cupons_disponiveis": cupons_disponiveis,
+        "mensagens": mensagens,
+    }
 
 
 def _parse_data_validade_funcionario(valor: Optional[str]) -> Optional[datetime]:
@@ -1082,6 +1349,34 @@ def obter_caixa_aberto_funcionario_pdv(
     }
 
 
+@router.post("/funcionario/pdv/beneficios/preview", response_model=FuncionarioPdvBeneficiosPreviewResponse)
+def preview_beneficios_funcionario_pdv(
+    dados: FuncionarioPdvBeneficiosPreviewRequest,
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
+    _funcionario, tenant_id = _get_funcionario_operacional_or_403(db, current_user)
+    beneficios = _calcular_beneficios_funcionario_pdv(
+        db,
+        tenant_id=tenant_id,
+        cliente_id=dados.cliente_id,
+        itens=dados.itens,
+        cupom_codigo=dados.cupom_codigo,
+        cashback_valor=dados.cashback_valor,
+    )
+    return {
+        "subtotal": beneficios["subtotal"],
+        "desconto_cupom": beneficios["desconto_cupom"],
+        "cupom_code": beneficios["cupom_code"],
+        "cashback_disponivel": beneficios["cashback_disponivel"],
+        "cashback_valor": beneficios["cashback_valor"],
+        "total_venda": beneficios["total_venda"],
+        "valor_pagamento": beneficios["valor_pagamento"],
+        "cupons_disponiveis": beneficios["cupons_disponiveis"],
+        "mensagens": beneficios["mensagens"],
+    }
+
+
 @router.post("/funcionario/pdv/vendas/finalizar", response_model=FuncionarioPdvFinalizarResponse)
 def finalizar_venda_funcionario_pdv(
     dados: FuncionarioPdvFinalizarRequest,
@@ -1107,57 +1402,17 @@ def finalizar_venda_funcionario_pdv(
     if not caixa:
         raise HTTPException(status_code=400, detail="Abra um caixa no ERP web antes de vender pelo app.")
 
-    if dados.cliente_id:
-        cliente = (
-            db.query(Cliente)
-            .filter(
-                Cliente.id == dados.cliente_id,
-                Cliente.tenant_id == tenant_id,
-                Cliente.tipo_cadastro == "cliente",
-                Cliente.ativo == True,
-            )
-            .first()
-        )
-        if not cliente:
-            raise HTTPException(status_code=404, detail="Cliente nao encontrado.")
-
-    itens_payload = []
-    total_venda = 0.0
-    for item in dados.itens:
-        produto = (
-            db.query(Produto)
-            .filter(
-                Produto.id == item.produto_id,
-                Produto.tenant_id == tenant_id,
-                Produto.ativo == True,
-                Produto.situacao.is_not(False),
-                Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
-            )
-            .first()
-        )
-        if not produto:
-            raise HTTPException(status_code=404, detail=f"Produto ID {item.produto_id} nao encontrado.")
-
-        preco_unitario = float(produto.preco_venda or item.preco_unitario or 0)
-        if preco_unitario <= 0:
-            raise HTTPException(status_code=400, detail=f"Produto '{produto.nome}' esta sem preco de venda.")
-
-        quantidade = float(item.quantidade)
-        subtotal = round(quantidade * preco_unitario, 2)
-        total_venda = round(total_venda + subtotal, 2)
-        itens_payload.append(
-            {
-                "tipo": "produto",
-                "produto_id": produto.id,
-                "quantidade": quantidade,
-                "preco_unitario": preco_unitario,
-                "desconto_item": 0,
-                "subtotal": subtotal,
-            }
-        )
+    beneficios = _calcular_beneficios_funcionario_pdv(
+        db,
+        tenant_id=tenant_id,
+        cliente_id=dados.cliente_id,
+        itens=dados.itens,
+        cupom_codigo=dados.cupom_codigo,
+        cashback_valor=dados.cashback_valor,
+    )
 
     valor_pagamento = round(float(dados.pagamento.valor), 2)
-    if abs(valor_pagamento - total_venda) > 0.01:
+    if abs(valor_pagamento - beneficios["valor_pagamento"]) > 0.01:
         raise HTTPException(status_code=400, detail="Valor do pagamento deve fechar o total da venda.")
 
     forma_pagamento = _normalizar_forma_pagamento_pdv(dados.pagamento.forma_pagamento)
@@ -1165,9 +1420,11 @@ def finalizar_venda_funcionario_pdv(
         "cliente_id": dados.cliente_id,
         "vendedor_id": current_user.id,
         "funcionario_id": funcionario.id,
-        "itens": itens_payload,
-        "desconto_valor": 0,
+        "itens": beneficios["itens_payload"],
+        "desconto_valor": beneficios["desconto_cupom"],
         "desconto_percentual": 0,
+        "cupom_code": beneficios["cupom_code"],
+        "cupom_discount_applied": beneficios["desconto_cupom"],
         "tenant_id": tenant_id,
         "observacoes": dados.observacoes,
         "tem_entrega": False,
@@ -1178,28 +1435,45 @@ def finalizar_venda_funcionario_pdv(
     }
     venda_criada = VendaService.criar_venda(payload=criar_payload, user_id=current_user.id, db=db)
 
-    pagamento_payload = {
-        "forma_pagamento": forma_pagamento,
-        "valor": valor_pagamento,
-        "numero_parcelas": 1,
-    }
-    if dados.pagamento.valor_recebido is not None:
-        pagamento_payload["valor_recebido"] = float(dados.pagamento.valor_recebido)
-    if dados.pagamento.troco is not None:
-        pagamento_payload["troco"] = float(dados.pagamento.troco)
+    pagamentos_payload = []
+    if valor_pagamento > 0:
+        pagamento_payload = {
+            "forma_pagamento": forma_pagamento,
+            "valor": valor_pagamento,
+            "numero_parcelas": 1,
+        }
+        if dados.pagamento.valor_recebido is not None:
+            pagamento_payload["valor_recebido"] = float(dados.pagamento.valor_recebido)
+        if dados.pagamento.troco is not None:
+            pagamento_payload["troco"] = float(dados.pagamento.troco)
+        pagamentos_payload.append(pagamento_payload)
+
+    if beneficios["cashback_valor"] > 0:
+        pagamentos_payload.append(
+            {
+                "forma_pagamento": "Cashback",
+                "valor": beneficios["cashback_valor"],
+                "numero_parcelas": 1,
+            }
+        )
+
+    if not pagamentos_payload:
+        raise HTTPException(status_code=400, detail="Informe uma forma de pagamento valida.")
 
     resultado = VendaService.finalizar_venda(
         venda_id=venda_criada["id"],
-        pagamentos=[pagamento_payload],
+        pagamentos=pagamentos_payload,
         user_id=current_user.id,
         user_nome=current_user.nome or current_user.email or "Funcionario",
         tenant_id=tenant_id,
         db=db,
+        cupom_code=beneficios["cupom_code"],
+        cupom_discount_applied=beneficios["desconto_cupom"],
     )
     processar_comissoes_venda(
         venda_id=venda_criada["id"],
         funcionario_id=funcionario.id,
-        valor_pago=valor_pagamento,
+        valor_pago=beneficios["total_venda"],
         user_id=current_user.id,
         db=db,
     )
@@ -1208,9 +1482,9 @@ def finalizar_venda_funcionario_pdv(
         "status": venda_resultado.get("status", "finalizada"),
         "venda_id": venda_criada["id"],
         "numero_venda": venda_resultado.get("numero_venda") or venda_criada.get("numero_venda"),
-        "total": float(venda_resultado.get("total") or total_venda),
-        "total_pago": float(venda_resultado.get("total_pago") or valor_pagamento),
-        "forma_pagamento": forma_pagamento,
+        "total": float(venda_resultado.get("total") or beneficios["total_venda"]),
+        "total_pago": float(venda_resultado.get("total_pago") or beneficios["total_venda"]),
+        "forma_pagamento": " + ".join(p["forma_pagamento"] for p in pagamentos_payload),
         "mensagem": "Venda registrada pelo app.",
     }
 
