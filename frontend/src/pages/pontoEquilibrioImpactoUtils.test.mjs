@@ -120,11 +120,48 @@ test("monta analise de custos com grupos e pareceres percentuais", () => {
   assert.equal(analise.grupos.find((item) => item.id === "folha").valor, 10000);
   assert.equal(aluguel.percentualFaturamento, 20);
   assert.equal(aluguel.referenciaPercentual, 13);
-  assert.equal(aluguel.diferencaPercentual, 7);
-  assert.equal(aluguel.diferencaValor, 3500);
+  assert.equal(aluguel.metaPercentual, 6.96);
+  assert.equal(aluguel.diferencaPercentual, 13.04);
+  assert.equal(aluguel.diferencaValor, 6517.86);
   assert.equal(aluguel.status, "acima");
   assert.equal(folha.percentualFaturamento, 20);
-  assert.equal(folha.status, "saudavel");
+  assert.equal(folha.metaPercentual, 15);
+  assert.equal(folha.status, "atencao");
+});
+
+test("usa metas setoriais que cabem dentro do limite total de custo fixo", () => {
+  const analise = montarAnaliseCustosPontoEquilibrio({
+    porte: "pequeno",
+    dados: {
+      faturamento: 100000,
+      despesas_fixas: 39810,
+      detalhes_classificacao: {
+        fixas: [
+          { id: 1, descricao: "Aluguel loja", valor: 11210, origem_classificacao: "Categoria financeira: Aluguel" },
+          { id: 2, descricao: "Folha e pro labore", valor: 24600, origem_classificacao: "Tipo de despesa: Salarios" },
+          { id: 3, descricao: "Energia e agua", valor: 1440, origem_classificacao: "Categoria financeira: Energia" },
+          { id: 4, descricao: "Internet e sistemas", valor: 1410, origem_classificacao: "Categoria financeira: Internet" },
+          { id: 5, descricao: "Escritorio", valor: 880, origem_classificacao: "Categoria financeira: Escritorio" },
+        ],
+      },
+    },
+  });
+
+  const pareceresSetoriais = analise.pareceres.filter((item) => item.id !== "total_fixo");
+  const aluguel = analise.pareceres.find((item) => item.id === "aluguel");
+  const folha = analise.pareceres.find((item) => item.id === "folha");
+  const total = analise.pareceres.find((item) => item.id === "total_fixo");
+  const somaMetasSetoriais = pareceresSetoriais.reduce((soma, item) => soma + item.metaPercentual, 0);
+
+  assert.equal(total.status, "atencao");
+  assert.equal(total.metaPercentual, 34);
+  assert.equal(arredondarParaTeste(somaMetasSetoriais), 34);
+  assert.equal(aluguel.referenciaPercentual, 14);
+  assert.equal(aluguel.metaPercentual, 7.68);
+  assert.equal(aluguel.status, "atencao");
+  assert.equal(folha.referenciaPercentual, 30);
+  assert.equal(folha.metaPercentual, 16.45);
+  assert.equal(folha.status, "atencao");
 });
 
 test("define faixas gerenciais mensais para porte do petshop", () => {
@@ -157,3 +194,7 @@ test("ajusta referencia de aluguel conforme porte selecionado", () => {
   assert.equal(grande.porte.id, "grande");
   assert.equal(grande.pareceres.find((item) => item.id === "aluguel").referenciaPercentual, 10);
 });
+
+function arredondarParaTeste(valor) {
+  return Math.round((valor + Number.EPSILON) * 100) / 100;
+}
