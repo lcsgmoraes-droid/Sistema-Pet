@@ -17,6 +17,7 @@ from pydantic import BaseModel, Field
 from sqlalchemy import case, func, or_, text
 from sqlalchemy.orm import Session
 
+from app.caixa_models import Caixa
 from app.db import get_session
 from app.models import Cliente, Pet, User
 from app.produtos_models import EstoqueMovimentacao, Produto, ProdutoLote
@@ -118,6 +119,67 @@ class FuncionarioBalancoResponse(BaseModel):
     mensagem: str
 
 
+class FuncionarioPdvProdutoResponse(BaseModel):
+    id: int
+    nome: str
+    codigo: Optional[str] = None
+    codigo_barras: Optional[str] = None
+    unidade: str = "UN"
+    preco_venda: float = 0
+    estoque_atual: float = 0
+    imagem_url: Optional[str] = None
+    tipo_produto: Optional[str] = None
+    tipo_kit: Optional[str] = None
+    vendavel: bool = True
+    aviso: Optional[str] = None
+
+
+class FuncionarioPdvClienteResponse(BaseModel):
+    id: int
+    codigo: Optional[str] = None
+    nome: str
+    telefone: Optional[str] = None
+    celular: Optional[str] = None
+    documento: Optional[str] = None
+
+
+class FuncionarioPdvCaixaResponse(BaseModel):
+    aberto: bool
+    caixa_id: Optional[int] = None
+    numero_caixa: Optional[int] = None
+    mensagem: str
+
+
+class FuncionarioPdvItemRequest(BaseModel):
+    produto_id: int
+    quantidade: float = Field(gt=0)
+    preco_unitario: float = Field(ge=0)
+
+
+class FuncionarioPdvPagamentoRequest(BaseModel):
+    forma_pagamento: str
+    valor: float = Field(gt=0)
+    valor_recebido: Optional[float] = None
+    troco: Optional[float] = None
+
+
+class FuncionarioPdvFinalizarRequest(BaseModel):
+    cliente_id: Optional[int] = None
+    itens: list[FuncionarioPdvItemRequest]
+    pagamento: FuncionarioPdvPagamentoRequest
+    observacoes: Optional[str] = None
+
+
+class FuncionarioPdvFinalizarResponse(BaseModel):
+    status: str
+    venda_id: int
+    numero_venda: str
+    total: float
+    total_pago: float
+    forma_pagamento: str
+    mensagem: str
+
+
 # ─────────────────────────────────────────
 # Helpers
 # ─────────────────────────────────────────
@@ -212,6 +274,61 @@ def _barcode_filters_for_produto(barcode: str) -> list:
             Produto.codigos_barras_alternativos.ilike(f"%{barcode_digits}%"),
         ])
     return filtros_codigo
+
+
+def _somente_digitos_funcionario_pdv(valor: Optional[str]) -> str:
+    return "".join(ch for ch in str(valor or "") if ch.isdigit())
+
+
+def _serialize_funcionario_pdv_produto(produto: Produto) -> dict:
+    vendavel = (
+        bool(produto.ativo)
+        and produto.situacao is not False
+        and produto.tipo_produto in ["SIMPLES", "VARIACAO", "KIT"]
+    )
+    return {
+        "id": produto.id,
+        "nome": produto.nome,
+        "codigo": produto.codigo,
+        "codigo_barras": produto.codigo_barras,
+        "unidade": produto.unidade or "UN",
+        "preco_venda": float(produto.preco_venda or 0),
+        "estoque_atual": float(produto.estoque_atual or 0),
+        "imagem_url": produto.imagem_principal,
+        "tipo_produto": produto.tipo_produto,
+        "tipo_kit": produto.tipo_kit,
+        "vendavel": vendavel,
+        "aviso": None if vendavel else "Produto nao vendavel no PDV.",
+    }
+
+
+def _serialize_funcionario_pdv_cliente(cliente: Cliente) -> dict:
+    documento = cliente.cpf or cliente.cnpj
+    return {
+        "id": cliente.id,
+        "codigo": cliente.codigo,
+        "nome": cliente.nome or cliente.nome_fantasia or cliente.razao_social or f"Cliente #{cliente.id}",
+        "telefone": cliente.telefone,
+        "celular": cliente.celular,
+        "documento": documento,
+    }
+
+
+def _normalizar_forma_pagamento_pdv(forma_pagamento: str) -> str:
+    forma = (forma_pagamento or "").strip().lower()
+    mapa = {
+        "dinheiro": "Dinheiro",
+        "pix": "PIX",
+        "credito": "cartao_credito",
+        "cartao_credito": "cartao_credito",
+        "cartao de credito": "cartao_credito",
+        "debito": "cartao_debito",
+        "cartao_debito": "cartao_debito",
+        "cartao de debito": "cartao_debito",
+    }
+    if forma not in mapa:
+        raise HTTPException(status_code=400, detail="Forma de pagamento invalida para o PDV mobile.")
+    return mapa[forma]
 
 
 def _parse_data_validade_funcionario(valor: Optional[str]) -> Optional[datetime]:
@@ -816,6 +933,285 @@ def registrar_balanco_funcionario_estoque(
         "quantidade_movimentada": quantidade_movimentada,
         "movimentacao_id": movimentacao.id,
         "mensagem": f"Balanco registrado por {funcionario.nome or current_user.nome or current_user.email}.",
+    }
+
+
+@router.get("/funcionario/pdv/produtos/buscar", response_model=list[FuncionarioPdvProdutoResponse])
+def buscar_produtos_funcionario_pdv(
+    q: str = "",
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
+    _funcionario, tenant_id = _get_funcionario_operacional_or_403(db, current_user)
+    termo = (q or "").strip()
+    if len(termo) < 2:
+        return []
+
+    termo_digits = _somente_digitos_funcionario_pdv(termo)
+    filtros = [
+        Produto.nome.ilike(f"%{termo}%"),
+        Produto.codigo.ilike(f"%{termo}%"),
+        Produto.codigo_barras.ilike(f"%{termo}%"),
+        Produto.gtin_ean.ilike(f"%{termo}%"),
+        Produto.gtin_ean_tributario.ilike(f"%{termo}%"),
+        Produto.codigos_barras_alternativos.ilike(f"%{termo}%"),
+    ]
+    if termo_digits:
+        filtros.extend(_barcode_filters_for_produto(termo_digits))
+
+    prioridade_estoque = case((func.coalesce(Produto.estoque_atual, 0) > 0, 0), else_=1)
+    produtos = (
+        db.query(Produto)
+        .filter(
+            Produto.tenant_id == tenant_id,
+            Produto.ativo == True,
+            Produto.situacao.is_not(False),
+            Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
+            or_(*filtros),
+        )
+        .order_by(prioridade_estoque.asc(), Produto.nome.asc())
+        .limit(20)
+        .all()
+    )
+    return [_serialize_funcionario_pdv_produto(produto) for produto in produtos]
+
+
+@router.get("/funcionario/pdv/produtos/barcode/{barcode}", response_model=FuncionarioPdvProdutoResponse)
+def buscar_produto_funcionario_pdv_barcode(
+    barcode: str,
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
+    _funcionario, tenant_id = _get_funcionario_operacional_or_403(db, current_user)
+    barcode = (barcode or "").strip()
+    if not barcode:
+        raise HTTPException(status_code=400, detail="Codigo de barras obrigatorio.")
+
+    prioridade_estoque = case((func.coalesce(Produto.estoque_atual, 0) > 0, 0), else_=1)
+    produto = (
+        db.query(Produto)
+        .filter(
+            Produto.tenant_id == tenant_id,
+            Produto.ativo == True,
+            Produto.situacao.is_not(False),
+            Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
+            or_(*_barcode_filters_for_produto(barcode)),
+        )
+        .order_by(prioridade_estoque.asc(), Produto.nome.asc(), Produto.id.asc())
+        .first()
+    )
+    if not produto:
+        raise HTTPException(status_code=404, detail="Produto ERP nao encontrado para este codigo.")
+    return _serialize_funcionario_pdv_produto(produto)
+
+
+@router.get("/funcionario/pdv/clientes/buscar", response_model=list[FuncionarioPdvClienteResponse])
+def buscar_clientes_funcionario_pdv(
+    q: str = "",
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
+    _funcionario, tenant_id = _get_funcionario_operacional_or_403(db, current_user)
+    termo = (q or "").strip()
+    if len(termo) < 2:
+        return []
+
+    termo_digits = _somente_digitos_funcionario_pdv(termo)
+    filtros = [
+        Cliente.codigo.ilike(f"%{termo}%"),
+        Cliente.nome.ilike(f"%{termo}%"),
+        Cliente.nome_fantasia.ilike(f"%{termo}%"),
+        Cliente.razao_social.ilike(f"%{termo}%"),
+        Cliente.cpf.ilike(f"%{termo}%"),
+        Cliente.cnpj.ilike(f"%{termo}%"),
+        Cliente.telefone.ilike(f"%{termo}%"),
+        Cliente.celular.ilike(f"%{termo}%"),
+    ]
+    if termo_digits:
+        filtros.extend(
+            [
+                Cliente.cpf.ilike(f"%{termo_digits}%"),
+                Cliente.cnpj.ilike(f"%{termo_digits}%"),
+                Cliente.telefone.ilike(f"%{termo_digits}%"),
+                Cliente.celular.ilike(f"%{termo_digits}%"),
+            ]
+        )
+
+    clientes = (
+        db.query(Cliente)
+        .filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.tipo_cadastro == "cliente",
+            Cliente.ativo == True,
+            or_(*filtros),
+        )
+        .order_by(Cliente.nome.asc(), Cliente.id.asc())
+        .limit(20)
+        .all()
+    )
+    return [_serialize_funcionario_pdv_cliente(cliente) for cliente in clientes]
+
+
+@router.get("/funcionario/pdv/caixa/aberto", response_model=FuncionarioPdvCaixaResponse)
+def obter_caixa_aberto_funcionario_pdv(
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
+    _funcionario, tenant_id = _get_funcionario_operacional_or_403(db, current_user)
+    caixa = (
+        db.query(Caixa)
+        .filter(
+            Caixa.usuario_id == current_user.id,
+            Caixa.tenant_id == tenant_id,
+            Caixa.status == "aberto",
+        )
+        .first()
+    )
+    if not caixa:
+        return {
+            "aberto": False,
+            "caixa_id": None,
+            "numero_caixa": None,
+            "mensagem": "Abra um caixa no ERP web antes de vender pelo app.",
+        }
+    return {
+        "aberto": True,
+        "caixa_id": caixa.id,
+        "numero_caixa": caixa.numero_caixa,
+        "mensagem": "Caixa aberto.",
+    }
+
+
+@router.post("/funcionario/pdv/vendas/finalizar", response_model=FuncionarioPdvFinalizarResponse)
+def finalizar_venda_funcionario_pdv(
+    dados: FuncionarioPdvFinalizarRequest,
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
+    from app.vendas import VendaService
+    from app.vendas.service import processar_comissoes_venda
+
+    funcionario, tenant_id = _get_funcionario_operacional_or_403(db, current_user)
+    if not dados.itens:
+        raise HTTPException(status_code=400, detail="Adicione ao menos um item para vender.")
+
+    caixa = (
+        db.query(Caixa)
+        .filter(
+            Caixa.usuario_id == current_user.id,
+            Caixa.tenant_id == tenant_id,
+            Caixa.status == "aberto",
+        )
+        .first()
+    )
+    if not caixa:
+        raise HTTPException(status_code=400, detail="Abra um caixa no ERP web antes de vender pelo app.")
+
+    if dados.cliente_id:
+        cliente = (
+            db.query(Cliente)
+            .filter(
+                Cliente.id == dados.cliente_id,
+                Cliente.tenant_id == tenant_id,
+                Cliente.tipo_cadastro == "cliente",
+                Cliente.ativo == True,
+            )
+            .first()
+        )
+        if not cliente:
+            raise HTTPException(status_code=404, detail="Cliente nao encontrado.")
+
+    itens_payload = []
+    total_venda = 0.0
+    for item in dados.itens:
+        produto = (
+            db.query(Produto)
+            .filter(
+                Produto.id == item.produto_id,
+                Produto.tenant_id == tenant_id,
+                Produto.ativo == True,
+                Produto.situacao.is_not(False),
+                Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
+            )
+            .first()
+        )
+        if not produto:
+            raise HTTPException(status_code=404, detail=f"Produto ID {item.produto_id} nao encontrado.")
+
+        preco_unitario = float(produto.preco_venda or item.preco_unitario or 0)
+        if preco_unitario <= 0:
+            raise HTTPException(status_code=400, detail=f"Produto '{produto.nome}' esta sem preco de venda.")
+
+        quantidade = float(item.quantidade)
+        subtotal = round(quantidade * preco_unitario, 2)
+        total_venda = round(total_venda + subtotal, 2)
+        itens_payload.append(
+            {
+                "tipo": "produto",
+                "produto_id": produto.id,
+                "quantidade": quantidade,
+                "preco_unitario": preco_unitario,
+                "desconto_item": 0,
+                "subtotal": subtotal,
+            }
+        )
+
+    valor_pagamento = round(float(dados.pagamento.valor), 2)
+    if abs(valor_pagamento - total_venda) > 0.01:
+        raise HTTPException(status_code=400, detail="Valor do pagamento deve fechar o total da venda.")
+
+    forma_pagamento = _normalizar_forma_pagamento_pdv(dados.pagamento.forma_pagamento)
+    criar_payload = {
+        "cliente_id": dados.cliente_id,
+        "vendedor_id": current_user.id,
+        "funcionario_id": funcionario.id,
+        "itens": itens_payload,
+        "desconto_valor": 0,
+        "desconto_percentual": 0,
+        "tenant_id": tenant_id,
+        "observacoes": dados.observacoes,
+        "tem_entrega": False,
+        "taxa_entrega": 0,
+        "percentual_taxa_loja": 0,
+        "percentual_taxa_entregador": 0,
+        "canal": "app_funcionario",
+    }
+    venda_criada = VendaService.criar_venda(payload=criar_payload, user_id=current_user.id, db=db)
+
+    pagamento_payload = {
+        "forma_pagamento": forma_pagamento,
+        "valor": valor_pagamento,
+        "numero_parcelas": 1,
+    }
+    if dados.pagamento.valor_recebido is not None:
+        pagamento_payload["valor_recebido"] = float(dados.pagamento.valor_recebido)
+    if dados.pagamento.troco is not None:
+        pagamento_payload["troco"] = float(dados.pagamento.troco)
+
+    resultado = VendaService.finalizar_venda(
+        venda_id=venda_criada["id"],
+        pagamentos=[pagamento_payload],
+        user_id=current_user.id,
+        user_nome=current_user.nome or current_user.email or "Funcionario",
+        tenant_id=tenant_id,
+        db=db,
+    )
+    processar_comissoes_venda(
+        venda_id=venda_criada["id"],
+        funcionario_id=funcionario.id,
+        valor_pago=valor_pagamento,
+        user_id=current_user.id,
+        db=db,
+    )
+    venda_resultado = resultado.get("venda", {})
+    return {
+        "status": venda_resultado.get("status", "finalizada"),
+        "venda_id": venda_criada["id"],
+        "numero_venda": venda_resultado.get("numero_venda") or venda_criada.get("numero_venda"),
+        "total": float(venda_resultado.get("total") or total_venda),
+        "total_pago": float(venda_resultado.get("total_pago") or valor_pagamento),
+        "forma_pagamento": forma_pagamento,
+        "mensagem": "Venda registrada pelo app.",
     }
 
 

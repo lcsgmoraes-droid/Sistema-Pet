@@ -266,6 +266,69 @@ export interface FuncionarioBalancoResponse {
   mensagem: string;
 }
 
+export interface FuncionarioPdvProduto {
+  id: number;
+  nome: string;
+  codigo?: string | null;
+  codigo_barras?: string | null;
+  unidade?: string;
+  preco_venda: number;
+  estoque_atual: number;
+  imagem_url?: string | null;
+  tipo_produto?: string | null;
+  tipo_kit?: string | null;
+  vendavel: boolean;
+  aviso?: string | null;
+}
+
+export interface FuncionarioPdvCliente {
+  id: number;
+  codigo?: string | null;
+  nome: string;
+  telefone?: string | null;
+  celular?: string | null;
+  documento?: string | null;
+}
+
+export interface FuncionarioPdvCaixa {
+  aberto: boolean;
+  caixa_id?: number | null;
+  numero_caixa?: number | null;
+  mensagem: string;
+}
+
+export interface FuncionarioPdvItemPayload {
+  produto_id: number;
+  quantidade: number;
+  preco_unitario: number;
+}
+
+export type FuncionarioPdvFormaPagamento = "dinheiro" | "pix" | "credito" | "debito";
+
+export interface FuncionarioPdvPagamentoPayload {
+  forma_pagamento: FuncionarioPdvFormaPagamento;
+  valor: number;
+  valor_recebido?: number | null;
+  troco?: number | null;
+}
+
+export interface FuncionarioPdvFinalizarPayload {
+  cliente_id?: number | null;
+  itens: FuncionarioPdvItemPayload[];
+  pagamento: FuncionarioPdvPagamentoPayload;
+  observacoes?: string | null;
+}
+
+export interface FuncionarioPdvFinalizarResponse {
+  status: string;
+  venda_id: number;
+  numero_venda: string;
+  total: number;
+  total_pago: number;
+  forma_pagamento: string;
+  mensagem: string;
+}
+
 // =====================
 // CARRINHO & PEDIDO
 // =====================

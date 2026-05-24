@@ -2,6 +2,8 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import React from "react";
 import { Alert, Text, TouchableOpacity } from "react-native";
 import FuncionarioBalancoScreen from "../screens/funcionario/FuncionarioBalancoScreen";
+import FuncionarioHomeScreen from "../screens/funcionario/FuncionarioHomeScreen";
+import FuncionarioPdvScreen from "../screens/funcionario/FuncionarioPdvScreen";
 import { useAuthStore } from "../store/auth.store";
 import { FuncionarioStackParamList } from "../types/funcionarioNavigation";
 
@@ -45,9 +47,19 @@ export default function FuncionarioNavigator() {
       }}
     >
       <Stack.Screen
+        name="FuncionarioHome"
+        component={FuncionarioHomeScreen}
+        options={{ title: "Funcionario" }}
+      />
+      <Stack.Screen
         name="FuncionarioBalanco"
         component={FuncionarioBalancoScreen}
         options={{ title: "Balanco de Estoque" }}
+      />
+      <Stack.Screen
+        name="FuncionarioPdv"
+        component={FuncionarioPdvScreen}
+        options={{ title: "PDV Rapido" }}
       />
     </Stack.Navigator>
   );
