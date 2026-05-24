@@ -611,19 +611,24 @@ const ContasPagar = () => {
       key: 'valor_original',
       header: 'Valor Original',
       align: 'right',
+      headerClassName: 'min-w-[120px] whitespace-nowrap',
+      className: 'min-w-[120px] whitespace-nowrap tabular-nums',
       render: (conta) => <MoneyCell value={conta.valor_original} />,
     },
     {
       key: 'valor_pago',
       header: 'Valor Pago',
       align: 'right',
+      headerClassName: 'min-w-[120px] whitespace-nowrap',
+      className: 'min-w-[120px] whitespace-nowrap tabular-nums',
       render: (conta) => <MoneyCell value={conta.valor_pago} zeroAsDash />,
     },
     {
       key: 'saldo',
       header: 'Saldo',
       align: 'right',
-      className: 'font-bold',
+      headerClassName: 'min-w-[120px] whitespace-nowrap',
+      className: 'min-w-[120px] whitespace-nowrap tabular-nums font-bold',
       render: (conta) => <MoneyCell value={conta.valor_final - conta.valor_pago} zeroAsDash />,
     },
     {
@@ -946,7 +951,7 @@ const ContasPagar = () => {
           data={safeArray(contas)}
           emptyMessage="Nenhuma conta encontrada"
           getRowKey={(conta) => conta.id}
-          tableClassName="min-w-[1500px]"
+          tableClassName="min-w-[1740px]"
           theadClassName="bg-gray-50"
           tbodyClassName="divide-y divide-gray-200"
         />
