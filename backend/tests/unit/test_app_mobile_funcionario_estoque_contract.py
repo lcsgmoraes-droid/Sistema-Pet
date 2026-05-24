@@ -79,4 +79,6 @@ def test_mobile_employee_stock_service_and_screen_exist():
     assert "CameraView" in screen
     assert "saldoFinal" in screen
     assert "registrarBalancoFuncionario" in screen
+    assert "historicoSessao" in screen
+    assert "Lancamentos da sessao" in screen
     assert "FuncionarioBalanco" in navigator
