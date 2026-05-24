@@ -228,7 +228,7 @@ export default function useEntradaXmlConferencia({
     const divergenciasCadastro = detectarDivergencias(item);
     return Boolean(item.tem_divergencia) || conferenciaItem.temDivergencia || divergenciasCadastro.length > 0;
   });
-  const itensExibidosNota = filtroItensNota === 'divergencias'
+  const itensExibidosNota = filtroItensNota === 'divergencias' && itensComDivergenciaDetalhe.length > 0
     ? itensComDivergenciaDetalhe
     : itensNotaDetalhe;
 
