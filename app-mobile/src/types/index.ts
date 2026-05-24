@@ -31,10 +31,12 @@ export interface EcommerceUser {
   // perfil entregador
   is_entregador?: boolean;
   funcionario_id?: number | null;
+  // perfil operacional funcionario
+  is_funcionario?: boolean;
   // perfil operacional veterinario
   is_veterinario?: boolean;
   veterinario_id?: number | null;
-  perfil_operacional?: "cliente" | "entregador" | "veterinario";
+  perfil_operacional?: "cliente" | "entregador" | "veterinario" | "funcionario";
 }
 
 // =====================
@@ -224,6 +226,44 @@ export interface Produto {
   categoria_nome?: string | null;
   marca_nome?: string | null;
   peso_embalagem_kg?: number | null;   // para calculadora de ração
+}
+
+export interface FuncionarioProdutoEstoque {
+  id: number;
+  nome: string;
+  codigo?: string | null;
+  codigo_barras?: string | null;
+  gtin_ean?: string | null;
+  unidade?: string;
+  preco_venda: number;
+  preco_custo: number;
+  estoque_atual: number;
+  imagem_url?: string | null;
+  is_parent?: boolean;
+  tipo_produto?: string | null;
+  tipo_kit?: string | null;
+  permite_balanco?: boolean;
+  aviso?: string | null;
+}
+
+export interface FuncionarioBalancoPayload {
+  produto_id: number;
+  saldo_final: number;
+  numero_lote?: string | null;
+  data_validade?: string | null;
+  observacao?: string | null;
+}
+
+export interface FuncionarioBalancoResponse {
+  status: string;
+  produto: FuncionarioProdutoEstoque;
+  estoque_anterior: number;
+  estoque_novo: number;
+  diferenca: number;
+  tipo_movimentacao?: "entrada" | "saida" | null;
+  quantidade_movimentada: number;
+  movimentacao_id?: number | null;
+  mensagem: string;
 }
 
 // =====================
