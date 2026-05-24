@@ -1,5 +1,7 @@
 import api from "./api";
 import {
+  FuncionarioPdvBeneficiosPreview,
+  FuncionarioPdvBeneficiosPreviewPayload,
   FuncionarioPdvCaixa,
   FuncionarioPdvCliente,
   FuncionarioPdvFinalizarPayload,
@@ -74,6 +76,37 @@ export async function obterCaixaAbertoPdv(): Promise<FuncionarioPdvCaixa> {
     caixa_id: response.data?.caixa_id ?? null,
     numero_caixa: response.data?.numero_caixa ?? null,
     mensagem: String(response.data?.mensagem ?? ""),
+  };
+}
+
+export async function previewBeneficiosPdv(
+  payload: FuncionarioPdvBeneficiosPreviewPayload,
+): Promise<FuncionarioPdvBeneficiosPreview> {
+  const response = await api.post("/app/funcionario/pdv/beneficios/preview", payload);
+  const cupons = Array.isArray(response.data?.cupons_disponiveis)
+    ? response.data.cupons_disponiveis
+    : [];
+
+  return {
+    subtotal: Number(response.data?.subtotal ?? 0),
+    desconto_cupom: Number(response.data?.desconto_cupom ?? 0),
+    cupom_code: response.data?.cupom_code ?? null,
+    cashback_disponivel: Number(response.data?.cashback_disponivel ?? 0),
+    cashback_valor: Number(response.data?.cashback_valor ?? 0),
+    total_venda: Number(response.data?.total_venda ?? 0),
+    valor_pagamento: Number(response.data?.valor_pagamento ?? 0),
+    cupons_disponiveis: cupons.map((item: any) => ({
+      code: String(item.code ?? ""),
+      coupon_type: String(item.coupon_type ?? ""),
+      discount_value: item.discount_value == null ? null : Number(item.discount_value),
+      discount_percent: item.discount_percent == null ? null : Number(item.discount_percent),
+      discount_applied: Number(item.discount_applied ?? 0),
+      min_purchase_value: item.min_purchase_value == null ? null : Number(item.min_purchase_value),
+      valid_until: item.valid_until ?? null,
+    })),
+    mensagens: Array.isArray(response.data?.mensagens)
+      ? response.data.mensagens.map((item: any) => String(item))
+      : [],
   };
 }
 
