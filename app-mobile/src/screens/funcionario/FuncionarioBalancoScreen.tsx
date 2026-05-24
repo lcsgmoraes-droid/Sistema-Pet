@@ -24,6 +24,18 @@ import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from "../../theme";
 import { FuncionarioProdutoEstoque } from "../../types";
 import { formatarMoeda } from "../../utils/format";
 
+type HistoricoBalancoSessao = {
+  id: string;
+  produtoNome: string;
+  codigo?: string | null;
+  estoqueAnterior: number;
+  estoqueNovo: number;
+  diferenca: number;
+  tipoMovimentacao?: "entrada" | "saida" | null;
+  quantidadeMovimentada: number;
+  mensagem: string;
+};
+
 function mensagemErroApi(error: any, fallback: string) {
   const detail = error?.response?.data?.detail;
   if (typeof detail === "string" && detail.trim()) return detail;
@@ -59,6 +71,7 @@ export default function FuncionarioBalancoScreen() {
   const [observacao, setObservacao] = useState("");
   const [salvando, setSalvando] = useState(false);
   const [ultimoResultado, setUltimoResultado] = useState<string | null>(null);
+  const [historicoSessao, setHistoricoSessao] = useState<HistoricoBalancoSessao[]>([]);
   const ultimoScan = useRef("");
 
   useEffect(() => {
@@ -153,6 +166,20 @@ export default function FuncionarioBalancoScreen() {
       setDataValidade("");
       setObservacao("");
       setUltimoResultado(resposta.mensagem);
+      setHistoricoSessao((atual) => [
+        {
+          id: String(resposta.movimentacao_id ?? `sem-mov-${Date.now()}`),
+          produtoNome: resposta.produto.nome,
+          codigo: resposta.produto.codigo,
+          estoqueAnterior: resposta.estoque_anterior,
+          estoqueNovo: resposta.estoque_novo,
+          diferenca: resposta.diferenca,
+          tipoMovimentacao: resposta.tipo_movimentacao,
+          quantidadeMovimentada: resposta.quantidade_movimentada,
+          mensagem: resposta.mensagem,
+        },
+        ...atual,
+      ].slice(0, 10));
       Alert.alert("Balanco registrado", resposta.mensagem);
     } catch (error: any) {
       Alert.alert("Erro", mensagemErroApi(error, "Nao foi possivel registrar o balanco."));
@@ -354,6 +381,47 @@ export default function FuncionarioBalancoScreen() {
             <Text style={styles.resultadoTexto}>{ultimoResultado}</Text>
           </View>
         ) : null}
+
+        {historicoSessao.length ? (
+          <View style={styles.card}>
+            <Text style={styles.secaoTitulo}>Lancamentos da sessao</Text>
+            {historicoSessao.map((item) => (
+              <View key={item.id} style={styles.historicoItem}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.historicoProduto} numberOfLines={2}>
+                    {item.produtoNome}
+                  </Text>
+                  <Text style={styles.historicoMeta}>
+                    SKU {item.codigo || "-"} | Saldo {formatarQuantidade(item.estoqueAnterior)} para {formatarQuantidade(item.estoqueNovo)}
+                  </Text>
+                  <Text style={styles.historicoMensagem} numberOfLines={2}>
+                    {item.mensagem}
+                  </Text>
+                </View>
+                <View style={styles.historicoResumo}>
+                  <Text style={[
+                    styles.historicoBadge,
+                    item.tipoMovimentacao === "saida" && styles.historicoBadgeSaida,
+                    !item.tipoMovimentacao && styles.historicoBadgeNeutro,
+                  ]}>
+                    {item.tipoMovimentacao === "entrada"
+                      ? "Entrada"
+                      : item.tipoMovimentacao === "saida"
+                        ? "Saida"
+                        : "Sem mov."}
+                  </Text>
+                  <Text style={[styles.historicoDiferenca, item.diferenca < 0 && styles.diferencaNegativa]}>
+                    {item.diferenca > 0
+                      ? `+${formatarQuantidade(item.quantidadeMovimentada)}`
+                      : item.diferenca < 0
+                        ? `-${formatarQuantidade(item.quantidadeMovimentada)}`
+                        : "0"}
+                  </Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : null}
       </ScrollView>
     </KeyboardAvoidingView>
   );
@@ -386,6 +454,7 @@ const styles = StyleSheet.create({
   headerTexto: { flex: 1 },
   titulo: { fontSize: FONTE.titulo, fontWeight: "800", color: CORES.texto },
   subtitulo: { fontSize: FONTE.normal, color: CORES.textoSecundario, marginTop: 2 },
+  secaoTitulo: { fontSize: FONTE.grande, fontWeight: "800", color: CORES.texto },
   card: {
     backgroundColor: CORES.superficie,
     borderRadius: RAIO.md,
@@ -508,6 +577,32 @@ const styles = StyleSheet.create({
     padding: ESPACO.md,
   },
   resultadoTexto: { flex: 1, color: "#065F46", fontWeight: "700" },
+  historicoItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ESPACO.sm,
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    borderRadius: RAIO.md,
+    padding: ESPACO.md,
+  },
+  historicoProduto: { fontSize: FONTE.normal, fontWeight: "800", color: CORES.texto },
+  historicoMeta: { fontSize: FONTE.pequena, color: CORES.textoSecundario, marginTop: 2 },
+  historicoMensagem: { fontSize: FONTE.pequena, color: CORES.textoSecundario, marginTop: 4 },
+  historicoResumo: { alignItems: "flex-end", gap: ESPACO.xs },
+  historicoBadge: {
+    overflow: "hidden",
+    borderRadius: RAIO.circulo,
+    paddingHorizontal: ESPACO.sm,
+    paddingVertical: 3,
+    backgroundColor: "#DCFCE7",
+    color: "#065F46",
+    fontSize: FONTE.pequena,
+    fontWeight: "800",
+  },
+  historicoBadgeSaida: { backgroundColor: "#FEE2E2", color: CORES.erro },
+  historicoBadgeNeutro: { backgroundColor: "#E5E7EB", color: CORES.textoSecundario },
+  historicoDiferenca: { fontSize: FONTE.media, fontWeight: "900", color: CORES.sucesso },
   botaoPrimario: {
     backgroundColor: CORES.primario,
     borderRadius: RAIO.md,
