@@ -216,18 +216,22 @@ function criarMapaGrupos() {
   }, {});
 }
 
-function criarParecer({ id, valor, faturamento, referencia }) {
+function criarParecer({ id, valor, faturamento, referencia, metaPercentual }) {
   const valorSeguro = Math.max(0, numeroSeguro(valor));
   const faturamentoSeguro = Math.max(0, numeroSeguro(faturamento));
   const percentualFaturamento = faturamentoSeguro > 0
     ? (valorSeguro / faturamentoSeguro) * 100
     : 0;
-  const valorIdeal = faturamentoSeguro * (referencia.referenciaPercentual / 100);
-  const diferencaValor = valorSeguro - valorIdeal;
-  const diferencaPercentual = percentualFaturamento - referencia.referenciaPercentual;
-  const status = percentualFaturamento <= referencia.referenciaPercentual
+  const metaSaudavelPercentual = numeroOuPadrao(metaPercentual, referencia.referenciaPercentual);
+  const valorMeta = faturamentoSeguro * (metaSaudavelPercentual / 100);
+  const diferencaValor = valorSeguro - valorMeta;
+  const diferencaPercentual = percentualFaturamento - metaSaudavelPercentual;
+  const limiteAtencao = id === "total_fixo"
+    ? referencia.limiteAtencaoPercentual
+    : referencia.referenciaPercentual;
+  const status = percentualFaturamento <= metaSaudavelPercentual
     ? "saudavel"
-    : percentualFaturamento <= referencia.limiteAtencaoPercentual
+    : percentualFaturamento <= limiteAtencao
       ? "atencao"
       : "acima";
 
@@ -237,6 +241,7 @@ function criarParecer({ id, valor, faturamento, referencia }) {
     descricao: referencia.descricao,
     valor: arredondarCentavos(valorSeguro),
     percentualFaturamento: arredondarPercentual(percentualFaturamento),
+    metaPercentual: arredondarPercentual(metaSaudavelPercentual),
     referenciaPercentual: referencia.referenciaPercentual,
     limiteAtencaoPercentual: referencia.limiteAtencaoPercentual,
     diferencaPercentual: arredondarPercentual(diferencaPercentual),
@@ -356,42 +361,61 @@ export function montarAnaliseCustosPontoEquilibrio({
 
   const valorGrupo = (id) => gruposMapa[id]?.valor || 0;
   const custoFixoProjetado = Math.max(0, numeroSeguro(dados?.despesas_fixas) + impacto);
+  const idsSetoriais = ["aluguel", "folha", "utilidades", "tecnologia", "administrativo"];
+  const somaReferenciasSetoriais = idsSetoriais.reduce(
+    (soma, id) => soma + numeroSeguro(referencias[id]?.referenciaPercentual),
+    0,
+  );
+  const metaTotalPercentual = numeroSeguro(referencias.total_fixo.referenciaPercentual);
+  const metaSetorial = (id) => {
+    if (somaReferenciasSetoriais <= 0 || metaTotalPercentual <= 0) {
+      return referencias[id]?.referenciaPercentual || 0;
+    }
+    return (numeroSeguro(referencias[id]?.referenciaPercentual) / somaReferenciasSetoriais) * metaTotalPercentual;
+  };
+
   const pareceres = [
     criarParecer({
       id: "aluguel",
       valor: valorGrupo("aluguel"),
       faturamento: faturamentoSeguro,
       referencia: referencias.aluguel,
+      metaPercentual: metaSetorial("aluguel"),
     }),
     criarParecer({
       id: "folha",
       valor: valorGrupo("folha"),
       faturamento: faturamentoSeguro,
       referencia: referencias.folha,
+      metaPercentual: metaSetorial("folha"),
     }),
     criarParecer({
       id: "utilidades",
       valor: valorGrupo("utilidades"),
       faturamento: faturamentoSeguro,
       referencia: referencias.utilidades,
+      metaPercentual: metaSetorial("utilidades"),
     }),
     criarParecer({
       id: "tecnologia",
       valor: valorGrupo("tecnologia"),
       faturamento: faturamentoSeguro,
       referencia: referencias.tecnologia,
+      metaPercentual: metaSetorial("tecnologia"),
     }),
     criarParecer({
       id: "administrativo",
       valor: valorGrupo("administrativo"),
       faturamento: faturamentoSeguro,
       referencia: referencias.administrativo,
+      metaPercentual: metaSetorial("administrativo"),
     }),
     criarParecer({
       id: "total_fixo",
       valor: custoFixoProjetado,
       faturamento: faturamentoSeguro,
       referencia: referencias.total_fixo,
+      metaPercentual: referencias.total_fixo.referenciaPercentual,
     }),
   ];
 
@@ -404,6 +428,7 @@ export function montarAnaliseCustosPontoEquilibrio({
     comparativoPercentual: pareceres.map((item) => ({
       nome: item.titulo,
       atual: item.percentualFaturamento,
+      meta: item.metaPercentual,
       referencia: item.referenciaPercentual,
     })),
   };

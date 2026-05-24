@@ -215,6 +215,13 @@ function statusParecerLabel(status) {
   return "Acima do ideal";
 }
 
+function statusParecerLabelGerencial(parecer) {
+  if (parecer.id === "total_fixo") return statusParecerLabel(parecer.status);
+  if (parecer.status === "saudavel") return "Dentro da meta";
+  if (parecer.status === "atencao") return "Pressiona total";
+  return "Acima da referencia";
+}
+
 function SimuladorImpactoPanel({ dados, impactoForm, impactoSimulado, impactoValor, setImpactoForm }) {
   return (
     <div className="rounded-lg border border-indigo-200 bg-white p-4 shadow-sm">
@@ -365,7 +372,7 @@ function ParecerCard({ parecer }) {
           <p className="mt-1 text-xs text-slate-600">{parecer.descricao}</p>
         </div>
         <span className="rounded-md bg-white/70 px-2 py-1 text-xs font-bold">
-          {statusParecerLabel(parecer.status)}
+          {statusParecerLabelGerencial(parecer)}
         </span>
       </div>
       <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
@@ -375,11 +382,16 @@ function ParecerCard({ parecer }) {
           <p className="text-xs text-slate-600">{formatMoneyBRL(parecer.valor)}</p>
         </div>
         <div>
-          <p className="text-xs font-semibold uppercase text-slate-500">Ideal</p>
-          <p className="font-bold text-slate-900">{formatPercent(parecer.referenciaPercentual)}</p>
+          <p className="text-xs font-semibold uppercase text-slate-500">Meta</p>
+          <p className="font-bold text-slate-900">{formatPercent(parecer.metaPercentual)}</p>
           <p className={parecer.diferencaValor > 0 ? "text-xs text-red-700" : "text-xs text-emerald-700"}>
             {formatarVariacaoPercentual(parecer.diferencaPercentual)} ({formatarImpactoMoeda(parecer.diferencaValor)})
           </p>
+          {parecer.id !== "total_fixo" && (
+            <p className="mt-1 text-[11px] text-slate-500">
+              Ref. setorial {formatPercent(parecer.referenciaPercentual)}
+            </p>
+          )}
         </div>
       </div>
     </div>
@@ -398,8 +410,8 @@ function AnaliseCustosPanel({ analise, porteAnalise, setPorteAnalise }) {
             <div>
               <h2 className="text-base font-semibold text-slate-900">Analise dos custos</h2>
               <p className="mt-1 text-sm text-slate-600">
-                Parecer gerencial com referencias percentuais para comparar Aluguel sobre faturamento,
-                Folha e pro-labore, utilidades, sistemas e custo fixo total.
+                Parecer gerencial com metas setoriais ajustadas para caber no limite saudavel de custo fixo total.
+                As referencias setoriais aparecem como contexto de comparacao.
               </p>
             </div>
           </div>
@@ -457,7 +469,7 @@ function AnaliseCustosPanel({ analise, porteAnalise, setPorteAnalise }) {
         </div>
 
         <div className="rounded-lg border border-slate-200 bg-white p-4">
-          <h3 className="text-sm font-bold text-slate-900">% do faturamento vs ideal</h3>
+          <h3 className="text-sm font-bold text-slate-900">% do faturamento vs meta</h3>
           <div className="mt-4 h-72">
             <ResponsiveContainer width="100%" height="100%">
               <BarChart data={analise.comparativoPercentual} margin={{ left: -10, right: 10 }}>
@@ -465,7 +477,7 @@ function AnaliseCustosPanel({ analise, porteAnalise, setPorteAnalise }) {
                 <XAxis dataKey="nome" tick={{ fontSize: 11 }} interval={0} angle={-12} textAnchor="end" height={70} />
                 <YAxis tickFormatter={(value) => `${value}%`} />
                 <Tooltip content={<TooltipPercentual />} />
-                <Bar dataKey="referencia" name="Ideal" fill="#94a3b8" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="meta" name="Meta" fill="#94a3b8" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="atual" name="Atual" fill="#2563eb" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
