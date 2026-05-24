@@ -198,10 +198,13 @@ const EntradaXML = () => {
     try {
       const response = await api.get(`/notas-entrada/${notaId}`);
       const nota = aplicarNotaSelecionada(response.data);
-      const temDivergenciaConferencia = (nota?.conferencia?.itens_com_divergencia || 0) > 0;
+      const temDivergenciaNosItens = (nota?.itens || []).some((item) => (
+        Boolean(item.tem_divergencia) || detectarDivergencias(item).length > 0
+      ));
+      const temDivergenciaConferencia = (nota?.conferencia?.itens_com_divergencia || 0) > 0 || temDivergenciaNosItens;
       setMostrarDetalhes(true);
       setMostrarCamposConferencia(abrirConferencia || temDivergenciaConferencia);
-      setFiltroItensNota((abrirConferencia || temDivergenciaConferencia) ? 'divergencias' : 'todos');
+      setFiltroItensNota(temDivergenciaConferencia ? 'divergencias' : 'todos');
       setMultiplicadoresPack({}); // limpar overrides manuais ao abrir nova nota
     } catch (error) {
       toast.error('Erro ao carregar detalhes da nota');

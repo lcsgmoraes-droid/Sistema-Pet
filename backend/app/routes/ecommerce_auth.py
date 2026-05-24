@@ -689,7 +689,19 @@ def _serialize_profile(user: User, cliente: Cliente | None) -> dict:
         and getattr(cliente, "tipo_cadastro", None) == "veterinario"
         and getattr(cliente, "ativo", True) is not False
     )
-    perfil_operacional = "veterinario" if is_veterinario else ("entregador" if is_entregador else "cliente")
+    is_funcionario = bool(
+        cliente
+        and getattr(cliente, "tipo_cadastro", None) == "funcionario"
+        and getattr(cliente, "ativo", True) is not False
+    )
+    if is_veterinario:
+        perfil_operacional = "veterinario"
+    elif is_entregador:
+        perfil_operacional = "entregador"
+    elif is_funcionario:
+        perfil_operacional = "funcionario"
+    else:
+        perfil_operacional = "cliente"
     return {
         "id": user.id,
         "email": user.email,
@@ -719,7 +731,8 @@ def _serialize_profile(user: User, cliente: Cliente | None) -> dict:
         "cliente_id": cliente.id if cliente else None,
         # Perfil entregador — usado pelo app mobile para mostrar interface correta
         "is_entregador": is_entregador,
-        "funcionario_id": cliente.id if (cliente and is_entregador) else None,
+        "is_funcionario": is_funcionario,
+        "funcionario_id": cliente.id if (cliente and (is_entregador or is_funcionario)) else None,
         "is_veterinario": is_veterinario,
         "veterinario_id": cliente.id if (cliente and is_veterinario) else None,
         "perfil_operacional": perfil_operacional,

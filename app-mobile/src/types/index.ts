@@ -31,10 +31,12 @@ export interface EcommerceUser {
   // perfil entregador
   is_entregador?: boolean;
   funcionario_id?: number | null;
+  // perfil operacional funcionario
+  is_funcionario?: boolean;
   // perfil operacional veterinario
   is_veterinario?: boolean;
   veterinario_id?: number | null;
-  perfil_operacional?: "cliente" | "entregador" | "veterinario";
+  perfil_operacional?: "cliente" | "entregador" | "veterinario" | "funcionario";
 }
 
 // =====================
@@ -224,6 +226,107 @@ export interface Produto {
   categoria_nome?: string | null;
   marca_nome?: string | null;
   peso_embalagem_kg?: number | null;   // para calculadora de ração
+}
+
+export interface FuncionarioProdutoEstoque {
+  id: number;
+  nome: string;
+  codigo?: string | null;
+  codigo_barras?: string | null;
+  gtin_ean?: string | null;
+  unidade?: string;
+  preco_venda: number;
+  preco_custo: number;
+  estoque_atual: number;
+  imagem_url?: string | null;
+  is_parent?: boolean;
+  tipo_produto?: string | null;
+  tipo_kit?: string | null;
+  permite_balanco?: boolean;
+  aviso?: string | null;
+}
+
+export interface FuncionarioBalancoPayload {
+  produto_id: number;
+  saldo_final: number;
+  numero_lote?: string | null;
+  data_validade?: string | null;
+  observacao?: string | null;
+}
+
+export interface FuncionarioBalancoResponse {
+  status: string;
+  produto: FuncionarioProdutoEstoque;
+  estoque_anterior: number;
+  estoque_novo: number;
+  diferenca: number;
+  tipo_movimentacao?: "entrada" | "saida" | null;
+  quantidade_movimentada: number;
+  movimentacao_id?: number | null;
+  mensagem: string;
+}
+
+export interface FuncionarioPdvProduto {
+  id: number;
+  nome: string;
+  codigo?: string | null;
+  codigo_barras?: string | null;
+  unidade?: string;
+  preco_venda: number;
+  estoque_atual: number;
+  imagem_url?: string | null;
+  tipo_produto?: string | null;
+  tipo_kit?: string | null;
+  vendavel: boolean;
+  aviso?: string | null;
+}
+
+export interface FuncionarioPdvCliente {
+  id: number;
+  codigo?: string | null;
+  nome: string;
+  telefone?: string | null;
+  celular?: string | null;
+  documento?: string | null;
+}
+
+export interface FuncionarioPdvCaixa {
+  aberto: boolean;
+  caixa_id?: number | null;
+  numero_caixa?: number | null;
+  mensagem: string;
+}
+
+export interface FuncionarioPdvItemPayload {
+  produto_id: number;
+  quantidade: number;
+  preco_unitario: number;
+}
+
+export type FuncionarioPdvFormaPagamento = "dinheiro" | "pix" | "credito" | "debito";
+
+export interface FuncionarioPdvPagamentoPayload {
+  forma_pagamento: FuncionarioPdvFormaPagamento;
+  valor: number;
+  valor_recebido?: number | null;
+  troco?: number | null;
+}
+
+export interface FuncionarioPdvFinalizarPayload {
+  cliente_id?: number | null;
+  itens: FuncionarioPdvItemPayload[];
+  pagamento: FuncionarioPdvPagamentoPayload;
+  observacoes?: string | null;
+}
+
+export interface FuncionarioPdvFinalizarResponse {
+  status: string;
+  venda_id: number;
+  numero_venda: string;
+  total: number;
+  total_pago: number;
+  forma_pagamento: string;
+  mensagem: string;
 }
 
 // =====================
