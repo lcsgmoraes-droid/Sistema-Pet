@@ -12,7 +12,7 @@ import MoneyCell, { formatMoneyCellValue } from './ui/MoneyCell';
 import PageHeader from './ui/PageHeader';
 import StatusBadge from './ui/StatusBadge';
 import FornecedorSelector from './fornecedores/FornecedorSelector';
-import FornecedorIdentity from './ui/FornecedorIdentity';
+import FornecedorIdentity, { getFornecedorIdentityName } from './ui/FornecedorIdentity';
 
 const PERIODOS_RAPIDOS_CONTAS_PAGAR = [
   { value: 'hoje', label: 'Hoje' },
@@ -495,35 +495,39 @@ const ContasPagar = () => {
     return <StatusBadge status="pendente" />;
   };
 
-  const getOrigemBadge = (conta) => {
+  const getOrigemLabel = (conta) => {
     const origem = conta.origem_lancamento || 'manual';
 
     if (origem === 'caixa_pdv') {
-      return (
-        <div className="flex flex-col gap-1">
-          <span className="inline-flex w-fit px-2 py-1 text-xs rounded-full bg-rose-100 text-rose-700 font-semibold">
-            Caixa/PDV
-          </span>
-          {conta.caixa_referencia && (
-            <span className="text-[11px] text-gray-500">{conta.caixa_referencia}</span>
-          )}
-        </div>
-      );
+      return conta.caixa_referencia ? `Caixa/PDV (${conta.caixa_referencia})` : 'Caixa/PDV';
     }
 
     if (origem === 'nota_entrada') {
-      return (
-        <span className="inline-flex w-fit px-2 py-1 text-xs rounded-full bg-blue-100 text-blue-700 font-semibold">
-          Nota entrada
-        </span>
-      );
+      return 'Nota entrada';
     }
 
-    return (
-      <span className="inline-flex w-fit px-2 py-1 text-xs rounded-full bg-gray-100 text-gray-700 font-semibold">
-        Manual
-      </span>
-    );
+    return 'Manual';
+  };
+
+  const getDescricaoPrincipal = (conta) => {
+    const descricao = String(conta.descricao || '-').trim();
+    const nfMatch = descricao.match(/\bNF-e?\s+\d+/i);
+    if (nfMatch) return nfMatch[0].replace(/\s+/g, ' ');
+    return descricao;
+  };
+
+  const getContaTooltip = (conta) => {
+    const linhas = [
+      `Descricao: ${conta.descricao || '-'}`,
+      conta.documento ? `Documento/NF: ${conta.documento}` : null,
+      `Origem: ${getOrigemLabel(conta)}`,
+      conta.tipo_despesa_nome ? `Tipo de despesa: ${conta.tipo_despesa_nome}` : null,
+      conta.eh_parcelado ? `Parcela: ${conta.numero_parcela}/${conta.total_parcelas}` : null,
+      conta.e_custo_fixo === true ? 'Tipo de custo: Fixo' : null,
+      conta.e_custo_fixo === false ? 'Tipo de custo: Variavel' : null,
+    ].filter(Boolean);
+
+    return linhas.join('\n');
   };
 
   const tiposDespesaOrdenados = [...safeArray(tiposDespesa)].sort((a, b) =>
@@ -545,25 +549,25 @@ const ContasPagar = () => {
     },
     {
       key: 'descricao',
-      header: 'Descricao',
-      className: 'min-w-[220px] max-w-[260px]',
-      cellStyle: { maxWidth: 260 },
+      header: 'Conta',
+      className: 'w-[210px] max-w-[210px]',
+      cellStyle: { width: 210, maxWidth: 210 },
       render: (conta) => (
-        <div className="min-w-0 max-w-[260px]">
-          <div className="break-words text-sm font-medium text-slate-900" title={conta.descricao}>
-            {conta.descricao}
+        <div className="min-w-0 max-w-[210px]" title={getContaTooltip(conta)}>
+          <div className="truncate text-sm font-semibold text-slate-900" title={getContaTooltip(conta)}>
+            {getDescricaoPrincipal(conta)}
           </div>
-          <div className="mt-1 flex flex-wrap gap-1">
+          <div className="mt-1 flex flex-nowrap gap-1 overflow-hidden">
             {conta.eh_parcelado && (
-              <span className="px-2 py-1 text-xs rounded bg-gray-100 text-gray-700">
+              <span className="shrink-0 px-2 py-0.5 text-xs rounded bg-gray-100 text-gray-700">
                 {conta.numero_parcela}/{conta.total_parcelas}
               </span>
             )}
             {conta.e_custo_fixo === true && (
-              <span className="px-2 py-0.5 text-xs rounded-full bg-orange-100 text-orange-700 font-semibold">Fixo</span>
+              <span className="shrink-0 px-2 py-0.5 text-xs rounded-full bg-orange-100 text-orange-700 font-semibold">Fixo</span>
             )}
             {conta.e_custo_fixo === false && (
-              <span className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 font-semibold">Variavel</span>
+              <span className="shrink-0 px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-700 font-semibold">Variavel</span>
             )}
           </div>
         </div>
@@ -572,29 +576,30 @@ const ContasPagar = () => {
     {
       key: 'fornecedor',
       header: 'Fornecedor',
-      className: 'min-w-[240px] max-w-[340px]',
-      cellStyle: { maxWidth: 340 },
-      render: (conta) => (
-        <FornecedorIdentity
-          className="w-full max-w-[330px]"
-          fallback=""
-          nameClassName="font-medium text-slate-700"
-          record={conta}
-          showDocument={false}
-        />
-      ),
-    },
-    {
-      key: 'origem',
-      header: 'Origem',
-      render: getOrigemBadge,
+      className: 'w-[220px] max-w-[220px]',
+      cellStyle: { width: 220, maxWidth: 220 },
+      render: (conta) => {
+        const fornecedorNome = getFornecedorIdentityName(conta);
+        return (
+          <div className="max-w-[220px] truncate" title={fornecedorNome}>
+            <FornecedorIdentity
+              className="w-full max-w-[220px] truncate"
+              copyable={false}
+              fallback=""
+              nameClassName="max-w-[220px] truncate font-medium text-slate-700"
+              record={conta}
+              showDocument={false}
+            />
+          </div>
+        );
+      },
     },
     {
       key: 'tipo',
       header: 'Tipo',
       render: (conta) => (
         conta.tipo_despesa_nome ? (
-          <span className="inline-flex px-2 py-1 text-xs rounded-full bg-slate-100 text-slate-700">
+          <span className="inline-flex max-w-[150px] truncate px-2 py-1 text-xs rounded-full bg-slate-100 text-slate-700" title={conta.tipo_despesa_nome}>
             {conta.tipo_despesa_nome}
           </span>
         ) : (
@@ -605,30 +610,34 @@ const ContasPagar = () => {
     {
       key: 'vencimento',
       header: 'Vencimento',
+      headerClassName: 'w-[110px] whitespace-nowrap',
+      className: 'w-[110px] whitespace-nowrap',
       render: (conta) => formatarData(conta.data_vencimento),
     },
     {
       key: 'valor_original',
-      header: 'Valor Original',
+      header: 'Original',
+      title: 'Valor original',
       align: 'right',
-      headerClassName: 'min-w-[120px] whitespace-nowrap',
-      className: 'min-w-[120px] whitespace-nowrap tabular-nums',
+      headerClassName: 'w-[110px] whitespace-nowrap',
+      className: 'w-[110px] whitespace-nowrap tabular-nums',
       render: (conta) => <MoneyCell value={conta.valor_original} />,
     },
     {
       key: 'valor_pago',
-      header: 'Valor Pago',
+      header: 'Pago',
+      title: 'Valor pago',
       align: 'right',
-      headerClassName: 'min-w-[120px] whitespace-nowrap',
-      className: 'min-w-[120px] whitespace-nowrap tabular-nums',
+      headerClassName: 'w-[100px] whitespace-nowrap',
+      className: 'w-[100px] whitespace-nowrap tabular-nums',
       render: (conta) => <MoneyCell value={conta.valor_pago} zeroAsDash />,
     },
     {
       key: 'saldo',
       header: 'Saldo',
       align: 'right',
-      headerClassName: 'min-w-[120px] whitespace-nowrap',
-      className: 'min-w-[120px] whitespace-nowrap tabular-nums font-bold',
+      headerClassName: 'w-[100px] whitespace-nowrap',
+      className: 'w-[100px] whitespace-nowrap tabular-nums font-bold',
       render: (conta) => <MoneyCell value={conta.valor_final - conta.valor_pago} zeroAsDash />,
     },
     {
@@ -639,8 +648,8 @@ const ContasPagar = () => {
     {
       key: 'acoes',
       header: 'Acoes',
-      headerClassName: 'contas-pagar-actions-cell sticky right-0 z-20 w-[320px] min-w-[320px] bg-gray-50 text-right',
-      className: 'contas-pagar-actions-cell sticky right-0 z-10 w-[320px] min-w-[320px] border-l border-slate-100 bg-white',
+      headerClassName: 'contas-pagar-actions-cell sticky right-0 z-20 w-[260px] min-w-[260px] bg-gray-50 text-right',
+      className: 'contas-pagar-actions-cell sticky right-0 z-10 w-[260px] min-w-[260px] border-l border-slate-100 bg-white',
       render: (conta) => (
         <div className="flex flex-wrap items-center justify-end gap-2">
           <ActionButton
@@ -951,7 +960,7 @@ const ContasPagar = () => {
           data={safeArray(contas)}
           emptyMessage="Nenhuma conta encontrada"
           getRowKey={(conta) => conta.id}
-          tableClassName="min-w-[1740px]"
+          tableClassName="min-w-[1280px]"
           theadClassName="bg-gray-50"
           tbodyClassName="divide-y divide-gray-200"
         />
