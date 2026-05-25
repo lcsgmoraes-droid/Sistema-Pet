@@ -82,3 +82,14 @@ def test_mobile_employee_stock_service_and_screen_exist():
     assert "historicoSessao" in screen
     assert "Lancamentos da sessao" in screen
     assert "FuncionarioBalanco" in navigator
+
+
+def test_mobile_employee_stock_adjustment_hides_current_stock_and_uses_autocomplete():
+    screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioBalancoScreen.tsx")
+
+    assert "autocompleteProdutosTimer" in screen
+    assert "buscarManual(false)" in screen
+    assert 'placeholder="Buscar produto por nome, codigo ou barras"' in screen
+    assert "setSaldoFinal(String(item.estoque_atual" not in screen
+    assert "Estoque atual" not in screen
+    assert "diferencaBox" not in screen

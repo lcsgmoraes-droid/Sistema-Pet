@@ -289,6 +289,11 @@ export interface FuncionarioPdvCliente {
   celular?: string | null;
   documento?: string | null;
   tipo_cadastro?: string | null;
+  email?: string | null;
+  endereco?: string | null;
+  credito?: number;
+  fidelidade?: Record<string, any> | null;
+  cupons_disponiveis?: any[];
 }
 
 export interface FuncionarioPdvCaixa {
@@ -306,11 +311,24 @@ export interface FuncionarioPdvItemPayload {
 
 export type FuncionarioPdvFormaPagamento = "dinheiro" | "pix" | "credito" | "debito";
 
+export interface FuncionarioPdvFormaPagamentoOpcao {
+  id: number;
+  nome: string;
+  tipo: string;
+  key: FuncionarioPdvFormaPagamento;
+  taxa_percentual: number;
+  permite_parcelamento: boolean;
+  numero_parcelas: number;
+  max_parcelas: number;
+  parcelas_maximas: number;
+}
+
 export interface FuncionarioPdvPagamentoPayload {
   forma_pagamento: FuncionarioPdvFormaPagamento;
   valor: number;
   valor_recebido?: number | null;
   troco?: number | null;
+  numero_parcelas: number;
 }
 
 export interface FuncionarioPdvCupomDisponivel {
@@ -321,6 +339,15 @@ export interface FuncionarioPdvCupomDisponivel {
   discount_applied: number;
   min_purchase_value?: number | null;
   valid_until?: string | null;
+}
+
+export interface FuncionarioPdvBeneficioGerado {
+  tipo: string;
+  titulo: string;
+  valor?: number | null;
+  percentual?: number | null;
+  quantidade?: number | null;
+  descricao?: string | null;
 }
 
 export interface FuncionarioPdvBeneficiosPreviewPayload {
@@ -339,6 +366,7 @@ export interface FuncionarioPdvBeneficiosPreview {
   total_venda: number;
   valor_pagamento: number;
   cupons_disponiveis: FuncionarioPdvCupomDisponivel[];
+  beneficios_gerados: FuncionarioPdvBeneficioGerado[];
   mensagens: string[];
 }
 
@@ -346,6 +374,15 @@ export interface FuncionarioPdvFinalizarPayload {
   cliente_id?: number | null;
   itens: FuncionarioPdvItemPayload[];
   pagamento: FuncionarioPdvPagamentoPayload;
+  observacoes?: string | null;
+  cupom_codigo?: string | null;
+  desconto_cupom?: number | null;
+  cashback_valor?: number | null;
+}
+
+export interface FuncionarioPdvSalvarPayload {
+  cliente_id?: number | null;
+  itens: FuncionarioPdvItemPayload[];
   observacoes?: string | null;
   cupom_codigo?: string | null;
   desconto_cupom?: number | null;

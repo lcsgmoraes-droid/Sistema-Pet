@@ -20,8 +20,10 @@ import {
   buscarProdutoPdvPorBarcode,
   buscarProdutosPdv,
   finalizarVendaPdv,
+  listarFormasPagamentoPdv,
   obterCaixaAbertoPdv,
   previewBeneficiosPdv,
+  salvarVendaPdv,
 } from "../../services/funcionarioPdv.service";
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from "../../theme";
 import {
@@ -29,6 +31,7 @@ import {
   FuncionarioPdvBeneficiosPreview,
   FuncionarioPdvCliente,
   FuncionarioPdvFormaPagamento,
+  FuncionarioPdvFormaPagamentoOpcao,
   FuncionarioPdvProduto,
 } from "../../types";
 import { formatarMoeda } from "../../utils/format";
@@ -77,12 +80,16 @@ export default function FuncionarioPdvScreen() {
   const [clienteBusca, setClienteBusca] = useState("");
   const [clientesSugestoes, setClientesSugestoes] = useState<FuncionarioPdvCliente[]>([]);
   const [cliente, setCliente] = useState<FuncionarioPdvCliente | null>(null);
+  const [mostrarDetalhesCliente, setMostrarDetalhesCliente] = useState(false);
   const [formaPagamento, setFormaPagamento] = useState<FuncionarioPdvFormaPagamento>("dinheiro");
+  const [formasPagamentoErp, setFormasPagamentoErp] = useState<FuncionarioPdvFormaPagamentoOpcao[]>([]);
+  const [numeroParcelas, setNumeroParcelas] = useState(1);
   const [valorRecebido, setValorRecebido] = useState("");
   const [observacoes, setObservacoes] = useState("");
   const [caixa, setCaixa] = useState<FuncionarioPdvCaixa | null>(null);
   const [carregandoCaixa, setCarregandoCaixa] = useState(false);
   const [finalizando, setFinalizando] = useState(false);
+  const [salvandoAberta, setSalvandoAberta] = useState(false);
   const [beneficiosPreview, setBeneficiosPreview] = useState<FuncionarioPdvBeneficiosPreview | null>(null);
   const [carregandoBeneficios, setCarregandoBeneficios] = useState(false);
   const [erroBeneficios, setErroBeneficios] = useState<string | null>(null);
@@ -101,6 +108,7 @@ export default function FuncionarioPdvScreen() {
   useEffect(() => {
     if (!isFocused) return;
     carregarCaixa();
+    carregarFormasPagamento();
   }, [isFocused]);
 
   useEffect(() => {
@@ -163,6 +171,27 @@ export default function FuncionarioPdvScreen() {
     () => carrinho.reduce((soma, item) => soma + item.quantidade, 0),
     [carrinho],
   );
+  const formaCreditoErp = useMemo(
+    () => formasPagamentoErp.find((item) => item.key === "credito") ?? null,
+    [formasPagamentoErp],
+  );
+  const parcelasCredito = useMemo(() => {
+    const maximo = Math.max(
+      1,
+      Number(formaCreditoErp?.parcelas_maximas ?? formaCreditoErp?.max_parcelas ?? formaCreditoErp?.numero_parcelas ?? 12),
+    );
+    return Array.from({ length: maximo }, (_, indice) => indice + 1);
+  }, [formaCreditoErp]);
+
+  useEffect(() => {
+    if (formaPagamento !== "credito") {
+      setNumeroParcelas(1);
+      return;
+    }
+    if (!parcelasCredito.includes(numeroParcelas)) {
+      setNumeroParcelas(parcelasCredito[0] ?? 1);
+    }
+  }, [formaPagamento, numeroParcelas, parcelasCredito]);
 
   useEffect(() => {
     if (!isFocused || carrinho.length === 0) {
@@ -186,6 +215,14 @@ export default function FuncionarioPdvScreen() {
       Alert.alert("Erro", mensagemErroApi(error, "Nao foi possivel consultar o caixa."));
     } finally {
       setCarregandoCaixa(false);
+    }
+  }
+
+  async function carregarFormasPagamento() {
+    try {
+      setFormasPagamentoErp(await listarFormasPagamentoPdv());
+    } catch {
+      setFormasPagamentoErp([]);
     }
   }
 
@@ -309,6 +346,59 @@ export default function FuncionarioPdvScreen() {
     }
   }
 
+  function limparVendaAtual() {
+    setCarrinho([]);
+    setCliente(null);
+    setMostrarDetalhesCliente(false);
+    setClienteBusca("");
+    setClientesSugestoes([]);
+    setValorRecebido("");
+    setObservacoes("");
+    setCupomCodigo("");
+    setUsarCashback(false);
+    setCashbackValor("");
+    setBeneficiosPreview(null);
+    setNumeroParcelas(1);
+  }
+
+  async function salvarAberta() {
+    if (!caixa?.aberto) {
+      Alert.alert("Caixa fechado", caixa?.mensagem || "Abra um caixa no ERP web antes de salvar pelo app.");
+      return;
+    }
+    if (!carrinho.length) {
+      Alert.alert("Carrinho vazio", "Adicione ao menos um produto para salvar.");
+      return;
+    }
+    setSalvandoAberta(true);
+    try {
+      const previewAtual = await previewBeneficiosPdv({
+        cliente_id: cliente?.id ?? null,
+        itens: itensPayload,
+        cupom_codigo: cupomCodigo.trim() || null,
+        cashback_valor: 0,
+      });
+      setBeneficiosPreview(previewAtual);
+      setErroBeneficios(null);
+
+      const resposta = await salvarVendaPdv({
+        cliente_id: cliente?.id ?? null,
+        itens: itensPayload,
+        observacoes: observacoes.trim() || null,
+        cupom_codigo: cupomCodigo.trim() || null,
+        desconto_cupom: previewAtual.desconto_cupom,
+        cashback_valor: 0,
+      });
+      Alert.alert("Venda salva", `${resposta.numero_venda} ficou aberta para recebimento no caixa.`);
+      limparVendaAtual();
+      carregarCaixa();
+    } catch (error: any) {
+      Alert.alert("Erro", mensagemErroApi(error, "Nao foi possivel salvar a venda."));
+    } finally {
+      setSalvandoAberta(false);
+    }
+  }
+
   async function finalizar() {
     if (!caixa?.aberto) {
       Alert.alert("Caixa fechado", caixa?.mensagem || "Abra um caixa no ERP web antes de vender pelo app.");
@@ -348,6 +438,7 @@ export default function FuncionarioPdvScreen() {
           valor: Number(previewAtual.valor_pagamento.toFixed(2)),
           valor_recebido: formaPagamento === "dinheiro" && previewAtual.valor_pagamento > 0 ? Number(valorRecebidoNumero.toFixed(2)) : null,
           troco: formaPagamento === "dinheiro" && previewAtual.valor_pagamento > 0 ? Number(trocoFinal.toFixed(2)) : null,
+          numero_parcelas: formaPagamento === "credito" ? numeroParcelas : 1,
         },
         observacoes: observacoes.trim() || null,
         cupom_codigo: cupomCodigo.trim() || null,
@@ -355,16 +446,7 @@ export default function FuncionarioPdvScreen() {
         cashback_valor: previewAtual.cashback_valor,
       });
       Alert.alert("Venda registrada", `${resposta.numero_venda} - ${formatarMoeda(resposta.total)}`);
-      setCarrinho([]);
-      setCliente(null);
-      setClienteBusca("");
-      setClientesSugestoes([]);
-      setValorRecebido("");
-      setObservacoes("");
-      setCupomCodigo("");
-      setUsarCashback(false);
-      setCashbackValor("");
-      setBeneficiosPreview(null);
+      limparVendaAtual();
       carregarCaixa();
     } catch (error: any) {
       Alert.alert("Erro", mensagemErroApi(error, "Nao foi possivel finalizar a venda."));
@@ -539,24 +621,60 @@ export default function FuncionarioPdvScreen() {
         <View style={styles.card}>
           <Text style={styles.secaoTitulo}>Comprador opcional</Text>
           {cliente ? (
-            <View style={styles.clienteSelecionado}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.clienteNome}>{cliente.nome}</Text>
-                <Text style={styles.clienteMeta}>
-                  Codigo {cliente.codigo || "-"} | {cliente.tipo_cadastro || "pessoa"}
-                </Text>
+            <>
+              <View style={styles.clienteSelecionado}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.clienteNome}>{cliente.nome}</Text>
+                  <Text style={styles.clienteMeta}>
+                    Codigo {cliente.codigo || "-"} | {cliente.tipo_cadastro || "pessoa"}
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  style={styles.botaoDetalhesCliente}
+                  onPress={() => setMostrarDetalhesCliente((atual) => !atual)}
+                >
+                  <Ionicons name="information-circle-outline" size={17} color={CORES.primario} />
+                  <Text style={styles.botaoDetalhesClienteTexto}>Detalhes</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.botaoLimpar}
+                  onPress={() => {
+                    setCliente(null);
+                    setMostrarDetalhesCliente(false);
+                    setUsarCashback(false);
+                    setCashbackValor("");
+                  }}
+                >
+                  <Ionicons name="close" size={18} color={CORES.erro} />
+                </TouchableOpacity>
               </View>
-              <TouchableOpacity
-                style={styles.botaoLimpar}
-                onPress={() => {
-                  setCliente(null);
-                  setUsarCashback(false);
-                  setCashbackValor("");
-                }}
-              >
-                <Ionicons name="close" size={18} color={CORES.erro} />
-              </TouchableOpacity>
-            </View>
+              {mostrarDetalhesCliente ? (
+                <View style={styles.detalhesCliente}>
+                  <Text style={styles.detalhesClienteTitulo}>Detalhes do cliente</Text>
+                  <Text style={styles.detalhesClienteLinha}>Telefone: {cliente.celular || cliente.telefone || "-"}</Text>
+                  <Text style={styles.detalhesClienteLinha}>Documento: {cliente.documento || "-"}</Text>
+                  <Text style={styles.detalhesClienteLinha}>Email: {cliente.email || "-"}</Text>
+                  <Text style={styles.detalhesClienteLinha}>Endereco: {cliente.endereco || "-"}</Text>
+                  <Text style={styles.detalhesClienteLinha}>Credito: {formatarMoeda(cliente.credito ?? 0)}</Text>
+                  <Text style={styles.detalhesClienteSubtitulo}>Cartao fidelidade</Text>
+                  <Text style={styles.detalhesClienteLinha}>
+                    {cliente.fidelidade
+                      ? `Pontos ${cliente.fidelidade.pontos ?? 0} | Carimbos ${cliente.fidelidade.carimbos ?? 0}`
+                      : "Sem informacao de fidelidade"}
+                  </Text>
+                  <Text style={styles.detalhesClienteSubtitulo}>Cupons disponiveis</Text>
+                  {(cliente.cupons_disponiveis ?? []).length ? (
+                    (cliente.cupons_disponiveis ?? []).slice(0, 3).map((cupom: any, indice: number) => (
+                      <Text key={`${cupom.code ?? indice}`} style={styles.detalhesClienteLinha}>
+                        {cupom.code ?? "Cupom"} {cupom.discount_applied ? `- ${formatarMoeda(cupom.discount_applied)}` : ""}
+                      </Text>
+                    ))
+                  ) : (
+                    <Text style={styles.detalhesClienteLinha}>Nenhum cupom nominal carregado.</Text>
+                  )}
+                </View>
+              ) : null}
+            </>
           ) : (
             <>
               <View style={styles.buscaLinha}>
@@ -578,6 +696,7 @@ export default function FuncionarioPdvScreen() {
                   style={styles.sugestao}
                   onPress={() => {
                     setCliente(item);
+                    setMostrarDetalhesCliente(false);
                     setClientesSugestoes([]);
                     setClienteBusca("");
                     setUsarCashback(false);
@@ -637,6 +756,27 @@ export default function FuncionarioPdvScreen() {
                     {cupom.code} - {formatarMoeda(cupom.discount_applied)}
                   </Text>
                 </TouchableOpacity>
+              ))}
+            </View>
+          ) : null}
+
+          {beneficiosPreview?.beneficios_gerados?.length ? (
+            <View style={styles.beneficiosGeradosBox}>
+              <Text style={styles.beneficiosGeradosTitulo}>Beneficios que esta venda vai gerar</Text>
+              {beneficiosPreview.beneficios_gerados.slice(0, 4).map((beneficio, indice) => (
+                <View key={`${beneficio.tipo}-${indice}`} style={styles.beneficioGeradoLinha}>
+                  <Ionicons
+                    name={beneficio.tipo === "cashback" ? "wallet-outline" : beneficio.tipo === "fidelidade" ? "star-outline" : "ticket-outline"}
+                    size={16}
+                    color={CORES.sucesso}
+                  />
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.beneficioGeradoTitulo}>{beneficio.titulo}</Text>
+                    <Text style={styles.beneficioGeradoDescricao}>
+                      {beneficio.descricao || (beneficio.valor ? formatarMoeda(beneficio.valor) : `${beneficio.quantidade ?? 0}`)}
+                    </Text>
+                  </View>
+                </View>
               ))}
             </View>
           ) : null}
@@ -749,6 +889,25 @@ export default function FuncionarioPdvScreen() {
             </>
           ) : null}
 
+          {formaPagamento === "credito" ? (
+            <View style={styles.parcelasBox}>
+              <Text style={styles.label}>Parcelamento</Text>
+              <View style={styles.parcelasGrid}>
+                {parcelasCredito.map((parcela) => (
+                  <TouchableOpacity
+                    key={parcela}
+                    style={[styles.parcelaBotao, numeroParcelas === parcela && styles.parcelaBotaoAtivo]}
+                    onPress={() => setNumeroParcelas(parcela)}
+                  >
+                    <Text style={[styles.parcelaTexto, numeroParcelas === parcela && styles.parcelaTextoAtivo]}>
+                      {parcela}x
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
+          ) : null}
+
           <Text style={styles.label}>Observacao</Text>
           <TextInput
             value={observacoes}
@@ -767,14 +926,24 @@ export default function FuncionarioPdvScreen() {
               <Text style={styles.resumoSubvalor}>Venda {formatarMoeda(totalComBeneficios)}</Text>
             ) : null}
           </View>
-          <TouchableOpacity
-            style={[styles.botaoFinalizar, (finalizando || !carrinho.length || !caixa?.aberto) && styles.botaoDesabilitado]}
-            onPress={finalizar}
-            disabled={finalizando || !carrinho.length || !caixa?.aberto}
-          >
-            {finalizando ? <ActivityIndicator color="#fff" /> : <Ionicons name="checkmark-circle" size={20} color="#fff" />}
-            <Text style={styles.botaoFinalizarTexto}>Finalizar</Text>
-          </TouchableOpacity>
+          <View style={styles.resumoAcoes}>
+            <TouchableOpacity
+              style={[styles.botaoSalvarAberta, (salvandoAberta || finalizando || !carrinho.length || !caixa?.aberto) && styles.botaoDesabilitado]}
+              onPress={salvarAberta}
+              disabled={salvandoAberta || finalizando || !carrinho.length || !caixa?.aberto}
+            >
+              {salvandoAberta ? <ActivityIndicator color={CORES.primario} /> : <Ionicons name="save-outline" size={18} color={CORES.primario} />}
+              <Text style={styles.botaoSalvarAbertaTexto}>Salvar para o caixa</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.botaoFinalizar, (finalizando || salvandoAberta || !carrinho.length || !caixa?.aberto) && styles.botaoDesabilitado]}
+              onPress={finalizar}
+              disabled={finalizando || salvandoAberta || !carrinho.length || !caixa?.aberto}
+            >
+              {finalizando ? <ActivityIndicator color="#fff" /> : <Ionicons name="checkmark-circle" size={20} color="#fff" />}
+              <Text style={styles.botaoFinalizarTexto}>Finalizar</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
     </KeyboardAvoidingView>
@@ -932,6 +1101,31 @@ const styles = StyleSheet.create({
   },
   clienteNome: { fontSize: FONTE.media, fontWeight: "800", color: CORES.texto },
   clienteMeta: { fontSize: FONTE.pequena, color: CORES.textoSecundario },
+  botaoDetalhesCliente: {
+    height: 36,
+    borderRadius: RAIO.md,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    paddingHorizontal: ESPACO.sm,
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: 4,
+    marginRight: ESPACO.xs,
+    backgroundColor: "#EFF6FF",
+  },
+  botaoDetalhesClienteTexto: { color: CORES.primario, fontWeight: "800", fontSize: FONTE.pequena },
+  detalhesCliente: {
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    backgroundColor: "#EFF6FF",
+    borderRadius: RAIO.md,
+    padding: ESPACO.md,
+    gap: 3,
+  },
+  detalhesClienteTitulo: { color: CORES.texto, fontWeight: "900", fontSize: FONTE.media },
+  detalhesClienteSubtitulo: { color: CORES.primario, fontWeight: "900", fontSize: FONTE.pequena, marginTop: ESPACO.xs },
+  detalhesClienteLinha: { color: CORES.textoSecundario, fontSize: FONTE.pequena },
   botaoLimpar: {
     width: 36,
     height: 36,
@@ -957,6 +1151,21 @@ const styles = StyleSheet.create({
   formaBotaoAtivo: { borderColor: CORES.primario, backgroundColor: CORES.primarioClaro },
   formaTexto: { color: CORES.textoSecundario, fontWeight: "800" },
   formaTextoAtivo: { color: CORES.primario },
+  parcelasBox: { gap: ESPACO.xs },
+  parcelasGrid: { flexDirection: "row", flexWrap: "wrap", gap: ESPACO.xs },
+  parcelaBotao: {
+    minWidth: 48,
+    height: 38,
+    borderRadius: RAIO.md,
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#fff",
+  },
+  parcelaBotaoAtivo: { borderColor: CORES.primario, backgroundColor: CORES.primarioClaro },
+  parcelaTexto: { color: CORES.textoSecundario, fontWeight: "800" },
+  parcelaTextoAtivo: { color: CORES.primario },
   label: { fontSize: FONTE.normal, fontWeight: "700", color: CORES.texto, marginTop: ESPACO.xs },
   beneficioErro: {
     flexDirection: "row",
@@ -993,6 +1202,18 @@ const styles = StyleSheet.create({
     paddingVertical: ESPACO.xs,
   },
   cupomChipTexto: { flex: 1, color: CORES.primario, fontWeight: "800", fontSize: FONTE.pequena },
+  beneficiosGeradosBox: {
+    borderWidth: 1,
+    borderColor: "#BBF7D0",
+    backgroundColor: "#ECFDF5",
+    borderRadius: RAIO.md,
+    padding: ESPACO.md,
+    gap: ESPACO.xs,
+  },
+  beneficiosGeradosTitulo: { color: "#065F46", fontWeight: "900", fontSize: FONTE.normal },
+  beneficioGeradoLinha: { flexDirection: "row", alignItems: "center", gap: ESPACO.sm },
+  beneficioGeradoTitulo: { color: CORES.texto, fontWeight: "800", fontSize: FONTE.pequena },
+  beneficioGeradoDescricao: { color: CORES.textoSecundario, fontSize: FONTE.pequena },
   cashbackBox: {
     flexDirection: "row",
     alignItems: "center",
@@ -1059,9 +1280,22 @@ const styles = StyleSheet.create({
   resumoLabel: { color: CORES.textoSecundario, fontSize: FONTE.pequena, fontWeight: "700" },
   resumoValor: { color: CORES.texto, fontSize: FONTE.titulo, fontWeight: "900", marginTop: 2 },
   resumoSubvalor: { color: CORES.textoSecundario, fontSize: FONTE.pequena, marginTop: 2 },
+  resumoAcoes: { flex: 1, gap: ESPACO.sm },
+  botaoSalvarAberta: {
+    minHeight: 48,
+    borderRadius: RAIO.md,
+    borderWidth: 1,
+    borderColor: "#BFDBFE",
+    backgroundColor: "#EFF6FF",
+    alignItems: "center",
+    justifyContent: "center",
+    flexDirection: "row",
+    gap: ESPACO.xs,
+    paddingHorizontal: ESPACO.sm,
+  },
+  botaoSalvarAbertaTexto: { color: CORES.primario, fontSize: FONTE.pequena, fontWeight: "900" },
   botaoFinalizar: {
-    minWidth: 150,
-    height: 52,
+    minHeight: 52,
     borderRadius: RAIO.md,
     backgroundColor: CORES.sucesso,
     alignItems: "center",

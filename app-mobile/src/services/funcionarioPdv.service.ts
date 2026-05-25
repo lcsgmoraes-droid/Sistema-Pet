@@ -4,9 +4,11 @@ import {
   FuncionarioPdvBeneficiosPreviewPayload,
   FuncionarioPdvCaixa,
   FuncionarioPdvCliente,
+  FuncionarioPdvFormaPagamentoOpcao,
   FuncionarioPdvFinalizarPayload,
   FuncionarioPdvFinalizarResponse,
   FuncionarioPdvProduto,
+  FuncionarioPdvSalvarPayload,
 } from "../types";
 
 function normalizarProdutoPdv(data: any): FuncionarioPdvProduto {
@@ -35,6 +37,11 @@ function normalizarClientePdv(data: any): FuncionarioPdvCliente {
     celular: data.celular ?? null,
     documento: data.documento ?? null,
     tipo_cadastro: data.tipo_cadastro ?? null,
+    email: data.email ?? null,
+    endereco: data.endereco ?? null,
+    credito: Number(data.credito ?? 0),
+    fidelidade: data.fidelidade ?? null,
+    cupons_disponiveis: data.cupons_disponiveis ?? [],
   };
 }
 
@@ -80,12 +87,32 @@ export async function obterCaixaAbertoPdv(): Promise<FuncionarioPdvCaixa> {
   };
 }
 
+export async function listarFormasPagamentoPdv(): Promise<FuncionarioPdvFormaPagamentoOpcao[]> {
+  const response = await api.get("/app/funcionario/pdv/formas-pagamento");
+  return Array.isArray(response.data)
+    ? response.data.map((item: any) => ({
+        id: Number(item.id),
+        nome: String(item.nome ?? ""),
+        tipo: String(item.tipo ?? ""),
+        key: item.key,
+        taxa_percentual: Number(item.taxa_percentual ?? 0),
+        permite_parcelamento: Boolean(item.permite_parcelamento),
+        numero_parcelas: Number(item.numero_parcelas ?? 1),
+        max_parcelas: Number(item.max_parcelas ?? item.numero_parcelas ?? 1),
+        parcelas_maximas: Number(item.parcelas_maximas ?? item.numero_parcelas ?? 1),
+      }))
+    : [];
+}
+
 export async function previewBeneficiosPdv(
   payload: FuncionarioPdvBeneficiosPreviewPayload,
 ): Promise<FuncionarioPdvBeneficiosPreview> {
   const response = await api.post("/app/funcionario/pdv/beneficios/preview", payload);
   const cupons = Array.isArray(response.data?.cupons_disponiveis)
     ? response.data.cupons_disponiveis
+    : [];
+  const beneficiosGerados = Array.isArray(response.data?.beneficios_gerados)
+    ? response.data.beneficios_gerados
     : [];
 
   return {
@@ -105,6 +132,14 @@ export async function previewBeneficiosPdv(
       min_purchase_value: item.min_purchase_value == null ? null : Number(item.min_purchase_value),
       valid_until: item.valid_until ?? null,
     })),
+    beneficios_gerados: beneficiosGerados.map((item: any) => ({
+      tipo: String(item.tipo ?? ""),
+      titulo: String(item.titulo ?? ""),
+      valor: item.valor == null ? null : Number(item.valor),
+      percentual: item.percentual == null ? null : Number(item.percentual),
+      quantidade: item.quantidade == null ? null : Number(item.quantidade),
+      descricao: item.descricao ?? null,
+    })),
     mensagens: Array.isArray(response.data?.mensagens)
       ? response.data.mensagens.map((item: any) => String(item))
       : [],
@@ -115,6 +150,21 @@ export async function finalizarVendaPdv(
   payload: FuncionarioPdvFinalizarPayload,
 ): Promise<FuncionarioPdvFinalizarResponse> {
   const response = await api.post("/app/funcionario/pdv/vendas/finalizar", payload);
+  return {
+    status: String(response.data?.status ?? ""),
+    venda_id: Number(response.data?.venda_id ?? 0),
+    numero_venda: String(response.data?.numero_venda ?? ""),
+    total: Number(response.data?.total ?? 0),
+    total_pago: Number(response.data?.total_pago ?? 0),
+    forma_pagamento: String(response.data?.forma_pagamento ?? ""),
+    mensagem: String(response.data?.mensagem ?? ""),
+  };
+}
+
+export async function salvarVendaPdv(
+  payload: FuncionarioPdvSalvarPayload,
+): Promise<FuncionarioPdvFinalizarResponse> {
+  const response = await api.post("/app/funcionario/pdv/vendas/salvar", payload);
   return {
     status: String(response.data?.status ?? ""),
     venda_id: Number(response.data?.venda_id ?? 0),

@@ -80,15 +80,26 @@ export default function FuncionarioBalancoScreen() {
     }
   }, [scannerAberto, permission?.granted, requestPermission]);
 
+  useEffect(() => {
+    if (!isFocused) return;
+    const termo = buscaManual.trim();
+    if (termo.length < 2) {
+      setSugestoes([]);
+      return;
+    }
+
+    const autocompleteProdutosTimer = setTimeout(() => {
+      buscarManual(false);
+    }, 350);
+
+    return () => clearTimeout(autocompleteProdutosTimer);
+  }, [buscaManual, isFocused]);
+
   const saldoFinalNumero = useMemo(() => parseNumero(saldoFinal), [saldoFinal]);
-  const diferenca = useMemo(() => {
-    if (!produto || saldoFinalNumero == null) return null;
-    return saldoFinalNumero - Number(produto.estoque_atual ?? 0);
-  }, [produto, saldoFinalNumero]);
 
   function selecionarProduto(item: FuncionarioProdutoEstoque) {
     setProduto(item);
-    setSaldoFinal(String(item.estoque_atual ?? 0).replace(".", ","));
+    setSaldoFinal("");
     setSugestoes([]);
     setBuscaManual("");
     setUltimoResultado(null);
@@ -124,14 +135,16 @@ export default function FuncionarioBalancoScreen() {
     }
   }
 
-  async function buscarManual() {
+  async function buscarManual(mostrarAlerta = true) {
     const termo = buscaManual.trim();
     if (termo.length < 2) return;
     setBuscando(true);
     try {
       setSugestoes(await buscarProdutosFuncionario(termo));
     } catch (error: any) {
-      Alert.alert("Erro", mensagemErroApi(error, "Nao foi possivel buscar no ERP."));
+      if (mostrarAlerta) {
+        Alert.alert("Erro", mensagemErroApi(error, "Nao foi possivel buscar no ERP."));
+      }
     } finally {
       setBuscando(false);
     }
@@ -160,8 +173,8 @@ export default function FuncionarioBalancoScreen() {
         data_validade: dataValidade.trim() || null,
         observacao: observacao.trim() || null,
       });
-      setProduto(resposta.produto);
-      setSaldoFinal(String(resposta.estoque_novo).replace(".", ","));
+      setProduto(null);
+      setSaldoFinal("");
       setNumeroLote("");
       setDataValidade("");
       setObservacao("");
@@ -265,12 +278,12 @@ export default function FuncionarioBalancoScreen() {
             <TextInput
               value={buscaManual}
               onChangeText={setBuscaManual}
-              placeholder="Buscar por nome, SKU ou codigo"
+              placeholder="Buscar produto por nome, codigo ou barras"
               style={styles.inputBusca}
               returnKeyType="search"
-              onSubmitEditing={buscarManual}
+              onSubmitEditing={() => buscarManual()}
             />
-            <TouchableOpacity style={styles.botaoBusca} onPress={buscarManual} disabled={buscando}>
+            <TouchableOpacity style={styles.botaoBusca} onPress={() => buscarManual()} disabled={buscando}>
               {buscando ? <ActivityIndicator color="#fff" /> : <Ionicons name="search" size={20} color="#fff" />}
             </TouchableOpacity>
           </View>
@@ -279,7 +292,7 @@ export default function FuncionarioBalancoScreen() {
             <TouchableOpacity key={item.id} style={styles.sugestao} onPress={() => selecionarProduto(item)}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.sugestaoNome} numberOfLines={2}>{item.nome}</Text>
-                <Text style={styles.sugestaoMeta}>SKU {item.codigo || "-"} | Estoque {formatarQuantidade(item.estoque_atual)}</Text>
+                <Text style={styles.sugestaoMeta}>SKU {item.codigo || "-"} | {item.unidade || "UN"}</Text>
               </View>
               <Ionicons name="chevron-forward" size={18} color={CORES.textoClaro} />
             </TouchableOpacity>
@@ -310,10 +323,6 @@ export default function FuncionarioBalancoScreen() {
                 <Text style={styles.metricaLabel}>Preco venda</Text>
                 <Text style={styles.metricaValor}>{formatarMoeda(produto.preco_venda)}</Text>
               </View>
-              <View style={styles.metrica}>
-                <Text style={styles.metricaLabel}>Estoque ERP</Text>
-                <Text style={styles.metricaValor}>{formatarQuantidade(produto.estoque_atual)}</Text>
-              </View>
             </View>
 
             <Text style={styles.label}>Saldo final contado</Text>
@@ -324,19 +333,6 @@ export default function FuncionarioBalancoScreen() {
               keyboardType="decimal-pad"
               style={styles.input}
             />
-
-            <View style={styles.diferencaBox}>
-              <Text style={styles.diferencaLabel}>Movimentacao calculada</Text>
-              <Text style={[styles.diferencaValor, (diferenca ?? 0) < 0 && styles.diferencaNegativa]}>
-                {diferenca == null
-                  ? "Informe o saldo"
-                  : diferenca > 0
-                    ? `Entrada de ${formatarQuantidade(diferenca)}`
-                    : diferenca < 0
-                      ? `Saida de ${formatarQuantidade(Math.abs(diferenca))}`
-                      : "Sem alteracao"}
-              </Text>
-            </View>
 
             <Text style={styles.label}>Lote</Text>
             <TextInput
@@ -392,7 +388,7 @@ export default function FuncionarioBalancoScreen() {
                     {item.produtoNome}
                   </Text>
                   <Text style={styles.historicoMeta}>
-                    SKU {item.codigo || "-"} | Saldo {formatarQuantidade(item.estoqueAnterior)} para {formatarQuantidade(item.estoqueNovo)}
+                    SKU {item.codigo || "-"} | Lancamento registrado
                   </Text>
                   <Text style={styles.historicoMensagem} numberOfLines={2}>
                     {item.mensagem}
@@ -544,15 +540,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#fff",
   },
   inputMultilinha: { minHeight: 82, textAlignVertical: "top" },
-  diferencaBox: {
-    backgroundColor: CORES.primarioClaro,
-    borderRadius: RAIO.md,
-    padding: ESPACO.md,
-    borderWidth: 1,
-    borderColor: "#BFDBFE",
-  },
-  diferencaLabel: { color: CORES.textoSecundario, fontSize: FONTE.pequena },
-  diferencaValor: { color: CORES.sucesso, fontWeight: "900", fontSize: FONTE.grande, marginTop: 2 },
   diferencaNegativa: { color: CORES.erro },
   botaoSalvar: {
     height: 52,
