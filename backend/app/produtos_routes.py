@@ -69,6 +69,12 @@ from .produtos.validade import (
     _calcular_status_validade,
     _mapa_validade_proxima_produtos,
 )
+from .produtos.valorizacao import (
+    departamento_id_produto as _departamento_id_produto,
+    fornecedor_nome_produto as _fornecedor_nome_produto,
+    nome_area_produto as _nome_area_produto,
+    resolver_metricas_valorizacao_produto as _resolver_metricas_valorizacao_produto_base,
+)
 from .produtos.normalizacao import (
     nome_indica_granel as _nome_indica_granel,
     normalizar_payload_granel as _normalizar_payload_granel,
@@ -217,92 +223,17 @@ def _enriquecer_produto_listagem(
     )
 
 
-def _nome_area_produto(produto: Produto) -> str:
-    if getattr(produto, "departamento", None):
-        return produto.departamento.nome
-    if getattr(produto, "categoria", None) and getattr(produto.categoria, "departamento", None):
-        return produto.categoria.departamento.nome
-    return "Sem setor"
-
-
-def _departamento_id_produto(produto: Produto) -> Optional[int]:
-    if getattr(produto, "departamento_id", None):
-        return produto.departamento_id
-    if getattr(produto, "categoria", None):
-        return getattr(produto.categoria, "departamento_id", None)
-    return None
-
-
-def _fornecedor_nome_produto(produto: Produto) -> Optional[str]:
-    fornecedor = produto.fornecedor
-    if not fornecedor and getattr(produto, "fornecedores_alternativos", None):
-        vinculo_principal = next(
-            (
-                vinculo
-                for vinculo in produto.fornecedores_alternativos
-                if vinculo.ativo and vinculo.e_principal and vinculo.fornecedor
-            ),
-            None,
-        )
-        vinculo_secundario = next(
-            (
-                vinculo
-                for vinculo in produto.fornecedores_alternativos
-                if vinculo.ativo and vinculo.fornecedor
-            ),
-            None,
-        )
-        fornecedor = (
-            vinculo_principal.fornecedor
-            if vinculo_principal
-            else vinculo_secundario.fornecedor if vinculo_secundario else None
-        )
-    return fornecedor.nome if fornecedor else None
-
-
 def _resolver_metricas_valorizacao_produto(
     db: Session,
     produto: Produto,
     reservas_por_produto: dict[int, float] | None = None,
 ) -> dict:
-    reservas_por_produto = reservas_por_produto or {}
-    estoque_reservado = float(reservas_por_produto.get(produto.id, 0.0) or 0.0)
-    estoque_atual = float(produto.estoque_atual or 0)
-    preco_custo = float(produto.preco_custo or 0)
-
-    if produto.tipo_produto in ("KIT", "VARIACAO") and produto.tipo_kit == "VIRTUAL":
-        try:
-            from .services.kit_custo_service import KitCustoService
-
-            estoque_atual = float(
-                KitEstoqueService.calcular_estoque_virtual_kit(
-                    db,
-                    produto.id,
-                    tenant_id=getattr(produto, "tenant_id", None),
-                    reservas_por_produto=reservas_por_produto,
-                )
-            )
-            preco_custo = float(KitCustoService.calcular_custo_kit(produto.id, db))
-            estoque_reservado = 0.0
-        except Exception as exc:
-            logger.warning(
-                "Erro ao calcular valorizacao do kit virtual %s: %s",
-                produto.id,
-                exc,
-            )
-
-    estoque_disponivel = max(estoque_atual - estoque_reservado, 0.0)
-    preco_venda = float(produto.preco_venda or 0)
-
-    return {
-        "estoque_atual": estoque_atual,
-        "estoque_reservado": estoque_reservado,
-        "estoque_disponivel": estoque_disponivel,
-        "preco_custo": preco_custo,
-        "preco_venda": preco_venda,
-        "valor_custo_total": estoque_atual * preco_custo,
-        "valor_venda_total": estoque_atual * preco_venda,
-    }
+    return _resolver_metricas_valorizacao_produto_base(
+        db,
+        produto,
+        reservas_por_produto=reservas_por_produto,
+        kit_estoque_service=KitEstoqueService,
+    )
 
 
 def _validar_pode_inativar_produto(db: Session, produto: Produto, tenant_id):

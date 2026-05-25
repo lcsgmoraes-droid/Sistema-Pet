@@ -1935,6 +1935,10 @@ Proximas tarefas sugeridas para execucao continua:
   - SKU, promocao ERP de payload e regra estrutural de granel foram movidos para `backend/app/produtos/normalizacao.py`
   - `produtos_routes.py` passou a manter apenas aliases importados para preservar os nomes internos ja usados pelas rotas
   - novos testes unitarios cobrem normalizacao de SKU, promocao e produto a granel
+- [x] continuar a decomposicao backend de `produtos_routes.py` por valorizacao de estoque
+  - area/departamento, fornecedor exibido e metricas do relatorio de valorizacao foram movidos para `backend/app/produtos/valorizacao.py`
+  - o wrapper da rota preserva o `KitEstoqueService` antigo para manter compatibilidade com patches e testes existentes
+  - novos testes unitarios cobrem fallback de setor, fornecedor principal e valorizacao de kit virtual
 - [x] iniciar a decomposicao de `UsuariosPage.jsx` pela separacao da carga/acoes e dos blocos visuais principais
   - a carga de usuarios/roles, o modal e as acoes de ativar, desativar e forcar logout foram movidos para `frontend/src/hooks/useUsuariosPage.js`
   - a tabela e o modal foram extraidos para `frontend/src/components/usuarios/UsuariosTable.jsx` e `frontend/src/components/usuarios/UsuarioModal.jsx`
