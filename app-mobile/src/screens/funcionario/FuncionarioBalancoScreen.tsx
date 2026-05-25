@@ -39,6 +39,8 @@ type HistoricoBalancoSessao = {
 function mensagemErroApi(error: any, fallback: string) {
   const detail = error?.response?.data?.detail;
   if (typeof detail === "string" && detail.trim()) return detail;
+  const message = error?.response?.data?.message;
+  if (typeof message === "string" && message.trim()) return message;
   return fallback;
 }
 

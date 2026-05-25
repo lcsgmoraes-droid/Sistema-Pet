@@ -2,7 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import api from "../api";
 import { getMarcas, getProdutos } from "../api/produtos";
-import { parseNumeroBR } from "../components/produtoBalanco/produtosBalancoUtils";
+import {
+  montarMovimentoBalanco,
+  parseNumeroBR,
+} from "../components/produtoBalanco/produtosBalancoUtils";
 
 export function useProdutosBalancoPage() {
   const [produtos, setProdutos] = useState([]);
@@ -133,7 +136,12 @@ export function useProdutosBalancoPage() {
     setSubmetendo((prev) => ({ ...prev, [produto.id]: campo }));
 
     try {
-      const estoqueAtual = Number(produto.estoque_atual || 0);
+      const estoqueAtual = parseNumeroBR(produto.estoque_atual ?? 0);
+      if (!Number.isFinite(estoqueAtual)) {
+        toast.error("Estoque atual invalido. Atualize a lista e tente novamente.");
+        return false;
+      }
+
       const numeroLote = String(inputs?.[produto.id]?.lote || "").trim();
       const dataValidade = String(inputs?.[produto.id]?.validade || "").trim();
 
@@ -164,27 +172,19 @@ export function useProdutosBalancoPage() {
       }
 
       if (campo === "balanco") {
-        const diferenca = qtd - estoqueAtual;
-        if (Math.abs(diferenca) < 0.0001) {
-          toast("Sem alteracao: estoque ja esta nesse valor.", { icon: "ℹ️" });
+        const movimento = montarMovimentoBalanco(produto, qtd, { numeroLote, dataValidade });
+        if (movimento.erro) {
+          toast.error(movimento.erro);
+          return false;
+        }
+
+        if (movimento.semAlteracao) {
+          toast("Sem alteracao: estoque ja esta nesse valor.", { icon: "i" });
           limparLinhaInputs(produto.id);
           return true;
         }
 
-        const endpoint = diferenca > 0 ? "/estoque/entrada" : "/estoque/saida";
-        const payload = {
-          produto_id: produto.id,
-          quantidade: Math.abs(diferenca),
-          motivo: "balanco",
-          observacao: `Balanco rapido: estoque ajustado para ${qtd}`,
-        };
-
-        if (diferenca > 0) {
-          payload.numero_lote = numeroLote || undefined;
-          payload.data_validade = dataValidade || undefined;
-        }
-
-        await api.post(endpoint, payload);
+        await api.post(movimento.endpoint, movimento.payload);
         atualizarEstoqueLocal(produto.id, qtd);
       }
 
@@ -193,7 +193,11 @@ export function useProdutosBalancoPage() {
       toast.success("Lancamento registrado com origem Balanco.");
       return true;
     } catch (error) {
-      toast.error(error?.response?.data?.detail || "Erro ao registrar lancamento.");
+      toast.error(
+        error?.response?.data?.detail ||
+          error?.response?.data?.message ||
+          "Erro ao registrar lancamento."
+      );
       return false;
     } finally {
       setSubmetendo((prev) => {
