@@ -397,13 +397,12 @@ def _buscar_cliente_pdv_funcionario(db: Session, tenant_id: str, cliente_id: Opt
         .filter(
             Cliente.id == cliente_id,
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "cliente",
             Cliente.ativo == True,
         )
         .first()
     )
     if not cliente:
-        raise HTTPException(status_code=404, detail="Cliente nao encontrado.")
+        raise HTTPException(status_code=404, detail="Pessoa nao encontrada.")
     return cliente
 
 
