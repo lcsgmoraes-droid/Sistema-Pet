@@ -5,9 +5,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
+  Image,
   StyleSheet,
   Text,
   TextInput,
@@ -25,6 +23,7 @@ import {
   previewBeneficiosPdv,
   salvarVendaPdv,
 } from "../../services/funcionarioPdv.service";
+import KeyboardSafeScrollView from "../../components/KeyboardSafeScrollView";
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from "../../theme";
 import {
   FuncionarioPdvCaixa,
@@ -66,6 +65,18 @@ function formatarQuantidade(valor: number | null | undefined) {
     minimumFractionDigits: 0,
     maximumFractionDigits: 3,
   }).format(Number(valor ?? 0));
+}
+
+function ProdutoImagem({ uri, compacta = false }: { uri?: string | null; compacta?: boolean }) {
+  return (
+    <View style={[styles.produtoImagemWrap, compacta && styles.produtoImagemWrapCompacta]}>
+      {uri ? (
+        <Image source={{ uri }} style={styles.produtoImagem} resizeMode="cover" />
+      ) : (
+        <Ionicons name="image-outline" size={compacta ? 18 : 22} color={CORES.textoClaro} />
+      )}
+    </View>
+  );
 }
 
 export default function FuncionarioPdvScreen() {
@@ -205,8 +216,8 @@ export default function FuncionarioPdvScreen() {
       setNumeroParcelas(1);
       return;
     }
-    if (!opcoesCartao.some((item) => item.id === formaPagamentoIdSelecionada)) {
-      setFormaPagamentoIdSelecionada(opcoesCartao[0]?.id ?? null);
+    if (formaPagamentoIdSelecionada && !opcoesCartao.some((item) => item.id === formaPagamentoIdSelecionada)) {
+      setFormaPagamentoIdSelecionada(null);
     }
     if (formaPagamento !== "credito") {
       setNumeroParcelas(1);
@@ -458,11 +469,6 @@ export default function FuncionarioPdvScreen() {
         Alert.alert("Cartao", "Selecione a bandeira/operadora do cartao.");
         return;
       }
-      if (ehCartao && formaPagamentoSelecionada?.requer_nsu && !nsuCartao.trim()) {
-        Alert.alert("NSU", "Informe o NSU do cartao.");
-        return;
-      }
-
       const trocoFinal = formaPagamento === "dinheiro" ? Math.max(0, valorRecebidoNumero - previewAtual.valor_pagamento) : 0;
       const resposta = await finalizarVendaPdv({
         cliente_id: cliente?.id ?? null,
@@ -543,8 +549,7 @@ export default function FuncionarioPdvScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <ScrollView contentContainerStyle={styles.conteudo} keyboardShouldPersistTaps="handled">
+    <KeyboardSafeScrollView style={styles.container} contentContainerStyle={styles.conteudo}>
         <View style={styles.headerCard}>
           <View style={styles.headerIcone}>
             <Ionicons name="cart-outline" size={24} color={CORES.primario} />
@@ -602,6 +607,7 @@ export default function FuncionarioPdvScreen() {
 
           {sugestoes.map((produto) => (
             <TouchableOpacity key={produto.id} style={styles.sugestao} onPress={() => adicionarProduto(produto)}>
+              <ProdutoImagem uri={produto.imagem_url} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.sugestaoNome} numberOfLines={2}>{produto.nome}</Text>
                 <Text style={styles.sugestaoMeta}>
@@ -626,6 +632,7 @@ export default function FuncionarioPdvScreen() {
           ) : (
             carrinho.map((item) => (
               <View key={item.produto.id} style={styles.itemCarrinho}>
+                <ProdutoImagem uri={item.produto.imagem_url} compacta />
                 <View style={{ flex: 1 }}>
                   <Text style={styles.itemNome} numberOfLines={2}>{item.produto.nome}</Text>
                   <Text style={styles.itemMeta}>{formatarMoeda(item.produto.preco_venda)} un.</Text>
@@ -935,6 +942,9 @@ export default function FuncionarioPdvScreen() {
           {ehCartao ? (
             <View style={styles.cartaoBox}>
               <Text style={styles.label}>Bandeira/operadora</Text>
+              {!formaPagamentoSelecionada ? (
+                <Text style={styles.cartaoInstrucao}>Selecione a bandeira/operadora do cartao</Text>
+              ) : null}
               {opcoesCartao.length ? (
                 <View style={styles.cartaoOpcoesGrid}>
                   {opcoesCartao.map((opcao) => {
@@ -954,7 +964,7 @@ export default function FuncionarioPdvScreen() {
                         <Text style={styles.cartaoOpcaoSubtitulo}>
                           {opcao.operadora || opcao.tipo || "Cartao"} {opcao.taxa_percentual ? `- taxa ${opcao.taxa_percentual}%` : ""}
                         </Text>
-                        {opcao.requer_nsu ? <Text style={styles.cartaoOpcaoAviso}>NSU obrigatorio</Text> : null}
+                        {opcao.requer_nsu ? <Text style={styles.cartaoOpcaoAviso}>NSU recomendado</Text> : null}
                       </TouchableOpacity>
                     );
                   })}
@@ -966,7 +976,7 @@ export default function FuncionarioPdvScreen() {
                 </View>
               )}
 
-              <Text style={styles.label}>NSU{formaPagamentoSelecionada?.requer_nsu ? " *" : ""}</Text>
+              <Text style={styles.label}>NSU (opcional)</Text>
               <TextInput
                 value={nsuCartao}
                 onChangeText={setNsuCartao}
@@ -1033,8 +1043,7 @@ export default function FuncionarioPdvScreen() {
             </TouchableOpacity>
           </View>
         </View>
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardSafeScrollView>
   );
 }
 
@@ -1134,6 +1143,7 @@ const styles = StyleSheet.create({
   sugestao: {
     flexDirection: "row",
     alignItems: "center",
+    gap: ESPACO.sm,
     borderWidth: 1,
     borderColor: CORES.borda,
     borderRadius: RAIO.md,
@@ -1163,6 +1173,22 @@ const styles = StyleSheet.create({
     borderTopColor: CORES.borda,
     paddingTop: ESPACO.sm,
   },
+  produtoImagemWrap: {
+    width: 54,
+    height: 54,
+    borderRadius: RAIO.md,
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    backgroundColor: CORES.fundo,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  produtoImagemWrapCompacta: {
+    width: 44,
+    height: 44,
+  },
+  produtoImagem: { width: "100%", height: "100%" },
   itemNome: { fontSize: FONTE.normal, fontWeight: "800", color: CORES.texto },
   itemMeta: { fontSize: FONTE.pequena, color: CORES.textoSecundario, marginTop: 2 },
   quantidadeBox: { flexDirection: "row", alignItems: "center", borderWidth: 1, borderColor: CORES.borda, borderRadius: RAIO.md },
@@ -1240,6 +1266,7 @@ const styles = StyleSheet.create({
   formaTexto: { color: CORES.textoSecundario, fontWeight: "800" },
   formaTextoAtivo: { color: CORES.primario },
   cartaoBox: { gap: ESPACO.xs },
+  cartaoInstrucao: { color: CORES.textoSecundario, fontSize: FONTE.pequena, marginTop: -ESPACO.xs },
   cartaoOpcoesGrid: { gap: ESPACO.xs },
   cartaoOpcao: {
     borderWidth: 1,

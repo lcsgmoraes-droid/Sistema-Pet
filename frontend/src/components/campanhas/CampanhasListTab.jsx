@@ -9,6 +9,8 @@ export default function CampanhasListTab({
   campanhas,
   loadingCampanhas,
   campanhaEditando,
+  nomeEditando,
+  setNomeEditando,
   paramsEditando,
   setParamsEditando,
   arquivando,
@@ -128,6 +130,15 @@ export default function CampanhasListTab({
                       {tipoLabels[campanha.campaign_type]?.label ||
                         campanha.campaign_type}
                     </p>
+                    <label className="block text-xs font-semibold text-gray-700 mb-1">
+                      Nome da campanha
+                    </label>
+                    <input
+                      value={nomeEditando}
+                      onChange={(e) => setNomeEditando(e.target.value)}
+                      className="w-full rounded-lg border border-blue-200 bg-white px-3 py-2 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-blue-500 mb-4"
+                      placeholder="Nome exibido na lista de campanhas"
+                    />
                     <CampanhasParametrosForm
                       campanha={campanha}
                       paramsEditando={paramsEditando}
@@ -140,7 +151,7 @@ export default function CampanhasListTab({
                     >
                       {salvandoParams
                         ? "Salvando..."
-                        : "\u{1F4BE} Salvar Parametros"}
+                        : "\u{1F4BE} Salvar campanha"}
                     </button>
                   </div>
                 )}

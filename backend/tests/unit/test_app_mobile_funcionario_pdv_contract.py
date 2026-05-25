@@ -113,7 +113,9 @@ def test_funcionario_pdv_searches_products_and_clients_like_web_pdv():
         "Produto.gtin_ean.ilike",
         "Produto.codigos_barras_alternativos.ilike",
     ]:
-        assert field in product_block
+        assert field in source
+    assert "_produto_busca_filtros_funcionario(termo)" in product_block
+    assert "_produto_busca_rank_funcionario(termo)" in product_block
     assert "_barcode_filters_for_produto(barcode)" in barcode_block
 
     for field in [
@@ -245,6 +247,45 @@ def test_funcionario_pdv_collects_card_brand_nsu_and_erp_payment_rule():
     assert "Bandeira/operadora" in screen
     assert "NSU" in screen
     assert "setNsuCartao" in screen
+
+
+def test_funcionario_pdv_card_brand_is_explicit_and_nsu_optional():
+    backend = read_repo("backend/app/routes/app_mobile_routes.py")
+    resolver_block = extract_block(
+        backend, "def _resolver_forma_pagamento_cartao_funcionario_pdv"
+    )
+    screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx")
+
+    assert "Informe o NSU do cartao" not in resolver_block
+    assert "formaPagamentoSelecionada?.requer_nsu && !nsuCartao.trim()" not in screen
+    assert "setFormaPagamentoIdSelecionada(opcoesCartao[0]?.id ?? null)" not in screen
+    assert "Selecione a bandeira/operadora do cartao" in screen
+    assert "NSU (opcional)" in screen
+
+
+def test_funcionario_pdv_search_ranks_full_phrase_before_loose_code_digits():
+    source = read_repo("backend/app/routes/app_mobile_routes.py")
+    search_block = extract_block(source, "def buscar_produtos_funcionario_pdv")
+
+    assert "_produto_busca_filtros_funcionario(termo)" in search_block
+    assert "_produto_busca_rank_funcionario(termo)" in search_block
+    assert "_termo_parece_codigo_produto_funcionario" in source
+    assert "_barcode_filters_for_produto(termo_digits)" not in search_block
+
+
+def test_funcionario_pdv_uses_keyboard_safe_scroll_and_product_images():
+    service = read_repo("app-mobile/src/services/funcionarioPdv.service.ts")
+    screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx")
+
+    assert "resolveMediaUrl" in service
+    assert "imagem_url: resolveMediaUrl" in service
+    assert "KeyboardSafeScrollView" in screen
+    assert "<KeyboardSafeScrollView" in screen
+    assert "KeyboardAvoidingView" not in screen
+    assert "Image" in screen
+    assert "produto.imagem_url" in screen
+    assert "item.produto.imagem_url" in screen
+    assert "produtoImagemWrap" in screen
 
 
 def test_funcionario_pdv_can_save_open_sale_for_cashier_checkout():

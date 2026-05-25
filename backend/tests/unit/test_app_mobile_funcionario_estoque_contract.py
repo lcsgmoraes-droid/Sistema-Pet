@@ -93,3 +93,28 @@ def test_mobile_employee_stock_adjustment_hides_current_stock_and_uses_autocompl
     assert "setSaldoFinal(String(item.estoque_atual" not in screen
     assert "Estoque atual" not in screen
     assert "diferencaBox" not in screen
+
+
+def test_employee_stock_search_ranks_full_phrase_before_loose_code_digits():
+    source = read_repo("backend/app/routes/app_mobile_routes.py")
+    search_block = extract_block(source, "def buscar_produtos_funcionario_estoque")
+
+    assert "_produto_busca_filtros_funcionario(termo)" in search_block
+    assert "_produto_busca_rank_funcionario(termo)" in search_block
+    assert "_termo_parece_codigo_produto_funcionario" in source
+    assert "_barcode_filters_for_produto(termo_digits)" not in search_block
+
+
+def test_mobile_employee_stock_uses_keyboard_safe_scroll_and_product_images():
+    service = read_repo("app-mobile/src/services/funcionarioEstoque.service.ts")
+    screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioBalancoScreen.tsx")
+
+    assert "resolveMediaUrl" in service
+    assert "imagem_url: resolveMediaUrl" in service
+    assert "KeyboardSafeScrollView" in screen
+    assert "<KeyboardSafeScrollView" in screen
+    assert "KeyboardAvoidingView" not in screen
+    assert "Image" in screen
+    assert "item.imagem_url" in screen
+    assert "produto.imagem_url" in screen
+    assert "produtoImagemWrap" in screen
