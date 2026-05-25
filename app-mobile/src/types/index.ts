@@ -288,6 +288,7 @@ export interface FuncionarioPdvCliente {
   telefone?: string | null;
   celular?: string | null;
   documento?: string | null;
+  tipo_cadastro?: string | null;
 }
 
 export interface FuncionarioPdvCaixa {

@@ -95,6 +95,9 @@ def test_funcionario_pdv_searches_products_and_clients_like_web_pdv():
     product_block = extract_block(source, "def buscar_produtos_funcionario_pdv")
     barcode_block = extract_block(source, "def buscar_produto_funcionario_pdv_barcode")
     client_block = extract_block(source, "def buscar_clientes_funcionario_pdv")
+    serializer_block = extract_block(source, "def _serialize_funcionario_pdv_cliente")
+    types = read_repo("app-mobile/src/types/index.ts")
+    service = read_repo("app-mobile/src/services/funcionarioPdv.service.ts")
     screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx")
 
     for field in [
@@ -116,10 +119,23 @@ def test_funcionario_pdv_searches_products_and_clients_like_web_pdv():
     ]:
         assert field in client_block
 
+    assert 'Cliente.tipo_cadastro == "cliente"' not in client_block
+    for field in [
+        "telefone_digits.ilike",
+        "celular_digits.ilike",
+        "cpf_digits.ilike",
+        "cnpj_digits.ilike",
+    ]:
+        assert field in client_block
+    assert '"tipo_cadastro": cliente.tipo_cadastro' in serializer_block
+    assert "tipo_cadastro?: string | null" in types
+    assert "tipo_cadastro: data.tipo_cadastro ?? null" in service
+
     assert "autocompleteProdutosTimer" in screen
     assert "autocompleteClientesTimer" in screen
     assert 'placeholder="Buscar produto por nome, codigo ou barras"' in screen
-    assert 'placeholder="Buscar cliente por nome ou telefone"' in screen
+    assert 'placeholder="Buscar pessoa por nome ou telefone"' in screen
+    assert "item.tipo_cadastro" in screen
 
 
 def test_mobile_app_has_employee_pdv_navigation_service_and_screen():

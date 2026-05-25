@@ -147,6 +147,7 @@ class FuncionarioPdvClienteResponse(BaseModel):
     telefone: Optional[str] = None
     celular: Optional[str] = None
     documento: Optional[str] = None
+    tipo_cadastro: Optional[str] = None
 
 
 class FuncionarioPdvCaixaResponse(BaseModel):
@@ -349,6 +350,7 @@ def _serialize_funcionario_pdv_cliente(cliente: Cliente) -> dict:
         "telefone": cliente.telefone,
         "celular": cliente.celular,
         "documento": documento,
+        "tipo_cadastro": cliente.tipo_cadastro,
     }
 
 
@@ -1297,6 +1299,10 @@ def buscar_clientes_funcionario_pdv(
         return []
 
     termo_digits = _somente_digitos_funcionario_pdv(termo)
+    cpf_digits = func.regexp_replace(func.coalesce(Cliente.cpf, ""), r"\D", "", "g")
+    cnpj_digits = func.regexp_replace(func.coalesce(Cliente.cnpj, ""), r"\D", "", "g")
+    telefone_digits = func.regexp_replace(func.coalesce(Cliente.telefone, ""), r"\D", "", "g")
+    celular_digits = func.regexp_replace(func.coalesce(Cliente.celular, ""), r"\D", "", "g")
     filtros = [
         Cliente.codigo.ilike(f"%{termo}%"),
         Cliente.nome.ilike(f"%{termo}%"),
@@ -1310,10 +1316,10 @@ def buscar_clientes_funcionario_pdv(
     if termo_digits:
         filtros.extend(
             [
-                Cliente.cpf.ilike(f"%{termo_digits}%"),
-                Cliente.cnpj.ilike(f"%{termo_digits}%"),
-                Cliente.telefone.ilike(f"%{termo_digits}%"),
-                Cliente.celular.ilike(f"%{termo_digits}%"),
+                cpf_digits.ilike(f"%{termo_digits}%"),
+                cnpj_digits.ilike(f"%{termo_digits}%"),
+                telefone_digits.ilike(f"%{termo_digits}%"),
+                celular_digits.ilike(f"%{termo_digits}%"),
             ]
         )
 
@@ -1321,7 +1327,6 @@ def buscar_clientes_funcionario_pdv(
         db.query(Cliente)
         .filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "cliente",
             Cliente.ativo == True,
             or_(*filtros),
         )
