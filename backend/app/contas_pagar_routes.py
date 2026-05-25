@@ -31,6 +31,11 @@ from .financeiro.contas_pagar_origem import (
     CAIXA_PDV_OBSERVACAO_MARKER,
     _identificar_origem_conta_pagar,
 )
+from .financeiro.contas_pagar_classificacao import (
+    aplicar_classificacao_aprendida_conta_pagar,
+    aplicar_classificacao_similar_contas_pagar,
+    registrar_regra_classificacao_conta_pagar,
+)
 from app.services.reconciliacao_simples_service import reconciliar_das_simples
 from app.services.reconciliacao_provisao_service import reconciliar_provisao
 
@@ -588,6 +593,26 @@ async def criar_conta_pagar(
     contas_criadas = []
     
     try:
+        conta_pre_classificacao = ContaPagar(
+            descricao=conta.descricao,
+            fornecedor_id=conta.fornecedor_id,
+            categoria_id=conta.categoria_id,
+            dre_subcategoria_id=conta.dre_subcategoria_id,
+            canal=conta.canal,
+            tipo_despesa_id=conta.tipo_despesa_id,
+            valor_original=conta.valor_original,
+            valor_final=conta.valor_original,
+            data_emissao=conta.data_emissao,
+            data_vencimento=conta.data_vencimento,
+            user_id=current_user.id,
+            tenant_id=tenant_id,
+        )
+        if aplicar_classificacao_aprendida_conta_pagar(db, tenant_id, conta_pre_classificacao):
+            conta.categoria_id = conta_pre_classificacao.categoria_id
+            conta.dre_subcategoria_id = conta_pre_classificacao.dre_subcategoria_id
+            conta.canal = conta_pre_classificacao.canal or conta.canal
+            conta.tipo_despesa_id = conta_pre_classificacao.tipo_despesa_id
+
         # ============================
         # CLASSIFICACAO DRE
         # ============================
@@ -1117,7 +1142,7 @@ def classificar_conta_pagar(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Permite classificar conta existente com categoria, subcategoria DRE e tipo de despesa."""
-    _, tenant_id = user_and_tenant
+    current_user, tenant_id = user_and_tenant
 
     conta = db.query(ContaPagar).filter(
         ContaPagar.id == conta_id,
@@ -1167,24 +1192,22 @@ def classificar_conta_pagar(
     if payload.canal is not None:
         conta.canal = payload.canal
 
-    fornecedor_atualizadas = 0
-    if aplicar_fornecedor and conta.fornecedor_id:
-        outras_contas = db.query(ContaPagar).filter(
-            ContaPagar.tenant_id == tenant_id,
-            ContaPagar.fornecedor_id == conta.fornecedor_id,
-            ContaPagar.id != conta.id,
-        ).all()
-
-        for outra_conta in outras_contas:
-            if payload.categoria_id is not None:
-                outra_conta.categoria_id = payload.categoria_id
-            if payload.dre_subcategoria_id is not None:
-                outra_conta.dre_subcategoria_id = payload.dre_subcategoria_id
-            if payload.tipo_despesa_id is not None:
-                outra_conta.tipo_despesa_id = payload.tipo_despesa_id
-            if payload.canal is not None:
-                outra_conta.canal = payload.canal
-            fornecedor_atualizadas += 1
+    campos_classificacao = payload.model_fields_set
+    regra_aprendida = registrar_regra_classificacao_conta_pagar(
+        db,
+        tenant_id,
+        conta,
+        user_id=current_user.id,
+        campos=campos_classificacao,
+    )
+    similares_atualizadas = aplicar_classificacao_similar_contas_pagar(
+        db,
+        tenant_id,
+        conta,
+        campos=campos_classificacao,
+        regra=regra_aprendida,
+        user_id=current_user.id,
+    )
 
     db.commit()
     db.refresh(conta)
@@ -1197,7 +1220,9 @@ def classificar_conta_pagar(
         "dre_subcategoria_id": conta.dre_subcategoria_id,
         "tipo_despesa_id": conta.tipo_despesa_id,
         "canal": conta.canal,
-        "fornecedor_atualizadas": fornecedor_atualizadas,
+        "fornecedor_atualizadas": similares_atualizadas,
+        "similares_atualizadas": similares_atualizadas,
+        "regra_aprendida": bool(regra_aprendida),
     }
 
 

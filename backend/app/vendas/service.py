@@ -2564,6 +2564,7 @@ def processar_contas_pagar_taxas(
         }
     """
     from app.financeiro_models import ContaPagar, FormaPagamento
+    from app.financeiro.contas_pagar_classificacao import aplicar_classificacao_aprendida_conta_pagar
     from app.dre_plano_contas_models import DRESubcategoria
     from decimal import Decimal
     from datetime import date
@@ -2729,6 +2730,7 @@ def processar_contas_pagar_taxas(
                 dre_subcategoria_id=subcategoria_taxa.id,
                 observacoes=observacoes
             )
+            aplicar_classificacao_aprendida_conta_pagar(db, tenant_id, conta_taxa)
             
             db.add(conta_taxa)
             db.flush()
