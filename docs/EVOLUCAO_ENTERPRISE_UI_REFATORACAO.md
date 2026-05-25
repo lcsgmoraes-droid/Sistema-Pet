@@ -1939,6 +1939,10 @@ Proximas tarefas sugeridas para execucao continua:
   - area/departamento, fornecedor exibido e metricas do relatorio de valorizacao foram movidos para `backend/app/produtos/valorizacao.py`
   - o wrapper da rota preserva o `KitEstoqueService` antigo para manter compatibilidade com patches e testes existentes
   - novos testes unitarios cobrem fallback de setor, fornecedor principal e valorizacao de kit virtual
+- [x] continuar a decomposicao backend de `produtos_routes.py` por status de produto
+  - bloqueio de inativacao de produto pai e sincronizacao `ativo`/`situacao` foram movidos para `backend/app/produtos/status.py`
+  - o wrapper da rota preserva o modelo `Produto` usado nas consultas existentes
+  - novos testes unitarios cobrem variacoes ativas, desligamento de canais e reativacao sem religar anuncios
 - [x] iniciar a decomposicao de `UsuariosPage.jsx` pela separacao da carga/acoes e dos blocos visuais principais
   - a carga de usuarios/roles, o modal e as acoes de ativar, desativar e forcar logout foram movidos para `frontend/src/hooks/useUsuariosPage.js`
   - a tabela e o modal foram extraidos para `frontend/src/components/usuarios/UsuariosTable.jsx` e `frontend/src/components/usuarios/UsuarioModal.jsx`

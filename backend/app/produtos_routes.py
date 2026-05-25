@@ -75,6 +75,10 @@ from .produtos.valorizacao import (
     nome_area_produto as _nome_area_produto,
     resolver_metricas_valorizacao_produto as _resolver_metricas_valorizacao_produto_base,
 )
+from .produtos.status import (
+    aplicar_status_ativo_produto as _aplicar_status_ativo_produto_base,
+    validar_pode_inativar_produto as _validar_pode_inativar_produto_base,
+)
 from .produtos.normalizacao import (
     nome_indica_granel as _nome_indica_granel,
     normalizar_payload_granel as _normalizar_payload_granel,
@@ -237,34 +241,16 @@ def _resolver_metricas_valorizacao_produto(
 
 
 def _validar_pode_inativar_produto(db: Session, produto: Produto, tenant_id):
-    """Bloqueia inativaÃ§Ã£o de produto pai com variaÃ§Ãµes ativas."""
-    if not produto.is_parent:
-        return
-
-    variacoes_ativas = db.query(Produto).filter(
-        Produto.produto_pai_id == produto.id,
-        Produto.tenant_id == tenant_id,
-        Produto.ativo == True
-    ).count()
-
-    if variacoes_ativas > 0:
-        raise HTTPException(
-            status_code=409,
-            detail=(
-                f"âŒ Produto '{produto.nome}' possui {variacoes_ativas} variaÃ§Ã£o(Ãµes) ativa(s) "
-                "e nÃ£o pode ser desativado. Desative primeiro todas as variaÃ§Ãµes."
-            )
-        )
+    return _validar_pode_inativar_produto_base(
+        db,
+        produto,
+        tenant_id,
+        produto_model=Produto,
+    )
 
 
 def _aplicar_status_ativo_produto(produto: Produto, ativo: bool):
-    """MantÃ©m ativo e situaÃ§Ã£o sincronizados."""
-    produto.ativo = ativo
-    produto.situacao = ativo
-    if not ativo:
-        produto.anunciar_ecommerce = False
-        produto.anunciar_app = False
-    produto.updated_at = datetime.now()
+    return _aplicar_status_ativo_produto_base(produto, ativo)
 
 
 # ==========================================
