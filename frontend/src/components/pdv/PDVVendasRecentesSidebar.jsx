@@ -4,6 +4,7 @@ import {
   ChevronRight,
   Clock,
   Scissors,
+  Smartphone,
   Stethoscope,
   X,
 } from "lucide-react";
@@ -37,6 +38,15 @@ function getCanalInfo(canal) {
         border: "border-green-200 hover:border-green-300",
         icon: "\uD83D\uDCF1",
         label: "App",
+      },
+      app_funcionario: {
+        cor: "border-l-cyan-500",
+        bg: "bg-cyan-50",
+        border: "border-cyan-200 hover:border-cyan-300",
+        Icon: Smartphone,
+        iconColor: "text-cyan-700",
+        label: "App Funcionario",
+        title: "Venda pelo app do funcionario",
       },
       loja_fisica: {
         cor: "border-l-blue-500",

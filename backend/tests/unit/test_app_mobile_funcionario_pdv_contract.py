@@ -24,6 +24,8 @@ def test_funcionario_pdv_endpoints_exist():
     assert '"/funcionario/pdv/produtos/barcode/{barcode}"' in source
     assert '"/funcionario/pdv/clientes/buscar"' in source
     assert '"/funcionario/pdv/caixa/aberto"' in source
+    assert '"/funcionario/pdv/formas-pagamento"' in source
+    assert '"/funcionario/pdv/vendas/salvar"' in source
     assert '"/funcionario/pdv/vendas/finalizar"' in source
 
 
@@ -172,6 +174,9 @@ def test_funcionario_pdv_supports_campaign_benefits_preview_contract():
     assert "beneficiosPreview" in screen
     assert "cupomCodigo" in screen
     assert "usarCashback" in screen
+    assert "beneficios_gerados" in backend
+    assert "beneficios_gerados" in service
+    assert "Beneficios que esta venda vai gerar" in screen
 
 
 def test_funcionario_pdv_finalization_passes_coupon_and_cashback_to_official_sale_flow():
@@ -186,3 +191,79 @@ def test_funcionario_pdv_finalization_passes_coupon_and_cashback_to_official_sal
     assert '"forma_pagamento": "Cashback"' in block
     assert "cupom_code=beneficios[\"cupom_code\"]" in block
     assert "cupom_discount_applied=beneficios[\"desconto_cupom\"]" in block
+
+
+def test_funcionario_pdv_supports_credit_installments_from_erp_payment_rules():
+    backend = read_repo("backend/app/routes/app_mobile_routes.py")
+    types = read_repo("app-mobile/src/types/index.ts")
+    service = read_repo("app-mobile/src/services/funcionarioPdv.service.ts")
+    screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx")
+    finalizar_block = extract_block(backend, "def finalizar_venda_funcionario_pdv")
+
+    assert "FuncionarioPdvFormaPagamentoResponse" in backend
+    assert "FormaPagamento.tenant_id == tenant_id" in backend
+    assert "FormaPagamento.ativo == True" in backend
+    assert "numero_parcelas" in backend
+    assert "numero_parcelas: number" in types
+    assert "FuncionarioPdvFormaPagamentoOpcao" in types
+    assert "/app/funcionario/pdv/formas-pagamento" in service
+    assert "listarFormasPagamentoPdv" in service
+    assert "parcelasCredito" in screen
+    assert "numeroParcelas" in screen
+    assert "setNumeroParcelas" in screen
+    assert '"numero_parcelas": numero_parcelas' in finalizar_block
+    assert '"numero_parcelas": 1' not in finalizar_block
+
+
+def test_funcionario_pdv_can_save_open_sale_for_cashier_checkout():
+    backend = read_repo("backend/app/routes/app_mobile_routes.py")
+    service = read_repo("app-mobile/src/services/funcionarioPdv.service.ts")
+    screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx")
+    save_block = extract_block(backend, "def salvar_venda_funcionario_pdv")
+
+    assert "FuncionarioPdvSalvarRequest" in backend
+    assert "FuncionarioPdvSalvarResponse" in backend
+    assert "VendaService.criar_venda" in save_block
+    assert "VendaService.finalizar_venda" not in save_block
+    assert '"status": "aberta"' in save_block
+    assert '"canal": "app_funcionario"' in save_block
+    assert "/app/funcionario/pdv/vendas/salvar" in service
+    assert "salvarVendaPdv" in service
+    assert "Salvar para o caixa" in screen
+    assert "salvarAberta" in screen
+
+
+def test_funcionario_pdv_shows_customer_details_like_web_pdv():
+    types = read_repo("app-mobile/src/types/index.ts")
+    service = read_repo("app-mobile/src/services/funcionarioPdv.service.ts")
+    screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx")
+
+    for field in [
+        "email?: string | null",
+        "endereco?: string | null",
+        "credito?: number",
+        "fidelidade",
+        "cupons_disponiveis",
+    ]:
+        assert field in types
+    for field in [
+        "email: data.email ?? null",
+        "endereco: data.endereco ?? null",
+        "credito: Number(data.credito ?? 0)",
+        "fidelidade: data.fidelidade ?? null",
+        "cupons_disponiveis: data.cupons_disponiveis ?? []",
+    ]:
+        assert field in service
+    assert "mostrarDetalhesCliente" in screen
+    assert "Detalhes do cliente" in screen
+    assert "Cartao fidelidade" in screen
+    assert "Cupons disponiveis" in screen
+
+
+def test_erp_recent_sales_highlights_employee_mobile_origin():
+    sidebar = read_repo("frontend/src/components/pdv/PDVVendasRecentesSidebar.jsx")
+
+    assert "app_funcionario" in sidebar
+    assert "App Funcionario" in sidebar
+    assert "Smartphone" in sidebar
+    assert "Venda pelo app do funcionario" in sidebar

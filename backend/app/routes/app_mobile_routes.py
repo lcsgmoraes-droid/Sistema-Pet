@@ -18,9 +18,19 @@ from sqlalchemy import case, func, or_, text
 from sqlalchemy.orm import Session
 
 from app.caixa_models import Caixa
+from app.campaigns.channel_scope import campaign_allows_sale_channel, normalize_benefit_channel
 from app.campaigns.coupon_service import preview_coupon_redemption
-from app.campaigns.models import CashbackTransaction, Coupon, CouponChannelEnum, CouponStatusEnum
+from app.campaigns.models import (
+    Campaign,
+    CampaignStatusEnum,
+    CampaignTypeEnum,
+    CashbackTransaction,
+    Coupon,
+    CouponChannelEnum,
+    CouponStatusEnum,
+)
 from app.db import get_session
+from app.financeiro_models import FormaPagamento
 from app.models import Cliente, Pet, User
 from app.produtos_models import EstoqueMovimentacao, Produto, ProdutoLote
 from app.routes.ecommerce_auth import (
@@ -148,6 +158,11 @@ class FuncionarioPdvClienteResponse(BaseModel):
     celular: Optional[str] = None
     documento: Optional[str] = None
     tipo_cadastro: Optional[str] = None
+    email: Optional[str] = None
+    endereco: Optional[str] = None
+    credito: float = 0
+    fidelidade: Optional[dict] = None
+    cupons_disponiveis: list[dict] = Field(default_factory=list)
 
 
 class FuncionarioPdvCaixaResponse(BaseModel):
@@ -168,6 +183,7 @@ class FuncionarioPdvPagamentoRequest(BaseModel):
     valor: float = Field(ge=0)
     valor_recebido: Optional[float] = None
     troco: Optional[float] = None
+    numero_parcelas: int = Field(default=1, ge=1)
 
 
 class FuncionarioPdvFinalizarRequest(BaseModel):
@@ -178,6 +194,27 @@ class FuncionarioPdvFinalizarRequest(BaseModel):
     cupom_codigo: Optional[str] = None
     desconto_cupom: Optional[float] = Field(default=0, ge=0)
     cashback_valor: Optional[float] = Field(default=0, ge=0)
+
+
+class FuncionarioPdvSalvarRequest(BaseModel):
+    cliente_id: Optional[int] = None
+    itens: list[FuncionarioPdvItemRequest]
+    observacoes: Optional[str] = None
+    cupom_codigo: Optional[str] = None
+    desconto_cupom: Optional[float] = Field(default=0, ge=0)
+    cashback_valor: Optional[float] = Field(default=0, ge=0)
+
+
+class FuncionarioPdvFormaPagamentoResponse(BaseModel):
+    id: int
+    nome: str
+    tipo: str
+    key: str
+    taxa_percentual: float = 0
+    permite_parcelamento: bool = False
+    numero_parcelas: int = 1
+    max_parcelas: int = 1
+    parcelas_maximas: int = 1
 
 
 class FuncionarioPdvBeneficioCupomResponse(BaseModel):
@@ -206,6 +243,7 @@ class FuncionarioPdvBeneficiosPreviewResponse(BaseModel):
     total_venda: float
     valor_pagamento: float
     cupons_disponiveis: list[FuncionarioPdvBeneficioCupomResponse] = Field(default_factory=list)
+    beneficios_gerados: list[dict] = Field(default_factory=list)
     mensagens: list[str] = Field(default_factory=list)
 
 
@@ -216,6 +254,14 @@ class FuncionarioPdvFinalizarResponse(BaseModel):
     total: float
     total_pago: float
     forma_pagamento: str
+    mensagem: str
+
+
+class FuncionarioPdvSalvarResponse(BaseModel):
+    status: str
+    venda_id: int
+    numero_venda: str
+    total: float
     mensagem: str
 
 
@@ -343,6 +389,24 @@ def _serialize_funcionario_pdv_produto(produto: Produto) -> dict:
 
 def _serialize_funcionario_pdv_cliente(cliente: Cliente) -> dict:
     documento = cliente.cpf or cliente.cnpj
+    partes_endereco = [
+        getattr(cliente, "endereco", None),
+        getattr(cliente, "numero", None),
+        getattr(cliente, "bairro", None),
+        getattr(cliente, "cidade", None),
+        getattr(cliente, "estado", None),
+    ]
+    endereco = ", ".join(str(parte).strip() for parte in partes_endereco if str(parte or "").strip()) or None
+    credito = (
+        getattr(cliente, "credito", None)
+        or getattr(cliente, "saldo_credito", None)
+        or getattr(cliente, "credito_cliente", None)
+        or 0
+    )
+    fidelidade = {
+        "pontos": int(getattr(cliente, "pontos_fidelidade", None) or getattr(cliente, "pontos", None) or 0),
+        "carimbos": int(getattr(cliente, "carimbos_fidelidade", None) or getattr(cliente, "carimbos", None) or 0),
+    }
     return {
         "id": cliente.id,
         "codigo": cliente.codigo,
@@ -351,6 +415,11 @@ def _serialize_funcionario_pdv_cliente(cliente: Cliente) -> dict:
         "celular": cliente.celular,
         "documento": documento,
         "tipo_cadastro": cliente.tipo_cadastro,
+        "email": cliente.email,
+        "endereco": endereco,
+        "credito": float(credito or 0),
+        "fidelidade": fidelidade,
+        "cupons_disponiveis": [],
     }
 
 
@@ -383,6 +452,19 @@ def _normalizar_forma_pagamento_pdv(forma_pagamento: str) -> str:
     if forma not in mapa:
         raise HTTPException(status_code=400, detail="Forma de pagamento invalida para o PDV mobile.")
     return mapa[forma]
+
+
+def _forma_pagamento_key_funcionario_pdv(forma_pagamento: FormaPagamento) -> Optional[str]:
+    texto = f"{forma_pagamento.tipo or ''} {forma_pagamento.nome or ''} {forma_pagamento.tipo_cartao or ''}".lower()
+    if "credito" in texto or "crédito" in texto:
+        return "credito"
+    if "debito" in texto or "débito" in texto:
+        return "debito"
+    if "pix" in texto:
+        return "pix"
+    if "dinheiro" in texto:
+        return "dinheiro"
+    return None
 
 
 def _round_money_funcionario_pdv(valor) -> float:
@@ -477,6 +559,155 @@ def _saldo_cashback_funcionario_pdv(
         .scalar()
     )
     return max(0.0, _round_money_funcionario_pdv(saldo_raw))
+
+
+def _cashback_bonus_param_key_funcionario_pdv(sale_channel: str) -> str:
+    channel = normalize_benefit_channel(sale_channel)
+    if channel == "app":
+        return "app_bonus_percent"
+    if channel == "ecommerce":
+        return "ecommerce_bonus_percent"
+    return "pdv_bonus_percent"
+
+
+def _param_float_funcionario_pdv(params: dict, *keys: str, default: float = 0) -> float:
+    for key in keys:
+        valor = params.get(key)
+        if valor is None or valor == "":
+            continue
+        try:
+            return float(valor)
+        except (TypeError, ValueError):
+            continue
+    return default
+
+
+def _param_int_funcionario_pdv(params: dict, *keys: str, default: int = 0) -> int:
+    for key in keys:
+        valor = params.get(key)
+        if valor is None or valor == "":
+            continue
+        try:
+            return int(float(valor))
+        except (TypeError, ValueError):
+            continue
+    return default
+
+
+def _calcular_beneficios_gerados_funcionario_pdv(
+    db: Session,
+    *,
+    tenant_id: str,
+    cliente_id: Optional[int],
+    total_venda: float,
+) -> list[dict]:
+    if total_venda <= 0:
+        return []
+
+    sale_channel = "loja_fisica"
+    campanhas = (
+        db.query(Campaign)
+        .filter(
+            Campaign.tenant_id == tenant_id,
+            Campaign.status == CampaignStatusEnum.active,
+            Campaign.campaign_type.in_([
+                CampaignTypeEnum.cashback,
+                CampaignTypeEnum.loyalty_stamp,
+                CampaignTypeEnum.quick_repurchase,
+            ]),
+        )
+        .order_by(Campaign.priority.asc(), Campaign.id.asc())
+        .all()
+    )
+
+    beneficios: list[dict] = []
+    for campanha in campanhas:
+        if not campaign_allows_sale_channel(campanha, sale_channel):
+            continue
+
+        params = campanha.params or {}
+        min_purchase_value = _param_float_funcionario_pdv(
+            params,
+            "min_purchase_value",
+            "valor_minimo",
+            "minimum_purchase",
+            default=0,
+        )
+        if min_purchase_value and total_venda + 0.01 < min_purchase_value:
+            continue
+
+        tipo_campanha = campanha.campaign_type
+        if tipo_campanha == CampaignTypeEnum.cashback:
+            percentual = _param_float_funcionario_pdv(
+                params,
+                "cashback_percent",
+                "percentual_cashback",
+                "percentual",
+                default=0,
+            )
+            percentual += _param_float_funcionario_pdv(
+                params,
+                _cashback_bonus_param_key_funcionario_pdv(sale_channel),
+                default=0,
+            )
+            valor_cashback = _round_money_funcionario_pdv(total_venda * percentual / 100)
+            if valor_cashback > 0:
+                beneficios.append({
+                    "tipo": "cashback",
+                    "titulo": campanha.name or "Cashback",
+                    "valor": valor_cashback,
+                    "descricao": f"{percentual:.2f}% sobre a venda",
+                    "cliente_id": cliente_id,
+                })
+            continue
+
+        if tipo_campanha == CampaignTypeEnum.loyalty_stamp:
+            stamps_per_purchase = max(1, _param_int_funcionario_pdv(
+                params,
+                "stamps_per_purchase",
+                "carimbos_por_compra",
+                "stamp_count",
+                default=1,
+            ))
+            if min_purchase_value > 0:
+                quantidade = max(1, int(total_venda // min_purchase_value)) * stamps_per_purchase
+            else:
+                quantidade = stamps_per_purchase
+            beneficios.append({
+                "tipo": "fidelidade",
+                "titulo": campanha.name or "Cartao fidelidade",
+                "quantidade": quantidade,
+                "descricao": f"{quantidade} carimbo(s) previstos",
+                "cliente_id": cliente_id,
+            })
+            continue
+
+        if tipo_campanha == CampaignTypeEnum.quick_repurchase:
+            valor_cupom = _param_float_funcionario_pdv(
+                params,
+                "coupon_value",
+                "valor_cupom",
+                "discount_value",
+                default=0,
+            )
+            percentual_cupom = _param_float_funcionario_pdv(
+                params,
+                "coupon_percent",
+                "percentual_cupom",
+                "discount_percent",
+                default=0,
+            )
+            if valor_cupom > 0 or percentual_cupom > 0:
+                beneficios.append({
+                    "tipo": "cupom",
+                    "titulo": campanha.name or "Cupom de recompra",
+                    "valor": valor_cupom,
+                    "percentual": percentual_cupom,
+                    "descricao": "Cupom previsto apos a venda",
+                    "cliente_id": cliente_id,
+                })
+
+    return beneficios
 
 
 def _aplicar_desconto_cupom_nos_itens_funcionario_pdv(
@@ -597,6 +828,12 @@ def _calcular_beneficios_funcionario_pdv(
         cliente_id=cliente_id,
         subtotal=subtotal_bruto,
     )
+    beneficios_gerados = _calcular_beneficios_gerados_funcionario_pdv(
+        db,
+        tenant_id=tenant_id,
+        cliente_id=cliente_id,
+        total_venda=total_venda,
+    )
 
     return {
         "itens_payload": itens_payload,
@@ -608,6 +845,7 @@ def _calcular_beneficios_funcionario_pdv(
         "total_venda": total_venda,
         "valor_pagamento": valor_pagamento,
         "cupons_disponiveis": cupons_disponiveis,
+        "beneficios_gerados": beneficios_gerados,
         "mensagens": mensagens,
     }
 
@@ -1358,6 +1596,44 @@ def obter_caixa_aberto_funcionario_pdv(
     }
 
 
+@router.get("/funcionario/pdv/formas-pagamento", response_model=list[FuncionarioPdvFormaPagamentoResponse])
+def listar_formas_pagamento_funcionario_pdv(
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
+    _funcionario, tenant_id = _get_funcionario_operacional_or_403(db, current_user)
+    formas = (
+        db.query(FormaPagamento)
+        .filter(
+            FormaPagamento.tenant_id == tenant_id,
+            FormaPagamento.ativo == True,
+        )
+        .order_by(FormaPagamento.nome.asc())
+        .all()
+    )
+
+    resposta = []
+    for forma in formas:
+        key = _forma_pagamento_key_funcionario_pdv(forma)
+        if not key:
+            continue
+        parcelas_maximas = int(forma.parcelas_maximas or forma.max_parcelas or 1)
+        max_parcelas = int(forma.max_parcelas or parcelas_maximas or 1)
+        numero_parcelas = max(1, parcelas_maximas, max_parcelas)
+        resposta.append({
+            "id": forma.id,
+            "nome": forma.nome,
+            "tipo": forma.tipo,
+            "key": key,
+            "taxa_percentual": float(forma.taxa_percentual or 0),
+            "permite_parcelamento": bool(forma.permite_parcelamento) and key == "credito",
+            "numero_parcelas": numero_parcelas if key == "credito" else 1,
+            "max_parcelas": numero_parcelas if key == "credito" else 1,
+            "parcelas_maximas": numero_parcelas if key == "credito" else 1,
+        })
+    return resposta
+
+
 @router.post("/funcionario/pdv/beneficios/preview", response_model=FuncionarioPdvBeneficiosPreviewResponse)
 def preview_beneficios_funcionario_pdv(
     dados: FuncionarioPdvBeneficiosPreviewRequest,
@@ -1382,7 +1658,60 @@ def preview_beneficios_funcionario_pdv(
         "total_venda": beneficios["total_venda"],
         "valor_pagamento": beneficios["valor_pagamento"],
         "cupons_disponiveis": beneficios["cupons_disponiveis"],
+        "beneficios_gerados": beneficios["beneficios_gerados"],
         "mensagens": beneficios["mensagens"],
+    }
+
+
+@router.post("/funcionario/pdv/vendas/salvar", response_model=FuncionarioPdvSalvarResponse)
+def salvar_venda_funcionario_pdv(
+    dados: FuncionarioPdvSalvarRequest,
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
+    from app.vendas import VendaService
+
+    funcionario, tenant_id = _get_funcionario_operacional_or_403(db, current_user)
+    if not dados.itens:
+        raise HTTPException(status_code=400, detail="Adicione ao menos um item para vender.")
+
+    caixa = _obter_caixa_aberto_funcionario_pdv(db, tenant_id, current_user)
+    if not caixa:
+        raise HTTPException(status_code=400, detail="Abra um caixa no ERP web antes de salvar pelo app.")
+
+    beneficios = _calcular_beneficios_funcionario_pdv(
+        db,
+        tenant_id=tenant_id,
+        cliente_id=dados.cliente_id,
+        itens=dados.itens,
+        cupom_codigo=dados.cupom_codigo,
+        cashback_valor=0,
+    )
+
+    criar_payload = {
+        "cliente_id": dados.cliente_id,
+        "vendedor_id": current_user.id,
+        "funcionario_id": funcionario.id,
+        "itens": beneficios["itens_payload"],
+        "desconto_valor": beneficios["desconto_cupom"],
+        "desconto_percentual": 0,
+        "cupom_code": beneficios["cupom_code"],
+        "cupom_discount_applied": beneficios["desconto_cupom"],
+        "tenant_id": tenant_id,
+        "observacoes": dados.observacoes,
+        "tem_entrega": False,
+        "taxa_entrega": 0,
+        "percentual_taxa_loja": 0,
+        "percentual_taxa_entregador": 0,
+        "canal": "app_funcionario",
+    }
+    venda_criada = VendaService.criar_venda(payload=criar_payload, user_id=current_user.id, db=db)
+    return {
+        "status": "aberta",
+        "venda_id": venda_criada["id"],
+        "numero_venda": venda_criada.get("numero_venda") or str(venda_criada["id"]),
+        "total": float(venda_criada.get("total") or beneficios["total_venda"]),
+        "mensagem": "Venda salva em aberto para recebimento no caixa.",
     }
 
 
@@ -1417,6 +1746,9 @@ def finalizar_venda_funcionario_pdv(
         raise HTTPException(status_code=400, detail="Valor do pagamento deve fechar o total da venda.")
 
     forma_pagamento = _normalizar_forma_pagamento_pdv(dados.pagamento.forma_pagamento)
+    numero_parcelas = max(1, int(dados.pagamento.numero_parcelas or 1))
+    if forma_pagamento != "cartao_credito":
+        numero_parcelas = max(1, min(numero_parcelas, 1))
     criar_payload = {
         "cliente_id": dados.cliente_id,
         "vendedor_id": current_user.id,
@@ -1441,7 +1773,7 @@ def finalizar_venda_funcionario_pdv(
         pagamento_payload = {
             "forma_pagamento": forma_pagamento,
             "valor": valor_pagamento,
-            "numero_parcelas": 1,
+            "numero_parcelas": numero_parcelas,
         }
         if dados.pagamento.valor_recebido is not None:
             pagamento_payload["valor_recebido"] = float(dados.pagamento.valor_recebido)
@@ -1450,11 +1782,12 @@ def finalizar_venda_funcionario_pdv(
         pagamentos_payload.append(pagamento_payload)
 
     if beneficios["cashback_valor"] > 0:
+        parcelas_cashback = max(1, 1)
         pagamentos_payload.append(
             {
                 "forma_pagamento": "Cashback",
                 "valor": beneficios["cashback_valor"],
-                "numero_parcelas": 1,
+                "numero_parcelas": parcelas_cashback,
             }
         )
 
