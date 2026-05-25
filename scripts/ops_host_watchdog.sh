@@ -180,7 +180,7 @@ fi
 
 nginx_5xx_count="$(
   { docker logs --since "${NGINX_5XX_WINDOW_SECONDS}s" petshop-prod-nginx 2>&1 || true; } \
-    | awk '/ 50[0-9] / {count++} END {print count + 0}'
+    | awk 'match($0, /" 50[0-9] /) {count++} END {print count + 0}'
 )"
 
 healthy=true
