@@ -4,6 +4,14 @@ import {
   FuncionarioBalancoResponse,
   FuncionarioProdutoEstoque,
 } from "../types";
+import { API_BASE_URL } from "../config";
+
+function resolveMediaUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url)) return url;
+  const base = API_BASE_URL.replace(/\/api\/?$/, "").replace(/\/$/, "");
+  return `${base}${url.startsWith("/") ? url : `/${url}`}`;
+}
 
 function normalizarProduto(data: any): FuncionarioProdutoEstoque {
   return {
@@ -16,7 +24,7 @@ function normalizarProduto(data: any): FuncionarioProdutoEstoque {
     preco_venda: Number(data.preco_venda ?? 0),
     preco_custo: Number(data.preco_custo ?? 0),
     estoque_atual: Number(data.estoque_atual ?? 0),
-    imagem_url: data.imagem_url ?? null,
+    imagem_url: resolveMediaUrl(data.imagem_url ?? data.imagem_principal ?? data.foto_url),
     is_parent: Boolean(data.is_parent),
     tipo_produto: data.tipo_produto ?? null,
     tipo_kit: data.tipo_kit ?? null,

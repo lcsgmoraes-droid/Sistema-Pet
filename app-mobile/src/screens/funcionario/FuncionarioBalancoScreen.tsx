@@ -5,9 +5,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import {
   ActivityIndicator,
   Alert,
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
+  Image,
   StyleSheet,
   Text,
   TextInput,
@@ -20,6 +18,7 @@ import {
   buscarProdutosFuncionario,
   registrarBalancoFuncionario,
 } from "../../services/funcionarioEstoque.service";
+import KeyboardSafeScrollView from "../../components/KeyboardSafeScrollView";
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from "../../theme";
 import { FuncionarioProdutoEstoque } from "../../types";
 import { formatarMoeda } from "../../utils/format";
@@ -56,6 +55,18 @@ function formatarQuantidade(valor: number | null | undefined) {
     minimumFractionDigits: 0,
     maximumFractionDigits: 3,
   }).format(Number(valor ?? 0));
+}
+
+function ProdutoImagem({ uri, compacta = false }: { uri?: string | null; compacta?: boolean }) {
+  return (
+    <View style={[styles.produtoImagemWrap, compacta && styles.produtoImagemWrapCompacta]}>
+      {uri ? (
+        <Image source={{ uri }} style={styles.produtoImagem} resizeMode="cover" />
+      ) : (
+        <Ionicons name="image-outline" size={compacta ? 18 : 22} color={CORES.textoClaro} />
+      )}
+    </View>
+  );
 }
 
 export default function FuncionarioBalancoScreen() {
@@ -251,8 +262,7 @@ export default function FuncionarioBalancoScreen() {
   }
 
   return (
-    <KeyboardAvoidingView style={styles.container} behavior={Platform.OS === "ios" ? "padding" : undefined}>
-      <ScrollView contentContainerStyle={styles.conteudo} keyboardShouldPersistTaps="handled">
+    <KeyboardSafeScrollView style={styles.container} contentContainerStyle={styles.conteudo}>
         <View style={styles.headerCard}>
           <View style={styles.headerIcone}>
             <Ionicons name="barcode-outline" size={24} color={CORES.sucesso} />
@@ -292,6 +302,7 @@ export default function FuncionarioBalancoScreen() {
 
           {sugestoes.map((item) => (
             <TouchableOpacity key={item.id} style={styles.sugestao} onPress={() => selecionarProduto(item)}>
+              <ProdutoImagem uri={item.imagem_url} />
               <View style={{ flex: 1 }}>
                 <Text style={styles.sugestaoNome} numberOfLines={2}>{item.nome}</Text>
                 <Text style={styles.sugestaoMeta}>SKU {item.codigo || "-"} | {item.unidade || "UN"}</Text>
@@ -304,6 +315,7 @@ export default function FuncionarioBalancoScreen() {
         {produto ? (
           <View style={styles.card}>
             <View style={styles.produtoCabecalho}>
+              <ProdutoImagem uri={produto.imagem_url} compacta />
               <View style={{ flex: 1 }}>
                 <Text style={styles.produtoNome}>{produto.nome}</Text>
                 <Text style={styles.produtoMeta}>SKU {produto.codigo || "-"} | {produto.unidade || "UN"}</Text>
@@ -420,8 +432,7 @@ export default function FuncionarioBalancoScreen() {
             ))}
           </View>
         ) : null}
-      </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardSafeScrollView>
   );
 }
 
@@ -495,6 +506,7 @@ const styles = StyleSheet.create({
   sugestao: {
     flexDirection: "row",
     alignItems: "center",
+    gap: ESPACO.sm,
     borderWidth: 1,
     borderColor: CORES.borda,
     borderRadius: RAIO.md,
@@ -503,6 +515,22 @@ const styles = StyleSheet.create({
   },
   sugestaoNome: { fontSize: FONTE.normal, fontWeight: "700", color: CORES.texto },
   sugestaoMeta: { fontSize: FONTE.pequena, color: CORES.textoSecundario, marginTop: 2 },
+  produtoImagemWrap: {
+    width: 54,
+    height: 54,
+    borderRadius: RAIO.md,
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    backgroundColor: CORES.fundo,
+    overflow: "hidden",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  produtoImagemWrapCompacta: {
+    width: 44,
+    height: 44,
+  },
+  produtoImagem: { width: "100%", height: "100%" },
   produtoCabecalho: { flexDirection: "row", alignItems: "flex-start", gap: ESPACO.sm },
   produtoNome: { fontSize: FONTE.grande, fontWeight: "800", color: CORES.texto },
   produtoMeta: { fontSize: FONTE.normal, color: CORES.textoSecundario, marginTop: 2 },

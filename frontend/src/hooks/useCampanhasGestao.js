@@ -10,6 +10,7 @@ export default function useCampanhasGestao({
 }) {
   const [toggling, setToggling] = useState(null);
   const [campanhaEditando, setCampanhaEditando] = useState(null);
+  const [nomeEditando, setNomeEditando] = useState("");
   const [paramsEditando, setParamsEditando] = useState({});
   const [salvandoParams, setSalvandoParams] = useState(false);
   const [modalCriarCampanha, setModalCriarCampanha] = useState(false);
@@ -89,6 +90,7 @@ export default function useCampanhasGestao({
 
   const abrirEdicao = (campanha) => {
     setCampanhaEditando(campanha.id);
+    setNomeEditando(campanha.name || "");
     const params = { ...campanha.params };
     if (
       ["birthday_customer", "birthday_pet"].includes(campanha.campaign_type) &&
@@ -105,18 +107,23 @@ export default function useCampanhasGestao({
 
   const fecharEdicao = () => {
     setCampanhaEditando(null);
+    setNomeEditando("");
     setParamsEditando({});
   };
 
   const salvarParametros = async (campanha) => {
     setSalvandoParams(true);
     try {
+      const nomeCampanha = nomeEditando.trim() || campanha.name;
       await api.put(`/campanhas/${campanha.id}/parametros`, {
+        name: nomeCampanha,
         params: paramsEditando,
       });
       setCampanhas((prev) =>
         prev.map((item) =>
-          item.id === campanha.id ? { ...item, params: paramsEditando } : item,
+          item.id === campanha.id
+            ? { ...item, name: nomeCampanha, params: paramsEditando }
+            : item,
         ),
       );
       fecharEdicao();
@@ -169,6 +176,8 @@ export default function useCampanhasGestao({
   return {
     toggling,
     campanhaEditando,
+    nomeEditando,
+    setNomeEditando,
     paramsEditando,
     setParamsEditando,
     salvandoParams,

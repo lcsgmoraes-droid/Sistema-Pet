@@ -108,6 +108,8 @@ export default function CampanhasMainContent({
           campanhas={campanhas}
           loadingCampanhas={loadingCampanhas}
           campanhaEditando={gestao.campanhaEditando}
+          nomeEditando={gestao.nomeEditando}
+          setNomeEditando={gestao.setNomeEditando}
           paramsEditando={gestao.paramsEditando}
           setParamsEditando={gestao.setParamsEditando}
           arquivando={gestao.arquivando}
