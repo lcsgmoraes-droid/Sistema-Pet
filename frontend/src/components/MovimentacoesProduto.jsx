@@ -15,6 +15,7 @@ import {
   resolverEstoqueAtualMovimentacoes,
   resolverSaldoDisponivelMovimentacoes,
 } from './estoque/movimentacoesProdutoUtils';
+import { montarMovimentoBalanco } from './produtoBalanco/produtosBalancoUtils';
 import ReservasAtivasModal from './estoque/ReservasAtivasModal';
 import VendasPorCanalPanel from './estoque/VendasPorCanalPanel';
 import { useModulos } from '../contexts/ModulosContext';
@@ -566,8 +567,8 @@ export default function MovimentacoesProduto() {
       let endpoint = '/estoque/';
       let payload = {
         produto_id: parseInt(id),
-        quantidade: parseFloat(formData.quantidade),
-        custo_unitario: formData.custo_unitario ? parseFloat(formData.custo_unitario) : null,
+        quantidade: parseNumeroInput(formData.quantidade),
+        custo_unitario: formData.custo_unitario ? parseNumeroInput(formData.custo_unitario) : null,
         observacao: formData.observacao || null,
       };
 
@@ -596,14 +597,29 @@ export default function MovimentacoesProduto() {
         }
       } else if (tipoLancamento === 'balanco') {
         // Balanço: definir estoque para o valor exato
-        const novaQuantidade = parseFloat(formData.quantidade);
-        const estoqueAtual = produto?.estoque_atual || 0;
-        const diferenca = novaQuantidade - estoqueAtual;
-        
-        endpoint += diferenca >= 0 ? 'entrada' : 'saida';
-        payload.tipo = diferenca >= 0 ? 'entrada' : 'saida';
-        payload.quantidade = Math.abs(diferenca);
-        payload.motivo = 'balanco';
+        const novaQuantidade = parseNumeroInput(formData.quantidade);
+        const movimentoBalanco = montarMovimentoBalanco(produto, novaQuantidade, {
+          numeroLote: formData.lote,
+          dataValidade: formData.data_validade,
+        });
+
+        if (movimentoBalanco.erro) {
+          toast.error(movimentoBalanco.erro);
+          return;
+        }
+
+        if (movimentoBalanco.semAlteracao) {
+          toast('Sem alteracao: estoque ja esta nesse valor.', { icon: 'i' });
+          setShowModal(false);
+          return;
+        }
+
+        endpoint = movimentoBalanco.endpoint;
+        payload = {
+          ...payload,
+          ...movimentoBalanco.payload,
+          tipo: movimentoBalanco.endpoint.endsWith('/entrada') ? 'entrada' : 'saida',
+        };
       }
 
       const response = await api.post(endpoint, payload);

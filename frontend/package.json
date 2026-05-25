@@ -8,6 +8,7 @@
     "build": "vite build --mode production",
     "build:dev": "vite build --mode development",
     "test:auth-storage": "node scripts/test-token-storage.mjs",
+    "test:balanco": "node scripts/test-produtos-balanco-utils.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
