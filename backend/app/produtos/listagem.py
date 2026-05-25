@@ -5,19 +5,11 @@ from typing import Any, Optional
 from sqlalchemy.orm import Session
 
 from app.partner_utils import is_partner_owned
+from app.produtos.normalizacao import as_float_optional
 from app.produtos_models import Produto
 from app.services.kit_estoque_service import KitEstoqueService
 
 logger = logging.getLogger(__name__)
-
-
-def as_float_optional(valor: Any) -> Optional[float]:
-    if valor in (None, ""):
-        return None
-    try:
-        return float(valor)
-    except (TypeError, ValueError):
-        return None
 
 
 def datetime_naive(valor: Any) -> Optional[datetime]:

@@ -69,8 +69,14 @@ from .produtos.validade import (
     _calcular_status_validade,
     _mapa_validade_proxima_produtos,
 )
+from .produtos.normalizacao import (
+    nome_indica_granel as _nome_indica_granel,
+    normalizar_payload_granel as _normalizar_payload_granel,
+    normalizar_promocao_erp_payload as _normalizar_promocao_erp_payload,
+    normalizar_sku_produto as _normalizar_sku_produto,
+    produto_sku_value as _produto_sku_value,
+)
 from .produtos.listagem import (
-    as_float_optional as _as_float_optional,
     enriquecer_preco_pdv as _enriquecer_preco_pdv,
     enriquecer_produto_listagem as _enriquecer_produto_listagem_base,
     resolver_promocao_erp_produto as _resolver_promocao_erp_produto,
@@ -82,35 +88,6 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/produtos", tags=["produtos"])
 
 PRODUTO_SKU_COLUMN = getattr(Produto, "sku", None)
-
-
-def _produto_sku_value(produto: Produto) -> Optional[str]:
-    return getattr(produto, "sku", None)
-
-
-def _normalizar_sku_produto(sku: Optional[str]) -> str:
-    sku_normalizado = str(sku or "").strip().upper()
-    if not sku_normalizado:
-        raise HTTPException(status_code=400, detail="SKU do produto e obrigatorio")
-    return sku_normalizado
-
-
-def _normalizar_promocao_erp_payload(
-    dados: dict[str, Any],
-    produto_atual: Optional[Produto] = None,
-) -> dict[str, Any]:
-    campos_promocao = {"preco_promocional", "promocao_inicio", "promocao_fim"}
-
-    if produto_atual is not None and not any(campo in dados for campo in campos_promocao):
-        return dados
-
-    preco_promocional = (
-        dados.get("preco_promocional")
-        if "preco_promocional" in dados
-        else getattr(produto_atual, "preco_promocional", None)
-    )
-    dados["promocao_ativa"] = bool((_as_float_optional(preco_promocional) or 0) > 0)
-    return dados
 
 
 def _mapa_reservas_ativas_multitenant(db: Session, tenant_ids: List[str]) -> dict[int, float]:
@@ -157,22 +134,6 @@ def _obter_produto_ou_404(db: Session, produto_id: int, tenant_id: int):
         raise HTTPException(status_code=404, detail="Produto nÃ£o encontrado")
 
     return produto
-
-
-def _nome_indica_granel(nome: Optional[str]) -> bool:
-    return "granel" in str(nome or "").strip().lower()
-
-
-def _normalizar_payload_granel(dados: dict) -> dict:
-    """Aplica a regra estrutural: granel tem estoque proprio em KG e nao e item de compra."""
-    if bool(dados.get("e_granel")) or _nome_indica_granel(dados.get("nome")):
-        dados["e_granel"] = True
-        dados["tipo_produto"] = "SIMPLES"
-        dados["tipo_kit"] = None
-        dados["e_kit_fisico"] = False
-        dados["unidade"] = "KG"
-        dados["participa_sugestao_compra"] = False
-    return dados
 
 
 def _obter_categoria_ou_404(db: Session, categoria_id: int, tenant_id: int):
