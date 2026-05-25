@@ -2097,6 +2097,7 @@ class VendaService:
                     )
                 else:
                     logger.warning(f"⚠️ Processamento de taxas falhou: {resultado_taxas.get('error', 'Erro desconhecido')}")
+                    db.rollback()  # Limpa falha secundaria; a venda ja foi commitada antes dos efeitos financeiros
             except Exception as e:
                 logger.error(f"⚠️ Erro ao criar contas a pagar de taxas: {str(e)}", exc_info=True)
                 db.rollback()  # Rollback apenas das contas (venda já commitada)

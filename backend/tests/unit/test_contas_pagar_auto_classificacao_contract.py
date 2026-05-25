@@ -62,3 +62,14 @@ def test_contas_de_taxa_pdv_usam_classificacao_aprendida_por_descricao():
     )[0]
 
     assert "aplicar_classificacao_aprendida_conta_pagar(" in taxas
+
+
+def test_falha_ao_criar_taxa_do_pdv_limpa_transacao_da_venda_finalizada():
+    source = _source("backend/app/vendas/service.py")
+    bloco_taxas = source.split("resultado_taxas = processar_contas_pagar_taxas(", 1)[1].split(
+        "if venda.status == 'finalizada' and venda.cliente_id:",
+        1,
+    )[0]
+    ramo_falha = bloco_taxas.split("else:", 1)[1].split("except Exception as e:", 1)[0]
+
+    assert "db.rollback()" in ramo_falha
