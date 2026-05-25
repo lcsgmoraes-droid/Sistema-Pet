@@ -80,7 +80,6 @@ def _create_regras_table() -> None:
         sa.Column(
             "tenant_id",
             _uuid_type(),
-            sa.ForeignKey("tenants.id", ondelete="CASCADE"),
             nullable=False,
         ),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
@@ -118,7 +117,6 @@ def _create_historico_table() -> None:
         sa.Column(
             "tenant_id",
             _uuid_type(),
-            sa.ForeignKey("tenants.id", ondelete="CASCADE"),
             nullable=False,
         ),
         sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),

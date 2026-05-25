@@ -32,3 +32,10 @@ def test_regras_classificacao_dre_tem_migration_versionada():
     assert "afeta_dre" in migrations
     assert "idx_regras_classificacao_criterios" in migrations
     assert "idx_contas_pagar_beneficiario" in migrations
+
+
+def test_migration_regras_dre_nao_cria_fk_incompativel_com_tenants():
+    source = _source("backend/alembic/versions/oz20260525a1_create_dre_classificacao_rules.py")
+
+    assert 'sa.ForeignKey("tenants.id"' not in source
+    assert "sa.ForeignKey('tenants.id'" not in source
