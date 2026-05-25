@@ -15,7 +15,6 @@ from sqlalchemy.orm import Session, joinedload, noload
 from sqlalchemy import func, text, or_, and_, case
 from typing import Any, List, Optional
 from datetime import datetime, timedelta
-import random
 import logging
 import traceback
 
@@ -58,6 +57,11 @@ from .produtos.search import (
     _build_produto_search_order_clause,
     _produto_search_conditions,
     _produto_search_conditions_fast,
+)
+from .produtos.codigo_barras import (
+    calcular_digito_verificador_ean13,
+    gerar_codigo_barras_ean13,
+    validar_codigo_barras_ean13,
 )
 from .produtos.racao import (
     _normalizar_classificacao_racao,
@@ -1473,64 +1477,6 @@ def deletar_departamento(
 # ENDPOINTS - CÃ“DIGO DE BARRAS
 # ==========================================
 
-def calcular_digito_verificador_ean13(codigo_12_digitos: str) -> str:
-    """
-    Calcula o dÃ­gito verificador para cÃ³digo EAN-13
-    Algoritmo: MÃ³dulo 10
-    """
-    if len(codigo_12_digitos) != 12:
-        raise ValueError("CÃ³digo deve ter exatamente 12 dÃ­gitos")
-
-    # Somar dÃ­gitos nas posiÃ§Ãµes Ã­mpares (1, 3, 5...) multiplicados por 1
-    soma_impar = sum(int(codigo_12_digitos[i]) for i in range(0, 12, 2))
-
-    # Somar dÃ­gitos nas posiÃ§Ãµes pares (2, 4, 6...) multiplicados por 3
-    soma_par = sum(int(codigo_12_digitos[i]) * 3 for i in range(1, 12, 2))
-
-    # Soma total
-    soma_total = soma_impar + soma_par
-
-    # DÃ­gito verificador = (10 - (soma_total % 10)) % 10
-    digito = (10 - (soma_total % 10)) % 10
-
-    return str(digito)
-
-
-def gerar_codigo_barras_ean13(sku: str) -> str:
-    """
-    Gera cÃ³digo de barras EAN-13 com padrÃ£o:
-    789 (Brasil) + 5 dÃ­gitos aleatÃ³rios + 4 Ãºltimos dÃ­gitos do SKU + checksum
-
-    Exemplo: SKU = PROD-00123 â†’ EAN-13 = 7891234501234
-    """
-    # Extrair apenas nÃºmeros do SKU
-    numeros_sku = ''.join(filter(str.isdigit, sku))
-
-    if not numeros_sku:
-        # Se nÃ£o houver nÃºmeros, usar aleatÃ³rio
-        numeros_sku = str(random.randint(1000, 9999))
-
-    # Pegar Ãºltimos 4 dÃ­gitos
-    ultimos_4_sku = numeros_sku[-4:].zfill(4)
-
-    # Prefixo Brasil
-    prefixo = "789"
-
-    # 5 dÃ­gitos aleatÃ³rios
-    meio = str(random.randint(10000, 99999))
-
-    # Montar cÃ³digo de 12 dÃ­gitos
-    codigo_12 = prefixo + meio + ultimos_4_sku
-
-    # Calcular dÃ­gito verificador
-    digito_verificador = calcular_digito_verificador_ean13(codigo_12)
-
-    # CÃ³digo completo EAN-13
-    codigo_ean13 = codigo_12 + digito_verificador
-
-    return codigo_ean13
-
-
 @router.post("/gerar-codigo-barras", response_model=GerarCodigoBarrasResponse)
 def gerar_codigo_barras(
     request: GerarCodigoBarrasRequest,
@@ -1585,33 +1531,10 @@ def validar_codigo_barras(
 
     _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
-    # Remover espaÃ§os e traÃ§os
-    codigo_limpo = codigo.replace(" ", "").replace("-", "")
-
-    # Verificar comprimento
-    if len(codigo_limpo) != 13:
-        return {
-            "valido": False,
-            "erro": f"CÃ³digo deve ter 13 dÃ­gitos. Fornecido: {len(codigo_limpo)} dÃ­gitos"
-        }
-
-    # Verificar se sÃ£o apenas nÃºmeros
-    if not codigo_limpo.isdigit():
-        return {
-            "valido": False,
-            "erro": "CÃ³digo deve conter apenas nÃºmeros"
-        }
-
-    # Validar dÃ­gito verificador
-    codigo_12 = codigo_limpo[:12]
-    digito_fornecido = codigo_limpo[12]
-    digito_calculado = calcular_digito_verificador_ean13(codigo_12)
-
-    if digito_fornecido != digito_calculado:
-        return {
-            "valido": False,
-            "erro": f"DÃ­gito verificador invÃ¡lido. Esperado: {digito_calculado}, Fornecido: {digito_fornecido}"
-        }
+    validacao = validar_codigo_barras_ean13(codigo)
+    if not validacao.get("valido"):
+        return validacao
+    codigo_limpo = validacao["codigo_limpo"]
 
     # Verificar se jÃ¡ existe no banco
     existe = db.query(Produto).filter(

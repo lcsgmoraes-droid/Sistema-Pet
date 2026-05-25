@@ -1943,6 +1943,10 @@ Proximas tarefas sugeridas para execucao continua:
   - bloqueio de inativacao de produto pai e sincronizacao `ativo`/`situacao` foram movidos para `backend/app/produtos/status.py`
   - o wrapper da rota preserva o modelo `Produto` usado nas consultas existentes
   - novos testes unitarios cobrem variacoes ativas, desligamento de canais e reativacao sem religar anuncios
+- [x] continuar a decomposicao backend de `produtos_routes.py` por codigo de barras
+  - checksum, geracao EAN-13 e validacao estrutural foram movidos para `backend/app/produtos/codigo_barras.py`
+  - a rota de validacao passou a reutilizar o helper puro antes da consulta ao banco, preservando as respostas externas
+  - novos testes unitarios cobrem checksum conhecido, geracao deterministica e mensagens de validacao
 - [x] iniciar a decomposicao de `UsuariosPage.jsx` pela separacao da carga/acoes e dos blocos visuais principais
   - a carga de usuarios/roles, o modal e as acoes de ativar, desativar e forcar logout foram movidos para `frontend/src/hooks/useUsuariosPage.js`
   - a tabela e o modal foram extraidos para `frontend/src/components/usuarios/UsuariosTable.jsx` e `frontend/src/components/usuarios/UsuarioModal.jsx`
