@@ -184,6 +184,10 @@ class FuncionarioPdvPagamentoRequest(BaseModel):
     valor_recebido: Optional[float] = None
     troco: Optional[float] = None
     numero_parcelas: int = Field(default=1, ge=1)
+    forma_pagamento_id: Optional[int] = None
+    bandeira: Optional[str] = None
+    operadora: Optional[str] = None
+    nsu_cartao: Optional[str] = None
 
 
 class FuncionarioPdvFinalizarRequest(BaseModel):
@@ -215,6 +219,11 @@ class FuncionarioPdvFormaPagamentoResponse(BaseModel):
     numero_parcelas: int = 1
     max_parcelas: int = 1
     parcelas_maximas: int = 1
+    operadora: Optional[str] = None
+    requer_nsu: bool = False
+    tipo_cartao: Optional[str] = None
+    bandeira: Optional[str] = None
+    split_parcelas: bool = False
 
 
 class FuncionarioPdvBeneficioCupomResponse(BaseModel):
@@ -465,6 +474,54 @@ def _forma_pagamento_key_funcionario_pdv(forma_pagamento: FormaPagamento) -> Opt
     if "dinheiro" in texto:
         return "dinheiro"
     return None
+
+
+def _resolver_forma_pagamento_cartao_funcionario_pdv(
+    db: Session,
+    tenant_id: str,
+    pagamento: FuncionarioPdvPagamentoRequest,
+) -> Optional[FormaPagamento]:
+    forma_key = (pagamento.forma_pagamento or "").strip().lower()
+    if forma_key not in {"credito", "debito", "cartao_credito", "cartao_debito"}:
+        return None
+
+    forma_normalizada = "credito" if "credito" in forma_key else "debito"
+    query = db.query(FormaPagamento).filter(
+        FormaPagamento.tenant_id == tenant_id,
+        FormaPagamento.ativo == True,
+    )
+
+    if pagamento.forma_pagamento_id:
+        forma = query.filter(FormaPagamento.id == pagamento.forma_pagamento_id).first()
+        if not forma:
+            raise HTTPException(status_code=400, detail="Forma de pagamento do cartao nao encontrada.")
+        if _forma_pagamento_key_funcionario_pdv(forma) != forma_normalizada:
+            raise HTTPException(status_code=400, detail="Forma de pagamento nao corresponde ao tipo de cartao selecionado.")
+    else:
+        formas_cartao = [
+            forma
+            for forma in query.order_by(FormaPagamento.nome.asc()).all()
+            if _forma_pagamento_key_funcionario_pdv(forma) == forma_normalizada
+        ]
+        if len(formas_cartao) != 1:
+            raise HTTPException(status_code=400, detail="Selecione a bandeira/operadora do cartao.")
+        forma = formas_cartao[0]
+
+    max_parcelas = max(1, int(forma.parcelas_maximas or forma.max_parcelas or 1))
+    numero_parcelas = max(1, int(pagamento.numero_parcelas or 1))
+    pode_parcelar = forma_normalizada == "credito" and (bool(forma.permite_parcelamento) or bool(forma.split_parcelas))
+
+    if forma_normalizada == "debito" and numero_parcelas != 1:
+        raise HTTPException(status_code=400, detail="Cartao de debito deve ser registrado em 1 parcela.")
+    if forma_normalizada == "credito" and numero_parcelas > 1 and not pode_parcelar:
+        raise HTTPException(status_code=400, detail="Esta forma de credito nao permite parcelamento.")
+    if forma_normalizada == "credito" and numero_parcelas > max_parcelas:
+        raise HTTPException(status_code=400, detail=f"Esta forma de credito permite no maximo {max_parcelas}x.")
+
+    if bool(forma.requer_nsu) and not (pagamento.nsu_cartao or "").strip():
+        raise HTTPException(status_code=400, detail="Informe o NSU do cartao.")
+
+    return forma
 
 
 def _round_money_funcionario_pdv(valor) -> float:
@@ -1620,16 +1677,22 @@ def listar_formas_pagamento_funcionario_pdv(
         parcelas_maximas = int(forma.parcelas_maximas or forma.max_parcelas or 1)
         max_parcelas = int(forma.max_parcelas or parcelas_maximas or 1)
         numero_parcelas = max(1, parcelas_maximas, max_parcelas)
+        permite_parcelamento = key == "credito" and (bool(forma.permite_parcelamento) or bool(forma.split_parcelas))
         resposta.append({
             "id": forma.id,
             "nome": forma.nome,
             "tipo": forma.tipo,
             "key": key,
             "taxa_percentual": float(forma.taxa_percentual or 0),
-            "permite_parcelamento": bool(forma.permite_parcelamento) and key == "credito",
-            "numero_parcelas": numero_parcelas if key == "credito" else 1,
-            "max_parcelas": numero_parcelas if key == "credito" else 1,
-            "parcelas_maximas": numero_parcelas if key == "credito" else 1,
+            "permite_parcelamento": permite_parcelamento,
+            "numero_parcelas": numero_parcelas if permite_parcelamento else 1,
+            "max_parcelas": numero_parcelas if permite_parcelamento else 1,
+            "parcelas_maximas": numero_parcelas if permite_parcelamento else 1,
+            "operadora": forma.operadora,
+            "requer_nsu": bool(forma.requer_nsu),
+            "tipo_cartao": forma.tipo_cartao,
+            "bandeira": forma.bandeira,
+            "split_parcelas": bool(forma.split_parcelas),
         })
     return resposta
 
@@ -1747,6 +1810,7 @@ def finalizar_venda_funcionario_pdv(
 
     forma_pagamento = _normalizar_forma_pagamento_pdv(dados.pagamento.forma_pagamento)
     numero_parcelas = max(1, int(dados.pagamento.numero_parcelas or 1))
+    forma_pagamento_selecionada = _resolver_forma_pagamento_cartao_funcionario_pdv(db, tenant_id, dados.pagamento)
     if forma_pagamento != "cartao_credito":
         numero_parcelas = max(1, min(numero_parcelas, 1))
     criar_payload = {
@@ -1774,6 +1838,10 @@ def finalizar_venda_funcionario_pdv(
             "forma_pagamento": forma_pagamento,
             "valor": valor_pagamento,
             "numero_parcelas": numero_parcelas,
+            "forma_pagamento_id": dados.pagamento.forma_pagamento_id,
+            "bandeira": dados.pagamento.bandeira or (forma_pagamento_selecionada.bandeira if forma_pagamento_selecionada else None),
+            "operadora": dados.pagamento.operadora or (forma_pagamento_selecionada.operadora if forma_pagamento_selecionada else None),
+            "nsu_cartao": dados.pagamento.nsu_cartao,
         }
         if dados.pagamento.valor_recebido is not None:
             pagamento_payload["valor_recebido"] = float(dados.pagamento.valor_recebido)

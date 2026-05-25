@@ -83,7 +83,9 @@ export default function FuncionarioPdvScreen() {
   const [mostrarDetalhesCliente, setMostrarDetalhesCliente] = useState(false);
   const [formaPagamento, setFormaPagamento] = useState<FuncionarioPdvFormaPagamento>("dinheiro");
   const [formasPagamentoErp, setFormasPagamentoErp] = useState<FuncionarioPdvFormaPagamentoOpcao[]>([]);
+  const [formaPagamentoIdSelecionada, setFormaPagamentoIdSelecionada] = useState<number | null>(null);
   const [numeroParcelas, setNumeroParcelas] = useState(1);
+  const [nsuCartao, setNsuCartao] = useState("");
   const [valorRecebido, setValorRecebido] = useState("");
   const [observacoes, setObservacoes] = useState("");
   const [caixa, setCaixa] = useState<FuncionarioPdvCaixa | null>(null);
@@ -171,19 +173,41 @@ export default function FuncionarioPdvScreen() {
     () => carrinho.reduce((soma, item) => soma + item.quantidade, 0),
     [carrinho],
   );
-  const formaCreditoErp = useMemo(
-    () => formasPagamentoErp.find((item) => item.key === "credito") ?? null,
-    [formasPagamentoErp],
+  const ehCartao = formaPagamento === "credito" || formaPagamento === "debito";
+  const opcoesCartao = useMemo(
+    () => formasPagamentoErp.filter((item) => item.key === formaPagamento),
+    [formasPagamentoErp, formaPagamento],
+  );
+  const formaPagamentoSelecionada = useMemo(
+    () => opcoesCartao.find((item) => item.id === formaPagamentoIdSelecionada) ?? null,
+    [opcoesCartao, formaPagamentoIdSelecionada],
   );
   const parcelasCredito = useMemo(() => {
+    const formaParcelamento = formaPagamentoSelecionada;
+    const podeParcelar =
+      formaPagamento === "credito" &&
+      Boolean(formaParcelamento?.permite_parcelamento || formaParcelamento?.split_parcelas);
     const maximo = Math.max(
       1,
-      Number(formaCreditoErp?.parcelas_maximas ?? formaCreditoErp?.max_parcelas ?? formaCreditoErp?.numero_parcelas ?? 12),
+      Number(
+        podeParcelar
+          ? formaParcelamento?.parcelas_maximas ?? formaParcelamento?.max_parcelas ?? formaParcelamento?.numero_parcelas ?? 1
+          : 1,
+      ),
     );
     return Array.from({ length: maximo }, (_, indice) => indice + 1);
-  }, [formaCreditoErp]);
+  }, [formaPagamento, formaPagamentoSelecionada]);
 
   useEffect(() => {
+    if (!ehCartao) {
+      setFormaPagamentoIdSelecionada(null);
+      setNsuCartao("");
+      setNumeroParcelas(1);
+      return;
+    }
+    if (!opcoesCartao.some((item) => item.id === formaPagamentoIdSelecionada)) {
+      setFormaPagamentoIdSelecionada(opcoesCartao[0]?.id ?? null);
+    }
     if (formaPagamento !== "credito") {
       setNumeroParcelas(1);
       return;
@@ -191,7 +215,7 @@ export default function FuncionarioPdvScreen() {
     if (!parcelasCredito.includes(numeroParcelas)) {
       setNumeroParcelas(parcelasCredito[0] ?? 1);
     }
-  }, [formaPagamento, numeroParcelas, parcelasCredito]);
+  }, [ehCartao, formaPagamento, formaPagamentoIdSelecionada, numeroParcelas, opcoesCartao, parcelasCredito]);
 
   useEffect(() => {
     if (!isFocused || carrinho.length === 0) {
@@ -358,7 +382,9 @@ export default function FuncionarioPdvScreen() {
     setUsarCashback(false);
     setCashbackValor("");
     setBeneficiosPreview(null);
+    setFormaPagamentoIdSelecionada(null);
     setNumeroParcelas(1);
+    setNsuCartao("");
   }
 
   async function salvarAberta() {
@@ -428,6 +454,14 @@ export default function FuncionarioPdvScreen() {
         Alert.alert("Valor recebido", "Informe um valor recebido igual ou maior que o total.");
         return;
       }
+      if (ehCartao && !formaPagamentoSelecionada) {
+        Alert.alert("Cartao", "Selecione a bandeira/operadora do cartao.");
+        return;
+      }
+      if (ehCartao && formaPagamentoSelecionada?.requer_nsu && !nsuCartao.trim()) {
+        Alert.alert("NSU", "Informe o NSU do cartao.");
+        return;
+      }
 
       const trocoFinal = formaPagamento === "dinheiro" ? Math.max(0, valorRecebidoNumero - previewAtual.valor_pagamento) : 0;
       const resposta = await finalizarVendaPdv({
@@ -439,6 +473,10 @@ export default function FuncionarioPdvScreen() {
           valor_recebido: formaPagamento === "dinheiro" && previewAtual.valor_pagamento > 0 ? Number(valorRecebidoNumero.toFixed(2)) : null,
           troco: formaPagamento === "dinheiro" && previewAtual.valor_pagamento > 0 ? Number(trocoFinal.toFixed(2)) : null,
           numero_parcelas: formaPagamento === "credito" ? numeroParcelas : 1,
+          forma_pagamento_id: ehCartao ? formaPagamentoSelecionada?.id ?? null : null,
+          bandeira: ehCartao ? formaPagamentoSelecionada?.bandeira ?? formaPagamentoSelecionada?.nome ?? null : null,
+          operadora: ehCartao ? formaPagamentoSelecionada?.operadora ?? null : null,
+          nsu_cartao: ehCartao ? nsuCartao.trim() || null : null,
         },
         observacoes: observacoes.trim() || null,
         cupom_codigo: cupomCodigo.trim() || null,
@@ -861,7 +899,12 @@ export default function FuncionarioPdvScreen() {
               <TouchableOpacity
                 key={forma.key}
                 style={[styles.formaBotao, formaPagamento === forma.key && styles.formaBotaoAtivo]}
-                onPress={() => setFormaPagamento(forma.key)}
+                onPress={() => {
+                  setFormaPagamento(forma.key);
+                  setFormaPagamentoIdSelecionada(null);
+                  setNumeroParcelas(1);
+                  setNsuCartao("");
+                }}
               >
                 <Ionicons
                   name={forma.icon}
@@ -889,22 +932,67 @@ export default function FuncionarioPdvScreen() {
             </>
           ) : null}
 
-          {formaPagamento === "credito" ? (
-            <View style={styles.parcelasBox}>
-              <Text style={styles.label}>Parcelamento</Text>
-              <View style={styles.parcelasGrid}>
-                {parcelasCredito.map((parcela) => (
-                  <TouchableOpacity
-                    key={parcela}
-                    style={[styles.parcelaBotao, numeroParcelas === parcela && styles.parcelaBotaoAtivo]}
-                    onPress={() => setNumeroParcelas(parcela)}
-                  >
-                    <Text style={[styles.parcelaTexto, numeroParcelas === parcela && styles.parcelaTextoAtivo]}>
-                      {parcela}x
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
+          {ehCartao ? (
+            <View style={styles.cartaoBox}>
+              <Text style={styles.label}>Bandeira/operadora</Text>
+              {opcoesCartao.length ? (
+                <View style={styles.cartaoOpcoesGrid}>
+                  {opcoesCartao.map((opcao) => {
+                    const ativa = formaPagamentoSelecionada?.id === opcao.id;
+                    return (
+                      <TouchableOpacity
+                        key={opcao.id}
+                        style={[styles.cartaoOpcao, ativa && styles.cartaoOpcaoAtiva]}
+                        onPress={() => {
+                          setFormaPagamentoIdSelecionada(opcao.id);
+                          setNumeroParcelas(1);
+                        }}
+                      >
+                        <Text style={[styles.cartaoOpcaoTitulo, ativa && styles.cartaoOpcaoTituloAtivo]}>
+                          {opcao.bandeira || opcao.nome}
+                        </Text>
+                        <Text style={styles.cartaoOpcaoSubtitulo}>
+                          {opcao.operadora || opcao.tipo || "Cartao"} {opcao.taxa_percentual ? `- taxa ${opcao.taxa_percentual}%` : ""}
+                        </Text>
+                        {opcao.requer_nsu ? <Text style={styles.cartaoOpcaoAviso}>NSU obrigatorio</Text> : null}
+                      </TouchableOpacity>
+                    );
+                  })}
+                </View>
+              ) : (
+                <View style={styles.cartaoAviso}>
+                  <Ionicons name="alert-circle-outline" size={18} color={CORES.erro} />
+                  <Text style={styles.cartaoAvisoTexto}>Nenhuma forma de cartao configurada no ERP.</Text>
+                </View>
+              )}
+
+              <Text style={styles.label}>NSU{formaPagamentoSelecionada?.requer_nsu ? " *" : ""}</Text>
+              <TextInput
+                value={nsuCartao}
+                onChangeText={setNsuCartao}
+                placeholder="Codigo NSU da maquininha"
+                keyboardType="number-pad"
+                style={styles.input}
+              />
+
+              {formaPagamento === "credito" && parcelasCredito.length > 1 ? (
+                <View style={styles.parcelasBox}>
+                  <Text style={styles.label}>Parcelamento</Text>
+                  <View style={styles.parcelasGrid}>
+                    {parcelasCredito.map((parcela) => (
+                      <TouchableOpacity
+                        key={parcela}
+                        style={[styles.parcelaBotao, numeroParcelas === parcela && styles.parcelaBotaoAtivo]}
+                        onPress={() => setNumeroParcelas(parcela)}
+                      >
+                        <Text style={[styles.parcelaTexto, numeroParcelas === parcela && styles.parcelaTextoAtivo]}>
+                          {parcela}x
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              ) : null}
             </View>
           ) : null}
 
@@ -1151,6 +1239,32 @@ const styles = StyleSheet.create({
   formaBotaoAtivo: { borderColor: CORES.primario, backgroundColor: CORES.primarioClaro },
   formaTexto: { color: CORES.textoSecundario, fontWeight: "800" },
   formaTextoAtivo: { color: CORES.primario },
+  cartaoBox: { gap: ESPACO.xs },
+  cartaoOpcoesGrid: { gap: ESPACO.xs },
+  cartaoOpcao: {
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    borderRadius: RAIO.md,
+    backgroundColor: "#fff",
+    padding: ESPACO.sm,
+    gap: 2,
+  },
+  cartaoOpcaoAtiva: { borderColor: CORES.primario, backgroundColor: CORES.primarioClaro },
+  cartaoOpcaoTitulo: { color: CORES.texto, fontWeight: "900", fontSize: FONTE.normal },
+  cartaoOpcaoTituloAtivo: { color: CORES.primario },
+  cartaoOpcaoSubtitulo: { color: CORES.textoSecundario, fontSize: FONTE.pequena },
+  cartaoOpcaoAviso: { color: CORES.primario, fontSize: FONTE.pequena, fontWeight: "800" },
+  cartaoAviso: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: ESPACO.xs,
+    borderWidth: 1,
+    borderColor: "#FECACA",
+    backgroundColor: "#FEF2F2",
+    borderRadius: RAIO.md,
+    padding: ESPACO.sm,
+  },
+  cartaoAvisoTexto: { flex: 1, color: CORES.erro, fontWeight: "700", fontSize: FONTE.pequena },
   parcelasBox: { gap: ESPACO.xs },
   parcelasGrid: { flexDirection: "row", flexWrap: "wrap", gap: ESPACO.xs },
   parcelaBotao: {

@@ -100,6 +100,11 @@ export async function listarFormasPagamentoPdv(): Promise<FuncionarioPdvFormaPag
         numero_parcelas: Number(item.numero_parcelas ?? 1),
         max_parcelas: Number(item.max_parcelas ?? item.numero_parcelas ?? 1),
         parcelas_maximas: Number(item.parcelas_maximas ?? item.numero_parcelas ?? 1),
+        operadora: item.operadora ?? null,
+        requer_nsu: Boolean(item.requer_nsu),
+        tipo_cartao: item.tipo_cartao ?? null,
+        bandeira: item.bandeira ?? null,
+        split_parcelas: Boolean(item.split_parcelas),
       }))
     : [];
 }
