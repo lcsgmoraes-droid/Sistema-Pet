@@ -95,6 +95,7 @@ def test_funcionario_pdv_searches_products_and_clients_like_web_pdv():
     product_block = extract_block(source, "def buscar_produtos_funcionario_pdv")
     barcode_block = extract_block(source, "def buscar_produto_funcionario_pdv_barcode")
     client_block = extract_block(source, "def buscar_clientes_funcionario_pdv")
+    client_lookup_block = extract_block(source, "def _buscar_cliente_pdv_funcionario")
     serializer_block = extract_block(source, "def _serialize_funcionario_pdv_cliente")
     types = read_repo("app-mobile/src/types/index.ts")
     service = read_repo("app-mobile/src/services/funcionarioPdv.service.ts")
@@ -120,6 +121,7 @@ def test_funcionario_pdv_searches_products_and_clients_like_web_pdv():
         assert field in client_block
 
     assert 'Cliente.tipo_cadastro == "cliente"' not in client_block
+    assert 'Cliente.tipo_cadastro == "cliente"' not in client_lookup_block
     for field in [
         "telefone_digits.ilike",
         "celular_digits.ilike",
