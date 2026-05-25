@@ -1927,6 +1927,10 @@ Proximas tarefas sugeridas para execucao continua:
   - a configuracao de colunas foi movida para `frontend/src/components/produtos/ProdutosColunasModal.jsx`
   - o relatorio personalizado foi movido para `frontend/src/components/produtos/ProdutosRelatorioModal.jsx`
   - `ProdutosModalsLayer.jsx` caiu de `456` para `103` linhas e ficou focado em composicao dos modais
+- [x] iniciar a decomposicao backend de `produtos_routes.py` por listagem/enriquecimento
+  - promocao ERP, preco efetivo do PDV e enriquecimento de listagem foram movidos para `backend/app/produtos/listagem.py`
+  - `produtos_routes.py` manteve wrappers de compatibilidade para preservar endpoints, testes legados e patches de `KitEstoqueService`
+  - novos testes unitarios cobrem promocao ativa, preco PDV e estoque virtual com reservas do mesmo tenant
 - [x] iniciar a decomposicao de `UsuariosPage.jsx` pela separacao da carga/acoes e dos blocos visuais principais
   - a carga de usuarios/roles, o modal e as acoes de ativar, desativar e forcar logout foram movidos para `frontend/src/hooks/useUsuariosPage.js`
   - a tabela e o modal foram extraidos para `frontend/src/components/usuarios/UsuariosTable.jsx` e `frontend/src/components/usuarios/UsuarioModal.jsx`

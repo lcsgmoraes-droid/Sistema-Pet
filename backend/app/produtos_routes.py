@@ -25,7 +25,7 @@ from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
 from .security.permissions_decorator import require_permission
 from .models import User, Cliente, FornecedorGrupo
-from app.partner_utils import get_all_accessible_tenant_ids, is_partner_owned
+from app.partner_utils import get_all_accessible_tenant_ids
 from .vendas_models import Venda, VendaItem
 from .produtos_models import (
     Categoria, Marca, Departamento, Produto, ProdutoLote,
@@ -69,6 +69,12 @@ from .produtos.validade import (
     _calcular_status_validade,
     _mapa_validade_proxima_produtos,
 )
+from .produtos.listagem import (
+    as_float_optional as _as_float_optional,
+    enriquecer_preco_pdv as _enriquecer_preco_pdv,
+    enriquecer_produto_listagem as _enriquecer_produto_listagem_base,
+    resolver_promocao_erp_produto as _resolver_promocao_erp_produto,
+)
 
 # Configurar logger
 logger = logging.getLogger(__name__)
@@ -87,73 +93,6 @@ def _normalizar_sku_produto(sku: Optional[str]) -> str:
     if not sku_normalizado:
         raise HTTPException(status_code=400, detail="SKU do produto e obrigatorio")
     return sku_normalizado
-
-
-def _as_float_optional(valor: Any) -> Optional[float]:
-    if valor in (None, ""):
-        return None
-    try:
-        return float(valor)
-    except (TypeError, ValueError):
-        return None
-
-
-def _datetime_naive(valor: Any) -> Optional[datetime]:
-    if not valor:
-        return None
-    if isinstance(valor, datetime):
-        return valor.replace(tzinfo=None) if valor.tzinfo else valor
-    return None
-
-
-def _janela_promocao_ativa(inicio: Any, fim: Any, referencia: Optional[datetime] = None) -> bool:
-    agora = _datetime_naive(referencia) or datetime.now()
-    inicio_dt = _datetime_naive(inicio)
-    fim_dt = _datetime_naive(fim)
-
-    if inicio_dt and agora < inicio_dt:
-        return False
-    if fim_dt and agora > fim_dt:
-        return False
-    return True
-
-
-def _resolver_promocao_erp_produto(produto: Produto, referencia: Optional[datetime] = None) -> dict[str, Any]:
-    preco_regular = _as_float_optional(getattr(produto, "preco_venda", None)) or 0.0
-    preco_promocional = _as_float_optional(getattr(produto, "preco_promocional", None))
-
-    promocao_ativa = (
-        preco_promocional is not None
-        and preco_promocional > 0
-        and (preco_regular <= 0 or preco_promocional < preco_regular)
-        and _janela_promocao_ativa(
-            getattr(produto, "promocao_inicio", None),
-            getattr(produto, "promocao_fim", None),
-            referencia,
-        )
-    )
-
-    preco_pdv = preco_promocional if promocao_ativa else preco_regular
-    desconto = max(preco_regular - (preco_promocional or preco_regular), 0.0) if promocao_ativa else 0.0
-
-    return {
-        "promocao_ativa": bool(promocao_ativa),
-        "preco_pdv": round(float(preco_pdv or 0), 2),
-        "preco_regular": round(float(preco_regular or 0), 2),
-        "preco_promocional": round(float(preco_promocional), 2) if preco_promocional is not None else None,
-        "desconto": round(float(desconto or 0), 2),
-    }
-
-
-def _enriquecer_preco_pdv(produto: Produto, referencia: Optional[datetime] = None) -> Produto:
-    promocao = _resolver_promocao_erp_produto(produto, referencia)
-    produto.preco_venda_original = promocao["preco_regular"]
-    produto.preco_venda_pdv = promocao["preco_pdv"]
-    produto.preco_venda_efetivo = promocao["preco_pdv"]
-    produto.promocao_pdv_ativa = promocao["promocao_ativa"]
-    produto.promocao_origem_pdv = "Promocao ERP" if promocao["promocao_ativa"] else None
-    produto.desconto_promocional_pdv = promocao["desconto"]
-    return produto
 
 
 def _normalizar_promocao_erp_payload(
@@ -306,100 +245,15 @@ def _enriquecer_produto_listagem(
     incluir_detalhes_composto: bool = True,
     validade_por_produto: dict[int, dict[str, Any]] | None = None,
 ):
-    """Padroniza dados de listagem para produtos simples, kits e variaÃ§Ãµes-kit."""
-    reservas_por_produto = reservas_por_produto or {}
-    validade_por_produto = validade_por_produto or {}
-    tenant_produto = getattr(produto, "tenant_id", tenant_id)
-    reservas_mesmo_tenant = str(tenant_produto) == str(tenant_id)
-    estoque_reservado = float(
-        reservas_por_produto.get(produto.id, 0.0) or 0.0
-    ) if reservas_mesmo_tenant else 0.0
-
-    if produto.categoria:
-        produto.categoria_nome = produto.categoria.nome
-
-    produto_composto = produto.tipo_produto in ("KIT", "VARIACAO") and produto.tipo_kit
-
-    if produto_composto and incluir_detalhes_composto:
-        try:
-            from app.services.kit_custo_service import KitCustoService
-
-            composicao = KitEstoqueService.obter_detalhes_composicao(
-                db,
-                produto.id,
-                tenant_id=tenant_produto,
-                reservas_por_produto=reservas_por_produto if reservas_mesmo_tenant else None,
-            )
-            produto.composicao_kit = [
-                {
-                    "id": comp["id"],
-                    "produto_id": comp["produto_id"],
-                    "produto_nome": comp["produto_nome"],
-                    "produto_sku": comp["produto_sku"],
-                    "produto_tipo": comp["produto_tipo"],
-                    "quantidade": comp["quantidade"],
-                    "estoque_componente": comp["estoque_componente"],
-                    "estoque_reservado": comp.get("estoque_reservado", 0),
-                    "estoque_disponivel": comp.get("estoque_disponivel", 0),
-                    "kits_possiveis": comp["kits_possiveis"],
-                    "ordem": comp["ordem"],
-                    "opcional": comp["opcional"],
-                }
-                for comp in composicao
-            ]
-            produto.preco_custo = float(KitCustoService.calcular_custo_kit(produto.id, db))
-
-            if produto.tipo_kit == "VIRTUAL":
-                produto.estoque_virtual = int(
-                    KitEstoqueService.calcular_estoque_virtual_kit(
-                        db,
-                        produto.id,
-                        tenant_id=tenant_produto,
-                        reservas_por_produto=reservas_por_produto if reservas_mesmo_tenant else None,
-                    )
-                )
-            else:
-                produto.estoque_virtual = int(produto.estoque_atual or 0)
-        except Exception as e:
-            logger.warning(f"Erro ao processar produto composto {produto.id}: {e}")
-            produto.composicao_kit = []
-            produto.estoque_virtual = int(produto.estoque_atual or 0)
-    elif produto_composto and produto.tipo_kit == "VIRTUAL":
-        produto.composicao_kit = []
-        try:
-            produto.estoque_virtual = int(
-                KitEstoqueService.calcular_estoque_virtual_kit(
-                    db,
-                    produto.id,
-                    tenant_id=tenant_produto,
-                    reservas_por_produto=reservas_por_produto if reservas_mesmo_tenant else None,
-                )
-            )
-        except Exception as e:
-            logger.warning(f"Erro ao calcular estoque virtual do produto composto {produto.id}: {e}")
-            produto.estoque_virtual = int(produto.estoque_atual or 0)
-    elif produto_composto:
-        produto.composicao_kit = []
-        produto.estoque_virtual = int(produto.estoque_atual or 0)
-    else:
-        produto.composicao_kit = []
-        produto.estoque_virtual = int(produto.estoque_atual or 0)
-
-    validade_info = validade_por_produto.get(produto.id, {})
-    produto.validade_proxima_listagem = validade_info.get("validade_proxima_listagem")
-    produto.lote_validade_proxima = validade_info.get("lote_validade_proxima")
-    produto.lotes_validade_resumo = validade_info.get("lotes_validade_resumo", [])
-    produto.estoque_reservado = estoque_reservado
-    if produto.tipo_produto in ("KIT", "VARIACAO") and produto.tipo_kit == "VIRTUAL":
-        produto.estoque_disponivel = float(produto.estoque_virtual or 0)
-    else:
-        produto.estoque_disponivel = max(
-            float(produto.estoque_atual or 0) - produto.estoque_reservado,
-            0.0,
-        )
-    produto.de_parceiro = is_partner_owned(tenant_id, produto.tenant_id)
-    _enriquecer_preco_pdv(produto)
-    return produto
+    return _enriquecer_produto_listagem_base(
+        db,
+        produto,
+        tenant_id,
+        reservas_por_produto=reservas_por_produto,
+        incluir_detalhes_composto=incluir_detalhes_composto,
+        validade_por_produto=validade_por_produto,
+        kit_estoque_service=KitEstoqueService,
+    )
 
 
 def _nome_area_produto(produto: Produto) -> str:
