@@ -537,12 +537,14 @@ export default function FuncionarioPdvScreen() {
         </View>
 
         <View style={styles.card}>
-          <Text style={styles.secaoTitulo}>Cliente opcional</Text>
+          <Text style={styles.secaoTitulo}>Comprador opcional</Text>
           {cliente ? (
             <View style={styles.clienteSelecionado}>
               <View style={{ flex: 1 }}>
                 <Text style={styles.clienteNome}>{cliente.nome}</Text>
-                <Text style={styles.clienteMeta}>Codigo {cliente.codigo || "-"}</Text>
+                <Text style={styles.clienteMeta}>
+                  Codigo {cliente.codigo || "-"} | {cliente.tipo_cadastro || "pessoa"}
+                </Text>
               </View>
               <TouchableOpacity
                 style={styles.botaoLimpar}
@@ -561,7 +563,7 @@ export default function FuncionarioPdvScreen() {
                 <TextInput
                   value={clienteBusca}
                   onChangeText={setClienteBusca}
-                  placeholder="Buscar cliente por nome ou telefone"
+                  placeholder="Buscar pessoa por nome ou telefone"
                   style={styles.inputBusca}
                   returnKeyType="search"
                   onSubmitEditing={() => buscarCliente()}
@@ -584,7 +586,10 @@ export default function FuncionarioPdvScreen() {
                 >
                   <View style={{ flex: 1 }}>
                     <Text style={styles.sugestaoNome}>{item.nome}</Text>
-                    <Text style={styles.sugestaoMeta}>Codigo {item.codigo || "-"} | {item.celular || item.telefone || "-"}</Text>
+                    <Text style={styles.sugestaoMeta}>
+                      Codigo {item.codigo || "-"} | {item.celular || item.telefone || "-"}
+                      {item.tipo_cadastro ? ` | ${item.tipo_cadastro}` : ""}
+                    </Text>
                   </View>
                   <Ionicons name="person-add-outline" size={20} color={CORES.primario} />
                 </TouchableOpacity>
