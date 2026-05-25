@@ -103,6 +103,36 @@ export default function FuncionarioPdvScreen() {
     carregarCaixa();
   }, [isFocused]);
 
+  useEffect(() => {
+    if (!isFocused) return;
+    const termo = buscaManual.trim();
+    if (termo.length < 2) {
+      setSugestoes([]);
+      return;
+    }
+
+    const autocompleteProdutosTimer = setTimeout(() => {
+      buscarManualProduto(false);
+    }, 350);
+
+    return () => clearTimeout(autocompleteProdutosTimer);
+  }, [buscaManual, isFocused]);
+
+  useEffect(() => {
+    if (!isFocused || cliente) return;
+    const termo = clienteBusca.trim();
+    if (termo.length < 2) {
+      setClientesSugestoes([]);
+      return;
+    }
+
+    const autocompleteClientesTimer = setTimeout(() => {
+      buscarCliente(false);
+    }, 350);
+
+    return () => clearTimeout(autocompleteClientesTimer);
+  }, [clienteBusca, cliente, isFocused]);
+
   const total = useMemo(
     () =>
       carrinho.reduce(
@@ -252,26 +282,30 @@ export default function FuncionarioPdvScreen() {
     }
   }
 
-  async function buscarManualProduto() {
+  async function buscarManualProduto(mostrarAlerta = true) {
     const termo = buscaManual.trim();
     if (termo.length < 2) return;
     setBuscandoProduto(true);
     try {
       setSugestoes(await buscarProdutosPdv(termo));
     } catch (error: any) {
-      Alert.alert("Erro", mensagemErroApi(error, "Nao foi possivel buscar produtos."));
+      if (mostrarAlerta) {
+        Alert.alert("Erro", mensagemErroApi(error, "Nao foi possivel buscar produtos."));
+      }
     } finally {
       setBuscandoProduto(false);
     }
   }
 
-  async function buscarCliente() {
+  async function buscarCliente(mostrarAlerta = true) {
     const termo = clienteBusca.trim();
     if (termo.length < 2) return;
     try {
       setClientesSugestoes(await buscarClientesPdv(termo));
     } catch (error: any) {
-      Alert.alert("Erro", mensagemErroApi(error, "Nao foi possivel buscar clientes."));
+      if (mostrarAlerta) {
+        Alert.alert("Erro", mensagemErroApi(error, "Nao foi possivel buscar clientes."));
+      }
     }
   }
 
@@ -436,12 +470,12 @@ export default function FuncionarioPdvScreen() {
             <TextInput
               value={buscaManual}
               onChangeText={setBuscaManual}
-              placeholder="Buscar produto no ERP"
+              placeholder="Buscar produto por nome, codigo ou barras"
               style={styles.inputBusca}
               returnKeyType="search"
-              onSubmitEditing={buscarManualProduto}
+              onSubmitEditing={() => buscarManualProduto()}
             />
-            <TouchableOpacity style={styles.botaoBusca} onPress={buscarManualProduto} disabled={buscandoProduto}>
+            <TouchableOpacity style={styles.botaoBusca} onPress={() => buscarManualProduto()} disabled={buscandoProduto}>
               {buscandoProduto ? <ActivityIndicator color="#fff" /> : <Ionicons name="search" size={20} color="#fff" />}
             </TouchableOpacity>
           </View>
@@ -527,12 +561,12 @@ export default function FuncionarioPdvScreen() {
                 <TextInput
                   value={clienteBusca}
                   onChangeText={setClienteBusca}
-                  placeholder="Buscar cliente"
+                  placeholder="Buscar cliente por nome ou telefone"
                   style={styles.inputBusca}
                   returnKeyType="search"
-                  onSubmitEditing={buscarCliente}
+                  onSubmitEditing={() => buscarCliente()}
                 />
-                <TouchableOpacity style={styles.botaoBusca} onPress={buscarCliente}>
+                <TouchableOpacity style={styles.botaoBusca} onPress={() => buscarCliente()}>
                   <Ionicons name="search" size={20} color="#fff" />
                 </TouchableOpacity>
               </View>

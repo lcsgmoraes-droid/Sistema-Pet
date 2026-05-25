@@ -47,6 +47,36 @@ def test_funcionario_pdv_does_not_manage_cash_register():
     assert "FecharCaixaSchema" not in source
 
 
+def test_funcionario_pdv_reuses_open_erp_cash_register_for_tenant():
+    source = read_repo("backend/app/routes/app_mobile_routes.py")
+    service = read_repo("backend/app/vendas/service.py")
+    caixa_service = read_repo("backend/app/caixa/service.py")
+    caixa_block = extract_block(source, "def obter_caixa_aberto_funcionario_pdv")
+    finalizar_block = extract_block(source, "def finalizar_venda_funcionario_pdv")
+
+    assert "def _obter_caixa_aberto_funcionario_pdv" in source
+    helper_block = extract_block(source, "def _obter_caixa_aberto_funcionario_pdv")
+    assert "Caixa.tenant_id == tenant_id" in helper_block
+    assert 'Caixa.status == "aberto"' in helper_block
+    assert "case((Caixa.usuario_id == current_user.id, 0), else_=1)" in helper_block
+
+    assert "_obter_caixa_aberto_funcionario_pdv(db, tenant_id, current_user)" in caixa_block
+    assert "_obter_caixa_aberto_funcionario_pdv(db, tenant_id, current_user)" in finalizar_block
+    assert "caixa_id=caixa.id" in finalizar_block
+    assert "permitir_caixa_tenant=True" in finalizar_block
+
+    assert "caixa_id: Optional[int] = None" in service
+    assert "permitir_caixa_tenant: bool = False" in service
+    assert "CaixaService.validar_caixa_aberto(" in service
+    assert "caixa_id=caixa_id" in service
+    assert "permitir_caixa_tenant=permitir_caixa_tenant" in service
+
+    assert "tenant_id: Optional[str] = None" in caixa_service
+    assert "permitir_caixa_tenant: bool = False" in caixa_service
+    assert "Caixa.id == caixa_id" in caixa_service
+    assert "Caixa.tenant_id == tenant_id" in caixa_service
+
+
 def test_funcionario_pdv_searches_sellable_erp_products_not_app_catalog():
     source = read_repo("backend/app/routes/app_mobile_routes.py")
     search_block = extract_block(source, "def buscar_produtos_funcionario_pdv")
@@ -58,6 +88,38 @@ def test_funcionario_pdv_searches_sellable_erp_products_not_app_catalog():
         assert "Produto.tipo_produto.in_" in block
         assert "Produto.anunciar_app" not in block
         assert "Produto.is_sellable" not in block
+
+
+def test_funcionario_pdv_searches_products_and_clients_like_web_pdv():
+    source = read_repo("backend/app/routes/app_mobile_routes.py")
+    product_block = extract_block(source, "def buscar_produtos_funcionario_pdv")
+    barcode_block = extract_block(source, "def buscar_produto_funcionario_pdv_barcode")
+    client_block = extract_block(source, "def buscar_clientes_funcionario_pdv")
+    screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx")
+
+    for field in [
+        "Produto.nome.ilike",
+        "Produto.codigo.ilike",
+        "Produto.codigo_barras.ilike",
+        "Produto.gtin_ean.ilike",
+        "Produto.codigos_barras_alternativos.ilike",
+    ]:
+        assert field in product_block
+    assert "_barcode_filters_for_produto(barcode)" in barcode_block
+
+    for field in [
+        "Cliente.nome.ilike",
+        "Cliente.telefone.ilike",
+        "Cliente.celular.ilike",
+        "Cliente.cpf.ilike",
+        "Cliente.cnpj.ilike",
+    ]:
+        assert field in client_block
+
+    assert "autocompleteProdutosTimer" in screen
+    assert "autocompleteClientesTimer" in screen
+    assert 'placeholder="Buscar produto por nome, codigo ou barras"' in screen
+    assert 'placeholder="Buscar cliente por nome ou telefone"' in screen
 
 
 def test_mobile_app_has_employee_pdv_navigation_service_and_screen():
