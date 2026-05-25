@@ -321,6 +321,11 @@ export interface FuncionarioPdvFormaPagamentoOpcao {
   numero_parcelas: number;
   max_parcelas: number;
   parcelas_maximas: number;
+  operadora?: string | null;
+  requer_nsu: boolean;
+  tipo_cartao?: string | null;
+  bandeira?: string | null;
+  split_parcelas: boolean;
 }
 
 export interface FuncionarioPdvPagamentoPayload {
@@ -329,6 +334,10 @@ export interface FuncionarioPdvPagamentoPayload {
   valor_recebido?: number | null;
   troco?: number | null;
   numero_parcelas: number;
+  forma_pagamento_id?: number | null;
+  bandeira?: string | null;
+  operadora?: string | null;
+  nsu_cartao?: string | null;
 }
 
 export interface FuncionarioPdvCupomDisponivel {

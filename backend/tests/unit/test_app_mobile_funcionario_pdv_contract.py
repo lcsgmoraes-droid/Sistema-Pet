@@ -1,5 +1,8 @@
+import os
 from pathlib import Path
 
+
+os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 
@@ -213,6 +216,35 @@ def test_funcionario_pdv_supports_credit_installments_from_erp_payment_rules():
     assert "setNumeroParcelas" in screen
     assert '"numero_parcelas": numero_parcelas' in finalizar_block
     assert '"numero_parcelas": 1' not in finalizar_block
+
+
+def test_funcionario_pdv_collects_card_brand_nsu_and_erp_payment_rule():
+    backend = read_repo("backend/app/routes/app_mobile_routes.py")
+    types = read_repo("app-mobile/src/types/index.ts")
+    service = read_repo("app-mobile/src/services/funcionarioPdv.service.ts")
+    screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioPdvScreen.tsx")
+    formas_block = extract_block(backend, "def listar_formas_pagamento_funcionario_pdv")
+    finalizar_block = extract_block(backend, "def finalizar_venda_funcionario_pdv")
+
+    for field in ["bandeira", "operadora", "requer_nsu", "tipo_cartao", "split_parcelas"]:
+        assert field in backend
+        assert field in types
+        assert field in service
+
+    assert "forma_pagamento_id" in backend
+    assert "forma_pagamento_id" in types
+    assert "forma_pagamento_id" in screen
+    assert '"requer_nsu": bool(forma.requer_nsu)' in formas_block
+    assert '"bandeira": forma.bandeira' in formas_block
+    assert '"operadora": forma.operadora' in formas_block
+    assert '"forma_pagamento_id": dados.pagamento.forma_pagamento_id' in finalizar_block
+    assert '"bandeira": dados.pagamento.bandeira' in finalizar_block
+    assert '"nsu_cartao": dados.pagamento.nsu_cartao' in finalizar_block
+    assert "formaPagamentoSelecionada" in screen
+    assert "opcoesCartao" in screen
+    assert "Bandeira/operadora" in screen
+    assert "NSU" in screen
+    assert "setNsuCartao" in screen
 
 
 def test_funcionario_pdv_can_save_open_sale_for_cashier_checkout():
