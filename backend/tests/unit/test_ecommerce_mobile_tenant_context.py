@@ -191,9 +191,53 @@ def test_get_or_create_cliente_for_user_sets_tenant_context_before_query():
     )
     clear_current_tenant()
 
-    result = _get_or_create_cliente_for_user(_Db([cliente]), user)
+    result = _get_or_create_cliente_for_user(_Db([cliente], []), user)
 
     assert result is cliente
+    assert get_current_tenant() == tenant_id
+
+
+def test_get_or_create_cliente_for_user_prefers_operational_profile_by_email():
+    tenant_id = uuid4()
+    user = SimpleNamespace(
+        id=123,
+        tenant_id=tenant_id,
+        is_active=True,
+        cpf_cnpj="40888076851",
+        email="funcionario@example.com",
+        telefone="18996691730",
+        nome="Funcionario Teste",
+    )
+    cliente_vinculado = SimpleNamespace(
+        id=456,
+        tenant_id=str(tenant_id),
+        user_id=user.id,
+        cpf=user.cpf_cnpj,
+        email=user.email,
+        telefone=user.telefone,
+        nome="Cliente Teste",
+        tipo_cadastro="cliente",
+        ativo=True,
+        is_entregador=False,
+    )
+    funcionario_por_email = SimpleNamespace(
+        id=789,
+        tenant_id=str(tenant_id),
+        user_id=999,
+        cpf=None,
+        email=user.email,
+        telefone=None,
+        nome="Funcionario Teste",
+        tipo_cadastro="funcionario",
+        ativo=True,
+        is_entregador=False,
+    )
+    clear_current_tenant()
+
+    result = _get_or_create_cliente_for_user(_Db([cliente_vinculado], [funcionario_por_email]), user)
+
+    assert result is funcionario_por_email
+    assert funcionario_por_email.user_id == user.id
     assert get_current_tenant() == tenant_id
 
 

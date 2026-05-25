@@ -449,6 +449,69 @@ def _digits_only(value: str | None) -> str:
     return re.sub(r"\D+", "", str(value or ""))
 
 
+def _is_operational_cliente(cliente: Cliente | None) -> bool:
+    if not cliente or getattr(cliente, "ativo", True) is False:
+        return False
+    return bool(
+        getattr(cliente, "tipo_cadastro", None) in {"funcionario", "veterinario"}
+        or getattr(cliente, "is_entregador", False)
+    )
+
+
+def _identity_matches_cliente(
+    cliente: Cliente,
+    *,
+    email: str,
+    cpf_digits: str,
+    telefone_digits: str,
+) -> bool:
+    if cpf_digits and _digits_only(getattr(cliente, "cpf", None)) == cpf_digits:
+        return True
+    if email and (getattr(cliente, "email", None) or "").strip().lower() == email:
+        return True
+    if telefone_digits and _digits_only(getattr(cliente, "telefone", None)) == telefone_digits:
+        return True
+    return False
+
+
+def _find_operational_cliente_match(
+    db: Session,
+    *,
+    tenant_id: str,
+    user: User,
+) -> Cliente | None:
+    email = (getattr(user, "email", None) or "").strip().lower()
+    cpf_digits = _digits_only(getattr(user, "cpf_cnpj", None))
+    telefone_digits = _digits_only(getattr(user, "telefone", None))
+    if not email and not cpf_digits and not telefone_digits:
+        return None
+
+    candidatos = (
+        db.query(Cliente)
+        .filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.ativo == True,
+            or_(
+                Cliente.tipo_cadastro.in_(["funcionario", "veterinario"]),
+                Cliente.is_entregador == True,
+            ),
+        )
+        .order_by(Cliente.id.asc())
+        .all()
+    )
+
+    for candidato in candidatos:
+        if _identity_matches_cliente(
+            candidato,
+            email=email,
+            cpf_digits=cpf_digits,
+            telefone_digits=telefone_digits,
+        ):
+            return candidato
+
+    return None
+
+
 def _find_cliente_match(
     db: Session,
     *,
@@ -563,11 +626,38 @@ def _get_or_create_cliente_for_user(db: Session, user: User) -> Cliente:
     )
 
     cliente: Cliente | None = None
+    cliente_operacional = _find_operational_cliente_match(db, tenant_id=tenant_id, user=user)
+    if cliente_operacional:
+        cliente = cliente_operacional
+
     if clientes_vinculados:
         cpf_usuario = _digits_only(user.cpf_cnpj)
         email_usuario = (user.email or "").strip().lower()
 
-        if cpf_usuario:
+        if not cliente and cpf_usuario:
+            cliente = next(
+                (
+                    c
+                    for c in clientes_vinculados
+                    if _is_operational_cliente(c) and _digits_only(c.cpf) == cpf_usuario
+                ),
+                None,
+            )
+
+        if not cliente and email_usuario:
+            cliente = next(
+                (
+                    c
+                    for c in clientes_vinculados
+                    if _is_operational_cliente(c) and (c.email or "").strip().lower() == email_usuario
+                ),
+                None,
+            )
+
+        if not cliente:
+            cliente = next((c for c in clientes_vinculados if _is_operational_cliente(c)), None)
+
+        if not cliente and cpf_usuario:
             cliente = next(
                 (
                     c
