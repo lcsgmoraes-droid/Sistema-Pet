@@ -1229,6 +1229,8 @@ class VendaService:
         db: Session,
         cupom_code: Optional[str] = None,
         cupom_discount_applied: Optional[float] = None,
+        caixa_id: Optional[int] = None,
+        permitir_caixa_tenant: bool = False,
     ) -> Dict[str, Any]:
         """
         Finaliza uma venda com transação atômica.
@@ -1317,7 +1319,13 @@ class VendaService:
             # ============================================================
             
             # Validar caixa aberto
-            caixa_info = CaixaService.validar_caixa_aberto(user_id=user_id, db=db)
+            caixa_info = CaixaService.validar_caixa_aberto(
+                user_id=user_id,
+                db=db,
+                tenant_id=tenant_id,
+                caixa_id=caixa_id,
+                permitir_caixa_tenant=permitir_caixa_tenant,
+            )
             caixa_aberto_id = caixa_info['caixa_id']
             logger.debug(f"✅ Caixa validado: ID={caixa_aberto_id}")
             
@@ -2564,6 +2572,7 @@ def processar_contas_pagar_taxas(
         }
     """
     from app.financeiro_models import ContaPagar, FormaPagamento
+    from app.financeiro.contas_pagar_classificacao import aplicar_classificacao_aprendida_conta_pagar
     from app.dre_plano_contas_models import DRESubcategoria
     from decimal import Decimal
     from datetime import date
@@ -2729,6 +2738,7 @@ def processar_contas_pagar_taxas(
                 dre_subcategoria_id=subcategoria_taxa.id,
                 observacoes=observacoes
             )
+            aplicar_classificacao_aprendida_conta_pagar(db, tenant_id, conta_taxa)
             
             db.add(conta_taxa)
             db.flush()

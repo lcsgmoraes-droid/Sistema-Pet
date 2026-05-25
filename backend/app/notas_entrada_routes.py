@@ -32,6 +32,7 @@ from .produtos_models import (
     ProdutoFornecedor
 )
 from .financeiro_models import ContaPagar, TipoDespesa
+from .financeiro.contas_pagar_classificacao import aplicar_classificacao_aprendida_conta_pagar
 from .fiscal_patterns import aplicar_inteligencia_fiscal, identificar_padrao_fiscal
 from .notas_entrada_pdf_parser import (
     PDFEntradaFornecedor,
@@ -1341,6 +1342,7 @@ def criar_contas_pagar_da_nota(nota: NotaEntrada, dados_xml: dict, db: Session, 
                 user_id=user_id,
                 tenant_id=tenant_id
             )
+            aplicar_classificacao_aprendida_conta_pagar(db, tenant_id, conta)
             
             db.add(conta)
             db.flush()

@@ -67,7 +67,7 @@ DATA: 2025-01-23
 """
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 from decimal import Decimal
 from datetime import datetime
 from fastapi import HTTPException
@@ -86,7 +86,13 @@ class CaixaService:
     """
     
     @staticmethod
-    def validar_caixa_aberto(user_id: int, db: Session) -> Dict[str, Any]:
+    def validar_caixa_aberto(
+        user_id: int,
+        db: Session,
+        tenant_id: Optional[str] = None,
+        caixa_id: Optional[int] = None,
+        permitir_caixa_tenant: bool = False,
+    ) -> Dict[str, Any]:
         """
         Valida se existe um caixa aberto para o usuário.
         
@@ -120,10 +126,20 @@ class CaixaService:
         
         logger.debug(f"🔍 Validando caixa aberto para user_id={user_id}")
         
-        caixa_aberto = db.query(Caixa).filter(
-            Caixa.usuario_id == user_id,
-            Caixa.status == 'aberto'
-        ).first()
+        query = db.query(Caixa).filter(Caixa.status == 'aberto')
+        if tenant_id:
+            query = query.filter(Caixa.tenant_id == tenant_id)
+
+        if caixa_id is not None:
+            query = query.filter(Caixa.id == caixa_id)
+            if not permitir_caixa_tenant:
+                query = query.filter(Caixa.usuario_id == user_id)
+        elif permitir_caixa_tenant and tenant_id:
+            query = query.order_by(Caixa.id.desc())
+        else:
+            query = query.filter(Caixa.usuario_id == user_id)
+
+        caixa_aberto = query.first()
         
         if not caixa_aberto:
             logger.warning(f"⚠️ Tentativa de operação sem caixa aberto - user_id={user_id}")

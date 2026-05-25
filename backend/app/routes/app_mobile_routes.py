@@ -352,6 +352,19 @@ def _serialize_funcionario_pdv_cliente(cliente: Cliente) -> dict:
     }
 
 
+def _obter_caixa_aberto_funcionario_pdv(db: Session, tenant_id: str, current_user: User) -> Optional[Caixa]:
+    prioridade_usuario_atual = case((Caixa.usuario_id == current_user.id, 0), else_=1)
+    return (
+        db.query(Caixa)
+        .filter(
+            Caixa.tenant_id == tenant_id,
+            Caixa.status == "aberto",
+        )
+        .order_by(prioridade_usuario_atual.asc(), Caixa.id.desc())
+        .first()
+    )
+
+
 def _normalizar_forma_pagamento_pdv(forma_pagamento: str) -> str:
     forma = (forma_pagamento or "").strip().lower()
     mapa = {
@@ -1325,15 +1338,7 @@ def obter_caixa_aberto_funcionario_pdv(
     db: Session = Depends(get_session),
 ):
     _funcionario, tenant_id = _get_funcionario_operacional_or_403(db, current_user)
-    caixa = (
-        db.query(Caixa)
-        .filter(
-            Caixa.usuario_id == current_user.id,
-            Caixa.tenant_id == tenant_id,
-            Caixa.status == "aberto",
-        )
-        .first()
-    )
+    caixa = _obter_caixa_aberto_funcionario_pdv(db, tenant_id, current_user)
     if not caixa:
         return {
             "aberto": False,
@@ -1390,15 +1395,7 @@ def finalizar_venda_funcionario_pdv(
     if not dados.itens:
         raise HTTPException(status_code=400, detail="Adicione ao menos um item para vender.")
 
-    caixa = (
-        db.query(Caixa)
-        .filter(
-            Caixa.usuario_id == current_user.id,
-            Caixa.tenant_id == tenant_id,
-            Caixa.status == "aberto",
-        )
-        .first()
-    )
+    caixa = _obter_caixa_aberto_funcionario_pdv(db, tenant_id, current_user)
     if not caixa:
         raise HTTPException(status_code=400, detail="Abra um caixa no ERP web antes de vender pelo app.")
 
@@ -1469,6 +1466,8 @@ def finalizar_venda_funcionario_pdv(
         db=db,
         cupom_code=beneficios["cupom_code"],
         cupom_discount_applied=beneficios["desconto_cupom"],
+        caixa_id=caixa.id,
+        permitir_caixa_tenant=True,
     )
     processar_comissoes_venda(
         venda_id=venda_criada["id"],
