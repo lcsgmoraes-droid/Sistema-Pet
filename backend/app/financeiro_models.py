@@ -187,6 +187,11 @@ class ContaPagar(BaseTenantModel):
     nfe_numero = Column(String(50))
     documento = Column(String(100))
     observacoes = Column(Text)
+
+    # Classificacao DRE automatica/aprendizado
+    beneficiario = Column(String(255), nullable=True)
+    tipo_documento = Column(String(50), nullable=True)
+    afeta_dre = Column(Boolean, default=True, nullable=False)
     
     # Rateio Online vs Loja Física (para filtros e relatórios)
     percentual_online = Column(Float, default=0)  # % desta conta que é referente a vendas online
@@ -270,7 +275,11 @@ class ContaReceber(BaseTenantModel):
     nfe_numero = Column(String(50))
     documento = Column(String(100))
     observacoes = Column(Text)
-    
+
+    # Classificacao DRE automatica/aprendizado
+    beneficiario = Column(String(255), nullable=True)
+    tipo_documento = Column(String(50), nullable=True)
+
     # ============================
     # CONCILIAÇÃO DE CARTÃO (FASE 3)
     # ============================
