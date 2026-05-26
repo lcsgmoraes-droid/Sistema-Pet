@@ -37,6 +37,7 @@ from app.routes.ecommerce_auth import (
     _activate_user_tenant_context,
     _cashback_disponivel_clause,
     _get_current_ecommerce_user,
+    _get_or_create_cliente_for_user,
 )
 from app.bling_estoque_sync import sincronizar_bling_background
 from app.services.validade_campanha_service import (
@@ -280,15 +281,7 @@ class FuncionarioPdvSalvarResponse(BaseModel):
 
 def _get_cliente_or_404(db: Session, user: User) -> Cliente:
     """Retorna o Cliente ligado a este usuário ecommerce ou lança 404."""
-    tenant_id = _activate_user_tenant_context(user)
-    cliente = (
-        db.query(Cliente)
-        .filter(
-            Cliente.tenant_id == tenant_id,
-            Cliente.user_id == user.id,
-        )
-        .first()
-    )
+    cliente = _get_or_create_cliente_for_user(db, user)
     if not cliente:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

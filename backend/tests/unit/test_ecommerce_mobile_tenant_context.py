@@ -18,6 +18,7 @@ from app.routes.ecommerce_auth import (
     _get_or_create_cliente_for_user,
     _serialize_profile,
 )
+from app.routes import app_mobile_routes
 from app.routes.ecommerce_cart import (
     _activate_cart_tenant_context,
     _current_identity as cart_current_identity,
@@ -58,6 +59,35 @@ class _Db:
 
     def query(self, *_args, **_kwargs):
         return _Query(self.results.pop(0))
+
+
+class _UnorderedFirstQuery:
+    def __init__(self, unordered_first, ordered_results):
+        self.unordered_first = unordered_first
+        self.ordered_results = ordered_results
+        self.ordered = False
+
+    def filter(self, *_args, **_kwargs):
+        return self
+
+    def order_by(self, *_args, **_kwargs):
+        self.ordered = True
+        return self
+
+    def first(self):
+        return self.unordered_first
+
+    def all(self):
+        return self.ordered_results if self.ordered else [self.unordered_first]
+
+
+class _UnorderedFirstDb:
+    def __init__(self, unordered_first, ordered_results):
+        self.unordered_first = unordered_first
+        self.ordered_results = ordered_results
+
+    def query(self, *_args, **_kwargs):
+        return _UnorderedFirstQuery(self.unordered_first, self.ordered_results)
 
 
 def _token(user_id: int, tenant_id) -> str:
@@ -238,6 +268,56 @@ def test_get_or_create_cliente_for_user_prefers_operational_profile_by_email():
 
     assert result is funcionario_por_email
     assert funcionario_por_email.user_id == user.id
+    assert get_current_tenant() == tenant_id
+
+
+def test_app_mobile_cliente_helper_uses_profile_resolution_for_duplicate_customer_rows(monkeypatch):
+    tenant_id = uuid4()
+    user = SimpleNamespace(
+        id=123,
+        tenant_id=tenant_id,
+        is_active=True,
+        cpf_cnpj="23068780802",
+        email="cliente@example.com",
+        telefone=None,
+        nome="Lucas Guerra de Moraes",
+    )
+    cliente_ativo = SimpleNamespace(
+        id=456,
+        tenant_id=str(tenant_id),
+        user_id=user.id,
+        cpf=user.cpf_cnpj,
+        email=user.email,
+        telefone=None,
+        nome=user.nome,
+        tipo_cadastro="cliente",
+        ativo=True,
+        is_entregador=False,
+    )
+    cliente_inativo = SimpleNamespace(
+        id=789,
+        tenant_id=str(tenant_id),
+        user_id=user.id,
+        cpf=user.cpf_cnpj,
+        email=user.email,
+        telefone=None,
+        nome="Lucas",
+        tipo_cadastro="cliente",
+        ativo=False,
+        is_entregador=False,
+    )
+    monkeypatch.setattr(
+        "app.routes.ecommerce_auth._find_operational_cliente_match",
+        lambda *_args, **_kwargs: None,
+    )
+    clear_current_tenant()
+
+    result = app_mobile_routes._get_cliente_or_404(
+        _UnorderedFirstDb(cliente_inativo, [cliente_ativo, cliente_inativo]),
+        user,
+    )
+
+    assert result is cliente_ativo
     assert get_current_tenant() == tenant_id
 
 
