@@ -25,7 +25,13 @@ def test_api_ponto_equilibrio_usa_formula_de_margem_de_contribuicao():
     assert "margem_periodo_percentual" in source
     assert "ponto_equilibrio = despesas_fixas / margem_usada_decimal" in source
     assert "Produto.preco_custo" in source
-    assert "get_or_build_venda_rentabilidade_snapshot" in source
+    assert "build_venda_rentabilidade_snapshot" in source
+    assert "_preparar_snapshots_margem_vendas_pe" in source
+    assert "_bulk_estoque_custos_por_venda" in source
+    assert "_bulk_comissoes_por_venda" in source
+    assert "_bulk_cupons_por_venda" in source
+    assert "_bulk_cashback_por_venda" in source
+    assert "_bulk_taxa_operacional_por_venda" in source
     assert "_somar_componentes_margem_vendas_pe" in source
     assert "_conta_variavel_ja_coberta_pelo_snapshot_pe" in source
     assert "detalhes_margem" in source

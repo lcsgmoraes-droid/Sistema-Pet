@@ -28,7 +28,17 @@ from .cargo_models import Cargo
 from .dre_plano_contas_models import DRESubcategoria
 from .ia.aba7_dre_detalhada_models import DREDetalheCanal
 from .services.remuneracao_service import calcular_composicao_remuneracao
-from .services.venda_rentabilidade_snapshot_service import get_or_build_venda_rentabilidade_snapshot
+from .services.venda_rentabilidade_snapshot_service import build_venda_rentabilidade_snapshot
+from .dre_canais_routes import (
+    _bulk_cashback_por_venda,
+    _bulk_comissoes_por_venda,
+    _bulk_cupons_por_venda,
+    _bulk_estoque_custos_por_venda,
+    _bulk_taxa_operacional_por_venda,
+    _formas_pagamento_map,
+    _impostos_percentual,
+    _snapshot_pronto,
+)
 from .utils.tenant_safe_sql import execute_tenant_safe
 
 logger = logging.getLogger(__name__)
@@ -194,6 +204,7 @@ def _somar_componentes_margem_vendas_pe(
     *,
     outros_variaveis: float = 0.0,
     detalhes_outros_variaveis: Optional[list[dict]] = None,
+    incluir_detalhes: bool = True,
 ) -> dict:
     campos = {
         "receita_produtos_servicos": 0.0,
@@ -208,7 +219,7 @@ def _somar_componentes_margem_vendas_pe(
         "cmv_estimado": 0.0,
     }
     componentes = {campo: [] for campo in campos}
-    componentes["outros_variaveis"] = list(detalhes_outros_variaveis or [])
+    componentes["outros_variaveis"] = list(detalhes_outros_variaveis or []) if incluir_detalhes else []
 
     for venda_info in vendas_snapshot or []:
         snapshot = dict(venda_info.get("snapshot") or venda_info)
@@ -234,7 +245,7 @@ def _somar_componentes_margem_vendas_pe(
             valor = _snapshot_float(snapshot, campo_snapshot)
             campos[campo_total] = _round_money(campos[campo_total] + valor)
             custo_fiscal_omitido = campo_total == "custo_fiscal" and _snapshot_float(snapshot, "custo_fiscal_desconsiderado") > 0
-            if valor > 0 or custo_fiscal_omitido:
+            if incluir_detalhes and (valor > 0 or custo_fiscal_omitido):
                 componentes[campo_total].append(
                     _detalhe_venda_margem_pe(
                         snapshot,
@@ -651,6 +662,56 @@ def _calcular_despesas_variaveis_margem_pe(
     return _round_money(despesas_variaveis)
 
 
+def _preparar_snapshots_margem_vendas_pe(
+    db: Session,
+    tenant_id,
+    vendas: list[Venda],
+    modo_custo_fiscal: str,
+) -> list[dict]:
+    venda_ids = [venda.id for venda in vendas if getattr(venda, "id", None)]
+    formas_pagamento = _formas_pagamento_map(db, tenant_id)
+    impostos_percentual = _impostos_percentual(db, tenant_id)
+    comissoes_por_venda = _bulk_comissoes_por_venda(db, tenant_id, venda_ids)
+    cupons_por_venda = _bulk_cupons_por_venda(db, tenant_id, vendas)
+    cashback_por_venda = _bulk_cashback_por_venda(db, tenant_id, venda_ids)
+    taxa_operacional_por_venda = _bulk_taxa_operacional_por_venda(db, tenant_id, vendas)
+    estoque_custos_por_venda = _bulk_estoque_custos_por_venda(db, tenant_id, venda_ids)
+
+    vendas_snapshot = []
+    for venda in vendas:
+        venda_id = getattr(venda, "id", None)
+        nf_emitida = _venda_tem_documento_fiscal_pe(venda)
+        cupom_desconto = cupons_por_venda.get(venda_id, 0.0)
+        custo_campanha = cupom_desconto + cashback_por_venda.get(venda_id, 0.0)
+
+        snapshot = _snapshot_pronto(venda)
+        if snapshot and custo_campanha > 0 and _snapshot_float(snapshot, "custo_campanha") <= 0:
+            snapshot = None
+
+        if snapshot is None:
+            snapshot = build_venda_rentabilidade_snapshot(
+                venda,
+                db,
+                tenant_id,
+                impostos_percentual=impostos_percentual,
+                formas_pagamento_map=formas_pagamento,
+                custo_campanha=custo_campanha,
+                cupom_desconto=cupom_desconto,
+                comissao_total=comissoes_por_venda.get(venda_id, 0.0),
+                taxa_operacional_entrega=taxa_operacional_por_venda.get(venda_id, 0.0),
+                estoque_custos_por_produto=estoque_custos_por_venda.get(venda_id, {}),
+            )
+
+        snapshot = _ajustar_snapshot_custo_fiscal_pe(
+            snapshot,
+            venda_tem_documento=nf_emitida,
+            modo_custo_fiscal=modo_custo_fiscal,
+        )
+        vendas_snapshot.append({"snapshot": snapshot, "nf_emitida": nf_emitida})
+
+    return vendas_snapshot
+
+
 def _calcular_margem_periodo_ponto_equilibrio(
     db: Session,
     tenant_id,
@@ -660,6 +721,7 @@ def _calcular_margem_periodo_ponto_equilibrio(
     modo_custo_fiscal: str = MODO_CUSTO_FISCAL_PE_PADRAO,
     outros_variaveis: Optional[float] = None,
     detalhes_outros_variaveis: Optional[list[dict]] = None,
+    incluir_detalhes: bool = True,
 ) -> dict:
     inicio_dt = datetime.combine(inicio, time.min)
     fim_dt = datetime.combine(fim, time.max)
@@ -682,21 +744,12 @@ def _calcular_margem_periodo_ponto_equilibrio(
         vendas_query = vendas_query.filter(Venda.canal.in_(canais_lista))
 
     vendas = vendas_query.all()
-    vendas_snapshot = []
-    for venda in vendas:
-        nf_emitida = _venda_tem_documento_fiscal_pe(venda)
-        snapshot = get_or_build_venda_rentabilidade_snapshot(
-            venda,
-            db,
-            tenant_id,
-            persist_if_missing=True,
-        )
-        snapshot = _ajustar_snapshot_custo_fiscal_pe(
-            snapshot,
-            venda_tem_documento=nf_emitida,
-            modo_custo_fiscal=modo_custo_fiscal,
-        )
-        vendas_snapshot.append({"snapshot": snapshot, "nf_emitida": nf_emitida})
+    vendas_snapshot = _preparar_snapshots_margem_vendas_pe(
+        db,
+        tenant_id,
+        vendas,
+        modo_custo_fiscal,
+    )
 
     if outros_variaveis is None:
         outros_variaveis = _calcular_despesas_variaveis_margem_pe(
@@ -711,6 +764,7 @@ def _calcular_margem_periodo_ponto_equilibrio(
         vendas_snapshot,
         outros_variaveis=outros_variaveis,
         detalhes_outros_variaveis=detalhes_outros_variaveis,
+        incluir_detalhes=incluir_detalhes,
     )
     quantidade_vendas = len(vendas)
     ticket_medio = _round_money(resultado["faturamento"] / quantidade_vendas) if quantidade_vendas else 0
@@ -751,6 +805,7 @@ def _calcular_margem_referencia_ponto_equilibrio(
         fim_referencia,
         canais_lista,
         modo_custo_fiscal=modo_custo_fiscal,
+        incluir_detalhes=False,
     )
     return {
         **margem,
