@@ -557,6 +557,68 @@ def _detalhe_conta_pe(
     }
 
 
+PONTO_EQUILIBRIO_GRUPOS_CLASSIFICACAO = {
+    "fixas": {
+        "label": "Despesas fixas",
+        "origem": "Contas a pagar, provisoes da DRE e complemento gerencial de folha.",
+    },
+    "variaveis": {
+        "label": "Outros custos variaveis",
+        "origem": "Contas a pagar e provisoes variaveis que nao nasceram do snapshot da venda.",
+    },
+    "custos_venda_snapshot": {
+        "label": "Custos de venda ja no snapshot",
+        "origem": "Contas a pagar que foram separadas para evitar duplicidade com custos gerados pela venda.",
+    },
+    "sem_classificacao": {
+        "label": "Sem classificacao",
+        "origem": "Contas a pagar ainda sem regra suficiente para entrar no ponto de equilibrio.",
+    },
+    "estoque_excluido": {
+        "label": "Fora do PE: compras de estoque",
+        "origem": "Compras de produto para revenda ficam fora do PE porque entram no resultado pelo CMV quando vendidas.",
+    },
+}
+
+
+def _paginar_detalhes_ponto_equilibrio(items: list[dict], *, page: int = 1, page_size: int = 30) -> dict:
+    page_size = max(1, min(int(page_size or 30), 100))
+    total_itens = len(items or [])
+    pages = max(1, math.ceil(total_itens / page_size))
+    page = max(1, min(int(page or 1), pages))
+    inicio = (page - 1) * page_size
+    fim = inicio + page_size
+
+    return {
+        "items": list(items or [])[inicio:fim],
+        "total_itens": total_itens,
+        "page": page,
+        "page_size": page_size,
+        "pages": pages,
+    }
+
+
+def _normalizar_item_detalhe_ponto_equilibrio(item: dict, origem_label: str) -> dict:
+    data = item.get("data_venda") or item.get("data_vencimento")
+    descricao = item.get("descricao") or item.get("numero_venda") or item.get("id") or "-"
+    contraparte = item.get("cliente_nome") or item.get("fornecedor_nome") or item.get("canal")
+    return {
+        **item,
+        "data": data,
+        "descricao": descricao,
+        "contraparte": contraparte,
+        "origem_label": origem_label,
+    }
+
+
+def _formatar_data_br_ponto_equilibrio(valor) -> str:
+    if isinstance(valor, datetime):
+        valor = valor.date()
+    if isinstance(valor, date):
+        return valor.strftime("%d/%m/%Y")
+    return str(valor or "-")
+
+
 def _adicionar_meses(data_base: date, meses: int) -> date:
     indice_mes = data_base.year * 12 + data_base.month - 1 + meses
     ano = indice_mes // 12
@@ -821,6 +883,7 @@ async def obter_ponto_equilibrio(
     canais: Optional[str] = None,
     fonte_margem: Optional[str] = MARGEM_PONTO_EQUILIBRIO_PADRAO,
     modo_custo_fiscal: Optional[str] = MODO_CUSTO_FISCAL_PE_PADRAO,
+    incluir_detalhes: bool = False,
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant),
 ):
@@ -917,6 +980,10 @@ async def obter_ponto_equilibrio(
         "estoque_excluido": [],
     }
 
+    def adicionar_detalhe_classificacao(grupo: str, detalhe: dict):
+        if incluir_detalhes:
+            detalhes_classificacao[grupo].append(detalhe)
+
     for (
         conta,
         tipo_e_custo_fixo,
@@ -933,7 +1000,8 @@ async def obter_ponto_equilibrio(
         if _conta_eh_compra_estoque_para_pe(conta, tipo_despesa_nome, categoria_nome):
             despesas_estoque_excluidas += valor
             quantidade_contas_estoque_excluidas += 1
-            detalhes_classificacao["estoque_excluido"].append(
+            adicionar_detalhe_classificacao(
+                "estoque_excluido",
                 _detalhe_conta_pe(
                     conta,
                     valor=valor,
@@ -943,7 +1011,7 @@ async def obter_ponto_equilibrio(
                     tipo_despesa_nome=tipo_despesa_nome,
                     categoria_nome=categoria_nome,
                     dre_subcategoria_nome=dre_subcategoria_nome,
-                )
+                ),
             )
             continue
 
@@ -954,7 +1022,8 @@ async def obter_ponto_equilibrio(
             dre_subcategoria_nome,
         ):
             despesas_variaveis_ja_cobertas += valor
-            detalhes_classificacao["custos_venda_snapshot"].append(
+            adicionar_detalhe_classificacao(
+                "custos_venda_snapshot",
                 _detalhe_conta_pe(
                     conta,
                     valor=valor,
@@ -964,7 +1033,7 @@ async def obter_ponto_equilibrio(
                     tipo_despesa_nome=tipo_despesa_nome,
                     categoria_nome=categoria_nome,
                     dre_subcategoria_nome=dre_subcategoria_nome,
-                )
+                ),
             )
             continue
 
@@ -984,7 +1053,8 @@ async def obter_ponto_equilibrio(
 
         if classificacao == "fixo":
             despesas_fixas += valor
-            detalhes_classificacao["fixas"].append(
+            adicionar_detalhe_classificacao(
+                "fixas",
                 _detalhe_conta_pe(
                     conta,
                     valor=valor,
@@ -994,11 +1064,12 @@ async def obter_ponto_equilibrio(
                     tipo_despesa_nome=tipo_despesa_nome,
                     categoria_nome=categoria_nome,
                     dre_subcategoria_nome=dre_subcategoria_nome,
-                )
+                ),
             )
         elif classificacao == "variavel":
             outros_variaveis_contas += valor
-            detalhes_classificacao["variaveis"].append(
+            adicionar_detalhe_classificacao(
+                "variaveis",
                 _detalhe_conta_pe(
                     conta,
                     valor=valor,
@@ -1008,12 +1079,13 @@ async def obter_ponto_equilibrio(
                     tipo_despesa_nome=tipo_despesa_nome,
                     categoria_nome=categoria_nome,
                     dre_subcategoria_nome=dre_subcategoria_nome,
-                )
+                ),
             )
         else:
             despesas_sem_classificacao += valor
             quantidade_contas_sem_classificacao += 1
-            detalhes_classificacao["sem_classificacao"].append(
+            adicionar_detalhe_classificacao(
+                "sem_classificacao",
                 _detalhe_conta_pe(
                     conta,
                     valor=valor,
@@ -1023,7 +1095,7 @@ async def obter_ponto_equilibrio(
                     tipo_despesa_nome=tipo_despesa_nome,
                     categoria_nome=categoria_nome,
                     dre_subcategoria_nome=dre_subcategoria_nome,
-                )
+                ),
             )
 
     provisoes_dre_query = db.query(DREDetalheCanal).filter(
@@ -1053,7 +1125,8 @@ async def obter_ponto_equilibrio(
         if despesas_fixas_dre > 0:
             despesas_fixas += despesas_fixas_dre
             folha_provisoes_dre += despesas_pessoal
-            detalhes_classificacao["fixas"].append(
+            adicionar_detalhe_classificacao(
+                "fixas",
                 _detalhe_sintetico_pe(
                     item_id=f"dre-provisao-{provisao.id}-fixo",
                     descricao=provisao.observacao or "Provisao DRE",
@@ -1061,12 +1134,13 @@ async def obter_ponto_equilibrio(
                     data_vencimento=provisao.data_fim,
                     classificacao="fixo",
                     origem_classificacao="Provisao registrada na DRE",
-                )
+                ),
             )
 
         if despesas_variaveis_dre > 0:
             outros_variaveis_contas += despesas_variaveis_dre
-            detalhes_classificacao["variaveis"].append(
+            adicionar_detalhe_classificacao(
+                "variaveis",
                 _detalhe_sintetico_pe(
                     item_id=f"dre-provisao-{provisao.id}-variavel",
                     descricao=provisao.observacao or "Provisao DRE",
@@ -1074,7 +1148,7 @@ async def obter_ponto_equilibrio(
                     data_vencimento=provisao.data_fim,
                     classificacao="variavel",
                     origem_classificacao="Provisao variavel registrada na DRE",
-                )
+                ),
             )
 
     folha_gerencial = _calcular_folha_gerencial_estimada(db, tenant_id)
@@ -1085,7 +1159,8 @@ async def obter_ponto_equilibrio(
     )
     if folha_complemento_gerencial > 0:
         despesas_fixas += folha_complemento_gerencial
-        detalhes_classificacao["fixas"].append(
+        adicionar_detalhe_classificacao(
+            "fixas",
             _detalhe_sintetico_pe(
                 item_id="folha-gerencial-estimada",
                 descricao="Complemento de folha gerencial estimada",
@@ -1093,7 +1168,7 @@ async def obter_ponto_equilibrio(
                 data_vencimento=fim,
                 classificacao="fixo",
                 origem_classificacao="Funcionarios ativos/cargos, descontando contas a pagar e provisoes DRE ja lancadas",
-            )
+            ),
         )
 
     despesas_fixas = _round_money(despesas_fixas)
@@ -1112,7 +1187,8 @@ async def obter_ponto_equilibrio(
         canais_lista,
         modo_custo_fiscal=modo_custo_fiscal,
         outros_variaveis=outros_variaveis_contas,
-        detalhes_outros_variaveis=detalhes_classificacao["variaveis"],
+        detalhes_outros_variaveis=detalhes_classificacao["variaveis"] if incluir_detalhes else None,
+        incluir_detalhes=incluir_detalhes,
     )
     faturamento = margem_periodo["faturamento"]
     quantidade_vendas = margem_periodo["quantidade_vendas"]
@@ -1213,6 +1289,85 @@ async def obter_ponto_equilibrio(
         "produtos_sem_custo": produtos_sem_custo,
         "detalhes_classificacao": detalhes_classificacao,
         "status": status_pe,
+    }
+
+
+@router.get("/financeiro/ponto-equilibrio/detalhes")
+async def obter_ponto_equilibrio_detalhes(
+    grupo: str,
+    data_inicio: Optional[date] = None,
+    data_fim: Optional[date] = None,
+    canais: Optional[str] = None,
+    fonte_margem: Optional[str] = MARGEM_PONTO_EQUILIBRIO_PADRAO,
+    modo_custo_fiscal: Optional[str] = MODO_CUSTO_FISCAL_PE_PADRAO,
+    page: int = 1,
+    page_size: int = 30,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    """Carrega os lancamentos de uma linha do ponto de equilibrio sob demanda."""
+    grupo = (grupo or "").strip()
+    dados = await obter_ponto_equilibrio(
+        data_inicio=data_inicio,
+        data_fim=data_fim,
+        canais=canais,
+        fonte_margem=fonte_margem,
+        modo_custo_fiscal=modo_custo_fiscal,
+        incluir_detalhes=True,
+        db=db,
+        user_and_tenant=user_and_tenant,
+    )
+
+    detalhes_margem = dados.get("detalhes_margem") or {}
+    subtotais = detalhes_margem.get("subtotais") or []
+    componentes = detalhes_margem.get("componentes") or {}
+    detalhes_classificacao = dados.get("detalhes_classificacao") or {}
+
+    label = grupo
+    origem = "Lancamentos usados no calculo do ponto de equilibrio."
+    total = 0.0
+    items = []
+
+    subtotal = next((item for item in subtotais if item.get("id") == grupo), None)
+    if subtotal is not None:
+        label = subtotal.get("label") or label
+        origem = "Snapshot financeiro das vendas no periodo filtrado."
+        total = _round_money(subtotal.get("valor") or 0)
+        items = [
+            _normalizar_item_detalhe_ponto_equilibrio(item, "Venda")
+            for item in componentes.get(grupo, [])
+        ]
+    elif grupo in PONTO_EQUILIBRIO_GRUPOS_CLASSIFICACAO:
+        meta = PONTO_EQUILIBRIO_GRUPOS_CLASSIFICACAO[grupo]
+        label = meta["label"]
+        origem = meta["origem"]
+        items = [
+            _normalizar_item_detalhe_ponto_equilibrio(item, "Conta/DRE")
+            for item in detalhes_classificacao.get(grupo, [])
+        ]
+        total_por_grupo = {
+            "fixas": dados.get("despesas_fixas"),
+            "variaveis": dados.get("outros_variaveis", dados.get("despesas_variaveis_contas")),
+            "custos_venda_snapshot": dados.get("despesas_variaveis_ja_cobertas"),
+            "sem_classificacao": dados.get("despesas_sem_classificacao"),
+            "estoque_excluido": dados.get("despesas_estoque_excluidas"),
+        }
+        total = _round_money(total_por_grupo.get(grupo) or 0)
+    else:
+        raise HTTPException(status_code=404, detail="Grupo de detalhes nao encontrado")
+
+    paginacao = _paginar_detalhes_ponto_equilibrio(items, page=page, page_size=page_size)
+    periodo = dados.get("periodo") or {}
+    inicio = periodo.get("inicio")
+    fim = periodo.get("fim")
+
+    return {
+        "grupo": grupo,
+        "label": label,
+        "total": total,
+        "origem": origem,
+        "periodo": f"{_formatar_data_br_ponto_equilibrio(inicio)} - {_formatar_data_br_ponto_equilibrio(fim)}",
+        **paginacao,
     }
 
 

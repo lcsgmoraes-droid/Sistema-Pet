@@ -46,6 +46,18 @@ def test_api_ponto_equilibrio_usa_formula_de_margem_de_contribuicao():
     assert "detalhes_classificacao" in source
 
 
+def test_api_ponto_equilibrio_tem_detalhes_lazy_para_nao_pesar_resumo():
+    source = _backend_source("app/dashboard_routes.py")
+
+    assert '@router.get("/financeiro/ponto-equilibrio/detalhes")' in source
+    assert "incluir_detalhes: bool = False" in source
+    assert "incluir_detalhes=incluir_detalhes" in source
+    assert "_paginar_detalhes_ponto_equilibrio" in source
+    assert "page_size" in source
+    assert '"detalhes_margem"' in source
+    assert '"detalhes_classificacao"' in source
+
+
 def test_frontend_tem_tela_financeira_de_ponto_equilibrio():
     app = _frontend_source("src/App.jsx")
     menu = _frontend_source("src/components/layout/menuConfig.js")
@@ -71,6 +83,11 @@ def test_frontend_tem_tela_financeira_de_ponto_equilibrio():
     assert "Outros variaveis" in page
     assert "Fora do PE" in page
     assert "Detalhamento da margem" in page
+    assert "abrirDetalhesPontoEquilibrio" in page
+    assert "/financeiro/ponto-equilibrio/detalhes" in page
+    assert "linhaDetalhe" in page
+    assert "detalhesLinha" in page
+    assert "Lancamentos do ponto de equilibrio" in page
     assert "Calculadora de impacto" in page
     assert "Impacto mensal no custo fixo" in page
     assert "Faturamento projetado" in page

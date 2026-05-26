@@ -8,6 +8,7 @@ import {
   ShoppingCart,
   Target,
   TrendingUp,
+  X,
 } from "lucide-react";
 import {
   Bar,
@@ -75,113 +76,225 @@ function formatarDataBR(data) {
   return `${dia}/${mes}/${ano}`;
 }
 
-function DetalheContasCard({ title, total, items = [], tone = "slate", emptyLabel = "Nenhum lancamento" }) {
-  const tones = {
-    slate: "border-slate-200",
-    amber: "border-amber-200",
-    blue: "border-blue-200",
-    red: "border-red-200",
-  };
+const LINHAS_CLASSIFICACAO_PE = [
+  {
+    id: "fixas",
+    label: "Despesas fixas",
+    tipo: "custo",
+    valorKey: "despesas_fixas",
+    origem: "Contas a pagar, DRE e folha gerencial",
+  },
+  {
+    id: "variaveis",
+    label: "Outros custos variaveis",
+    tipo: "deducao",
+    valorKey: "outros_variaveis",
+    origem: "Contas/DRE fora do snapshot da venda",
+  },
+  {
+    id: "custos_venda_snapshot",
+    label: "Custos de venda ja no snapshot",
+    tipo: "informativo",
+    valorKey: "despesas_variaveis_ja_cobertas",
+    origem: "Separados para nao duplicar custos",
+  },
+  {
+    id: "sem_classificacao",
+    label: "Sem classificacao",
+    tipo: "alerta",
+    valorKey: "despesas_sem_classificacao",
+    origem: "Contas que precisam de classificacao",
+  },
+  {
+    id: "estoque_excluido",
+    label: "Fora do PE",
+    tipo: "informativo",
+    valorKey: "despesas_estoque_excluidas",
+    origem: "Compra de estoque entra via CMV",
+  },
+];
+
+function linhaValorClassName(tipo) {
+  if (tipo === "receita") return "text-emerald-700";
+  if (tipo === "alerta") return "text-amber-700";
+  if (tipo === "informativo") return "text-slate-700";
+  return "text-red-700";
+}
+
+function montarLinhasDetalhamentoPontoEquilibrio(dados) {
+  const subtotais = dados?.detalhes_margem?.subtotais || [];
+  const linhasMargem = subtotais
+    .filter((subtotal) => Math.abs(Number(subtotal.valor || 0)) > 0 || subtotal.id === "custo_fiscal")
+    .map((subtotal) => ({
+      ...subtotal,
+      grupo: subtotal.id,
+      origem: "Snapshot financeiro das vendas",
+    }));
+
+  const linhasClassificacao = LINHAS_CLASSIFICACAO_PE.map((linha) => ({
+    ...linha,
+    grupo: linha.id,
+    valor: Number(dados?.[linha.valorKey] || 0),
+  })).filter((linha) => Math.abs(Number(linha.valor || 0)) > 0 || linha.id === "sem_classificacao");
+
+  return [...linhasMargem, ...linhasClassificacao];
+}
+
+function DetalhamentoMargemPanel({ dados, onAbrirDetalhes }) {
+  const linhas = montarLinhasDetalhamentoPontoEquilibrio(dados);
 
   return (
-    <div className={`rounded-lg border bg-white p-4 ${tones[tone] || tones.slate}`}>
-      <div className="flex items-start justify-between gap-3">
-        <div>
-          <h3 className="text-sm font-bold text-slate-900">{title}</h3>
-          <p className="text-xs text-slate-500">Origem dos valores usados no calculo</p>
-        </div>
-        <span className="text-sm font-bold text-slate-900">{formatMoneyBRL(total || 0)}</span>
+    <div className="space-y-4">
+      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+        <h2 className="text-base font-semibold text-blue-950">Detalhamento da margem e custos</h2>
+        <p className="mt-1 text-sm text-blue-900">
+          Clique em detalhes para carregar os lancamentos daquela linha. O resumo fica leve e os
+          itens completos aparecem sob demanda, no mesmo estilo da DRE.
+        </p>
       </div>
 
-      <div className="mt-3 max-h-72 overflow-y-auto divide-y divide-slate-100">
-        {items.length === 0 ? (
-          <p className="py-4 text-sm text-slate-500">{emptyLabel}</p>
-        ) : (
-          items.map((item) => (
-            <div key={`${title}-${item.id}`} className="py-3 text-sm">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <p className="truncate font-semibold text-slate-900" title={item.descricao}>
-                    #{item.id} {item.descricao}
-                  </p>
-                  <p className="mt-1 text-xs text-slate-500">
-                    {formatarDataBR(item.data_vencimento)}
-                    {item.fornecedor_nome ? ` | ${item.fornecedor_nome}` : ""}
-                  </p>
-                  <p className="mt-1 text-xs text-blue-700">{item.origem_classificacao}</p>
-                </div>
-                <span className="shrink-0 font-bold text-slate-900">{formatMoneyBRL(item.valor || 0)}</span>
-              </div>
-            </div>
-          ))
-        )}
+      <div className="overflow-hidden rounded-lg border border-slate-200 bg-white">
+        <div className="grid grid-cols-1 gap-1 bg-slate-50 px-4 py-3 text-xs font-bold uppercase text-slate-500 sm:grid-cols-[minmax(220px,1fr)_160px_130px]">
+          <span>Origem das contas e custos fixos</span>
+          <span className="sm:text-right">Valor</span>
+          <span className="sm:text-right">Acao</span>
+        </div>
+        <div className="divide-y divide-slate-100">
+          {linhas.map((linha) => (
+            <button
+              key={linha.grupo}
+              type="button"
+              onClick={() => onAbrirDetalhes(linha)}
+              className="grid w-full grid-cols-1 items-center gap-2 px-4 py-3 text-left text-sm transition-colors hover:bg-blue-50 sm:grid-cols-[minmax(220px,1fr)_160px_130px] sm:gap-3"
+            >
+              <span className="min-w-0">
+                <span className="block font-semibold text-slate-900">{linha.label}</span>
+                <span className="block truncate text-xs text-slate-500">{linha.origem}</span>
+              </span>
+              <span className={`font-bold sm:text-right ${linhaValorClassName(linha.tipo)}`}>
+                {linha.tipo === "receita" ? "+" : linha.tipo === "informativo" ? "" : "-"} {formatMoneyBRL(Math.abs(linha.valor || 0))}
+              </span>
+              <span className="sm:text-right">
+                <span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                  detalhes
+                </span>
+              </span>
+            </button>
+          ))}
+        </div>
       </div>
     </div>
   );
 }
 
-function DetalhamentoMargemPanel({ dados }) {
-  const detalhes = dados?.detalhes_margem || {};
-  const subtotais = detalhes.subtotais || [];
-  const componentes = detalhes.componentes || {};
-  const grupos = subtotais.filter((subtotal) => Math.abs(Number(subtotal.valor || 0)) > 0 || subtotal.id === "custo_fiscal");
+function DetalhesPontoEquilibrioDrawer({ linha, detalhes, loading, onClose, onPageChange }) {
+  if (!linha) return null;
 
+  const items = detalhes?.items || [];
   return (
-    <div className="space-y-4">
-      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
-        <h2 className="text-base font-semibold text-blue-950">Detalhamento da margem</h2>
-        <p className="mt-1 text-sm text-blue-900">
-          A margem vem do mesmo snapshot financeiro das vendas: receita, descontos, campanhas,
-          taxas, entrega, comissoes, custo gerencial e CMV. Contas variaveis externas entram em
-          outros custos variaveis para nao duplicar o que a venda ja gerou.
-        </p>
-      </div>
-
-      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-        {grupos.map((subtotal) => {
-          const itens = componentes[subtotal.id] || [];
-          const sinal = subtotal.tipo === "receita" ? "+" : "-";
-          const valorClass = subtotal.tipo === "receita" ? "text-emerald-700" : "text-red-700";
-          return (
-            <div key={subtotal.id} className="rounded-lg border border-slate-200 bg-white p-4">
-              <div className="flex items-start justify-between gap-3">
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">{subtotal.label}</h3>
-                  <p className="text-xs text-slate-500">{itens.length} origem(ns)</p>
-                </div>
-                <span className={`text-sm font-bold ${valorClass}`}>
-                  {sinal} {formatMoneyBRL(subtotal.valor || 0)}
-                </span>
+    <div className="fixed inset-0 z-[70] bg-slate-900/30" onClick={onClose}>
+      <aside
+        className="fixed inset-x-0 bottom-0 max-h-[86dvh] overflow-hidden rounded-t-2xl bg-white shadow-2xl md:inset-y-0 md:left-auto md:right-0 md:max-h-none md:w-[760px] md:rounded-none"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="flex h-full flex-col">
+          <div className="border-b border-slate-200 p-4 md:p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <p className="text-xs font-semibold uppercase text-slate-500">Lancamentos do ponto de equilibrio</p>
+                <h2 className="mt-1 text-lg font-bold text-slate-900 md:text-xl">{detalhes?.label || linha.label}</h2>
+                <p className="mt-1 text-sm text-slate-600">{detalhes?.periodo || "Periodo filtrado"}</p>
               </div>
-              <div className="mt-3 max-h-56 overflow-y-auto divide-y divide-slate-100">
-                {itens.length === 0 ? (
-                  <p className="py-4 text-sm text-slate-500">Nenhuma origem detalhada neste grupo</p>
-                ) : (
-                  itens.map((item, index) => (
-                    <div key={`${subtotal.id}-${item.id || index}`} className="py-3 text-sm">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <p className="truncate font-semibold text-slate-900" title={item.descricao}>
-                            {item.descricao || `Venda ${item.numero_venda || item.venda_id || ""}`}
-                          </p>
-                          <p className="mt-1 text-xs text-slate-500">
-                            {formatarDataBR(item.data_venda || item.data_vencimento)}
-                            {item.cliente_nome ? ` | ${item.cliente_nome}` : ""}
-                          </p>
-                          {item.observacao && (
-                            <p className="mt-1 text-xs text-blue-700">{item.observacao}</p>
-                          )}
-                        </div>
-                        <span className="shrink-0 font-bold text-slate-900">{formatMoneyBRL(item.valor || 0)}</span>
-                      </div>
-                    </div>
-                  ))
-                )}
+              <button
+                type="button"
+                onClick={onClose}
+                className="rounded-md p-2 text-slate-500 transition-colors hover:bg-slate-100 hover:text-slate-900"
+                aria-label="Fechar detalhes"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase text-slate-500">Total da linha</p>
+                <p className="mt-1 text-lg font-bold text-slate-900">{formatMoneyBRL(detalhes?.total ?? linha.valor ?? 0)}</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase text-slate-500">Lancamentos</p>
+                <p className="mt-1 text-lg font-bold text-slate-900">{detalhes?.total_itens ?? "-"}</p>
+              </div>
+              <div className="rounded-lg border border-slate-200 bg-slate-50 p-3">
+                <p className="text-xs font-semibold uppercase text-slate-500">Origem</p>
+                <p className="mt-1 text-sm font-semibold text-slate-800">{items[0]?.origem_label || linha.origem}</p>
               </div>
             </div>
-          );
-        })}
-      </div>
+            {detalhes?.origem && (
+              <p className="mt-3 rounded-lg bg-blue-50 px-3 py-2 text-sm text-blue-800">{detalhes.origem}</p>
+            )}
+          </div>
+
+          <div className="flex-1 overflow-y-auto p-4 md:p-5">
+            {loading ? (
+              <div className="flex h-48 items-center justify-center text-slate-500">
+                <RefreshCcw className="mr-2 h-4 w-4 animate-spin" />
+                Carregando lancamentos...
+              </div>
+            ) : items.length === 0 ? (
+              <div className="rounded-lg border border-dashed border-slate-300 p-8 text-center text-sm text-slate-500">
+                Nenhum lancamento encontrado para esta linha no periodo.
+              </div>
+            ) : (
+              <div className="overflow-x-auto rounded-lg border border-slate-200">
+                <div className="grid min-w-[460px] grid-cols-[110px_minmax(220px,1fr)_120px] bg-slate-50 px-3 py-2 text-xs font-bold uppercase text-slate-500">
+                  <span>Data</span>
+                  <span>Descricao</span>
+                  <span className="text-right">Valor</span>
+                </div>
+                <div className="divide-y divide-slate-100 bg-white">
+                  {items.map((item, index) => (
+                    <div key={item.id || `${linha.grupo}-${index}`} className="grid min-w-[460px] grid-cols-[110px_minmax(220px,1fr)_120px] gap-3 px-3 py-3 text-sm">
+                      <span className="text-slate-600">{formatarDataBR(item.data)}</span>
+                      <span className="min-w-0">
+                        <span className="block truncate font-semibold text-slate-900" title={item.descricao}>
+                          {item.descricao}
+                        </span>
+                        {(item.contraparte || item.observacao || item.origem_classificacao) && (
+                          <span className="mt-1 block truncate text-xs text-slate-500">
+                            {item.contraparte || item.observacao || item.origem_classificacao}
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-right font-bold text-slate-900">{formatMoneyBRL(item.valor || 0)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {detalhes && detalhes.pages > 1 && (
+            <div className="flex items-center justify-between border-t border-slate-200 p-4 text-sm">
+              <button
+                type="button"
+                disabled={loading || detalhes.page <= 1}
+                onClick={() => onPageChange(detalhes.page - 1)}
+                className="rounded-md border border-slate-200 px-3 py-2 font-semibold text-slate-700 disabled:opacity-50"
+              >
+                Anterior
+              </button>
+              <span className="text-slate-600">Pagina {detalhes.page} de {detalhes.pages}</span>
+              <button
+                type="button"
+                disabled={loading || detalhes.page >= detalhes.pages}
+                onClick={() => onPageChange(detalhes.page + 1)}
+                className="rounded-md border border-slate-200 px-3 py-2 font-semibold text-slate-700 disabled:opacity-50"
+              >
+                Proxima
+              </button>
+            </div>
+          )}
+        </div>
+      </aside>
     </div>
   );
 }
@@ -225,6 +338,7 @@ const TOOLTIP_FAIXAS_PORTE =
   "Faixas gerenciais mensais: Pequeno ate R$ 80 mil/mes; Medio de R$ 80 mil a R$ 250 mil/mes; Grande acima de R$ 250 mil/mes. Use como parametro interno, nao como enquadramento fiscal.";
 
 const CORES_GRAFICO_CUSTOS = ["#2563eb", "#059669", "#d97706", "#7c3aed", "#dc2626", "#0891b2", "#64748b"];
+const PONTO_EQUILIBRIO_REQUEST_TIMEOUT_MS = 120000;
 
 function formatarImpactoMoeda(valor) {
   if (valor == null) return "-";
@@ -599,6 +713,9 @@ export default function PontoEquilibrio() {
   const [dados, setDados] = useState(null);
   const [loading, setLoading] = useState(false);
   const [erro, setErro] = useState("");
+  const [linhaDetalhe, setLinhaDetalhe] = useState(null);
+  const [detalhesLinha, setDetalhesLinha] = useState(null);
+  const [loadingDetalhes, setLoadingDetalhes] = useState(false);
 
   const percentualAtingido = Math.min(Number(dados?.percentual_atingido || 0), 100);
   const margemUsadaPercentual = Number(dados?.margem_usada_percentual ?? dados?.margem_contribuicao_percentual ?? 0);
@@ -657,26 +774,65 @@ export default function PontoEquilibrio() {
     };
   }, [dados]);
 
+  const montarParametrosPontoEquilibrio = (extras = {}) => {
+    const params = {
+      data_inicio: filtros.data_inicio,
+      data_fim: filtros.data_fim,
+      fonte_margem: filtros.fonte_margem,
+      modo_custo_fiscal: filtros.modo_custo_fiscal,
+      ...extras,
+    };
+    if (filtros.canal) {
+      params.canais = filtros.canal;
+    }
+    return params;
+  };
+
   const carregarDados = async () => {
     setLoading(true);
     setErro("");
+    fecharDetalhesPontoEquilibrio();
     try {
-      const params = new URLSearchParams({
-        data_inicio: filtros.data_inicio,
-        data_fim: filtros.data_fim,
-        fonte_margem: filtros.fonte_margem,
-        modo_custo_fiscal: filtros.modo_custo_fiscal,
+      const response = await api.get("/financeiro/ponto-equilibrio", {
+        params: montarParametrosPontoEquilibrio(),
+        timeout: PONTO_EQUILIBRIO_REQUEST_TIMEOUT_MS,
       });
-      if (filtros.canal) {
-        params.append("canais", filtros.canal);
-      }
-      const response = await api.get(`/financeiro/ponto-equilibrio?${params.toString()}`);
       setDados(response.data);
     } catch (error) {
       console.error("Erro ao carregar ponto de equilibrio:", error);
       setErro(error.response?.data?.detail || "Nao foi possivel carregar o ponto de equilibrio.");
     } finally {
       setLoading(false);
+    }
+  };
+
+  function fecharDetalhesPontoEquilibrio() {
+    setLinhaDetalhe(null);
+    setDetalhesLinha(null);
+    setLoadingDetalhes(false);
+  }
+
+  const abrirDetalhesPontoEquilibrio = async (linha, page = 1) => {
+    if (!linha?.grupo) return;
+
+    setLinhaDetalhe(linha);
+    setLoadingDetalhes(true);
+    setErro("");
+    try {
+      const response = await api.get("/financeiro/ponto-equilibrio/detalhes", {
+        params: montarParametrosPontoEquilibrio({
+          grupo: linha.grupo,
+          page,
+          page_size: 30,
+        }),
+        timeout: PONTO_EQUILIBRIO_REQUEST_TIMEOUT_MS,
+      });
+      setDetalhesLinha(response.data);
+    } catch (error) {
+      console.error("Erro ao carregar detalhes do ponto de equilibrio:", error);
+      setErro(error.response?.data?.detail || "Nao foi possivel carregar os detalhes desta linha.");
+    } finally {
+      setLoadingDetalhes(false);
     }
   };
 
@@ -941,52 +1097,18 @@ export default function PontoEquilibrio() {
               </div>
             </div>
 
-            <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <h2 className="text-base font-semibold text-slate-900">Origem das contas e custos fixos</h2>
-              <p className="mt-1 text-sm text-slate-600">
-                Use esta abertura para conferir o que entrou como despesa fixa, outros custos
-                variaveis de contas/DRE, sem classificacao ou fora do ponto de equilibrio.
-              </p>
-              <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
-                <DetalheContasCard
-                  title="Despesas fixas"
-                  total={dados.despesas_fixas}
-                  items={dados.detalhes_classificacao?.fixas || []}
-                  tone="amber"
-                />
-                <DetalheContasCard
-                  title="Outros variaveis"
-                  total={dados.outros_variaveis ?? dados.despesas_variaveis_contas}
-                  items={dados.detalhes_classificacao?.variaveis || []}
-                  tone="blue"
-                />
-                <DetalheContasCard
-                  title="Custos de venda ja no snapshot"
-                  total={dados.despesas_variaveis_ja_cobertas}
-                  items={dados.detalhes_classificacao?.custos_venda_snapshot || []}
-                  tone="blue"
-                  emptyLabel="Nenhuma conta duplicada pelo snapshot"
-                />
-                <DetalheContasCard
-                  title="Sem classificacao"
-                  total={dados.despesas_sem_classificacao}
-                  items={dados.detalhes_classificacao?.sem_classificacao || []}
-                  tone="red"
-                />
-                <DetalheContasCard
-                  title="Fora do PE"
-                  total={dados.despesas_estoque_excluidas}
-                  items={dados.detalhes_classificacao?.estoque_excluido || []}
-                  tone="slate"
-                  emptyLabel="Nenhuma compra de estoque identificada"
-                />
-              </div>
-            </div>
+            <DetalhamentoMargemPanel
+              dados={dados}
+              onAbrirDetalhes={abrirDetalhesPontoEquilibrio}
+            />
               </>
             )}
 
             {abaAtiva === "detalhamento" && (
-              <DetalhamentoMargemPanel dados={dados} />
+              <DetalhamentoMargemPanel
+                dados={dados}
+                onAbrirDetalhes={abrirDetalhesPontoEquilibrio}
+              />
             )}
 
             {abaAtiva === "simulador" && (
@@ -1025,6 +1147,13 @@ export default function PontoEquilibrio() {
           </>
         )}
       </div>
+      <DetalhesPontoEquilibrioDrawer
+        linha={linhaDetalhe}
+        detalhes={detalhesLinha}
+        loading={loadingDetalhes}
+        onClose={fecharDetalhesPontoEquilibrio}
+        onPageChange={(page) => abrirDetalhesPontoEquilibrio(linhaDetalhe, page)}
+      />
     </div>
   );
 }
