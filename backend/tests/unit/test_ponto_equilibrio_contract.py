@@ -24,8 +24,12 @@ def test_api_ponto_equilibrio_usa_formula_de_margem_de_contribuicao():
     assert "margem_usada_percentual" in source
     assert "margem_periodo_percentual" in source
     assert "ponto_equilibrio = despesas_fixas / margem_usada_decimal" in source
-    assert "custos_variaveis = cmv_estimado + despesas_variaveis" in source
     assert "Produto.preco_custo" in source
+    assert "get_or_build_venda_rentabilidade_snapshot" in source
+    assert "_somar_componentes_margem_vendas_pe" in source
+    assert "_conta_variavel_ja_coberta_pelo_snapshot_pe" in source
+    assert "detalhes_margem" in source
+    assert "modo_custo_fiscal" in source
     assert "TipoDespesa.e_custo_fixo" in source
     assert "DRESubcategoria.custo_pe" in source
     assert "DRESubcategoria.tipo_custo" in source
@@ -40,6 +44,7 @@ def test_frontend_tem_tela_financeira_de_ponto_equilibrio():
     app = _frontend_source("src/App.jsx")
     menu = _frontend_source("src/components/layout/menuConfig.js")
     page = _frontend_source("src/pages/PontoEquilibrio.jsx")
+    impact_utils = _frontend_source("src/pages/pontoEquilibrioImpactoUtils.js")
     dashboard = _frontend_source("src/pages/DashboardFinanceiro.jsx")
 
     assert 'const PontoEquilibrio = lazy(() => import("./pages/PontoEquilibrio"))' in app
@@ -49,13 +54,17 @@ def test_frontend_tem_tela_financeira_de_ponto_equilibrio():
     assert "Ponto de Equilibrio" in page
     assert "Fonte da margem" in page
     assert "fonte_margem" in page
+    assert "Visao de custo" in page
+    assert "modo_custo_fiscal" in page
     assert "Media 12 meses fechados" in page
+    assert "Somente documentos emitidos" in page
     assert "margem_usada_percentual" in page
     assert "custos fixos / margem de contribuicao" in page
-    assert "Origem dos valores" in page
+    assert "Origem das contas e custos fixos" in page
     assert "Despesas fixas" in page
-    assert "Despesas variaveis" in page
+    assert "Outros variaveis" in page
     assert "Fora do PE" in page
+    assert "Detalhamento da margem" in page
     assert "Calculadora de impacto" in page
     assert "Impacto mensal no custo fixo" in page
     assert "Faturamento projetado" in page
@@ -63,13 +72,15 @@ def test_frontend_tem_tela_financeira_de_ponto_equilibrio():
     assert "Novo ponto minimo" in page
     assert "Vendas a mais/menos" in page
     assert '{ id: "simulador", label: "Simulador" }' in page
+    assert '{ id: "detalhamento", label: "Detalhamento" }' in page
     assert '{ id: "graficos", label: "Graficos" }' in page
+    assert 'abaAtiva === "detalhamento"' in page
     assert 'abaAtiva === "simulador"' in page
     assert 'abaAtiva === "graficos"' in page
     assert "Analise dos custos" in page
     assert "Parecer gerencial" in page
-    assert "Aluguel sobre faturamento" in page
-    assert "Folha e pro-labore" in page
+    assert "Aluguel sobre faturamento" in impact_utils
+    assert "Folha e pro-labore" in impact_utils
     assert "Porte do petshop" in page
     assert "Pequeno" in page
     assert "Medio" in page
