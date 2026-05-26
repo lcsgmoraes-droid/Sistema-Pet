@@ -32,6 +32,15 @@ import NumberCell from "./ui/NumberCell";
 
 const DRE_REQUEST_TIMEOUT_MS = 120000;
 
+const CANAIS_DRE_PADRAO = [
+  { id: "loja_fisica", nome: "Loja Física", cor: "blue" },
+  { id: "mercado_livre", nome: "Mercado Livre", cor: "yellow" },
+  { id: "shopee", nome: "Shopee", cor: "orange" },
+  { id: "amazon", nome: "Amazon", cor: "green" },
+  { id: "ecommerce", nome: "E-commerce", cor: "purple" },
+  { id: "app", nome: "App", cor: "indigo" },
+];
+
 const DRE_TABLE_COLUMNS = [
   {
     key: "descricao",
@@ -157,15 +166,10 @@ const DRE = () => {
   const dreRequestIdRef = useRef(0);
 
   // Canais de venda (ABA 7)
-  const [canaisDisponiveis] = useState([
-    { id: "loja_fisica", nome: "Loja Física", cor: "blue" },
-    { id: "mercado_livre", nome: "Mercado Livre", cor: "yellow" },
-    { id: "shopee", nome: "Shopee", cor: "orange" },
-    { id: "amazon", nome: "Amazon", cor: "green" },
-    { id: "ecommerce", nome: "E-commerce", cor: "purple" },
-    { id: "app", nome: "App", cor: "indigo" },
-  ]);
-  const [canaisSelecionados, setCanaisSelecionados] = useState(["loja_fisica"]); // Loja Física por padrão
+  const [canaisDisponiveis] = useState(CANAIS_DRE_PADRAO);
+  const [canaisSelecionados, setCanaisSelecionados] = useState(
+    CANAIS_DRE_PADRAO.map((canal) => canal.id)
+  );
 
   // Filtros
   const obterDataLocal = () => {

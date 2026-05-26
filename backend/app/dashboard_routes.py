@@ -4,7 +4,7 @@ Endpoints para dados consolidados do sistema
 """
 
 from fastapi import APIRouter, HTTPException, Depends
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 from sqlalchemy import Float, cast, func, and_, or_
 from datetime import datetime, date, time, timedelta
 from typing import Optional
@@ -28,6 +28,7 @@ from .cargo_models import Cargo
 from .dre_plano_contas_models import DRESubcategoria
 from .ia.aba7_dre_detalhada_models import DREDetalheCanal
 from .services.remuneracao_service import calcular_composicao_remuneracao
+from .services.venda_rentabilidade_snapshot_service import get_or_build_venda_rentabilidade_snapshot
 from .utils.tenant_safe_sql import execute_tenant_safe
 
 logger = logging.getLogger(__name__)
@@ -43,6 +44,10 @@ def _round_money(value) -> float:
     return round(float(value or 0), 2)
 
 
+def _filtro_status_venda_relatorio():
+    return or_(Venda.status.is_(None), Venda.status != "cancelada")
+
+
 MARGEM_PONTO_EQUILIBRIO_PADRAO = "media_12_meses_fechados"
 MARGEM_PONTO_EQUILIBRIO_OPCOES = {
     "periodo_atual": {"label": "Periodo atual", "meses_fechados": 0},
@@ -50,6 +55,18 @@ MARGEM_PONTO_EQUILIBRIO_OPCOES = {
     "media_3_meses_fechados": {"label": "Media 3 meses fechados", "meses_fechados": 3},
     "media_6_meses_fechados": {"label": "Media 6 meses fechados", "meses_fechados": 6},
     "media_12_meses_fechados": {"label": "Media 12 meses fechados", "meses_fechados": 12},
+}
+
+MODO_CUSTO_FISCAL_PE_PADRAO = "gerencial_completo"
+MODO_CUSTO_FISCAL_PE_OPCOES = {
+    "gerencial_completo": {
+        "label": "Visao gerencial completa",
+        "descricao": "Considera o custo fiscal estimado em todas as vendas para uma leitura conservadora.",
+    },
+    "documentos_emitidos": {
+        "label": "Somente documentos emitidos",
+        "descricao": "Aplica o custo fiscal apenas nas vendas com NF/NFC-e emitida.",
+    },
 }
 
 
@@ -65,6 +82,225 @@ def _normalizar_texto_pe(valor: str) -> str:
     texto = "".join(ch for ch in texto if not unicodedata.combining(ch))
     texto = texto.replace("-", " ")
     return re.sub(r"\s+", " ", texto).strip()
+
+
+def _venda_tem_documento_fiscal_pe(venda: Venda) -> bool:
+    nfe_status = _normalizar_texto_pe(getattr(venda, "nfe_status", None))
+    if nfe_status in {"cancelada", "cancelado", "denegada", "rejeitada"}:
+        return False
+
+    return bool(
+        getattr(venda, "nfe_bling_id", None)
+        or getattr(venda, "nfe_chave", None)
+        or getattr(venda, "nfe_numero", None)
+        or _normalizar_texto_pe(getattr(venda, "status", None)) == "pago_nf"
+    )
+
+
+def _snapshot_float(snapshot: dict, campo: str) -> float:
+    return _round_money(float((snapshot or {}).get(campo, 0) or 0))
+
+
+def _detalhe_venda_margem_pe(
+    snapshot: dict,
+    *,
+    campo: str,
+    valor: float,
+    nf_emitida: bool,
+    observacao: str = "",
+) -> dict:
+    return {
+        "id": snapshot.get("venda_id"),
+        "venda_id": snapshot.get("venda_id"),
+        "numero_venda": snapshot.get("numero_venda"),
+        "descricao": f"Venda {snapshot.get('numero_venda') or snapshot.get('venda_id') or ''}".strip(),
+        "cliente_nome": snapshot.get("cliente_nome") or "Sem cliente",
+        "data_venda": snapshot.get("data_venda"),
+        "valor": _round_money(valor),
+        "campo": campo,
+        "nf_emitida": bool(nf_emitida),
+        "observacao": observacao,
+    }
+
+
+def _ajustar_snapshot_custo_fiscal_pe(
+    snapshot: dict,
+    *,
+    venda_tem_documento: bool,
+    modo_custo_fiscal: str,
+) -> dict:
+    ajustado = dict(snapshot or {})
+    imposto_original = _snapshot_float(ajustado, "imposto")
+    ajustado["custo_fiscal_original"] = imposto_original
+    ajustado["custo_fiscal_desconsiderado"] = 0.0
+
+    if modo_custo_fiscal == "documentos_emitidos" and not venda_tem_documento and imposto_original > 0:
+        ajustado["imposto"] = 0.0
+        ajustado["custo_fiscal_desconsiderado"] = imposto_original
+        ajustado["venda_liquida"] = _round_money(_snapshot_float(ajustado, "venda_liquida") + imposto_original)
+        ajustado["lucro"] = _round_money(_snapshot_float(ajustado, "lucro") + imposto_original)
+
+    return ajustado
+
+
+def _conta_variavel_ja_coberta_pelo_snapshot_pe(
+    conta: ContaPagar,
+    tipo_nome: str = "",
+    categoria_nome: str = "",
+    dre_subcategoria_nome: str = "",
+) -> bool:
+    texto = _normalizar_texto_pe(
+        f"{getattr(conta, 'descricao', '') or ''} {tipo_nome or ''} {categoria_nome or ''} {dre_subcategoria_nome or ''}"
+    )
+    termos_custos_venda = (
+        "taxa credito",
+        "taxa debito",
+        "taxa cartao",
+        "taxas cartao",
+        "taxa pix",
+        "pix boleto",
+        "comissao venda",
+        "comissoes venda",
+        "comissao de venda",
+        "comissoes de venda",
+        "comissao entregador",
+        "taxa de entrega",
+        "frete operacional",
+        "fretes sobre vendas",
+        "custo operacional entrega",
+        "campanha",
+        "cashback",
+        "cupom",
+    )
+    if any(termo in texto for termo in termos_custos_venda):
+        return True
+
+    return "venda" in texto and any(
+        termo in texto
+        for termo in (
+            "cartao",
+            "credito",
+            "debito",
+            "comissao",
+            "entrega",
+            "operacional",
+            "desconto",
+        )
+    )
+
+
+def _somar_componentes_margem_vendas_pe(
+    vendas_snapshot: list[dict],
+    *,
+    outros_variaveis: float = 0.0,
+    detalhes_outros_variaveis: Optional[list[dict]] = None,
+) -> dict:
+    campos = {
+        "receita_produtos_servicos": 0.0,
+        "receita_entrega": 0.0,
+        "descontos": 0.0,
+        "beneficios_campanhas": 0.0,
+        "taxas_cartao": 0.0,
+        "repasse_entrega": 0.0,
+        "custo_operacional_entrega": 0.0,
+        "comissoes": 0.0,
+        "custo_fiscal": 0.0,
+        "cmv_estimado": 0.0,
+    }
+    componentes = {campo: [] for campo in campos}
+    componentes["outros_variaveis"] = list(detalhes_outros_variaveis or [])
+
+    for venda_info in vendas_snapshot or []:
+        snapshot = dict(venda_info.get("snapshot") or venda_info)
+        nf_emitida = bool(venda_info.get("nf_emitida", False))
+        mapa = {
+            "receita_produtos_servicos": ("venda_bruta", ""),
+            "receita_entrega": ("taxa_loja", ""),
+            "descontos": ("desconto", ""),
+            "beneficios_campanhas": ("custo_campanha", ""),
+            "taxas_cartao": ("taxa_cartao", ""),
+            "repasse_entrega": ("taxa_entrega", ""),
+            "custo_operacional_entrega": ("taxa_operacional", ""),
+            "comissoes": ("comissao", ""),
+            "custo_fiscal": (
+                "imposto",
+                "Custo fiscal estimado desconsiderado nesta visao"
+                if _snapshot_float(snapshot, "custo_fiscal_desconsiderado") > 0
+                else "",
+            ),
+            "cmv_estimado": ("custo_produtos", ""),
+        }
+        for campo_total, (campo_snapshot, observacao) in mapa.items():
+            valor = _snapshot_float(snapshot, campo_snapshot)
+            campos[campo_total] = _round_money(campos[campo_total] + valor)
+            custo_fiscal_omitido = campo_total == "custo_fiscal" and _snapshot_float(snapshot, "custo_fiscal_desconsiderado") > 0
+            if valor > 0 or custo_fiscal_omitido:
+                componentes[campo_total].append(
+                    _detalhe_venda_margem_pe(
+                        snapshot,
+                        campo=campo_total,
+                        valor=valor,
+                        nf_emitida=nf_emitida,
+                        observacao=observacao,
+                    )
+                )
+
+    receita_produtos_servicos = _round_money(campos["receita_produtos_servicos"])
+    receita_entrega = _round_money(campos["receita_entrega"])
+    faturamento = _round_money(receita_produtos_servicos + receita_entrega)
+    outros_variaveis = _round_money(outros_variaveis)
+    despesas_variaveis = _round_money(
+        campos["descontos"]
+        + campos["beneficios_campanhas"]
+        + campos["taxas_cartao"]
+        + campos["repasse_entrega"]
+        + campos["custo_operacional_entrega"]
+        + campos["comissoes"]
+        + campos["custo_fiscal"]
+        + outros_variaveis
+    )
+    cmv_estimado = _round_money(campos["cmv_estimado"])
+    custos_variaveis = _round_money(cmv_estimado + despesas_variaveis)
+    margem_contribuicao = _round_money(faturamento - custos_variaveis)
+    margem_decimal = margem_contribuicao / faturamento if faturamento > 0 else 0
+
+    subtotais = [
+        {"id": "receita_produtos_servicos", "label": "Receita de produtos/servicos", "tipo": "receita", "valor": receita_produtos_servicos},
+        {"id": "receita_entrega", "label": "Receita de entrega", "tipo": "receita", "valor": receita_entrega},
+        {"id": "descontos", "label": "Descontos comerciais", "tipo": "deducao", "valor": _round_money(campos["descontos"])},
+        {"id": "beneficios_campanhas", "label": "Campanhas, cupons e cashback", "tipo": "deducao", "valor": _round_money(campos["beneficios_campanhas"])},
+        {"id": "taxas_cartao", "label": "Taxas de cartao/meios de pagamento", "tipo": "deducao", "valor": _round_money(campos["taxas_cartao"])},
+        {"id": "repasse_entrega", "label": "Repasse/custo de entrega", "tipo": "deducao", "valor": _round_money(campos["repasse_entrega"])},
+        {"id": "custo_operacional_entrega", "label": "Custo operacional de entrega", "tipo": "deducao", "valor": _round_money(campos["custo_operacional_entrega"])},
+        {"id": "comissoes", "label": "Comissoes de venda", "tipo": "deducao", "valor": _round_money(campos["comissoes"])},
+        {"id": "custo_fiscal", "label": "Custo fiscal gerencial", "tipo": "deducao", "valor": _round_money(campos["custo_fiscal"])},
+        {"id": "cmv_estimado", "label": "CMV", "tipo": "custo", "valor": cmv_estimado},
+        {"id": "outros_variaveis", "label": "Outros custos variaveis", "tipo": "deducao", "valor": outros_variaveis},
+    ]
+
+    return {
+        "faturamento": faturamento,
+        "receita_produtos_servicos": receita_produtos_servicos,
+        "receita_entrega": receita_entrega,
+        "descontos": _round_money(campos["descontos"]),
+        "beneficios_campanhas": _round_money(campos["beneficios_campanhas"]),
+        "taxas_cartao": _round_money(campos["taxas_cartao"]),
+        "repasse_entrega": _round_money(campos["repasse_entrega"]),
+        "custo_operacional_entrega": _round_money(campos["custo_operacional_entrega"]),
+        "comissoes": _round_money(campos["comissoes"]),
+        "custo_fiscal": _round_money(campos["custo_fiscal"]),
+        "cmv_estimado": cmv_estimado,
+        "outros_variaveis": outros_variaveis,
+        "despesas_variaveis": despesas_variaveis,
+        "custos_variaveis": custos_variaveis,
+        "margem_contribuicao": margem_contribuicao,
+        "margem_contribuicao_percentual": round(margem_decimal * 100, 2),
+        "margem_decimal": margem_decimal,
+        "detalhes_margem": {
+            "subtotais": subtotais,
+            "componentes": componentes,
+        },
+    }
 
 
 PE_TERMOS_FIXOS = (
@@ -374,6 +610,13 @@ def _calcular_despesas_variaveis_margem_pe(
     ) in contas_query.all():
         if _conta_eh_compra_estoque_para_pe(conta, tipo_despesa_nome, categoria_nome):
             continue
+        if _conta_variavel_ja_coberta_pelo_snapshot_pe(
+            conta,
+            tipo_despesa_nome,
+            categoria_nome,
+            dre_subcategoria_nome,
+        ):
+            continue
 
         classificacao, _ = _classificar_conta_ponto_equilibrio(
             conta,
@@ -403,7 +646,7 @@ def _calcular_despesas_variaveis_margem_pe(
         )
 
     for provisao in provisoes_dre_query.all():
-        despesas_variaveis += float(provisao.despesas_vendas or 0) + float(provisao.impostos or 0)
+        despesas_variaveis += float(provisao.despesas_vendas or 0)
 
     return _round_money(despesas_variaveis)
 
@@ -414,71 +657,70 @@ def _calcular_margem_periodo_ponto_equilibrio(
     inicio: date,
     fim: date,
     canais_lista: list[str],
+    modo_custo_fiscal: str = MODO_CUSTO_FISCAL_PE_PADRAO,
+    outros_variaveis: Optional[float] = None,
+    detalhes_outros_variaveis: Optional[list[dict]] = None,
 ) -> dict:
     inicio_dt = datetime.combine(inicio, time.min)
     fim_dt = datetime.combine(fim, time.max)
 
-    vendas_query = db.query(Venda).filter(
-        Venda.tenant_id == tenant_id,
-        Venda.status == "finalizada",
-        Venda.data_venda >= inicio_dt,
-        Venda.data_venda <= fim_dt,
+    vendas_query = (
+        db.query(Venda)
+        .options(
+            selectinload(Venda.cliente),
+            selectinload(Venda.itens).selectinload(VendaItem.produto),
+            selectinload(Venda.pagamentos),
+        )
+        .filter(
+            Venda.tenant_id == tenant_id,
+            _filtro_status_venda_relatorio(),
+            Venda.data_venda >= inicio_dt,
+            Venda.data_venda <= fim_dt,
+        )
     )
     if canais_lista:
         vendas_query = vendas_query.filter(Venda.canal.in_(canais_lista))
 
-    vendas_agregado = vendas_query.with_entities(
-        func.count(Venda.id).label("quantidade"),
-        func.coalesce(func.sum(Venda.total), 0).label("faturamento"),
-        func.coalesce(func.avg(Venda.total), 0).label("ticket_medio"),
-    ).first()
+    vendas = vendas_query.all()
+    vendas_snapshot = []
+    for venda in vendas:
+        nf_emitida = _venda_tem_documento_fiscal_pe(venda)
+        snapshot = get_or_build_venda_rentabilidade_snapshot(
+            venda,
+            db,
+            tenant_id,
+            persist_if_missing=True,
+        )
+        snapshot = _ajustar_snapshot_custo_fiscal_pe(
+            snapshot,
+            venda_tem_documento=nf_emitida,
+            modo_custo_fiscal=modo_custo_fiscal,
+        )
+        vendas_snapshot.append({"snapshot": snapshot, "nf_emitida": nf_emitida})
 
-    faturamento = _round_money(vendas_agregado.faturamento if vendas_agregado else 0)
-    quantidade_vendas = int(vendas_agregado.quantidade or 0) if vendas_agregado else 0
-    ticket_medio = _round_money(vendas_agregado.ticket_medio if vendas_agregado else 0)
+    if outros_variaveis is None:
+        outros_variaveis = _calcular_despesas_variaveis_margem_pe(
+            db,
+            tenant_id,
+            inicio,
+            fim,
+            canais_lista,
+        )
 
-    cmv_query = db.query(
-        func.coalesce(func.sum(cast(VendaItem.quantidade, Float) * func.coalesce(Produto.preco_custo, 0.0)), 0)
-    ).join(
-        Venda,
-        VendaItem.venda_id == Venda.id,
-    ).outerjoin(
-        Produto,
-        VendaItem.produto_id == Produto.id,
-    ).filter(
-        Venda.tenant_id == tenant_id,
-        Venda.status == "finalizada",
-        Venda.data_venda >= inicio_dt,
-        Venda.data_venda <= fim_dt,
-        VendaItem.tipo == "produto",
+    resultado = _somar_componentes_margem_vendas_pe(
+        vendas_snapshot,
+        outros_variaveis=outros_variaveis,
+        detalhes_outros_variaveis=detalhes_outros_variaveis,
     )
-    if canais_lista:
-        cmv_query = cmv_query.filter(Venda.canal.in_(canais_lista))
-
-    cmv_estimado = _round_money(cmv_query.scalar())
-    despesas_variaveis = _calcular_despesas_variaveis_margem_pe(
-        db,
-        tenant_id,
-        inicio,
-        fim,
-        canais_lista,
-    )
-    custos_variaveis = _round_money(cmv_estimado + despesas_variaveis)
-    margem_contribuicao = _round_money(faturamento - custos_variaveis)
-    margem_decimal = margem_contribuicao / faturamento if faturamento > 0 else 0
+    quantidade_vendas = len(vendas)
+    ticket_medio = _round_money(resultado["faturamento"] / quantidade_vendas) if quantidade_vendas else 0
 
     return {
+        **resultado,
         "inicio": inicio,
         "fim": fim,
-        "faturamento": faturamento,
         "quantidade_vendas": quantidade_vendas,
         "ticket_medio": ticket_medio,
-        "cmv_estimado": cmv_estimado,
-        "despesas_variaveis": despesas_variaveis,
-        "custos_variaveis": custos_variaveis,
-        "margem_contribuicao": margem_contribuicao,
-        "margem_contribuicao_percentual": round(margem_decimal * 100, 2),
-        "margem_decimal": margem_decimal,
     }
 
 
@@ -490,6 +732,7 @@ def _calcular_margem_referencia_ponto_equilibrio(
     canais_lista: list[str],
     fonte_margem: str,
     margem_periodo: dict,
+    modo_custo_fiscal: str = MODO_CUSTO_FISCAL_PE_PADRAO,
 ) -> dict:
     opcao = MARGEM_PONTO_EQUILIBRIO_OPCOES[fonte_margem]
     if fonte_margem == "periodo_atual":
@@ -507,6 +750,7 @@ def _calcular_margem_referencia_ponto_equilibrio(
         inicio_referencia,
         fim_referencia,
         canais_lista,
+        modo_custo_fiscal=modo_custo_fiscal,
     )
     return {
         **margem,
@@ -521,6 +765,7 @@ async def obter_ponto_equilibrio(
     data_fim: Optional[date] = None,
     canais: Optional[str] = None,
     fonte_margem: Optional[str] = MARGEM_PONTO_EQUILIBRIO_PADRAO,
+    modo_custo_fiscal: Optional[str] = MODO_CUSTO_FISCAL_PE_PADRAO,
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant),
 ):
@@ -541,44 +786,10 @@ async def obter_ponto_equilibrio(
     if fonte_margem not in MARGEM_PONTO_EQUILIBRIO_OPCOES:
         opcoes = ", ".join(MARGEM_PONTO_EQUILIBRIO_OPCOES.keys())
         raise HTTPException(status_code=422, detail=f"Fonte da margem invalida. Use: {opcoes}")
-
-    vendas_query = db.query(Venda).filter(
-        Venda.tenant_id == tenant_id,
-        Venda.status == "finalizada",
-        Venda.data_venda >= inicio_dt,
-        Venda.data_venda <= fim_dt,
-    )
-    if canais_lista:
-        vendas_query = vendas_query.filter(Venda.canal.in_(canais_lista))
-
-    vendas_agregado = vendas_query.with_entities(
-        func.count(Venda.id).label("quantidade"),
-        func.coalesce(func.sum(Venda.total), 0).label("faturamento"),
-        func.coalesce(func.avg(Venda.total), 0).label("ticket_medio"),
-    ).first()
-
-    faturamento = _round_money(vendas_agregado.faturamento if vendas_agregado else 0)
-    quantidade_vendas = int(vendas_agregado.quantidade or 0) if vendas_agregado else 0
-    ticket_medio = _round_money(vendas_agregado.ticket_medio if vendas_agregado else 0)
-
-    cmv_estimado = db.query(
-        func.coalesce(func.sum(cast(VendaItem.quantidade, Float) * func.coalesce(Produto.preco_custo, 0.0)), 0)
-    ).join(
-        Venda,
-        VendaItem.venda_id == Venda.id,
-    ).outerjoin(
-        Produto,
-        VendaItem.produto_id == Produto.id,
-    ).filter(
-        Venda.tenant_id == tenant_id,
-        Venda.status == "finalizada",
-        Venda.data_venda >= inicio_dt,
-        Venda.data_venda <= fim_dt,
-        VendaItem.tipo == "produto",
-    )
-    if canais_lista:
-        cmv_estimado = cmv_estimado.filter(Venda.canal.in_(canais_lista))
-    cmv_estimado = _round_money(cmv_estimado.scalar())
+    modo_custo_fiscal = (modo_custo_fiscal or MODO_CUSTO_FISCAL_PE_PADRAO).strip()
+    if modo_custo_fiscal not in MODO_CUSTO_FISCAL_PE_OPCOES:
+        opcoes = ", ".join(MODO_CUSTO_FISCAL_PE_OPCOES.keys())
+        raise HTTPException(status_code=422, detail=f"Modo de custo invalido. Use: {opcoes}")
 
     produtos_sem_custo = db.query(
         func.count(func.distinct(VendaItem.produto_id))
@@ -590,7 +801,7 @@ async def obter_ponto_equilibrio(
         VendaItem.produto_id == Produto.id,
     ).filter(
         Venda.tenant_id == tenant_id,
-        Venda.status == "finalizada",
+        _filtro_status_venda_relatorio(),
         Venda.data_venda >= inicio_dt,
         Venda.data_venda <= fim_dt,
         VendaItem.tipo == "produto",
@@ -635,7 +846,8 @@ async def obter_ponto_equilibrio(
         )
 
     despesas_fixas = 0.0
-    despesas_variaveis = 0.0
+    outros_variaveis_contas = 0.0
+    despesas_variaveis_ja_cobertas = 0.0
     despesas_sem_classificacao = 0.0
     despesas_estoque_excluidas = 0.0
     folha_lancada_contas_pagar = 0.0
@@ -645,6 +857,7 @@ async def obter_ponto_equilibrio(
     detalhes_classificacao = {
         "fixas": [],
         "variaveis": [],
+        "custos_venda_snapshot": [],
         "sem_classificacao": [],
         "estoque_excluido": [],
     }
@@ -671,6 +884,27 @@ async def obter_ponto_equilibrio(
                     valor=valor,
                     classificacao="estoque_excluido",
                     origem_classificacao="Compra de estoque/Produto para Revenda (CMV ja cobre quando vendido)",
+                    fornecedor_nome=fornecedor_nome,
+                    tipo_despesa_nome=tipo_despesa_nome,
+                    categoria_nome=categoria_nome,
+                    dre_subcategoria_nome=dre_subcategoria_nome,
+                )
+            )
+            continue
+
+        if _conta_variavel_ja_coberta_pelo_snapshot_pe(
+            conta,
+            tipo_despesa_nome,
+            categoria_nome,
+            dre_subcategoria_nome,
+        ):
+            despesas_variaveis_ja_cobertas += valor
+            detalhes_classificacao["custos_venda_snapshot"].append(
+                _detalhe_conta_pe(
+                    conta,
+                    valor=valor,
+                    classificacao="coberto_snapshot",
+                    origem_classificacao="Custo de venda ja considerado no snapshot da venda",
                     fornecedor_nome=fornecedor_nome,
                     tipo_despesa_nome=tipo_despesa_nome,
                     categoria_nome=categoria_nome,
@@ -708,7 +942,7 @@ async def obter_ponto_equilibrio(
                 )
             )
         elif classificacao == "variavel":
-            despesas_variaveis += valor
+            outros_variaveis_contas += valor
             detalhes_classificacao["variaveis"].append(
                 _detalhe_conta_pe(
                     conta,
@@ -759,7 +993,7 @@ async def obter_ponto_equilibrio(
             + float(provisao.despesas_financeiras or 0)
             + float(provisao.outras_despesas or 0)
         )
-        despesas_variaveis_dre = float(provisao.despesas_vendas or 0) + float(provisao.impostos or 0)
+        despesas_variaveis_dre = float(provisao.despesas_vendas or 0)
 
         if despesas_fixas_dre > 0:
             despesas_fixas += despesas_fixas_dre
@@ -776,7 +1010,7 @@ async def obter_ponto_equilibrio(
             )
 
         if despesas_variaveis_dre > 0:
-            despesas_variaveis += despesas_variaveis_dre
+            outros_variaveis_contas += despesas_variaveis_dre
             detalhes_classificacao["variaveis"].append(
                 _detalhe_sintetico_pe(
                     item_id=f"dre-provisao-{provisao.id}-variavel",
@@ -808,32 +1042,32 @@ async def obter_ponto_equilibrio(
         )
 
     despesas_fixas = _round_money(despesas_fixas)
-    despesas_variaveis = _round_money(despesas_variaveis)
+    outros_variaveis_contas = _round_money(outros_variaveis_contas)
+    despesas_variaveis_ja_cobertas = _round_money(despesas_variaveis_ja_cobertas)
     despesas_sem_classificacao = _round_money(despesas_sem_classificacao)
     despesas_estoque_excluidas = _round_money(despesas_estoque_excluidas)
     folha_lancada_contas_pagar = _round_money(folha_lancada_contas_pagar)
     folha_provisoes_dre = _round_money(folha_provisoes_dre)
 
-    custos_variaveis = cmv_estimado + despesas_variaveis
-    margem_contribuicao = faturamento - custos_variaveis
-    margem_contribuicao_percentual = (
-        margem_contribuicao / faturamento
-        if faturamento > 0
-        else 0
+    margem_periodo = _calcular_margem_periodo_ponto_equilibrio(
+        db,
+        tenant_id,
+        inicio,
+        fim,
+        canais_lista,
+        modo_custo_fiscal=modo_custo_fiscal,
+        outros_variaveis=outros_variaveis_contas,
+        detalhes_outros_variaveis=detalhes_classificacao["variaveis"],
     )
-    margem_periodo = {
-        "inicio": inicio,
-        "fim": fim,
-        "faturamento": faturamento,
-        "quantidade_vendas": quantidade_vendas,
-        "ticket_medio": ticket_medio,
-        "cmv_estimado": cmv_estimado,
-        "despesas_variaveis": despesas_variaveis,
-        "custos_variaveis": _round_money(custos_variaveis),
-        "margem_contribuicao": _round_money(margem_contribuicao),
-        "margem_contribuicao_percentual": round(margem_contribuicao_percentual * 100, 2),
-        "margem_decimal": margem_contribuicao_percentual,
-    }
+    faturamento = margem_periodo["faturamento"]
+    quantidade_vendas = margem_periodo["quantidade_vendas"]
+    ticket_medio = margem_periodo["ticket_medio"]
+    cmv_estimado = margem_periodo["cmv_estimado"]
+    despesas_variaveis = margem_periodo["despesas_variaveis"]
+    custos_variaveis = margem_periodo["custos_variaveis"]
+    margem_contribuicao = margem_periodo["margem_contribuicao"]
+    margem_contribuicao_percentual = margem_periodo["margem_decimal"]
+
     margem_referencia = _calcular_margem_referencia_ponto_equilibrio(
         db,
         tenant_id,
@@ -842,6 +1076,7 @@ async def obter_ponto_equilibrio(
         canais_lista,
         fonte_margem,
         margem_periodo,
+        modo_custo_fiscal=modo_custo_fiscal,
     )
     margem_usada_decimal = float(margem_referencia.get("margem_decimal") or 0)
     margem_usada_percentual = round(margem_usada_decimal * 100, 2)
@@ -875,13 +1110,27 @@ async def obter_ponto_equilibrio(
         "formula": "ponto_equilibrio = custos fixos / margem de contribuicao escolhida",
         "fonte_margem": fonte_margem,
         "opcoes_fonte_margem": MARGEM_PONTO_EQUILIBRIO_OPCOES,
+        "modo_custo_fiscal": modo_custo_fiscal,
+        "opcoes_modo_custo_fiscal": MODO_CUSTO_FISCAL_PE_OPCOES,
         "faturamento": faturamento,
+        "receita_produtos_servicos": margem_periodo.get("receita_produtos_servicos", 0),
+        "receita_entrega": margem_periodo.get("receita_entrega", 0),
+        "descontos": margem_periodo.get("descontos", 0),
+        "beneficios_campanhas": margem_periodo.get("beneficios_campanhas", 0),
+        "taxas_cartao": margem_periodo.get("taxas_cartao", 0),
+        "repasse_entrega": margem_periodo.get("repasse_entrega", 0),
+        "custo_operacional_entrega": margem_periodo.get("custo_operacional_entrega", 0),
+        "comissoes": margem_periodo.get("comissoes", 0),
+        "custo_fiscal": margem_periodo.get("custo_fiscal", 0),
+        "outros_variaveis": margem_periodo.get("outros_variaveis", 0),
         "quantidade_vendas": quantidade_vendas,
         "ticket_medio": ticket_medio,
         "ticket_medio_usado": ticket_medio_usado,
         "ticket_medio_referencia": _round_money(margem_referencia.get("ticket_medio")),
         "cmv_estimado": cmv_estimado,
         "despesas_variaveis": despesas_variaveis,
+        "despesas_variaveis_contas": outros_variaveis_contas,
+        "despesas_variaveis_ja_cobertas": despesas_variaveis_ja_cobertas,
         "custos_variaveis": _round_money(custos_variaveis),
         "despesas_fixas": despesas_fixas,
         "despesas_sem_classificacao": despesas_sem_classificacao,
@@ -901,6 +1150,7 @@ async def obter_ponto_equilibrio(
         "margem_usada_valor": _round_money(margem_referencia.get("margem_contribuicao")),
         "margem_usada_label": margem_referencia.get("label"),
         "margem_referencia": margem_referencia,
+        "detalhes_margem": margem_periodo.get("detalhes_margem", {}),
         "ponto_equilibrio": _round_money(ponto_equilibrio) if ponto_equilibrio is not None else None,
         "falta_faturar": _round_money(falta_faturar) if falta_faturar is not None else None,
         "percentual_atingido": round(percentual_atingido, 2),

@@ -120,6 +120,72 @@ function DetalheContasCard({ title, total, items = [], tone = "slate", emptyLabe
   );
 }
 
+function DetalhamentoMargemPanel({ dados }) {
+  const detalhes = dados?.detalhes_margem || {};
+  const subtotais = detalhes.subtotais || [];
+  const componentes = detalhes.componentes || {};
+  const grupos = subtotais.filter((subtotal) => Math.abs(Number(subtotal.valor || 0)) > 0 || subtotal.id === "custo_fiscal");
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-lg border border-blue-200 bg-blue-50 p-4">
+        <h2 className="text-base font-semibold text-blue-950">Detalhamento da margem</h2>
+        <p className="mt-1 text-sm text-blue-900">
+          A margem vem do mesmo snapshot financeiro das vendas: receita, descontos, campanhas,
+          taxas, entrega, comissoes, custo gerencial e CMV. Contas variaveis externas entram em
+          outros custos variaveis para nao duplicar o que a venda ja gerou.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        {grupos.map((subtotal) => {
+          const itens = componentes[subtotal.id] || [];
+          const sinal = subtotal.tipo === "receita" ? "+" : "-";
+          const valorClass = subtotal.tipo === "receita" ? "text-emerald-700" : "text-red-700";
+          return (
+            <div key={subtotal.id} className="rounded-lg border border-slate-200 bg-white p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-bold text-slate-900">{subtotal.label}</h3>
+                  <p className="text-xs text-slate-500">{itens.length} origem(ns)</p>
+                </div>
+                <span className={`text-sm font-bold ${valorClass}`}>
+                  {sinal} {formatMoneyBRL(subtotal.valor || 0)}
+                </span>
+              </div>
+              <div className="mt-3 max-h-56 overflow-y-auto divide-y divide-slate-100">
+                {itens.length === 0 ? (
+                  <p className="py-4 text-sm text-slate-500">Nenhuma origem detalhada neste grupo</p>
+                ) : (
+                  itens.map((item, index) => (
+                    <div key={`${subtotal.id}-${item.id || index}`} className="py-3 text-sm">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="truncate font-semibold text-slate-900" title={item.descricao}>
+                            {item.descricao || `Venda ${item.numero_venda || item.venda_id || ""}`}
+                          </p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            {formatarDataBR(item.data_venda || item.data_vencimento)}
+                            {item.cliente_nome ? ` | ${item.cliente_nome}` : ""}
+                          </p>
+                          {item.observacao && (
+                            <p className="mt-1 text-xs text-blue-700">{item.observacao}</p>
+                          )}
+                        </div>
+                        <span className="shrink-0 font-bold text-slate-900">{formatMoneyBRL(item.valor || 0)}</span>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 const CANAIS = [
   { value: "", label: "Todos os canais" },
   { value: "loja_fisica", label: "Loja fisica" },
@@ -137,6 +203,11 @@ const MARGEM_PONTO_EQUILIBRIO_OPCOES = [
   { value: "periodo_atual", label: "Periodo atual" },
 ];
 
+const MODO_CUSTO_FISCAL_OPCOES = [
+  { value: "gerencial_completo", label: "Visao gerencial completa" },
+  { value: "documentos_emitidos", label: "Somente documentos emitidos" },
+];
+
 const CENARIOS_RAPIDOS = [
   { descricao: "Aumento aluguel", valor: "1000", faturamento: "" },
   { descricao: "Novo funcionario", valor: "3000", faturamento: "" },
@@ -145,6 +216,7 @@ const CENARIOS_RAPIDOS = [
 
 const ABAS_PONTO_EQUILIBRIO = [
   { id: "resumo", label: "Resumo" },
+  { id: "detalhamento", label: "Detalhamento" },
   { id: "simulador", label: "Simulador" },
   { id: "graficos", label: "Graficos" },
 ];
@@ -515,6 +587,7 @@ export default function PontoEquilibrio() {
     data_fim: fimMesAtual(),
     canal: "",
     fonte_margem: "media_12_meses_fechados",
+    modo_custo_fiscal: "gerencial_completo",
   });
   const [impactoForm, setImpactoForm] = useState({
     descricao: "",
@@ -580,7 +653,7 @@ export default function PontoEquilibrio() {
     return {
       tone: "slate",
       title: "Sem faturamento no periodo",
-      text: "Selecione um periodo com vendas finalizadas para calcular a margem.",
+      text: "Selecione um periodo com vendas para calcular a margem.",
     };
   }, [dados]);
 
@@ -592,6 +665,7 @@ export default function PontoEquilibrio() {
         data_inicio: filtros.data_inicio,
         data_fim: filtros.data_fim,
         fonte_margem: filtros.fonte_margem,
+        modo_custo_fiscal: filtros.modo_custo_fiscal,
       });
       if (filtros.canal) {
         params.append("canais", filtros.canal);
@@ -628,7 +702,7 @@ export default function PontoEquilibrio() {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-white p-3 md:grid-cols-[160px_160px_180px_220px_auto]">
+          <div className="grid grid-cols-1 gap-3 rounded-lg border border-slate-200 bg-white p-3 md:grid-cols-2 xl:grid-cols-[140px_140px_160px_210px_210px_auto]">
             <div>
               <label className="text-xs font-semibold text-slate-600">Inicio</label>
               <input
@@ -675,6 +749,20 @@ export default function PontoEquilibrio() {
                 ))}
               </select>
             </div>
+            <div>
+              <label className="text-xs font-semibold text-slate-600">Visao de custo</label>
+              <select
+                value={filtros.modo_custo_fiscal}
+                onChange={(event) => setFiltros({ ...filtros, modo_custo_fiscal: event.target.value })}
+                className="mt-1 w-full rounded-md border border-slate-300 px-3 py-2 text-sm"
+              >
+                {MODO_CUSTO_FISCAL_OPCOES.map((opcao) => (
+                  <option key={opcao.value} value={opcao.value}>
+                    {opcao.label}
+                  </option>
+                ))}
+              </select>
+            </div>
             <button
               type="button"
               onClick={carregarDados}
@@ -691,9 +779,9 @@ export default function PontoEquilibrio() {
           <p className="font-semibold">Formula usada</p>
           <p className="mt-1">
             Ponto de equilibrio = custos fixos / margem de contribuicao. A margem de contribuicao
-            pode vir do periodo atual ou de meses fechados. Ela considera faturamento menos CMV
-            estimado e despesas variaveis operacionais. Compras de estoque/produtos para revenda
-            ficam fora das despesas variaveis para nao duplicar o CMV.
+            pode vir do periodo atual ou de meses fechados. Ela usa o snapshot financeiro das
+            vendas: receita, descontos, campanhas, taxas, entrega, comissoes, custo gerencial,
+            CMV e outros custos variaveis sem duplicar contas geradas pela propria venda.
           </p>
         </div>
 
@@ -779,7 +867,15 @@ export default function PontoEquilibrio() {
                 <h2 className="text-base font-semibold text-slate-900">Composicao da margem</h2>
                 <div className="mt-4 space-y-3 text-sm">
                   <div className="flex justify-between gap-4">
-                    <span className="text-slate-600">Faturamento</span>
+                    <span className="text-slate-600">Receita produtos/servicos</span>
+                    <span className="font-semibold text-emerald-700">{formatMoneyBRL(dados.receita_produtos_servicos ?? dados.faturamento)}</span>
+                  </div>
+                  <div className="flex justify-between gap-4">
+                    <span className="text-slate-600">Receita entrega</span>
+                    <span className="font-semibold text-emerald-700">{formatMoneyBRL(dados.receita_entrega || 0)}</span>
+                  </div>
+                  <div className="flex justify-between gap-4 border-t border-slate-100 pt-3">
+                    <span className="text-slate-600">Faturamento total</span>
                     <span className="font-semibold text-slate-900">{formatMoneyBRL(dados.faturamento)}</span>
                   </div>
                   <div className="flex justify-between gap-4">
@@ -787,8 +883,17 @@ export default function PontoEquilibrio() {
                     <span className="font-semibold text-red-700">- {formatMoneyBRL(dados.cmv_estimado)}</span>
                   </div>
                   <div className="flex justify-between gap-4">
-                    <span className="text-slate-600">Despesas variaveis</span>
+                    <span className="text-slate-600">Custos de venda</span>
                     <span className="font-semibold text-red-700">- {formatMoneyBRL(dados.despesas_variaveis)}</span>
+                  </div>
+                  <div className="grid grid-cols-2 gap-2 rounded-md bg-slate-50 p-3 text-xs text-slate-600">
+                    <span>Descontos: {formatMoneyBRL(dados.descontos || 0)}</span>
+                    <span>Campanhas: {formatMoneyBRL(dados.beneficios_campanhas || 0)}</span>
+                    <span>Cartao: {formatMoneyBRL(dados.taxas_cartao || 0)}</span>
+                    <span>Entrega: {formatMoneyBRL((dados.repasse_entrega || 0) + (dados.custo_operacional_entrega || 0))}</span>
+                    <span>Comissoes: {formatMoneyBRL(dados.comissoes || 0)}</span>
+                    <span>Custo gerencial: {formatMoneyBRL(dados.custo_fiscal || 0)}</span>
+                    <span>Outros variaveis: {formatMoneyBRL(dados.outros_variaveis || 0)}</span>
                   </div>
                   <div className="border-t border-slate-100 pt-3">
                     <div className="flex justify-between gap-4">
@@ -837,10 +942,10 @@ export default function PontoEquilibrio() {
             </div>
 
             <div className="rounded-lg border border-slate-200 bg-slate-50 p-4">
-              <h2 className="text-base font-semibold text-slate-900">Origem dos valores</h2>
+              <h2 className="text-base font-semibold text-slate-900">Origem das contas e custos fixos</h2>
               <p className="mt-1 text-sm text-slate-600">
-                Use esta abertura para conferir o que entrou como despesa fixa, despesa variavel,
-                sem classificacao ou fora do ponto de equilibrio.
+                Use esta abertura para conferir o que entrou como despesa fixa, outros custos
+                variaveis de contas/DRE, sem classificacao ou fora do ponto de equilibrio.
               </p>
               <div className="mt-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
                 <DetalheContasCard
@@ -850,10 +955,17 @@ export default function PontoEquilibrio() {
                   tone="amber"
                 />
                 <DetalheContasCard
-                  title="Despesas variaveis"
-                  total={dados.despesas_variaveis}
+                  title="Outros variaveis"
+                  total={dados.outros_variaveis ?? dados.despesas_variaveis_contas}
                   items={dados.detalhes_classificacao?.variaveis || []}
                   tone="blue"
+                />
+                <DetalheContasCard
+                  title="Custos de venda ja no snapshot"
+                  total={dados.despesas_variaveis_ja_cobertas}
+                  items={dados.detalhes_classificacao?.custos_venda_snapshot || []}
+                  tone="blue"
+                  emptyLabel="Nenhuma conta duplicada pelo snapshot"
                 />
                 <DetalheContasCard
                   title="Sem classificacao"
@@ -871,6 +983,10 @@ export default function PontoEquilibrio() {
               </div>
             </div>
               </>
+            )}
+
+            {abaAtiva === "detalhamento" && (
+              <DetalhamentoMargemPanel dados={dados} />
             )}
 
             {abaAtiva === "simulador" && (

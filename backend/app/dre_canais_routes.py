@@ -131,7 +131,7 @@ def _obter_vendas_por_canal_legacy(db: Session, mes: int, ano: int, user_id: int
             Venda.user_id == user_id,
             extract('month', Venda.data_venda) == mes,
             extract('year', Venda.data_venda) == ano,
-            Venda.status.in_(['finalizada', 'pago_nf', 'baixa_parcial'])
+            _filtro_status_venda_dre()
         )
     ).all()
     
@@ -175,6 +175,10 @@ def _periodo_mes(mes: int, ano: int) -> tuple[datetime, datetime]:
     inicio = datetime(ano, mes, 1)
     fim = datetime(ano + 1, 1, 1) if mes == 12 else datetime(ano, mes + 1, 1)
     return inicio, fim
+
+
+def _filtro_status_venda_dre():
+    return or_(Venda.status.is_(None), Venda.status != "cancelada")
 
 
 def _decimal(valor) -> Decimal:
@@ -488,7 +492,7 @@ def obter_vendas_por_canal(db: Session, mes: int, ano: int, tenant_id: str) -> D
         Venda.tenant_id == tenant_id,
         Venda.data_venda >= inicio,
         Venda.data_venda < fim,
-        Venda.status.in_(['finalizada', 'pago_nf', 'baixa_parcial']),
+        _filtro_status_venda_dre(),
     ]
 
     dados_por_canal: Dict[str, Dict] = {}
@@ -1000,7 +1004,7 @@ def _detalhes_vendas_campo(
                 Venda.tenant_id == tenant_id,
                 Venda.data_venda >= inicio,
                 Venda.data_venda < fim,
-                Venda.status.in_(['finalizada', 'pago_nf', 'baixa_parcial']),
+                _filtro_status_venda_dre(),
             )
         )
         .all()
@@ -1214,7 +1218,7 @@ def detalhar_linha_dre_por_canal(
 def gerar_dre_por_canais(
     ano: int = Query(..., description="Ano do DRE"),
     mes: int = Query(..., description="Mês do DRE (1-12)"),
-    canais: str = Query("loja_fisica", description="Canais selecionados separados por vírgula (ex: loja_fisica,mercado_livre)"),
+    canais: str = Query("", description="Canais selecionados separados por vírgula (ex: loja_fisica,mercado_livre)"),
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
