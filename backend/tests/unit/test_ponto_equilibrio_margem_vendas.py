@@ -226,3 +226,20 @@ def test_ponto_equilibrio_identifica_conta_variavel_ja_coberta_pelo_snapshot():
 
     assert func(taxa_cartao, "Taxas de Cartao de Credito", "Taxas") is True
     assert func(embalagem, "Embalagens", "Custos variaveis") is False
+
+
+def test_ponto_equilibrio_pagina_detalhes_sob_demanda():
+    func = getattr(dashboard_routes, "_paginar_detalhes_ponto_equilibrio", None)
+    assert func is not None
+
+    resultado = func(
+        [{"id": item_id, "valor": item_id} for item_id in range(1, 6)],
+        page=2,
+        page_size=2,
+    )
+
+    assert resultado["page"] == 2
+    assert resultado["page_size"] == 2
+    assert resultado["pages"] == 3
+    assert resultado["total_itens"] == 5
+    assert [item["id"] for item in resultado["items"]] == [3, 4]
