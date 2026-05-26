@@ -13,6 +13,7 @@ import logging
 from decimal import Decimal
 from datetime import date, timedelta
 from typing import Dict, List, Optional
+from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 from app.tenancy.context import get_current_tenant_id
 from app.utils.tenant_safe_sql import TenantSafeSQLError, execute_tenant_safe
@@ -79,6 +80,103 @@ def _resolver_usuario_responsavel(db: Session, tenant_id: str, user_id: Optional
     raise TenantSafeSQLError(
         f"Nenhum usuario responsavel encontrado para provisionar comissoes do tenant {tenant_id}."
     )
+
+
+def _table_columns(db: Session, table_name: str) -> set[str]:
+    try:
+        inspector = inspect(db.get_bind())
+        if not inspector.has_table(table_name):
+            return set()
+        return {column["name"] for column in inspector.get_columns(table_name)}
+    except Exception as exc:
+        logger.warning("Nao foi possivel inspecionar tabela %s: %s", table_name, exc)
+        return set()
+
+
+def _resolver_subcategoria_comissoes(db: Session, tenant_id: str) -> Optional[int]:
+    result_subcat = execute_tenant_safe(db, """
+        SELECT id
+        FROM dre_subcategorias
+        WHERE ativo = true
+          AND (
+              lower(nome) LIKE '%comiss%'
+              OR lower(nome) LIKE '%vended%'
+          )
+          AND {tenant_filter}
+        ORDER BY
+          CASE
+            WHEN lower(nome) LIKE '%comiss%' THEN 0
+            WHEN lower(nome) LIKE '%vended%' THEN 1
+            ELSE 2
+          END,
+          id
+        LIMIT 1
+    """, {}, tenant_id=tenant_id)
+
+    subcat_comissoes = result_subcat.fetchone()
+    if subcat_comissoes:
+        return subcat_comissoes[0]
+
+    subcat_columns = _table_columns(db, "dre_subcategorias")
+    cat_columns = _table_columns(db, "dre_categorias")
+    required_subcat_columns = {"categoria_id", "nome", "tipo_custo", "escopo_rateio", "ativo", "tenant_id"}
+
+    if not required_subcat_columns.issubset(subcat_columns) or not cat_columns:
+        return None
+
+    result_categoria = execute_tenant_safe(db, """
+        SELECT id
+        FROM dre_categorias
+        WHERE ativo = true
+          AND (
+              natureza = 'despesa'
+              OR lower(nome) LIKE '%despesa%'
+          )
+          AND {tenant_filter}
+        ORDER BY
+          CASE
+            WHEN lower(nome) LIKE '%operacion%' THEN 0
+            WHEN lower(nome) LIKE '%despesa%' THEN 1
+            ELSE 2
+          END,
+          id
+        LIMIT 1
+    """, {}, tenant_id=tenant_id)
+    categoria = result_categoria.fetchone()
+    if not categoria:
+        return None
+
+    insert_columns = ["categoria_id", "nome", "tipo_custo", "escopo_rateio", "ativo", "tenant_id"]
+    insert_values = [":categoria_id", ":nome", ":tipo_custo", ":escopo_rateio", "true", ":tenant_id"]
+    params = {
+        "categoria_id": categoria[0],
+        "nome": "Comissões de Vendas",
+        "tipo_custo": "DIRETO",
+        "escopo_rateio": "AMBOS",
+        "tenant_id": tenant_id,
+    }
+
+    if "custo_pe" in subcat_columns:
+        insert_columns.append("custo_pe")
+        insert_values.append(":custo_pe")
+        params["custo_pe"] = "variavel"
+
+    result_insert = execute_tenant_safe(db, f"""
+        INSERT INTO dre_subcategorias (
+            {', '.join(insert_columns)}
+        ) VALUES (
+            {', '.join(insert_values)}
+        )
+        RETURNING id
+    """, params, tenant_id=tenant_id, require_tenant=False)
+
+    subcategoria_id = result_insert.fetchone()[0]
+    logger.info(
+        "Subcategoria DRE de comissoes criada automaticamente: #%s tenant=%s",
+        subcategoria_id,
+        tenant_id,
+    )
+    return subcategoria_id
 
 
 def provisionar_comissoes_venda(
@@ -199,18 +297,9 @@ def provisionar_comissoes_venda(
         # ETAPA 3: BUSCAR SUBCATEGORIA DRE "Comissões de Vendas"
         # ============================================================
         
-        result_subcat = execute_tenant_safe(db, """
-            SELECT id
-            FROM dre_subcategorias
-            WHERE nome LIKE '%Vendedores%'
-              AND ativo = true
-              AND {tenant_filter}
-            LIMIT 1
-        """, {}, tenant_id=tenant_id)
-        
-        subcat_comissoes = result_subcat.fetchone()
-        
-        if not subcat_comissoes:
+        dre_subcategoria_id = _resolver_subcategoria_comissoes(db, tenant_id)
+
+        if not dre_subcategoria_id:
             logger.error(
                 f"⚠️ Subcategoria DRE 'Comissões de Vendas' não encontrada para tenant {tenant_id}"
             )
@@ -221,8 +310,6 @@ def provisionar_comissoes_venda(
                 'contas_criadas': [],
                 'message': 'Subcategoria DRE Comissões não configurada'
             }
-        
-        dre_subcategoria_id = subcat_comissoes[0]
         
         # ============================================================
         # ETAPA 4: PROCESSAR CADA COMISSÃO

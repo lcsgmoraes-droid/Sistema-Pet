@@ -77,8 +77,23 @@ def _create_schema(session):
         """,
         """
         CREATE TABLE dre_subcategorias (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            categoria_id INTEGER,
+            nome TEXT,
+            tipo_custo TEXT,
+            base_rateio TEXT,
+            escopo_rateio TEXT,
+            ativo BOOLEAN,
+            custo_pe TEXT,
+            tenant_id TEXT NOT NULL
+        )
+        """,
+        """
+        CREATE TABLE dre_categorias (
             id INTEGER NOT NULL,
             nome TEXT,
+            ordem INTEGER,
+            natureza TEXT,
             ativo BOOLEAN,
             tenant_id TEXT NOT NULL
         )
@@ -243,6 +258,44 @@ def test_reexecucao_nao_duplica_provisao_no_mesmo_tenant(db_session):
     assert second["success"] is True
     assert second["comissoes_provisionadas"] == 0
     assert len(_contas(db_session)) == 1
+
+
+def test_cria_subcategoria_comissoes_quando_tenant_tem_apenas_categoria_despesa(db_session):
+    db_session.execute(
+        text("DELETE FROM dre_subcategorias WHERE tenant_id = :tenant_id"),
+        {"tenant_id": TENANT_A},
+    )
+    db_session.execute(
+        text("""
+            INSERT INTO dre_categorias (id, nome, ordem, natureza, ativo, tenant_id)
+            VALUES (9901, 'Despesas Operacionais', 3, 'despesa', 1, :tenant_id)
+        """),
+        {"tenant_id": TENANT_A},
+    )
+    db_session.commit()
+
+    result = provisionar_comissoes_venda(VENDA_ID, TENANT_A, db_session)
+
+    assert result["success"] is True
+    assert result["comissoes_provisionadas"] == 1
+
+    subcategoria = db_session.execute(
+        text("""
+            SELECT id, categoria_id, nome, tipo_custo, escopo_rateio, custo_pe
+            FROM dre_subcategorias
+            WHERE tenant_id = :tenant_id
+        """),
+        {"tenant_id": TENANT_A},
+    ).fetchone()
+    assert subcategoria.nome == "Comissões de Vendas"
+    assert subcategoria.categoria_id == 9901
+    assert subcategoria.tipo_custo == "DIRETO"
+    assert subcategoria.escopo_rateio == "AMBOS"
+    assert subcategoria.custo_pe == "variavel"
+
+    contas = _contas(db_session)
+    assert len(contas) == 1
+    assert contas[0].dre_subcategoria_id == subcategoria.id
 
 
 def test_funcao_sem_tenant_id_ou_contexto_falha(db_session):
