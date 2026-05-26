@@ -121,6 +121,72 @@ def _parcelas_com_comissao_funcionario(
     return {row[0] for row in rows}
 
 
+def _gerar_comissoes_pendentes_venda(
+    db: Session,
+    venda,
+    tenant_id,
+    trigger: str,
+) -> dict:
+    """Gera comissoes somente para pagamentos ainda sem comissao."""
+    if not venda.funcionario_id:
+        return {"comissoes_geradas": 0, "total_comissoes": 0.0}
+
+    from app.comissoes_service import gerar_comissoes_venda
+
+    todos_pagamentos = _listar_pagamentos_venda_para_comissao(db, venda.id, tenant_id)
+    if not todos_pagamentos:
+        logger.info("Nenhum pagamento encontrado na venda %s para gerar comissao", venda.id)
+        return {"comissoes_geradas": 0, "total_comissoes": 0.0}
+
+    parcelas_com_comissao = _parcelas_com_comissao_funcionario(
+        db,
+        venda.id,
+        venda.funcionario_id,
+        tenant_id,
+    )
+
+    comissoes_geradas = 0
+    total_comissoes = Decimal("0")
+
+    for idx, pagamento_row in enumerate(todos_pagamentos, start=1):
+        parcela_numero = idx
+        if parcela_numero in parcelas_com_comissao:
+            logger.info("Parcela %s ja tem comissao - pulando", parcela_numero)
+            continue
+
+        valor_pagamento = Decimal(str(pagamento_row[2]))
+        forma_pagamento = pagamento_row[1]
+
+        struct_logger.info(
+            event="COMMISSION_START",
+            message="Gerando comissao pendente para pagamento",
+            venda_id=venda.id,
+            funcionario_id=venda.funcionario_id,
+            valor_pago=float(valor_pagamento),
+            forma_pagamento=forma_pagamento,
+            parcela_numero=parcela_numero,
+            trigger=trigger,
+        )
+
+        resultado = gerar_comissoes_venda(
+            venda_id=venda.id,
+            funcionario_id=venda.funcionario_id,
+            valor_pago=valor_pagamento,
+            forma_pagamento=forma_pagamento,
+            parcela_numero=parcela_numero,
+            db=db,
+        )
+
+        if resultado and resultado.get("success") and not resultado.get("duplicated"):
+            comissoes_geradas += 1
+            total_comissoes += Decimal(str(resultado.get("total_comissao", 0)))
+
+    return {
+        "comissoes_geradas": comissoes_geradas,
+        "total_comissoes": float(total_comissoes),
+    }
+
+
 def _total_pago_venda(db: Session, venda_id: int, tenant_id) -> Decimal:
     row = execute_tenant_safe(db, """
         SELECT COALESCE(SUM(valor), 0) as total_pago
@@ -726,11 +792,12 @@ def atualizar_venda(
     # ============================================================================
     # Cenário: Usuário registrou pagamento primeiro, depois adicionou funcionário comissionado
     # Neste caso, precisa verificar se venda está paga e gerar comissões
-    if venda.funcionario_id and venda.status != 'finalizada':
+    if venda.funcionario_id:
         try:
             # Buscar total pago com filtro tenant-safe em SQL bruto
             total_pago = _total_pago_venda(db, venda.id, tenant_id)
             total_venda = Decimal(str(venda.total))
+            status_anterior = venda.status
 
             logger.info(f"📊 Venda {venda.id}: Total={total_venda}, Pago={total_pago}")
 
@@ -739,7 +806,6 @@ def atualizar_venda(
                 logger.info(f"✅ Venda {venda.id} está totalmente paga, finalizando e gerando comissões...")
 
                 # Atualizar status
-                status_anterior = venda.status
                 venda.status = 'finalizada'
                 venda.updated_at = datetime.now()
                 get_or_build_venda_rentabilidade_snapshot(
@@ -752,53 +818,28 @@ def atualizar_venda(
                 db.commit()
                 db.refresh(venda)
 
-                # Gerar comissões para cada pagamento
-                from app.comissoes_service import gerar_comissoes_venda
-
-                todos_pagamentos = _listar_pagamentos_venda_para_comissao(db, venda.id, tenant_id)
-
-                # Verificar quais pagamentos já têm comissão
-                parcelas_com_comissao = _parcelas_com_comissao_funcionario(
-                    db,
-                    venda.id,
-                    venda.funcionario_id,
-                    tenant_id,
+            if venda.status in ['baixa_parcial', 'finalizada']:
+                resultado_comissoes = _gerar_comissoes_pendentes_venda(
+                    db=db,
+                    venda=venda,
+                    tenant_id=tenant_id,
+                    trigger="update_sale",
                 )
 
-                comissoes_geradas = 0
-                total_comissoes = Decimal('0')
-
-                for idx, pagamento_row in enumerate(todos_pagamentos, start=1):
-                    parcela_numero = idx
-
-                    if parcela_numero in parcelas_com_comissao:
-                        continue
-
-                    valor_pagamento = Decimal(str(pagamento_row[2]))
-                    forma_pagamento = pagamento_row[1]
-
-                    resultado = gerar_comissoes_venda(
-                        venda_id=venda.id,
-                        funcionario_id=venda.funcionario_id,
-                        valor_pago=valor_pagamento,
-                        forma_pagamento=forma_pagamento,
-                        parcela_numero=parcela_numero,
-                        db=db
+                if resultado_comissoes["comissoes_geradas"] > 0:
+                    logger.info(
+                        "Comissoes geradas ao atualizar venda %s: %s - Total: R$ %.2f",
+                        venda.id,
+                        resultado_comissoes["comissoes_geradas"],
+                        resultado_comissoes["total_comissoes"],
                     )
-
-                    if resultado and resultado.get('success') and not resultado.get('duplicated'):
-                        comissoes_geradas += 1
-                        total_comissoes += Decimal(str(resultado.get('total_comissao', 0)))
-
-                if comissoes_geradas > 0:
-                    logger.info(f"✅ {comissoes_geradas} comissões geradas - Total: R$ {total_comissoes:.2f}")
                     struct_logger.info(
                         event="COMMISSION_GENERATED_ON_UPDATE",
-                        message=f"Comissões geradas ao atualizar venda com funcionário",
+                        message="Comissoes geradas ao atualizar venda com funcionario",
                         venda_id=venda.id,
                         funcionario_id=venda.funcionario_id,
-                        total_comissoes=float(total_comissoes),
-                        status_anterior=status_anterior
+                        total_comissoes=resultado_comissoes["total_comissoes"],
+                        status_anterior=status_anterior,
                     )
 
         except Exception as e:

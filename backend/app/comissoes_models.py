@@ -605,6 +605,9 @@ class ComissaoItem(Base):
     
     # Status e controle
     status = Column(String(20), nullable=False, default='pendente', index=True)  # pendente, pago, estornado
+    comissao_provisionada = Column(Boolean, nullable=True, default=False)
+    conta_pagar_id = Column(Integer, ForeignKey('contas_pagar.id'), nullable=True)
+    data_provisao = Column(Date, nullable=True)
     
     # Estorno
     data_estorno = Column(Date, nullable=True)
