@@ -49,8 +49,12 @@ import {
   calcularFaixasParcelamento,
   calcularResumoRecebimento,
   descreverCupomMargem,
+  montarFormasPagamentoAnalise,
   montarCupomParaFinalizar,
+  montarPagamentoAVista,
   montarPagamentoRecebido,
+  montarPagamentosMargem,
+  montarPayloadAnaliseMargem,
 } from './modalPagamentoUtils';
 
 const BANDEIRAS = [
@@ -340,30 +344,15 @@ export default function ModalPagamento({
   const calcularStatusMargemInicial = async () => {
     setLoadingStatusMargem(true);
     try {
-            // 🎯 SIMULAR pagamento à vista (dinheiro) para análise inicial
-      const pagamentoSimuladoAVista = [{
-        forma_pagamento_id: 1, // ID do dinheiro (geralmente 1)
-        valor: venda.total,
-        parcelas: 1
-      }];
-
-      // 🔧 Mapear itens para o formato correto do backend
-      const itemsFormatados = (venda.itens || []).map(item => ({
-        produto_id: item.produto_id,
-        quantidade: item.quantidade,
-        preco_venda: item.preco_unitario || item.preco_venda || 0,
-        custo: item.custo || null
-      }));
+      // 🎯 SIMULAR pagamento à vista (dinheiro) para análise inicial
+      const pagamentoSimuladoAVista = montarPagamentoAVista(venda.total);
 
       const response = await api.post(
         `/formas-pagamento/analisar-venda`,
-        {
-          items: itemsFormatados,
-          formas_pagamento: pagamentoSimuladoAVista,
-          desconto: venda.desconto_valor || 0,
-          taxa_entrega: venda.entrega?.taxa_entrega_total || 0,
-          vendedor_id: venda.funcionario_id || null
-        }
+        montarPayloadAnaliseMargem({
+          venda,
+          formasPagamento: pagamentoSimuladoAVista,
+        })
       );
 
       // Salvar SOMENTE a cor do indicador
@@ -388,29 +377,17 @@ export default function ModalPagamento({
 
     setLoadingStatusMargem(true);
     try {
-            const todosPagamentos = [
-        ...pagamentosExistentes,
-        // Excluir cashback da análise de margem (não é uma forma real de pagamento)
-        ...pagamentos.filter(p => !p.is_cashback)
-      ];
-
-      // 🔧 Mapear itens para o formato correto do backend
-      const itemsFormatados = (venda.itens || []).map(item => ({
-        produto_id: item.produto_id,
-        quantidade: item.quantidade,
-        preco_venda: item.preco_unitario || item.preco_venda || 0,
-        custo: item.custo || null
-      }));
+      const todosPagamentos = montarPagamentosMargem({
+        pagamentosExistentes,
+        pagamentos,
+      });
 
       const response = await api.post(
         `/formas-pagamento/analisar-venda`,
-        {
-          items: itemsFormatados,
-          formas_pagamento: todosPagamentos,
-          desconto: venda.desconto_valor || 0,
-          taxa_entrega: venda.entrega?.taxa_entrega_total || 0,
-          vendedor_id: venda.funcionario_id || null
-        }
+        montarPayloadAnaliseMargem({
+          venda,
+          formasPagamento: todosPagamentos,
+        })
       );
 
       // Salvar SOMENTE a cor do indicador
@@ -490,14 +467,6 @@ export default function ModalPagamento({
     try {
             const resultados = {};
       
-      // 🔧 Mapear itens para o formato correto do backend
-      const itemsFormatados = (venda.itens || []).map(item => ({
-        produto_id: item.produto_id,
-        quantidade: item.quantidade,
-        preco_venda: item.preco_unitario || item.preco_venda || 0,
-        custo: item.custo || null
-      }));
-      
       // Simular todas as parcelas de 1 até max
       for (let parcelas = 1; parcelas <= maxParcelas; parcelas++) {
         const pagamentoSimulado = [{
@@ -509,13 +478,10 @@ export default function ModalPagamento({
         try {
           const response = await api.post(
             `/formas-pagamento/analisar-venda`,
-            {
-              items: itemsFormatados,
-              formas_pagamento: pagamentoSimulado,
-              desconto: venda.desconto_valor || 0,
-              taxa_entrega: venda.entrega?.taxa_entrega_total || 0,
-              vendedor_id: venda.funcionario_id || null
-            }
+            montarPayloadAnaliseMargem({
+              venda,
+              formasPagamento: pagamentoSimulado,
+            })
           );
 
           if (response.data?.resultado?.cor_indicador) {
@@ -837,57 +803,11 @@ export default function ModalPagamento({
 
     console.log('🔍 DEBUG pagamentos atuais:', pagamentos);
 
-    // Calcular o total já alocado em formas de pagamento
-    const totalAlocado = pagamentos.reduce((sum, p) => sum + p.valor, 0);
-    const restante = valorTotal - totalAlocado;
-
-    console.log('💰 Total alocado:', totalAlocado);
-    console.log('💵 Restante:', restante);
-
-    // Preparar dados para análise
-    // Se houver pagamentos, usar proporcionalmente
-    // Se não houver, assumir tudo em dinheiro
-    let formasPagamentoAnalise = [];
-
-    if (pagamentos.length > 0) {
-      // Adicionar pagamentos já selecionados
-      formasPagamentoAnalise = pagamentos.map(pag => {
-        console.log('📋 Processando pagamento:', pag);
-        const formaId = pag.forma_pagamento_id || pag.forma_id;
-        const parcelas = pag.parcelas || pag.numero_parcelas || 1;
-        
-        console.log(`  ➡️ forma_id: ${formaId}, valor: ${pag.valor}, parcelas: ${parcelas}`);
-        
-        return {
-          forma_pagamento_id: formaId,
-          valor: pag.valor,
-          parcelas: parcelas
-        };
-      });
-
-      console.log('📊 Formas de pagamento para análise (após adicionar):', formasPagamentoAnalise);
-
-      // Se ainda sobrou valor, assumir o restante em dinheiro
-      if (restante > 0) {
-        // Buscar ID do dinheiro
-        const dinheiro = formasPagamento.find(f => f.tipo === 'dinheiro' || f.nome.toLowerCase().includes('dinheiro'));
-        formasPagamentoAnalise.push({
-          forma_pagamento_id: dinheiro?.id || null,
-          valor: restante,
-          parcelas: 1
-        });
-        console.log('💵 Adicionado restante em dinheiro');
-      }
-    } else {
-      // Sem pagamentos = assumir tudo em dinheiro
-      const dinheiro = formasPagamento.find(f => f.tipo === 'dinheiro' || f.nome.toLowerCase().includes('dinheiro'));
-      formasPagamentoAnalise = [{
-        forma_pagamento_id: dinheiro?.id || null,
-        valor: valorTotal,
-        parcelas: 1
-      }];
-      console.log('💵 Sem pagamentos, assumindo tudo em dinheiro');
-    }
+    const formasPagamentoAnalise = montarFormasPagamentoAnalise({
+      pagamentos,
+      formasPagamento,
+      valorTotal,
+    });
 
     console.log('✅ Formas finais enviadas para análise:', formasPagamentoAnalise);
 

@@ -80,6 +80,82 @@ export function montarPagamentoRecebido({
   };
 }
 
+export function montarItensAnaliseMargem(itens = []) {
+  return (itens || []).map((item) => ({
+    produto_id: item.produto_id,
+    quantidade: item.quantidade,
+    preco_venda: item.preco_unitario || item.preco_venda || 0,
+    custo: item.custo || null,
+  }));
+}
+
+export function montarPagamentoAVista(valor, formaPagamentoId = 1) {
+  return [
+    {
+      forma_pagamento_id: formaPagamentoId,
+      valor,
+      parcelas: 1,
+    },
+  ];
+}
+
+export function montarPagamentosMargem({
+  pagamentosExistentes = [],
+  pagamentos = [],
+}) {
+  return [
+    ...pagamentosExistentes,
+    ...pagamentos.filter((pagamento) => !pagamento.is_cashback),
+  ];
+}
+
+export function montarPayloadAnaliseMargem({ venda = {}, formasPagamento = [] }) {
+  return {
+    items: montarItensAnaliseMargem(venda.itens || []),
+    formas_pagamento: formasPagamento,
+    desconto: venda.desconto_valor || 0,
+    taxa_entrega: venda.entrega?.taxa_entrega_total || 0,
+    vendedor_id: venda.funcionario_id || null,
+  };
+}
+
+export function montarFormasPagamentoAnalise({
+  pagamentos = [],
+  formasPagamento = [],
+  valorTotal = 0,
+}) {
+  const totalAlocado = pagamentos.reduce(
+    (sum, pagamento) => sum + Number(pagamento.valor || 0),
+    0,
+  );
+  const restante = Number(valorTotal || 0) - totalAlocado;
+  const dinheiro = formasPagamento.find(
+    (forma) =>
+      forma.tipo === "dinheiro" ||
+      String(forma.nome || "").toLowerCase().includes("dinheiro"),
+  );
+
+  if (pagamentos.length === 0) {
+    return montarPagamentoAVista(Number(valorTotal || 0), dinheiro?.id || null);
+  }
+
+  const formasAnalise = pagamentos.map((pagamento) => ({
+    forma_pagamento_id: pagamento.forma_pagamento_id || pagamento.forma_id,
+    valor: pagamento.valor,
+    parcelas: pagamento.parcelas || pagamento.numero_parcelas || 1,
+  }));
+
+  if (restante > 0) {
+    formasAnalise.push({
+      forma_pagamento_id: dinheiro?.id || null,
+      valor: restante,
+      parcelas: 1,
+    });
+  }
+
+  return formasAnalise;
+}
+
 export function calcularFaixasParcelamento(simulacoes, maxParcelas) {
   const faixas = {
     saudavel: { min: 1, max: 0 },

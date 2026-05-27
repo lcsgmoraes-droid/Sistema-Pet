@@ -6,7 +6,12 @@ import {
   calcularResumoRecebimento,
   descreverCupomMargem,
   montarCupomParaFinalizar,
+  montarFormasPagamentoAnalise,
+  montarItensAnaliseMargem,
+  montarPagamentoAVista,
   montarPagamentoRecebido,
+  montarPagamentosMargem,
+  montarPayloadAnaliseMargem,
 } from "./modalPagamentoUtils.js";
 
 test("calcula faixas quando ha parcelas saudaveis, alerta e criticas", () => {
@@ -226,4 +231,87 @@ test("monta pagamento em dinheiro com troco e sem dados de cartao", () => {
   assert.equal(pagamento.nsu_cartao, null);
   assert.equal(pagamento.numero_parcelas, 1);
   assert.equal(pagamento.troco, 20);
+});
+
+test("monta itens e payload para analise de margem", () => {
+  const venda = {
+    total: 200,
+    desconto_valor: 15,
+    funcionario_id: 9,
+    entrega: { taxa_entrega_total: 12 },
+    itens: [
+      {
+        produto_id: 10,
+        quantidade: 2,
+        preco_unitario: 40,
+        preco_venda: 45,
+        custo: 20,
+      },
+      {
+        produto_id: 11,
+        quantidade: 1,
+        preco_venda: 30,
+      },
+    ],
+  };
+
+  assert.deepEqual(montarItensAnaliseMargem(venda.itens), [
+    { produto_id: 10, quantidade: 2, preco_venda: 40, custo: 20 },
+    { produto_id: 11, quantidade: 1, preco_venda: 30, custo: null },
+  ]);
+
+  assert.deepEqual(
+    montarPayloadAnaliseMargem({
+      venda,
+      formasPagamento: [{ forma_pagamento_id: 1, valor: 200, parcelas: 1 }],
+    }),
+    {
+      items: [
+        { produto_id: 10, quantidade: 2, preco_venda: 40, custo: 20 },
+        { produto_id: 11, quantidade: 1, preco_venda: 30, custo: null },
+      ],
+      formas_pagamento: [{ forma_pagamento_id: 1, valor: 200, parcelas: 1 }],
+      desconto: 15,
+      taxa_entrega: 12,
+      vendedor_id: 9,
+    },
+  );
+});
+
+test("monta pagamentos de margem ignorando cashback novo", () => {
+  const pagamentos = montarPagamentosMargem({
+    pagamentosExistentes: [{ id: 1, valor: 20 }],
+    pagamentos: [
+      { id: 2, valor: 30 },
+      { id: 3, valor: 10, is_cashback: true },
+    ],
+  });
+
+  assert.deepEqual(pagamentos, [
+    { id: 1, valor: 20 },
+    { id: 2, valor: 30 },
+  ]);
+});
+
+test("monta formas de pagamento para analise da venda com restante em dinheiro", () => {
+  const formas = montarFormasPagamentoAnalise({
+    pagamentos: [
+      { forma_id: 4, valor: 60, parcelas: 2 },
+    ],
+    formasPagamento: [
+      { id: 1, tipo: "dinheiro", nome: "Dinheiro" },
+    ],
+    valorTotal: 100,
+  });
+
+  assert.deepEqual(formas, [
+    { forma_pagamento_id: 4, valor: 60, parcelas: 2 },
+    { forma_pagamento_id: 1, valor: 40, parcelas: 1 },
+  ]);
+});
+
+test("monta pagamento a vista padrao para margem inicial", () => {
+  assert.deepEqual(montarPagamentoAVista(99.9), [
+    { forma_pagamento_id: 1, valor: 99.9, parcelas: 1 },
+  ]);
 });
