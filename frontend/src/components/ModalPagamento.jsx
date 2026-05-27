@@ -43,11 +43,11 @@ import {
   extrairMensagemNFe,
 } from '../utils/nfeFiscalAssistida';
 import { montarPayloadVenda } from '../utils/pdvVendaPayload';
-import {
-  campaignAllowsSaleChannel,
-  getCashbackBonusParamKey,
-} from '../utils/campaignChannelScope';
 import { useModulos } from '../contexts/ModulosContext';
+import {
+  calcularBeneficiosCampanhaPreview,
+  calcularFaixasParcelamento,
+} from './modalPagamentoUtils';
 
 const BANDEIRAS = [
   'Visa',
@@ -326,67 +326,16 @@ export default function ModalPagamento({
     }
   }, [erroJustificativa, revelarJustificativaObrigatoria]);
 
-  const valorBaseBeneficios = Number(venda.total || 0);
-  const canalVendaBeneficios = venda.canal || venda.origem_canal_venda || 'loja_fisica';
-  const campanhasElegiveisCanal = campanhasCompra.filter((campanha) =>
-    campaignAllowsSaleChannel(campanha, canalVendaBeneficios),
-  );
-  const campanhasCashback = campanhasElegiveisCanal.filter((campanha) => campanha.campaign_type === 'cashback');
-  const campanhasCarimbo = campanhasElegiveisCanal.filter((campanha) => campanha.campaign_type === 'loyalty_stamp');
-  const campanhasRecompra = campanhasElegiveisCanal.filter((campanha) => campanha.campaign_type === 'quick_repurchase');
-
-  const cashbackPrevisto = campanhasCashback
-    .map((campanha) => {
-      const params = campanha.params || {};
-      const chaveRank = `${rankCliente}_percent`;
-      const percentualBase = Number(params[chaveRank] ?? params.bronze_percent ?? 0);
-      const bonusPdv = Number(params[getCashbackBonusParamKey(canalVendaBeneficios)] ?? 0);
-      const percentualTotal = percentualBase + bonusPdv;
-      const valor = (valorBaseBeneficios * percentualTotal) / 100;
-
-      if (valor <= 0) return null;
-
-      return {
-        campanha: campanha.name,
-        percentual: percentualTotal,
-        valor,
-      };
-    })
-    .filter(Boolean);
-
-  const carimbosPrevistos = campanhasCarimbo
-    .map((campanha) => {
-      const params = campanha.params || {};
-      const valorPorCarimbo = Number(params.min_purchase_value || 0);
-
-      if (valorPorCarimbo <= 0) return null;
-
-      const quantidade = Math.floor(valorBaseBeneficios / valorPorCarimbo);
-      if (quantidade <= 0) return null;
-
-      return {
-        campanha: campanha.name,
-        quantidade,
-      };
-    })
-    .filter(Boolean);
-
-  const recompraPrevista = campanhasRecompra
-    .map((campanha) => {
-      const params = campanha.params || {};
-      const minPurchase = Number(params.min_purchase_value || 0);
-      const couponType = String(params.coupon_type || 'percent');
-      const couponValue = Number(params.coupon_value || 0);
-
-      if (couponValue <= 0 || valorBaseBeneficios < minPurchase) return null;
-
-      return {
-        campanha: campanha.name,
-        tipo: couponType,
-        valor: couponValue,
-      };
-    })
-    .filter(Boolean);
+  const {
+    cashbackPrevisto,
+    carimbosPrevistos,
+    recompraPrevista,
+  } = calcularBeneficiosCampanhaPreview({
+    campanhasCompra,
+    rankCliente,
+    canalVenda: venda.canal || venda.origem_canal_venda || 'loja_fisica',
+    valorBase: venda.total,
+  });
 
   // 🆕 Função para calcular status de margem operacional (INICIAL - À VISTA)
   const calcularStatusMargemInicial = async () => {
@@ -601,39 +550,6 @@ export default function ModalPagamento({
     } finally {
       setLoadingSimulacao(false);
     }
-  };
-
-  // 🆕 PASSO 3️⃣ - Calcular faixas de parcelamento baseado nas CORES DO BACKEND
-  const calcularFaixasParcelamento = (simulacoes, maxParcelas) => {
-    const faixas = {
-      saudavel: { min: 1, max: 0 },
-      alerta: { min: 0, max: 0 },
-      proibido: { min: 0, max: maxParcelas }
-    };
-    
-    let ultimaVerde = 0;
-    let primeiraVermelha = maxParcelas + 1;
-    
-    for (let i = 1; i <= maxParcelas; i++) {
-      const sim = simulacoes[i];
-      if (!sim) continue;
-      
-      // ✅ Usar a COR que veio do BACKEND, não interpretar
-      if (sim.cor === 'verde') {
-        ultimaVerde = i;
-      } else if (sim.cor === 'vermelho') {
-        if (i < primeiraVermelha) {
-          primeiraVermelha = i;
-        }
-      }
-    }
-    
-    faixas.saudavel.max = ultimaVerde;
-    faixas.alerta.min = ultimaVerde + 1;
-    faixas.alerta.max = primeiraVermelha - 1;
-    faixas.proibido.min = primeiraVermelha;
-    
-    return faixas;
   };
 
   // 🆕 PASSO 2️⃣ - Disparar simulação quando forma de pagamento é selecionada
