@@ -4,6 +4,15 @@ import api from "../../api";
 import { api as apiServices } from "../../services/api";
 import CustomerIdentity from "../../components/ui/CustomerIdentity";
 import ProductIdentity from "../../components/ui/ProductIdentity";
+import {
+  calcularTempoEstimado,
+  formatarHorarioLocalizacao,
+  formatarTempo,
+  getStatusColor,
+  getStatusLabel,
+  getUltimaParadaPendente,
+  montarDestinoMapaRota,
+} from "./rotasEntregaUtils";
 
 export default function RotasEntrega() {
   const navigate = useNavigate();
@@ -146,114 +155,10 @@ export default function RotasEntrega() {
     }
   }
 
-  function calcularTempoEstimado(rota) {
-    if (!rota.paradas || rota.paradas.length === 0) return null;
-
-    // Só mostrar tempo se a rota foi otimizada (tem tempo_acumulado nas paradas)
-    const ultimaParada = rota.paradas[rota.paradas.length - 1];
-    if (ultimaParada.tempo_acumulado) {
-      return ultimaParada.tempo_acumulado;
-    }
-
-    // Se não foi otimizada, retornar null (não mostrar estimativa)
-    return null;
-  }
-
-  function formatarTempo(segundos) {
-    if (!segundos) return "N/A";
-    // Converter de segundos para minutos
-    const minutos = Math.floor(segundos / 60);
-    const horas = Math.floor(minutos / 60);
-    const mins = minutos % 60;
-    if (horas > 0) {
-      return `${horas}h${mins}min`;
-    }
-    return `${mins}min`;
-  }
-
-  function getStatusColor(status) {
-    switch (status) {
-      case "pendente":
-        return "#FFA500";
-      case "em_andamento":
-        return "#007BFF";
-      case "em_rota":
-        return "#007BFF";
-      case "concluida":
-        return "#28A745";
-      case "cancelada":
-        return "#DC3545";
-      default:
-        return "#6C757D";
-    }
-  }
-
-  function getStatusLabel(status) {
-    switch (status) {
-      case "pendente":
-        return "🟠 Pendente";
-      case "em_andamento":
-        return "🔵 Em Andamento";
-      case "em_rota":
-        return "🔵 Em Rota";
-      case "concluida":
-        return "✅ Concluída";
-      case "cancelada":
-        return "❌ Cancelada";
-      default:
-        return status;
-    }
-  }
-
-  function formatarHorarioLocalizacao(dataIso) {
-    if (!dataIso) return "Sem atualização";
-    const data = new Date(dataIso);
-    if (Number.isNaN(data.getTime())) return "Sem atualização";
-    return data.toLocaleTimeString("pt-BR", {
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-    });
-  }
-
-  function getUltimaParadaPendente(rota) {
-    if (!Array.isArray(rota?.paradas)) return null;
-    return (
-      rota.paradas.find((parada) => parada.status !== "entregue") ||
-      rota.paradas[rota.paradas.length - 1] ||
-      null
-    );
-  }
-
   function abrirMapaRota(rota) {
-    if (rota?.token_rastreio) {
-      window.open(
-        `/rastreio/${encodeURIComponent(rota.token_rastreio)}`,
-        "_blank",
-        "noopener,noreferrer",
-      );
-      return;
-    }
-
-    const lat = rota?.lat_atual;
-    const lon = rota?.lon_atual;
-    if (lat && lon) {
-      window.open(
-        `https://www.google.com/maps?q=${lat},${lon}`,
-        "_blank",
-        "noopener,noreferrer",
-      );
-      return;
-    }
-
-    const ultimaParada = getUltimaParadaPendente(rota);
-    const endereco = ultimaParada?.endereco || rota?.endereco_destino;
-    if (endereco) {
-      window.open(
-        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(endereco)}`,
-        "_blank",
-        "noopener,noreferrer",
-      );
+    const destino = montarDestinoMapaRota(rota);
+    if (destino?.url) {
+      window.open(destino.url, "_blank", "noopener,noreferrer");
       return;
     }
 
