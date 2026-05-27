@@ -97,6 +97,20 @@ export function validarProdutoParaSalvar(produto = {}) {
   return null;
 }
 
+export function validarArquivoImagemProduto(file, maxUploadBytes = 10 * 1024 * 1024) {
+  const allowedTypes = ["image/jpeg", "image/png", "image/webp"];
+
+  if (!allowedTypes.includes(file?.type)) {
+    return "Apenas JPG, PNG e WebP são permitidos";
+  }
+
+  if ((file?.size || 0) > maxUploadBytes) {
+    return "Imagem deve ter no maximo 10MB";
+  }
+
+  return null;
+}
+
 export function montarPayloadProdutoParaSalvar(produto) {
   const { _mostrarCanais, ...restoProduto } = produto;
   const lojaFisicaAtiva = produto.status !== "inativo";

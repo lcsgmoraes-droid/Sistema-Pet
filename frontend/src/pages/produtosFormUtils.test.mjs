@@ -10,6 +10,7 @@ import {
   montarPayloadMovimentoEstoque,
   montarPayloadProdutoParaSalvar,
   organizarCategoriasHierarquicas,
+  validarArquivoImagemProduto,
   validarProdutoParaSalvar,
 } from "./produtosFormUtils.js";
 
@@ -142,6 +143,21 @@ test("monta payload numerico para salvar produto respeitando canais ativos", () 
       anunciar_ecommerce: false,
       anunciar_app: false,
     },
+  );
+});
+
+test("valida arquivo de imagem permitido para upload do produto", () => {
+  assert.equal(
+    validarArquivoImagemProduto({ type: "image/webp", size: 1024 }),
+    null,
+  );
+  assert.equal(
+    validarArquivoImagemProduto({ type: "application/pdf", size: 1024 }),
+    "Apenas JPG, PNG e WebP são permitidos",
+  );
+  assert.equal(
+    validarArquivoImagemProduto({ type: "image/png", size: 11 * 1024 * 1024 }),
+    "Imagem deve ter no maximo 10MB",
   );
 });
 

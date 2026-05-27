@@ -38,10 +38,9 @@ import {
   montarPayloadMovimentoEstoque,
   montarPayloadProdutoParaSalvar,
   organizarCategoriasHierarquicas,
+  validarArquivoImagemProduto,
   validarProdutoParaSalvar,
 } from './produtosFormUtils';
-
-const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
 
 export default function ProdutosForm() {
   const { id } = useParams();
@@ -298,15 +297,9 @@ export default function ProdutosForm() {
     const file = e.target.files[0];
     if (!file) return;
     
-    // Validações
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      alert('Apenas JPG, PNG e WebP são permitidos');
-      return;
-    }
-    
-    if (file.size > MAX_UPLOAD_SIZE_BYTES) {
-      alert('Imagem deve ter no maximo 10MB');
+    const mensagemValidacao = validarArquivoImagemProduto(file);
+    if (mensagemValidacao) {
+      alert(mensagemValidacao);
       return;
     }
     
