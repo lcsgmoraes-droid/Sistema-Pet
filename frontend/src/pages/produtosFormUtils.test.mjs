@@ -5,9 +5,12 @@ import {
   calcularMargemPercentual,
   formatarPorcentagemProduto,
   formatarValorMonetarioProduto,
+  montarEstadoProdutoFormulario,
   montarPayloadFornecedorProduto,
   montarPayloadMovimentoEstoque,
+  montarPayloadProdutoParaSalvar,
   organizarCategoriasHierarquicas,
+  validarProdutoParaSalvar,
 } from "./produtosFormUtils.js";
 
 test("organiza categorias em hierarquia achatada com nivel", () => {
@@ -50,6 +53,96 @@ test("calcula margem percentual mantendo nulo quando custo nao permite recalculo
   assert.equal(calcularMargemPercentual("50", "0"), "-100.00");
   assert.equal(calcularMargemPercentual("0", "75"), null);
   assert.equal(calcularMargemPercentual("", "75"), null);
+});
+
+test("normaliza produto carregado para o estado do formulario", () => {
+  assert.deepEqual(
+    montarEstadoProdutoFormulario({
+      codigo: "ABC",
+      nome: "Racao",
+      preco_custo: 10,
+      preco_venda: 20,
+      margem_lucro: 100,
+      controle_lote: true,
+      preco_ecommerce: 19.9,
+      anunciar_ecommerce: false,
+    }),
+    {
+      codigo: "ABC",
+      nome: "Racao",
+      descricao: "",
+      categoria_id: "",
+      marca_id: "",
+      departamento_id: "",
+      tipo: "produto",
+      preco_custo: 10,
+      preco_venda: 20,
+      margem_lucro: 100,
+      estoque_minimo: "",
+      estoque_maximo: "",
+      localizacao: "",
+      observacoes: "",
+      controle_lote: true,
+      status: "ativo",
+      preco_ecommerce: 19.9,
+      preco_ecommerce_promo: null,
+      preco_ecommerce_promo_inicio: null,
+      preco_ecommerce_promo_fim: null,
+      preco_app: null,
+      preco_app_promo: null,
+      preco_app_promo_inicio: null,
+      preco_app_promo_fim: null,
+      anunciar_ecommerce: false,
+      anunciar_app: true,
+    },
+  );
+});
+
+test("valida dados obrigatorios antes de salvar produto", () => {
+  assert.equal(
+    validarProdutoParaSalvar({ nome: "  ", preco_venda: "10" }),
+    "Nome do produto é obrigatório",
+  );
+  assert.equal(
+    validarProdutoParaSalvar({ nome: "Racao", preco_venda: "0" }),
+    "Preço de venda é obrigatório e deve ser maior que zero",
+  );
+  assert.equal(
+    validarProdutoParaSalvar({ nome: "Racao", preco_venda: "10" }),
+    null,
+  );
+});
+
+test("monta payload numerico para salvar produto respeitando canais ativos", () => {
+  assert.deepEqual(
+    montarPayloadProdutoParaSalvar({
+      _mostrarCanais: true,
+      nome: "Racao",
+      preco_custo: "12.50",
+      preco_venda: "20",
+      margem_lucro: "60",
+      estoque_minimo: "",
+      estoque_maximo: "4",
+      categoria_id: "",
+      marca_id: "8",
+      status: "inativo",
+      anunciar_ecommerce: true,
+      anunciar_app: true,
+    }),
+    {
+      nome: "Racao",
+      preco_custo: 12.5,
+      preco_venda: 20,
+      margem_lucro: 60,
+      estoque_minimo: 0,
+      estoque_maximo: 4,
+      categoria_id: null,
+      marca_id: "8",
+      status: "inativo",
+      anunciar_ecommerce: false,
+      anunciar_app: false,
+    },
+  );
 });
 
 test("monta payload normalizado de fornecedor do produto", () => {

@@ -33,9 +33,12 @@ import {
   calcularMargemPercentual,
   formatarPorcentagemProduto as formatarPorcentagem,
   formatarValorMonetarioProduto as formatarValorMonetario,
+  montarEstadoProdutoFormulario,
   montarPayloadFornecedorProduto,
   montarPayloadMovimentoEstoque,
+  montarPayloadProdutoParaSalvar,
   organizarCategoriasHierarquicas,
+  validarProdutoParaSalvar,
 } from './produtosFormUtils';
 
 const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
@@ -160,35 +163,7 @@ export default function ProdutosForm() {
       const response = await getProduto(id);
       const prod = response.data;
       
-      setProduto({
-        codigo: prod.codigo || '',
-        nome: prod.nome || '',
-        descricao: prod.descricao || '',
-        categoria_id: prod.categoria_id || '',
-        marca_id: prod.marca_id || '',
-        departamento_id: prod.departamento_id || '',
-        tipo: prod.tipo || 'produto',
-        preco_custo: prod.preco_custo || '',
-        preco_venda: prod.preco_venda || '',
-        margem_lucro: prod.margem_lucro || '',
-        estoque_minimo: prod.estoque_minimo || '',
-        estoque_maximo: prod.estoque_maximo || '',
-        localizacao: prod.localizacao || '',
-        observacoes: prod.observacoes || '',
-        controle_lote: prod.controle_lote || false,
-        status: prod.status || 'ativo',
-        // Preços por canal
-        preco_ecommerce: prod.preco_ecommerce ?? null,
-        preco_ecommerce_promo: prod.preco_ecommerce_promo ?? null,
-        preco_ecommerce_promo_inicio: prod.preco_ecommerce_promo_inicio ?? null,
-        preco_ecommerce_promo_fim: prod.preco_ecommerce_promo_fim ?? null,
-        preco_app: prod.preco_app ?? null,
-        preco_app_promo: prod.preco_app_promo ?? null,
-        preco_app_promo_inicio: prod.preco_app_promo_inicio ?? null,
-        preco_app_promo_fim: prod.preco_app_promo_fim ?? null,
-        anunciar_ecommerce: prod.anunciar_ecommerce ?? true,
-        anunciar_app: prod.anunciar_app ?? true,
-      });
+      setProduto(montarEstadoProdutoFormulario(prod));
       
       // Carregar imagens
       if (prod.imagens && prod.imagens.length > 0) {
@@ -289,34 +264,16 @@ export default function ProdutosForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Validações
-    if (!produto.nome.trim()) {
-      alert('Nome do produto é obrigatório');
-      return;
-    }
-    
-    if (!produto.preco_venda || parseFloat(produto.preco_venda) <= 0) {
-      alert('Preço de venda é obrigatório e deve ser maior que zero');
+    const mensagemValidacao = validarProdutoParaSalvar(produto);
+    if (mensagemValidacao) {
+      alert(mensagemValidacao);
       return;
     }
     
     try {
       setSalvando(true);
       
-      const { _mostrarCanais, ...restoProduto } = produto;
-      const lojaFisicaAtiva = produto.status !== 'inativo';
-      const dados = {
-        ...restoProduto,
-        preco_custo: parseFloat(produto.preco_custo) || 0,
-        preco_venda: parseFloat(produto.preco_venda) || 0,
-        margem_lucro: parseFloat(produto.margem_lucro) || 0,
-        estoque_minimo: parseFloat(produto.estoque_minimo) || 0,
-        estoque_maximo: parseFloat(produto.estoque_maximo) || 0,
-        categoria_id: produto.categoria_id || null,
-        marca_id: produto.marca_id || null,
-        anunciar_ecommerce: lojaFisicaAtiva ? Boolean(produto.anunciar_ecommerce) : false,
-        anunciar_app: lojaFisicaAtiva ? Boolean(produto.anunciar_app) : false,
-      };
+      const dados = montarPayloadProdutoParaSalvar(produto);
       
       if (isEdit) {
         await updateProduto(id, dados);
