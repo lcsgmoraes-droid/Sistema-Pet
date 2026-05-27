@@ -2,40 +2,21 @@ import { useCallback, useState, useEffect, useRef } from 'react';
 import {
   X,
   CreditCard,
-  DollarSign,
   Wallet,
-  Building,
   CheckCircle,
   AlertCircle,
   Trash2,
   FileText,
   BarChart2,
-  Banknote,
-  QrCode,
-  ArrowLeftRight,
-  Receipt,
-  Landmark
 } from 'lucide-react';
 
-// Mapeia o campo icone (palavra-chave ou emoji) para um componente lucide
-const getIconeFormaPagamento = (icone, nome) => {
-  const key = (icone || nome || '').toLowerCase();
-  if (key.includes('pix'))                           return <QrCode className="w-6 h-6" />;
-  if (key.includes('dinheiro') || key.includes('cash')) return <Banknote className="w-6 h-6" />;
-  if (key.includes('debito') || key.includes('d\u00e9bito'))  return <CreditCard className="w-6 h-6" />;
-  if (key.includes('parcelado'))                     return <CreditCard className="w-6 h-6" />;
-  if (key.includes('credito') || key.includes('cr\u00e9dito'))return <CreditCard className="w-6 h-6" />;
-  if (key.includes('transfer') || key.includes('banc')) return <ArrowLeftRight className="w-6 h-6" />;
-  if (key.includes('boleto'))                        return <Receipt className="w-6 h-6" />;
-  if (key.includes('wallet') || key.includes('carteira')) return <Wallet className="w-6 h-6" />;
-  return <CreditCard className="w-6 h-6" />;
-};
 import { finalizarVenda, criarVenda, atualizarVenda } from '../api/vendas';
 import { verificarEstoqueNegativo } from '../api/alertasEstoque';
 import StatusMargemIndicador from './StatusMargemIndicador';
 import api from '../api';
 import CurrencyInput from './CurrencyInput';
 import ModalAdicionarCredito from './ModalAdicionarCredito';
+import PaymentMethodIcon from './PaymentMethodIcon';
 import useRevealFloatingPanel from '../hooks/useRevealFloatingPanel';
 import { formatBRL, formatMoneyBRL } from '../utils/formatters';
 import {
@@ -49,6 +30,7 @@ import {
   calcularFaixasParcelamento,
   calcularResumoRecebimento,
   descreverCupomMargem,
+  avaliarEstadoJustificativaMargem,
   montarFormasPagamentoAnalise,
   montarCupomParaFinalizar,
   montarObservacoesComJustificativaMargem,
@@ -56,6 +38,7 @@ import {
   montarPagamentoRecebido,
   montarPagamentosMargem,
   montarPayloadAnaliseMargem,
+  obterCorParcelamentoAtual,
   validarPagamentoParaAdicionar,
 } from './modalPagamentoUtils';
 
@@ -262,15 +245,17 @@ export default function ModalPagamento({
   });
   const cupomParaFinalizar = montarCupomParaFinalizar({ cupomAplicado, venda });
   const descricaoCupomMargem = descreverCupomMargem(cupomParaFinalizar, formatMoneyBRL);
-  const corParcelamentoAtual =
-    formaPagamentoSelecionada?.permite_parcelamento &&
-    simulacoesParcelamento[formaPagamentoSelecionada.id]?.[numeroParcelas]
-      ? simulacoesParcelamento[formaPagamentoSelecionada.id][numeroParcelas]?.cor ?? 'verde'
-      : 'verde';
-  const margemCriticaAtual =
-    statusMargem === 'vermelho' || corParcelamentoAtual === 'vermelho';
-  const mostrarCampoJustificativa =
-    margemCriticaAtual || Boolean(justificativaTexto && justificativaTexto.trim().length > 0);
+  const corParcelamentoAtual = obterCorParcelamentoAtual({
+    formaPagamento: formaPagamentoSelecionada,
+    simulacoesParcelamento,
+    numeroParcelas,
+  });
+  const { margemCriticaAtual, mostrarCampoJustificativa } =
+    avaliarEstadoJustificativaMargem({
+      statusMargem,
+      corParcelamentoAtual,
+      justificativaTexto,
+    });
   const mostrarBotaoAdicionarRodape =
     Boolean(formaPagamentoSelecionada) && valorRestante > 0.01;
 
@@ -1021,7 +1006,7 @@ export default function ModalPagamento({
                         }`}
                       >
                         <div className="flex justify-center mb-1 text-gray-500">
-                          {getIconeFormaPagamento(forma.icone, forma.nome)}
+                          <PaymentMethodIcon icone={forma.icone} nome={forma.nome} />
                         </div>
                         <div className={`text-sm font-medium ${selecionada ? 'text-blue-900' : 'text-gray-700'}`}>
                           {forma.nome}

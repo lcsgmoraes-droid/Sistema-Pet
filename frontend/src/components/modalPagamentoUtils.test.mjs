@@ -5,6 +5,8 @@ import {
   calcularFaixasParcelamento,
   calcularResumoRecebimento,
   descreverCupomMargem,
+  avaliarEstadoJustificativaMargem,
+  identificarIconeFormaPagamento,
   montarCupomParaFinalizar,
   montarFormasPagamentoAnalise,
   montarItensAnaliseMargem,
@@ -13,8 +15,84 @@ import {
   montarPagamentosMargem,
   montarPayloadAnaliseMargem,
   montarObservacoesComJustificativaMargem,
+  obterCorParcelamentoAtual,
   validarPagamentoParaAdicionar,
 } from "./modalPagamentoUtils.js";
+
+test("identifica icone da forma de pagamento por icone ou nome", () => {
+  assert.equal(identificarIconeFormaPagamento("pix", "Pix"), "qr_code");
+  assert.equal(identificarIconeFormaPagamento("", "Dinheiro"), "banknote");
+  assert.equal(identificarIconeFormaPagamento("", "Cartao de debito"), "credit_card");
+  assert.equal(identificarIconeFormaPagamento("", "Crédito parcelado"), "credit_card");
+  assert.equal(identificarIconeFormaPagamento("", "Transferencia bancaria"), "transfer");
+  assert.equal(identificarIconeFormaPagamento("", "Boleto"), "receipt");
+  assert.equal(identificarIconeFormaPagamento("", "Carteira digital"), "wallet");
+  assert.equal(identificarIconeFormaPagamento("", "Outro"), "credit_card");
+});
+
+test("obtem cor do parcelamento atual com fallback seguro", () => {
+  const simulacoes = {
+    12: {
+      1: { cor: "verde" },
+      2: { cor: "amarelo" },
+      3: {},
+    },
+  };
+
+  assert.equal(
+    obterCorParcelamentoAtual({
+      formaPagamento: { id: 12, permite_parcelamento: true },
+      simulacoesParcelamento: simulacoes,
+      numeroParcelas: 2,
+    }),
+    "amarelo",
+  );
+  assert.equal(
+    obterCorParcelamentoAtual({
+      formaPagamento: { id: 12, permite_parcelamento: true },
+      simulacoesParcelamento: simulacoes,
+      numeroParcelas: 3,
+    }),
+    "verde",
+  );
+  assert.equal(
+    obterCorParcelamentoAtual({
+      formaPagamento: { id: 12, permite_parcelamento: false },
+      simulacoesParcelamento: simulacoes,
+      numeroParcelas: 2,
+    }),
+    "verde",
+  );
+});
+
+test("avalia quando margem exige justificativa ou campo visivel", () => {
+  assert.deepEqual(
+    avaliarEstadoJustificativaMargem({
+      statusMargem: "vermelho",
+      corParcelamentoAtual: "verde",
+      justificativaTexto: "",
+    }),
+    { margemCriticaAtual: true, mostrarCampoJustificativa: true },
+  );
+
+  assert.deepEqual(
+    avaliarEstadoJustificativaMargem({
+      statusMargem: "verde",
+      corParcelamentoAtual: "vermelho",
+      justificativaTexto: "",
+    }),
+    { margemCriticaAtual: true, mostrarCampoJustificativa: true },
+  );
+
+  assert.deepEqual(
+    avaliarEstadoJustificativaMargem({
+      statusMargem: "verde",
+      corParcelamentoAtual: "verde",
+      justificativaTexto: "ajuste aprovado",
+    }),
+    { margemCriticaAtual: false, mostrarCampoJustificativa: true },
+  );
+});
 
 test("calcula faixas quando ha parcelas saudaveis, alerta e criticas", () => {
   const faixas = calcularFaixasParcelamento(

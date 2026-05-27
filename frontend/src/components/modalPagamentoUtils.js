@@ -3,6 +3,44 @@ import {
   getCashbackBonusParamKey,
 } from "../utils/campaignChannelScope.js";
 
+export function identificarIconeFormaPagamento(icone, nome) {
+  const key = String(icone || nome || "").toLowerCase();
+  if (key.includes("pix")) return "qr_code";
+  if (key.includes("dinheiro") || key.includes("cash")) return "banknote";
+  if (key.includes("debito") || key.includes("débito")) return "credit_card";
+  if (key.includes("parcelado")) return "credit_card";
+  if (key.includes("credito") || key.includes("crédito")) return "credit_card";
+  if (key.includes("transfer") || key.includes("banc")) return "transfer";
+  if (key.includes("boleto")) return "receipt";
+  if (key.includes("wallet") || key.includes("carteira")) return "wallet";
+  return "credit_card";
+}
+
+export function obterCorParcelamentoAtual({
+  formaPagamento = null,
+  simulacoesParcelamento = {},
+  numeroParcelas = 1,
+}) {
+  if (!formaPagamento?.permite_parcelamento) return "verde";
+  return simulacoesParcelamento[formaPagamento.id]?.[numeroParcelas]?.cor ?? "verde";
+}
+
+export function avaliarEstadoJustificativaMargem({
+  statusMargem = null,
+  corParcelamentoAtual = "verde",
+  justificativaTexto = "",
+}) {
+  const margemCriticaAtual =
+    statusMargem === "vermelho" || corParcelamentoAtual === "vermelho";
+
+  return {
+    margemCriticaAtual,
+    mostrarCampoJustificativa:
+      margemCriticaAtual ||
+      Boolean(justificativaTexto && justificativaTexto.trim().length > 0),
+  };
+}
+
 export function calcularResumoRecebimento({
   valorTotal = 0,
   pagamentos = [],
