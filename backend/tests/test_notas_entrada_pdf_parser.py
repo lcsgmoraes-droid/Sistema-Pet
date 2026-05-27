@@ -94,6 +94,26 @@ BOLETO 11/06/26 01/07/26 21/07/26
 REPRESENTANTE: EMPRESA PESO TOTAL: 823,000 Kg VALOR TOTAL: 3.534,79
 """
 
+PEDIDO_APP_VENDAS_MOBILE_TEXT = """
+Juliana Lacerda
+CNPJ:43922456000111
+Cidade:Presidente Prudente -Sp
+Fones: 18 99795-2282/
+E-mail: julysanchezpp@hotmail.com
+26/05/2026 11:13:09 PEDIDO N°:241
+Empresa PETS MAR DISTRIBUIDORA LTDA
+Número Vencimento Valor Número Vencimento Valor Número Vencimento Valor
+241/1-1 26/05/2026 1.220,00
+Código Descrição Unid. Qtde. Vlr. unit. Desconto Vlr. total
+36 Osso nò 10/11 a granel 1 kilo 10 61,00 610,00
+35 Osso nò 9/10 a granel 1 kilo 10 61,00 610,00
+2 itens Peso liq.:0 Peso bru.:0 Volumes:20 Total unid.:0 1.220,00 0,00 1.220,00
+Desconto (0%): 0,00
+Vlr.frete: 0,00
+----------------------- ----------------------- Total:R$ 1.220,00
+APP VENDAS MOBILE Ass. vendedor Ass. cliente
+"""
+
 
 def test_parse_pedido_pdf_text_extracts_order_items_total_and_installments():
     pedido = parse_pedido_pdf_text(PEDIDO_2_TEXT)
@@ -159,6 +179,29 @@ def test_parse_pedido_pdf_text_accepts_alphanumeric_and_multipage_items():
         (date(2026, 6, 11), pytest.approx(1178.27)),
         (date(2026, 7, 1), pytest.approx(1178.26)),
         (date(2026, 7, 21), pytest.approx(1178.26)),
+    ]
+
+
+def test_parse_pedido_pdf_text_accepts_app_vendas_mobile_layout():
+    pedido = parse_pedido_pdf_text(PEDIDO_APP_VENDAS_MOBILE_TEXT)
+
+    assert pedido.numero_pedido == "241"
+    assert pedido.data_emissao == date(2026, 5, 26)
+    assert pedido.valor_total == pytest.approx(1220.00)
+    assert pedido.valor_produtos == pytest.approx(1220.00)
+
+    assert len(pedido.itens) == 2
+    assert pedido.itens[0].codigo == "36"
+    assert pedido.itens[0].descricao == "Osso nò 10/11 a granel 1 kilo"
+    assert pedido.itens[0].quantidade == pytest.approx(10)
+    assert pedido.itens[0].valor_unitario == pytest.approx(61.00)
+    assert pedido.itens[0].valor_total == pytest.approx(610.00)
+    assert pedido.itens[0].unidade == "UN"
+
+    assert pedido.itens[1].codigo == "35"
+    assert pedido.itens[1].descricao == "Osso nò 9/10 a granel 1 kilo"
+    assert [(dup.vencimento, dup.valor) for dup in pedido.duplicatas] == [
+        (date(2026, 5, 26), pytest.approx(1220.00)),
     ]
 
 
