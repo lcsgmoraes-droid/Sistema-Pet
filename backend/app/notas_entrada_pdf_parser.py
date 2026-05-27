@@ -170,7 +170,11 @@ def _extrair_numero_pedido(text: str) -> str:
     if match:
         return match.group(1)
 
-    match = re.search(r"\bPEDIDO\s*(?:N[RO\.]*|NUMERO)?\s*[:#-]?\s*(\d{3,})", text, flags=re.IGNORECASE)
+    match = re.search(
+        r"\bPEDIDO\s*(?:N[ROº°\.]*|NUMERO)?\s*[:#-]?\s*(\d{1,})",
+        text,
+        flags=re.IGNORECASE,
+    )
     if match:
         return match.group(1)
 
@@ -185,6 +189,17 @@ def _extrair_data_emissao(text: str) -> date:
 
 
 def _extrair_itens(text: str) -> list[PDFEntradaItem]:
+    for extractor in (
+        _extrair_itens_romaneio,
+        _extrair_itens_app_vendas_mobile,
+    ):
+        itens = extractor(text)
+        if itens:
+            return itens
+    return []
+
+
+def _extrair_itens_romaneio(text: str) -> list[PDFEntradaItem]:
     itens = []
     codigo_pattern = r"([A-Z0-9][A-Z0-9._/-]{2,})"
     valor_pattern = r"(\d{1,3}(?:\.\d{3})*,\d{2})"
@@ -225,8 +240,56 @@ def _extrair_itens(text: str) -> list[PDFEntradaItem]:
 
     return itens
 
+
+def _extrair_itens_app_vendas_mobile(text: str) -> list[PDFEntradaItem]:
+    itens = []
+    valor_pattern = r"(\d{1,3}(?:\.\d{3})*,\d{2})"
+    item_pattern = re.compile(
+        rf"^([A-Z0-9][A-Z0-9._/-]*)\s+(.+?)\s+(\d+(?:[,.]\d+)?)\s+"
+        rf"{valor_pattern}\s+{valor_pattern}$",
+        flags=re.IGNORECASE,
+    )
+
+    parsing_items = False
+    for line in text.split("\n"):
+        upper_line = line.upper()
+        if "CÓDIGO DESCRIÇÃO" in upper_line or "CODIGO DESCRICAO" in upper_line:
+            parsing_items = True
+            continue
+        if parsing_items and (
+            re.search(r"\b\d+\s+ITENS?\b", upper_line)
+            or upper_line.startswith("DESCONTO ")
+            or upper_line.startswith("VLR.FRETE")
+            or "TOTAL:R$" in upper_line
+            or "APP VENDAS" in upper_line
+        ):
+            break
+        if not parsing_items:
+            continue
+
+        match = item_pattern.match(line)
+        if not match:
+            continue
+        codigo, descricao, quantidade, valor_unitario, valor_total = match.groups()
+        itens.append(
+            PDFEntradaItem(
+                numero_item=len(itens) + 1,
+                codigo=codigo,
+                descricao=descricao.strip(),
+                quantidade=float(_parse_decimal(quantidade)),
+                valor_unitario=float(_parse_decimal(valor_unitario)),
+                valor_total=float(_parse_decimal(valor_total)),
+                unidade="UN",
+            )
+        )
+
+    return itens
+
+
 def _extrair_valor_total(text: str) -> Optional[float]:
     match = re.search(r"VALOR TOTAL:\s*(\d{1,3}(?:\.\d{3})*,\d{2})", text, flags=re.IGNORECASE)
+    if not match:
+        match = re.search(r"\bTOTAL\s*:\s*R\$\s*(\d{1,3}(?:\.\d{3})*,\d{2})", text, flags=re.IGNORECASE)
     if not match:
         return None
     return float(_parse_decimal(match.group(1)))
@@ -288,6 +351,26 @@ def _extrair_duplicatas(text: str) -> list[PDFEntradaDuplicata]:
                 continue
             vistos.add(chave)
             pares.append((vencimento, valor))
+
+    for line in lines:
+        match = re.match(
+            r"^([A-Z0-9./-]+)\s+(\d{2}/\d{2}/(?:\d{4}|\d{2}))\s+(\d{1,3}(?:\.\d{3})*,\d{2})$",
+            line,
+            flags=re.IGNORECASE,
+        )
+        if not match:
+            continue
+        _, data_vencimento, valor_texto = match.groups()
+        try:
+            vencimento = _parse_date(data_vencimento)
+            valor = _parse_decimal(valor_texto)
+        except ValueError:
+            continue
+        chave = (vencimento, valor)
+        if chave in vistos:
+            continue
+        vistos.add(chave)
+        pares.append((vencimento, valor))
 
     pares = sorted(pares, key=lambda pair: pair[0])
 
