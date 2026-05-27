@@ -70,3 +70,11 @@ export const previewFusaoPessoas = (data) => {
 export const executarFusaoPessoas = (data) => {
   return api.post('/clientes/fusao/executar', data);
 };
+
+export const buscarSugestoesDuplicidadePessoas = (params = {}) => {
+  return api.get('/clientes/duplicidades/sugestoes', { params });
+};
+
+export const executarFusoesAutomaticasPessoas = () => {
+  return api.post('/clientes/duplicidades/fundir-automaticas');
+};

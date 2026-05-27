@@ -31,6 +31,10 @@ from app.services.pessoa_merge_service import (
     executar_fusao_pessoas,
     montar_preview_fusao_pessoas,
 )
+from app.services.pessoa_duplicate_service import (
+    executar_fusoes_automaticas_pessoas_duplicadas,
+    listar_sugestoes_duplicidade_pessoas,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -1045,6 +1049,45 @@ def executar_fusao_pessoas_route(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail=f"Erro ao fundir pessoas: {str(exc)}",
+        )
+
+
+@router.get("/duplicidades/sugestoes")
+@require_permission("clientes.visualizar")
+def listar_sugestoes_duplicidade_pessoas_route(
+    limit: int = Query(50, ge=1, le=100),
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    """Lista possiveis duplicidades de pessoas que exigem revisao manual."""
+    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    return listar_sugestoes_duplicidade_pessoas(
+        db,
+        tenant_id=tenant_id,
+        limit=limit,
+    )
+
+
+@router.post("/duplicidades/fundir-automaticas")
+@require_permission("clientes.editar")
+def executar_fusoes_automaticas_pessoas_route(
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    """Funde automaticamente duplicidades seguras por nome 100% igual."""
+    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    try:
+        return executar_fusoes_automaticas_pessoas_duplicadas(
+            db,
+            tenant_id=tenant_id,
+            user_id=current_user.id,
+        )
+    except Exception as exc:
+        db.rollback()
+        logger.exception("Erro na varredura de duplicidade de pessoas")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Erro ao verificar duplicidades: {str(exc)}",
         )
 
 
