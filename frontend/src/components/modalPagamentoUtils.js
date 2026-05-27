@@ -47,6 +47,25 @@ export function descreverCupomMargem(cupomParaFinalizar, formatarValor = (valor)
   return `A margem ficou baixa por conta do cupom ${String(cupomParaFinalizar.code).toUpperCase()} (${formatarValor(Number(cupomParaFinalizar.discount_applied || 0))} de desconto).`;
 }
 
+export function montarObservacoesComJustificativaMargem({
+  observacoesAtuais = "",
+  descricaoCupomMargem = "",
+  justificativaTexto = "",
+}) {
+  const justificativaFinal = descricaoCupomMargem
+    ? `${descricaoCupomMargem} Observacao informada: ${justificativaTexto}`
+    : justificativaTexto;
+  const blocoJustificativa = `JUSTIFICATIVA (Margem Critica): ${justificativaFinal}`;
+
+  if (String(observacoesAtuais || "").includes(blocoJustificativa)) {
+    return observacoesAtuais || "";
+  }
+
+  return observacoesAtuais
+    ? `${observacoesAtuais}\n\n${blocoJustificativa}`
+    : blocoJustificativa;
+}
+
 export function montarPagamentoRecebido({
   formaPagamento,
   valor = 0,
@@ -78,6 +97,61 @@ export function montarPagamentoRecebido({
       formaPagamento.nome === "Crédito Cliente" || tipo === "credito_cliente",
     is_cashback: formaPagamento.id === "cashback",
   };
+}
+
+export function validarPagamentoParaAdicionar({
+  formaPagamento,
+  valor = 0,
+  saldoCashback = 0,
+  bandeira = "",
+  operadora = null,
+  numeroParcelas = 1,
+}) {
+  if (!formaPagamento) {
+    return "Selecione uma forma de pagamento";
+  }
+
+  const valorNumerico = Number(valor || 0);
+
+  if (valorNumerico <= 0) {
+    return "Informe o valor recebido";
+  }
+
+  if (
+    formaPagamento.id === "credito_cliente" &&
+    valorNumerico > Number(formaPagamento.credito_disponivel || 0)
+  ) {
+    return `Valor excede o crédito disponível (R$ ${Number(
+      formaPagamento.credito_disponivel || 0,
+    ).toFixed(2)})`;
+  }
+
+  if (
+    formaPagamento.id === "cashback" &&
+    valorNumerico > Number(saldoCashback || 0) + 0.01
+  ) {
+    return `Valor excede o cashback disponível (R$ ${Number(saldoCashback || 0)
+      .toFixed(2)
+      .replace(".", ",")})`;
+  }
+
+  const isCartao = ["cartao_credito", "cartao_debito"].includes(
+    formaPagamento.tipo,
+  );
+
+  if (isCartao && !bandeira) {
+    return "Selecione a bandeira do cartão";
+  }
+
+  if (isCartao && !operadora) {
+    return "Selecione a operadora do cartão";
+  }
+
+  if (operadora && numeroParcelas > operadora.max_parcelas) {
+    return `A operadora ${operadora.nome} permite no máximo ${operadora.max_parcelas}x`;
+  }
+
+  return "";
 }
 
 export function montarItensAnaliseMargem(itens = []) {

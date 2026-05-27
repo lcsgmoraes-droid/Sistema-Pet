@@ -51,10 +51,12 @@ import {
   descreverCupomMargem,
   montarFormasPagamentoAnalise,
   montarCupomParaFinalizar,
+  montarObservacoesComJustificativaMargem,
   montarPagamentoAVista,
   montarPagamentoRecebido,
   montarPagamentosMargem,
   montarPayloadAnaliseMargem,
+  validarPagamentoParaAdicionar,
 } from './modalPagamentoUtils';
 
 const BANDEIRAS = [
@@ -551,49 +553,18 @@ export default function ModalPagamento({
 
   // Adicionar forma de pagamento
   const adicionarPagamento = () => {
-    if (!formaPagamentoSelecionada) {
-      setErro('Selecione uma forma de pagamento');
-      return;
-    }
-
     const valor = valorRecebido || 0;
+    const erroValidacao = validarPagamentoParaAdicionar({
+      formaPagamento: formaPagamentoSelecionada,
+      valor,
+      saldoCashback,
+      bandeira,
+      operadora: operadoraSelecionada,
+      numeroParcelas,
+    });
 
-    if (valor <= 0) {
-      setErro('Informe o valor recebido');
-      return;
-    }
-
-    // Validar crédito disponível para Crédito Cliente
-    if (formaPagamentoSelecionada.id === 'credito_cliente') {
-      if (valor > formaPagamentoSelecionada.credito_disponivel) {
-        setErro(`Valor excede o crédito disponível (R$ ${formaPagamentoSelecionada.credito_disponivel.toFixed(2)})`);
-        return;
-      }
-    }
-
-    // Validar cashback disponível
-    if (formaPagamentoSelecionada.id === 'cashback') {
-      if (valor > saldoCashback + 0.01) {
-        setErro(`Valor excede o cashback disponível (R$ ${saldoCashback.toFixed(2).replace('.', ',')})`);
-        return;
-      }
-    }
-
-    // Validar bandeira para cartões
-    if (['cartao_credito', 'cartao_debito'].includes(formaPagamentoSelecionada.tipo) && !bandeira) {
-      setErro('Selecione a bandeira do cartão');
-      return;
-    }
-
-    // 🆕 ALERTA 1: Validar operadora para cartões
-    if (['cartao_credito', 'cartao_debito'].includes(formaPagamentoSelecionada.tipo) && !operadoraSelecionada) {
-      setErro('Selecione a operadora do cartão');
-      return;
-    }
-
-    // 🆕 ALERTA 1: Validar parcelas contra operadora
-    if (operadoraSelecionada && numeroParcelas > operadoraSelecionada.max_parcelas) {
-      setErro(`A operadora ${operadoraSelecionada.nome} permite no máximo ${operadoraSelecionada.max_parcelas}x`);
+    if (erroValidacao) {
+      setErro(erroValidacao);
       return;
     }
 
@@ -627,19 +598,11 @@ export default function ModalPagamento({
         return;
       }
       
-      const justificativaFinal = descricaoCupomMargem
-        ? `${descricaoCupomMargem} Observacao informada: ${justificativaTexto}`
-        : justificativaTexto;
-      const blocoJustificativa = `JUSTIFICATIVA (Margem Critica): ${justificativaFinal}`;
-      const observacoesAtuais = venda.observacoes || "";
-
-      if (!observacoesAtuais.includes(blocoJustificativa)) {
-        const observacoesAtualizadas = observacoesAtuais
-          ? `${observacoesAtuais}\n\n${blocoJustificativa}`
-          : blocoJustificativa;
-
-        venda.observacoes = observacoesAtualizadas;
-      }
+      venda.observacoes = montarObservacoesComJustificativaMargem({
+        observacoesAtuais: venda.observacoes || "",
+        descricaoCupomMargem,
+        justificativaTexto,
+      });
     }
 
     // Adicionar pagamento normalmente

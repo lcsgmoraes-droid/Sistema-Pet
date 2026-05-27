@@ -12,6 +12,8 @@ import {
   montarPagamentoRecebido,
   montarPagamentosMargem,
   montarPayloadAnaliseMargem,
+  montarObservacoesComJustificativaMargem,
+  validarPagamentoParaAdicionar,
 } from "./modalPagamentoUtils.js";
 
 test("calcula faixas quando ha parcelas saudaveis, alerta e criticas", () => {
@@ -314,4 +316,107 @@ test("monta pagamento a vista padrao para margem inicial", () => {
   assert.deepEqual(montarPagamentoAVista(99.9), [
     { forma_pagamento_id: 1, valor: 99.9, parcelas: 1 },
   ]);
+});
+
+test("valida pagamento antes de adicionar", () => {
+  assert.equal(
+    validarPagamentoParaAdicionar({
+      formaPagamento: null,
+      valor: 100,
+    }),
+    "Selecione uma forma de pagamento",
+  );
+
+  assert.equal(
+    validarPagamentoParaAdicionar({
+      formaPagamento: { id: 1, tipo: "dinheiro" },
+      valor: 0,
+    }),
+    "Informe o valor recebido",
+  );
+
+  assert.equal(
+    validarPagamentoParaAdicionar({
+      formaPagamento: {
+        id: "credito_cliente",
+        tipo: "credito_cliente",
+        credito_disponivel: 20,
+      },
+      valor: 25,
+    }),
+    "Valor excede o crédito disponível (R$ 20.00)",
+  );
+
+  assert.equal(
+    validarPagamentoParaAdicionar({
+      formaPagamento: {
+        id: "cashback",
+        tipo: "cashback",
+      },
+      valor: 15,
+      saldoCashback: 10,
+    }),
+    "Valor excede o cashback disponível (R$ 10,00)",
+  );
+
+  assert.equal(
+    validarPagamentoParaAdicionar({
+      formaPagamento: { id: 2, tipo: "cartao_credito" },
+      valor: 100,
+      bandeira: "",
+      operadora: { nome: "Cielo", max_parcelas: 3 },
+    }),
+    "Selecione a bandeira do cartão",
+  );
+
+  assert.equal(
+    validarPagamentoParaAdicionar({
+      formaPagamento: { id: 2, tipo: "cartao_credito" },
+      valor: 100,
+      bandeira: "Visa",
+      operadora: null,
+    }),
+    "Selecione a operadora do cartão",
+  );
+
+  assert.equal(
+    validarPagamentoParaAdicionar({
+      formaPagamento: { id: 2, tipo: "cartao_credito" },
+      valor: 100,
+      bandeira: "Visa",
+      operadora: { nome: "Cielo", max_parcelas: 3 },
+      numeroParcelas: 4,
+    }),
+    "A operadora Cielo permite no máximo 3x",
+  );
+
+  assert.equal(
+    validarPagamentoParaAdicionar({
+      formaPagamento: { id: 1, tipo: "dinheiro" },
+      valor: 100,
+    }),
+    "",
+  );
+});
+
+test("monta observacoes com justificativa de margem sem duplicar bloco existente", () => {
+  const observacoes = montarObservacoesComJustificativaMargem({
+    observacoesAtuais: "Observacao original",
+    descricaoCupomMargem: "A margem ficou baixa por conta do cupom TESTE.",
+    justificativaTexto: "Autorizado pelo gerente",
+  });
+
+  assert.equal(
+    observacoes,
+    "Observacao original\n\nJUSTIFICATIVA (Margem Critica): A margem ficou baixa por conta do cupom TESTE. Observacao informada: Autorizado pelo gerente",
+  );
+
+  assert.equal(
+    montarObservacoesComJustificativaMargem({
+      observacoesAtuais: observacoes,
+      descricaoCupomMargem: "A margem ficou baixa por conta do cupom TESTE.",
+      justificativaTexto: "Autorizado pelo gerente",
+    }),
+    observacoes,
+  );
 });
