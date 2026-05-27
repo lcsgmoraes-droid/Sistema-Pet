@@ -29,6 +29,14 @@ import ResponsiveTabs, { TabContent } from '../components/ResponsiveTabs';
 import FornecedorSelector from '../components/fornecedores/FornecedorSelector';
 import FornecedorIdentity from '../components/ui/FornecedorIdentity';
 import { resolveMediaUrl } from '../utils/mediaUrl';
+import {
+  calcularMargemPercentual,
+  formatarPorcentagemProduto as formatarPorcentagem,
+  formatarValorMonetarioProduto as formatarValorMonetario,
+  montarPayloadFornecedorProduto,
+  montarPayloadMovimentoEstoque,
+  organizarCategoriasHierarquicas,
+} from './produtosFormUtils';
 
 const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
 
@@ -117,47 +125,6 @@ export default function ProdutosForm() {
     }
   };
   
-  // Função para organizar categorias hierarquicamente
-  const organizarCategoriasHierarquicas = (categorias) => {
-    if (!categorias || categorias.length === 0) return [];
-    
-    // Criar um mapa de categorias por ID para fácil acesso
-    const categoriasMap = {};
-    categorias.forEach(cat => {
-      categoriasMap[cat.id] = { ...cat, filhas: [] };
-    });
-    
-    // Identificar raízes e construir árvore
-    const raizes = [];
-    categorias.forEach(cat => {
-      if (cat.categoria_pai_id) {
-        // Adicionar como filha da categoria pai
-        if (categoriasMap[cat.categoria_pai_id]) {
-          categoriasMap[cat.categoria_pai_id].filhas.push(categoriasMap[cat.id]);
-        }
-      } else {
-        // É uma categoria raiz
-        raizes.push(categoriasMap[cat.id]);
-      }
-    });
-    
-    // Função recursiva para achatar a árvore com nível de indentação
-    const aplanar = (categorias, nivel = 0) => {
-      let resultado = [];
-      categorias.forEach(cat => {
-        resultado.push({ ...cat, nivel });
-        if (cat.filhas && cat.filhas.length > 0) {
-          resultado = resultado.concat(aplanar(cat.filhas, nivel + 1));
-        }
-      });
-      return resultado;
-    };
-    
-    const resultado = aplanar(raizes);
-    console.log('Categorias organizadas:', resultado);
-    return resultado;
-  };
-  
   const carregarMarcas = async () => {
     try {
       const response = await getMarcas({ apenas_ativas: true });
@@ -165,22 +132,6 @@ export default function ProdutosForm() {
     } catch (error) {
       console.error('Erro ao carregar marcas:', error);
     }
-  };
-  
-  // Função auxiliar para formatar valores monetários
-  const formatarValorMonetario = (valor) => {
-    if (!valor || valor === '') return 'R$ 0,00';
-    const numero = typeof valor === 'string' ? parseFloat(valor) : valor;
-    if (isNaN(numero)) return 'R$ 0,00';
-    return `R$ ${numero.toFixed(2).replace('.', ',')}`;
-  };
-  
-  // Função auxiliar para formatar porcentagem
-  const formatarPorcentagem = (valor) => {
-    if (!valor || valor === '') return '0,00%';
-    const numero = typeof valor === 'string' ? parseFloat(valor) : valor;
-    if (isNaN(numero)) return '0,00%';
-    return `${numero.toFixed(2).replace('.', ',')}%`;
   };
   
   const carregarDepartamentos = async () => {
@@ -295,22 +246,17 @@ export default function ProdutosForm() {
     
     // Calcular margem automaticamente
     if (name === 'preco_custo' || name === 'preco_venda') {
-      calcularMargem(
+      const margemCalculada = calcularMargemPercentual(
         name === 'preco_custo' ? value : produto.preco_custo,
         name === 'preco_venda' ? value : produto.preco_venda
       );
-    }
-  };
-  
-  const calcularMargem = (custo, venda) => {
-    const c = parseFloat(custo) || 0;
-    const v = parseFloat(venda) || 0;
-    if (c > 0) {
-      const margem = ((v - c) / c) * 100;
-      setProduto(prev => ({
-        ...prev,
-        margem_lucro: margem.toFixed(2)
-      }));
+
+      if (margemCalculada !== null) {
+        setProduto(prev => ({
+          ...prev,
+          margem_lucro: margemCalculada
+        }));
+      }
     }
   };
   
@@ -1406,12 +1352,7 @@ function ModalFornecedor({ fornecedor, clientes, onSave, onClose }) {
   
   const handleSubmit = (e) => {
     e.preventDefault();
-    onSave({
-      ...dados,
-      preco_custo: parseFloat(dados.preco_custo) || null,
-      prazo_entrega: parseInt(dados.prazo_entrega) || null,
-      estoque_fornecedor: parseFloat(dados.estoque_fornecedor) || null,
-    });
+    onSave(montarPayloadFornecedorProduto(dados));
   };
   
   return (
@@ -1559,19 +1500,7 @@ function ModalMovimentoEstoque({ tipo, onSave, onClose }) {
   
   const handleSubmit = (e) => {
     e.preventDefault();
-    
-    const payload = {
-      quantidade: parseFloat(dados.quantidade),
-      observacao: dados.observacao || null,
-    };
-    
-    if (tipo === 'entrada') {
-      payload.numero_lote = dados.numero_lote || null;
-      payload.preco_custo = parseFloat(dados.preco_custo) || 0;
-      payload.data_validade = dados.data_validade || null;
-    }
-    
-    onSave(payload);
+    onSave(montarPayloadMovimentoEstoque(tipo, dados));
   };
   
   return (
