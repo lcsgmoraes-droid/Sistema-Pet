@@ -3,6 +3,10 @@ import { test } from "node:test";
 import {
   calcularBeneficiosCampanhaPreview,
   calcularFaixasParcelamento,
+  calcularResumoRecebimento,
+  descreverCupomMargem,
+  montarCupomParaFinalizar,
+  montarPagamentoRecebido,
 } from "./modalPagamentoUtils.js";
 
 test("calcula faixas quando ha parcelas saudaveis, alerta e criticas", () => {
@@ -117,4 +121,109 @@ test("calcula previa de cashback, carimbos e recompra elegiveis por canal", () =
       },
     ],
   });
+});
+
+test("calcula resumo do recebimento considerando pagamentos novos e existentes", () => {
+  const resumo = calcularResumoRecebimento({
+    valorTotal: 100,
+    pagamentos: [{ valor: 20 }, { valor: 10 }],
+    totalPagoExistente: 30,
+    valorRecebido: 50,
+  });
+
+  assert.deepEqual(resumo, {
+    valorPago: 60,
+    valorRestante: 40,
+    vendaQuitadaComPagamentosExistentes: false,
+    podeConfirmarFinalizacao: true,
+    troco: 10,
+  });
+});
+
+test("monta cupom salvo na venda quando nao ha cupom aplicado na tela", () => {
+  const cupom = montarCupomParaFinalizar({
+    cupomAplicado: null,
+    venda: {
+      cupom_code: "recompra10",
+      cupom_discount_applied: 12.5,
+      desconto_valor: 15,
+    },
+  });
+
+  assert.deepEqual(cupom, {
+    code: "recompra10",
+    discount_applied: 12.5,
+  });
+});
+
+test("descreve cupom somente quando ha codigo e desconto", () => {
+  const texto = descreverCupomMargem(
+    { code: "recompra10", discount_applied: 12.5 },
+    (valor) => `R$ ${valor.toFixed(2)}`,
+  );
+
+  assert.equal(
+    texto,
+    "A margem ficou baixa por conta do cupom RECOMPRA10 (R$ 12.50 de desconto).",
+  );
+  assert.equal(descreverCupomMargem(null), "");
+});
+
+test("monta pagamento de cartao com valor efetivo limitado ao restante", () => {
+  const pagamento = montarPagamentoRecebido({
+    formaPagamento: {
+      id: 2,
+      nome: "Credito",
+      tipo: "cartao_credito",
+      permite_parcelamento: true,
+    },
+    valor: 150,
+    valorRestante: 100,
+    bandeira: "Visa",
+    nsuCartao: "123456",
+    operadora: { id: 7 },
+    numeroParcelas: 3,
+    troco: 50,
+  });
+
+  assert.deepEqual(pagamento, {
+    forma_pagamento: "Credito",
+    forma_id: 2,
+    forma_pagamento_id: 2,
+    nome: "Credito",
+    valor: 100,
+    bandeira: "Visa",
+    nsu_cartao: "123456",
+    operadora_id: 7,
+    numero_parcelas: 3,
+    parcelas: 3,
+    valor_recebido: 150,
+    troco: null,
+    is_credito_cliente: false,
+    is_cashback: false,
+  });
+});
+
+test("monta pagamento em dinheiro com troco e sem dados de cartao", () => {
+  const pagamento = montarPagamentoRecebido({
+    formaPagamento: {
+      id: 1,
+      nome: "Dinheiro",
+      tipo: "dinheiro",
+      permite_parcelamento: false,
+    },
+    valor: 120,
+    valorRestante: 100,
+    bandeira: "Visa",
+    nsuCartao: "123456",
+    operadora: { id: 7 },
+    numeroParcelas: 2,
+    troco: 20,
+  });
+
+  assert.equal(pagamento.valor, 100);
+  assert.equal(pagamento.bandeira, null);
+  assert.equal(pagamento.nsu_cartao, null);
+  assert.equal(pagamento.numero_parcelas, 1);
+  assert.equal(pagamento.troco, 20);
 });

@@ -47,6 +47,10 @@ import { useModulos } from '../contexts/ModulosContext';
 import {
   calcularBeneficiosCampanhaPreview,
   calcularFaixasParcelamento,
+  calcularResumoRecebimento,
+  descreverCupomMargem,
+  montarCupomParaFinalizar,
+  montarPagamentoRecebido,
 } from './modalPagamentoUtils';
 
 const BANDEIRAS = [
@@ -238,25 +242,20 @@ export default function ModalPagamento({
   }, [formaPagamentoSelecionada?.permite_parcelamento]);
 
   const valorTotal = venda.total;
-  const valorPago = pagamentos.reduce((sum, p) => sum + p.valor, 0) + totalPagoExistente;
-  const valorRestante = Math.max(0, valorTotal - valorPago);
-  const vendaQuitadaComPagamentosExistentes = totalPagoExistente >= valorTotal - 0.01;
-  const podeConfirmarFinalizacao =
-    pagamentos.length > 0 || vendaQuitadaComPagamentosExistentes;
-  const troco = valorRecebido > 0 ? valorRecebido - valorRestante : 0;
-  const cupomParaFinalizar =
-    cupomAplicado ||
-    (venda.cupom_code
-      ? {
-          code: venda.cupom_code,
-          discount_applied:
-            venda.cupom_discount_applied ?? venda.desconto_valor ?? null,
-        }
-      : null);
-  const descricaoCupomMargem =
-    cupomParaFinalizar?.code && Number(cupomParaFinalizar?.discount_applied || 0) > 0
-      ? `A margem ficou baixa por conta do cupom ${String(cupomParaFinalizar.code).toUpperCase()} (${formatMoneyBRL(cupomParaFinalizar.discount_applied)} de desconto).`
-      : "";
+  const {
+    valorPago,
+    valorRestante,
+    vendaQuitadaComPagamentosExistentes,
+    podeConfirmarFinalizacao,
+    troco,
+  } = calcularResumoRecebimento({
+    valorTotal,
+    pagamentos,
+    totalPagoExistente,
+    valorRecebido,
+  });
+  const cupomParaFinalizar = montarCupomParaFinalizar({ cupomAplicado, venda });
+  const descricaoCupomMargem = descreverCupomMargem(cupomParaFinalizar, formatMoneyBRL);
   const corParcelamentoAtual =
     formaPagamentoSelecionada?.permite_parcelamento &&
     simulacoesParcelamento[formaPagamentoSelecionada.id]?.[numeroParcelas]
@@ -638,30 +637,16 @@ export default function ModalPagamento({
     // DEBUG: Verificar estrutura da forma de pagamento
     console.log('🔍 DEBUG formaPagamentoSelecionada:', formaPagamentoSelecionada);
     
-    const novoPagamento = {
-      forma_pagamento: formaPagamentoSelecionada.nome, // Enviar o nome ao invés do ID
-      forma_id: formaPagamentoSelecionada.id, // ID da forma de pagamento
-      forma_pagamento_id: formaPagamentoSelecionada.id, // ID da forma de pagamento (compatibilidade)
-      nome: formaPagamentoSelecionada.nome,
-      valor: Math.min(valor, valorRestante), // Valor efetivo do pagamento
-      bandeira: ['cartao_credito', 'cartao_debito'].includes(formaPagamentoSelecionada.tipo)
-        ? bandeira
-        : null,
-      nsu_cartao: ['cartao_credito', 'cartao_debito'].includes(formaPagamentoSelecionada.tipo) && nsuCartao
-        ? nsuCartao
-        : null,
-      operadora_id: operadoraSelecionada?.id || null, // 🆕 ID da operadora
-      numero_parcelas: formaPagamentoSelecionada.permite_parcelamento ? numeroParcelas : 1,
-      parcelas: formaPagamentoSelecionada.permite_parcelamento ? numeroParcelas : 1, // Compatibilidade
-      valor_recebido: valor, // Valor recebido do cliente
-      troco:
-        formaPagamentoSelecionada.tipo === 'dinheiro' && troco > 0 ? troco : null,
-      // Marcar se é crédito cliente
-      is_credito_cliente: formaPagamentoSelecionada.nome === 'Crédito Cliente' || formaPagamentoSelecionada.tipo === 'credito_cliente',
-      // Marcar se é cashback
-      is_cashback: formaPagamentoSelecionada.id === 'cashback'
-    };
-    
+    const novoPagamento = montarPagamentoRecebido({
+      formaPagamento: formaPagamentoSelecionada,
+      valor,
+      valorRestante,
+      bandeira,
+      nsuCartao,
+      operadora: operadoraSelecionada,
+      numeroParcelas,
+      troco,
+    });
     console.log('📤 DEBUG novoPagamento:', novoPagamento);
 
     // ✅ PASSO 5: Se margem crítica, EXIGIR justificativa (mas NÃO bloquear fluxo)
