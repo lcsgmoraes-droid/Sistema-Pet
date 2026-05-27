@@ -7,9 +7,14 @@ import ClientesNovoCadastroRecenteBanner from "../components/clientes/ClientesNo
 import ClientesNovoModalsLayer from "../components/clientes/ClientesNovoModalsLayer";
 import ClientesNovoTabelaSection from "../components/clientes/ClientesNovoTabelaSection";
 import ClientesNovoTabsBar from "../components/clientes/ClientesNovoTabsBar";
+import PessoasDuplicidadeBanner from "../components/pessoas/PessoasDuplicidadeBanner";
 import PessoasFusaoModal from "../components/pessoas/PessoasFusaoModal";
 import LoadingState from "../components/ui/LoadingState";
 import PageHeader from "../components/ui/PageHeader";
+import {
+  buscarSugestoesDuplicidadePessoas,
+  executarFusoesAutomaticasPessoas,
+} from "../api/clientes";
 import { useClientesNovoCadastro } from "../hooks/useClientesNovoCadastro";
 import { useClientesNovoListagem } from "../hooks/useClientesNovoListagem";
 import { debugLog } from "../utils/debug";
@@ -21,7 +26,14 @@ const Pessoas = () => {
   const [clienteRecemCriado, setClienteRecemCriado] = useState(null);
   const [campoCopiadoRecente, setCampoCopiadoRecente] = useState("");
   const [pessoasSelecionadasFusao, setPessoasSelecionadasFusao] = useState([]);
+  const [pessoasSugestaoFusao, setPessoasSugestaoFusao] = useState(null);
   const [modalFusaoAberto, setModalFusaoAberto] = useState(false);
+  const [duplicidade, setDuplicidade] = useState({
+    sugestoes: [],
+    totalAutomaticas: 0,
+    verificando: false,
+    varreduraInicialExecutada: false,
+  });
   const {
     clientes,
     loading,
@@ -38,15 +50,16 @@ const Pessoas = () => {
     getClientePorCodigoExato,
   } = useClientesNovoListagem({ tipoFiltro, setError });
 
-  const pessoasParaFusao = useMemo(
-    () => filteredClientes.filter((cliente) => pessoasSelecionadasFusao.includes(cliente.id)),
-    [filteredClientes, pessoasSelecionadasFusao],
-  );
+  const pessoasParaFusao = useMemo(() => {
+    if (pessoasSugestaoFusao?.length === 2) return pessoasSugestaoFusao;
+    return filteredClientes.filter((cliente) => pessoasSelecionadasFusao.includes(cliente.id));
+  }, [filteredClientes, pessoasSelecionadasFusao, pessoasSugestaoFusao]);
 
   const handleSearchTermChange = (value) => {
     setPaginaAtual(1);
     setSearchTerm(value);
     setPessoasSelecionadasFusao([]);
+    setPessoasSugestaoFusao(null);
   };
 
   const handleClienteCriado = async (cliente) => {
@@ -136,6 +149,7 @@ const Pessoas = () => {
   };
 
   const togglePessoaFusao = (clienteId) => {
+    setPessoasSugestaoFusao(null);
     setPessoasSelecionadasFusao((prev) => {
       if (prev.includes(clienteId)) {
         return prev.filter((id) => id !== clienteId);
@@ -150,13 +164,66 @@ const Pessoas = () => {
     });
   };
 
-  const limparSelecaoFusao = () => setPessoasSelecionadasFusao([]);
+  const limparSelecaoFusao = () => {
+    setPessoasSelecionadasFusao([]);
+    setPessoasSugestaoFusao(null);
+  };
 
   const abrirModalFusao = () => {
     if (pessoasSelecionadasFusao.length !== 2) {
       toast.error("Selecione exatamente 2 pessoas para fundir.");
       return;
     }
+    setModalFusaoAberto(true);
+  };
+
+  const carregarSugestoesDuplicidade = async () => {
+    try {
+      const { data } = await buscarSugestoesDuplicidadePessoas({ limit: 20 });
+      setDuplicidade((prev) => ({
+        ...prev,
+        sugestoes: data?.sugestoes || [],
+      }));
+    } catch (err) {
+      console.error("Erro ao buscar sugestoes de duplicidade:", err);
+    }
+  };
+
+  const executarVarreduraDuplicidade = async ({ silencioso = false } = {}) => {
+    setDuplicidade((prev) => ({ ...prev, verificando: true }));
+    try {
+      const { data } = await executarFusoesAutomaticasPessoas();
+      const totalAutomaticas = Number(data?.total_automaticas || 0);
+      setDuplicidade((prev) => ({
+        ...prev,
+        totalAutomaticas,
+        sugestoes: data?.sugestoes || prev.sugestoes,
+        varreduraInicialExecutada: true,
+      }));
+      if (totalAutomaticas > 0) {
+        toast.success(`${totalAutomaticas} cadastro(s) duplicado(s) fundido(s).`);
+        await loadClientes();
+      } else if (!silencioso) {
+        toast("Nenhuma duplicidade segura para fundir automaticamente.");
+      }
+      await carregarSugestoesDuplicidade();
+    } catch (err) {
+      console.error("Erro ao executar varredura de duplicidade:", err);
+      if (!silencioso) {
+        toast.error(err?.response?.data?.detail || "Nao foi possivel verificar duplicidades.");
+      }
+    } finally {
+      setDuplicidade((prev) => ({
+        ...prev,
+        verificando: false,
+        varreduraInicialExecutada: true,
+      }));
+    }
+  };
+
+  const revisarSugestaoDuplicidade = (sugestao) => {
+    setPessoasSelecionadasFusao([]);
+    setPessoasSugestaoFusao([sugestao.principal, sugestao.duplicado].filter(Boolean));
     setModalFusaoAberto(true);
   };
 
@@ -197,6 +264,11 @@ const Pessoas = () => {
   useEffect(() => {
     limparSelecaoFusao();
   }, [tipoFiltro, paginaAtual, registrosPorPagina]);
+
+  useEffect(() => {
+    if (!carregamentoInicialConcluido || duplicidade.varreduraInicialExecutada) return;
+    executarVarreduraDuplicidade({ silencioso: true });
+  }, [carregamentoInicialConcluido, duplicidade.varreduraInicialExecutada]);
 
   useEffect(() => {
     setPessoasSelecionadasFusao((prev) => {
@@ -272,6 +344,13 @@ const Pessoas = () => {
         onCopiarCampo={handleCopiarCampoRecente}
         onLimparFiltro={handleLimparFiltroRecente}
       />
+      <PessoasDuplicidadeBanner
+        sugestoes={duplicidade.sugestoes}
+        totalAutomaticas={duplicidade.totalAutomaticas}
+        verificando={duplicidade.verificando}
+        onExecutarVarredura={() => executarVarreduraDuplicidade({ silencioso: false })}
+        onRevisarSugestao={revisarSugestaoDuplicidade}
+      />
       {error && !cadastro.showModal && (
         <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg flex items-center gap-2 text-red-700">
           <AlertCircle className="h-5 w-5" aria-hidden="true" />
@@ -301,11 +380,15 @@ const Pessoas = () => {
       <ClientesNovoModalsLayer {...cadastro.modalsLayerProps} />
       <PessoasFusaoModal
         isOpen={modalFusaoAberto}
-        onClose={() => setModalFusaoAberto(false)}
+        onClose={() => {
+          setModalFusaoAberto(false);
+          setPessoasSugestaoFusao(null);
+        }}
         onSuccess={async () => {
           setModalFusaoAberto(false);
           limparSelecaoFusao();
           await loadClientes();
+          await carregarSugestoesDuplicidade();
         }}
         pessoasSelecionadas={pessoasParaFusao}
       />
