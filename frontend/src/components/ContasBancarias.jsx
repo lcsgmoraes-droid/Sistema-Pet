@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { 
   Plus, Edit2, Trash2, AlertCircle,
-  Building2, Wallet, CreditCard, X, Save
+  Building2, Wallet, CreditCard, X, Save, Banknote, Landmark
 } from 'lucide-react';
 import api from '../api';
 import { getGuiaClassNames } from '../utils/guiaHighlight';
@@ -23,6 +23,19 @@ const DEFAULT_ICON_BY_TIPO = {
   banco: '\uD83C\uDFE6',
   caixa: '\uD83D\uDCB0',
   digital: '\uD83D\uDCB3'
+};
+
+const LUCIDE_ICON_BY_NAME = {
+  banknote: Banknote,
+  landmark: Landmark,
+  building: Building2,
+  building2: Building2,
+  banco: Building2,
+  wallet: Wallet,
+  caixa: Wallet,
+  creditcard: CreditCard,
+  card: CreditCard,
+  digital: CreditCard
 };
 
 const tryRepairMojibake = (value) => {
@@ -49,6 +62,23 @@ const normalizeContaIcon = (rawIcon, tipo = 'banco') => {
   }
 
   return repaired;
+};
+
+const normalizeIconKey = (value) =>
+  String(value || '')
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '');
+
+const resolveContaIcon = (rawIcon, tipo = 'banco') => {
+  const repaired = tryRepairMojibake(rawIcon).trim();
+  const ContaIconComponent = LUCIDE_ICON_BY_NAME[normalizeIconKey(repaired)];
+
+  if (ContaIconComponent) {
+    return { ContaIconComponent, emoji: null };
+  }
+
+  return { ContaIconComponent: null, emoji: normalizeContaIcon(rawIcon, tipo) };
 };
 
 function ContasBancarias() {
@@ -219,6 +249,7 @@ function ContasBancarias() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
         {contas.map(conta => {
           const TipoIcon = TIPOS_CONTA.find(t => t.value === conta.tipo)?.icon || Building2;
+          const { ContaIconComponent, emoji } = resolveContaIcon(conta.icone, conta.tipo);
           
           return (
             <div
@@ -228,25 +259,34 @@ function ContasBancarias() {
               }`}
             >
               {/* Header do Card */}
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-center gap-3">
+              <div className="flex min-w-0 items-start justify-between gap-3 mb-3">
+                <div className="flex min-w-0 items-center gap-3">
                   <div 
-                    className="w-12 h-12 rounded-full flex items-center justify-center text-2xl"
+                    className="w-12 h-12 shrink-0 rounded-full flex items-center justify-center overflow-hidden text-2xl"
                     style={{ backgroundColor: `${conta.cor}20` }}
                   >
-                    {conta.icone}
+                    {ContaIconComponent ? (
+                      <ContaIconComponent
+                        className="h-6 w-6"
+                        style={{ color: conta.cor || '#4b5563' }}
+                      />
+                    ) : (
+                      <span className="leading-none">{emoji}</span>
+                    )}
                   </div>
-                  <div>
-                    <h3 className="font-bold text-gray-800">{conta.nome}</h3>
-                    <p className="text-sm text-gray-500 flex items-center gap-1">
-                      <TipoIcon className="w-3 h-3" />
-                      {TIPOS_CONTA.find(t => t.value === conta.tipo)?.label}
+                  <div className="min-w-0">
+                    <h3 title={conta.nome} className="truncate font-bold text-gray-800">{conta.nome}</h3>
+                    <p className="flex min-w-0 items-center gap-1 text-sm text-gray-500">
+                      <TipoIcon className="w-3 h-3 shrink-0" />
+                      <span className="truncate">
+                        {TIPOS_CONTA.find(t => t.value === conta.tipo)?.label}
+                      </span>
                     </p>
                   </div>
                 </div>
                 
                 {!conta.ativa && (
-                  <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">
+                  <span className="shrink-0 text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded">
                     Inativa
                   </span>
                 )}
@@ -255,11 +295,14 @@ function ContasBancarias() {
               {/* Informações */}
               <div className="mb-4">
                 <p className="text-sm text-gray-600 mb-1">Tipo de Conta</p>
-                <p className="text-lg font-semibold text-gray-800">
+                <p
+                  className="truncate text-lg font-semibold text-gray-800"
+                  title={TIPOS_CONTA.find(t => t.value === conta.tipo)?.label}
+                >
                   {TIPOS_CONTA.find(t => t.value === conta.tipo)?.label}
                 </p>
                 {conta.banco && (
-                  <p className="text-sm text-gray-500 mt-1">{conta.banco}</p>
+                  <p title={conta.banco} className="truncate text-sm text-gray-500 mt-1">{conta.banco}</p>
                 )}
               </div>
 
