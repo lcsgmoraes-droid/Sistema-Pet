@@ -18,6 +18,7 @@ import {
   montarPayloadAnaliseMargem,
   montarObservacoesComJustificativaMargem,
   obterCorParcelamentoAtual,
+  resolverFaixasParcelamentoDaForma,
   validarPagamentoParaAdicionar,
 } from "./modalPagamentoUtils.js";
 
@@ -145,6 +146,73 @@ test("ignora parcelas sem simulacao e mantem limite maximo informado", () => {
     alerta: { min: 2, max: 3 },
     proibido: { min: 4, max: 4 },
   });
+});
+
+test("resolve faixas de parcelamento existentes ou indica simulacao pendente", () => {
+  const formaCredito = {
+    id: 4,
+    permite_parcelamento: true,
+    parcelas_maximas: 3,
+  };
+  const simulacoes = {
+    4: {
+      1: { cor: "verde" },
+      2: { cor: "amarelo" },
+      3: { cor: "vermelho" },
+    },
+  };
+
+  assert.deepEqual(
+    resolverFaixasParcelamentoDaForma({
+      formaPagamentoSelecionada: formaCredito,
+      simulacoesParcelamento: {},
+      formasPagamento: [formaCredito],
+    }),
+    {
+      acao: "simular",
+      formaPagamento: formaCredito,
+      faixas: null,
+    },
+  );
+
+  assert.deepEqual(
+    resolverFaixasParcelamentoDaForma({
+      formaPagamentoSelecionada: formaCredito,
+      simulacoesParcelamento: simulacoes,
+      formasPagamento: [formaCredito],
+    }),
+    {
+      acao: "usar_existente",
+      formaPagamento: formaCredito,
+      faixas: {
+        saudavel: { min: 1, max: 1 },
+        alerta: { min: 2, max: 2 },
+        proibido: { min: 3, max: 3 },
+      },
+    },
+  );
+
+  assert.deepEqual(
+    resolverFaixasParcelamentoDaForma({
+      formaPagamentoSelecionada: null,
+      simulacoesParcelamento: simulacoes,
+      formasPagamento: [formaCredito],
+    })?.faixas,
+    {
+      saudavel: { min: 1, max: 1 },
+      alerta: { min: 2, max: 2 },
+      proibido: { min: 3, max: 3 },
+    },
+  );
+
+  assert.equal(
+    resolverFaixasParcelamentoDaForma({
+      formaPagamentoSelecionada: { id: 5, permite_parcelamento: false },
+      simulacoesParcelamento: simulacoes,
+      formasPagamento: [formaCredito],
+    }),
+    null,
+  );
 });
 
 test("calcula previa de cashback, carimbos e recompra elegiveis por canal", () => {

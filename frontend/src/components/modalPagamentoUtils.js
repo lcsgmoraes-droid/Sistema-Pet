@@ -317,6 +317,55 @@ export function calcularFaixasParcelamento(simulacoes, maxParcelas) {
   return faixas;
 }
 
+export function resolverFaixasParcelamentoDaForma({
+  formaPagamentoSelecionada = null,
+  simulacoesParcelamento = {},
+  formasPagamento = [],
+}) {
+  if (formaPagamentoSelecionada?.permite_parcelamento) {
+    const simulacoesExistentes =
+      simulacoesParcelamento[formaPagamentoSelecionada.id];
+
+    if (!simulacoesExistentes) {
+      return {
+        acao: "simular",
+        formaPagamento: formaPagamentoSelecionada,
+        faixas: null,
+      };
+    }
+
+    return {
+      acao: "usar_existente",
+      formaPagamento: formaPagamentoSelecionada,
+      faixas: calcularFaixasParcelamento(
+        simulacoesExistentes,
+        formaPagamentoSelecionada?.parcelas_maximas ?? 12,
+      ),
+    };
+  }
+
+  if (formaPagamentoSelecionada) return null;
+
+  const primeiraFormaComParcelamento = Object.keys(simulacoesParcelamento)[0];
+  if (!primeiraFormaComParcelamento || formasPagamento.length === 0) {
+    return null;
+  }
+
+  const formaInfo = formasPagamento.find(
+    (forma) => forma.id === Number(primeiraFormaComParcelamento),
+  );
+  if (!formaInfo) return null;
+
+  return {
+    acao: "usar_existente",
+    formaPagamento: formaInfo,
+    faixas: calcularFaixasParcelamento(
+      simulacoesParcelamento[primeiraFormaComParcelamento],
+      formaInfo?.parcelas_maximas ?? 12,
+    ),
+  };
+}
+
 export function calcularBeneficiosCampanhaPreview({
   campanhasCompra = [],
   rankCliente = "bronze",

@@ -41,6 +41,7 @@ import {
   montarPagamentosMargem,
   montarPayloadAnaliseMargem,
   obterCorParcelamentoAtual,
+  resolverFaixasParcelamentoDaForma,
   validarPagamentoParaAdicionar,
 } from './modalPagamentoUtils';
 
@@ -508,32 +509,21 @@ export default function ModalPagamento({
 
   // 🆕 PASSO 2️⃣ - Disparar simulação quando forma de pagamento é selecionada
   useEffect(() => {
-    if (formaPagamentoSelecionada?.permite_parcelamento) {
-      // Verificar se já temos simulação para esta forma
-      if (!simulacoesParcelamento[formaPagamentoSelecionada.id]) {
-        simularParcelamentos(formaPagamentoSelecionada);
-      } else {
-        // Reutilizar simulação existente
-        const simulacoesExistentes = simulacoesParcelamento[formaPagamentoSelecionada.id];
-        const faixas = calcularFaixasParcelamento(
-          simulacoesExistentes, 
-          formaPagamentoSelecionada?.parcelas_maximas ?? 12
-        );
-        setFaixasParcelamento(faixas);
-        console.log('♻️ Reutilizando simulação existente');
-      }
-    } else if (!formaPagamentoSelecionada) {
-      // Se não há forma selecionada mas já temos simulações, usar a primeira disponível
-      const primeiraFormaComParcelamento = Object.keys(simulacoesParcelamento)[0];
-      if (primeiraFormaComParcelamento && formasPagamento.length > 0) {
-        const formaInfo = formasPagamento.find(f => f.id === parseInt(primeiraFormaComParcelamento));
-        if (formaInfo) {
-          const faixas = calcularFaixasParcelamento(
-            simulacoesParcelamento[primeiraFormaComParcelamento],
-            formaInfo?.parcelas_maximas ?? 12
-          );
-          setFaixasParcelamento(faixas);
-        }
+    const decisaoParcelamento = resolverFaixasParcelamentoDaForma({
+      formaPagamentoSelecionada,
+      simulacoesParcelamento,
+      formasPagamento,
+    });
+
+    if (decisaoParcelamento?.acao === 'simular') {
+      simularParcelamentos(decisaoParcelamento.formaPagamento);
+      return;
+    }
+
+    if (decisaoParcelamento?.faixas) {
+      setFaixasParcelamento(decisaoParcelamento.faixas);
+      if (decisaoParcelamento.formaPagamento === formaPagamentoSelecionada) {
+        console.log('Reutilizando simulacao existente');
       }
     }
   }, [formaPagamentoSelecionada?.id]);
