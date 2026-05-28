@@ -111,6 +111,57 @@ export function validarArquivoImagemProduto(file, maxUploadBytes = 10 * 1024 * 1
   return null;
 }
 
+export function montarEstadoFornecedorProduto(fornecedor = {}) {
+  return {
+    fornecedor_id: fornecedor?.fornecedor_id || "",
+    codigo_fornecedor: fornecedor?.codigo_fornecedor || "",
+    preco_custo: fornecedor?.preco_custo || "",
+    prazo_entrega: fornecedor?.prazo_entrega || "",
+    estoque_fornecedor: fornecedor?.estoque_fornecedor || "",
+    e_principal: fornecedor?.e_principal || false,
+  };
+}
+
+export function montarEstadoMovimentoEstoque() {
+  return {
+    quantidade: "",
+    numero_lote: "",
+    preco_custo: "",
+    data_validade: "",
+    observacao: "",
+  };
+}
+
+export function montarAbasProdutoFormulario({
+  isEdit,
+  imagens = [],
+  fornecedores = [],
+  lotes = [],
+  variacoes = [],
+  produto = {},
+}) {
+  const abas = [{ id: "dados", label: "\u{1F4CB} Dados B\u00E1sicos", count: null }];
+
+  if (!isEdit) {
+    return abas;
+  }
+
+  abas.push(
+    { id: "imagens", label: "\u{1F5BC}\uFE0F Imagens", count: imagens.length },
+    { id: "fornecedores", label: "\u{1F3ED} Fornecedores", count: fornecedores.length },
+  );
+
+  if (produto.controle_lote) {
+    abas.push({ id: "lotes", label: "\u{1F4E6} Lotes", count: lotes.length });
+  }
+
+  if (produto.tipo_produto === "PAI") {
+    abas.push({ id: "variacoes", label: "\u{1F539} Varia\u00E7\u00F5es", count: variacoes.length });
+  }
+
+  return abas;
+}
+
 export function montarPayloadProdutoParaSalvar(produto) {
   const { _mostrarCanais, ...restoProduto } = produto;
   const lojaFisicaAtiva = produto.status !== "inativo";

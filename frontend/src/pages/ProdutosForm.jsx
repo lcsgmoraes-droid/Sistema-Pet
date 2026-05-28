@@ -33,6 +33,9 @@ import {
   calcularMargemPercentual,
   formatarPorcentagemProduto as formatarPorcentagem,
   formatarValorMonetarioProduto as formatarValorMonetario,
+  montarAbasProdutoFormulario,
+  montarEstadoFornecedorProduto,
+  montarEstadoMovimentoEstoque,
   montarEstadoProdutoFormulario,
   montarPayloadFornecedorProduto,
   montarPayloadMovimentoEstoque,
@@ -58,35 +61,7 @@ export default function ProdutosForm() {
   const [clientes, setClientes] = useState([]);
   
   // Dados do produto
-  const [produto, setProduto] = useState({
-    codigo: '',
-    nome: '',
-    descricao: '',
-    categoria_id: '',
-    marca_id: '',
-    departamento_id: '',
-    tipo: 'produto',
-    preco_custo: '',
-    preco_venda: '',
-    margem_lucro: '',
-    estoque_minimo: '',
-    estoque_maximo: '',
-    localizacao: '',
-    observacoes: '',
-    controle_lote: false,
-    status: 'ativo',
-    // Preços por canal
-    preco_ecommerce: null,
-    preco_ecommerce_promo: null,
-    preco_ecommerce_promo_inicio: null,
-    preco_ecommerce_promo_fim: null,
-    preco_app: null,
-    preco_app_promo: null,
-    preco_app_promo_inicio: null,
-    preco_app_promo_fim: null,
-    anunciar_ecommerce: true,
-    anunciar_app: true,
-  });
+  const [produto, setProduto] = useState(() => montarEstadoProdutoFormulario());
   
   // Imagens
   const [imagens, setImagens] = useState([]);
@@ -457,19 +432,14 @@ export default function ProdutosForm() {
       
       {/* Abas */}
       <ResponsiveTabs
-        tabs={[
-          { id: 'dados', label: '📋 Dados Básicos', count: null },
-          ...(isEdit ? [
-            { id: 'imagens', label: '🖼️ Imagens', count: imagens.length },
-            { id: 'fornecedores', label: '🏭 Fornecedores', count: fornecedores.length },
-            ...(produto.controle_lote ? [
-              { id: 'lotes', label: '📦 Lotes', count: lotes.length }
-            ] : []),
-            ...(produto.tipo_produto === 'PAI' ? [
-              { id: 'variacoes', label: '🔹 Variações', count: variacoes.length }
-            ] : [])
-          ] : [])
-        ]}
+        tabs={montarAbasProdutoFormulario({
+          isEdit,
+          imagens,
+          fornecedores,
+          lotes,
+          variacoes,
+          produto,
+        })}
         activeTab={abaAtiva}
         onChange={setAbaAtiva}
       />
@@ -1288,14 +1258,7 @@ export default function ProdutosForm() {
 // ==================== MODAL FORNECEDOR ====================
 
 function ModalFornecedor({ fornecedor, clientes, onSave, onClose }) {
-  const [dados, setDados] = useState({
-    fornecedor_id: fornecedor?.fornecedor_id || '',
-    codigo_fornecedor: fornecedor?.codigo_fornecedor || '',
-    preco_custo: fornecedor?.preco_custo || '',
-    prazo_entrega: fornecedor?.prazo_entrega || '',
-    estoque_fornecedor: fornecedor?.estoque_fornecedor || '',
-    e_principal: fornecedor?.e_principal || false,
-  });
+  const [dados, setDados] = useState(() => montarEstadoFornecedorProduto(fornecedor));
   const fornecedorSelecionado = clientes.find(
     (cliente) => String(cliente.id) === String(dados.fornecedor_id),
   );
@@ -1440,13 +1403,7 @@ function ModalFornecedor({ fornecedor, clientes, onSave, onClose }) {
 // ==================== MODAL MOVIMENTO ESTOQUE ====================
 
 function ModalMovimentoEstoque({ tipo, onSave, onClose }) {
-  const [dados, setDados] = useState({
-    quantidade: '',
-    numero_lote: '',
-    preco_custo: '',
-    data_validade: '',
-    observacao: '',
-  });
+  const [dados, setDados] = useState(() => montarEstadoMovimentoEstoque());
   
   const handleSubmit = (e) => {
     e.preventDefault();

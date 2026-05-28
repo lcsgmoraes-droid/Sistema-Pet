@@ -5,6 +5,9 @@ import {
   calcularMargemPercentual,
   formatarPorcentagemProduto,
   formatarValorMonetarioProduto,
+  montarAbasProdutoFormulario,
+  montarEstadoFornecedorProduto,
+  montarEstadoMovimentoEstoque,
   montarEstadoProdutoFormulario,
   montarPayloadFornecedorProduto,
   montarPayloadMovimentoEstoque,
@@ -158,6 +161,78 @@ test("valida arquivo de imagem permitido para upload do produto", () => {
   assert.equal(
     validarArquivoImagemProduto({ type: "image/png", size: 11 * 1024 * 1024 }),
     "Imagem deve ter no maximo 10MB",
+  );
+});
+
+test("normaliza estado inicial do modal de fornecedor do produto", () => {
+  assert.deepEqual(montarEstadoFornecedorProduto(), {
+    fornecedor_id: "",
+    codigo_fornecedor: "",
+    preco_custo: "",
+    prazo_entrega: "",
+    estoque_fornecedor: "",
+    e_principal: false,
+  });
+
+  assert.deepEqual(
+    montarEstadoFornecedorProduto({
+      fornecedor_id: 12,
+      codigo_fornecedor: "FOR-1",
+      preco_custo: 8.5,
+      prazo_entrega: 3,
+      estoque_fornecedor: 20,
+      e_principal: true,
+    }),
+    {
+      fornecedor_id: 12,
+      codigo_fornecedor: "FOR-1",
+      preco_custo: 8.5,
+      prazo_entrega: 3,
+      estoque_fornecedor: 20,
+      e_principal: true,
+    },
+  );
+});
+
+test("cria estado inicial do modal de movimento de estoque", () => {
+  assert.deepEqual(montarEstadoMovimentoEstoque(), {
+    quantidade: "",
+    numero_lote: "",
+    preco_custo: "",
+    data_validade: "",
+    observacao: "",
+  });
+});
+
+test("monta abas do formulario conforme produto e modo de edicao", () => {
+  assert.deepEqual(
+    montarAbasProdutoFormulario({
+      isEdit: false,
+      imagens: [{ id: 1 }],
+      fornecedores: [{ id: 10 }],
+      lotes: [{ id: 20 }],
+      variacoes: [{ id: 30 }],
+      produto: { controle_lote: true, tipo_produto: "PAI" },
+    }).map(({ id, count }) => ({ id, count })),
+    [{ id: "dados", count: null }],
+  );
+
+  assert.deepEqual(
+    montarAbasProdutoFormulario({
+      isEdit: true,
+      imagens: [{ id: 1 }, { id: 2 }],
+      fornecedores: [{ id: 10 }],
+      lotes: [{ id: 20 }, { id: 21 }, { id: 22 }],
+      variacoes: [{ id: 30 }],
+      produto: { controle_lote: true, tipo_produto: "PAI" },
+    }).map(({ id, count }) => ({ id, count })),
+    [
+      { id: "dados", count: null },
+      { id: "imagens", count: 2 },
+      { id: "fornecedores", count: 1 },
+      { id: "lotes", count: 3 },
+      { id: "variacoes", count: 1 },
+    ],
   );
 });
 
