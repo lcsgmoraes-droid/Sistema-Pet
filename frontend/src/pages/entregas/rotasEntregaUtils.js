@@ -52,6 +52,27 @@ export function getStatusLabel(status) {
   }
 }
 
+export function filtrarRotasEmAndamento(rotas = []) {
+  if (!Array.isArray(rotas)) return [];
+  return rotas.filter(
+    (rota) => rota.status === "em_rota" || rota.status === "em_andamento",
+  );
+}
+
+export function agruparRotasPorEntregador(rotas = []) {
+  return (rotas || []).reduce((acc, rota) => {
+    const chave = rota?.entregador?.id || `sem-id-${rota.id}`;
+    if (!acc[chave]) {
+      acc[chave] = {
+        entregadorNome: rota?.entregador?.nome || "Entregador não informado",
+        rotas: [],
+      };
+    }
+    acc[chave].rotas.push(rota);
+    return acc;
+  }, {});
+}
+
 export function formatarHorarioLocalizacao(dataIso) {
   if (!dataIso) return "Sem atualização";
   const data = new Date(dataIso);

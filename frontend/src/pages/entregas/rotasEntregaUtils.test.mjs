@@ -3,6 +3,8 @@ import { test } from "node:test";
 
 import {
   calcularTempoEstimado,
+  agruparRotasPorEntregador,
+  filtrarRotasEmAndamento,
   formatarTempo,
   formatarHorarioLocalizacao,
   getStatusColor,
@@ -34,6 +36,37 @@ test("retorna cores e labels dos status conhecidos", () => {
   assert.equal(getStatusLabel("em_andamento"), "🔵 Em Andamento");
   assert.equal(getStatusLabel("cancelada"), "❌ Cancelada");
   assert.equal(getStatusLabel("custom"), "custom");
+});
+
+test("filtra rotas em andamento e agrupa por entregador", () => {
+  const rotas = [
+    { id: 1, status: "pendente", entregador: { id: 10, nome: "Ana" } },
+    { id: 2, status: "em_rota", entregador: { id: 10, nome: "Ana" } },
+    { id: 3, status: "em_andamento", entregador: { id: 11, nome: "Bruno" } },
+    { id: 4, status: "concluida", entregador: { id: 11, nome: "Bruno" } },
+    { id: 5, status: "em_rota", entregador: null },
+  ];
+
+  const emAndamento = filtrarRotasEmAndamento(rotas);
+  assert.deepEqual(
+    emAndamento.map((rota) => rota.id),
+    [2, 3, 5],
+  );
+
+  assert.deepEqual(agruparRotasPorEntregador(emAndamento), {
+    10: {
+      entregadorNome: "Ana",
+      rotas: [rotas[1]],
+    },
+    11: {
+      entregadorNome: "Bruno",
+      rotas: [rotas[2]],
+    },
+    "sem-id-5": {
+      entregadorNome: "Entregador não informado",
+      rotas: [rotas[4]],
+    },
+  });
 });
 
 test("formata horario de localizacao e protege datas invalidas", () => {

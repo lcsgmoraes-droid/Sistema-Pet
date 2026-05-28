@@ -5,7 +5,9 @@ import { api as apiServices } from "../../services/api";
 import CustomerIdentity from "../../components/ui/CustomerIdentity";
 import ProductIdentity from "../../components/ui/ProductIdentity";
 import {
+  agruparRotasPorEntregador,
   calcularTempoEstimado,
+  filtrarRotasEmAndamento,
   formatarHorarioLocalizacao,
   formatarTempo,
   getStatusColor,
@@ -167,23 +169,8 @@ export default function RotasEntrega() {
     );
   }
 
-  const rotasEmAndamento = Array.isArray(rotas)
-    ? rotas.filter(
-        (rota) => rota.status === "em_rota" || rota.status === "em_andamento",
-      )
-    : [];
-
-  const monitoramentoEntregadores = rotasEmAndamento.reduce((acc, rota) => {
-    const chave = rota?.entregador?.id || `sem-id-${rota.id}`;
-    if (!acc[chave]) {
-      acc[chave] = {
-        entregadorNome: rota?.entregador?.nome || "Entregador não informado",
-        rotas: [],
-      };
-    }
-    acc[chave].rotas.push(rota);
-    return acc;
-  }, {});
+  const rotasEmAndamento = filtrarRotasEmAndamento(rotas);
+  const monitoramentoEntregadores = agruparRotasPorEntregador(rotasEmAndamento);
 
   if (loading) {
     return (
