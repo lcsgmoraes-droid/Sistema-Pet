@@ -68,7 +68,7 @@ function ProdutoSugestaoPDV({
       className="w-full border-b px-4 py-3 text-left last:border-b-0 hover:bg-gray-50"
     >
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex min-w-0 items-start gap-3">
+        <div className="flex min-w-0 flex-1 items-start gap-3">
           {imagemSugestao ? (
             <img
               src={imagemSugestao}
@@ -84,9 +84,11 @@ function ProdutoSugestaoPDV({
               <Package className="h-5 w-5" />
             </div>
           )}
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5 font-medium text-gray-900">
-              <span className="truncate">{produto.nome}</span>
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 items-center gap-1.5 font-medium text-gray-900">
+              <span className="min-w-0 truncate" title={produto.nome}>
+                {produto.nome}
+              </span>
               {estoqueZerado && vendaAtual.cliente && (
                 <span
                   onClick={(e) => onAdicionarNaListaEsperaRapido(produto, e)}
@@ -115,7 +117,7 @@ function ProdutoSugestaoPDV({
             </div>
           </div>
         </div>
-        <div className="flex flex-row items-center justify-between gap-2 sm:flex-col sm:items-end sm:justify-start">
+        <div className="flex shrink-0 flex-row items-center justify-between gap-2 sm:flex-col sm:items-end sm:justify-start">
           {promocaoAtiva && precoOriginal > precoPDV && (
             <span className="text-xs text-gray-400 line-through">
               {formatMoneyBRL(precoOriginal)}
@@ -234,15 +236,16 @@ export default function PDVProdutosCard({
             return (
               <div
                 key={index}
-                className="space-y-2.5 rounded-lg border border-gray-200 bg-gray-50 p-3 transition-colors hover:border-blue-400"
+                data-testid="pdv-cart-item"
+                className="space-y-2.5 overflow-hidden rounded-lg border border-gray-200 bg-gray-50 p-3 transition-colors hover:border-blue-400"
               >
                 <div
-                  className="flex cursor-pointer flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
+                  className="flex cursor-pointer flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"
                   onClick={() =>
                     !modoVisualizacao && onAbrirModalDescontoItem(item)
                   }
                 >
-                  <div className="flex-1 flex items-start gap-2">
+                  <div className="flex min-w-0 flex-1 items-start gap-2">
                     {hasComposicao && (
                       <button
                         type="button"
@@ -260,9 +263,12 @@ export default function PDVProdutosCard({
                       </button>
                     )}
 
-                    <div className="flex-1">
-                      <div className="flex flex-wrap items-start gap-2">
-                        <div className="inline-flex items-start gap-2">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex min-w-0 flex-wrap items-start gap-2">
+                        <div
+                          className="flex min-w-0 max-w-full flex-1 items-start gap-2"
+                          title={item.produto_nome}
+                        >
                           {imagemProduto && (
                             <img
                               src={imagemProduto}
@@ -275,10 +281,11 @@ export default function PDVProdutosCard({
                             />
                           )}
                           <CopyableValue
+                            className="max-w-full flex-1"
                             copied={copiadoCodigoItem === `nome-${chaveCodigoItem}`}
                             title="Copiar nome do produto"
                             value={item.produto_nome}
-                            valueClassName="font-medium text-gray-900 break-words"
+                            valueClassName="font-medium text-gray-900"
                             onCopy={() =>
                               onCopiarCodigoProdutoCarrinho(
                                 item.produto_nome,
@@ -346,10 +353,12 @@ export default function PDVProdutosCard({
                           </span>
                         )}
                       </div>
-                      <div className="text-sm text-gray-500">
-                        {item.quantidade} Unidade
-                        {item.quantidade !== 1 ? "s" : ""} x{" "}
-                        {formatMoneyBRL(item.preco_unitario)}
+                      <div className="mt-1 flex min-w-0 flex-wrap items-center gap-x-1 gap-y-0.5 text-sm text-gray-500">
+                        <span>
+                          {item.quantidade} Unidade
+                          {item.quantidade !== 1 ? "s" : ""} x{" "}
+                          {formatMoneyBRL(item.preco_unitario)}
+                        </span>
                         {itemEmPromocao && item.preco_venda_original > item.preco_unitario && (
                           <span className="ml-1 text-xs text-gray-400 line-through">
                             {formatMoneyBRL(item.preco_venda_original)}
@@ -365,10 +374,10 @@ export default function PDVProdutosCard({
                   </div>
 
                   <div
-                    className="flex flex-wrap items-center justify-between gap-2 sm:flex-nowrap sm:justify-end"
+                    className="flex w-full shrink-0 flex-wrap items-center justify-end gap-2 sm:w-auto sm:flex-nowrap"
                     onClick={(e) => e.stopPropagation()}
                   >
-                    <div className="flex items-center rounded-lg border border-gray-300 bg-white">
+                    <div className="flex shrink-0 items-center rounded-lg border border-gray-300 bg-white">
                       <button
                         type="button"
                         onClick={() => onAlterarQuantidade(index, -1)}
@@ -395,14 +404,16 @@ export default function PDVProdutosCard({
                       </button>
                     </div>
 
-                    <SubtotalInput
-                      subtotal={item.subtotal}
-                      precoUnitario={item.preco_unitario}
-                      disabled={modoVisualizacao}
-                      onQuantidadeChange={(novaQuantidade) =>
-                        onAtualizarQuantidadeItem(index, novaQuantidade)
-                      }
-                    />
+                    <div className="shrink-0">
+                      <SubtotalInput
+                        subtotal={item.subtotal}
+                        precoUnitario={item.preco_unitario}
+                        disabled={modoVisualizacao}
+                        onQuantidadeChange={(novaQuantidade) =>
+                          onAtualizarQuantidadeItem(index, novaQuantidade)
+                        }
+                      />
+                    </div>
 
                     <button
                       type="button"
@@ -416,7 +427,7 @@ export default function PDVProdutosCard({
                 </div>
 
                 {hasComposicao && isExpanded && (
-                  <div className="ml-7 mt-3 p-3 bg-white rounded-lg border border-gray-200">
+                  <div className="ml-7 mt-3 overflow-hidden p-3 bg-white rounded-lg border border-gray-200">
                     <div className="text-xs font-semibold text-gray-600 uppercase mb-2">
                       Composicao do KIT
                     </div>
@@ -424,15 +435,15 @@ export default function PDVProdutosCard({
                       {item.composicao_kit.map((componente, compIndex) => (
                         <div
                           key={compIndex}
-                          className="flex items-center justify-between text-sm py-1.5 px-2 rounded hover:bg-gray-50"
+                          className="flex min-w-0 items-center justify-between gap-3 text-sm py-1.5 px-2 rounded hover:bg-gray-50"
                         >
-                          <div className="flex items-center gap-2">
-                            <Package className="w-4 h-4 text-gray-400" />
-                            <span className="text-gray-700">
+                          <div className="flex min-w-0 items-center gap-2">
+                            <Package className="w-4 h-4 shrink-0 text-gray-400" />
+                            <span className="truncate text-gray-700" title={componente.produto_nome}>
                               {componente.produto_nome}
                             </span>
                           </div>
-                          <span className="text-gray-500 font-medium">
+                          <span className="shrink-0 text-gray-500 font-medium">
                             {componente.quantidade}x
                           </span>
                         </div>

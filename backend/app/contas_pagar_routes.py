@@ -9,7 +9,7 @@ from sqlalchemy import and_, or_, func, desc, extract, select
 from typing import List, Optional
 from datetime import datetime, date, timedelta
 from pydantic import BaseModel, field_validator
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 import re
 import unicodedata
 
@@ -61,6 +61,19 @@ def _expressao_texto_busca(coluna):
     texto = func.coalesce(coluna, "")
     texto = func.replace(func.lower(texto), "-", " ")
     return func.translate(texto, BUSCA_ACENTOS, BUSCA_SEM_ACENTOS)
+
+
+def _decimal_monetario(valor) -> Decimal:
+    if valor is None:
+        return Decimal("0.00")
+    return Decimal(str(valor)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def _valor_reais_para_centavos(valor) -> Decimal:
+    return (_decimal_monetario(valor) * Decimal("100")).quantize(
+        Decimal("1"),
+        rounding=ROUND_HALF_UP,
+    )
 
 # ============================================================================
 # SCHEMAS
@@ -1779,7 +1792,10 @@ async def registrar_pagamento(
     """
     current_user, tenant_id = user_and_tenant
     
-    conta = db.query(ContaPagar).filter(ContaPagar.id == conta_id).first()
+    conta = db.query(ContaPagar).filter(
+        ContaPagar.id == conta_id,
+        ContaPagar.tenant_id == tenant_id,
+    ).first()
     
     if not conta:
         raise HTTPException(status_code=404, detail="Conta não encontrada")
@@ -1787,11 +1803,36 @@ async def registrar_pagamento(
     if conta.status == 'pago':
         raise HTTPException(status_code=400, detail="Conta já está paga")
     
+    conta.valor_original = _decimal_monetario(conta.valor_original)
+    conta.valor_pago = _decimal_monetario(conta.valor_pago)
+    conta.valor_juros = _decimal_monetario(conta.valor_juros)
+    conta.valor_multa = _decimal_monetario(conta.valor_multa)
+    conta.valor_desconto = _decimal_monetario(conta.valor_desconto)
+    conta.valor_final = _decimal_monetario(conta.valor_final or conta.valor_original)
+
+    valor_base_pagamento = _decimal_monetario(pagamento.valor_pago)
+    valor_juros = _decimal_monetario(pagamento.valor_juros)
+    valor_multa = _decimal_monetario(pagamento.valor_multa)
+    valor_desconto = _decimal_monetario(pagamento.valor_desconto)
+    valor_total_pagamento = valor_base_pagamento + valor_juros + valor_multa - valor_desconto
+
+    if valor_base_pagamento <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="Informe um valor de pagamento maior que zero.",
+        )
+
+    if valor_total_pagamento <= 0:
+        raise HTTPException(
+            status_code=400,
+            detail="O valor final do pagamento precisa ser maior que zero. Revise juros, multa e desconto.",
+        )
+
     # Atualizar valores
-    conta.valor_pago += Decimal(str(pagamento.valor_pago))
-    conta.valor_juros += Decimal(str(pagamento.valor_juros))
-    conta.valor_multa += Decimal(str(pagamento.valor_multa))
-    conta.valor_desconto += Decimal(str(pagamento.valor_desconto))
+    conta.valor_pago += valor_total_pagamento
+    conta.valor_juros += valor_juros
+    conta.valor_multa += valor_multa
+    conta.valor_desconto += valor_desconto
     
     # Recalcular valor final
     conta.valor_final = (
@@ -1812,7 +1853,7 @@ async def registrar_pagamento(
     novo_pagamento = Pagamento(
         conta_pagar_id=conta.id,
         forma_pagamento_id=pagamento.forma_pagamento_id,
-        valor_pago=pagamento.valor_pago,
+        valor_pago=valor_total_pagamento,
         data_pagamento=pagamento.data_pagamento,
         observacoes=pagamento.observacoes,
         user_id=current_user.id,
@@ -1827,7 +1868,8 @@ async def registrar_pagamento(
     if pagamento.conta_bancaria_id:
         # Buscar conta bancária
         conta_bancaria = db.query(ContaBancaria).filter(
-            ContaBancaria.id == pagamento.conta_bancaria_id
+            ContaBancaria.id == pagamento.conta_bancaria_id,
+            ContaBancaria.tenant_id == tenant_id,
         ).first()
         
         if not conta_bancaria:
@@ -1843,7 +1885,7 @@ async def registrar_pagamento(
             )
         
         # Converter valor para centavos
-        valor_centavos = int(pagamento.valor_pago * 100)
+        valor_centavos = _valor_reais_para_centavos(valor_total_pagamento)
         
         # Criar movimentação financeira (SAÍDA)
         movimentacao = MovimentacaoFinanceira(
@@ -1851,7 +1893,7 @@ async def registrar_pagamento(
             tipo='saida',
             valor=valor_centavos,
             descricao=f"Pagamento: {conta.descricao}",
-            data_movimento=pagamento.data_pagamento,
+            data_movimento=datetime.combine(pagamento.data_pagamento, datetime.min.time()),
             categoria_id=conta.categoria_id,
             status='realizado',
             forma_pagamento_id=pagamento.forma_pagamento_id,
@@ -1869,7 +1911,7 @@ async def registrar_pagamento(
         
         logger.info(
             f"🏦 Movimentação bancária criada: {conta_bancaria.nome} "
-            f"-R$ {pagamento.valor_pago:.2f} (Saldo: R$ {conta_bancaria.saldo_atual/100:.2f})"
+            f"-R$ {valor_total_pagamento:.2f} (Saldo: R$ {conta_bancaria.saldo_atual/100:.2f})"
         )
     
     # ========================================

@@ -57,14 +57,14 @@ export default function SubtotalInput({ subtotal, precoUnitario, onQuantidadeCha
 
   if (disabled) {
     return (
-      <div className="text-lg font-semibold text-gray-900 w-28 text-right">
+      <div className="w-24 shrink-0 text-right text-lg font-semibold text-gray-900 sm:w-28">
         R$ {(subtotal ?? 0).toFixed(2).replace('.', ',')}
       </div>
     );
   }
 
   return (
-    <div className="flex items-center gap-1" title="Digite o valor total para calcular a quantidade">
+    <div className="flex shrink-0 items-center gap-1" title="Digite o valor total para calcular a quantidade">
       <span className="text-gray-600 font-medium text-sm">R$</span>
       <input
         type="text"
@@ -74,7 +74,7 @@ export default function SubtotalInput({ subtotal, precoUnitario, onQuantidadeCha
         onFocus={handleFocus}
         onBlur={handleBlur}
         onKeyDown={handleKeyDown}
-        className="w-24 text-lg font-semibold text-gray-900 text-right border border-transparent hover:border-blue-300 focus:border-blue-500 rounded px-1 focus:ring-1 focus:ring-blue-500 focus:outline-none cursor-text"
+        className="w-24 shrink-0 text-lg font-semibold text-gray-900 text-right border border-transparent hover:border-blue-300 focus:border-blue-500 rounded px-1 focus:ring-1 focus:ring-blue-500 focus:outline-none cursor-text"
       />
     </div>
   );

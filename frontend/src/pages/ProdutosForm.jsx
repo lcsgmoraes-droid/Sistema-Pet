@@ -26,11 +26,21 @@ import {
 } from '../api/produtos';
 import api from '../api';
 import ResponsiveTabs, { TabContent } from '../components/ResponsiveTabs';
-import FornecedorSelector from '../components/fornecedores/FornecedorSelector';
 import FornecedorIdentity from '../components/ui/FornecedorIdentity';
 import { resolveMediaUrl } from '../utils/mediaUrl';
-
-const MAX_UPLOAD_SIZE_BYTES = 10 * 1024 * 1024;
+import ModalFornecedor from './produtos/ModalFornecedorProduto';
+import ModalMovimentoEstoque from './produtos/ModalMovimentoEstoqueProduto';
+import {
+  formatarPorcentagemProduto as formatarPorcentagem,
+  formatarValorMonetarioProduto as formatarValorMonetario,
+  montarAbasProdutoFormulario,
+  montarEstadoProdutoFormulario,
+  montarProdutoComAlteracao,
+  montarPayloadProdutoParaSalvar,
+  organizarCategoriasHierarquicas,
+  validarArquivoImagemProduto,
+  validarProdutoParaSalvar,
+} from './produtosFormUtils';
 
 export default function ProdutosForm() {
   const { id } = useParams();
@@ -48,35 +58,7 @@ export default function ProdutosForm() {
   const [clientes, setClientes] = useState([]);
   
   // Dados do produto
-  const [produto, setProduto] = useState({
-    codigo: '',
-    nome: '',
-    descricao: '',
-    categoria_id: '',
-    marca_id: '',
-    departamento_id: '',
-    tipo: 'produto',
-    preco_custo: '',
-    preco_venda: '',
-    margem_lucro: '',
-    estoque_minimo: '',
-    estoque_maximo: '',
-    localizacao: '',
-    observacoes: '',
-    controle_lote: false,
-    status: 'ativo',
-    // Preços por canal
-    preco_ecommerce: null,
-    preco_ecommerce_promo: null,
-    preco_ecommerce_promo_inicio: null,
-    preco_ecommerce_promo_fim: null,
-    preco_app: null,
-    preco_app_promo: null,
-    preco_app_promo_inicio: null,
-    preco_app_promo_fim: null,
-    anunciar_ecommerce: true,
-    anunciar_app: true,
-  });
+  const [produto, setProduto] = useState(() => montarEstadoProdutoFormulario());
   
   // Imagens
   const [imagens, setImagens] = useState([]);
@@ -117,47 +99,6 @@ export default function ProdutosForm() {
     }
   };
   
-  // Função para organizar categorias hierarquicamente
-  const organizarCategoriasHierarquicas = (categorias) => {
-    if (!categorias || categorias.length === 0) return [];
-    
-    // Criar um mapa de categorias por ID para fácil acesso
-    const categoriasMap = {};
-    categorias.forEach(cat => {
-      categoriasMap[cat.id] = { ...cat, filhas: [] };
-    });
-    
-    // Identificar raízes e construir árvore
-    const raizes = [];
-    categorias.forEach(cat => {
-      if (cat.categoria_pai_id) {
-        // Adicionar como filha da categoria pai
-        if (categoriasMap[cat.categoria_pai_id]) {
-          categoriasMap[cat.categoria_pai_id].filhas.push(categoriasMap[cat.id]);
-        }
-      } else {
-        // É uma categoria raiz
-        raizes.push(categoriasMap[cat.id]);
-      }
-    });
-    
-    // Função recursiva para achatar a árvore com nível de indentação
-    const aplanar = (categorias, nivel = 0) => {
-      let resultado = [];
-      categorias.forEach(cat => {
-        resultado.push({ ...cat, nivel });
-        if (cat.filhas && cat.filhas.length > 0) {
-          resultado = resultado.concat(aplanar(cat.filhas, nivel + 1));
-        }
-      });
-      return resultado;
-    };
-    
-    const resultado = aplanar(raizes);
-    console.log('Categorias organizadas:', resultado);
-    return resultado;
-  };
-  
   const carregarMarcas = async () => {
     try {
       const response = await getMarcas({ apenas_ativas: true });
@@ -165,22 +106,6 @@ export default function ProdutosForm() {
     } catch (error) {
       console.error('Erro ao carregar marcas:', error);
     }
-  };
-  
-  // Função auxiliar para formatar valores monetários
-  const formatarValorMonetario = (valor) => {
-    if (!valor || valor === '') return 'R$ 0,00';
-    const numero = typeof valor === 'string' ? parseFloat(valor) : valor;
-    if (isNaN(numero)) return 'R$ 0,00';
-    return `R$ ${numero.toFixed(2).replace('.', ',')}`;
-  };
-  
-  // Função auxiliar para formatar porcentagem
-  const formatarPorcentagem = (valor) => {
-    if (!valor || valor === '') return '0,00%';
-    const numero = typeof valor === 'string' ? parseFloat(valor) : valor;
-    if (isNaN(numero)) return '0,00%';
-    return `${numero.toFixed(2).replace('.', ',')}%`;
   };
   
   const carregarDepartamentos = async () => {
@@ -209,35 +134,7 @@ export default function ProdutosForm() {
       const response = await getProduto(id);
       const prod = response.data;
       
-      setProduto({
-        codigo: prod.codigo || '',
-        nome: prod.nome || '',
-        descricao: prod.descricao || '',
-        categoria_id: prod.categoria_id || '',
-        marca_id: prod.marca_id || '',
-        departamento_id: prod.departamento_id || '',
-        tipo: prod.tipo || 'produto',
-        preco_custo: prod.preco_custo || '',
-        preco_venda: prod.preco_venda || '',
-        margem_lucro: prod.margem_lucro || '',
-        estoque_minimo: prod.estoque_minimo || '',
-        estoque_maximo: prod.estoque_maximo || '',
-        localizacao: prod.localizacao || '',
-        observacoes: prod.observacoes || '',
-        controle_lote: prod.controle_lote || false,
-        status: prod.status || 'ativo',
-        // Preços por canal
-        preco_ecommerce: prod.preco_ecommerce ?? null,
-        preco_ecommerce_promo: prod.preco_ecommerce_promo ?? null,
-        preco_ecommerce_promo_inicio: prod.preco_ecommerce_promo_inicio ?? null,
-        preco_ecommerce_promo_fim: prod.preco_ecommerce_promo_fim ?? null,
-        preco_app: prod.preco_app ?? null,
-        preco_app_promo: prod.preco_app_promo ?? null,
-        preco_app_promo_inicio: prod.preco_app_promo_inicio ?? null,
-        preco_app_promo_fim: prod.preco_app_promo_fim ?? null,
-        anunciar_ecommerce: prod.anunciar_ecommerce ?? true,
-        anunciar_app: prod.anunciar_app ?? true,
-      });
+      setProduto(montarEstadoProdutoFormulario(prod));
       
       // Carregar imagens
       if (prod.imagens && prod.imagens.length > 0) {
@@ -288,30 +185,7 @@ export default function ProdutosForm() {
   
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setProduto(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
-    
-    // Calcular margem automaticamente
-    if (name === 'preco_custo' || name === 'preco_venda') {
-      calcularMargem(
-        name === 'preco_custo' ? value : produto.preco_custo,
-        name === 'preco_venda' ? value : produto.preco_venda
-      );
-    }
-  };
-  
-  const calcularMargem = (custo, venda) => {
-    const c = parseFloat(custo) || 0;
-    const v = parseFloat(venda) || 0;
-    if (c > 0) {
-      const margem = ((v - c) / c) * 100;
-      setProduto(prev => ({
-        ...prev,
-        margem_lucro: margem.toFixed(2)
-      }));
-    }
+    setProduto(prev => montarProdutoComAlteracao(prev, { name, value, type, checked }));
   };
   
   // 🔒 SPRINT 2: Carregar variações do produto PAI
@@ -343,34 +217,16 @@ export default function ProdutosForm() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     
-    // Validações
-    if (!produto.nome.trim()) {
-      alert('Nome do produto é obrigatório');
-      return;
-    }
-    
-    if (!produto.preco_venda || parseFloat(produto.preco_venda) <= 0) {
-      alert('Preço de venda é obrigatório e deve ser maior que zero');
+    const mensagemValidacao = validarProdutoParaSalvar(produto);
+    if (mensagemValidacao) {
+      alert(mensagemValidacao);
       return;
     }
     
     try {
       setSalvando(true);
       
-      const { _mostrarCanais, ...restoProduto } = produto;
-      const lojaFisicaAtiva = produto.status !== 'inativo';
-      const dados = {
-        ...restoProduto,
-        preco_custo: parseFloat(produto.preco_custo) || 0,
-        preco_venda: parseFloat(produto.preco_venda) || 0,
-        margem_lucro: parseFloat(produto.margem_lucro) || 0,
-        estoque_minimo: parseFloat(produto.estoque_minimo) || 0,
-        estoque_maximo: parseFloat(produto.estoque_maximo) || 0,
-        categoria_id: produto.categoria_id || null,
-        marca_id: produto.marca_id || null,
-        anunciar_ecommerce: lojaFisicaAtiva ? Boolean(produto.anunciar_ecommerce) : false,
-        anunciar_app: lojaFisicaAtiva ? Boolean(produto.anunciar_app) : false,
-      };
+      const dados = montarPayloadProdutoParaSalvar(produto);
       
       if (isEdit) {
         await updateProduto(id, dados);
@@ -395,15 +251,9 @@ export default function ProdutosForm() {
     const file = e.target.files[0];
     if (!file) return;
     
-    // Validações
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
-    if (!allowedTypes.includes(file.type)) {
-      alert('Apenas JPG, PNG e WebP são permitidos');
-      return;
-    }
-    
-    if (file.size > MAX_UPLOAD_SIZE_BYTES) {
-      alert('Imagem deve ter no maximo 10MB');
+    const mensagemValidacao = validarArquivoImagemProduto(file);
+    if (mensagemValidacao) {
+      alert(mensagemValidacao);
       return;
     }
     
@@ -561,19 +411,14 @@ export default function ProdutosForm() {
       
       {/* Abas */}
       <ResponsiveTabs
-        tabs={[
-          { id: 'dados', label: '📋 Dados Básicos', count: null },
-          ...(isEdit ? [
-            { id: 'imagens', label: '🖼️ Imagens', count: imagens.length },
-            { id: 'fornecedores', label: '🏭 Fornecedores', count: fornecedores.length },
-            ...(produto.controle_lote ? [
-              { id: 'lotes', label: '📦 Lotes', count: lotes.length }
-            ] : []),
-            ...(produto.tipo_produto === 'PAI' ? [
-              { id: 'variacoes', label: '🔹 Variações', count: variacoes.length }
-            ] : [])
-          ] : [])
-        ]}
+        tabs={montarAbasProdutoFormulario({
+          isEdit,
+          imagens,
+          fornecedores,
+          lotes,
+          variacoes,
+          produto,
+        })}
         activeTab={abaAtiva}
         onChange={setAbaAtiva}
       />
@@ -1385,312 +1230,6 @@ export default function ProdutosForm() {
           onClose={() => setShowModalLote(false)}
         />
       )}
-    </div>
-  );
-}
-
-// ==================== MODAL FORNECEDOR ====================
-
-function ModalFornecedor({ fornecedor, clientes, onSave, onClose }) {
-  const [dados, setDados] = useState({
-    fornecedor_id: fornecedor?.fornecedor_id || '',
-    codigo_fornecedor: fornecedor?.codigo_fornecedor || '',
-    preco_custo: fornecedor?.preco_custo || '',
-    prazo_entrega: fornecedor?.prazo_entrega || '',
-    estoque_fornecedor: fornecedor?.estoque_fornecedor || '',
-    e_principal: fornecedor?.e_principal || false,
-  });
-  const fornecedorSelecionado = clientes.find(
-    (cliente) => String(cliente.id) === String(dados.fornecedor_id),
-  );
-  
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    onSave({
-      ...dados,
-      preco_custo: parseFloat(dados.preco_custo) || null,
-      prazo_entrega: parseInt(dados.prazo_entrega) || null,
-      estoque_fornecedor: parseFloat(dados.estoque_fornecedor) || null,
-    });
-  };
-  
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-        <div className="flex justify-between items-center p-6 border-b">
-          <h3 className="text-lg font-semibold">
-            {fornecedor ? 'Editar Fornecedor' : 'Adicionar Fornecedor'}
-          </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
-        </div>
-        
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Fornecedor *
-            </label>
-            <FornecedorSelector
-              fornecedores={clientes}
-              fornecedorId={dados.fornecedor_id}
-              fornecedorSelecionado={fornecedorSelecionado}
-              showLabel={false}
-              required
-              disabled={Boolean(fornecedor)}
-              placeholder="Digite o fornecedor..."
-              inputClassName="rounded-lg border-gray-300"
-              onInputChange={(termo) => {
-                if (!termo || dados.fornecedor_id) {
-                  setDados({ ...dados, fornecedor_id: '' });
-                }
-              }}
-              onSelect={(fornecedorSelecionado) =>
-                setDados({ ...dados, fornecedor_id: String(fornecedorSelecionado.id) })
-              }
-              onClear={() => setDados({ ...dados, fornecedor_id: '' })}
-              onFornecedorCriado={(fornecedorSelecionado) =>
-                setDados({ ...dados, fornecedor_id: String(fornecedorSelecionado.id) })
-              }
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Código no Fornecedor
-            </label>
-            <input
-              type="text"
-              value={dados.codigo_fornecedor}
-              onChange={(e) => setDados({ ...dados, codigo_fornecedor: e.target.value })}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              placeholder="SKU-FORNECEDOR-001"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Preço de Custo
-            </label>
-            <div className="relative">
-              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
-              <input
-                type="number"
-                value={dados.preco_custo}
-                onChange={(e) => setDados({ ...dados, preco_custo: e.target.value })}
-                step="0.01"
-                min="0"
-                className="w-full pl-12 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                placeholder="0,00"
-              />
-            </div>
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Prazo de Entrega (dias)
-            </label>
-            <input
-              type="number"
-              value={dados.prazo_entrega}
-              onChange={(e) => setDados({ ...dados, prazo_entrega: e.target.value })}
-              min="0"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              placeholder="7"
-            />
-          </div>
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Estoque no Fornecedor
-            </label>
-            <input
-              type="number"
-              value={dados.estoque_fornecedor}
-              onChange={(e) => setDados({ ...dados, estoque_fornecedor: e.target.value })}
-              step="0.01"
-              min="0"
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              placeholder="100"
-            />
-          </div>
-          
-          <div className="flex items-center space-x-2">
-            <input
-              type="checkbox"
-              checked={dados.e_principal}
-              onChange={(e) => setDados({ ...dados, e_principal: e.target.checked })}
-              className="w-4 h-4 text-blue-600 border-gray-300 rounded"
-            />
-            <label className="text-sm font-medium text-gray-700">
-              Fornecedor Principal
-            </label>
-          </div>
-          
-          <div className="flex justify-end gap-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-            >
-              Salvar
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
-  );
-}
-
-// ==================== MODAL MOVIMENTO ESTOQUE ====================
-
-function ModalMovimentoEstoque({ tipo, onSave, onClose }) {
-  const [dados, setDados] = useState({
-    quantidade: '',
-    numero_lote: '',
-    preco_custo: '',
-    data_validade: '',
-    observacao: '',
-  });
-  
-  const handleSubmit = (e) => {
-    e.preventDefault();
-    
-    const payload = {
-      quantidade: parseFloat(dados.quantidade),
-      observacao: dados.observacao || null,
-    };
-    
-    if (tipo === 'entrada') {
-      payload.numero_lote = dados.numero_lote || null;
-      payload.preco_custo = parseFloat(dados.preco_custo) || 0;
-      payload.data_validade = dados.data_validade || null;
-    }
-    
-    onSave(payload);
-  };
-  
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-        <div className="flex justify-between items-center p-6 border-b">
-          <h3 className="text-lg font-semibold">
-            {tipo === 'entrada' ? '➕ Entrada de Estoque' : '➖ Saída de Estoque'}
-          </h3>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">✕</button>
-        </div>
-        
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Quantidade *
-            </label>
-            <input
-              type="number"
-              value={dados.quantidade}
-              onChange={(e) => setDados({ ...dados, quantidade: e.target.value })}
-              step="0.01"
-              min="0.01"
-              required
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              placeholder="0"
-              autoFocus
-            />
-          </div>
-          
-          {tipo === 'entrada' && (
-            <>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Número do Lote
-                </label>
-                <input
-                  type="text"
-                  value={dados.numero_lote}
-                  onChange={(e) => setDados({ ...dados, numero_lote: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                  placeholder="LOTE-001"
-                />
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Preço de Custo
-                </label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">R$</span>
-                  <input
-                    type="number"
-                    value={dados.preco_custo}
-                    onChange={(e) => setDados({ ...dados, preco_custo: e.target.value })}
-                    step="0.01"
-                    min="0"
-                    className="w-full pl-12 pr-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                    placeholder="0,00"
-                  />
-                </div>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Data de Validade
-                </label>
-                <input
-                  type="date"
-                  value={dados.data_validade}
-                  onChange={(e) => setDados({ ...dados, data_validade: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </>
-          )}
-          
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Observação
-            </label>
-            <textarea
-              value={dados.observacao}
-              onChange={(e) => setDados({ ...dados, observacao: e.target.value })}
-              rows={2}
-              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
-              placeholder="Observações sobre este movimento..."
-            />
-          </div>
-          
-          {tipo === 'saida' && (
-            <div className="p-3 bg-yellow-50 border border-yellow-200 rounded-lg">
-              <p className="text-sm text-yellow-800">
-                <strong>FIFO:</strong> A saída será descontada automaticamente dos lotes mais antigos primeiro.
-              </p>
-            </div>
-          )}
-          
-          <div className="flex justify-end gap-3 pt-4">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className={`px-4 py-2 text-white rounded-lg ${
-                tipo === 'entrada'
-                  ? 'bg-green-600 hover:bg-green-700'
-                  : 'bg-red-600 hover:bg-red-700'
-              }`}
-            >
-              Confirmar
-            </button>
-          </div>
-        </form>
-      </div>
     </div>
   );
 }

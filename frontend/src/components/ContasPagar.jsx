@@ -56,6 +56,45 @@ function calcularIntervaloPeriodoRapido(periodo) {
   };
 }
 
+function extrairMensagemErroPagamento(error) {
+  const detail = error?.response?.data?.detail ?? error?.response?.data?.message;
+
+  if (typeof detail === 'string') {
+    return detail;
+  }
+
+  if (Array.isArray(detail)) {
+    const mensagens = detail
+      .map((item) => {
+        const campo = Array.isArray(item?.loc)
+          ? item.loc.filter((parte) => parte !== 'body').join('.')
+          : '';
+        const mensagem = item?.msg || item?.message || item?.detail || String(item);
+
+        if (campo.includes('data_pagamento')) {
+          return 'Data do pagamento e obrigatoria.';
+        }
+
+        if (campo.includes('valor_pago')) {
+          return 'Valor a pagar e obrigatorio.';
+        }
+
+        return campo ? `${campo}: ${mensagem}` : mensagem;
+      })
+      .filter(Boolean);
+
+    if (mensagens.length > 0) {
+      return mensagens.join(' ');
+    }
+  }
+
+  if (detail && typeof detail === 'object') {
+    return detail.mensagem || detail.message || detail.erro || 'Erro ao registrar pagamento';
+  }
+
+  return error?.message || 'Erro ao registrar pagamento';
+}
+
 const ContasPagar = () => {
   const [contas, setContas] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -271,6 +310,7 @@ const ContasPagar = () => {
     const formaDefault = formasPagamento.find(f => f.id === conta.forma_pagamento_id);
     setDadosPagamento({
       valor_pago: conta.valor_final - conta.valor_pago,
+      data_pagamento: formatarDataISO(new Date()),
       forma_pagamento_id: conta.forma_pagamento_id || '',
       conta_bancaria_id: formaDefault?.conta_bancaria_destino_id || '',
       valor_juros: 0,
@@ -458,11 +498,57 @@ const ContasPagar = () => {
     }
   };
 
+  const calcularValorFinalPagamento = (dados = dadosPagamento) => (
+    (Number(dados.valor_pago) || 0) +
+    (Number(dados.valor_juros) || 0) +
+    (Number(dados.valor_multa) || 0) -
+    (Number(dados.valor_desconto) || 0)
+  );
+
+  const confirmarSaldoNegativoPagamento = () => {
+    const contaBancaria = safeArray(contasBancarias).find(
+      (conta) => Number(conta.id) === Number(dadosPagamento.conta_bancaria_id)
+    );
+
+    if (!contaBancaria) {
+      return true;
+    }
+
+    const saldoAtual = Number(contaBancaria.saldo_atual || 0);
+    const valorFinal = calcularValorFinalPagamento();
+
+    if (valorFinal <= saldoAtual) {
+      return true;
+    }
+
+    const saldoDepois = saldoAtual - valorFinal;
+    const mensagem = [
+      `Saldo insuficiente na conta bancaria "${contaBancaria.nome}".`,
+      '',
+      `Saldo atual: ${formatarMoeda(saldoAtual)}`,
+      `Pagamento: ${formatarMoeda(valorFinal)}`,
+      `A conta ficara negativo em ${formatarMoeda(Math.abs(saldoDepois))}.`,
+      '',
+      'Deseja baixar mesmo assim?',
+    ].join('\n');
+
+    return window.confirm(mensagem);
+  };
+
   const registrarPagamento = async () => {
+    if (!confirmarSaldoNegativoPagamento()) {
+      return;
+    }
+
+    const payloadPagamento = {
+      ...dadosPagamento,
+      data_pagamento: dadosPagamento.data_pagamento || formatarDataISO(new Date()),
+    };
+
     try {
             await api.post(
         `/contas-pagar/${contaSelecionada.id}/pagar`,
-        dadosPagamento
+        payloadPagamento
       );
       
       toast.success('Pagamento registrado com sucesso!');
@@ -470,7 +556,7 @@ const ContasPagar = () => {
       carregarDados();
     } catch (error) {
       console.error('Erro ao registrar pagamento:', error);
-      toast.error(error.response?.data?.detail || 'Erro ao registrar pagamento');
+      toast.error(extrairMensagemErroPagamento(error));
     }
   };
 

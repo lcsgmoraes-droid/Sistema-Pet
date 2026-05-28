@@ -2,61 +2,59 @@ import { useCallback, useState, useEffect, useRef } from 'react';
 import {
   X,
   CreditCard,
-  DollarSign,
   Wallet,
-  Building,
   CheckCircle,
   AlertCircle,
-  Trash2,
-  FileText,
   BarChart2,
-  Banknote,
-  QrCode,
-  ArrowLeftRight,
-  Receipt,
-  Landmark
 } from 'lucide-react';
 
-// Mapeia o campo icone (palavra-chave ou emoji) para um componente lucide
-const getIconeFormaPagamento = (icone, nome) => {
-  const key = (icone || nome || '').toLowerCase();
-  if (key.includes('pix'))                           return <QrCode className="w-6 h-6" />;
-  if (key.includes('dinheiro') || key.includes('cash')) return <Banknote className="w-6 h-6" />;
-  if (key.includes('debito') || key.includes('d\u00e9bito'))  return <CreditCard className="w-6 h-6" />;
-  if (key.includes('parcelado'))                     return <CreditCard className="w-6 h-6" />;
-  if (key.includes('credito') || key.includes('cr\u00e9dito'))return <CreditCard className="w-6 h-6" />;
-  if (key.includes('transfer') || key.includes('banc')) return <ArrowLeftRight className="w-6 h-6" />;
-  if (key.includes('boleto'))                        return <Receipt className="w-6 h-6" />;
-  if (key.includes('wallet') || key.includes('carteira')) return <Wallet className="w-6 h-6" />;
-  return <CreditCard className="w-6 h-6" />;
-};
 import { finalizarVenda, criarVenda, atualizarVenda } from '../api/vendas';
 import { verificarEstoqueNegativo } from '../api/alertasEstoque';
 import StatusMargemIndicador from './StatusMargemIndicador';
 import api from '../api';
 import CurrencyInput from './CurrencyInput';
 import ModalAdicionarCredito from './ModalAdicionarCredito';
+import ModalPerguntaNFe from './ModalPerguntaNFe';
+import ModalPagamentoResumoLateral from './ModalPagamentoResumoLateral';
+import PaymentMethodIcon from './PaymentMethodIcon';
 import useRevealFloatingPanel from '../hooks/useRevealFloatingPanel';
-import { formatBRL, formatMoneyBRL } from '../utils/formatters';
+import { formatMoneyBRL } from '../utils/formatters';
 import {
   emitirNotaFiscalAssistida,
   extrairMensagemNFe,
 } from '../utils/nfeFiscalAssistida';
 import { montarPayloadVenda } from '../utils/pdvVendaPayload';
-import {
-  campaignAllowsSaleChannel,
-  getCashbackBonusParamKey,
-} from '../utils/campaignChannelScope';
 import { useModulos } from '../contexts/ModulosContext';
-
-const BANDEIRAS = [
-  'Visa',
-  'Mastercard',
-  'Elo',
-  'American Express',
-  'Hipercard',
-  'Outros'
-];
+import {
+  BANDEIRAS_CARTAO,
+  calcularBeneficiosCampanhaPreview,
+  calcularFaixasParcelamento,
+  calcularCustoTotalItensVenda,
+  calcularResumoRecebimento,
+  descreverCupomMargem,
+  devePerguntarNotaFiscal,
+  ehFormaPagamentoPix,
+  avaliarEstadoJustificativaMargem,
+  extrairCorIndicadorMargem,
+  montarFormasPagamentoAnalise,
+  montarCupomParaFinalizar,
+  montarItensParaVerificarEstoqueNegativo,
+  montarMensagemEstoqueNegativo,
+  montarObservacoesComJustificativaMargem,
+  montarFallbackSimulacaoParcelamento,
+  montarPagamentoAVista,
+  montarPagamentoRecebido,
+  montarPagamentoSimuladoParcelamento,
+  montarPagamentosMargem,
+  montarPayloadAnaliseMargem,
+  montarVendaParaPersistirComCupom,
+  normalizarResultadoSimulacaoParcelamento,
+  obterCorParcelamentoAtual,
+  obterCorVisualParcelamento,
+  obterEstiloVisualParcelamento,
+  resolverFaixasParcelamentoDaForma,
+  validarPagamentoParaAdicionar,
+} from './modalPagamentoUtils';
 
 export default function ModalPagamento({
   venda,
@@ -238,34 +236,39 @@ export default function ModalPagamento({
   }, [formaPagamentoSelecionada?.permite_parcelamento]);
 
   const valorTotal = venda.total;
-  const valorPago = pagamentos.reduce((sum, p) => sum + p.valor, 0) + totalPagoExistente;
-  const valorRestante = Math.max(0, valorTotal - valorPago);
-  const vendaQuitadaComPagamentosExistentes = totalPagoExistente >= valorTotal - 0.01;
-  const podeConfirmarFinalizacao =
-    pagamentos.length > 0 || vendaQuitadaComPagamentosExistentes;
-  const troco = valorRecebido > 0 ? valorRecebido - valorRestante : 0;
-  const cupomParaFinalizar =
-    cupomAplicado ||
-    (venda.cupom_code
-      ? {
-          code: venda.cupom_code,
-          discount_applied:
-            venda.cupom_discount_applied ?? venda.desconto_valor ?? null,
-        }
-      : null);
-  const descricaoCupomMargem =
-    cupomParaFinalizar?.code && Number(cupomParaFinalizar?.discount_applied || 0) > 0
-      ? `A margem ficou baixa por conta do cupom ${String(cupomParaFinalizar.code).toUpperCase()} (${formatMoneyBRL(cupomParaFinalizar.discount_applied)} de desconto).`
-      : "";
-  const corParcelamentoAtual =
-    formaPagamentoSelecionada?.permite_parcelamento &&
-    simulacoesParcelamento[formaPagamentoSelecionada.id]?.[numeroParcelas]
-      ? simulacoesParcelamento[formaPagamentoSelecionada.id][numeroParcelas]?.cor ?? 'verde'
-      : 'verde';
-  const margemCriticaAtual =
-    statusMargem === 'vermelho' || corParcelamentoAtual === 'vermelho';
-  const mostrarCampoJustificativa =
-    margemCriticaAtual || Boolean(justificativaTexto && justificativaTexto.trim().length > 0);
+  const {
+    valorPago,
+    valorRestante,
+    vendaQuitadaComPagamentosExistentes,
+    podeConfirmarFinalizacao,
+    troco,
+  } = calcularResumoRecebimento({
+    valorTotal,
+    pagamentos,
+    totalPagoExistente,
+    valorRecebido,
+  });
+  const cupomParaFinalizar = montarCupomParaFinalizar({ cupomAplicado, venda });
+  const descricaoCupomMargem = descreverCupomMargem(cupomParaFinalizar, formatMoneyBRL);
+  const corParcelamentoAtual = obterCorParcelamentoAtual({
+    formaPagamento: formaPagamentoSelecionada,
+    simulacoesParcelamento,
+    numeroParcelas,
+  });
+  const corVisualParcelamento = obterCorVisualParcelamento({
+    formaPagamento: formaPagamentoSelecionada,
+    simulacoesParcelamento,
+    numeroParcelas,
+    statusMargem,
+  });
+  const estiloVisualParcelamento =
+    obterEstiloVisualParcelamento(corVisualParcelamento);
+  const { margemCriticaAtual, mostrarCampoJustificativa } =
+    avaliarEstadoJustificativaMargem({
+      statusMargem,
+      corParcelamentoAtual,
+      justificativaTexto,
+    });
   const mostrarBotaoAdicionarRodape =
     Boolean(formaPagamentoSelecionada) && valorRestante > 0.01;
 
@@ -326,102 +329,37 @@ export default function ModalPagamento({
     }
   }, [erroJustificativa, revelarJustificativaObrigatoria]);
 
-  const valorBaseBeneficios = Number(venda.total || 0);
-  const canalVendaBeneficios = venda.canal || venda.origem_canal_venda || 'loja_fisica';
-  const campanhasElegiveisCanal = campanhasCompra.filter((campanha) =>
-    campaignAllowsSaleChannel(campanha, canalVendaBeneficios),
-  );
-  const campanhasCashback = campanhasElegiveisCanal.filter((campanha) => campanha.campaign_type === 'cashback');
-  const campanhasCarimbo = campanhasElegiveisCanal.filter((campanha) => campanha.campaign_type === 'loyalty_stamp');
-  const campanhasRecompra = campanhasElegiveisCanal.filter((campanha) => campanha.campaign_type === 'quick_repurchase');
-
-  const cashbackPrevisto = campanhasCashback
-    .map((campanha) => {
-      const params = campanha.params || {};
-      const chaveRank = `${rankCliente}_percent`;
-      const percentualBase = Number(params[chaveRank] ?? params.bronze_percent ?? 0);
-      const bonusPdv = Number(params[getCashbackBonusParamKey(canalVendaBeneficios)] ?? 0);
-      const percentualTotal = percentualBase + bonusPdv;
-      const valor = (valorBaseBeneficios * percentualTotal) / 100;
-
-      if (valor <= 0) return null;
-
-      return {
-        campanha: campanha.name,
-        percentual: percentualTotal,
-        valor,
-      };
-    })
-    .filter(Boolean);
-
-  const carimbosPrevistos = campanhasCarimbo
-    .map((campanha) => {
-      const params = campanha.params || {};
-      const valorPorCarimbo = Number(params.min_purchase_value || 0);
-
-      if (valorPorCarimbo <= 0) return null;
-
-      const quantidade = Math.floor(valorBaseBeneficios / valorPorCarimbo);
-      if (quantidade <= 0) return null;
-
-      return {
-        campanha: campanha.name,
-        quantidade,
-      };
-    })
-    .filter(Boolean);
-
-  const recompraPrevista = campanhasRecompra
-    .map((campanha) => {
-      const params = campanha.params || {};
-      const minPurchase = Number(params.min_purchase_value || 0);
-      const couponType = String(params.coupon_type || 'percent');
-      const couponValue = Number(params.coupon_value || 0);
-
-      if (couponValue <= 0 || valorBaseBeneficios < minPurchase) return null;
-
-      return {
-        campanha: campanha.name,
-        tipo: couponType,
-        valor: couponValue,
-      };
-    })
-    .filter(Boolean);
+  const {
+    cashbackPrevisto,
+    carimbosPrevistos,
+    recompraPrevista,
+  } = calcularBeneficiosCampanhaPreview({
+    campanhasCompra,
+    rankCliente,
+    canalVenda: venda.canal || venda.origem_canal_venda || 'loja_fisica',
+    valorBase: venda.total,
+  });
 
   // 🆕 Função para calcular status de margem operacional (INICIAL - À VISTA)
   const calcularStatusMargemInicial = async () => {
     setLoadingStatusMargem(true);
     try {
-            // 🎯 SIMULAR pagamento à vista (dinheiro) para análise inicial
-      const pagamentoSimuladoAVista = [{
-        forma_pagamento_id: 1, // ID do dinheiro (geralmente 1)
-        valor: venda.total,
-        parcelas: 1
-      }];
-
-      // 🔧 Mapear itens para o formato correto do backend
-      const itemsFormatados = (venda.itens || []).map(item => ({
-        produto_id: item.produto_id,
-        quantidade: item.quantidade,
-        preco_venda: item.preco_unitario || item.preco_venda || 0,
-        custo: item.custo || null
-      }));
+      // 🎯 SIMULAR pagamento à vista (dinheiro) para análise inicial
+      const pagamentoSimuladoAVista = montarPagamentoAVista(venda.total);
 
       const response = await api.post(
         `/formas-pagamento/analisar-venda`,
-        {
-          items: itemsFormatados,
-          formas_pagamento: pagamentoSimuladoAVista,
-          desconto: venda.desconto_valor || 0,
-          taxa_entrega: venda.entrega?.taxa_entrega_total || 0,
-          vendedor_id: venda.funcionario_id || null
-        }
+        montarPayloadAnaliseMargem({
+          venda,
+          formasPagamento: pagamentoSimuladoAVista,
+        })
       );
 
       // Salvar SOMENTE a cor do indicador
-      if (response.data?.resultado?.cor_indicador) {
-        setStatusMargem(response.data.resultado.cor_indicador);
-        console.log('✅ Status inicial calculado:', response.data.resultado.cor_indicador);
+      const corIndicador = extrairCorIndicadorMargem(response.data);
+      if (corIndicador) {
+        setStatusMargem(corIndicador);
+        console.log('✅ Status inicial calculado:', corIndicador);
       }
     } catch (error) {
       console.error('❌ Erro ao calcular status inicial:', error);
@@ -440,34 +378,23 @@ export default function ModalPagamento({
 
     setLoadingStatusMargem(true);
     try {
-            const todosPagamentos = [
-        ...pagamentosExistentes,
-        // Excluir cashback da análise de margem (não é uma forma real de pagamento)
-        ...pagamentos.filter(p => !p.is_cashback)
-      ];
-
-      // 🔧 Mapear itens para o formato correto do backend
-      const itemsFormatados = (venda.itens || []).map(item => ({
-        produto_id: item.produto_id,
-        quantidade: item.quantidade,
-        preco_venda: item.preco_unitario || item.preco_venda || 0,
-        custo: item.custo || null
-      }));
+      const todosPagamentos = montarPagamentosMargem({
+        pagamentosExistentes,
+        pagamentos,
+      });
 
       const response = await api.post(
         `/formas-pagamento/analisar-venda`,
-        {
-          items: itemsFormatados,
-          formas_pagamento: todosPagamentos,
-          desconto: venda.desconto_valor || 0,
-          taxa_entrega: venda.entrega?.taxa_entrega_total || 0,
-          vendedor_id: venda.funcionario_id || null
-        }
+        montarPayloadAnaliseMargem({
+          venda,
+          formasPagamento: todosPagamentos,
+        })
       );
 
       // Salvar SOMENTE a cor do indicador
-      if (response.data?.resultado?.cor_indicador) {
-        setStatusMargem(response.data.resultado.cor_indicador);
+      const corIndicador = extrairCorIndicadorMargem(response.data);
+      if (corIndicador) {
+        setStatusMargem(corIndicador);
       }
     } catch (error) {
       console.error('Erro ao calcular status de margem:', error);
@@ -491,12 +418,12 @@ export default function ModalPagamento({
 
   // 💡 Calcular sugestão PIX quando a forma de pagamento selecionada NÃO É PIX
   useEffect(() => {
-    const ehPix = (formaPagamentoSelecionada?.nome || '').toLowerCase().includes('pix');
+    const ehPix = ehFormaPagamentoPix(formaPagamentoSelecionada);
     if (ehPix || !formaPagamentoSelecionada) {
       setSugestaoPix(null);
       return;
     }
-    const custoTotal = (venda.itens || []).reduce((sum, item) => sum + ((item.custo || 0) * (item.quantidade || 1)), 0);
+    const custoTotal = calcularCustoTotalItensVenda(venda.itens);
     if (!custoTotal) { setSugestaoPix(null); return; }
     api.post('/pdv/indicadores/sugestao-pix', {
       total_venda: venda.total || 0,
@@ -542,44 +469,29 @@ export default function ModalPagamento({
     try {
             const resultados = {};
       
-      // 🔧 Mapear itens para o formato correto do backend
-      const itemsFormatados = (venda.itens || []).map(item => ({
-        produto_id: item.produto_id,
-        quantidade: item.quantidade,
-        preco_venda: item.preco_unitario || item.preco_venda || 0,
-        custo: item.custo || null
-      }));
-      
       // Simular todas as parcelas de 1 até max
       for (let parcelas = 1; parcelas <= maxParcelas; parcelas++) {
-        const pagamentoSimulado = [{
-          forma_pagamento_id: formaPagamentoId,
-          valor: venda.total,
-          parcelas: parcelas
-        }];
+        const pagamentoSimulado = montarPagamentoSimuladoParcelamento({
+          formaPagamentoId,
+          valorTotal: venda.total,
+          parcelas,
+        });
 
         try {
           const response = await api.post(
             `/formas-pagamento/analisar-venda`,
-            {
-              items: itemsFormatados,
-              formas_pagamento: pagamentoSimulado,
-              desconto: venda.desconto_valor || 0,
-              taxa_entrega: venda.entrega?.taxa_entrega_total || 0,
-              vendedor_id: venda.funcionario_id || null
-            }
+            montarPayloadAnaliseMargem({
+              venda,
+              formasPagamento: pagamentoSimulado,
+            })
           );
 
-          if (response.data?.resultado?.cor_indicador) {
-            resultados[parcelas] = {
-              cor: response.data.resultado.cor_indicador,
-              // ✅ O BACKEND já define a classificação através da cor
-              classificacao: response.data.resultado.cor_indicador
-            };
-          }
+          const resultadoSimulacao =
+            normalizarResultadoSimulacaoParcelamento(response.data);
+          if (resultadoSimulacao) resultados[parcelas] = resultadoSimulacao;
         } catch (error) {
           console.error(`Erro ao simular ${parcelas}x:`, error);
-          resultados[parcelas] = { cor: null, classificacao: 'verde' }; // Default seguro
+          resultados[parcelas] = montarFallbackSimulacaoParcelamento();
         }
       }
       
@@ -603,116 +515,41 @@ export default function ModalPagamento({
     }
   };
 
-  // 🆕 PASSO 3️⃣ - Calcular faixas de parcelamento baseado nas CORES DO BACKEND
-  const calcularFaixasParcelamento = (simulacoes, maxParcelas) => {
-    const faixas = {
-      saudavel: { min: 1, max: 0 },
-      alerta: { min: 0, max: 0 },
-      proibido: { min: 0, max: maxParcelas }
-    };
-    
-    let ultimaVerde = 0;
-    let primeiraVermelha = maxParcelas + 1;
-    
-    for (let i = 1; i <= maxParcelas; i++) {
-      const sim = simulacoes[i];
-      if (!sim) continue;
-      
-      // ✅ Usar a COR que veio do BACKEND, não interpretar
-      if (sim.cor === 'verde') {
-        ultimaVerde = i;
-      } else if (sim.cor === 'vermelho') {
-        if (i < primeiraVermelha) {
-          primeiraVermelha = i;
-        }
-      }
-    }
-    
-    faixas.saudavel.max = ultimaVerde;
-    faixas.alerta.min = ultimaVerde + 1;
-    faixas.alerta.max = primeiraVermelha - 1;
-    faixas.proibido.min = primeiraVermelha;
-    
-    return faixas;
-  };
-
   // 🆕 PASSO 2️⃣ - Disparar simulação quando forma de pagamento é selecionada
   useEffect(() => {
-    if (formaPagamentoSelecionada?.permite_parcelamento) {
-      // Verificar se já temos simulação para esta forma
-      if (!simulacoesParcelamento[formaPagamentoSelecionada.id]) {
-        simularParcelamentos(formaPagamentoSelecionada);
-      } else {
-        // Reutilizar simulação existente
-        const simulacoesExistentes = simulacoesParcelamento[formaPagamentoSelecionada.id];
-        const faixas = calcularFaixasParcelamento(
-          simulacoesExistentes, 
-          formaPagamentoSelecionada?.parcelas_maximas ?? 12
-        );
-        setFaixasParcelamento(faixas);
-        console.log('♻️ Reutilizando simulação existente');
-      }
-    } else if (!formaPagamentoSelecionada) {
-      // Se não há forma selecionada mas já temos simulações, usar a primeira disponível
-      const primeiraFormaComParcelamento = Object.keys(simulacoesParcelamento)[0];
-      if (primeiraFormaComParcelamento && formasPagamento.length > 0) {
-        const formaInfo = formasPagamento.find(f => f.id === parseInt(primeiraFormaComParcelamento));
-        if (formaInfo) {
-          const faixas = calcularFaixasParcelamento(
-            simulacoesParcelamento[primeiraFormaComParcelamento],
-            formaInfo?.parcelas_maximas ?? 12
-          );
-          setFaixasParcelamento(faixas);
-        }
+    const decisaoParcelamento = resolverFaixasParcelamentoDaForma({
+      formaPagamentoSelecionada,
+      simulacoesParcelamento,
+      formasPagamento,
+    });
+
+    if (decisaoParcelamento?.acao === 'simular') {
+      simularParcelamentos(decisaoParcelamento.formaPagamento);
+      return;
+    }
+
+    if (decisaoParcelamento?.faixas) {
+      setFaixasParcelamento(decisaoParcelamento.faixas);
+      if (decisaoParcelamento.formaPagamento === formaPagamentoSelecionada) {
+        console.log('Reutilizando simulacao existente');
       }
     }
   }, [formaPagamentoSelecionada?.id]);
 
   // Adicionar forma de pagamento
   const adicionarPagamento = () => {
-    if (!formaPagamentoSelecionada) {
-      setErro('Selecione uma forma de pagamento');
-      return;
-    }
-
     const valor = valorRecebido || 0;
+    const erroValidacao = validarPagamentoParaAdicionar({
+      formaPagamento: formaPagamentoSelecionada,
+      valor,
+      saldoCashback,
+      bandeira,
+      operadora: operadoraSelecionada,
+      numeroParcelas,
+    });
 
-    if (valor <= 0) {
-      setErro('Informe o valor recebido');
-      return;
-    }
-
-    // Validar crédito disponível para Crédito Cliente
-    if (formaPagamentoSelecionada.id === 'credito_cliente') {
-      if (valor > formaPagamentoSelecionada.credito_disponivel) {
-        setErro(`Valor excede o crédito disponível (R$ ${formaPagamentoSelecionada.credito_disponivel.toFixed(2)})`);
-        return;
-      }
-    }
-
-    // Validar cashback disponível
-    if (formaPagamentoSelecionada.id === 'cashback') {
-      if (valor > saldoCashback + 0.01) {
-        setErro(`Valor excede o cashback disponível (R$ ${saldoCashback.toFixed(2).replace('.', ',')})`);
-        return;
-      }
-    }
-
-    // Validar bandeira para cartões
-    if (['cartao_credito', 'cartao_debito'].includes(formaPagamentoSelecionada.tipo) && !bandeira) {
-      setErro('Selecione a bandeira do cartão');
-      return;
-    }
-
-    // 🆕 ALERTA 1: Validar operadora para cartões
-    if (['cartao_credito', 'cartao_debito'].includes(formaPagamentoSelecionada.tipo) && !operadoraSelecionada) {
-      setErro('Selecione a operadora do cartão');
-      return;
-    }
-
-    // 🆕 ALERTA 1: Validar parcelas contra operadora
-    if (operadoraSelecionada && numeroParcelas > operadoraSelecionada.max_parcelas) {
-      setErro(`A operadora ${operadoraSelecionada.nome} permite no máximo ${operadoraSelecionada.max_parcelas}x`);
+    if (erroValidacao) {
+      setErro(erroValidacao);
       return;
     }
 
@@ -722,30 +559,16 @@ export default function ModalPagamento({
     // DEBUG: Verificar estrutura da forma de pagamento
     console.log('🔍 DEBUG formaPagamentoSelecionada:', formaPagamentoSelecionada);
     
-    const novoPagamento = {
-      forma_pagamento: formaPagamentoSelecionada.nome, // Enviar o nome ao invés do ID
-      forma_id: formaPagamentoSelecionada.id, // ID da forma de pagamento
-      forma_pagamento_id: formaPagamentoSelecionada.id, // ID da forma de pagamento (compatibilidade)
-      nome: formaPagamentoSelecionada.nome,
-      valor: Math.min(valor, valorRestante), // Valor efetivo do pagamento
-      bandeira: ['cartao_credito', 'cartao_debito'].includes(formaPagamentoSelecionada.tipo)
-        ? bandeira
-        : null,
-      nsu_cartao: ['cartao_credito', 'cartao_debito'].includes(formaPagamentoSelecionada.tipo) && nsuCartao
-        ? nsuCartao
-        : null,
-      operadora_id: operadoraSelecionada?.id || null, // 🆕 ID da operadora
-      numero_parcelas: formaPagamentoSelecionada.permite_parcelamento ? numeroParcelas : 1,
-      parcelas: formaPagamentoSelecionada.permite_parcelamento ? numeroParcelas : 1, // Compatibilidade
-      valor_recebido: valor, // Valor recebido do cliente
-      troco:
-        formaPagamentoSelecionada.tipo === 'dinheiro' && troco > 0 ? troco : null,
-      // Marcar se é crédito cliente
-      is_credito_cliente: formaPagamentoSelecionada.nome === 'Crédito Cliente' || formaPagamentoSelecionada.tipo === 'credito_cliente',
-      // Marcar se é cashback
-      is_cashback: formaPagamentoSelecionada.id === 'cashback'
-    };
-    
+    const novoPagamento = montarPagamentoRecebido({
+      formaPagamento: formaPagamentoSelecionada,
+      valor,
+      valorRestante,
+      bandeira,
+      nsuCartao,
+      operadora: operadoraSelecionada,
+      numeroParcelas,
+      troco,
+    });
     console.log('📤 DEBUG novoPagamento:', novoPagamento);
 
     // ✅ PASSO 5: Se margem crítica, EXIGIR justificativa (mas NÃO bloquear fluxo)
@@ -760,19 +583,11 @@ export default function ModalPagamento({
         return;
       }
       
-      const justificativaFinal = descricaoCupomMargem
-        ? `${descricaoCupomMargem} Observacao informada: ${justificativaTexto}`
-        : justificativaTexto;
-      const blocoJustificativa = `JUSTIFICATIVA (Margem Critica): ${justificativaFinal}`;
-      const observacoesAtuais = venda.observacoes || "";
-
-      if (!observacoesAtuais.includes(blocoJustificativa)) {
-        const observacoesAtualizadas = observacoesAtuais
-          ? `${observacoesAtuais}\n\n${blocoJustificativa}`
-          : blocoJustificativa;
-
-        venda.observacoes = observacoesAtualizadas;
-      }
+      venda.observacoes = montarObservacoesComJustificativaMargem({
+        observacoesAtuais: venda.observacoes || "",
+        descricaoCupomMargem,
+        justificativaTexto,
+      });
     }
 
     // Adicionar pagamento normalmente
@@ -859,26 +674,14 @@ export default function ModalPagamento({
 
     try {
       // ⚠️ VERIFICAR ESTOQUE NEGATIVO ANTES DE FINALIZAR
-      const itensParaVerificar = venda.itens
-        .filter(item => item.tipo === 'produto' && item.produto_id)
-        .map(item => ({
-          produto_id: item.produto_id,
-          quantidade: item.quantidade
-        }));
+      const itensParaVerificar = montarItensParaVerificarEstoqueNegativo(venda.itens);
       
       if (itensParaVerificar.length > 0) {
         const response = await verificarEstoqueNegativo(itensParaVerificar);
         const produtosNegativos = response.data || [];
         
         if (produtosNegativos.length > 0) {
-          // Montar mensagem de alerta
-          const mensagens = produtosNegativos.map(p => 
-            `• ${p.produto_nome}: estoque atual ${p.estoque_atual}, após venda ficará ${p.estoque_resultante}`
-          ).join('\n');
-          
-          const confirmar = window.confirm(
-            `⚠️ ATENÇÃO: Os seguintes produtos ficarão com ESTOQUE NEGATIVO:\n\n${mensagens}\n\nDeseja continuar mesmo assim?`
-          );
+          const confirmar = window.confirm(montarMensagemEstoqueNegativo(produtosNegativos));
           
           if (!confirmar) {
             setLoading(false);
@@ -887,13 +690,10 @@ export default function ModalPagamento({
         }
       }
       
-      const vendaParaPersistir = cupomParaFinalizar
-        ? {
-            ...venda,
-            cupom_code: cupomParaFinalizar.code,
-            cupom_discount_applied: cupomParaFinalizar.discount_applied,
-          }
-        : venda;
+      const vendaParaPersistir = montarVendaParaPersistirComCupom({
+        venda,
+        cupomParaFinalizar,
+      });
       const payloadVenda = montarPayloadVenda(vendaParaPersistir);
 
       // Criar a venda primeiro se ainda não foi criada
@@ -916,7 +716,7 @@ export default function ModalPagamento({
       setVendaFinalizadaId(vendaId);
       
       // ✅ Só perguntar sobre NFCe se status for 'finalizada' (pagamento completo)
-      if (resultado?.status === 'finalizada' || resultado?.status === 'pago_nf') {
+      if (devePerguntarNotaFiscal(resultado)) {
         setMostrarPerguntaNFe(true);
       } else {
         // Se foi pagamento parcial, apenas fechar modal
@@ -936,57 +736,11 @@ export default function ModalPagamento({
 
     console.log('🔍 DEBUG pagamentos atuais:', pagamentos);
 
-    // Calcular o total já alocado em formas de pagamento
-    const totalAlocado = pagamentos.reduce((sum, p) => sum + p.valor, 0);
-    const restante = valorTotal - totalAlocado;
-
-    console.log('💰 Total alocado:', totalAlocado);
-    console.log('💵 Restante:', restante);
-
-    // Preparar dados para análise
-    // Se houver pagamentos, usar proporcionalmente
-    // Se não houver, assumir tudo em dinheiro
-    let formasPagamentoAnalise = [];
-
-    if (pagamentos.length > 0) {
-      // Adicionar pagamentos já selecionados
-      formasPagamentoAnalise = pagamentos.map(pag => {
-        console.log('📋 Processando pagamento:', pag);
-        const formaId = pag.forma_pagamento_id || pag.forma_id;
-        const parcelas = pag.parcelas || pag.numero_parcelas || 1;
-        
-        console.log(`  ➡️ forma_id: ${formaId}, valor: ${pag.valor}, parcelas: ${parcelas}`);
-        
-        return {
-          forma_pagamento_id: formaId,
-          valor: pag.valor,
-          parcelas: parcelas
-        };
-      });
-
-      console.log('📊 Formas de pagamento para análise (após adicionar):', formasPagamentoAnalise);
-
-      // Se ainda sobrou valor, assumir o restante em dinheiro
-      if (restante > 0) {
-        // Buscar ID do dinheiro
-        const dinheiro = formasPagamento.find(f => f.tipo === 'dinheiro' || f.nome.toLowerCase().includes('dinheiro'));
-        formasPagamentoAnalise.push({
-          forma_pagamento_id: dinheiro?.id || null,
-          valor: restante,
-          parcelas: 1
-        });
-        console.log('💵 Adicionado restante em dinheiro');
-      }
-    } else {
-      // Sem pagamentos = assumir tudo em dinheiro
-      const dinheiro = formasPagamento.find(f => f.tipo === 'dinheiro' || f.nome.toLowerCase().includes('dinheiro'));
-      formasPagamentoAnalise = [{
-        forma_pagamento_id: dinheiro?.id || null,
-        valor: valorTotal,
-        parcelas: 1
-      }];
-      console.log('💵 Sem pagamentos, assumindo tudo em dinheiro');
-    }
+    const formasPagamentoAnalise = montarFormasPagamentoAnalise({
+      pagamentos,
+      formasPagamento,
+      valorTotal,
+    });
 
     console.log('✅ Formas finais enviadas para análise:', formasPagamentoAnalise);
 
@@ -1030,72 +784,13 @@ export default function ModalPagamento({
   // Modal de pergunta NF-e
   if (mostrarPerguntaNFe) {
     return (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg shadow-xl max-w-md w-full mx-4">
-          <div className="p-6">
-            <div className="flex items-center space-x-3 mb-4">
-              <div className="w-12 h-12 bg-green-100 rounded-full flex items-center justify-center">
-                <CheckCircle className="w-6 h-6 text-green-600" />
-              </div>
-              <div>
-                <h3 className="text-lg font-bold text-gray-900">Venda Finalizada!</h3>
-                <p className="text-sm text-gray-500">Deseja emitir nota fiscal?</p>
-              </div>
-            </div>
-
-            {erro && (
-              <div className="mb-4 whitespace-pre-line rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-                {erro}
-              </div>
-            )}
-
-            <div className="space-y-3">
-              {/* Cliente tem CNPJ? Oferecer NF-e, senão só NFC-e */}
-              {venda.cliente?.cnpj ? (
-                <>
-                  <button
-                    onClick={() => emitirNFe('nfe')}
-                    disabled={loading}
-                    className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
-                  >
-                    <FileText className="w-5 h-5" />
-                    <span>Emitir NF-e (Empresa)</span>
-                  </button>
-                  <button
-                    onClick={() => emitirNFe('nfce')}
-                    disabled={loading}
-                    className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
-                  >
-                    <FileText className="w-5 h-5" />
-                    <span>Emitir NFC-e (Cupom)</span>
-                  </button>
-                </>
-              ) : (
-                <button
-                  onClick={() => emitirNFe('nfce')}
-                  disabled={loading}
-                  className="w-full flex items-center justify-center space-x-2 px-4 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50"
-                >
-                  <FileText className="w-5 h-5" />
-                  <span>Emitir NFC-e</span>
-                </button>
-              )}
-
-              <button
-                onClick={onConfirmar}
-                disabled={loading}
-                className="w-full px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors disabled:opacity-50"
-              >
-                Não emitir agora
-              </button>
-            </div>
-
-            <p className="text-xs text-gray-500 text-center mt-4">
-              Você pode emitir a nota fiscal depois na tela de vendas
-            </p>
-          </div>
-        </div>
-      </div>
+      <ModalPerguntaNFe
+        cliente={venda.cliente}
+        erro={erro}
+        loading={loading}
+        onConfirmar={onConfirmar}
+        onEmitir={emitirNFe}
+      />
     );
   }
 
@@ -1237,7 +932,7 @@ export default function ModalPagamento({
                         }`}
                       >
                         <div className="flex justify-center mb-1 text-gray-500">
-                          {getIconeFormaPagamento(forma.icone, forma.nome)}
+                          <PaymentMethodIcon icone={forma.icone} nome={forma.nome} />
                         </div>
                         <div className={`text-sm font-medium ${selecionada ? 'text-blue-900' : 'text-gray-700'}`}>
                           {forma.nome}
@@ -1425,7 +1120,7 @@ export default function ModalPagamento({
                           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                         >
                           <option value="">Selecione...</option>
-                          {BANDEIRAS.map((b) => (
+                          {BANDEIRAS_CARTAO.map((b) => (
                             <option key={b} value={b}>
                               {b}
                             </option>
@@ -1459,19 +1154,7 @@ export default function ModalPagamento({
                       <select
                         value={numeroParcelas}
                         onChange={(e) => setNumeroParcelas(parseInt(e.target.value))}
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-                          (() => {
-                            // ✅ Usar COR do BACKEND (única fonte da verdade)
-                            const simulacao = simulacoesParcelamento[formaPagamentoSelecionada.id]?.[numeroParcelas];
-                            const cor = simulacao?.cor || statusMargem || 'verde';
-                            
-                            return cor === 'verde' 
-                              ? 'border-gray-300 bg-white' 
-                              : cor === 'amarelo'
-                              ? 'border-yellow-400 bg-yellow-50 text-yellow-900'
-                              : 'border-red-400 bg-red-50 text-red-900';
-                          })()
-                        }`}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${estiloVisualParcelamento.selectClass}`}
                       >
                         {/* 🆕 Usar max_parcelas da operadora se cartão, senão da forma de pagamento */}
                         {Array.from({ 
@@ -1480,22 +1163,21 @@ export default function ModalPagamento({
                           (n) => {
                             const valorParaParcelar = valorRecebido || valorRestante;
                             const valorParcela = valorParaParcelar / n;
-                            
-                            // ✅ Usar COR do BACKEND (única fonte da verdade)
-                            const simulacao = simulacoesParcelamento[formaPagamentoSelecionada.id]?.[n];
-                            const cor = simulacao?.cor || 'verde';
+                            const cor = obterCorVisualParcelamento({
+                              formaPagamento: formaPagamentoSelecionada,
+                              simulacoesParcelamento,
+                              numeroParcelas: n,
+                              statusMargem: 'verde',
+                            });
+                            const estilo = obterEstiloVisualParcelamento(cor);
                             
                             return (
                               <option 
                                 key={n} 
                                 value={n}
-                                className={
-                                  cor === 'verde' ? '' 
-                                  : cor === 'amarelo' ? 'bg-yellow-100 text-yellow-900'
-                                  : 'bg-red-100 text-red-900'
-                                }
+                                className={estilo.optionClass}
                               >
-                                {cor === 'vermelho' ? '🚫 ' : cor === 'amarelo' ? '⚠️ ' : ''}
+                                {estilo.prefixo}
                                 {n}x de R$ {valorParcela.toFixed(2)} {valorRecebido > 0 ? `(Total: R$ ${valorParaParcelar.toFixed(2)})` : ''}
                               </option>
                             );
@@ -1503,61 +1185,14 @@ export default function ModalPagamento({
                         )}
                       </select>
                       {valorRecebido > 0 && numeroParcelas > 1 && (
-                        <div className={`mt-2 p-3 border rounded-lg ${
-                          (() => {
-                            // ✅ Usar COR do BACKEND (única fonte da verdade)
-                            const simulacao = simulacoesParcelamento[formaPagamentoSelecionada.id]?.[numeroParcelas];
-                            const cor = simulacao?.cor || statusMargem || 'verde';
-                            
-                            return cor === 'verde'
-                              ? 'bg-blue-50 border-blue-200'
-                              : cor === 'amarelo'
-                              ? 'bg-yellow-50 border-yellow-300'
-                              : 'bg-red-50 border-red-300';
-                          })()
-                        }`}>
-                          <p className={`text-sm font-medium ${
-                            (() => {
-                              const simulacao = simulacoesParcelamento[formaPagamentoSelecionada.id]?.[numeroParcelas];
-                              const cor = simulacao?.cor || statusMargem || 'verde';
-                              
-                              return cor === 'verde'
-                                ? 'text-blue-800'
-                                : cor === 'amarelo'
-                                ? 'text-yellow-800'
-                                : 'text-red-800';
-                            })()
-                          }`}>
-                            {(() => {
-                              const simulacao = simulacoesParcelamento[formaPagamentoSelecionada.id]?.[numeroParcelas];
-                              const cor = simulacao?.cor || statusMargem || 'verde';
-                              return (
-                                <>
-                                  {cor === 'vermelho' && '🚫 '}
-                                  {cor === 'amarelo' && '⚠️ '}
-                                  💳 {numeroParcelas}x de R$ {(valorRecebido / numeroParcelas).toFixed(2)}
-                                </>
-                              );
-                            })()}
+                        <div className={`mt-2 p-3 border rounded-lg ${estiloVisualParcelamento.painelClass}`}>
+                          <p className={`text-sm font-medium ${estiloVisualParcelamento.tituloClass}`}>
+                            {estiloVisualParcelamento.prefixo}
+                            💳 {numeroParcelas}x de R$ {(valorRecebido / numeroParcelas).toFixed(2)}
                           </p>
-                          <p className={`text-xs mt-1 ${
-                            (() => {
-                              const simulacao = simulacoesParcelamento[formaPagamentoSelecionada.id]?.[numeroParcelas];
-                              const cor = simulacao?.cor || statusMargem || 'verde';
-                              
-                              return cor === 'verde'
-                                ? 'text-blue-600'
-                                : cor === 'amarelo'
-                                ? 'text-yellow-700'
-                                : 'text-red-700';
-                            })()
-                          }`}>
+                          <p className={`text-xs mt-1 ${estiloVisualParcelamento.descricaoClass}`}>
                             Valor total parcelado: R$ {valorRecebido.toFixed(2)}
-                            {(() => {
-                              const simulacao = simulacoesParcelamento[formaPagamentoSelecionada.id]?.[numeroParcelas];
-                              const cor = simulacao?.cor || statusMargem || 'verde';
-                              return cor === 'amarelo' ? ' - Requer atenção' : cor === 'vermelho' ? ' - Requer justificativa' : '';
-                            })()}
+                            {estiloVisualParcelamento.aviso}
                           </p>
                         </div>
                       )}
@@ -1576,208 +1211,22 @@ export default function ModalPagamento({
 
             {/* Coluna Direita - Resumo */}
             <div className="space-y-6">
-              <div className="bg-gray-50 rounded-lg p-4">
-                <h3 className="font-semibold text-gray-900 mb-4">Resumo da Venda</h3>
-
-                <div className="space-y-3">
-                  <div className="flex justify-between text-gray-600">
-                    <span>Total da Venda:</span>
-                    <span className="font-medium">R$ {valorTotal.toFixed(2)}</span>
-                  </div>
-
-                  <div className="flex justify-between text-green-600">
-                    <span>Valor Pago:</span>
-                    <span className="font-medium">R$ {valorPago.toFixed(2)}</span>
-                  </div>
-
-                  <div className="flex justify-between text-blue-600 text-lg font-semibold border-t pt-3">
-                    <span>Restante:</span>
-                    <span>R$ {valorRestante.toFixed(2)}</span>
-                  </div>
-                </div>
-              </div>
-
-              {moduloCampanhasAtivo && (
-              <div className="bg-indigo-50 border border-indigo-200 rounded-lg p-4">
-                <h3 className="font-semibold text-indigo-900 mb-2">Benefícios que esta venda pode gerar</h3>
-                <p className="text-xs text-indigo-700 mb-3">
-                  Prévia para o cliente com base nas campanhas ativas no momento.
-                </p>
-
-                {!venda.cliente?.id ? (
-                  <p className="text-sm text-indigo-800">Associe um cliente para visualizar os benefícios de campanhas.</p>
-                ) : loadingBeneficiosCampanha ? (
-                  <p className="text-sm text-indigo-800">Carregando campanhas ativas...</p>
-                ) : (
-                  <div className="space-y-1.5 text-sm text-indigo-900">
-                    {carimbosPrevistos.length > 0 && carimbosPrevistos.map((item) => (
-                      <div key={`carimbo-modal-${item.campanha}`}>
-                        {item.campanha}: esta venda está gerando <strong>{item.quantidade}</strong> carimbo(s).
-                      </div>
-                    ))}
-
-                    {cashbackPrevisto.length > 0 && cashbackPrevisto.map((item) => (
-                      <div key={`cashback-modal-${item.campanha}`}>
-                        {item.campanha}: cashback previsto de <strong>{formatMoneyBRL(item.valor)}</strong> ({formatBRL(item.percentual)}%).
-                      </div>
-                    ))}
-
-                    {recompraPrevista.length > 0 && recompraPrevista.map((item) => (
-                      <div key={`recompra-modal-${item.campanha}`}>
-                        {item.campanha}: pode gerar 1 cupom de recompra de
-                        <strong> {item.tipo === 'fixed' ? formatMoneyBRL(item.valor) : `${formatBRL(item.valor)}%`}</strong>.
-                      </div>
-                    ))}
-
-                    {carimbosPrevistos.length === 0 && cashbackPrevisto.length === 0 && recompraPrevista.length === 0 && (
-                      <div>Nenhum benefício de campanha previsto para esta venda.</div>
-                    )}
-                  </div>
-                )}
-              </div>
-              )}
-
-              {/* Pagamentos adicionados */}
-              <div>
-                <h3 className="font-semibold text-gray-900 mb-4">
-                  Formas de Pagamento
-                </h3>
-
-                {/* Pagamentos Existentes (já registrados) */}
-                {pagamentosExistentes.length > 0 && (
-                  <div className="mb-4">
-                    <h4 className="text-sm font-medium text-gray-600 mb-2">
-                      💰 Pagamentos Registrados ({pagamentosExistentes.length})
-                    </h4>
-                    <div className="space-y-2">
-                      {pagamentosExistentes.map((pag, idx) => (
-                        <div
-                          key={pag.id}
-                          className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-lg"
-                        >
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-2">
-                              <div className="font-medium text-gray-900">
-                                {pag.forma_pagamento === 'dinheiro' ? '💵 Dinheiro' :
-                                 pag.forma_pagamento === 'pix' ? '📱 PIX' :
-                                 pag.forma_pagamento === 'credito' ? '💳 Cartão de Crédito' :
-                                 pag.forma_pagamento === 'debito' ? '💳 Cartão de Débito' :
-                                 pag.forma_pagamento === 'boleto' ? '📄 Boleto' :
-                                 pag.forma_pagamento}
-                              </div>
-                              <span className="px-2 py-0.5 bg-green-200 text-green-800 text-xs rounded-full font-medium">
-                                Pagamento {idx + 1}
-                              </span>
-                            </div>
-                            {pag.bandeira && (
-                              <div className="text-sm text-gray-500 mt-1">Bandeira: {pag.bandeira}</div>
-                            )}
-                            {pag.nsu_cartao && (
-                              <div className="text-sm text-gray-600 mt-1 font-mono">🔢 NSU: {pag.nsu_cartao}</div>
-                            )}
-                            {pag.numero_parcelas && pag.numero_parcelas > 1 && (
-                              <div className="text-sm text-blue-600 mt-1 font-medium">
-                                🔢 Parcelado em {pag.numero_parcelas}x de R$ {(parseFloat(pag.valor) / pag.numero_parcelas).toFixed(2)}
-                              </div>
-                            )}
-                            <div className="text-xs text-gray-400 mt-1">
-                              📅 {new Date(pag.data_pagamento).toLocaleString('pt-BR')}
-                            </div>
-                          </div>
-                          <div className="flex items-center space-x-3">
-                            <div className="text-right">
-                              <div className="font-semibold text-green-700 text-lg">
-                                R$ {parseFloat(pag.valor).toFixed(2)}
-                              </div>
-                              {pag.troco && parseFloat(pag.troco) > 0 && (
-                                <div className="text-xs text-yellow-600">
-                                  Troco: R$ {parseFloat(pag.troco).toFixed(2)}
-                                </div>
-                              )}
-                            </div>
-                            <button
-                              onClick={() => excluirPagamentoExistente(pag.id)}
-                              disabled={loading}
-                              className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors disabled:opacity-50"
-                              title="Excluir pagamento"
-                            >
-                              <Trash2 className="w-4 h-4" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Novos Pagamentos (a serem adicionados) */}
-                {pagamentos.length === 0 && pagamentosExistentes.length === 0 ? (
-                  <div className="text-center py-8 text-gray-400 bg-gray-50 rounded-lg border-2 border-dashed">
-                    <Wallet className="w-12 h-12 mx-auto mb-2 opacity-40" />
-                    <p className="text-sm font-medium">Nenhuma forma de pagamento adicionada</p>
-                    <p className="text-xs mt-1">Selecione uma forma acima para começar</p>
-                  </div>
-                ) : pagamentos.length > 0 ? (
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-600 mb-2">
-                      ⏳ Novos Pagamentos (a confirmar)
-                    </h4>
-                    <div className="space-y-3">
-                      {pagamentos.map((pag, index) => (
-                        <div
-                          key={index}
-                          className={`flex items-center justify-between p-4 rounded-lg border ${
-                            pag.is_cashback
-                              ? 'bg-green-50 border-green-200'
-                              : 'bg-blue-50 border-blue-200'
-                          }`}
-                        >
-                          <div className="flex-1">
-                            <div className="flex items-center space-x-2">
-                              <div className="font-medium text-gray-900">{pag.is_cashback ? '💰 ' : ''}{pag.nome}</div>
-                              <span className={`px-2 py-0.5 text-xs rounded-full font-medium ${
-                                pag.is_cashback
-                                  ? 'bg-green-200 text-green-800'
-                                  : 'bg-blue-200 text-blue-800'
-                              }`}>
-                                {pag.is_cashback ? 'Cashback' : 'Novo'}
-                              </span>
-                            </div>
-                            {pag.bandeira && (
-                              <div className="text-sm text-gray-500 mt-1">Bandeira: {pag.bandeira}</div>
-                            )}
-                            {pag.nsu_cartao && (
-                              <div className="text-sm text-gray-600 mt-1 font-mono">🔢 NSU: {pag.nsu_cartao}</div>
-                            )}
-                            {pag.numero_parcelas > 1 && (
-                              <div className="text-sm text-blue-600 mt-1 font-medium">
-                                🔢 {pag.numero_parcelas}x de R$ {(pag.valor / pag.numero_parcelas).toFixed(2)}
-                              </div>
-                            )}
-                            {pag.troco && pag.troco > 0 && (
-                              <div className="text-sm text-yellow-600 mt-1">
-                                💵 Troco: R$ {pag.troco.toFixed(2)}
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex items-center space-x-3">
-                            <span className={`font-semibold text-lg ${pag.is_cashback ? 'text-green-700' : 'text-blue-700'}`}>
-                              R$ {pag.valor.toFixed(2)}
-                            </span>
-                            <button
-                              onClick={() => removerPagamento(index)}
-                              className="p-1 text-red-600 hover:bg-red-100 rounded transition-colors"
-                              title="Remover"
-                            >
-                              <X className="w-5 h-5" />
-                            </button>
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ) : null}
-              </div>
+              <ModalPagamentoResumoLateral
+                valorTotal={valorTotal}
+                valorPago={valorPago}
+                valorRestante={valorRestante}
+                moduloCampanhasAtivo={moduloCampanhasAtivo}
+                clienteId={venda.cliente?.id}
+                loadingBeneficiosCampanha={loadingBeneficiosCampanha}
+                carimbosPrevistos={carimbosPrevistos}
+                cashbackPrevisto={cashbackPrevisto}
+                recompraPrevista={recompraPrevista}
+                pagamentosExistentes={pagamentosExistentes}
+                pagamentos={pagamentos}
+                loading={loading}
+                excluirPagamentoExistente={excluirPagamentoExistente}
+                removerPagamento={removerPagamento}
+              />
 
               {/* ✅ Indicador de Status de Margem Operacional (movido para cá) */}
               {statusMargem && (

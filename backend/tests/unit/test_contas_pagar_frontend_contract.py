@@ -66,9 +66,9 @@ def test_contas_pagar_mantem_acoes_visiveis_com_textos_longos():
 
     assert "contas-pagar-actions-cell" in source
     assert "sticky right-0" in source
-    assert 'tableClassName="min-w-[1500px]"' in source
-    assert 'cellStyle: { maxWidth: 260 }' in source
-    assert 'cellStyle: { maxWidth: 340 }' in source
+    assert 'tableClassName="min-w-[1280px]"' in source
+    assert 'cellStyle: { width: 210, maxWidth: 210 }' in source
+    assert 'cellStyle: { width: 220, maxWidth: 220 }' in source
 
 
 def test_contas_pagar_frontend_trata_recorrencia_em_lote():
@@ -91,6 +91,27 @@ def test_modal_conta_pagar_nao_envia_data_recorrencia_vazia():
     assert "normalizarDataOpcionalRecorrencia" in source
     assert "data_inicio_recorrencia: normalizarDataOpcionalRecorrencia(payload.data_inicio_recorrencia)" in source
     assert "data_fim_recorrencia: normalizarDataOpcionalRecorrencia(payload.data_fim_recorrencia)" in source
+
+
+def test_contas_pagar_pagamento_envia_data_e_mostra_erros_legiveis():
+    source = (REPO_ROOT / "frontend/src/components/ContasPagar.jsx").read_text(encoding="utf-8")
+    abrir_modal = source.split("const abrirModalPagamento = (conta) => {", 1)[1].split(
+        "const abrirModalEdicao",
+        1,
+    )[0]
+
+    assert "data_pagamento: formatarDataISO(new Date())" in abrir_modal
+    assert "extrairMensagemErroPagamento" in source
+    assert "toast.error(extrairMensagemErroPagamento(error))" in source
+
+
+def test_contas_pagar_pagamento_alerta_saldo_negativo_antes_de_baixar():
+    source = (REPO_ROOT / "frontend/src/components/ContasPagar.jsx").read_text(encoding="utf-8")
+
+    assert "confirmarSaldoNegativoPagamento" in source
+    assert "Saldo insuficiente na conta bancaria" in source
+    assert "ficara negativo" in source
+    assert "window.confirm(mensagem)" in source
 
 
 def test_modal_conta_pagar_pergunta_antes_de_replicar_nome_recorrente():

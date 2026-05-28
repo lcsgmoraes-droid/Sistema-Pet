@@ -25,3 +25,17 @@ def test_busca_conta_pagar_respeita_tenant_na_consulta():
 
     assert "ContaPagar.tenant_id == tenant_id" in buscar_conta
     assert "Cliente.tenant_id == tenant_id" in buscar_conta
+
+
+def test_registrar_pagamento_normaliza_valores_antigos_e_respeita_tenant():
+    source = (REPO_ROOT / "backend/app/contas_pagar_routes.py").read_text(encoding="utf-8")
+    registrar_pagamento = source.split("async def registrar_pagamento(", 1)[1].split(
+        "# ============================================================================\n# DASHBOARD / RESUMO",
+        1,
+    )[0]
+
+    assert "_decimal_monetario" in source
+    assert "ContaPagar.tenant_id == tenant_id" in registrar_pagamento
+    assert "ContaBancaria.tenant_id == tenant_id" in registrar_pagamento
+    assert "conta.valor_pago = _decimal_monetario(conta.valor_pago)" in registrar_pagamento
+    assert "valor_centavos = _valor_reais_para_centavos" in registrar_pagamento
