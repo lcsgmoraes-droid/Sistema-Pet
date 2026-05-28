@@ -211,6 +211,34 @@ export function montarPagamentoAVista(valor, formaPagamentoId = 1) {
   ];
 }
 
+export function montarPagamentoSimuladoParcelamento({
+  formaPagamentoId,
+  valorTotal = 0,
+  parcelas = 1,
+}) {
+  return [
+    {
+      forma_pagamento_id: formaPagamentoId,
+      valor: Number(valorTotal || 0),
+      parcelas,
+    },
+  ];
+}
+
+export function normalizarResultadoSimulacaoParcelamento(resposta = {}) {
+  const corIndicador = resposta?.resultado?.cor_indicador;
+  if (!corIndicador) return null;
+
+  return {
+    cor: corIndicador,
+    classificacao: corIndicador,
+  };
+}
+
+export function montarFallbackSimulacaoParcelamento() {
+  return { cor: null, classificacao: "verde" };
+}
+
 export function montarPagamentosMargem({
   pagamentosExistentes = [],
   pagamentos = [],

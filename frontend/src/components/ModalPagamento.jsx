@@ -36,10 +36,13 @@ import {
   montarItensParaVerificarEstoqueNegativo,
   montarMensagemEstoqueNegativo,
   montarObservacoesComJustificativaMargem,
+  montarFallbackSimulacaoParcelamento,
   montarPagamentoAVista,
   montarPagamentoRecebido,
+  montarPagamentoSimuladoParcelamento,
   montarPagamentosMargem,
   montarPayloadAnaliseMargem,
+  normalizarResultadoSimulacaoParcelamento,
   obterCorParcelamentoAtual,
   resolverFaixasParcelamentoDaForma,
   validarPagamentoParaAdicionar,
@@ -459,11 +462,11 @@ export default function ModalPagamento({
       
       // Simular todas as parcelas de 1 até max
       for (let parcelas = 1; parcelas <= maxParcelas; parcelas++) {
-        const pagamentoSimulado = [{
-          forma_pagamento_id: formaPagamentoId,
-          valor: venda.total,
-          parcelas: parcelas
-        }];
+        const pagamentoSimulado = montarPagamentoSimuladoParcelamento({
+          formaPagamentoId,
+          valorTotal: venda.total,
+          parcelas,
+        });
 
         try {
           const response = await api.post(
@@ -474,16 +477,12 @@ export default function ModalPagamento({
             })
           );
 
-          if (response.data?.resultado?.cor_indicador) {
-            resultados[parcelas] = {
-              cor: response.data.resultado.cor_indicador,
-              // ✅ O BACKEND já define a classificação através da cor
-              classificacao: response.data.resultado.cor_indicador
-            };
-          }
+          const resultadoSimulacao =
+            normalizarResultadoSimulacaoParcelamento(response.data);
+          if (resultadoSimulacao) resultados[parcelas] = resultadoSimulacao;
         } catch (error) {
           console.error(`Erro ao simular ${parcelas}x:`, error);
-          resultados[parcelas] = { cor: null, classificacao: 'verde' }; // Default seguro
+          resultados[parcelas] = montarFallbackSimulacaoParcelamento();
         }
       }
       

@@ -12,11 +12,14 @@ import {
   montarItensParaVerificarEstoqueNegativo,
   montarMensagemEstoqueNegativo,
   montarItensAnaliseMargem,
+  montarFallbackSimulacaoParcelamento,
   montarPagamentoAVista,
   montarPagamentoRecebido,
+  montarPagamentoSimuladoParcelamento,
   montarPagamentosMargem,
   montarPayloadAnaliseMargem,
   montarObservacoesComJustificativaMargem,
+  normalizarResultadoSimulacaoParcelamento,
   obterCorParcelamentoAtual,
   resolverFaixasParcelamentoDaForma,
   validarPagamentoParaAdicionar,
@@ -213,6 +216,34 @@ test("resolve faixas de parcelamento existentes ou indica simulacao pendente", (
     }),
     null,
   );
+});
+
+test("monta pagamento simulado e normaliza retorno da margem por parcela", () => {
+  assert.deepEqual(
+    montarPagamentoSimuladoParcelamento({
+      formaPagamentoId: 7,
+      valorTotal: 150,
+      parcelas: 3,
+    }),
+    [{ forma_pagamento_id: 7, valor: 150, parcelas: 3 }],
+  );
+
+  assert.deepEqual(
+    normalizarResultadoSimulacaoParcelamento({
+      resultado: { cor_indicador: "amarelo" },
+    }),
+    { cor: "amarelo", classificacao: "amarelo" },
+  );
+
+  assert.equal(
+    normalizarResultadoSimulacaoParcelamento({ resultado: {} }),
+    null,
+  );
+
+  assert.deepEqual(montarFallbackSimulacaoParcelamento(), {
+    cor: null,
+    classificacao: "verde",
+  });
 });
 
 test("calcula previa de cashback, carimbos e recompra elegiveis por canal", () => {
