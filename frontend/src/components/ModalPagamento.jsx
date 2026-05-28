@@ -26,11 +26,16 @@ import {
 import { montarPayloadVenda } from '../utils/pdvVendaPayload';
 import { useModulos } from '../contexts/ModulosContext';
 import {
+  BANDEIRAS_CARTAO,
   calcularBeneficiosCampanhaPreview,
   calcularFaixasParcelamento,
+  calcularCustoTotalItensVenda,
   calcularResumoRecebimento,
   descreverCupomMargem,
+  devePerguntarNotaFiscal,
+  ehFormaPagamentoPix,
   avaliarEstadoJustificativaMargem,
+  extrairCorIndicadorMargem,
   montarFormasPagamentoAnalise,
   montarCupomParaFinalizar,
   montarItensParaVerificarEstoqueNegativo,
@@ -42,20 +47,14 @@ import {
   montarPagamentoSimuladoParcelamento,
   montarPagamentosMargem,
   montarPayloadAnaliseMargem,
+  montarVendaParaPersistirComCupom,
   normalizarResultadoSimulacaoParcelamento,
   obterCorParcelamentoAtual,
+  obterCorVisualParcelamento,
+  obterEstiloVisualParcelamento,
   resolverFaixasParcelamentoDaForma,
   validarPagamentoParaAdicionar,
 } from './modalPagamentoUtils';
-
-const BANDEIRAS = [
-  'Visa',
-  'Mastercard',
-  'Elo',
-  'American Express',
-  'Hipercard',
-  'Outros'
-];
 
 export default function ModalPagamento({
   venda,
@@ -256,6 +255,14 @@ export default function ModalPagamento({
     simulacoesParcelamento,
     numeroParcelas,
   });
+  const corVisualParcelamento = obterCorVisualParcelamento({
+    formaPagamento: formaPagamentoSelecionada,
+    simulacoesParcelamento,
+    numeroParcelas,
+    statusMargem,
+  });
+  const estiloVisualParcelamento =
+    obterEstiloVisualParcelamento(corVisualParcelamento);
   const { margemCriticaAtual, mostrarCampoJustificativa } =
     avaliarEstadoJustificativaMargem({
       statusMargem,
@@ -349,9 +356,10 @@ export default function ModalPagamento({
       );
 
       // Salvar SOMENTE a cor do indicador
-      if (response.data?.resultado?.cor_indicador) {
-        setStatusMargem(response.data.resultado.cor_indicador);
-        console.log('✅ Status inicial calculado:', response.data.resultado.cor_indicador);
+      const corIndicador = extrairCorIndicadorMargem(response.data);
+      if (corIndicador) {
+        setStatusMargem(corIndicador);
+        console.log('✅ Status inicial calculado:', corIndicador);
       }
     } catch (error) {
       console.error('❌ Erro ao calcular status inicial:', error);
@@ -384,8 +392,9 @@ export default function ModalPagamento({
       );
 
       // Salvar SOMENTE a cor do indicador
-      if (response.data?.resultado?.cor_indicador) {
-        setStatusMargem(response.data.resultado.cor_indicador);
+      const corIndicador = extrairCorIndicadorMargem(response.data);
+      if (corIndicador) {
+        setStatusMargem(corIndicador);
       }
     } catch (error) {
       console.error('Erro ao calcular status de margem:', error);
@@ -409,12 +418,12 @@ export default function ModalPagamento({
 
   // 💡 Calcular sugestão PIX quando a forma de pagamento selecionada NÃO É PIX
   useEffect(() => {
-    const ehPix = (formaPagamentoSelecionada?.nome || '').toLowerCase().includes('pix');
+    const ehPix = ehFormaPagamentoPix(formaPagamentoSelecionada);
     if (ehPix || !formaPagamentoSelecionada) {
       setSugestaoPix(null);
       return;
     }
-    const custoTotal = (venda.itens || []).reduce((sum, item) => sum + ((item.custo || 0) * (item.quantidade || 1)), 0);
+    const custoTotal = calcularCustoTotalItensVenda(venda.itens);
     if (!custoTotal) { setSugestaoPix(null); return; }
     api.post('/pdv/indicadores/sugestao-pix', {
       total_venda: venda.total || 0,
@@ -681,13 +690,10 @@ export default function ModalPagamento({
         }
       }
       
-      const vendaParaPersistir = cupomParaFinalizar
-        ? {
-            ...venda,
-            cupom_code: cupomParaFinalizar.code,
-            cupom_discount_applied: cupomParaFinalizar.discount_applied,
-          }
-        : venda;
+      const vendaParaPersistir = montarVendaParaPersistirComCupom({
+        venda,
+        cupomParaFinalizar,
+      });
       const payloadVenda = montarPayloadVenda(vendaParaPersistir);
 
       // Criar a venda primeiro se ainda não foi criada
@@ -710,7 +716,7 @@ export default function ModalPagamento({
       setVendaFinalizadaId(vendaId);
       
       // ✅ Só perguntar sobre NFCe se status for 'finalizada' (pagamento completo)
-      if (resultado?.status === 'finalizada' || resultado?.status === 'pago_nf') {
+      if (devePerguntarNotaFiscal(resultado)) {
         setMostrarPerguntaNFe(true);
       } else {
         // Se foi pagamento parcial, apenas fechar modal
@@ -1173,7 +1179,7 @@ export default function ModalPagamento({
                           className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500"
                         >
                           <option value="">Selecione...</option>
-                          {BANDEIRAS.map((b) => (
+                          {BANDEIRAS_CARTAO.map((b) => (
                             <option key={b} value={b}>
                               {b}
                             </option>
@@ -1207,19 +1213,7 @@ export default function ModalPagamento({
                       <select
                         value={numeroParcelas}
                         onChange={(e) => setNumeroParcelas(parseInt(e.target.value))}
-                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${
-                          (() => {
-                            // ✅ Usar COR do BACKEND (única fonte da verdade)
-                            const simulacao = simulacoesParcelamento[formaPagamentoSelecionada.id]?.[numeroParcelas];
-                            const cor = simulacao?.cor || statusMargem || 'verde';
-                            
-                            return cor === 'verde' 
-                              ? 'border-gray-300 bg-white' 
-                              : cor === 'amarelo'
-                              ? 'border-yellow-400 bg-yellow-50 text-yellow-900'
-                              : 'border-red-400 bg-red-50 text-red-900';
-                          })()
-                        }`}
+                        className={`w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 ${estiloVisualParcelamento.selectClass}`}
                       >
                         {/* 🆕 Usar max_parcelas da operadora se cartão, senão da forma de pagamento */}
                         {Array.from({ 
@@ -1228,22 +1222,21 @@ export default function ModalPagamento({
                           (n) => {
                             const valorParaParcelar = valorRecebido || valorRestante;
                             const valorParcela = valorParaParcelar / n;
-                            
-                            // ✅ Usar COR do BACKEND (única fonte da verdade)
-                            const simulacao = simulacoesParcelamento[formaPagamentoSelecionada.id]?.[n];
-                            const cor = simulacao?.cor || 'verde';
+                            const cor = obterCorVisualParcelamento({
+                              formaPagamento: formaPagamentoSelecionada,
+                              simulacoesParcelamento,
+                              numeroParcelas: n,
+                              statusMargem: 'verde',
+                            });
+                            const estilo = obterEstiloVisualParcelamento(cor);
                             
                             return (
                               <option 
                                 key={n} 
                                 value={n}
-                                className={
-                                  cor === 'verde' ? '' 
-                                  : cor === 'amarelo' ? 'bg-yellow-100 text-yellow-900'
-                                  : 'bg-red-100 text-red-900'
-                                }
+                                className={estilo.optionClass}
                               >
-                                {cor === 'vermelho' ? '🚫 ' : cor === 'amarelo' ? '⚠️ ' : ''}
+                                {estilo.prefixo}
                                 {n}x de R$ {valorParcela.toFixed(2)} {valorRecebido > 0 ? `(Total: R$ ${valorParaParcelar.toFixed(2)})` : ''}
                               </option>
                             );
@@ -1251,61 +1244,14 @@ export default function ModalPagamento({
                         )}
                       </select>
                       {valorRecebido > 0 && numeroParcelas > 1 && (
-                        <div className={`mt-2 p-3 border rounded-lg ${
-                          (() => {
-                            // ✅ Usar COR do BACKEND (única fonte da verdade)
-                            const simulacao = simulacoesParcelamento[formaPagamentoSelecionada.id]?.[numeroParcelas];
-                            const cor = simulacao?.cor || statusMargem || 'verde';
-                            
-                            return cor === 'verde'
-                              ? 'bg-blue-50 border-blue-200'
-                              : cor === 'amarelo'
-                              ? 'bg-yellow-50 border-yellow-300'
-                              : 'bg-red-50 border-red-300';
-                          })()
-                        }`}>
-                          <p className={`text-sm font-medium ${
-                            (() => {
-                              const simulacao = simulacoesParcelamento[formaPagamentoSelecionada.id]?.[numeroParcelas];
-                              const cor = simulacao?.cor || statusMargem || 'verde';
-                              
-                              return cor === 'verde'
-                                ? 'text-blue-800'
-                                : cor === 'amarelo'
-                                ? 'text-yellow-800'
-                                : 'text-red-800';
-                            })()
-                          }`}>
-                            {(() => {
-                              const simulacao = simulacoesParcelamento[formaPagamentoSelecionada.id]?.[numeroParcelas];
-                              const cor = simulacao?.cor || statusMargem || 'verde';
-                              return (
-                                <>
-                                  {cor === 'vermelho' && '🚫 '}
-                                  {cor === 'amarelo' && '⚠️ '}
-                                  💳 {numeroParcelas}x de R$ {(valorRecebido / numeroParcelas).toFixed(2)}
-                                </>
-                              );
-                            })()}
+                        <div className={`mt-2 p-3 border rounded-lg ${estiloVisualParcelamento.painelClass}`}>
+                          <p className={`text-sm font-medium ${estiloVisualParcelamento.tituloClass}`}>
+                            {estiloVisualParcelamento.prefixo}
+                            💳 {numeroParcelas}x de R$ {(valorRecebido / numeroParcelas).toFixed(2)}
                           </p>
-                          <p className={`text-xs mt-1 ${
-                            (() => {
-                              const simulacao = simulacoesParcelamento[formaPagamentoSelecionada.id]?.[numeroParcelas];
-                              const cor = simulacao?.cor || statusMargem || 'verde';
-                              
-                              return cor === 'verde'
-                                ? 'text-blue-600'
-                                : cor === 'amarelo'
-                                ? 'text-yellow-700'
-                                : 'text-red-700';
-                            })()
-                          }`}>
+                          <p className={`text-xs mt-1 ${estiloVisualParcelamento.descricaoClass}`}>
                             Valor total parcelado: R$ {valorRecebido.toFixed(2)}
-                            {(() => {
-                              const simulacao = simulacoesParcelamento[formaPagamentoSelecionada.id]?.[numeroParcelas];
-                              const cor = simulacao?.cor || statusMargem || 'verde';
-                              return cor === 'amarelo' ? ' - Requer atenção' : cor === 'vermelho' ? ' - Requer justificativa' : '';
-                            })()}
+                            {estiloVisualParcelamento.aviso}
                           </p>
                         </div>
                       )}

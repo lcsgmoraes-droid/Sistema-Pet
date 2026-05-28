@@ -3,6 +3,15 @@ import {
   getCashbackBonusParamKey,
 } from "../utils/campaignChannelScope.js";
 
+export const BANDEIRAS_CARTAO = [
+  "Visa",
+  "Mastercard",
+  "Elo",
+  "American Express",
+  "Hipercard",
+  "Outros",
+];
+
 export function identificarIconeFormaPagamento(icone, nome) {
   const key = String(icone || nome || "").toLowerCase();
   if (key.includes("pix")) return "qr_code";
@@ -16,6 +25,39 @@ export function identificarIconeFormaPagamento(icone, nome) {
   return "credit_card";
 }
 
+export function ehFormaPagamentoPix(formaPagamento = null) {
+  return String(formaPagamento?.nome || "").toLowerCase().includes("pix");
+}
+
+export function calcularCustoTotalItensVenda(itens = []) {
+  return (itens || []).reduce(
+    (sum, item) =>
+      sum + Number(item?.custo || 0) * Number(item?.quantidade || 1),
+    0,
+  );
+}
+
+export function montarVendaParaPersistirComCupom({
+  venda = {},
+  cupomParaFinalizar = null,
+}) {
+  if (!cupomParaFinalizar) return venda;
+
+  return {
+    ...venda,
+    cupom_code: cupomParaFinalizar.code,
+    cupom_discount_applied: cupomParaFinalizar.discount_applied,
+  };
+}
+
+export function devePerguntarNotaFiscal(resultado = {}) {
+  return resultado?.status === "finalizada" || resultado?.status === "pago_nf";
+}
+
+export function extrairCorIndicadorMargem(resposta = {}) {
+  return resposta?.resultado?.cor_indicador || null;
+}
+
 export function obterCorParcelamentoAtual({
   formaPagamento = null,
   simulacoesParcelamento = {},
@@ -23,6 +65,55 @@ export function obterCorParcelamentoAtual({
 }) {
   if (!formaPagamento?.permite_parcelamento) return "verde";
   return simulacoesParcelamento[formaPagamento.id]?.[numeroParcelas]?.cor ?? "verde";
+}
+
+export function obterCorVisualParcelamento({
+  formaPagamento = null,
+  simulacoesParcelamento = {},
+  numeroParcelas = 1,
+  statusMargem = "verde",
+}) {
+  return (
+    simulacoesParcelamento[formaPagamento?.id]?.[numeroParcelas]?.cor ||
+    statusMargem ||
+    "verde"
+  );
+}
+
+export function obterEstiloVisualParcelamento(cor = "verde") {
+  if (cor === "vermelho") {
+    return {
+      selectClass: "border-red-400 bg-red-50 text-red-900",
+      painelClass: "bg-red-50 border-red-300",
+      tituloClass: "text-red-800",
+      descricaoClass: "text-red-700",
+      optionClass: "bg-red-100 text-red-900",
+      prefixo: "\uD83D\uDEAB ",
+      aviso: " - Requer justificativa",
+    };
+  }
+
+  if (cor === "amarelo") {
+    return {
+      selectClass: "border-yellow-400 bg-yellow-50 text-yellow-900",
+      painelClass: "bg-yellow-50 border-yellow-300",
+      tituloClass: "text-yellow-800",
+      descricaoClass: "text-yellow-700",
+      optionClass: "bg-yellow-100 text-yellow-900",
+      prefixo: "\u26A0\uFE0F ",
+      aviso: " - Requer aten\u00E7\u00E3o",
+    };
+  }
+
+  return {
+    selectClass: "border-gray-300 bg-white",
+    painelClass: "bg-blue-50 border-blue-200",
+    tituloClass: "text-blue-800",
+    descricaoClass: "text-blue-600",
+    optionClass: "",
+    prefixo: "",
+    aviso: "",
+  };
 }
 
 export function avaliarEstadoJustificativaMargem({
@@ -226,7 +317,7 @@ export function montarPagamentoSimuladoParcelamento({
 }
 
 export function normalizarResultadoSimulacaoParcelamento(resposta = {}) {
-  const corIndicador = resposta?.resultado?.cor_indicador;
+  const corIndicador = extrairCorIndicadorMargem(resposta);
   if (!corIndicador) return null;
 
   return {

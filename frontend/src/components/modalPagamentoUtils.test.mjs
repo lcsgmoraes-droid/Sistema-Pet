@@ -1,11 +1,16 @@
 import assert from "node:assert/strict";
 import { test } from "node:test";
 import {
+  BANDEIRAS_CARTAO,
   calcularBeneficiosCampanhaPreview,
   calcularFaixasParcelamento,
+  calcularCustoTotalItensVenda,
   calcularResumoRecebimento,
+  devePerguntarNotaFiscal,
   descreverCupomMargem,
+  ehFormaPagamentoPix,
   avaliarEstadoJustificativaMargem,
+  extrairCorIndicadorMargem,
   identificarIconeFormaPagamento,
   montarCupomParaFinalizar,
   montarFormasPagamentoAnalise,
@@ -18,8 +23,11 @@ import {
   montarPagamentoSimuladoParcelamento,
   montarPagamentosMargem,
   montarPayloadAnaliseMargem,
+  montarVendaParaPersistirComCupom,
   montarObservacoesComJustificativaMargem,
   normalizarResultadoSimulacaoParcelamento,
+  obterCorVisualParcelamento,
+  obterEstiloVisualParcelamento,
   obterCorParcelamentoAtual,
   resolverFaixasParcelamentoDaForma,
   validarPagamentoParaAdicionar,
@@ -34,6 +42,66 @@ test("identifica icone da forma de pagamento por icone ou nome", () => {
   assert.equal(identificarIconeFormaPagamento("", "Boleto"), "receipt");
   assert.equal(identificarIconeFormaPagamento("", "Carteira digital"), "wallet");
   assert.equal(identificarIconeFormaPagamento("", "Outro"), "credit_card");
+});
+
+test("mantem lista padrao de bandeiras de cartao", () => {
+  assert.deepEqual(BANDEIRAS_CARTAO, [
+    "Visa",
+    "Mastercard",
+    "Elo",
+    "American Express",
+    "Hipercard",
+    "Outros",
+  ]);
+});
+
+test("calcula dados auxiliares da venda sem depender do modal", () => {
+  assert.equal(ehFormaPagamentoPix({ nome: "Pix QR Code" }), true);
+  assert.equal(ehFormaPagamentoPix({ nome: "Cartao de credito" }), false);
+
+  assert.equal(
+    calcularCustoTotalItensVenda([
+      { custo: 10, quantidade: 2 },
+      { custo: 4.5, quantidade: 3 },
+      { custo: 99, quantidade: 0 },
+    ]),
+    132.5,
+  );
+
+  const venda = { id: 10, total: 100, desconto_valor: 5 };
+  assert.equal(
+    montarVendaParaPersistirComCupom({ venda, cupomParaFinalizar: null }),
+    venda,
+  );
+  assert.deepEqual(
+    montarVendaParaPersistirComCupom({
+      venda,
+      cupomParaFinalizar: {
+        code: "recompra10",
+        discount_applied: 7,
+      },
+    }),
+    {
+      id: 10,
+      total: 100,
+      desconto_valor: 5,
+      cupom_code: "recompra10",
+      cupom_discount_applied: 7,
+    },
+  );
+
+  assert.equal(devePerguntarNotaFiscal({ status: "finalizada" }), true);
+  assert.equal(devePerguntarNotaFiscal({ status: "pago_nf" }), true);
+  assert.equal(devePerguntarNotaFiscal({ status: "aberta" }), false);
+});
+
+test("extrai cor de margem do retorno do backend", () => {
+  assert.equal(
+    extrairCorIndicadorMargem({ resultado: { cor_indicador: "vermelho" } }),
+    "vermelho",
+  );
+  assert.equal(extrairCorIndicadorMargem({ resultado: {} }), null);
+  assert.equal(extrairCorIndicadorMargem(null), null);
 });
 
 test("obtem cor do parcelamento atual com fallback seguro", () => {
@@ -69,6 +137,47 @@ test("obtem cor do parcelamento atual com fallback seguro", () => {
     }),
     "verde",
   );
+});
+
+test("resolve estilo visual de parcelamento por cor", () => {
+  assert.equal(
+    obterCorVisualParcelamento({
+      formaPagamento: { id: 12 },
+      simulacoesParcelamento: { 12: { 3: { cor: "vermelho" } } },
+      numeroParcelas: 3,
+      statusMargem: "amarelo",
+    }),
+    "vermelho",
+  );
+  assert.equal(
+    obterCorVisualParcelamento({
+      formaPagamento: { id: 12 },
+      simulacoesParcelamento: {},
+      numeroParcelas: 3,
+      statusMargem: "amarelo",
+    }),
+    "amarelo",
+  );
+
+  assert.deepEqual(obterEstiloVisualParcelamento("verde"), {
+    selectClass: "border-gray-300 bg-white",
+    painelClass: "bg-blue-50 border-blue-200",
+    tituloClass: "text-blue-800",
+    descricaoClass: "text-blue-600",
+    optionClass: "",
+    prefixo: "",
+    aviso: "",
+  });
+
+  assert.deepEqual(obterEstiloVisualParcelamento("vermelho"), {
+    selectClass: "border-red-400 bg-red-50 text-red-900",
+    painelClass: "bg-red-50 border-red-300",
+    tituloClass: "text-red-800",
+    descricaoClass: "text-red-700",
+    optionClass: "bg-red-100 text-red-900",
+    prefixo: "\uD83D\uDEAB ",
+    aviso: " - Requer justificativa",
+  });
 });
 
 test("avalia quando margem exige justificativa ou campo visivel", () => {
