@@ -30,13 +30,13 @@ import FornecedorSelector from '../components/fornecedores/FornecedorSelector';
 import FornecedorIdentity from '../components/ui/FornecedorIdentity';
 import { resolveMediaUrl } from '../utils/mediaUrl';
 import {
-  calcularMargemPercentual,
   formatarPorcentagemProduto as formatarPorcentagem,
   formatarValorMonetarioProduto as formatarValorMonetario,
   montarAbasProdutoFormulario,
   montarEstadoFornecedorProduto,
   montarEstadoMovimentoEstoque,
   montarEstadoProdutoFormulario,
+  montarProdutoComAlteracao,
   montarPayloadFornecedorProduto,
   montarPayloadMovimentoEstoque,
   montarPayloadProdutoParaSalvar,
@@ -188,25 +188,7 @@ export default function ProdutosForm() {
   
   const handleChange = (e) => {
     const { name, value, type, checked } = e.target;
-    setProduto(prev => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value
-    }));
-    
-    // Calcular margem automaticamente
-    if (name === 'preco_custo' || name === 'preco_venda') {
-      const margemCalculada = calcularMargemPercentual(
-        name === 'preco_custo' ? value : produto.preco_custo,
-        name === 'preco_venda' ? value : produto.preco_venda
-      );
-
-      if (margemCalculada !== null) {
-        setProduto(prev => ({
-          ...prev,
-          margem_lucro: margemCalculada
-        }));
-      }
-    }
+    setProduto(prev => montarProdutoComAlteracao(prev, { name, value, type, checked }));
   };
   
   // 🔒 SPRINT 2: Carregar variações do produto PAI

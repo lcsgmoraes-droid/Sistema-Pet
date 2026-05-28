@@ -9,6 +9,8 @@ import {
   identificarIconeFormaPagamento,
   montarCupomParaFinalizar,
   montarFormasPagamentoAnalise,
+  montarItensParaVerificarEstoqueNegativo,
+  montarMensagemEstoqueNegativo,
   montarItensAnaliseMargem,
   montarPagamentoAVista,
   montarPagamentoRecebido,
@@ -252,6 +254,33 @@ test("descreve cupom somente quando ha codigo e desconto", () => {
     "A margem ficou baixa por conta do cupom RECOMPRA10 (R$ 12.50 de desconto).",
   );
   assert.equal(descreverCupomMargem(null), "");
+});
+
+test("monta itens e mensagem para confirmacao de estoque negativo", () => {
+  assert.deepEqual(
+    montarItensParaVerificarEstoqueNegativo([
+      { tipo: "produto", produto_id: 10, quantidade: 2 },
+      { tipo: "servico", produto_id: 11, quantidade: 1 },
+      { tipo: "produto", quantidade: 3 },
+    ]),
+    [{ produto_id: 10, quantidade: 2 }],
+  );
+
+  assert.equal(
+    montarMensagemEstoqueNegativo([
+      {
+        produto_nome: "Racao",
+        estoque_atual: 1,
+        estoque_resultante: -1,
+      },
+      {
+        produto_nome: "Areia",
+        estoque_atual: 0,
+        estoque_resultante: -2,
+      },
+    ]),
+    "\u26A0\uFE0F ATEN\u00C7\u00C3O: Os seguintes produtos ficar\u00E3o com ESTOQUE NEGATIVO:\n\n\u2022 Racao: estoque atual 1, ap\u00F3s venda ficar\u00E1 -1\n\u2022 Areia: estoque atual 0, ap\u00F3s venda ficar\u00E1 -2\n\nDeseja continuar mesmo assim?",
+  );
 });
 
 test("monta pagamento de cartao com valor efetivo limitado ao restante", () => {

@@ -9,6 +9,7 @@ import {
   montarEstadoFornecedorProduto,
   montarEstadoMovimentoEstoque,
   montarEstadoProdutoFormulario,
+  montarProdutoComAlteracao,
   montarPayloadFornecedorProduto,
   montarPayloadMovimentoEstoque,
   montarPayloadProdutoParaSalvar,
@@ -57,6 +58,56 @@ test("calcula margem percentual mantendo nulo quando custo nao permite recalculo
   assert.equal(calcularMargemPercentual("50", "0"), "-100.00");
   assert.equal(calcularMargemPercentual("0", "75"), null);
   assert.equal(calcularMargemPercentual("", "75"), null);
+});
+
+test("atualiza campo do produto e recalcula margem quando preco muda", () => {
+  assert.deepEqual(
+    montarProdutoComAlteracao(
+      {
+        nome: "Racao",
+        preco_custo: "50",
+        preco_venda: "75",
+        margem_lucro: "20",
+        anunciar_app: false,
+      },
+      {
+        name: "preco_venda",
+        value: "100",
+        type: "text",
+        checked: false,
+      },
+    ),
+    {
+      nome: "Racao",
+      preco_custo: "50",
+      preco_venda: "100",
+      margem_lucro: "100.00",
+      anunciar_app: false,
+    },
+  );
+
+  assert.deepEqual(
+    montarProdutoComAlteracao(
+      {
+        preco_custo: "50",
+        preco_venda: "100",
+        margem_lucro: "100.00",
+        anunciar_app: false,
+      },
+      {
+        name: "anunciar_app",
+        value: "on",
+        type: "checkbox",
+        checked: true,
+      },
+    ),
+    {
+      preco_custo: "50",
+      preco_venda: "100",
+      margem_lucro: "100.00",
+      anunciar_app: true,
+    },
+  );
 });
 
 test("normaliza produto carregado para o estado do formulario", () => {

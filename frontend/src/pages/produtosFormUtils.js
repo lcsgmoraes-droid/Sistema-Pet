@@ -54,6 +54,32 @@ export function calcularMargemPercentual(custo, venda) {
   return margem.toFixed(2);
 }
 
+export function montarProdutoComAlteracao(produto, campo) {
+  const valorCampo = campo.type === "checkbox" ? campo.checked : campo.value;
+  const produtoAtualizado = {
+    ...produto,
+    [campo.name]: valorCampo,
+  };
+
+  if (campo.name !== "preco_custo" && campo.name !== "preco_venda") {
+    return produtoAtualizado;
+  }
+
+  const margemCalculada = calcularMargemPercentual(
+    campo.name === "preco_custo" ? campo.value : produto.preco_custo,
+    campo.name === "preco_venda" ? campo.value : produto.preco_venda,
+  );
+
+  if (margemCalculada === null) {
+    return produtoAtualizado;
+  }
+
+  return {
+    ...produtoAtualizado,
+    margem_lucro: margemCalculada,
+  };
+}
+
 export function montarEstadoProdutoFormulario(prod = {}) {
   return {
     codigo: prod.codigo || "",

@@ -231,6 +231,26 @@ export function montarPayloadAnaliseMargem({ venda = {}, formasPagamento = [] })
   };
 }
 
+export function montarItensParaVerificarEstoqueNegativo(itens = []) {
+  return (itens || [])
+    .filter((item) => item.tipo === "produto" && item.produto_id)
+    .map((item) => ({
+      produto_id: item.produto_id,
+      quantidade: item.quantidade,
+    }));
+}
+
+export function montarMensagemEstoqueNegativo(produtosNegativos = []) {
+  const mensagens = (produtosNegativos || [])
+    .map(
+      (produto) =>
+        `\u2022 ${produto.produto_nome}: estoque atual ${produto.estoque_atual}, ap\u00F3s venda ficar\u00E1 ${produto.estoque_resultante}`,
+    )
+    .join("\n");
+
+  return `\u26A0\uFE0F ATEN\u00C7\u00C3O: Os seguintes produtos ficar\u00E3o com ESTOQUE NEGATIVO:\n\n${mensagens}\n\nDeseja continuar mesmo assim?`;
+}
+
 export function montarFormasPagamentoAnalise({
   pagamentos = [],
   formasPagamento = [],
