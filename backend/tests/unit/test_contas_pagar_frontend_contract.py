@@ -105,6 +105,19 @@ def test_contas_pagar_pagamento_envia_data_e_mostra_erros_legiveis():
     assert "toast.error(extrairMensagemErroPagamento(error))" in source
 
 
+def test_contas_pagar_pagamento_usa_formas_financeiras_validas():
+    source = (REPO_ROOT / "frontend/src/components/ContasPagar.jsx").read_text(encoding="utf-8")
+    carregar_formas = source.split("const carregarFormasPagamento = async () => {", 1)[1].split(
+        "const carregarDados = async () => {",
+        1,
+    )[0]
+
+    assert "api.get('/financeiro/formas-pagamento?apenas_ativas=true')" in carregar_formas
+    assert "/comissoes/formas-pagamento" not in carregar_formas
+    assert "safeArray(response.data).map" in carregar_formas
+    assert "conta_bancaria_destino_id: forma.conta_bancaria_destino_id || null" in carregar_formas
+
+
 def test_contas_pagar_pagamento_alerta_saldo_negativo_antes_de_baixar():
     source = (REPO_ROOT / "frontend/src/components/ContasPagar.jsx").read_text(encoding="utf-8")
 
