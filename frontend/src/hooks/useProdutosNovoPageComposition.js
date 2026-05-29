@@ -62,8 +62,8 @@ export default function useProdutosNovoPageComposition({
     setModalEdicaoLote,
     setModalEntrada,
   } = lotesState;
-  const { handleVoltar, navigate, setAbaAtiva } = navigationState;
-  const { abaAtiva, camposEmEdicao, formData, isEdicao, salvando, setCamposEmEdicao, setFormData } =
+  const { handleClonarProduto, handleVoltar, navigate, setAbaAtiva } = navigationState;
+  const { abaAtiva, camposEmEdicao, formData, isClone, isEdicao, salvando, setCamposEmEdicao, setFormData } =
     pageState;
   const {
     buscaPredecessor,
@@ -106,7 +106,9 @@ export default function useProdutosNovoPageComposition({
 
   const headerProps = {
     formData,
+    isClone,
     isEdicao,
+    onClonar: handleClonarProduto,
     onVoltar: handleVoltar,
   };
 
@@ -238,6 +240,7 @@ export default function useProdutosNovoPageComposition({
   };
 
   const footerProps = {
+    isClone,
     isEdicao,
     onCancel: () => navigate("/produtos"),
     salvando,

@@ -1,4 +1,6 @@
-export default function ProdutosNovoFooterActions({ isEdicao, onCancel, salvando }) {
+export default function ProdutosNovoFooterActions({ isClone, isEdicao, onCancel, salvando }) {
+  const submitLabel = isClone ? 'Criar Copia' : isEdicao ? 'Atualizar' : 'Cadastrar';
+
   return (
     <div className="mt-6 flex justify-end gap-4">
       <button
@@ -13,7 +15,7 @@ export default function ProdutosNovoFooterActions({ isEdicao, onCancel, salvando
         disabled={salvando}
         className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400"
       >
-        {salvando ? 'Salvando...' : isEdicao ? 'Atualizar' : 'Cadastrar'}
+        {salvando ? 'Salvando...' : submitLabel}
       </button>
     </div>
   );

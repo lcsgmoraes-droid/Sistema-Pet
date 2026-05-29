@@ -42,6 +42,8 @@ export default function ProdutosNovo() {
   const { id } = useParams();
   const [searchParams] = useSearchParams();
   const isEdicao = !!id;
+  const cloneId = searchParams.get('clone') || searchParams.get('clone_id');
+  const isClone = !isEdicao && !!cloneId;
 
   // Estado das abas
   const [abaAtiva, setAbaAtiva] = useState(1);
@@ -259,6 +261,7 @@ export default function ProdutosNovo() {
   } = useProdutosNovoFornecedores({ id });
 
   const { salvarFiscal } = useProdutosNovoCarregamento({
+    cloneId,
     id,
     isEdicao,
     formData,
@@ -348,6 +351,7 @@ export default function ProdutosNovo() {
 
   const { handleSubmit } = useProdutosNovoSubmit({
     id,
+    isClone,
     isEdicao,
     formData,
     navigate,
@@ -367,6 +371,11 @@ export default function ProdutosNovo() {
     }
 
     navigate('/produtos');
+  };
+
+  const handleClonarProduto = () => {
+    if (!id) return;
+    navigate(`/produtos/novo?clone=${id}`);
   };
 
   const handleCriarOpcaoRacao = async (tipo, dados) => {
@@ -462,6 +471,7 @@ export default function ProdutosNovo() {
       abaAtiva,
       camposEmEdicao,
       formData,
+      isClone,
       isEdicao,
       loading,
       salvando,
@@ -564,6 +574,7 @@ export default function ProdutosNovo() {
       setQuantidadeKit,
     },
     navigationState: {
+      handleClonarProduto,
       handleVoltar,
       navigate,
       setAbaAtiva,
@@ -613,16 +624,16 @@ export default function ProdutosNovo() {
   if (loading) {
     return (
       <div className="p-6 flex justify-center items-center h-96">
-        <div className="text-gray-600">Carregando produto...</div>
+        <div className="text-gray-600">{isClone ? 'Preparando clone do produto...' : 'Carregando produto...'}</div>
       </div>
     );
   }
 
   // Proteção: Se é edição mas o formData ainda não foi carregado
-  if (isEdicao && !formData.nome) {
+  if ((isEdicao || isClone) && !formData.nome) {
     return (
       <div className="p-6 flex justify-center items-center h-96">
-        <div className="text-gray-600">Carregando dados...</div>
+        <div className="text-gray-600">{isClone ? 'Preparando dados para clonar...' : 'Carregando dados...'}</div>
       </div>
     );
   }

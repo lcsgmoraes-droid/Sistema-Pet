@@ -4,6 +4,7 @@ import { normalizeMarkdownContent } from '../utils/safeMarkdown';
 
 export default function useProdutosNovoSubmit({
   id,
+  isClone,
   isEdicao,
   formData,
   navigate,
@@ -165,7 +166,7 @@ export default function useProdutosNovoSubmit({
         return;
       }
 
-      alert('Produto cadastrado com sucesso!');
+      alert(isClone ? 'Produto clonado com sucesso!' : 'Produto cadastrado com sucesso!');
       navigate('/produtos');
     } catch (error) {
       console.error('Erro ao salvar produto:', error);

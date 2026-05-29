@@ -360,7 +360,7 @@ export default function ProdutosTabelaSection({
                       </div>
                     </div>
 
-                    <div className="mt-3 flex gap-2">
+                    <div className="mt-3 flex flex-wrap gap-2">
                       <ActionButton
                         type="button"
                         onClick={(event) => {
@@ -373,6 +373,19 @@ export default function ProdutosTabelaSection({
                         className="flex-1"
                       >
                         Editar
+                      </ActionButton>
+                      <ActionButton
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          navigate(`/produtos/novo?clone=${produto.id}`);
+                        }}
+                        intent="neutral"
+                        tone="soft"
+                        size="sm"
+                        className="flex-1"
+                      >
+                        Clonar
                       </ActionButton>
                       {codigo && (
                         <ActionButton
