@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { formatBRL, formatMoneyBRL } from "../../utils/formatters";
+import { buildPdvCouponTooltip } from "../../utils/pdvCouponTooltip";
 import { buildReturnTo } from "../../utils/petReturnFlow";
 import PessoaSelector from "../clientes/PessoaSelector";
 import ActionButton from "../ui/ActionButton";
@@ -122,10 +123,14 @@ function ClienteCupomBadgeList({
     if (!codigoCupom) return null;
 
     const chaveCopia = `cupom-${codigoCupom}`;
+    const tooltipCupom = buildPdvCouponTooltip(c);
 
     return (
       <span
         key={codigoCupom}
+        tabIndex={0}
+        title={tooltipCupom}
+        aria-label={tooltipCupom}
         className="inline-flex max-w-full items-center gap-1 rounded border border-yellow-300 bg-yellow-100 px-1.5 py-0.5 font-mono text-[11px] text-yellow-800"
       >
         <span className="truncate">{codigoCupom}</span>
