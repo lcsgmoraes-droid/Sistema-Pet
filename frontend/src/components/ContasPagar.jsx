@@ -158,14 +158,13 @@ const ContasPagar = () => {
   }, []);
 
   const carregarFormasPagamento = async () => {
-    const response = await api.get('/comissoes/formas-pagamento');
-    const lista = response.data?.formas || [];
-    return safeArray(lista).map((forma) => ({
+    const response = await api.get('/financeiro/formas-pagamento?apenas_ativas=true');
+    return safeArray(response.data).map((forma) => ({
       id: forma.id,
       nome: forma.nome,
-      tipo: forma.nome?.toLowerCase()?.replace(/\s+/g, '_') || 'outro',
-      icone: '💳',
-      conta_bancaria_destino_id: null,
+      tipo: forma.tipo || forma.nome?.toLowerCase()?.replace(/\s+/g, '_') || 'outro',
+      icone: forma.icone || '💳',
+      conta_bancaria_destino_id: forma.conta_bancaria_destino_id || null,
     }));
   };
 

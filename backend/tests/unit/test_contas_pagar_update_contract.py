@@ -39,3 +39,17 @@ def test_registrar_pagamento_normaliza_valores_antigos_e_respeita_tenant():
     assert "ContaBancaria.tenant_id == tenant_id" in registrar_pagamento
     assert "conta.valor_pago = _decimal_monetario(conta.valor_pago)" in registrar_pagamento
     assert "valor_centavos = _valor_reais_para_centavos" in registrar_pagamento
+
+
+def test_registrar_pagamento_valida_forma_pagamento_do_tenant_antes_de_gravar():
+    source = (REPO_ROOT / "backend/app/contas_pagar_routes.py").read_text(encoding="utf-8")
+    registrar_pagamento = source.split("async def registrar_pagamento(", 1)[1].split(
+        "# ============================================================================\n# DASHBOARD / RESUMO",
+        1,
+    )[0]
+
+    assert "forma_pagamento_validada_id" in registrar_pagamento
+    assert "FormaPagamento.id == pagamento.forma_pagamento_id" in registrar_pagamento
+    assert "FormaPagamento.tenant_id == tenant_id" in registrar_pagamento
+    assert "Forma de pagamento selecionada nao foi encontrada" in registrar_pagamento
+    assert "forma_pagamento_id=forma_pagamento_validada_id" in registrar_pagamento

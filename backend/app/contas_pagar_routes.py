@@ -1828,6 +1828,22 @@ async def registrar_pagamento(
             detail="O valor final do pagamento precisa ser maior que zero. Revise juros, multa e desconto.",
         )
 
+    forma_pagamento_validada_id = None
+    if pagamento.forma_pagamento_id:
+        forma_pagamento = db.query(FormaPagamento).filter(
+            FormaPagamento.id == pagamento.forma_pagamento_id,
+            FormaPagamento.tenant_id == tenant_id,
+            FormaPagamento.ativo == True,
+        ).first()
+
+        if not forma_pagamento:
+            raise HTTPException(
+                status_code=400,
+                detail="Forma de pagamento selecionada nao foi encontrada ou esta inativa. Atualize a tela e selecione uma forma valida.",
+            )
+
+        forma_pagamento_validada_id = forma_pagamento.id
+
     # Atualizar valores
     conta.valor_pago += valor_total_pagamento
     conta.valor_juros += valor_juros
@@ -1852,7 +1868,7 @@ async def registrar_pagamento(
     # Registrar pagamento
     novo_pagamento = Pagamento(
         conta_pagar_id=conta.id,
-        forma_pagamento_id=pagamento.forma_pagamento_id,
+        forma_pagamento_id=forma_pagamento_validada_id,
         valor_pago=valor_total_pagamento,
         data_pagamento=pagamento.data_pagamento,
         observacoes=pagamento.observacoes,
@@ -1896,7 +1912,7 @@ async def registrar_pagamento(
             data_movimento=datetime.combine(pagamento.data_pagamento, datetime.min.time()),
             categoria_id=conta.categoria_id,
             status='realizado',
-            forma_pagamento_id=pagamento.forma_pagamento_id,
+            forma_pagamento_id=forma_pagamento_validada_id,
             documento=conta.documento,
             origem_tipo='conta_pagar',
             origem_id=conta.id,
