@@ -917,6 +917,18 @@ def saldo_cliente(
         .limit(10)
         .all()
     )
+    campanhas_cupons_map = {}
+    campanha_ids = [c.campaign_id for c in cupons_ativos if c.campaign_id]
+    if campanha_ids:
+        campanhas = (
+            db.query(Campaign)
+            .filter(
+                Campaign.tenant_id == tenant_id,
+                Campaign.id.in_(campanha_ids),
+            )
+            .all()
+        )
+        campanhas_cupons_map = {campanha.id: campanha for campanha in campanhas}
 
     # Nível de ranking atual (último período calculado)
     rank_atual = (
@@ -948,7 +960,28 @@ def saldo_cliente(
                 "coupon_type": c.coupon_type.value,
                 "discount_value": float(c.discount_value) if c.discount_value else None,
                 "discount_percent": float(c.discount_percent) if c.discount_percent else None,
+                "channel": c.channel.value,
+                "status": c.status.value,
                 "valid_until": c.valid_until.isoformat() if c.valid_until else None,
+                "min_purchase_value": float(c.min_purchase_value) if c.min_purchase_value else None,
+                "customer_id": c.customer_id,
+                "campaign_id": c.campaign_id,
+                "nome_campanha": (
+                    campanhas_cupons_map[c.campaign_id].name
+                    if c.campaign_id in campanhas_cupons_map
+                    else None
+                ),
+                "campaign_type": (
+                    campanhas_cupons_map[c.campaign_id].campaign_type.value
+                    if c.campaign_id in campanhas_cupons_map
+                    else None
+                ),
+                "campaign_params": (
+                    campanhas_cupons_map[c.campaign_id].params
+                    if c.campaign_id in campanhas_cupons_map
+                    else None
+                ),
+                "meta": c.meta,
             }
             for c in cupons_ativos
         ],
