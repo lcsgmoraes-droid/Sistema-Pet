@@ -10,6 +10,7 @@ import {
   getMarcas,
   getProduto,
 } from '../api/produtos';
+import { montarEstadoProdutoClonado } from '../pages/produtosFormUtils';
 
 const construirListaHierarquica = (categorias, parentId = null, nivel = 0) => {
   let resultado = [];
@@ -35,6 +36,7 @@ const construirListaHierarquica = (categorias, parentId = null, nivel = 0) => {
 };
 
 export default function useProdutosNovoCarregamento({
+  cloneId,
   id,
   isEdicao,
   formData,
@@ -326,6 +328,37 @@ export default function useProdutosNovoCarregamento({
     }
   };
 
+  const carregarProdutoParaClone = async () => {
+    try {
+      setLoading(true);
+      setPredecessorInfo(null);
+      setSucessorInfo(null);
+      setImagens([]);
+      setLotes([]);
+      setFornecedores([]);
+
+      const response = await getProduto(cloneId);
+      const produto = response.data;
+      const clone = montarEstadoProdutoClonado(produto);
+
+      let markup = '';
+      if (clone.preco_custo && clone.preco_venda && Number(clone.preco_custo) > 0) {
+        markup = calcularMarkup(Number(clone.preco_custo), Number(clone.preco_venda)).toFixed(2);
+      }
+
+      setFormData((prev) => ({
+        ...prev,
+        ...clone,
+        markup,
+      }));
+    } catch (error) {
+      console.error('Erro ao carregar produto para clone:', error);
+      alert('Erro ao carregar produto para clonar: ' + (error.response?.data?.detail || error.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const salvarFiscal = async (produto) => {
     const payload = {
       origem_mercadoria: formData.tributacao.origem_mercadoria,
@@ -351,11 +384,17 @@ export default function useProdutosNovoCarregamento({
 
     if (isEdicao) {
       carregarProduto();
+      return;
     }
-  }, [id, isEdicao]);
+
+    if (cloneId) {
+      carregarProdutoParaClone();
+    }
+  }, [id, isEdicao, cloneId]);
 
   return {
     carregarDadosAuxiliares,
+    carregarProdutoParaClone,
     carregarProduto,
     salvarFiscal,
   };

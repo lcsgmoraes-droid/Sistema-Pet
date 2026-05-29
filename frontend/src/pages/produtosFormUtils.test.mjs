@@ -3,11 +3,13 @@ import test from "node:test";
 
 import {
   calcularMargemPercentual,
+  deveMostrarTipoProdutoNoFormulario,
   formatarPorcentagemProduto,
   formatarValorMonetarioProduto,
   montarAbasProdutoFormulario,
   montarEstadoFornecedorProduto,
   montarEstadoMovimentoEstoque,
+  montarEstadoProdutoClonado,
   montarEstadoProdutoFormulario,
   montarProdutoComAlteracao,
   montarPayloadFornecedorProduto,
@@ -151,6 +153,77 @@ test("normaliza produto carregado para o estado do formulario", () => {
       anunciar_app: true,
     },
   );
+});
+
+test("monta estado de produto clonado sem copiar identidade ou estoque", () => {
+  const clone = montarEstadoProdutoClonado({
+    id: 99,
+    codigo: "ABC-123",
+    sku: "ABC-123",
+    nome: "Racao Premium",
+    descricao_curta: "Texto comercial",
+    codigo_barras: "789123",
+    bling_id: "BL-1",
+    categoria_id: 5,
+    marca_id: 6,
+    departamento_id: 7,
+    tipo_produto: "KIT",
+    tipo_kit: "VIRTUAL",
+    e_kit_fisico: false,
+    preco_custo: 12.5,
+    preco_venda: 29.9,
+    estoque_atual: 18,
+    estoque: 18,
+    saldo_atual: 18,
+    lotes: [{ id: 1, numero_lote: "L-1" }],
+    composicao_kit: [
+      {
+        id: 10,
+        produto_id: 20,
+        produto_componente_id: 20,
+        produto_nome: "Componente",
+        quantidade: 2,
+        ordem: 1,
+      },
+    ],
+  });
+
+  assert.equal(clone.nome, "Racao Premium (Copia)");
+  assert.equal(clone.codigo, "");
+  assert.equal(clone.sku, "");
+  assert.equal(clone.codigo_barras, "");
+  assert.equal(clone.ativo, true);
+  assert.equal(clone.situacao, true);
+  assert.equal(clone.categoria_id, 5);
+  assert.equal(clone.marca_id, 6);
+  assert.equal(clone.departamento_id, 7);
+  assert.equal(clone.tipo_produto, "KIT");
+  assert.equal(clone.tipo_kit, "VIRTUAL");
+  assert.equal(clone.preco_custo, 12.5);
+  assert.equal(clone.preco_venda, 29.9);
+  assert.equal(clone.descricao, "Texto comercial");
+  assert.deepEqual(clone.composicao_kit, [
+    {
+      produto_id: 20,
+      produto_componente_id: 20,
+      produto_nome: "Componente",
+      quantidade: 2,
+      ordem: 1,
+      opcional: false,
+    },
+  ]);
+  assert.equal(Object.hasOwn(clone, "id"), false);
+  assert.equal(Object.hasOwn(clone, "bling_id"), false);
+  assert.equal(Object.hasOwn(clone, "estoque_atual"), false);
+  assert.equal(Object.hasOwn(clone, "lotes"), false);
+});
+
+test("mantem seletor de tipo disponivel para produto existente que nao seja variacao", () => {
+  assert.equal(deveMostrarTipoProdutoNoFormulario({ isEdicao: false, tipoProduto: "SIMPLES" }), true);
+  assert.equal(deveMostrarTipoProdutoNoFormulario({ isEdicao: true, tipoProduto: "SIMPLES" }), true);
+  assert.equal(deveMostrarTipoProdutoNoFormulario({ isEdicao: true, tipoProduto: "KIT" }), true);
+  assert.equal(deveMostrarTipoProdutoNoFormulario({ isEdicao: true, tipoProduto: "PAI" }), true);
+  assert.equal(deveMostrarTipoProdutoNoFormulario({ isEdicao: true, tipoProduto: "VARIACAO" }), false);
 });
 
 test("valida dados obrigatorios antes de salvar produto", () => {

@@ -54,6 +54,98 @@ export function calcularMargemPercentual(custo, venda) {
   return margem.toFixed(2);
 }
 
+export function deveMostrarTipoProdutoNoFormulario({ tipoProduto } = {}) {
+  return tipoProduto !== "VARIACAO";
+}
+
+export function montarEstadoProdutoClonado(prod = {}) {
+  const tipoOrigem = prod.tipo_produto || "SIMPLES";
+  const tipoProduto = tipoOrigem === "VARIACAO" ? "SIMPLES" : tipoOrigem;
+  const produtoComComposicao = tipoProduto === "KIT";
+  const nomeBase = String(prod.nome || "").trim();
+
+  const composicaoKit = produtoComComposicao
+    ? (prod.composicao_kit || []).map((item) => ({
+        produto_id: item.produto_id || item.produto_componente_id,
+        produto_componente_id: item.produto_componente_id || item.produto_id,
+        produto_nome: item.produto_nome || item.nome || "",
+        quantidade: item.quantidade || 1,
+        ordem: Number.isFinite(Number(item.ordem)) ? Number(item.ordem) : 0,
+        opcional: Boolean(item.opcional),
+      }))
+    : [];
+
+  return {
+    codigo: "",
+    sku: "",
+    nome: nomeBase ? `${nomeBase} (Copia)` : "Produto (Copia)",
+    codigo_barras: "",
+    categoria_id: prod.categoria_id || "",
+    marca_id: prod.marca_id || "",
+    departamento_id: prod.departamento_id || "",
+    tipo: prod.tipo || "produto",
+    unidade: prod.unidade || "UN",
+    descricao: prod.descricao_curta || prod.descricao || "",
+    preco_custo: prod.preco_custo || "",
+    preco_venda: prod.preco_venda || "",
+    preco_promocional: prod.preco_promocional || "",
+    data_inicio_promocao: prod.promocao_inicio || prod.data_inicio_promocao || "",
+    data_fim_promocao: prod.promocao_fim || prod.data_fim_promocao || "",
+    preco_ecommerce: prod.preco_ecommerce ?? "",
+    preco_ecommerce_promo: prod.preco_ecommerce_promo ?? "",
+    preco_ecommerce_promo_inicio: prod.preco_ecommerce_promo_inicio ?? "",
+    preco_ecommerce_promo_fim: prod.preco_ecommerce_promo_fim ?? "",
+    preco_app: prod.preco_app ?? "",
+    preco_app_promo: prod.preco_app_promo ?? "",
+    preco_app_promo_inicio: prod.preco_app_promo_inicio ?? "",
+    preco_app_promo_fim: prod.preco_app_promo_fim ?? "",
+    anunciar_ecommerce: prod.anunciar_ecommerce ?? true,
+    anunciar_app: prod.anunciar_app ?? true,
+    ativo: true,
+    situacao: true,
+    controle_lote: prod.controle_lote ?? true,
+    estoque_minimo: prod.estoque_minimo || "",
+    estoque_maximo: prod.estoque_maximo || "",
+    participa_sugestao_compra: prod.participa_sugestao_compra ?? true,
+    tipo_produto: tipoProduto,
+    produto_pai_id: null,
+    tipo_kit: produtoComComposicao ? prod.tipo_kit || "VIRTUAL" : null,
+    e_kit_fisico: produtoComComposicao ? Boolean(prod.e_kit_fisico) : false,
+    composicao_kit: composicaoKit,
+    produto_predecessor_id: null,
+    motivo_descontinuacao: "",
+    origem: prod.origem || "0",
+    ncm: prod.ncm || "",
+    cest: prod.cest || "",
+    cfop: prod.cfop || "",
+    aliquota_icms: prod.aliquota_icms || "",
+    aliquota_pis: prod.aliquota_pis || "",
+    aliquota_cofins: prod.aliquota_cofins || "",
+    tem_recorrencia: Boolean(prod.tem_recorrencia),
+    tipo_recorrencia: prod.tipo_recorrencia || "monthly",
+    intervalo_dias: prod.intervalo_dias || "",
+    numero_doses: prod.numero_doses || "",
+    observacoes_recorrencia: prod.observacoes_recorrencia || "",
+    especie_compativel: prod.especie_compativel || "both",
+    eh_racao: Boolean(prod.eh_racao),
+    e_granel: Boolean(prod.e_granel),
+    classificacao_racao: prod.classificacao_racao && prod.classificacao_racao !== "sim"
+      ? prod.classificacao_racao
+      : "",
+    peso_embalagem: prod.peso_embalagem || "",
+    tabela_nutricional: prod.tabela_nutricional || "",
+    tabela_consumo: prod.tabela_consumo || "",
+    categoria_racao: prod.categoria_racao || "",
+    especies_indicadas: prod.especies_indicadas || "both",
+    linha_racao_id: prod.linha_racao_id || "",
+    porte_animal_id: prod.porte_animal_id || "",
+    fase_publico_id: prod.fase_publico_id || "",
+    tipo_tratamento_id: prod.tipo_tratamento_id || "",
+    sabor_proteina_id: prod.sabor_proteina_id || "",
+    apresentacao_peso_id: prod.apresentacao_peso_id || "",
+  };
+}
+
 export function montarProdutoComAlteracao(produto, campo) {
   const valorCampo = campo.type === "checkbox" ? campo.checked : campo.value;
   const produtoAtualizado = {

@@ -1,3 +1,5 @@
+import { deveMostrarTipoProdutoNoFormulario } from '../../pages/produtosFormUtils';
+
 export default function ProdutosNovoEstruturaSection({
   buscaPredecessor,
   formData,
@@ -13,6 +15,11 @@ export default function ProdutosNovoEstruturaSection({
   setAbaAtiva,
   setFormData,
 }) {
+  const mostrarTipoProduto = deveMostrarTipoProdutoNoFormulario({
+    isEdicao,
+    tipoProduto: formData.tipo_produto,
+  });
+
   return (
     <>
       {!isEdicao && (
@@ -131,7 +138,7 @@ export default function ProdutosNovoEstruturaSection({
         </div>
       )}
 
-      {!isEdicao && (
+      {mostrarTipoProduto && (
         <div className="border-t pt-6">
           <div className="p-6 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-lg border border-blue-200">
             <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
@@ -141,7 +148,7 @@ export default function ProdutosNovoEstruturaSection({
               Tipo do Produto
             </h3>
 
-            <p className="text-sm text-gray-600 mb-4">Escolha o tipo de produto que esta cadastrando:</p>
+            <p className="text-sm text-gray-600 mb-4">Escolha ou ajuste a estrutura deste produto:</p>
 
             <div className="space-y-3">
               <div
@@ -203,7 +210,7 @@ export default function ProdutosNovoEstruturaSection({
                   )}
                   {formData.tipo_produto === 'PAI' && isEdicao && (
                     <div className="mt-2 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-800">
-                      Produto salvo! Va para a aba "Variacoes" para cadastrar as variacoes.
+                      A aba "Variacoes" esta disponivel. Se voce acabou de mudar a estrutura, clique em Atualizar antes de cadastrar novas variacoes.
                     </div>
                   )}
                 </div>
