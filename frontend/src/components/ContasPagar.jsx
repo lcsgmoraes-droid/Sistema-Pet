@@ -1115,7 +1115,7 @@ const ContasPagar = () => {
                     >
                       <option value="">Selecione...</option>
                       {safeArray(formasPagamento).map(f => (
-                        <option key={f.id} value={f.id}>{f.icone || '💳'} {f.nome}</option>
+                        <option key={f.id} value={f.id}>{f.nome}</option>
                       ))}
                     </select>
                     <ActionButton

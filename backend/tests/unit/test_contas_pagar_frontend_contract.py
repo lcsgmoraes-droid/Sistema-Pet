@@ -118,6 +118,17 @@ def test_contas_pagar_pagamento_usa_formas_financeiras_validas():
     assert "conta_bancaria_destino_id: forma.conta_bancaria_destino_id || null" in carregar_formas
 
 
+def test_contas_pagar_pagamento_nao_mostra_icone_textual_na_forma():
+    source = (REPO_ROOT / "frontend/src/components/ContasPagar.jsx").read_text(encoding="utf-8")
+    modal_pagamento = source.split("Forma de Pagamento</label>", 1)[1].split(
+        "Conta Banc",
+        1,
+    )[0]
+
+    assert "<option key={f.id} value={f.id}>{f.nome}</option>" in modal_pagamento
+    assert "{f.icone" not in modal_pagamento
+
+
 def test_contas_pagar_pagamento_alerta_saldo_negativo_antes_de_baixar():
     source = (REPO_ROOT / "frontend/src/components/ContasPagar.jsx").read_text(encoding="utf-8")
 
