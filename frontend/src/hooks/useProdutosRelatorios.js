@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import toast from "react-hot-toast";
 import { formatarData, getProdutos } from "../api/produtos";
+import { montarFiltrosProdutosParams } from "../components/produtos/produtosFiltroParams";
 
 const COLUNAS_RELATORIO_PRODUTOS = [
   { key: "nome", label: "Nome", value: (p) => p.nome || "" },
@@ -79,27 +80,10 @@ const extrairItensDaRespostaProdutos = (payload) => {
   return [];
 };
 
-const montarFiltroLimpo = (baseFiltros) => {
-  const filtrosLimpos = {};
-  Object.entries(baseFiltros || {}).forEach(([key, valor]) => {
-    if (key === "mostrarPaisVariacoes") return;
-    if (key === "ativo") {
-      if (valor === "ativos") {
-        filtrosLimpos[key] = true;
-      } else if (valor === "inativos") {
-        filtrosLimpos[key] = false;
-      }
-      return;
-    }
-    if (valor === "" || valor === null || valor === undefined) return;
-    if (typeof valor === "boolean") {
-      if (valor) filtrosLimpos[key] = true;
-      return;
-    }
-    filtrosLimpos[key] = valor;
+const montarFiltroLimpo = (baseFiltros) =>
+  montarFiltrosProdutosParams(baseFiltros, {
+    incluirFlagsListagem: false,
   });
-  return filtrosLimpos;
-};
 
 const ordenarProdutosRelatorio = (lista, ordenacao, obterEstoqueVisualProduto) => {
   const copia = [...lista];

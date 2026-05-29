@@ -78,6 +78,28 @@ router = APIRouter(prefix="/produtos", tags=["produtos"])
 PRODUTO_SKU_COLUMN = getattr(Produto, "sku", None)
 
 
+def _resolver_filtro_ativo_produtos(
+    ativo: Optional[bool],
+    ativo_status: Optional[str] = None,
+) -> Optional[bool]:
+    status_normalizado = (ativo_status or "").strip().lower()
+    if status_normalizado in {"todos", "all", "ativos_e_inativos", "ativo_e_inativo"}:
+        return None
+    if status_normalizado in {"ativos", "ativo", "true", "1", "sim"}:
+        return True
+    if status_normalizado in {"inativos", "inativo", "false", "0", "nao", "não"}:
+        return False
+    return ativo
+
+
+def _filtro_ativo_produtos_clause(ativo_filtro: Optional[bool]):
+    if ativo_filtro is None:
+        return None
+    if ativo_filtro:
+        return or_(Produto.ativo.is_(True), Produto.ativo.is_(None))
+    return Produto.ativo.is_(False)
+
+
 def _produto_sku_value(produto: Produto) -> Optional[str]:
     return getattr(produto, "sku", None)
 
@@ -2232,6 +2254,7 @@ def listar_produtos(
     estoque_baixo: Optional[bool] = False,
     em_promocao: Optional[bool] = False,
     ativo: Optional[bool] = True,
+    ativo_status: Optional[str] = None,
     tipo_produto: Optional[str] = None,  # Filtro por tipo de produto
     produto_predecessor_id: Optional[int] = None,  # Buscar sucessores de um produto
     include_variations: Optional[bool] = False,
@@ -2253,6 +2276,7 @@ def listar_produtos(
     """
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     termo_busca = (busca or "").strip()
+    ativo_filtro = _resolver_filtro_ativo_produtos(ativo, ativo_status)
 
     # Incluir produtos de tenants parceiros (ex.: pet shop parceiro da clínica)
     access_ids = get_all_accessible_tenant_ids(db, tenant_id)
@@ -2288,11 +2312,9 @@ def listar_produtos(
     # Se ativo=None, mostra todos (ativos e inativos)
     # Se ativo=True, mostra apenas ativos
     # Se ativo=False, mostra apenas inativos
-    if ativo is not None:
-        if ativo:
-            query = query.filter(or_(Produto.ativo.is_(True), Produto.ativo.is_(None)))
-        else:
-            query = query.filter(Produto.ativo.is_(False))
+    ativo_clause = _filtro_ativo_produtos_clause(ativo_filtro)
+    if ativo_clause is not None:
+        query = query.filter(ativo_clause)
 
     # FILTROS OPCIONAIS
 
@@ -2400,10 +2422,15 @@ def listar_produtos(
     for produto in produtos:
         # Se for PAI, contar variaÃ§Ãµes antes de adicionar
         if produto.tipo_produto == 'PAI':
-            total_variacoes = db.query(func.count(Produto.id)).filter(
+            filtros_variacoes_count = [
                 Produto.produto_pai_id == produto.id,
                 Produto.tipo_produto == 'VARIACAO',
-                Produto.ativo == True
+            ]
+            ativo_variacao_clause = _filtro_ativo_produtos_clause(ativo_filtro)
+            if ativo_variacao_clause is not None:
+                filtros_variacoes_count.append(ativo_variacao_clause)
+            total_variacoes = db.query(func.count(Produto.id)).filter(
+                *filtros_variacoes_count
             ).scalar()
             produto.total_variacoes = total_variacoes or 0
 
@@ -2420,10 +2447,15 @@ def listar_produtos(
         # Se for PAI, buscar e incluir suas variaÃ§Ãµes logo apÃ³s
         # apenas quando a tela pedir explicitamente include_variations.
         if include_variations and not termo_busca and produto.tipo_produto == 'PAI':
-            variacoes = db.query(Produto).filter(
+            filtros_variacoes = [
                 Produto.produto_pai_id == produto.id,
                 Produto.tipo_produto == 'VARIACAO',
-                Produto.ativo == True
+            ]
+            ativo_variacao_clause = _filtro_ativo_produtos_clause(ativo_filtro)
+            if ativo_variacao_clause is not None:
+                filtros_variacoes.append(ativo_variacao_clause)
+            variacoes = db.query(Produto).filter(
+                *filtros_variacoes
             ).options(*load_options).order_by(Produto.nome).all()
             validade_por_variacao = _mapa_validade_proxima_produtos(
                 db,

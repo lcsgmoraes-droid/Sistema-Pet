@@ -216,6 +216,7 @@ export default function Produtos() {
       onOpenEdicaoLote: handleAbrirEdicaoLote,
       onOpenFusao: () => setModalFusao(true),
       onOpenImportacao: () => setModalImportacao(true),
+      onOpenRelatorioValidade: () => navigate("/estoque/alertas?aba=validade"),
       onToggleMenuRelatorios,
       selecionadosCount: selecionados.length,
     },

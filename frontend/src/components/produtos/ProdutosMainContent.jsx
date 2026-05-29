@@ -45,6 +45,7 @@ export default function ProdutosMainContent({
   onOpenEdicaoLote,
   onOpenImportacao,
   onOpenModalRelatorio,
+  onOpenRelatorioValidade,
   onPaginaAnterior,
   onProximaPagina,
   onToggleMenuRelatorios,
@@ -80,6 +81,7 @@ export default function ProdutosMainContent({
         onOpenEdicaoLote={onOpenEdicaoLote}
         onOpenImportacao={onOpenImportacao}
         onOpenModalRelatorio={onOpenModalRelatorio}
+        onOpenRelatorioValidade={onOpenRelatorioValidade}
         onToggleMenuRelatorios={onToggleMenuRelatorios}
         selecionadosCount={selecionadosCount}
       />

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { getProdutos } from "../api/produtos";
+import { montarFiltrosProdutosParams } from "../components/produtos/produtosFiltroParams";
 
 const PRODUTOS_PERSISTIR_KEY = "produtos_persistir_busca";
 const PRODUTOS_FILTROS_KEY = "produtos_filtros_v2";
@@ -246,35 +247,10 @@ export default function useProdutosListagem({
   const carregarDados = async (filtrosAtuais = filtros) => {
     try {
       setLoading(true);
-      const filtrosLimpos = {};
-      Object.keys(filtrosAtuais).forEach((key) => {
-        const valor = filtrosAtuais[key];
-
-        if (key === "mostrarPaisVariacoes") {
-          return;
-        }
-
-        if (key === "ativo") {
-          if (valor === "ativos") {
-            filtrosLimpos[key] = true;
-          } else if (valor === "inativos") {
-            filtrosLimpos[key] = false;
-          }
-          return;
-        }
-
-        if (valor !== "" && valor !== null && valor !== undefined) {
-          filtrosLimpos[key] = valor;
-        }
+      const filtrosLimpos = montarFiltrosProdutosParams(filtrosAtuais, {
+        page: paginaAtual,
+        pageSize: itensPorPagina,
       });
-
-      filtrosLimpos.page = paginaAtual;
-      filtrosLimpos.page_size = itensPorPagina;
-      filtrosLimpos.include_variations = filtrosAtuais.mostrarPaisVariacoes;
-      filtrosLimpos.busca_completa = false;
-      filtrosLimpos.incluir_imagens = false;
-      filtrosLimpos.incluir_lotes = false;
-      filtrosLimpos.incluir_detalhes_composto = false;
 
       const response = await getProdutos(filtrosLimpos);
 

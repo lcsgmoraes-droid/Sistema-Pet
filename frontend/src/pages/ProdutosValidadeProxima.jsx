@@ -221,6 +221,7 @@ export default function ProdutosValidadeProxima({
   const [paginaAtual, setPaginaAtual] = useState(1);
   const [filtrosForm, setFiltrosForm] = useState(filtrosIniciais);
   const [filtrosAplicados, setFiltrosAplicados] = useState(filtrosIniciais);
+  const [lotesSelecionados, setLotesSelecionados] = useState([]);
   const [dados, setDados] = useState({
     items: [],
     total: 0,
@@ -244,7 +245,36 @@ export default function ProdutosValidadeProxima({
     void carregarRelatorio(filtrosAplicados, paginaAtual);
   }, [filtrosAplicados, paginaAtual, reloadSignal]);
 
+  useEffect(() => {
+    setLotesSelecionados([]);
+  }, [filtrosAplicados, paginaAtual, reloadSignal]);
+
   const quickDays = useMemo(() => [30, 60, 90, 120], []);
+  const itensPagina = Array.isArray(dados.items) ? dados.items : [];
+  const lotesSelecionadosSet = useMemo(
+    () => new Set(lotesSelecionados.map((loteId) => String(loteId))),
+    [lotesSelecionados],
+  );
+  const todosLotesPaginaSelecionados =
+    itensPagina.length > 0 &&
+    itensPagina.every((item) => lotesSelecionadosSet.has(String(item.lote_id)));
+
+  const alternarLoteSelecionado = (loteId) => {
+    const loteIdTexto = String(loteId);
+    setLotesSelecionados((prev) =>
+      prev.some((id) => String(id) === loteIdTexto)
+        ? prev.filter((id) => String(id) !== loteIdTexto)
+        : [...prev, loteId],
+    );
+  };
+
+  const alternarTodosLotesPagina = (selecionar) => {
+    if (!selecionar) {
+      setLotesSelecionados([]);
+      return;
+    }
+    setLotesSelecionados(itensPagina.map((item) => item.lote_id));
+  };
 
   const carregarRelatorio = async (filtros, pagina) => {
     try {
@@ -326,27 +356,36 @@ export default function ProdutosValidadeProxima({
     setFiltrosAplicados(filtrosIniciais);
   };
 
-  const exportarCsv = async () => {
+  const exportarCsv = async ({ somenteSelecionados = false } = {}) => {
     try {
       setExportando(true);
       toast.loading("Montando relatorio CSV...", { id: "csv-validade" });
 
-      let pagina = 1;
-      let totalPaginas = 1;
       const itens = [];
 
-      while (pagina <= totalPaginas) {
-        const response = await getRelatorioValidadeProxima(
-          montarParametros(filtrosAplicados, pagina, 200),
+      if (somenteSelecionados) {
+        itens.push(
+          ...itensPagina.filter((item) =>
+            lotesSelecionadosSet.has(String(item.lote_id)),
+          ),
         );
-        const payload = response.data || {};
-        const linhasPagina = Array.isArray(payload.items) ? payload.items : [];
-        itens.push(...linhasPagina);
-        totalPaginas = Number(payload.pages || 0) || 1;
-        if (!linhasPagina.length) {
-          break;
+      } else {
+        let pagina = 1;
+        let totalPaginasExportacao = 1;
+
+        while (pagina <= totalPaginasExportacao) {
+          const response = await getRelatorioValidadeProxima(
+            montarParametros(filtrosAplicados, pagina, 200),
+          );
+          const payload = response.data || {};
+          const linhasPagina = Array.isArray(payload.items) ? payload.items : [];
+          itens.push(...linhasPagina);
+          totalPaginasExportacao = Number(payload.pages || 0) || 1;
+          if (!linhasPagina.length) {
+            break;
+          }
+          pagina += 1;
         }
-        pagina += 1;
       }
 
       if (!itens.length) {
@@ -420,7 +459,7 @@ export default function ProdutosValidadeProxima({
 
       const dataArquivo = new Date().toISOString().slice(0, 10);
       baixarCsv(
-        `validade_proxima_${dataArquivo}.csv`,
+        `${somenteSelecionados ? "validade_selecionados" : "validade_proxima"}_${dataArquivo}.csv`,
         [cabecalho, ...linhas],
       );
       toast.success(`CSV gerado com ${itens.length} lote(s).`, {
@@ -526,7 +565,7 @@ export default function ProdutosValidadeProxima({
               Abrir campanhas
             </ActionButton>
             <ActionButton
-              onClick={exportarCsv}
+              onClick={() => exportarCsv()}
               disabled={exportando}
               intent="edit"
               loading={exportando}
@@ -534,6 +573,17 @@ export default function ProdutosValidadeProxima({
             >
               Exportar CSV
             </ActionButton>
+            {lotesSelecionados.length > 0 && (
+              <ActionButton
+                onClick={() => exportarCsv({ somenteSelecionados: true })}
+                disabled={exportando}
+                intent="create"
+                loading={exportando}
+                tone="soft"
+              >
+                Exportar selecionados ({lotesSelecionados.length})
+              </ActionButton>
+            )}
             <ActionButton
               onClick={() => navigate("/produtos")}
               tone="soft"
@@ -561,11 +611,21 @@ export default function ProdutosValidadeProxima({
             {embedded && (
               <button
                 type="button"
-                onClick={exportarCsv}
+                onClick={() => exportarCsv()}
                 disabled={exportando}
                 className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-blue-700 ring-1 ring-blue-200 transition-colors hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {exportando ? "Exportando..." : "Exportar CSV"}
+              </button>
+            )}
+            {embedded && lotesSelecionados.length > 0 && (
+              <button
+                type="button"
+                onClick={() => exportarCsv({ somenteSelecionados: true })}
+                disabled={exportando}
+                className="rounded-full bg-white px-3 py-1.5 text-sm font-medium text-emerald-700 ring-1 ring-emerald-200 transition-colors hover:bg-emerald-50 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Exportar selecionados ({lotesSelecionados.length})
               </button>
             )}
             {embedded && (
@@ -839,6 +899,16 @@ export default function ProdutosValidadeProxima({
           </div>
 
           <div className="flex flex-wrap gap-2 text-xs text-gray-500">
+            {lotesSelecionados.length > 0 && (
+              <button
+                type="button"
+                onClick={() => exportarCsv({ somenteSelecionados: true })}
+                disabled={exportando}
+                className="rounded-full bg-emerald-50 px-3 py-1.5 font-medium text-emerald-700 ring-1 ring-emerald-200 transition-colors hover:bg-emerald-100 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Exportar {lotesSelecionados.length} selecionado(s)
+              </button>
+            )}
             <span className="rounded-full bg-slate-100 px-3 py-1.5">
               Ordenacao padrao: validade crescente
             </span>
@@ -870,7 +940,16 @@ export default function ProdutosValidadeProxima({
                   className="rounded-lg border border-gray-200 bg-white p-3 shadow-sm"
                 >
                   <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
+                    <label className="pt-1">
+                      <input
+                        type="checkbox"
+                        checked={lotesSelecionadosSet.has(String(item.lote_id))}
+                        onChange={() => alternarLoteSelecionado(item.lote_id)}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        aria-label={`Selecionar lote ${item.nome_lote || item.lote_id}`}
+                      />
+                    </label>
+                    <div className="min-w-0 flex-1">
                       <h3 className="line-clamp-2 text-sm font-semibold text-gray-900">
                         {item.nome}
                       </h3>
@@ -989,6 +1068,16 @@ export default function ProdutosValidadeProxima({
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-5 py-3 text-left">
+                  <input
+                    type="checkbox"
+                    checked={todosLotesPaginaSelecionados}
+                    onChange={(event) => alternarTodosLotesPagina(event.target.checked)}
+                    disabled={loading || itensPagina.length === 0}
+                    className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:cursor-not-allowed disabled:opacity-50"
+                    aria-label="Selecionar todos os lotes da pagina"
+                  />
+                </th>
                 <th className="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">
                   Produto
                 </th>
@@ -1017,7 +1106,7 @@ export default function ProdutosValidadeProxima({
               {!loading && dados.items.length === 0 && (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={8}
                     className="px-5 py-10 text-center text-sm text-gray-500"
                   >
                     Nenhum lote encontrado para os filtros aplicados.
@@ -1033,6 +1122,15 @@ export default function ProdutosValidadeProxima({
 
                 return (
                   <tr key={item.lote_id} className="hover:bg-gray-50">
+                    <td className="px-5 py-4 align-top">
+                      <input
+                        type="checkbox"
+                        checked={lotesSelecionadosSet.has(String(item.lote_id))}
+                        onChange={() => alternarLoteSelecionado(item.lote_id)}
+                        className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        aria-label={`Selecionar lote ${item.nome_lote || item.lote_id}`}
+                      />
+                    </td>
                     <td className="px-5 py-4 align-top">
                       <div className="space-y-1">
                         <div className="text-sm font-semibold text-gray-900">

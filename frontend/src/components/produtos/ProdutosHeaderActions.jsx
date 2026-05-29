@@ -15,6 +15,7 @@ export default function ProdutosHeaderActions({
   onOpenEdicaoLote,
   onOpenImportacao,
   onOpenModalRelatorio,
+  onOpenRelatorioValidade,
   onToggleMenuRelatorios,
   selecionadosCount,
 }) {
@@ -112,6 +113,12 @@ export default function ProdutosHeaderActions({
               className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 border-t border-gray-100"
             >
               Relatorio personalizado
+            </button>
+            <button
+              onClick={onOpenRelatorioValidade}
+              className="w-full text-left px-4 py-3 text-sm hover:bg-gray-50 border-t border-gray-100"
+            >
+              Validade curta ou vencida
             </button>
           </div>
         )}

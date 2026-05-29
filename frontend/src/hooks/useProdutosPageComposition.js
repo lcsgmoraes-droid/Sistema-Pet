@@ -66,6 +66,7 @@ export default function useProdutosPageComposition({
     onOpenEdicaoLote,
     onOpenFusao,
     onOpenImportacao,
+    onOpenRelatorioValidade,
     onToggleMenuRelatorios,
     selecionadosCount,
   } = headerState;
@@ -167,6 +168,7 @@ export default function useProdutosPageComposition({
       onOpenFusao,
       onOpenImportacao,
       onOpenModalRelatorio,
+      onOpenRelatorioValidade,
       onPaginaAnterior,
       onProximaPagina,
       onToggleMenuRelatorios,
