@@ -100,7 +100,12 @@ def _registrar_lote_entrada(
     if not (numero_lote or data_validade):
         return lote, lote_id
 
-    nome_lote = numero_lote or f"{produto.sku or produto.codigo}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
+    codigo_produto = (
+        getattr(produto, "codigo", None)
+        or getattr(produto, "codigo_barras", None)
+        or f"produto-{produto.id}"
+    )
+    nome_lote = numero_lote or f"{codigo_produto}-{datetime.now().strftime('%Y%m%d%H%M%S')}"
     produto.controle_lote = True
 
     lote = db.query(ProdutoLote).filter(
