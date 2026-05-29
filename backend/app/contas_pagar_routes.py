@@ -75,6 +75,21 @@ def _valor_reais_para_centavos(valor) -> Decimal:
         rounding=ROUND_HALF_UP,
     )
 
+
+def _registrar_observacao_operacao_conta_pagar(
+    conta: ContaPagar,
+    descricao_operacao: str,
+    motivo: Optional[str] = None,
+) -> None:
+    momento = datetime.now().strftime("%d/%m/%Y %H:%M")
+    linha = f"{descricao_operacao} em {momento}"
+    motivo_limpo = (motivo or "").strip()
+    if motivo_limpo:
+        linha = f"{linha}. Motivo: {motivo_limpo}"
+
+    observacoes_atuais = (conta.observacoes or "").strip()
+    conta.observacoes = f"{observacoes_atuais}\n{linha}".strip()
+
 # ============================================================================
 # SCHEMAS
 # ============================================================================
@@ -178,6 +193,10 @@ class PagamentoCreate(BaseModel):
     valor_multa: float = 0
     valor_desconto: float = 0
     observacoes: Optional[str] = None
+
+
+class ContaPagarOperacaoRequest(BaseModel):
+    motivo: Optional[str] = None
 
 
 class ContaPagarResponse(BaseModel):
@@ -1659,6 +1678,128 @@ def excluir_conta_pagar(
         "ok": True,
         "mensagem": "Conta a pagar excluida com sucesso",
         "conta_id": conta_id,
+    }
+
+
+@router.post("/{conta_id}/estornar")
+def estornar_pagamento_conta_pagar(
+    conta_id: int,
+    payload: ContaPagarOperacaoRequest,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    """Estorna os pagamentos registrados e reverte a movimentacao bancaria."""
+    _, tenant_id = user_and_tenant
+
+    conta = db.query(ContaPagar).options(
+        joinedload(ContaPagar.pagamentos)
+    ).filter(
+        ContaPagar.id == conta_id,
+        ContaPagar.tenant_id == tenant_id,
+    ).first()
+
+    if not conta:
+        raise HTTPException(status_code=404, detail="Conta nao encontrada")
+
+    valor_pago = conta.valor_pago or Decimal("0")
+    if valor_pago <= 0 and not conta.pagamentos:
+        raise HTTPException(
+            status_code=400,
+            detail="Conta nao possui pagamento registrado para estornar",
+        )
+
+    movimentacoes = db.query(MovimentacaoFinanceira).filter(
+        MovimentacaoFinanceira.tenant_id == tenant_id,
+        MovimentacaoFinanceira.origem_tipo == 'conta_pagar',
+        MovimentacaoFinanceira.origem_id == conta.id,
+    ).all()
+
+    movimentacoes_estornadas = 0
+    for movimentacao in movimentacoes:
+        conta_bancaria = db.query(ContaBancaria).filter(
+            ContaBancaria.id == movimentacao.conta_bancaria_id,
+            ContaBancaria.tenant_id == tenant_id,
+        ).first()
+
+        if conta_bancaria:
+            if movimentacao.tipo == "saida":
+                conta_bancaria.saldo_atual += movimentacao.valor
+            elif movimentacao.tipo == "entrada":
+                conta_bancaria.saldo_atual -= movimentacao.valor
+
+        db.delete(movimentacao)
+        movimentacoes_estornadas += 1
+
+    pagamentos_estornados = 0
+    for pagamento in list(conta.pagamentos):
+        db.delete(pagamento)
+        pagamentos_estornados += 1
+
+    conta.valor_pago = Decimal("0.00")
+    conta.valor_juros = Decimal("0.00")
+    conta.valor_multa = Decimal("0.00")
+    conta.valor_desconto = Decimal("0.00")
+    conta.valor_final = _decimal_monetario(conta.valor_original)
+    conta.data_pagamento = None
+    conta.status = "pendente"
+    _registrar_observacao_operacao_conta_pagar(
+        conta,
+        "Pagamento estornado",
+        payload.motivo,
+    )
+
+    db.commit()
+
+    return {
+        "ok": True,
+        "mensagem": "Pagamento estornado com sucesso",
+        "conta_id": conta.id,
+        "pagamentos_estornados": pagamentos_estornados,
+        "movimentacoes_estornadas": movimentacoes_estornadas,
+    }
+
+
+@router.post("/{conta_id}/cancelar")
+def cancelar_conta_pagar(
+    conta_id: int,
+    payload: ContaPagarOperacaoRequest,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant),
+):
+    """Cancela uma conta a pagar sem apagar o historico do lancamento."""
+    _, tenant_id = user_and_tenant
+
+    conta = db.query(ContaPagar).options(
+        joinedload(ContaPagar.pagamentos)
+    ).filter(
+        ContaPagar.id == conta_id,
+        ContaPagar.tenant_id == tenant_id,
+    ).first()
+
+    if not conta:
+        raise HTTPException(status_code=404, detail="Conta nao encontrada")
+
+    valor_pago = conta.valor_pago or Decimal("0")
+    if valor_pago > 0 or conta.pagamentos:
+        raise HTTPException(
+            status_code=400,
+            detail="Estorne o pagamento antes de cancelar o lancamento",
+        )
+
+    if conta.status != "cancelado":
+        conta.status = "cancelado"
+        _registrar_observacao_operacao_conta_pagar(
+            conta,
+            "Lancamento cancelado",
+            payload.motivo,
+        )
+
+    db.commit()
+
+    return {
+        "ok": True,
+        "mensagem": "Conta a pagar cancelada com sucesso",
+        "conta_id": conta.id,
     }
 
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Edit3, Plus, Trash2, Wallet, X } from 'lucide-react';
+import { Ban, Edit3, Plus, RotateCcw, Trash2, Wallet, X } from 'lucide-react';
 import api from '../api';
 import { toast } from 'react-hot-toast';
 import ModalNovaContaPagar from './ModalNovaContaPagar';
@@ -131,6 +131,7 @@ const ContasPagar = () => {
     loading: false,
   });
   const [recorrenciasSelecionadasExclusao, setRecorrenciasSelecionadasExclusao] = useState([]);
+  const [contasSelecionadas, setContasSelecionadas] = useState([]);
   const [formasPagamento, setFormasPagamento] = useState([]);
   const [contasBancarias, setContasBancarias] = useState([]);
   const [mostrarModalNovaForma, setMostrarModalNovaForma] = useState(false);
@@ -156,6 +157,11 @@ const ContasPagar = () => {
   useEffect(() => {
     carregarDados();
   }, []);
+
+  useEffect(() => {
+    const idsVisiveis = new Set(safeArray(contas).map((conta) => conta.id));
+    setContasSelecionadas((atuais) => atuais.filter((id) => idsVisiveis.has(id)));
+  }, [contas]);
 
   const carregarFormasPagamento = async () => {
     const response = await api.get('/financeiro/formas-pagamento?apenas_ativas=true');
@@ -303,6 +309,21 @@ const ContasPagar = () => {
     aplicarFiltros(filtrosPadrao);
   };
 
+  const contasVisiveis = safeArray(contas);
+  const contaTemPagamento = (conta) => (
+    Number(conta?.valor_pago || 0) > 0 || ['pago', 'parcial'].includes(conta?.status)
+  );
+  const contaPodeExcluir = (conta) => !contaTemPagamento(conta);
+  const contaPodeCancelar = (conta) => !contaTemPagamento(conta) && conta?.status !== 'cancelado';
+  const contasSelecionadasObjetos = contasVisiveis.filter((conta) => contasSelecionadas.includes(conta.id));
+  const totalSelecionadas = contasSelecionadasObjetos.length;
+  const todasVisiveisSelecionadas = contasVisiveis.length > 0
+    && contasVisiveis.every((conta) => contasSelecionadas.includes(conta.id));
+  const algumasVisiveisSelecionadas = contasVisiveis.some((conta) => contasSelecionadas.includes(conta.id));
+  const haContaPagaSelecionada = contasSelecionadasObjetos.some(contaTemPagamento);
+  const haContaCancelavelSelecionada = contasSelecionadasObjetos.some(contaPodeCancelar);
+  const haContaExcluivelSelecionada = contasSelecionadasObjetos.some(contaPodeExcluir);
+
   const abrirModalPagamento = (conta) => {
     setContaSelecionada(conta);
     // Buscar conta padrão da forma de pagamento se houver
@@ -407,6 +428,122 @@ const ContasPagar = () => {
     } catch (error) {
       console.error('Erro ao excluir recorrencia:', error);
       toast.error(error.response?.data?.detail || 'Erro ao excluir lancamentos recorrentes');
+    }
+  };
+
+  const alternarSelecaoConta = (contaId) => {
+    setContasSelecionadas((atuais) => (
+      atuais.includes(contaId)
+        ? atuais.filter((id) => id !== contaId)
+        : [...atuais, contaId]
+    ));
+  };
+
+  const selecionarTodasContasVisiveis = (event) => {
+    const selecionar = event.target.checked;
+    if (!selecionar) {
+      setContasSelecionadas([]);
+      return;
+    }
+
+    setContasSelecionadas(contasVisiveis.map((conta) => conta.id));
+  };
+
+  const limparSelecaoContas = () => {
+    setContasSelecionadas([]);
+  };
+
+  const editarContaSelecionada = () => {
+    if (totalSelecionadas !== 1) {
+      toast.error('Selecione apenas um lancamento para editar');
+      return;
+    }
+
+    abrirModalEdicao(contasSelecionadasObjetos[0]);
+  };
+
+  const estornarContasSelecionadas = async () => {
+    const contasParaEstornar = contasSelecionadasObjetos.filter(contaTemPagamento);
+    if (contasParaEstornar.length === 0) {
+      toast.error('Selecione pelo menos uma conta com pagamento para estornar');
+      return;
+    }
+
+    const motivo = window.prompt('Motivo do estorno (opcional):', '');
+    if (motivo === null) return;
+
+    const confirmado = window.confirm(
+      `Estornar pagamento de ${contasParaEstornar.length} lancamento(s)? O saldo bancario sera revertido.`
+    );
+    if (!confirmado) return;
+
+    try {
+      for (const conta of contasParaEstornar) {
+        await api.post(`/contas-pagar/${conta.id}/estornar`, { motivo });
+      }
+      toast.success('Pagamento(s) estornado(s) com sucesso');
+      limparSelecaoContas();
+      carregarDados();
+    } catch (error) {
+      console.error('Erro ao estornar pagamentos:', error);
+      toast.error(error.response?.data?.detail || 'Erro ao estornar pagamento');
+    }
+  };
+
+  const cancelarContasSelecionadas = async () => {
+    const contasParaCancelar = contasSelecionadasObjetos.filter(contaPodeCancelar);
+    if (contasParaCancelar.length === 0) {
+      toast.error('Selecione pelo menos uma conta sem pagamento para cancelar');
+      return;
+    }
+
+    const motivo = window.prompt('Motivo do cancelamento (opcional):', '');
+    if (motivo === null) return;
+
+    const confirmado = window.confirm(
+      `Cancelar ${contasParaCancelar.length} lancamento(s)? O historico sera mantido.`
+    );
+    if (!confirmado) return;
+
+    try {
+      for (const conta of contasParaCancelar) {
+        await api.post(`/contas-pagar/${conta.id}/cancelar`, { motivo });
+      }
+      toast.success('Lancamento(s) cancelado(s) com sucesso');
+      limparSelecaoContas();
+      carregarDados();
+    } catch (error) {
+      console.error('Erro ao cancelar contas:', error);
+      toast.error(error.response?.data?.detail || 'Erro ao cancelar lancamento');
+    }
+  };
+
+  const excluirContasSelecionadas = async () => {
+    const contasParaExcluir = contasSelecionadasObjetos.filter(contaPodeExcluir);
+    if (contasParaExcluir.length === 0) {
+      toast.error('Selecione pelo menos uma conta sem pagamento para excluir');
+      return;
+    }
+
+    const ignoradas = totalSelecionadas - contasParaExcluir.length;
+    const avisoIgnoradas = ignoradas > 0
+      ? ` ${ignoradas} lancamento(s) com pagamento serao ignorados.`
+      : '';
+    const confirmado = window.confirm(
+      `Excluir ${contasParaExcluir.length} lancamento(s) selecionado(s)?${avisoIgnoradas}`
+    );
+    if (!confirmado) return;
+
+    try {
+      await api.post('/contas-pagar/recorrencias/excluir', {
+        ids: contasParaExcluir.map((conta) => conta.id),
+      });
+      toast.success('Lancamento(s) excluido(s) com sucesso');
+      limparSelecaoContas();
+      carregarDados();
+    } catch (error) {
+      console.error('Erro ao excluir contas:', error);
+      toast.error(error.response?.data?.detail || 'Erro ao excluir lancamentos');
     }
   };
 
@@ -574,6 +711,7 @@ const ContasPagar = () => {
   const getStatusBadge = (conta) => {
     const hoje = new Date();
     const vencimento = new Date(conta.data_vencimento);
+    if (conta.status === 'cancelado') return <StatusBadge status="cancelado" />;
     if (conta.status === 'pago') return <StatusBadge status="pago" />;
     if (vencimento < hoje) return <StatusBadge status="vencida" />;
     if (conta.status === 'parcial') return <StatusBadge status="parcial" />;
@@ -627,6 +765,31 @@ const ContasPagar = () => {
     fornecedor?.nome || fornecedor?.razao_social || fornecedor?.nome_fantasia || '';
 
   const contasPagarColumns = [
+    {
+      key: 'selecao',
+      headerClassName: 'w-[44px] text-center',
+      className: 'w-[44px] text-center',
+      renderHeader: () => (
+        <input
+          aria-checked={todasVisiveisSelecionadas ? 'true' : algumasVisiveisSelecionadas ? 'mixed' : 'false'}
+          aria-label="Selecionar todos os lancamentos visiveis"
+          checked={todasVisiveisSelecionadas}
+          className="contas-pagar-select-all h-4 w-4 rounded border-slate-300"
+          onChange={selecionarTodasContasVisiveis}
+          type="checkbox"
+        />
+      ),
+      render: (conta) => (
+        <input
+          aria-label={`Selecionar lancamento ${conta.id}`}
+          checked={contasSelecionadas.includes(conta.id)}
+          className="contas-pagar-select-row h-4 w-4 rounded border-slate-300"
+          onChange={() => alternarSelecaoConta(conta.id)}
+          onClick={(event) => event.stopPropagation()}
+          type="checkbox"
+        />
+      ),
+    },
     {
       key: 'id',
       header: 'ID',
@@ -773,7 +936,7 @@ const ContasPagar = () => {
             size="xs"
             icon={Trash2}
             onClick={() => excluirContaPagar(conta)}
-            disabled={Number(conta.valor_pago || 0) > 0 || conta.status === 'pago'}
+            disabled={contaTemPagamento(conta)}
             title="Excluir conta sem pagamento"
           >
             Excluir
@@ -1040,9 +1203,76 @@ const ContasPagar = () => {
 
       {/* Tabela de Contas */}
       <div className="bg-white rounded-lg shadow-md overflow-hidden">
+        {totalSelecionadas > 0 && (
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-slate-50 px-4 py-3">
+            <div>
+              <div className="text-sm font-semibold text-slate-800">Acoes em lote</div>
+              <div className="text-xs text-slate-500">{totalSelecionadas} lancamento(s) selecionado(s)</div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <ActionButton
+                intent="edit"
+                tone="soft"
+                size="xs"
+                icon={Edit3}
+                disabled={totalSelecionadas !== 1}
+                onClick={editarContaSelecionada}
+                title="Editar apenas um lancamento selecionado"
+                type="button"
+              >
+                Editar selecionado
+              </ActionButton>
+              <ActionButton
+                intent="warning"
+                tone="soft"
+                size="xs"
+                icon={RotateCcw}
+                disabled={!haContaPagaSelecionada}
+                onClick={estornarContasSelecionadas}
+                title="Estornar pagamentos selecionados"
+                type="button"
+              >
+                Estornar pagamento
+              </ActionButton>
+              <ActionButton
+                intent="warning"
+                tone="soft"
+                size="xs"
+                icon={Ban}
+                disabled={!haContaCancelavelSelecionada}
+                onClick={cancelarContasSelecionadas}
+                title="Cancelar lancamentos sem apagar historico"
+                type="button"
+              >
+                Cancelar lancamento
+              </ActionButton>
+              <ActionButton
+                intent="delete"
+                tone="soft"
+                size="xs"
+                icon={Trash2}
+                disabled={!haContaExcluivelSelecionada}
+                onClick={excluirContasSelecionadas}
+                title="Excluir lancamentos sem pagamento"
+                type="button"
+              >
+                Excluir selecionados
+              </ActionButton>
+              <ActionButton
+                intent="neutral"
+                tone="soft"
+                size="xs"
+                onClick={limparSelecaoContas}
+                type="button"
+              >
+                Limpar selecao
+              </ActionButton>
+            </div>
+          </div>
+        )}
         <DataTable
           columns={contasPagarColumns}
-          data={safeArray(contas)}
+          data={contasVisiveis}
           emptyMessage="Nenhuma conta encontrada"
           getRowKey={(conta) => conta.id}
           tableClassName="min-w-[1280px]"
@@ -1050,11 +1280,11 @@ const ContasPagar = () => {
           tbodyClassName="divide-y divide-gray-200"
         />
 
-        {contas.length > 0 && (
+        {contasVisiveis.length > 0 && (
           <div className="bg-green-50 border-t border-green-200 px-4 py-3">
-            <strong>Total:</strong> {contas.length} conta(s) | 
+            <strong>Total:</strong> {contasVisiveis.length} conta(s) | 
             <strong className="ml-3">Saldo a Pagar:</strong>{" "}
-            <MoneyCell value={contas.reduce((sum, c) => sum + (c.valor_final - c.valor_pago), 0)} zeroAsDash />
+            <MoneyCell value={contasVisiveis.reduce((sum, c) => sum + (c.valor_final - c.valor_pago), 0)} zeroAsDash />
           </div>
         )}
       </div>

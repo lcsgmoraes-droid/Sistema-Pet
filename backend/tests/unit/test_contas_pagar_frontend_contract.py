@@ -138,6 +138,32 @@ def test_contas_pagar_pagamento_alerta_saldo_negativo_antes_de_baixar():
     assert "window.confirm(mensagem)" in source
 
 
+def test_contas_pagar_lista_tem_selecao_e_acoes_em_lote():
+    source = (REPO_ROOT / "frontend/src/components/ContasPagar.jsx").read_text(encoding="utf-8")
+
+    assert "contasSelecionadas" in source
+    assert "alternarSelecaoConta" in source
+    assert "selecionarTodasContasVisiveis" in source
+    assert "contas-pagar-select-all" in source
+    assert "contas-pagar-select-row" in source
+    assert "Acoes em lote" in source
+    assert "Editar selecionado" in source
+    assert "Estornar pagamento" in source
+    assert "Cancelar lancamento" in source
+    assert "Excluir selecionados" in source
+
+
+def test_contas_pagar_frontend_chama_endpoints_de_estorno_cancelamento_e_exclusao_em_lote():
+    source = (REPO_ROOT / "frontend/src/components/ContasPagar.jsx").read_text(encoding="utf-8")
+
+    assert "estornarContasSelecionadas" in source
+    assert "cancelarContasSelecionadas" in source
+    assert "excluirContasSelecionadas" in source
+    assert "api.post(`/contas-pagar/${conta.id}/estornar`" in source
+    assert "api.post(`/contas-pagar/${conta.id}/cancelar`" in source
+    assert "api.post('/contas-pagar/recorrencias/excluir'" in source
+
+
 def test_modal_conta_pagar_pergunta_antes_de_replicar_nome_recorrente():
     source = (REPO_ROOT / "frontend/src/components/ModalNovaContaPagar.jsx").read_text(encoding="utf-8")
 
