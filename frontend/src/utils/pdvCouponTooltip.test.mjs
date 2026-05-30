@@ -53,11 +53,13 @@ test("buildPdvCouponTooltip explica regras vindas da configuracao da campanha", 
     channel: "pdv",
     campaign_params: {
       coupon_valid_days: 10,
+      cooldown_days: 30,
       benefit_channels: ["loja_fisica", "app"],
     },
   });
 
   assert.match(tooltip, /Regras: Gerado apos uma compra finalizada/);
   assert.match(tooltip, /validade configurada de 10 dia\(s\)/);
+  assert.match(tooltip, /novo cupom no maximo a cada 30 dia\(s\)/);
   assert.match(tooltip, /Canais de beneficio: Loja \/ PDV, App/);
 });

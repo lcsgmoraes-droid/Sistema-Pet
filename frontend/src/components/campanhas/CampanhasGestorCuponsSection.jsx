@@ -8,10 +8,23 @@ export default function CampanhasGestorCuponsSection({
   formatBRL,
   anularCupomGestor,
   gestorAnulando,
+  abrirCupomManual,
+  gestorCliente,
 }) {
   const isOpen = gestorSecao === "cupons";
   const ativos =
     gestorCupons?.filter((cupom) => cupom.status === "active").length || 0;
+  const criarCupomParaCliente = () => {
+    if (!abrirCupomManual || !gestorCliente) return;
+    abrirCupomManual({
+      customer_id: gestorCliente.id,
+      cliente_nome: gestorCliente.nome,
+      channel: "pdv",
+      motivo: "",
+      descricao: "",
+      retornar_para_aba: "gestor",
+    });
+  };
 
   return (
     <CampanhasGestorSection
@@ -21,6 +34,18 @@ export default function CampanhasGestorCuponsSection({
       isOpen={isOpen}
       onToggle={() => setGestorSecao(isOpen ? null : "cupons")}
     >
+      <div className="flex items-center justify-between gap-3 mb-3">
+        <p className="text-xs text-gray-500">
+          Gere cupons pontuais para aniversarios, eventos e acoes da loja.
+        </p>
+        <button
+          type="button"
+          onClick={criarCupomParaCliente}
+          className="px-3 py-2 bg-blue-600 text-white text-xs font-semibold rounded-lg hover:bg-blue-700"
+        >
+          + Gerar cupom
+        </button>
+      </div>
       {gestorCupons && gestorCupons.length > 0 ? (
         <div className="overflow-x-auto">
           <table className="w-full text-sm">

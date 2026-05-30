@@ -132,6 +132,7 @@ export default function useCampanhasPageComposition({
     },
     gestor: {
       ...gestor,
+      abrirCupomManual: cupons.abrirCupomManual,
       formatBRL,
       RANK_LABELS,
       CUPOM_STATUS,
@@ -201,6 +202,7 @@ export default function useCampanhasPageComposition({
     criandoCampanha: gestao.criandoCampanha,
     modalCupomAberto: cupons.modalCupomAberto,
     setModalCupomAberto: cupons.setModalCupomAberto,
+    abrirCupomManual: cupons.abrirCupomManual,
     setErroCupom: cupons.setErroCupom,
     novoCupom: cupons.novoCupom,
     setNovoCupom: cupons.setNovoCupom,

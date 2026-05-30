@@ -10,7 +10,11 @@ const DEFAULT_CUPOM = {
   valid_until: "",
   min_purchase_value: "",
   customer_id: "",
+  cliente_nome: "",
+  motivo: "",
   descricao: "",
+  regras_resumo: "",
+  retornar_para_aba: "",
 };
 
 export default function useCampanhasCupons({
@@ -18,12 +22,26 @@ export default function useCampanhasCupons({
   carregarCupons,
   aba,
   setAba,
+  onCupomCriado,
 }) {
   const [anulando, setAnulando] = useState(null);
   const [modalCupomAberto, setModalCupomAberto] = useState(false);
   const [novoCupom, setNovoCupom] = useState(DEFAULT_CUPOM);
   const [criandoCupom, setCriandoCupom] = useState(false);
   const [erroCupom, setErroCupom] = useState("");
+
+  const abrirCupomManual = useCallback((defaults = {}) => {
+    setErroCupom("");
+    setNovoCupom({
+      ...DEFAULT_CUPOM,
+      ...defaults,
+      customer_id:
+        defaults.customer_id === undefined || defaults.customer_id === null
+          ? ""
+          : String(defaults.customer_id),
+    });
+    setModalCupomAberto(true);
+  }, []);
 
   const anularCupom = useCallback(
     async (code) => {
@@ -57,7 +75,9 @@ export default function useCampanhasCupons({
         coupon_type: novoCupom.coupon_type,
         channel: novoCupom.channel,
       };
+      if (novoCupom.motivo) body.motivo = novoCupom.motivo;
       if (novoCupom.descricao) body.descricao = novoCupom.descricao;
+      if (novoCupom.regras_resumo) body.regras_resumo = novoCupom.regras_resumo;
       if (novoCupom.coupon_type === "fixed" && novoCupom.discount_value) {
         body.discount_value = Number.parseFloat(
           String(novoCupom.discount_value).replace(",", "."),
@@ -76,11 +96,16 @@ export default function useCampanhasCupons({
         body.customer_id = Number.parseInt(novoCupom.customer_id, 10);
       }
 
-      await api.post("/campanhas/cupons/manual", body);
+      const cupomRes = await api.post("/campanhas/cupons/manual", body);
       setModalCupomAberto(false);
       setNovoCupom(DEFAULT_CUPOM);
       await carregarCupons();
-      if (aba !== "cupons") setAba("cupons");
+      if (onCupomCriado) await onCupomCriado(cupomRes.data);
+      if (novoCupom.retornar_para_aba) {
+        setAba(novoCupom.retornar_para_aba);
+      } else if (aba !== "cupons") {
+        setAba("cupons");
+      }
     } catch (e) {
       setErroCupom(e?.response?.data?.detail || "Erro ao criar cupom.");
     } finally {
@@ -102,6 +127,7 @@ export default function useCampanhasCupons({
     anulando,
     modalCupomAberto,
     setModalCupomAberto,
+    abrirCupomManual,
     novoCupom,
     setNovoCupom,
     criandoCupom,

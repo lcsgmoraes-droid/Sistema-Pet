@@ -541,6 +541,27 @@ def listar_cupons(
 # Cupons — criar cupom manual
 # ---------------------------------------------------------------------------
 
+def _build_manual_coupon_meta(
+    *,
+    motivo: Optional[str] = None,
+    descricao: Optional[str] = None,
+    regras_resumo: Optional[str] = None,
+) -> dict:
+    motivo_final = (motivo or descricao or "Cupom manual").strip() or "Cupom manual"
+    descricao_final = (descricao or motivo_final).strip() or motivo_final
+    regras_final = (
+        (regras_resumo or "").strip()
+        or "Cupom gerado manualmente no gestor para uso conforme valor, canal e validade configurados."
+    )
+    return {
+        "descricao": descricao_final,
+        "motivo": motivo_final,
+        "campaign_name": motivo_final,
+        "regras_resumo": regras_final,
+        "criado_por": "manual",
+    }
+
+
 class CriarCupomManualBody(BaseModel):
     coupon_type: str  # "percent" | "fixed" | "gift"
     discount_value: Optional[float] = None
@@ -549,7 +570,9 @@ class CriarCupomManualBody(BaseModel):
     valid_until: Optional[str] = None  # ISO date string "YYYY-MM-DD"
     min_purchase_value: Optional[float] = None
     customer_id: Optional[int] = None
+    motivo: Optional[str] = None
     descricao: Optional[str] = None
+    regras_resumo: Optional[str] = None
 
 
 @router.post("/cupons/manual")
@@ -607,7 +630,11 @@ def criar_cupom_manual(
         min_purchase_value=body.min_purchase_value,
         customer_id=customer_id_resolvido,
         campaign_id=None,
-        meta={"descricao": body.descricao or "Cupom manual", "criado_por": "manual"},
+        meta=_build_manual_coupon_meta(
+            motivo=body.motivo,
+            descricao=body.descricao,
+            regras_resumo=body.regras_resumo,
+        ),
     )
     db.add(cupom)
     db.flush()
@@ -621,7 +648,7 @@ def criar_cupom_manual(
         metadata=build_coupon_audit_metadata(
             cupom,
             source="manual",
-            extra={"description": body.descricao or "Cupom manual"},
+            extra={"description": body.descricao or body.motivo or "Cupom manual"},
         ),
         details=f"Cupom manual {cupom.code} criado",
     )
@@ -637,7 +664,9 @@ def criar_cupom_manual(
         "channel": cupom.channel.value,
         "status": cupom.status.value,
         "valid_until": cupom.valid_until.isoformat() if cupom.valid_until else None,
+        "min_purchase_value": float(cupom.min_purchase_value) if cupom.min_purchase_value else None,
         "customer_id": cupom.customer_id,
+        "meta": cupom.meta,
     }
 
 

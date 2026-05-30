@@ -109,6 +109,7 @@ export default function Campanhas() {
     erroCupom,
     setErroCupom,
     anularCupom,
+    abrirCupomManual,
     criarCupomManual,
     formatarValorCupom,
   } = useCampanhasCupons({
@@ -116,6 +117,7 @@ export default function Campanhas() {
     carregarCupons,
     aba,
     setAba,
+    onCupomCriado: campanhasGestor.recarregarGestor,
   });
   const {
     enviandoDestaque,
@@ -226,6 +228,7 @@ export default function Campanhas() {
       formatarValorCupom,
       modalCupomAberto,
       setModalCupomAberto,
+      abrirCupomManual,
       novoCupom,
       setNovoCupom,
       criandoCupom,

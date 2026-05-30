@@ -139,6 +139,9 @@ export function CampanhasParametrosQuickRepurchaseSection({
   str,
   set,
 }) {
+  const cooldownRaw = num("cooldown_days");
+  const cooldownDays = cooldownRaw === "" ? 60 : cooldownRaw;
+
   return (
     <div className="grid grid-cols-2 gap-3">
       <CampanhaField
@@ -189,6 +192,25 @@ export function CampanhasParametrosQuickRepurchaseSection({
         <option value="ecommerce">E-commerce</option>
         <option value="all">Todos</option>
       </CampanhaSel>
+      <div>
+        <CampanhaField
+          label="Intervalo para novo cupom (dias)"
+          id="p-qr-cooldown"
+          step="1"
+          min="0"
+          value={cooldownDays}
+          onChange={(e) =>
+            set(
+              "cooldown_days",
+              Math.max(0, Number.parseInt(e.target.value, 10) || 0),
+            )
+          }
+        />
+        <p className="text-[11px] text-gray-500 mt-1">
+          Ex: 60 gera no maximo um cupom para o cliente a cada 60 dias. Use 0
+          para liberar a cada compra.
+        </p>
+      </div>
       <div className="col-span-2">
         <label
           htmlFor="p-qr-msg"

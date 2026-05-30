@@ -259,6 +259,7 @@ export default function useCampanhasGestor() {
     gestorCampanhaCarregando,
     buscarClientesGestor,
     selecionarClienteGestor,
+    recarregarGestor,
     carregarClientesPorCampanha,
     abrirClienteNoGestor,
     lancarCarimboGestor,

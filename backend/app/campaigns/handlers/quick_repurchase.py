@@ -18,6 +18,7 @@ Parâmetros esperados em campaign.params:
     "coupon_type": "percent",        # "percent" ou "fixed"
     "coupon_value": 10.0,            # 10% off ou R$ 10 off
     "coupon_valid_days": 15,         # cupom válido por X dias
+    "cooldown_days": 60,             # intervalo mínimo para gerar outro cupom
     "coupon_channel": "pdv",         # canal onde o cupom pode ser usado
     "notification_message": ""       # mensagem opcional (futura integração de push/email)
   }
@@ -40,6 +41,21 @@ from app.campaigns.models import (
 logger = logging.getLogger(__name__)
 
 _SUPPORTED_EVENTS = frozenset({"purchase_completed"})
+
+
+def _quick_repurchase_cooldown_days(params: dict | None) -> int:
+    """Return cooldown in days for quick repurchase coupons."""
+    if not params or "cooldown_days" not in params:
+        return 60
+
+    raw_value = params.get("cooldown_days")
+    if raw_value in (None, ""):
+        return 60
+
+    try:
+        return max(0, int(float(raw_value)))
+    except (TypeError, ValueError):
+        return 60
 
 
 class QuickRepurchaseHandler:
@@ -89,20 +105,22 @@ class QuickRepurchaseHandler:
         if existing_coupon:
             return {"evaluated": 1, "rewarded": 0, "errors": 0}
 
-        # Cooldown: não reenviar cupom se já foi gerado nos últimos 60 dias
-        sixty_days_ago = date.today() - timedelta(days=60)
-        recent_coupon = (
-            db.query(Coupon.id)
-            .filter(
-                Coupon.tenant_id == campaign.tenant_id,
-                Coupon.customer_id == customer_id,
-                Coupon.campaign_id == campaign.id,
-                Coupon.created_at >= sixty_days_ago,
+        # Cooldown: evita reenviar cupom dentro do intervalo configurado.
+        cooldown_days = _quick_repurchase_cooldown_days(params)
+        if cooldown_days > 0:
+            cooldown_since = date.today() - timedelta(days=cooldown_days)
+            recent_coupon = (
+                db.query(Coupon.id)
+                .filter(
+                    Coupon.tenant_id == campaign.tenant_id,
+                    Coupon.customer_id == customer_id,
+                    Coupon.campaign_id == campaign.id,
+                    Coupon.created_at >= cooldown_since,
+                )
+                .first()
             )
-            .first()
-        )
-        if recent_coupon:
-            return {"evaluated": 1, "rewarded": 0, "errors": 0}
+            if recent_coupon:
+                return {"evaluated": 1, "rewarded": 0, "errors": 0}
 
         coupon_type = params.get("coupon_type", "percent")
         coupon_value = float(params.get("coupon_value", 10.0))
