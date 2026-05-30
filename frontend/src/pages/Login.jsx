@@ -1,8 +1,9 @@
 import { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { PawPrint } from 'lucide-react';
 import { FiAlertCircle, FiEye, FiEyeOff, FiLock, FiMail } from 'react-icons/fi';
 import { useAuth } from '../contexts/AuthContext';
+
+const COREPET_LOGO = '/brand/corepet/corepet-horizontal.png';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -52,14 +53,15 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-600 via-purple-700 to-purple-900 flex items-center justify-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-8 animate-fade-in">
+    <div className="min-h-screen bg-gradient-to-br from-[#0f3f43] via-[#0f8b8d] to-[#f2a541] flex items-center justify-center p-4">
+      <div className="bg-white rounded-lg shadow-2xl w-full max-w-md p-8 animate-fade-in">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-purple-100 rounded-full mb-4">
-            <PawPrint className="w-8 h-8 text-purple-600" />
-          </div>
-          <h1 className="text-3xl font-bold text-gray-900">Pet Shop Pro</h1>
-          <p className="text-gray-600 mt-2">Sistema de Gestao Completo</p>
+          <img
+            src={COREPET_LOGO}
+            alt="CorePet"
+            className="mx-auto mb-5 h-20 w-auto max-w-full object-contain"
+          />
+          <p className="text-gray-600 mt-2">Gestao integrada para petshops</p>
         </div>
 
         {error && (
@@ -89,7 +91,7 @@ const Login = () => {
                 value={email}
                 autoComplete="username"
                 onChange={(event) => setEmail(event.target.value)}
-                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0f8b8d] focus:border-transparent outline-none transition"
                 placeholder="seu@email.com"
                 required
               />
@@ -105,7 +107,7 @@ const Login = () => {
                 value={password}
                 autoComplete="current-password"
                 onChange={(event) => setPassword(event.target.value)}
-                className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
+                className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#0f8b8d] focus:border-transparent outline-none transition"
                 placeholder="Sua senha"
                 required
               />
@@ -123,14 +125,14 @@ const Login = () => {
           <button
             type="submit"
             disabled={loading}
-            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-[#0f8b8d] hover:bg-[#0d7375] text-white font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {loading ? 'Entrando...' : 'Entrar'}
           </button>
         </form>
 
         <div className="mt-4 text-center">
-          <Link to="/recuperar-senha" className="text-sm text-purple-600 hover:text-purple-700 font-semibold">
+          <Link to="/recuperar-senha" className="text-sm text-[#0f8b8d] hover:text-[#0d7375] font-semibold">
             Esqueci minha senha
           </Link>
         </div>
@@ -138,7 +140,7 @@ const Login = () => {
         <div className="mt-6 text-center">
           <p className="text-gray-600">
             Nao tem uma conta?{' '}
-            <Link to="/register" className="text-purple-600 hover:text-purple-700 font-semibold">
+            <Link to="/register" className="text-[#0f8b8d] hover:text-[#0d7375] font-semibold">
               Criar conta
             </Link>
           </p>
