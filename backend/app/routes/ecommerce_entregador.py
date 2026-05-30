@@ -45,6 +45,10 @@ class RegistrarRecebimentoPayload(BaseModel):
     numero_parcelas: int = 1
 
 
+def rota_entregador_permite_reordenar(status_rota: Optional[str]) -> bool:
+    return (status_rota or "").strip().lower() not in {"concluida", "cancelada"}
+
+
 def _get_entregador_cliente(
     current_user: User = Depends(_get_current_ecommerce_user),
     db: Session = Depends(get_session),
@@ -550,8 +554,11 @@ def reordenar_paradas_rota_entregador(
     ).first()
     if not rota:
         raise HTTPException(status_code=404, detail="Rota não encontrada")
-    if rota.status != "pendente":
-        raise HTTPException(status_code=400, detail="Só é possível reordenar antes de iniciar a rota")
+    if not rota_entregador_permite_reordenar(rota.status):
+        raise HTTPException(
+            status_code=400,
+            detail="Rota encerrada nao pode ser reordenada",
+        )
 
     paradas = db.query(RotaEntregaParada).filter(
         RotaEntregaParada.rota_id == rota.id,

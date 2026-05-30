@@ -3,6 +3,7 @@ Google Maps Service - Etapa 9.2
 Serviços para integração com Google Maps API (Distance Matrix, Directions, Geocoding)
 """
 
+import re
 import requests
 from decimal import Decimal
 from typing import Dict, Any, List, Tuple
@@ -14,6 +15,34 @@ from app.utils.logger import logger
 GOOGLE_DISTANCE_MATRIX_URL = "https://maps.googleapis.com/maps/api/distancematrix/json"
 GOOGLE_DIRECTIONS_URL = "https://maps.googleapis.com/maps/api/directions/json"
 GOOGLE_GEOCODING_URL = "https://maps.googleapis.com/maps/api/geocode/json"
+
+_ROTULO_NUMERO_RE = re.compile(r"\b(?:numero|n[uú]mero|n[º°])\s*[:\-]?\s*", re.IGNORECASE)
+_COMPLEMENTO_RE = re.compile(
+    r"^(?:complemento|compl\.?|apto|apartamento|ap\.?|bloco|torre|sala|fundos|"
+    r"referencia|refer[eê]ncia|ponto de referencia|ponto de refer[eê]ncia|"
+    r"obs\.?|observacao|observa[cç][aã]o|condominio|condom[ií]nio|cond\.?)\b",
+    re.IGNORECASE,
+)
+
+
+def limpar_endereco_para_maps(endereco: str) -> str:
+    """Remove complemento e rotulos que confundem o Maps sem alterar o endereco salvo."""
+    if not endereco:
+        return ""
+
+    texto = _ROTULO_NUMERO_RE.sub("", str(endereco))
+    partes = re.split(r"[,;|\n]+", texto)
+    partes_limpas: List[str] = []
+
+    for parte in partes:
+        parte_limpa = re.sub(r"\s+", " ", parte).strip(" -")
+        if not parte_limpa:
+            continue
+        if _COMPLEMENTO_RE.match(parte_limpa):
+            continue
+        partes_limpas.append(parte_limpa)
+
+    return ", ".join(partes_limpas)
 
 
 def calcular_distancia_km(origem: str, destino: str) -> Decimal:
@@ -42,8 +71,8 @@ def calcular_distancia_km(origem: str, destino: str) -> Decimal:
         raise Exception("GOOGLE_MAPS_API_KEY não configurada")
     
     params = {
-        "origins": origem,
-        "destinations": destino,
+        "origins": limpar_endereco_para_maps(origem) or origem,
+        "destinations": limpar_endereco_para_maps(destino) or destino,
         "key": GOOGLE_MAPS_API_KEY,
         "units": "metric",
     }
@@ -96,8 +125,8 @@ def calcular_distancia_com_duracao(origem: str, destino: str) -> Dict[str, Any]:
         raise Exception("GOOGLE_MAPS_API_KEY não configurada")
     
     params = {
-        "origins": origem,
-        "destinations": destino,
+        "origins": limpar_endereco_para_maps(origem) or origem,
+        "destinations": limpar_endereco_para_maps(destino) or destino,
         "key": GOOGLE_MAPS_API_KEY,
         "units": "metric",
     }
@@ -177,7 +206,7 @@ def geocode_endereco(endereco: str) -> Tuple[Decimal, Decimal]:
         raise Exception("GOOGLE_MAPS_API_KEY não configurada")
     
     params = {
-        "address": endereco,
+        "address": limpar_endereco_para_maps(endereco) or endereco,
         "key": GOOGLE_MAPS_API_KEY,
     }
 
@@ -231,17 +260,21 @@ def calcular_rota_multiplos_pontos(
     if not GOOGLE_MAPS_API_KEY:
         raise Exception("GOOGLE_MAPS_API_KEY não configurada")
     
+    origem_maps = limpar_endereco_para_maps(origem) or origem
+    destino_maps = limpar_endereco_para_maps(destino) or destino
+    paradas_maps = [limpar_endereco_para_maps(parada) or parada for parada in paradas]
+
     params = {
-        "origin": origem,
-        "destination": destino,
+        "origin": origem_maps,
+        "destination": destino_maps,
         "key": GOOGLE_MAPS_API_KEY,
         "units": "metric",
     }
     
     # Adicionar paradas (waypoints)
-    if paradas:
+    if paradas_maps:
         # optimize:true pede ao Google para otimizar a ordem das paradas
-        waypoints_str = "optimize:true|" + "|".join(paradas)
+        waypoints_str = "optimize:true|" + "|".join(paradas_maps)
         params["waypoints"] = waypoints_str
 
     try:
@@ -277,7 +310,7 @@ def calcular_rota_multiplos_pontos(
     
     # Ordem otimizada (se houver paradas)
     ordem_otimizada = []
-    if paradas and "waypoint_order" in route:
+    if paradas_maps and "waypoint_order" in route:
         ordem_otimizada = route["waypoint_order"]
 
     return {
@@ -331,12 +364,18 @@ def calcular_rota_otimizada(origem: str, destinos: List[str]) -> Tuple[List[int]
     if not destinos:
         raise Exception("Lista de destinos está vazia")
     
+    origem_maps = limpar_endereco_para_maps(origem) or origem
+    destinos_maps = [limpar_endereco_para_maps(destino) or destino for destino in destinos]
+
+    if not destinos_maps:
+        raise Exception("Lista de destinos esta vazia apos limpeza dos enderecos")
+
     # Montar waypoints com optimize:true
-    waypoints = "|".join(destinos)
+    waypoints = "|".join(destinos_maps)
     
     params = {
-        "origin": origem,
-        "destination": destinos[-1],  # Último destino (será reordenado)
+        "origin": origem_maps,
+        "destination": destinos_maps[-1],  # Ultimo destino (sera reordenado)
         "waypoints": f"optimize:true|{waypoints}",
         "key": GOOGLE_MAPS_API_KEY,
         "units": "metric",
