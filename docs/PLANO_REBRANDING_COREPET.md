@@ -311,6 +311,7 @@ Classificar cada ocorrencia como:
 - `d7e6c9f52` - runtime de produto: e-mails de auth, remetente padrao, alertas Ops, health, calendario veterinario, mensagens de Bling/WhatsApp e area Ops.
 - `cb721054f` - app mobile: nome exibido, paleta, icone/splash, telas de entrada, login, cadastro, perfil, compartilhamento e notificacoes veterinarias.
 - Rodada atual - SEO e configuracao: sitemap, robots, exemplos de `.env`, CORS padrao com dominio CorePet e compatibilidade explicita com dominio legado.
+- Runbook operacional criado em `docs/COREPET_DOMINIO_GO_LIVE.md` para ativar DNS/SSL sem redirecionar o dominio legado.
 
 ## Riscos e cuidados
 
