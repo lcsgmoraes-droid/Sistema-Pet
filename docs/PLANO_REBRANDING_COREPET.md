@@ -309,7 +309,8 @@ Classificar cada ocorrencia como:
 - `051e006d4` - aplicacao inicial da identidade no ERP: logo, favicon, titulo, login, layout e ativos.
 - `34b275d0e` - textos publicos CorePet em landing, planos, ajuda, legal, app/e-commerce e e-mails do e-commerce.
 - `d7e6c9f52` - runtime de produto: e-mails de auth, remetente padrao, alertas Ops, health, calendario veterinario, mensagens de Bling/WhatsApp e area Ops.
-- Rodada atual - app mobile: nome exibido, paleta, icone/splash, telas de entrada, login, cadastro, perfil, compartilhamento e notificacoes veterinarias.
+- `cb721054f` - app mobile: nome exibido, paleta, icone/splash, telas de entrada, login, cadastro, perfil, compartilhamento e notificacoes veterinarias.
+- Rodada atual - SEO e configuracao: sitemap, robots, exemplos de `.env`, CORS padrao com dominio CorePet e compatibilidade explicita com dominio legado.
 
 ## Riscos e cuidados
 

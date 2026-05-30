@@ -67,9 +67,9 @@ class Settings(BaseSettings):
         return self.ENVIRONMENT
 
     # CORS - Em produ��o, definir dom�nios espec�ficos via ALLOWED_ORIGINS
-    # Exemplo: ALLOWED_ORIGINS="https://app.seupetshop.com,https://www.seupetshop.com"
+    # Exemplo: ALLOWED_ORIGINS="https://corepet.com.br,https://www.corepet.com.br"
     # ?? NUNCA use "*" em produ��o!
-    ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000"
+    ALLOWED_ORIGINS: str = "http://localhost:5173,http://localhost:3000,https://corepet.com.br,https://www.corepet.com.br,https://mlprohub.com.br"
 
     model_config = SettingsConfigDict(
         env_file=".env",

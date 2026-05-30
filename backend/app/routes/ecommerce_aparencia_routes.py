@@ -232,7 +232,7 @@ def atualizar_slug(
 ):
     """
     Atualiza o slug (endereço público) da loja.
-    O slug define a URL: mlprohub.com.br/{slug}
+    O slug define a URL publica: corepet.com.br/{slug}
     """
     _, tenant_id = user_and_tenant
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()

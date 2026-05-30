@@ -11,10 +11,18 @@ const indexHtml = read('index.html');
 const login = read('src/pages/Login.jsx');
 const layout = read('src/components/Layout.jsx');
 const favicon = read('public/favicon.svg');
+const robots = read('public/robots.txt');
+const sitemap = read('public/sitemap.xml');
 
 assert.match(indexHtml, /<title>CorePet - Sistema de Gestao Integrada<\/title>/);
 assert.match(indexHtml, /content="CorePet centraliza a gestao do petshop/);
 assert.match(favicon, /CorePet favicon/);
+assert.match(robots, /https:\/\/corepet\.com\.br\/sitemap\.xml/);
+assert.doesNotMatch(robots, /mlprohub\.com\.br/);
+assert.match(sitemap, /https:\/\/corepet\.com\.br\/landing/);
+assert.match(sitemap, /https:\/\/corepet\.com\.br\/login/);
+assert.match(sitemap, /https:\/\/corepet\.com\.br\/register/);
+assert.doesNotMatch(sitemap, /mlprohub\.com\.br/);
 
 assert.match(login, /\/brand\/corepet\/corepet-horizontal\.png/);
 assert.doesNotMatch(login, /Pet Shop Pro/);
@@ -65,6 +73,21 @@ for (const path of [
   const content = readRepo(path);
   assert.doesNotMatch(content, legacyBrandPattern, `${path} should use CorePet in runtime copy`);
 }
+
+for (const path of [
+  '.env.example',
+  'backend/.env.example',
+]) {
+  const content = readRepo(path);
+  assert.match(content, /SYSTEM_NAME=CorePet ERP/, `${path} should document CorePet as the app name`);
+  assert.doesNotMatch(content, /Pet Shop Pro|PetShop ERP/, `${path} should not expose old product branding`);
+}
+
+assert.match(
+  readRepo('backend/app/config.py'),
+  /https:\/\/corepet\.com\.br/,
+  'backend default CORS examples should include corepet.com.br',
+);
 
 assert.doesNotMatch(
   readRepo('backend/app/routes/ecommerce_auth.py'),
