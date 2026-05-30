@@ -28,6 +28,35 @@ export default function CampanhasCupomManualModal({
           </button>
         </div>
         <div className="px-6 py-4 space-y-3">
+          {novoCupom.cliente_nome && (
+            <div className="rounded-lg border border-blue-100 bg-blue-50 px-3 py-2">
+              <p className="text-xs font-semibold text-blue-900">Cliente</p>
+              <p className="text-sm text-blue-900 truncate">
+                {novoCupom.cliente_nome}
+              </p>
+              <p className="text-[11px] text-blue-700">
+                Cupom vinculado ao ID {novoCupom.customer_id}
+              </p>
+            </div>
+          )}
+          <div>
+            <label
+              htmlFor="cupom-motivo"
+              className="block text-xs font-medium text-gray-600 mb-1"
+            >
+              Motivo/acao
+            </label>
+            <input
+              id="cupom-motivo"
+              type="text"
+              placeholder="Ex: Aniversario 7 anos da loja"
+              value={novoCupom.motivo || ""}
+              onChange={(e) =>
+                setNovoCupom((p) => ({ ...p, motivo: e.target.value }))
+              }
+              className="w-full border rounded-lg px-3 py-2 text-sm"
+            />
+          </div>
           <div>
             <label
               htmlFor="cupom-tipo"
@@ -111,6 +140,7 @@ export default function CampanhasCupomManualModal({
               }
               className="w-full border rounded-lg px-3 py-2 text-sm"
             >
+              <option value="all">Todos os canais</option>
               <option value="pdv">PDV (caixa)</option>
               <option value="ecommerce">E-commerce</option>
               <option value="app">App</option>
@@ -154,40 +184,60 @@ export default function CampanhasCupomManualModal({
               className="w-full border rounded-lg px-3 py-2 text-sm"
             />
           </div>
+          {!novoCupom.cliente_nome && (
+            <div>
+              <label
+                htmlFor="cupom-cliente"
+                className="block text-xs font-medium text-gray-600 mb-1"
+              >
+                ID do cliente (opcional)
+              </label>
+              <input
+                id="cupom-cliente"
+                type="number"
+                placeholder="Deixe vazio para cupom generico"
+                value={novoCupom.customer_id}
+                onChange={(e) =>
+                  setNovoCupom((p) => ({ ...p, customer_id: e.target.value }))
+                }
+                className="w-full border rounded-lg px-3 py-2 text-sm"
+              />
+            </div>
+          )}
           <div>
             <label
-              htmlFor="cupom-cliente"
+              htmlFor="cupom-descricao"
               className="block text-xs font-medium text-gray-600 mb-1"
             >
-              ID do cliente (opcional)
+              Descricao interna (opcional)
             </label>
             <input
-              id="cupom-cliente"
-              type="number"
-              placeholder="Deixe vazio para cupom generico"
-              value={novoCupom.customer_id}
+              id="cupom-descricao"
+              type="text"
+              placeholder="Ex: Bexiga premiada, acao do balcao"
+              value={novoCupom.descricao}
               onChange={(e) =>
-                setNovoCupom((p) => ({ ...p, customer_id: e.target.value }))
+                setNovoCupom((p) => ({ ...p, descricao: e.target.value }))
               }
               className="w-full border rounded-lg px-3 py-2 text-sm"
             />
           </div>
           <div>
             <label
-              htmlFor="cupom-descricao"
+              htmlFor="cupom-regras"
               className="block text-xs font-medium text-gray-600 mb-1"
             >
-              Descricao (opcional)
+              Regras para o atendente (opcional)
             </label>
-            <input
-              id="cupom-descricao"
-              type="text"
-              placeholder="Ex: Cupom de cortesia"
-              value={novoCupom.descricao}
+            <textarea
+              id="cupom-regras"
+              rows={3}
+              placeholder="Ex: Cupom entregue no aniversario da loja. Valido somente uma vez."
+              value={novoCupom.regras_resumo || ""}
               onChange={(e) =>
-                setNovoCupom((p) => ({ ...p, descricao: e.target.value }))
+                setNovoCupom((p) => ({ ...p, regras_resumo: e.target.value }))
               }
-              className="w-full border rounded-lg px-3 py-2 text-sm"
+              className="w-full border rounded-lg px-3 py-2 text-sm resize-none"
             />
           </div>
           {erroCupom && <p className="text-red-600 text-sm">{erroCupom}</p>}
@@ -204,7 +254,7 @@ export default function CampanhasCupomManualModal({
             disabled={criandoCupom}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
           >
-            {criandoCupom ? "Criando..." : "Criar cupom"}
+            {criandoCupom ? "Criando..." : "Gerar cupom"}
           </button>
         </div>
       </div>

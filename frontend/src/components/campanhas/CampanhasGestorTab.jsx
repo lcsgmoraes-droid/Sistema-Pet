@@ -55,6 +55,7 @@ export default function CampanhasGestorTab({
   CUPOM_STATUS,
   anularCupomGestor,
   gestorAnulando,
+  abrirCupomManual,
 }) {
   return (
     <div className="space-y-4">
@@ -149,6 +150,8 @@ export default function CampanhasGestorTab({
               formatBRL={formatBRL}
               anularCupomGestor={anularCupomGestor}
               gestorAnulando={gestorAnulando}
+              abrirCupomManual={abrirCupomManual}
+              gestorCliente={gestorCliente}
             />
 
             <CampanhasGestorRankingSection

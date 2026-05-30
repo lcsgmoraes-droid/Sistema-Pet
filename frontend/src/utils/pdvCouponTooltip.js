@@ -98,6 +98,11 @@ function getConfiguredRules(coupon = {}) {
     rules.push(`validade configurada de ${params.coupon_valid_days} dia(s)`);
   }
 
+  const cooldownDays = Number(params.cooldown_days || 0);
+  if (campaignType === "quick_repurchase" && cooldownDays > 0) {
+    rules.push(`novo cupom no maximo a cada ${cooldownDays} dia(s)`);
+  }
+
   if (hasBenefitChannelScope(params)) {
     rules.push(`Canais de beneficio: ${formatBenefitChannelsSummary(params)}`);
   }

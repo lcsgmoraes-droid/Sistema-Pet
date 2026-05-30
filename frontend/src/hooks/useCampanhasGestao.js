@@ -168,7 +168,12 @@ export default function useCampanhasGestao({
         params.coupon_type === "fixed"
           ? `R$ ${formatBRL(params.coupon_value || 0)}`
           : `${params.coupon_value || "?"}%`;
-      return `Pos-compra: ${valor} desconto em ${params.coupon_valid_days || "?"} dias | Canais: ${formatBenefitChannelsSummary(params)}`;
+      const intervalo = params.cooldown_days ?? 60;
+      return [
+        `Pos-compra: ${valor} desconto em ${params.coupon_valid_days || "?"} dias`,
+        `novo cupom a cada ${intervalo} dia(s)`,
+        `Canais: ${formatBenefitChannelsSummary(params)}`,
+      ].join(" | ");
     }
     return `${JSON.stringify(params).slice(0, 60)}...`;
   };
