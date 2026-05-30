@@ -186,7 +186,7 @@ async def test_webhook_connection(
         
         response = await client.send_text_message(
             to=config.phone_number,
-            message="🧪 Teste de conexão WhatsApp - Sistema Pet Shop Pro"
+            message="Teste de conexao WhatsApp - CorePet"
         )
         
         return {

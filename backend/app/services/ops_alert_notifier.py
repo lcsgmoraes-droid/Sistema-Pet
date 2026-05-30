@@ -106,12 +106,12 @@ def _email_subject(alerts: list[dict[str, Any]]) -> str:
     first = alerts[0] if alerts else {}
     severity = str(first.get("severity") or "critical").lower()
     title = str(first.get("title") or first.get("alert_key") or "Alerta Ops")
-    return f"[Sistema Pet Ops] {severity} - {title}"[:180]
+    return f"[CorePet Ops] {severity} - {title}"[:180]
 
 
 def _email_body(alerts: list[dict[str, Any]], min_severity: str) -> tuple[str, str]:
     lines = [
-        "Sistema Pet Ops - alerta operacional",
+        "CorePet Ops - alerta operacional",
         "",
         f"Severidade minima: {min_severity}",
         f"Gerado em: {_utcnow_iso()}",
@@ -157,7 +157,7 @@ def _email_body(alerts: list[dict[str, Any]], min_severity: str) -> tuple[str, s
     text_body = "\n".join(lines).strip()
     html_body = (
         "<html><body>"
-        "<h2>Sistema Pet Ops - alerta operacional</h2>"
+        "<h2>CorePet Ops - alerta operacional</h2>"
         f"<p><strong>Severidade minima:</strong> {escape(min_severity)}</p>"
         f"<p><strong>Gerado em:</strong> {escape(_utcnow_iso())}</p>"
         "<ul>"
@@ -256,7 +256,7 @@ def notify_ops_alerts(alerts: list[dict[str, Any]]) -> dict[str, Any]:
         return result
 
     payload = {
-        "source": "sistema_pet.ops_alerts",
+        "source": "corepet.ops_alerts",
         "created_at": _utcnow_iso(),
         "min_severity": min_severity,
         "alerts": [item for _, item in pending],

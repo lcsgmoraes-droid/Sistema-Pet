@@ -24,6 +24,8 @@ assert.match(layout, /\/brand\/corepet\/corepet-horizontal\.png/);
 assert.match(layout, /\/brand\/corepet\/corepet-icon-64\.png/);
 assert.doesNotMatch(layout, /Pet Shop Pro/);
 
+const legacyBrandPattern = /Pet Shop Pro|Sistema Pet|MLProHub|PetShop ERP/;
+
 for (const path of [
   'src/pages/Ajuda.jsx',
   'src/pages/AppPublicEntry.jsx',
@@ -36,7 +38,32 @@ for (const path of [
   'src/pages/entregas/RastreioPublico.jsx',
 ]) {
   const content = read(path);
-  assert.doesNotMatch(content, /Pet Shop Pro|Sistema Pet/, `${path} should use CorePet in public copy`);
+  assert.doesNotMatch(content, legacyBrandPattern, `${path} should use CorePet in public copy`);
+}
+
+for (const path of [
+  'src/components/OpsLayout.jsx',
+]) {
+  const content = read(path);
+  assert.doesNotMatch(content, legacyBrandPattern, `${path} should use CorePet in runtime copy`);
+}
+
+for (const path of [
+  'backend/app/auth_routes_multitenant.py',
+  'backend/app/services/email_service.py',
+  'backend/app/services/ops_alert_notifier.py',
+  'backend/app/health_router.py',
+  'backend/app/routers/whatsapp_config.py',
+  'backend/app/campaigns/notification_sender.py',
+  'backend/app/bling_integration.py',
+  'backend/app/services/bling_sync_service.py',
+  'backend/app/bling_sync_routes.py',
+  'backend/app/veterinario_calendar.py',
+  'backend/app/config.py',
+  'backend/app/main.py',
+]) {
+  const content = readRepo(path);
+  assert.doesNotMatch(content, legacyBrandPattern, `${path} should use CorePet in runtime copy`);
 }
 
 assert.doesNotMatch(

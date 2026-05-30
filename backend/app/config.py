@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     DATABASE_URL: str
 
     # Campos legacy esperados pelo sistema
-    SYSTEM_NAME: str = "PetShop ERP"
+    SYSTEM_NAME: str = "CorePet ERP"
     SYSTEM_VERSION: str = "dev"
     ENVIRONMENT: str = "development"
     DEBUG: bool = False

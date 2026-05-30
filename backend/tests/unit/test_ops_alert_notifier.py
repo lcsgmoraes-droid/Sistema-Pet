@@ -59,7 +59,7 @@ def test_notify_ops_alerts_sends_email_when_webhook_is_absent(monkeypatch, tmp_p
     assert result["sent_webhook"] == 0
     assert len(sent_emails) == 1
     assert sent_emails[0]["to"] == "ops@example.test"
-    assert sent_emails[0]["subject"] == "[Sistema Pet Ops] critical - Watchdog degradado"
+    assert sent_emails[0]["subject"] == "[CorePet Ops] critical - Watchdog degradado"
     assert sent_emails[0]["simulate_if_unconfigured"] is False
     assert "system:watchdog:degraded" in sent_emails[0]["text_body"]
     assert "payload" not in sent_emails[0]["text_body"]
@@ -100,7 +100,7 @@ def test_notify_ops_alerts_sends_critical_once_and_redacts_result(monkeypatch, t
     assert second["skipped_duplicate"] == 1
     assert len(calls) == 1
     assert calls[0]["url"].endswith("/secret-token")
-    assert calls[0]["json"]["source"] == "sistema_pet.ops_alerts"
+    assert calls[0]["json"]["source"] == "corepet.ops_alerts"
     assert calls[0]["json"]["alerts"][0]["alert_key"] == "system:watchdog:degraded"
     assert "payload" not in calls[0]["json"]["alerts"][0]
     assert log_path.exists()

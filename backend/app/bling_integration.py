@@ -811,7 +811,7 @@ class BlingAPI:
                 "valorTotal": valor_total
             },
             "informacoesAdicionais": {
-                "informacoesComplementares": f"Venda #{venda.id} - Sistema Pet Shop Pro - Emitida em {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}"
+                "informacoesComplementares": f"Venda #{venda.id} - CorePet - Emitida em {datetime.now().strftime('%d/%m/%Y %H:%M:%S')}"
             }
         }
         
@@ -954,7 +954,7 @@ class BlingAPI:
             "produto": {"id": int(produto_id)},
             "operacao": "B",  # B = Balanço: define saldo absoluto
             "quantidade": float(estoque_novo),
-            "observacoes": observacao or "Sync automático - Sistema Pet Shop"
+            "observacoes": observacao or "Sync automatico - CorePet"
         }
 
         if _deposito_id:

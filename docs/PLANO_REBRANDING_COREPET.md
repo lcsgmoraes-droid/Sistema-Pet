@@ -29,6 +29,19 @@ Sugestoes de assinatura:
 - CorePet - ERP, app e e-commerce para petshops
 - CorePet - O centro da operacao do seu petshop
 
+## Decisoes de identidade ja tomadas
+
+- Direcao visual atual: simbolo CP arredondado, com cachorro e gato em negativo e coleiras em dourado.
+- Variantes escolhidas como base: opcoes 3 e 4 da rodada visual, por serem mais amigaveis, menos duras e mais claramente ligadas ao mundo pet.
+- Tom visual: profissional e operacional, mas com pet explicito no simbolo para nao ficar distante do segmento.
+- Ativos principais criados:
+  - `frontend/public/brand/corepet/corepet-horizontal.png`
+  - `frontend/public/brand/corepet/corepet-symbol.png`
+  - `frontend/public/brand/corepet/corepet-icon-32.png` ate `corepet-icon-1024.png`
+  - `frontend/public/favicon.svg`
+- Fontes dos mockups guardadas em `docs/assets/corepet/source/`.
+- Paleta operacional inicial: verde petróleo para marca principal, dourado como acento e neutros claros no ERP.
+
 ## Fase 1 - Dominio e infraestrutura
 
 ### DNS no Registro.br
@@ -272,10 +285,10 @@ Classificar cada ocorrencia como:
 
 ## Checklist tecnico inicial
 
-- [ ] Definir logo principal.
-- [ ] Definir paleta de cores.
-- [ ] Definir favicon e app icon.
-- [ ] Definir assinatura/slogan.
+- [x] Definir logo principal.
+- [x] Definir paleta de cores inicial.
+- [x] Definir favicon e app icon.
+- [x] Definir assinatura/slogan inicial.
 - [ ] Configurar DNS `corepet.com.br`.
 - [ ] Configurar `www.corepet.com.br`.
 - [ ] Emitir SSL.
@@ -285,10 +298,17 @@ Classificar cada ocorrencia como:
 - [ ] Revisar CORS/cookies.
 - [ ] Revisar variaveis de producao.
 - [ ] Revisar app mobile.
-- [ ] Revisar e-commerce.
-- [ ] Revisar e-mails.
+- [x] Revisar primeira camada do e-commerce.
+- [x] Revisar primeira camada de e-mails transacionais.
 - [ ] Revisar PDFs e relatorios.
 - [ ] Criar materiais de venda.
+
+## Registro de execucao
+
+- `f50f6c6dd` - plano inicial de rebranding CorePet.
+- `051e006d4` - aplicacao inicial da identidade no ERP: logo, favicon, titulo, login, layout e ativos.
+- `34b275d0e` - textos publicos CorePet em landing, planos, ajuda, legal, app/e-commerce e e-mails do e-commerce.
+- Rodada atual - runtime de produto: e-mails de auth, remetente padrao, alertas Ops, health, calendario veterinario, mensagens de Bling/WhatsApp e area Ops.
 
 ## Riscos e cuidados
 

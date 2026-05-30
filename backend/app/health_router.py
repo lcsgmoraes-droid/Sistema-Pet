@@ -34,7 +34,7 @@ async def health_check() -> Dict[str, Any]:
     return {
         "status": "healthy",
         "timestamp": datetime.utcnow().isoformat(),
-        "service": "Pet Shop Pro - WhatsApp IA",
+        "service": "CorePet - WhatsApp IA",
         "version": "1.0.0"
     }
 
