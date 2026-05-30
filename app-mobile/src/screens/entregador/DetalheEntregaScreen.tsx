@@ -85,6 +85,15 @@ function reordenarParadasPorPosicao(
   return ordenadas;
 }
 
+function rotaPermiteReordenacao(status?: string | null) {
+  return !!status && !["concluida", "cancelada"].includes(status);
+}
+
+function extrairPosicaoOrdem(texto: string) {
+  const match = texto.match(/\d+/);
+  return match ? Number.parseInt(match[0], 10) : Number.NaN;
+}
+
 type RouteProps = RouteProp<EntregadorStackParamList, "DetalheEntrega">;
 type Nav = NativeStackNavigationProp<EntregadorStackParamList, "DetalheEntrega">;
 
@@ -110,8 +119,21 @@ function obterMensagemErro(error: unknown, fallback: string) {
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 
+function limparEnderecoParaMaps(endereco: string) {
+  return endereco
+    .replace(/\b(?:numero|n[uú]mero|n[º°])\s*[:\-]?\s*/gi, "")
+    .split(/[,;|\n]+/)
+    .map((parte) => parte.replace(/\s+/g, " ").trim().replace(/^-+|-+$/g, ""))
+    .filter((parte) => {
+      if (!parte) return false;
+      return !/^(?:complemento|compl\.?|apto|apartamento|ap\.?|bloco|torre|sala|fundos|referencia|refer[eê]ncia|ponto de referencia|ponto de refer[eê]ncia|obs\.?|observacao|observa[cç][aã]o|condominio|condom[ií]nio|cond\.?)\b/i.test(parte);
+    })
+    .join(", ");
+}
+
 function abrirMapa(endereco: string) {
-  const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(endereco)}`;
+  const enderecoMaps = limparEnderecoParaMaps(endereco) || endereco;
+  const url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(enderecoMaps)}`;
   Linking.openURL(url).catch(() =>
     Alert.alert("Erro", "Não foi possível abrir o mapa."),
   );
@@ -433,7 +455,7 @@ export default function DetalheEntregaScreen() {
   }
 
   async function moverParada(paradaId: number, direcao: "up" | "down") {
-    if (rota?.status !== "pendente") return;
+    if (!rota || !rotaPermiteReordenacao(rota.status)) return;
 
     const ordenadas = [...rota.paradas].sort((a, b) => a.ordem - b.ordem);
     const idx = ordenadas.findIndex((p) => p.id === paradaId);
@@ -458,6 +480,11 @@ export default function DetalheEntregaScreen() {
   }
 
   async function salvarNovaOrdemParadas(paradasOrdenadas: Parada[]) {
+    if (!rotaPermiteReordenacao(rota?.status)) {
+      Alert.alert("Rota encerrada", "Nao e possivel reordenar uma rota encerrada.");
+      return false;
+    }
+
     try {
       await api.put(`/ecommerce/entregador/rotas/${rotaId}/paradas/reordenar`, {
         parada_ids: paradasOrdenadas.map((p) => p.id),
@@ -476,9 +503,9 @@ export default function DetalheEntregaScreen() {
   }
 
   function abrirModalOrdem(parada: Parada) {
-    if (rota?.status !== "pendente") return;
+    if (!rotaPermiteReordenacao(rota?.status)) return;
     setParadaOrdemEmEdicao(parada);
-    setNovaOrdemTexto(String(parada.ordem));
+    setNovaOrdemTexto(`n${parada.ordem}`);
     setModalOrdemAberto(true);
   }
 
@@ -492,7 +519,7 @@ export default function DetalheEntregaScreen() {
   async function confirmarNovaOrdemManual() {
     if (!rota || !paradaOrdemEmEdicao) return;
 
-    const novaPosicao = Number.parseInt(novaOrdemTexto, 10);
+    const novaPosicao = extrairPosicaoOrdem(novaOrdemTexto);
     if (!Number.isFinite(novaPosicao)) {
       Alert.alert("Posição inválida", "Digite um número válido para reordenar a entrega.");
       return;
@@ -629,7 +656,7 @@ export default function DetalheEntregaScreen() {
         {/* Cabeçalho */}
         <View style={styles.paradaHeader}>
           <View style={styles.ordemWrapper}>
-            {rota?.status === "pendente" ? (
+            {rotaPermiteReordenacao(rota?.status) ? (
               <TouchableOpacity
                 style={styles.ordemCircle}
                 onPress={() => abrirModalOrdem(parada)}
@@ -642,7 +669,7 @@ export default function DetalheEntregaScreen() {
                 <Text style={styles.ordemText}>{parada.ordem}</Text>
               </View>
             )}
-            {rota?.status === "pendente" ? (
+            {rotaPermiteReordenacao(rota?.status) ? (
               <Text style={styles.ordemEditHint}>Toque para alterar</Text>
             ) : null}
           </View>
@@ -654,7 +681,7 @@ export default function DetalheEntregaScreen() {
               {parada.endereco}
             </Text>
           </View>
-          {rota?.status === "pendente" && drag ? (
+          {rotaPermiteReordenacao(rota?.status) && drag ? (
             <TouchableOpacity
               style={[styles.btnDrag, isActive && styles.btnDragAtivo]}
               onLongPress={drag}
@@ -763,6 +790,7 @@ export default function DetalheEntregaScreen() {
     ["em_rota", "em_andamento"].includes(rota.status) &&
     rota.paradas.length > 0 &&
     pendentes === 0;
+  const podeReordenar = rotaPermiteReordenacao(rota.status);
 
   return (
     <KeyboardSafeScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -806,10 +834,10 @@ export default function DetalheEntregaScreen() {
       )}
 
       {/* Lista de paradas */}
-      {rota.status === "pendente" ? (
+      {podeReordenar ? (
         <>
           <Text style={styles.dragHint}>
-            Arraste pelo ícone ↕️ ou toque no número azul para definir a ordem manualmente.
+            Arraste pelo icone ou toque no numero azul para definir a ordem manualmente. Voce pode digitar n1, n2 ou apenas 1, 2.
           </Text>
           <DraggableFlatList
             data={[...rota.paradas].sort((a, b) => a.ordem - b.ordem)}
@@ -841,7 +869,7 @@ export default function DetalheEntregaScreen() {
           <View style={styles.modalCard}>
             <Text style={styles.modalTitulo}>Reordenar entrega</Text>
             <Text style={styles.modalSubtitulo}>
-              Escolha a nova posição dessa parada na rota.
+              Escolha a nova posicao dessa parada na rota. Aceita n1, n2 ou apenas o numero.
             </Text>
 
             {paradaOrdemEmEdicao ? (
@@ -858,15 +886,16 @@ export default function DetalheEntregaScreen() {
             ) : null}
 
             <Text style={styles.modalCampoLabel}>
-              Nova posição (1 a {rota?.paradas.length ?? 1})
+              Nova posicao (1 a {rota?.paradas.length ?? 1})
             </Text>
             <TextInput
               style={styles.modalInput}
               value={novaOrdemTexto}
-              onChangeText={(value) => setNovaOrdemTexto(value.replace(/\D/g, ""))}
-              placeholder="Ex: 1"
+              onChangeText={setNovaOrdemTexto}
+              placeholder="Ex: n1 ou 1"
               placeholderTextColor="#9ca3af"
-              keyboardType="number-pad"
+              keyboardType="default"
+              autoCapitalize="none"
               returnKeyType="done"
               onSubmitEditing={() => {
                 void confirmarNovaOrdemManual();
