@@ -205,7 +205,7 @@ export default function EcommerceAparencia() {
             Define a URL pública da sua loja. Use apenas letras minúsculas, números e hífens.
           </p>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: 13, color: '#6b7280', whiteSpace: 'nowrap', flexShrink: 0 }}>mlprohub.com.br/</span>
+            <span style={{ fontSize: 13, color: '#6b7280', whiteSpace: 'nowrap', flexShrink: 0 }}>corepet.com.br/</span>
             <input
               type="text"
               value={slug}
@@ -235,7 +235,7 @@ export default function EcommerceAparencia() {
             <div style={{ marginTop: 8, fontSize: 12, color: '#6b7280' }}>
               🌐 Loja pública:{' '}
               <a href={`/${slugOriginal}`} target="_blank" rel="noreferrer" style={{ color: '#6366f1' }}>
-                mlprohub.com.br/{slugOriginal}
+                corepet.com.br/{slugOriginal}
               </a>
             </div>
           )}

@@ -1,4 +1,4 @@
-import { ArrowRight, Search, ShieldCheck, Store, XCircle } from "lucide-react";
+import { ArrowRight, Search, ShieldCheck, XCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import ecommerceApi from "../services/ecommerceApi";
@@ -106,12 +106,10 @@ export default function AppPublicEntry() {
     <main className="min-h-screen bg-slate-50 text-slate-950">
       <section className="mx-auto flex min-h-screen w-full max-w-3xl flex-col justify-center px-5 py-12">
         <div className="mb-7 flex items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm">
-            <Store size={24} />
-          </div>
+          <img src="/favicon.svg" alt="" className="h-11 w-11 rounded-xl shadow-sm" />
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">
-              Pet Shop Pro
+              CorePet
             </p>
             <h1 className="text-2xl font-bold tracking-normal text-slate-950">
               Entrar na loja pelo app
@@ -142,7 +140,7 @@ export default function AppPublicEntry() {
                   }
                 }}
                 className="h-11 w-full rounded-lg border border-slate-300 pl-10 pr-3 text-sm outline-none transition focus:border-blue-500 focus:ring-2 focus:ring-blue-100"
-                placeholder="Ex: atacadao ou mlprohub.com.br/atacadao"
+                placeholder="Ex: atacadao ou corepet.com.br/atacadao"
               />
             </div>
             <button

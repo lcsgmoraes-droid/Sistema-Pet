@@ -246,7 +246,7 @@ def _send_email_verification(user: User) -> bool:
     raw_token = _issue_email_verification_token(user)
     verification_link = _build_email_verification_link(user.email, raw_token)
     saudacao = f", {user.nome}" if getattr(user, "nome", None) else ""
-    subject = "Confirme seu e-mail - Pet Shop Pro"
+    subject = "Confirme seu e-mail - CorePet"
     html_body = f"""
     <html>
       <body style="font-family: Arial, sans-serif; color: #1f2937; max-width: 620px; margin: 0 auto;">
@@ -272,7 +272,7 @@ def _send_email_verification(user: User) -> bool:
     </html>
     """
     text_body = (
-        "Confirme seu e-mail - Pet Shop Pro\n\n"
+        "Confirme seu e-mail - CorePet\n\n"
         f"Acesse: {verification_link}\n\n"
         f"Codigo manual: {raw_token}\n"
         f"Validade: {EMAIL_VERIFICATION_TOKEN_HOURS} horas."
@@ -313,7 +313,7 @@ def _resolve_password_recovery_channel(request: Request, payload: EcommerceForgo
 
 def _build_reset_password_email_for_app(user: User, reset_token: str) -> tuple[str, str, str]:
         saudacao = f", {user.nome}" if getattr(user, "nome", None) else ""
-        subject = "Recuperacao de senha do app - Pet Shop Pro"
+        subject = "Recuperacao de senha do app - CorePet"
         html_body = f"""
         <html>
             <body style="font-family: Arial, sans-serif; color: #1f2937; max-width: 620px; margin: 0 auto;">
@@ -336,7 +336,7 @@ def _build_reset_password_email_for_app(user: User, reset_token: str) -> tuple[s
         </html>
         """
         text_body = (
-                "Recuperacao de senha do app - Pet Shop Pro\n\n"
+                "Recuperacao de senha do app - CorePet\n\n"
                 "Abra o app e use este codigo na tela Recuperar senha:\n"
                 f"{reset_token}\n\n"
                 f"Validade: {RESET_TOKEN_MINUTES} minutos.\n"
@@ -347,7 +347,7 @@ def _build_reset_password_email_for_app(user: User, reset_token: str) -> tuple[s
 
 def _build_reset_password_email_for_site(user: User, reset_token: str, reset_link: str) -> tuple[str, str, str]:
         saudacao = f", {user.nome}" if getattr(user, "nome", None) else ""
-        subject = "Recuperacao de senha da loja - Pet Shop Pro"
+        subject = "Recuperacao de senha da loja - CorePet"
         html_body = f"""
         <html>
             <body style="font-family: Arial, sans-serif; color: #1f2937; max-width: 620px; margin: 0 auto;">
@@ -378,7 +378,7 @@ def _build_reset_password_email_for_site(user: User, reset_token: str, reset_lin
         </html>
         """
         text_body = (
-                "Recuperacao de senha da loja - Pet Shop Pro\n\n"
+                "Recuperacao de senha da loja - CorePet\n\n"
                 "Clique no botao do e-mail para redefinir sua senha.\n\n"
                 "Ou use este codigo na tela de recuperacao da loja online:\n"
                 f"{reset_token}\n\n"

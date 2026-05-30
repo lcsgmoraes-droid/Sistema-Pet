@@ -1,5 +1,5 @@
 /**
- * Ajuda.jsx — Página central de ajuda e planos do Sistema Pet.
+ * Ajuda.jsx — Página central de ajuda e planos do CorePet.
  * Linguagem simples, foco em benefício para o usuário.
  */
 import { useState } from "react";
@@ -101,10 +101,10 @@ const CardModulo = ({ moduloKey }) => {
 
   const Icone = ICONES_MODULO[moduloKey] || FiZap;
   const msgWhatsApp = encodeURIComponent(
-    `Olá! Quero saber mais sobre o módulo ${info.nome} do Sistema Pet. Pode me ajudar?`,
+    `Olá! Quero saber mais sobre o módulo ${info.nome} do CorePet. Pode me ajudar?`,
   );
   const msgContratar = encodeURIComponent(
-    `Ola! Quero solicitar acesso Beta ao modulo ${info.nome} do Sistema Pet.`,
+    `Ola! Quero solicitar acesso Beta ao modulo ${info.nome} do CorePet.`,
   );
 
   return (
@@ -200,7 +200,7 @@ const ItemFAQ = ({ pergunta, resposta }) => {
 const Ajuda = () => {
   const [aba, setAba] = useState("planos");
   const msgGeral = encodeURIComponent(
-    "Olá! Tenho dúvidas sobre os planos do Sistema Pet.",
+    "Olá! Tenho dúvidas sobre os planos do CorePet.",
   );
 
   return (
@@ -215,8 +215,8 @@ const Ajuda = () => {
             {aba === "introducao"
               ? "Preparando seu sistema"
               : aba === "central"
-              ? "Como usar o Sistema Pet"
-              : "Módulos Beta do Sistema Pet"}
+              ? "Como usar o CorePet"
+              : "Módulos Beta do CorePet"}
           </h1>
           <p className="text-indigo-100 text-base max-w-xl mx-auto">
             {aba === "introducao"

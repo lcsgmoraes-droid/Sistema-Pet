@@ -214,7 +214,7 @@ export default function RastreioPublico() {
     return (
       <div style={styles.page}>
         <div style={styles.card}>
-          <div style={styles.logo}>Sistema Pet</div>
+          <div style={styles.logo}>CorePet</div>
           <p style={{ textAlign: "center", color: "#666" }}>Carregando rastreio...</p>
         </div>
       </div>
@@ -225,7 +225,7 @@ export default function RastreioPublico() {
     return (
       <div style={styles.page}>
         <div style={styles.card}>
-          <div style={styles.logo}>Sistema Pet</div>
+          <div style={styles.logo}>CorePet</div>
           <div style={styles.erroBanner}>Erro: {erro}</div>
         </div>
       </div>
@@ -261,7 +261,7 @@ export default function RastreioPublico() {
     <div style={styles.page}>
       <div style={styles.card}>
         <div style={styles.header}>
-          <div style={styles.logo}>Sistema Pet</div>
+          <div style={styles.logo}>CorePet</div>
           <div style={styles.statusBadge(dados.status)}>{getStatusLabel(dados.status)}</div>
         </div>
 

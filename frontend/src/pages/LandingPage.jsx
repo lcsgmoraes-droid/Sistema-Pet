@@ -6,7 +6,6 @@ import {
   Database,
   MessageCircle,
   Package,
-  PawPrint,
   ShieldCheck,
   ShoppingCart,
   Sparkles,
@@ -17,7 +16,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "../contexts/AuthContext";
 
 const whatsappUrl =
-  "https://wa.me/5518997401641?text=Ol%C3%A1!%20Quero%20come%C3%A7ar%20no%20Plano%20B%C3%A1sico%20do%20Pet%20Shop%20Pro.";
+  "https://wa.me/5518997401641?text=Ol%C3%A1!%20Quero%20come%C3%A7ar%20no%20Plano%20B%C3%A1sico%20do%20CorePet.";
 
 const heroImage =
   "https://images.unsplash.com/photo-1583337130417-3346a1be7dee?auto=format&fit=crop&w=2200&q=85";
@@ -74,10 +73,10 @@ export default function LandingPage() {
       document.head.appendChild(metaDescription);
     }
 
-    document.title = "Pet Shop Pro | 30 dias grátis do Plano Básico";
+    document.title = "CorePet | 30 dias grátis do Plano Básico";
     metaDescription.setAttribute(
       "content",
-      "Teste o Plano Básico do Pet Shop Pro por 30 dias: clientes, pets, produtos, estoque, PDV, caixa, vendas, usuários e permissões."
+      "Teste o Plano Básico do CorePet por 30 dias: clientes, pets, produtos, estoque, PDV, caixa, vendas, usuários e permissões."
     );
 
     return () => {
@@ -102,8 +101,8 @@ export default function LandingPage() {
       <nav className="fixed left-0 right-0 top-0 z-50 border-b border-white/15 bg-slate-950/70 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
           <Link to="/landing" className="flex items-center gap-2 font-bold text-white">
-            <PawPrint className="h-7 w-7 text-emerald-300" />
-            Pet Shop Pro
+            <img src="/favicon.svg" alt="" className="h-7 w-7 rounded-md" />
+            CorePet
           </Link>
 
           <div className="hidden items-center gap-7 text-sm font-semibold text-slate-200 md:flex">
@@ -141,7 +140,7 @@ export default function LandingPage() {
                 30 dias grátis do Plano Básico
               </span>
               <h1 className="mt-6 text-4xl font-extrabold leading-tight md:text-6xl">
-                Pet Shop Pro
+                CorePet
               </h1>
               <p className="mt-5 max-w-2xl text-xl leading-8 text-slate-100">
                 Use clientes, pets, estoque, PDV, caixa, vendas e permissões sem pagar no
@@ -294,8 +293,8 @@ export default function LandingPage() {
       <footer className="bg-white py-8 text-slate-500">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 text-sm md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-2 font-bold text-slate-900">
-            <PawPrint className="h-5 w-5 text-emerald-600" />
-            Pet Shop Pro
+            <img src="/favicon.svg" alt="" className="h-5 w-5 rounded" />
+            CorePet
           </div>
           <div className="flex flex-wrap gap-5">
             <Link to="/termos" className="hover:text-slate-900">Termos</Link>

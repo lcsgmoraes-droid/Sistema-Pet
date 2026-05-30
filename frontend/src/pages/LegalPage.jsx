@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom';
-import { PawPrint, ShieldCheck } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 
 const updatedAt = '08/05/2026';
 const privacyContact = 'admin@mlprohub.com.br';
@@ -10,7 +10,7 @@ const legalContent = {
     eyebrow: 'Contrato de uso da plataforma',
     version: 'Versao 2026-05-08',
     intro:
-      'Estes Termos regulam o acesso e o uso do Pet Shop Pro, plataforma de gestao, vendas, estoque, financeiro, entregas, atendimento, loja online, aplicativo e integracoes para operacoes de pet shop, clinica, banho e tosa e negocios relacionados.',
+      'Estes Termos regulam o acesso e o uso do CorePet, plataforma de gestao, vendas, estoque, financeiro, entregas, atendimento, loja online, aplicativo e integracoes para operacoes de pet shop, clinica, banho e tosa e negocios relacionados.',
     sections: [
       {
         title: '1. Aceite dos Termos',
@@ -207,7 +207,7 @@ const legalContent = {
     eyebrow: 'Protecao de dados pessoais',
     version: 'Versao 2026-05-08',
     intro:
-      'Esta Politica explica como dados pessoais podem ser coletados, usados, armazenados, compartilhados e protegidos no Pet Shop Pro, incluindo ERP, loja online, aplicativo, atendimento, entregas, campanhas, integracoes e suporte.',
+      'Esta Politica explica como dados pessoais podem ser coletados, usados, armazenados, compartilhados e protegidos no CorePet, incluindo ERP, loja online, aplicativo, atendimento, entregas, campanhas, integracoes e suporte.',
     sections: [
       {
         title: '1. Abrangencia',
@@ -222,10 +222,10 @@ const legalContent = {
       {
         title: '2. Controlador, operador e responsabilidades',
         body:
-          'Conforme o contexto, a empresa que usa a plataforma pode ser controladora dos dados de seus clientes, pets, colaboradores, vendas e operacao. O Pet Shop Pro pode atuar como operador desses dados para executar a plataforma e, em alguns casos, como controlador de dados de conta, seguranca, faturamento, suporte e melhoria do servico.',
+          'Conforme o contexto, a empresa que usa a plataforma pode ser controladora dos dados de seus clientes, pets, colaboradores, vendas e operacao. O CorePet pode atuar como operador desses dados para executar a plataforma e, em alguns casos, como controlador de dados de conta, seguranca, faturamento, suporte e melhoria do servico.',
         bullets: [
           'A loja ou empresa cadastrada define as finalidades principais do tratamento dos dados que insere sobre seus clientes, pets, pedidos, entregas e operacao.',
-          'O Pet Shop Pro trata dados para hospedar, processar, proteger, auditar, dar suporte e disponibilizar as funcionalidades contratadas.',
+          'O CorePet trata dados para hospedar, processar, proteger, auditar, dar suporte e disponibilizar as funcionalidades contratadas.',
           'Clientes finais podem exercer direitos tanto perante a loja responsavel pelo atendimento quanto pelo canal de privacidade informado nesta Politica, conforme o caso.',
         ],
       },
@@ -457,8 +457,8 @@ const LegalPage = ({ type = 'termos' }) => {
           to="/login"
           className="inline-flex items-center gap-2 text-sm font-semibold text-blue-700 hover:text-blue-800"
         >
-          <PawPrint className="h-4 w-4" />
-          Pet Shop Pro
+          <img src="/favicon.svg" alt="" className="h-4 w-4 rounded" />
+          CorePet
         </Link>
 
         <section className="mt-8 rounded-lg border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
