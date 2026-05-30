@@ -1,9 +1,9 @@
 // Paleta de cores do app
 export const CORES = {
-  primario: '#2563EB',
-  primarioEscuro: '#1D4ED8',
-  primarioClaro: '#EFF6FF',
-  secundario: '#F97316',
+  primario: '#0F5F66',
+  primarioEscuro: '#083F46',
+  primarioClaro: '#E6F4F2',
+  secundario: '#C9A13A',
   sucesso: '#16A34A',
   erro: '#DC2626',
   aviso: '#D97706',
@@ -13,7 +13,7 @@ export const CORES = {
   texto: '#111827',
   textoSecundario: '#6B7280',
   textoClaro: '#9CA3AF',
-  pontos: '#F59E0B',
+  pontos: '#C9A13A',
 };
 
 export const ESPACO = {

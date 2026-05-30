@@ -55,11 +55,11 @@ export default function CheckoutSucessoScreen() {
 
   async function compartilhar() {
     const msg = isEntrega
-      ? `🐾 Comprei no PetShop App!\n` +
+      ? `Comprei no CorePet!\n` +
         `Pedido: ${pedido.pedido_id.slice(-8).toUpperCase()}\n` +
         `Entrega em: ${pedido.endereco_entrega || "a combinar"}\n` +
         `Total: ${formatarMoeda(pedido.total)}`
-      : `🐾 Comprei no PetShop App!\n` +
+      : `Comprei no CorePet!\n` +
         `Pedido: ${pedido.pedido_id.slice(-8).toUpperCase()}\n` +
         `Palavra-chave: ${pedido.palavra_chave_retirada?.toUpperCase()}\n` +
         `Total: ${formatarMoeda(pedido.total)}`;

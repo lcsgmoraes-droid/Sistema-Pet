@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "PetShop App",
-    "slug": "petshop-app",
+    "name": "CorePet",
+    "slug": "corepet-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "updates": {
@@ -15,7 +15,7 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#2563EB"
+      "backgroundColor": "#0F5F66"
     },
     "ios": {
       "supportsTablet": false,
@@ -33,7 +33,7 @@
       "softwareKeyboardLayoutMode": "resize",
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#2563EB"
+        "backgroundColor": "#0F5F66"
       },
       "package": "com.petshoppro.app",
       "permissions": [
@@ -61,7 +61,7 @@
         "expo-notifications",
         {
           "icon": "./assets/notification-icon.png",
-          "color": "#2563EB",
+          "color": "#C9A13A",
           "sounds": []
         }
       ],

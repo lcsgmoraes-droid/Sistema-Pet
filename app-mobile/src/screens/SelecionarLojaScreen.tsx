@@ -177,11 +177,11 @@ export default function SelecionarLojaScreen() {
         {/* Logo / Ícone */}
         <View style={styles.heroArea}>
           <View style={styles.iconeCirculo}>
-            <Text style={styles.iconeEmoji}>🐾</Text>
+            <Image source={require("../../assets/icon.png")} style={styles.iconeLogo} />
           </View>
-          <Text style={styles.titulo}>Bem-vindo!</Text>
+          <Text style={styles.titulo}>Bem-vindo ao CorePet</Text>
           <Text style={styles.subtitulo}>
-            Para começar, vincule o app à sua loja petshop.
+            Para começar, vincule o CorePet à sua loja.
           </Text>
         </View>
 
@@ -381,14 +381,18 @@ const styles = StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: 44,
-    backgroundColor: CORES.primario,
+    backgroundColor: CORES.superficie,
     alignItems: "center",
     justifyContent: "center",
     marginBottom: ESPACO.md,
+    borderWidth: 1,
+    borderColor: CORES.borda,
     ...(SOMBRA ?? {}),
   },
-  iconeEmoji: {
-    fontSize: 40,
+  iconeLogo: {
+    width: 74,
+    height: 74,
+    borderRadius: 20,
   },
   titulo: {
     fontSize: FONTE.titulo ?? 26,

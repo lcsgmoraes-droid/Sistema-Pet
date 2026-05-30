@@ -297,7 +297,7 @@ Classificar cada ocorrencia como:
 - [ ] Validar login pelo dominio novo.
 - [ ] Revisar CORS/cookies.
 - [ ] Revisar variaveis de producao.
-- [ ] Revisar app mobile.
+- [x] Revisar primeira camada do app mobile.
 - [x] Revisar primeira camada do e-commerce.
 - [x] Revisar primeira camada de e-mails transacionais.
 - [ ] Revisar PDFs e relatorios.
@@ -308,7 +308,8 @@ Classificar cada ocorrencia como:
 - `f50f6c6dd` - plano inicial de rebranding CorePet.
 - `051e006d4` - aplicacao inicial da identidade no ERP: logo, favicon, titulo, login, layout e ativos.
 - `34b275d0e` - textos publicos CorePet em landing, planos, ajuda, legal, app/e-commerce e e-mails do e-commerce.
-- Rodada atual - runtime de produto: e-mails de auth, remetente padrao, alertas Ops, health, calendario veterinario, mensagens de Bling/WhatsApp e area Ops.
+- `d7e6c9f52` - runtime de produto: e-mails de auth, remetente padrao, alertas Ops, health, calendario veterinario, mensagens de Bling/WhatsApp e area Ops.
+- Rodada atual - app mobile: nome exibido, paleta, icone/splash, telas de entrada, login, cadastro, perfil, compartilhamento e notificacoes veterinarias.
 
 ## Riscos e cuidados
 
