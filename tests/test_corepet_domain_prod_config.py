@@ -6,6 +6,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 NGINX_CONF = ROOT / "nginx" / "nginx.conf"
 COMPOSE_PROD = ROOT / "docker-compose.prod.yml"
+GITIGNORE = ROOT / ".gitignore"
 
 
 def test_prod_nginx_accepts_corepet_and_legacy_domains():
@@ -54,6 +55,16 @@ def test_prod_nginx_mounts_certbot_webroot_for_corepet_renewal():
     compose_text = COMPOSE_PROD.read_text(encoding="utf-8")
 
     assert "./runtime/certbot/www:/var/www/certbot:ro" in compose_text
+
+
+def test_prod_ssl_certificates_are_not_tracked_by_git():
+    gitignore_lines = {
+        line.strip()
+        for line in GITIGNORE.read_text(encoding="utf-8").splitlines()
+        if line.strip() and not line.lstrip().startswith("#")
+    }
+
+    assert "nginx/ssl/" in gitignore_lines
 
 
 def test_prod_cors_allows_corepet_and_legacy_domains():

@@ -147,6 +147,7 @@ produtos_estrutura_*.csv
 
 # Certificados locais gerados automaticamente (NUNCA versionar)
 nginx/ssl/*.pem
+nginx/ssl/
 
 # Certificados e configuracoes locais de integracao fiscal (NUNCA versionar)
 backend/secrets/
