@@ -19,7 +19,7 @@
     },
     "ios": {
       "supportsTablet": false,
-      "bundleIdentifier": "com.petshoppro.app",
+      "bundleIdentifier": "br.com.corepet.app",
       "infoPlist": {
         "NSCameraUsageDescription": "Usado para escanear codigo de barras dos produtos.",
         "NSPhotoLibraryUsageDescription": "Usado para adicionar foto do seu pet.",
@@ -35,7 +35,8 @@
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#0F5F66"
       },
-      "package": "com.petshoppro.app",
+      "package": "br.com.corepet.app",
+      "allowBackup": false,
       "permissions": [
         "POST_NOTIFICATIONS",
         "READ_MEDIA_IMAGES",
@@ -66,7 +67,10 @@
         }
       ],
       [
-        "expo-secure-store"
+        "expo-secure-store",
+        {
+          "configureAndroidBackup": false
+        }
       ],
       [
         "expo-location",
