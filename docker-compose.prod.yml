@@ -58,6 +58,9 @@ services:
       
       # App
       APP_NAME: "CorePet ERP"
+      SYSTEM_NAME: ${SYSTEM_NAME:-CorePet ERP}
+      FRONTEND_URL: ${FRONTEND_URL:-https://corepet.com.br}
+      ECOMMERCE_BASE_URL: ${ECOMMERCE_BASE_URL:-https://corepet.com.br}
       APP_VERSION: "1.1.0"
 
       # Backend self-healing / database pool
