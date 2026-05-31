@@ -186,8 +186,8 @@ function showBrowserNotification(title: string, body: string, priority?: string)
   if (Notification.permission === 'granted') {
     const notification = new Notification(title, {
       body,
-      icon: '/favicon.svg',
-      badge: '/favicon.svg',
+      icon: '/brand/corepet/corepet-icon-64.png',
+      badge: '/brand/corepet/corepet-icon-64.png',
       tag: 'whatsapp-notification',
       requireInteraction: priority === 'urgent',
       silent: false

@@ -101,7 +101,7 @@ export default function LandingPage() {
       <nav className="fixed left-0 right-0 top-0 z-50 border-b border-white/15 bg-slate-950/70 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
           <Link to="/landing" className="flex items-center gap-2 font-bold text-white">
-            <img src="/favicon.svg" alt="" className="h-7 w-7 rounded-md" />
+            <img src="/brand/corepet/corepet-icon-64.png" alt="" className="h-7 w-7 rounded-md" />
             CorePet
           </Link>
 
@@ -293,7 +293,7 @@ export default function LandingPage() {
       <footer className="bg-white py-8 text-slate-500">
         <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 text-sm md:flex-row md:items-center md:justify-between">
           <div className="flex items-center gap-2 font-bold text-slate-900">
-            <img src="/favicon.svg" alt="" className="h-5 w-5 rounded" />
+            <img src="/brand/corepet/corepet-icon-64.png" alt="" className="h-5 w-5 rounded" />
             CorePet
           </div>
           <div className="flex flex-wrap gap-5">
