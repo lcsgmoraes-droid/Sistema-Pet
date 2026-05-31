@@ -77,3 +77,12 @@ def test_prod_cors_allows_corepet_and_legacy_domains():
     ) in compose_text
     assert 'APP_NAME: "CorePet ERP"' in compose_text
     assert 'APP_NAME: "Pet Shop Pro"' not in compose_text
+
+
+def test_prod_generates_public_links_with_corepet_domain():
+    compose_text = COMPOSE_PROD.read_text(encoding="utf-8")
+
+    assert "SYSTEM_NAME: ${SYSTEM_NAME:-CorePet ERP}" in compose_text
+    assert "FRONTEND_URL: ${FRONTEND_URL:-https://corepet.com.br}" in compose_text
+    assert "ECOMMERCE_BASE_URL: ${ECOMMERCE_BASE_URL:-https://corepet.com.br}" in compose_text
+    assert "SMTP_FROM" not in compose_text
