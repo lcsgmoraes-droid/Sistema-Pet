@@ -62,6 +62,8 @@ export default function StoneIntegracao() {
     enable_credit_card: true,
     enable_debit_card: true,
     active: false,
+    // POS
+    pos_serial_number: "", // Número de série da maquininha (adesivo ou Dashboard Pagar.me → Terminais)
     // Conciliação
     affiliation_code: "", // Stone Code
     documento: "", // CNPJ
@@ -71,6 +73,7 @@ export default function StoneIntegracao() {
     conciliacao_configurado: false,
   });
 
+  const webhookUrlPagamentos = `${globalThis.location.origin}/api/stone/webhook`;
   const webhookUrlPadrao = `${globalThis.location.origin}/api/stone/webhook-consentimento`;
 
   useEffect(() => {
@@ -221,6 +224,7 @@ export default function StoneIntegracao() {
         affiliation_code: config.affiliation_code,
         documento: config.documento,
         webhook_url: config.webhook_url || webhookUrlPadrao,
+        pos_serial_number: config.pos_serial_number || null,
       });
       mostrarMensagem(
         "sucesso",
@@ -371,6 +375,44 @@ export default function StoneIntegracao() {
                 {mostrarChave ? <FiEyeOff size={16} /> : <FiEye size={16} />}
               </button>
             </div>
+          </div>
+
+          <div>
+            <label
+              htmlFor="stone-serial-number"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
+              Nº de Série da Maquininha (POS)
+            </label>
+            <input
+              id="stone-serial-number"
+              type="text"
+              className="w-full border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-green-400"
+              placeholder="Ex: 6C582505  — adesivo na maquininha ou Dashboard Pagar.me → Terminais"
+              value={config.pos_serial_number}
+              onChange={(e) =>
+                setConfig({ ...config, pos_serial_number: e.target.value.trim() })
+              }
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Usado como padrão ao enviar pedidos para o POS. Pode ser sobrescrito pedido a pedido.
+            </p>
+          </div>
+
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+            <label htmlFor="stone-payment-webhook-url" className="block text-sm font-medium text-gray-700 mb-1">
+              Webhook de pagamentos
+            </label>
+            <input
+              id="stone-payment-webhook-url"
+              type="text"
+              value={webhookUrlPagamentos}
+              readOnly
+              className="w-full border rounded-lg px-3 py-2 text-sm bg-white text-gray-700"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Cadastre esta URL no dashboard Pagar.me para eventos de pagamento do POS.
+            </p>
           </div>
 
           <div className="flex flex-wrap gap-4">

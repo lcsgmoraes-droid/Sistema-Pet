@@ -7,7 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Request, BackgroundTasks,
 from sqlalchemy.orm import Session
 from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta, timezone
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
+from dataclasses import dataclass
 import logging
 import uuid
 
@@ -17,10 +18,10 @@ from .auth.dependencies import get_current_user_and_tenant
 from .stone_api_client import StoneAPIClient
 from .stone_conciliation_client import StoneConciliationClient
 from .stone_models import StoneTransaction, StoneTransactionLog, StoneConfig
-from .financeiro_models import ContaReceber
-from .vendas_models import Venda
+from .financeiro_models import ContaReceber, FormaPagamento
+from .vendas_models import Venda, VendaPagamento
 from pydantic import BaseModel, Field
-from sqlalchemy import and_
+from sqlalchemy import and_, or_, func as sa_func
 
 
 logger = logging.getLogger(__name__)
@@ -45,6 +46,7 @@ class StoneConfigSchema(BaseModel):
     enable_debit_card: bool = False
     max_installments: int = 12
     webhook_url: Optional[str] = None
+    pos_serial_number: Optional[str] = None
 
 
 class CreatePixPaymentSchema(BaseModel):
@@ -90,7 +92,7 @@ class RefundPaymentSchema(BaseModel):
 
 class CriarPedidoPosSchema(BaseModel):
     """Schema para criar pedido na maquininha (POS)"""
-    serial_number: str = Field(..., description="Número de série da maquininha Stone")
+    serial_number: Optional[str] = Field(None, description="Número de série da maquininha Stone (usa padrão da config se omitido)")
     items: List[Dict] = Field(..., description="Itens: [{amount (centavos), description, quantity, code}]")
     customer_name: str = Field(default="Cliente")
     customer_email: Optional[str] = None
@@ -99,6 +101,13 @@ class CriarPedidoPosSchema(BaseModel):
     installments: int = Field(default=1, ge=1, le=12)
     venda_id: Optional[int] = None
     external_id: Optional[str] = None
+
+
+class CriarPedidoPosVendaSchema(BaseModel):
+    """Schema para enviar uma venda ja criada para a maquininha Stone."""
+    serial_number: Optional[str] = Field(None, description="Numero de serie da maquininha Stone")
+    payment_type: Optional[str] = Field(None, description="credit | debit | pix | cartao_credito | cartao_debito")
+    installments: int = Field(default=1, ge=1, le=12)
 
 
 # ==========================================
@@ -119,6 +128,146 @@ def get_stone_client(db: Session, tenant_id) -> StoneAPIClient:
         )
 
     return StoneAPIClient(secret_key=config.client_id)
+
+
+def get_stone_client_and_config(db: Session, tenant_id):
+    """Obtém cliente Stone e o registro de config para o tenant"""
+    config = db.query(StoneConfig).filter(
+        StoneConfig.tenant_id == tenant_id,
+        StoneConfig.active == True
+    ).first()
+
+    if not config:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Configuração Stone não encontrada. Configure primeiro em /api/stone/config"
+        )
+
+    return StoneAPIClient(secret_key=config.client_id), config
+
+
+def _somente_digitos(valor: Any) -> str:
+    return "".join(c for c in str(valor or "") if c.isdigit())
+
+
+def _decimal_monetario(valor: Any) -> Decimal:
+    try:
+        return Decimal(str(valor or 0)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    except Exception:
+        return Decimal("0.00")
+
+
+def _moeda_para_centavos(valor: Any) -> int:
+    return int((_decimal_monetario(valor) * Decimal("100")).to_integral_value(rounding=ROUND_HALF_UP))
+
+
+def _formatar_quantidade_pos(valor: Any) -> str:
+    try:
+        quantidade = Decimal(str(valor or 1))
+        if quantidade == quantidade.to_integral_value():
+            return str(int(quantidade))
+        return format(quantidade.normalize(), "f").rstrip("0").rstrip(".")
+    except Exception:
+        return "1"
+
+
+def _montar_payment_setup_pos(payment_type: Optional[str], installments: int = 1) -> Optional[Dict[str, Any]]:
+    if not payment_type:
+        return None
+
+    tipo = str(payment_type).strip().lower()
+    mapa = {
+        "credit": "credit",
+        "credito": "credit",
+        "cartao_credito": "credit",
+        "cartao-credito": "credit",
+        "debit": "debit",
+        "debito": "debit",
+        "cartao_debito": "debit",
+        "cartao-debito": "debit",
+        "pix": "pix",
+    }
+    tipo_stone = mapa.get(tipo)
+    if not tipo_stone:
+        raise ValueError("Tipo de pagamento Stone POS invalido")
+
+    payment_setup = {"type": tipo_stone}
+    if tipo_stone == "credit":
+        parcelas = max(1, int(installments or 1))
+        payment_setup.update({
+            "installments": parcelas,
+            "installment_type": "merchant",
+        })
+    return payment_setup
+
+
+def _total_itens_pos_reais(items: List[Dict]) -> Decimal:
+    total_centavos = Decimal("0")
+    for item in items or []:
+        amount = Decimal(str(item.get("amount") or 0))
+        quantidade = Decimal(str(item.get("quantity") or 1))
+        total_centavos += amount * quantidade
+    return (total_centavos / Decimal("100")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+
+def _montar_pedido_pos_da_venda(
+    venda: Venda,
+    *,
+    payment_type: Optional[str] = None,
+    installments: int = 1,
+) -> Dict[str, Any]:
+    items = []
+    for item in venda.itens or []:
+        quantidade_txt = _formatar_quantidade_pos(getattr(item, "quantidade", 1))
+        produto = getattr(item, "produto", None)
+        nome = (
+            getattr(produto, "nome", None)
+            or getattr(item, "servico_descricao", None)
+            or f"Item {getattr(item, 'id', '')}".strip()
+        )
+        subtotal = getattr(item, "subtotal", None)
+        if subtotal is None:
+            subtotal = _decimal_monetario(getattr(item, "preco_unitario", 0)) * Decimal(str(getattr(item, "quantidade", 1) or 1))
+
+        amount = _moeda_para_centavos(subtotal)
+        if amount <= 0:
+            continue
+
+        codigo = (
+            getattr(produto, "codigo", None)
+            or getattr(item, "produto_id", None)
+            or getattr(item, "id", None)
+            or len(items) + 1
+        )
+        items.append({
+            "amount": amount,
+            "description": f"{str(nome)[:80]} x{quantidade_txt}",
+            "quantity": 1,
+            "code": str(codigo),
+        })
+
+    if not items:
+        raise ValueError("A venda nao possui itens com valor para enviar ao POS")
+
+    cliente = getattr(venda, "cliente", None)
+    documento = _somente_digitos(getattr(cliente, "cnpj", None) or getattr(cliente, "cpf", None))
+    customer = {
+        "name": getattr(cliente, "nome", None) or "Cliente",
+        "type": "company" if len(documento) == 14 else "individual",
+    }
+    email = getattr(cliente, "email", None)
+    if email:
+        customer["email"] = email
+    if documento:
+        customer["document"] = documento
+
+    return {
+        "items": items,
+        "customer": customer,
+        "amount": _total_itens_pos_reais(items),
+        "display_name": f"Venda {getattr(venda, 'numero_venda', None) or venda.id}",
+        "payment_setup": _montar_payment_setup_pos(payment_type, installments),
+    }
 
 
 # ==========================================
@@ -143,7 +292,15 @@ async def criar_pedido_pos(
     user, tenant_id = auth
     tenant_id_str = str(tenant_id)
 
-    stone_client = get_stone_client(db, tenant_id_str)
+    stone_client, stone_config = get_stone_client_and_config(db, tenant_id_str)
+
+    # Serial number: usa o do pedido, ou o salvo na config como padrão
+    serial_number = pedido.serial_number or (stone_config.pos_serial_number or "")
+    if not serial_number:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Informe o número de série da maquininha (serial_number) ou configure-o em /api/stone/config"
+        )
 
     external_id = pedido.external_id or f"VENDA-{pedido.venda_id or uuid.uuid4().hex[:8]}-{uuid.uuid4().hex[:6]}"
 
@@ -156,24 +313,21 @@ async def criar_pedido_pos(
     if pedido.customer_document:
         customer["document"] = pedido.customer_document.replace(".", "").replace("-", "").replace("/", "")
 
-    payment_setup = None
-    if pedido.payment_type:
-        payment_setup = {
-            "type": pedido.payment_type,
-            "installments": pedido.installments,
-            "installment_type": "merchant",
-        }
+    try:
+        payment_setup = _montar_payment_setup_pos(pedido.payment_type, pedido.installments)
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
 
     try:
         stone_response = await stone_client.criar_pedido_pos(
             items=pedido.items,
             customer=customer,
-            serial_number=pedido.serial_number,
+            serial_number=serial_number,
             payment_setup=payment_setup,
-            metadata={"external_id": external_id, "venda_id": pedido.venda_id},
+            metadata={"external_id": external_id, "venda_id": pedido.venda_id, "display_name": f"Pedido #{pedido.venda_id or external_id[:8]}"},
         )
 
-        amount_reais = Decimal(sum(i.get("amount", 0) for i in pedido.items)) / 100
+        amount_reais = _total_itens_pos_reais(pedido.items)
 
         transaction = StoneTransaction(
             stone_payment_id=stone_response["id"],
@@ -201,13 +355,13 @@ async def criar_pedido_pos(
             transaction_id=transaction.id,
             event_type="pedido_pos_criado",
             event_source="sistema",
-            description=f"Pedido POS criado na maquininha {pedido.serial_number}",
+            description="Pedido POS criado na maquininha configurada",
             new_status="pending",
             user_id=user.id,
             tenant_id=tenant_id_str,
         )
 
-        logger.info(f"Pedido POS criado: order_id={stone_response['id']} serial={pedido.serial_number}")
+        logger.info("Pedido POS criado: order_id=%s", stone_response["id"])
 
         return {
             "success": True,
@@ -220,6 +374,129 @@ async def criar_pedido_pos(
     except Exception as e:
         logger.error(f"Erro ao criar pedido POS: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Erro ao criar pedido POS: {str(e)}")
+
+
+@router.post("/pedido-pos/venda/{venda_id}")
+async def criar_pedido_pos_da_venda(
+    venda_id: int,
+    pedido: CriarPedidoPosVendaSchema,
+    db: Session = Depends(get_session),
+    auth = Depends(get_current_user_and_tenant)
+):
+    """
+    Envia uma venda aberta do PDV para a maquininha Stone.
+
+    A venda continua aberta ate o webhook charge.paid confirmar o pagamento.
+    """
+    user, tenant_id = auth
+    tenant_id_str = str(tenant_id)
+
+    venda = db.query(Venda).filter(
+        Venda.id == venda_id,
+        Venda.tenant_id == tenant_id_str,
+    ).first()
+    if not venda:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Venda nao encontrada")
+
+    if venda.status not in ("aberta", "baixa_parcial"):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Apenas vendas abertas ou com baixa parcial podem ser enviadas ao POS (status atual: {venda.status})",
+        )
+
+    transaction_pendente = db.query(StoneTransaction).filter(
+        StoneTransaction.tenant_id == tenant_id_str,
+        StoneTransaction.venda_id == venda.id,
+        StoneTransaction.status == "pending",
+    ).order_by(StoneTransaction.created_at.desc()).first()
+    if transaction_pendente:
+        return {
+            "success": True,
+            "message": "Ja existe um pedido Stone aguardando pagamento para esta venda",
+            "order_id": transaction_pendente.stone_payment_id,
+            "transaction_id": transaction_pendente.id,
+            "status": transaction_pendente.status,
+            "reused": True,
+        }
+
+    stone_client, stone_config = get_stone_client_and_config(db, tenant_id_str)
+
+    serial_number = pedido.serial_number or (stone_config.pos_serial_number or "")
+    if not serial_number:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Informe o numero de serie da maquininha ou configure o POS padrao em Stone Connect",
+        )
+
+    try:
+        payload_pos = _montar_pedido_pos_da_venda(
+            venda,
+            payment_type=pedido.payment_type,
+            installments=pedido.installments,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc))
+
+    external_id = f"VENDA-{venda.numero_venda or venda.id}-{uuid.uuid4().hex[:6]}"
+    metadata = {
+        "external_id": external_id,
+        "venda_id": venda.id,
+        "numero_venda": venda.numero_venda,
+        "display_name": payload_pos["display_name"],
+    }
+
+    try:
+        stone_response = await stone_client.criar_pedido_pos(
+            items=payload_pos["items"],
+            customer=payload_pos["customer"],
+            serial_number=serial_number,
+            payment_setup=payload_pos["payment_setup"],
+            metadata=metadata,
+        )
+
+        transaction = StoneTransaction(
+            stone_payment_id=stone_response["id"],
+            external_id=external_id,
+            venda_id=venda.id,
+            payment_method=(payload_pos["payment_setup"] or {}).get("type") or "pos",
+            amount=payload_pos["amount"],
+            description=f"Pedido POS - venda {venda.numero_venda}",
+            installments=pedido.installments,
+            status="pending",
+            stone_status=stone_response.get("status"),
+            customer_name=payload_pos["customer"].get("name"),
+            customer_document=payload_pos["customer"].get("document"),
+            customer_email=payload_pos["customer"].get("email"),
+            stone_response=stone_response,
+            tenant_id=tenant_id_str,
+            user_id=user.id,
+        )
+        db.add(transaction)
+        db.commit()
+        db.refresh(transaction)
+
+        registrar_log(
+            db=db,
+            transaction_id=transaction.id,
+            event_type="pedido_pos_criado",
+            event_source="pdv",
+            description=f"Venda {venda.numero_venda} enviada para POS configurado",
+            new_status="pending",
+            user_id=user.id,
+            tenant_id=tenant_id_str,
+        )
+
+        return {
+            "success": True,
+            "message": "Venda enviada para a maquininha",
+            "order_id": stone_response["id"],
+            "transaction_id": transaction.id,
+            "status": stone_response.get("status") or "pending",
+            "reused": False,
+        }
+    except Exception as e:
+        logger.error(f"Erro ao enviar venda {venda.id} para POS Stone: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erro ao enviar venda para Stone POS: {str(e)}")
 
 
 @router.post("/pedido-pos/{order_id}/fechar")
@@ -268,6 +545,87 @@ async def fechar_pedido_pos(
         return {"success": True, "message": "Pedido fechado com sucesso"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao fechar pedido: {str(e)}")
+
+
+@router.get("/pedidos-abertos")
+async def listar_pedidos_abertos_pos(
+    db: Session = Depends(get_session),
+    auth = Depends(get_current_user_and_tenant)
+):
+    """
+    Lista pedidos em aberto na Stone (closed=false).
+    Útil para diagnosticar o limite de 30 pedidos que bloqueia o POS:
+    se a conta tiver >= 30 pedidos abertos, a maquininha para de exibir novos.
+    """
+    user, tenant_id = auth
+    stone_client = get_stone_client(db, str(tenant_id))
+    try:
+        resultado = await stone_client.listar_pedidos_abertos()
+        pedidos = resultado.get("data", [])
+        return {
+            "total": len(pedidos),
+            "alerta_limite": len(pedidos) >= 25,
+            "pedidos": [
+                {
+                    "id": p.get("id"),
+                    "code": p.get("code"),
+                    "status": p.get("status"),
+                    "amount": p.get("amount"),
+                    "created_at": p.get("created_at"),
+                    "closed": p.get("closed"),
+                }
+                for p in pedidos
+            ],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao listar pedidos abertos: {str(e)}")
+
+
+@router.post("/pedidos-abertos/cancelar-todos")
+async def cancelar_todos_pedidos_abertos(
+    db: Session = Depends(get_session),
+    auth = Depends(get_current_user_and_tenant)
+):
+    """
+    Cancela todos os pedidos abertos na Stone para liberar a fila do POS.
+    Use isso quando a maquininha parar de exibir novos pedidos (limite de 30).
+    Só cancela pedidos que ainda não foram pagos (status != paid).
+    """
+    user, tenant_id = auth
+    stone_client = get_stone_client(db, str(tenant_id))
+    try:
+        resultado = await stone_client.listar_pedidos_abertos()
+        pedidos = resultado.get("data", [])
+
+        cancelados = []
+        erros = []
+        for p in pedidos:
+            order_id = p.get("id")
+            if not order_id:
+                continue
+            try:
+                await stone_client.cancelar_pedido(order_id)
+                cancelados.append(order_id)
+                # Atualiza registro local se existir
+                local = db.query(StoneTransaction).filter(
+                    StoneTransaction.stone_payment_id == order_id
+                ).first()
+                if local:
+                    local.status = "cancelled"
+                    local.cancelled_at = datetime.now(timezone.utc)
+            except Exception as ex:
+                erros.append({"order_id": order_id, "erro": str(ex)})
+
+        db.commit()
+        return {
+            "success": True,
+            "cancelados": len(cancelados),
+            "erros": len(erros),
+            "ids_cancelados": cancelados,
+            "detalhes_erros": erros,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao cancelar pedidos: {str(e)}")
 
 
 def registrar_log(
@@ -387,6 +745,7 @@ def obter_config_stone(
             "documento": "",
             "conciliacao_username": None,
             "conciliacao_configurado": False,
+            "pos_serial_number": None,
         }
 
     return config.to_dict()
@@ -864,6 +1223,267 @@ async def estornar_pagamento(
 # WEBHOOK (Recebe notificações da Stone)
 # ==========================================
 
+@dataclass(frozen=True)
+class StonePosPaymentData:
+    order_id: str
+    charge_id: str
+    valor: Decimal
+    tipo_forma_pagamento: str
+    bandeira: Optional[str]
+    nsu: Optional[str]
+    numero_autorizacao: Optional[str]
+    parcelas: int
+    paid_at: Optional[datetime]
+    terminal_serial_number: Optional[str]
+
+
+def _normalizar_chave_metadata(chave: str) -> str:
+    return "".join(c for c in str(chave or "").lower() if c.isalnum())
+
+
+def _metadata_value(metadata: dict, *chaves: str) -> Any:
+    if not isinstance(metadata, dict):
+        return None
+
+    for chave in chaves:
+        valor = metadata.get(chave)
+        if valor not in (None, ""):
+            return valor
+
+    normalizado = {
+        _normalizar_chave_metadata(chave): valor
+        for chave, valor in metadata.items()
+        if valor not in (None, "")
+    }
+    for chave in chaves:
+        valor = normalizado.get(_normalizar_chave_metadata(chave))
+        if valor not in (None, ""):
+            return valor
+    return None
+
+
+def _centavos_para_decimal(valor_centavos: Any) -> Decimal:
+    try:
+        return (Decimal(str(valor_centavos or 0)) / Decimal("100")).quantize(Decimal("0.01"))
+    except Exception:
+        return Decimal("0.00")
+
+
+def _parse_datetime_stone(valor: Any) -> Optional[datetime]:
+    if not valor:
+        return None
+    try:
+        texto = str(valor).strip()
+        if texto.endswith("Z"):
+            texto = f"{texto[:-1]}+00:00"
+        return datetime.fromisoformat(texto)
+    except Exception:
+        return None
+
+
+def _normalizar_tipo_pagamento_pos(account_funding_source: Any, payment_method: Any) -> str:
+    origem = str(account_funding_source or "").strip().lower()
+    metodo = str(payment_method or "").strip().lower()
+
+    if origem in {"credit", "credito", "crédito"} or metodo in {"credit", "credit_card", "cartao_credito"}:
+        return "cartao_credito"
+    if origem in {"debit", "debito", "débito", "prepaid"} or metodo in {"debit", "debit_card", "cartao_debito"}:
+        return "cartao_debito"
+    if metodo == "pix":
+        return "pix"
+
+    # Nos exemplos oficiais do POS o payment_method aparece como "cash",
+    # enquanto o tipo real vem no metadata.account_funding_source.
+    return "cartao_credito"
+
+
+def _extrair_dados_pagamento_pos(webhook_data: dict) -> StonePosPaymentData:
+    data = webhook_data.get("data") or {}
+    order = data.get("order") or {}
+    last_transaction = data.get("last_transaction") or {}
+    metadata = {
+        **(order.get("metadata") or {}),
+        **(last_transaction.get("metadata") or {}),
+        **(data.get("metadata") or {}),
+    }
+
+    order_id = order.get("id") or data.get("order_id") or _metadata_value(metadata, "order_id")
+    charge_id = data.get("id") or last_transaction.get("id") or ""
+    parcelas_raw = (
+        _metadata_value(metadata, "installment_quantity", "installmentQuantity")
+        or last_transaction.get("installments")
+        or 1
+    )
+    try:
+        parcelas = max(1, int(parcelas_raw or 1))
+    except (TypeError, ValueError):
+        parcelas = 1
+
+    valor_centavos = data.get("paid_amount") or data.get("amount") or last_transaction.get("amount")
+    account_funding_source = _metadata_value(metadata, "account_funding_source", "accountFundingSource")
+    tipo_forma_pagamento = _normalizar_tipo_pagamento_pos(
+        account_funding_source=account_funding_source,
+        payment_method=data.get("payment_method") or last_transaction.get("transaction_type"),
+    )
+
+    return StonePosPaymentData(
+        order_id=str(order_id or ""),
+        charge_id=str(charge_id or ""),
+        valor=_centavos_para_decimal(valor_centavos),
+        tipo_forma_pagamento=tipo_forma_pagamento,
+        bandeira=_metadata_value(metadata, "scheme_name", "schemeName"),
+        nsu=data.get("code"),
+        numero_autorizacao=_metadata_value(metadata, "authorization_code", "authorizationCode"),
+        parcelas=parcelas,
+        paid_at=_parse_datetime_stone(data.get("paid_at") or _metadata_value(metadata, "transaction_timestamp", "transactionTimestamp")),
+        terminal_serial_number=_metadata_value(metadata, "terminal_serial_number", "terminalSerialNumber"),
+    )
+
+
+def _mapear_forma_pagamento_stone(
+    db: Session,
+    tenant_id: str,
+    tipo_forma_pagamento: str,
+    parcelas: int,
+) -> str:
+    query = db.query(FormaPagamento).filter(
+        FormaPagamento.tenant_id == tenant_id,
+        FormaPagamento.tipo == tipo_forma_pagamento,
+        FormaPagamento.ativo == True,
+    )
+
+    forma = None
+    if tipo_forma_pagamento == "cartao_credito":
+        if parcelas > 1:
+            forma = query.filter(
+                FormaPagamento.permite_parcelamento == True,
+                FormaPagamento.parcelas_maximas >= parcelas,
+            ).order_by(FormaPagamento.parcelas_maximas.desc()).first()
+            if not forma:
+                forma = query.filter(sa_func.lower(FormaPagamento.nome).like("%parcel%")).first()
+        else:
+            forma = query.filter(~sa_func.lower(FormaPagamento.nome).like("%parcel%")).first()
+
+    if not forma:
+        forma = query.first()
+
+    if forma:
+        return forma.nome
+
+    fallback = {
+        "cartao_credito": "Cartão Crédito",
+        "cartao_debito": "Cartão Débito",
+        "pix": "PIX",
+    }
+    return fallback.get(tipo_forma_pagamento, "Stone POS")
+
+
+def _buscar_pagamento_stone_existente(
+    db: Session,
+    *,
+    venda_id: int,
+    tenant_id: str,
+    dados_pagamento: StonePosPaymentData,
+) -> Optional[VendaPagamento]:
+    filtros = [
+        VendaPagamento.tenant_id == tenant_id,
+        VendaPagamento.venda_id == venda_id,
+    ]
+    identificadores = []
+    if dados_pagamento.charge_id:
+        identificadores.append(VendaPagamento.numero_transacao == dados_pagamento.charge_id)
+    if dados_pagamento.nsu:
+        identificadores.append(VendaPagamento.nsu_cartao == dados_pagamento.nsu)
+
+    if not identificadores:
+        return None
+
+    return db.query(VendaPagamento).filter(*filtros, or_(*identificadores)).first()
+
+
+def _registrar_pagamento_venda_stone(
+    db: Session,
+    *,
+    transaction: StoneTransaction,
+    dados_pagamento: StonePosPaymentData,
+) -> Optional[VendaPagamento]:
+    if not transaction.venda_id:
+        return None
+
+    tenant_id = str(transaction.tenant_id)
+    venda = db.query(Venda).filter(
+        Venda.id == transaction.venda_id,
+        Venda.tenant_id == tenant_id,
+    ).first()
+    if not venda:
+        logger.warning("Venda %s não encontrada para webhook Stone.", transaction.venda_id)
+        return None
+
+    existente = _buscar_pagamento_stone_existente(
+        db,
+        venda_id=venda.id,
+        tenant_id=tenant_id,
+        dados_pagamento=dados_pagamento,
+    )
+    if existente:
+        existente.bandeira = existente.bandeira or dados_pagamento.bandeira
+        existente.numero_parcelas = existente.numero_parcelas or dados_pagamento.parcelas
+        existente.numero_transacao = existente.numero_transacao or dados_pagamento.charge_id
+        existente.numero_autorizacao = existente.numero_autorizacao or dados_pagamento.numero_autorizacao
+        existente.status = "aprovado"
+        db.flush()
+        return existente
+
+    forma_pagamento_nome = _mapear_forma_pagamento_stone(
+        db,
+        tenant_id=tenant_id,
+        tipo_forma_pagamento=dados_pagamento.tipo_forma_pagamento,
+        parcelas=dados_pagamento.parcelas,
+    )
+
+    from app.vendas.service import VendaService
+
+    VendaService.finalizar_venda(
+        venda_id=venda.id,
+        pagamentos=[
+            {
+                "forma_pagamento": forma_pagamento_nome,
+                "valor": float(dados_pagamento.valor),
+                "numero_parcelas": dados_pagamento.parcelas,
+                "bandeira": dados_pagamento.bandeira,
+                "nsu_cartao": dados_pagamento.nsu,
+                "operadora_id": None,
+            }
+        ],
+        user_id=transaction.user_id,
+        user_nome="Stone POS",
+        tenant_id=tenant_id,
+        db=db,
+    )
+
+    pagamento = _buscar_pagamento_stone_existente(
+        db,
+        venda_id=venda.id,
+        tenant_id=tenant_id,
+        dados_pagamento=dados_pagamento,
+    )
+    if not pagamento:
+        pagamento = db.query(VendaPagamento).filter(
+            VendaPagamento.tenant_id == tenant_id,
+            VendaPagamento.venda_id == venda.id,
+        ).order_by(VendaPagamento.id.desc()).first()
+
+    if pagamento:
+        pagamento.numero_transacao = dados_pagamento.charge_id
+        pagamento.numero_autorizacao = dados_pagamento.numero_autorizacao
+        pagamento.status = "aprovado"
+        if dados_pagamento.paid_at:
+            pagamento.data_pagamento = dados_pagamento.paid_at
+        db.flush()
+
+    return pagamento
+
+
 _WEBHOOK_STATUS_MAP = {
     "charge.paid": "approved",
     "charge.refunded": "refunded",
@@ -914,7 +1534,8 @@ async def receber_webhook_stone(
 
     logger.info(f"Webhook Stone Connect recebido: {event_type}")
 
-    order_id = data.get("order", {}).get("id") or data.get("id")
+    dados_pagamento = _extrair_dados_pagamento_pos(webhook_data)
+    order_id = dados_pagamento.order_id
 
     if not order_id:
         logger.error(f"Webhook Stone sem order_id: {webhook_data}")
@@ -933,7 +1554,16 @@ async def receber_webhook_stone(
 
     if event_type == "charge.paid":
         if not transaction.paid_at:
-            transaction.paid_at = datetime.now(timezone.utc)
+            transaction.paid_at = dados_pagamento.paid_at or datetime.now(timezone.utc)
+        transaction.payment_method = dados_pagamento.tipo_forma_pagamento
+        transaction.amount = dados_pagamento.valor
+        transaction.card_brand = dados_pagamento.bandeira
+        transaction.installments = dados_pagamento.parcelas
+        _registrar_pagamento_venda_stone(
+            db=db,
+            transaction=transaction,
+            dados_pagamento=dados_pagamento,
+        )
         await _fechar_pedido_stone(db, transaction.tenant_id, order_id)
     elif event_type in ("charge.refunded", "charge.chargedback"):
         if not transaction.refunded_at:

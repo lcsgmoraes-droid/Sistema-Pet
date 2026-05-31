@@ -53,6 +53,14 @@ export const finalizarVenda = async (
 };
 
 /**
+ * Enviar venda aberta para pagamento na maquininha Stone POS.
+ */
+export const enviarVendaStonePos = async (vendaId, dados = {}) => {
+  const response = await api.post(`/stone/pedido-pos/venda/${vendaId}`, dados);
+  return response.data;
+};
+
+/**
  * Cancelar venda
  */
 export const cancelarVenda = async (vendaId, motivo) => {

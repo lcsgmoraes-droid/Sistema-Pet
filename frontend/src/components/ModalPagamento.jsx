@@ -8,7 +8,7 @@ import {
   BarChart2,
 } from 'lucide-react';
 
-import { finalizarVenda, criarVenda, atualizarVenda } from '../api/vendas';
+import { finalizarVenda, criarVenda, atualizarVenda, enviarVendaStonePos } from '../api/vendas';
 import { verificarEstoqueNegativo } from '../api/alertasEstoque';
 import StatusMargemIndicador from './StatusMargemIndicador';
 import api from '../api';
@@ -34,8 +34,10 @@ import {
   descreverCupomMargem,
   devePerguntarNotaFiscal,
   ehFormaPagamentoPix,
+  ehFormaPagamentoStonePos,
   avaliarEstadoJustificativaMargem,
   extrairCorIndicadorMargem,
+  mapearTipoPagamentoStonePos,
   montarFormasPagamentoAnalise,
   montarCupomParaFinalizar,
   montarItensParaVerificarEstoqueNegativo,
@@ -52,6 +54,7 @@ import {
   obterCorParcelamentoAtual,
   obterCorVisualParcelamento,
   obterEstiloVisualParcelamento,
+  podeEnviarPagamentoStonePos,
   resolverFaixasParcelamentoDaForma,
   validarPagamentoParaAdicionar,
 } from './modalPagamentoUtils';
@@ -77,6 +80,8 @@ export default function ModalPagamento({
   const [numeroParcelas, setNumeroParcelas] = useState(1);
   const [valorRecebido, setValorRecebido] = useState(0);
   const [loading, setLoading] = useState(false);
+  const [stoneLoading, setStoneLoading] = useState(false);
+  const [stonePedidoPendente, setStonePedidoPendente] = useState(null);
   const [loadingPagamentos, setLoadingPagamentos] = useState(false);
   const [erro, setErro] = useState('');
   const [totalPagoExistente, setTotalPagoExistente] = useState(0);
@@ -269,8 +274,17 @@ export default function ModalPagamento({
       corParcelamentoAtual,
       justificativaTexto,
     });
+  const tipoPagamentoStone = mapearTipoPagamentoStonePos(formaPagamentoSelecionada);
+  const stonePosDisponivel = ehFormaPagamentoStonePos(formaPagamentoSelecionada);
+  const estadoEnvioStonePos = podeEnviarPagamentoStonePos({
+    formaPagamento: formaPagamentoSelecionada,
+    pagamentos,
+    totalPagoExistente,
+    valorRestante,
+    stonePedidoPendente: Boolean(stonePedidoPendente),
+  });
   const mostrarBotaoAdicionarRodape =
-    Boolean(formaPagamentoSelecionada) && valorRestante > 0.01;
+    Boolean(formaPagamentoSelecionada) && valorRestante > 0.01 && !stonePedidoPendente;
 
   const rolarElementoNoModal = useCallback((elemento, { focusElement } = {}) => {
     if (!elemento) return;
@@ -661,9 +675,83 @@ export default function ModalPagamento({
     }
   };
 
+  const confirmarEstoqueNegativoAntesDeReceber = async () => {
+    const itensParaVerificar = montarItensParaVerificarEstoqueNegativo(venda.itens);
+
+    if (itensParaVerificar.length === 0) {
+      return true;
+    }
+
+    const response = await verificarEstoqueNegativo(itensParaVerificar);
+    const produtosNegativos = response.data || [];
+
+    if (produtosNegativos.length === 0) {
+      return true;
+    }
+
+    return globalThis.confirm(montarMensagemEstoqueNegativo(produtosNegativos));
+  };
+
+  const salvarVendaAbertaParaPagamento = async () => {
+    const vendaParaPersistir = montarVendaParaPersistirComCupom({
+      venda,
+      cupomParaFinalizar,
+    });
+    const payloadVenda = montarPayloadVenda(vendaParaPersistir);
+
+    const vendaIdPersistida = vendaParaPersistir.id;
+    if (!vendaIdPersistida) {
+      const vendaCriada = await criarVenda(payloadVenda);
+      return vendaCriada.id;
+    }
+
+    await atualizarVenda(vendaIdPersistida, payloadVenda);
+    return vendaIdPersistida;
+  };
+
+  const handleEnviarStonePos = async () => {
+    const permissao = podeEnviarPagamentoStonePos({
+      formaPagamento: formaPagamentoSelecionada,
+      pagamentos,
+      totalPagoExistente,
+      valorRestante,
+      stonePedidoPendente: Boolean(stonePedidoPendente),
+    });
+
+    if (!permissao.podeEnviar) {
+      setErro(permissao.motivo);
+      return;
+    }
+
+    setStoneLoading(true);
+    setErro('');
+
+    try {
+      const podeContinuar = await confirmarEstoqueNegativoAntesDeReceber();
+      if (!podeContinuar) return;
+
+      const vendaId = await salvarVendaAbertaParaPagamento();
+      const resposta = await enviarVendaStonePos(vendaId, {
+        payment_type: tipoPagamentoStone,
+        installments: tipoPagamentoStone === 'credit' ? numeroParcelas : 1,
+      });
+
+      setStonePedidoPendente(resposta);
+      setErro('');
+      if (onVendaAtualizada) {
+        await onVendaAtualizada();
+      }
+    } catch (error) {
+      console.error('Erro ao enviar venda para Stone POS:', error);
+      setErro(error.response?.data?.detail || 'Erro ao enviar venda para a maquininha Stone');
+    } finally {
+      setStoneLoading(false);
+    }
+  };
+
   // Finalizar venda
   const handleFinalizar = async () => {
-    // Permitir baixa parcial - não exigir pagamento total
+    // Permitir baixa parcial - nao exigir pagamento total
     if (!podeConfirmarFinalizacao) {
       setErro('Adicione pelo menos uma forma de pagamento');
       return;
@@ -673,38 +761,14 @@ export default function ModalPagamento({
     setErro('');
 
     try {
-      // ⚠️ VERIFICAR ESTOQUE NEGATIVO ANTES DE FINALIZAR
-      const itensParaVerificar = montarItensParaVerificarEstoqueNegativo(venda.itens);
-      
-      if (itensParaVerificar.length > 0) {
-        const response = await verificarEstoqueNegativo(itensParaVerificar);
-        const produtosNegativos = response.data || [];
-        
-        if (produtosNegativos.length > 0) {
-          const confirmar = window.confirm(montarMensagemEstoqueNegativo(produtosNegativos));
-          
-          if (!confirmar) {
-            setLoading(false);
-            return; // Cancelar finalização
-          }
-        }
+      const podeContinuar = await confirmarEstoqueNegativoAntesDeReceber();
+      if (!podeContinuar) {
+        setLoading(false);
+        return;
       }
-      
-      const vendaParaPersistir = montarVendaParaPersistirComCupom({
-        venda,
-        cupomParaFinalizar,
-      });
-      const payloadVenda = montarPayloadVenda(vendaParaPersistir);
 
-      // Criar a venda primeiro se ainda não foi criada
-      let vendaId = venda.id;
-      
-      if (!vendaId) {
-        const vendaCriada = await criarVenda(payloadVenda);
-        vendaId = vendaCriada.id;
-      } else {
-        await atualizarVenda(vendaId, payloadVenda);
-      }
+      // Criar a venda primeiro se ainda nao foi criada
+      const vendaId = await salvarVendaAbertaParaPagamento();
 
       // Finalizar a venda com os pagamentos
       const resultado = await finalizarVenda(vendaId, pagamentos, {
@@ -714,12 +778,10 @@ export default function ModalPagamento({
 
       // Mostrar pergunta sobre NF-e APENAS se pagamento completo
       setVendaFinalizadaId(vendaId);
-      
-      // ✅ Só perguntar sobre NFCe se status for 'finalizada' (pagamento completo)
+
       if (devePerguntarNotaFiscal(resultado)) {
         setMostrarPerguntaNFe(true);
       } else {
-        // Se foi pagamento parcial, apenas fechar modal
         onConfirmar();
       }
     } catch (error) {
@@ -729,7 +791,6 @@ export default function ModalPagamento({
       setLoading(false);
     }
   };
-
   // Analisar venda com formas de pagamento atuais
   const analisarVendaModal = async () => {
     if (!onAnalisarVenda) return;
@@ -1199,8 +1260,45 @@ export default function ModalPagamento({
                     </div>
                   )}
 
+                  {stonePosDisponivel && (
+                    <div className="rounded-lg border border-emerald-200 bg-emerald-50 p-3 space-y-3">
+                      <div className="flex items-start gap-2">
+                        <CreditCard className="w-4 h-4 text-emerald-700 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-semibold text-emerald-900">
+                            Pagamento pela maquininha Stone
+                          </p>
+                          <p className="text-xs text-emerald-700">
+                            Envia a venda para o POS e aguarda o webhook confirmar bandeira, parcelas, NSU e autorizacao.
+                          </p>
+                        </div>
+                      </div>
+
+                      {stonePedidoPendente ? (
+                        <div className="rounded-md bg-white border border-emerald-200 px-3 py-2 text-sm text-emerald-800">
+                          Pedido enviado: <strong>{stonePedidoPendente.order_id}</strong>. Aguarde o pagamento na maquininha.
+                        </div>
+                      ) : (
+                        <>
+                          {!estadoEnvioStonePos.podeEnviar && estadoEnvioStonePos.motivo && (
+                            <p className="text-xs text-amber-700">{estadoEnvioStonePos.motivo}</p>
+                          )}
+                          <button
+                            type="button"
+                            onClick={handleEnviarStonePos}
+                            disabled={stoneLoading || !estadoEnvioStonePos.podeEnviar}
+                            className="w-full px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            {stoneLoading ? 'Enviando para a Stone...' : 'Enviar para maquininha Stone'}
+                          </button>
+                        </>
+                      )}
+                    </div>
+                  )}
+
                   <button
                     onClick={adicionarPagamento}
+                    disabled={Boolean(stonePedidoPendente)}
                     className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium transition-colors"
                   >
                     Adicionar Pagamento
@@ -1433,7 +1531,7 @@ export default function ModalPagamento({
 
               <button
                 onClick={handleFinalizar}
-                disabled={loading || !podeConfirmarFinalizacao}
+                disabled={loading || stoneLoading || Boolean(stonePedidoPendente) || !podeConfirmarFinalizacao}
                 className="flex items-center space-x-2 px-8 py-3 bg-green-600 hover:bg-green-700 text-white rounded-lg font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 {loading ? (

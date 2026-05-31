@@ -9,9 +9,11 @@ import {
   devePerguntarNotaFiscal,
   descreverCupomMargem,
   ehFormaPagamentoPix,
+  ehFormaPagamentoStonePos,
   avaliarEstadoJustificativaMargem,
   extrairCorIndicadorMargem,
   identificarIconeFormaPagamento,
+  mapearTipoPagamentoStonePos,
   montarCupomParaFinalizar,
   montarFormasPagamentoAnalise,
   montarItensParaVerificarEstoqueNegativo,
@@ -29,6 +31,7 @@ import {
   obterCorVisualParcelamento,
   obterEstiloVisualParcelamento,
   obterCorParcelamentoAtual,
+  podeEnviarPagamentoStonePos,
   resolverFaixasParcelamentoDaForma,
   validarPagamentoParaAdicionar,
 } from "./modalPagamentoUtils.js";
@@ -93,6 +96,44 @@ test("calcula dados auxiliares da venda sem depender do modal", () => {
   assert.equal(devePerguntarNotaFiscal({ status: "finalizada" }), true);
   assert.equal(devePerguntarNotaFiscal({ status: "pago_nf" }), true);
   assert.equal(devePerguntarNotaFiscal({ status: "aberta" }), false);
+});
+
+test("identifica formas compativeis com envio para Stone POS", () => {
+  assert.equal(ehFormaPagamentoStonePos({ tipo: "cartao_credito" }), true);
+  assert.equal(ehFormaPagamentoStonePos({ tipo: "cartao_debito" }), true);
+  assert.equal(ehFormaPagamentoStonePos({ nome: "Pix" }), true);
+  assert.equal(ehFormaPagamentoStonePos({ tipo: "dinheiro" }), false);
+
+  assert.equal(mapearTipoPagamentoStonePos({ tipo: "cartao_credito" }), "credit");
+  assert.equal(mapearTipoPagamentoStonePos({ tipo: "cartao_debito" }), "debit");
+  assert.equal(mapearTipoPagamentoStonePos({ nome: "Pix QR Code" }), "pix");
+});
+
+test("libera Stone POS somente para venda sem pagamentos manuais", () => {
+  const forma = { tipo: "cartao_credito" };
+  assert.deepEqual(
+    podeEnviarPagamentoStonePos({
+      formaPagamento: forma,
+      pagamentos: [],
+      totalPagoExistente: 0,
+      valorRestante: 100,
+      stonePedidoPendente: false,
+    }),
+    { podeEnviar: true, motivo: "" },
+  );
+  assert.deepEqual(
+    podeEnviarPagamentoStonePos({
+      formaPagamento: forma,
+      pagamentos: [{ valor: 10 }],
+      totalPagoExistente: 0,
+      valorRestante: 90,
+      stonePedidoPendente: false,
+    }),
+    {
+      podeEnviar: false,
+      motivo: "Remova os pagamentos manuais antes de enviar para a Stone.",
+    },
+  );
 });
 
 test("extrai cor de margem do retorno do backend", () => {

@@ -107,13 +107,14 @@ class PagarmeConnectClient:
         payment_setup : (fluxo Pagamento Direto) define a forma de pagamento na criação.
             Se omitido, usa fluxo Listagem (cliente escolhe na maquininha).
         """
+        display_name = (metadata or {}).get("display_name") or (metadata or {}).get("external_id", "Pedido POS")
         body: Dict[str, Any] = {
             "closed": False,
             "items": items,
             "customer": customer,
-            "display_name": (metadata or {}).get("external_id", "Pedido POS"),
             "poi_payment_settings": {
                 "devices_serial_number": [serial_number],
+                "display_name": display_name,
                 "visible": True,
                 "print_order_receipt": False,
             },
@@ -145,9 +146,16 @@ class PagarmeConnectClient:
         """
         Cancela um pedido aberto (retira da fila da maquininha).
         Só pode ser cancelado ANTES do pagamento.
-        Endpoint: PATCH /orders/{order_id}/closed/ com status=canceled
+        Endpoint: PATCH /orders/{order_id}/closed com status=canceled
         """
-        return await self._request("PATCH", f"/orders/{order_id}/closed/", json={"status": "canceled"})
+        return await self._request("PATCH", f"/orders/{order_id}/closed", json={"status": "canceled"})
+
+    async def listar_pedidos_abertos(self, page: int = 1, size: int = 50) -> Dict[str, Any]:
+        """
+        Lista pedidos em aberto (closed=false).
+        Útil para diagnosticar o limite de 30 pedidos que bloqueia o POS.
+        """
+        return await self._request("GET", "/orders", params={"closed": "false", "page": page, "size": size})
 
     # ---------------------------------------------------------------------------
     # Webhook
