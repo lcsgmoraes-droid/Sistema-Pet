@@ -175,7 +175,7 @@ def _montar_payment_setup_pos(payment_type: Optional[str], installments: int = 1
     if not payment_type:
         return None
 
-    tipo = str(payment_type or "").strip().lower()
+    tipo = str(payment_type).strip().lower()
     mapa = {
         "credit": "credit",
         "credito": "credit",
@@ -355,13 +355,13 @@ async def criar_pedido_pos(
             transaction_id=transaction.id,
             event_type="pedido_pos_criado",
             event_source="sistema",
-            description=f"Pedido POS criado na maquininha {serial_number}",
+            description="Pedido POS criado na maquininha configurada",
             new_status="pending",
             user_id=user.id,
             tenant_id=tenant_id_str,
         )
 
-        logger.info(f"Pedido POS criado: order_id={stone_response['id']} serial={serial_number}")
+        logger.info("Pedido POS criado: order_id=%s", stone_response["id"])
 
         return {
             "success": True,
@@ -480,7 +480,7 @@ async def criar_pedido_pos_da_venda(
             transaction_id=transaction.id,
             event_type="pedido_pos_criado",
             event_source="pdv",
-            description=f"Venda {venda.numero_venda} enviada para POS {serial_number}",
+            description=f"Venda {venda.numero_venda} enviada para POS configurado",
             new_status="pending",
             user_id=user.id,
             tenant_id=tenant_id_str,

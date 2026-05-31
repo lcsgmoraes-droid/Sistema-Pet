@@ -689,7 +689,7 @@ export default function ModalPagamento({
       return true;
     }
 
-    return window.confirm(montarMensagemEstoqueNegativo(produtosNegativos));
+    return globalThis.confirm(montarMensagemEstoqueNegativo(produtosNegativos));
   };
 
   const salvarVendaAbertaParaPagamento = async () => {
@@ -699,13 +699,14 @@ export default function ModalPagamento({
     });
     const payloadVenda = montarPayloadVenda(vendaParaPersistir);
 
-    if (!venda.id) {
+    const vendaIdPersistida = vendaParaPersistir.id;
+    if (!vendaIdPersistida) {
       const vendaCriada = await criarVenda(payloadVenda);
       return vendaCriada.id;
     }
 
-    await atualizarVenda(venda.id, payloadVenda);
-    return venda.id;
+    await atualizarVenda(vendaIdPersistida, payloadVenda);
+    return vendaIdPersistida;
   };
 
   const handleEnviarStonePos = async () => {

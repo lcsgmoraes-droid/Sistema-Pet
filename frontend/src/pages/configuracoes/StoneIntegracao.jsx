@@ -400,10 +400,11 @@ export default function StoneIntegracao() {
           </div>
 
           <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-            <label className="block text-sm font-medium text-gray-700 mb-1">
+            <label htmlFor="stone-payment-webhook-url" className="block text-sm font-medium text-gray-700 mb-1">
               Webhook de pagamentos
             </label>
             <input
+              id="stone-payment-webhook-url"
               type="text"
               value={webhookUrlPagamentos}
               readOnly
