@@ -4,7 +4,7 @@
 // 2. Em dev, EXPO_PUBLIC_DEV_API_URL ou localhost.
 // 3. Em release, EXPO_PUBLIC_PROD_API_URL ou producao.
 const DEFAULT_DEV_API_URL = 'http://localhost:8000/api';
-const DEFAULT_PROD_API_URL = 'https://mlprohub.com.br/api';
+const DEFAULT_PROD_API_URL = 'https://corepet.com.br/api';
 
 const ENV_API_URL = process.env.EXPO_PUBLIC_API_URL;
 const DEV_API_URL = process.env.EXPO_PUBLIC_DEV_API_URL || DEFAULT_DEV_API_URL;
