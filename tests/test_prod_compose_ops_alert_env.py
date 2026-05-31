@@ -20,3 +20,20 @@ def test_backend_prod_compose_exposes_ops_alert_channel_env():
 
     for item in expected_env:
         assert item in compose_text
+
+
+def test_backend_prod_compose_exposes_mercado_pago_checkout_env():
+    compose_text = COMPOSE_PROD.read_text(encoding="utf-8")
+
+    expected_env = [
+        "ECOMMERCE_PAYMENT_GATEWAY_ENABLED: ${ECOMMERCE_PAYMENT_GATEWAY_ENABLED:-false}",
+        "ECOMMERCE_PAYMENT_PROVIDER: ${ECOMMERCE_PAYMENT_PROVIDER:-}",
+        "ECOMMERCE_PUBLIC_BASE_URL: ${ECOMMERCE_PUBLIC_BASE_URL:-https://corepet.com.br}",
+        "MERCADO_PAGO_ACCESS_TOKEN: ${MERCADO_PAGO_ACCESS_TOKEN:-}",
+        "MERCADO_PAGO_WEBHOOK_SECRET: ${MERCADO_PAGO_WEBHOOK_SECRET:-}",
+        "MERCADO_PAGO_USE_SANDBOX: ${MERCADO_PAGO_USE_SANDBOX:-false}",
+        "MERCADO_PAGO_WEBHOOK_VALIDATE_SIGNATURE: ${MERCADO_PAGO_WEBHOOK_VALIDATE_SIGNATURE:-true}",
+    ]
+
+    for item in expected_env:
+        assert item in compose_text
