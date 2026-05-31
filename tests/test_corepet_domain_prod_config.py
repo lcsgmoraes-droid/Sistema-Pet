@@ -86,3 +86,24 @@ def test_prod_generates_public_links_with_corepet_domain():
     assert "FRONTEND_URL: ${FRONTEND_URL:-https://corepet.com.br}" in compose_text
     assert "ECOMMERCE_BASE_URL: ${ECOMMERCE_BASE_URL:-https://corepet.com.br}" in compose_text
     assert "SMTP_FROM" not in compose_text
+
+
+def test_prod_serves_product_images_from_corepet_domain():
+    nginx_conf = NGINX_CONF.read_text(encoding="utf-8")
+    compose_text = COMPOSE_PROD.read_text(encoding="utf-8")
+    image_locations_path = ROOT / "nginx" / "includes" / "product-image-server-locations.conf"
+
+    assert image_locations_path.exists()
+    image_locations = image_locations_path.read_text(encoding="utf-8")
+
+    assert "server_name img.corepet.com.br;" in nginx_conf
+    assert "ssl_certificate /etc/nginx/ssl/corepet-img/fullchain.pem;" in nginx_conf
+    assert "ssl_certificate_key /etc/nginx/ssl/corepet-img/privkey.pem;" in nginx_conf
+    assert "include /etc/nginx/includes/product-image-server-locations.conf;" in nginx_conf
+    assert "proxy_pass http://backend/public/product-images/produtos/;" in image_locations
+    assert 'add_header Access-Control-Allow-Origin "*";' in image_locations
+    assert (
+        "PRODUCT_IMAGE_S3_PUBLIC_BASE_URL: "
+        "${PRODUCT_IMAGE_S3_PUBLIC_BASE_URL:-https://img.corepet.com.br}"
+    ) in compose_text
+    assert "https://img.mlprohub.com.br" not in compose_text

@@ -181,6 +181,7 @@ from app.routes.ecommerce_notify_routes import router as ecommerce_notify_router
 from app.routes.ecommerce_analytics_routes import router as ecommerce_analytics_router
 from app.routes.ecommerce_entregador import router as ecommerce_entregador_router
 from app.routes.ecommerce_drive_routes import router as ecommerce_drive_router
+from app.routes.product_images_public import router as product_images_public_router
 from app.routes.sefaz_routes import router as sefaz_router
 from app.routes.modulos_routes import router as modulos_router
 from app.security.module_access import require_active_module
@@ -832,6 +833,7 @@ app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
 app.include_router(health_check_router, tags=["Infrastructure"])
 app.include_router(error_events_router)
 app.include_router(ops_tenants_router)
+app.include_router(product_images_public_router)
 
 app.include_router(auth_router, tags=["Autenticação Multi-Tenant"])
 app.include_router(usuarios_router, tags=["Usuários & RBAC"])
