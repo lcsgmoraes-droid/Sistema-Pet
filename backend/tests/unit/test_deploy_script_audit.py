@@ -48,3 +48,11 @@ def test_deploy_step_audit_does_not_suppress_failure_trap():
 
     assert 'if [[ "$status" == "success" || "$status" == "failed" ]]; then' in script
     assert "DEPLOY_EVENT_RECORDED=1" in script
+
+
+def test_deploy_script_keeps_manual_ops_audit_log_writable():
+    script = _deploy_script_text()
+
+    assert 'ops_command_audit_log_path="$APP_DIR/backend/logs/ops_command_events.jsonl"' in script
+    assert 'touch "$ops_command_audit_log_path"' in script
+    assert 'chmod 0666 "$ops_command_audit_log_path"' in script
