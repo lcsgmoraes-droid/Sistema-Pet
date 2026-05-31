@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
+from email.utils import format_datetime
 from io import BytesIO
 from pathlib import Path, PurePosixPath
 from typing import Optional
@@ -32,6 +34,15 @@ class StoredProductImage:
     url: str
     thumbnail_url: str
     image_token: str
+
+
+@dataclass(frozen=True)
+class PublicProductImage:
+    content: bytes
+    content_type: str
+    cache_control: Optional[str] = None
+    etag: Optional[str] = None
+    last_modified: Optional[str] = None
 
 
 def get_product_image_storage_backend() -> str:
@@ -73,6 +84,70 @@ def _build_s3_public_url(storage_key: str) -> str:
             "PRODUCT_IMAGE_S3_PUBLIC_BASE_URL precisa estar configurada para servir imagens externas.",
         )
     return f"{base_url}/{storage_key.lstrip('/')}"
+
+
+def _normalize_public_s3_product_image_key(storage_key: str) -> str:
+    raw_key = str(storage_key or "").strip()
+    parsed = urlparse(raw_key)
+    if (
+        not raw_key
+        or parsed.scheme
+        or parsed.netloc
+        or raw_key.startswith("/")
+        or "\\" in raw_key
+    ):
+        raise ValueError("Chave de imagem invalida.")
+
+    parts = PurePosixPath(raw_key).parts
+    if any(part in {"", ".", ".."} for part in parts):
+        raise ValueError("Chave de imagem invalida.")
+
+    prefix = _s3_prefix()
+    if prefix and not raw_key.startswith(f"{prefix}/"):
+        raise ValueError("Chave de imagem fora do prefixo permitido.")
+
+    return raw_key
+
+
+def _format_s3_last_modified(value) -> Optional[str]:
+    if not value:
+        return None
+    if isinstance(value, datetime):
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return format_datetime(value.astimezone(timezone.utc), usegmt=True)
+    return str(value)
+
+
+def read_public_s3_product_image(storage_key: str) -> PublicProductImage:
+    if get_product_image_storage_backend() != "s3":
+        raise RuntimeError("Storage de imagens S3 nao esta ativo.")
+
+    normalized_key = _normalize_public_s3_product_image_key(storage_key)
+    bucket = str(settings.PRODUCT_IMAGE_S3_BUCKET or "").strip()
+    if not bucket:
+        raise RuntimeError("PRODUCT_IMAGE_S3_BUCKET nao configurado.")
+
+    client = _get_s3_client()
+    try:
+        response = client.get_object(Bucket=bucket, Key=normalized_key)
+    except Exception as exc:
+        error_code = str(
+            getattr(exc, "response", {}).get("Error", {}).get("Code", "")
+        )
+        if error_code in {"404", "NoSuchKey", "NotFound"}:
+            raise FileNotFoundError(normalized_key) from exc
+        raise
+
+    body = response.get("Body")
+    content = body.read() if body is not None else b""
+    return PublicProductImage(
+        content=content,
+        content_type=str(response.get("ContentType") or WEBP_CONTENT_TYPE),
+        cache_control=response.get("CacheControl"),
+        etag=response.get("ETag"),
+        last_modified=_format_s3_last_modified(response.get("LastModified")),
+    )
 
 
 def _get_s3_client():

@@ -1,9 +1,11 @@
 import os
 import sys
+from datetime import datetime, timezone
 from io import BytesIO
 from pathlib import Path
 
 from PIL import Image
+import pytest
 
 
 os.environ["DEBUG"] = "false"
@@ -99,3 +101,65 @@ def test_save_product_image_variants_local_writes_original_and_thumbnail(tmp_pat
         / "thumbs"
         / "foto-principal.webp"
     ).exists()
+
+
+class _FakeS3Body:
+    def __init__(self, content: bytes):
+        self._content = content
+
+    def read(self) -> bytes:
+        return self._content
+
+
+class _FakeS3Client:
+    def __init__(self):
+        self.calls = []
+
+    def get_object(self, *, Bucket, Key):
+        self.calls.append((Bucket, Key))
+        return {
+            "Body": _FakeS3Body(b"imagem-webp"),
+            "ContentType": "image/webp",
+            "CacheControl": "public, max-age=31536000, immutable",
+            "ETag": '"abc123"',
+            "LastModified": datetime(2026, 4, 28, 11, 58, 4, tzinfo=timezone.utc),
+        }
+
+
+def test_read_public_s3_product_image_fetches_allowed_key(monkeypatch):
+    fake_client = _FakeS3Client()
+    monkeypatch.setattr(storage, "_get_s3_client", lambda: fake_client)
+    monkeypatch.setattr(storage.settings, "PRODUCT_IMAGE_STORAGE_BACKEND", "s3")
+    monkeypatch.setattr(storage.settings, "PRODUCT_IMAGE_S3_BUCKET", "petshop-produtos-prod")
+    monkeypatch.setattr(storage.settings, "PRODUCT_IMAGE_S3_PREFIX", "produtos")
+
+    image = storage.read_public_s3_product_image(
+        "produtos/tenant-1/42/originais/foto-principal.webp",
+    )
+
+    assert fake_client.calls == [
+        ("petshop-produtos-prod", "produtos/tenant-1/42/originais/foto-principal.webp")
+    ]
+    assert image.content == b"imagem-webp"
+    assert image.content_type == "image/webp"
+    assert image.cache_control == "public, max-age=31536000, immutable"
+    assert image.etag == '"abc123"'
+    assert image.last_modified == "Tue, 28 Apr 2026 11:58:04 GMT"
+
+
+@pytest.mark.parametrize(
+    "storage_key",
+    [
+        "../secrets.txt",
+        "/produtos/tenant-1/42/originais/foto.webp",
+        "uploads/produtos/tenant-1/42/originais/foto.webp",
+        "https://img.mlprohub.com.br/produtos/tenant-1/42/originais/foto.webp",
+    ],
+)
+def test_read_public_s3_product_image_rejects_untrusted_keys(storage_key, monkeypatch):
+    monkeypatch.setattr(storage.settings, "PRODUCT_IMAGE_STORAGE_BACKEND", "s3")
+    monkeypatch.setattr(storage.settings, "PRODUCT_IMAGE_S3_BUCKET", "petshop-produtos-prod")
+    monkeypatch.setattr(storage.settings, "PRODUCT_IMAGE_S3_PREFIX", "produtos")
+
+    with pytest.raises(ValueError):
+        storage.read_public_s3_product_image(storage_key)
