@@ -165,7 +165,7 @@ def _activate_user_tenant_context(user: User) -> str:
 
 
 def _build_storefront_reset_link(tenant: Tenant | None, user_email: str, reset_token: str) -> str:
-    base_url = (os.getenv("ECOMMERCE_BASE_URL") or "https://mlprohub.com.br").rstrip("/")
+    base_url = (os.getenv("ECOMMERCE_BASE_URL") or "https://corepet.com.br").rstrip("/")
     store_ref = None
     if tenant:
         store_ref = tenant.ecommerce_slug or tenant.id
@@ -238,7 +238,7 @@ def _issue_email_verification_token(user: User) -> str:
 
 
 def _build_email_verification_link(user_email: str, raw_token: str) -> str:
-    base_url = (os.getenv("FRONTEND_URL") or os.getenv("ECOMMERCE_BASE_URL") or "https://mlprohub.com.br").rstrip("/")
+    base_url = (os.getenv("FRONTEND_URL") or os.getenv("ECOMMERCE_BASE_URL") or "https://corepet.com.br").rstrip("/")
     return f"{base_url}/verificar-email?email={quote(user_email)}&token={quote(raw_token)}"
 
 

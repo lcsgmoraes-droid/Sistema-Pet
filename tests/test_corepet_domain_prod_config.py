@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 
@@ -7,6 +8,10 @@ ROOT = Path(__file__).resolve().parents[1]
 NGINX_CONF = ROOT / "nginx" / "nginx.conf"
 COMPOSE_PROD = ROOT / "docker-compose.prod.yml"
 GITIGNORE = ROOT / ".gitignore"
+APP_MOBILE_CONFIG = ROOT / "app-mobile" / "src" / "config.ts"
+APP_MOBILE_EAS = ROOT / "app-mobile" / "eas.json"
+ECOMMERCE_AUTH = ROOT / "backend" / "app" / "routes" / "ecommerce_auth.py"
+ECOMMERCE_NOTIFY = ROOT / "backend" / "app" / "routes" / "ecommerce_notify_routes.py"
 
 
 def test_prod_nginx_accepts_corepet_and_legacy_domains():
@@ -86,6 +91,30 @@ def test_prod_generates_public_links_with_corepet_domain():
     assert "FRONTEND_URL: ${FRONTEND_URL:-https://corepet.com.br}" in compose_text
     assert "ECOMMERCE_BASE_URL: ${ECOMMERCE_BASE_URL:-https://corepet.com.br}" in compose_text
     assert "SMTP_FROM" not in compose_text
+
+
+def test_runtime_defaults_use_corepet_domain():
+    mobile_config = APP_MOBILE_CONFIG.read_text(encoding="utf-8")
+    eas_config = json.loads(APP_MOBILE_EAS.read_text(encoding="utf-8"))
+    ecommerce_auth = ECOMMERCE_AUTH.read_text(encoding="utf-8")
+    ecommerce_notify = ECOMMERCE_NOTIFY.read_text(encoding="utf-8")
+
+    assert "const DEFAULT_PROD_API_URL = 'https://corepet.com.br/api';" in mobile_config
+    assert "https://mlprohub.com.br/api" not in mobile_config
+
+    assert (
+        eas_config["build"]["preview"]["env"]["EXPO_PUBLIC_API_URL"]
+        == "https://corepet.com.br/api"
+    )
+    assert (
+        eas_config["build"]["production"]["env"]["EXPO_PUBLIC_API_URL"]
+        == "https://corepet.com.br/api"
+    )
+
+    assert 'or "https://corepet.com.br"' in ecommerce_auth
+    assert 'or "https://mlprohub.com.br"' not in ecommerce_auth
+    assert '"https://corepet.com.br"' in ecommerce_notify
+    assert '"https://mlprohub.com.br"' not in ecommerce_notify
 
 
 def test_prod_serves_product_images_from_corepet_domain():

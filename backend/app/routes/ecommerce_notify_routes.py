@@ -162,7 +162,7 @@ def notificar_clientes_estoque_disponivel(
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
     store_name = tenant.name if tenant else "Petshop"
     store_ref = (tenant.ecommerce_slug or tenant_id) if tenant else tenant_id
-    base_url = os.getenv("ECOMMERCE_BASE_URL", "https://mlprohub.com.br")
+    base_url = os.getenv("ECOMMERCE_BASE_URL", "https://corepet.com.br")
 
     # Buscar SKU do produto para incluir na URL (link direto filtrado)
     from app.produtos_models import Produto
