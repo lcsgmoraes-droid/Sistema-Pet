@@ -70,7 +70,7 @@ export default function Planos() {
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
           <Link to="/landing" className="flex items-center gap-2 font-bold">
-            <img src="/favicon.svg" alt="" className="h-6 w-6 rounded" />
+            <img src="/brand/corepet/corepet-icon-64.png" alt="" className="h-6 w-6 rounded" />
             CorePet
           </Link>
           <div className="flex items-center gap-3 text-sm">

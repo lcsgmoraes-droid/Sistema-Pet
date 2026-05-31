@@ -457,7 +457,7 @@ const LegalPage = ({ type = 'termos' }) => {
           to="/login"
           className="inline-flex items-center gap-2 text-sm font-semibold text-blue-700 hover:text-blue-800"
         >
-          <img src="/favicon.svg" alt="" className="h-4 w-4 rounded" />
+          <img src="/brand/corepet/corepet-icon-64.png" alt="" className="h-4 w-4 rounded" />
           CorePet
         </Link>
 

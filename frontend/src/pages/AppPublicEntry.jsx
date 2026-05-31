@@ -106,7 +106,7 @@ export default function AppPublicEntry() {
     <main className="min-h-screen bg-slate-50 text-slate-950">
       <section className="mx-auto flex min-h-screen w-full max-w-3xl flex-col justify-center px-5 py-12">
         <div className="mb-7 flex items-center gap-3">
-          <img src="/favicon.svg" alt="" className="h-11 w-11 rounded-xl shadow-sm" />
+          <img src="/brand/corepet/corepet-icon-64.png" alt="" className="h-11 w-11 rounded-xl shadow-sm" />
           <div>
             <p className="text-xs font-bold uppercase tracking-[0.18em] text-blue-600">
               CorePet

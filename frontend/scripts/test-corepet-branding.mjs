@@ -18,6 +18,10 @@ const sitemap = read('public/sitemap.xml');
 
 assert.match(indexHtml, /<title>CorePet - Sistema de Gestao Integrada<\/title>/);
 assert.match(indexHtml, /content="CorePet centraliza a gestao do petshop/);
+assert.match(indexHtml, /\/brand\/corepet\/corepet-icon-32\.png/);
+assert.match(indexHtml, /\/brand\/corepet\/corepet-icon-192\.png/);
+assert.match(indexHtml, /\/brand\/corepet\/corepet-icon-180\.png/);
+assert.doesNotMatch(indexHtml, /href="\/favicon\.svg"/);
 assert.match(favicon, /CorePet favicon/);
 assert.match(robots, /https:\/\/corepet\.com\.br\/sitemap\.xml/);
 assert.doesNotMatch(robots, /mlprohub\.com\.br/);
