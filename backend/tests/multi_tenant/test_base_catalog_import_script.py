@@ -43,7 +43,7 @@ def _script_session():
         )
     )
     session.execute(
-        text("INSERT INTO users (email, tenant_id, is_active) VALUES ('admin@mlprohub.com.br', :tenant, 1)"),
+        text("INSERT INTO users (email, tenant_id, is_active) VALUES ('atacadaopetpp@gmail.com', :tenant, 1)"),
         {"tenant": SOURCE_TENANT},
     )
     session.commit()

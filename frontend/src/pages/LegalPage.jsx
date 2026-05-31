@@ -2,7 +2,7 @@ import { Link } from 'react-router-dom';
 import { ShieldCheck } from 'lucide-react';
 
 const updatedAt = '08/05/2026';
-const privacyContact = 'admin@mlprohub.com.br';
+const privacyContact = 'atacadaopetpp@gmail.com';
 
 const legalContent = {
   termos: {

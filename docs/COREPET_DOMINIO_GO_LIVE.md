@@ -87,7 +87,7 @@ Observacoes:
 
 - `mlprohub.com.br` fica em `ALLOWED_ORIGINS` enquanto houver acesso legado.
 - `SMTP_FROM` so deve mudar quando o dominio/e-mail estiver autenticado para envio.
-- Nao alterar tenants ou usuarios antigos como `admin@mlprohub.com.br`.
+- Nao alterar tenants ou usuarios antigos sem roteiro explicito. A troca pontual do administrador para `atacadaopetpp@gmail.com` deve preservar `id`, `tenant_id`, senha, permissoes e historico.
 
 ## Validacao antes do deploy
 

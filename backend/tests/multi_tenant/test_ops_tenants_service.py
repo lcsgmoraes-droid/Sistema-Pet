@@ -94,7 +94,7 @@ def ops_tenants_session():
             """
             INSERT INTO users (id, email, tenant_id, nome, is_active, is_admin, created_at)
             VALUES
-            (1, 'admin@mlprohub.com.br', :source, 'Lucas Admin', 1, 1, '2026-05-01'),
+            (1, 'atacadaopetpp@gmail.com', :source, 'Lucas Admin', 1, 1, '2026-05-01'),
             (10, 'maiaraalmeidaa42@hotmail.com', :target, 'Maiara Almeida', 1, 1, '2026-05-17'),
             (11, 'vet@clinica.test', :target, 'Veterinario', 1, 0, '2026-05-18')
             """
