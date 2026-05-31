@@ -1,4 +1,4 @@
-package com.petshopapp
+package br.com.corepet.app
 
 import android.os.Build
 import android.os.Bundle
