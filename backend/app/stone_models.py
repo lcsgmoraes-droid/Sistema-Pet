@@ -223,6 +223,11 @@ class StoneConfig(BaseTenantModel):
     webhook_url = Column(String(500))
     webhook_enabled = Column(Boolean, default=True)
 
+    # ── POS (maquininha) ─────────────────────────────────────────────────────
+    # Número de série da maquininha principal. Aparece no adesivo da máquina
+    # (ex: "6C582505") ou no Dashboard Pagar.me → Terminais.
+    pos_serial_number = Column(String(50), nullable=True)
+
     # Status
     active = Column(Boolean, default=True)
 
@@ -260,6 +265,8 @@ class StoneConfig(BaseTenantModel):
             'documento': self.documento,
             'conciliacao_username': self.conciliacao_username,
             'conciliacao_configurado': bool(self.conciliacao_username and self.conciliacao_password_enc),
+            # POS
+            'pos_serial_number': self.pos_serial_number,
             'created_at': safe_datetime_to_iso(self.created_at),
             'updated_at': safe_datetime_to_iso(self.updated_at),
             'tenant_id': self.tenant_id

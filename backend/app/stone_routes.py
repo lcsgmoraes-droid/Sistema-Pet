@@ -45,6 +45,7 @@ class StoneConfigSchema(BaseModel):
     enable_debit_card: bool = False
     max_installments: int = 12
     webhook_url: Optional[str] = None
+    pos_serial_number: Optional[str] = None
 
 
 class CreatePixPaymentSchema(BaseModel):
@@ -90,7 +91,7 @@ class RefundPaymentSchema(BaseModel):
 
 class CriarPedidoPosSchema(BaseModel):
     """Schema para criar pedido na maquininha (POS)"""
-    serial_number: str = Field(..., description="Número de série da maquininha Stone")
+    serial_number: Optional[str] = Field(None, description="Número de série da maquininha Stone (usa padrão da config se omitido)")
     items: List[Dict] = Field(..., description="Itens: [{amount (centavos), description, quantity, code}]")
     customer_name: str = Field(default="Cliente")
     customer_email: Optional[str] = None
@@ -121,6 +122,22 @@ def get_stone_client(db: Session, tenant_id) -> StoneAPIClient:
     return StoneAPIClient(secret_key=config.client_id)
 
 
+def get_stone_client_and_config(db: Session, tenant_id):
+    """Obtém cliente Stone e o registro de config para o tenant"""
+    config = db.query(StoneConfig).filter(
+        StoneConfig.tenant_id == tenant_id,
+        StoneConfig.active == True
+    ).first()
+
+    if not config:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Configuração Stone não encontrada. Configure primeiro em /api/stone/config"
+        )
+
+    return StoneAPIClient(secret_key=config.client_id), config
+
+
 # ==========================================
 # PEDIDO POS (MAQUININHA)
 # ==========================================
@@ -143,7 +160,15 @@ async def criar_pedido_pos(
     user, tenant_id = auth
     tenant_id_str = str(tenant_id)
 
-    stone_client = get_stone_client(db, tenant_id_str)
+    stone_client, stone_config = get_stone_client_and_config(db, tenant_id_str)
+
+    # Serial number: usa o do pedido, ou o salvo na config como padrão
+    serial_number = pedido.serial_number or (stone_config.pos_serial_number or "")
+    if not serial_number:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Informe o número de série da maquininha (serial_number) ou configure-o em /api/stone/config"
+        )
 
     external_id = pedido.external_id or f"VENDA-{pedido.venda_id or uuid.uuid4().hex[:8]}-{uuid.uuid4().hex[:6]}"
 
@@ -168,9 +193,9 @@ async def criar_pedido_pos(
         stone_response = await stone_client.criar_pedido_pos(
             items=pedido.items,
             customer=customer,
-            serial_number=pedido.serial_number,
+            serial_number=serial_number,
             payment_setup=payment_setup,
-            metadata={"external_id": external_id, "venda_id": pedido.venda_id},
+            metadata={"external_id": external_id, "venda_id": pedido.venda_id, "display_name": f"Pedido #{pedido.venda_id or external_id[:8]}"},
         )
 
         amount_reais = Decimal(sum(i.get("amount", 0) for i in pedido.items)) / 100
@@ -201,13 +226,13 @@ async def criar_pedido_pos(
             transaction_id=transaction.id,
             event_type="pedido_pos_criado",
             event_source="sistema",
-            description=f"Pedido POS criado na maquininha {pedido.serial_number}",
+            description=f"Pedido POS criado na maquininha {serial_number}",
             new_status="pending",
             user_id=user.id,
             tenant_id=tenant_id_str,
         )
 
-        logger.info(f"Pedido POS criado: order_id={stone_response['id']} serial={pedido.serial_number}")
+        logger.info(f"Pedido POS criado: order_id={stone_response['id']} serial={serial_number}")
 
         return {
             "success": True,
@@ -268,6 +293,87 @@ async def fechar_pedido_pos(
         return {"success": True, "message": "Pedido fechado com sucesso"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erro ao fechar pedido: {str(e)}")
+
+
+@router.get("/pedidos-abertos")
+async def listar_pedidos_abertos_pos(
+    db: Session = Depends(get_session),
+    auth = Depends(get_current_user_and_tenant)
+):
+    """
+    Lista pedidos em aberto na Stone (closed=false).
+    Útil para diagnosticar o limite de 30 pedidos que bloqueia o POS:
+    se a conta tiver >= 30 pedidos abertos, a maquininha para de exibir novos.
+    """
+    user, tenant_id = auth
+    stone_client = get_stone_client(db, str(tenant_id))
+    try:
+        resultado = await stone_client.listar_pedidos_abertos()
+        pedidos = resultado.get("data", [])
+        return {
+            "total": len(pedidos),
+            "alerta_limite": len(pedidos) >= 25,
+            "pedidos": [
+                {
+                    "id": p.get("id"),
+                    "code": p.get("code"),
+                    "status": p.get("status"),
+                    "amount": p.get("amount"),
+                    "created_at": p.get("created_at"),
+                    "closed": p.get("closed"),
+                }
+                for p in pedidos
+            ],
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao listar pedidos abertos: {str(e)}")
+
+
+@router.post("/pedidos-abertos/cancelar-todos")
+async def cancelar_todos_pedidos_abertos(
+    db: Session = Depends(get_session),
+    auth = Depends(get_current_user_and_tenant)
+):
+    """
+    Cancela todos os pedidos abertos na Stone para liberar a fila do POS.
+    Use isso quando a maquininha parar de exibir novos pedidos (limite de 30).
+    Só cancela pedidos que ainda não foram pagos (status != paid).
+    """
+    user, tenant_id = auth
+    stone_client = get_stone_client(db, str(tenant_id))
+    try:
+        resultado = await stone_client.listar_pedidos_abertos()
+        pedidos = resultado.get("data", [])
+
+        cancelados = []
+        erros = []
+        for p in pedidos:
+            order_id = p.get("id")
+            if not order_id:
+                continue
+            try:
+                await stone_client.cancelar_pedido(order_id)
+                cancelados.append(order_id)
+                # Atualiza registro local se existir
+                local = db.query(StoneTransaction).filter(
+                    StoneTransaction.stone_payment_id == order_id
+                ).first()
+                if local:
+                    local.status = "cancelled"
+                    local.cancelled_at = datetime.now(timezone.utc)
+            except Exception as ex:
+                erros.append({"order_id": order_id, "erro": str(ex)})
+
+        db.commit()
+        return {
+            "success": True,
+            "cancelados": len(cancelados),
+            "erros": len(erros),
+            "ids_cancelados": cancelados,
+            "detalhes_erros": erros,
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erro ao cancelar pedidos: {str(e)}")
 
 
 def registrar_log(
@@ -387,6 +493,7 @@ def obter_config_stone(
             "documento": "",
             "conciliacao_username": None,
             "conciliacao_configurado": False,
+            "pos_serial_number": None,
         }
 
     return config.to_dict()
