@@ -72,6 +72,7 @@ def build_preference_payload(
     forma_pagamento_tipo: str,
     endereco_entrega: str | None,
     tipo_retirada: str | None,
+    notification_url: str | None = None,
 ) -> dict[str, Any]:
     base_url = _public_base_url()
     pedido_id = str(pedido.pedido_id)
@@ -103,7 +104,7 @@ def build_preference_payload(
         ],
         "external_reference": pedido_id,
         "metadata": metadata,
-        "notification_url": f"{base_url}/api/webhooks/mercadopago",
+        "notification_url": notification_url or f"{base_url}/api/webhooks/mercadopago",
         "back_urls": {
             "success": os.getenv("MERCADO_PAGO_BACK_URL_SUCCESS")
             or f"{base_url}/ecommerce?payment_status=success&pedido_id={pedido_id}",
@@ -120,8 +121,9 @@ def build_preference_payload(
     }
 
 
-def select_checkout_url(preference: dict[str, Any]) -> str:
-    if _env_flag("MERCADO_PAGO_USE_SANDBOX"):
+def select_checkout_url(preference: dict[str, Any], *, use_sandbox: bool | None = None) -> str:
+    sandbox = _env_flag("MERCADO_PAGO_USE_SANDBOX") if use_sandbox is None else bool(use_sandbox)
+    if sandbox:
         return str(preference.get("sandbox_init_point") or preference.get("init_point") or "")
     return str(preference.get("init_point") or preference.get("sandbox_init_point") or "")
 
@@ -133,6 +135,9 @@ def create_preference(
     forma_pagamento_tipo: str,
     endereco_entrega: str | None,
     tipo_retirada: str | None,
+    access_token: str | None = None,
+    notification_url: str | None = None,
+    use_sandbox: bool | None = None,
     http_post: Callable[..., Any] = requests.post,
 ) -> dict[str, Any]:
     payload = build_preference_payload(
@@ -141,11 +146,13 @@ def create_preference(
         forma_pagamento_tipo=forma_pagamento_tipo,
         endereco_entrega=endereco_entrega,
         tipo_retirada=tipo_retirada,
+        notification_url=notification_url,
     )
+    token = (access_token or "").strip() or _get_access_token()
     response = http_post(
         f"{MERCADO_PAGO_API_BASE_URL}/checkout/preferences",
         headers={
-            "Authorization": f"Bearer {_get_access_token()}",
+            "Authorization": f"Bearer {token}",
             "Content-Type": "application/json",
         },
         json=payload,
@@ -160,7 +167,7 @@ def create_preference(
         )
 
     preference = response.json()
-    checkout_url = select_checkout_url(preference)
+    checkout_url = select_checkout_url(preference, use_sandbox=use_sandbox)
     if not checkout_url:
         raise HTTPException(
             status_code=status.HTTP_502_BAD_GATEWAY,
@@ -176,13 +183,18 @@ def create_preference(
     }
 
 
-def fetch_payment(payment_id: str, http_get: Callable[..., Any] = requests.get) -> dict[str, Any]:
+def fetch_payment(
+    payment_id: str,
+    *,
+    access_token: str | None = None,
+    http_get: Callable[..., Any] = requests.get,
+) -> dict[str, Any]:
     if not payment_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="payment_id obrigatorio")
 
     response = http_get(
         f"{MERCADO_PAGO_API_BASE_URL}/v1/payments/{payment_id}",
-        headers={"Authorization": f"Bearer {_get_access_token()}"},
+        headers={"Authorization": f"Bearer {(access_token or '').strip() or _get_access_token()}"},
         timeout=20,
     )
 

@@ -12,10 +12,12 @@ from app.idempotency_models import IdempotencyKey
 from app.models import Cliente, User
 from app.pedido_models import Pedido, PedidoItem
 from app.produtos_models import Produto
+from app.services.ecommerce_payment_config import runtime_config_from_webhook_token
 from app.services.mercado_pago_checkout import (
     extract_notification_payment_id,
     fetch_payment,
     normalize_payment_payload,
+    validate_webhook_signature,
     validate_webhook_signature_from_env,
 )
 from app.tenancy.context import set_current_tenant
@@ -787,6 +789,146 @@ async def webhook_pagarme(request: Request):
     except Exception as exc:
         db.rollback()
         raise HTTPException(status_code=500, detail=f"Erro ao processar webhook Pagar.me: {exc}")
+    finally:
+        db.close()
+
+
+@router.post("/mercadopago/{webhook_token}")
+async def webhook_mercadopago_tenant(webhook_token: str, request: Request):
+    raw_body = await request.body()
+    try:
+        notification_payload = json.loads(raw_body.decode("utf-8")) if raw_body else {}
+    except Exception:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Payload JSON invalido")
+
+    payment_id = extract_notification_payment_id(notification_payload, request)
+
+    db = SessionLocal()
+    try:
+        payment_config = runtime_config_from_webhook_token(db, webhook_token)
+        if not payment_config:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Configuracao Mercado Pago nao encontrada para este webhook",
+            )
+
+        signature_status = validate_webhook_signature(
+            request,
+            payment_config.webhook_secret,
+            data_id=payment_id,
+        )
+
+        try:
+            payment_payload = fetch_payment(
+                str(payment_id or ""),
+                access_token=payment_config.access_token,
+            )
+        except HTTPException as exc:
+            live_mode = notification_payload.get("live_mode")
+            if live_mode is False or str(live_mode).strip().lower() == "false":
+                return {
+                    "status": "ignored_simulation",
+                    "provider": "mercadopago",
+                    "payment_id": payment_id,
+                    "signature": signature_status,
+                    "detail": "Simulacao Mercado Pago sem pagamento real consultavel",
+                }
+            raise exc
+
+        payload = normalize_payment_payload(payment_payload, notification_payload)
+        tenant_id = payment_config.tenant_id
+        set_current_tenant(UUID(tenant_id))
+
+        event_id, event_type, request_hash = _extract_event_info(notification_payload, raw_body)
+        payment_status = str(payload.get("status") or "unknown").strip().lower()
+
+        endpoint_name = "POST /api/webhooks/mercadopago/{webhook_token}"
+        key_name = f"mercadopago:{payment_id}:{event_type}:{payment_status}"
+
+        existing = (
+            db.query(IdempotencyKey)
+            .filter(
+                IdempotencyKey.user_id == 0,
+                IdempotencyKey.tenant_id == tenant_id,
+                IdempotencyKey.endpoint == endpoint_name,
+                IdempotencyKey.chave_idempotencia == key_name,
+            )
+            .first()
+        )
+
+        if existing:
+            if existing.request_hash != request_hash:
+                return {
+                    "status": "duplicate_status",
+                    "event_id": event_id,
+                    "event_type": event_type,
+                    "payment_id": payment_id,
+                    "signature": signature_status,
+                }
+            return {
+                "status": "duplicate",
+                "event_id": event_id,
+                "event_type": event_type,
+                "payment_id": payment_id,
+                "signature": signature_status,
+            }
+
+        registry = IdempotencyKey(
+            user_id=0,
+            tenant_id=tenant_id,
+            endpoint=endpoint_name,
+            chave_idempotencia=key_name,
+            request_hash=request_hash,
+            status="processing",
+        )
+        db.add(registry)
+        db.flush()
+
+        pedido_id = _find_pedido_id(payload)
+        pedido_status = _map_payment_status(payload)
+
+        updated = False
+        venda_id = None
+        if pedido_id and pedido_status:
+            pedido = (
+                db.query(Pedido)
+                .filter(Pedido.pedido_id == pedido_id, Pedido.tenant_id == tenant_id)
+                .first()
+            )
+            if pedido:
+                pedido.status = pedido_status
+                updated = True
+                if pedido_status == "aprovado":
+                    payment_method, _ = _extrair_pagamento_do_webhook(payload)
+                    _normalizar_payment_method_online(payment_method)
+                    venda_id = _integrar_venda_ao_motor(db, pedido, payload)
+
+        response = {
+            "status": "processed",
+            "provider": "mercadopago",
+            "event_id": event_id,
+            "event_type": event_type,
+            "payment_id": payment_id,
+            "payment_status": payment_status,
+            "signature": signature_status,
+            "pedido_atualizado": updated,
+            "venda_id": venda_id,
+        }
+
+        registry.status = "completed"
+        registry.response_status_code = 200
+        registry.response_body = json.dumps(response)
+        registry.completed_at = datetime.utcnow()
+        db.commit()
+
+        return response
+
+    except HTTPException:
+        db.rollback()
+        raise
+    except Exception as exc:
+        db.rollback()
+        raise HTTPException(status_code=500, detail=f"Erro ao processar webhook Mercado Pago: {exc}")
     finally:
         db.close()
 

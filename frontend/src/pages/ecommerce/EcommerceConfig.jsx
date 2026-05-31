@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { Copy, CreditCard, KeyRound, Webhook } from 'lucide-react'
 import { api } from '../../services/api'
 
 const DIAS_SEMANA = [
@@ -23,6 +24,7 @@ function formatDias(diasArr) {
 export default function EcommerceConfig() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [savingPayment, setSavingPayment] = useState(false)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
 
@@ -31,6 +33,19 @@ export default function EcommerceConfig() {
   const [horarioAbertura, setHorarioAbertura] = useState('')
   const [horarioFechamento, setHorarioFechamento] = useState('')
   const [diasSelecionados, setDiasSelecionados] = useState([])
+  const [paymentLoading, setPaymentLoading] = useState(true)
+  const [paymentConfig, setPaymentConfig] = useState({
+    enabled: false,
+    environment: 'production',
+    public_key: '',
+    access_token_configured: false,
+    webhook_secret_configured: false,
+    webhook_url: '',
+  })
+  const [paymentSecrets, setPaymentSecrets] = useState({
+    access_token: '',
+    webhook_secret: '',
+  })
 
   // Avise-me pendentes
   const [avisos, setAvisos] = useState([])
@@ -39,6 +54,7 @@ export default function EcommerceConfig() {
   useEffect(() => {
     fetchConfig()
     fetchAvisos()
+    fetchPaymentConfig()
   }, [])
 
   async function fetchConfig() {
@@ -68,6 +84,25 @@ export default function EcommerceConfig() {
     }
   }
 
+  async function fetchPaymentConfig() {
+    try {
+      const res = await api.get('/ecommerce-payment-config/mercadopago')
+      const d = res.data || {}
+      setPaymentConfig({
+        enabled: Boolean(d.enabled),
+        environment: d.environment || 'production',
+        public_key: d.public_key || '',
+        access_token_configured: Boolean(d.access_token_configured),
+        webhook_secret_configured: Boolean(d.webhook_secret_configured),
+        webhook_url: d.webhook_url || '',
+      })
+    } catch {
+      setError('Nao foi possivel carregar a configuracao de pagamento.')
+    } finally {
+      setPaymentLoading(false)
+    }
+  }
+
   async function salvar(e) {
     e.preventDefault()
     setSaving(true)
@@ -87,6 +122,49 @@ export default function EcommerceConfig() {
       setError('Erro ao salvar. Tente novamente.')
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function salvarPagamento(e) {
+    e.preventDefault()
+    setSavingPayment(true)
+    setError('')
+    setSuccess('')
+    try {
+      const res = await api.put('/ecommerce-payment-config/mercadopago', {
+        enabled: paymentConfig.enabled,
+        environment: paymentConfig.environment,
+        public_key: paymentConfig.public_key || null,
+        access_token: paymentSecrets.access_token || null,
+        webhook_secret: paymentSecrets.webhook_secret || null,
+      })
+      const d = res.data || {}
+      setPaymentConfig({
+        enabled: Boolean(d.enabled),
+        environment: d.environment || 'production',
+        public_key: d.public_key || '',
+        access_token_configured: Boolean(d.access_token_configured),
+        webhook_secret_configured: Boolean(d.webhook_secret_configured),
+        webhook_url: d.webhook_url || '',
+      })
+      setPaymentSecrets({ access_token: '', webhook_secret: '' })
+      setSuccess('Configuracao do Mercado Pago salva com sucesso!')
+      setTimeout(() => setSuccess(''), 4000)
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Erro ao salvar Mercado Pago. Confira as credenciais.')
+    } finally {
+      setSavingPayment(false)
+    }
+  }
+
+  async function copiarWebhookUrl() {
+    if (!paymentConfig.webhook_url) return
+    try {
+      await navigator.clipboard.writeText(paymentConfig.webhook_url)
+      setSuccess('URL do webhook copiada.')
+      setTimeout(() => setSuccess(''), 2500)
+    } catch {
+      setError('Nao foi possivel copiar a URL automaticamente.')
     }
   }
 
@@ -227,6 +305,146 @@ export default function EcommerceConfig() {
           className="w-full bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition-colors"
         >
           {saving ? 'Salvando…' : 'Salvar Configurações'}
+        </button>
+      </form>
+
+      {/* Pagamentos online */}
+      <form onSubmit={salvarPagamento} className="space-y-6">
+        <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-5">
+          <div className="flex items-start gap-3">
+            <div className="h-10 w-10 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
+              <CreditCard size={20} />
+            </div>
+            <div>
+              <h2 className="text-base font-semibold text-gray-800">Mercado Pago</h2>
+              <p className="text-sm text-gray-500">
+                Conta que recebe os pagamentos Pix, debito e credito desta loja.
+              </p>
+            </div>
+          </div>
+
+          {paymentLoading ? (
+            <div className="animate-pulse h-24 bg-gray-100 rounded-lg" />
+          ) : (
+            <>
+              <div className="flex items-center justify-between gap-4 border border-gray-100 rounded-lg p-4">
+                <div>
+                  <p className="font-medium text-gray-700">Pagamento online</p>
+                  <p className="text-sm text-gray-500">
+                    {paymentConfig.enabled ? 'Ativo no app e e-commerce.' : 'Desligado para esta loja.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPaymentConfig((prev) => ({ ...prev, enabled: !prev.enabled }))}
+                  className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none ${
+                    paymentConfig.enabled ? 'bg-emerald-500' : 'bg-gray-300'
+                  }`}
+                >
+                  <span
+                    className={`inline-block h-5 w-5 transform rounded-full bg-white shadow transition-transform ${
+                      paymentConfig.enabled ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Ambiente</label>
+                  <select
+                    value={paymentConfig.environment}
+                    onChange={(e) =>
+                      setPaymentConfig((prev) => ({ ...prev, environment: e.target.value }))
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
+                  >
+                    <option value="production">Producao</option>
+                    <option value="sandbox">Teste / Sandbox</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-medium text-gray-600 mb-1">Public key</label>
+                  <input
+                    value={paymentConfig.public_key}
+                    onChange={(e) =>
+                      setPaymentConfig((prev) => ({ ...prev, public_key: e.target.value }))
+                    }
+                    placeholder="APP_USR-..."
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="flex items-center gap-1 text-xs font-medium text-gray-600 mb-1">
+                    <KeyRound size={14} />
+                    Access token
+                  </label>
+                  <input
+                    type="password"
+                    value={paymentSecrets.access_token}
+                    onChange={(e) =>
+                      setPaymentSecrets((prev) => ({ ...prev, access_token: e.target.value }))
+                    }
+                    placeholder={
+                      paymentConfig.access_token_configured
+                        ? 'Token ja configurado'
+                        : 'APP_USR-...'
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  />
+                </div>
+                <div>
+                  <label className="flex items-center gap-1 text-xs font-medium text-gray-600 mb-1">
+                    <Webhook size={14} />
+                    Assinatura secreta
+                  </label>
+                  <input
+                    type="password"
+                    value={paymentSecrets.webhook_secret}
+                    onChange={(e) =>
+                      setPaymentSecrets((prev) => ({ ...prev, webhook_secret: e.target.value }))
+                    }
+                    placeholder={
+                      paymentConfig.webhook_secret_configured
+                        ? 'Assinatura ja configurada'
+                        : 'Cole a assinatura secreta do webhook'
+                    }
+                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-600 mb-1">URL do webhook</label>
+                <div className="flex gap-2">
+                  <input
+                    value={paymentConfig.webhook_url}
+                    readOnly
+                    className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-700"
+                  />
+                  <button
+                    type="button"
+                    onClick={copiarWebhookUrl}
+                    className="inline-flex items-center justify-center h-10 w-10 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                    title="Copiar URL"
+                  >
+                    <Copy size={18} />
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+
+        <button
+          type="submit"
+          disabled={savingPayment || paymentLoading}
+          className="w-full bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 text-white font-semibold py-2.5 rounded-xl transition-colors"
+        >
+          {savingPayment ? 'Salvando...' : 'Salvar Mercado Pago'}
         </button>
       </form>
 
