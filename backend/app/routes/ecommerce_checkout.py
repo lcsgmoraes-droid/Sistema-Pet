@@ -17,6 +17,7 @@ from app.idempotency_models import IdempotencyKey
 from app.models import Cliente, User
 from app.pedido_models import Pedido, PedidoItem
 from app.routes.ecommerce_auth import _activate_user_tenant_context, _get_current_ecommerce_user
+from app.services.mercado_pago_checkout import create_preference, is_mercado_pago_provider
 from app.utils.timezone import now_brasilia
 
 
@@ -191,6 +192,10 @@ def _pagamento_online_configurado() -> bool:
     enabled = str(os.getenv("ECOMMERCE_PAYMENT_GATEWAY_ENABLED", "")).strip().lower()
     provider = str(os.getenv("ECOMMERCE_PAYMENT_PROVIDER", "")).strip()
     return enabled in {"1", "true", "yes", "on"} and bool(provider)
+
+
+def _payment_provider() -> str:
+    return str(os.getenv("ECOMMERCE_PAYMENT_PROVIDER", "") or "").strip().lower()
 
 
 def _classificar_forma_pagamento_online(nome: str | None) -> str | None:
@@ -434,6 +439,24 @@ def finalizar_checkout(
         "forma_pagamento_tipo": forma_pagamento_tipo,
         "palavra_chave_retirada": palavra_chave,
     }
+
+    provider = _payment_provider()
+    response["payment_provider"] = provider
+    if is_mercado_pago_provider(provider):
+        preference = create_preference(
+            pedido=carrinho,
+            total=total,
+            forma_pagamento_tipo=forma_pagamento_tipo,
+            endereco_entrega=payload.endereco_entrega,
+            tipo_retirada=tipo_retirada,
+        )
+        response.update({
+            "payment_provider": "mercadopago",
+            "payment_preference_id": preference.get("preference_id"),
+            "payment_url": preference.get("payment_url"),
+            "init_point": preference.get("init_point"),
+            "sandbox_init_point": preference.get("sandbox_init_point"),
+        })
 
     if idem_row:
         idem_row.status = "completed"

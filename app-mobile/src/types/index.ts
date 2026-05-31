@@ -429,6 +429,9 @@ export interface Pedido {
   is_drive?: boolean | null;
   palavra_chave_retirada?: string | null;
   endereco_entrega?: string | null;
+  payment_provider?: string | null;
+  payment_preference_id?: string | null;
+  payment_url?: string | null;
   created_at?: string | null;
   itens: {
     produto_id: number;

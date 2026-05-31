@@ -200,6 +200,12 @@ export default function useEcommerceCheckout({
         await recordOrderId(result.pedido_id);
       }
 
+      if (result?.payment_url) {
+        onSuccess('Redirecionando para pagamento seguro...');
+        window.location.assign(result.payment_url);
+        return;
+      }
+
       onSuccess('Pagamento enviado para analise. O pedido sera liberado apos aprovacao.');
       setView('pedidos');
     } catch (err) {

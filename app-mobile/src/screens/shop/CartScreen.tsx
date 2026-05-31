@@ -10,6 +10,7 @@ import {
   Image,
   TextInput,
   KeyboardAvoidingView,
+  Linking,
   Platform,
   Modal,
 } from 'react-native';
@@ -151,6 +152,9 @@ export default function CartScreen() {
               });
               // Limpar o carrinho após o pedido ser feito com sucesso
               await limpar();
+              if (pedido.payment_url) {
+                await Linking.openURL(pedido.payment_url);
+              }
               navigation.navigate('CheckoutSucesso', { pedido });
             } catch (err: any) {
               Alert.alert(
