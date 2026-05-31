@@ -54,10 +54,10 @@ services:
       SQL_AUDIT_ENFORCE_LEVEL: error
       
       # CORS
-      ALLOWED_ORIGINS: https://mlprohub.com.br,https://www.mlprohub.com.br
+      ALLOWED_ORIGINS: https://corepet.com.br,https://www.corepet.com.br,https://mlprohub.com.br,https://www.mlprohub.com.br
       
       # App
-      APP_NAME: "Pet Shop Pro"
+      APP_NAME: "CorePet ERP"
       APP_VERSION: "1.1.0"
 
       # Backend self-healing / database pool
