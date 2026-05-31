@@ -92,10 +92,10 @@ export default function MeuPlano() {
     .filter((modulo) => !(modulosForaOfertaPublica || []).includes(modulo))
     .slice(0, 8);
   const msgContratar = encodeURIComponent(
-    "Ola! Quero ativar meu Plano Basico do Pet Shop Pro apos o periodo gratuito.",
+    "Ola! Quero ativar meu Plano Basico do CorePet apos o periodo gratuito.",
   );
   const msgBeta = encodeURIComponent(
-    "Ola! Quero solicitar acesso Beta a um modulo do Pet Shop Pro.",
+    "Ola! Quero solicitar acesso Beta a um modulo do CorePet.",
   );
 
   return (

@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import KeyboardSafeScrollView from '../../components/KeyboardSafeScrollView';
@@ -45,9 +46,9 @@ export default function LoginScreen({ navigation }: any) {
         {/* Logo / cabeçalho */}
         <View style={styles.header}>
           <View style={styles.logoCircle}>
-            <Text style={styles.logoEmoji}>🐾</Text>
+            <Image source={require('../../../assets/icon.png')} style={styles.logoImage} />
           </View>
-          <Text style={styles.titulo}>PetShop App</Text>
+          <Text style={styles.titulo}>CorePet</Text>
           <Text style={styles.subtitulo}>Faça login para continuar</Text>
         </View>
 
@@ -149,13 +150,17 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: CORES.primario,
+    backgroundColor: CORES.superficie,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: ESPACO.md,
+    borderWidth: 1,
+    borderColor: CORES.borda,
   },
-  logoEmoji: {
-    fontSize: 36,
+  logoImage: {
+    width: 68,
+    height: 68,
+    borderRadius: 18,
   },
   titulo: {
     fontSize: FONTE.destaque,

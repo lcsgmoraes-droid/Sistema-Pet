@@ -706,7 +706,7 @@ class BlingSyncService:
             BlingAPI().atualizar_estoque_produto(
                 produto_id=sync.bling_produto_id,
                 estoque_novo=float(fila.estoque_novo),
-                observacao=f"Sync {fila.origem or 'manual'} - {fila.motivo or 'Sistema Pet'}",
+                observacao=f"Sync {fila.origem or 'manual'} - {fila.motivo or 'CorePet'}",
             )
             return BlingSyncService._mark_success(db, fila, sync)
         except Exception as error:

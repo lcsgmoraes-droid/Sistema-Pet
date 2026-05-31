@@ -6,7 +6,6 @@ import {
   CreditCard,
   Lock,
   Package,
-  PawPrint,
   ShieldCheck,
   ShoppingCart,
   Sparkles,
@@ -16,9 +15,9 @@ import {
 import { Link } from "react-router-dom";
 
 const whatsappUrl =
-  "https://wa.me/5518997401641?text=Ol%C3%A1!%20Quero%20entender%20o%20Plano%20B%C3%A1sico%20do%20Pet%20Shop%20Pro.";
+  "https://wa.me/5518997401641?text=Ol%C3%A1!%20Quero%20entender%20o%20Plano%20B%C3%A1sico%20do%20CorePet.";
 const betaAccessUrl =
-  "https://wa.me/5518997401641?text=Ol%C3%A1!%20Quero%20testar%20um%20m%C3%B3dulo%20Beta%20do%20Pet%20Shop%20Pro.";
+  "https://wa.me/5518997401641?text=Ol%C3%A1!%20Quero%20testar%20um%20m%C3%B3dulo%20Beta%20do%20CorePet.";
 
 const basicFeatures = [
   "Pessoas, clientes e pets",
@@ -71,8 +70,8 @@ export default function Planos() {
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4">
           <Link to="/landing" className="flex items-center gap-2 font-bold">
-            <PawPrint className="h-6 w-6 text-emerald-600" />
-            Pet Shop Pro
+            <img src="/favicon.svg" alt="" className="h-6 w-6 rounded" />
+            CorePet
           </Link>
           <div className="flex items-center gap-3 text-sm">
             <Link to="/login" className="font-semibold text-slate-600 hover:text-slate-900">

@@ -1,5 +1,5 @@
 """
-Sistema Pet Shop Pro - Backend API
+CorePet - Backend API
 FastAPI + SQLAlchemy + SQLite/PostgreSQL
 """
 import app.database.orm_guards  # ✅ ORM Guards: força IDs=None antes do flush

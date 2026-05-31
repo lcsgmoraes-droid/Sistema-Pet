@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
 
-Sitemap: https://mlprohub.com.br/sitemap.xml
+Sitemap: https://corepet.com.br/sitemap.xml

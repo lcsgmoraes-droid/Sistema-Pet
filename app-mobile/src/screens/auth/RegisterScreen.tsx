@@ -8,6 +8,7 @@ import {
   Alert,
   ActivityIndicator,
   Linking,
+  Image,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import KeyboardSafeScrollView from '../../components/KeyboardSafeScrollView';
@@ -91,7 +92,7 @@ export default function RegisterScreen({ navigation }: any) {
     <KeyboardSafeScrollView style={styles.container} contentContainerStyle={styles.scroll}>
         <View style={styles.header}>
           <View style={styles.logoCircle}>
-            <Text style={styles.logoEmoji}>🐾</Text>
+            <Image source={require('../../../assets/icon.png')} style={styles.logoImage} />
           </View>
           <Text style={styles.titulo}>Criar conta</Text>
           <Text style={styles.subtitulo}>É grátis e bem rapidinho!</Text>
@@ -203,7 +204,7 @@ export default function RegisterScreen({ navigation }: any) {
               Li e aceito os{' '}
               <Text
                 style={styles.linkDestaque}
-                onPress={() => Linking.openURL('https://mlprohub.com.br/termos')}
+                onPress={() => Linking.openURL('https://corepet.com.br/termos')}
               >
                 Termos de Uso
               </Text>
@@ -225,7 +226,7 @@ export default function RegisterScreen({ navigation }: any) {
               Li e aceito a{' '}
               <Text
                 style={styles.linkDestaque}
-                onPress={() => Linking.openURL('https://mlprohub.com.br/privacidade')}
+                onPress={() => Linking.openURL('https://corepet.com.br/privacidade')}
               >
                 Politica de Privacidade
               </Text>
@@ -266,12 +267,14 @@ const styles = StyleSheet.create({
     width: 70,
     height: 70,
     borderRadius: 35,
-    backgroundColor: CORES.primario,
+    backgroundColor: CORES.superficie,
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: ESPACO.sm,
+    borderWidth: 1,
+    borderColor: CORES.borda,
   },
-  logoEmoji: { fontSize: 32 },
+  logoImage: { width: 58, height: 58, borderRadius: 16 },
   titulo: { fontSize: FONTE.titulo, fontWeight: 'bold', color: CORES.texto },
   subtitulo: { fontSize: FONTE.normal, color: CORES.textoSecundario, marginTop: 2 },
   bonusCard: {

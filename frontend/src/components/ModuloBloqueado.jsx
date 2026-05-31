@@ -290,7 +290,7 @@ const PreviewCampanhas = () => {
                 {campanhaAtiva.msgSistema}
               </p>
               <p className="text-[10px] text-gray-400 text-right mt-1">
-                Sistema Pet ✓✓
+                CorePet ✓✓
               </p>
             </div>
           </div>
@@ -814,8 +814,8 @@ const ModuloBloqueado = ({ modulo, children }) => {
 
   const msgWhatsApp = encodeURIComponent(
     betaPublico
-      ? `Ola! Quero solicitar acesso Beta ao modulo ${info.nome} do Sistema Pet. Pode me ajudar?`
-      : `Ola! Quero saber mais sobre o modulo ${info.nome} do Sistema Pet. Pode me ajudar?`,
+      ? `Ola! Quero solicitar acesso Beta ao modulo ${info.nome} do CorePet. Pode me ajudar?`
+      : `Ola! Quero saber mais sobre o modulo ${info.nome} do CorePet. Pode me ajudar?`,
   );
 
   const Preview = PREVIEWS[modulo] ?? null;

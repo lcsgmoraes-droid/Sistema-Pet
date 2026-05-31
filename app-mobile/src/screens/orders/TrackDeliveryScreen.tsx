@@ -441,7 +441,7 @@ export default function TrackDeliveryScreen() {
             </Text>
           )}
           {rota.paradas_antes === 0 && rota.status_parada === "pendente" && (
-            <Text style={[styles.progressoAntes, { color: "#2563EB" }]}>
+            <Text style={[styles.progressoAntes, { color: "#0F5F66" }]}>
               Voce e o proximo da rota.
             </Text>
           )}
@@ -489,7 +489,7 @@ export default function TrackDeliveryScreen() {
             {routeTrail.length > 1 && (
               <Polyline
                 coordinates={routeTrail}
-                strokeColor="#2563EB"
+                strokeColor="#0F5F66"
                 strokeWidth={4}
                 lineDashPattern={[1]}
               />
@@ -699,7 +699,7 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: "#2563EB",
+    backgroundColor: "#0F5F66",
     alignItems: "center",
     justifyContent: "center",
     borderWidth: 2,

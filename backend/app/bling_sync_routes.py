@@ -1,5 +1,5 @@
 """
-SINCRONIZAÇÃO BLING - Sistema Pet Shop Pro
+SINCRONIZAÇÃO BLING - CorePet
 Sincronização bidirecional de estoque entre sistema e Bling
 
 Fluxo:
@@ -141,9 +141,9 @@ def _motivo_faltante_bling(item: dict) -> str:
     if sku and barcode:
         return "Nao existe produto local com esse SKU nem com esse codigo de barras."
     if sku:
-        return "O SKU do Bling ainda nao existe no Sistema Pet."
+        return "O SKU do Bling ainda nao existe no CorePet."
     if barcode:
-        return "O codigo de barras do Bling ainda nao existe no Sistema Pet."
+        return "O codigo de barras do Bling ainda nao existe no CorePet."
     return "O cadastro do Bling esta sem SKU e sem codigo de barras para autocorrecao."
 
 
@@ -1268,7 +1268,7 @@ def _calcular_snapshot_sem_vinculo_com_match_bling(
             "sincroniza_estoque": _produto_sincroniza_estoque(produto),
             "motivo": (
                 (
-                    "Encontramos esse item no Sistema Pet como produto PAI. O vinculo pode existir para catalogo, "
+                    "Encontramos esse item no CorePet como produto PAI. O vinculo pode existir para catalogo, "
                     "mas o estoque fica nas variacoes e nao sera sincronizado por esse cadastro."
                 )
                 if _produto_eh_pai(produto)
@@ -1962,7 +1962,7 @@ def resumo_cobertura_bling(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """
-    Resumo de cobertura Bling -> Sistema Pet.
+    Resumo de cobertura Bling -> CorePet.
 
     Regra de negócio: o universo principal é o Bling (online/marketplace).
     """
@@ -2001,7 +2001,7 @@ def listar_faltantes_bling(
     user_and_tenant = Depends(get_current_user_and_tenant),
 ):
     """
-    Retorna snapshot dos produtos existentes no Bling que não possuem match no Sistema Pet.
+    Retorna snapshot dos produtos existentes no Bling que não possuem match no CorePet.
 
     - Sem force_refresh: usa cache para responder rápido.
     - Com force_refresh: recalcula snapshot sob demanda.

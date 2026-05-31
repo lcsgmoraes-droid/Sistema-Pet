@@ -1,4 +1,4 @@
-import { CalendarDays, FlaskConical, PawPrint, Stethoscope, Syringe } from "lucide-react";
+import { CalendarDays, FlaskConical, Stethoscope, Syringe } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import {
   FiCreditCard,
@@ -18,6 +18,9 @@ import FloatingCalculatorButton from "./FloatingCalculatorButton";
 import { createLayoutMenuItems } from "./layout/menuConfig";
 import SidebarMenu from "./layout/SidebarMenu";
 import ModalCalculadoraUniversal from "./ModalCalculadoraUniversal";
+
+const COREPET_LOGO = "/brand/corepet/corepet-horizontal.png";
+const COREPET_ICON = "/brand/corepet/corepet-icon-64.png";
 
 const Layout = () => {
   useEscapeFallbackForVisibleModals();
@@ -458,31 +461,33 @@ const Layout = () => {
                   sidebarOpen ? "translate-x-0" : "-translate-x-full"
                 }`
               : `${sidebarOpen ? "w-64" : "w-20"} transition-all duration-300`
-          } erp-sidebar bg-gradient-to-b from-indigo-50 to-purple-50 border-r border-indigo-100 flex flex-col shadow-lg`}
+          } erp-sidebar bg-gradient-to-b from-[#f4fbfa] to-[#fff8ea] border-r border-[#d8eee9] flex flex-col shadow-lg`}
         >
           {/* Logo/Header com Toggle */}
           <div
-            className={`p-4 flex items-center border-b border-indigo-100 bg-white/50 ${!isMobile && !sidebarOpen ? "justify-center" : "justify-between"}`}
+            className={`p-4 flex items-center border-b border-[#d8eee9] bg-white/70 ${!isMobile && !sidebarOpen ? "justify-center" : "justify-between"}`}
           >
             <div className="flex items-center gap-3">
               {!isMobile && (
                 <button
                   onClick={() => setSidebarOpen(!sidebarOpen)}
-                  className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-400 to-purple-500 hover:from-indigo-500 hover:to-purple-600 flex items-center justify-center shadow-md transition-all cursor-pointer"
+                  className="w-10 h-10 rounded-xl bg-gradient-to-br from-[#0f5f63] to-[#0f8b8d] hover:from-[#0d4f52] hover:to-[#0d7375] flex items-center justify-center shadow-md transition-all cursor-pointer"
                   title={sidebarOpen ? "Recolher menu" : "Expandir menu"}
                 >
                   <FiMenu className="text-white w-6 h-6" />
                 </button>
               )}
               {(isMobile || sidebarOpen) && (
-                <div>
-                  <h1 className="font-bold text-lg text-gray-800">
-                    Pet Shop Pro
-                  </h1>
-                  <p className="text-xs text-gray-500">Central de Gestão</p>
+                <div className="min-w-0">
+                  <img
+                    src={COREPET_LOGO}
+                    alt="CorePet"
+                    className="h-9 w-auto max-w-[148px] object-contain"
+                  />
+                  <p className="mt-1 text-xs text-gray-500">Central de Gestao</p>
                   {devControlesAtivos && sidebarOpen && (
                     <div className="mt-2 space-y-1.5">
-                      <p className="text-[10px] font-semibold uppercase tracking-wide text-indigo-500">
+                      <p className="text-[10px] font-semibold uppercase tracking-wide text-[#0f8b8d]">
                         DEV modulos: {getModoDevLabel()}
                       </p>
                       <div className="flex gap-1.5">
@@ -490,7 +495,7 @@ const Layout = () => {
                           onClick={() => definirModoDevModulos("normal")}
                           className={`px-2 py-1 rounded text-[10px] border ${
                             devModoModulos === "normal"
-                              ? "bg-indigo-100 border-indigo-200 text-indigo-700"
+                              ? "bg-[#d8eee9] border-[#b9ddd8] text-[#0f5f63]"
                               : "bg-white/70 border-gray-200 text-gray-500"
                           }`}
                         >
@@ -529,13 +534,13 @@ const Layout = () => {
                 onClick={() =>
                   isMobile ? setSidebarOpen(false) : setSidebarVisible(false)
                 }
-                className="p-2 hover:bg-indigo-100 rounded-lg transition-colors"
+                className="p-2 hover:bg-[#d8eee9] rounded-lg transition-colors"
                 title={isMobile ? "Fechar menu" : "Esconder menu completamente"}
               >
                 {isMobile ? (
-                  <FiX className="w-6 h-6 text-indigo-600" />
+                  <FiX className="w-6 h-6 text-[#0f5f63]" />
                 ) : (
-                  <PawPrint className="w-5 h-5 text-indigo-600" />
+                  <FiX className="w-5 h-5 text-[#0f5f63]" />
                 )}
               </button>
             )}
@@ -555,7 +560,7 @@ const Layout = () => {
           />
 
           {/* Bottom Actions */}
-          <div className="border-t border-indigo-100 bg-white/30">
+          <div className="border-t border-[#d8eee9] bg-white/40">
             <Link
               to="/meu-plano"
               onClick={handleMenuClick}
@@ -570,7 +575,7 @@ const Layout = () => {
             <Link
               to="/ajuda"
               onClick={handleMenuClick}
-              className="w-full flex items-center gap-3 px-4 py-2.5 mx-2 mt-1 rounded-lg text-indigo-600 hover:bg-indigo-50 transition-all"
+              className="w-full flex items-center gap-3 px-4 py-2.5 mx-2 mt-1 rounded-lg text-[#0f5f63] hover:bg-[#d8eee9] transition-all"
               title={!sidebarOpen ? "Ajuda & Planos" : ""}
             >
               <FiHelpCircle className="text-lg flex-shrink-0" />
@@ -594,10 +599,10 @@ const Layout = () => {
       {!effectiveSidebarVisible && !isMobile && !isBradescoOrganizerRoute && (
         <button
           onClick={() => setSidebarVisible(true)}
-          className="fixed left-0 top-4 z-50 p-3 bg-gradient-to-br from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white rounded-r-xl shadow-lg transition-all"
+          className="fixed left-0 top-4 z-50 p-3 bg-gradient-to-br from-[#0f5f63] to-[#0f8b8d] hover:from-[#0d4f52] hover:to-[#0d7375] text-white rounded-r-xl shadow-lg transition-all"
           title="Mostrar menu"
         >
-          <PawPrint className="w-6 h-6" />
+          <img src={COREPET_ICON} alt="" className="h-6 w-6 rounded bg-white" />
         </button>
       )}
 
@@ -618,14 +623,14 @@ const Layout = () => {
             </button>
           )}
 
-          {/* Botão Patinha Mobile - Mostrar menu quando escondido */}
+          {/* Botao CorePet Mobile - Mostrar menu quando escondido */}
           {isMobile && !effectiveSidebarVisible && !isBradescoOrganizerRoute && (
             <button
               onClick={() => setSidebarVisible(true)}
-              className="p-2 rounded-lg hover:bg-indigo-100 transition-colors md:hidden"
+              className="p-2 rounded-lg hover:bg-[#d8eee9] transition-colors md:hidden"
               aria-label="Mostrar menu"
             >
-              <PawPrint className="w-6 h-6 text-indigo-600" />
+              <img src={COREPET_ICON} alt="" className="h-6 w-6 rounded" />
             </button>
           )}
 
@@ -637,7 +642,7 @@ const Layout = () => {
               </p>
               <p className="text-xs text-gray-500">{user?.email}</p>
             </div>
-            <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-purple-600 flex items-center justify-center text-white font-bold text-sm md:text-base">
+            <div className="w-9 h-9 md:w-10 md:h-10 rounded-full bg-[#0f5f63] flex items-center justify-center text-white font-bold text-sm md:text-base">
               {user?.nome?.[0]?.toUpperCase() ||
                 user?.email?.[0]?.toUpperCase()}
             </div>

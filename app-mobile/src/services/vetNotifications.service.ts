@@ -18,7 +18,7 @@ async function ensureChannel() {
     name: "Lembretes veterinarios",
     importance: Notifications.AndroidImportance.MAX,
     vibrationPattern: [0, 350, 250, 350],
-    lightColor: "#2563EB",
+    lightColor: "#0F5F66",
   });
 }
 

@@ -126,7 +126,7 @@ const Register = () => {
                 value={nomeLoja}
                 onChange={(event) => setNomeLoja(event.target.value)}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition"
-                placeholder="Ex: Pet Shop Pro"
+                placeholder="Ex: CorePet"
                 required
               />
             </div>

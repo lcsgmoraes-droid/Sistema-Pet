@@ -335,7 +335,7 @@ export default function ProfileScreen() {
           <Text style={styles.botaoSairTexto}>Sair da conta</Text>
         </TouchableOpacity>
 
-        <Text style={styles.versao}>PetShop App v1.0.0</Text>
+        <Text style={styles.versao}>CorePet v1.0.0</Text>
         <View style={{ height: ESPACO.xxl }} />
     </KeyboardSafeScrollView>
   );

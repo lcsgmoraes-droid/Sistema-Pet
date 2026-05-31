@@ -25,7 +25,7 @@ from dotenv import load_dotenv
 from app.utils.correlation import current_correlation_id
 
 logger = logging.getLogger(__name__)
-DEFAULT_SENDER_NAME = "Pet Shop Pro"
+DEFAULT_SENDER_NAME = "CorePet"
 
 
 for env_path in (Path("/opt/petshop/.env"), Path(".env")):

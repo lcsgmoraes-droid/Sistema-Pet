@@ -65,7 +65,7 @@ export default function OpsLayout() {
               <FiShield className="h-6 w-6" />
             </div>
             <div>
-              <div className="text-base font-bold tracking-tight">MLProHub Ops</div>
+              <div className="text-base font-bold tracking-tight">CorePet Ops</div>
               <div className="text-xs text-slate-400">Central operacional</div>
             </div>
           </div>
@@ -123,7 +123,7 @@ export default function OpsLayout() {
             className="mb-3 flex items-center gap-2 rounded-lg border border-slate-800 px-3 py-2 text-sm font-semibold text-slate-200 transition hover:bg-slate-900 hover:text-white"
           >
             <FiArrowLeft className="h-4 w-4" />
-            Voltar ao Pet Shop
+            Voltar ao CorePet
           </Link>
 
           <div className="flex items-center gap-3 rounded-lg bg-slate-900 px-3 py-3">
@@ -152,7 +152,7 @@ export default function OpsLayout() {
             <div>
               <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wide text-blue-600">
                 <FiBarChart2 className="h-4 w-4" />
-                Plataforma MLProHub
+                Plataforma CorePet
               </div>
               <h1 className="mt-1 text-xl font-bold text-slate-950">Central de saude e suporte</h1>
             </div>

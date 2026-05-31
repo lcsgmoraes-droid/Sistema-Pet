@@ -1,9 +1,9 @@
 // Paleta de cores do app
 export const CORES = {
-  primario: '#2563EB',      // azul principal
-  primarioEscuro: '#1D4ED8',
-  primarioClaro: '#EFF6FF',
-  secundario: '#F97316',    // laranja (pet/energia)
+  primario: '#0F5F66',      // verde petroleo principal
+  primarioEscuro: '#083F46',
+  primarioClaro: '#E6F4F2',
+  secundario: '#C9A13A',    // dourado CorePet
   sucesso: '#16A34A',
   erro: '#DC2626',
   aviso: '#D97706',

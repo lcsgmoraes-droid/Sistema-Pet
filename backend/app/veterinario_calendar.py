@@ -136,7 +136,7 @@ def gerar_calendario_ics(
     linhas = [
         "BEGIN:VCALENDAR",
         "VERSION:2.0",
-        "PRODID:-//Sistema Pet//Agenda Veterinaria//PT-BR",
+        "PRODID:-//CorePet//Agenda Veterinaria//PT-BR",
         "CALSCALE:GREGORIAN",
         "METHOD:PUBLISH",
         "X-WR-CALNAME:" + escape_ics(nome_calendario),
@@ -170,7 +170,7 @@ def gerar_calendario_ics(
 
         linhas.extend([
             "BEGIN:VEVENT",
-            f"UID:vet-agendamento-{ag.id}@sistemapet",
+            f"UID:vet-agendamento-{ag.id}@corepet",
             f"DTSTAMP:{datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ')}",
             f"DTSTART:{formatar_datetime_ics(data_inicio)}",
             f"DTEND:{formatar_datetime_ics(data_fim)}",

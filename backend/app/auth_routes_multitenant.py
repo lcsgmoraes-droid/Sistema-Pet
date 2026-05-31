@@ -265,7 +265,7 @@ def _issue_email_verification_token(user: User) -> str:
 
 def _build_email_verification_email(user: User, raw_token: str, verification_link: str) -> tuple[str, str, str]:
     saudacao = f", {user.nome}" if getattr(user, "nome", None) else ""
-    subject = "Confirme seu e-mail - Pet Shop Pro"
+    subject = "Confirme seu e-mail - CorePet"
     html_body = f"""
     <html>
       <body style="font-family: Arial, sans-serif; color: #1f2937; max-width: 620px; margin: 0 auto;">
@@ -274,7 +274,7 @@ def _build_email_verification_email(user: User, raw_token: str, verification_lin
         </div>
         <div style="border: 1px solid #bfdbfe; border-top: none; border-radius: 0 0 12px 12px; padding: 24px;">
           <p>Ola{saudacao}.</p>
-          <p>Para ativar sua conta no Pet Shop Pro, confirme que este e-mail pertence a voce.</p>
+          <p>Para ativar sua conta no CorePet, confirme que este e-mail pertence a voce.</p>
           <p style="margin: 18px 0;">
             <a href="{verification_link}"
                style="display: inline-block; background: #2563eb; color: #ffffff; text-decoration: none; padding: 12px 18px; border-radius: 10px; font-weight: 700;">
@@ -293,7 +293,7 @@ def _build_email_verification_email(user: User, raw_token: str, verification_lin
     </html>
     """
     text_body = (
-        "Confirme seu e-mail - Pet Shop Pro\n\n"
+        "Confirme seu e-mail - CorePet\n\n"
         "Acesse o link abaixo para ativar sua conta:\n"
         f"{verification_link}\n\n"
         "Ou use este codigo manualmente na tela de confirmacao:\n"
@@ -334,7 +334,7 @@ def _is_token_expired(expires_at: datetime | None) -> bool:
 
 def _build_password_reset_email(user: User, reset_token: str, reset_link: str) -> tuple[str, str, str]:
     saudacao = f", {user.nome}" if getattr(user, "nome", None) else ""
-    subject = "Recuperacao de senha - Pet Shop Pro"
+    subject = "Recuperacao de senha - CorePet"
     html_body = f"""
     <html>
       <body style="font-family: Arial, sans-serif; color: #1f2937; max-width: 620px; margin: 0 auto;">
@@ -364,7 +364,7 @@ def _build_password_reset_email(user: User, reset_token: str, reset_link: str) -
     </html>
     """
     text_body = (
-        "Recuperacao de senha - Pet Shop Pro\n\n"
+        "Recuperacao de senha - CorePet\n\n"
         "Clique no botao do e-mail para redefinir sua senha.\n\n"
         "Ou use este codigo na tela de recuperacao:\n"
         f"{reset_token}\n\n"

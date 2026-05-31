@@ -1,5 +1,5 @@
 // Script para gerar os assets necessários para o Expo
-// Cria imagens PNG sólidas com a cor primária do app (#2563EB = R:37 G:99 B:235)
+// Cria imagens PNG solidas com a cor primaria do app (#0F5F66 = R:15 G:95 B:102)
 const fs = require('fs');
 const zlib = require('zlib');
 
@@ -21,8 +21,8 @@ function makePNG(w, h, r, g, b) {
 }
 
 const dir = './assets';
-// Azul primário do app
-const [R, G, B] = [37, 99, 235];
+// Verde petroleo primario CorePet
+const [R, G, B] = [15, 95, 102];
 
 fs.writeFileSync(dir+'/icon.png',              makePNG(1024, 1024, R, G, B));
 fs.writeFileSync(dir+'/adaptive-icon.png',     makePNG(1024, 1024, R, G, B));

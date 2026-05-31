@@ -272,7 +272,7 @@ class NotificationSender:
         if not notif.push_token:
             raise ValueError("Notificação sem push_token")
 
-        subject = notif.subject or "Sistema Pet"
+        subject = notif.subject or "CorePet"
         _send_push(
             push_token=notif.push_token,
             title=subject,
