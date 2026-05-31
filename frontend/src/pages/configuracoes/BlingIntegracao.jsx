@@ -269,7 +269,7 @@ export default function BlingIntegracao() {
               <ol className="list-decimal list-inside space-y-1 text-xs">
                 <li>Acesse o painel do Bling (bling.com.br)</li>
                 <li>Vá em Integrações → Aplicações</li>
-                <li>Encontre "Sistema Pet" e autorize novamente</li>
+                <li>Encontre "CorePet" e autorize novamente</li>
                 <li>Copie o código gerado</li>
                 <li>Contacte o suporte com esse código</li>
               </ol>

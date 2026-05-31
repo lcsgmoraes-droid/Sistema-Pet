@@ -10,7 +10,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 
-DEFAULT_BASE_CATALOG_SOURCE_EMAIL = "admin@mlprohub.com.br"
+DEFAULT_BASE_CATALOG_SOURCE_EMAIL = "atacadaopetpp@gmail.com"
 DEFAULT_BASE_CATALOG_BUNDLE_CODE = "catalogo-base-loja-lucas"
 DEFAULT_BASE_CATALOG_BUNDLE_VERSION = "v1"
 

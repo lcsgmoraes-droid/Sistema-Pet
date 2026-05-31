@@ -11,7 +11,7 @@ A mudanca deve acontecer em etapas. Primeiro o novo dominio deve funcionar em pa
 - Nao quebrar acessos atuais de clientes, usuarios, funcionarios e administradores.
 - Manter `mlprohub.com.br` funcionando durante a transicao.
 - Ativar `corepet.com.br` como dominio adicional antes de qualquer redirecionamento definitivo.
-- Separar dados internos de marca publica. Logins e tenants existentes, como `admin@mlprohub.com.br`, nao devem ser alterados automaticamente.
+- Separar dados internos de marca publica. Logins e tenants existentes nao devem ser alterados automaticamente; trocas especificas devem passar por roteiro seguro.
 - Evitar mudancas grandes sem validacao em producao.
 - Aplicar a nova identidade em camadas: dominio, configuracoes tecnicas, marca visual, app mobile, materiais comerciais.
 
@@ -108,9 +108,9 @@ Ocorrencias ja identificadas:
 
 Nao trocar automaticamente e-mails de login, tenants ou historicos. O dominio novo e publico/comercial; os dados existentes continuam preservados.
 
-Exemplo:
+Decisao operacional posterior:
 
-- Usuario/tenant `admin@mlprohub.com.br` pode continuar existindo.
+- O usuario administrador fonte pode trocar o login de `admin@mlprohub.com.br` para `atacadaopetpp@gmail.com` por script seguro, mantendo o mesmo `id`, `tenant_id`, senha, permissoes e historico.
 - Sistema publico passa a aparecer como CorePet.
 - Novos e-mails comerciais podem ser criados depois, como `contato@corepet.com.br` ou `suporte@corepet.com.br`.
 
@@ -312,6 +312,7 @@ Classificar cada ocorrencia como:
 - `cb721054f` - app mobile: nome exibido, paleta, icone/splash, telas de entrada, login, cadastro, perfil, compartilhamento e notificacoes veterinarias.
 - Rodada atual - SEO e configuracao: sitemap, robots, exemplos de `.env`, CORS padrao com dominio CorePet e compatibilidade explicita com dominio legado.
 - Runbook operacional criado em `docs/COREPET_DOMINIO_GO_LIVE.md` para ativar DNS/SSL sem redirecionar o dominio legado.
+- Ajuste pos-merge planejado: trocar o e-mail do usuario administrador fonte para `atacadaopetpp@gmail.com` sem alterar tenant ou historico.
 
 ## Riscos e cuidados
 
@@ -319,7 +320,7 @@ Classificar cada ocorrencia como:
 - App mobile pode continuar usando dominio antigo ate nova build.
 - Links enviados por e-mail podem continuar apontando para `mlprohub.com.br` se nao forem revisados.
 - Webhooks de pagamento precisam ter URLs estaveis antes de ativar gateway.
-- Trocar tenants/e-mails antigos automaticamente pode quebrar historico e suporte.
+- Trocar tenants/e-mails antigos automaticamente pode quebrar historico e suporte; trocas pontuais devem preservar `id` e `tenant_id`.
 - Redirecionar cedo demais pode atrapalhar clientes e testes.
 
 ## Decisoes pendentes
