@@ -114,6 +114,23 @@ Decisao operacional posterior:
 - Sistema publico passa a aparecer como CorePet.
 - Novos e-mails comerciais podem ser criados depois, como `contato@corepet.com.br` ou `suporte@corepet.com.br`.
 
+### Pendencia operacional Stone POS
+
+Status em 2026-05-31:
+
+- Fluxo tecnico CorePet -> Stone POS ja foi implementado e publicado em producao.
+- Webhook de pagamentos no Dashboard Pagar.me foi ajustado para `https://corepet.com.br/api/stone/webhook`.
+- Eventos selecionados no webhook: `charge.paid`, `charge.pending`, `charge.refunded` e, se disponivel, `charge.payment_failed`.
+- Teste fim a fim com maquininha esta bloqueado porque a Positivo L400 nao conclui ativacao e apresenta `Erro: Servico interno - Falha ao autenticar`.
+- A configuracao Stone em producao ainda deve receber o serial valido da maquininha quando a ativacao for resolvida.
+
+Decisao temporaria:
+
+- Deixar Stone POS como pendencia externa de fornecedor.
+- Nao travar a migracao de dominio, identidade CorePet e ajustes do sistema por causa da maquininha.
+- Quando a Stone resolver a ativacao, validar se chave `sk_...`, conta Pagar.me/Stone, CNPJ/Stone Code e serial POS pertencem ao mesmo cadastro.
+- Repetir teste controlado no PDV: criar venda pequena, enviar para maquininha, pagar, confirmar webhook, NSU, bandeira, parcelas/autorizacao e fechamento automatico do pedido Stone.
+
 ## Fase 3 - Identidade visual
 
 ### Logo

@@ -129,6 +129,20 @@ Fluxos funcionais minimos:
 - `robots.txt` aponta para sitemap CorePet.
 - `sitemap.xml` lista URLs CorePet.
 
+## Integracoes externas durante a transicao
+
+### Stone POS
+
+Status em 2026-05-31:
+
+- Webhook de pagamentos Pagar.me/Stone deve apontar para `https://corepet.com.br/api/stone/webhook`.
+- O webhook deve manter, no minimo, `charge.paid`, `charge.pending` e `charge.refunded`.
+- O fluxo Stone POS ja esta disponivel no CorePet, mas o teste real ficou pendente por falha externa de ativacao da Positivo L400 (`Erro: Servico interno - Falha ao autenticar`).
+- Antes de testar novamente, confirmar no Dashboard Pagar.me/Stone se chave `sk_...`, serial POS, CNPJ/Stone Code e webhook pertencem a mesma conta/afiliacao.
+- Salvar o serial POS valido em `Configuracoes > Integracoes > Stone Connect`.
+
+Esta pendencia nao bloqueia o go-live do dominio CorePet, desde que o modulo Stone seja tratado como funcionalidade beta/pendente ate validacao real da maquininha.
+
 ## App mobile
 
 O app mobile ja esta com identidade CorePet, mas as URLs de API de build ainda
