@@ -29,6 +29,64 @@ export function ehFormaPagamentoPix(formaPagamento = null) {
   return String(formaPagamento?.nome || "").toLowerCase().includes("pix");
 }
 
+export function mapearTipoPagamentoStonePos(formaPagamento = null) {
+  const tipo = String(formaPagamento?.tipo || "").toLowerCase();
+  const nome = String(formaPagamento?.nome || "").toLowerCase();
+
+  if (tipo === "cartao_credito" || tipo === "credito" || nome.includes("credito") || nome.includes("cr\u00E9dito")) {
+    return "credit";
+  }
+  if (tipo === "cartao_debito" || tipo === "debito" || nome.includes("debito") || nome.includes("d\u00E9bito")) {
+    return "debit";
+  }
+  if (tipo === "pix" || nome.includes("pix")) {
+    return "pix";
+  }
+  return null;
+}
+
+export function ehFormaPagamentoStonePos(formaPagamento = null) {
+  return Boolean(mapearTipoPagamentoStonePos(formaPagamento));
+}
+
+export function podeEnviarPagamentoStonePos({
+  formaPagamento = null,
+  pagamentos = [],
+  totalPagoExistente = 0,
+  valorRestante = 0,
+  stonePedidoPendente = false,
+} = {}) {
+  if (stonePedidoPendente) {
+    return {
+      podeEnviar: false,
+      motivo: "Ja existe um pedido Stone aguardando retorno.",
+    };
+  }
+
+  if (!ehFormaPagamentoStonePos(formaPagamento)) {
+    return {
+      podeEnviar: false,
+      motivo: "Selecione cartao ou Pix para enviar para a Stone.",
+    };
+  }
+
+  if ((pagamentos || []).length > 0 || Number(totalPagoExistente || 0) > 0.01) {
+    return {
+      podeEnviar: false,
+      motivo: "Remova os pagamentos manuais antes de enviar para a Stone.",
+    };
+  }
+
+  if (Number(valorRestante || 0) <= 0.01) {
+    return {
+      podeEnviar: false,
+      motivo: "Nao ha saldo em aberto para enviar para a Stone.",
+    };
+  }
+
+  return { podeEnviar: true, motivo: "" };
+}
+
 export function calcularCustoTotalItensVenda(itens = []) {
   return (itens || []).reduce(
     (sum, item) =>

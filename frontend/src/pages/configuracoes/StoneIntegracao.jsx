@@ -73,6 +73,7 @@ export default function StoneIntegracao() {
     conciliacao_configurado: false,
   });
 
+  const webhookUrlPagamentos = `${globalThis.location.origin}/api/stone/webhook`;
   const webhookUrlPadrao = `${globalThis.location.origin}/api/stone/webhook-consentimento`;
 
   useEffect(() => {
@@ -395,6 +396,21 @@ export default function StoneIntegracao() {
             />
             <p className="text-xs text-gray-400 mt-1">
               Usado como padrão ao enviar pedidos para o POS. Pode ser sobrescrito pedido a pedido.
+            </p>
+          </div>
+
+          <div className="bg-gray-50 border border-gray-200 rounded-lg p-3">
+            <label className="block text-sm font-medium text-gray-700 mb-1">
+              Webhook de pagamentos
+            </label>
+            <input
+              type="text"
+              value={webhookUrlPagamentos}
+              readOnly
+              className="w-full border rounded-lg px-3 py-2 text-sm bg-white text-gray-700"
+            />
+            <p className="text-xs text-gray-400 mt-1">
+              Cadastre esta URL no dashboard Pagar.me para eventos de pagamento do POS.
             </p>
           </div>
 
