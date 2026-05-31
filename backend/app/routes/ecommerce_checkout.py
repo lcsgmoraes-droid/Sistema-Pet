@@ -17,6 +17,7 @@ from app.idempotency_models import IdempotencyKey
 from app.models import Cliente, User
 from app.pedido_models import Pedido, PedidoItem
 from app.routes.ecommerce_auth import _activate_user_tenant_context, _get_current_ecommerce_user
+from app.services.ecommerce_payment_config import get_active_mercado_pago_runtime_config
 from app.services.mercado_pago_checkout import create_preference, is_mercado_pago_provider
 from app.utils.timezone import now_brasilia
 
@@ -188,7 +189,10 @@ def _request_hash(data: dict) -> str:
     return hashlib.sha256(serialized.encode("utf-8")).hexdigest()
 
 
-def _pagamento_online_configurado() -> bool:
+def _pagamento_online_configurado(db: Session | None = None, tenant_id: str | None = None) -> bool:
+    if db is not None and tenant_id is not None:
+        return get_active_mercado_pago_runtime_config(db, tenant_id) is not None
+
     enabled = str(os.getenv("ECOMMERCE_PAYMENT_GATEWAY_ENABLED", "")).strip().lower()
     provider = str(os.getenv("ECOMMERCE_PAYMENT_PROVIDER", "")).strip()
     return enabled in {"1", "true", "yes", "on"} and bool(provider)
@@ -334,12 +338,13 @@ def finalizar_checkout(
     _expirar_reservas_automaticamente(db, identity.tenant_id)
     forma_pagamento_tipo = _validar_forma_pagamento_online(payload.forma_pagamento_nome)
 
-    if not _pagamento_online_configurado():
+    payment_config = get_active_mercado_pago_runtime_config(db, identity.tenant_id)
+    if not payment_config:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=(
-                "Pagamento online ainda nao configurado para app/ecommerce. "
-                "Configure a intermediadora antes de finalizar pedidos."
+                "Mercado Pago ainda nao configurado para esta loja. "
+                "Configure as credenciais em E-commerce > Configuracoes antes de finalizar pedidos."
             ),
         )
 
@@ -440,7 +445,7 @@ def finalizar_checkout(
         "palavra_chave_retirada": palavra_chave,
     }
 
-    provider = _payment_provider()
+    provider = payment_config.provider
     response["payment_provider"] = provider
     if is_mercado_pago_provider(provider):
         preference = create_preference(
@@ -449,6 +454,9 @@ def finalizar_checkout(
             forma_pagamento_tipo=forma_pagamento_tipo,
             endereco_entrega=payload.endereco_entrega,
             tipo_retirada=tipo_retirada,
+            access_token=payment_config.access_token,
+            notification_url=payment_config.webhook_url,
+            use_sandbox=payment_config.use_sandbox,
         )
         response.update({
             "payment_provider": "mercadopago",
