@@ -177,6 +177,7 @@ from app.routes.app_vet_routes import router as app_vet_router
 from app.routes.ecommerce_webhooks import router as ecommerce_webhooks_router
 from app.routes.ecommerce_aparencia_routes import router as ecommerce_aparencia_router
 from app.routes.ecommerce_config_routes import router as ecommerce_config_router
+from app.routes.ecommerce_payment_config_routes import public_router as ecommerce_payment_config_public_router
 from app.routes.ecommerce_payment_config_routes import router as ecommerce_payment_config_router
 from app.routes.ecommerce_notify_routes import router as ecommerce_notify_router
 from app.routes.ecommerce_analytics_routes import router as ecommerce_analytics_router
@@ -978,6 +979,7 @@ app.include_router(ecommerce_checkout_router)
 app.include_router(ecommerce_webhooks_router)
 app.include_router(ecommerce_aparencia_router, dependencies=_module_dependencies("ecommerce"))
 app.include_router(ecommerce_config_router, dependencies=_module_dependencies("ecommerce"))
+app.include_router(ecommerce_payment_config_public_router)
 app.include_router(ecommerce_payment_config_router, dependencies=_module_dependencies("ecommerce"))
 app.include_router(ecommerce_notify_router)
 app.include_router(ecommerce_analytics_router, dependencies=_module_dependencies("ecommerce"))
