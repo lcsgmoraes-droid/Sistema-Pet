@@ -1,6 +1,7 @@
 """Rotas de configuracao de pagamento online do e-commerce."""
 
 from typing import Optional
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import RedirectResponse
@@ -26,6 +27,7 @@ from app.services.ecommerce_payment_config import (
     validate_mercado_pago_oauth_state,
 )
 from app.ecommerce_payment_models import EcommercePaymentGatewayConfig
+from app.tenancy.context import set_current_tenant
 
 
 router = APIRouter(prefix="/ecommerce-payment-config", tags=["ecommerce-payment-config"])
@@ -159,6 +161,7 @@ def callback_oauth_mercado_pago(
         )
 
     tenant_id = state_payload["tenant_id"]
+    set_current_tenant(UUID(str(tenant_id)))
     config = _ensure_config(db, tenant_id=tenant_id)
     try:
         token_payload = exchange_mercado_pago_oauth_code(
