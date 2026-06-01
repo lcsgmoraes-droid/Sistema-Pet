@@ -11,6 +11,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.services.ecommerce_payment_config import (
     build_mercado_pago_oauth_authorization_url,
+    build_mercado_pago_oauth_return_url,
     decrypt_secret,
     encode_mercado_pago_oauth_state,
     ensure_mercado_pago_access_token_fresh,
@@ -37,6 +38,15 @@ def test_callback_oauth_mercado_pago_nao_exige_token_do_erp():
     assert response.status_code == 303
     assert response.headers["location"].startswith("https://corepet.com.br/ecommerce/configuracoes")
     assert "mercadopago_oauth=error" in response.headers["location"]
+
+
+def test_oauth_return_url_remove_prefixo_api_do_frontend(monkeypatch):
+    monkeypatch.delenv("FRONTEND_PUBLIC_BASE_URL", raising=False)
+    monkeypatch.setenv("FRONTEND_URL", "https://corepet.com.br/api")
+
+    return_url = build_mercado_pago_oauth_return_url("connected")
+
+    assert return_url == "https://corepet.com.br/ecommerce/configuracoes?mercadopago_oauth=connected"
 
 
 def test_oauth_authorization_url_usa_client_id_redirect_e_state_assinado(monkeypatch):
