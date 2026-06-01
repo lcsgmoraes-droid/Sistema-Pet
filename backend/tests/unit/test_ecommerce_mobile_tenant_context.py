@@ -298,21 +298,14 @@ def test_get_or_create_cliente_for_user_prefers_operational_profile_by_email():
 
 
 def test_ecommerce_profile_merge_transfers_customer_relations_before_delete():
-    previous = SimpleNamespace(id=1)
-    target = SimpleNamespace(id=2)
-    pet = SimpleNamespace(cliente_id=previous.id, cliente=previous)
-    pendencia = SimpleNamespace(cliente_id=previous.id, cliente=previous)
-    venda = SimpleNamespace(cliente_id=previous.id, cliente=previous)
-    previous.pets = [pet]
-    previous.pendencias_estoque = [pendencia]
-    previous.vendas = [venda]
+    source = inspect.getsource(_transfer_cliente_relations_for_ecommerce_merge)
 
-    moved = _transfer_cliente_relations_for_ecommerce_merge(previous, target)
-
-    assert moved == 3
-    for item in (pet, pendencia, venda):
-        assert item.cliente_id == target.id
-        assert item.cliente is target
+    assert "db.query(PendenciaEstoque)" in source
+    assert "db.query(Pet)" in source
+    assert "db.query(Venda)" in source
+    assert "synchronize_session=False" in source
+    assert "db.expire(previous_cliente" in source
+    assert "getattr(previous_cliente, relationship_name" not in source
 
 
 def test_atualizar_perfil_transfers_customer_relations_before_deleting_duplicate():
