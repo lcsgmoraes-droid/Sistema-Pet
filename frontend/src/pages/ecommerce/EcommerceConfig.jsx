@@ -40,17 +40,26 @@ export default function EcommerceConfig() {
     enabled: false,
     environment: 'production',
     public_key: '',
+    public_key_configured: false,
+    public_key_preview: null,
     access_token_configured: false,
     webhook_secret_configured: false,
+    oauth_client_id_configured: false,
+    oauth_client_id_preview: null,
+    oauth_client_secret_configured: false,
     oauth_available: false,
     oauth_connected: false,
     oauth_connected_at: null,
     mercado_pago_user_id: null,
+    oauth_redirect_uri: '',
     webhook_url: '',
   })
   const [paymentSecrets, setPaymentSecrets] = useState({
+    public_key: '',
     access_token: '',
     webhook_secret: '',
+    oauth_client_id: '',
+    oauth_client_secret: '',
   })
 
   // Avise-me pendentes
@@ -78,13 +87,19 @@ export default function EcommerceConfig() {
     setPaymentConfig({
       enabled: Boolean(d.enabled),
       environment: d.environment || 'production',
-      public_key: d.public_key || '',
+      public_key: '',
+      public_key_configured: Boolean(d.public_key_configured),
+      public_key_preview: d.public_key_preview || null,
       access_token_configured: Boolean(d.access_token_configured),
       webhook_secret_configured: Boolean(d.webhook_secret_configured),
+      oauth_client_id_configured: Boolean(d.oauth_client_id_configured),
+      oauth_client_id_preview: d.oauth_client_id_preview || null,
+      oauth_client_secret_configured: Boolean(d.oauth_client_secret_configured),
       oauth_available: Boolean(d.oauth_available),
       oauth_connected: Boolean(d.oauth_connected),
       oauth_connected_at: d.oauth_connected_at || null,
       mercado_pago_user_id: d.mercado_pago_user_id || null,
+      oauth_redirect_uri: d.oauth_redirect_uri || '',
       webhook_url: d.webhook_url || '',
     })
   }
@@ -158,12 +173,20 @@ export default function EcommerceConfig() {
       const res = await api.put('/ecommerce-payment-config/mercadopago', {
         enabled: paymentConfig.enabled,
         environment: paymentConfig.environment,
-        public_key: paymentConfig.public_key || null,
+        public_key: paymentSecrets.public_key || null,
         access_token: paymentSecrets.access_token || null,
         webhook_secret: paymentSecrets.webhook_secret || null,
+        oauth_client_id: paymentSecrets.oauth_client_id || null,
+        oauth_client_secret: paymentSecrets.oauth_client_secret || null,
       })
       applyPaymentConfigResponse(res.data)
-      setPaymentSecrets({ access_token: '', webhook_secret: '' })
+      setPaymentSecrets({
+        public_key: '',
+        access_token: '',
+        webhook_secret: '',
+        oauth_client_id: '',
+        oauth_client_secret: '',
+      })
       setSuccess('Configuracao do Mercado Pago salva com sucesso!')
       setTimeout(() => setSuccess(''), 4000)
     } catch (err) {
@@ -202,7 +225,13 @@ export default function EcommerceConfig() {
     try {
       const res = await api.post('/ecommerce-payment-config/mercadopago/oauth/disconnect')
       applyPaymentConfigResponse(res.data)
-      setPaymentSecrets({ access_token: '', webhook_secret: '' })
+      setPaymentSecrets({
+        public_key: '',
+        access_token: '',
+        webhook_secret: '',
+        oauth_client_id: '',
+        oauth_client_secret: '',
+      })
       setSuccess('Mercado Pago desconectado desta loja.')
       setTimeout(() => setSuccess(''), 4000)
     } catch (err) {
@@ -212,20 +241,38 @@ export default function EcommerceConfig() {
     }
   }
 
-  async function copiarWebhookUrl() {
-    if (!paymentConfig.webhook_url) return
+  async function copiarTexto(texto, mensagem) {
+    if (!texto) return
     try {
-      await navigator.clipboard.writeText(paymentConfig.webhook_url)
-      setSuccess('URL do webhook copiada.')
+      await navigator.clipboard.writeText(texto)
+      setSuccess(mensagem)
       setTimeout(() => setSuccess(''), 2500)
     } catch {
-      setError('Nao foi possivel copiar a URL automaticamente.')
+      setError('Nao foi possivel copiar automaticamente.')
     }
+  }
+
+  function copiarWebhookUrl() {
+    copiarTexto(paymentConfig.webhook_url, 'URL do webhook copiada.')
+  }
+
+  function copiarOAuthRedirectUri() {
+    copiarTexto(paymentConfig.oauth_redirect_uri, 'URL de retorno OAuth copiada.')
   }
 
   function toggleDia(key) {
     setDiasSelecionados((prev) =>
       prev.includes(key) ? prev.filter((d) => d !== key) : [...prev, key]
+    )
+  }
+
+  function statusConfigurado(configurado, preview = null) {
+    if (!configurado) return null
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
+        <CheckCircle2 size={12} />
+        {preview ? `Configurado (${preview})` : 'Configurado'}
+      </span>
     )
   }
 
@@ -437,7 +484,7 @@ export default function EcommerceConfig() {
                     <button
                       type="button"
                       onClick={conectarMercadoPago}
-                      disabled={connectingPayment}
+                      disabled={connectingPayment || !paymentConfig.oauth_available}
                       className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
                     >
                       <ExternalLink size={16} />
@@ -447,7 +494,7 @@ export default function EcommerceConfig() {
                 </div>
                 {!paymentConfig.oauth_available && (
                   <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-3 py-2">
-                    O botao sera liberado quando o Client ID e Client Secret OAuth estiverem configurados no servidor.
+                    O botao sera liberado quando o Client ID e Client Secret OAuth forem salvos abaixo.
                   </p>
                 )}
               </div>
@@ -491,13 +538,86 @@ export default function EcommerceConfig() {
                       </select>
                     </div>
                     <div>
-                      <label className="block text-xs font-medium text-gray-600 mb-1">Public key</label>
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <label className="block text-xs font-medium text-gray-600">Public key</label>
+                        {statusConfigurado(paymentConfig.public_key_configured, paymentConfig.public_key_preview)}
+                      </div>
                       <input
-                        value={paymentConfig.public_key}
+                        type="password"
+                        value={paymentSecrets.public_key}
                         onChange={(e) =>
-                          setPaymentConfig((prev) => ({ ...prev, public_key: e.target.value }))
+                          setPaymentSecrets((prev) => ({ ...prev, public_key: e.target.value }))
                         }
-                        placeholder="APP_USR-..."
+                        placeholder={
+                          paymentConfig.public_key_configured
+                            ? 'Public key ja configurada'
+                            : 'APP_USR-...'
+                        }
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">URL de retorno OAuth</label>
+                    <div className="flex gap-2">
+                      <input
+                        value={paymentConfig.oauth_redirect_uri}
+                        readOnly
+                        className="flex-1 border border-gray-300 rounded-lg px-3 py-2 text-sm bg-gray-50 text-gray-700"
+                      />
+                      <button
+                        type="button"
+                        onClick={copiarOAuthRedirectUri}
+                        className="inline-flex items-center justify-center h-10 w-10 rounded-lg border border-gray-300 text-gray-700 hover:bg-gray-50"
+                        title="Copiar URL de retorno OAuth"
+                      >
+                        <Copy size={18} />
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <label className="flex items-center gap-1 text-xs font-medium text-gray-600">
+                          <KeyRound size={14} />
+                          OAuth Client ID
+                        </label>
+                        {statusConfigurado(paymentConfig.oauth_client_id_configured, paymentConfig.oauth_client_id_preview)}
+                      </div>
+                      <input
+                        value={paymentSecrets.oauth_client_id}
+                        onChange={(e) =>
+                          setPaymentSecrets((prev) => ({ ...prev, oauth_client_id: e.target.value }))
+                        }
+                        placeholder={
+                          paymentConfig.oauth_client_id_configured
+                            ? 'Client ID ja configurado'
+                            : 'Client ID da aplicacao'
+                        }
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                      />
+                    </div>
+                    <div>
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <label className="flex items-center gap-1 text-xs font-medium text-gray-600">
+                          <KeyRound size={14} />
+                          OAuth Client Secret
+                        </label>
+                        {statusConfigurado(paymentConfig.oauth_client_secret_configured)}
+                      </div>
+                      <input
+                        type="password"
+                        value={paymentSecrets.oauth_client_secret}
+                        onChange={(e) =>
+                          setPaymentSecrets((prev) => ({ ...prev, oauth_client_secret: e.target.value }))
+                        }
+                        placeholder={
+                          paymentConfig.oauth_client_secret_configured
+                            ? 'Client Secret ja configurado'
+                            : 'Client Secret da aplicacao'
+                        }
                         className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
                       />
                     </div>
@@ -505,10 +625,13 @@ export default function EcommerceConfig() {
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <label className="flex items-center gap-1 text-xs font-medium text-gray-600 mb-1">
-                        <KeyRound size={14} />
-                        Access token
-                      </label>
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <label className="flex items-center gap-1 text-xs font-medium text-gray-600">
+                          <KeyRound size={14} />
+                          Access token
+                        </label>
+                        {statusConfigurado(paymentConfig.access_token_configured)}
+                      </div>
                       <input
                         type="password"
                         value={paymentSecrets.access_token}
@@ -524,10 +647,13 @@ export default function EcommerceConfig() {
                       />
                     </div>
                     <div>
-                      <label className="flex items-center gap-1 text-xs font-medium text-gray-600 mb-1">
-                        <Webhook size={14} />
-                        Assinatura secreta
-                      </label>
+                      <div className="mb-1 flex items-center justify-between gap-2">
+                        <label className="flex items-center gap-1 text-xs font-medium text-gray-600">
+                          <Webhook size={14} />
+                          Assinatura secreta
+                        </label>
+                        {statusConfigurado(paymentConfig.webhook_secret_configured)}
+                      </div>
                       <input
                         type="password"
                         value={paymentSecrets.webhook_secret}

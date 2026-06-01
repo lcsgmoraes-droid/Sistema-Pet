@@ -36,12 +36,18 @@ class MercadoPagoConfigResponse(BaseModel):
     enabled: bool
     environment: str
     public_key: Optional[str]
+    public_key_configured: bool
+    public_key_preview: Optional[str]
     access_token_configured: bool
     webhook_secret_configured: bool
+    oauth_client_id_configured: bool
+    oauth_client_id_preview: Optional[str]
+    oauth_client_secret_configured: bool
     oauth_available: bool
     oauth_connected: bool
     oauth_connected_at: Optional[str]
     mercado_pago_user_id: Optional[str]
+    oauth_redirect_uri: str
     webhook_url: str
     updated_at: Optional[str]
 
@@ -52,6 +58,8 @@ class MercadoPagoConfigUpdate(BaseModel):
     public_key: Optional[str] = None
     access_token: Optional[str] = None
     webhook_secret: Optional[str] = None
+    oauth_client_id: Optional[str] = None
+    oauth_client_secret: Optional[str] = None
 
 
 class MercadoPagoOAuthUrlResponse(BaseModel):
@@ -101,14 +109,14 @@ def gerar_url_oauth_mercado_pago(
 ):
     """Gera URL para o tenant conectar sua conta Mercado Pago via OAuth."""
     current_user, tenant_id = user_and_tenant
-    _ensure_config(db, tenant_id=tenant_id)
+    config = _ensure_config(db, tenant_id=tenant_id)
     redirect_uri = build_mercado_pago_oauth_redirect_uri()
-    if not is_mercado_pago_oauth_available():
+    if not is_mercado_pago_oauth_available(config):
         return MercadoPagoOAuthUrlResponse(
             configured=False,
             authorization_url=None,
             redirect_uri=redirect_uri,
-            missing=missing_mercado_pago_oauth_settings(),
+            missing=missing_mercado_pago_oauth_settings(config),
         )
     return MercadoPagoOAuthUrlResponse(
         configured=True,
@@ -116,6 +124,7 @@ def gerar_url_oauth_mercado_pago(
             tenant_id=tenant_id,
             user_id=current_user.id,
             redirect_uri=redirect_uri,
+            config=config,
         ),
         redirect_uri=redirect_uri,
         missing=[],
@@ -155,6 +164,7 @@ def callback_oauth_mercado_pago(
             code=code,
             redirect_uri=build_mercado_pago_oauth_redirect_uri(),
             environment=config.environment,
+            config=config,
         )
         save_mercado_pago_oauth_tokens(config, token_payload)
         if config.access_token_encrypted and (
@@ -192,6 +202,8 @@ def salvar_config_mercado_pago(
         public_key=body.public_key,
         access_token=body.access_token,
         webhook_secret=body.webhook_secret,
+        oauth_client_id=body.oauth_client_id,
+        oauth_client_secret=body.oauth_client_secret,
     )
     return serialize_mercado_pago_config(config)
 

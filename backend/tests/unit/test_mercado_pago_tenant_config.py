@@ -13,6 +13,7 @@ from app.services.ecommerce_payment_config import (
     build_mercado_pago_webhook_url,
     decrypt_secret,
     encrypt_secret,
+    save_mercado_pago_config,
     serialize_mercado_pago_config,
 )
 
@@ -33,6 +34,8 @@ def test_config_mercado_pago_mascara_segredos_e_expoe_webhook_url(monkeypatch):
         public_key="APP_USR-public-key",
         access_token_encrypted=encrypt_secret("APP_USR-access-token"),
         webhook_secret_encrypted=encrypt_secret("webhook-secret"),
+        oauth_client_id="tenant-oauth-client-id",
+        oauth_client_secret_encrypted=encrypt_secret("tenant-oauth-client-secret"),
         webhook_token="mp_abc123",
         updated_at=None,
     )
@@ -46,19 +49,131 @@ def test_config_mercado_pago_mascara_segredos_e_expoe_webhook_url(monkeypatch):
         "provider": "mercadopago",
         "enabled": True,
         "environment": "production",
-        "public_key": "APP_USR-public-key",
+        "public_key": None,
+        "public_key_configured": True,
+        "public_key_preview": "APP_US...-key",
         "access_token_configured": True,
         "webhook_secret_configured": True,
-        "oauth_available": False,
+        "oauth_client_id_configured": True,
+        "oauth_client_id_preview": "tenant...t-id",
+        "oauth_client_secret_configured": True,
+        "oauth_available": True,
         "oauth_connected": False,
         "oauth_connected_at": None,
         "mercado_pago_user_id": None,
+        "oauth_redirect_uri": "https://corepet.com.br/api/ecommerce-payment-config/mercadopago/oauth/callback",
         "webhook_url": "https://corepet.com.br/api/webhooks/mercadopago/mp_abc123",
         "updated_at": None,
     }
     assert "access_token" not in serialized
     assert "webhook_secret" not in serialized
+    assert "APP_USR-public-key" not in serialized.values()
     assert decrypt_secret(config.access_token_encrypted) == "APP_USR-access-token"
+
+
+def test_save_config_preserva_valores_sensiveis_quando_campos_vazios(monkeypatch):
+    monkeypatch.setenv("JWT_SECRET_KEY", "tenant-secret-for-save-tests")
+    config = SimpleNamespace(
+        enabled=True,
+        environment="production",
+        public_key="APP_USR-existing-public-key",
+        access_token_encrypted=encrypt_secret("existing-access-token"),
+        webhook_secret_encrypted=encrypt_secret("existing-webhook-secret"),
+        oauth_client_id="existing-client-id",
+        oauth_client_secret_encrypted=encrypt_secret("existing-client-secret"),
+        refresh_token_encrypted=None,
+        access_token_expires_at=None,
+        oauth_connected=False,
+        oauth_connected_at=None,
+        mercado_pago_user_id=None,
+        oauth_scope=None,
+        oauth_last_error=None,
+        oauth_refresh_failed_at=None,
+    )
+
+    class Db:
+        committed = False
+
+        def commit(self):
+            self.committed = True
+
+        def refresh(self, _config):
+            return None
+
+    import app.services.ecommerce_payment_config as service
+
+    monkeypatch.setattr(service, "get_mercado_pago_config", lambda db, tenant_id: config)
+    db = Db()
+
+    saved = save_mercado_pago_config(
+        db,
+        tenant_id="180d9cbf-5dcb-4676-bf11-dcbd91ed444b",
+        user_id=1,
+        enabled=True,
+        environment="production",
+        public_key=None,
+        access_token=None,
+        webhook_secret=None,
+        oauth_client_id=None,
+        oauth_client_secret=None,
+    )
+
+    assert saved.public_key == "APP_USR-existing-public-key"
+    assert decrypt_secret(saved.access_token_encrypted) == "existing-access-token"
+    assert decrypt_secret(saved.webhook_secret_encrypted) == "existing-webhook-secret"
+    assert saved.oauth_client_id == "existing-client-id"
+    assert decrypt_secret(saved.oauth_client_secret_encrypted) == "existing-client-secret"
+    assert db.committed is True
+
+
+def test_save_config_ativa_com_oauth_sem_access_token_para_permitir_conectar(monkeypatch):
+    monkeypatch.setenv("JWT_SECRET_KEY", "tenant-secret-for-oauth-save-tests")
+    config = SimpleNamespace(
+        enabled=False,
+        environment="production",
+        public_key=None,
+        access_token_encrypted=None,
+        webhook_secret_encrypted=encrypt_secret("existing-webhook-secret"),
+        oauth_client_id=None,
+        oauth_client_secret_encrypted=None,
+        refresh_token_encrypted=None,
+        access_token_expires_at=None,
+        oauth_connected=False,
+        oauth_connected_at=None,
+        mercado_pago_user_id=None,
+        oauth_scope=None,
+        oauth_last_error=None,
+        oauth_refresh_failed_at=None,
+    )
+
+    class Db:
+        def commit(self):
+            return None
+
+        def refresh(self, _config):
+            return None
+
+    import app.services.ecommerce_payment_config as service
+
+    monkeypatch.setattr(service, "get_mercado_pago_config", lambda db, tenant_id: config)
+
+    saved = save_mercado_pago_config(
+        Db(),
+        tenant_id="180d9cbf-5dcb-4676-bf11-dcbd91ed444b",
+        user_id=1,
+        enabled=True,
+        environment="production",
+        public_key=None,
+        access_token=None,
+        webhook_secret=None,
+        oauth_client_id="tenant-client-id",
+        oauth_client_secret="tenant-client-secret",
+    )
+
+    assert saved.enabled is True
+    assert saved.oauth_client_id == "tenant-client-id"
+    assert decrypt_secret(saved.oauth_client_secret_encrypted) == "tenant-client-secret"
+    assert saved.access_token_encrypted is None
 
 
 def test_preferencia_usa_webhook_especifico_do_tenant():

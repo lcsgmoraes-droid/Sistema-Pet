@@ -26,6 +26,8 @@ class EcommercePaymentGatewayConfig(BaseTenantModel):
     refresh_token_encrypted = Column(Text, nullable=True)
     access_token_expires_at = Column(DateTime(timezone=True), nullable=True)
     webhook_secret_encrypted = Column(Text, nullable=True)
+    oauth_client_id = Column(Text, nullable=True)
+    oauth_client_secret_encrypted = Column(Text, nullable=True)
     webhook_token = Column(String(80), nullable=False, unique=True, index=True)
     oauth_connected = Column(Boolean, nullable=False, server_default="false")
     oauth_connected_at = Column(DateTime(timezone=True), nullable=True)

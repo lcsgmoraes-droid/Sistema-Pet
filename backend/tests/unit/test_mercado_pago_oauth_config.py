@@ -11,6 +11,8 @@ from app.services.ecommerce_payment_config import (
     decrypt_secret,
     encode_mercado_pago_oauth_state,
     ensure_mercado_pago_access_token_fresh,
+    encrypt_secret,
+    exchange_mercado_pago_oauth_code,
     is_mercado_pago_oauth_available,
     save_mercado_pago_oauth_tokens,
     serialize_mercado_pago_config,
@@ -70,6 +72,62 @@ def test_oauth_available_exige_client_id_e_secret(monkeypatch):
     monkeypatch.setenv("MERCADO_PAGO_OAUTH_CLIENT_SECRET", "client-secret")
 
     assert is_mercado_pago_oauth_available() is True
+
+
+def test_oauth_pode_usar_client_id_e_secret_do_tenant(monkeypatch):
+    monkeypatch.setenv("JWT_SECRET_KEY", "oauth-config-secret")
+    monkeypatch.delenv("MERCADO_PAGO_OAUTH_CLIENT_ID", raising=False)
+    monkeypatch.delenv("MERCADO_PAGO_OAUTH_CLIENT_SECRET", raising=False)
+    config = SimpleNamespace(
+        oauth_client_id="tenant-client-id",
+        oauth_client_secret_encrypted=encrypt_secret("tenant-client-secret"),
+    )
+
+    assert is_mercado_pago_oauth_available(config) is True
+
+    auth_url = build_mercado_pago_oauth_authorization_url(
+        tenant_id=TENANT_ID,
+        user_id=42,
+        redirect_uri="https://corepet.com.br/api/ecommerce-payment-config/mercadopago/oauth/callback",
+        config=config,
+    )
+
+    params = parse_qs(urlparse(auth_url).query)
+    assert params["client_id"] == ["tenant-client-id"]
+
+
+def test_exchange_oauth_usa_client_secret_do_tenant(monkeypatch):
+    monkeypatch.setenv("JWT_SECRET_KEY", "oauth-exchange-secret")
+    monkeypatch.delenv("MERCADO_PAGO_OAUTH_CLIENT_ID", raising=False)
+    monkeypatch.delenv("MERCADO_PAGO_OAUTH_CLIENT_SECRET", raising=False)
+    config = SimpleNamespace(
+        oauth_client_id="tenant-client-id",
+        oauth_client_secret_encrypted=encrypt_secret("tenant-client-secret"),
+    )
+    captured = {}
+
+    class Response:
+        status_code = 200
+        text = "{}"
+
+        @staticmethod
+        def json():
+            return {"access_token": "oauth-access-token", "expires_in": 21600}
+
+    def http_post(url, headers, json, timeout):
+        captured.update({"url": url, "headers": headers, "json": json, "timeout": timeout})
+        return Response()
+
+    payload = exchange_mercado_pago_oauth_code(
+        code="oauth-code",
+        redirect_uri="https://corepet.com.br/api/ecommerce-payment-config/mercadopago/oauth/callback",
+        config=config,
+        http_post=http_post,
+    )
+
+    assert payload["access_token"] == "oauth-access-token"
+    assert captured["json"]["client_id"] == "tenant-client-id"
+    assert captured["json"]["client_secret"] == "tenant-client-secret"
 
 
 def test_salva_tokens_oauth_criptografados_no_tenant(monkeypatch):
