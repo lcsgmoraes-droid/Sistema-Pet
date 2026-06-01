@@ -12,7 +12,10 @@ from app.idempotency_models import IdempotencyKey
 from app.models import Cliente, User
 from app.pedido_models import Pedido, PedidoItem
 from app.produtos_models import Produto
-from app.services.ecommerce_payment_config import runtime_config_from_webhook_token
+from app.services.ecommerce_payment_config import (
+    resolve_mercado_pago_tenant_id_from_webhook_token,
+    runtime_config_from_webhook_token,
+)
 from app.services.mercado_pago_checkout import (
     extract_notification_payment_id,
     fetch_payment,
@@ -805,6 +808,14 @@ async def webhook_mercadopago_tenant(webhook_token: str, request: Request):
 
     db = SessionLocal()
     try:
+        webhook_tenant_id = resolve_mercado_pago_tenant_id_from_webhook_token(db, webhook_token)
+        if not webhook_tenant_id:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Configuracao Mercado Pago nao encontrada para este webhook",
+            )
+
+        set_current_tenant(UUID(str(webhook_tenant_id)))
         payment_config = runtime_config_from_webhook_token(db, webhook_token)
         if not payment_config:
             raise HTTPException(

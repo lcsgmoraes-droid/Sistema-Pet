@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import os
 from typing import Any, Callable
+from urllib.parse import urlencode
 
 import requests
 from fastapi import HTTPException, status
@@ -65,6 +66,17 @@ def _excluded_payment_types(forma_pagamento_tipo: str) -> list[dict[str, str]]:
     return [{"id": "ticket"}]
 
 
+def _payment_return_url(base_url: str, payment_status: str, pedido_id: str) -> str:
+    query = urlencode(
+        {
+            "view": "pedidos",
+            "payment_status": payment_status,
+            "pedido_id": pedido_id,
+        }
+    )
+    return f"{str(base_url or '').strip().rstrip('/')}?{query}"
+
+
 def build_preference_payload(
     *,
     pedido: Any,
@@ -73,8 +85,10 @@ def build_preference_payload(
     endereco_entrega: str | None,
     tipo_retirada: str | None,
     notification_url: str | None = None,
+    return_url_base: str | None = None,
 ) -> dict[str, Any]:
     base_url = _public_base_url()
+    payment_return_base_url = str(return_url_base or base_url).strip().rstrip("/")
     pedido_id = str(pedido.pedido_id)
     tenant_id = str(pedido.tenant_id)
     canal = str(getattr(pedido, "origem", "") or "ecommerce")
@@ -107,11 +121,11 @@ def build_preference_payload(
         "notification_url": notification_url or f"{base_url}/api/webhooks/mercadopago",
         "back_urls": {
             "success": os.getenv("MERCADO_PAGO_BACK_URL_SUCCESS")
-            or f"{base_url}/ecommerce?payment_status=success&pedido_id={pedido_id}",
+            or _payment_return_url(payment_return_base_url, "success", pedido_id),
             "pending": os.getenv("MERCADO_PAGO_BACK_URL_PENDING")
-            or f"{base_url}/ecommerce?payment_status=pending&pedido_id={pedido_id}",
+            or _payment_return_url(payment_return_base_url, "pending", pedido_id),
             "failure": os.getenv("MERCADO_PAGO_BACK_URL_FAILURE")
-            or f"{base_url}/ecommerce?payment_status=failure&pedido_id={pedido_id}",
+            or _payment_return_url(payment_return_base_url, "failure", pedido_id),
         },
         "auto_return": "approved",
         "payment_methods": {
@@ -137,6 +151,7 @@ def create_preference(
     tipo_retirada: str | None,
     access_token: str | None = None,
     notification_url: str | None = None,
+    return_url_base: str | None = None,
     use_sandbox: bool | None = None,
     http_post: Callable[..., Any] = requests.post,
 ) -> dict[str, Any]:
@@ -147,6 +162,7 @@ def create_preference(
         endereco_entrega=endereco_entrega,
         tipo_retirada=tipo_retirada,
         notification_url=notification_url,
+        return_url_base=return_url_base,
     )
     token = (access_token or "").strip() or _get_access_token()
     response = http_post(

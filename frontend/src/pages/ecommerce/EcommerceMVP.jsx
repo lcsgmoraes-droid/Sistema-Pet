@@ -20,6 +20,10 @@ import useEcommerceEngagement from './useEcommerceEngagement';
 import useEcommerceOrders from './useEcommerceOrders';
 import useEcommerceProductModal from './useEcommerceProductModal';
 import {
+  readMercadoPagoPaymentReturn,
+  stripMercadoPagoPaymentReturnParams,
+} from '../../utils/mercadoPagoPaymentReturn';
+import {
   trackPageView,
   trackViewCart,
 } from '../../services/analytics';
@@ -229,6 +233,33 @@ export default function EcommerceMVP() {
     view,
     onError: setError,
   });
+
+  useEffect(() => {
+    const viewParam = new URLSearchParams(location.search).get('view');
+    if (['loja', 'carrinho', 'checkout', 'pedidos', 'conta'].includes(viewParam)) {
+      setView(viewParam);
+    }
+  }, [location.search]);
+
+  useEffect(() => {
+    const paymentReturn = readMercadoPagoPaymentReturn(location.search);
+    if (!paymentReturn) return;
+
+    setView('pedidos');
+    if (paymentReturn.level === 'error') {
+      setError(paymentReturn.message);
+      setSuccess('');
+    } else {
+      setError('');
+      setSuccess(paymentReturn.message);
+    }
+    if (paymentReturn.pedidoId) {
+      void recordOrderId(paymentReturn.pedidoId);
+    }
+
+    const cleanedSearch = stripMercadoPagoPaymentReturnParams(location.search);
+    navigate(`${location.pathname}${cleanedSearch ? `?${cleanedSearch}` : ''}`, { replace: true });
+  }, [location.pathname, location.search, navigate, recordOrderId]);
 
   const {
     addressFields,

@@ -154,14 +154,19 @@ export default function useEcommerceCart({ authHeaders, customerToken, productMa
     }
     onError('');
     try {
+      const itemAtual = Array.isArray(cart?.itens)
+        ? cart.itens.find((item) => item.item_id === itemId)
+        : null;
+      const produtoId = itemAtual?.produto_id || itemId;
+
       if (quantidade <= 0) {
-        const response = await ecommerceApi.delete(`/api/carrinho/remover/${itemId}`, { headers: authHeaders });
+        const response = await ecommerceApi.delete(`/api/carrinho/remover/${produtoId}`, { headers: authHeaders });
         setCart(response.data);
         return;
       }
       const response = await ecommerceApi.put(
-        `/api/carrinho/atualizar/${itemId}`,
-        { quantidade },
+        '/api/carrinho/atualizar',
+        { produto_id: produtoId, quantidade },
         { headers: authHeaders }
       );
       setCart(response.data);
