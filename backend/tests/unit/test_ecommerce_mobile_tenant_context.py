@@ -17,6 +17,7 @@ from app.routes.ecommerce_auth import (
     _extract_tenant_id_from_request,
     _get_current_ecommerce_user,
     _get_or_create_cliente_for_user,
+    _select_preferred_cliente,
     _serialize_profile,
     _transfer_cliente_relations_for_ecommerce_merge,
     atualizar_perfil,
@@ -375,14 +376,99 @@ def test_get_or_create_cliente_for_user_prefers_active_linked_customer():
     assert get_current_tenant() == tenant_id
 
 
+def test_get_or_create_cliente_for_user_reactivates_old_erp_customer_when_all_matches_are_inactive():
+    tenant_id = uuid4()
+    user = SimpleNamespace(
+        id=123,
+        tenant_id=tenant_id,
+        is_active=True,
+        cpf_cnpj="23068780802",
+        email="lcsgmoraes@gmail.com",
+        telefone="18997401641",
+        nome="Lucas Guerra de Moraes",
+    )
+    erp_customer = SimpleNamespace(
+        id=5794,
+        codigo="1",
+        tenant_id=str(tenant_id),
+        user_id=user.id,
+        cpf=user.cpf_cnpj,
+        email=user.email,
+        telefone=user.telefone,
+        celular=user.telefone,
+        nome="Lucas Guerra de Moraes",
+        tipo_cadastro="cliente",
+        ativo=False,
+        is_entregador=False,
+        created_at=None,
+    )
+    ecommerce_duplicate = SimpleNamespace(
+        id=10000,
+        codigo="10163",
+        tenant_id=str(tenant_id),
+        user_id=user.id,
+        cpf=user.cpf_cnpj,
+        email=user.email,
+        telefone=user.telefone,
+        celular=None,
+        nome="Lucas",
+        tipo_cadastro="cliente",
+        ativo=False,
+        is_entregador=False,
+        created_at=None,
+    )
+    clear_current_tenant()
+
+    result = _get_or_create_cliente_for_user(_Db([ecommerce_duplicate, erp_customer], []), user)
+
+    assert result is erp_customer
+    assert erp_customer.ativo is True
+    assert ecommerce_duplicate.ativo is False
+    assert get_current_tenant() == tenant_id
+
+
+def test_select_preferred_cliente_prefers_erp_code_over_newer_ecommerce_duplicate():
+    tenant_id = uuid4()
+    erp_customer = SimpleNamespace(
+        id=5794,
+        codigo="1",
+        tenant_id=str(tenant_id),
+        cpf="23068780802",
+        email="lcsgmoraes@gmail.com",
+        telefone=None,
+        celular="18997401641",
+        tipo_cadastro="cliente",
+        ativo=False,
+        is_entregador=False,
+    )
+    ecommerce_duplicate = SimpleNamespace(
+        id=10000,
+        codigo="10163",
+        tenant_id=str(tenant_id),
+        cpf="23068780802",
+        email="lcsgmoraes@gmail.com",
+        telefone="18997401641",
+        celular=None,
+        tipo_cadastro="cliente",
+        ativo=True,
+        is_entregador=False,
+    )
+
+    result = _select_preferred_cliente(
+        [ecommerce_duplicate, erp_customer],
+        email="lcsgmoraes@gmail.com",
+        cpf="230.687.808-02",
+        telefone="(18) 99740-1641",
+    )
+
+    assert result is erp_customer
+
+
 def test_ecommerce_profile_merge_transfers_customer_relations_before_detaching_duplicate():
     source = inspect.getsource(_transfer_cliente_relations_for_ecommerce_merge)
 
-    assert "db.query(PendenciaEstoque)" in source
-    assert "db.query(Pet)" in source
-    assert "db.query(Venda)" in source
-    assert "db.query(ContaReceber)" in source
-    assert "synchronize_session=False" in source
+    assert "transferir_referencias_pessoa" in source
+    assert "transferidos_genericos" in source
     assert "db.expire(previous_cliente" in source
     assert "getattr(previous_cliente, relationship_name" not in source
 
@@ -395,10 +481,31 @@ def test_atualizar_perfil_detaches_duplicate_customer_instead_of_deleting_histor
     assert "db.delete(previous_cliente)" not in source
 
 
-def test_ecommerce_profile_merge_transfers_accounts_receivable_before_detaching_duplicate():
+def test_ecommerce_profile_merge_uses_generic_reference_transfer_before_detaching_duplicate(monkeypatch):
+    calls = {}
+
+    def fake_transferir_referencias_pessoa(db, *, tenant_id, principal_id, duplicado_id):
+        calls["args"] = {
+            "db": db,
+            "tenant_id": tenant_id,
+            "principal_id": principal_id,
+            "duplicado_id": duplicado_id,
+        }
+        return {
+            "transferidos_especiais": {"produto_fornecedores": 1},
+            "transferidos_genericos": [
+                {"tabela": "vendas", "campo": "cliente_id", "total": 2},
+                {"tabela": "campaign_coupons", "campo": "customer_id", "total": 3},
+            ],
+        }
+
+    monkeypatch.setattr(
+        "app.routes.ecommerce_auth.transferir_referencias_pessoa",
+        fake_transferir_referencias_pessoa,
+    )
     db = _TransferDb()
-    previous_cliente = SimpleNamespace(id=10)
-    target_cliente = SimpleNamespace(id=20)
+    previous_cliente = SimpleNamespace(id=10, tenant_id="tenant-1")
+    target_cliente = SimpleNamespace(id=20, tenant_id="tenant-1")
 
     transferred = _transfer_cliente_relations_for_ecommerce_merge(
         db,
@@ -406,10 +513,11 @@ def test_ecommerce_profile_merge_transfers_accounts_receivable_before_detaching_
         target_cliente,
     )
 
-    updated_models = [item["model"] for item in db.updated_models]
-    assert "ContaReceber" in updated_models
+    assert calls["args"]["tenant_id"] == "tenant-1"
+    assert calls["args"]["principal_id"] == target_cliente.id
+    assert calls["args"]["duplicado_id"] == previous_cliente.id
     assert db.flushed is True
-    assert transferred == len(updated_models)
+    assert transferred == 6
 
 
 def test_app_mobile_cliente_helper_uses_profile_resolution_for_duplicate_customer_rows(monkeypatch):

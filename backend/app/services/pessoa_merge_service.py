@@ -346,6 +346,32 @@ def _transferir_referencias_genericas(
     return transferencias
 
 
+def transferir_referencias_pessoa(
+    db: Session,
+    *,
+    tenant_id: Any,
+    principal_id: int,
+    duplicado_id: int,
+) -> dict[str, Any]:
+    """Transfere todas as referencias de uma pessoa duplicada para a principal sem commitar."""
+    return {
+        "transferidos_especiais": {
+            "produto_fornecedores": _mesclar_produto_fornecedores(
+                db,
+                principal_id,
+                duplicado_id,
+                tenant_id,
+            ),
+        },
+        "transferidos_genericos": _transferir_referencias_genericas(
+            db,
+            principal_id=principal_id,
+            duplicado_id=duplicado_id,
+            tenant_id=tenant_id,
+        ),
+    }
+
+
 def executar_fusao_pessoas(
     db: Session,
     *,
@@ -375,14 +401,11 @@ def executar_fusao_pessoas(
     principal.credito = Decimal(str(principal.credito or 0)) + Decimal(str(duplicado.credito or 0))
     duplicado.credito = Decimal("0")
 
-    transferidos_especiais = {
-        "produto_fornecedores": _mesclar_produto_fornecedores(db, principal.id, duplicado.id, tenant_id),
-    }
-    transferidos_genericos = _transferir_referencias_genericas(
+    transferencias = transferir_referencias_pessoa(
         db,
+        tenant_id=tenant_id,
         principal_id=principal.id,
         duplicado_id=duplicado.id,
-        tenant_id=tenant_id,
     )
 
     nota = (
@@ -410,6 +433,6 @@ def executar_fusao_pessoas(
         "duplicado_inativado": _pessoa_resumo(duplicado),
         "campos_aplicados": campos_aplicados,
         "credito_somado": float(principal.credito or 0),
-        "transferidos_especiais": transferidos_especiais,
-        "transferidos_genericos": transferidos_genericos,
+        "transferidos_especiais": transferencias["transferidos_especiais"],
+        "transferidos_genericos": transferencias["transferidos_genericos"],
     }
