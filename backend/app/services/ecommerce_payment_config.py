@@ -153,7 +153,19 @@ def build_mercado_pago_oauth_return_url(status_value: str, *, message: str | Non
     return f"{base}/ecommerce/configuracoes?{urlencode(params)}"
 
 
-def _oauth_client_id() -> str:
+def _mask_config_value(value: str | None) -> str | None:
+    raw = str(value or "").strip()
+    if not raw:
+        return None
+    if len(raw) <= 10:
+        return "configurado"
+    return f"{raw[:6]}...{raw[-4:]}"
+
+
+def _oauth_client_id(config: Any | None = None) -> str:
+    configured = str(getattr(config, "oauth_client_id", None) or "").strip()
+    if configured:
+        return configured
     return (
         os.getenv("MERCADO_PAGO_OAUTH_CLIENT_ID")
         or os.getenv("MERCADOPAGO_OAUTH_CLIENT_ID")
@@ -162,7 +174,10 @@ def _oauth_client_id() -> str:
     ).strip()
 
 
-def _oauth_client_secret() -> str:
+def _oauth_client_secret(config: Any | None = None) -> str:
+    configured = decrypt_secret(getattr(config, "oauth_client_secret_encrypted", None))
+    if configured:
+        return configured
     return (
         os.getenv("MERCADO_PAGO_OAUTH_CLIENT_SECRET")
         or os.getenv("MERCADOPAGO_OAUTH_CLIENT_SECRET")
@@ -171,15 +186,15 @@ def _oauth_client_secret() -> str:
     ).strip()
 
 
-def is_mercado_pago_oauth_available() -> bool:
-    return bool(_oauth_client_id() and _oauth_client_secret())
+def is_mercado_pago_oauth_available(config: Any | None = None) -> bool:
+    return bool(_oauth_client_id(config) and _oauth_client_secret(config))
 
 
-def missing_mercado_pago_oauth_settings() -> list[str]:
+def missing_mercado_pago_oauth_settings(config: Any | None = None) -> list[str]:
     missing: list[str] = []
-    if not _oauth_client_id():
+    if not _oauth_client_id(config):
         missing.append("MERCADO_PAGO_OAUTH_CLIENT_ID")
-    if not _oauth_client_secret():
+    if not _oauth_client_secret(config):
         missing.append("MERCADO_PAGO_OAUTH_CLIENT_SECRET")
     return missing
 
@@ -251,8 +266,9 @@ def build_mercado_pago_oauth_authorization_url(
     tenant_id: str | UUID,
     user_id: int,
     redirect_uri: str,
+    config: Any | None = None,
 ) -> str:
-    client_id = _oauth_client_id()
+    client_id = _oauth_client_id(config)
     if not client_id:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -274,17 +290,18 @@ def exchange_mercado_pago_oauth_code(
     code: str,
     redirect_uri: str,
     environment: str = "production",
+    config: Any | None = None,
     http_post=requests.post,
 ) -> dict[str, Any]:
-    if not is_mercado_pago_oauth_available():
+    if not is_mercado_pago_oauth_available(config):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="OAuth Mercado Pago nao configurado no servidor CorePet.",
         )
 
     payload = {
-        "client_id": _oauth_client_id(),
-        "client_secret": _oauth_client_secret(),
+        "client_id": _oauth_client_id(config),
+        "client_secret": _oauth_client_secret(config),
         "code": str(code or "").strip(),
         "grant_type": "authorization_code",
         "redirect_uri": redirect_uri,
@@ -416,15 +433,15 @@ def refresh_mercado_pago_oauth_token(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="Refresh token Mercado Pago nao configurado.",
         )
-    if not is_mercado_pago_oauth_available():
+    if not is_mercado_pago_oauth_available(config):
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="OAuth Mercado Pago nao configurado no servidor CorePet.",
         )
 
     payload = {
-        "client_id": _oauth_client_id(),
-        "client_secret": _oauth_client_secret(),
+        "client_id": _oauth_client_id(config),
+        "client_secret": _oauth_client_secret(config),
         "grant_type": "refresh_token",
         "refresh_token": refresh_token,
     }
@@ -499,6 +516,8 @@ def save_mercado_pago_config(
     public_key: str | None,
     access_token: str | None = None,
     webhook_secret: str | None = None,
+    oauth_client_id: str | None = None,
+    oauth_client_secret: str | None = None,
 ) -> EcommercePaymentGatewayConfig:
     config = get_mercado_pago_config(db, tenant_id)
     if not config:
@@ -511,7 +530,12 @@ def save_mercado_pago_config(
 
     access_token_value = (access_token or "").strip()
     webhook_secret_value = (webhook_secret or "").strip()
+    public_key_value = (public_key or "").strip()
+    oauth_client_id_value = (oauth_client_id or "").strip()
+    oauth_client_secret_value = (oauth_client_secret or "").strip()
 
+    if public_key_value:
+        config.public_key = public_key_value
     if access_token_value:
         config.access_token_encrypted = encrypt_secret(access_token_value)
         config.refresh_token_encrypted = None
@@ -524,14 +548,22 @@ def save_mercado_pago_config(
         config.oauth_refresh_failed_at = None
     if webhook_secret_value:
         config.webhook_secret_encrypted = encrypt_secret(webhook_secret_value)
+    if oauth_client_id_value:
+        config.oauth_client_id = oauth_client_id_value
+    if oauth_client_secret_value:
+        config.oauth_client_secret_encrypted = encrypt_secret(oauth_client_secret_value)
 
     if enabled:
         existing_access_token = decrypt_secret(config.access_token_encrypted)
+        existing_oauth_settings = is_mercado_pago_oauth_available(config)
         existing_webhook_secret = _effective_webhook_secret(config)
-        if not existing_access_token:
+        if not existing_access_token and not existing_oauth_settings:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Access token do Mercado Pago obrigatorio para ativar o pagamento online.",
+                detail=(
+                    "Access token ou Client ID/Client Secret OAuth do Mercado Pago "
+                    "obrigatorios para ativar o pagamento online."
+                ),
             )
         if not existing_webhook_secret:
             raise HTTPException(
@@ -541,7 +573,6 @@ def save_mercado_pago_config(
 
     config.enabled = bool(enabled)
     config.environment = _normalize_environment(environment)
-    config.public_key = str(public_key or "").strip() or None
 
     # Mantido para auditoria futura; a tabela nao expõe esse campo.
     _ = user_id
@@ -599,29 +630,43 @@ def serialize_mercado_pago_config(
 ) -> dict[str, Any]:
     if not config:
         token = new_webhook_token()
+        env_oauth_client_id = _oauth_client_id()
         return {
             "provider": MERCADO_PAGO_PROVIDER,
             "enabled": False,
             "environment": "production",
             "public_key": None,
+            "public_key_configured": False,
+            "public_key_preview": None,
             "access_token_configured": False,
             "webhook_secret_configured": False,
+            "oauth_client_id_configured": bool(env_oauth_client_id),
+            "oauth_client_id_preview": _mask_config_value(env_oauth_client_id),
+            "oauth_client_secret_configured": bool(_oauth_client_secret()),
             "oauth_available": is_mercado_pago_oauth_available(),
             "oauth_connected": False,
             "oauth_connected_at": None,
             "mercado_pago_user_id": None,
+            "oauth_redirect_uri": build_mercado_pago_oauth_redirect_uri(base_url=base_url),
             "webhook_url": build_mercado_pago_webhook_url(token, base_url=base_url),
             "updated_at": None,
         }
 
+    oauth_client_id = _oauth_client_id(config)
+    public_key = str(getattr(config, "public_key", None) or "").strip()
     return {
         "provider": MERCADO_PAGO_PROVIDER,
         "enabled": bool(config.enabled),
         "environment": _normalize_environment(config.environment),
-        "public_key": config.public_key,
+        "public_key": None,
+        "public_key_configured": bool(public_key),
+        "public_key_preview": _mask_config_value(public_key),
         "access_token_configured": bool(decrypt_secret(config.access_token_encrypted)),
         "webhook_secret_configured": bool(_effective_webhook_secret(config)),
-        "oauth_available": is_mercado_pago_oauth_available(),
+        "oauth_client_id_configured": bool(oauth_client_id),
+        "oauth_client_id_preview": _mask_config_value(oauth_client_id),
+        "oauth_client_secret_configured": bool(_oauth_client_secret(config)),
+        "oauth_available": is_mercado_pago_oauth_available(config),
         "oauth_connected": bool(getattr(config, "oauth_connected", False)),
         "oauth_connected_at": (
             config.oauth_connected_at.isoformat()
@@ -629,6 +674,7 @@ def serialize_mercado_pago_config(
             else None
         ),
         "mercado_pago_user_id": getattr(config, "mercado_pago_user_id", None),
+        "oauth_redirect_uri": build_mercado_pago_oauth_redirect_uri(base_url=base_url),
         "webhook_url": build_mercado_pago_webhook_url(config.webhook_token, base_url=base_url),
         "updated_at": config.updated_at.isoformat() if getattr(config, "updated_at", None) else None,
     }
