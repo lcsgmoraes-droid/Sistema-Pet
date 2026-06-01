@@ -58,6 +58,25 @@ def test_build_preference_payload_inclui_metadados_urls_e_total(monkeypatch):
     }
 
 
+def test_build_preference_payload_normaliza_web_como_ecommerce(monkeypatch):
+    monkeypatch.setenv("ECOMMERCE_BASE_URL", "https://corepet.com.br/")
+    pedido = SimpleNamespace(
+        pedido_id="PED-WEB-123",
+        tenant_id="180d9cbf-5dcb-4676-bf11-dcbd91ed444b",
+        origem="web",
+    )
+
+    payload = build_preference_payload(
+        pedido=pedido,
+        total=12.34,
+        forma_pagamento_tipo="pix",
+        endereco_entrega="RETIRADA NA LOJA",
+        tipo_retirada="proprio",
+    )
+
+    assert payload["metadata"]["canal"] == "ecommerce"
+
+
 def test_build_preference_payload_retorna_para_pedidos_da_loja(monkeypatch):
     monkeypatch.setenv("ECOMMERCE_BASE_URL", "https://corepet.com.br/")
 

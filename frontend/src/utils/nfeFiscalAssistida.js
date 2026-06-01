@@ -45,6 +45,34 @@ export function extrairMensagemNFe(error) {
   return detail || error?.message || "Erro ao emitir nota fiscal.";
 }
 
+export function extrairAcaoCorrecaoFiscal(error) {
+  const detail = error?.response?.data?.detail;
+  const validacao = error?.validacaoFiscal || detail?.validacao || detail;
+
+  if (!validacao || typeof validacao !== "object") return null;
+
+  const pendencias = [
+    ...(validacao.bloqueios || []),
+    ...(validacao.correcoes || []),
+  ];
+  const pendenciaProduto = pendencias.find((item) => item?.produto_id);
+
+  if (!pendenciaProduto) return null;
+
+  return {
+    produtoId: pendenciaProduto.produto_id,
+    produtoNome: pendenciaProduto.produto_nome,
+    campo: pendenciaProduto.campo,
+    url: `/produtos/${pendenciaProduto.produto_id}/editar?aba=5`,
+  };
+}
+
+function erroComValidacaoFiscal(validacao) {
+  const error = new Error(formatarPendenciasFiscais(validacao));
+  error.validacaoFiscal = validacao;
+  return error;
+}
+
 export async function emitirNotaFiscalAssistida({
   vendaId,
   tipoNota = "nfce",
@@ -58,7 +86,7 @@ export async function emitirNotaFiscalAssistida({
   const bloqueios = validacao?.bloqueios || [];
   const correcoes = validacao?.correcoes || [];
   if (bloqueios.length) {
-    throw new Error(formatarPendenciasFiscais(validacao));
+    throw erroComValidacaoFiscal(validacao);
   }
 
   let autorizarCorrecoes = false;

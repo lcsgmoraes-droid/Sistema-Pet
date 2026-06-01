@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import api from "../api";
 import { buscarClientePorId } from "../api/clientes";
@@ -6,6 +7,7 @@ import { buscarVenda } from "../api/vendas";
 import { debugLog } from "../utils/debug";
 import {
   emitirNotaFiscalAssistida,
+  extrairAcaoCorrecaoFiscal,
   extrairMensagemNFe,
 } from "../utils/nfeFiscalAssistida";
 
@@ -109,6 +111,7 @@ export function usePDVVendaFinalizacao({
   carregarVendasRecentes,
   recarregarContextoClienteAtual,
 }) {
+  const navigate = useNavigate();
   const [statusOriginalVenda, setStatusOriginalVenda] = useState(null);
 
   const habilitarEdicao = () => {
@@ -240,7 +243,18 @@ export function usePDVVendaFinalizacao({
       }
     } catch (error) {
       console.error("Erro ao emitir nota da venda finalizada:", error);
-      alert(extrairMensagemNFe(error));
+      const mensagem = extrairMensagemNFe(error);
+      const acaoFiscal = extrairAcaoCorrecaoFiscal(error);
+      if (
+        acaoFiscal &&
+        window.confirm(
+          `${mensagem}\n\nAbrir o cadastro fiscal deste produto agora?`,
+        )
+      ) {
+        navigate(acaoFiscal.url);
+      } else {
+        alert(mensagem);
+      }
     } finally {
       setLoading(false);
     }

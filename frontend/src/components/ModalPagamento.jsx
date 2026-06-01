@@ -1,4 +1,5 @@
 import { useCallback, useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
   X,
   CreditCard,
@@ -21,6 +22,7 @@ import useRevealFloatingPanel from '../hooks/useRevealFloatingPanel';
 import { formatMoneyBRL } from '../utils/formatters';
 import {
   emitirNotaFiscalAssistida,
+  extrairAcaoCorrecaoFiscal,
   extrairMensagemNFe,
 } from '../utils/nfeFiscalAssistida';
 import { montarPayloadVenda } from '../utils/pdvVendaPayload';
@@ -67,6 +69,7 @@ export default function ModalPagamento({
   onVendaAtualizada,
   onAnalisarVenda,
 }) {
+  const navigate = useNavigate();
   const { moduloAtivo } = useModulos();
   const moduloCampanhasAtivo = moduloAtivo('campanhas');
   const [pagamentos, setPagamentos] = useState([]);
@@ -834,8 +837,18 @@ export default function ModalPagamento({
     } catch (error) {
       console.error('Erro ao emitir nota:', error);
       const mensagem = extrairMensagemNFe(error);
+      const acaoFiscal = extrairAcaoCorrecaoFiscal(error);
       setErro(mensagem);
-      alert(mensagem);
+      if (
+        acaoFiscal &&
+        window.confirm(
+          `${mensagem}\n\nAbrir o cadastro fiscal deste produto agora?`,
+        )
+      ) {
+        navigate(acaoFiscal.url);
+      } else {
+        alert(mensagem);
+      }
       return;
     } finally {
       setLoading(false);
