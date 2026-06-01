@@ -1,4 +1,5 @@
 import asyncio
+import inspect
 from types import SimpleNamespace
 from uuid import uuid4
 
@@ -17,13 +18,19 @@ from app.routes.ecommerce_auth import (
     _get_current_ecommerce_user,
     _get_or_create_cliente_for_user,
     _serialize_profile,
+    _transfer_cliente_relations_for_ecommerce_merge,
+    atualizar_perfil,
 )
 from app.routes import app_mobile_routes
 from app.routes.ecommerce_cart import (
     _activate_cart_tenant_context,
     _current_identity as cart_current_identity,
 )
-from app.routes.ecommerce_checkout import _current_identity as checkout_current_identity
+from app.routes.ecommerce_checkout import (
+    _activate_checkout_tenant_context,
+    _current_identity as checkout_current_identity,
+    finalizar_checkout,
+)
 from app.routes.ecommerce_entregador import _get_entregador_cliente
 from app.routes.ecommerce_entregador import obter_rota_entregador
 from app.routes.ecommerce_notify_routes import _resolve_notify_tenant
@@ -156,6 +163,25 @@ def test_cart_routes_can_reactivate_tenant_context_from_identity():
     assert get_current_tenant() == tenant_id
 
 
+def test_checkout_routes_can_reactivate_tenant_context_from_identity():
+    tenant_id = uuid4()
+    identity = SimpleNamespace(user_id=123, tenant_id=str(tenant_id))
+    clear_current_tenant()
+
+    resolved_tenant = _activate_checkout_tenant_context(identity)
+
+    assert resolved_tenant == str(tenant_id)
+    assert get_current_tenant() == tenant_id
+
+
+def test_checkout_finalizar_reactivates_tenant_before_gateway_lookup():
+    source = inspect.getsource(finalizar_checkout)
+
+    assert source.index("_activate_checkout_tenant_context(identity)") < source.index(
+        "get_active_mercado_pago_runtime_config"
+    )
+
+
 def test_get_entregador_cliente_uses_validated_ecommerce_user_context():
     tenant_id = uuid4()
     user = SimpleNamespace(id=123, tenant_id=tenant_id, is_active=True)
@@ -269,6 +295,32 @@ def test_get_or_create_cliente_for_user_prefers_operational_profile_by_email():
     assert result is funcionario_por_email
     assert funcionario_por_email.user_id == user.id
     assert get_current_tenant() == tenant_id
+
+
+def test_ecommerce_profile_merge_transfers_customer_relations_before_delete():
+    previous = SimpleNamespace(id=1)
+    target = SimpleNamespace(id=2)
+    pet = SimpleNamespace(cliente_id=previous.id, cliente=previous)
+    pendencia = SimpleNamespace(cliente_id=previous.id, cliente=previous)
+    venda = SimpleNamespace(cliente_id=previous.id, cliente=previous)
+    previous.pets = [pet]
+    previous.pendencias_estoque = [pendencia]
+    previous.vendas = [venda]
+
+    moved = _transfer_cliente_relations_for_ecommerce_merge(previous, target)
+
+    assert moved == 3
+    for item in (pet, pendencia, venda):
+        assert item.cliente_id == target.id
+        assert item.cliente is target
+
+
+def test_atualizar_perfil_transfers_customer_relations_before_deleting_duplicate():
+    source = inspect.getsource(atualizar_perfil)
+
+    assert source.index("_transfer_cliente_relations_for_ecommerce_merge") < source.index(
+        "db.delete(previous_cliente)"
+    )
 
 
 def test_app_mobile_cliente_helper_uses_profile_resolution_for_duplicate_customer_rows(monkeypatch):
