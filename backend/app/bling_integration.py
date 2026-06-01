@@ -7,6 +7,7 @@ import os
 import requests
 import threading
 import time
+import unicodedata
 from collections import Counter
 from datetime import datetime, timedelta
 from typing import Dict, Optional
@@ -207,6 +208,23 @@ _NCM_SUBSTITUICOES_SEGURAS = {
 
 _NCM_POR_TERMO_PRODUTO = [
     (
+        (
+            "racao",
+            "ração",
+            "sache",
+            "sachê",
+            "petisco",
+            "alimento para cao",
+            "alimento para caes",
+            "alimento para cão",
+            "alimento para cães",
+            "alimento para gato",
+            "alimento para gatos",
+        ),
+        "23091000",
+        "Produto parece alimento para caes ou gatos acondicionado para venda a retalho; confirme com o responsavel fiscal.",
+    ),
+    (
         ("guia", "coleira", "enforcador", "peitoral", "focinheira"),
         "42010090",
         "Produto parece acessorio para animais; sugestao conservadora para outros materiais.",
@@ -225,7 +243,18 @@ def _ncm_normalizado(value) -> Optional[str]:
 
 def _ncm_basico_aceitavel(value) -> bool:
     ncm = _ncm_normalizado(value)
-    return bool(ncm and len(ncm) == 8 and ncm not in _NCM_SUBSTITUICOES_SEGURAS)
+    return bool(
+        ncm
+        and len(ncm) == 8
+        and ncm != "00000000"
+        and ncm not in _NCM_SUBSTITUICOES_SEGURAS
+    )
+
+
+def _texto_busca_produto(value) -> str:
+    texto = str(value or "").lower()
+    normalizado = unicodedata.normalize("NFKD", texto)
+    return "".join(ch for ch in normalizado if not unicodedata.combining(ch))
 
 
 def _sugerir_ncm_por_historico(db: Session, tenant_id, produto) -> Optional[Dict[str, str]]:
@@ -279,9 +308,9 @@ def _sugerir_ncm(produto, fiscal_item: Dict[str, Optional[str]], db: Session, te
     if historico:
         return historico
 
-    nome = str(getattr(produto, "nome", "") or "").lower()
+    nome = _texto_busca_produto(getattr(produto, "nome", ""))
     for termos, ncm, motivo in _NCM_POR_TERMO_PRODUTO:
-        if any(termo in nome for termo in termos):
+        if any(_texto_busca_produto(termo) in nome for termo in termos):
             return {"valor": ncm, "motivo": motivo}
 
     return None
@@ -625,8 +654,8 @@ class BlingAPI:
             logger.info(f"  - CEST: {fiscal_item.get('cest') or 'NAO CADASTRADO'}")
             logger.info(f"  - Origem: {fiscal_item.get('origem_mercadoria') or 'NAO CADASTRADO'}")
             
-            if not fiscal_item.get("ncm"):
-                erros_produtos.append(f"{produto.nome} (SKU {sku}): NCM nao cadastrado")
+            if not _ncm_basico_aceitavel(fiscal_item.get("ncm")):
+                erros_produtos.append(f"{produto.nome} (SKU {sku}): NCM nao cadastrado ou invalido")
             if not fiscal_item.get("origem_mercadoria"):
                 erros_produtos.append(f"{produto.nome} (SKU {sku}): Origem da mercadoria nao cadastrada")
         
@@ -757,7 +786,7 @@ class BlingAPI:
                 "valor": valor_unitario,
                 "desconto": desconto * quantidade,
                 "total": valor_total,
-                "ncm": fiscal_item.get("ncm") or "00000000",
+                "ncm": _ncm_normalizado(fiscal_item.get("ncm")) or "",
                 "cfop": fiscal_item.get("cfop") or "5102",
                 "icms": {
                     "situacaoTributaria": fiscal_item.get("cst_icms") or "102",

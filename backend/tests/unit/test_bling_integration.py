@@ -1,7 +1,8 @@
 import requests
+import pytest
 from types import SimpleNamespace
 
-from app.bling_integration import BlingAPI
+from app.bling_integration import BlingAPI, prevalidar_fiscal_venda
 
 
 class _FakeResponse:
@@ -55,6 +56,60 @@ def _make_venda_nfce():
         tem_entrega=False,
         data_venda=None,
     )
+
+
+def test_prevalidacao_sugere_ncm_para_racao_caes_gatos_com_ncm_zerado():
+    produto = SimpleNamespace(
+        id=10,
+        codigo="SACHE-TESTE",
+        codigo_barras="7890000000000",
+        nome="Sache Gran Plus Gourmet Gato Adulto Trato Urinario Frango 85g",
+        unidade="UN",
+        ncm="00000000",
+        origem="0",
+        cfop="5102",
+    )
+    venda = SimpleNamespace(
+        id=30,
+        tenant_id="tenant-1",
+        itens=[
+            SimpleNamespace(
+                id=20,
+                produto=produto,
+                preco_unitario=1.99,
+                desconto_item=0,
+                quantidade=1,
+            )
+        ],
+        cliente=None,
+    )
+
+    validacao = prevalidar_fiscal_venda(venda, "nfce")
+
+    assert validacao["bloqueios"] == []
+    assert validacao["correcoes"][0]["campo"] == "ncm"
+    assert validacao["correcoes"][0]["valor_atual"] == "00000000"
+    assert validacao["correcoes"][0]["valor_sugerido"] == "23091000"
+    assert validacao["pode_emitir"] is False
+
+
+def test_emitir_nfce_bloqueia_ncm_zerado_antes_de_criar_nota_no_bling(monkeypatch):
+    api = _make_api()
+    venda = _make_venda_nfce()
+    venda.itens[0].produto.ncm = "00000000"
+
+    chamadas_bling = []
+
+    def fake_request(*args, **kwargs):
+        chamadas_bling.append((args, kwargs))
+        return {"data": {"id": 123}}
+
+    monkeypatch.setattr(api, "_request", fake_request)
+
+    with pytest.raises(ValueError, match="NCM"):
+        api.emitir_nota_fiscal(venda, "nfce")
+
+    assert chamadas_bling == []
 
 
 def test_request_renova_token_e_repete_quando_bling_retorna_invalid_token(monkeypatch):
