@@ -58,6 +58,25 @@ def test_build_preference_payload_inclui_metadados_urls_e_total(monkeypatch):
     }
 
 
+def test_build_preference_payload_retorna_para_pedidos_da_loja(monkeypatch):
+    monkeypatch.setenv("ECOMMERCE_BASE_URL", "https://corepet.com.br/")
+
+    payload = build_preference_payload(
+        pedido=_pedido(),
+        total=123.45,
+        forma_pagamento_tipo="pix",
+        endereco_entrega="RETIRADA NA LOJA",
+        tipo_retirada="app_loja",
+        return_url_base="https://corepet.com.br/atacadao",
+    )
+
+    assert payload["back_urls"] == {
+        "success": "https://corepet.com.br/atacadao?view=pedidos&payment_status=success&pedido_id=PED-COREPET-123",
+        "pending": "https://corepet.com.br/atacadao?view=pedidos&payment_status=pending&pedido_id=PED-COREPET-123",
+        "failure": "https://corepet.com.br/atacadao?view=pedidos&payment_status=failure&pedido_id=PED-COREPET-123",
+    }
+
+
 def test_select_checkout_url_respeita_sandbox(monkeypatch):
     preference = {
         "init_point": "https://www.mercadopago.com.br/checkout/v1/redirect",

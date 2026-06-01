@@ -51,7 +51,7 @@ def _make_venda_nfce():
         itens=[item],
         cliente=None,
         desconto_valor=0,
-        taxa_entrega_total=0,
+        taxa_entrega=0,
         tem_entrega=False,
         data_venda=None,
     )
@@ -134,3 +134,17 @@ def test_payload_nfce_usa_serie_3_e_deixa_numero_para_sequencia_do_bling():
     assert payload["tipo"] == 1
     assert payload["serie"] == 3
     assert payload["numero"] is None
+
+
+def test_payload_nfce_usa_taxa_entrega_da_venda_sem_campo_legado():
+    api = _make_api()
+    venda = _make_venda_nfce()
+    venda.tem_entrega = True
+    venda.taxa_entrega = 12.5
+
+    assert not hasattr(venda, "taxa_entrega_total")
+
+    payload = api._montar_payload(venda, "nfce")
+
+    assert payload["totais"]["valorFrete"] == 12.5
+    assert payload["totais"]["valorTotal"] == 112.5

@@ -1,4 +1,5 @@
 import os
+import inspect
 from types import SimpleNamespace
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
@@ -13,6 +14,7 @@ from app.services.ecommerce_payment_config import (
     build_mercado_pago_webhook_url,
     decrypt_secret,
     encrypt_secret,
+    resolve_mercado_pago_tenant_id_from_webhook_token,
     save_mercado_pago_config,
     serialize_mercado_pago_config,
 )
@@ -195,6 +197,44 @@ def test_preferencia_usa_webhook_especifico_do_tenant():
         "https://corepet.com.br/api/webhooks/mercadopago/tenant-token"
     )
     assert payload["metadata"]["tenant_id"] == "180d9cbf-5dcb-4676-bf11-dcbd91ed444b"
+
+
+def test_webhook_tenant_resolve_tenant_por_token_sem_orm_fail_fast():
+    captured = {}
+
+    class Result:
+        def first(self):
+            return ("180d9cbf-5dcb-4676-bf11-dcbd91ed444b",)
+
+    class Db:
+        def execute(self, statement, params):
+            captured["statement"] = str(statement)
+            captured["params"] = params
+            return Result()
+
+    tenant_id = resolve_mercado_pago_tenant_id_from_webhook_token(Db(), " mp_abc123 ")
+
+    assert tenant_id == "180d9cbf-5dcb-4676-bf11-dcbd91ed444b"
+    assert "ecommerce_payment_gateway_configs" in captured["statement"]
+    assert "webhook_token" in captured["statement"]
+    assert captured["params"] == {
+        "provider": "mercadopago",
+        "webhook_token": "mp_abc123",
+    }
+
+
+def test_webhook_tenant_ativa_contexto_antes_de_carregar_runtime_config():
+    from app.routes import ecommerce_webhooks
+
+    source = inspect.getsource(ecommerce_webhooks.webhook_mercadopago_tenant)
+
+    assert "resolve_mercado_pago_tenant_id_from_webhook_token" in source
+    assert source.index("resolve_mercado_pago_tenant_id_from_webhook_token") < source.index(
+        "runtime_config_from_webhook_token"
+    )
+    assert source.index("set_current_tenant(UUID(str(webhook_tenant_id)))") < source.index(
+        "runtime_config_from_webhook_token"
+    )
 
 
 def test_create_preference_usa_access_token_do_tenant(monkeypatch):

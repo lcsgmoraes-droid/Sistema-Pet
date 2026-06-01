@@ -769,7 +769,10 @@ class BlingAPI:
         # Totais
         valor_produtos = sum((float(i.preco_unitario or 0) - float(i.desconto_item or 0)) * float(i.quantidade or 1) for i in venda.itens)
         desconto_total = float(venda.desconto_valor or 0)
-        valor_frete = float(venda.taxa_entrega_total or 0) if venda.tem_entrega else 0
+        taxa_entrega = getattr(venda, "taxa_entrega_total", None)
+        if taxa_entrega is None:
+            taxa_entrega = getattr(venda, "taxa_entrega", 0)
+        valor_frete = float(taxa_entrega or 0) if venda.tem_entrega else 0
         valor_total = valor_produtos - desconto_total + valor_frete
         
         # Definir situação e finalidade conforme ambiente configurado

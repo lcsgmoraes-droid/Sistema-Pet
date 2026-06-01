@@ -14,12 +14,12 @@ from sqlalchemy import text
 from app.db import get_session
 from app.financeiro_models import FormaPagamento
 from app.idempotency_models import IdempotencyKey
-from app.models import Cliente, User
+from app.models import Cliente, Tenant, User
 from app.pedido_models import Pedido, PedidoItem
 from app.routes.ecommerce_auth import _activate_user_tenant_context, _get_current_ecommerce_user
 from app.services.ecommerce_payment_config import get_active_mercado_pago_runtime_config
 from app.services.mercado_pago_checkout import create_preference, is_mercado_pago_provider
-from app.tenancy.context import set_current_tenant
+from app.tenancy.context import clear_current_tenant, get_current_tenant, set_current_tenant
 from app.utils.timezone import now_brasilia
 
 
@@ -174,20 +174,29 @@ def _payment_info_for_pedido(db: Session, pedido: Pedido) -> dict[str, str | Non
     if payment_info["payment_url"] or payment_info["payment_preference_id"]:
         return payment_info
 
-    idem_rows = (
-        db.query(IdempotencyKey)
-        .filter(
-            IdempotencyKey.user_id == pedido.cliente_id,
-            IdempotencyKey.tenant_id == pedido.tenant_id,
-            IdempotencyKey.endpoint == "POST /api/checkout/finalizar",
-            IdempotencyKey.status == "completed",
-            IdempotencyKey.response_body.isnot(None),
-            IdempotencyKey.response_body.contains(pedido.pedido_id),
+    previous_tenant = get_current_tenant()
+    set_current_tenant(UUID(str(pedido.tenant_id)))
+    try:
+        idem_rows = (
+            db.query(IdempotencyKey)
+            .filter(
+                IdempotencyKey.user_id == pedido.cliente_id,
+                IdempotencyKey.tenant_id == pedido.tenant_id,
+                IdempotencyKey.endpoint == "POST /api/checkout/finalizar",
+                IdempotencyKey.status == "completed",
+                IdempotencyKey.response_body.isnot(None),
+                IdempotencyKey.response_body.contains(pedido.pedido_id),
+            )
+            .order_by(IdempotencyKey.completed_at.desc(), IdempotencyKey.id.desc())
+            .limit(5)
+            .all()
         )
-        .order_by(IdempotencyKey.completed_at.desc(), IdempotencyKey.id.desc())
-        .limit(5)
-        .all()
-    )
+    finally:
+        if previous_tenant is None:
+            clear_current_tenant()
+        else:
+            set_current_tenant(previous_tenant)
+
     for idem_row in idem_rows:
         try:
             response = json.loads(idem_row.response_body or "{}")
@@ -505,6 +514,12 @@ def finalizar_checkout(
     provider = payment_config.provider
     response["payment_provider"] = provider
     if is_mercado_pago_provider(provider):
+        tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
+        storefront_ref = str(getattr(tenant, "ecommerce_slug", None) or tenant_id).strip("/")
+        return_url_base = (
+            f"{(os.getenv('ECOMMERCE_PUBLIC_BASE_URL') or os.getenv('ECOMMERCE_BASE_URL') or os.getenv('FRONTEND_URL') or 'https://corepet.com.br').strip().rstrip('/')}"
+            f"/{storefront_ref}"
+        )
         preference = create_preference(
             pedido=carrinho,
             total=total,
@@ -513,6 +528,7 @@ def finalizar_checkout(
             tipo_retirada=tipo_retirada,
             access_token=payment_config.access_token,
             notification_url=payment_config.webhook_url,
+            return_url_base=return_url_base,
             use_sandbox=payment_config.use_sandbox,
         )
         carrinho.payment_provider = "mercadopago"

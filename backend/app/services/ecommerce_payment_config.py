@@ -18,6 +18,7 @@ from uuid import UUID
 from cryptography.fernet import Fernet
 from fastapi import HTTPException, status
 import requests
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.config import JWT_SECRET_KEY
@@ -373,6 +374,34 @@ def get_mercado_pago_config_by_webhook_token(
         )
         .first()
     )
+
+
+def resolve_mercado_pago_tenant_id_from_webhook_token(
+    db: Session,
+    webhook_token: str,
+) -> str | None:
+    token = str(webhook_token or "").strip()
+    if not token:
+        return None
+
+    row = db.execute(
+        text(
+            """
+            SELECT tenant_id
+            FROM ecommerce_payment_gateway_configs
+            WHERE provider = :provider
+              AND webhook_token = :webhook_token
+            LIMIT 1
+            """
+        ),
+        {
+            "provider": MERCADO_PAGO_PROVIDER,
+            "webhook_token": token,
+        },
+    ).first()
+    if not row:
+        return None
+    return str(row[0])
 
 
 def _effective_webhook_secret(config: Any | None) -> str:
