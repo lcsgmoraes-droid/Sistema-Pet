@@ -616,7 +616,7 @@ def _upsert_delivery_details(cliente: Cliente, details: dict, enabled: bool) -> 
         cliente.enderecos_adicionais = items if items else None
 
 
-_CLIENTE_RELATIONSHIPS_TO_TRANSFER = ("pets", "pendencias_estoque", "vendas")
+_CLIENTE_RELATIONSHIPS_TO_TRANSFER = ("pets", "pendencias_estoque", "vendas", "contas_receber")
 
 
 def _transfer_cliente_relations_for_ecommerce_merge(
@@ -630,6 +630,7 @@ def _transfer_cliente_relations_for_ecommerce_merge(
     from app.models import Pet
     from app.pendencia_estoque_models import PendenciaEstoque
     from app.vendas_models import Venda
+    from app.financeiro_models import ContaReceber
 
     transferred = (
         db.query(Pet)
@@ -645,6 +646,11 @@ def _transfer_cliente_relations_for_ecommerce_merge(
         db.query(Venda)
         .filter(Venda.cliente_id == previous_cliente.id)
         .update({Venda.cliente_id: target_cliente.id}, synchronize_session=False)
+    )
+    transferred += (
+        db.query(ContaReceber)
+        .filter(ContaReceber.cliente_id == previous_cliente.id)
+        .update({ContaReceber.cliente_id: target_cliente.id}, synchronize_session=False)
     )
 
     db.flush()
@@ -673,6 +679,9 @@ def _get_or_create_cliente_for_user(db: Session, user: User) -> Cliente:
         cliente = cliente_operacional
 
     if clientes_vinculados:
+        clientes_vinculados_ativos = [
+            c for c in clientes_vinculados if getattr(c, "ativo", True) is not False
+        ] or clientes_vinculados
         cpf_usuario = _digits_only(user.cpf_cnpj)
         email_usuario = (user.email or "").strip().lower()
 
@@ -680,7 +689,7 @@ def _get_or_create_cliente_for_user(db: Session, user: User) -> Cliente:
             cliente = next(
                 (
                     c
-                    for c in clientes_vinculados
+                    for c in clientes_vinculados_ativos
                     if _is_operational_cliente(c) and _digits_only(c.cpf) == cpf_usuario
                 ),
                 None,
@@ -690,20 +699,20 @@ def _get_or_create_cliente_for_user(db: Session, user: User) -> Cliente:
             cliente = next(
                 (
                     c
-                    for c in clientes_vinculados
+                    for c in clientes_vinculados_ativos
                     if _is_operational_cliente(c) and (c.email or "").strip().lower() == email_usuario
                 ),
                 None,
             )
 
         if not cliente:
-            cliente = next((c for c in clientes_vinculados if _is_operational_cliente(c)), None)
+            cliente = next((c for c in clientes_vinculados_ativos if _is_operational_cliente(c)), None)
 
         if not cliente and cpf_usuario:
             cliente = next(
                 (
                     c
-                    for c in clientes_vinculados
+                    for c in clientes_vinculados_ativos
                     if _digits_only(c.cpf) == cpf_usuario
                 ),
                 None,
@@ -713,14 +722,14 @@ def _get_or_create_cliente_for_user(db: Session, user: User) -> Cliente:
             cliente = next(
                 (
                     c
-                    for c in clientes_vinculados
+                    for c in clientes_vinculados_ativos
                     if (c.email or "").strip().lower() == email_usuario
                 ),
                 None,
             )
 
         if not cliente:
-            cliente = clientes_vinculados[0]
+            cliente = clientes_vinculados_ativos[0]
 
     if not cliente:
         cliente = (
@@ -1211,7 +1220,12 @@ def atualizar_perfil(
         potential_match.user_id = current_user.id
         _transfer_cliente_relations_for_ecommerce_merge(db, previous_cliente, potential_match)
         cliente = potential_match
-        db.delete(previous_cliente)
+        previous_cliente.ativo = False
+        nota_fusao = (
+            f"\n[{datetime.utcnow().isoformat()}] Cadastro e-commerce duplicado #{previous_cliente.id} "
+            f"mantido inativo apos fusao no cliente #{cliente.id}."
+        )
+        previous_cliente.observacoes = (previous_cliente.observacoes or "") + nota_fusao
 
     if payload.endereco is not None:
         cliente.endereco = payload.endereco.strip() or None

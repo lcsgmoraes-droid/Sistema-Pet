@@ -68,6 +68,41 @@ class _Db:
         return _Query(self.results.pop(0))
 
 
+class _TransferQuery:
+    def __init__(self, db, model):
+        self.db = db
+        self.model_name = getattr(model, "__name__", str(model))
+
+    def filter(self, *_args, **_kwargs):
+        return self
+
+    def update(self, values, synchronize_session=False):
+        self.db.updated_models.append(
+            {
+                "model": self.model_name,
+                "values": values,
+                "synchronize_session": synchronize_session,
+            }
+        )
+        return 1
+
+
+class _TransferDb:
+    def __init__(self):
+        self.updated_models = []
+        self.flushed = False
+        self.expired = []
+
+    def query(self, model):
+        return _TransferQuery(self, model)
+
+    def flush(self):
+        self.flushed = True
+
+    def expire(self, obj, relationship_names):
+        self.expired.append((obj, relationship_names))
+
+
 class _UnorderedFirstQuery:
     def __init__(self, unordered_first, ordered_results):
         self.unordered_first = unordered_first
@@ -297,23 +332,84 @@ def test_get_or_create_cliente_for_user_prefers_operational_profile_by_email():
     assert get_current_tenant() == tenant_id
 
 
-def test_ecommerce_profile_merge_transfers_customer_relations_before_delete():
+def test_get_or_create_cliente_for_user_prefers_active_linked_customer():
+    tenant_id = uuid4()
+    user = SimpleNamespace(
+        id=123,
+        tenant_id=tenant_id,
+        is_active=True,
+        cpf_cnpj="23068780802",
+        email="cliente@example.com",
+        telefone="18996691730",
+        nome="Cliente Teste",
+    )
+    inactive_duplicate = SimpleNamespace(
+        id=456,
+        tenant_id=str(tenant_id),
+        user_id=user.id,
+        cpf=user.cpf_cnpj,
+        email=user.email,
+        telefone=user.telefone,
+        nome="Cliente Inativo",
+        tipo_cadastro="cliente",
+        ativo=False,
+        is_entregador=False,
+    )
+    active_customer = SimpleNamespace(
+        id=789,
+        tenant_id=str(tenant_id),
+        user_id=user.id,
+        cpf=user.cpf_cnpj,
+        email=user.email,
+        telefone=user.telefone,
+        nome="Cliente Ativo",
+        tipo_cadastro="cliente",
+        ativo=True,
+        is_entregador=False,
+    )
+    clear_current_tenant()
+
+    result = _get_or_create_cliente_for_user(_Db([inactive_duplicate, active_customer], []), user)
+
+    assert result is active_customer
+    assert get_current_tenant() == tenant_id
+
+
+def test_ecommerce_profile_merge_transfers_customer_relations_before_detaching_duplicate():
     source = inspect.getsource(_transfer_cliente_relations_for_ecommerce_merge)
 
     assert "db.query(PendenciaEstoque)" in source
     assert "db.query(Pet)" in source
     assert "db.query(Venda)" in source
+    assert "db.query(ContaReceber)" in source
     assert "synchronize_session=False" in source
     assert "db.expire(previous_cliente" in source
     assert "getattr(previous_cliente, relationship_name" not in source
 
 
-def test_atualizar_perfil_transfers_customer_relations_before_deleting_duplicate():
+def test_atualizar_perfil_detaches_duplicate_customer_instead_of_deleting_history():
     source = inspect.getsource(atualizar_perfil)
 
-    assert source.index("_transfer_cliente_relations_for_ecommerce_merge") < source.index(
-        "db.delete(previous_cliente)"
+    assert "_transfer_cliente_relations_for_ecommerce_merge" in source
+    assert "previous_cliente.ativo = False" in source
+    assert "db.delete(previous_cliente)" not in source
+
+
+def test_ecommerce_profile_merge_transfers_accounts_receivable_before_detaching_duplicate():
+    db = _TransferDb()
+    previous_cliente = SimpleNamespace(id=10)
+    target_cliente = SimpleNamespace(id=20)
+
+    transferred = _transfer_cliente_relations_for_ecommerce_merge(
+        db,
+        previous_cliente,
+        target_cliente,
     )
+
+    updated_models = [item["model"] for item in db.updated_models]
+    assert "ContaReceber" in updated_models
+    assert db.flushed is True
+    assert transferred == len(updated_models)
 
 
 def test_app_mobile_cliente_helper_uses_profile_resolution_for_duplicate_customer_rows(monkeypatch):
