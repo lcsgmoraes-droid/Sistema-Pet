@@ -48,6 +48,20 @@ def is_mercado_pago_provider(provider: str | None = None) -> bool:
     }
 
 
+def normalizar_canal_venda_online(canal: str | None) -> str:
+    value = str(canal or "").strip().lower().replace("-", "_")
+    aliases = {
+        "web": "ecommerce",
+        "site": "ecommerce",
+        "loja_virtual": "ecommerce",
+        "e_commerce": "ecommerce",
+        "ecommerce": "ecommerce",
+        "app": "app",
+        "aplicativo": "app",
+    }
+    return aliases.get(value, value or "ecommerce")
+
+
 def _delivery_mode(endereco_entrega: str | None, tipo_retirada: str | None) -> str:
     endereco = str(endereco_entrega or "").strip().lower()
     retirada = str(tipo_retirada or "").strip().lower()
@@ -91,7 +105,7 @@ def build_preference_payload(
     payment_return_base_url = str(return_url_base or base_url).strip().rstrip("/")
     pedido_id = str(pedido.pedido_id)
     tenant_id = str(pedido.tenant_id)
-    canal = str(getattr(pedido, "origem", "") or "ecommerce")
+    canal = normalizar_canal_venda_online(getattr(pedido, "origem", "") or "ecommerce")
     modo_entrega = _delivery_mode(endereco_entrega, tipo_retirada)
     total_value = round(float(total or 0.0), 2)
 

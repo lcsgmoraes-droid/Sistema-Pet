@@ -9,6 +9,7 @@ import {
   X,
 } from "lucide-react";
 import { formatMoneyBRL } from "../../utils/formatters";
+import { normalizeBenefitChannel } from "../../utils/campaignChannelScope";
 import CopyableCode from "../ui/CopyableCode";
 import CustomerIdentity, { getCustomerIdentityCode } from "../ui/CustomerIdentity";
 import IconActionButton from "../ui/IconActionButton";
@@ -16,6 +17,7 @@ import SaleReference from "../ui/SaleReference";
 import StatusBadge from "../ui/StatusBadge";
 
 function getCanalInfo(canal) {
+  const canalNormalizado = normalizeBenefitChannel(canal);
   return (
     {
       ecommerce: {
@@ -73,7 +75,7 @@ function getCanalInfo(canal) {
         label: "Veterinario",
         title: "Venda gerada pelo modulo Veterinario",
       },
-    }[canal] || {
+    }[canalNormalizado] || {
       cor: "border-l-gray-400",
       bg: "bg-gray-50",
       border: "border-gray-200 hover:border-blue-300",
