@@ -5,6 +5,7 @@ import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Linking,
   RefreshControl,
   StyleSheet,
   Text,
@@ -156,6 +157,7 @@ export default function OrdersScreen() {
       ["aprovado", "em_preparo", "pronto", "pago", "criado"].includes(
         item.status,
       );
+    const podePagarAgora = item.status === "pendente" && !!item.payment_url;
 
     return (
       <View style={styles.card}>
@@ -232,6 +234,25 @@ export default function OrdersScreen() {
             <Text style={styles.totalValor}>{formatarMoeda(item.total)}</Text>
           </View>
           <View style={styles.acoes}>
+            {podePagarAgora && (
+              <TouchableOpacity
+                style={styles.btnPagar}
+                onPress={async () => {
+                  if (!item.payment_url) return;
+                  try {
+                    await Linking.openURL(item.payment_url);
+                  } catch {
+                    Alert.alert(
+                      "Erro",
+                      "Nao foi possivel abrir o pagamento. Tente novamente.",
+                    );
+                  }
+                }}
+              >
+                <Ionicons name="card-outline" size={14} color="#fff" />
+                <Text style={styles.btnPagarTexto}>Pagar agora</Text>
+              </TouchableOpacity>
+            )}
             {podeRastrear && (
               <TouchableOpacity
                 style={styles.btnRastrear}
@@ -434,7 +455,21 @@ const styles = StyleSheet.create({
   },
   totalLabel: { fontSize: FONTE.pequena, color: CORES.textoSecundario },
   totalValor: { fontSize: FONTE.grande, fontWeight: "800", color: CORES.texto },
-  acoes: { flexDirection: "row", gap: 8 },
+  acoes: { flexDirection: "row", flexWrap: "wrap", justifyContent: "flex-end", gap: 8 },
+  btnPagar: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: ESPACO.md,
+    paddingVertical: ESPACO.sm - 2,
+    backgroundColor: CORES.primario,
+    borderRadius: RAIO.circulo,
+  },
+  btnPagarTexto: {
+    fontSize: FONTE.pequena,
+    color: "#fff",
+    fontWeight: "700",
+  },
   btnRastrear: {
     flexDirection: "row",
     alignItems: "center",
