@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Copy, CreditCard, KeyRound, Webhook } from 'lucide-react'
+import { CheckCircle2, Copy, CreditCard, ExternalLink, KeyRound, Unplug, Webhook } from 'lucide-react'
 import { api } from '../../services/api'
 
 const DIAS_SEMANA = [
@@ -25,6 +25,8 @@ export default function EcommerceConfig() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [savingPayment, setSavingPayment] = useState(false)
+  const [connectingPayment, setConnectingPayment] = useState(false)
+  const [disconnectingPayment, setDisconnectingPayment] = useState(false)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
 
@@ -40,6 +42,10 @@ export default function EcommerceConfig() {
     public_key: '',
     access_token_configured: false,
     webhook_secret_configured: false,
+    oauth_available: false,
+    oauth_connected: false,
+    oauth_connected_at: null,
+    mercado_pago_user_id: null,
     webhook_url: '',
   })
   const [paymentSecrets, setPaymentSecrets] = useState({
@@ -52,10 +58,36 @@ export default function EcommerceConfig() {
   const [loadingAvisos, setLoadingAvisos] = useState(true)
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const oauthStatus = params.get('mercadopago_oauth')
+    if (oauthStatus === 'connected') {
+      setSuccess('Mercado Pago conectado com sucesso.')
+      window.history.replaceState({}, '', window.location.pathname)
+    }
+    if (oauthStatus === 'error') {
+      setError(params.get('mercadopago_message') || 'Nao foi possivel concluir a conexao com o Mercado Pago.')
+      window.history.replaceState({}, '', window.location.pathname)
+    }
     fetchConfig()
     fetchAvisos()
     fetchPaymentConfig()
   }, [])
+
+  function applyPaymentConfigResponse(data) {
+    const d = data || {}
+    setPaymentConfig({
+      enabled: Boolean(d.enabled),
+      environment: d.environment || 'production',
+      public_key: d.public_key || '',
+      access_token_configured: Boolean(d.access_token_configured),
+      webhook_secret_configured: Boolean(d.webhook_secret_configured),
+      oauth_available: Boolean(d.oauth_available),
+      oauth_connected: Boolean(d.oauth_connected),
+      oauth_connected_at: d.oauth_connected_at || null,
+      mercado_pago_user_id: d.mercado_pago_user_id || null,
+      webhook_url: d.webhook_url || '',
+    })
+  }
 
   async function fetchConfig() {
     try {
@@ -87,15 +119,7 @@ export default function EcommerceConfig() {
   async function fetchPaymentConfig() {
     try {
       const res = await api.get('/ecommerce-payment-config/mercadopago')
-      const d = res.data || {}
-      setPaymentConfig({
-        enabled: Boolean(d.enabled),
-        environment: d.environment || 'production',
-        public_key: d.public_key || '',
-        access_token_configured: Boolean(d.access_token_configured),
-        webhook_secret_configured: Boolean(d.webhook_secret_configured),
-        webhook_url: d.webhook_url || '',
-      })
+      applyPaymentConfigResponse(res.data)
     } catch {
       setError('Nao foi possivel carregar a configuracao de pagamento.')
     } finally {
@@ -138,15 +162,7 @@ export default function EcommerceConfig() {
         access_token: paymentSecrets.access_token || null,
         webhook_secret: paymentSecrets.webhook_secret || null,
       })
-      const d = res.data || {}
-      setPaymentConfig({
-        enabled: Boolean(d.enabled),
-        environment: d.environment || 'production',
-        public_key: d.public_key || '',
-        access_token_configured: Boolean(d.access_token_configured),
-        webhook_secret_configured: Boolean(d.webhook_secret_configured),
-        webhook_url: d.webhook_url || '',
-      })
+      applyPaymentConfigResponse(res.data)
       setPaymentSecrets({ access_token: '', webhook_secret: '' })
       setSuccess('Configuracao do Mercado Pago salva com sucesso!')
       setTimeout(() => setSuccess(''), 4000)
@@ -154,6 +170,45 @@ export default function EcommerceConfig() {
       setError(err.response?.data?.detail || 'Erro ao salvar Mercado Pago. Confira as credenciais.')
     } finally {
       setSavingPayment(false)
+    }
+  }
+
+  async function conectarMercadoPago() {
+    setConnectingPayment(true)
+    setError('')
+    setSuccess('')
+    try {
+      const res = await api.get('/ecommerce-payment-config/mercadopago/oauth/url')
+      const data = res.data || {}
+      if (!data.configured || !data.authorization_url) {
+        const missing = Array.isArray(data.missing) && data.missing.length > 0
+          ? ` (${data.missing.join(', ')})`
+          : ''
+        setError(`OAuth Mercado Pago ainda nao esta configurado no servidor CorePet${missing}.`)
+        return
+      }
+      window.location.assign(data.authorization_url)
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Nao foi possivel iniciar a conexao com o Mercado Pago.')
+    } finally {
+      setConnectingPayment(false)
+    }
+  }
+
+  async function desconectarMercadoPago() {
+    setDisconnectingPayment(true)
+    setError('')
+    setSuccess('')
+    try {
+      const res = await api.post('/ecommerce-payment-config/mercadopago/oauth/disconnect')
+      applyPaymentConfigResponse(res.data)
+      setPaymentSecrets({ access_token: '', webhook_secret: '' })
+      setSuccess('Mercado Pago desconectado desta loja.')
+      setTimeout(() => setSuccess(''), 4000)
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Nao foi possivel desconectar o Mercado Pago.')
+    } finally {
+      setDisconnectingPayment(false)
     }
   }
 
@@ -349,72 +404,52 @@ export default function EcommerceConfig() {
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Ambiente</label>
-                  <select
-                    value={paymentConfig.environment}
-                    onChange={(e) =>
-                      setPaymentConfig((prev) => ({ ...prev, environment: e.target.value }))
-                    }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
-                  >
-                    <option value="production">Producao</option>
-                    <option value="sandbox">Teste / Sandbox</option>
-                  </select>
+              <div className="border border-emerald-100 rounded-lg p-4 bg-emerald-50/40 space-y-3">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-start gap-3">
+                    <div className={`mt-0.5 h-8 w-8 rounded-full flex items-center justify-center ${
+                      paymentConfig.oauth_connected ? 'bg-emerald-100 text-emerald-700' : 'bg-white text-gray-500'
+                    }`}>
+                      <CheckCircle2 size={18} />
+                    </div>
+                    <div>
+                      <p className="font-medium text-gray-800">
+                        {paymentConfig.oauth_connected ? 'Conta Mercado Pago conectada' : 'Conectar conta Mercado Pago'}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {paymentConfig.oauth_connected
+                          ? `Recebendo nesta loja${paymentConfig.mercado_pago_user_id ? ` (conta ${paymentConfig.mercado_pago_user_id})` : ''}.`
+                          : 'O cliente autoriza a propria conta e os tokens ficam salvos no tenant.'}
+                      </p>
+                    </div>
+                  </div>
+                  {paymentConfig.oauth_connected ? (
+                    <button
+                      type="button"
+                      onClick={desconectarMercadoPago}
+                      disabled={disconnectingPayment}
+                      className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                    >
+                      <Unplug size={16} />
+                      {disconnectingPayment ? 'Desconectando...' : 'Desconectar'}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={conectarMercadoPago}
+                      disabled={connectingPayment}
+                      className="inline-flex items-center gap-2 rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-50"
+                    >
+                      <ExternalLink size={16} />
+                      {connectingPayment ? 'Abrindo...' : 'Conectar'}
+                    </button>
+                  )}
                 </div>
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">Public key</label>
-                  <input
-                    value={paymentConfig.public_key}
-                    onChange={(e) =>
-                      setPaymentConfig((prev) => ({ ...prev, public_key: e.target.value }))
-                    }
-                    placeholder="APP_USR-..."
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="flex items-center gap-1 text-xs font-medium text-gray-600 mb-1">
-                    <KeyRound size={14} />
-                    Access token
-                  </label>
-                  <input
-                    type="password"
-                    value={paymentSecrets.access_token}
-                    onChange={(e) =>
-                      setPaymentSecrets((prev) => ({ ...prev, access_token: e.target.value }))
-                    }
-                    placeholder={
-                      paymentConfig.access_token_configured
-                        ? 'Token ja configurado'
-                        : 'APP_USR-...'
-                    }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                  />
-                </div>
-                <div>
-                  <label className="flex items-center gap-1 text-xs font-medium text-gray-600 mb-1">
-                    <Webhook size={14} />
-                    Assinatura secreta
-                  </label>
-                  <input
-                    type="password"
-                    value={paymentSecrets.webhook_secret}
-                    onChange={(e) =>
-                      setPaymentSecrets((prev) => ({ ...prev, webhook_secret: e.target.value }))
-                    }
-                    placeholder={
-                      paymentConfig.webhook_secret_configured
-                        ? 'Assinatura ja configurada'
-                        : 'Cole a assinatura secreta do webhook'
-                    }
-                    className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
-                  />
-                </div>
+                {!paymentConfig.oauth_available && (
+                  <p className="text-xs text-amber-700 bg-amber-50 border border-amber-100 rounded-md px-3 py-2">
+                    O botao sera liberado quando o Client ID e Client Secret OAuth estiverem configurados no servidor.
+                  </p>
+                )}
               </div>
 
               <div>
@@ -435,6 +470,81 @@ export default function EcommerceConfig() {
                   </button>
                 </div>
               </div>
+
+              <details className="border border-gray-200 rounded-lg">
+                <summary className="cursor-pointer px-4 py-3 text-sm font-medium text-gray-700">
+                  Configuracao avancada
+                </summary>
+                <div className="px-4 pb-4 pt-1 space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Ambiente</label>
+                      <select
+                        value={paymentConfig.environment}
+                        onChange={(e) =>
+                          setPaymentConfig((prev) => ({ ...prev, environment: e.target.value }))
+                        }
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white"
+                      >
+                        <option value="production">Producao</option>
+                        <option value="sandbox">Teste / Sandbox</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium text-gray-600 mb-1">Public key</label>
+                      <input
+                        value={paymentConfig.public_key}
+                        onChange={(e) =>
+                          setPaymentConfig((prev) => ({ ...prev, public_key: e.target.value }))
+                        }
+                        placeholder="APP_USR-..."
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <label className="flex items-center gap-1 text-xs font-medium text-gray-600 mb-1">
+                        <KeyRound size={14} />
+                        Access token
+                      </label>
+                      <input
+                        type="password"
+                        value={paymentSecrets.access_token}
+                        onChange={(e) =>
+                          setPaymentSecrets((prev) => ({ ...prev, access_token: e.target.value }))
+                        }
+                        placeholder={
+                          paymentConfig.access_token_configured
+                            ? 'Token ja configurado'
+                            : 'APP_USR-...'
+                        }
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                      />
+                    </div>
+                    <div>
+                      <label className="flex items-center gap-1 text-xs font-medium text-gray-600 mb-1">
+                        <Webhook size={14} />
+                        Assinatura secreta
+                      </label>
+                      <input
+                        type="password"
+                        value={paymentSecrets.webhook_secret}
+                        onChange={(e) =>
+                          setPaymentSecrets((prev) => ({ ...prev, webhook_secret: e.target.value }))
+                        }
+                        placeholder={
+                          paymentConfig.webhook_secret_configured
+                            ? 'Assinatura ja configurada'
+                            : 'Cole a assinatura secreta do webhook'
+                        }
+                        className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-400"
+                      />
+                    </div>
+                  </div>
+                </div>
+              </details>
             </>
           )}
         </div>

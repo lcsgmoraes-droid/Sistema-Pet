@@ -2,7 +2,8 @@
 
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
@@ -10,10 +11,19 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.services.ecommerce_payment_config import (
     MERCADO_PAGO_PROVIDER,
+    build_mercado_pago_oauth_authorization_url,
+    build_mercado_pago_oauth_redirect_uri,
+    build_mercado_pago_oauth_return_url,
+    disconnect_mercado_pago_oauth_config,
+    exchange_mercado_pago_oauth_code,
     get_mercado_pago_config,
+    is_mercado_pago_oauth_available,
+    missing_mercado_pago_oauth_settings,
     new_webhook_token,
     save_mercado_pago_config,
+    save_mercado_pago_oauth_tokens,
     serialize_mercado_pago_config,
+    validate_mercado_pago_oauth_state,
 )
 from app.ecommerce_payment_models import EcommercePaymentGatewayConfig
 
@@ -28,6 +38,10 @@ class MercadoPagoConfigResponse(BaseModel):
     public_key: Optional[str]
     access_token_configured: bool
     webhook_secret_configured: bool
+    oauth_available: bool
+    oauth_connected: bool
+    oauth_connected_at: Optional[str]
+    mercado_pago_user_id: Optional[str]
     webhook_url: str
     updated_at: Optional[str]
 
@@ -38,6 +52,13 @@ class MercadoPagoConfigUpdate(BaseModel):
     public_key: Optional[str] = None
     access_token: Optional[str] = None
     webhook_secret: Optional[str] = None
+
+
+class MercadoPagoOAuthUrlResponse(BaseModel):
+    configured: bool
+    authorization_url: Optional[str] = None
+    redirect_uri: str
+    missing: list[str] = Field(default_factory=list)
 
 
 def _ensure_config(
@@ -73,6 +94,87 @@ def buscar_config_mercado_pago(
     return serialize_mercado_pago_config(config)
 
 
+@router.get("/mercadopago/oauth/url", response_model=MercadoPagoOAuthUrlResponse)
+def gerar_url_oauth_mercado_pago(
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    """Gera URL para o tenant conectar sua conta Mercado Pago via OAuth."""
+    current_user, tenant_id = user_and_tenant
+    _ensure_config(db, tenant_id=tenant_id)
+    redirect_uri = build_mercado_pago_oauth_redirect_uri()
+    if not is_mercado_pago_oauth_available():
+        return MercadoPagoOAuthUrlResponse(
+            configured=False,
+            authorization_url=None,
+            redirect_uri=redirect_uri,
+            missing=missing_mercado_pago_oauth_settings(),
+        )
+    return MercadoPagoOAuthUrlResponse(
+        configured=True,
+        authorization_url=build_mercado_pago_oauth_authorization_url(
+            tenant_id=tenant_id,
+            user_id=current_user.id,
+            redirect_uri=redirect_uri,
+        ),
+        redirect_uri=redirect_uri,
+        missing=[],
+    )
+
+
+@router.get("/mercadopago/oauth/callback")
+def callback_oauth_mercado_pago(
+    code: Optional[str] = None,
+    error: Optional[str] = None,
+    state: Optional[str] = None,
+    db: Session = Depends(get_session),
+):
+    """Recebe o retorno OAuth do Mercado Pago e salva tokens no tenant."""
+    if error:
+        return RedirectResponse(
+            build_mercado_pago_oauth_return_url("error", message=error),
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    state_payload = validate_mercado_pago_oauth_state(state)
+    if not state_payload:
+        return RedirectResponse(
+            build_mercado_pago_oauth_return_url("error", message="state invalido ou expirado"),
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+    if not code:
+        return RedirectResponse(
+            build_mercado_pago_oauth_return_url("error", message="codigo nao recebido"),
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    tenant_id = state_payload["tenant_id"]
+    config = _ensure_config(db, tenant_id=tenant_id)
+    try:
+        token_payload = exchange_mercado_pago_oauth_code(
+            code=code,
+            redirect_uri=build_mercado_pago_oauth_redirect_uri(),
+            environment=config.environment,
+        )
+        save_mercado_pago_oauth_tokens(config, token_payload)
+        if config.access_token_encrypted and (
+            config.webhook_secret_encrypted or serialize_mercado_pago_config(config)["webhook_secret_configured"]
+        ):
+            config.enabled = True
+        db.commit()
+    except HTTPException as exc:
+        db.rollback()
+        return RedirectResponse(
+            build_mercado_pago_oauth_return_url("error", message=str(exc.detail)),
+            status_code=status.HTTP_303_SEE_OTHER,
+        )
+
+    return RedirectResponse(
+        build_mercado_pago_oauth_return_url("connected"),
+        status_code=status.HTTP_303_SEE_OTHER,
+    )
+
+
 @router.put("/mercadopago", response_model=MercadoPagoConfigResponse)
 def salvar_config_mercado_pago(
     body: MercadoPagoConfigUpdate,
@@ -91,4 +193,18 @@ def salvar_config_mercado_pago(
         access_token=body.access_token,
         webhook_secret=body.webhook_secret,
     )
+    return serialize_mercado_pago_config(config)
+
+
+@router.post("/mercadopago/oauth/disconnect", response_model=MercadoPagoConfigResponse)
+def desconectar_oauth_mercado_pago(
+    user_and_tenant=Depends(get_current_user_and_tenant),
+    db: Session = Depends(get_session),
+):
+    """Remove tokens OAuth do tenant e desativa pagamento online."""
+    _, tenant_id = user_and_tenant
+    config = _ensure_config(db, tenant_id=tenant_id)
+    disconnect_mercado_pago_oauth_config(config)
+    db.commit()
+    db.refresh(config)
     return serialize_mercado_pago_config(config)
