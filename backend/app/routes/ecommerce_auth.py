@@ -620,24 +620,40 @@ _CLIENTE_RELATIONSHIPS_TO_TRANSFER = ("pets", "pendencias_estoque", "vendas")
 
 
 def _transfer_cliente_relations_for_ecommerce_merge(
+    db: Session,
     previous_cliente: Cliente | None,
     target_cliente: Cliente | None,
 ) -> int:
     if not previous_cliente or not target_cliente or previous_cliente.id == target_cliente.id:
         return 0
 
-    transferred = 0
-    for relationship_name in _CLIENTE_RELATIONSHIPS_TO_TRANSFER:
-        related_items = getattr(previous_cliente, relationship_name, None)
-        if not related_items:
-            continue
+    from app.models import Pet
+    from app.pendencia_estoque_models import PendenciaEstoque
+    from app.vendas_models import Venda
 
-        for item in list(related_items):
-            if hasattr(item, "cliente_id"):
-                item.cliente_id = target_cliente.id
-            if hasattr(item, "cliente"):
-                item.cliente = target_cliente
-            transferred += 1
+    transferred = (
+        db.query(Pet)
+        .filter(Pet.cliente_id == previous_cliente.id)
+        .update({Pet.cliente_id: target_cliente.id}, synchronize_session=False)
+    )
+    transferred += (
+        db.query(PendenciaEstoque)
+        .filter(PendenciaEstoque.cliente_id == previous_cliente.id)
+        .update({PendenciaEstoque.cliente_id: target_cliente.id}, synchronize_session=False)
+    )
+    transferred += (
+        db.query(Venda)
+        .filter(Venda.cliente_id == previous_cliente.id)
+        .update({Venda.cliente_id: target_cliente.id}, synchronize_session=False)
+    )
+
+    db.flush()
+
+    for relationship_name in _CLIENTE_RELATIONSHIPS_TO_TRANSFER:
+        try:
+            db.expire(previous_cliente, [relationship_name])
+        except Exception:
+            pass
 
     return transferred
 
@@ -1193,7 +1209,7 @@ def atualizar_perfil(
             potential_match.endereco_entrega = cliente.endereco_entrega
 
         potential_match.user_id = current_user.id
-        _transfer_cliente_relations_for_ecommerce_merge(previous_cliente, potential_match)
+        _transfer_cliente_relations_for_ecommerce_merge(db, previous_cliente, potential_match)
         cliente = potential_match
         db.delete(previous_cliente)
 

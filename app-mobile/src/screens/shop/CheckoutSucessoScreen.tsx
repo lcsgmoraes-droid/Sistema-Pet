@@ -2,6 +2,8 @@ import { Ionicons } from "@expo/vector-icons";
 import { RouteProp, useNavigation, useRoute } from "@react-navigation/native";
 import React, { useEffect, useState } from "react";
 import {
+  Alert,
+  Linking,
   ScrollView,
   Share,
   StyleSheet,
@@ -41,6 +43,18 @@ export default function CheckoutSucessoScreen() {
   const isEntrega = pedido.tipo_retirada === "entrega";
   const isTerceiro = pedido.tipo_retirada === "terceiro";
 
+  async function abrirPagamento() {
+    if (!pedido.payment_url) return;
+    try {
+      await Linking.openURL(pedido.payment_url);
+    } catch {
+      Alert.alert(
+        "Nao foi possivel abrir o pagamento",
+        "Tente novamente pelo botao Abrir pagamento."
+      );
+    }
+  }
+
   async function avisarCheguei() {
     setAvisando(true);
     try {
@@ -79,6 +93,13 @@ export default function CheckoutSucessoScreen() {
           ? "O pedido sera liberado para entrega apos aprovacao do pagamento."
           : "O pedido sera liberado para retirada apos aprovacao do pagamento."}
       </Text>
+
+      {pedido.payment_url && (
+        <TouchableOpacity style={styles.botaoPagamento} onPress={abrirPagamento}>
+          <Ionicons name="card-outline" size={20} color="#fff" style={{ marginRight: 8 }} />
+          <Text style={styles.botaoPagamentoTexto}>Abrir pagamento</Text>
+        </TouchableOpacity>
+      )}
 
       {/* Card de entrega */}
       {isEntrega ? (
@@ -405,6 +426,21 @@ const styles = StyleSheet.create({
     backgroundColor: CORES.sucesso,
   },
   botaoDriveTexto: {
+    color: "#fff",
+    fontWeight: "bold",
+    fontSize: FONTE.media,
+  },
+  botaoPagamento: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#009ee3",
+    borderRadius: RAIO.md,
+    paddingVertical: ESPACO.md,
+    width: "100%",
+    marginBottom: ESPACO.lg,
+  },
+  botaoPagamentoTexto: {
     color: "#fff",
     fontWeight: "bold",
     fontSize: FONTE.media,
