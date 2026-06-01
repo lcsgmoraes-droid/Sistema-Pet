@@ -616,6 +616,32 @@ def _upsert_delivery_details(cliente: Cliente, details: dict, enabled: bool) -> 
         cliente.enderecos_adicionais = items if items else None
 
 
+_CLIENTE_RELATIONSHIPS_TO_TRANSFER = ("pets", "pendencias_estoque", "vendas")
+
+
+def _transfer_cliente_relations_for_ecommerce_merge(
+    previous_cliente: Cliente | None,
+    target_cliente: Cliente | None,
+) -> int:
+    if not previous_cliente or not target_cliente or previous_cliente.id == target_cliente.id:
+        return 0
+
+    transferred = 0
+    for relationship_name in _CLIENTE_RELATIONSHIPS_TO_TRANSFER:
+        related_items = getattr(previous_cliente, relationship_name, None)
+        if not related_items:
+            continue
+
+        for item in list(related_items):
+            if hasattr(item, "cliente_id"):
+                item.cliente_id = target_cliente.id
+            if hasattr(item, "cliente"):
+                item.cliente = target_cliente
+            transferred += 1
+
+    return transferred
+
+
 def _get_or_create_cliente_for_user(db: Session, user: User) -> Cliente:
     tenant_id = _activate_user_tenant_context(user)
     clientes_vinculados = (
@@ -1167,6 +1193,7 @@ def atualizar_perfil(
             potential_match.endereco_entrega = cliente.endereco_entrega
 
         potential_match.user_id = current_user.id
+        _transfer_cliente_relations_for_ecommerce_merge(previous_cliente, potential_match)
         cliente = potential_match
         db.delete(previous_cliente)
 

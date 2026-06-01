@@ -19,6 +19,7 @@ from app.pedido_models import Pedido, PedidoItem
 from app.routes.ecommerce_auth import _activate_user_tenant_context, _get_current_ecommerce_user
 from app.services.ecommerce_payment_config import get_active_mercado_pago_runtime_config
 from app.services.mercado_pago_checkout import create_preference, is_mercado_pago_provider
+from app.tenancy.context import set_current_tenant
 from app.utils.timezone import now_brasilia
 
 
@@ -70,6 +71,19 @@ class CheckoutFinalizarRequest(BaseModel):
 def _current_identity(current_user: User = Depends(_get_current_ecommerce_user)) -> EcommerceIdentity:
     tenant_id = _activate_user_tenant_context(current_user)
     return EcommerceIdentity(user_id=current_user.id, tenant_id=str(UUID(str(tenant_id))))
+
+
+def _activate_checkout_tenant_context(identity: EcommerceIdentity) -> str:
+    try:
+        tenant_id = UUID(str(identity.tenant_id))
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token invalido",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    set_current_tenant(tenant_id)
+    return str(tenant_id)
 
 
 def _normalize_text(value: str | None) -> str:
@@ -265,10 +279,11 @@ def listar_formas_pagamento(
     db: Session = Depends(get_session),
 ):
     """Lista as formas de pagamento ativas cadastradas no ERP."""
+    tenant_id = _activate_checkout_tenant_context(identity)
     formas = (
         db.query(FormaPagamento)
         .filter(
-            FormaPagamento.tenant_id == identity.tenant_id,
+            FormaPagamento.tenant_id == tenant_id,
             FormaPagamento.ativo == True,
         )
         .order_by(FormaPagamento.nome)
@@ -288,7 +303,8 @@ def calcular_frete_local(
     identity: EcommerceIdentity = Depends(_current_identity),
     db: Session = Depends(get_session),
 ):
-    return _frete_local_por_cidade(db, identity.tenant_id, payload.cidade_destino)
+    tenant_id = _activate_checkout_tenant_context(identity)
+    return _frete_local_por_cidade(db, tenant_id, payload.cidade_destino)
 
 
 @router.get("/resumo")
@@ -298,7 +314,8 @@ def resumo_checkout(
     identity: EcommerceIdentity = Depends(_current_identity),
     db: Session = Depends(get_session),
 ):
-    _expirar_reservas_automaticamente(db, identity.tenant_id)
+    tenant_id = _activate_checkout_tenant_context(identity)
+    _expirar_reservas_automaticamente(db, tenant_id)
 
     carrinho = _buscar_carrinho(db, identity)
     if not carrinho:
@@ -309,7 +326,7 @@ def resumo_checkout(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Carrinho vazio")
 
     subtotal = round(sum(float(item.subtotal or 0.0) for item in itens), 2)
-    frete = _frete_local_por_cidade(db, identity.tenant_id, cidade_destino)
+    frete = _frete_local_por_cidade(db, tenant_id, cidade_destino)
     cupom_codigo, cupom_percentual, desconto = _calcular_desconto(subtotal, cupom)
     total = round(max(subtotal - desconto, 0.0) + float(frete["valor_frete"]), 2)
 
@@ -335,10 +352,11 @@ def finalizar_checkout(
     identity: EcommerceIdentity = Depends(_current_identity),
     db: Session = Depends(get_session),
 ):
-    _expirar_reservas_automaticamente(db, identity.tenant_id)
+    tenant_id = _activate_checkout_tenant_context(identity)
+    _expirar_reservas_automaticamente(db, tenant_id)
     forma_pagamento_tipo = _validar_forma_pagamento_online(payload.forma_pagamento_nome)
 
-    payment_config = get_active_mercado_pago_runtime_config(db, identity.tenant_id)
+    payment_config = get_active_mercado_pago_runtime_config(db, tenant_id)
     if not payment_config:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -405,7 +423,7 @@ def finalizar_checkout(
             "cidade_destino": payload.cidade_destino,
         }
     else:
-        frete = _frete_local_por_cidade(db, identity.tenant_id, payload.cidade_destino)
+        frete = _frete_local_por_cidade(db, tenant_id, payload.cidade_destino)
 
     cupom_codigo, cupom_percentual, desconto = _calcular_desconto(subtotal, payload.cupom)
     total = round(max(subtotal - desconto, 0.0) + float(frete["valor_frete"]), 2)
