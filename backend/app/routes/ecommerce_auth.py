@@ -29,6 +29,7 @@ from app.services.auth_security import (
     register_successful_login,
     remaining_lock_seconds,
 )
+from app.services.pessoa_merge_service import transferir_referencias_pessoa
 from app.tenancy.context import set_current_tenant
 
 
@@ -458,6 +459,31 @@ def _is_operational_cliente(cliente: Cliente | None) -> bool:
     )
 
 
+def _cliente_phones_digits(cliente: Cliente) -> set[str]:
+    phones = {
+        _digits_only(getattr(cliente, "telefone", None)),
+        _digits_only(getattr(cliente, "celular", None)),
+    }
+    return {phone for phone in phones if phone}
+
+
+def _identity_match_reasons(
+    cliente: Cliente,
+    *,
+    email: str,
+    cpf_digits: str,
+    telefone_digits: str,
+) -> set[str]:
+    reasons: set[str] = set()
+    if cpf_digits and _digits_only(getattr(cliente, "cpf", None)) == cpf_digits:
+        reasons.add("cpf")
+    if email and (getattr(cliente, "email", None) or "").strip().lower() == email:
+        reasons.add("email")
+    if telefone_digits and telefone_digits in _cliente_phones_digits(cliente):
+        reasons.add("telefone")
+    return reasons
+
+
 def _identity_matches_cliente(
     cliente: Cliente,
     *,
@@ -465,13 +491,119 @@ def _identity_matches_cliente(
     cpf_digits: str,
     telefone_digits: str,
 ) -> bool:
-    if cpf_digits and _digits_only(getattr(cliente, "cpf", None)) == cpf_digits:
-        return True
-    if email and (getattr(cliente, "email", None) or "").strip().lower() == email:
-        return True
-    if telefone_digits and _digits_only(getattr(cliente, "telefone", None)) == telefone_digits:
-        return True
-    return False
+    return bool(
+        _identity_match_reasons(
+            cliente,
+            email=email,
+            cpf_digits=cpf_digits,
+            telefone_digits=telefone_digits,
+        )
+    )
+
+
+def _codigo_sort_value(cliente: Cliente) -> tuple[int, int | str]:
+    codigo = str(getattr(cliente, "codigo", "") or "").strip()
+    if codigo.isdigit():
+        return (0, int(codigo))
+    if codigo:
+        return (1, codigo)
+    return (2, "")
+
+
+def _select_preferred_cliente(
+    candidates: list[Cliente],
+    *,
+    email: str | None,
+    cpf: str | None,
+    telefone: str | None,
+    prefer_operational: bool = False,
+) -> Cliente | None:
+    email_normalized = (email or "").strip().lower()
+    cpf_digits = _digits_only(cpf)
+    telefone_digits = _digits_only(telefone)
+    if not email_normalized and not cpf_digits and not telefone_digits:
+        return None
+
+    unique_candidates: list[Cliente] = []
+    seen_ids: set[int] = set()
+    for candidate in candidates:
+        candidate_id = getattr(candidate, "id", None)
+        if candidate_id is not None and int(candidate_id) in seen_ids:
+            continue
+        if candidate_id is not None:
+            seen_ids.add(int(candidate_id))
+        unique_candidates.append(candidate)
+
+    ranked: list[tuple[tuple, Cliente]] = []
+    for candidate in unique_candidates:
+        reasons = _identity_match_reasons(
+            candidate,
+            email=email_normalized,
+            cpf_digits=cpf_digits,
+            telefone_digits=telefone_digits,
+        )
+        if not reasons:
+            continue
+
+        is_operational = _is_operational_cliente(candidate)
+        if prefer_operational:
+            operational_rank = 0 if is_operational else 1
+        else:
+            operational_rank = 1 if is_operational else 0
+        active_rank = 0 if getattr(candidate, "ativo", True) is not False else 1
+        match_rank = (
+            0 if "cpf" in reasons else 1,
+            0 if "telefone" in reasons else 1,
+            0 if "email" in reasons else 1,
+        )
+        ranked.append(
+            (
+                (
+                    operational_rank,
+                    match_rank,
+                    _codigo_sort_value(candidate),
+                    active_rank,
+                    int(getattr(candidate, "id", 0) or 0),
+                ),
+                candidate,
+            )
+        )
+
+    if not ranked:
+        return None
+
+    ranked.sort(key=lambda item: item[0])
+    return ranked[0][1]
+
+
+def _select_linked_cliente_fallback(clientes: list[Cliente]) -> Cliente | None:
+    if not clientes:
+        return None
+    active = [cliente for cliente in clientes if getattr(cliente, "ativo", True) is not False]
+    pool = active or clientes
+    return sorted(pool, key=lambda cliente: (_codigo_sort_value(cliente), int(getattr(cliente, "id", 0) or 0)))[0]
+
+
+def _copy_missing_cliente_fields(target: Cliente, source: Cliente) -> None:
+    for field_name in (
+        "nome",
+        "email",
+        "telefone",
+        "celular",
+        "cpf",
+        "endereco",
+        "cep",
+        "numero",
+        "complemento",
+        "bairro",
+        "cidade",
+        "estado",
+        "endereco_entrega",
+        "endereco_entrega_2",
+        "enderecos_adicionais",
+    ):
+        if not getattr(target, field_name, None) and getattr(source, field_name, None):
+            setattr(target, field_name, getattr(source, field_name))
 
 
 def _find_operational_cliente_match(
@@ -530,48 +662,37 @@ def _find_cliente_match(
     base_query = db.query(Cliente).filter(Cliente.tenant_id == tenant_id)
 
     if exclude_cliente_id is not None:
+        linked_query = linked_query.filter(Cliente.id != exclude_cliente_id)
         base_query = base_query.filter(Cliente.id != exclude_cliente_id)
+
+    candidates: list[Cliente] = []
+    candidates.extend(linked_query.all())
 
     cpf_digits = _digits_only(cpf)
     if cpf_digits:
-        # Busca exata pelo CPF já normalizado (como salvo no banco)
-        linked_by_cpf = linked_query.filter(Cliente.cpf == cpf_digits).first()
-        if linked_by_cpf:
-            return linked_by_cpf
-
-        matched_by_cpf = base_query.filter(Cliente.cpf == cpf_digits).first()
-        if matched_by_cpf:
-            return matched_by_cpf
-
-        # Fallback: busca normalizada por dígitos (para registros com CPF formatado no banco)
-        cpf_candidates = base_query.filter(Cliente.cpf.isnot(None)).all()
-        for candidate in cpf_candidates:
-            if _digits_only(candidate.cpf) == cpf_digits:
-                return candidate
+        candidates.extend(base_query.filter(Cliente.cpf.isnot(None)).all())
 
     email = (email or "").strip().lower()
     if email:
-        linked_by_email = linked_query.filter(Cliente.email == email).first()
-        if linked_by_email:
-            return linked_by_email
-
-        matched_by_email = base_query.filter(Cliente.email == email).first()
-        if matched_by_email:
-            return matched_by_email
+        candidates.extend(base_query.filter(Cliente.email == email).all())
 
     telefone_digits = _digits_only(telefone)
     if telefone_digits:
-        linked_phone_candidates = linked_query.filter(Cliente.telefone.isnot(None)).all()
-        for candidate in linked_phone_candidates:
-            if _digits_only(candidate.telefone) == telefone_digits:
-                return candidate
+        candidates.extend(
+            base_query.filter(
+                or_(
+                    Cliente.telefone.isnot(None),
+                    Cliente.celular.isnot(None),
+                )
+            ).all()
+        )
 
-        phone_candidates = base_query.filter(Cliente.telefone.isnot(None)).all()
-        for candidate in phone_candidates:
-            if _digits_only(candidate.telefone) == telefone_digits:
-                return candidate
-
-    return None
+    return _select_preferred_cliente(
+        candidates,
+        email=email,
+        cpf=cpf,
+        telefone=telefone,
+    )
 
 
 def _extract_ecommerce_delivery_details(cliente: Cliente | None) -> dict:
@@ -627,30 +748,16 @@ def _transfer_cliente_relations_for_ecommerce_merge(
     if not previous_cliente or not target_cliente or previous_cliente.id == target_cliente.id:
         return 0
 
-    from app.models import Pet
-    from app.pendencia_estoque_models import PendenciaEstoque
-    from app.vendas_models import Venda
-    from app.financeiro_models import ContaReceber
-
-    transferred = (
-        db.query(Pet)
-        .filter(Pet.cliente_id == previous_cliente.id)
-        .update({Pet.cliente_id: target_cliente.id}, synchronize_session=False)
+    transferencias = transferir_referencias_pessoa(
+        db,
+        tenant_id=getattr(target_cliente, "tenant_id", None) or getattr(previous_cliente, "tenant_id", None),
+        principal_id=target_cliente.id,
+        duplicado_id=previous_cliente.id,
     )
-    transferred += (
-        db.query(PendenciaEstoque)
-        .filter(PendenciaEstoque.cliente_id == previous_cliente.id)
-        .update({PendenciaEstoque.cliente_id: target_cliente.id}, synchronize_session=False)
-    )
-    transferred += (
-        db.query(Venda)
-        .filter(Venda.cliente_id == previous_cliente.id)
-        .update({Venda.cliente_id: target_cliente.id}, synchronize_session=False)
-    )
-    transferred += (
-        db.query(ContaReceber)
-        .filter(ContaReceber.cliente_id == previous_cliente.id)
-        .update({ContaReceber.cliente_id: target_cliente.id}, synchronize_session=False)
+    transferred = int(transferencias.get("transferidos_especiais", {}).get("produto_fornecedores") or 0)
+    transferred += sum(
+        int(item.get("total") or 0)
+        for item in transferencias.get("transferidos_genericos", [])
     )
 
     db.flush()
@@ -674,69 +781,24 @@ def _get_or_create_cliente_for_user(db: Session, user: User) -> Cliente:
     )
 
     cliente: Cliente | None = None
+    cpf_usuario = getattr(user, "cpf_cnpj", None)
+    email_usuario = (getattr(user, "email", None) or "").strip().lower()
+    telefone_usuario = getattr(user, "telefone", None)
     cliente_operacional = _find_operational_cliente_match(db, tenant_id=tenant_id, user=user)
     if cliente_operacional:
         cliente = cliente_operacional
 
     if clientes_vinculados:
-        clientes_vinculados_ativos = [
-            c for c in clientes_vinculados if getattr(c, "ativo", True) is not False
-        ] or clientes_vinculados
-        cpf_usuario = _digits_only(user.cpf_cnpj)
-        email_usuario = (user.email or "").strip().lower()
-
-        if not cliente and cpf_usuario:
-            cliente = next(
-                (
-                    c
-                    for c in clientes_vinculados_ativos
-                    if _is_operational_cliente(c) and _digits_only(c.cpf) == cpf_usuario
-                ),
-                None,
-            )
-
-        if not cliente and email_usuario:
-            cliente = next(
-                (
-                    c
-                    for c in clientes_vinculados_ativos
-                    if _is_operational_cliente(c) and (c.email or "").strip().lower() == email_usuario
-                ),
-                None,
-            )
-
         if not cliente:
-            cliente = next((c for c in clientes_vinculados_ativos if _is_operational_cliente(c)), None)
-
-        if not cliente and cpf_usuario:
-            cliente = next(
-                (
-                    c
-                    for c in clientes_vinculados_ativos
-                    if _digits_only(c.cpf) == cpf_usuario
-                ),
-                None,
+            cliente = _select_preferred_cliente(
+                clientes_vinculados,
+                email=email_usuario,
+                cpf=cpf_usuario,
+                telefone=telefone_usuario,
+                prefer_operational=True,
             )
-
-        if not cliente and email_usuario:
-            cliente = next(
-                (
-                    c
-                    for c in clientes_vinculados_ativos
-                    if (c.email or "").strip().lower() == email_usuario
-                ),
-                None,
-            )
-
         if not cliente:
-            cliente = clientes_vinculados_ativos[0]
-
-    if not cliente:
-        cliente = (
-            db.query(Cliente)
-            .filter(Cliente.tenant_id == tenant_id, Cliente.user_id == user.id)
-        .first()
-        )
+            cliente = _select_linked_cliente_fallback(clientes_vinculados)
 
     if not cliente:
         cliente = _find_cliente_match(
@@ -764,6 +826,8 @@ def _get_or_create_cliente_for_user(db: Session, user: User) -> Cliente:
         db.flush()
     else:
         cliente.user_id = user.id
+        if getattr(cliente, "ativo", True) is False:
+            cliente.ativo = True
         if not cliente.nome:
             cliente.nome = user.nome or user.email
         if not cliente.email:
@@ -1191,35 +1255,20 @@ def atualizar_perfil(
     )
 
     if potential_match and potential_match.id != cliente.id:
-        previous_cliente = cliente
-        if not potential_match.nome and cliente.nome:
-            potential_match.nome = cliente.nome
-        if not potential_match.email and cliente.email:
-            potential_match.email = cliente.email
-        if not potential_match.telefone and cliente.telefone:
-            potential_match.telefone = cliente.telefone
-        if not potential_match.cpf and cliente.cpf:
-            potential_match.cpf = cliente.cpf
-        if not potential_match.endereco and cliente.endereco:
-            potential_match.endereco = cliente.endereco
-        if not potential_match.cep and cliente.cep:
-            potential_match.cep = cliente.cep
-        if not potential_match.numero and cliente.numero:
-            potential_match.numero = cliente.numero
-        if not potential_match.complemento and cliente.complemento:
-            potential_match.complemento = cliente.complemento
-        if not potential_match.bairro and cliente.bairro:
-            potential_match.bairro = cliente.bairro
-        if not potential_match.cidade and cliente.cidade:
-            potential_match.cidade = cliente.cidade
-        if not potential_match.estado and cliente.estado:
-            potential_match.estado = cliente.estado
-        if not potential_match.endereco_entrega and cliente.endereco_entrega:
-            potential_match.endereco_entrega = cliente.endereco_entrega
+        canonical_cliente = _select_preferred_cliente(
+            [cliente, potential_match],
+            email=current_user.email,
+            cpf=current_user.cpf_cnpj,
+            telefone=current_user.telefone,
+            prefer_operational=True,
+        ) or cliente
+        previous_cliente = potential_match if canonical_cliente.id == cliente.id else cliente
 
-        potential_match.user_id = current_user.id
-        _transfer_cliente_relations_for_ecommerce_merge(db, previous_cliente, potential_match)
-        cliente = potential_match
+        _copy_missing_cliente_fields(canonical_cliente, previous_cliente)
+        canonical_cliente.user_id = current_user.id
+        canonical_cliente.ativo = True
+        _transfer_cliente_relations_for_ecommerce_merge(db, previous_cliente, canonical_cliente)
+        cliente = canonical_cliente
         previous_cliente.ativo = False
         nota_fusao = (
             f"\n[{datetime.utcnow().isoformat()}] Cadastro e-commerce duplicado #{previous_cliente.id} "
