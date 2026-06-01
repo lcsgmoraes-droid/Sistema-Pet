@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react'
-import { CheckCircle2, Copy, CreditCard, ExternalLink, KeyRound, Unplug, Webhook } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { AlertCircle, CheckCircle2, Copy, CreditCard, ExternalLink, KeyRound, Unplug, Webhook } from 'lucide-react'
 import { api } from '../../services/api'
+import { readMercadoPagoOAuthReturn } from '../../utils/mercadoPagoOAuthReturn'
 
 const DIAS_SEMANA = [
   { key: 'seg', label: 'Segunda' },
@@ -29,6 +30,8 @@ export default function EcommerceConfig() {
   const [disconnectingPayment, setDisconnectingPayment] = useState(false)
   const [success, setSuccess] = useState('')
   const [error, setError] = useState('')
+  const [oauthReturn, setOauthReturn] = useState(null)
+  const mercadoPagoSectionRef = useRef(null)
 
   const [ativo, setAtivo] = useState(true)
   const [descricao, setDescricao] = useState('')
@@ -67,15 +70,18 @@ export default function EcommerceConfig() {
   const [loadingAvisos, setLoadingAvisos] = useState(true)
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search)
-    const oauthStatus = params.get('mercadopago_oauth')
-    if (oauthStatus === 'connected') {
-      setSuccess('Mercado Pago conectado com sucesso.')
+    const oauthResult = readMercadoPagoOAuthReturn(window.location.search)
+    if (oauthResult) {
+      setOauthReturn(oauthResult)
+      if (oauthResult.status === 'success') {
+        setSuccess(oauthResult.message)
+      } else {
+        setError(oauthResult.message)
+      }
       window.history.replaceState({}, '', window.location.pathname)
-    }
-    if (oauthStatus === 'error') {
-      setError(params.get('mercadopago_message') || 'Nao foi possivel concluir a conexao com o Mercado Pago.')
-      window.history.replaceState({}, '', window.location.pathname)
+      window.setTimeout(() => {
+        mercadoPagoSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }, 150)
     }
     fetchConfig()
     fetchAvisos()
@@ -169,6 +175,7 @@ export default function EcommerceConfig() {
     setSavingPayment(true)
     setError('')
     setSuccess('')
+    setOauthReturn(null)
     try {
       const res = await api.put('/ecommerce-payment-config/mercadopago', {
         enabled: paymentConfig.enabled,
@@ -200,6 +207,7 @@ export default function EcommerceConfig() {
     setConnectingPayment(true)
     setError('')
     setSuccess('')
+    setOauthReturn(null)
     try {
       const res = await api.get('/ecommerce-payment-config/mercadopago/oauth/url')
       const data = res.data || {}
@@ -222,6 +230,7 @@ export default function EcommerceConfig() {
     setDisconnectingPayment(true)
     setError('')
     setSuccess('')
+    setOauthReturn(null)
     try {
       const res = await api.post('/ecommerce-payment-config/mercadopago/oauth/disconnect')
       applyPaymentConfigResponse(res.data)
@@ -411,7 +420,7 @@ export default function EcommerceConfig() {
       </form>
 
       {/* Pagamentos online */}
-      <form onSubmit={salvarPagamento} className="space-y-6">
+      <form ref={mercadoPagoSectionRef} onSubmit={salvarPagamento} className="space-y-6">
         <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm space-y-5">
           <div className="flex items-start gap-3">
             <div className="h-10 w-10 rounded-lg bg-emerald-50 text-emerald-700 flex items-center justify-center">
@@ -429,6 +438,24 @@ export default function EcommerceConfig() {
             <div className="animate-pulse h-24 bg-gray-100 rounded-lg" />
           ) : (
             <>
+              {oauthReturn && (
+                <div className={`flex items-start gap-3 rounded-lg border px-4 py-3 text-sm ${
+                  oauthReturn.status === 'success'
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-800'
+                    : 'border-red-200 bg-red-50 text-red-700'
+                }`}>
+                  <div className="mt-0.5">
+                    {oauthReturn.status === 'success' ? <CheckCircle2 size={18} /> : <AlertCircle size={18} />}
+                  </div>
+                  <div>
+                    <p className="font-semibold">
+                      {oauthReturn.status === 'success' ? 'Conexao concluida' : 'Conexao nao concluida'}
+                    </p>
+                    <p>{oauthReturn.message}</p>
+                  </div>
+                </div>
+              )}
+
               <div className="flex items-center justify-between gap-4 border border-gray-100 rounded-lg p-4">
                 <div>
                   <p className="font-medium text-gray-700">Pagamento online</p>

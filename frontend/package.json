@@ -9,6 +9,7 @@
     "build:dev": "vite build --mode development",
     "test:auth-storage": "node scripts/test-token-storage.mjs",
     "test:corepet-branding": "node scripts/test-corepet-branding.mjs",
+    "test:mercado-pago-oauth": "node scripts/test-mercado-pago-oauth-return.mjs",
     "test:balanco": "node scripts/test-produtos-balanco-utils.mjs",
     "preview": "vite preview"
   },
