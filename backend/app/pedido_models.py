@@ -28,6 +28,10 @@ class Pedido(Base):
 
     status = Column(String, default="criado")
 
+    payment_provider = Column(String(50), nullable=True)
+    payment_preference_id = Column(String(255), nullable=True)
+    payment_url = Column(String(1000), nullable=True)
+
     # Retirada na loja
     tipo_retirada = Column(String(20), nullable=True)  # proprio, terceiro
     palavra_chave_retirada = Column(String(100), nullable=True)

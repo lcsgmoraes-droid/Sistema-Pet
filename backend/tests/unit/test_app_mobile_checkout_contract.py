@@ -22,3 +22,11 @@ def test_cart_screen_does_not_depend_only_on_automatic_payment_redirect():
 
     assert "Linking.openURL(pedido.payment_url)" in source
     assert "navigation.navigate('CheckoutSucesso', { pedido })" in source
+
+
+def test_orders_screen_can_reopen_pending_payment_link():
+    source = _read_mobile_source("app-mobile/src/screens/orders/OrdersScreen.tsx")
+
+    assert "Linking.openURL(item.payment_url)" in source
+    assert "Pagar agora" in source
+    assert "item.status === \"pendente\"" in source

@@ -165,6 +165,45 @@ def _buscar_itens(db: Session, pedido_id: str) -> list[PedidoItem]:
     )
 
 
+def _payment_info_for_pedido(db: Session, pedido: Pedido) -> dict[str, str | None]:
+    payment_info = {
+        "payment_provider": pedido.payment_provider,
+        "payment_preference_id": pedido.payment_preference_id,
+        "payment_url": pedido.payment_url,
+    }
+    if payment_info["payment_url"] or payment_info["payment_preference_id"]:
+        return payment_info
+
+    idem_rows = (
+        db.query(IdempotencyKey)
+        .filter(
+            IdempotencyKey.user_id == pedido.cliente_id,
+            IdempotencyKey.tenant_id == pedido.tenant_id,
+            IdempotencyKey.endpoint == "POST /api/checkout/finalizar",
+            IdempotencyKey.status == "completed",
+            IdempotencyKey.response_body.isnot(None),
+            IdempotencyKey.response_body.contains(pedido.pedido_id),
+        )
+        .order_by(IdempotencyKey.completed_at.desc(), IdempotencyKey.id.desc())
+        .limit(5)
+        .all()
+    )
+    for idem_row in idem_rows:
+        try:
+            response = json.loads(idem_row.response_body or "{}")
+        except (TypeError, json.JSONDecodeError):
+            continue
+        if response.get("pedido_id") != pedido.pedido_id:
+            continue
+        return {
+            "payment_provider": response.get("payment_provider"),
+            "payment_preference_id": response.get("payment_preference_id"),
+            "payment_url": response.get("payment_url"),
+        }
+
+    return payment_info
+
+
 def _expirar_reservas_automaticamente(db: Session, tenant_id: str) -> None:
     agora = datetime.utcnow()
     limite_carrinho = agora - timedelta(minutes=RESERVA_EXPIRACAO_CARRINHO_MINUTOS)
@@ -476,10 +515,13 @@ def finalizar_checkout(
             notification_url=payment_config.webhook_url,
             use_sandbox=payment_config.use_sandbox,
         )
+        carrinho.payment_provider = "mercadopago"
+        carrinho.payment_preference_id = preference.get("preference_id")
+        carrinho.payment_url = preference.get("payment_url")
         response.update({
-            "payment_provider": "mercadopago",
-            "payment_preference_id": preference.get("preference_id"),
-            "payment_url": preference.get("payment_url"),
+            "payment_provider": carrinho.payment_provider,
+            "payment_preference_id": carrinho.payment_preference_id,
+            "payment_url": carrinho.payment_url,
             "init_point": preference.get("init_point"),
             "sandbox_init_point": preference.get("sandbox_init_point"),
         })
@@ -526,6 +568,7 @@ def listar_pedidos_cliente(
     resultado = []
     for pedido in pedidos:
         itens = _buscar_itens(db, pedido.pedido_id)
+        payment_info = _payment_info_for_pedido(db, pedido)
         resultado.append({
             "pedido_id": pedido.pedido_id,
             "status": pedido.status,
@@ -533,6 +576,9 @@ def listar_pedidos_cliente(
             "origem": pedido.origem or '-',
             "tipo_retirada": pedido.tipo_retirada,
             "palavra_chave_retirada": pedido.palavra_chave_retirada,
+            "payment_provider": payment_info["payment_provider"],
+            "payment_preference_id": payment_info["payment_preference_id"],
+            "payment_url": payment_info["payment_url"],
             "created_at": pedido.created_at.isoformat() if pedido.created_at else None,
             "itens_count": len(itens),
             "itens": [
@@ -570,6 +616,7 @@ def consultar_status_pedido(
     if not pedido:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pedido não encontrado")
 
+    payment_info = _payment_info_for_pedido(db, pedido)
     return {
         "pedido_id": pedido.pedido_id,
         "status": pedido.status,
@@ -579,6 +626,9 @@ def consultar_status_pedido(
         "drive_chegou_at": pedido.drive_chegou_at.isoformat() if pedido.drive_chegou_at else None,
         "drive_entregue_at": pedido.drive_entregue_at.isoformat() if pedido.drive_entregue_at else None,
         "palavra_chave_retirada": pedido.palavra_chave_retirada,
+        "payment_provider": payment_info["payment_provider"],
+        "payment_preference_id": payment_info["payment_preference_id"],
+        "payment_url": payment_info["payment_url"],
         "created_at": pedido.created_at,
     }
 
