@@ -56,6 +56,17 @@ def test_prod_nginx_allows_direct_corepet_without_exposing_legacy_origin():
     assert "deny all;" in cloudflare_allowlist
 
 
+def test_prod_nginx_preserves_frontend_redirects_from_api_routes():
+    app_locations = (ROOT / "nginx" / "includes" / "app-server-locations.conf").read_text(
+        encoding="utf-8"
+    )
+
+    assert "proxy_redirect http://localhost:8000/ https://$http_host/api/;" in app_locations
+    assert "proxy_redirect http://backend:8000/ https://$http_host/api/;" in app_locations
+    assert "proxy_redirect http://$http_host/ https://$http_host/api/;" not in app_locations
+    assert "proxy_redirect https://$http_host/ https://$http_host/api/;" not in app_locations
+
+
 def test_prod_nginx_mounts_certbot_webroot_for_corepet_renewal():
     compose_text = COMPOSE_PROD.read_text(encoding="utf-8")
 
