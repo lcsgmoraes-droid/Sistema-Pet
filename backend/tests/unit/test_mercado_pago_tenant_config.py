@@ -1,4 +1,8 @@
+import os
 from types import SimpleNamespace
+
+os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
+os.environ.setdefault("ENVIRONMENT", "test")
 
 from app.services.mercado_pago_checkout import (
     build_preference_payload,
@@ -45,6 +49,10 @@ def test_config_mercado_pago_mascara_segredos_e_expoe_webhook_url(monkeypatch):
         "public_key": "APP_USR-public-key",
         "access_token_configured": True,
         "webhook_secret_configured": True,
+        "oauth_available": False,
+        "oauth_connected": False,
+        "oauth_connected_at": None,
+        "mercado_pago_user_id": None,
         "webhook_url": "https://corepet.com.br/api/webhooks/mercadopago/mp_abc123",
         "updated_at": None,
     }
