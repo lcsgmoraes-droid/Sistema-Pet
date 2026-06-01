@@ -6,6 +6,9 @@ from urllib.parse import parse_qs, urlparse
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 os.environ.setdefault("ENVIRONMENT", "test")
 
+from fastapi.testclient import TestClient
+
+from app.main import app
 from app.services.ecommerce_payment_config import (
     build_mercado_pago_oauth_authorization_url,
     decrypt_secret,
@@ -21,6 +24,19 @@ from app.services.ecommerce_payment_config import (
 
 
 TENANT_ID = "180d9cbf-5dcb-4676-bf11-dcbd91ed444b"
+
+
+def test_callback_oauth_mercado_pago_nao_exige_token_do_erp():
+    client = TestClient(app, follow_redirects=False)
+
+    response = client.get(
+        "/ecommerce-payment-config/mercadopago/oauth/callback",
+        params={"state": "invalido", "code": "TG-code"},
+    )
+
+    assert response.status_code == 303
+    assert response.headers["location"].startswith("https://corepet.com.br/ecommerce/configuracoes")
+    assert "mercadopago_oauth=error" in response.headers["location"]
 
 
 def test_oauth_authorization_url_usa_client_id_redirect_e_state_assinado(monkeypatch):

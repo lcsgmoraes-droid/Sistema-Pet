@@ -29,6 +29,7 @@ from app.ecommerce_payment_models import EcommercePaymentGatewayConfig
 
 
 router = APIRouter(prefix="/ecommerce-payment-config", tags=["ecommerce-payment-config"])
+public_router = APIRouter(prefix="/ecommerce-payment-config", tags=["ecommerce-payment-config"])
 
 
 class MercadoPagoConfigResponse(BaseModel):
@@ -131,7 +132,7 @@ def gerar_url_oauth_mercado_pago(
     )
 
 
-@router.get("/mercadopago/oauth/callback")
+@public_router.get("/mercadopago/oauth/callback")
 def callback_oauth_mercado_pago(
     code: Optional[str] = None,
     error: Optional[str] = None,
