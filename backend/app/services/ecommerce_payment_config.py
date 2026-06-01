@@ -67,7 +67,10 @@ def _frontend_base_url() -> str:
         or os.getenv("ECOMMERCE_PUBLIC_BASE_URL")
         or "https://corepet.com.br"
     )
-    return str(value).strip().rstrip("/")
+    base = str(value).strip().rstrip("/")
+    if base.endswith("/api"):
+        base = base[: -len("/api")]
+    return base
 
 
 def _normalize_tenant_id(tenant_id: str | UUID) -> UUID:
