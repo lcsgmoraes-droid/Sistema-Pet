@@ -331,10 +331,10 @@ def _seed_comissao_data(session):
             INSERT INTO vendas (
                 id, numero_venda, data_venda, canal, cliente_id, status, tenant_id
             ) VALUES (
-                900, 'VA-900', NULL, :canal, 123, 'finalizada', :tenant_id
+                900, 'VA-900', :data_venda, :canal, 123, 'finalizada', :tenant_id
             )
         """),
-        {"canal": CANAL, "tenant_id": _tenant_str(TENANT_A)},
+        {"data_venda": DATA_LANCAMENTO, "canal": CANAL, "tenant_id": _tenant_str(TENANT_A)},
     )
     session.execute(
         text("""

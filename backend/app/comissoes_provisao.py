@@ -11,7 +11,7 @@ CONCEITO-CHAVE: Comissão é DESPESA por COMPETÊNCIA, não depende de pagamento
 
 import logging
 from decimal import Decimal
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from typing import Dict, List, Optional
 from sqlalchemy import inspect
 from sqlalchemy.orm import Session
@@ -30,6 +30,22 @@ def _require_tenant_id(tenant_id=None):
             "configure app.tenancy.context antes de provisionar comissoes."
         )
     return resolved_tenant_id
+
+
+def _normalizar_data_competencia(value) -> date:
+    if value is None:
+        return date.today()
+    if isinstance(value, datetime):
+        return value.date()
+    if isinstance(value, date):
+        return value
+    if isinstance(value, str):
+        try:
+            return date.fromisoformat(value[:10])
+        except ValueError:
+            logger.warning("Data de venda invalida para provisao de comissoes: %s", value)
+            return date.today()
+    return value
 
 
 def _buscar_comissionado(db: Session, funcionario_id: int, tenant_id: str):
@@ -260,7 +276,7 @@ def provisionar_comissoes_venda(
             }
         
         canal_venda = venda.canal or 'loja_fisica'
-        data_competencia = venda.data_venda or date.today()
+        data_competencia = _normalizar_data_competencia(venda.data_venda)
         
         # ============================================================
         # ETAPA 2: BUSCAR COMISSÕES NÃO PROVISIONADAS
