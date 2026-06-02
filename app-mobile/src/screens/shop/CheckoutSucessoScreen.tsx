@@ -190,7 +190,7 @@ export default function CheckoutSucessoScreen() {
             />
             <InstrucaoItem
               numero={3}
-              texto="Pague ao receber ou conforme combinado"
+              texto="Acompanhe o status em Meus Pedidos"
             />
           </>
         ) : (
@@ -229,7 +229,7 @@ export default function CheckoutSucessoScreen() {
       <TouchableOpacity style={styles.botaoCompartilhar} onPress={compartilhar}>
         <Ionicons name="share-outline" size={18} color={CORES.primario} />
         <Text style={styles.botaoCompartilharTexto}>
-          Compartilhar comprovante
+          Compartilhar pedido
         </Text>
       </TouchableOpacity>
 

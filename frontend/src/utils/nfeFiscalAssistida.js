@@ -68,7 +68,12 @@ export function extrairAcaoCorrecaoFiscal(error) {
 }
 
 function erroComValidacaoFiscal(validacao) {
-  const error = new Error(formatarPendenciasFiscais(validacao));
+  const mensagem = [
+    "A nota ainda nao foi criada porque existem pendencias fiscais.",
+    "",
+    formatarPendenciasFiscais(validacao),
+  ].join("\n");
+  const error = new Error(mensagem);
   error.validacaoFiscal = validacao;
   return error;
 }
@@ -96,7 +101,7 @@ export async function emitirNotaFiscalAssistida({
       "",
       formatarPendenciasFiscais(validacao),
       "",
-      "Autorizar correcao e emitir a nota agora?",
+      "Autorizar correcao fiscal e emitir a nota agora?",
     ].join("\n");
     autorizarCorrecoes = confirmar(mensagem);
     if (!autorizarCorrecoes) {

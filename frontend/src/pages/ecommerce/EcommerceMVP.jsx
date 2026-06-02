@@ -247,11 +247,11 @@ export default function EcommerceMVP() {
 
     setView('pedidos');
     if (paymentReturn.level === 'error') {
-      setError(paymentReturn.message);
+      setError(`${paymentReturn.title}: ${paymentReturn.message}`);
       setSuccess('');
     } else {
       setError('');
-      setSuccess(paymentReturn.message);
+      setSuccess(`${paymentReturn.title}: ${paymentReturn.message}`);
     }
     if (paymentReturn.pedidoId) {
       void recordOrderId(paymentReturn.pedidoId);
@@ -303,6 +303,11 @@ export default function EcommerceMVP() {
     onError: setError,
     onSuccess: setSuccess,
   });
+
+  const abrirPagamentoPedido = (paymentUrl) => {
+    if (!paymentUrl) return;
+    window.location.assign(paymentUrl);
+  };
 
   // Ler ?busca= da URL (ex: link do email de avise-me) e pré-filtrar
   useEffect(() => {
@@ -551,6 +556,7 @@ export default function EcommerceMVP() {
           styles={S}
           onContinueShopping={() => setView('loja')}
           onDriveArrived={avisarCheguei}
+          onOpenPayment={abrirPagamentoPedido}
           onReload={loadOrdersDetailed}
         />
       )}
