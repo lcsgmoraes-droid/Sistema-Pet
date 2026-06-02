@@ -243,7 +243,11 @@ export async function finalizarCheckoutAppLoja(opcoes: CheckoutOptions | string)
       origem: 'app',
     },
     {
-      headers: { 'Idempotency-Key': idempotencyKey },
+      headers: {
+        'Idempotency-Key': idempotencyKey,
+        'X-Client-Channel': 'app',
+        'X-Canal-Venda': 'app',
+      },
     }
   );
   return data;

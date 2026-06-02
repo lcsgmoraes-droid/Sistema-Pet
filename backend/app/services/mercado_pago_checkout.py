@@ -58,6 +58,7 @@ def normalizar_canal_venda_online(canal: str | None) -> str:
         "ecommerce": "ecommerce",
         "app": "app",
         "aplicativo": "app",
+        "mobile": "app",
     }
     return aliases.get(value, value or "ecommerce")
 

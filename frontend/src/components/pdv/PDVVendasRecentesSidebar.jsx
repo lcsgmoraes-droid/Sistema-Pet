@@ -90,7 +90,7 @@ function isCanalOnline(canal) {
   return ["app", "aplicativo", "ecommerce"].includes(canalNormalizado);
 }
 
-function isRetiradaOnline(venda) {
+function isRetiradaOnlineSemEntrega(venda) {
   return (
     isCanalOnline(venda?.canal) &&
     !venda?.tem_entrega &&
@@ -98,14 +98,21 @@ function isRetiradaOnline(venda) {
   );
 }
 
-function isRetiradaPendente(venda) {
-  return isRetiradaOnline(venda) && venda?.status_entrega === "pendente";
+function isPedidoOnlineOperacional(venda) {
+  return (
+    isCanalOnline(venda?.canal) &&
+    (Boolean(venda?.tem_entrega) || isRetiradaOnlineSemEntrega(venda))
+  );
+}
+
+function isPedidoOnlinePendente(venda) {
+  return isPedidoOnlineOperacional(venda) && venda?.status_entrega === "pendente";
 }
 
 function canConfirmarRetirada(venda) {
   return (
     venda?.status_entrega !== "entregue" &&
-    (isRetiradaOnline(venda) ||
+    (isPedidoOnlineOperacional(venda) ||
       venda?.tipo_retirada === "terceiro" ||
       Boolean(venda?.palavra_chave_retirada))
   );
@@ -129,7 +136,7 @@ function formatarDataVenda(dataStr) {
 }
 
 function getEntregaStatusInfo(venda) {
-  if (isRetiradaOnline(venda)) {
+  if (isPedidoOnlineOperacional(venda)) {
     if (venda.status_entrega === "pendente") {
       return {
         intent: "warning",
@@ -142,7 +149,7 @@ function getEntregaStatusInfo(venda) {
       return {
         intent: "success",
         label: "Pronto",
-        title: "Pedido pronto para retirada",
+        title: venda.tem_entrega ? "Pedido pronto para entrega" : "Pedido pronto para retirada",
       };
     }
   }
@@ -201,7 +208,7 @@ export default function PDVVendasRecentesSidebar({
   marcarProntoRetirada,
   setConfirmandoRetirada,
 }) {
-  const pendenciasSeparacao = vendasRecentes.filter(isRetiradaPendente).length;
+  const pendenciasSeparacao = vendasRecentes.filter(isPedidoOnlinePendente).length;
 
   return (
     <>
@@ -307,13 +314,17 @@ export default function PDVVendasRecentesSidebar({
                 const CanalIcon = canalInfo.Icon;
                 const entregaStatus = getEntregaStatusInfo(venda);
                 const customerCode = getCustomerIdentityCode(venda);
-                const retiradaOnline = isRetiradaOnline(venda);
+                const pedidoOnlineOperacional = isPedidoOnlineOperacional(venda);
                 const podeMarcarPronto =
-                  retiradaOnline && venda.status_entrega === "pendente";
-                const podeConfirmarRetirada =
+                  pedidoOnlineOperacional && venda?.status_entrega === "pendente";
+                const podeConfirmarConclusao =
                   canConfirmarRetirada(venda) &&
-                  (!retiradaOnline || venda.status_entrega === "pronto") &&
+                  (!pedidoOnlineOperacional || venda.status_entrega === "pronto") &&
                   confirmandoRetirada.vendaId !== venda.id;
+                const conclusaoLabel = venda.tem_entrega ? "Entregue" : "Retirada";
+                const conclusaoTitle = venda.tem_entrega
+                  ? "Informar quem recebeu"
+                  : "Informar quem retirou";
 
                 return (
                   <div
@@ -422,19 +433,20 @@ export default function PDVVendasRecentesSidebar({
                           <button
                             onClick={(e) => marcarProntoRetirada(e, venda.id)}
                             className="rounded border border-amber-500 bg-white px-2 py-0.5 text-[10px] font-semibold text-amber-700 transition-colors hover:bg-amber-50"
-                            title="Marcar pedido como pronto para retirada"
+                            title={venda.tem_entrega ? "Marcar pedido como pronto para entrega" : "Marcar pedido como pronto para retirada"}
                             type="button"
                           >
                             Pronto
                           </button>
                         )}
-                        {podeConfirmarRetirada && (
+                        {podeConfirmarConclusao && (
                           <button
                             onClick={(e) => abrirConfirmacaoRetirada(e, venda.id)}
                             className="rounded border border-green-600 bg-white px-2 py-0.5 text-[10px] font-semibold text-green-700 transition-colors hover:bg-green-50"
+                            title={conclusaoTitle}
                             type="button"
                           >
-                            Retirada
+                            {conclusaoLabel}
                           </button>
                         )}
                         {entregaStatus && (
@@ -457,7 +469,11 @@ export default function PDVVendasRecentesSidebar({
                         <input
                           autoFocus
                           type="text"
-                          placeholder="Nome de quem esta retirando (opcional)"
+                          placeholder={
+                            venda.tem_entrega
+                              ? "Nome de quem recebeu (opcional)"
+                              : "Nome de quem esta retirando (opcional)"
+                          }
                           value={confirmandoRetirada.nome}
                           onChange={(e) =>
                             setConfirmandoRetirada((prev) => ({
