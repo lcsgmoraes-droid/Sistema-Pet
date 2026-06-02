@@ -20,6 +20,20 @@ import SelecionarLojaScreen from '../screens/SelecionarLojaScreen';
 
 const Stack = createNativeStackNavigator();
 
+const appLinking = {
+  prefixes: ["corepet://", "https://corepet.com.br/app"],
+  config: {
+    screens: {
+      Pedidos: {
+        screens: {
+          ListaPedidos: "pedidos",
+          Rastreio: "pedidos/:pedidoId/rastreio",
+        },
+      },
+    },
+  },
+};
+
 export default function AppNavigator() {
   const { isAuthenticated, isLoading: authLoading, loadUser, user } = useAuthStore();
   const { tenant, isLoading: tenantLoading, loadTenant } = useTenantStore();
@@ -45,7 +59,7 @@ export default function AppNavigator() {
   // Nenhuma loja vinculada → mostra onboarding de seleção
   if (!tenant) {
     return (
-      <NavigationContainer>
+      <NavigationContainer linking={appLinking as any}>
         <Stack.Navigator screenOptions={{ headerShown: false }}>
           <Stack.Screen name="SelecionarLoja" component={SelecionarLojaScreen} />
         </Stack.Navigator>
@@ -68,7 +82,7 @@ export default function AppNavigator() {
   }
 
   return (
-    <NavigationContainer ref={navigationRef}>
+    <NavigationContainer ref={navigationRef} linking={appLinking as any}>
       {activeNav}
     </NavigationContainer>
   );

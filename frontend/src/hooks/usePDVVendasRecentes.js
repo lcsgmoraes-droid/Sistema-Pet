@@ -103,6 +103,16 @@ export function usePDVVendasRecentes() {
     }
   };
 
+  const marcarProntoRetirada = async (event, vendaId) => {
+    event.stopPropagation();
+    try {
+      await api.post(`/vendas/${vendaId}/marcar-pronto-retirada`);
+      await carregarVendasRecentes({ force: true });
+    } catch (error) {
+      console.error("Erro ao marcar retirada pronta:", error);
+    }
+  };
+
   const fecharDriveAlert = () => {
     setDriveAlertVisible(false);
   };
@@ -167,6 +177,7 @@ export function usePDVVendasRecentes() {
     confirmarDriveEntregue,
     abrirConfirmacaoRetirada,
     confirmarRetirada,
+    marcarProntoRetirada,
     fecharDriveAlert,
   };
 }

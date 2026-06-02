@@ -18,7 +18,11 @@ from app.models import Cliente, Tenant, User
 from app.pedido_models import Pedido, PedidoItem
 from app.routes.ecommerce_auth import _activate_user_tenant_context, _get_current_ecommerce_user
 from app.services.ecommerce_payment_config import get_active_mercado_pago_runtime_config
-from app.services.mercado_pago_checkout import create_preference, is_mercado_pago_provider
+from app.services.mercado_pago_checkout import (
+    create_preference,
+    is_mercado_pago_provider,
+    normalizar_canal_venda_online,
+)
 from app.tenancy.context import clear_current_tenant, get_current_tenant, set_current_tenant
 from app.utils.timezone import now_brasilia
 
@@ -213,6 +217,67 @@ def _payment_info_for_pedido(db: Session, pedido: Pedido) -> dict[str, str | Non
     return payment_info
 
 
+def _venda_info_for_pedido(db: Session, pedido: Pedido) -> dict[str, str | bool | None]:
+    venda_info = {
+        "venda_id": None,
+        "status_entrega": None,
+        "retirado_por": None,
+        "tem_entrega": None,
+        "canal": None,
+    }
+    previous_tenant = get_current_tenant()
+    set_current_tenant(UUID(str(pedido.tenant_id)))
+    try:
+        registry = (
+            db.query(IdempotencyKey)
+            .filter(
+                IdempotencyKey.user_id == 0,
+                IdempotencyKey.tenant_id == pedido.tenant_id,
+                IdempotencyKey.endpoint == "POST /api/ecommerce/integracao/venda",
+                IdempotencyKey.chave_idempotencia == f"ecommerce-venda:{pedido.pedido_id}",
+                IdempotencyKey.status == "completed",
+                IdempotencyKey.response_body.isnot(None),
+            )
+            .order_by(IdempotencyKey.completed_at.desc(), IdempotencyKey.id.desc())
+            .first()
+        )
+
+        if not registry or not registry.response_body:
+            return venda_info
+
+        try:
+            response_body = json.loads(registry.response_body or "{}")
+            venda_id = int(response_body.get("venda_id")) if response_body.get("venda_id") else None
+        except (TypeError, ValueError, json.JSONDecodeError):
+            venda_id = None
+
+        if not venda_id:
+            return venda_info
+
+        from app.vendas_models import Venda
+
+        venda = (
+            db.query(Venda)
+            .filter(Venda.id == venda_id, Venda.tenant_id == pedido.tenant_id)
+            .first()
+        )
+        if not venda:
+            return venda_info
+
+        return {
+            "venda_id": venda.id,
+            "status_entrega": venda.status_entrega,
+            "retirado_por": venda.retirado_por,
+            "tem_entrega": bool(venda.tem_entrega),
+            "canal": venda.canal,
+        }
+    finally:
+        if previous_tenant is None:
+            clear_current_tenant()
+        else:
+            set_current_tenant(previous_tenant)
+
+
 def _expirar_reservas_automaticamente(db: Session, tenant_id: str) -> None:
     agora = datetime.utcnow()
     limite_carrinho = agora - timedelta(minutes=RESERVA_EXPIRACAO_CARRINHO_MINUTOS)
@@ -262,6 +327,15 @@ def _pagamento_online_configurado(db: Session | None = None, tenant_id: str | No
 
 def _payment_provider() -> str:
     return str(os.getenv("ECOMMERCE_PAYMENT_PROVIDER", "") or "").strip().lower()
+
+
+def _public_base_url() -> str:
+    return (
+        os.getenv("ECOMMERCE_PUBLIC_BASE_URL")
+        or os.getenv("ECOMMERCE_BASE_URL")
+        or os.getenv("FRONTEND_URL")
+        or "https://corepet.com.br"
+    ).strip().rstrip("/")
 
 
 def _classificar_forma_pagamento_online(nome: str | None) -> str | None:
@@ -454,6 +528,9 @@ def finalizar_checkout(
     if not carrinho:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Carrinho vazio")
 
+    origem_checkout = normalizar_canal_venda_online(payload.origem)
+    carrinho.origem = origem_checkout
+
     itens = _buscar_itens(db, carrinho.pedido_id)
     if not itens:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Carrinho vazio")
@@ -509,6 +586,7 @@ def finalizar_checkout(
         "is_drive": payload.is_drive,
         "forma_pagamento_tipo": forma_pagamento_tipo,
         "palavra_chave_retirada": palavra_chave,
+        "origem": carrinho.origem,
     }
 
     provider = payment_config.provider
@@ -516,10 +594,10 @@ def finalizar_checkout(
     if is_mercado_pago_provider(provider):
         tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
         storefront_ref = str(getattr(tenant, "ecommerce_slug", None) or tenant_id).strip("/")
-        return_url_base = (
-            f"{(os.getenv('ECOMMERCE_PUBLIC_BASE_URL') or os.getenv('ECOMMERCE_BASE_URL') or os.getenv('FRONTEND_URL') or 'https://corepet.com.br').strip().rstrip('/')}"
-            f"/{storefront_ref}"
-        )
+        if origem_checkout == "app":
+            return_url_base = f"{_public_base_url()}/app/retorno-pagamento"
+        else:
+            return_url_base = f"{_public_base_url()}/{storefront_ref}"
         preference = create_preference(
             pedido=carrinho,
             total=total,
@@ -548,9 +626,6 @@ def finalizar_checkout(
         idem_row.response_body = json.dumps(response, ensure_ascii=False)
         idem_row.completed_at = datetime.utcnow()
 
-    # Atualizar origem do carrinho se informada no payload (app envia 'app', web envia 'web' ou omite)
-    if payload.origem:
-        carrinho.origem = payload.origem
     db.commit()
 
     logger.info(
@@ -585,11 +660,16 @@ def listar_pedidos_cliente(
     for pedido in pedidos:
         itens = _buscar_itens(db, pedido.pedido_id)
         payment_info = _payment_info_for_pedido(db, pedido)
+        venda_info = _venda_info_for_pedido(db, pedido)
         resultado.append({
             "pedido_id": pedido.pedido_id,
             "status": pedido.status,
             "total": float(pedido.total or 0.0),
-            "origem": pedido.origem or '-',
+            "origem": pedido.origem or venda_info["canal"] or '-',
+            "venda_id": venda_info["venda_id"],
+            "status_entrega": venda_info["status_entrega"],
+            "retirado_por": venda_info["retirado_por"],
+            "tem_entrega": venda_info["tem_entrega"],
             "tipo_retirada": pedido.tipo_retirada,
             "palavra_chave_retirada": pedido.palavra_chave_retirada,
             "payment_provider": payment_info["payment_provider"],
@@ -633,10 +713,16 @@ def consultar_status_pedido(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Pedido não encontrado")
 
     payment_info = _payment_info_for_pedido(db, pedido)
+    venda_info = _venda_info_for_pedido(db, pedido)
     return {
         "pedido_id": pedido.pedido_id,
         "status": pedido.status,
         "total": float(pedido.total or 0.0),
+        "origem": pedido.origem or venda_info["canal"] or '-',
+        "venda_id": venda_info["venda_id"],
+        "status_entrega": venda_info["status_entrega"],
+        "retirado_por": venda_info["retirado_por"],
+        "tem_entrega": venda_info["tem_entrega"],
         "tipo_retirada": pedido.tipo_retirada,
         "is_drive": pedido.is_drive,
         "drive_chegou_at": pedido.drive_chegou_at.isoformat() if pedido.drive_chegou_at else None,

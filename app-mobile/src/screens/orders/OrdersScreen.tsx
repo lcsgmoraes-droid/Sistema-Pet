@@ -82,10 +82,29 @@ const STATUS_CONFIG: Record<
 
 const STATUS_ENTREGA: Record<string, { label: string; cor: string }> = {
   pendente: { label: "Despacho pendente", cor: "#F59E0B" },
+  pronto: { label: "Pronto para retirada", cor: "#10B981" },
   em_andamento: { label: "🛵 Entregador a caminho", cor: "#3B82F6" },
   em_rota: { label: "🛵 Em rota", cor: "#3B82F6" },
   entregue: { label: "✅ Entregue", cor: "#10B981" },
 };
+
+function getEntregaStatusConfig(pedido: Pedido) {
+  const statusEntrega = pedido.status_entrega || "";
+  if (!statusEntrega) return null;
+
+  const retiradaNaLoja = !pedido.tem_entrega && !!pedido.tipo_retirada;
+  if (retiradaNaLoja && statusEntrega === "pendente") {
+    return { label: "Em separacao", cor: "#F59E0B" };
+  }
+  if (retiradaNaLoja && statusEntrega === "pronto") {
+    return { label: "Pronto para retirada", cor: "#10B981" };
+  }
+  if (retiradaNaLoja && statusEntrega === "entregue") {
+    return { label: "Retirado", cor: "#10B981" };
+  }
+
+  return STATUS_ENTREGA[statusEntrega] || null;
+}
 
 export default function OrdersScreen() {
   const navigation = useNavigation<any>();
@@ -147,11 +166,12 @@ export default function OrdersScreen() {
 
   function renderPedido({ item }: { item: Pedido }) {
     const cfg = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.pendente;
-    const temEntrega = (item as any).tem_entrega;
-    const statusEntrega = (item as any).status_entrega;
-    const entregaCfg = statusEntrega ? STATUS_ENTREGA[statusEntrega] : null;
+    const temEntrega = Boolean(item.tem_entrega);
+    const entregaCfg = getEntregaStatusConfig(item);
     const temPalavraChave =
-      item.palavra_chave_retirada && item.status === "pendente";
+      !!item.palavra_chave_retirada &&
+      item.status !== "cancelado" &&
+      item.status_entrega !== "entregue";
     const podeRastrear =
       temEntrega &&
       ["aprovado", "em_preparo", "pronto", "pago", "criado"].includes(

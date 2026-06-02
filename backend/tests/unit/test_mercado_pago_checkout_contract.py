@@ -1,10 +1,15 @@
 import hashlib
 import hmac
+import inspect
+import os
 from types import SimpleNamespace
 
 import pytest
 from fastapi import HTTPException
 
+os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
+
+from app.routes import ecommerce_checkout, ecommerce_webhooks
 from app.services.mercado_pago_checkout import (
     build_preference_payload,
     select_checkout_url,
@@ -94,6 +99,31 @@ def test_build_preference_payload_retorna_para_pedidos_da_loja(monkeypatch):
         "pending": "https://corepet.com.br/atacadao?view=pedidos&payment_status=pending&pedido_id=PED-COREPET-123",
         "failure": "https://corepet.com.br/atacadao?view=pedidos&payment_status=failure&pedido_id=PED-COREPET-123",
     }
+
+
+def test_finalizar_checkout_define_origem_antes_de_criar_preferencia_mp():
+    source = inspect.getsource(ecommerce_checkout.finalizar_checkout)
+
+    assert "origem_checkout = normalizar_canal_venda_online(payload.origem)" in source
+    assert source.index("carrinho.origem = origem_checkout") < source.index(
+        "preference = create_preference("
+    )
+
+
+def test_webhook_integracao_usa_origem_do_pedido_como_fallback():
+    source = inspect.getsource(ecommerce_webhooks._integrar_venda_ao_motor)
+
+    assert 'getattr(pedido, "origem", None)' in source
+    assert source.index('getattr(pedido, "origem", None)') < source.index(
+        'or "ecommerce"'
+    )
+
+
+def test_webhook_integracao_retirada_online_fica_pendente_de_separacao():
+    source = inspect.getsource(ecommerce_webhooks._integrar_venda_ao_motor)
+
+    assert "online_retirada" in source
+    assert 'venda_row.status_entrega = "pendente"' in source
 
 
 def test_select_checkout_url_respeita_sandbox(monkeypatch):

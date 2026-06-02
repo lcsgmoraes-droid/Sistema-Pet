@@ -10,6 +10,8 @@ const EmailVerification = () => {
   const [token, setToken] = useState(searchParams.get('token') || '');
   const [status, setStatus] = useState('idle');
   const [message, setMessage] = useState('');
+  const canal = (searchParams.get('canal') || '').trim().toLowerCase();
+  const isAppFlow = ['app', 'mobile', 'aplicativo'].includes(canal);
 
   const verify = async (manualToken = token) => {
     if (!manualToken) {
@@ -137,9 +139,15 @@ const EmailVerification = () => {
         )}
 
         <div className="mt-6 text-center">
-          <Link to="/login" className="text-blue-600 hover:text-blue-700 font-semibold">
-            Ir para login
-          </Link>
+          {isSuccess && isAppFlow ? (
+            <a href="corepet://" className="text-blue-600 hover:text-blue-700 font-semibold">
+              Abrir app CorePet
+            </a>
+          ) : (
+            <Link to="/login" className="text-blue-600 hover:text-blue-700 font-semibold">
+              Ir para login
+            </Link>
+          )}
         </div>
       </div>
     </div>

@@ -425,6 +425,11 @@ export interface Pedido {
   pedido_id: string;
   status: string;
   total: number;
+  origem?: string | null;
+  venda_id?: number | null;
+  status_entrega?: string | null;
+  retirado_por?: string | null;
+  tem_entrega?: boolean | null;
   tipo_retirada?: string | null;
   is_drive?: boolean | null;
   palavra_chave_retirada?: string | null;

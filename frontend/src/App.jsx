@@ -19,6 +19,7 @@ const LandingPage = lazy(() => import("./pages/LandingPage"));
 const Planos = lazy(() => import("./pages/Planos"));
 const MeuPlano = lazy(() => import("./pages/MeuPlano"));
 const AppPublicEntry = lazy(() => import("./pages/AppPublicEntry"));
+const AppPaymentReturn = lazy(() => import("./pages/AppPaymentReturn"));
 const preloadPessoas = () => import("./pages/ClientesNovo");
 const Pessoas = lazy(preloadPessoas);
 
@@ -310,6 +311,7 @@ function App() {
                 <Route path="/planos" element={<Planos />} />
                 <Route path="/rastreio/:token" element={<RastreioPublico />} />
                 <Route path="/app" element={<AppPublicEntry />} />
+                <Route path="/app/retorno-pagamento" element={<AppPaymentReturn />} />
                 <Route path="/ecommerce" element={<EcommerceMVP />} />
 
                 {/* Rota dinâmica do e-commerce (precisa ficar após as rotas fixas) */}

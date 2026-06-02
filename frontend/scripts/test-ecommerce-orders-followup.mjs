@@ -29,6 +29,24 @@ assert.match(
 
 assert.match(
   source,
+  /function getOrderFulfillmentStatus/,
+  'pagina de pedidos deve traduzir o status operacional da venda',
+);
+
+assert.match(
+  source,
+  /Pronto para retirada/,
+  'pedido pronto deve informar claramente que ja pode ser retirado',
+);
+
+assert.match(
+  source,
+  /Em separacao/,
+  'pedido online pendente deve aparecer como em separacao para o cliente',
+);
+
+assert.match(
+  source,
   /aprovado:\s*'#10b981'/,
   'status aprovado deve ter cor positiva propria',
 );

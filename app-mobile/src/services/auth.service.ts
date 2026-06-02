@@ -30,8 +30,11 @@ export async function register(
     nome,
     cpf: cpf || undefined,
     telefone: telefone || undefined,
+    canal: 'app',
     accepted_terms: acceptedTerms,
     accepted_privacy: acceptedPrivacy,
+  }, {
+    headers: { 'X-Client-Channel': 'app' },
   });
   if (data.access_token) {
     await SecureStore.setItemAsync('auth_token', data.access_token);

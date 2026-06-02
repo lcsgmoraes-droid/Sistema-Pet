@@ -26,6 +26,77 @@ function normalizarStatusPedido(status) {
   return String(status || 'pendente').trim().toLowerCase();
 }
 
+function getOrderFulfillmentStatus(order) {
+  const statusPedido = normalizarStatusPedido(order.status);
+  const statusEntrega = String(order.status_entrega || '').trim().toLowerCase();
+
+  if (statusPedido === 'cancelado' || statusPedido === 'recusado') {
+    return null;
+  }
+
+  if (order.tem_entrega) {
+    if (statusEntrega === 'entregue') {
+      return {
+        background: '#f0fdf4',
+        border: '#bbf7d0',
+        color: '#166534',
+        label: 'Entregue',
+        text: 'Seu pedido foi entregue.',
+      };
+    }
+
+    if (statusEntrega === 'pendente') {
+      return {
+        background: '#eff6ff',
+        border: '#bfdbfe',
+        color: '#1d4ed8',
+        label: 'Pedido em separacao',
+        text: 'A loja ja recebeu a venda e vai preparar a entrega.',
+      };
+    }
+
+    return null;
+  }
+
+  if (!order.tipo_retirada && !statusEntrega) {
+    return null;
+  }
+
+  if (statusEntrega === 'pronto') {
+    return {
+      background: '#f0fdf4',
+      border: '#bbf7d0',
+      color: '#166534',
+      label: 'Pronto para retirada',
+      text: 'Apresente a senha de retirada na loja.',
+    };
+  }
+
+  if (statusEntrega === 'entregue') {
+    return {
+      background: '#f0fdf4',
+      border: '#bbf7d0',
+      color: '#166534',
+      label: 'Retirado',
+      text: order.retirado_por
+        ? `Pedido retirado por ${order.retirado_por}.`
+        : 'Pedido retirado na loja.',
+    };
+  }
+
+  if (statusEntrega === 'pendente') {
+    return {
+      background: '#fffbeb',
+      border: '#fde68a',
+      color: '#92400e',
+      label: 'Em separacao',
+      text: 'A loja esta preparando seu pedido para retirada.',
+    };
+  }
+
+  return null;
+}
+
 function OrderPickupPassword({ password }) {
   if (!password) return null;
 
@@ -122,6 +193,19 @@ function OrderPaymentFollowup({ order, onOpenPayment }) {
   return null;
 }
 
+function OrderFulfillmentStatus({ order }) {
+  const fulfillment = getOrderFulfillmentStatus(order);
+
+  if (!fulfillment) return null;
+
+  return (
+    <div style={{ background: fulfillment.background, border: `1px solid ${fulfillment.border}`, borderRadius: 10, padding: 12, marginTop: 8 }}>
+      <div style={{ color: fulfillment.color, fontWeight: 800, fontSize: 13 }}>{fulfillment.label}</div>
+      <div style={{ color: fulfillment.color, fontSize: 12, marginTop: 2 }}>{fulfillment.text}</div>
+    </div>
+  );
+}
+
 function OrderCard({ order, styles: S, onDriveArrived, onOpenPayment }) {
   const status = normalizarStatusPedido(order.status);
   const statusColor = ORDER_STATUS_COLORS[status] || '#6b7280';
@@ -141,6 +225,7 @@ function OrderCard({ order, styles: S, onDriveArrived, onOpenPayment }) {
       </div>
 
       <OrderPaymentFollowup order={order} onOpenPayment={onOpenPayment} />
+      <OrderFulfillmentStatus order={order} />
       <OrderPickupPassword password={order.palavra_chave_retirada} />
       <OrderDriveStatus order={order} onDriveArrived={onDriveArrived} />
       <OrderItems order={order} />
