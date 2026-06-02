@@ -8,6 +8,7 @@ import {
   Stethoscope,
   X,
 } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 import { formatMoneyBRL } from "../../utils/formatters";
 import { normalizeBenefitChannel } from "../../utils/campaignChannelScope";
 import CopyableCode from "../ui/CopyableCode";
@@ -208,7 +209,21 @@ export default function PDVVendasRecentesSidebar({
   marcarProntoRetirada,
   setConfirmandoRetirada,
 }) {
+  const [mostrarSomentePendenciasSeparacao, setMostrarSomentePendenciasSeparacao] = useState(false);
   const pendenciasSeparacao = vendasRecentes.filter(isPedidoOnlinePendente).length;
+  const vendasRecentesVisiveis = useMemo(
+    () =>
+      mostrarSomentePendenciasSeparacao
+        ? vendasRecentes.filter(isPedidoOnlinePendente)
+        : vendasRecentes,
+    [mostrarSomentePendenciasSeparacao, vendasRecentes],
+  );
+
+  useEffect(() => {
+    if (pendenciasSeparacao === 0 && mostrarSomentePendenciasSeparacao) {
+      setMostrarSomentePendenciasSeparacao(false);
+    }
+  }, [mostrarSomentePendenciasSeparacao, pendenciasSeparacao]);
 
   return (
     <>
@@ -293,23 +308,47 @@ export default function PDVVendasRecentesSidebar({
             </div>
 
             {pendenciasSeparacao > 0 && (
-              <div className="mx-2 mb-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-2 py-2 text-[11px] font-semibold leading-snug text-amber-800">
+              <button
+                className={`mx-2 mb-2 flex w-[calc(100%-1rem)] items-start gap-2 rounded-lg border px-2 py-2 text-left text-[11px] font-semibold leading-snug transition-colors ${
+                  mostrarSomentePendenciasSeparacao
+                    ? "border-red-300 bg-red-100 text-red-900"
+                    : "border-red-200 bg-red-50 text-red-800 hover:bg-red-100"
+                }`}
+                onClick={() => {
+                  setFiltroStatus("todas");
+                  setFiltroTemEntrega(false);
+                  setBuscaNumeroVenda("");
+                  setMostrarSomentePendenciasSeparacao(true);
+                }}
+                title="Filtrar pedidos online aguardando separacao"
+                type="button"
+              >
                 <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
                 <span>
                   {pendenciasSeparacao} pedido(s) online aguardando separacao.
                 </span>
-              </div>
+              </button>
+            )}
+
+            {mostrarSomentePendenciasSeparacao && pendenciasSeparacao > 0 && (
+              <button
+                className="mx-2 mb-2 w-[calc(100%-1rem)] rounded-lg border border-red-200 bg-white px-2 py-1.5 text-[11px] font-semibold text-red-700 transition-colors hover:bg-red-50"
+                onClick={() => setMostrarSomentePendenciasSeparacao(false)}
+                type="button"
+              >
+                Limpar filtro de separacao
+              </button>
             )}
           </div>
 
           <div className="flex-1 overflow-y-auto p-2 space-y-2">
-            {vendasRecentes.length === 0 ? (
+            {vendasRecentesVisiveis.length === 0 ? (
               <div className="text-center py-8 text-gray-400">
                 <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-50" />
                 <p className="text-xs">Nenhuma venda encontrada</p>
               </div>
             ) : (
-              vendasRecentes.map((venda) => {
+              vendasRecentesVisiveis.map((venda) => {
                 const canalInfo = getCanalInfo(venda.canal);
                 const CanalIcon = canalInfo.Icon;
                 const entregaStatus = getEntregaStatusInfo(venda);

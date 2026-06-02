@@ -30,6 +30,11 @@ export default function AppPaymentReturn() {
   const [searchParams] = useSearchParams();
   const paymentStatus = searchParams.get("payment_status") || "pending";
   const pedidoId = searchParams.get("pedido_id") || "";
+  const loja =
+    searchParams.get("loja") ||
+    searchParams.get("tenant") ||
+    searchParams.get("store") ||
+    "";
   const statusCopy = STATUS_COPY[paymentStatus] || STATUS_COPY.pending;
   const Icon = statusCopy.icon;
 
@@ -37,15 +42,37 @@ export default function AppPaymentReturn() {
     const params = new URLSearchParams();
     if (paymentStatus) params.set("payment_status", paymentStatus);
     if (pedidoId) params.set("pedido_id", pedidoId);
-    return `corepet://pedidos${params.toString() ? `?${params.toString()}` : ""}`;
-  }, [paymentStatus, pedidoId]);
+    if (loja) params.set("loja", loja);
+    return `corepet://app/pedidos${params.toString() ? `?${params.toString()}` : ""}`;
+  }, [paymentStatus, pedidoId, loja]);
+
+  const androidIntentLink = useMemo(() => {
+    const params = new URLSearchParams();
+    if (paymentStatus) params.set("payment_status", paymentStatus);
+    if (pedidoId) params.set("pedido_id", pedidoId);
+    if (loja) params.set("loja", loja);
+    const query = params.toString();
+    return `intent://app/pedidos${query ? `?${query}` : ""}#Intent;scheme=corepet;package=br.com.corepet.app;end`;
+  }, [paymentStatus, pedidoId, loja]);
+
+  const appOpenLink = useMemo(() => {
+    if (typeof navigator !== "undefined" && /Android/i.test(navigator.userAgent || "")) {
+      return androidIntentLink;
+    }
+    return deepLink;
+  }, [androidIntentLink, deepLink]);
+
+  const fallbackAppUrl = useMemo(() => {
+    if (!loja) return "/app";
+    return `/app?loja=${encodeURIComponent(loja)}`;
+  }, [loja]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      window.location.href = deepLink;
+      window.location.href = appOpenLink;
     }, 350);
     return () => window.clearTimeout(timer);
-  }, [deepLink]);
+  }, [appOpenLink]);
 
   return (
     <main className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
@@ -62,15 +89,15 @@ export default function AppPaymentReturn() {
         )}
         <a
           className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-teal-700 px-4 py-3 text-sm font-bold text-white hover:bg-teal-800"
-          href={deepLink}
+          href={appOpenLink}
         >
           Abrir app CorePet
         </a>
         <Link
           className="mt-3 inline-flex w-full items-center justify-center rounded-xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50"
-          to="/app"
+          to={fallbackAppUrl}
         >
-          Ver opcoes do app
+          Abrir dados da loja
         </Link>
       </section>
     </main>

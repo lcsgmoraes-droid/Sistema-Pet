@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import { Linking } from 'react-native';
 import { create } from 'zustand';
 import { API_BASE_URL } from '../config';
 
@@ -26,6 +27,10 @@ interface TenantState {
 }
 
 const STORAGE_KEY = 'tenant_info';
+
+function apiPublicBaseUrl(): string {
+  return API_BASE_URL.replace(/\/api\/?$/, '').replace(/\/$/, '');
+}
 
 export function extractStoreSlug(input: string): string {
   const raw = input.trim().toLowerCase();
@@ -78,6 +83,22 @@ function sanitizeSlug(value: string): string {
   return value.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '');
 }
 
+async function fetchTenantBySlug(slug: string): Promise<TenantInfo> {
+  const slugLimpo = extractStoreSlug(slug);
+  if (!slugLimpo) {
+    throw new Error('Informe o codigo ou QR Code da loja.');
+  }
+
+  const response = await fetch(`${apiPublicBaseUrl()}/api/ecommerce/tenant-slug/${slugLimpo}`);
+
+  if (!response.ok) {
+    const body = await response.json().catch(() => ({}));
+    throw new Error(body.detail || 'Loja nao encontrada. Verifique o codigo.');
+  }
+
+  return response.json();
+}
+
 export const useTenantStore = create<TenantState>()((set) => ({
   tenant: null,
   isLoading: true,
@@ -89,6 +110,15 @@ export const useTenantStore = create<TenantState>()((set) => ({
       if (raw) {
         const tenant: TenantInfo = JSON.parse(raw);
         set({ tenant });
+        return;
+      }
+
+      const initialUrl = await Linking.getInitialURL().catch(() => null);
+      const slugInicial = initialUrl ? extractStoreSlug(initialUrl) : '';
+      if (slugInicial) {
+        const tenant = await fetchTenantBySlug(slugInicial);
+        await SecureStore.setItemAsync(STORAGE_KEY, JSON.stringify(tenant));
+        set({ tenant });
       }
     } catch {
       // Ignore corrupted local tenant data and force a fresh selection later.
@@ -98,32 +128,17 @@ export const useTenantStore = create<TenantState>()((set) => ({
   },
 
   buscarPorSlug: async (slug: string) => {
-    const slugLimpo = extractStoreSlug(slug);
-    if (!slugLimpo) {
-      throw new Error('Informe o codigo ou QR Code da loja.');
-    }
-
-    const base = API_BASE_URL.replace(/\/api\/?$/, '').replace(/\/$/, '');
-    const response = await fetch(`${base}/api/ecommerce/tenant-slug/${slugLimpo}`);
-
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({}));
-      throw new Error(body.detail || 'Loja nao encontrada. Verifique o codigo.');
-    }
-
-    const tenant: TenantInfo = await response.json();
-    return tenant;
+    return fetchTenantBySlug(slug);
   },
 
   buscarPorLocalidade: async (cidade: string, uf?: string | null) => {
     const cidadeLimpa = cidade.trim();
     if (!cidadeLimpa) return [];
 
-    const base = API_BASE_URL.replace(/\/api\/?$/, '').replace(/\/$/, '');
     const params = new URLSearchParams({ cidade: cidadeLimpa });
     if (uf?.trim()) params.set('uf', uf.trim().slice(0, 2).toUpperCase());
 
-    const response = await fetch(`${base}/api/ecommerce/tenants/sugerir?${params.toString()}`);
+    const response = await fetch(`${apiPublicBaseUrl()}/api/ecommerce/tenants/sugerir?${params.toString()}`);
     if (!response.ok) return [];
 
     const data = await response.json().catch(() => ({ lojas: [] }));

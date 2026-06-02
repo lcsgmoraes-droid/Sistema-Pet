@@ -81,14 +81,21 @@ def _excluded_payment_types(forma_pagamento_tipo: str) -> list[dict[str, str]]:
     return [{"id": "ticket"}]
 
 
-def _payment_return_url(base_url: str, payment_status: str, pedido_id: str) -> str:
-    query = urlencode(
-        {
-            "view": "pedidos",
-            "payment_status": payment_status,
-            "pedido_id": pedido_id,
-        }
-    )
+def _payment_return_url(
+    base_url: str,
+    payment_status: str,
+    pedido_id: str,
+    extra_params: dict[str, Any] | None = None,
+) -> str:
+    params = {
+        "view": "pedidos",
+        "payment_status": payment_status,
+        "pedido_id": pedido_id,
+    }
+    for key, value in (extra_params or {}).items():
+        if value is not None and str(value).strip():
+            params[str(key)] = str(value).strip()
+    query = urlencode(params)
     return f"{str(base_url or '').strip().rstrip('/')}?{query}"
 
 
@@ -101,6 +108,7 @@ def build_preference_payload(
     tipo_retirada: str | None,
     notification_url: str | None = None,
     return_url_base: str | None = None,
+    return_url_params: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     base_url = _public_base_url()
     payment_return_base_url = str(return_url_base or base_url).strip().rstrip("/")
@@ -136,11 +144,11 @@ def build_preference_payload(
         "notification_url": notification_url or f"{base_url}/api/webhooks/mercadopago",
         "back_urls": {
             "success": os.getenv("MERCADO_PAGO_BACK_URL_SUCCESS")
-            or _payment_return_url(payment_return_base_url, "success", pedido_id),
+            or _payment_return_url(payment_return_base_url, "success", pedido_id, return_url_params),
             "pending": os.getenv("MERCADO_PAGO_BACK_URL_PENDING")
-            or _payment_return_url(payment_return_base_url, "pending", pedido_id),
+            or _payment_return_url(payment_return_base_url, "pending", pedido_id, return_url_params),
             "failure": os.getenv("MERCADO_PAGO_BACK_URL_FAILURE")
-            or _payment_return_url(payment_return_base_url, "failure", pedido_id),
+            or _payment_return_url(payment_return_base_url, "failure", pedido_id, return_url_params),
         },
         "auto_return": "approved",
         "payment_methods": {
@@ -167,6 +175,7 @@ def create_preference(
     access_token: str | None = None,
     notification_url: str | None = None,
     return_url_base: str | None = None,
+    return_url_params: dict[str, Any] | None = None,
     use_sandbox: bool | None = None,
     http_post: Callable[..., Any] = requests.post,
 ) -> dict[str, Any]:
@@ -178,6 +187,7 @@ def create_preference(
         tipo_retirada=tipo_retirada,
         notification_url=notification_url,
         return_url_base=return_url_base,
+        return_url_params=return_url_params,
     )
     token = (access_token or "").strip() or _get_access_token()
     response = http_post(

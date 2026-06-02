@@ -44,3 +44,17 @@ def test_app_order_tracking_accepts_app_channel_sales():
     source = _read_mobile_source("backend/app/routes/app_mobile_routes.py")
 
     assert 'Venda.canal.in_(["ecommerce", "app", "aplicativo"])' in source
+
+
+def test_app_linking_returns_payment_to_orders_without_store_picker():
+    navigator = _read_mobile_source("app-mobile/src/navigation/AppNavigator.tsx")
+    tenant_store = _read_mobile_source("app-mobile/src/store/tenant.store.ts")
+    app_return = _read_mobile_source("frontend/src/pages/AppPaymentReturn.jsx")
+
+    assert '"corepet://app"' in navigator
+    assert 'ListaPedidos: "pedidos"' in navigator
+    assert "Linking.getInitialURL" in tenant_store
+    assert "extractStoreSlug(initialUrl" in tenant_store
+    assert "corepet://app/pedidos" in app_return
+    assert "intent://app/pedidos" in app_return
+    assert "loja" in app_return
