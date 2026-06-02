@@ -606,8 +606,15 @@ def finalizar_checkout(
     if is_mercado_pago_provider(provider):
         tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
         storefront_ref = str(getattr(tenant, "ecommerce_slug", None) or tenant_id).strip("/")
+        return_url_params = None
         if origem_checkout == "app":
             return_url_base = f"{_public_base_url()}/app/retorno-pagamento"
+            return_url_params = {
+                "loja": storefront_ref,
+                "tenant": storefront_ref,
+                "tenant_id": tenant_id,
+                "canal": "app",
+            }
         else:
             return_url_base = f"{_public_base_url()}/{storefront_ref}"
         preference = create_preference(
@@ -619,6 +626,7 @@ def finalizar_checkout(
             access_token=payment_config.access_token,
             notification_url=payment_config.webhook_url,
             return_url_base=return_url_base,
+            return_url_params=return_url_params,
             use_sandbox=payment_config.use_sandbox,
         )
         carrinho.payment_provider = "mercadopago"

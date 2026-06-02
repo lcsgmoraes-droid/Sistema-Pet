@@ -101,6 +101,26 @@ def test_build_preference_payload_retorna_para_pedidos_da_loja(monkeypatch):
     }
 
 
+def test_build_preference_payload_retorno_app_preserva_loja_e_canal(monkeypatch):
+    monkeypatch.setenv("ECOMMERCE_BASE_URL", "https://corepet.com.br/")
+
+    payload = build_preference_payload(
+        pedido=_pedido(),
+        total=123.45,
+        forma_pagamento_tipo="pix",
+        endereco_entrega="RETIRADA NA LOJA",
+        tipo_retirada="app_loja",
+        return_url_base="https://corepet.com.br/app/retorno-pagamento",
+        return_url_params={"loja": "atacadao", "tenant": "atacadao", "canal": "app"},
+    )
+
+    assert payload["back_urls"] == {
+        "success": "https://corepet.com.br/app/retorno-pagamento?view=pedidos&payment_status=success&pedido_id=PED-COREPET-123&loja=atacadao&tenant=atacadao&canal=app",
+        "pending": "https://corepet.com.br/app/retorno-pagamento?view=pedidos&payment_status=pending&pedido_id=PED-COREPET-123&loja=atacadao&tenant=atacadao&canal=app",
+        "failure": "https://corepet.com.br/app/retorno-pagamento?view=pedidos&payment_status=failure&pedido_id=PED-COREPET-123&loja=atacadao&tenant=atacadao&canal=app",
+    }
+
+
 def test_finalizar_checkout_define_origem_antes_de_criar_preferencia_mp():
     source = inspect.getsource(ecommerce_checkout.finalizar_checkout)
 

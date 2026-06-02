@@ -21,7 +21,7 @@ import SelecionarLojaScreen from '../screens/SelecionarLojaScreen';
 const Stack = createNativeStackNavigator();
 
 const appLinking = {
-  prefixes: ["corepet://", "https://corepet.com.br/app"],
+  prefixes: ["corepet://app", "corepet://", "https://corepet.com.br/app"],
   config: {
     screens: {
       Pedidos: {

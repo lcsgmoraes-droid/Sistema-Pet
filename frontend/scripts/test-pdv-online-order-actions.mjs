@@ -23,8 +23,20 @@ assert.match(
 
 assert.match(
   sidebarSource,
-  /pedido\(s\) online aguardando separacao/,
-  'PDV deve exibir aviso chamativo para pedidos online pendentes de separacao',
+  /bg-red-50/,
+  'aviso de separacao deve ficar vermelho para chamar atencao do operador',
+);
+
+assert.match(
+  sidebarSource,
+  /setMostrarSomentePendenciasSeparacao\(true\)/,
+  'clique no aviso de separacao deve ativar filtro de pendencias online',
+);
+
+assert.match(
+  sidebarSource,
+  /vendasRecentes\.filter\(isPedidoOnlinePendente\)/,
+  'painel deve conseguir listar somente pedidos online aguardando separacao',
 );
 
 assert.match(
