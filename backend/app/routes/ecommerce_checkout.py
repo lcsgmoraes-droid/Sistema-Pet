@@ -361,9 +361,21 @@ def _validar_forma_pagamento_online(nome: str | None) -> str:
     return tipo
 
 
+def _resolver_origem_checkout(payload: CheckoutFinalizarRequest, request: Request) -> str:
+    for candidato in (
+        payload.origem,
+        request.headers.get("X-Client-Channel"),
+        request.headers.get("X-Canal-Venda"),
+    ):
+        if str(candidato or "").strip():
+            return normalizar_canal_venda_online(candidato)
+    return normalizar_canal_venda_online(None)
+
+
 def _checkout_idempotency_payload(
     identity: EcommerceIdentity,
     payload: CheckoutFinalizarRequest,
+    origem: str | None = None,
 ) -> dict:
     return {
         "user_id": identity.user_id,
@@ -374,7 +386,7 @@ def _checkout_idempotency_payload(
         "tipo_retirada": payload.tipo_retirada,
         "is_drive": payload.is_drive,
         "forma_pagamento_nome": payload.forma_pagamento_nome,
-        "origem": payload.origem,
+        "origem": origem if origem is not None else payload.origem,
     }
 
 
@@ -490,7 +502,8 @@ def finalizar_checkout(
 
     endpoint_name = "POST /api/checkout/finalizar"
     idem_key_value = idempotency_key or request.headers.get("Idempotency-Key")
-    request_data = _checkout_idempotency_payload(identity, payload)
+    origem_checkout = _resolver_origem_checkout(payload, request)
+    request_data = _checkout_idempotency_payload(identity, payload, origem_checkout)
     tenant_uuid = request_data["tenant_id"]
     request_hash = _request_hash(request_data)
     idem_row = None
@@ -528,7 +541,6 @@ def finalizar_checkout(
     if not carrinho:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Carrinho vazio")
 
-    origem_checkout = normalizar_canal_venda_online(payload.origem)
     carrinho.origem = origem_checkout
 
     itens = _buscar_itens(db, carrinho.pedido_id)

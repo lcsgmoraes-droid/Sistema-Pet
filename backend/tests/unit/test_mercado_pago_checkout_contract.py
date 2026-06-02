@@ -104,10 +104,42 @@ def test_build_preference_payload_retorna_para_pedidos_da_loja(monkeypatch):
 def test_finalizar_checkout_define_origem_antes_de_criar_preferencia_mp():
     source = inspect.getsource(ecommerce_checkout.finalizar_checkout)
 
-    assert "origem_checkout = normalizar_canal_venda_online(payload.origem)" in source
+    assert "origem_checkout = _resolver_origem_checkout(payload, request)" in source
+    assert source.index("origem_checkout = _resolver_origem_checkout(payload, request)") < source.index(
+        "request_data = _checkout_idempotency_payload("
+    )
     assert source.index("carrinho.origem = origem_checkout") < source.index(
         "preference = create_preference("
     )
+
+
+def test_checkout_resolve_origem_app_por_payload_ou_headers():
+    payload = ecommerce_checkout.CheckoutFinalizarRequest(
+        cidade_destino="Presidente Prudente",
+        forma_pagamento_nome="PIX",
+        origem=None,
+    )
+
+    assert ecommerce_checkout._resolver_origem_checkout(
+        ecommerce_checkout.CheckoutFinalizarRequest(
+            cidade_destino="Presidente Prudente",
+            forma_pagamento_nome="PIX",
+            origem="app",
+        ),
+        SimpleNamespace(headers={}),
+    ) == "app"
+    assert ecommerce_checkout._resolver_origem_checkout(
+        payload,
+        SimpleNamespace(headers={"X-Canal-Venda": "app"}),
+    ) == "app"
+    assert ecommerce_checkout._resolver_origem_checkout(
+        payload,
+        SimpleNamespace(headers={"X-Client-Channel": "mobile"}),
+    ) == "app"
+    assert ecommerce_checkout._resolver_origem_checkout(
+        payload,
+        SimpleNamespace(headers={}),
+    ) == "ecommerce"
 
 
 def test_webhook_integracao_usa_origem_do_pedido_como_fallback():

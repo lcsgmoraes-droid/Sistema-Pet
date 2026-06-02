@@ -17,8 +17,8 @@ const hookSource = readFileSync(
 
 assert.match(
   sidebarSource,
-  /function isRetiradaOnline/,
-  'painel de vendas recentes deve identificar retirada de pedidos online',
+  /function isPedidoOnlineOperacional/,
+  'painel de vendas recentes deve identificar pedidos online operacionais',
 );
 
 assert.match(
@@ -29,14 +29,32 @@ assert.match(
 
 assert.match(
   sidebarSource,
+  /isPedidoOnlineOperacional\(venda\) && venda\?\.status_entrega === "pendente"/,
+  'aviso de separacao deve incluir app/ecommerce com retirada ou entrega',
+);
+
+assert.match(
+  sidebarSource,
   /marcarProntoRetirada\(e, venda\.id\)/,
-  'PDV deve permitir marcar pedido online como pronto para retirada',
+  'PDV deve permitir marcar pedido online como pronto',
 );
 
 assert.match(
   sidebarSource,
   /Informar quem retirou/,
   'senha de retirada deve abrir o campo para informar quem retirou',
+);
+
+assert.match(
+  sidebarSource,
+  /podeConfirmarConclusao/,
+  'PDV deve ter acao de concluir pedido online mesmo sem palavra-chave',
+);
+
+assert.match(
+  sidebarSource,
+  /venda\.tem_entrega \? "Entregue" : "Retirada"/,
+  'acao final deve diferenciar entrega e retirada',
 );
 
 assert.match(
