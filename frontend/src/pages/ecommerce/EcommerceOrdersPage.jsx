@@ -2,11 +2,29 @@ import { formatCurrency, formatDateTime } from './ecommerceMvpUtils';
 
 const ORDER_STATUS_COLORS = {
   pendente: '#f59e0b',
+  pending: '#f59e0b',
   confirmado: '#3b82f6',
+  aprovado: '#10b981',
+  pago: '#10b981',
   enviado: '#8b5cf6',
   entregue: '#10b981',
+  recusado: '#ef4444',
   cancelado: '#ef4444',
 };
+
+const ORDER_STATUS_LABELS = {
+  pendente: 'pendente',
+  pending: 'pendente',
+  aprovado: 'aprovado',
+  pago: 'aprovado',
+  confirmado: 'confirmado',
+  recusado: 'recusado',
+  cancelado: 'cancelado',
+};
+
+function normalizarStatusPedido(status) {
+  return String(status || 'pendente').trim().toLowerCase();
+}
 
 function OrderPickupPassword({ password }) {
   if (!password) return null;
@@ -63,8 +81,51 @@ function OrderItems({ order }) {
   );
 }
 
-function OrderCard({ order, styles: S, onDriveArrived }) {
-  const statusColor = ORDER_STATUS_COLORS[(order.status || '').toLowerCase()] || '#6b7280';
+function OrderPaymentFollowup({ order, onOpenPayment }) {
+  const status = normalizarStatusPedido(order.status);
+
+  if ((status === 'pendente' || status === 'pending') && order.payment_url) {
+    return (
+      <div style={{ background: '#fffbeb', border: '1px solid #fde68a', borderRadius: 10, padding: 12, marginTop: 8, display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+        <div>
+          <div style={{ color: '#92400e', fontWeight: 800, fontSize: 13 }}>Pagamento pendente</div>
+          <div style={{ color: '#92400e', fontSize: 12, marginTop: 2 }}>Se voce saiu da tela do Mercado Pago, pode abrir o pagamento novamente por aqui.</div>
+        </div>
+        <button
+          onClick={() => onOpenPayment(order.payment_url)}
+          style={{ background: '#f97316', color: '#fff', border: 'none', borderRadius: 10, padding: '10px 16px', fontWeight: 800, fontSize: 13, cursor: 'pointer', flexShrink: 0 }}
+        >
+          Abrir pagamento
+        </button>
+      </div>
+    );
+  }
+
+  if (status === 'aprovado' || status === 'pago') {
+    return (
+      <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: 12, marginTop: 8 }}>
+        <div style={{ color: '#166534', fontWeight: 800, fontSize: 13 }}>Pagamento aprovado</div>
+        <div style={{ color: '#166534', fontSize: 12, marginTop: 2 }}>A loja ja recebeu a venda e o pedido entrou no fluxo de separacao.</div>
+      </div>
+    );
+  }
+
+  if (status === 'recusado' || status === 'cancelado') {
+    return (
+      <div style={{ background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 10, padding: 12, marginTop: 8 }}>
+        <div style={{ color: '#991b1b', fontWeight: 800, fontSize: 13 }}>Pagamento nao concluido</div>
+        <div style={{ color: '#991b1b', fontSize: 12, marginTop: 2 }}>Revise o pedido ou fale com a loja para tentar novamente.</div>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+function OrderCard({ order, styles: S, onDriveArrived, onOpenPayment }) {
+  const status = normalizarStatusPedido(order.status);
+  const statusColor = ORDER_STATUS_COLORS[status] || '#6b7280';
+  const statusLabel = ORDER_STATUS_LABELS[status] || order.status || 'Pendente';
 
   return (
     <div style={S.orderCard}>
@@ -74,11 +135,12 @@ function OrderCard({ order, styles: S, onDriveArrived }) {
           <div style={{ fontSize: 12, color: '#9ca3af' }}>{order.created_at ? new Date(order.created_at).toLocaleString('pt-BR') : '-'}</div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 4 }}>
-          <span style={{ ...S.statusBadge(order.status), background: statusColor + '20', color: statusColor, border: `1px solid ${statusColor}40` }}>{order.status || 'Pendente'}</span>
+          <span style={{ ...S.statusBadge(statusLabel), background: statusColor + '20', color: statusColor, border: `1px solid ${statusColor}40` }}>{statusLabel}</span>
           <div style={{ fontWeight: 800, fontSize: 16, color: '#1a1a2e' }}>{formatCurrency(order.total)}</div>
         </div>
       </div>
 
+      <OrderPaymentFollowup order={order} onOpenPayment={onOpenPayment} />
       <OrderPickupPassword password={order.palavra_chave_retirada} />
       <OrderDriveStatus order={order} onDriveArrived={onDriveArrived} />
       <OrderItems order={order} />
@@ -96,6 +158,7 @@ export default function EcommerceOrdersPage({
   styles: S,
   onContinueShopping,
   onDriveArrived,
+  onOpenPayment,
   onReload,
 }) {
   const orderList = Array.isArray(orders) ? orders : [];
@@ -121,7 +184,7 @@ export default function EcommerceOrdersPage({
       ) : (
         <div style={{ display: 'grid', gap: 14 }}>
           {orderList.map((order) => (
-            <OrderCard key={order.pedido_id} order={order} styles={S} onDriveArrived={onDriveArrived} />
+            <OrderCard key={order.pedido_id} order={order} styles={S} onDriveArrived={onDriveArrived} onOpenPayment={onOpenPayment} />
           ))}
         </div>
       )}

@@ -9,7 +9,8 @@ assert.deepEqual(
   {
     status: 'success',
     level: 'success',
-    message: 'Pagamento aprovado. Seu pedido sera atualizado automaticamente.',
+    title: 'Pagamento aprovado',
+    message: 'Recebemos a confirmacao do Mercado Pago. A loja ja recebeu seu pedido e a lista abaixo sera atualizada automaticamente.',
     pedidoId: 'PED-123',
   },
   'retorno aprovado deve virar mensagem positiva com pedido',
@@ -19,11 +20,24 @@ assert.deepEqual(
   readMercadoPagoPaymentReturn('?payment_status=pending&pedido_id=PED-123'),
   {
     status: 'pending',
-    level: 'success',
-    message: 'Pagamento em analise. Atualize seus pedidos em instantes para acompanhar.',
+    level: 'warning',
+    title: 'Pagamento em analise',
+    message: 'O Mercado Pago ainda esta confirmando o pagamento. Atualize seus pedidos em alguns instantes para acompanhar.',
     pedidoId: 'PED-123',
   },
   'retorno pendente deve orientar acompanhamento do pedido',
+);
+
+assert.deepEqual(
+  readMercadoPagoPaymentReturn('?payment_status=approved&pedido_id=PED-123'),
+  {
+    status: 'success',
+    level: 'success',
+    title: 'Pagamento aprovado',
+    message: 'Recebemos a confirmacao do Mercado Pago. A loja ja recebeu seu pedido e a lista abaixo sera atualizada automaticamente.',
+    pedidoId: 'PED-123',
+  },
+  'retorno approved do Mercado Pago deve ser tratado como success',
 );
 
 assert.equal(

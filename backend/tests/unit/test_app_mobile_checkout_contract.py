@@ -30,3 +30,17 @@ def test_orders_screen_can_reopen_pending_payment_link():
     assert "Linking.openURL(item.payment_url)" in source
     assert "Pagar agora" in source
     assert "item.status === \"pendente\"" in source
+
+
+def test_checkout_success_screen_does_not_tell_online_customer_to_pay_on_delivery():
+    source = _read_mobile_source("app-mobile/src/screens/shop/CheckoutSucessoScreen.tsx")
+
+    assert "Pague ao receber ou conforme combinado" not in source
+    assert "Acompanhe o status em Meus Pedidos" in source
+    assert "Compartilhar pedido" in source
+
+
+def test_app_order_tracking_accepts_app_channel_sales():
+    source = _read_mobile_source("backend/app/routes/app_mobile_routes.py")
+
+    assert 'Venda.canal.in_(["ecommerce", "app", "aplicativo"])' in source

@@ -2084,7 +2084,7 @@ def rastreio_entrega(
         db.query(Venda)
         .filter(
             Venda.tenant_id == tenant_id,
-            Venda.canal.in_(["ecommerce", "aplicativo"]),
+            Venda.canal.in_(["ecommerce", "app", "aplicativo"]),
             Venda.observacoes.contains(pedido_id),
         )
         .first()
