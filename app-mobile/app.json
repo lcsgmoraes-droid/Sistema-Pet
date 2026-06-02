@@ -2,6 +2,7 @@
   "expo": {
     "name": "CorePet",
     "slug": "petshop-app",
+    "scheme": "corepet",
     "version": "1.0.0",
     "orientation": "portrait",
     "updates": {

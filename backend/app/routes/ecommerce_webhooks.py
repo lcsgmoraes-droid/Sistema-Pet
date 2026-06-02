@@ -445,8 +445,10 @@ def _integrar_venda_ao_motor(db, pedido: Pedido, webhook_payload: dict | None = 
         metadata.get("canal")
         or nested_metadata.get("canal")
         or payload_data.get("canal")
+        or getattr(pedido, "origem", None)
         or "ecommerce"
     )
+    origem_label = "app" if canal_origem == "app" else "e-commerce"
 
     entrega_mode = str(
         metadata.get("delivery_mode")
@@ -614,13 +616,13 @@ def _integrar_venda_ao_motor(db, pedido: Pedido, webhook_payload: dict | None = 
         ],
         "desconto_valor": 0,
         "desconto_percentual": 0,
-        "observacoes": f"Pedido e-commerce {pedido.pedido_id}",
+        "observacoes": f"Pedido {origem_label} {pedido.pedido_id}",
         "tem_entrega": tem_entrega,
         "taxa_entrega": 0,
         "percentual_taxa_loja": 100,
         "percentual_taxa_entregador": 0,
         "entregador_id": entregador_id,
-        "loja_origem": "ecommerce",
+        "loja_origem": canal_origem,
         "endereco_entrega": endereco_entrega,
         "distancia_km": None,
         "valor_por_km": None,
@@ -637,11 +639,17 @@ def _integrar_venda_ao_motor(db, pedido: Pedido, webhook_payload: dict | None = 
         if venda_row:
             venda_row.status = "finalizada"
             venda_row.data_finalizacao = datetime.utcnow()
-            if venda_row.tem_entrega and not venda_row.status_entrega:
-                venda_row.status_entrega = "pendente"
-            # Repassa dados de retirada do ecommerce para a venda no PDV
             venda_row.tipo_retirada = pedido.tipo_retirada
             venda_row.palavra_chave_retirada = pedido.palavra_chave_retirada
+            venda_row.canal = canal_origem
+            venda_row.loja_origem = canal_origem
+            online_retirada = (
+                not venda_row.tem_entrega
+                and venda_row.tipo_retirada in {"proprio", "terceiro", "app_loja"}
+                and canal_origem in {"app", "ecommerce"}
+            )
+            if (venda_row.tem_entrega or online_retirada) and not venda_row.status_entrega:
+                venda_row.status_entrega = "pendente"
 
             # ── Efeitos colaterais completos (espelha finalização do PDV) ───────
             _processar_pos_venda_ecommerce(

@@ -209,6 +209,7 @@ export default function PDV() {
     confirmarDriveEntregue,
     abrirConfirmacaoRetirada,
     confirmarRetirada,
+    marcarProntoRetirada,
     fecharDriveAlert,
   } = usePDVVendasRecentes();
 
@@ -546,6 +547,7 @@ export default function PDV() {
       confirmandoRetirada,
       abrirConfirmacaoRetirada,
       confirmarRetirada,
+      marcarProntoRetirada,
       setConfirmandoRetirada,
       painelOportunidadesAberto,
       setPainelOportunidadesAberto,

@@ -24,6 +24,7 @@ export default function PDVOverlays(props) {
     confirmandoRetirada,
     abrirConfirmacaoRetirada,
     confirmarRetirada,
+    marcarProntoRetirada,
     setConfirmandoRetirada,
     painelOportunidadesAberto,
     setPainelOportunidadesAberto,
@@ -116,6 +117,7 @@ export default function PDVOverlays(props) {
         confirmandoRetirada={confirmandoRetirada}
         abrirConfirmacaoRetirada={abrirConfirmacaoRetirada}
         confirmarRetirada={confirmarRetirada}
+        marcarProntoRetirada={marcarProntoRetirada}
         setConfirmandoRetirada={setConfirmandoRetirada}
       />
 

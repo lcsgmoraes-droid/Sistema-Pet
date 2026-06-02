@@ -85,6 +85,32 @@ function getCanalInfo(canal) {
   );
 }
 
+function isCanalOnline(canal) {
+  const canalNormalizado = normalizeBenefitChannel(canal);
+  return ["app", "aplicativo", "ecommerce"].includes(canalNormalizado);
+}
+
+function isRetiradaOnline(venda) {
+  return (
+    isCanalOnline(venda?.canal) &&
+    !venda?.tem_entrega &&
+    ["proprio", "terceiro", "app_loja"].includes(venda?.tipo_retirada)
+  );
+}
+
+function isRetiradaPendente(venda) {
+  return isRetiradaOnline(venda) && venda?.status_entrega === "pendente";
+}
+
+function canConfirmarRetirada(venda) {
+  return (
+    venda?.status_entrega !== "entregue" &&
+    (isRetiradaOnline(venda) ||
+      venda?.tipo_retirada === "terceiro" ||
+      Boolean(venda?.palavra_chave_retirada))
+  );
+}
+
 function formatarDataVenda(dataStr) {
   if (typeof dataStr === "string" && dataStr.includes("T")) {
     const [date, timeWithTz] = dataStr.split("T");
@@ -103,12 +129,39 @@ function formatarDataVenda(dataStr) {
 }
 
 function getEntregaStatusInfo(venda) {
+  if (isRetiradaOnline(venda)) {
+    if (venda.status_entrega === "pendente") {
+      return {
+        intent: "warning",
+        label: "Separar",
+        title: "Pedido online aguardando separacao",
+      };
+    }
+
+    if (venda.status_entrega === "pronto") {
+      return {
+        intent: "success",
+        label: "Pronto",
+        title: "Pedido pronto para retirada",
+      };
+    }
+  }
+
+  if (venda.status_entrega === "pendente" && venda.tem_entrega) {
+    return {
+      intent: "warning",
+      label: "Entrega",
+      title: "Entrega pendente",
+    };
+  }
+
   if (venda.status_entrega !== "entregue") {
     return null;
   }
 
   if (venda.tem_entrega) {
     return {
+      intent: "success",
       label: "Entregue",
       title: "Pedido entregue ao cliente",
     };
@@ -116,12 +169,14 @@ function getEntregaStatusInfo(venda) {
 
   if (venda.retirado_por) {
     return {
+      intent: "success",
       label: venda.retirado_por,
       title: `Retirado por: ${venda.retirado_por}`,
     };
   }
 
   return {
+    intent: "success",
     label: "Retirado",
     title: "Pedido retirado na loja",
   };
@@ -143,8 +198,11 @@ export default function PDVVendasRecentesSidebar({
   confirmandoRetirada,
   abrirConfirmacaoRetirada,
   confirmarRetirada,
+  marcarProntoRetirada,
   setConfirmandoRetirada,
 }) {
+  const pendenciasSeparacao = vendasRecentes.filter(isRetiradaPendente).length;
+
   return (
     <>
       {painelVendasAberto && (
@@ -226,6 +284,15 @@ export default function PDVVendasRecentesSidebar({
                 className="w-full px-3 py-2 text-xs border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
+
+            {pendenciasSeparacao > 0 && (
+              <div className="mx-2 mb-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-2 py-2 text-[11px] font-semibold leading-snug text-amber-800">
+                <AlertCircle className="mt-0.5 h-3.5 w-3.5 flex-shrink-0" />
+                <span>
+                  {pendenciasSeparacao} pedido(s) online aguardando separacao.
+                </span>
+              </div>
+            )}
           </div>
 
           <div className="flex-1 overflow-y-auto p-2 space-y-2">
@@ -240,6 +307,13 @@ export default function PDVVendasRecentesSidebar({
                 const CanalIcon = canalInfo.Icon;
                 const entregaStatus = getEntregaStatusInfo(venda);
                 const customerCode = getCustomerIdentityCode(venda);
+                const retiradaOnline = isRetiradaOnline(venda);
+                const podeMarcarPronto =
+                  retiradaOnline && venda.status_entrega === "pendente";
+                const podeConfirmarRetirada =
+                  canConfirmarRetirada(venda) &&
+                  (!retiradaOnline || venda.status_entrega === "pronto") &&
+                  confirmandoRetirada.vendaId !== venda.id;
 
                 return (
                   <div
@@ -268,12 +342,24 @@ export default function PDVVendasRecentesSidebar({
                         )}
                       </span>
                       {venda.palavra_chave_retirada && (
-                        <span
-                          className="text-[10px] bg-orange-100 text-orange-700 font-semibold px-1.5 py-0.5 rounded-full border border-orange-200"
-                          title="Senha de retirada"
+                        <button
+                          onClick={(e) => {
+                            if (canConfirmarRetirada(venda)) {
+                              abrirConfirmacaoRetirada(e, venda.id);
+                              return;
+                            }
+                            e.stopPropagation();
+                          }}
+                          className="rounded-full border border-orange-200 bg-orange-100 px-1.5 py-0.5 text-[10px] font-semibold text-orange-700 transition-colors hover:bg-orange-200"
+                          title={
+                            canConfirmarRetirada(venda)
+                              ? "Informar quem retirou"
+                              : "Senha de retirada"
+                          }
+                          type="button"
                         >
                           {"\uD83D\uDD11"} {venda.palavra_chave_retirada}
-                        </span>
+                        </button>
                       )}
                     </div>
 
@@ -331,26 +417,36 @@ export default function PDVVendasRecentesSidebar({
                       <div className="text-[10px] text-gray-500">
                         {formatarDataVenda(venda.data_venda)}
                       </div>
-                      {venda.tipo_retirada === "terceiro" &&
-                        venda.status_entrega !== "entregue" &&
-                        confirmandoRetirada.vendaId !== venda.id && (
+                      <div className="flex flex-wrap justify-end gap-1">
+                        {podeMarcarPronto && (
                           <button
-                            onClick={(e) => abrirConfirmacaoRetirada(e, venda.id)}
-                            className="text-[10px] bg-white hover:bg-green-50 text-green-700 font-semibold px-2 py-0.5 rounded border border-green-600 transition-colors"
+                            onClick={(e) => marcarProntoRetirada(e, venda.id)}
+                            className="rounded border border-amber-500 bg-white px-2 py-0.5 text-[10px] font-semibold text-amber-700 transition-colors hover:bg-amber-50"
+                            title="Marcar pedido como pronto para retirada"
                             type="button"
                           >
-                            Confirmar retirada
+                            Pronto
                           </button>
                         )}
-                      {entregaStatus && (
-                        <StatusBadge
-                          intent="success"
-                          size="xs"
-                          title={entregaStatus.title}
-                        >
-                          {entregaStatus.label}
-                        </StatusBadge>
-                      )}
+                        {podeConfirmarRetirada && (
+                          <button
+                            onClick={(e) => abrirConfirmacaoRetirada(e, venda.id)}
+                            className="rounded border border-green-600 bg-white px-2 py-0.5 text-[10px] font-semibold text-green-700 transition-colors hover:bg-green-50"
+                            type="button"
+                          >
+                            Retirada
+                          </button>
+                        )}
+                        {entregaStatus && (
+                          <StatusBadge
+                            intent={entregaStatus.intent || "success"}
+                            size="xs"
+                            title={entregaStatus.title}
+                          >
+                            {entregaStatus.label}
+                          </StatusBadge>
+                        )}
+                      </div>
                     </div>
 
                     {confirmandoRetirada.vendaId === venda.id && (

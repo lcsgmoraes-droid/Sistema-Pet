@@ -873,6 +873,24 @@ async def marcar_venda_entregue(
     return {"id": venda_id, "status_entrega": "entregue", "data_entrega": venda.data_entrega.isoformat(), "retirado_por": venda.retirado_por}
 
 
+@router.post('/{venda_id}/marcar-pronto-retirada')
+async def marcar_venda_pronta_retirada(
+    venda_id: int,
+    db: Session = Depends(get_session),
+    user_and_tenant = Depends(get_current_user_and_tenant)
+):
+    """Marca pedido de retirada/app/e-commerce como separado e pronto para o cliente."""
+    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    venda = db.query(Venda).filter(Venda.id == venda_id, Venda.tenant_id == tenant_id).first()
+    if not venda:
+        raise HTTPException(status_code=404, detail="Venda nao encontrada")
+    if venda.status_entrega == "entregue":
+        raise HTTPException(status_code=400, detail="Venda ja foi entregue/retirada")
+    venda.status_entrega = "pronto"
+    db.commit()
+    return {"id": venda_id, "status_entrega": "pronto"}
+
+
 @router.post('/{venda_id}/finalizar')
 @idempotent()  # 🔒 IDEMPOTÊNCIA: evita finalização duplicada
 async def finalizar_venda(

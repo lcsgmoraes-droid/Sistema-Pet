@@ -48,6 +48,7 @@ class EcommerceRegisterRequest(BaseModel):
     password: str = Field(min_length=8)
     nome: str | None = None
     telefone: str = Field(min_length=8, max_length=20, description="Telefone obrigatorio")
+    canal: str | None = None
     accepted_terms: bool = False
     accepted_privacy: bool = False
     terms_version: str | None = None
@@ -238,14 +239,15 @@ def _issue_email_verification_token(user: User) -> str:
     return raw_token
 
 
-def _build_email_verification_link(user_email: str, raw_token: str) -> str:
+def _build_email_verification_link(user_email: str, raw_token: str, canal: str | None = None) -> str:
     base_url = (os.getenv("FRONTEND_URL") or os.getenv("ECOMMERCE_BASE_URL") or "https://corepet.com.br").rstrip("/")
-    return f"{base_url}/verificar-email?email={quote(user_email)}&token={quote(raw_token)}"
+    canal_query = f"&canal={quote(canal)}" if canal else ""
+    return f"{base_url}/verificar-email?email={quote(user_email)}&token={quote(raw_token)}{canal_query}"
 
 
-def _send_email_verification(user: User) -> bool:
+def _send_email_verification(user: User, canal: str | None = None) -> bool:
     raw_token = _issue_email_verification_token(user)
-    verification_link = _build_email_verification_link(user.email, raw_token)
+    verification_link = _build_email_verification_link(user.email, raw_token, canal)
     saudacao = f", {user.nome}" if getattr(user, "nome", None) else ""
     subject = "Confirme seu e-mail - CorePet"
     html_body = f"""
@@ -948,6 +950,8 @@ def _serialize_profile(user: User, cliente: Cliente | None) -> dict:
 def registrar_cliente(payload: EcommerceRegisterRequest, request: Request, db: Session = Depends(get_session)):
     tenant_id = _extract_tenant_id_from_request(request)
     email = payload.email.strip().lower()
+    canal_raw = (payload.canal or request.headers.get("X-Client-Channel") or "").strip().lower()
+    canal_registro = "app" if canal_raw in {"app", "mobile", "aplicativo"} else "ecommerce"
 
     if not payload.accepted_terms or not payload.accepted_privacy:
         raise HTTPException(
@@ -980,7 +984,7 @@ def registrar_cliente(payload: EcommerceRegisterRequest, request: Request, db: S
     _mark_user_consent(user, request, payload.terms_version, payload.privacy_version)
     db.add(user)
     if EMAIL_VERIFICATION_REQUIRED:
-        enviado = _send_email_verification(user)
+        enviado = _send_email_verification(user, canal_registro)
         if not enviado:
             db.rollback()
             raise HTTPException(
@@ -997,7 +1001,7 @@ def registrar_cliente(payload: EcommerceRegisterRequest, request: Request, db: S
         cliente.cpf = cpf_normalizado
     cliente.telefone = telefone
     _ensure_active_store_access(db, user, str(tenant_id))
-    register_account_created(db, user, request, "ecommerce")
+    register_account_created(db, user, request, canal_registro)
     db.commit()
     db.refresh(cliente)
 
@@ -1013,7 +1017,7 @@ def registrar_cliente(payload: EcommerceRegisterRequest, request: Request, db: S
             event_depth=0,
             payload={
                 "customer_id": cliente.id,
-                "canal": "app",
+                "canal": canal_registro,
                 "email": user.email,
             },
         )
