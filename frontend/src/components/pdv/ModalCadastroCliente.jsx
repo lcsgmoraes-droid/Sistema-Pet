@@ -1,6 +1,6 @@
 import { CheckCircle, X } from "lucide-react";
 import { useState } from "react";
-import api from "../../api";
+import { criarCliente } from "../../api/clientes";
 
 function validarCpf(cpf) {
   const digits = String(cpf || "").replace(/\D/g, "");
@@ -59,6 +59,24 @@ function inferirDadosIniciais(valorBuscaInicial) {
   return base;
 }
 
+function extrairMensagemErroCadastroCliente(error) {
+  const detail = error?.response?.data?.detail;
+  if (typeof detail === "string" && detail.trim()) {
+    return detail;
+  }
+
+  if (Array.isArray(detail) && detail.length > 0) {
+    const mensagens = detail
+      .map((item) => item?.msg || item?.message)
+      .filter(Boolean);
+    if (mensagens.length > 0) {
+      return mensagens.join("; ");
+    }
+  }
+
+  return "Erro ao cadastrar cliente";
+}
+
 export default function ModalCadastroCliente({ onClose, onClienteCriado, valorBuscaInicial }) {
   const [formData, setFormData] = useState({
     ...inferirDadosIniciais(valorBuscaInicial),
@@ -78,17 +96,18 @@ export default function ModalCadastroCliente({ onClose, onClienteCriado, valorBu
     setErro("");
 
     try {
-      const response = await api.post("/clientes", {
+      const clienteCriado = await criarCliente({
         ...formData,
         data_nascimento: formData.data_nascimento || null,
         tipo_cadastro: "cliente",
         tipo_pessoa: "PF",
       });
 
-      onClienteCriado(response.data);
+      onClienteCriado(clienteCriado);
     } catch (error) {
       console.error("Erro ao cadastrar cliente rapido:", error);
-      setErro("Erro ao cadastrar cliente");
+      const mensagemErro = extrairMensagemErroCadastroCliente(error);
+      setErro(mensagemErro);
     } finally {
       setLoading(false);
     }
