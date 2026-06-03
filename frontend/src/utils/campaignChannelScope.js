@@ -1,3 +1,5 @@
+import { benefitChannelFromSalesChannel } from './salesChannel.js';
+
 export const BENEFIT_CHANNEL_OPTIONS = [
   {
     value: 'loja_fisica',
@@ -37,32 +39,8 @@ export const PURCHASE_BENEFIT_CAMPAIGN_TYPES = new Set([
 const ALL_CHANNELS = BENEFIT_CHANNEL_OPTIONS.map((option) => option.value);
 const LEGACY_BLOCKED_SERVICE_CHANNELS = new Set(['banho_tosa', 'veterinario']);
 
-const CHANNEL_ALIASES = {
-  pdv: 'loja_fisica',
-  loja: 'loja_fisica',
-  loja_fisica: 'loja_fisica',
-  'loja-fisica': 'loja_fisica',
-  balcao: 'loja_fisica',
-  banho_tosa: 'banho_tosa',
-  'banho-e-tosa': 'banho_tosa',
-  'banho e tosa': 'banho_tosa',
-  bt: 'banho_tosa',
-  veterinario: 'veterinario',
-  veterinaria: 'veterinario',
-  vet: 'veterinario',
-  clinica: 'veterinario',
-  app: 'app',
-  aplicativo: 'app',
-  mobile: 'app',
-  ecommerce: 'ecommerce',
-  'e-commerce': 'ecommerce',
-  site: 'ecommerce',
-  web: 'ecommerce',
-};
-
 export function normalizeBenefitChannel(channel) {
-  const value = String(channel || 'loja_fisica').trim().toLowerCase().replace(/\s+/g, '_');
-  return CHANNEL_ALIASES[value] || value || 'loja_fisica';
+  return benefitChannelFromSalesChannel(channel);
 }
 function extractBenefitScope(params = {}) {
   if (Object.prototype.hasOwnProperty.call(params, 'benefit_channels')) {

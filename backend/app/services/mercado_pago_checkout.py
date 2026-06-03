@@ -7,6 +7,8 @@ from urllib.parse import urlencode
 import requests
 from fastapi import HTTPException, status
 
+from app.services.sales_channel import normalize_online_sales_channel
+
 
 TRUE_ENV_VALUES = {"1", "true", "yes", "on"}
 MERCADO_PAGO_API_BASE_URL = "https://api.mercadopago.com"
@@ -49,18 +51,7 @@ def is_mercado_pago_provider(provider: str | None = None) -> bool:
 
 
 def normalizar_canal_venda_online(canal: str | None) -> str:
-    value = str(canal or "").strip().lower().replace("-", "_")
-    aliases = {
-        "web": "ecommerce",
-        "site": "ecommerce",
-        "loja_virtual": "ecommerce",
-        "e_commerce": "ecommerce",
-        "ecommerce": "ecommerce",
-        "app": "app",
-        "aplicativo": "app",
-        "mobile": "app",
-    }
-    return aliases.get(value, value or "ecommerce")
+    return normalize_online_sales_channel(canal)
 
 
 def _delivery_mode(endereco_entrega: str | None, tipo_retirada: str | None) -> str:

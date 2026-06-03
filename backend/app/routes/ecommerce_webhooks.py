@@ -19,11 +19,11 @@ from app.services.ecommerce_payment_config import (
 from app.services.mercado_pago_checkout import (
     extract_notification_payment_id,
     fetch_payment,
-    normalizar_canal_venda_online as _normalizar_canal_venda_online,
     normalize_payment_payload,
     validate_webhook_signature,
     validate_webhook_signature_from_env,
 )
+from app.services.sales_channel import benefit_channel_from_sales_channel, normalize_sales_channel
 from app.tenancy.context import set_current_tenant
 
 
@@ -34,6 +34,10 @@ PAYMENT_METHODS_ONLINE_ACEITOS = {
     "credit_card": "cartao_credito",
     "debit_card": "cartao_debito",
 }
+
+
+def _normalizar_canal_venda_online(canal: str | None) -> str:
+    return normalize_sales_channel(canal)
 
 TRUE_ENV_VALUES = {"1", "true", "yes", "on"}
 PAGARME_SIGNATURE_HEADERS = (
@@ -441,7 +445,7 @@ def _integrar_venda_ao_motor(db, pedido: Pedido, webhook_payload: dict | None = 
     metadata = (payload_data.get("metadata") or {}) if isinstance(payload_data, dict) else {}
     nested_metadata = ((payload_data.get("data") or {}).get("metadata") or {}) if isinstance(payload_data, dict) else {}
 
-    canal_origem = _normalizar_canal_venda_online(
+    canal_origem = normalize_sales_channel(
         metadata.get("canal")
         or nested_metadata.get("canal")
         or payload_data.get("canal")
@@ -664,7 +668,7 @@ def _integrar_venda_ao_motor(db, pedido: Pedido, webhook_payload: dict | None = 
         if venda_id and cliente_id:
             try:
                 from app.campaigns.models import CampaignEventQueue, EventOriginEnum
-                canal_campanha = "app" if canal_origem == "app" else "ecommerce"
+                canal_campanha = benefit_channel_from_sales_channel(canal_origem)
                 evento_campanha = CampaignEventQueue(
                     tenant_id=pedido.tenant_id,
                     event_type="purchase_completed",

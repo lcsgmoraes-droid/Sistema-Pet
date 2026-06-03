@@ -19,6 +19,7 @@ from app.config import JWT_SECRET_KEY
 from app.db import get_session
 from app.models import Cliente, Role, Tenant, User, UserTenant
 from app.services.email_service import send_email
+from app.services.sales_channel import normalize_online_sales_channel
 from app.session_manager import revoke_all_sessions
 from app.services.auth_security import (
     is_user_locked,
@@ -298,9 +299,10 @@ def _tenant_status_is_active(status_value: object) -> bool:
 
 
 def _resolve_password_recovery_channel(request: Request, payload: EcommerceForgotPasswordRequest) -> str:
-    canal = (payload.canal or request.headers.get("X-Client-Channel") or "").strip().lower()
-    if canal in {"app", "mobile", "site", "web", "loja"}:
-        return "app" if canal in {"app", "mobile"} else "site"
+    raw_canal = payload.canal or request.headers.get("X-Client-Channel") or ""
+    if str(raw_canal or "").strip():
+        canal = normalize_online_sales_channel(raw_canal)
+        return "app" if canal == "app" else "site"
 
     origin = (request.headers.get("origin") or "").lower()
     referer = (request.headers.get("referer") or "").lower()
@@ -950,8 +952,7 @@ def _serialize_profile(user: User, cliente: Cliente | None) -> dict:
 def registrar_cliente(payload: EcommerceRegisterRequest, request: Request, db: Session = Depends(get_session)):
     tenant_id = _extract_tenant_id_from_request(request)
     email = payload.email.strip().lower()
-    canal_raw = (payload.canal or request.headers.get("X-Client-Channel") or "").strip().lower()
-    canal_registro = "app" if canal_raw in {"app", "mobile", "aplicativo"} else "ecommerce"
+    canal_registro = normalize_online_sales_channel(payload.canal or request.headers.get("X-Client-Channel") or "")
 
     if not payload.accepted_terms or not payload.accepted_privacy:
         raise HTTPException(

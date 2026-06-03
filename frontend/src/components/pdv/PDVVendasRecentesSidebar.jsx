@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { formatMoneyBRL } from "../../utils/formatters";
-import { normalizeBenefitChannel } from "../../utils/campaignChannelScope";
+import { getSalesChannelInfo, isOnlineSalesChannel } from "../../utils/salesChannel";
 import CopyableCode from "../ui/CopyableCode";
 import CustomerIdentity, { getCustomerIdentityCode } from "../ui/CustomerIdentity";
 import IconActionButton from "../ui/IconActionButton";
@@ -18,77 +18,17 @@ import SaleReference from "../ui/SaleReference";
 import StatusBadge from "../ui/StatusBadge";
 
 function getCanalInfo(canal) {
-  const canalNormalizado = normalizeBenefitChannel(canal);
-  return (
-    {
-      ecommerce: {
-        cor: "border-l-purple-500",
-        bg: "bg-purple-50",
-        border: "border-purple-200 hover:border-purple-300",
-        icon: "\uD83D\uDED2",
-        label: "Ecommerce",
-      },
-      aplicativo: {
-        cor: "border-l-green-500",
-        bg: "bg-green-50",
-        border: "border-green-200 hover:border-green-300",
-        icon: "\uD83D\uDCF1",
-        label: "App",
-      },
-      app: {
-        cor: "border-l-green-500",
-        bg: "bg-green-50",
-        border: "border-green-200 hover:border-green-300",
-        icon: "\uD83D\uDCF1",
-        label: "App",
-      },
-      app_funcionario: {
-        cor: "border-l-cyan-500",
-        bg: "bg-cyan-50",
-        border: "border-cyan-200 hover:border-cyan-300",
-        Icon: Smartphone,
-        iconColor: "text-cyan-700",
-        label: "App Funcionario",
-        title: "Venda pelo app do funcionario",
-      },
-      loja_fisica: {
-        cor: "border-l-blue-500",
-        bg: "bg-blue-50",
-        border: "border-blue-200 hover:border-blue-300",
-        icon: "\uD83C\uDFEA",
-        label: "PDV",
-      },
-      banho_tosa: {
-        cor: "border-l-pink-500",
-        bg: "bg-pink-50",
-        border: "border-pink-200 hover:border-pink-300",
-        Icon: Scissors,
-        iconColor: "text-pink-700",
-        label: "Banho & Tosa",
-        title: "Venda gerada pelo modulo Banho & Tosa",
-      },
-      veterinario: {
-        cor: "border-l-amber-500",
-        bg: "bg-yellow-50",
-        border: "border-amber-200 hover:border-amber-300",
-        Icon: Stethoscope,
-        iconColor: "text-amber-700",
-        label: "Veterinario",
-        title: "Venda gerada pelo modulo Veterinario",
-      },
-    }[canalNormalizado] || {
-      cor: "border-l-gray-400",
-      bg: "bg-gray-50",
-      border: "border-gray-200 hover:border-blue-300",
-      icon: "\uD83C\uDFEA",
-      label: "PDV",
-    }
-  );
+  const info = getSalesChannelInfo(canal);
+  const iconByKey = {
+    scissors: Scissors,
+    smartphone: Smartphone,
+    stethoscope: Stethoscope,
+  };
+  return { ...info, Icon: iconByKey[info.iconKey] };
 }
 
 function isCanalOnline(canal) {
-  const canalNormalizado = normalizeBenefitChannel(canal);
-  return ["app", "aplicativo", "ecommerce"].includes(canalNormalizado);
+  return isOnlineSalesChannel(canal);
 }
 
 function isRetiradaOnlineSemEntrega(venda) {

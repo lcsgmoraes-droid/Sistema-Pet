@@ -15,6 +15,7 @@ from app.services.validade_campanha_service import (
     mapear_ofertas_validade_por_produto,
     resolver_preco_publico_produto,
 )
+from app.services.sales_channel import normalize_online_sales_channel
 from app.tenancy.context import set_current_tenant
 
 
@@ -53,10 +54,7 @@ def _activate_cart_tenant_context(identity: EcommerceIdentity) -> str:
 
 
 def _normalize_sales_channel(raw_channel: str | None) -> str:
-    value = str(raw_channel or "ecommerce").strip().lower()
-    if value in {"app", "app_movel", "mobile", "aplicativo"}:
-        return "app"
-    return "ecommerce"
+    return normalize_online_sales_channel(raw_channel)
 
 
 def _produto_disponivel_no_canal(produto: Produto, canal: str) -> bool:
