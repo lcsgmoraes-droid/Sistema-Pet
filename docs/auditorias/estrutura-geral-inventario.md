@@ -126,3 +126,24 @@ Foto da varredura final:
   qualquer nova regra em hotspot deve entrar em fatia pequena, com teste focado
   e seguindo a Definition of Done modular.
 
+## Atualizacao continua - 2026-06-03
+
+Fatia executada na trilha Produtos/listagem:
+
+- `backend/app/produtos_routes.py` extraiu helpers de listagem, promocao de
+  preco para exibicao, reservas multitenant, area/fornecedor e metricas de
+  valorizacao para `backend/app/produtos/listagem.py`.
+- O router principal caiu de 6275 para 6003 linhas, preservando os nomes
+  importados usados pelas rotas e testes antigos.
+- Testes focados adicionados em
+  `backend/tests/unit/test_produtos_listagem_helpers.py` e mantidos em
+  `test_produtos_listagem_kit_virtual.py`, `test_produtos_validade_listagem.py`
+  e `test_produtos_search_helpers.py`.
+
+Proxima fatia recomendada:
+
+1. Continuar em Produtos, mas extrair apenas construcao de queries/filtros de
+   `listar_produtos` e `listar_produtos_vendaveis`.
+2. Manter endpoints, payloads, permissoes, tenant e paginacao iguais.
+3. Nao misturar com estoque, PDV, fiscal, cadastro em lote ou regras de preco.
+
