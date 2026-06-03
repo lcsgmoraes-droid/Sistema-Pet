@@ -25,7 +25,7 @@ function inferirDadosIniciais(valorBuscaInicial) {
   const base = {
     nome: "",
     data_nascimento: "",
-    telefone: "",
+    celular: "",
     cpf: "",
     email: "",
   };
@@ -49,7 +49,7 @@ function inferirDadosIniciais(valorBuscaInicial) {
   }
 
   if (digitos.length >= 10) {
-    return { ...base, telefone: texto };
+    return { ...base, celular: texto };
   }
 
   if (digitos.length > 0) {
@@ -87,8 +87,8 @@ export default function ModalCadastroCliente({ onClose, onClienteCriado, valorBu
   const handleSubmit = async (event) => {
     event.preventDefault();
 
-    if (!formData.nome || !formData.telefone) {
-      setErro("Nome e telefone sao obrigatorios");
+    if (!formData.nome || !formData.celular) {
+      setErro("Nome e celular sao obrigatorios");
       return;
     }
 
@@ -97,7 +97,10 @@ export default function ModalCadastroCliente({ onClose, onClienteCriado, valorBu
 
     try {
       const clienteCriado = await criarCliente({
-        ...formData,
+        nome: formData.nome,
+        celular: formData.celular,
+        cpf: formData.cpf,
+        email: formData.email,
         data_nascimento: formData.data_nascimento || null,
         tipo_cadastro: "cliente",
         tipo_pessoa: "PF",
@@ -151,13 +154,13 @@ export default function ModalCadastroCliente({ onClose, onClienteCriado, valorBu
 
           <div>
             <label className="mb-2 block text-sm font-medium text-gray-700">
-              Telefone *
+              Celular *
             </label>
             <input
               type="tel"
-              value={formData.telefone}
+              value={formData.celular}
               onChange={(event) =>
-                setFormData({ ...formData, telefone: event.target.value })
+                setFormData({ ...formData, celular: event.target.value })
               }
               placeholder="(00) 00000-0000"
               className="w-full rounded-lg border border-gray-300 px-4 py-2 focus:border-transparent focus:ring-2 focus:ring-blue-500"

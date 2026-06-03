@@ -22,3 +22,12 @@ def test_modal_cadastro_cliente_pdv_exibe_detalhe_do_erro_da_api():
 
     assert "error?.response?.data?.detail" in source
     assert "setErro(mensagemErro" in source
+
+
+def test_modal_cadastro_cliente_pdv_salva_numero_como_celular():
+    source = _read("frontend/src/components/pdv/ModalCadastroCliente.jsx")
+
+    assert 'celular: ""' in source
+    assert "formData.celular" in source
+    assert "celular: formData.celular" in source
+    assert "Nome e celular sao obrigatorios" in source
