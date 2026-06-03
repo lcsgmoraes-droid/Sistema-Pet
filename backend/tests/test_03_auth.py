@@ -6,6 +6,21 @@ import os
 from datetime import datetime
 
 
+def _login_and_select_tenant(client, email: str, password: str, tenant_id: str):
+    login_response = client.post(
+        "/auth/login-multitenant",
+        json={"email": email, "password": password}
+    )
+    assert login_response.status_code == 200
+    login_token = login_response.json()["access_token"]
+
+    return client.post(
+        "/auth/select-tenant",
+        json={"tenant_id": str(tenant_id)},
+        headers={"Authorization": f"Bearer {login_token}"}
+    )
+
+
 def test_login_returns_jwt_token(client, tenant_factory, user_factory):
     """
     Testa que login com credenciais válidas retorna JWT.
@@ -20,7 +35,7 @@ def test_login_returns_jwt_token(client, tenant_factory, user_factory):
     )
     
     response = client.post(
-        "/api/v1/auth/login",
+        "/auth/login-multitenant",
         json={"email": "login@test.com", "password": password}
     )
     
@@ -43,9 +58,11 @@ def test_jwt_contains_tenant_id(client, tenant_factory, user_factory):
         password=password
     )
     
-    response = client.post(
-        "/api/v1/auth/login",
-        json={"email": "jwt@test.com", "password": password}
+    response = _login_and_select_tenant(
+        client,
+        "jwt@test.com",
+        password,
+        tenant.id,
     )
     
     assert response.status_code == 200
@@ -56,7 +73,7 @@ def test_jwt_contains_tenant_id(client, tenant_factory, user_factory):
     payload = jwt.decode(token, secret_key, algorithms=["HS256"])
     
     assert "tenant_id" in payload
-    assert payload["tenant_id"] == tenant.id
+    assert payload["tenant_id"] == str(tenant.id)
     assert payload["sub"] == str(user.id)
 
 
@@ -73,7 +90,7 @@ def test_login_with_invalid_credentials_fails(client, tenant_factory, user_facto
     )
     
     response = client.post(
-        "/api/v1/auth/login",
+        "/auth/login-multitenant",
         json={"email": "valid@test.com", "password": "WrongPassword"}
     )
     
@@ -95,6 +112,6 @@ def test_auth_headers_contain_valid_jwt(auth_headers):
     
     payload = jwt.decode(token, secret_key, algorithms=["HS256"])
     
-    assert payload["tenant_id"] == tenant.id
+    assert payload["tenant_id"] == str(tenant.id)
     assert payload["sub"] == str(user.id)
     assert payload["exp"] > datetime.utcnow().timestamp()

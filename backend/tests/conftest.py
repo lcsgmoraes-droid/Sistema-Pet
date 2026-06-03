@@ -1,13 +1,18 @@
 """
-Minimal conftest for unit tests.
+Minimal conftest for unit and legacy integration-style tests.
 
-For integration tests, import from conftest_infra.py manually.
+The legacy root tests import ORM models during collection, so test defaults must
+exist before those imports happen.
 """
-import pytest
 import sys
 import os
+
+import pytest
 from sqlalchemy import create_engine
+from sqlalchemy.dialects.postgresql import JSONB, UUID as PostgreSQLUUID
+from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import sessionmaker
+from sqlalchemy.pool import StaticPool
 
 # Ensure backend is in path
 backend_dir = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
@@ -16,18 +21,60 @@ if backend_dir not in sys.path:
 
 
 # Database URL for tests
-TEST_DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "postgresql://petshop_user:petshop_password_2026@localhost:5432/petshop_db"
-)
+DEFAULT_TEST_DATABASE_URL = "sqlite://"
+os.environ.setdefault("DATABASE_URL", DEFAULT_TEST_DATABASE_URL)
+os.environ.setdefault("ENVIRONMENT", "test")
+os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-min-32-chars-long-for-security")
+
+TEST_DATABASE_URL = os.environ["DATABASE_URL"]
+
+
+@compiles(PostgreSQLUUID, "sqlite")
+def _compile_postgresql_uuid_for_sqlite(_type, _compiler, **_kw):
+    """Allow legacy ORM tests to run without a local PostgreSQL service."""
+    return "CHAR(36)"
+
+
+@compiles(JSONB, "sqlite")
+def _compile_jsonb_for_sqlite(_type, _compiler, **_kw):
+    """Allow product metadata JSONB columns in lightweight SQLite tests."""
+    return "JSON"
+
+
+# Re-export legacy factory fixtures without replacing the canonical db_session.
+from tests.conftest_infra import auth_headers, tenant_factory, user_factory  # noqa: E402,F401
+
+
+def _is_sqlite_url(database_url: str) -> bool:
+    return database_url.startswith("sqlite")
+
+
+def _create_engine_kwargs(database_url: str) -> dict:
+    if _is_sqlite_url(database_url):
+        return {
+            "connect_args": {"check_same_thread": False},
+            "poolclass": StaticPool,
+        }
+    return {"pool_pre_ping": True}
+
+
+def _create_sqlite_schema(engine) -> None:
+    from app.db import Base
+    from app import caixa_models, models, produtos_models, vendas_models  # noqa: F401
+
+    Base.metadata.create_all(engine)
 
 
 @pytest.fixture(autouse=True)
 def clear_rate_limit_store():
-    """Limpa o rate limit store antes de cada teste."""
+    """Limpa stores globais antes e depois de cada teste."""
     from app.middlewares.rate_limit import rate_limit_store
+    from app.tenancy.context import clear_current_tenant
+
+    clear_current_tenant()
     rate_limit_store.clear()
     yield
+    clear_current_tenant()
     rate_limit_store.clear()
 
 
@@ -37,22 +84,61 @@ def dummy_fixture():
     return True
 
 
+@pytest.fixture
+def client(db_session):
+    """FastAPI test client wired to the isolated test session."""
+    from fastapi.testclient import TestClient
+
+    from app.db import get_session
+    from app.main import app
+
+    def override_get_session():
+        yield db_session
+
+    app.dependency_overrides[get_session] = override_get_session
+    try:
+        with TestClient(app) as test_client:
+            yield test_client
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.fixture
+def tenant_context():
+    """Set the current tenant context for ORM tenant-safe tests."""
+    from uuid import UUID
+
+    from app.tenancy.context import clear_current_tenant, set_current_tenant
+
+    def _set_tenant(tenant_id):
+        set_current_tenant(UUID(str(tenant_id)))
+
+    yield _set_tenant
+    clear_current_tenant()
+
+
 @pytest.fixture(scope="session")
 def db_engine():
     """Create database engine for tests."""
-    engine = create_engine(TEST_DATABASE_URL, pool_pre_ping=True)
+    engine = create_engine(TEST_DATABASE_URL, **_create_engine_kwargs(TEST_DATABASE_URL))
+    if _is_sqlite_url(TEST_DATABASE_URL):
+        _create_sqlite_schema(engine)
     yield engine
     engine.dispose()
 
 
 @pytest.fixture
 def db_session(db_engine):
-    """Provide a database session with automatic rollback."""
-    SessionLocal = sessionmaker(bind=db_engine)
+    """Provide a database session isolated by an outer transaction."""
+    connection = db_engine.connect()
+    transaction = connection.begin()
+    SessionLocal = sessionmaker(bind=connection)
     session = SessionLocal()
+
     try:
         yield session
-        session.rollback()
     finally:
         session.close()
+        transaction.rollback()
+        connection.close()
 

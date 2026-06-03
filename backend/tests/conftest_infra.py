@@ -4,9 +4,8 @@ Configuração de fixtures para testes do Sistema Pet Shop
 import os
 import sys
 import pytest
-from sqlalchemy import create_engine, event
-from sqlalchemy.orm import sessionmaker, Session
-from fastapi.testclient import TestClient
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
 from datetime import datetime, timedelta
 import jwt
 import uuid
@@ -16,16 +15,6 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 # OTIMIZAÇÃO: Imports tardios para evitar carregar OpenAI, Prophet, etc.
 # Importar apenas o necessário no momento do uso
-import hashlib
-
-def _hash_password_for_tests(password: str) -> str:
-    """
-    Hash simples para testes (SHA256).
-    NOTA: Em produção usar bcrypt. Aqui evitamos o bug passlib+bcrypt.
-    """
-    return hashlib.sha256(password.encode()).hexdigest()
-
-
 def _get_db_dependencies():
     """
     Lazy import para dependências de banco.
@@ -51,6 +40,12 @@ def _get_app():
     """Lazy import do app FastAPI apenas quando necessário."""
     from app.main import app
     return app
+
+
+def _set_tenant_context_for_tests(tenant_id: str) -> None:
+    from app.tenancy.context import set_current_tenant
+
+    set_current_tenant(uuid.UUID(str(tenant_id)))
 
 
 # Engine de teste usando DATABASE_URL do ambiente
@@ -129,6 +124,7 @@ def tenant_factory(db_session):
         
         # Buscar o tenant criado
         tenant = db_session.query(Tenant).filter_by(id=tenant_id).first()
+        _set_tenant_context_for_tests(tenant_id)
         return tenant
     
     return _create_tenant
@@ -137,9 +133,10 @@ def tenant_factory(db_session):
 @pytest.fixture(scope="function")
 def user_factory(db_session):
     """
-    Factory para criar usuários de teste via SQL direto.
+    Factory para criar usuários de teste com vínculo multitenant mínimo.
     """
-    from sqlalchemy import text
+    from app.auth import hash_password
+    from app.models import Role, UserTenant
     _, _, _, User = _get_db_dependencies()
     
     def _create_user(
@@ -150,26 +147,52 @@ def user_factory(db_session):
     ):
         user_name = nome or f"User Test {str(uuid.uuid4())[:8]}"
         user_email = email or f"user_{str(uuid.uuid4())[:8]}@test.com"
-        # Hash simples para testes (evita bug passlib+bcrypt)
-        hashed_pass = _hash_password_for_tests(password)
+        # Usa o mesmo hash do app para que fixtures autenticadas exercitem o fluxo real.
+        hashed_pass = hash_password(password)
+        _set_tenant_context_for_tests(tenant_id)
+        tenant_uuid = uuid.UUID(str(tenant_id))
         
-        # Inserir diretamente via SQL
-        db_session.execute(
-            text("""
-                INSERT INTO users (tenant_id, nome, email, hashed_password, is_active, is_admin, created_at, updated_at)
-                VALUES (:tenant_id, :nome, :email, :hashed_password, TRUE, FALSE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-            """),
-            {
-                "tenant_id": tenant_id,
-                "nome": user_name,
-                "email": user_email,
-                "hashed_password": hashed_pass
-            }
+        # Inserir pelo ORM para respeitar o mesmo binding de UUID do app.
+        user = User(
+            tenant_id=tenant_uuid,
+            nome=user_name,
+            email=user_email,
+            hashed_password=hashed_pass,
+            is_active=True,
+            is_admin=False,
+            email_verified=True,
+            failed_login_attempts=0,
         )
+        db_session.add(user)
         db_session.flush()
         
-        # Buscar o usuário criado
-        user = db_session.query(User).filter_by(email=user_email).first()
+        # Criar vinculo minimo para o fluxo de login multitenant.
+        role = (
+            db_session.query(Role)
+            .filter_by(tenant_id=tenant_uuid, name="Admin Test")
+            .first()
+        )
+        if role is None:
+            role = Role(tenant_id=tenant_uuid, name="Admin Test")
+            db_session.add(role)
+            db_session.flush()
+
+        user_tenant = (
+            db_session.query(UserTenant)
+            .filter_by(tenant_id=tenant_uuid, user_id=user.id, role_id=role.id)
+            .first()
+        )
+        if user_tenant is None:
+            db_session.add(
+                UserTenant(
+                    tenant_id=tenant_uuid,
+                    user_id=user.id,
+                    role_id=role.id,
+                    is_active=True,
+                )
+            )
+            db_session.flush()
+
         return user
     
     return _create_user
@@ -195,9 +218,9 @@ def auth_headers(user_factory, tenant_factory):
         
         payload = {
             "sub": str(user.id),
-            "tenant_id": tenant.id,
+            "tenant_id": str(tenant.id),
             "email": user.email,
-            "exp": datetime.utcnow() + timedelta(hours=1)
+            "exp": datetime.utcnow() + timedelta(days=7)
         }
         
         token = jwt.encode(payload, secret_key, algorithm="HS256")

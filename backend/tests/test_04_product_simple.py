@@ -4,9 +4,14 @@ Testes de criação de produtos simples
 # OTIMIZAÇÃO: Import direto para evitar carregar app.__init__.py (IA/Prophet)
 import sys
 import os
+from uuid import UUID
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from app.produtos_models import Produto
+
+
+def _tenant_uuid(tenant):
+    return UUID(str(tenant.id))
 
 
 def test_create_simple_product(db_session, tenant_factory, user_factory):
@@ -19,7 +24,7 @@ def test_create_simple_product(db_session, tenant_factory, user_factory):
     user = user_factory(tenant_id=tenant.id)
     
     produto = Produto(
-        tenant_id=tenant.id,
+        tenant_id=_tenant_uuid(tenant),
         user_id=user.id,
         codigo=f"PROD-{uuid.uuid4().hex[:8].upper()}",
         nome="Ração Premium 15kg",
@@ -33,7 +38,7 @@ def test_create_simple_product(db_session, tenant_factory, user_factory):
     db_session.refresh(produto)
     
     assert produto.id is not None
-    assert produto.tenant_id == tenant.id
+    assert produto.tenant_id == _tenant_uuid(tenant)
     assert produto.nome == "Ração Premium 15kg"
     assert produto.preco_venda == 120.00
     assert produto.estoque_atual == 50
@@ -49,7 +54,7 @@ def test_product_persistence(db_session, tenant_factory, user_factory):
     user = user_factory(tenant_id=tenant.id)
     
     produto = Produto(
-        tenant_id=tenant.id,
+        tenant_id=_tenant_uuid(tenant),
         user_id=user.id,
         codigo=f"PROD-{uuid.uuid4().hex[:8].upper()}",
         nome="Coleira Ajustável",
@@ -67,10 +72,10 @@ def test_product_persistence(db_session, tenant_factory, user_factory):
     
     assert produto_retrieved is not None
     assert produto_retrieved.nome == "Coleira Ajustável"
-    assert produto_retrieved.tenant_id == tenant.id
+    assert produto_retrieved.tenant_id == _tenant_uuid(tenant)
 
 
-def test_product_has_correct_tenant_id(db_session, tenant_factory, user_factory):
+def test_product_has_correct_tenant_id(db_session, tenant_factory, user_factory, tenant_context):
     """
     Testa que produto possui tenant_id correto.
     Protege: vínculo produto-tenant.
@@ -81,8 +86,9 @@ def test_product_has_correct_tenant_id(db_session, tenant_factory, user_factory)
     user_a = user_factory(tenant_id=tenant_a.id)
     user_b = user_factory(tenant_id=tenant_b.id)
     
+    tenant_context(tenant_a.id)
     produto_a = Produto(
-        tenant_id=tenant_a.id,
+        tenant_id=_tenant_uuid(tenant_a),
         user_id=user_a.id,
         codigo=f"PROD-{uuid.uuid4().hex[:8].upper()}",
         nome="Produto A",
@@ -93,8 +99,9 @@ def test_product_has_correct_tenant_id(db_session, tenant_factory, user_factory)
     db_session.add(produto_a)
     db_session.commit()
     
+    tenant_context(tenant_b.id)
     produto_b = Produto(
-        tenant_id=tenant_b.id,
+        tenant_id=_tenant_uuid(tenant_b),
         user_id=user_b.id,
         codigo=f"PROD-{uuid.uuid4().hex[:8].upper()}",
         nome="Produto B",
@@ -105,8 +112,8 @@ def test_product_has_correct_tenant_id(db_session, tenant_factory, user_factory)
     db_session.add(produto_b)
     db_session.commit()
     
-    assert produto_a.tenant_id == tenant_a.id
-    assert produto_b.tenant_id == tenant_b.id
+    assert produto_a.tenant_id == _tenant_uuid(tenant_a)
+    assert produto_b.tenant_id == _tenant_uuid(tenant_b)
     assert produto_a.tenant_id != produto_b.tenant_id
 
 
@@ -120,7 +127,7 @@ def test_query_products_by_tenant(db_session, tenant_factory, user_factory):
     user = user_factory(tenant_id=tenant.id)
     
     produto1 = Produto(
-        tenant_id=tenant.id,
+        tenant_id=_tenant_uuid(tenant),
         user_id=user.id,
         codigo=f"PROD-{uuid.uuid4().hex[:8].upper()}",
         nome="Produto 1",
@@ -132,7 +139,7 @@ def test_query_products_by_tenant(db_session, tenant_factory, user_factory):
     db_session.commit()
     
     produto2 = Produto(
-        tenant_id=tenant.id,
+        tenant_id=_tenant_uuid(tenant),
         user_id=user.id,
         codigo=f"PROD-{uuid.uuid4().hex[:8].upper()}",
         nome="Produto 2",
@@ -143,7 +150,7 @@ def test_query_products_by_tenant(db_session, tenant_factory, user_factory):
     db_session.add(produto2)
     db_session.commit()
     
-    produtos = db_session.query(Produto).filter_by(tenant_id=tenant.id).all()
+    produtos = db_session.query(Produto).filter_by(tenant_id=_tenant_uuid(tenant)).all()
     
     assert len(produtos) >= 2
-    assert all(p.tenant_id == tenant.id for p in produtos)
+    assert all(p.tenant_id == _tenant_uuid(tenant) for p in produtos)
