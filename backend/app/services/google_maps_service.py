@@ -16,13 +16,19 @@ GOOGLE_DISTANCE_MATRIX_URL = "https://maps.googleapis.com/maps/api/distancematri
 GOOGLE_DIRECTIONS_URL = "https://maps.googleapis.com/maps/api/directions/json"
 GOOGLE_GEOCODING_URL = "https://maps.googleapis.com/maps/api/geocode/json"
 
-_ROTULO_NUMERO_RE = re.compile(r"\b(?:numero|n[uú]mero|n[º°])\s*[:\-]?\s*", re.IGNORECASE)
-_COMPLEMENTO_RE = re.compile(
-    r"^(?:complemento|compl\.?|apto|apartamento|ap\.?|bloco|torre|sala|fundos|"
-    r"referencia|refer[eê]ncia|ponto de referencia|ponto de refer[eê]ncia|"
-    r"obs\.?|observacao|observa[cç][aã]o|condominio|condom[ií]nio|cond\.?)\b",
+_COMPLEMENTO_LABELS = (
+    r"complemento|compl\.?|apto|apartamento|ap\.?|bloco|torre|sala|fundos|casa|"
+    r"referencia|refer[\u00ea\u00e9]ncia|ponto de referencia|ponto de refer[\u00ea\u00e9]ncia|"
+    r"obs\.?|observacao|observa[c\u00e7][a\u00e3]o|condominio|condom[i\u00ed]nio|cond\.?"
+)
+_ROTULO_NUMERO_RE = re.compile(r"\b(?:numero|n\u00famero|n[º°])\s*[:\-]?\s*", re.IGNORECASE)
+_COMPLEMENTO_RE = re.compile(rf"^(?:{_COMPLEMENTO_LABELS})\b", re.IGNORECASE)
+_COMPLEMENTO_APOS_NUMERO_RE = re.compile(
+    rf"^(\d+[A-Za-z]?)\s+(?:{_COMPLEMENTO_LABELS})\b.*$",
     re.IGNORECASE,
 )
+_CEP_RE = re.compile(r"^(?:cep\s*[:\-]?\s*)?\d{5}-?\d{3}$", re.IGNORECASE)
+_CIDADE_UF_RE = re.compile(r"^(.+?)/([A-Z]{2})$", re.IGNORECASE)
 
 
 def limpar_endereco_para_maps(endereco: str) -> str:
@@ -31,15 +37,28 @@ def limpar_endereco_para_maps(endereco: str) -> str:
         return ""
 
     texto = _ROTULO_NUMERO_RE.sub("", str(endereco))
-    partes = re.split(r"[,;|\n]+", texto)
+    partes = re.split(r"[,;|\n]+|\s+-\s+", texto)
     partes_limpas: List[str] = []
 
     for parte in partes:
         parte_limpa = re.sub(r"\s+", " ", parte).strip(" -")
-        if not parte_limpa:
+        if not parte_limpa or _CEP_RE.match(parte_limpa) or _COMPLEMENTO_RE.match(parte_limpa):
             continue
-        if _COMPLEMENTO_RE.match(parte_limpa):
+
+        complemento_numero = _COMPLEMENTO_APOS_NUMERO_RE.match(parte_limpa)
+        if complemento_numero:
+            parte_limpa = complemento_numero.group(1)
+
+        cidade_uf = _CIDADE_UF_RE.match(parte_limpa)
+        if cidade_uf:
+            cidade = cidade_uf.group(1).strip()
+            uf = cidade_uf.group(2).strip().upper()
+            if cidade:
+                partes_limpas.append(cidade)
+            if uf:
+                partes_limpas.append(uf)
             continue
+
         partes_limpas.append(parte_limpa)
 
     return ", ".join(partes_limpas)

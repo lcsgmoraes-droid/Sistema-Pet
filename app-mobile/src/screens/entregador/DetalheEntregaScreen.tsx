@@ -17,6 +17,7 @@ import DraggableFlatList, {
   RenderItemParams,
 } from "react-native-draggable-flatlist";
 import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { limparEnderecoParaMaps } from "@/utils/mapsAddress";
 import KeyboardSafeScrollView from "../../components/KeyboardSafeScrollView";
 import api from "../../services/api";
 import { EntregadorStackParamList } from "../../types/entregadorNavigation";
@@ -118,18 +119,6 @@ function obterMensagemErro(error: unknown, fallback: string) {
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-
-function limparEnderecoParaMaps(endereco: string) {
-  return endereco
-    .replace(/\b(?:numero|n[uú]mero|n[º°])\s*[:\-]?\s*/gi, "")
-    .split(/[,;|\n]+/)
-    .map((parte) => parte.replace(/\s+/g, " ").trim().replace(/^-+|-+$/g, ""))
-    .filter((parte) => {
-      if (!parte) return false;
-      return !/^(?:complemento|compl\.?|apto|apartamento|ap\.?|bloco|torre|sala|fundos|referencia|refer[eê]ncia|ponto de referencia|ponto de refer[eê]ncia|obs\.?|observacao|observa[cç][aã]o|condominio|condom[ií]nio|cond\.?)\b/i.test(parte);
-    })
-    .join(", ");
-}
 
 function abrirMapa(endereco: string) {
   const enderecoMaps = limparEnderecoParaMaps(endereco) || endereco;
