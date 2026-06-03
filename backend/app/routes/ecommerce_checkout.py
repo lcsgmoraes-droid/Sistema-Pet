@@ -21,8 +21,8 @@ from app.services.ecommerce_payment_config import get_active_mercado_pago_runtim
 from app.services.mercado_pago_checkout import (
     create_preference,
     is_mercado_pago_provider,
-    normalizar_canal_venda_online,
 )
+from app.services.sales_channel import resolve_checkout_sales_channel
 from app.tenancy.context import clear_current_tenant, get_current_tenant, set_current_tenant
 from app.utils.timezone import now_brasilia
 
@@ -362,14 +362,7 @@ def _validar_forma_pagamento_online(nome: str | None) -> str:
 
 
 def _resolver_origem_checkout(payload: CheckoutFinalizarRequest, request: Request) -> str:
-    for candidato in (
-        payload.origem,
-        request.headers.get("X-Client-Channel"),
-        request.headers.get("X-Canal-Venda"),
-    ):
-        if str(candidato or "").strip():
-            return normalizar_canal_venda_online(candidato)
-    return normalizar_canal_venda_online(None)
+    return resolve_checkout_sales_channel(payload, request)
 
 
 def _checkout_idempotency_payload(
