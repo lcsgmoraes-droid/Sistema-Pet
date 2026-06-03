@@ -16,6 +16,30 @@ const CONFIG_SEFAZ_INICIAL = {
   ultimo_sync_documentos: 0,
 };
 
+const MENSAGEM_SEFAZ_INDISPONIVEL =
+  'SEFAZ esta temporariamente indisponivel ou retornou uma resposta incompleta; tente novamente em alguns minutos. Se o erro persistir, confira o status do servico SEFAZ.';
+
+const PADROES_ERRO_SEFAZ_INDISPONIVEL = [
+  'Cloudflare',
+  'origin web server',
+  'invalid or incomplete response',
+];
+
+export function normalizarMensagemErroSefaz(err) {
+  const detail = err?.response?.data?.detail;
+  const mensagem = typeof detail === 'string' ? detail : err?.message || '';
+  const mensagemNormalizada = mensagem.toLowerCase();
+  const indisponivel = PADROES_ERRO_SEFAZ_INDISPONIVEL.some((padrao) =>
+    mensagemNormalizada.includes(padrao.toLowerCase())
+  );
+
+  if (indisponivel) {
+    return MENSAGEM_SEFAZ_INDISPONIVEL;
+  }
+
+  return typeof detail === 'string' && detail.trim() ? detail : 'Erro ao consultar a SEFAZ.';
+}
+
 export default function useEntradaXmlSefaz({
   api,
   abrirDetalhes,
@@ -103,12 +127,12 @@ export default function useEntradaXmlSefaz({
       setConsultasSefaz((prev) => [novaConsulta, ...prev]);
       setConsultaExpandidaId(null);
     } catch (err) {
-      const msg = err?.response?.data?.detail || 'Erro ao consultar a SEFAZ.';
+      const msg = normalizarMensagemErroSefaz(err);
       const httpStatus = Number(err?.response?.status || 0);
       if (httpStatus === 501 && msg.toLowerCase().includes('conector')) {
         setAvisoConectorSefaz(msg);
       } else {
-        setErroSefaz(msg);
+        setErroSefaz(normalizarMensagemErroSefaz(err));
       }
     } finally {
       setLoadingSefaz(false);

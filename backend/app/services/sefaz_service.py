@@ -239,6 +239,24 @@ class SefazService:
             "</nfeDadosMsg>"
         )
 
+    @staticmethod
+    def _mensagem_falha_comunicacao(exc: Exception) -> str:
+        texto = str(exc or "").strip()
+        texto_lower = texto.lower()
+        origem_indisponivel = (
+            "cloudflare" in texto_lower
+            or "origin web server" in texto_lower
+            or "invalid or incomplete response" in texto_lower
+        )
+        if origem_indisponivel:
+            return (
+                "SEFAZ esta temporariamente indisponivel ou retornou uma resposta incompleta; "
+                "tente novamente em alguns minutos. Se o erro persistir, confira o status do servico SEFAZ."
+            )
+        if not texto:
+            return "Falha de comunicacao com a SEFAZ."
+        return f"Falha de comunicacao com a SEFAZ: {texto}"
+
     @classmethod
     def _post_soap_dist_dfe(cls, cfg: dict[str, Any], dados_msg_xml: str) -> str:
         endpoint = cls._ENDPOINTS_DISTRIBUICAO.get(cfg["ambiente"])
@@ -267,7 +285,7 @@ class SefazService:
         except requests.exceptions.Timeout as exc:
             raise HTTPException(status_code=504, detail=f"Timeout na comunicação com a SEFAZ: {exc}") from exc
         except requests.exceptions.RequestException as exc:
-            raise HTTPException(status_code=502, detail=f"Falha de comunicação com a SEFAZ: {exc}") from exc
+            raise HTTPException(status_code=502, detail=cls._mensagem_falha_comunicacao(exc)) from exc
         finally:
             if cert_file:
                 Path(cert_file).unlink(missing_ok=True)

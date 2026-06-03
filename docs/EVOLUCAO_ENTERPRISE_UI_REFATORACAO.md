@@ -104,6 +104,8 @@ Tela piloto:
 - Fornecedores: cadastro de fornecedor no produto, edicao em lote de fornecedores e despesa do caixa passaram a usar autocomplete/cadastro rapido via `FornecedorSelector`.
 - Produtos: filtros de categoria e marca migraram para `AutocompleteSelect`, mantendo seta de abertura e busca digitavel; o filtro de fornecedor segue com `FornecedorSelector`.
 - Produtos: opcao "Persistir filtros" agora salva busca, categoria, marca, fornecedor, status, estoque baixo, promocao, pais/variacoes, pagina e itens por pagina.
+- Backend/Produtos: primeira fatia de reducao de `produtos_routes.py` extraiu helpers de listagem para `app/produtos/listagem.py`, com testes unitarios para flags, ordenacao e enriquecimento de kits.
+- Testes/fixtures: a base legada de testes agora roda sem PostgreSQL local usando SQLite em memoria, reexporta `tenant_factory`, `user_factory`, `auth_headers` e `client`, e cria usuarios com bcrypt/vinculo `UserTenant` para validar o fluxo multitenant atual.
 - Produtos/Estoque: tela de movimentacoes voltou a exibir "Lancar granel" para produtos elegiveis e manteve balanco manual permitido em produto granel para ajuste de inventario.
 - Pessoas: listagem ganhou selecao em massa e fluxo de fusao de 2 cadastros, transferindo vinculos/historico para o principal e inativando o duplicado.
 - Pessoas `/clientes`: a barra de busca e acoes voltou para `Panel`, `ActionButton` e `IconActionButton`; o botao `Novo` usa `intent=create` (verde/emerald) e `Importar Excel` ficou como acao secundaria neutra.
@@ -980,6 +982,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-20: `EcommerceMVP.jsx` extraiu estado e operacoes de checkout/pagamento para `frontend/src/pages/ecommerce/useEcommerceCheckout.js`, mantendo cupom, endereco, resumo, idempotencia, tracking e finalizacao em hook dedicado, reduzindo o arquivo para 983 linhas. Proximo passo: separar autenticacao/perfil ou finalizar esta rodada para merge controlado.
 - 2026-05-20: `EcommerceMVP.jsx` extraiu autenticacao, perfil e recuperacao de senha para `frontend/src/pages/ecommerce/useEcommerceCustomer.js`, mantendo login, cadastro, sessao, CEPs do perfil e sincronizacao do carrinho apos autenticar em hook dedicado, reduzindo o arquivo para 637 linhas. Proximo passo: revisar o PR para merge/deploy controlado ou escolher outro hotspot.
 - 2026-05-20: `EcommerceMVP.jsx` extraiu os estilos internos para `frontend/src/pages/ecommerce/ecommerceMvpStyles.js`, mantendo a mesma API de `styles={S}` usada pelas telas do storefront e reduzindo o arquivo para 553 linhas. Proximo passo: revisar o PR para merge/deploy controlado.
+- 2026-06-03: `produtos_routes.py` retomou a frente de arquivos grandes extraindo helpers de listagem, promocao exibida no PDV, reservas multitenant, area/fornecedor e valorizacao para `backend/app/produtos/listagem.py`, reduzindo o router de 6275 para 6003 linhas com testes focados de listagem/validade/busca preservados. Proximo passo: extrair construcao de queries/filtros de `listar_produtos` e `listar_produtos_vendaveis`, sem mexer em estoque, fiscal, PDV ou regras de preco.
 
 ### Nao fazer nesta onda
 

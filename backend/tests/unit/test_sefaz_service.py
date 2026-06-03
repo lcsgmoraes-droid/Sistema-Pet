@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+import requests
 from fastapi import HTTPException
 
 from app.middlewares.request_context import clear_request_context, set_request_id
@@ -151,3 +152,19 @@ def test_sincronizar_nsu_cstat_656_retorna_excecao_com_nsu(monkeypatch: pytest.M
     assert "cStat 656" in str(exc.value)
     assert exc.value.ult_nsu == "000000000001234"
     assert exc.value.max_nsu == "000000000001240"
+
+
+def test_falha_cloudflare_na_sefaz_retorna_mensagem_operacional() -> None:
+    raw_msg = (
+        "The origin web server returned an invalid or incomplete response to Cloudflare. "
+        "This typically indicates the origin is overloaded or misconfigured."
+    )
+
+    detail = SefazService._mensagem_falha_comunicacao(
+        requests.exceptions.RequestException(raw_msg)
+    )
+
+    assert "SEFAZ esta temporariamente indisponivel" in detail
+    assert "tente novamente em alguns minutos" in detail
+    assert "Cloudflare" not in detail
+    assert "origin web server" not in detail

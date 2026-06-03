@@ -1,155 +1,182 @@
 """
-Testes de isolamento multi-tenant
+Testes de isolamento multi-tenant.
 """
+from datetime import datetime
+from uuid import UUID, uuid4
+
 from app.produtos_models import Produto
 from app.vendas_models import Venda
-from datetime import datetime
 
 
-def test_tenant_cannot_access_other_tenant_products(db_session, tenant_factory):
+def _tenant_uuid(tenant):
+    return UUID(str(tenant.id))
+
+
+def _create_product(tenant, user=None, nome: str = "Produto", preco: float = 10.0) -> Produto:
+    return Produto(
+        tenant_id=_tenant_uuid(tenant),
+        user_id=user.id if user else None,
+        codigo=f"PROD-{uuid4().hex[:8].upper()}",
+        nome=nome,
+        preco_venda=preco,
+        estoque_atual=10,
+        ativo=True,
+    )
+
+
+def _create_sale(tenant, user, total: float) -> Venda:
+    return Venda(
+        tenant_id=_tenant_uuid(tenant),
+        user_id=user.id,
+        vendedor_id=user.id,
+        numero_venda=f"TST-{uuid4().hex[:8].upper()}",
+        data_venda=datetime.utcnow(),
+        subtotal=total,
+        total=total,
+        status="finalizada",
+    )
+
+
+def test_tenant_cannot_access_other_tenant_products(
+    db_session,
+    tenant_factory,
+    user_factory,
+    tenant_context,
+):
     """
-    Testa que tenant A não acessa produtos do tenant B.
+    Testa que tenant A nao acessa produtos do tenant B.
     Protege: isolamento de dados de produtos.
     """
-    import uuid
     tenant_a = tenant_factory(nome="Loja A")
     tenant_b = tenant_factory(nome="Loja B")
-    
-    # Criar produtos para cada tenant
-    produto_a = Produto(
-        tenant_id=tenant_a.id,
-        codigo=f"PROD-{uuid.uuid4().hex[:8].upper()}",
-        nome="Produto Loja A",
-        preco_venda=50.00,
-        estoque_atual=10,
-        ativo=True
-    )
-    
-    produto_b = Produto(
-        tenant_id=tenant_b.id,
-        codigo=f"PROD-{uuid.uuid4().hex[:8].upper()}",
-        nome="Produto Loja B",
-        preco_venda=75.00,
-        estoque_atual=20,
-        ativo=True
-    )
-    
+    user_a = user_factory(tenant_id=tenant_a.id)
+    user_b = user_factory(tenant_id=tenant_b.id)
+
+    tenant_context(tenant_a.id)
+    produto_a = _create_product(tenant_a, user_a, "Produto Loja A", 50.00)
     db_session.add(produto_a)
+    db_session.commit()
+
+    tenant_context(tenant_b.id)
+    produto_b = _create_product(tenant_b, user_b, "Produto Loja B", 75.00)
     db_session.add(produto_b)
     db_session.commit()
-    
-    # Tenant A só vê seus produtos
-    produtos_a = db_session.query(Produto).filter_by(tenant_id=tenant_a.id).all()
-    assert all(p.tenant_id == tenant_a.id for p in produtos_a)
+
+    tenant_context(tenant_a.id)
+    produtos_a = db_session.query(Produto).filter_by(tenant_id=_tenant_uuid(tenant_a)).all()
+    assert all(p.tenant_id == _tenant_uuid(tenant_a) for p in produtos_a)
     assert produto_b not in produtos_a
-    
-    # Tenant B só vê seus produtos
-    produtos_b = db_session.query(Produto).filter_by(tenant_id=tenant_b.id).all()
-    assert all(p.tenant_id == tenant_b.id for p in produtos_b)
+
+    tenant_context(tenant_b.id)
+    produtos_b = db_session.query(Produto).filter_by(tenant_id=_tenant_uuid(tenant_b)).all()
+    assert all(p.tenant_id == _tenant_uuid(tenant_b) for p in produtos_b)
     assert produto_a not in produtos_b
 
 
-def test_tenant_cannot_access_other_tenant_sales(db_session, tenant_factory, user_factory):
+def test_tenant_cannot_access_other_tenant_sales(
+    db_session,
+    tenant_factory,
+    user_factory,
+    tenant_context,
+):
     """
-    Testa que tenant A não acessa vendas do tenant B.
+    Testa que tenant A nao acessa vendas do tenant B.
     Protege: isolamento de dados de vendas.
     """
     tenant_a = tenant_factory(nome="Loja A")
     tenant_b = tenant_factory(nome="Loja B")
-    
+
     user_a = user_factory(tenant_id=tenant_a.id)
     user_b = user_factory(tenant_id=tenant_b.id)
-    
-    # Criar vendas para cada tenant
-    venda_a = Venda(
-        tenant_id=tenant_a.id,
-        user_id=user_a.id,
-        data_venda=datetime.utcnow(),
-        valor_total=100.00,
-        status="finalizada"
-    )
-    
-    venda_b = Venda(
-        tenant_id=tenant_b.id,
-        user_id=user_b.id,
-        data_venda=datetime.utcnow(),
-        valor_total=200.00,
-        status="finalizada"
-    )
-    
+
+    tenant_context(tenant_a.id)
+    venda_a = _create_sale(tenant_a, user_a, total=100.00)
     db_session.add(venda_a)
+    db_session.commit()
+
+    tenant_context(tenant_b.id)
+    venda_b = _create_sale(tenant_b, user_b, total=200.00)
     db_session.add(venda_b)
     db_session.commit()
-    
-    # Tenant A só vê suas vendas
-    vendas_a = db_session.query(Venda).filter_by(tenant_id=tenant_a.id).all()
-    assert all(v.tenant_id == tenant_a.id for v in vendas_a)
+
+    tenant_context(tenant_a.id)
+    vendas_a = db_session.query(Venda).filter_by(tenant_id=_tenant_uuid(tenant_a)).all()
+    assert all(v.tenant_id == _tenant_uuid(tenant_a) for v in vendas_a)
     assert venda_b not in vendas_a
-    
-    # Tenant B só vê suas vendas
-    vendas_b = db_session.query(Venda).filter_by(tenant_id=tenant_b.id).all()
-    assert all(v.tenant_id == tenant_b.id for v in vendas_b)
+
+    tenant_context(tenant_b.id)
+    vendas_b = db_session.query(Venda).filter_by(tenant_id=_tenant_uuid(tenant_b)).all()
+    assert all(v.tenant_id == _tenant_uuid(tenant_b) for v in vendas_b)
     assert venda_a not in vendas_b
 
 
 def test_jwt_enforces_tenant_context(auth_headers, tenant_factory):
     """
-    Testa que JWT contém tenant_id correto para isolamento.
-    Protege: contexto de tenant em requisições autenticadas.
+    Testa que JWT contem tenant_id correto para isolamento.
+    Protege: contexto de tenant em requisicoes autenticadas.
     """
     tenant_a = tenant_factory(nome="Tenant A")
     tenant_b = tenant_factory(nome="Tenant B")
-    
+
     headers_a, _, user_a = auth_headers(tenant=tenant_a)
     headers_b, _, user_b = auth_headers(tenant=tenant_b)
-    
-    # Verificar que os tenants são diferentes
-    assert user_a.tenant_id == tenant_a.id
-    assert user_b.tenant_id == tenant_b.id
+
+    assert headers_a["Authorization"] != headers_b["Authorization"]
+    assert user_a.tenant_id == _tenant_uuid(tenant_a)
+    assert user_b.tenant_id == _tenant_uuid(tenant_b)
     assert user_a.tenant_id != user_b.tenant_id
 
 
-def test_cross_tenant_data_leakage_prevention(db_session, tenant_factory, user_factory):
+def test_cross_tenant_data_leakage_prevention(
+    db_session,
+    tenant_factory,
+    user_factory,
+    tenant_context,
+):
     """
-    Testa que dados entre tenants não vazam em queries gerais.
-    Protege: prevenção de vazamento de dados cross-tenant.
+    Testa que dados entre tenants nao vazam em queries gerais.
+    Protege: prevencao de vazamento de dados cross-tenant.
     """
     tenant_1 = tenant_factory(nome="Pet Shop 1")
     tenant_2 = tenant_factory(nome="Pet Shop 2")
     tenant_3 = tenant_factory(nome="Pet Shop 3")
-    
+
     user_1 = user_factory(tenant_id=tenant_1.id, email="user1@test.com")
     user_2 = user_factory(tenant_id=tenant_2.id, email="user2@test.com")
     user_3 = user_factory(tenant_id=tenant_3.id, email="user3@test.com")
-    
-    # Criar produtos para cada tenant
-    import uuid
-    produto_1 = Produto(tenant_id=tenant_1.id, user_id=user_1.id, codigo=f"P1-{uuid.uuid4().hex[:6]}", nome="P1", preco_venda=10, estoque_atual=5, ativo=True)
-    produto_2 = Produto(tenant_id=tenant_2.id, user_id=user_2.id, codigo=f"P2-{uuid.uuid4().hex[:6]}", nome="P2", preco_venda=20, estoque_atual=10, ativo=True)
-    produto_3 = Produto(tenant_id=tenant_3.id, user_id=user_3.id, codigo=f"P3-{uuid.uuid4().hex[:6]}", nome="P3", preco_venda=30, estoque_atual=15, ativo=True)
-    
+
+    tenant_context(tenant_1.id)
+    produto_1 = _create_product(tenant_1, user_1, "P1", 10)
     db_session.add(produto_1)
     db_session.flush()
+
+    tenant_context(tenant_2.id)
+    produto_2 = _create_product(tenant_2, user_2, "P2", 20)
     db_session.add(produto_2)
     db_session.flush()
+
+    tenant_context(tenant_3.id)
+    produto_3 = _create_product(tenant_3, user_3, "P3", 30)
     db_session.add(produto_3)
     db_session.commit()
-    
-    # Verificar isolamento para cada tenant
-    produtos_tenant_1 = db_session.query(Produto).filter_by(tenant_id=tenant_1.id).all()
-    produtos_tenant_2 = db_session.query(Produto).filter_by(tenant_id=tenant_2.id).all()
-    produtos_tenant_3 = db_session.query(Produto).filter_by(tenant_id=tenant_3.id).all()
-    
-    # Cada tenant vê apenas seus produtos
+
+    tenant_context(tenant_1.id)
+    produtos_tenant_1 = db_session.query(Produto).filter_by(tenant_id=_tenant_uuid(tenant_1)).all()
+
+    tenant_context(tenant_2.id)
+    produtos_tenant_2 = db_session.query(Produto).filter_by(tenant_id=_tenant_uuid(tenant_2)).all()
+
+    tenant_context(tenant_3.id)
+    produtos_tenant_3 = db_session.query(Produto).filter_by(tenant_id=_tenant_uuid(tenant_3)).all()
+
     assert len(produtos_tenant_1) >= 1
     assert len(produtos_tenant_2) >= 1
     assert len(produtos_tenant_3) >= 1
-    
-    assert all(p.tenant_id == tenant_1.id for p in produtos_tenant_1)
-    assert all(p.tenant_id == tenant_2.id for p in produtos_tenant_2)
-    assert all(p.tenant_id == tenant_3.id for p in produtos_tenant_3)
-    
-    # Nenhum produto de outro tenant deve aparecer
+
+    assert all(p.tenant_id == _tenant_uuid(tenant_1) for p in produtos_tenant_1)
+    assert all(p.tenant_id == _tenant_uuid(tenant_2) for p in produtos_tenant_2)
+    assert all(p.tenant_id == _tenant_uuid(tenant_3) for p in produtos_tenant_3)
+
     assert produto_2 not in produtos_tenant_1
     assert produto_3 not in produtos_tenant_1
     assert produto_1 not in produtos_tenant_2

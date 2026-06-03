@@ -2,6 +2,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 from app import produtos_routes
+from app.produtos import listagem as produtos_listagem
 
 
 def test_listagem_calcula_estoque_virtual_mesmo_sem_detalhes_do_kit():
@@ -20,7 +21,7 @@ def test_listagem_calcula_estoque_virtual_mesmo_sem_detalhes_do_kit():
     )
 
     with patch.object(
-        produtos_routes.KitEstoqueService,
+        produtos_listagem.KitEstoqueService,
         "calcular_estoque_virtual_kit",
         return_value=31,
     ) as calcular_estoque_virtual:
