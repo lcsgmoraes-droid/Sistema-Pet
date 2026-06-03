@@ -8,6 +8,12 @@ def test_limpar_endereco_para_maps_remove_complemento_e_rotulo_numero():
 
 
 def test_limpar_endereco_para_maps_preserva_rua_numero_bairro_e_cidade():
-    endereco = "Av Brasil, Número: 900, Jardim Paulista, Ribeirao Preto, SP, 14000-000"
+    endereco = "Av Brasil, numero: 900, Jardim Paulista, Ribeirao Preto, SP, 14000-000"
 
-    assert limpar_endereco_para_maps(endereco) == "Av Brasil, 900, Jardim Paulista, Ribeirao Preto, SP, 14000-000"
+    assert limpar_endereco_para_maps(endereco) == "Av Brasil, 900, Jardim Paulista, Ribeirao Preto, SP"
+
+
+def test_limpar_endereco_para_maps_remove_complemento_colado_no_numero():
+    endereco = "Rua A, 123 Apto 42 - Vila Industrial - Presidente Prudente/SP - CEP: 19013-002"
+
+    assert limpar_endereco_para_maps(endereco) == "Rua A, 123, Vila Industrial, Presidente Prudente, SP"
