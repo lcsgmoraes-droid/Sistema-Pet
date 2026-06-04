@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session, joinedload, selectinload
 
 from app.db import get_session
 from app.models import Tenant
-from app.produtos_models import Produto
+from app.produtos_models import Categoria, Produto
 from app.services.validade_campanha_service import (
     mapear_ofertas_validade_por_produto,
     resolver_preco_publico_produto,
@@ -18,7 +18,11 @@ from app.tenancy.context import set_current_tenant
 
 router = APIRouter(prefix="/ecommerce", tags=["ecommerce-public"])
 _SLUG_PATTERN = re.compile(r"^[a-z0-9]+(?:-[a-z0-9]+)*$")
-_CATALOG_ORDER_OPTIONS = {"prontos", "nome", "menor_preco", "maior_preco"}
+_CATALOG_ORDER_OPTIONS = {"prontos", "relevancia", "nome", "nome_asc", "menor_preco", "maior_preco"}
+_CATALOG_ORDER_ALIASES = {
+    "relevancia": "prontos",
+    "nome_asc": "nome",
+}
 
 
 def _normalize_location_text(value: str | None) -> str:
@@ -51,6 +55,35 @@ def _normalize_sales_channel(raw_channel: str | None) -> str:
     if value in {"app", "app_movel", "mobile", "aplicativo"}:
         return "app"
     return "ecommerce"
+
+
+def _normalize_catalog_order(raw_order: str | None) -> str:
+    value = str(raw_order or "prontos").strip().lower()
+    normalized = _CATALOG_ORDER_ALIASES.get(value, value)
+    if normalized not in {"prontos", "nome", "menor_preco", "maior_preco"}:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Ordenacao invalida. Use: relevancia, nome_asc, menor_preco ou maior_preco.",
+        )
+    return normalized
+
+
+def _serialize_catalog_categories(rows) -> list[dict]:
+    categorias = []
+    for row in rows:
+        category_id = getattr(row, "id", None)
+        category_name = getattr(row, "nome", None) or "Sem categoria"
+        total = int(getattr(row, "total", 0) or 0)
+        if category_id is None:
+            continue
+        categorias.append(
+            {
+                "id": int(category_id),
+                "nome": category_name,
+                "total": total,
+            }
+        )
+    return categorias
 
 
 def _normalize_tenant_uuid(raw_tenant_id: str | None) -> str | None:
@@ -247,6 +280,7 @@ def tenant_context(
 def listar_produtos_publicos(
     tenant_ref: tuple[str, str] = Depends(_resolve_tenant_ref),
     busca: str | None = Query(default=None),
+    categoria_id: int | None = Query(default=None, ge=1),
     offset: int = Query(default=0, ge=0),
     limit: int = Query(default=100, ge=1, le=500),
     apenas_com_estoque: bool = Query(default=False),
@@ -258,7 +292,7 @@ def listar_produtos_publicos(
     db: Session = Depends(get_session),
 ):
     tenant = _get_active_tenant(db, tenant_ref)
-    ordenacao_normalizada = str(ordenacao or "prontos").strip().lower()
+    ordenacao_normalizada = _normalize_catalog_order(ordenacao)
     canal_resolvido = canal
     if not canal_resolvido:
         canal_resolvido = x_canal_venda
@@ -289,6 +323,13 @@ def listar_produtos_publicos(
     else:
         preco_catalogo = func.coalesce(Produto.preco_ecommerce, Produto.preco_venda, 0)
 
+    base_filters = [
+        Produto.tenant_id == tenant.id,
+        Produto.ativo == True,
+        Produto.situacao.is_not(False),
+        Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
+    ]
+
     query = (
         db.query(Produto)
         .options(
@@ -296,35 +337,54 @@ def listar_produtos_publicos(
             joinedload(Produto.marca),
             selectinload(Produto.imagens),
         )
-        .filter(
-            Produto.tenant_id == tenant.id,
-            Produto.ativo == True,
-            Produto.situacao.is_not(False),
-            Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
+        .filter(*base_filters)
+    )
+    category_name_expr = func.coalesce(Categoria.nome, "Sem categoria")
+    categorias_query = (
+        db.query(
+            Produto.categoria_id.label("id"),
+            category_name_expr.label("nome"),
+            func.count(Produto.id).label("total"),
         )
+        .outerjoin(Categoria, Produto.categoria_id == Categoria.id)
+        .filter(*base_filters)
     )
 
     if canal_normalizado == "app":
         query = query.filter(Produto.anunciar_app.is_(True))
+        categorias_query = categorias_query.filter(Produto.anunciar_app.is_(True))
     else:
         query = query.filter(Produto.anunciar_ecommerce.is_(True))
+        categorias_query = categorias_query.filter(Produto.anunciar_ecommerce.is_(True))
 
     if busca:
         termo = busca.strip()
         like_termo = f"%{termo}%"
-        query = query.filter(
-            or_(
-                func.unaccent(Produto.nome).ilike(func.unaccent(like_termo)),
-                Produto.codigo.ilike(like_termo),
-                Produto.codigo_barras.ilike(like_termo),
-            )
+        busca_filter = or_(
+            func.unaccent(Produto.nome).ilike(func.unaccent(like_termo)),
+            Produto.codigo.ilike(like_termo),
+            Produto.codigo_barras.ilike(like_termo),
         )
+        query = query.filter(busca_filter)
+        categorias_query = categorias_query.filter(busca_filter)
 
     if apenas_com_estoque:
         query = query.filter(estoque_catalogo > 0)
+        categorias_query = categorias_query.filter(estoque_catalogo > 0)
 
     if apenas_com_imagem:
         query = query.filter(tem_imagem_expr)
+        categorias_query = categorias_query.filter(tem_imagem_expr)
+
+    categorias = _serialize_catalog_categories(
+        categorias_query
+        .group_by(Produto.categoria_id, category_name_expr)
+        .order_by(func.lower(category_name_expr).asc())
+        .all()
+    )
+
+    if categoria_id is not None:
+        query = query.filter(Produto.categoria_id == categoria_id)
 
     total = query.count()
 
@@ -350,6 +410,7 @@ def listar_produtos_publicos(
         "total": total,
         "offset": offset,
         "limit": limit,
+        "categorias": categorias,
         "items": [
             (lambda pricing, oferta: {
                 "id": produto.id,

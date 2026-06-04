@@ -1,66 +1,25 @@
-import { RefreshCw, Search, X } from 'lucide-react';
+import { RefreshCw, Search, SlidersHorizontal, X } from 'lucide-react';
 
-const CATALOG_METRICS = [
-  {
-    key: 'prontos',
-    label: 'Prontos para vender',
-    color: '#16a34a',
-    border: '#bbf7d0',
-    bg: '#f0fdf4',
-  },
-  {
-    key: 'emEstoque',
-    label: 'Com estoque',
-    color: '#2563eb',
-    border: '#bfdbfe',
-    bg: '#eff6ff',
-  },
-  {
-    key: 'comImagem',
-    label: 'Com foto',
-    color: '#ea580c',
-    border: '#fed7aa',
-    bg: '#fff7ed',
-  },
+const ORDER_OPTIONS = [
+  { value: 'relevancia', label: 'Mais relevantes' },
+  { value: 'nome_asc', label: 'Nome A-Z' },
+  { value: 'menor_preco', label: 'Menor preco' },
+  { value: 'maior_preco', label: 'Maior preco' },
 ];
 
 export function EcommerceCatalogSummary({
-  catalogMetrics,
   isMobile,
   productCount,
 }) {
   const productCountText = `${productCount} produto${productCount !== 1 ? 's' : ''} encontrado${productCount !== 1 ? 's' : ''}`;
 
   return (
-    <>
-      <div style={{ maxWidth: 1280, margin: '0 auto', padding: isMobile ? '16px 12px 0' : '24px 20px 0' }}>
-        <h2 style={{ margin: 0, fontSize: isMobile ? 18 : 22, fontWeight: 800, color: '#1c1917' }}>
-          {'Cat\u00e1logo da loja'}
-        </h2>
-        <p style={{ margin: '4px 0 0', color: '#9ca3af', fontSize: 13 }}>{productCountText}</p>
-      </div>
-
-      <div style={{ maxWidth: 1280, margin: '0 auto', padding: '0 20px' }}>
-        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 14 }}>
-          {CATALOG_METRICS.map((item) => (
-            <div
-              key={item.key}
-              style={{
-                minWidth: isMobile ? 'calc(50% - 8px)' : 180,
-                background: item.bg,
-                color: item.color,
-                border: `1px solid ${item.border}`,
-                borderRadius: 14,
-                padding: '10px 14px',
-              }}
-            >
-              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: 0.4 }}>{item.label}</div>
-              <div style={{ fontSize: 20, fontWeight: 800, marginTop: 2 }}>{catalogMetrics[item.key]}</div>
-            </div>
-          ))}
-        </div>
-      </div>
-    </>
+    <div style={{ maxWidth: 1280, margin: '0 auto', padding: isMobile ? '16px 12px 0' : '24px 20px 0' }}>
+      <h2 style={{ margin: 0, fontSize: isMobile ? 20 : 24, fontWeight: 800, color: '#1c1917' }}>
+        Catalogo da loja
+      </h2>
+      <p style={{ margin: '5px 0 0', color: '#78716c', fontSize: 13 }}>{productCountText}</p>
+    </div>
   );
 }
 
@@ -71,59 +30,104 @@ export default function EcommerceCatalogControls({
   loading,
   order,
   search,
-  showOnlyInStock,
-  showOnlyWithImage,
   styles: S,
   onCategoryChange,
   onClearFilters,
-  onImageFilterChange,
   onOrderChange,
   onRefresh,
   onSearchChange,
-  onStockFilterChange,
 }) {
-  const hasActiveFilters = showOnlyInStock || showOnlyWithImage || order !== 'prontos' || category !== 'todas' || search;
+  const hasActiveFilters = order !== 'relevancia' || category !== 'todas' || Boolean(search);
+  const selectStyle = {
+    ...S.formInput,
+    width: isMobile ? '100%' : 'auto',
+    minWidth: isMobile ? '100%' : 220,
+    paddingRight: 30,
+    background: '#fff',
+  };
 
   return (
-    <div style={{ display: 'grid', gap: 14, marginBottom: 16 }}>
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', flexDirection: isMobile ? 'column' : 'row' }}>
-          <div style={{ flex: 1, minWidth: 220, position: 'relative' }}>
-            <Search
-              size={14}
-              color="#9ca3af"
-              strokeWidth={2}
-              style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}
-            />
-            <input
-              value={search}
-              onChange={(event) => onSearchChange(event.target.value)}
-              placeholder="O que seu pet precisa?"
-              style={{ ...S.formInput, paddingLeft: 36 }}
-            />
-          </div>
+    <div
+      style={{
+        display: 'grid',
+        gap: 12,
+        marginBottom: 18,
+        padding: isMobile ? 12 : 14,
+        background: '#fff',
+        border: '1px solid #e7e5e4',
+        borderRadius: 14,
+        boxShadow: '0 1px 4px rgba(0,0,0,0.04)',
+      }}
+    >
+      <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: '#78716c', fontSize: 12, fontWeight: 800, textTransform: 'uppercase' }}>
+        <SlidersHorizontal size={15} />
+        Encontrar produtos
+      </div>
 
-          <select value={category} onChange={(event) => onCategoryChange(event.target.value)} style={{ ...S.formInput, width: 'auto', paddingRight: 30 }}>
-            {categories.map((item) => (
-              <option key={item} value={item}>{item === 'todas' ? 'Todas as categorias' : item}</option>
-            ))}
-          </select>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(260px, 1.2fr) minmax(220px, 0.9fr) minmax(180px, 0.7fr) auto', gap: 10, alignItems: 'center' }}>
+        <div style={{ minWidth: 0, position: 'relative' }}>
+          <Search
+            size={14}
+            color="#9ca3af"
+            strokeWidth={2}
+            style={{ position: 'absolute', left: 12, top: '50%', transform: 'translateY(-50%)' }}
+          />
+          <input
+            value={search}
+            onChange={(event) => onSearchChange(event.target.value)}
+            placeholder="Buscar por nome, SKU ou codigo de barras"
+            style={{ ...S.formInput, paddingLeft: 36, background: '#fff' }}
+          />
+        </div>
 
-          <select value={order} onChange={(event) => onOrderChange(event.target.value)} style={{ ...S.formInput, width: 'auto', minWidth: 190, paddingRight: 30 }}>
-            <option value="prontos">Mais prontos para vender</option>
-            <option value="nome">{'Ordem alfab\u00e9tica'}</option>
-            <option value="menor_preco">{'Menor pre\u00e7o'}</option>
-            <option value="maior_preco">{'Maior pre\u00e7o'}</option>
-          </select>
+        <select value={category} onChange={(event) => onCategoryChange(event.target.value)} style={selectStyle}>
+          {categories.map((item) => (
+            <option key={item.value || item} value={item.value || item}>
+              {item.label || (item === 'todas' ? 'Todas as categorias' : item)}
+            </option>
+          ))}
+        </select>
+
+        <select value={order} onChange={(event) => onOrderChange(event.target.value)} style={selectStyle}>
+          {ORDER_OPTIONS.map((item) => (
+            <option key={item.value} value={item.value}>{item.label}</option>
+          ))}
+        </select>
+
+        <div style={{ display: 'flex', gap: 8, justifyContent: isMobile ? 'stretch' : 'flex-end' }}>
+          {hasActiveFilters && (
+            <button
+              onClick={onClearFilters}
+              style={{
+                padding: '10px 12px',
+                borderRadius: 10,
+                border: '1.5px solid #fed7aa',
+                background: '#fff7ed',
+                color: '#c2410c',
+                fontSize: 12,
+                fontWeight: 800,
+                cursor: 'pointer',
+                display: 'inline-flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                gap: 5,
+                flex: isMobile ? 1 : '0 0 auto',
+              }}
+            >
+              <X size={14} />
+              Limpar
+            </button>
+          )}
 
           <button
             onClick={onRefresh}
             disabled={loading}
             style={{
-              padding: '10px 16px',
+              padding: '10px 14px',
               border: '1.5px solid #e7e5e4',
-              borderRadius: 9,
-              fontSize: 13,
-              fontWeight: 600,
+              borderRadius: 10,
+              fontSize: 12,
+              fontWeight: 800,
               background: '#fff',
               color: '#f97316',
               cursor: loading ? 'wait' : 'pointer',
@@ -131,85 +135,14 @@ export default function EcommerceCatalogControls({
               alignItems: 'center',
               justifyContent: 'center',
               gap: 6,
+              flex: isMobile ? 1 : '0 0 auto',
             }}
           >
             <RefreshCw size={14} />
             {loading ? 'Atualizando' : 'Atualizar'}
           </button>
         </div>
-
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {[
-            { label: 'Somente com estoque', active: showOnlyInStock, onClick: onStockFilterChange },
-            { label: 'Somente com foto', active: showOnlyWithImage, onClick: onImageFilterChange },
-          ].map((item) => (
-            <button
-              key={item.label}
-              onClick={item.onClick}
-              aria-pressed={item.active}
-              style={{
-                padding: '8px 14px',
-                borderRadius: 999,
-                border: item.active ? '1.5px solid #16a34a' : '1.5px solid #e7e5e4',
-                background: item.active ? '#f0fdf4' : '#fff',
-                color: item.active ? '#166534' : '#57534e',
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: 'pointer',
-              }}
-            >
-              {item.label}
-            </button>
-          ))}
-
-          {hasActiveFilters && (
-            <button
-              onClick={onClearFilters}
-              style={{
-                padding: '8px 14px',
-                borderRadius: 999,
-                border: '1.5px solid #fed7aa',
-                background: '#fff7ed',
-                color: '#c2410c',
-                fontSize: 12,
-                fontWeight: 700,
-                cursor: 'pointer',
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 5,
-              }}
-            >
-              <X size={13} />
-              Limpar filtros
-            </button>
-          )}
-        </div>
-
-        {categories.length > 2 && (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'space-between' }}>
-            {categories.map((item) => (
-              <button
-                key={item}
-                onClick={() => onCategoryChange(item)}
-                style={{
-                  flex: '1 1 auto',
-                  textAlign: 'center',
-                  padding: '6px 14px',
-                  borderRadius: 20,
-                  border: category === item ? '1.5px solid #f97316' : '1.5px solid #e7e5e4',
-                  background: category === item ? '#fff7ed' : '#fff',
-                  color: category === item ? '#ea580c' : '#78716c',
-                  fontWeight: category === item ? 700 : 500,
-                  fontSize: 12,
-                  cursor: 'pointer',
-                  transition: 'all 0.15s',
-                }}
-              >
-                {item === 'todas' ? 'Todas' : item}
-              </button>
-            ))}
-          </div>
-        )}
+      </div>
     </div>
   );
 }

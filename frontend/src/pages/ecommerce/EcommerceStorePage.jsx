@@ -1,12 +1,12 @@
 import { Search } from 'lucide-react';
 import EcommerceCatalogControls, { EcommerceCatalogSummary } from './EcommerceCatalogControls';
+import EcommerceCatalogPagination from './EcommerceCatalogPagination';
 import EcommerceCatalogProductCard from './EcommerceCatalogProductCard';
 import { EcommerceCartSidebar } from './EcommerceCartPanels';
 
 export default function EcommerceStorePage({
   cart,
   cartTotal,
-  catalogMetrics,
   categories,
   category,
   customerToken,
@@ -15,10 +15,10 @@ export default function EcommerceStorePage({
   isMobile,
   loading,
   order,
+  pagination,
   productMap,
+  productCount,
   search,
-  showOnlyInStock,
-  showOnlyWithImage,
   styles: S,
   wishlist,
   onAddToCart,
@@ -26,12 +26,11 @@ export default function EcommerceStorePage({
   onCheckout,
   onClearFilters,
   onHoverProduct,
-  onImageFilterChange,
   onOpenProduct,
   onOrderChange,
+  onPageChange,
   onRefresh,
   onSearchChange,
-  onStockFilterChange,
   onToggleWishlist,
   onViewCart,
   onNotifyMe,
@@ -39,9 +38,8 @@ export default function EcommerceStorePage({
   return (
     <>
       <EcommerceCatalogSummary
-        catalogMetrics={catalogMetrics}
         isMobile={isMobile}
-        productCount={filteredProducts.length}
+        productCount={productCount}
       />
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'minmax(0, 1fr) 300px', gap: 24, maxWidth: 1280, margin: '0 auto', padding: isMobile ? '12px 12px 28px' : '16px 20px 28px' }}>
@@ -53,16 +51,12 @@ export default function EcommerceStorePage({
             loading={loading}
             order={order}
             search={search}
-            showOnlyInStock={showOnlyInStock}
-            showOnlyWithImage={showOnlyWithImage}
             styles={S}
             onCategoryChange={onCategoryChange}
             onClearFilters={onClearFilters}
-            onImageFilterChange={onImageFilterChange}
             onOrderChange={onOrderChange}
             onRefresh={onRefresh}
             onSearchChange={onSearchChange}
-            onStockFilterChange={onStockFilterChange}
           />
 
           <div style={{ ...S.grid, gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(auto-fill, minmax(200px, 1fr))', gap: isMobile ? 10 : 16 }}>
@@ -91,6 +85,13 @@ export default function EcommerceStorePage({
               </div>
             )}
           </div>
+
+          <EcommerceCatalogPagination
+            isMobile={isMobile}
+            loading={loading}
+            pagination={pagination}
+            onPageChange={onPageChange}
+          />
         </div>
 
         <EcommerceCartSidebar
