@@ -1,12 +1,12 @@
 import { Bell, Heart, ImageOff, ShoppingCart } from 'lucide-react';
 import {
+  formatCatalogCategoryLabel,
   formatCurrency,
   getProductImages,
   hasPromotionalPrice,
   isProductOutOfStock,
   resolveOriginalProductPrice,
   resolveProductPrice,
-  resolveProductStock,
   resolveValidityPromotionText,
 } from './ecommerceMvpUtils';
 
@@ -21,9 +21,9 @@ export default function EcommerceCatalogProductCard({
   onOpen,
   onToggleWishlist,
 }) {
-  const stock = resolveProductStock(product);
   const outOfStock = isProductOutOfStock(product);
   const productImage = getProductImages(product)[0];
+  const categoryLabel = formatCatalogCategoryLabel(product?.categoria_nome || product?.categoria || 'Sem categoria');
 
   return (
     <div
@@ -56,10 +56,6 @@ export default function EcommerceCatalogProductCard({
 
         {outOfStock ? (
           <div style={S.unavailBadge}>{'Indispon\u00edvel'}</div>
-        ) : Number.isFinite(stock) && stock > 0 && stock < 9999 ? (
-          <div style={{ position: 'absolute', top: 8, left: 8, background: '#dcfce7', color: '#166534', borderRadius: 6, padding: '3px 8px', fontSize: 10, fontWeight: 700, boxShadow: '0 1px 3px rgba(0,0,0,0.08)' }}>
-            Estoque {stock}
-          </div>
         ) : null}
 
         <button
@@ -78,7 +74,7 @@ export default function EcommerceCatalogProductCard({
 
       <div style={S.cardBody}>
         <div style={S.cardName}>{product.nome}</div>
-        <div style={S.cardCat}>{product?.categoria_nome || product?.categoria || 'Sem categoria'}</div>
+        <div style={S.cardCat}>{categoryLabel}</div>
         <div style={S.cardSku}>SKU: {product?.codigo || '-'}</div>
         <div style={S.cardPrice}>{formatCurrency(resolveProductPrice(product))}</div>
 

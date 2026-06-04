@@ -28,11 +28,14 @@ import {
   trackViewCart,
 } from '../../services/analytics';
 import {
+  DEFAULT_CATALOG_LIMIT,
   STORAGE_TOKEN_KEY,
   buildActiveBanners,
+  buildCatalogQueryParams,
+  buildPaginationWindow,
   extractApiErrorMessage,
   isProductOutOfStock,
-  normalizeProductPayload,
+  normalizeCatalogPayload,
   resolveStoreDisplayName,
 } from './ecommerceMvpUtils';
 
@@ -74,18 +77,17 @@ export default function EcommerceMVP() {
   const {
     products,
     setProducts,
+    catalogMeta,
+    setCatalogMeta,
+    page: catalogPage,
+    setPage: setCatalogPage,
     search,
     setSearch,
     categoria,
     setCategoria,
-    somenteComEstoque,
-    setSomenteComEstoque,
-    somenteComImagem,
-    setSomenteComImagem,
     ordenacaoCatalogo,
     setOrdenacaoCatalogo,
     categorias,
-    catalogMetrics,
     filteredProducts,
     productMap,
     clearCatalogFilters,
@@ -129,6 +131,36 @@ export default function EcommerceMVP() {
   const storeDisplayName = useMemo(() => {
     return resolveStoreDisplayName({ tenantContext, storefrontRef });
   }, [tenantContext, storefrontRef]);
+
+  const catalogPagination = useMemo(() => {
+    return buildPaginationWindow({
+      total: catalogMeta.total,
+      limit: catalogMeta.limit || DEFAULT_CATALOG_LIMIT,
+      page: catalogPage,
+    });
+  }, [catalogMeta.limit, catalogMeta.total, catalogPage]);
+
+  const handleCatalogSearchChange = (value) => {
+    setSearch(value);
+    setCatalogPage(1);
+  };
+
+  const handleCatalogCategoryChange = (value) => {
+    setCategoria(value);
+    setCatalogPage(1);
+  };
+
+  const handleCatalogOrderChange = (value) => {
+    setOrdenacaoCatalogo(value);
+    setCatalogPage(1);
+  };
+
+  const handleCatalogPageChange = (nextPage) => {
+    setCatalogPage(nextPage);
+    if (typeof window !== 'undefined') {
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+  };
 
   const {
     cart,
@@ -314,17 +346,22 @@ export default function EcommerceMVP() {
     const params = new URLSearchParams(location.search);
     const buscaParam = params.get('busca');
     if (buscaParam) {
-      setSearch(buscaParam);
+      handleCatalogSearchChange(buscaParam);
     }
   }, [location.search]);
 
   useEffect(() => {
     // Sem slug = acesso pelo painel (usuario logado) → carrega via API autenticada
     loadTenantContext();
-    if (tenantRef) {
-      loadProducts();
-    }
   }, [tenantRef]);
+
+  useEffect(() => {
+    if (!tenantRef) return undefined;
+    const timer = setTimeout(() => {
+      loadProducts();
+    }, 220);
+    return () => clearTimeout(timer);
+  }, [tenantRef, search, categoria, ordenacaoCatalogo, catalogPage]);
 
   // Apos carregar o contexto via painel (sem slug), usar o tenant.id para buscar produtos
   // e redirecionar para a URL real da loja (/{slug})
@@ -332,11 +369,17 @@ export default function EcommerceMVP() {
     if (!tenantRef && tenantContext?.id) {
       if (tenantContext.ecommerce_slug) {
         navigate(`/${tenantContext.ecommerce_slug}`, { replace: true });
-      } else {
-        loadProductsById(tenantContext.id);
       }
     }
-  }, [tenantContext?.id]);
+  }, [tenantContext?.ecommerce_slug, tenantContext?.id, tenantRef]);
+
+  useEffect(() => {
+    if (tenantRef || !tenantContext?.id || tenantContext.ecommerce_slug) return undefined;
+    const timer = setTimeout(() => {
+      loadProductsById(tenantContext.id);
+    }, 220);
+    return () => clearTimeout(timer);
+  }, [tenantContext?.ecommerce_slug, tenantContext?.id, tenantRef, search, categoria, ordenacaoCatalogo, catalogPage]);
 
   useEffect(() => {
     const total = activeBanners.length;
@@ -362,37 +405,50 @@ export default function EcommerceMVP() {
     }
   }
 
-  async function loadProducts() {
-    if (!tenantRef) return;
+  async function loadCatalogProducts(tenantValue) {
+    if (!tenantValue) return;
     setLoading(true);
     setError('');
     try {
       const response = await ecommerceApi.get('/api/ecommerce/produtos', {
-        params: { tenant: tenantRef, limit: 500, ordenacao: 'prontos' },
+        params: buildCatalogQueryParams({
+          tenant: tenantValue,
+          search,
+          category: categoria,
+          order: ordenacaoCatalogo,
+          page: catalogPage,
+          limit: DEFAULT_CATALOG_LIMIT,
+          channel: 'ecommerce',
+        }),
       });
-      setProducts(normalizeProductPayload(response?.data));
+      const payload = normalizeCatalogPayload(response?.data);
+      setProducts(payload.items);
+      setCatalogMeta({
+        total: payload.total,
+        offset: payload.offset,
+        limit: payload.limit,
+        categories: payload.categories,
+      });
     } catch (err) {
       setProducts([]);
-      setError(extractApiErrorMessage(err, 'Erro ao carregar produtos vendáveis'));
+      setCatalogMeta({
+        total: 0,
+        offset: 0,
+        limit: DEFAULT_CATALOG_LIMIT,
+        categories: [],
+      });
+      setError(extractApiErrorMessage(err, 'Erro ao carregar produtos vendaveis'));
     } finally {
       setLoading(false);
     }
   }
 
+  async function loadProducts() {
+    return loadCatalogProducts(tenantRef);
+  }
+
   async function loadProductsById(tenantId) {
-    setLoading(true);
-    setError('');
-    try {
-      const response = await ecommerceApi.get('/api/ecommerce/produtos', {
-        params: { tenant: tenantId, limit: 500, ordenacao: 'prontos' },
-      });
-      setProducts(normalizeProductPayload(response?.data));
-    } catch (err) {
-      setProducts([]);
-      setError(extractApiErrorMessage(err, 'Erro ao carregar produtos vendáveis'));
-    } finally {
-      setLoading(false);
-    }
+    return loadCatalogProducts(tenantId);
   }
 
   function logoutCustomer() {
@@ -421,7 +477,7 @@ export default function EcommerceMVP() {
         wishlist={wishlist}
         onBannerSlideChange={setBannerSlide}
         onNavigate={setView}
-        onSearchChange={setSearch}
+        onSearchChange={handleCatalogSearchChange}
       />
 
       {!tenantRef && (
@@ -444,7 +500,6 @@ export default function EcommerceMVP() {
         <EcommerceStorePage
           cart={cart}
           cartTotal={cartTotal}
-          catalogMetrics={catalogMetrics}
           categories={categorias}
           category={categoria}
           customerToken={customerToken}
@@ -453,24 +508,23 @@ export default function EcommerceMVP() {
           isMobile={isMobile}
           loading={loading}
           order={ordenacaoCatalogo}
+          pagination={catalogPagination}
           productMap={productMap}
+          productCount={catalogMeta.total}
           search={search}
-          showOnlyInStock={somenteComEstoque}
-          showOnlyWithImage={somenteComImagem}
           styles={S}
           wishlist={wishlist}
           onAddToCart={addToCart}
-          onCategoryChange={setCategoria}
+          onCategoryChange={handleCatalogCategoryChange}
           onCheckout={handleCheckoutFromLoja}
           onClearFilters={clearCatalogFilters}
           onHoverProduct={setHoveredCard}
-          onImageFilterChange={() => setSomenteComImagem((value) => !value)}
           onNotifyMe={registerNotifyMe}
           onOpenProduct={openProductDetails}
-          onOrderChange={setOrdenacaoCatalogo}
+          onOrderChange={handleCatalogOrderChange}
+          onPageChange={handleCatalogPageChange}
           onRefresh={loadProducts}
-          onSearchChange={setSearch}
-          onStockFilterChange={() => setSomenteComEstoque((value) => !value)}
+          onSearchChange={handleCatalogSearchChange}
           onToggleWishlist={toggleWishlist}
           onViewCart={() => setView('carrinho')}
         />

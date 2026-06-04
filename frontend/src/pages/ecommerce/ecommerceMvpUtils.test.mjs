@@ -2,14 +2,19 @@ import assert from "node:assert/strict";
 import { test } from "node:test";
 
 import {
+  DEFAULT_CATALOG_LIMIT,
   buildActiveBanners,
   buildCatalogCategories,
+  buildCatalogCategoryOptions,
+  buildCatalogQueryParams,
   buildCustomerAddressFields,
   buildCustomerProfileForm,
+  buildPaginationWindow,
   buildProductMap,
   calculateCatalogMetrics,
   filterCatalogProducts,
   isCustomerProfileComplete,
+  normalizeCatalogPayload,
   resolveStoreDisplayName,
 } from "./ecommerceMvpUtils.js";
 
@@ -89,7 +94,74 @@ test("buildActiveBanners prioriza banners do tenant e cai nos padroes", () => {
     { type: "image", url: "/b1.jpg" },
     { type: "image", url: "/b3.jpg" },
   ]);
-  assert.equal(buildActiveBanners({}).every((banner) => banner.type === "text"), true);
+  assert.equal(buildActiveBanners({}).length, 3);
+  assert.ok(buildActiveBanners({}).every((banner) => banner.bg && banner.title));
+});
+
+test("buildCatalogCategoryOptions usa categorias da API com nomes limpos", () => {
+  assert.deepEqual(
+    buildCatalogCategoryOptions({
+      categories: [
+        { id: 10, nome: "Gatos>>Higiene>>Areia Higi\u00eanicas", total: 3 },
+        { id: 11, nome: "Ra\u00e7\u00f5es", total: 5 },
+      ],
+      products,
+    }),
+    [
+      { id: "todas", value: "todas", label: "Todas as categorias", total: 8 },
+      { id: "10", value: "10", label: "Areia Higi\u00eanicas", rawLabel: "Gatos>>Higiene>>Areia Higi\u00eanicas", total: 3 },
+      { id: "11", value: "11", label: "Ra\u00e7\u00f5es", rawLabel: "Ra\u00e7\u00f5es", total: 5 },
+    ]
+  );
+});
+
+test("buildCatalogQueryParams combina busca categoria ordenacao e paginacao", () => {
+  assert.deepEqual(
+    buildCatalogQueryParams({
+      tenant: "atacadao",
+      search: "gran plus",
+      category: "12",
+      order: "menor_preco",
+      page: 3,
+      limit: 24,
+      channel: "ecommerce",
+    }),
+    {
+      tenant: "atacadao",
+      busca: "gran plus",
+      categoria_id: 12,
+      ordenacao: "menor_preco",
+      offset: 48,
+      limit: 24,
+      canal: "ecommerce",
+    }
+  );
+  assert.equal(buildCatalogQueryParams({ tenant: "atacadao", order: "relevancia" }).ordenacao, "prontos");
+});
+
+test("normalizeCatalogPayload padroniza itens, total e limite", () => {
+  assert.deepEqual(normalizeCatalogPayload({ items: products, total: 73, offset: 24 }), {
+    items: products,
+    total: 73,
+    offset: 24,
+    limit: DEFAULT_CATALOG_LIMIT,
+    categories: [],
+  });
+});
+
+test("buildPaginationWindow calcula intervalo e paginas proximas", () => {
+  assert.deepEqual(buildPaginationWindow({ total: 73, limit: 24, page: 2 }), {
+    total: 73,
+    limit: 24,
+    page: 2,
+    totalPages: 4,
+    startItem: 25,
+    endItem: 48,
+    pages: [1, 2, 3, 4],
+    hasPrevious: true,
+    hasNext: true,
+  });
+  assert.deepEqual(buildPaginationWindow({ total: 0, limit: 24, page: 1 }).pages, []);
 });
 
 test("isCustomerProfileComplete exige nome completo, telefone, cpf e endereco", () => {

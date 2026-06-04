@@ -1,63 +1,68 @@
 import { useMemo, useState } from 'react';
 import {
-  buildCatalogCategories,
+  DEFAULT_CATALOG_LIMIT,
+  DEFAULT_CATALOG_ORDER,
+  buildCatalogCategoryOptions,
   buildProductMap,
-  calculateCatalogMetrics,
-  filterCatalogProducts,
 } from './ecommerceMvpUtils';
 
 export default function useEcommerceCatalog() {
   const [products, setProducts] = useState([]);
+  const [productCache, setProductCache] = useState({});
+  const [catalogMeta, setCatalogMeta] = useState({
+    total: 0,
+    offset: 0,
+    limit: DEFAULT_CATALOG_LIMIT,
+    categories: [],
+  });
+  const [page, setPage] = useState(1);
   const [search, setSearch] = useState('');
   const [categoria, setCategoria] = useState('todas');
-  const [somenteComEstoque, setSomenteComEstoque] = useState(false);
-  const [somenteComImagem, setSomenteComImagem] = useState(false);
-  const [ordenacaoCatalogo, setOrdenacaoCatalogo] = useState('prontos');
+  const [ordenacaoCatalogo, setOrdenacaoCatalogo] = useState(DEFAULT_CATALOG_ORDER);
 
   const categorias = useMemo(() => {
-    return buildCatalogCategories(products);
-  }, [products]);
-
-  const catalogMetrics = useMemo(() => {
-    return calculateCatalogMetrics(products);
-  }, [products]);
-
-  const filteredProducts = useMemo(() => {
-    return filterCatalogProducts(products, {
-      search,
-      categoria,
-      somenteComEstoque,
-      somenteComImagem,
-      ordenacaoCatalogo,
+    return buildCatalogCategoryOptions({
+      categories: catalogMeta.categories,
+      products,
     });
-  }, [products, search, categoria, somenteComEstoque, somenteComImagem, ordenacaoCatalogo]);
+  }, [catalogMeta.categories, products]);
 
-  const productMap = useMemo(() => buildProductMap(products), [products]);
+  const productMap = useMemo(() => ({
+    ...productCache,
+    ...buildProductMap(products),
+  }), [productCache, products]);
+
+  function setCatalogProducts(nextProducts) {
+    const normalizedProducts = Array.isArray(nextProducts) ? nextProducts : [];
+    setProducts(normalizedProducts);
+    setProductCache((current) => ({
+      ...current,
+      ...buildProductMap(normalizedProducts),
+    }));
+  }
 
   function clearCatalogFilters() {
     setSearch('');
     setCategoria('todas');
-    setSomenteComEstoque(false);
-    setSomenteComImagem(false);
-    setOrdenacaoCatalogo('prontos');
+    setOrdenacaoCatalogo(DEFAULT_CATALOG_ORDER);
+    setPage(1);
   }
 
   return {
     products,
-    setProducts,
+    setProducts: setCatalogProducts,
+    catalogMeta,
+    setCatalogMeta,
+    page,
+    setPage,
     search,
     setSearch,
     categoria,
     setCategoria,
-    somenteComEstoque,
-    setSomenteComEstoque,
-    somenteComImagem,
-    setSomenteComImagem,
     ordenacaoCatalogo,
     setOrdenacaoCatalogo,
     categorias,
-    catalogMetrics,
-    filteredProducts,
+    filteredProducts: products,
     productMap,
     clearCatalogFilters,
   };

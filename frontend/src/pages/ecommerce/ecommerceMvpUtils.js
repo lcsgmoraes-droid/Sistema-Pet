@@ -9,6 +9,9 @@ export const STORAGE_NOTIFY_KEY = 'ecommerce_notify_requests';
 
 const configuredApiUrl = import.meta.env?.VITE_API_URL;
 
+export const DEFAULT_CATALOG_LIMIT = 24;
+export const DEFAULT_CATALOG_ORDER = 'relevancia';
+
 export const EMPTY_CART = { pedido_id: null, itens: [], subtotal: 0, total: 0 };
 
 export const EMPTY_ADDRESS_FIELDS = {
@@ -173,12 +176,159 @@ export function normalizeProductPayload(payload) {
   return [];
 }
 
+export function normalizeCatalogPayload(payload) {
+  const items = normalizeProductPayload(payload);
+  return {
+    items,
+    total: Number(payload?.total ?? items.length) || 0,
+    offset: Number(payload?.offset ?? 0) || 0,
+    limit: Number(payload?.limit ?? DEFAULT_CATALOG_LIMIT) || DEFAULT_CATALOG_LIMIT,
+    categories: Array.isArray(payload?.categorias) ? payload.categorias : [],
+  };
+}
+
 export function buildCatalogCategories(products) {
   const all = products
     .map((item) => item?.categoria_nome || item?.categoria || 'Sem categoria')
     .filter(Boolean);
 
   return ['todas', ...Array.from(new Set(all))];
+}
+
+export function formatCatalogCategoryLabel(value) {
+  const text = String(value || '').trim();
+  if (!text) return 'Sem categoria';
+  const parts = text
+    .split(/>>|>|\/|\\/)
+    .map((part) => part.trim())
+    .filter(Boolean);
+  return parts.at(-1) || text;
+}
+
+export function buildCatalogCategoryOptions({ categories = [], products = [] } = {}) {
+  if (Array.isArray(categories) && categories.length > 0) {
+    const normalized = categories
+      .filter((item) => item?.id !== undefined && item?.id !== null)
+      .map((item) => {
+        const rawLabel = item?.nome || item?.label || 'Sem categoria';
+        return {
+          id: String(item.id),
+          value: String(item.id),
+          label: formatCatalogCategoryLabel(rawLabel),
+          rawLabel,
+          total: Number(item?.total ?? 0) || 0,
+        };
+      });
+    const total = normalized.reduce((sum, item) => sum + item.total, 0);
+    return [
+      { id: 'todas', value: 'todas', label: 'Todas as categorias', total },
+      ...normalized,
+    ];
+  }
+
+  const counts = new Map();
+  products.forEach((item) => {
+    const rawLabel = item?.categoria_nome || item?.categoria || 'Sem categoria';
+    const key = item?.categoria_id !== undefined && item?.categoria_id !== null
+      ? String(item.categoria_id)
+      : rawLabel;
+    const current = counts.get(key) || { rawLabel, total: 0 };
+    counts.set(key, { rawLabel: current.rawLabel || rawLabel, total: current.total + 1 });
+  });
+
+  return [
+    { id: 'todas', value: 'todas', label: 'Todas as categorias', total: products.length },
+    ...Array.from(counts.entries()).map(([id, item]) => ({
+      id,
+      value: id,
+      label: formatCatalogCategoryLabel(item.rawLabel),
+      rawLabel: item.rawLabel,
+      total: item.total,
+    })),
+  ];
+}
+
+export function normalizeCatalogOrder(order) {
+  const value = String(order || DEFAULT_CATALOG_ORDER).trim().toLowerCase();
+  if (value === 'relevancia' || value === 'prontos') return 'prontos';
+  if (value === 'nome') return 'nome_asc';
+  if (['nome_asc', 'menor_preco', 'maior_preco'].includes(value)) return value;
+  return 'prontos';
+}
+
+export function buildCatalogQueryParams({
+  tenant,
+  search = '',
+  category = 'todas',
+  order = DEFAULT_CATALOG_ORDER,
+  page = 1,
+  limit = DEFAULT_CATALOG_LIMIT,
+  channel,
+} = {}) {
+  const safeLimit = Math.max(1, Math.min(500, Number(limit) || DEFAULT_CATALOG_LIMIT));
+  const safePage = Math.max(1, Number(page) || 1);
+  const categoryValue = typeof category === 'object' ? category?.value : category;
+  const params = {
+    tenant,
+    ordenacao: normalizeCatalogOrder(order),
+    offset: (safePage - 1) * safeLimit,
+    limit: safeLimit,
+  };
+
+  const trimmedSearch = String(search || '').trim();
+  if (trimmedSearch) params.busca = trimmedSearch;
+
+  if (categoryValue && categoryValue !== 'todas') {
+    const numericCategory = Number(categoryValue);
+    if (Number.isFinite(numericCategory)) {
+      params.categoria_id = numericCategory;
+    }
+  }
+
+  if (channel) params.canal = channel;
+  return params;
+}
+
+export function buildPaginationWindow({ total = 0, limit = DEFAULT_CATALOG_LIMIT, page = 1, siblingCount = 1 } = {}) {
+  const safeTotal = Math.max(0, Number(total) || 0);
+  const safeLimit = Math.max(1, Number(limit) || DEFAULT_CATALOG_LIMIT);
+  const totalPages = safeTotal > 0 ? Math.ceil(safeTotal / safeLimit) : 0;
+  const safePage = totalPages > 0 ? Math.min(Math.max(1, Number(page) || 1), totalPages) : 1;
+
+  if (totalPages === 0) {
+    return {
+      total: safeTotal,
+      limit: safeLimit,
+      page: safePage,
+      totalPages,
+      startItem: 0,
+      endItem: 0,
+      pages: [],
+      hasPrevious: false,
+      hasNext: false,
+    };
+  }
+
+  const pages = new Set([1, totalPages]);
+  if (totalPages <= 7) {
+    for (let item = 1; item <= totalPages; item += 1) pages.add(item);
+  } else {
+    for (let item = safePage - siblingCount; item <= safePage + siblingCount; item += 1) {
+      if (item >= 1 && item <= totalPages) pages.add(item);
+    }
+  }
+
+  return {
+    total: safeTotal,
+    limit: safeLimit,
+    page: safePage,
+    totalPages,
+    startItem: (safePage - 1) * safeLimit + 1,
+    endItem: Math.min(safePage * safeLimit, safeTotal),
+    pages: Array.from(pages).sort((left, right) => left - right),
+    hasPrevious: safePage > 1,
+    hasNext: safePage < totalPages,
+  };
 }
 
 export function calculateCatalogMetrics(products) {
@@ -250,7 +400,7 @@ export function filterCatalogProducts(
       return rightPrice - leftPrice || leftName.localeCompare(rightName, 'pt-BR');
     }
 
-    if (ordenacaoCatalogo === 'nome') {
+    if (ordenacaoCatalogo === 'nome' || ordenacaoCatalogo === 'nome_asc') {
       return leftName.localeCompare(rightName, 'pt-BR');
     }
 
@@ -272,7 +422,7 @@ export function buildActiveBanners(tenantContext) {
   ].filter(Boolean);
 
   if (urls.length > 0) return urls.map((url) => ({ type: 'image', url }));
-  return BANNERS.map((banner) => ({ ...banner, type: 'text' }));
+  return BANNERS;
 }
 
 export function isCustomerProfileComplete(customer) {
