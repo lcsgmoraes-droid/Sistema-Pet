@@ -157,7 +157,6 @@ def upgrade() -> None:
         type_=sa.String(length=20),
         existing_nullable=True,
     )
-    _preencher_codigos_existentes()
     op.alter_column(
         "produtos",
         "gtin_ean_tributario",
@@ -165,6 +164,7 @@ def upgrade() -> None:
         type_=sa.String(length=20),
         existing_nullable=True,
     )
+    _preencher_codigos_existentes()
 
 
 def downgrade() -> None:
