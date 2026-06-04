@@ -88,6 +88,8 @@ const montarFiltroLimpo = (baseFiltros) => {
         filtrosLimpos[key] = true;
       } else if (valor === "inativos") {
         filtrosLimpos[key] = false;
+      } else if (valor === "todos") {
+        filtrosLimpos.incluir_inativos = true;
       }
       return;
     }

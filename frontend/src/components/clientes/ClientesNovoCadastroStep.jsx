@@ -1,16 +1,41 @@
 import { FiCheck, FiDollarSign } from "react-icons/fi";
 
+function formatarDataHoraCadastro(valor) {
+  if (!valor) return "Data nao registrada";
+  const data = new Date(valor);
+  if (Number.isNaN(data.getTime())) return "Data nao registrada";
+  return new Intl.DateTimeFormat("pt-BR", {
+    dateStyle: "short",
+    timeStyle: "short",
+  }).format(data);
+}
+
 const ClientesNovoCadastroStep = ({
   formData,
   setFormData,
   setShowDuplicadoWarning,
   setClienteDuplicado,
+  editingCliente,
 }) => {
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-gray-900 mb-4">
         Informações do cadastro
       </h3>
+
+      {editingCliente?.id && (
+        <div className="rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-600">
+          <div className="font-medium text-slate-700">
+            Cadastro criado em {formatarDataHoraCadastro(editingCliente.created_at)}
+          </div>
+          <div>
+            Criado por{" "}
+            {editingCliente.criado_por_nome ||
+              editingCliente.criado_por_email ||
+              "Usuario nao registrado"}
+          </div>
+        </div>
+      )}
 
       {/* Tipo de Cadastro */}
       <div>

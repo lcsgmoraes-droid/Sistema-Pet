@@ -207,6 +207,17 @@ class Venda(BaseTenantModel):
             'tipo_retirada': self.tipo_retirada,
             'palavra_chave_retirada': self.palavra_chave_retirada,
             'retirado_por': self.retirado_por,
+            'cancelada_por': self.cancelada_por,
+            'cancelada_por_nome': (
+                getattr(self.cancelador, 'nome', None)
+                or getattr(self.cancelador, 'email', None)
+            ) if getattr(self, 'cancelador', None) else None,
+            'cancelada_por_email': (
+                getattr(self.cancelador, 'email', None)
+                if getattr(self, 'cancelador', None) else None
+            ),
+            'motivo_cancelamento': self.motivo_cancelamento,
+            'data_cancelamento': safe_datetime_to_iso(self.data_cancelamento),
             'data_venda': safe_datetime_to_iso(self.data_venda),
             'data_finalizacao': safe_datetime_to_iso(self.data_finalizacao),
             'observacoes': self.observacoes,

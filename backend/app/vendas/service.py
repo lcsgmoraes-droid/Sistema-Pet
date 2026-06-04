@@ -867,7 +867,7 @@ class VendaService:
             
             venda = db.query(Venda).filter_by(
                 id=venda_id,
-                user_id=user_id
+                tenant_id=tenant_id
             ).first()
             
             if not venda:
@@ -1072,7 +1072,7 @@ class VendaService:
             venda.data_cancelamento = now_brasilia()
             venda.updated_at = now_brasilia()
 
-            if venda.status in ['baixa_parcial', 'finalizada']:
+            if status_anterior in ['baixa_parcial', 'finalizada']:
                 get_or_build_venda_rentabilidade_snapshot(
                     venda,
                     db,
