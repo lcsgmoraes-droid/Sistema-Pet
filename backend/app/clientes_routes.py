@@ -116,6 +116,38 @@ def _obter_cliente_ou_404(db: Session, cliente_id: int, tenant_id: str):
     return cliente
 
 
+def _anexar_metadados_criacao_cliente(db: Session, clientes):
+    lista = clientes if isinstance(clientes, list) else [clientes]
+    user_ids = {
+        cliente.user_id
+        for cliente in lista
+        if getattr(cliente, "user_id", None)
+    }
+    usuarios_por_id = {}
+    if user_ids:
+        usuarios_por_id = {
+            usuario.id: usuario
+            for usuario in db.query(User).filter(User.id.in_(user_ids)).all()
+        }
+
+    for cliente in lista:
+        criado_por_id = getattr(cliente, "user_id", None)
+        usuario = usuarios_por_id.get(criado_por_id)
+        setattr(cliente, "criado_por_id", criado_por_id)
+        setattr(
+            cliente,
+            "criado_por_nome",
+            (getattr(usuario, "nome", None) or getattr(usuario, "email", None))
+            if usuario else None,
+        )
+        setattr(
+            cliente,
+            "criado_por_email",
+            getattr(usuario, "email", None) if usuario else None,
+        )
+    return clientes
+
+
 # ========== UTILITÃRIOS ==========
 
 def gerar_codigo_cliente(db: Session, tipo_cadastro: str, tipo_pessoa: str, tenant_id: int) -> str:
@@ -502,6 +534,9 @@ class ClienteResponse(BaseModel):
     credito: Optional[Decimal] = Decimal('0.00')
     created_at: dt
     updated_at: dt
+    criado_por_id: Optional[int] = None
+    criado_por_nome: Optional[str] = None
+    criado_por_email: Optional[str] = None
     pets: List[PetResponse] = []
     
     @validator('parceiro_ativo', pre=True)
@@ -679,6 +714,7 @@ def create_cliente(
     # Log de auditoria
     log_create(db, current_user.id, "cliente", novo_cliente.id, cliente_data.model_dump())
     
+    _anexar_metadados_criacao_cliente(db, novo_cliente)
     return novo_cliente
 
 
@@ -815,6 +851,8 @@ def list_clientes(
         for c in clientes:
             if str(c.tenant_id) != tenant_id_str:
                 c.de_parceiro = True
+
+        _anexar_metadados_criacao_cliente(db, clientes)
 
         return ClientesListResponse(
             items=clientes,
@@ -1134,6 +1172,7 @@ def get_cliente(
     """Obter cliente por ID"""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
+    _anexar_metadados_criacao_cliente(db, cliente)
     return cliente
 
 
@@ -1303,6 +1342,8 @@ def update_cliente(
     
     # Log de auditoria
     log_update(db, current_user.id, "cliente", cliente.id, old_data, update_data)
+
+    _anexar_metadados_criacao_cliente(db, cliente)
     
     # ðŸ“¢ PREPARAR RESPOSTA COM AVISO SOBRE COMISSÃ•ES
     response = {
@@ -1320,7 +1361,10 @@ def update_cliente(
         "data_fechamento_comissao": cliente.data_fechamento_comissao,
         "ativo": cliente.ativo,
         "created_at": cliente.created_at,
-        "updated_at": cliente.updated_at
+        "updated_at": cliente.updated_at,
+        "criado_por_id": getattr(cliente, "criado_por_id", None),
+        "criado_por_nome": getattr(cliente, "criado_por_nome", None),
+        "criado_por_email": getattr(cliente, "criado_por_email", None),
     }
     
     # Adicionar aviso se comissÃµes foram desativadas

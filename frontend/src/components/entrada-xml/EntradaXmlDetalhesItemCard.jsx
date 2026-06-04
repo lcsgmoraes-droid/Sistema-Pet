@@ -68,6 +68,12 @@ function EntradaXmlDetalhesItemCard({
                                 <span className="font-mono font-semibold">{item.ean}</span>
                               </div>
                             )}
+                            {item.ean_tributario && item.ean_tributario !== item.ean && item.ean_tributario !== 'SEM GTIN' && (
+                              <div className="flex justify-between">
+                                <span className="text-gray-600">EAN fiscal:</span>
+                                <span className="font-mono font-semibold">{item.ean_tributario}</span>
+                              </div>
+                            )}
                             <div className="flex justify-between">
                               <span className="text-gray-600">NCM:</span>
                               <span className="font-mono font-semibold">{item.ncm}</span>
@@ -243,11 +249,27 @@ function EntradaXmlDetalhesItemCard({
                                       </span>
                                     </div>
                                     <div className="flex items-center justify-between gap-2">
-                                      <span className="font-semibold text-gray-600">EAN:</span>
+                                      <span className="font-semibold text-gray-600">Cod. barras:</span>
                                       <span className="font-mono text-gray-900">
                                         {item.produto_ean || 'Nao informado'}
                                       </span>
                                     </div>
+                                    {item.produto_gtin_ean && (
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span className="font-semibold text-gray-600">EAN comercial:</span>
+                                        <span className="font-mono text-gray-900">
+                                          {item.produto_gtin_ean}
+                                        </span>
+                                      </div>
+                                    )}
+                                    {item.produto_ean_tributario && (
+                                      <div className="flex items-center justify-between gap-2">
+                                        <span className="font-semibold text-gray-600">EAN fiscal:</span>
+                                        <span className="font-mono text-gray-900">
+                                          {item.produto_ean_tributario}
+                                        </span>
+                                      </div>
+                                    )}
                                     {item.origem_vinculo_automatico && item.referencia_vinculo && (
                                       <div className="mt-2 rounded border border-emerald-200 bg-emerald-50 p-2 text-emerald-800">
                                         Match automatico por <strong>{item.origem_vinculo_automatico === 'codigo_barras' ? 'codigo de barras' : 'SKU'}</strong>: <strong>{item.referencia_vinculo}</strong>

@@ -397,6 +397,9 @@ export function normalizarProdutoPreview(item) {
     produto_nome: item.produto_nome,
     produto_codigo: item.produto_codigo,
     produto_ean: item.produto_ean,
+    produto_codigo_barras: item.produto_codigo_barras,
+    produto_gtin_ean: item.produto_gtin_ean,
+    produto_ean_tributario: item.produto_ean_tributario,
     custo_anterior: item.custo_anterior,
     custo_novo: item.custo_novo,
     variacao_custo_percentual: item.variacao_custo_percentual,
@@ -448,7 +451,14 @@ export function detectarDivergencias(item) {
   const descNF = item.descricao_nf || item.descricao || '';
   const descProd = produtoNome || '';
 
-  if (!descNF || !descProd) return [];
+  const divergenciaCodigoBarras = item.divergencia_codigo_barras;
+  if (divergenciaCodigoBarras?.tem_divergencia && Array.isArray(divergenciaCodigoBarras.mensagens)) {
+    divergenciaCodigoBarras.mensagens.forEach((mensagem) => {
+      if (mensagem) divergencias.push(mensagem);
+    });
+  }
+
+  if (!descNF || !descProd) return divergencias;
 
   const normalizarTexto = (txt) =>
     (txt || '')

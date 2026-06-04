@@ -3,7 +3,7 @@ import { useNavigate } from "react-router-dom";
 import toast from "react-hot-toast";
 import api from "../api";
 import { buscarClientePorId } from "../api/clientes";
-import { buscarVenda } from "../api/vendas";
+import { buscarVenda, cancelarVenda } from "../api/vendas";
 import { debugLog } from "../utils/debug";
 import {
   emitirNotaFiscalAssistida,
@@ -149,17 +149,29 @@ export function usePDVVendaFinalizacao({
     if (!vendaAtual.id) return;
 
     const confirmar = window.confirm(
-      "Deseja realmente excluir esta venda?\n\nEsta a\u00e7\u00e3o n\u00e3o pode ser desfeita e o estoque ser\u00e1 devolvido.",
+      "Deseja cancelar/excluir esta venda?\n\nEla continuara rastreavel no historico, e o estoque sera devolvido.",
     );
 
     if (!confirmar) return;
 
+    const motivo = window.prompt(
+      "Informe a justificativa do cancelamento/exclusao da venda:",
+    );
+
+    if (!motivo) return;
+
+    const motivoNormalizado = motivo.trim();
+    if (motivoNormalizado.length < 10) {
+      alert("Informe uma justificativa com pelo menos 10 caracteres.");
+      return;
+    }
+
     try {
       setLoading(true);
-      await api.delete(`/vendas/${vendaAtual.id}`);
+      await cancelarVenda(vendaAtual.id, motivoNormalizado);
       limparVenda();
       carregarVendasRecentes();
-      alert("Venda exclu\u00edda com sucesso!");
+      alert("Venda cancelada com sucesso e mantida no historico.");
     } catch (error) {
       console.error("Erro ao excluir venda:", error);
       alert(montarMensagemErroExclusao(error.response?.data?.detail));

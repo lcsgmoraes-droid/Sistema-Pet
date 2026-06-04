@@ -277,7 +277,22 @@ class FinalizarVendaRequest(BaseModel):
     cupom_discount_applied: Optional[float] = None
 
 class CancelarVendaRequest(BaseModel):
-    motivo: str
+    motivo: Optional[str] = None
+
+
+class ExcluirVendaRequest(BaseModel):
+    motivo: Optional[str] = None
+    justificativa: Optional[str] = None
+
+
+def _normalizar_motivo_exclusao_venda(motivo: Optional[str]) -> str:
+    motivo_normalizado = (motivo or "").strip()
+    if len(motivo_normalizado) < 10:
+        raise HTTPException(
+            status_code=400,
+            detail="Informe uma justificativa com pelo menos 10 caracteres para excluir/cancelar a venda.",
+        )
+    return motivo_normalizado
 
 # [DEPRECATED - Sprint 1 BLOCO 3] Movido para app/api/endpoints/configuracoes_entrega.py
 # class ConfiguracaoEntregaSchema(BaseModel):
@@ -1292,19 +1307,20 @@ async def cancelar_venda(
     """
     from app.vendas.service import VendaService
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
+    motivo_final = _normalizar_motivo_exclusao_venda(dados.motivo)
 
     set_user_id(current_user.id)
     struct_logger.info(
         event="VENDA_CANCELAMENTO_START",
         message="Iniciando cancelamento de venda via service",
         venda_id=venda_id,
-        motivo=dados.motivo
+        motivo=motivo_final
     )
 
     # Chamar service (toda lógica de negócio está lá)
     resultado = VendaService.cancelar_venda(
         venda_id=venda_id,
-        motivo=dados.motivo,
+        motivo=motivo_final,
         user_id=current_user.id,
         tenant_id=tenant_id,
         db=db
@@ -1874,286 +1890,74 @@ def excluir_pagamento(
 @router.delete('/{venda_id}')
 def excluir_venda(
     venda_id: int,
+    dados: Optional[ExcluirVendaRequest] = None,
+    motivo: Optional[str] = Query(None, description="Justificativa para cancelar/excluir a venda"),
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
-    """Excluir uma venda e devolver estoque"""
-    from sqlalchemy.exc import IntegrityError
+    """Cancelar uma venda mantendo rastreabilidade para auditoria."""
     from app.rotas_entrega_models import RotaEntrega
+    from app.vendas.service import VendaService
 
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
 
-    logger.info(f"🗑️  INICIANDO EXCLUSÃO - Venda ID: {venda_id}, User: {current_user.id}, Tenant: {tenant_id}")
+    motivo_payload = motivo
+    if dados:
+        motivo_payload = motivo_payload or dados.motivo or dados.justificativa
+    motivo_final = _normalizar_motivo_exclusao_venda(motivo_payload)
 
-    try:
-        # Buscar a venda
-        venda = db.query(Venda).filter_by(
-            id=venda_id,
-            tenant_id=tenant_id
-        ).first()
+    venda = db.query(Venda).filter_by(
+        id=venda_id,
+        tenant_id=tenant_id
+    ).first()
 
-        if not venda:
-            logger.warning(f"⚠️  Venda {venda_id} não encontrada para exclusão")
-            raise HTTPException(status_code=404, detail='Venda não encontrada')
+    if not venda:
+        raise HTTPException(status_code=404, detail='Venda nao encontrada')
 
-        logger.info(f"✅ Venda encontrada: #{venda.numero_venda}, Status: {venda.status}")
-
-        # Verificar se a venda tem NF emitida
-        if venda.status == 'pago_nf':
-            logger.warning(f"🚫 Venda {venda_id} tem NF-e emitida, bloqueando exclusão")
-            raise HTTPException(
-                status_code=400,
-                detail='Não é possível excluir uma venda com NF-e emitida. Cancele a nota fiscal primeiro.'
-            )
-
-        # Verificar se a venda está finalizada
-        if venda.status == 'finalizada':
-            logger.warning(f"🚫 Venda {venda_id} está finalizada, bloqueando exclusão")
-            raise HTTPException(
-                status_code=400,
-                detail='Não é possível excluir uma venda finalizada. Estorne os pagamentos primeiro.'
-            )
-
-        # ✅ NOVO: Verificar se a venda está vinculada a uma rota de entrega
-        rota_vinculada = db.query(RotaEntrega).filter_by(venda_id=venda_id).first()
-        if rota_vinculada:
-            passos_resolucao = [
-                f"1. Acesse a rota de entrega #{rota_vinculada.id}",
-                "2. Remova esta venda da rota",
-                "3. Tente excluir a venda novamente"
-            ]
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    'erro': 'Venda vinculada a uma rota de entrega',
-                    'mensagem': f'Esta venda está associada à Rota #{rota_vinculada.id} (Status: {rota_vinculada.status})',
-                    'solucao': 'Para excluir esta venda, primeiro remova-a da rota de entrega.',
-                    'passos': passos_resolucao,
-                    'rota_id': rota_vinculada.id,
-                    'rota_status': rota_vinculada.status
-                }
-            )
-
-        # 💾 GUARDAR itens para estorno DEPOIS de deletar (evita conflito)
-        itens = db.query(VendaItem).filter_by(venda_id=venda_id).all()
-        itens_para_estorno = [(item.produto_id, float(item.quantidade), item.tipo) for item in itens if item.produto_id]
-        numero_venda = venda.numero_venda  # Guardar número antes de deletar
-        logger.info(f"🔍 EXCLUIR VENDA: Armazenando {len(itens_para_estorno)} itens para estorno posterior")
-        logger.info(f"📝 Auditoria: Venda #{venda.id} ({numero_venda}) será excluída - Total: R$ {venda.total} - {len(itens)} itens")
-
-        # 💰 IMPORTANTE: Excluir movimentações de caixa relacionadas
-        from app.caixa_models import MovimentacaoCaixa
-        movimentacoes = db.query(MovimentacaoCaixa).filter_by(venda_id=venda_id).all()
-        for mov in movimentacoes:
-            logger.info(f"🗑️ Removendo movimentação de caixa: R$ {mov.valor} ({mov.tipo})")
-            db.delete(mov)
-
-        # 🚚 IMPORTANTE: Excluir paradas de entrega relacionadas e reverter status da venda
-        from app.rotas_entrega_models import RotaEntregaParada
-        paradas = db.query(RotaEntregaParada).filter_by(venda_id=venda_id).all()
-        for parada in paradas:
-            logger.info(f"🚚 Removendo parada de entrega da rota #{parada.rota_id}")
-            db.delete(parada)
-
-        # Reverter status de entrega para None (venda excluída não precisa de entrega)
-        venda.status_entrega = None
-
-        # 🏦 ESTORNAR MOVIMENTAÇÕES BANCÁRIAS
-        from app.financeiro_models import MovimentacaoFinanceira, ContaBancaria, LancamentoManual
-
-        movimentacoes_bancarias = db.query(MovimentacaoFinanceira).filter(
-            MovimentacaoFinanceira.origem_tipo == 'venda',
-            MovimentacaoFinanceira.origem_id == venda_id
-        ).all()
-        for mov_banc in movimentacoes_bancarias:
-            # 🔒 SEGURANÇA: Validar que a conta bancária pertence ao usuário
-            conta_bancaria = get_by_id_user(
-                db=db,
-                model=ContaBancaria,
-                entity_id=mov_banc.conta_bancaria_id,
-                user_id=current_user.id,
-                error_message="Conta bancária não encontrada"
-            )
-            if conta_bancaria:
-                if mov_banc.tipo == 'receita':
-                    conta_bancaria.saldo_atual -= mov_banc.valor
-                    logger.info(f"🏦 Estornando saldo bancário: {conta_bancaria.nome} -R$ {mov_banc.valor}")
-                elif mov_banc.tipo == 'despesa':
-                    conta_bancaria.saldo_atual += mov_banc.valor
-                    logger.info(f"🏦 Estornando saldo bancário: {conta_bancaria.nome} +R$ {mov_banc.valor}")
-
-            db.delete(mov_banc)
-
-        # 📊 CANCELAR LANÇAMENTOS MANUAIS (Fluxo de Caixa)
-        # Buscar por documento VENDA-{id} ou por venda vinculada
-        lancamentos = db.query(LancamentoManual).filter(
-            or_(
-                LancamentoManual.documento == f"VENDA-{venda_id}",
-                LancamentoManual.documento.like(f"VENDA-{venda_id}-%")
-            )
-        ).all()
-
-        for lanc in lancamentos:
-            if lanc.status == 'previsto':
-                # Apenas remover se ainda não foi realizado
-                logger.info(f"📊 Removendo lançamento previsto: {lanc.descricao} - R$ {lanc.valor}")
-                db.delete(lanc)
-            elif lanc.status == 'realizado':
-                # Marcar como cancelado (manter histórico)
-                lanc.status = 'cancelado'
-                logger.info(f"📊 Cancelando lançamento realizado: {lanc.descricao} - R$ {lanc.valor}")
-
-        # Excluir pagamentos (se houver)
-        db.query(VendaPagamento).filter_by(venda_id=venda_id).delete()
-
-        # Excluir/Cancelar contas a receber vinculadas
-        contas_receber = db.query(ContaReceber).filter_by(venda_id=venda_id).all()
-        for conta in contas_receber:
-            if conta.status == 'pendente' or conta.status == 'parcial':
-                # Pode excluir contas pendentes
-                logger.info(f"💳 Removendo conta a receber: {conta.descricao} - R$ {conta.valor_original}")
-                db.delete(conta)
-            elif conta.status == 'recebido':
-                # Marcar como cancelada (manter histórico)
-                conta.status = 'cancelado'
-                logger.info(f"💳 Cancelando conta já recebida: {conta.descricao} - R$ {conta.valor_recebido}")
-
-        # Excluir itens
-        db.query(VendaItem).filter_by(venda_id=venda_id).delete()
-
-        from app.campaigns.coupon_service import reverse_coupon_redemptions_for_sale
-        from app.campaigns.loyalty_service import void_loyalty_stamps_for_sale
-
-        reverse_coupon_redemptions_for_sale(
-            db,
-            tenant_id=tenant_id,
-            venda_id=venda_id,
-            reason="Venda excluida",
-        )
-
-        void_loyalty_stamps_for_sale(
-            db,
-            tenant_id=tenant_id,
-            venda_id=venda_id,
-            reason="Venda excluida",
-        )
-
-        # Excluir venda
-        logger.info(f"🗑️  DELETANDO venda do banco: ID={venda_id}, Numero={venda.numero_venda}")
-        db.delete(venda)
-
-        # ✅ AGORA SIM: Estornar estoque DEPOIS de deletar dados da venda (evita conflito de ordem)
-        logger.info(f"📦 INICIANDO ESTORNO DE ESTOQUE: {len(itens_para_estorno)} itens")
-        for produto_id, quantidade, tipo in itens_para_estorno:
-            logger.info(f"  → Produto: {produto_id}, Qtd: {quantidade}, Tipo: {tipo}")
-            try:
-                logger.info(f"📦 Estornando estoque: Produto {produto_id} +{quantidade}")
-                resultado_estorno = EstoqueService.estornar_estoque(
-                    produto_id=produto_id,
-                    quantidade=quantidade,
-                    motivo='cancelamento',
-                    referencia_id=venda_id,
-                    referencia_tipo='venda_excluida',
-                    user_id=current_user.id,
-                    tenant_id=tenant_id,
-                    db=db,
-                    documento=numero_venda,
-                    observacao=f'Venda {numero_venda} excluída'
-                )
-                logger.info(f"✅ Estoque estornado com sucesso: {resultado_estorno}")
-                logger.info(f"🔍 DEBUG: Movimentação ID={resultado_estorno.get('movimentacao_id')}, Estoque: {resultado_estorno.get('estoque_anterior')} → {resultado_estorno.get('estoque_novo')}")
-                logger.info(f"📝 Auditoria: Estorno de estoque (+{quantidade}) - Venda {numero_venda} excluída")
-
-            except ValueError as e:
-                logger.error(f"Erro ao estornar estoque: {e}")
-
-        # 🔍 DEBUG: Verificar movimentações pendentes antes do commit
-        pending_movs = [obj for obj in db.new if obj.__class__.__name__ == 'EstoqueMovimentacao']
-        logger.info(f"🔍 DEBUG: Movimentações pendentes ANTES do commit: {len(pending_movs)}")
-        for mov in pending_movs:
-            logger.info(f"  → Mov ID={mov.id}, tipo={mov.tipo}, produto_id={mov.produto_id}, qtd={mov.quantidade}")
-
-        # Commit da transação
-        logger.info(f"💾 EXECUTANDO COMMIT...")
-        db.commit()
-        logger.info(f"✅ COMMIT CONCLUÍDO!")
-        logger.info(f"✅ ✅ VENDA EXCLUÍDA COM SUCESSO: ID={venda_id}")
-
-        return {
-            'message': 'Venda excluída com sucesso',
-            'itens_devolvidos': len(itens)
-        }
-
-    except IntegrityError as e:
-        # ✅ Tratamento amigável para erros de integridade referencial
-        db.rollback()
-        logger.error(f"❌ IntegrityError ao excluir venda: {e}")
-
-        erro_msg = str(e.orig)
-
-        # Identificar tipo de violação
-        if 'rotas_entrega' in erro_msg:
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    'erro': 'Venda vinculada a uma rota de entrega',
-                    'mensagem': 'Esta venda ainda está associada a uma ou mais rotas de entrega.',
-                    'solucao': 'Remova a venda da rota de entrega antes de excluí-la.',
-                    'passos': [
-                        '1. Acesse o menu de Rotas de Entrega',
-                        '2. Encontre a rota que contém esta venda',
-                        '3. Remova a venda da rota',
-                        '4. Tente excluir a venda novamente'
-                    ],
-                    'detalhes_tecnicos': erro_msg if current_user.is_admin else None
-                }
-            )
-        elif 'contas_receber' in erro_msg:
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    'erro': 'Venda possui contas a receber vinculadas',
-                    'mensagem': 'Esta venda possui contas a receber que precisam ser tratadas.',
-                    'solucao': 'Cancele ou exclua as contas a receber vinculadas antes de excluir a venda.',
-                    'passos': [
-                        '1. Acesse Financeiro > Contas a Receber',
-                        '2. Filtre pela venda',
-                        '3. Cancele ou exclua as contas pendentes',
-                        '4. Tente excluir a venda novamente'
-                    ],
-                    'detalhes_tecnicos': erro_msg if current_user.is_admin else None
-                }
-            )
-        else:
-            # Erro genérico de integridade
-            raise HTTPException(
-                status_code=400,
-                detail={
-                    'erro': 'Não é possível excluir esta venda',
-                    'mensagem': 'Esta venda está vinculada a outros registros no sistema.',
-                    'solucao': 'Remova ou cancele os vínculos antes de excluir a venda.',
-                    'passos': [
-                        '1. Verifique se existem rotas de entrega vinculadas',
-                        '2. Verifique contas a receber pendentes',
-                        '3. Entre em contato com o suporte se o problema persistir'
-                    ],
-                    'detalhes_tecnicos': erro_msg if current_user.is_admin else None
-                }
-            )
-
-    except HTTPException:
-        db.rollback()
-        raise
-
-    except Exception as e:
-        # ❌ Capturar QUALQUER outra exceção que possa estar causando rollback
-        db.rollback()
-        logger.error(f"❌ ERRO INESPERADO ao excluir venda {venda_id}: {type(e).__name__}: {e}", exc_info=True)
+    if venda.status == 'pago_nf':
         raise HTTPException(
-            status_code=500,
-            detail=f'Erro inesperado ao excluir venda: {str(e)}'
+            status_code=400,
+            detail='Nao e possivel cancelar/excluir uma venda com NF-e emitida. Cancele a nota fiscal primeiro.'
         )
 
+    rota_vinculada = db.query(RotaEntrega).filter_by(venda_id=venda_id).first()
+    if rota_vinculada:
+        passos_resolucao = [
+            f"1. Acesse a rota de entrega #{rota_vinculada.id}",
+            "2. Remova esta venda da rota",
+            "3. Tente cancelar/excluir a venda novamente",
+        ]
+        raise HTTPException(
+            status_code=400,
+            detail={
+                'erro': 'Venda vinculada a uma rota de entrega',
+                'mensagem': f'Esta venda esta associada a Rota #{rota_vinculada.id} (Status: {rota_vinculada.status})',
+                'solucao': 'Para cancelar/excluir esta venda, primeiro remova-a da rota de entrega.',
+                'passos': passos_resolucao,
+                'rota_id': rota_vinculada.id,
+                'rota_status': rota_vinculada.status
+            }
+        )
+
+    logger.info(
+        "Cancelando venda por rota DELETE preservando auditoria: venda_id=%s user_id=%s tenant_id=%s",
+        venda_id,
+        current_user.id,
+        tenant_id,
+    )
+    resultado = VendaService.cancelar_venda(
+        venda_id=venda_id,
+        motivo=motivo_final,
+        user_id=current_user.id,
+        tenant_id=tenant_id,
+        db=db,
+    )
+
+    return {
+        'message': 'Venda cancelada com sucesso e mantida no historico',
+        'venda': resultado['venda'],
+        'itens_devolvidos': resultado['estornos'].get('itens_estornados', 0),
+    }
 
 @router.post('/{venda_id}/devolucao')
 def registrar_devolucao(

@@ -154,6 +154,7 @@ const ClientesNovoWizardModal = ({
               setFormData={setFormData}
               setShowDuplicadoWarning={setShowDuplicadoWarning}
               setClienteDuplicado={setClienteDuplicado}
+              editingCliente={editingCliente}
             />
           )}
 

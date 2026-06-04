@@ -99,6 +99,15 @@ def _normalizar_sku_produto(sku: Optional[str]) -> str:
     return sku_normalizado
 
 
+def _normalizar_filtro_ativo_produtos(
+    ativo: Optional[bool],
+    incluir_inativos: bool = False,
+) -> Optional[bool]:
+    if incluir_inativos:
+        return None
+    return ativo
+
+
 def _normalizar_promocao_erp_payload(
     dados: dict[str, Any],
     produto_atual: Optional[Produto] = None,
@@ -1967,6 +1976,7 @@ def listar_produtos(
     incluir_imagens: bool = False,
     incluir_lotes: bool = False,
     incluir_detalhes_composto: bool = False,
+    incluir_inativos: bool = False,
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
@@ -1981,6 +1991,7 @@ def listar_produtos(
     """
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     termo_busca = (busca or "").strip()
+    ativo = _normalizar_filtro_ativo_produtos(ativo, incluir_inativos)
 
     # Incluir produtos de tenants parceiros (ex.: pet shop parceiro da clínica)
     access_ids = get_all_accessible_tenant_ids(db, tenant_id)
