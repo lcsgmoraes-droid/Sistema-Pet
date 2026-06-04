@@ -808,6 +808,7 @@ def parse_nfe_xml(xml_content: str) -> dict:
             valor_unitario = float(prod.find('nfe:vUnCom', ns).text) if prod.find('nfe:vUnCom', ns) is not None else 0
             valor_total_item = float(prod.find('nfe:vProd', ns).text) if prod.find('nfe:vProd', ns) is not None else 0
             ean = prod.find('nfe:cEAN', ns).text if prod.find('nfe:cEAN', ns) is not None else ''
+            ean_tributario = prod.find('nfe:cEANTrib', ns).text if prod.find('nfe:cEANTrib', ns) is not None else ''
             
             # Extrair lote e validade da tag <rastro> (rastreabilidade)
             lote = ''
@@ -914,6 +915,7 @@ def parse_nfe_xml(xml_content: str) -> dict:
                 'valor_unitario': valor_unitario,
                 'valor_total': valor_total_item,
                 'ean': ean,
+                'ean_tributario': ean_tributario,
                 'lote': lote,
                 'data_validade': data_validade
             })
@@ -1165,13 +1167,91 @@ def normalizar_codigo_barras(valor: Optional[str]) -> str:
     return re.sub(r"\D", "", str(valor))
 
 
+def _codigo_barras_valido_nf(valor: Optional[str]) -> str:
+    texto = str(valor or "").strip()
+    if not texto:
+        return ""
+    if texto.upper().replace(" ", "") == "SEMGTIN":
+        return ""
+    return normalizar_codigo_barras(texto)
+
+
+def _codigos_barras_nf(item: Any) -> Dict[str, str]:
+    ean = _codigo_barras_valido_nf(getattr(item, "ean", None))
+    ean_tributario = _codigo_barras_valido_nf(getattr(item, "ean_tributario", None))
+    return {
+        "ean": ean,
+        "ean_tributario": ean_tributario,
+        "principal": ean_tributario or ean,
+    }
+
+
+def _preencher_campo_codigo_barras_vazio(produto: Produto, campo: str, valor: str) -> bool:
+    if not valor:
+        return False
+    atual = _codigo_barras_valido_nf(getattr(produto, campo, None))
+    if atual:
+        return False
+    setattr(produto, campo, valor)
+    return True
+
+
+def _aplicar_codigos_barras_item_no_produto(produto: Produto, item: NotaEntradaItem) -> bool:
+    """Preenche codigos vindos da NF-e sem sobrescrever cadastro divergente."""
+    codigos = _codigos_barras_nf(item)
+    atualizou = False
+
+    atualizou = _preencher_campo_codigo_barras_vazio(produto, "gtin_ean", codigos["ean"]) or atualizou
+    atualizou = _preencher_campo_codigo_barras_vazio(
+        produto,
+        "gtin_ean_tributario",
+        codigos["ean_tributario"],
+    ) or atualizou
+    atualizou = _preencher_campo_codigo_barras_vazio(produto, "codigo_barras", codigos["principal"]) or atualizou
+
+    if atualizou:
+        logger.info(
+            "Codigos de barras da NF aplicados ao produto %s: ean=%s ean_tributario=%s principal=%s",
+            getattr(produto, "codigo", None),
+            codigos["ean"] or "-",
+            codigos["ean_tributario"] or "-",
+            codigos["principal"] or "-",
+        )
+
+    return atualizou
+
+
+def _montar_divergencia_codigo_barras_item(item: NotaEntradaItem) -> Dict[str, Any]:
+    if not item or not item.produto:
+        return {"tem_divergencia": False, "mensagens": []}
+
+    codigos_nf = _codigos_barras_nf(item)
+    produto = item.produto
+    pares = [
+        ("codigo_barras", "Codigo de barras principal", codigos_nf["principal"]),
+        ("gtin_ean", "EAN comercial", codigos_nf["ean"]),
+        ("gtin_ean_tributario", "EAN fiscal", codigos_nf["ean_tributario"]),
+    ]
+    mensagens = []
+
+    for campo, label, valor_nf in pares:
+        valor_produto = _codigo_barras_valido_nf(getattr(produto, campo, None))
+        if valor_nf and valor_produto and valor_nf != valor_produto:
+            mensagens.append(f"{label}: NF={valor_nf} vs cadastro={valor_produto}")
+
+    return {"tem_divergencia": bool(mensagens), "mensagens": mensagens}
+
+
 def obter_detalhe_vinculo_item(item: NotaEntradaItem) -> Dict[str, Optional[str]]:
     """Identifica por qual referencia o item da NF-e coincide com o produto vinculado."""
     if not item or not item.produto_id or not item.produto:
         return {"origem": None, "referencia": None}
 
     referencia_nf_codigo = (item.codigo_produto or "").strip()
-    referencia_nf_ean = normalizar_codigo_barras(item.ean)
+    referencias_nf_ean = [
+        _codigo_barras_valido_nf(getattr(item, "ean_tributario", None)),
+        _codigo_barras_valido_nf(item.ean),
+    ]
     produto_codigo = (item.produto.codigo or "").strip()
 
     produto_codigos_barras = {
@@ -1181,8 +1261,9 @@ def obter_detalhe_vinculo_item(item: NotaEntradaItem) -> Dict[str, Optional[str]
     }
     produto_codigos_barras.discard("")
 
-    if referencia_nf_ean and referencia_nf_ean in produto_codigos_barras:
-        return {"origem": "codigo_barras", "referencia": referencia_nf_ean}
+    for referencia_nf_ean in referencias_nf_ean:
+        if referencia_nf_ean and referencia_nf_ean in produto_codigos_barras:
+            return {"origem": "codigo_barras", "referencia": referencia_nf_ean}
 
     if referencia_nf_codigo and referencia_nf_codigo == produto_codigo:
         return {"origem": "sku", "referencia": referencia_nf_codigo}
@@ -1201,6 +1282,7 @@ def encontrar_produto_similar(
     tenant_id = None,
     fornecedor_id: int = None,
     ean: Optional[str] = None,
+    ean_tributario: Optional[str] = None,
 ) -> tuple:
     """
     Encontra produto similar no banco (ativo OU inativo)
@@ -1256,10 +1338,13 @@ def encontrar_produto_similar(
     
     # 2. Tentar por EAN/Código de Barras exato
     referencias_codigo_barras = []
-    ean_normalizado = normalizar_codigo_barras(ean)
+    ean_tributario_normalizado = _codigo_barras_valido_nf(ean_tributario)
+    ean_normalizado = _codigo_barras_valido_nf(ean)
     codigo_normalizado = normalizar_codigo_barras(codigo)
 
-    if ean_normalizado:
+    if ean_tributario_normalizado:
+        referencias_codigo_barras.append(ean_tributario_normalizado)
+    if ean_normalizado and ean_normalizado not in referencias_codigo_barras:
         referencias_codigo_barras.append(ean_normalizado)
     if codigo_normalizado and codigo_normalizado not in referencias_codigo_barras:
         referencias_codigo_barras.append(codigo_normalizado)
@@ -1483,7 +1568,8 @@ async def upload_xml(
                 db,
                 tenant_id=tenant_id,
                 fornecedor_id=fornecedor.id if fornecedor else None,
-                ean=item_data.get('ean')
+                ean=item_data.get('ean'),
+                ean_tributario=item_data.get('ean_tributario'),
             )
             
             if produto:
@@ -1535,6 +1621,7 @@ async def upload_xml(
                 valor_unitario=item_data['valor_unitario'],
                 valor_total=item_data['valor_total'],
                 ean=item_data.get('ean'),
+                ean_tributario=item_data.get('ean_tributario'),
                 lote=item_data.get('lote'),
                 data_validade=item_data.get('data_validade'),
                 produto_id=produto_id,
@@ -1686,6 +1773,7 @@ async def upload_pdf(
                 tenant_id=tenant_id,
                 fornecedor_id=fornecedor.id,
                 ean=item_data.get("ean"),
+                ean_tributario=item_data.get("ean_tributario"),
             )
 
             if produto:
@@ -1731,6 +1819,7 @@ async def upload_pdf(
                 valor_unitario=item_data["valor_unitario"],
                 valor_total=item_data["valor_total"],
                 ean=item_data.get("ean"),
+                ean_tributario=item_data.get("ean_tributario"),
                 lote=item_data.get("lote"),
                 data_validade=item_data.get("data_validade"),
                 produto_id=produto_id,
@@ -1882,7 +1971,8 @@ async def upload_lote_xml(
                     db,
                     tenant_id=tenant_id,
                     fornecedor_id=None,
-                    ean=item_data.get('ean')
+                    ean=item_data.get('ean'),
+                    ean_tributario=item_data.get('ean_tributario'),
                 )
                 
                 if produto:
@@ -1911,6 +2001,7 @@ async def upload_lote_xml(
                     valor_unitario=item_data['valor_unitario'],
                     valor_total=item_data['valor_total'],
                     ean=item_data.get('ean'),
+                    ean_tributario=item_data.get('ean_tributario'),
                     lote=item_data.get('lote'),
                     data_validade=item_data.get('data_validade'),
                     produto_id=produto_id,
@@ -2092,6 +2183,7 @@ def buscar_nota(
             "valor_unitario": item.valor_unitario,
             "valor_total": item.valor_total,
             "ean": item.ean,
+            "ean_tributario": getattr(item, "ean_tributario", None),
             "lote": item.lote,
             "data_validade": item.data_validade.isoformat() if item.data_validade else None,
             "produto_id": item.produto_id,
@@ -2102,6 +2194,10 @@ def buscar_nota(
                 or item.produto.gtin_ean
                 or item.produto.gtin_ean_tributario
             ) if item.produto else None,
+            "produto_codigo_barras": item.produto.codigo_barras if item.produto else None,
+            "produto_gtin_ean": item.produto.gtin_ean if item.produto else None,
+            "produto_ean_tributario": item.produto.gtin_ean_tributario if item.produto else None,
+            "divergencia_codigo_barras": _montar_divergencia_codigo_barras_item(item),
             "vinculado": item.vinculado,
             "confianca_vinculo": item.confianca_vinculo,
             "origem_vinculo_automatico": detalhe_vinculo["origem"],
@@ -2483,6 +2579,7 @@ def _montar_sugestao_sku_produto(
             "preco_custo": composicao_item.get("custo_aquisicao_unitario", item.valor_unitario),
             "ncm": item.ncm if hasattr(item, "ncm") else None,
             "ean": item.ean if hasattr(item, "ean") else None,
+            "ean_tributario": getattr(item, "ean_tributario", None),
         },
     }
 
@@ -2895,9 +2992,11 @@ def preview_processamento(
             "pack_detectado_automatico": dados_pack["pack_detectado"],
             "pack_multiplicador_detectado": dados_pack["multiplicador_pack"],
             "ean_nf": item.ean,
+            "ean_tributario_nf": getattr(item, "ean_tributario", None),
             "ncm_nf": item.ncm,
             "vinculado": item.vinculado,
             "confianca_vinculo": item.confianca_vinculo,
+            "divergencia_codigo_barras": _montar_divergencia_codigo_barras_item(item),
             **conferencia_item,
         }
 
@@ -2931,6 +3030,10 @@ def preview_processamento(
                 "produto_codigo": produto.codigo,
                 "produto_nome": produto.nome,
                 "produto_ean": produto.codigo_barras,
+                "produto_codigo_barras": produto.codigo_barras,
+                "produto_gtin_ean": produto.gtin_ean,
+                "produto_ean_tributario": produto.gtin_ean_tributario,
+                "divergencia_codigo_barras": _montar_divergencia_codigo_barras_item(item),
                 "custo_anterior": custo_atual,
                 "custo_novo": custo_novo,
                 "variacao_custo_percentual": round(variacao_custo, 2),
@@ -3171,10 +3274,7 @@ def processar_entrada_estoque(
             sobrescrever=nota.serie != "PDF",
         )
         
-        # âœ… ATUALIZAR EAN se fornecido e vÃ¡lido
-        if item.ean and item.ean != 'SEM GTIN' and item.ean.strip():
-            produto.codigo_barras = item.ean
-            logger.info(f"  ðŸ”– EAN atualizado: {produto.codigo} â†’ {item.ean}")
+        _aplicar_codigos_barras_item_no_produto(produto, item)
         
         # âœ… VINCULAR ao fornecedor da nota
         if nota.fornecedor_id:
@@ -3775,6 +3875,8 @@ def criar_produto_from_item(
         if dados_fiscais.get("padrao_fiscal_motivo"):
             logger.info(f"🎯 {dados_fiscais['padrao_fiscal_motivo']} (confiança: {dados_fiscais.get('padrao_fiscal_confianca', 0):.0%})")
         
+        codigos_barras_nf = _codigos_barras_nf(item)
+
         novo_produto = Produto(
             codigo=sku_final,
             nome=dados.nome,
@@ -3793,7 +3895,9 @@ def criar_produto_from_item(
             aliquota_icms=dados_fiscais.get("aliquota_icms", 0),
             aliquota_pis=dados_fiscais.get("aliquota_pis", 0),
             aliquota_cofins=dados_fiscais.get("aliquota_cofins", 0),
-            codigo_barras=item.ean if item.ean and item.ean != 'SEM GTIN' else None,
+            codigo_barras=codigos_barras_nf["principal"] or None,
+            gtin_ean=codigos_barras_nf["ean"] or None,
+            gtin_ean_tributario=codigos_barras_nf["ean_tributario"] or None,
             
             # ESTOQUE
             estoque_minimo=dados.estoque_minimo,
@@ -4067,6 +4171,7 @@ def importar_docs_sefaz(docs: list, tenant_id_str: str, db) -> dict:
                     tenant_id=tenant_id_str,
                     fornecedor_id=fornecedor.id if fornecedor else None,
                     ean=item_data.get("ean"),
+                    ean_tributario=item_data.get("ean_tributario"),
                 )
                 item = NotaEntradaItem(
                     nota_entrada_id=nota.id,
@@ -4085,6 +4190,7 @@ def importar_docs_sefaz(docs: list, tenant_id_str: str, db) -> dict:
                     valor_unitario=item_data["valor_unitario"],
                     valor_total=item_data["valor_total"],
                     ean=item_data.get("ean"),
+                    ean_tributario=item_data.get("ean_tributario"),
                     lote=item_data.get("lote"),
                     data_validade=item_data.get("data_validade"),
                     produto_id=produto.id if produto else None,

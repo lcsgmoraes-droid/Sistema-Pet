@@ -44,29 +44,33 @@ export default function BarcodeScannerScreen({ navigation }: any) {
     }
   }, []);
 
-  async function onBarcodeScanned({ data }: { data: string }) {
-    if (!scanAtivo || buscando || data === ultimoScan.current) return;
-
+  async function buscarBarcode(data: string) {
     ultimoScan.current = data;
     setScanAtivo(false);
     setBuscando(true);
-    Vibration.vibrate(100);
-
     try {
       const produto = await buscarProdutoPorBarcode(data);
       if (produto) {
         setProdutoEncontrado(produto);
       } else {
         Alert.alert(
-          'Produto não encontrado',
-          `Código ${data} não está no nosso catálogo.`,
+          'Produto nao encontrado',
+          `Codigo ${data} nao esta no catalogo do app. Se o cadastro acabou de ser corrigido no ERP, tente buscar de novo.`,
           [
+            {
+              text: 'Tentar de novo',
+              onPress: () => {
+                ultimoScan.current = '';
+                void buscarBarcode(data);
+              },
+            },
             {
               text: 'Escanear outro',
               onPress: () => {
                 ultimoScan.current = '';
                 setScanAtivo(true);
               },
+              style: 'cancel',
             },
           ]
         );
@@ -78,6 +82,13 @@ export default function BarcodeScannerScreen({ navigation }: any) {
     } finally {
       setBuscando(false);
     }
+  }
+
+  async function onBarcodeScanned({ data }: { data: string }) {
+    if (!scanAtivo || buscando || data === ultimoScan.current) return;
+
+    Vibration.vibrate(100);
+    await buscarBarcode(data);
   }
 
   async function adicionarAoCarrinho() {

@@ -184,8 +184,8 @@ class Produto(BaseTenantModel):
     # Fiscal
     ncm = Column(String(8), nullable=True)
     cest = Column(String(7), nullable=True)
-    gtin_ean = Column(String(13), nullable=True)
-    gtin_ean_tributario = Column(String(13), nullable=True)
+    gtin_ean = Column(String(20), nullable=True)
+    gtin_ean_tributario = Column(String(20), nullable=True)
     origem = Column(String(1), nullable=True)  # 0-8
     perfil_tributario = Column(String(50), nullable=True)
     forma_aquisicao = Column(String(50), nullable=True)
@@ -990,7 +990,8 @@ class NotaEntradaItem(BaseTenantModel):
     quantidade = Column(Float, nullable=False)
     valor_unitario = Column(Float, nullable=False)
     valor_total = Column(Float, nullable=False)
-    ean = Column(String(14))  # C�digo de barras EAN
+    ean = Column(String(14))  # Codigo de barras EAN comercial
+    ean_tributario = Column(String(14))  # Codigo de barras EAN tributario/fiscal
     lote = Column(String(50))  # Lote do produto
     data_validade = Column(Date)  # Data de validade
     
