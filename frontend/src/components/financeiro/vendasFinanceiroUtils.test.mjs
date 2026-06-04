@@ -401,7 +401,7 @@ test("monta cards dos totalizadores da lista de vendas financeiras", () => {
     { label: "Desconto", value: "-:7", intent: "amber" },
     { label: "Tx. Entrega", value: "-:7", intent: "blue" },
     { label: "Tx. Operac.", value: "-:5", intent: "amber" },
-    { label: "Tx. Cartao", value: "-:8", intent: "violet" },
+    { label: "Tx. Pagto", value: "-:8", intent: "violet" },
     { label: "Comissao", value: "-:12", intent: "blue" },
     { label: "Imposto", value: "-:14", intent: "red" },
     { label: "Custo Camp.", value: "-:16", intent: "cyan" },

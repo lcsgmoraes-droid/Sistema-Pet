@@ -443,6 +443,7 @@ export default function VendasFinanceiro() {
       if (filtroFormaPagamento)
         params.append("forma_pagamento", filtroFormaPagamento);
       if (filtroCategoria) params.append("categoria", filtroCategoria);
+      if (filtroCanalVenda) params.append("canal_venda", filtroCanalVenda);
 
       const response = await api.get(
         `/relatorios/vendas/export/pdf?${params.toString()}`,
@@ -569,6 +570,11 @@ export default function VendasFinanceiro() {
 
   const calcularVariacao = calcularVariacaoFinanceira;
 
+  const montarParametrosRelatorio = (params) => ({
+    ...params,
+    ...(filtroCanalVenda ? { canal_venda: filtroCanalVenda } : {}),
+  });
+
   const carregarDados = async () => {
     if (!podeVerFinanceiroCompleto) return;
     if (!dataInicio || !dataFim) return;
@@ -577,7 +583,10 @@ export default function VendasFinanceiro() {
 
     try {
       const response = await api.get("/relatorios/vendas/relatorio", {
-        params: { data_inicio: dataInicio, data_fim: dataFim },
+        params: montarParametrosRelatorio({
+          data_inicio: dataInicio,
+          data_fim: dataFim,
+        }),
       });
       const data = response.data;
 
@@ -594,7 +603,7 @@ export default function VendasFinanceiro() {
       if (modoComparacao || abaAtiva === "comparacao") {
         const periodoComp = calcularPeriodoComparacao();
         const responseComp = await api.get("/relatorios/vendas/relatorio", {
-          params: periodoComp,
+          params: montarParametrosRelatorio(periodoComp),
         });
         setResumoComparacao(responseComp.data.resumo || {});
         setFormasRecebimentoComparacao(
@@ -653,6 +662,7 @@ export default function VendasFinanceiro() {
     dataFim,
     modoComparacao,
     periodoComparacao,
+    filtroCanalVenda,
     abaAtiva,
     podeVerFinanceiroCompleto,
   ]);
@@ -717,6 +727,7 @@ export default function VendasFinanceiro() {
         exportarParaPDF={exportarParaPDF}
         exportarRelatorioListaVendas={exportarRelatorioListaVendas}
         filtroCategoria={filtroCategoria}
+        filtroCanalVenda={filtroCanalVenda}
         filtroFormaPagamento={filtroFormaPagamento}
         filtroFuncionario={filtroFuncionario}
         filtroSelecionado={filtroSelecionado}
@@ -733,6 +744,7 @@ export default function VendasFinanceiro() {
         setDataFim={setDataFim}
         setDataInicio={setDataInicio}
         setFiltroCategoria={setFiltroCategoria}
+        setFiltroCanalVenda={setFiltroCanalVenda}
         setFiltroFormaPagamento={setFiltroFormaPagamento}
         setFiltroFuncionario={setFiltroFuncionario}
         setFiltroSelecionado={setFiltroSelecionado}

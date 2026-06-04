@@ -36,6 +36,36 @@ def _texto_normalizado(valor) -> str:
     return str(valor or "").strip().lower()
 
 
+CANAIS_RELATORIO_ALIASES = {
+    "pdv": "loja_fisica",
+    "erp": "loja_fisica",
+    "loja": "loja_fisica",
+    "caixa": "loja_fisica",
+    "balcao": "loja_fisica",
+    "loja_fisica": "loja_fisica",
+    "loja-fisica": "loja_fisica",
+    "app": "app",
+    "mobile": "app",
+    "aplicativo": "app",
+    "app_movel": "app",
+    "ecommerce": "ecommerce",
+    "e_commerce": "ecommerce",
+    "e-commerce": "ecommerce",
+    "loja_virtual": "ecommerce",
+    "site": "ecommerce",
+    "web": "ecommerce",
+}
+
+
+def _normalizar_canal_venda_relatorio(valor: Optional[str]) -> Optional[str]:
+    texto = str(valor or "").strip().lower()
+    if not texto:
+        return None
+
+    chave = texto.replace(" ", "_")
+    return CANAIS_RELATORIO_ALIASES.get(chave, chave)
+
+
 def _venda_tem_documento_fiscal(venda: Venda) -> bool:
     nfe_status = _texto_normalizado(getattr(venda, "nfe_status", None))
     if nfe_status in {"cancelada", "cancelado", "denegada", "rejeitada"}:
@@ -259,6 +289,7 @@ def _enriquecer_itens_promocionais(venda: Venda, itens_snapshot: list[dict]) -> 
 async def obter_relatorio_vendas(
     data_inicio: Optional[str] = Query(None),
     data_fim: Optional[str] = Query(None),
+    canal_venda: Optional[str] = Query(None),
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
@@ -286,6 +317,16 @@ async def obter_relatorio_vendas(
     data_inicio_dt = data_inicio_dt.replace(hour=0, minute=0, second=0)
     data_fim_dt = datetime.fromisoformat(data_fim)
     data_fim_dt = data_fim_dt.replace(hour=23, minute=59, second=59)
+    canal_normalizado = _normalizar_canal_venda_relatorio(canal_venda)
+
+    filtros_vendas = [
+        Venda.tenant_id == tenant_id,
+        Venda.data_venda >= data_inicio_dt,
+        Venda.data_venda <= data_fim_dt,
+        or_(Venda.status.is_(None), Venda.status != 'cancelada'),
+    ]
+    if canal_normalizado:
+        filtros_vendas.append(Venda.canal == canal_normalizado)
 
     # OTIMIZAÇÃO: Buscar vendas com EAGER LOADING para evitar N+1 queries
     # Isso carrega todos os relacionamentos de uma vez, reduzindo drasticamente queries ao BD
@@ -295,14 +336,7 @@ async def obter_relatorio_vendas(
         selectinload(Venda.itens).selectinload(VendaItem.produto).selectinload(Produto.categoria),
         selectinload(Venda.itens).selectinload(VendaItem.produto).selectinload(Produto.marca),
         selectinload(Venda.pagamentos)
-    ).filter(
-        and_(
-            Venda.tenant_id == tenant_id,
-            Venda.data_venda >= data_inicio_dt,
-            Venda.data_venda <= data_fim_dt,
-            or_(Venda.status.is_(None), Venda.status != 'cancelada')
-        )
-    ).all()
+    ).filter(and_(*filtros_vendas)).all()
 
     # OTIMIZAÇÃO: Buscar config fiscal UMA VEZ (não para cada venda)
     # Tratamento de erro caso a tabela não exista
@@ -992,6 +1026,7 @@ async def exportar_vendas_pdf(
     funcionario: Optional[str] = Query(None),
     forma_pagamento: Optional[str] = Query(None),
     categoria: Optional[str] = Query(None),
+    canal_venda: Optional[str] = Query(None),
     db: Session = Depends(get_session),
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
@@ -1025,16 +1060,19 @@ async def exportar_vendas_pdf(
             data_inicio = datetime.now().replace(day=1).strftime('%Y-%m-%d')
         if not data_fim:
             data_fim = datetime.now().strftime('%Y-%m-%d')
+        canal_normalizado = _normalizar_canal_venda_relatorio(canal_venda)
 
         # Buscar todas as vendas do período com filtro de tenant
-        vendas_query = db.query(Venda).filter(
-            and_(
-                Venda.tenant_id == tenant_id,
-                func.date(Venda.data_venda) >= data_inicio,
-                func.date(Venda.data_venda) <= data_fim,
-                Venda.status != 'cancelada'
-            )
-        )
+        filtros_vendas = [
+            Venda.tenant_id == tenant_id,
+            func.date(Venda.data_venda) >= data_inicio,
+            func.date(Venda.data_venda) <= data_fim,
+            or_(Venda.status.is_(None), Venda.status != 'cancelada'),
+        ]
+        if canal_normalizado:
+            filtros_vendas.append(Venda.canal == canal_normalizado)
+
+        vendas_query = db.query(Venda).filter(and_(*filtros_vendas))
 
         vendas = vendas_query.all()
 

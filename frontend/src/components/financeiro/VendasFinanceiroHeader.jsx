@@ -3,6 +3,7 @@ import ActionButton from "../ui/ActionButton";
 import ExportActionButton from "../ui/ExportActionButton";
 import FilterBar, { FilterRow } from "../ui/FilterBar";
 import ModuleTabs from "../ui/ModuleTabs";
+import { VENDAS_FINANCEIRO_CHANNEL_FILTERS } from "./vendasFinanceiroChannels";
 
 const FILTROS_RAPIDOS = [
   { id: "hoje", label: "Hoje" },
@@ -26,6 +27,7 @@ export default function VendasFinanceiroHeader({
   exportarParaPDF,
   exportarRelatorioListaVendas,
   filtroCategoria,
+  filtroCanalVenda,
   filtroFormaPagamento,
   filtroFuncionario,
   filtroSelecionado,
@@ -42,6 +44,7 @@ export default function VendasFinanceiroHeader({
   setDataFim,
   setDataInicio,
   setFiltroCategoria,
+  setFiltroCanalVenda,
   setFiltroFormaPagamento,
   setFiltroFuncionario,
   setFiltroSelecionado,
@@ -239,6 +242,22 @@ export default function VendasFinanceiroHeader({
             </div>
 
             <select
+              value={filtroCanalVenda}
+              onChange={(event) => setFiltroCanalVenda(event.target.value)}
+              title={filtroCanalVenda ? "Canal selecionado" : "Todos os canais"}
+              className="h-11 w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 text-sm sm:min-w-[200px] sm:flex-1 lg:h-9 lg:w-auto lg:min-w-[160px] lg:flex-none"
+            >
+              {VENDAS_FINANCEIRO_CHANNEL_FILTERS.map((canal) => (
+                <option
+                  key={`canal-${canal.value || "todos"}`}
+                  value={canal.value}
+                >
+                  {canal.filterLabel}
+                </option>
+              ))}
+            </select>
+
+            <select
               value={filtroFuncionario}
               onChange={(event) => setFiltroFuncionario(event.target.value)}
               className="h-11 w-full min-w-0 rounded-md border border-slate-300 bg-white px-3 text-sm sm:min-w-[220px] sm:flex-1 lg:h-9 lg:w-auto lg:min-w-[180px] lg:flex-none"
@@ -292,6 +311,7 @@ export default function VendasFinanceiroHeader({
               size="md"
               className="w-full justify-center sm:w-auto sm:flex-1 lg:w-auto lg:flex-none"
               onClick={() => {
+                setFiltroCanalVenda("");
                 setFiltroFuncionario("");
                 setFiltroFormaPagamento("");
                 setFiltroCategoria("");
