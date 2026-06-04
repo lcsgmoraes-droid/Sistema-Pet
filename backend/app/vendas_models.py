@@ -371,6 +371,13 @@ class VendaPagamento(BaseTenantModel):
     operadora_id = Column(Integer, nullable=True, index=True)  # was: ForeignKey('operadoras_cartao.id') - tabela não existe
     status_conciliacao = Column(Enum('nao_conciliado', 'conciliado', name='status_conciliacao_enum'), nullable=False, server_default='nao_conciliado')  # Status da conciliação
     
+    # Dados financeiros do gateway online (Mercado Pago, etc.)
+    gateway_provider = Column(String(50), nullable=True, index=True)
+    gateway_payment_id = Column(String(100), nullable=True, index=True)
+    gateway_fee_amount = Column(DECIMAL(10, 2), nullable=True)
+    gateway_net_amount = Column(DECIMAL(10, 2), nullable=True)
+    gateway_gross_amount = Column(DECIMAL(10, 2), nullable=True)
+
     # Troco (se dinheiro)
     valor_recebido = Column(DECIMAL(10, 2), nullable=True)
     troco = Column(DECIMAL(10, 2), nullable=True)
@@ -394,6 +401,11 @@ class VendaPagamento(BaseTenantModel):
             'numero_parcelas': self.numero_parcelas,
             'status': self.status,
             'data_pagamento': safe_datetime_to_iso(self.data_pagamento),
+            'gateway_provider': self.gateway_provider,
+            'gateway_payment_id': self.gateway_payment_id,
+            'gateway_fee_amount': safe_decimal_to_float(self.gateway_fee_amount),
+            'gateway_net_amount': safe_decimal_to_float(self.gateway_net_amount),
+            'gateway_gross_amount': safe_decimal_to_float(self.gateway_gross_amount),
         }
     
     def __repr__(self):

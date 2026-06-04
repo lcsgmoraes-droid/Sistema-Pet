@@ -14,7 +14,7 @@ from app.utils.timezone import now_brasilia
 
 logger = logging.getLogger(__name__)
 
-SNAPSHOT_VERSION = 4
+SNAPSHOT_VERSION = 5
 FROZEN_STATUSES = {"finalizada", "baixa_parcial"}
 
 
@@ -86,6 +86,59 @@ def _resolve_taxa_cartao_total(
         taxa_total += _as_float(getattr(pagamento, "valor", 0)) * taxa_percentual / 100.0
 
     return _round_money(taxa_total)
+
+
+def _resolve_gateway_financials(venda: Any) -> Dict[str, Any]:
+    taxa_gateway = 0.0
+    valor_liquido_gateway = 0.0
+    valor_bruto_gateway = 0.0
+    has_gateway = False
+    has_fee = False
+    has_net = False
+    provider = None
+    payment_ids: list[str] = []
+
+    for pagamento in list(getattr(venda, "pagamentos", []) or []):
+        gateway_provider = getattr(pagamento, "gateway_provider", None)
+        if not gateway_provider:
+            continue
+
+        has_gateway = True
+        provider = provider or str(gateway_provider).strip().lower()
+
+        payment_id = getattr(pagamento, "gateway_payment_id", None) or getattr(pagamento, "numero_transacao", None)
+        if payment_id:
+            payment_ids.append(str(payment_id))
+
+        gross_amount = getattr(pagamento, "gateway_gross_amount", None)
+        if gross_amount is None:
+            gross_amount = getattr(pagamento, "valor", 0)
+        valor_bruto_gateway += _as_float(gross_amount)
+
+        fee_amount = getattr(pagamento, "gateway_fee_amount", None)
+        if fee_amount is not None:
+            taxa_gateway += _as_float(fee_amount)
+            has_fee = True
+
+        net_amount = getattr(pagamento, "gateway_net_amount", None)
+        if net_amount is not None:
+            valor_liquido_gateway += _as_float(net_amount)
+            has_net = True
+
+    if not has_net and has_fee:
+        valor_liquido_gateway = valor_bruto_gateway - taxa_gateway
+        has_net = True
+
+    return {
+        "has_gateway": has_gateway,
+        "has_fee": has_fee,
+        "has_net": has_net,
+        "gateway_provider": provider,
+        "gateway_payment_ids": payment_ids,
+        "taxa_gateway": _round_money(taxa_gateway) if has_fee else None,
+        "valor_liquido_gateway": _round_money(valor_liquido_gateway) if has_net else None,
+        "valor_bruto_gateway": _round_money(valor_bruto_gateway) if has_gateway else None,
+    }
 
 
 def _resolve_impostos_percentual(
@@ -273,7 +326,12 @@ def build_venda_rentabilidade_snapshot(
         db, tenant_id, venda.id, estoque_custos_por_produto
     )
 
-    taxa_cartao_total = _resolve_taxa_cartao_total(venda, formas_pagamento_map)
+    gateway_financials = _resolve_gateway_financials(venda)
+    taxa_cartao_total = (
+        gateway_financials["taxa_gateway"]
+        if gateway_financials["taxa_gateway"] is not None
+        else _resolve_taxa_cartao_total(venda, formas_pagamento_map)
+    )
     comissao_total = _resolve_comissao_total(db, tenant_id, venda.id, comissao_total)
     impostos_percentual = _resolve_impostos_percentual(db, tenant_id, impostos_percentual)
     taxa_operacional_entrega = _resolve_taxa_operacional_entrega(
@@ -413,6 +471,11 @@ def build_venda_rentabilidade_snapshot(
         "taxa_entrega": _round_money(taxa_entrega_repasse),
         "taxa_operacional": _round_money(taxa_operacional_entrega),
         "taxa_cartao": _round_money(taxa_cartao_total),
+        "taxa_gateway": gateway_financials["taxa_gateway"],
+        "valor_liquido_gateway": gateway_financials["valor_liquido_gateway"],
+        "valor_bruto_gateway": gateway_financials["valor_bruto_gateway"],
+        "gateway_provider": gateway_financials["gateway_provider"],
+        "gateway_payment_ids": gateway_financials["gateway_payment_ids"],
         "comissao": _round_money(comissao_total),
         "imposto": _round_money(imposto_total),
         "impostos_percentual": round(impostos_percentual, 4),

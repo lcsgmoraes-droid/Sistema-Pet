@@ -17,6 +17,7 @@ from app.services.ecommerce_payment_config import (
     runtime_config_from_webhook_token,
 )
 from app.services.mercado_pago_checkout import (
+    extract_gateway_financials,
     extract_notification_payment_id,
     fetch_payment,
     normalize_payment_payload,
@@ -266,6 +267,17 @@ def _extrair_pagamento_do_webhook(payload: dict) -> tuple:
     return str(payment_method or "").strip().lower(), installments
 
 
+def _extrair_financeiro_gateway_online(payload: dict) -> dict:
+    if not isinstance(payload, dict):
+        return {}
+
+    provider = str(payload.get("gateway_provider") or payload.get("provider") or "").strip().lower()
+    if provider not in {"mercadopago", "mercado_pago"} and not isinstance(payload.get("mercadopago"), dict):
+        return {}
+
+    return extract_gateway_financials(payload)
+
+
 def _mapear_forma_pagamento_ecommerce(
     payment_method: str,
     installments: int,
@@ -353,6 +365,7 @@ def _processar_pos_venda_ecommerce(
     forma_pag_nome, parcelas = _mapear_forma_pagamento_ecommerce(
         payment_method, installments, tenant_id, db
     )
+    gateway_financials = _extrair_financeiro_gateway_online(webhook_payload)
 
     log.info(
         f"💳 Ecommerce pós-venda: venda #{venda_row.id} | "
@@ -368,9 +381,17 @@ def _processar_pos_venda_ecommerce(
             forma_pagamento=forma_pag_nome,
             valor=venda_row.total,
             numero_parcelas=parcelas,
+            numero_transacao=gateway_financials.get("gateway_payment_id"),
+            gateway_provider=gateway_financials.get("gateway_provider"),
+            gateway_payment_id=gateway_financials.get("gateway_payment_id"),
+            gateway_fee_amount=gateway_financials.get("gateway_fee_amount"),
+            gateway_net_amount=gateway_financials.get("gateway_net_amount"),
+            gateway_gross_amount=gateway_financials.get("gateway_gross_amount"),
         )
         db.add(pagamento_obj)
         db.flush()
+        venda_row.rentabilidade_snapshot = None
+        venda_row.rentabilidade_snapshot_em = None
         log.info(f"  ✅ VendaPagamento criado: '{forma_pag_nome}' R$ {float(venda_row.total):.2f}")
     except Exception as e:
         log.error(f"  ❌ Erro ao criar VendaPagamento (ecommerce): {e}", exc_info=True)

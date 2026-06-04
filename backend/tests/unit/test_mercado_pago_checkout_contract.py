@@ -12,6 +12,8 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 from app.routes import ecommerce_checkout, ecommerce_webhooks
 from app.services.mercado_pago_checkout import (
     build_preference_payload,
+    extract_gateway_financials,
+    normalize_payment_payload,
     select_checkout_url,
     validate_webhook_signature,
 )
@@ -245,3 +247,58 @@ def test_webhook_mercado_pago_mapeia_credito_parcelado_e_recusado():
 
     assert _map_payment_status(payload) == "recusado"
     assert _extrair_pagamento_do_webhook(payload) == ("credit_card", 3)
+
+
+def test_normalize_payment_payload_expõe_taxa_real_e_liquido_do_mercado_pago():
+    payment = {
+        "id": 1387729134,
+        "status": "approved",
+        "payment_method_id": "pix",
+        "payment_type_id": "bank_transfer",
+        "transaction_amount": 3.98,
+        "fee_details": [
+            {"type": "mercadopago_fee", "amount": 0.23},
+            {"type": "financing_fee", "amount": 0},
+        ],
+        "transaction_details": {
+            "net_received_amount": 3.75,
+            "total_paid_amount": 3.98,
+        },
+    }
+
+    financials = extract_gateway_financials(payment)
+    normalized = normalize_payment_payload(payment)
+
+    assert financials == {
+        "gateway_provider": "mercadopago",
+        "gateway_payment_id": "1387729134",
+        "gateway_fee_amount": 0.23,
+        "gateway_net_amount": 3.75,
+        "gateway_gross_amount": 3.98,
+    }
+    assert normalized["gateway_provider"] == "mercadopago"
+    assert normalized["gateway_fee_amount"] == 0.23
+    assert normalized["gateway_net_amount"] == 3.75
+    assert normalized["data"]["gateway_fee_amount"] == 0.23
+
+
+def test_extract_gateway_financials_preserva_taxa_zero_configurada():
+    payment = {
+        "provider": "mercadopago",
+        "mercadopago": {
+            "payment": {
+                "id": "mp-zero-fee",
+                "gateway_fee_amount": 0,
+                "gateway_net_amount": 10,
+                "gateway_gross_amount": 10,
+            }
+        },
+    }
+
+    assert extract_gateway_financials(payment) == {
+        "gateway_provider": "mercadopago",
+        "gateway_payment_id": "mp-zero-fee",
+        "gateway_fee_amount": 0.0,
+        "gateway_net_amount": 10.0,
+        "gateway_gross_amount": 10.0,
+    }

@@ -1,10 +1,88 @@
 import MetricCard from "../ui/MetricCard";
 import MetricGrid from "../ui/MetricGrid";
 import VendasFinanceiroListaTable from "./VendasFinanceiroListaTable";
+import {
+  CANAL_APP,
+  CANAL_ECOMMERCE,
+  CANAL_LOJA_FISICA,
+  normalizeSalesChannel,
+} from "../../utils/salesChannel";
+
+const CANAL_FILTROS = [
+  {
+    value: "",
+    label: "Consolidado",
+    description: "Todos os canais",
+    activeClass: "bg-slate-900 text-white border-slate-900",
+    idleClass: "bg-white text-slate-700 border-slate-200 hover:border-slate-300",
+  },
+  {
+    value: CANAL_LOJA_FISICA,
+    label: "ERP/PDV",
+    description: "Loja fisica",
+    activeClass: "bg-blue-600 text-white border-blue-600",
+    idleClass: "bg-blue-50 text-blue-700 border-blue-200 hover:border-blue-300",
+  },
+  {
+    value: CANAL_APP,
+    label: "App",
+    description: "Aplicativo",
+    activeClass: "bg-emerald-600 text-white border-emerald-600",
+    idleClass: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:border-emerald-300",
+  },
+  {
+    value: CANAL_ECOMMERCE,
+    label: "E-commerce",
+    description: "Site da loja",
+    activeClass: "bg-purple-600 text-white border-purple-600",
+    idleClass: "bg-purple-50 text-purple-700 border-purple-200 hover:border-purple-300",
+  },
+];
+
+const formatCurrencyCompact = new Intl.NumberFormat("pt-BR", {
+  style: "currency",
+  currency: "BRL",
+  maximumFractionDigits: 0,
+});
+
+function obterCanalVenda(venda) {
+  return normalizeSalesChannel(
+    venda?.canal_venda ||
+      venda?.origem_canal_venda ||
+      venda?.canal ||
+      venda?.origem ||
+      venda?.origem_loja_virtual,
+    CANAL_LOJA_FISICA,
+  );
+}
+
+function montarResumoCanais(vendas = []) {
+  const resumo = new Map();
+  CANAL_FILTROS.forEach((canal) => {
+    resumo.set(canal.value, { quantidade: 0, total: 0 });
+  });
+
+  vendas.forEach((venda) => {
+    const canal = obterCanalVenda(venda);
+    const total = Number(venda?.venda_bruta || venda?.valor_total || 0);
+
+    const consolidado = resumo.get("");
+    consolidado.quantidade += 1;
+    consolidado.total += total;
+
+    const atual = resumo.get(canal) || { quantidade: 0, total: 0 };
+    atual.quantidade += 1;
+    atual.total += total;
+    resumo.set(canal, atual);
+  });
+
+  return resumo;
+}
 
 export default function VendasListaPanel({
   abrirVendaNoPdv,
   cardsTotalizadoresLista,
+  filtroCanalVenda,
   filtroStatusLista,
   formatarData,
   formatarMoeda,
@@ -13,15 +91,58 @@ export default function VendasListaPanel({
   listaVendasFiltrada,
   listaVendasVisiveis,
   mostrarImpostoTodasVendas,
+  setFiltroCanalVenda,
   setFiltroStatusLista,
   setMostrarImpostoTodasVendas,
   toggleVendaExpandida,
   vendasExpandidas,
 }) {
+  const resumoCanais = montarResumoCanais(listaVendasVisiveis);
+
   return (
     <div className="rounded-lg bg-white shadow">
       <div className="rounded-t-lg bg-gray-600 px-3 py-2 font-semibold text-white sm:px-4">
         Lista de Vendas com Analise de Rentabilidade
+      </div>
+      <div className="border-b border-gray-100 px-3 py-3 sm:px-4">
+        <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="text-sm font-semibold text-slate-800">Canal da venda</div>
+            <div className="text-xs text-slate-500">
+              Filtre sem adicionar novas colunas na tabela.
+            </div>
+          </div>
+          <div className="text-xs text-slate-500">
+            {filtroCanalVenda ? "Visao filtrada por canal" : "Visao consolidada"}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+          {CANAL_FILTROS.map((canal) => {
+            const ativo = filtroCanalVenda === canal.value;
+            const resumo = resumoCanais.get(canal.value) || { quantidade: 0, total: 0 };
+
+            return (
+              <button
+                key={canal.value || "consolidado"}
+                type="button"
+                onClick={() => setFiltroCanalVenda(canal.value)}
+                className={`rounded-lg border px-3 py-2 text-left transition ${ativo ? canal.activeClass : canal.idleClass}`}
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm font-bold">{canal.label}</span>
+                  <span className="rounded-full bg-white/70 px-2 py-0.5 text-xs font-bold text-slate-700">
+                    {resumo.quantidade}
+                  </span>
+                </div>
+                <div className="mt-0.5 text-xs opacity-80">{canal.description}</div>
+                <div className="mt-1 text-xs font-semibold">
+                  {formatCurrencyCompact.format(resumo.total)}
+                </div>
+              </button>
+            );
+          })}
+        </div>
       </div>
       <div className="flex flex-col gap-3 border-b border-gray-100 px-3 py-3 lg:flex-row lg:items-center lg:justify-between sm:px-4">
         <div className="grid w-full grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center lg:w-auto">

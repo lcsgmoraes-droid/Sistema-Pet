@@ -10,7 +10,7 @@ export const COLUNAS_RELATORIO_VENDAS = [
   { key: "desconto", label: "Desconto", value: (v) => Number(v.desconto || 0) },
   { key: "taxa_entrega", label: "Taxa Entrega", value: (v) => Number(v.taxa_entrega || 0) },
   { key: "taxa_operacional", label: "Taxa Operac.", value: (v) => Number(v.taxa_operacional || 0) },
-  { key: "taxa_cartao", label: "Taxa Cartao", value: (v) => Number(v.taxa_cartao || 0) },
+  { key: "taxa_cartao", label: "Taxa Pagto", value: (v) => Number(v.taxa_cartao || 0) },
   { key: "comissao", label: "Comissao", value: (v) => Number(v.comissao || 0) },
   { key: "imposto", label: "Imposto", value: (v) => Number(v.imposto || 0) },
   { key: "custo_campanha", label: "Custo Campanha", value: (v) => Number(v.custo_campanha || 0) },
@@ -897,7 +897,7 @@ export function montarCardsTotalizadoresListaVendasFinanceiro(
       intent: "amber",
     },
     {
-      label: "Tx. Cartao",
+      label: "Tx. Pagto",
       value: formatarDeducao(totalizadores.taxa_cartao),
       intent: "violet",
     },

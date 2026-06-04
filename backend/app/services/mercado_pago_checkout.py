@@ -324,10 +324,92 @@ def validate_webhook_signature_from_env(request: Any, data_id: str | None = None
     return validate_webhook_signature(request, secret, data_id=data_id)
 
 
+def _as_optional_float(value: Any) -> float | None:
+    try:
+        if value is None or value == "":
+            return None
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+def _round_money_or_none(value: Any) -> float | None:
+    number = _as_optional_float(value)
+    if number is None:
+        return None
+    return round(number, 2)
+
+
+def _first_present(*values: Any) -> Any:
+    for value in values:
+        if value is not None and value != "":
+            return value
+    return None
+
+
+def extract_gateway_financials(payment: dict[str, Any]) -> dict[str, Any]:
+    source = payment
+    if isinstance(payment.get("mercadopago"), dict) and isinstance(payment["mercadopago"].get("payment"), dict):
+        source = payment["mercadopago"]["payment"]
+
+    transaction_details = source.get("transaction_details") if isinstance(source.get("transaction_details"), dict) else {}
+    fee_details = source.get("fee_details") if isinstance(source.get("fee_details"), list) else []
+
+    gateway_payment_id = (
+        source.get("gateway_payment_id")
+        or source.get("id")
+        or payment.get("gateway_payment_id")
+        or payment.get("id")
+    )
+    gateway_fee_amount = _round_money_or_none(
+        _first_present(source.get("gateway_fee_amount"), payment.get("gateway_fee_amount"))
+    )
+    if gateway_fee_amount is None and fee_details:
+        total_fee = 0.0
+        has_fee = False
+        for fee in fee_details:
+            if not isinstance(fee, dict):
+                continue
+            amount = _as_optional_float(fee.get("amount"))
+            if amount is None:
+                continue
+            total_fee += abs(amount)
+            has_fee = True
+        if has_fee:
+            gateway_fee_amount = round(total_fee, 2)
+
+    gateway_gross_amount = _round_money_or_none(
+        _first_present(
+            source.get("gateway_gross_amount"),
+            payment.get("gateway_gross_amount"),
+            source.get("transaction_amount"),
+            transaction_details.get("total_paid_amount"),
+        )
+    )
+    gateway_net_amount = _round_money_or_none(
+        _first_present(
+            source.get("gateway_net_amount"),
+            payment.get("gateway_net_amount"),
+            transaction_details.get("net_received_amount"),
+        )
+    )
+    if gateway_net_amount is None and gateway_gross_amount is not None and gateway_fee_amount is not None:
+        gateway_net_amount = round(gateway_gross_amount - gateway_fee_amount, 2)
+
+    return {
+        "gateway_provider": "mercadopago",
+        "gateway_payment_id": str(gateway_payment_id) if gateway_payment_id is not None else None,
+        "gateway_fee_amount": gateway_fee_amount,
+        "gateway_net_amount": gateway_net_amount,
+        "gateway_gross_amount": gateway_gross_amount,
+    }
+
+
 def normalize_payment_payload(payment: dict[str, Any], notification: dict[str, Any] | None = None) -> dict[str, Any]:
     notification = notification or {}
     metadata = payment.get("metadata") if isinstance(payment.get("metadata"), dict) else {}
     external_reference = payment.get("external_reference")
+    gateway_financials = extract_gateway_financials(payment)
 
     normalized_metadata = dict(metadata)
     if external_reference and not normalized_metadata.get("pedido_id"):
@@ -345,10 +427,12 @@ def normalize_payment_payload(payment: dict[str, Any], notification: dict[str, A
         "installments": payment.get("installments") or 1,
         "transaction_amount": payment.get("transaction_amount"),
         "date_approved": payment.get("date_approved"),
+        **gateway_financials,
         "data": {
             "id": payment.get("id"),
             "status": payment.get("status"),
             "metadata": normalized_metadata,
+            **gateway_financials,
         },
         "mercadopago": {
             "payment": payment,

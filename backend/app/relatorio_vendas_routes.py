@@ -878,6 +878,25 @@ async def obter_relatorio_vendas(
             "lucro": round(float(snapshot.get("lucro", 0) or 0), 2),
             "margem_sobre_venda": round(float(snapshot.get("margem_sobre_venda", 0) or 0), 1),
             "margem_sobre_custo": round(float(snapshot.get("margem_sobre_custo", 0) or 0), 1),
+            "canal": getattr(venda, "canal", None),
+            "loja_origem": getattr(venda, "loja_origem", None),
+            "gateway_provider": snapshot.get("gateway_provider"),
+            "gateway_payment_ids": snapshot.get("gateway_payment_ids") or [],
+            "taxa_gateway": (
+                round(float(snapshot.get("taxa_gateway") or 0), 2)
+                if snapshot.get("taxa_gateway") is not None
+                else None
+            ),
+            "valor_liquido_gateway": (
+                round(float(snapshot.get("valor_liquido_gateway") or 0), 2)
+                if snapshot.get("valor_liquido_gateway") is not None
+                else None
+            ),
+            "valor_bruto_gateway": (
+                round(float(snapshot.get("valor_bruto_gateway") or 0), 2)
+                if snapshot.get("valor_bruto_gateway") is not None
+                else None
+            ),
             "status": venda.status,
             "tem_promocao": bool(itens_promocionais),
             "itens_promocionais": len(itens_promocionais),

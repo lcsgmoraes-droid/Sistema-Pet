@@ -1,4 +1,14 @@
-import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  ChevronDown,
+  ChevronRight,
+  CreditCard,
+  ExternalLink,
+  ShoppingCart,
+  Smartphone,
+  Store,
+} from "lucide-react";
 import CustomerIdentity from "../ui/CustomerIdentity";
 import DataTable from "../ui/DataTable";
 import MoneyCell from "../ui/MoneyCell";
@@ -6,30 +16,143 @@ import NumberCell from "../ui/NumberCell";
 import SaleReference from "../ui/SaleReference";
 import StatusBadge from "../ui/StatusBadge";
 import ProductIdentity from "../ui/ProductIdentity";
+import {
+  CANAL_APP,
+  CANAL_ECOMMERCE,
+  CANAL_LOJA_FISICA,
+  normalizeSalesChannel,
+} from "../../utils/salesChannel";
+
+const CANAL_CONFIG = {
+  [CANAL_LOJA_FISICA]: {
+    label: "ERP/PDV",
+    className: "border-blue-200 bg-blue-50 text-blue-700",
+    rowClassName: "border-l-4 border-l-blue-500",
+    icon: Store,
+  },
+  [CANAL_APP]: {
+    label: "App",
+    className: "border-emerald-200 bg-emerald-50 text-emerald-700",
+    rowClassName: "border-l-4 border-l-emerald-500",
+    icon: Smartphone,
+  },
+  [CANAL_ECOMMERCE]: {
+    label: "E-commerce",
+    className: "border-purple-200 bg-purple-50 text-purple-700",
+    rowClassName: "border-l-4 border-l-purple-500",
+    icon: ShoppingCart,
+  },
+};
+
+function obterCanalVenda(venda) {
+  return normalizeSalesChannel(
+    venda?.canal_venda ||
+      venda?.origem_canal_venda ||
+      venda?.canal ||
+      venda?.origem ||
+      venda?.origem_loja_virtual,
+    CANAL_LOJA_FISICA,
+  );
+}
+
+function getCanalConfig(venda) {
+  const canal = obterCanalVenda(venda);
+  return CANAL_CONFIG[canal] || CANAL_CONFIG[CANAL_LOJA_FISICA];
+}
+
+function CanalVendaBadge({ venda }) {
+  const config = getCanalConfig(venda);
+  const Icon = config.icon;
+
+  return (
+    <span
+      className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase leading-none ${config.className}`}
+      title="Canal de origem desta venda"
+    >
+      <Icon className="h-3 w-3" />
+      {config.label}
+    </span>
+  );
+}
+
+function normalizarGateway(venda) {
+  return String(
+    venda?.gateway_pagamento ||
+      venda?.gateway_provider ||
+      venda?.gateway ||
+      venda?.adquirente ||
+      venda?.operadora ||
+      "",
+  )
+    .trim()
+    .toLowerCase();
+}
+
+function isMercadoPago(venda) {
+  const gateway = normalizarGateway(venda);
+  return gateway.includes("mercado") || gateway.includes("mp");
+}
+
+function hasValorInformado(valor) {
+  return valor !== null && valor !== undefined && valor !== "";
+}
+
+function obterTaxaGatewayInformada(venda) {
+  const camposTaxa = [
+    venda?.taxa_gateway,
+    venda?.taxa_mercado_pago,
+    venda?.taxa_pagamento,
+  ];
+  return camposTaxa.find(hasValorInformado);
+}
+
+function obterTaxaGateway(venda) {
+  const taxaGatewayInformada = obterTaxaGatewayInformada(venda);
+  const taxa = hasValorInformado(taxaGatewayInformada)
+    ? taxaGatewayInformada
+    : isMercadoPago(venda)
+      ? 0
+      : venda?.taxa_cartao;
+  return Number(taxa || 0);
+}
+
+function obterLiquidoGateway(venda, taxaGateway) {
+  const valor =
+    venda?.valor_liquido_gateway ??
+    venda?.gateway_valor_liquido ??
+    venda?.valor_recebido;
+  if (valor !== null && valor !== undefined && valor !== "") return Number(valor || 0);
+  return Number(venda?.venda_bruta || 0) - Number(taxaGateway || 0);
+}
 
 function CodigoVendaCell({ abrirVendaNoPdv, venda }) {
   const saleNumber = venda.numero_venda || venda.id;
 
   return (
-    <SaleReference
-      sale={venda}
-      showPrefix={false}
-      value={saleNumber}
-      valueClassName=""
-    >
-      <button
-        type="button"
-        onClick={(event) => {
-          event.stopPropagation();
-          abrirVendaNoPdv?.(venda);
-        }}
-        className="inline-flex items-center gap-1 border-0 bg-transparent p-0 font-medium text-blue-700 hover:text-blue-900 hover:underline"
-        title="Abrir venda no PDV"
+    <div className="min-w-[120px]">
+      <SaleReference
+        sale={venda}
+        showPrefix={false}
+        value={saleNumber}
+        valueClassName=""
       >
-        #{saleNumber}
-        <ExternalLink className="h-3.5 w-3.5" />
-      </button>
-    </SaleReference>
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            abrirVendaNoPdv?.(venda);
+          }}
+          className="inline-flex items-center gap-1 border-0 bg-transparent p-0 font-medium text-blue-700 hover:text-blue-900 hover:underline"
+          title="Abrir venda no PDV"
+        >
+          #{saleNumber}
+          <ExternalLink className="h-3.5 w-3.5" />
+        </button>
+      </SaleReference>
+      <div className="mt-1">
+        <CanalVendaBadge venda={venda} />
+      </div>
+    </div>
   );
 }
 
@@ -55,6 +178,48 @@ function StatusVendaCell({ getStatusVendaMeta, status }) {
     <StatusBadge intent={statusMeta.intent} size="xs">
       {statusMeta.label}
     </StatusBadge>
+  );
+}
+
+function TaxaPagamentoCell({ venda }) {
+  const taxaGateway = obterTaxaGateway(venda);
+  const liquidoGateway = obterLiquidoGateway(venda, taxaGateway);
+  const mercadoPago = isMercadoPago(venda);
+  const taxaPendente = mercadoPago && !hasValorInformado(obterTaxaGatewayInformada(venda));
+
+  if (!mercadoPago) {
+    return <MoneyCell value={venda.taxa_cartao} sign="-" zeroAsDash />;
+  }
+
+  return (
+    <div className="flex min-w-[110px] flex-col items-end leading-tight">
+      <div className="inline-flex items-center gap-1 text-purple-700">
+        <CreditCard className="h-3.5 w-3.5" />
+        <MoneyCell value={taxaGateway} sign="-" zeroAsDash />
+      </div>
+      <span
+        className={`mt-0.5 inline-flex items-center gap-1 rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+          taxaPendente ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"
+        }`}
+        title={
+          taxaPendente
+            ? "Pagamento via Mercado Pago sem taxa conciliada ainda"
+            : "Taxa do Mercado Pago conciliada nesta venda"
+        }
+      >
+        {taxaPendente ? (
+          <AlertCircle className="h-3 w-3" />
+        ) : (
+          <CheckCircle2 className="h-3 w-3" />
+        )}
+        {taxaPendente ? "Taxa pend." : "MP"}
+      </span>
+      {!taxaPendente && (
+        <span className="mt-0.5 text-[10px] font-semibold text-slate-500">
+          Liq. <MoneyCell value={liquidoGateway} zeroAsDash />
+        </span>
+      )}
+    </div>
   );
 }
 
@@ -292,10 +457,12 @@ export default function VendasFinanceiroListaTable({
     },
     {
       key: "taxa_cartao",
-      header: "Tx. Cartão",
+      header: "Tx. Pagto",
       align: "right",
       className: "text-purple-600 whitespace-nowrap",
-      render: (venda) => <MoneyCell value={venda.taxa_cartao} sign="-" zeroAsDash />,
+      title:
+        "Taxa da operadora/adquirente. Para Mercado Pago, mostra taxa e valor liquido quando conciliado.",
+      render: (venda) => <TaxaPagamentoCell venda={venda} />,
     },
     {
       key: "comissao",
@@ -389,6 +556,7 @@ export default function VendasFinanceiroListaTable({
       renderExpandedRow={(venda, _rowIndex, colSpan) => (
         <ItensVendaDetalhes colSpan={colSpan} formatarMoeda={formatarMoeda} venda={venda} />
       )}
+      rowClassName={(venda) => getCanalConfig(venda).rowClassName}
       tableClassName="min-w-[1500px]"
       theadClassName="bg-gray-100"
     />
