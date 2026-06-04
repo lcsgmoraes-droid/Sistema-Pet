@@ -1,11 +1,17 @@
 import os
 from datetime import date
+from pathlib import Path
 from types import SimpleNamespace
 
 os.environ["DATABASE_URL"] = os.environ.get("DATABASE_URL") or "sqlite:///./test.db"
 os.environ["DEBUG"] = "false"
 
 from app import notas_entrada_routes as routes  # noqa: E402
+
+BACKEND_ROOT = Path(__file__).resolve().parents[2]
+MIGRATION_EAN_TRIBUTARIO = (
+    BACKEND_ROOT / "alembic" / "versions" / "pg20260604a1_add_ean_tributario_notas_entrada.py"
+)
 
 
 def test_parse_nfe_xml_extrai_lote_e_validade_de_infadprod_no_det():
@@ -108,6 +114,16 @@ def test_parse_nfe_xml_extrai_ean_comercial_e_ean_tributario():
     item = dados["itens"][0]
     assert item["ean"] == "17898242030073"
     assert item["ean_tributario"] == "7898242030076"
+
+
+def test_migration_ean_tributario_aumenta_coluna_antes_do_backfill():
+    source = MIGRATION_EAN_TRIBUTARIO.read_text(encoding="utf-8")
+    upgrade_source = source[source.index("def upgrade()") : source.index("def downgrade()")]
+
+    alter_gtin_tributario = upgrade_source.index('"gtin_ean_tributario"')
+    backfill = upgrade_source.index("_preencher_codigos_existentes()")
+
+    assert alter_gtin_tributario < backfill
 
 
 def test_aplicar_codigos_barras_nf_preenche_campos_vazios_preferindo_ean_tributario():
