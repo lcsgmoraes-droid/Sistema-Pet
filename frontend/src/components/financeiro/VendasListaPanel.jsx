@@ -2,42 +2,10 @@ import MetricCard from "../ui/MetricCard";
 import MetricGrid from "../ui/MetricGrid";
 import VendasFinanceiroListaTable from "./VendasFinanceiroListaTable";
 import {
-  CANAL_APP,
-  CANAL_ECOMMERCE,
   CANAL_LOJA_FISICA,
   normalizeSalesChannel,
 } from "../../utils/salesChannel";
-
-const CANAL_FILTROS = [
-  {
-    value: "",
-    label: "Consolidado",
-    description: "Todos os canais",
-    activeClass: "bg-slate-900 text-white border-slate-900",
-    idleClass: "bg-white text-slate-700 border-slate-200 hover:border-slate-300",
-  },
-  {
-    value: CANAL_LOJA_FISICA,
-    label: "ERP/PDV",
-    description: "Loja fisica",
-    activeClass: "bg-blue-600 text-white border-blue-600",
-    idleClass: "bg-blue-50 text-blue-700 border-blue-200 hover:border-blue-300",
-  },
-  {
-    value: CANAL_APP,
-    label: "App",
-    description: "Aplicativo",
-    activeClass: "bg-emerald-600 text-white border-emerald-600",
-    idleClass: "bg-emerald-50 text-emerald-700 border-emerald-200 hover:border-emerald-300",
-  },
-  {
-    value: CANAL_ECOMMERCE,
-    label: "E-commerce",
-    description: "Site da loja",
-    activeClass: "bg-purple-600 text-white border-purple-600",
-    idleClass: "bg-purple-50 text-purple-700 border-purple-200 hover:border-purple-300",
-  },
-];
+import { VENDAS_FINANCEIRO_CHANNEL_FILTERS } from "./vendasFinanceiroChannels";
 
 const formatCurrencyCompact = new Intl.NumberFormat("pt-BR", {
   style: "currency",
@@ -58,7 +26,7 @@ function obterCanalVenda(venda) {
 
 function montarResumoCanais(vendas = []) {
   const resumo = new Map();
-  CANAL_FILTROS.forEach((canal) => {
+  VENDAS_FINANCEIRO_CHANNEL_FILTERS.forEach((canal) => {
     resumo.set(canal.value, { quantidade: 0, total: 0 });
   });
 
@@ -118,7 +86,7 @@ export default function VendasListaPanel({
         </div>
 
         <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-          {CANAL_FILTROS.map((canal) => {
+          {VENDAS_FINANCEIRO_CHANNEL_FILTERS.map((canal) => {
             const ativo = filtroCanalVenda === canal.value;
             const resumo = resumoCanais.get(canal.value) || { quantidade: 0, total: 0 };
 
