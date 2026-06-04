@@ -114,6 +114,9 @@ const OperadorasCartao = lazy(() => import("./pages/OperadorasCartao"));
 const FluxoCaixa = lazy(() => import("./components/FluxoCaixa"));
 const RelatorioVendas = lazy(() => import("./components/RelatorioVendas"));
 const VendasFinanceiro = lazy(() => import("./components/VendasFinanceiro"));
+const VendasCanaisPreview = import.meta.env.DEV
+  ? lazy(() => import("./components/financeiro/VendasCanaisPreview"))
+  : null;
 const AlertasRacao = lazy(() => import("./components/AlertasRacao"));
 const OpcoesRacao = lazy(() => import("./components/OpcoesRacao"));
 const DRE = lazy(() => import("./components/DRE"));
@@ -313,6 +316,9 @@ function App() {
                 <Route path="/app" element={<AppPublicEntry />} />
                 <Route path="/app/retorno-pagamento" element={<AppPaymentReturn />} />
                 <Route path="/ecommerce" element={<EcommerceMVP />} />
+                {VendasCanaisPreview && (
+                  <Route path="/dev/vendas-canais-preview" element={<VendasCanaisPreview />} />
+                )}
 
                 {/* Rota dinâmica do e-commerce (precisa ficar após as rotas fixas) */}
                 <Route path="/:tenantId" element={<EcommerceMVP />} />

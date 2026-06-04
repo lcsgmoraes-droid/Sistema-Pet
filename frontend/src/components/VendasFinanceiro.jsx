@@ -16,6 +16,7 @@ import VendasPromocoesResumoPanel from "./financeiro/VendasPromocoesResumoPanel"
 import VendasRelatorioPersonalizadoModal from "./financeiro/VendasRelatorioPersonalizadoModal";
 import VendasResultadoComposicaoPanel from "./financeiro/VendasResultadoComposicaoPanel";
 import VendasResumoTabelasPanel from "./financeiro/VendasResumoTabelasPanel";
+import { CANAL_LOJA_FISICA, normalizeSalesChannel } from "../utils/salesChannel";
 import {
   ajustarVendaImposto,
   calcularAnaliseInteligenteVendas,
@@ -49,6 +50,17 @@ import {
 } from "./financeiro/vendasFinanceiroUtils";
 import MoneyCell, { formatMoneyCellValue, isZeroMoneyValue } from "./ui/MoneyCell";
 import NumberCell from "./ui/NumberCell";
+
+function obterCanalVendaFinanceiro(venda) {
+  return normalizeSalesChannel(
+    venda?.canal_venda ||
+      venda?.origem_canal_venda ||
+      venda?.canal ||
+      venda?.origem ||
+      venda?.origem_loja_virtual,
+    CANAL_LOJA_FISICA,
+  );
+}
 
 export default function VendasFinanceiro() {
   const { user } = useAuth();
@@ -120,6 +132,7 @@ export default function VendasFinanceiro() {
   const [menuRelatoriosAberto, setMenuRelatoriosAberto] = useState(false);
   const [modalRelatorioAberto, setModalRelatorioAberto] = useState(false);
   const [filtroStatusLista, setFiltroStatusLista] = useState("");
+  const [filtroCanalVenda, setFiltroCanalVenda] = useState("");
   const [mostrarImpostoTodasVendas, setMostrarImpostoTodasVendas] = useState(true);
   const [mostrarConfigFeriados, setMostrarConfigFeriados] = useState(false);
   const [feriadosCustomizados, setFeriadosCustomizados] = useState(
@@ -355,10 +368,17 @@ export default function VendasFinanceiro() {
     [listaVendasComImpostoAjustado],
   );
 
+  const listaVendasPorCanal = useMemo(() => {
+    if (!filtroCanalVenda) return listaVendasVisiveis;
+    return listaVendasVisiveis.filter(
+      (venda) => obterCanalVendaFinanceiro(venda) === filtroCanalVenda,
+    );
+  }, [filtroCanalVenda, listaVendasVisiveis]);
+
   const listaVendasFiltrada = useMemo(() => {
-    if (filtroStatusLista !== "em_aberto") return listaVendasVisiveis;
-    return listaVendasVisiveis.filter(vendaEstaEmAberto);
-  }, [filtroStatusLista, listaVendasVisiveis]);
+    if (filtroStatusLista !== "em_aberto") return listaVendasPorCanal;
+    return listaVendasPorCanal.filter(vendaEstaEmAberto);
+  }, [filtroStatusLista, listaVendasPorCanal]);
 
   const vendasResumoPeriodo = useMemo(() => listaVendasVisiveis, [listaVendasVisiveis]);
 
@@ -846,6 +866,7 @@ export default function VendasFinanceiro() {
         <VendasListaPanel
           abrirVendaNoPdv={abrirVendaNoPdv}
           cardsTotalizadoresLista={cardsTotalizadoresLista}
+          filtroCanalVenda={filtroCanalVenda}
           filtroStatusLista={filtroStatusLista}
           formatarData={formatarData}
           formatarMoeda={formatarMoeda}
@@ -854,6 +875,7 @@ export default function VendasFinanceiro() {
           listaVendasFiltrada={listaVendasFiltrada}
           listaVendasVisiveis={listaVendasVisiveis}
           mostrarImpostoTodasVendas={mostrarImpostoTodasVendas}
+          setFiltroCanalVenda={setFiltroCanalVenda}
           setFiltroStatusLista={setFiltroStatusLista}
           setMostrarImpostoTodasVendas={setMostrarImpostoTodasVendas}
           toggleVendaExpandida={toggleVendaExpandida}
