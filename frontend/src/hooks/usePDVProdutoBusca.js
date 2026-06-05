@@ -1,17 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { getProdutosVendaveis } from "../api/produtos";
-
-function encontrarProdutoPorCodigo(produtos, termo) {
-  const termoLower = String(termo || "").toLowerCase();
-
-  return (
-    produtos.find((produto) => {
-      const codigo = String(produto.codigo || "").toLowerCase();
-      const codigoBarras = String(produto.codigo_barras || "").toLowerCase();
-      return codigo === termoLower || codigoBarras === termoLower;
-    }) || null
-  );
-}
+import {
+  deveAdicionarProdutoAutomaticamente,
+  encontrarProdutoPorCodigo,
+  normalizarCodigoProdutoBusca,
+} from "../utils/pdvProdutoBuscaUtils";
 
 function isBuscaCancelada(error) {
   return (
@@ -158,12 +151,16 @@ export function usePDVProdutoBusca({
           const matchExato = encontrarProdutoPorCodigo(produtos, termoAtual);
 
           if (
-            matchExato &&
-            ultimoAutoAddProdutoRef.current !== termoAtual.toLowerCase() &&
-            leituraScannerDetectadaRef.current &&
-            !modoVisualizacao
+            deveAdicionarProdutoAutomaticamente({
+              matchExato,
+              termo: termoAtual,
+              leituraScannerDetectada: leituraScannerDetectadaRef.current,
+              modoVisualizacao,
+              ultimoAutoAddProduto: ultimoAutoAddProdutoRef.current,
+            })
           ) {
-            ultimoAutoAddProdutoRef.current = termoAtual.toLowerCase();
+            ultimoAutoAddProdutoRef.current =
+              normalizarCodigoProdutoBusca(termoAtual);
             adicionarProduto(matchExato, { focarInput: true });
             return;
           }
@@ -234,8 +231,8 @@ export function usePDVProdutoBusca({
     leituraScannerDetectadaRef.current = sequenciaRapidaProdutoRef.current >= 6;
   };
 
-  const adicionarProdutoViaEnter = async () => {
-    const termo = String(buscarProduto || "").trim();
+  const adicionarProdutoViaEnter = async (termoOverride) => {
+    const termo = String(termoOverride ?? buscarProduto ?? "").trim();
     if (!termo || modoVisualizacao || adicionandoProdutoPorEnterRef.current) {
       return;
     }
@@ -301,7 +298,7 @@ export function usePDVProdutoBusca({
 
     if (event.key === "Enter") {
       event.preventDefault();
-      await adicionarProdutoViaEnter();
+      await adicionarProdutoViaEnter(event.currentTarget?.value);
     }
   };
 

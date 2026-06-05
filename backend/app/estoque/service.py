@@ -22,6 +22,21 @@ from app.models import User
 logger = logging.getLogger(__name__)
 
 
+def _normalizar_quantidade_estoque(valor) -> float:
+    """Converte valores numericos para operar com a coluna Float de estoque."""
+    if valor is None:
+        return 0.0
+    if isinstance(valor, Decimal):
+        return float(valor)
+    return float(valor)
+
+
+def _somar_quantidade_estoque(estoque_atual, quantidade) -> float:
+    return _normalizar_quantidade_estoque(estoque_atual) + _normalizar_quantidade_estoque(
+        quantidade
+    )
+
+
 def _agenda_sync_bling(produto_id: int, estoque_novo: float, motivo: str) -> None:
     """Enfileira sync de estoque com o Bling (fila persistente, fire-and-forget)."""
     try:
@@ -246,11 +261,12 @@ class EstoqueService:
                 f"Movimente o estoque das variações."
             )
         
-        estoque_anterior = produto.estoque_atual or 0
+        quantidade_estoque = _normalizar_quantidade_estoque(quantidade)
+        estoque_anterior = _normalizar_quantidade_estoque(produto.estoque_atual)
         
         EstoqueService._validar_ou_registrar_estoque_negativo(
             produto=produto,
-            quantidade=quantidade,
+            quantidade=quantidade_estoque,
             estoque_anterior=estoque_anterior,
             tenant_id=tenant_id,
             referencia_id=referencia_id,
@@ -261,12 +277,12 @@ class EstoqueService:
 
         lotes_consumidos = EstoqueService._consumir_lotes_fifo(
             produto_id=produto.id,
-            quantidade=quantidade,
+            quantidade=quantidade_estoque,
             db=db,
         )
         
         # Baixar estoque total do produto
-        produto.estoque_atual -= quantidade
+        produto.estoque_atual = estoque_anterior - quantidade_estoque
         estoque_novo = produto.estoque_atual
         
         user_id_movimentacao = EstoqueService._resolver_user_id_operacao(
@@ -280,7 +296,7 @@ class EstoqueService:
             produto_id=produto.id,
             tipo='saida',
             motivo=motivo,
-            quantidade=quantidade,
+            quantidade=quantidade_estoque,
             quantidade_anterior=estoque_anterior,
             quantidade_nova=estoque_novo,
             custo_unitario=(
@@ -291,7 +307,7 @@ class EstoqueService:
             valor_total=(
                 float(valor_total_override)
                 if valor_total_override is not None
-                else quantidade
+                else quantidade_estoque
                 * (
                     float(custo_unitario_override)
                     if custo_unitario_override is not None
@@ -311,7 +327,7 @@ class EstoqueService:
         
         logger.info(
             f"Estoque baixado: Produto {produto.nome} - "
-            f"Qtd: {quantidade} ({estoque_anterior} → {estoque_novo})"
+            f"Qtd: {quantidade_estoque} ({estoque_anterior} → {estoque_novo})"
         )
 
         # 🔄 Enfileirar sync com Bling (não bloqueia, não falha a operação)
@@ -378,10 +394,11 @@ class EstoqueService:
                 f"Movimente o estoque das variações."
             )
         
-        estoque_anterior = produto.estoque_atual or 0
+        quantidade_estoque = _normalizar_quantidade_estoque(quantidade)
+        estoque_anterior = _normalizar_quantidade_estoque(produto.estoque_atual)
         
         # Adicionar ao estoque
-        produto.estoque_atual += quantidade
+        produto.estoque_atual = _somar_quantidade_estoque(estoque_anterior, quantidade_estoque)
         estoque_novo = produto.estoque_atual
         
         # Criar movimentação de estoque (entrada)
@@ -389,7 +406,7 @@ class EstoqueService:
             produto_id=produto.id,
             tipo='entrada',
             motivo=motivo,
-            quantidade=quantidade,
+            quantidade=quantidade_estoque,
             quantidade_anterior=estoque_anterior,
             quantidade_nova=estoque_novo,
             custo_unitario=(
@@ -400,7 +417,7 @@ class EstoqueService:
             valor_total=(
                 float(valor_total_override)
                 if valor_total_override is not None
-                else quantidade
+                else quantidade_estoque
                 * (
                     float(custo_unitario_override)
                     if custo_unitario_override is not None
@@ -420,7 +437,7 @@ class EstoqueService:
         
         logger.info(
             f"Estoque estornado: Produto {produto.nome} - "
-            f"Qtd: +{quantidade} ({estoque_anterior} → {estoque_novo})"
+            f"Qtd: +{quantidade_estoque} ({estoque_anterior} → {estoque_novo})"
         )
 
         # 🔄 Enfileirar sync com Bling (não bloqueia, não falha o estorno)

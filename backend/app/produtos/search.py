@@ -8,6 +8,14 @@ from app.produtos_models import Categoria, Departamento, Marca, Produto
 
 
 PRODUTO_SKU_COLUMN = getattr(Produto, "sku", None)
+PRODUTO_GTIN_COLUMNS = [
+    column
+    for column in [
+        getattr(Produto, "gtin_ean", None),
+        getattr(Produto, "gtin_ean_tributario", None),
+    ]
+    if column is not None
+]
 
 
 def _build_produto_search_order_clause(termo_busca: Optional[str]):
@@ -85,6 +93,7 @@ def _produto_search_conditions(palavra: str):
         _unaccent_ilike(Produto.nome, busca_pattern),
         _unaccent_ilike(Produto.codigo, busca_pattern),
         _unaccent_ilike(Produto.codigo_barras, busca_pattern),
+        *[_unaccent_ilike(column, busca_pattern) for column in PRODUTO_GTIN_COLUMNS],
         Produto.marca.has(_unaccent_ilike(Marca.nome, busca_pattern)),
         Produto.categoria.has(_unaccent_ilike(Categoria.nome, busca_pattern)),
         Produto.departamento.has(_unaccent_ilike(Departamento.nome, busca_pattern)),
@@ -100,6 +109,7 @@ def _produto_search_conditions(palavra: str):
             [
                 _digits_expr(Produto.codigo).ilike(digitos_pattern),
                 _digits_expr(Produto.codigo_barras).ilike(digitos_pattern),
+                *[_digits_expr(column).ilike(digitos_pattern) for column in PRODUTO_GTIN_COLUMNS],
             ]
         )
 
@@ -120,6 +130,7 @@ def _produto_search_conditions_fast(palavra: str):
     conditions = [
         Produto.codigo.ilike(prefix_pattern),
         Produto.codigo_barras.ilike(prefix_pattern),
+        *[column.ilike(prefix_pattern) for column in PRODUTO_GTIN_COLUMNS],
         Produto.nome.ilike(contains_pattern),
     ]
 
@@ -133,8 +144,10 @@ def _produto_search_conditions_fast(palavra: str):
             [
                 Produto.codigo == termo,
                 Produto.codigo_barras == termo,
+                *[column == termo for column in PRODUTO_GTIN_COLUMNS],
                 _digits_expr(Produto.codigo).like(digits_prefix),
                 _digits_expr(Produto.codigo_barras).like(digits_prefix),
+                *[_digits_expr(column).like(digits_prefix) for column in PRODUTO_GTIN_COLUMNS],
             ]
         )
         if PRODUTO_SKU_COLUMN is not None:
