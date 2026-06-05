@@ -60,12 +60,16 @@ from .produtos.search import (
     _produto_search_conditions_fast,
 )
 from .produtos.listagem import (
+    _aplicar_busca_texto_produtos,
+    _aplicar_filtro_fornecedores_produtos,
+    _aplicar_filtro_promocao_ativa,
     _as_float_optional,
     _departamento_id_produto,
     _enriquecer_produto_listagem,
     _fornecedor_nome_produto,
     _mapa_reservas_ativas_multitenant,
     _nome_area_produto,
+    _resolver_fornecedor_ids_filtro,
     _resolver_metricas_valorizacao_produto,
     _resolver_promocao_erp_produto,
 )
@@ -1842,9 +1846,7 @@ def listar_produtos_vendaveis(
         # Busca por múltiplas palavras: todas as palavras precisam aparecer (qualquer ordem)
         # Ex: "golden castrado" acha "Ração Golden Gato Castrado Salmão"
         search_conditions = _produto_search_conditions if contar_total else _produto_search_conditions_fast
-        palavras = [p.strip() for p in termo_busca.split() if p.strip()]
-        for palavra in palavras:
-            query = query.filter(search_conditions(palavra))
+        query = _aplicar_busca_texto_produtos(query, termo_busca, search_conditions)
 
     if categoria_id:
         query = query.filter(Produto.categoria_id == categoria_id)
@@ -1855,53 +1857,28 @@ def listar_produtos_vendaveis(
     if departamento_id:
         query = query.filter(Produto.departamento_id == departamento_id)
 
-    fornecedor_ids_filtro = []
-    if fornecedor_grupo_id:
-        grupo = db.query(FornecedorGrupo).filter(
-            FornecedorGrupo.id == fornecedor_grupo_id,
-            FornecedorGrupo.tenant_id == tenant_id,
-            FornecedorGrupo.ativo.is_(True),
-        ).first()
-        if not grupo:
-            raise HTTPException(status_code=404, detail="Grupo de fornecedor nao encontrado")
-
-        fornecedor_ids_filtro = [
-            fornecedor_id_grupo
-            for (fornecedor_id_grupo,) in db.query(Cliente.id).filter(
-                Cliente.tenant_id == tenant_id,
-                Cliente.tipo_cadastro == "fornecedor",
-                Cliente.fornecedor_grupo_id == grupo.id,
-                Cliente.ativo.is_(True),
-            ).all()
-        ]
-    elif fornecedor_id:
-        fornecedor_ids_filtro = [fornecedor_id]
-
-    if fornecedor_grupo_id and not fornecedor_ids_filtro:
-        query = query.filter(Produto.id == -1)
-    elif fornecedor_ids_filtro:
-        query = query.filter(
-            or_(
-                Produto.fornecedor_id.in_(fornecedor_ids_filtro),
-                Produto.fornecedores_alternativos.any(
-                    and_(
-                        ProdutoFornecedor.fornecedor_id.in_(fornecedor_ids_filtro),
-                        ProdutoFornecedor.ativo == True,
-                    )
-                ),
-            )
+    try:
+        fornecedor_ids_filtro, filtro_por_grupo = _resolver_fornecedor_ids_filtro(
+            db,
+            fornecedor_id=fornecedor_id,
+            fornecedor_grupo_id=fornecedor_grupo_id,
+            tenant_id=tenant_id,
+            access_ids=[tenant_id],
         )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+    query = _aplicar_filtro_fornecedores_produtos(
+        query,
+        fornecedor_ids_filtro,
+        filtro_por_grupo=filtro_por_grupo,
+    )
 
     if estoque_baixo:
         query = query.filter(Produto.estoque_atual <= Produto.estoque_minimo)
 
     if em_promocao:
-        agora = datetime.now()
-        query = query.filter(
-            Produto.preco_promocional.isnot(None),
-            or_(Produto.promocao_inicio.is_(None), Produto.promocao_inicio <= agora),
-            or_(Produto.promocao_fim.is_(None), Produto.promocao_fim >= agora),
-        )
+        query = _aplicar_filtro_promocao_ativa(query)
 
     # PAGINAÃ‡ÃƒO
     offset = (page - 1) * page_size
@@ -2039,9 +2016,7 @@ def listar_produtos(
         # Busca por múltiplas palavras: todas as palavras precisam aparecer (qualquer ordem)
         # Ex: "special dog senior" encontra "Racao Special Dog Ultralife Senior"
         search_conditions = _produto_search_conditions if busca_completa else _produto_search_conditions_fast
-        palavras = [p.strip() for p in termo_busca.split() if p.strip()]
-        for palavra in palavras:
-            query = query.filter(search_conditions(palavra))
+        query = _aplicar_busca_texto_produtos(query, termo_busca, search_conditions)
 
     if categoria_id:
         query = query.filter(Produto.categoria_id == categoria_id)
@@ -2052,53 +2027,28 @@ def listar_produtos(
     if departamento_id:
         query = query.filter(Produto.departamento_id == departamento_id)
 
-    fornecedor_ids_filtro = []
-    if fornecedor_grupo_id:
-        grupo = db.query(FornecedorGrupo).filter(
-            FornecedorGrupo.id == fornecedor_grupo_id,
-            FornecedorGrupo.tenant_id == tenant_id,
-            FornecedorGrupo.ativo.is_(True),
-        ).first()
-        if not grupo:
-            raise HTTPException(status_code=404, detail="Grupo de fornecedor nao encontrado")
-
-        fornecedor_ids_filtro = [
-            fornecedor_id_grupo
-            for (fornecedor_id_grupo,) in db.query(Cliente.id).filter(
-                Cliente.tenant_id.in_(access_ids),
-                Cliente.tipo_cadastro == "fornecedor",
-                Cliente.fornecedor_grupo_id == grupo.id,
-                Cliente.ativo.is_(True),
-            ).all()
-        ]
-    elif fornecedor_id:
-        fornecedor_ids_filtro = [fornecedor_id]
-
-    if fornecedor_grupo_id and not fornecedor_ids_filtro:
-        query = query.filter(Produto.id == -1)
-    elif fornecedor_ids_filtro:
-        query = query.filter(
-            or_(
-                Produto.fornecedor_id.in_(fornecedor_ids_filtro),
-                Produto.fornecedores_alternativos.any(
-                    and_(
-                        ProdutoFornecedor.fornecedor_id.in_(fornecedor_ids_filtro),
-                        ProdutoFornecedor.ativo == True,
-                    )
-                ),
-            )
+    try:
+        fornecedor_ids_filtro, filtro_por_grupo = _resolver_fornecedor_ids_filtro(
+            db,
+            fornecedor_id=fornecedor_id,
+            fornecedor_grupo_id=fornecedor_grupo_id,
+            tenant_id=tenant_id,
+            access_ids=access_ids,
         )
+    except LookupError as exc:
+        raise HTTPException(status_code=404, detail=str(exc))
+
+    query = _aplicar_filtro_fornecedores_produtos(
+        query,
+        fornecedor_ids_filtro,
+        filtro_por_grupo=filtro_por_grupo,
+    )
 
     if estoque_baixo:
         query = query.filter(Produto.estoque_atual <= Produto.estoque_minimo)
 
     if em_promocao:
-        agora = datetime.now()
-        query = query.filter(
-            Produto.preco_promocional.isnot(None),
-            or_(Produto.promocao_inicio.is_(None), Produto.promocao_inicio <= agora),
-            or_(Produto.promocao_fim.is_(None), Produto.promocao_fim >= agora),
-        )
+        query = _aplicar_filtro_promocao_ativa(query)
 
     # TOTAL
     total = query.count()

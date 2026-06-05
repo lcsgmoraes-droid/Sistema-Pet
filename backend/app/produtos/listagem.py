@@ -2,12 +2,14 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any, List, Optional
+from typing import Any, Callable, List, Optional
 
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
+from app.models import Cliente, FornecedorGrupo
 from app.partner_utils import is_partner_owned
-from app.produtos_models import Produto
+from app.produtos_models import Produto, ProdutoFornecedor
 from app.services.kit_estoque_service import KitEstoqueService
 
 
@@ -92,6 +94,90 @@ def _enriquecer_preco_pdv(produto: Produto, referencia: Optional[datetime] = Non
     produto.promocao_origem_pdv = "Promocao ERP" if promocao["promocao_ativa"] else None
     produto.desconto_promocional_pdv = promocao["desconto"]
     return produto
+
+
+def _normalizar_palavras_busca_produto(termo_busca: str) -> list[str]:
+    return [palavra.strip() for palavra in (termo_busca or "").split() if palavra.strip()]
+
+
+def _aplicar_busca_texto_produtos(
+    query,
+    termo_busca: str,
+    search_conditions: Callable[[str], Any],
+):
+    for palavra in _normalizar_palavras_busca_produto(termo_busca):
+        query = query.filter(search_conditions(palavra))
+    return query
+
+
+def _aplicar_filtro_promocao_ativa(query, referencia: Optional[datetime] = None):
+    agora = _datetime_naive(referencia) or datetime.now()
+    return query.filter(
+        Produto.preco_promocional.isnot(None),
+        or_(Produto.promocao_inicio.is_(None), Produto.promocao_inicio <= agora),
+        or_(Produto.promocao_fim.is_(None), Produto.promocao_fim >= agora),
+    )
+
+
+def _resolver_fornecedor_ids_filtro(
+    db: Session,
+    *,
+    fornecedor_id: Optional[int],
+    fornecedor_grupo_id: Optional[int],
+    tenant_id: Any,
+    access_ids: List[Any],
+) -> tuple[list[int], bool]:
+    """Resolve fornecedores de filtros diretos ou por grupo."""
+    if fornecedor_grupo_id:
+        grupo = db.query(FornecedorGrupo).filter(
+            FornecedorGrupo.id == fornecedor_grupo_id,
+            FornecedorGrupo.tenant_id == tenant_id,
+            FornecedorGrupo.ativo.is_(True),
+        ).first()
+        if not grupo:
+            raise LookupError("Grupo de fornecedor nao encontrado")
+
+        fornecedor_ids = [
+            fornecedor_id_grupo
+            for (fornecedor_id_grupo,) in db.query(Cliente.id).filter(
+                Cliente.tenant_id.in_(access_ids),
+                Cliente.tipo_cadastro == "fornecedor",
+                Cliente.fornecedor_grupo_id == grupo.id,
+                Cliente.ativo.is_(True),
+            ).all()
+        ]
+        return fornecedor_ids, True
+
+    if fornecedor_id:
+        return [fornecedor_id], False
+
+    return [], False
+
+
+def _aplicar_filtro_fornecedores_produtos(
+    query,
+    fornecedor_ids_filtro: list[int],
+    *,
+    filtro_por_grupo: bool,
+):
+    """Aplica filtro de fornecedor principal ou alternativo na query de produtos."""
+    if filtro_por_grupo and not fornecedor_ids_filtro:
+        return query.filter(Produto.id == -1)
+
+    if not fornecedor_ids_filtro:
+        return query
+
+    return query.filter(
+        or_(
+            Produto.fornecedor_id.in_(fornecedor_ids_filtro),
+            Produto.fornecedores_alternativos.any(
+                and_(
+                    ProdutoFornecedor.fornecedor_id.in_(fornecedor_ids_filtro),
+                    ProdutoFornecedor.ativo == True,
+                )
+            ),
+        )
+    )
 
 
 def _mapa_reservas_ativas_multitenant(db: Session, tenant_ids: List[str]) -> dict[int, float]:

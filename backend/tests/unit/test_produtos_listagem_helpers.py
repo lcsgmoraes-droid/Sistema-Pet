@@ -1,13 +1,19 @@
 import os
+from datetime import datetime
 from types import SimpleNamespace
 
 os.environ["DATABASE_URL"] = os.environ.get("DATABASE_URL") or "sqlite:///./test.db"
 os.environ["DEBUG"] = "false"
 
 from app.produtos.listagem import (
+    _aplicar_filtro_fornecedores_produtos,
+    _aplicar_busca_texto_produtos,
+    _aplicar_filtro_promocao_ativa,
     _departamento_id_produto,
     _fornecedor_nome_produto,
     _nome_area_produto,
+    _normalizar_palavras_busca_produto,
+    _resolver_fornecedor_ids_filtro,
     _resolver_metricas_valorizacao_produto,
 )
 
@@ -78,3 +84,115 @@ def test_resolver_metricas_valorizacao_produto_simples_preserva_reservas():
         "valor_custo_total": 36.0,
         "valor_venda_total": 72.0,
     }
+
+
+class _FakeQuery:
+    def __init__(self, *, first_result=None, all_result=None):
+        self.first_result = first_result
+        self.all_result = all_result or []
+        self.filters = []
+
+    def filter(self, *criteria):
+        self.filters.extend(criteria)
+        return self
+
+    def first(self):
+        return self.first_result
+
+    def all(self):
+        return self.all_result
+
+
+class _FakeDB:
+    def __init__(self, *, grupo=None, fornecedores=None):
+        self.grupo = grupo
+        self.fornecedores = fornecedores or []
+
+    def query(self, model):
+        if getattr(model, "__name__", "") == "FornecedorGrupo":
+            return _FakeQuery(first_result=self.grupo)
+        return _FakeQuery(all_result=[(fornecedor_id,) for fornecedor_id in self.fornecedores])
+
+
+def test_resolver_fornecedor_ids_filtro_preserva_fornecedor_direto():
+    ids, veio_de_grupo = _resolver_fornecedor_ids_filtro(
+        _FakeDB(),
+        fornecedor_id=42,
+        fornecedor_grupo_id=None,
+        tenant_id="tenant-1",
+        access_ids=["tenant-1"],
+    )
+
+    assert ids == [42]
+    assert veio_de_grupo is False
+
+
+def test_resolver_fornecedor_ids_filtro_busca_fornecedores_do_grupo():
+    ids, veio_de_grupo = _resolver_fornecedor_ids_filtro(
+        _FakeDB(grupo=SimpleNamespace(id=7), fornecedores=[10, 11]),
+        fornecedor_id=None,
+        fornecedor_grupo_id=7,
+        tenant_id="tenant-1",
+        access_ids=["tenant-1", "tenant-parceiro"],
+    )
+
+    assert ids == [10, 11]
+    assert veio_de_grupo is True
+
+
+def test_resolver_fornecedor_ids_filtro_rejeita_grupo_inexistente():
+    try:
+        _resolver_fornecedor_ids_filtro(
+            _FakeDB(grupo=None),
+            fornecedor_id=None,
+            fornecedor_grupo_id=99,
+            tenant_id="tenant-1",
+            access_ids=["tenant-1"],
+        )
+    except LookupError as exc:
+        assert "Grupo de fornecedor nao encontrado" in str(exc)
+    else:
+        raise AssertionError("Grupo inexistente deveria gerar LookupError")
+
+
+def test_aplicar_filtro_fornecedores_produtos_sem_ids_de_grupo_forca_resultado_vazio():
+    query = _FakeQuery()
+
+    filtrada = _aplicar_filtro_fornecedores_produtos(
+        query,
+        fornecedor_ids_filtro=[],
+        filtro_por_grupo=True,
+    )
+
+    assert filtrada is query
+    assert len(query.filters) == 1
+
+
+def test_normalizar_palavras_busca_produto_remove_espacos_excedentes():
+    assert _normalizar_palavras_busca_produto("  golden   gato castrado  ") == [
+        "golden",
+        "gato",
+        "castrado",
+    ]
+
+
+def test_aplicar_busca_texto_produtos_filtra_todas_as_palavras():
+    query = _FakeQuery()
+
+    filtrada = _aplicar_busca_texto_produtos(
+        query,
+        "golden gato",
+        lambda palavra: f"condicao:{palavra}",
+    )
+
+    assert filtrada is query
+    assert query.filters == ["condicao:golden", "condicao:gato"]
+
+
+def test_aplicar_filtro_promocao_ativa_usa_janela_de_datas():
+    query = _FakeQuery()
+
+    filtrada = _aplicar_filtro_promocao_ativa(query, referencia=datetime(2026, 1, 1, 12, 0))
+
+    assert filtrada is query
+    assert len(query.filters) == 3
