@@ -1,5 +1,6 @@
 from datetime import datetime
 from math import atan2, cos, radians, sin, sqrt
+import secrets
 from typing import Optional
 
 from sqlalchemy import text
@@ -89,3 +90,94 @@ def _notificar_proximo_cliente_background(rota_id: int, parada_ordem: int, tenan
         logger.info(f"Erro ao notificar proximo cliente em background: {exc}")
     finally:
         clear_current_tenant()
+
+
+def montar_origem_config_entrega(config) -> str:
+    return ", ".join(filter(None, [
+        config.logradouro,
+        config.numero,
+        config.bairro,
+        config.cidade,
+        config.estado,
+        config.cep,
+    ]))
+
+
+def aplicar_ordem_otimizada_em_vendas(vendas, ordem_indices):
+    for posicao, indice_original in enumerate(ordem_indices, start=1):
+        if indice_original < len(vendas):
+            vendas[indice_original].ordem_entrega_otimizada = posicao
+    return [vendas[i].numero_venda for i in ordem_indices]
+
+
+def enriquecer_rota_para_resposta(
+    db: Session,
+    rota,
+    tenant_id,
+    *,
+    commit_token: bool = False,
+):
+    """Carrega campos legados de GPS/rastreio e ordena paradas para resposta da API."""
+    loc = db.execute(
+        text(
+            """
+            SELECT lat_atual, lon_atual, localizacao_atualizada_em, token_rastreio
+                 , distancia_total_km_real, distancia_retorno_km_real
+            FROM rotas_entrega
+            WHERE id = :rid AND tenant_id = :tenant
+            """
+        ),
+        {"rid": rota.id, "tenant": tenant_id},
+    ).fetchone()
+    if loc:
+        rota.lat_atual = loc[0]
+        rota.lon_atual = loc[1]
+        rota.localizacao_atualizada_em = loc[2]
+        token_rastreio = loc[3]
+        rota.distancia_total_km_real = loc[4]
+        rota.distancia_retorno_km_real = loc[5]
+        if loc[4] is not None:
+            total_real = float(loc[4])
+            retorno_real = float(loc[5] or 0)
+            rota.distancia_ate_ultima_entrega_km_real = max(total_real - retorno_real, 0)
+        if not token_rastreio:
+            token_rastreio = secrets.token_urlsafe(32)
+            db.execute(
+                text(
+                    """
+                    UPDATE rotas_entrega
+                    SET token_rastreio = :token
+                    WHERE id = :rid AND tenant_id = :tenant
+                    """
+                ),
+                {"token": token_rastreio, "rid": rota.id, "tenant": tenant_id},
+            )
+            if commit_token:
+                db.commit()
+        rota.token_rastreio = token_rastreio
+
+    if rota.paradas:
+        dist_rows = db.execute(
+            text(
+                """
+                SELECT id, distancia_trecho_real_km, distancia_acumulada_real_km
+                FROM rotas_entrega_paradas
+                WHERE rota_id = :rid AND tenant_id = :tenant
+                """
+            ),
+            {"rid": rota.id, "tenant": tenant_id},
+        ).fetchall()
+        dist_por_parada = {row[0]: row for row in dist_rows}
+
+        rota.paradas = sorted(rota.paradas, key=lambda p: p.ordem)
+        for parada in rota.paradas:
+            dist_row = dist_por_parada.get(parada.id)
+            if dist_row:
+                parada.distancia_trecho_real_km = dist_row[1]
+                parada.distancia_acumulada_real_km = dist_row[2]
+            if parada.venda and parada.venda.cliente:
+                parada.cliente_nome = parada.venda.cliente.nome
+                parada.cliente_telefone = parada.venda.cliente.telefone
+                parada.cliente_celular = parada.venda.cliente.celular
+
+    return rota

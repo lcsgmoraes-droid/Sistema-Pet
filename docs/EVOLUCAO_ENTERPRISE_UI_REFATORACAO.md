@@ -107,6 +107,8 @@ Tela piloto:
 - Backend/Produtos: primeira fatia de reducao de `produtos_routes.py` extraiu helpers de listagem para `app/produtos/listagem.py`, com testes unitarios para flags, ordenacao e enriquecimento de kits.
 - Entregas/Rotas: `backend/app/api/endpoints/rotas_entrega.py` teve autenticacao/tenant extraidos para `rotas_entrega_auth.py` e helpers de schema/distancia/sincronizacao extraidos para `services/rotas_entrega_service.py`; tambem foi corrigido o import de `or_` usado nos filtros de vendas de entregador.
 - Entregas/Rotas: endpoint de otimizar vendas selecionadas ficou com registro unico no router, preservando validacao/rollback e filtrando vendas entregues/canceladas.
+- Entregas/Rotas: enriquecimento de rota para resposta da API (GPS, token de rastreio, distancias reais e dados do cliente nas paradas) foi consolidado em `enriquecer_rota_para_resposta`, removendo duplicacao entre listagem e detalhe de rota.
+- Entregas/Rotas: montagem da origem de entrega e aplicacao da ordem otimizada do Google foram extraidas para helpers testaveis em `rotas_entrega_service.py`, mantendo compatibilidade dos endpoints de otimizacao.
 - Testes/fixtures: a base legada de testes agora roda sem PostgreSQL local usando SQLite em memoria, reexporta `tenant_factory`, `user_factory`, `auth_headers` e `client`, e cria usuarios com bcrypt/vinculo `UserTenant` para validar o fluxo multitenant atual.
 - Produtos/Estoque: tela de movimentacoes voltou a exibir "Lancar granel" para produtos elegiveis e manteve balanco manual permitido em produto granel para ajuste de inventario.
 - Pessoas: listagem ganhou selecao em massa e fluxo de fusao de 2 cadastros, transferindo vinculos/historico para o principal e inativando o duplicado.

@@ -41,6 +41,9 @@ from app.services.rotas_entrega_service import (
     _haversine_km,
     _notificar_proximo_cliente_background,
     _sincronizar_venda_entregue_por_parada,
+    aplicar_ordem_otimizada_em_vendas,
+    enriquecer_rota_para_resposta,
+    montar_origem_config_entrega,
 )
 
 router = APIRouter(prefix="/rotas-entrega", tags=["Entregas - Rotas"])
@@ -83,70 +86,8 @@ def listar_rotas(
     # Ordenar: rotas com paradas otimizadas primeiro, depois por data
     rotas = query.order_by(RotaEntrega.created_at.asc()).all()
 
-    # Se a rota tem paradas, ordenar internamente pelas paradas.ordem
-    # E incluir dados do cliente para exibição
     for rota in rotas:
-        # Carregar localização atual sem depender de mapeamento ORM de colunas legadas.
-        loc = db.execute(
-            text(
-                """
-                SELECT lat_atual, lon_atual, localizacao_atualizada_em, token_rastreio
-                     , distancia_total_km_real, distancia_retorno_km_real
-                FROM rotas_entrega
-                WHERE id = :rid AND tenant_id = :tenant
-                """
-            ),
-            {"rid": rota.id, "tenant": tenant_id},
-        ).fetchone()
-        if loc:
-            rota.lat_atual = loc[0]
-            rota.lon_atual = loc[1]
-            rota.localizacao_atualizada_em = loc[2]
-            token_rastreio = loc[3]
-            rota.distancia_total_km_real = loc[4]
-            rota.distancia_retorno_km_real = loc[5]
-            if loc[4] is not None:
-                total_real = float(loc[4])
-                retorno_real = float(loc[5] or 0)
-                rota.distancia_ate_ultima_entrega_km_real = max(total_real - retorno_real, 0)
-            if not token_rastreio:
-                token_rastreio = secrets.token_urlsafe(32)
-                db.execute(
-                    text(
-                        """
-                        UPDATE rotas_entrega
-                        SET token_rastreio = :token
-                        WHERE id = :rid AND tenant_id = :tenant
-                        """
-                    ),
-                    {"token": token_rastreio, "rid": rota.id, "tenant": tenant_id},
-                )
-            rota.token_rastreio = token_rastreio
-
-        if rota.paradas:
-            dist_rows = db.execute(
-                text(
-                    """
-                    SELECT id, distancia_trecho_real_km, distancia_acumulada_real_km
-                    FROM rotas_entrega_paradas
-                    WHERE rota_id = :rid AND tenant_id = :tenant
-                    """
-                ),
-                {"rid": rota.id, "tenant": tenant_id},
-            ).fetchall()
-            dist_por_parada = {row[0]: row for row in dist_rows}
-
-            rota.paradas = sorted(rota.paradas, key=lambda p: p.ordem)
-            # Adicionar informações do cliente em cada parada
-            for parada in rota.paradas:
-                dist_row = dist_por_parada.get(parada.id)
-                if dist_row:
-                    parada.distancia_trecho_real_km = dist_row[1]
-                    parada.distancia_acumulada_real_km = dist_row[2]
-                if parada.venda and parada.venda.cliente:
-                    parada.cliente_nome = parada.venda.cliente.nome
-                    parada.cliente_telefone = parada.venda.cliente.telefone
-                    parada.cliente_celular = parada.venda.cliente.celular
+        enriquecer_rota_para_resposta(db, rota, tenant_id)
 
     db.commit()
     return rotas
@@ -299,15 +240,7 @@ def otimizar_vendas_pendentes(
             detail="Configure o endereço da loja em Configurações > Entregas primeiro"
         )
 
-    # Montar endereço completo
-    origem = ", ".join(filter(None, [
-        config.logradouro,
-        config.numero,
-        config.bairro,
-        config.cidade,
-        config.estado,
-        config.cep
-    ]))
+    origem = montar_origem_config_entrega(config)
 
     logger.info(f"📍 Ponto de origem: {origem}")
 
@@ -346,19 +279,14 @@ def otimizar_vendas_pendentes(
 
         logger.info(f"🎯 Google Maps retornou ordem: {ordem_indices}")
 
-        # Salvar ordem otimizada no banco
-        for posicao, indice_original in enumerate(ordem_indices, start=1):
-            if indice_original < len(vendas):
-                venda = vendas[indice_original]
-                venda.ordem_entrega_otimizada = posicao
-                logger.info(f"   Posição {posicao}: Venda {venda.numero_venda} (índice {indice_original})")
+        ordem_vendas = aplicar_ordem_otimizada_em_vendas(vendas, ordem_indices)
+        for posicao, numero_venda in enumerate(ordem_vendas, start=1):
+            logger.info(f"   Posição {posicao}: Venda {numero_venda}")
 
         db.commit()
 
         logger.info(f"✅ Ordem salva! {len(ordem_indices)} vendas otimizadas")
 
-        # Retornar ordem legível
-        ordem_vendas = [vendas[i].numero_venda for i in ordem_indices]
         logger.info(f"📋 Ordem final: {ordem_vendas}")
 
         return {
@@ -403,10 +331,7 @@ def otimizar_vendas_selecionadas(
             detail="Configure o endereço da loja em Configurações > Entregas primeiro"
         )
 
-    origem = ", ".join(filter(None, [
-        config.logradouro, config.numero, config.bairro,
-        config.cidade, config.estado, config.cep
-    ]))
+    origem = montar_origem_config_entrega(config)
 
     vendas = db.query(Venda).filter(
         Venda.tenant_id == tenant_id,
@@ -428,13 +353,10 @@ def otimizar_vendas_selecionadas(
         destinos = [v.endereco_entrega for v in vendas]
         ordem_indices, legs = calcular_rota_otimizada(origem, destinos)
 
-        for posicao, indice_original in enumerate(ordem_indices, start=1):
-            if indice_original < len(vendas):
-                vendas[indice_original].ordem_entrega_otimizada = posicao
+        ordem_vendas = aplicar_ordem_otimizada_em_vendas(vendas, ordem_indices)
 
         db.commit()
 
-        ordem_vendas = [vendas[i].numero_venda for i in ordem_indices]
         return {
             "message": f"Rotas otimizadas com sucesso! {len(ordem_indices)} entregas reordenadas.",
             "total_otimizado": len(ordem_indices),
@@ -469,66 +391,7 @@ def obter_rota(
     if not rota:
         raise HTTPException(status_code=404, detail="Rota não encontrada")
 
-    loc = db.execute(
-        text(
-            """
-            SELECT lat_atual, lon_atual, localizacao_atualizada_em, token_rastreio
-                  , distancia_total_km_real, distancia_retorno_km_real
-            FROM rotas_entrega
-            WHERE id = :rid AND tenant_id = :tenant
-            """
-        ),
-        {"rid": rota.id, "tenant": tenant_id},
-    ).fetchone()
-    if loc:
-        rota.lat_atual = loc[0]
-        rota.lon_atual = loc[1]
-        rota.localizacao_atualizada_em = loc[2]
-        token_rastreio = loc[3]
-        rota.distancia_total_km_real = loc[4]
-        rota.distancia_retorno_km_real = loc[5]
-        if loc[4] is not None:
-            total_real = float(loc[4])
-            retorno_real = float(loc[5] or 0)
-            rota.distancia_ate_ultima_entrega_km_real = max(total_real - retorno_real, 0)
-        if not token_rastreio:
-            token_rastreio = secrets.token_urlsafe(32)
-            db.execute(
-                text(
-                    """
-                    UPDATE rotas_entrega
-                    SET token_rastreio = :token
-                    WHERE id = :rid AND tenant_id = :tenant
-                    """
-                ),
-                {"token": token_rastreio, "rid": rota.id, "tenant": tenant_id},
-            )
-            db.commit()
-        rota.token_rastreio = token_rastreio
-
-    if rota.paradas:
-        dist_rows = db.execute(
-            text(
-                """
-                SELECT id, distancia_trecho_real_km, distancia_acumulada_real_km
-                FROM rotas_entrega_paradas
-                WHERE rota_id = :rid AND tenant_id = :tenant
-                """
-            ),
-            {"rid": rota.id, "tenant": tenant_id},
-        ).fetchall()
-        dist_por_parada = {row[0]: row for row in dist_rows}
-
-        rota.paradas = sorted(rota.paradas, key=lambda p: p.ordem)
-        for parada in rota.paradas:
-            dist_row = dist_por_parada.get(parada.id)
-            if dist_row:
-                parada.distancia_trecho_real_km = dist_row[1]
-                parada.distancia_acumulada_real_km = dist_row[2]
-            if parada.venda and parada.venda.cliente:
-                parada.cliente_nome = parada.venda.cliente.nome
-                parada.cliente_telefone = parada.venda.cliente.telefone
-                parada.cliente_celular = parada.venda.cliente.celular
+    enriquecer_rota_para_resposta(db, rota, tenant_id, commit_token=True)
 
     return rota
 
