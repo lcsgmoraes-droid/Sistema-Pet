@@ -1,24 +1,16 @@
-from dataclasses import dataclass
-from uuid import UUID
-
 from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query, status
-from fastapi.security import HTTPAuthorizationCredentials
-from jose import JWTError, jwt
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy import or_, text
 from datetime import datetime
 from decimal import Decimal
-from math import radians, sin, cos, sqrt, atan2
 from typing import List, Optional
 import secrets
 
-from app.db import SessionLocal, get_session
-from app.auth.core import ALGORITHM, get_current_user_from_token
-from app.auth.dependencies import get_current_user_and_tenant, security
-from app.config import JWT_SECRET_KEY
+from app.db import get_session
+from app.auth.dependencies import get_current_user_and_tenant
 from app.rotas_entrega_models import RotaEntrega, RotaEntregaParada
-from app.models import Cliente, ConfiguracaoEntrega, Tenant, User, UserTenant
+from app.models import Cliente, ConfiguracaoEntrega
 from app.vendas_models import Venda
 from app.schemas.rota_entrega import (
     RotaEntregaCreate,
@@ -30,230 +22,32 @@ from app.services.custo_moto_service import calcular_custo_moto
 from app.services.google_maps_service import calcular_distancia_km, calcular_rota_otimizada
 from app.services.notificacao_entrega_service import notificar_inicio_rota, notificar_proximo_cliente
 from app.models_configuracao_custo_moto import ConfiguracaoCustoMoto
-from app.session_manager import get_session_by_jti
-from app.tenancy.context import clear_current_tenant, set_current_tenant
 from app.utils.logger import logger
+from app.api.endpoints.rotas_entrega_auth import (
+    DeliveryActor,
+    _activate_delivery_actor_tenant,
+    _credentials_exception,
+    _decode_delivery_token,
+    _is_int_like,
+    _rota_filters_for_actor,
+    _tenant_status_is_active,
+    _validate_admin_delivery_actor,
+    _validate_ecommerce_entregador_actor,
+    get_delivery_actor_and_tenant,
+)
+from app.services.rotas_entrega_service import (
+    ensure_rotas_entrega_schema,
+    _contar_paradas_nao_entregues,
+    _haversine_km,
+    _notificar_proximo_cliente_background,
+    _sincronizar_venda_entregue_por_parada,
+)
 
 router = APIRouter(prefix="/rotas-entrega", tags=["Entregas - Rotas"])
-_rotas_schema_checked = False
-
-
-@dataclass
-class DeliveryActor:
-    user: User
-    tenant_id: UUID
-    entregador: Cliente | None = None
-
 
 class RegistrarRecebimentoPayload(BaseModel):
     forma_pagamento: str = Field(..., description="pix | cartao_debito | cartao_credito")
     numero_parcelas: int = Field(1, ge=1, le=12)
-
-
-def _tenant_status_is_active(status_value: object) -> bool:
-    return str(status_value or "").strip().lower() in {"active", "ativo"}
-
-
-def _credentials_exception(detail: str = "Could not validate credentials") -> HTTPException:
-    return HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail=detail,
-        headers={"WWW-Authenticate": "Bearer"},
-    )
-
-
-def _decode_delivery_token(credentials: HTTPAuthorizationCredentials) -> dict:
-    try:
-        return jwt.decode(credentials.credentials, JWT_SECRET_KEY, algorithms=[ALGORITHM])
-    except JWTError as exc:
-        raise _credentials_exception() from exc
-
-
-def _validate_admin_delivery_actor(
-    credentials: HTTPAuthorizationCredentials,
-    db: Session,
-    payload: dict,
-) -> DeliveryActor:
-    tenant_id_str = payload.get("tenant_id")
-    token_jti = payload.get("jti")
-    if not tenant_id_str:
-        raise _credentials_exception("Tenant nao selecionado. Use /auth/select-tenant.")
-    if not token_jti:
-        raise _credentials_exception("Sessao invalida. Faca login novamente.")
-
-    try:
-        tenant_id = UUID(str(tenant_id_str))
-    except (TypeError, ValueError) as exc:
-        raise _credentials_exception("Tenant invalido no token") from exc
-
-    set_current_tenant(tenant_id)
-    user = get_current_user_from_token(credentials.credentials, db)
-
-    user_tenant = (
-        db.query(UserTenant)
-        .filter(
-            UserTenant.user_id == user.id,
-            UserTenant.tenant_id == tenant_id,
-            UserTenant.is_active == True,
-        )
-        .first()
-    )
-    if not user_tenant:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Usuario nao tem acesso ativo ao tenant selecionado",
-        )
-
-    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
-    if not tenant or not _tenant_status_is_active(tenant.status):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Tenant inativo ou indisponivel",
-        )
-
-    db_session = get_session_by_jti(db, token_jti)
-    if not db_session or db_session.user_id != user.id:
-        raise _credentials_exception("Sessao invalida. Faca login novamente.")
-    if db_session.tenant_id and str(db_session.tenant_id) != str(tenant_id):
-        raise _credentials_exception("Sessao pertence a outro tenant. Faca login novamente.")
-    if db_session.tenant_id is None:
-        db_session.tenant_id = tenant_id
-        db.flush()
-
-    return DeliveryActor(user=user, tenant_id=tenant_id)
-
-
-def _validate_ecommerce_entregador_actor(
-    credentials: HTTPAuthorizationCredentials,
-    db: Session,
-) -> DeliveryActor:
-    from app.routes.ecommerce_auth import _get_current_ecommerce_user
-
-    user = _get_current_ecommerce_user(credentials=credentials, db=db)
-    tenant_id = UUID(str(user.tenant_id))
-    set_current_tenant(tenant_id)
-    cliente = (
-        db.query(Cliente)
-        .filter(
-            Cliente.tenant_id == tenant_id,
-            Cliente.user_id == user.id,
-            Cliente.is_entregador == True,
-        )
-        .first()
-    )
-    if not cliente:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso restrito a entregadores",
-        )
-    return DeliveryActor(user=user, tenant_id=tenant_id, entregador=cliente)
-
-
-def get_delivery_actor_and_tenant(
-    credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: Session = Depends(get_session),
-) -> DeliveryActor:
-    payload = _decode_delivery_token(credentials)
-    if payload.get("token_type") == "ecommerce_customer":
-        return _validate_ecommerce_entregador_actor(credentials, db)
-    return _validate_admin_delivery_actor(credentials, db, payload)
-
-
-def _is_int_like(value: object) -> bool:
-    return str(value).strip().isdigit()
-
-
-def _activate_delivery_actor_tenant(actor: DeliveryActor) -> UUID:
-    set_current_tenant(actor.tenant_id)
-    return actor.tenant_id
-
-
-def _rota_filters_for_actor(actor: DeliveryActor, rota_ref):
-    tenant_id = _activate_delivery_actor_tenant(actor)
-    filters = [RotaEntrega.tenant_id == tenant_id]
-    if _is_int_like(rota_ref):
-        filters.append(RotaEntrega.id == int(str(rota_ref).strip()))
-    else:
-        filters.append(RotaEntrega.numero == str(rota_ref).strip())
-    if actor.entregador is not None:
-        filters.append(RotaEntrega.entregador_id == actor.entregador.id)
-    return filters
-
-
-
-def ensure_rotas_entrega_schema(db: Session) -> None:
-    """Compatibilidade de schema para rotas/paradas em ambientes legados."""
-    global _rotas_schema_checked
-    if _rotas_schema_checked:
-        return
-
-    db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS km_inicial NUMERIC(10,2)"))
-    db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS km_final NUMERIC(10,2)"))
-    db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS token_rastreio VARCHAR(64)"))
-    db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS lat_atual NUMERIC(10,6)"))
-    db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS lon_atual NUMERIC(10,6)"))
-    db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS localizacao_atualizada_em TIMESTAMP"))
-    db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS distancia_total_km_real NUMERIC(10,3)"))
-    db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS distancia_retorno_km_real NUMERIC(10,3)"))
-    db.execute(text("ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS observacoes TEXT"))
-    db.execute(text("ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS km_entrega NUMERIC(10,2)"))
-    db.execute(text("ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS lat_entrega NUMERIC(10,6)"))
-    db.execute(text("ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS lon_entrega NUMERIC(10,6)"))
-    db.execute(text("ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS distancia_trecho_real_km NUMERIC(10,3)"))
-    db.execute(text("ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS distancia_acumulada_real_km NUMERIC(10,3)"))
-    db.commit()
-    _rotas_schema_checked = True
-
-
-def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
-    """Calcula distância entre 2 coordenadas geográficas em km."""
-    raio_terra_km = 6371.0
-
-    d_lat = radians(lat2 - lat1)
-    d_lon = radians(lon2 - lon1)
-    a = sin(d_lat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(d_lon / 2) ** 2
-    c = 2 * atan2(sqrt(a), sqrt(1 - a))
-    return raio_terra_km * c
-
-
-def _sincronizar_venda_entregue_por_parada(
-    db: Session,
-    parada: RotaEntregaParada,
-    tenant_id,
-    data_entrega: Optional[datetime] = None,
-) -> Optional[Venda]:
-    """Mantem Venda e parada alinhadas para o PDV/lista de entregas abertas."""
-    entrega_em = data_entrega or parada.data_entrega or datetime.now()
-    parada.status = "entregue"
-    parada.data_entrega = entrega_em
-
-    venda = db.query(Venda).filter(
-        Venda.id == parada.venda_id,
-        Venda.tenant_id == tenant_id,
-    ).first()
-    if venda:
-        venda.status_entrega = "entregue"
-        venda.data_entrega = entrega_em
-    return venda
-
-
-def _contar_paradas_nao_entregues(db: Session, rota_id: int, tenant_id) -> int:
-    return db.query(RotaEntregaParada).filter(
-        RotaEntregaParada.rota_id == rota_id,
-        RotaEntregaParada.tenant_id == tenant_id,
-        RotaEntregaParada.status != "entregue",
-    ).count()
-
-
-def _notificar_proximo_cliente_background(rota_id: int, parada_ordem: int, tenant_id) -> None:
-    try:
-        set_current_tenant(tenant_id)
-        with SessionLocal() as db:
-            notificar_proximo_cliente(db, rota_id, parada_ordem, tenant_id)
-    except Exception as exc:
-        logger.info(f"Erro ao notificar proximo cliente em background: {exc}")
-    finally:
-        clear_current_tenant()
 
 
 @router.get("/", response_model=List[RotaEntregaResponse])
