@@ -106,6 +106,7 @@ Tela piloto:
 - Produtos: opcao "Persistir filtros" agora salva busca, categoria, marca, fornecedor, status, estoque baixo, promocao, pais/variacoes, pagina e itens por pagina.
 - Backend/Produtos: primeira fatia de reducao de `produtos_routes.py` extraiu helpers de listagem para `app/produtos/listagem.py`, com testes unitarios para flags, ordenacao e enriquecimento de kits.
 - Backend/Produtos: filtros comuns das listagens (`busca` por palavras, promocao ativa e fornecedor/grupo de fornecedor) foram movidos para `app/produtos/listagem.py`, reduzindo duplicacao entre `/produtos` e `/produtos/vendaveis`.
+- Backend/Produtos: filtros basicos de catalogo e montagem da resposta paginada tambem foram movidos para helpers testados em `app/produtos/listagem.py`, reduzindo mais duplicacao das listagens.
 - Entregas/Rotas: `backend/app/api/endpoints/rotas_entrega.py` teve autenticacao/tenant extraidos para `rotas_entrega_auth.py` e helpers de schema/distancia/sincronizacao extraidos para `services/rotas_entrega_service.py`; tambem foi corrigido o import de `or_` usado nos filtros de vendas de entregador.
 - Entregas/Rotas: endpoint de otimizar vendas selecionadas ficou com registro unico no router, preservando validacao/rollback e filtrando vendas entregues/canceladas.
 - Entregas/Rotas: enriquecimento de rota para resposta da API (GPS, token de rastreio, distancias reais e dados do cliente nas paradas) foi consolidado em `enriquecer_rota_para_resposta`, removendo duplicacao entre listagem e detalhe de rota.

@@ -8,9 +8,11 @@ os.environ["DEBUG"] = "false"
 from app.produtos.listagem import (
     _aplicar_filtro_fornecedores_produtos,
     _aplicar_busca_texto_produtos,
+    _aplicar_filtros_basicos_catalogo_produtos,
     _aplicar_filtro_promocao_ativa,
     _departamento_id_produto,
     _fornecedor_nome_produto,
+    _montar_resposta_paginada_produtos,
     _nome_area_produto,
     _normalizar_palavras_busca_produto,
     _resolver_fornecedor_ids_filtro,
@@ -196,3 +198,35 @@ def test_aplicar_filtro_promocao_ativa_usa_janela_de_datas():
 
     assert filtrada is query
     assert len(query.filters) == 3
+
+
+def test_aplicar_filtros_basicos_catalogo_produtos_combina_filtros_opcionais():
+    query = _FakeQuery()
+
+    filtrada = _aplicar_filtros_basicos_catalogo_produtos(
+        query,
+        categoria_id=1,
+        marca_id=2,
+        departamento_id=3,
+        estoque_baixo=True,
+    )
+
+    assert filtrada is query
+    assert len(query.filters) == 4
+
+
+def test_montar_resposta_paginada_produtos_calcula_paginas():
+    resposta = _montar_resposta_paginada_produtos(
+        items=["a", "b"],
+        total=101,
+        page=2,
+        page_size=50,
+    )
+
+    assert resposta == {
+        "items": ["a", "b"],
+        "total": 101,
+        "page": 2,
+        "page_size": 50,
+        "pages": 3,
+    }

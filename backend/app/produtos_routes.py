@@ -63,11 +63,13 @@ from .produtos.listagem import (
     _aplicar_busca_texto_produtos,
     _aplicar_filtro_fornecedores_produtos,
     _aplicar_filtro_promocao_ativa,
+    _aplicar_filtros_basicos_catalogo_produtos,
     _as_float_optional,
     _departamento_id_produto,
     _enriquecer_produto_listagem,
     _fornecedor_nome_produto,
     _mapa_reservas_ativas_multitenant,
+    _montar_resposta_paginada_produtos,
     _nome_area_produto,
     _resolver_fornecedor_ids_filtro,
     _resolver_metricas_valorizacao_produto,
@@ -1848,14 +1850,13 @@ def listar_produtos_vendaveis(
         search_conditions = _produto_search_conditions if contar_total else _produto_search_conditions_fast
         query = _aplicar_busca_texto_produtos(query, termo_busca, search_conditions)
 
-    if categoria_id:
-        query = query.filter(Produto.categoria_id == categoria_id)
-
-    if marca_id:
-        query = query.filter(Produto.marca_id == marca_id)
-
-    if departamento_id:
-        query = query.filter(Produto.departamento_id == departamento_id)
+    query = _aplicar_filtros_basicos_catalogo_produtos(
+        query,
+        categoria_id=categoria_id,
+        marca_id=marca_id,
+        departamento_id=departamento_id,
+        estoque_baixo=estoque_baixo,
+    )
 
     try:
         fornecedor_ids_filtro, filtro_por_grupo = _resolver_fornecedor_ids_filtro(
@@ -1873,9 +1874,6 @@ def listar_produtos_vendaveis(
         fornecedor_ids_filtro,
         filtro_por_grupo=filtro_por_grupo,
     )
-
-    if estoque_baixo:
-        query = query.filter(Produto.estoque_atual <= Produto.estoque_minimo)
 
     if em_promocao:
         query = _aplicar_filtro_promocao_ativa(query)
@@ -1921,15 +1919,13 @@ def listar_produtos_vendaveis(
 
     if total is None:
         total = offset + len(produtos)
-    pages = (total + page_size - 1) // page_size
 
-    return {
-        "items": produtos,
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "pages": pages
-    }
+    return _montar_resposta_paginada_produtos(
+        items=produtos,
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @router.get("/", response_model=ProdutosPaginadosResponse)
@@ -2018,14 +2014,13 @@ def listar_produtos(
         search_conditions = _produto_search_conditions if busca_completa else _produto_search_conditions_fast
         query = _aplicar_busca_texto_produtos(query, termo_busca, search_conditions)
 
-    if categoria_id:
-        query = query.filter(Produto.categoria_id == categoria_id)
-
-    if marca_id:
-        query = query.filter(Produto.marca_id == marca_id)
-
-    if departamento_id:
-        query = query.filter(Produto.departamento_id == departamento_id)
+    query = _aplicar_filtros_basicos_catalogo_produtos(
+        query,
+        categoria_id=categoria_id,
+        marca_id=marca_id,
+        departamento_id=departamento_id,
+        estoque_baixo=estoque_baixo,
+    )
 
     try:
         fornecedor_ids_filtro, filtro_por_grupo = _resolver_fornecedor_ids_filtro(
@@ -2043,9 +2038,6 @@ def listar_produtos(
         fornecedor_ids_filtro,
         filtro_por_grupo=filtro_por_grupo,
     )
-
-    if estoque_baixo:
-        query = query.filter(Produto.estoque_atual <= Produto.estoque_minimo)
 
     if em_promocao:
         query = _aplicar_filtro_promocao_ativa(query)
@@ -2131,15 +2123,12 @@ def listar_produtos(
                 )
                 produtos_expandidos.append(variacao)
 
-    pages = (total + page_size - 1) // page_size
-
-    return {
-        "items": produtos_expandidos,
-        "total": total,
-        "page": page,
-        "page_size": page_size,
-        "pages": pages
-    }
+    return _montar_resposta_paginada_produtos(
+        items=produtos_expandidos,
+        total=total,
+        page=page,
+        page_size=page_size,
+    )
 
 
 @router.get("/{produto_id}/variacoes", response_model=List[ProdutoResponse])

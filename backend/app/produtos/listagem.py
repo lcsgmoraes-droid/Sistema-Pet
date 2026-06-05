@@ -119,6 +119,46 @@ def _aplicar_filtro_promocao_ativa(query, referencia: Optional[datetime] = None)
     )
 
 
+def _aplicar_filtros_basicos_catalogo_produtos(
+    query,
+    *,
+    categoria_id: Optional[int] = None,
+    marca_id: Optional[int] = None,
+    departamento_id: Optional[int] = None,
+    estoque_baixo: Optional[bool] = False,
+):
+    if categoria_id:
+        query = query.filter(Produto.categoria_id == categoria_id)
+
+    if marca_id:
+        query = query.filter(Produto.marca_id == marca_id)
+
+    if departamento_id:
+        query = query.filter(Produto.departamento_id == departamento_id)
+
+    if estoque_baixo:
+        query = query.filter(Produto.estoque_atual <= Produto.estoque_minimo)
+
+    return query
+
+
+def _montar_resposta_paginada_produtos(
+    *,
+    items,
+    total: int,
+    page: int,
+    page_size: int,
+) -> dict[str, Any]:
+    pages = (total + page_size - 1) // page_size if page_size else 0
+    return {
+        "items": items,
+        "total": total,
+        "page": page,
+        "page_size": page_size,
+        "pages": pages,
+    }
+
+
 def _resolver_fornecedor_ids_filtro(
     db: Session,
     *,
