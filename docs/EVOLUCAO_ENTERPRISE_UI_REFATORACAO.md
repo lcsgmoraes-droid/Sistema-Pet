@@ -106,6 +106,7 @@ Tela piloto:
 - Produtos: opcao "Persistir filtros" agora salva busca, categoria, marca, fornecedor, status, estoque baixo, promocao, pais/variacoes, pagina e itens por pagina.
 - Backend/Produtos: primeira fatia de reducao de `produtos_routes.py` extraiu helpers de listagem para `app/produtos/listagem.py`, com testes unitarios para flags, ordenacao e enriquecimento de kits.
 - Entregas/Rotas: `backend/app/api/endpoints/rotas_entrega.py` teve autenticacao/tenant extraidos para `rotas_entrega_auth.py` e helpers de schema/distancia/sincronizacao extraidos para `services/rotas_entrega_service.py`; tambem foi corrigido o import de `or_` usado nos filtros de vendas de entregador.
+- Entregas/Rotas: endpoint de otimizar vendas selecionadas ficou com registro unico no router, preservando validacao/rollback e filtrando vendas entregues/canceladas.
 - Testes/fixtures: a base legada de testes agora roda sem PostgreSQL local usando SQLite em memoria, reexporta `tenant_factory`, `user_factory`, `auth_headers` e `client`, e cria usuarios com bcrypt/vinculo `UserTenant` para validar o fluxo multitenant atual.
 - Produtos/Estoque: tela de movimentacoes voltou a exibir "Lancar granel" para produtos elegiveis e manteve balanco manual permitido em produto granel para ajuste de inventario.
 - Pessoas: listagem ganhou selecao em massa e fluxo de fusao de 2 cadastros, transferindo vinculos/historico para o principal e inativando o duplicado.
