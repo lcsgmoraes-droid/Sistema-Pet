@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { recalcularItemComPrecoEDesconto } from "../utils/pdvDescontoItensUtils";
 
 export function usePDVDescontoItens({ vendaAtual, setVendaAtual }) {
   const [mostrarModalDescontoItem, setMostrarModalDescontoItem] =
@@ -44,34 +45,7 @@ export function usePDVDescontoItens({ vendaAtual, setVendaAtual }) {
   const salvarDescontoItem = () => {
     const itensAtualizados = vendaAtual.itens.map((item) => {
       if (item.produto_id === itemEditando.produto_id) {
-        const precoUnitario = itemEditando.preco;
-        const quantidade = item.quantidade;
-        const subtotalSemDesconto = precoUnitario * quantidade;
-        let descontoValor = 0;
-        let descontoPercentual = 0;
-
-        if (itemEditando.tipoDesconto === "valor") {
-          descontoValor = parseFloat(itemEditando.descontoValor) || 0;
-          descontoPercentual =
-            subtotalSemDesconto > 0
-              ? (descontoValor / subtotalSemDesconto) * 100
-              : 0;
-        } else {
-          descontoPercentual = parseFloat(itemEditando.descontoPercentual) || 0;
-          descontoValor = (subtotalSemDesconto * descontoPercentual) / 100;
-        }
-
-        const precoComDesconto = precoUnitario - descontoValor / quantidade;
-        const subtotal = subtotalSemDesconto - descontoValor;
-
-        return {
-          ...item,
-          desconto_valor: descontoValor,
-          desconto_percentual: descontoPercentual,
-          tipo_desconto_aplicado: itemEditando.tipoDesconto,
-          preco_com_desconto: precoComDesconto,
-          subtotal,
-        };
+        return recalcularItemComPrecoEDesconto(item, itemEditando);
       }
       return item;
     });

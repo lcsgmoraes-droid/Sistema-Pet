@@ -14,6 +14,8 @@
     "test:mercado-pago-payment-return": "node scripts/test-mercado-pago-payment-return.mjs",
     "test:nfe-fiscal-assistida": "node scripts/test-nfe-fiscal-assistida.mjs",
     "test:mercado-pago-oauth": "node scripts/test-mercado-pago-oauth-return.mjs",
+    "test:pdv-preco-manual": "node scripts/test-pdv-preco-manual.mjs",
+    "test:pdv-produto-busca": "node scripts/test-pdv-produto-busca.mjs",
     "test:balanco": "node scripts/test-produtos-balanco-utils.mjs",
     "preview": "vite preview"
   },

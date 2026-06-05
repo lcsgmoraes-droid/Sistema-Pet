@@ -1,30 +1,9 @@
 import { useState } from "react";
 import { debugLog } from "../utils/debug";
-
-function recalcularSubtotalItem(item, novaQuantidade) {
-  const subtotalSemDesconto = novaQuantidade * item.preco_unitario;
-  let novoDescontoValor = item.desconto_valor || 0;
-
-  if (
-    item.tipo_desconto_aplicado === "percentual" &&
-    item.desconto_percentual > 0
-  ) {
-    novoDescontoValor = (subtotalSemDesconto * item.desconto_percentual) / 100;
-  }
-
-  return {
-    ...item,
-    quantidade: novaQuantidade,
-    desconto_valor: novoDescontoValor,
-    subtotal: subtotalSemDesconto - novoDescontoValor,
-  };
-}
-
-function obterPrecoVendaPDV(produto) {
-  const preco = produto?.preco_venda_pdv ?? produto?.preco_venda_efetivo ?? produto?.preco_venda;
-  const numero = parseFloat(preco);
-  return Number.isFinite(numero) ? numero : 0;
-}
+import {
+  obterPrecoVendaPDV,
+  recalcularSubtotalItem,
+} from "../utils/pdvCarrinhoItensUtils";
 
 export function usePDVCarrinhoItens({
   vendaAtual,
@@ -62,11 +41,7 @@ export function usePDVCarrinhoItens({
     if (itemExistente) {
       novosItens = vendaAtual.itens.map((item) =>
         item.produto_id === produto.id
-          ? {
-              ...item,
-              quantidade: item.quantidade + 1,
-              subtotal: (item.quantidade + 1) * item.preco_unitario,
-            }
+          ? recalcularSubtotalItem(item, item.quantidade + 1)
           : item,
       );
     } else {

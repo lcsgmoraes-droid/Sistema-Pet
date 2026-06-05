@@ -17,6 +17,10 @@ import IconActionButton from "../ui/IconActionButton";
 import SaleReference from "../ui/SaleReference";
 import StatusBadge from "../ui/StatusBadge";
 
+const CANAL_APP_FUNCIONARIO = "app_funcionario";
+const APP_FUNCIONARIO_LABEL = "App Funcionario";
+const APP_FUNCIONARIO_TITLE = "Venda pelo app do funcionario";
+
 function getCanalInfo(canal) {
   const info = getSalesChannelInfo(canal);
   const iconByKey = {
@@ -24,6 +28,14 @@ function getCanalInfo(canal) {
     smartphone: Smartphone,
     stethoscope: Stethoscope,
   };
+  if (info.value === CANAL_APP_FUNCIONARIO) {
+    return {
+      ...info,
+      label: APP_FUNCIONARIO_LABEL,
+      title: APP_FUNCIONARIO_TITLE,
+      Icon: Smartphone,
+    };
+  }
   return { ...info, Icon: iconByKey[info.iconKey] };
 }
 
