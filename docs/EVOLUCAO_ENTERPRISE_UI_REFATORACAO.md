@@ -107,6 +107,7 @@ Tela piloto:
 - Backend/Produtos: primeira fatia de reducao de `produtos_routes.py` extraiu helpers de listagem para `app/produtos/listagem.py`, com testes unitarios para flags, ordenacao e enriquecimento de kits.
 - Backend/Produtos: fatia de 2026-06-07 extraiu helpers puros de codigo de barras/EAN para `app/produtos/codigo_barras.py`, com teste unitario dedicado e comportamento das rotas preservado.
 - Backend/Produtos: fatia de 2026-06-07 extraiu os schemas Pydantic de produtos para `app/produtos/schemas.py`, removendo cerca de 700 linhas do router sem alterar contratos de API.
+- Backend/Produtos: fatia de 2026-06-07 extraiu normalizacoes centrais, validadores de tenant/entidades e helpers de relatorio para `app/produtos/core.py`, `app/produtos/validators.py` e `app/produtos/relatorios.py`, com testes unitarios dedicados e reducao adicional do router.
 - Testes/fixtures: a base legada de testes agora roda sem PostgreSQL local usando SQLite em memoria, reexporta `tenant_factory`, `user_factory`, `auth_headers` e `client`, e cria usuarios com bcrypt/vinculo `UserTenant` para validar o fluxo multitenant atual.
 - Produtos/Estoque: tela de movimentacoes voltou a exibir "Lancar granel" para produtos elegiveis e manteve balanco manual permitido em produto granel para ajuste de inventario.
 - Pessoas: listagem ganhou selecao em massa e fluxo de fusao de 2 cadastros, transferindo vinculos/historico para o principal e inativando o duplicado.
