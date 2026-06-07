@@ -105,6 +105,8 @@ Tela piloto:
 - Produtos: filtros de categoria e marca migraram para `AutocompleteSelect`, mantendo seta de abertura e busca digitavel; o filtro de fornecedor segue com `FornecedorSelector`.
 - Produtos: opcao "Persistir filtros" agora salva busca, categoria, marca, fornecedor, status, estoque baixo, promocao, pais/variacoes, pagina e itens por pagina.
 - Backend/Produtos: primeira fatia de reducao de `produtos_routes.py` extraiu helpers de listagem para `app/produtos/listagem.py`, com testes unitarios para flags, ordenacao e enriquecimento de kits.
+- Backend/Produtos: fatia de 2026-06-07 extraiu helpers puros de codigo de barras/EAN para `app/produtos/codigo_barras.py`, com teste unitario dedicado e comportamento das rotas preservado.
+- Backend/Produtos: fatia de 2026-06-07 extraiu os schemas Pydantic de produtos para `app/produtos/schemas.py`, removendo cerca de 700 linhas do router sem alterar contratos de API.
 - Testes/fixtures: a base legada de testes agora roda sem PostgreSQL local usando SQLite em memoria, reexporta `tenant_factory`, `user_factory`, `auth_headers` e `client`, e cria usuarios com bcrypt/vinculo `UserTenant` para validar o fluxo multitenant atual.
 - Produtos/Estoque: tela de movimentacoes voltou a exibir "Lancar granel" para produtos elegiveis e manteve balanco manual permitido em produto granel para ajuste de inventario.
 - Pessoas: listagem ganhou selecao em massa e fluxo de fusao de 2 cadastros, transferindo vinculos/historico para o principal e inativando o duplicado.
@@ -188,6 +190,41 @@ Regras para refatorar sem quebrar producao:
 - Arquivos frontend devem ser quebrados por `Page`, `Header`, `Filters`, `Table`, `Modal`, `Card`, `hooks` e `utils`.
 
 Maiores arquivos mapeados em 2026-05-04:
+
+Inventario atualizado em 2026-06-07, excluindo testes e migracoes Alembic da fila operacional:
+
+- 112 arquivos de aplicacao acima de 700 linhas, em atencao.
+- 54 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
+- 22 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
+- 12 arquivos de aplicacao acima de 2000 linhas.
+- 5 arquivos de aplicacao acima de 3000 linhas.
+
+Top criticos ainda pendentes no inventario de 2026-06-07:
+
+| Linhas | Arquivo | Prioridade |
+| --- | --- | --- |
+| 5289 | `backend/app/produtos_routes.py` | Critico |
+| 3852 | `backend/app/notas_entrada_routes.py` | Critico |
+| 3576 | `backend/app/pedidos_compra_routes.py` | Critico |
+| 3459 | `backend/app/campaigns/routes.py` | Critico |
+| 3107 | `backend/app/vendas/service.py` | Critico |
+| 2863 | `backend/app/clientes_routes.py` | Critico |
+| 2599 | `backend/app/bling_sync_routes.py` | Critico |
+| 2552 | `backend/app/services/tenant_onboarding_service.py` | Critico |
+| 2374 | `backend/app/nfe_routes.py` | Critico |
+| 2239 | `backend/app/estoque_transferencia_parceiro_routes.py` | Critico |
+| 2077 | `backend/app/contas_pagar_routes.py` | Critico |
+| 2067 | `backend/app/vendas_routes.py` | Critico |
+| 1969 | `backend/app/routes/app_mobile_routes.py` | Critico |
+| 1816 | `backend/app/dashboard_routes.py` | Critico |
+| 1784 | `backend/app/stone_routes.py` | Critico |
+| 1766 | `backend/app/integracao_bling_pedido_routes.py` | Critico |
+| 1752 | `backend/app/services/bling_flow_monitor_service.py` | Critico |
+| 1643 | `backend/app/dre_canais_routes.py` | Critico |
+| 1632 | `frontend/src/components/ContasPagar.jsx` | Critico |
+| 1604 | `backend/app/api/endpoints/rotas_entrega.py` | Critico |
+| 1560 | `backend/app/conciliacao_services.py` | Critico |
+| 1536 | `backend/app/comissoes_demonstrativo_routes.py` | Critico |
 
 | Linhas | Arquivo | Prioridade |
 | --- | --- | --- |
