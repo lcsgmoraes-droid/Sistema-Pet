@@ -130,6 +130,7 @@ from .produtos.listagem import (
     _resolver_promocao_erp_produto,
     _tipos_base_listagem,
 )
+from .produtos.lotes import _consumir_lotes_fifo_produto
 from .produtos.racao import (
     _normalizar_classificacao_racao,
     _normalizar_payload_racao,
@@ -2614,34 +2615,7 @@ def saida_estoque_fifo(
         )
 
     # Consumir lotes usando FIFO
-    quantidade_restante = saida.quantidade
-    lotes_consumidos = []
-
-    for lote in lotes:
-        if quantidade_restante <= 0:
-            break
-
-        if lote.quantidade_disponivel >= quantidade_restante:
-            # Este lote tem quantidade suficiente
-            lote.quantidade_disponivel -= quantidade_restante
-            lotes_consumidos.append({
-                "lote_id": lote.id,
-                "nome_lote": lote.nome_lote,
-                "quantidade_consumida": quantidade_restante,
-                "data_validade": lote.data_validade.isoformat() if lote.data_validade else None
-            })
-            quantidade_restante = 0
-        else:
-            # Consumir todo este lote e continuar
-            quantidade_consumida = lote.quantidade_disponivel
-            lotes_consumidos.append({
-                "lote_id": lote.id,
-                "nome_lote": lote.nome_lote,
-                "quantidade_consumida": quantidade_consumida,
-                "data_validade": lote.data_validade.isoformat() if lote.data_validade else None
-            })
-            quantidade_restante -= quantidade_consumida
-            lote.quantidade_disponivel = 0
+    lotes_consumidos = _consumir_lotes_fifo_produto(lotes, saida.quantidade)
 
     # Atualizar estoque do produto
     estoque_anterior = produto.estoque_atual
