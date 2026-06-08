@@ -23,7 +23,7 @@ from app.config import settings
 from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
 from .security.permissions_decorator import require_permission
-from .models import User, Cliente, FornecedorGrupo
+from .models import User, Cliente
 from app.partner_utils import get_all_accessible_tenant_ids
 from .vendas_models import Venda, VendaItem
 from .produtos_models import (
@@ -117,6 +117,7 @@ from .produtos.core import (
     _produto_sku_value,
 )
 from .produtos.listagem import (
+    _aplicar_filtro_fornecedor_produto,
     _departamento_id_produto,
     _enriquecer_produto_listagem,
     _fornecedor_nome_produto,
@@ -124,6 +125,7 @@ from .produtos.listagem import (
     _nome_area_produto,
     _palavras_busca_produto,
     _resolver_metricas_valorizacao_produto,
+    _resolver_fornecedor_ids_filtro_produto,
     _resolver_promocao_erp_produto,
     _tipos_base_listagem,
 )
@@ -1073,42 +1075,18 @@ def listar_produtos_vendaveis(
     if departamento_id:
         query = query.filter(Produto.departamento_id == departamento_id)
 
-    fornecedor_ids_filtro = []
-    if fornecedor_grupo_id:
-        grupo = db.query(FornecedorGrupo).filter(
-            FornecedorGrupo.id == fornecedor_grupo_id,
-            FornecedorGrupo.tenant_id == tenant_id,
-            FornecedorGrupo.ativo.is_(True),
-        ).first()
-        if not grupo:
-            raise HTTPException(status_code=404, detail="Grupo de fornecedor nao encontrado")
-
-        fornecedor_ids_filtro = [
-            fornecedor_id_grupo
-            for (fornecedor_id_grupo,) in db.query(Cliente.id).filter(
-                Cliente.tenant_id == tenant_id,
-                Cliente.tipo_cadastro == "fornecedor",
-                Cliente.fornecedor_grupo_id == grupo.id,
-                Cliente.ativo.is_(True),
-            ).all()
-        ]
-    elif fornecedor_id:
-        fornecedor_ids_filtro = [fornecedor_id]
-
-    if fornecedor_grupo_id and not fornecedor_ids_filtro:
-        query = query.filter(Produto.id == -1)
-    elif fornecedor_ids_filtro:
-        query = query.filter(
-            or_(
-                Produto.fornecedor_id.in_(fornecedor_ids_filtro),
-                Produto.fornecedores_alternativos.any(
-                    and_(
-                        ProdutoFornecedor.fornecedor_id.in_(fornecedor_ids_filtro),
-                        ProdutoFornecedor.ativo == True,
-                    )
-                ),
-            )
-        )
+    fornecedor_ids_filtro, filtro_fornecedor_por_grupo = _resolver_fornecedor_ids_filtro_produto(
+        db,
+        tenant_id=tenant_id,
+        fornecedor_id=fornecedor_id,
+        fornecedor_grupo_id=fornecedor_grupo_id,
+        tenant_ids_fornecedores=[tenant_id],
+    )
+    query = _aplicar_filtro_fornecedor_produto(
+        query,
+        fornecedor_ids=fornecedor_ids_filtro,
+        filtro_por_grupo=filtro_fornecedor_por_grupo,
+    )
 
     if estoque_baixo:
         query = query.filter(Produto.estoque_atual <= Produto.estoque_minimo)
@@ -1261,42 +1239,18 @@ def listar_produtos(
     if departamento_id:
         query = query.filter(Produto.departamento_id == departamento_id)
 
-    fornecedor_ids_filtro = []
-    if fornecedor_grupo_id:
-        grupo = db.query(FornecedorGrupo).filter(
-            FornecedorGrupo.id == fornecedor_grupo_id,
-            FornecedorGrupo.tenant_id == tenant_id,
-            FornecedorGrupo.ativo.is_(True),
-        ).first()
-        if not grupo:
-            raise HTTPException(status_code=404, detail="Grupo de fornecedor nao encontrado")
-
-        fornecedor_ids_filtro = [
-            fornecedor_id_grupo
-            for (fornecedor_id_grupo,) in db.query(Cliente.id).filter(
-                Cliente.tenant_id.in_(access_ids),
-                Cliente.tipo_cadastro == "fornecedor",
-                Cliente.fornecedor_grupo_id == grupo.id,
-                Cliente.ativo.is_(True),
-            ).all()
-        ]
-    elif fornecedor_id:
-        fornecedor_ids_filtro = [fornecedor_id]
-
-    if fornecedor_grupo_id and not fornecedor_ids_filtro:
-        query = query.filter(Produto.id == -1)
-    elif fornecedor_ids_filtro:
-        query = query.filter(
-            or_(
-                Produto.fornecedor_id.in_(fornecedor_ids_filtro),
-                Produto.fornecedores_alternativos.any(
-                    and_(
-                        ProdutoFornecedor.fornecedor_id.in_(fornecedor_ids_filtro),
-                        ProdutoFornecedor.ativo == True,
-                    )
-                ),
-            )
-        )
+    fornecedor_ids_filtro, filtro_fornecedor_por_grupo = _resolver_fornecedor_ids_filtro_produto(
+        db,
+        tenant_id=tenant_id,
+        fornecedor_id=fornecedor_id,
+        fornecedor_grupo_id=fornecedor_grupo_id,
+        tenant_ids_fornecedores=access_ids,
+    )
+    query = _aplicar_filtro_fornecedor_produto(
+        query,
+        fornecedor_ids=fornecedor_ids_filtro,
+        filtro_por_grupo=filtro_fornecedor_por_grupo,
+    )
 
     if estoque_baixo:
         query = query.filter(Produto.estoque_atual <= Produto.estoque_minimo)
