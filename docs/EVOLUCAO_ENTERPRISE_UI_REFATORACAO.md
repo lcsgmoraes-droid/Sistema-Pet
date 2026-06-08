@@ -116,6 +116,8 @@ Tela piloto:
 - Backend/Notas de entrada: fatia de 2026-06-08 moveu o parser XML NF-e para `app/notas_entrada/xml_parser.py`, preservando o import `parse_nfe_xml` no router para compatibilidade com rotas e testes existentes.
 - Backend/Notas de entrada: fatia de 2026-06-08 moveu os schemas Pydantic para `app/notas_entrada/schemas.py`, mantendo os mesmos nomes importados pelo router e reduzindo acoplamento entre contratos e handlers.
 - Backend/Notas de entrada: fatia de 2026-06-08 moveu a importacao automatica de docs SEFAZ para `app/notas_entrada/sefaz_importer.py`, mantendo `importar_docs_sefaz` reexportado pelo router para nao quebrar chamadas existentes.
+- Backend/Notas de entrada: fatia de 2026-06-08 moveu rotas de rateio da nota e do item para `app/notas_entrada/rateio_routes.py`, mantendo o prefixo publico pelo `include_router` do router principal.
+- Backend/Notas de entrada: fatia de 2026-06-08 moveu rotas de vinculo, desvinculo, sugestao de SKU e criacao de produto por item para `app/notas_entrada/itens_produto_routes.py`, preservando contratos e reduzindo o router principal para `1824` linhas.
 - Testes/fixtures: a base legada de testes agora roda sem PostgreSQL local usando SQLite em memoria, reexporta `tenant_factory`, `user_factory`, `auth_headers` e `client`, e cria usuarios com bcrypt/vinculo `UserTenant` para validar o fluxo multitenant atual.
 - Produtos/Estoque: tela de movimentacoes voltou a exibir "Lancar granel" para produtos elegiveis e manteve balanco manual permitido em produto granel para ajuste de inventario.
 - Pessoas: listagem ganhou selecao em massa e fluxo de fusao de 2 cadastros, transferindo vinculos/historico para o principal e inativando o duplicado.
@@ -206,14 +208,14 @@ Inventario atualizado em 2026-06-07, excluindo testes e migracoes Alembic da fil
 - 54 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 22 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 12 arquivos de aplicacao acima de 2000 linhas.
-- 5 arquivos de aplicacao acima de 3000 linhas.
+- 4 arquivos de aplicacao acima de 3000 linhas.
 
 Top criticos ainda pendentes no inventario de 2026-06-07:
 
 | Linhas | Arquivo | Prioridade |
 | --- | --- | --- |
 | 5289 | `backend/app/produtos_routes.py` | Critico |
-| 2531 | `backend/app/notas_entrada_routes.py` | Critico, em reducao por fatias |
+| 1824 | `backend/app/notas_entrada_routes.py` | Em reducao por fatias |
 | 3576 | `backend/app/pedidos_compra_routes.py` | Critico |
 | 3459 | `backend/app/campaigns/routes.py` | Critico |
 | 3107 | `backend/app/vendas/service.py` | Critico |
