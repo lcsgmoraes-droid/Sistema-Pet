@@ -113,6 +113,7 @@ Tela piloto:
 - Backend/Produtos: fatia de 2026-06-08 extraiu normalizacao de paginacao para `app/produtos/listagem.py`, reaproveitando page/page_size/offset em produtos vendaveis e relatorios paginados.
 - Backend/Produtos: fatia de 2026-06-08 extraiu helpers de vinculo de fornecedores para `app/produtos/fornecedores.py`, cobrindo fornecedor principal unico e operacoes em lote com teste unitario dedicado.
 - Backend/Produtos: fatia de 2026-06-08 extraiu consumo FIFO de lotes para `app/produtos/lotes.py`, preservando o payload legado da rota de saida e adicionando testes unitarios para consumo parcial, consumo em multiplos lotes e quantidade zero.
+- Backend/Produtos: fatia de 2026-06-08 extraiu helpers de hierarquia de categorias para `app/produtos/categorias.py`, preservando os decorators das rotas no router principal e adicionando testes unitarios para nivel, ciclo e arvore.
 - Backend/Notas de entrada: fatia de 2026-06-07 extraiu helpers fiscais/XML e regras de conferencia/lotes para `app/notas_entrada/fiscal.py` e `app/notas_entrada/conferencia.py`, mantendo imports compativeis no router e testes focados para custo efetivo, pack, conferencia, validade e lotes.
 - Backend/Notas de entrada: fatia de 2026-06-07 extraiu helpers de produto, SKU, EAN/codigo de barras e vinculo automatico para `app/notas_entrada/produtos.py`, mantendo os nomes reexportados pelo router e testes dedicados para normalizacao/divergencia de codigos fiscais.
 - Backend/Notas de entrada: fatia de 2026-06-07 extraiu helpers de fornecedor automatico para `app/notas_entrada/fornecedores.py`, adicionou testes de prefixo/criacao e corrigiu o upload em lote para inicializar usuario/tenant e gravar `tenant_id` em notas e itens.
@@ -219,7 +220,7 @@ Top criticos ainda pendentes no inventario de 2026-06-07:
 
 | Linhas | Arquivo | Prioridade |
 | --- | --- | --- |
-| 4734 | `backend/app/produtos_routes.py` | Critico |
+| 4704 | `backend/app/produtos_routes.py` | Critico |
 | 1824 | `backend/app/notas_entrada_routes.py` | Em reducao por fatias |
 | 3576 | `backend/app/pedidos_compra_routes.py` | Critico |
 | 3459 | `backend/app/campaigns/routes.py` | Critico |
@@ -244,7 +245,7 @@ Top criticos ainda pendentes no inventario de 2026-06-07:
 
 | Linhas | Arquivo | Prioridade |
 | --- | --- | --- |
-| 4734 | `backend/app/produtos_routes.py` | Critico |
+| 4704 | `backend/app/produtos_routes.py` | Critico |
 | 621 | `frontend/src/components/EntradaXML.jsx` | Atencao |
 | 4064 | `backend/app/estoque_routes.py` | Critico |
 | 1980 | `frontend/src/components/VendasFinanceiro.jsx` | Critico |
@@ -668,7 +669,7 @@ Para cada dominio sensivel:
 
 | Arquivo | Linhas aprox. | Risco |
 | --- | ---: | --- |
-| `backend/app/produtos_routes.py` | 4842 | Muito alto |
+| `backend/app/produtos_routes.py` | 4704 | Muito alto |
 | `backend/app/estoque_routes.py` | 4064 | Muito alto |
 | `backend/app/notas_entrada_routes.py` | 3411 | Alto |
 | `backend/app/campaigns/routes.py` | 3295 | Alto |
@@ -1397,7 +1398,7 @@ Este documento mapeia telas, rotas e CTAs principais de negócio. Ele cobre bem 
   - `frontend/src/pages/ClientesNovo.jsx` com `4197` linhas
   - `frontend/src/pages/ProdutosNovo.jsx` com `4032` linhas
   - `backend/app/veterinario_routes.py` com `4780` linhas
-  - `backend/app/produtos_routes.py` com `4967` linhas
+  - `backend/app/produtos_routes.py` com `4704` linhas
   - `backend/app/campaigns/routes.py` com `3445` linhas
   - `backend/app/notas_entrada_routes.py` com `3184` linhas
 

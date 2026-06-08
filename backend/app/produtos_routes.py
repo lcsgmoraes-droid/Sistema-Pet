@@ -107,6 +107,10 @@ from .produtos.codigo_barras import (
     gerar_codigo_barras_ean13,
     validar_codigo_barras_ean13,
 )
+from .produtos.categorias import (
+    _calcular_niveis_categorias,
+    _construir_arvore_categorias,
+)
 from .produtos.core import (
     _aplicar_status_ativo_produto,
     _nome_indica_granel,
@@ -280,24 +284,7 @@ def listar_categorias(
             )
         }
 
-    niveis_cache: dict[int, int] = {}
-
-    def calcular_nivel_em_memoria(categoria_id: int) -> int:
-        nivel_cache = niveis_cache.get(categoria_id)
-        if nivel_cache is not None:
-            return nivel_cache
-
-        nivel = 1
-        atual = categoria_por_id.get(categoria_id)
-        visitados = set()
-
-        while atual and atual.categoria_pai_id and atual.categoria_pai_id not in visitados:
-            visitados.add(atual.id)
-            nivel += 1
-            atual = categoria_por_id.get(atual.categoria_pai_id)
-
-        niveis_cache[categoria_id] = nivel
-        return nivel
+    niveis_por_categoria = _calcular_niveis_categorias(categoria_por_id)
 
     # Calcular nÃ­vel e contadores para cada categoria sem N+1
     resultado = []
@@ -315,7 +302,7 @@ def listar_categorias(
             "ativo": cat.ativo,
             "created_at": cat.created_at,
             "updated_at": cat.updated_at,
-            "nivel": calcular_nivel_em_memoria(cat.id),
+            "nivel": niveis_por_categoria.get(cat.id, 1),
             "total_filhos": int(total_filhos_por_categoria.get(cat.id, 0) or 0),
             "total_produtos": int(total_produtos_por_categoria.get(cat.id, 0) or 0),
         }
@@ -348,24 +335,7 @@ def listar_categorias_hierarquia(
         Categoria.ativo == True
     ).order_by(Categoria.ordem, Categoria.nome).all()
 
-    # Construir Ã¡rvore
-    def construir_arvore(pai_id=None):
-        resultado = []
-        for cat in categorias:
-            if cat.categoria_pai_id == pai_id:
-                item = {
-                    "id": cat.id,
-                    "nome": cat.nome,
-                    "descricao": cat.descricao,
-                    "icone": cat.icone,
-                    "cor": cat.cor,
-                    "ordem": cat.ordem,
-                    "subcategorias": construir_arvore(cat.id)
-                }
-                resultado.append(item)
-        return resultado
-
-    return construir_arvore()
+    return _construir_arvore_categorias(categorias)
 
 
 @router.get("/categorias/{categoria_id}", response_model=CategoriaResponse)
