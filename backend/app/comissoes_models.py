@@ -510,6 +510,7 @@ class ComissoesConfigSistema:
 from sqlalchemy import Column, Integer, String, Numeric, Boolean, DateTime, Date, ForeignKey, Text
 from sqlalchemy.dialects.postgresql import UUID
 from app.db import Base
+from app.base_models import TenantScoped
 
 
 class ComissaoConfiguracao(Base):
@@ -618,25 +619,27 @@ class ComissaoItem(Base):
     data_atualizacao = Column(DateTime, nullable=True, onupdate=datetime.utcnow)
 
 
-class ComissaoVenda(Base):
+class ComissaoVenda(TenantScoped, Base):
     """
     Consolidação de comissão por venda completa.
     Gera conta a pagar quando comissão é aprovada.
-    
-    ⚠️ NOTA: Possui tenant_id NOT NULL (consistente)
+
+    Mantém esquema próprio (id autoincrement, created_at/updated_at nullable) por
+    isso não herda BaseTenantModel; adota o mixin TenantScoped para entrar no
+    filtro global de tenant (tenant_id vem do mixin: UUID NOT NULL indexado,
+    idêntico ao anterior → sem mudança de schema).
     """
     __tablename__ = "comissoes_vendas"
     __table_args__ = {'extend_existing': True}
-    
+
     id = Column(Integer, primary_key=True, index=True)
-    
+
     # Relacionamentos
     venda_id = Column(Integer, ForeignKey('vendas.id'), nullable=False, index=True)
     funcionario_id = Column(Integer, ForeignKey('clientes.id'), nullable=False, index=True)
     conta_pagar_id = Column(Integer, ForeignKey('contas_pagar.id'), nullable=True)
     user_id = Column(Integer, nullable=False)
-    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
-    
+
     # Valores
     valor_venda = Column(Numeric, nullable=False)
     valor_comissao = Column(Numeric, nullable=False)

@@ -87,8 +87,8 @@ KNOWN_BASE_TENANT_DEBT = frozenset(
         "notification_log",
         "notification_queue",
         # app/comissoes_models.py
-        "comissoes_itens",   # tenant_id NULLABLE
-        "comissoes_vendas",
+        # comissoes_vendas → MIGRADO para TenantScoped (PR comissoes)
+        "comissoes_itens",   # tenant_id NULLABLE: requer backfill + ALTER NOT NULL antes de migrar
         # app/conciliacao_models.py — MIGRADO para TenantScoped (PR conciliacao):
         #   adquirentes_templates, arquivos_evidencia, conciliacao_importacoes,
         #   conciliacao_metricas, empresa_parametros
