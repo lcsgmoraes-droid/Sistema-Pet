@@ -92,18 +92,26 @@ def _add_tenant_filter(execute_state):
 
     # Import lazy para evitar ciclo app.base_models -> app.db -> filters -> app.base_models
     # quando modulos/modelos sao importados diretamente em testes e utilitarios.
-    from app.base_models import BaseTenantModel
+    from app.base_models import BaseTenantModel, TenantScoped
 
     tenant_id = get_current_tenant()
-    
+
     if tenant_id is not None:
-        # CASO 1: Tenant presente → aplicar filtro normalmente
+        # CASO 1: Tenant presente → aplicar filtro normalmente.
+        # Dois alvos: BaseTenantModel (modelos modernos) e TenantScoped (modelos
+        # legados que herdam Base direto mas adotam o mixin). Cada entidade casa
+        # com exatamente um dos criterios (BaseTenantModel nao herda TenantScoped).
         execute_state.statement = execute_state.statement.options(
             with_loader_criteria(
                 BaseTenantModel,
                 lambda cls: cls.tenant_id == tenant_id,
                 include_aliases=True,
-            )
+            ),
+            with_loader_criteria(
+                TenantScoped,
+                lambda cls: cls.tenant_id == tenant_id,
+                include_aliases=True,
+            ),
         )
         return
     
@@ -122,12 +130,12 @@ def _add_tenant_filter(execute_state):
         # Percorrer todas as classes mapeadas para encontrar a tabela
         from sqlalchemy.orm import class_mapper
         from app.db import Base
-        
+
         for mapper in Base.registry.mappers:
             mapped_class = mapper.class_
             if hasattr(mapped_class, '__tablename__') and mapped_class.__tablename__ == table_name:
-                # Verificar se herda de BaseTenantModel
-                if issubclass(mapped_class, BaseTenantModel):
+                # Verificar se é multi-tenant (BaseTenantModel ou mixin TenantScoped)
+                if issubclass(mapped_class, (BaseTenantModel, TenantScoped)):
                     # FAIL-FAST: Tabela multi-tenant sem tenant_id
                     error_msg = (
                         f"[ORM FAIL-FAST] Tentativa de query em tabela multi-tenant '{table_name}' "

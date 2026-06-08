@@ -9,6 +9,32 @@ from sqlalchemy.sql import func
 from app.db import Base
 
 
+class TenantScoped:
+    """
+    Marcador leve de modelo multi-tenant.
+
+    Provê APENAS a coluna ``tenant_id`` (NOT NULL, indexada) e serve de alvo para
+    o filtro global de tenant em ``app/tenancy/filters.py`` (injeção automática de
+    ``WHERE tenant_id = ?`` + fail-fast).
+
+    Use este mixin em modelos LEGADOS que herdam ``Base`` diretamente e não podem
+    adotar ``BaseTenantModel`` por terem esquema próprio (ex.: ``id`` autoincrement,
+    timestamps ``criado_em``/``atualizado_em`` em vez de ``created_at``/``updated_at``).
+    Basta declarar ``class X(TenantScoped, Base)`` e NÃO declarar ``tenant_id`` na
+    classe (ele vem do mixin), entrando assim no filtro automático sem alterar o schema.
+
+    Modelos novos devem preferir ``BaseTenantModel`` (que já traz id/timestamps).
+    """
+
+    @declared_attr
+    def tenant_id(cls):
+        return Column(
+            UUID(as_uuid=True),
+            nullable=False,
+            index=True,
+        )
+
+
 class BaseTenantModel(Base):
     """
     Base class for all multi-tenant models.
