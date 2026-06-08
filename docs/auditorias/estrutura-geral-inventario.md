@@ -133,8 +133,10 @@ Fatia executada na trilha Produtos/listagem:
 - `backend/app/produtos_routes.py` extraiu helpers de listagem, promocao de
   preco para exibicao, reservas multitenant, area/fornecedor e metricas de
   valorizacao para `backend/app/produtos/listagem.py`.
-- O router principal caiu de 6275 para 6003 linhas, preservando os nomes
-  importados usados pelas rotas e testes antigos.
+- O router principal caiu de 6275 para 4677 linhas, preservando os nomes
+  importados usados pelas rotas e testes antigos. A fatia de 2026-06-08 tambem
+  extraiu a montagem de load options e filtros basicos de `listar_produtos` e
+  `listar_produtos_vendaveis`.
 - Testes focados adicionados em
   `backend/tests/unit/test_produtos_listagem_helpers.py` e mantidos em
   `test_produtos_listagem_kit_virtual.py`, `test_produtos_validade_listagem.py`
@@ -142,7 +144,7 @@ Fatia executada na trilha Produtos/listagem:
 
 Proxima fatia recomendada:
 
-1. Continuar em Produtos, mas extrair apenas construcao de queries/filtros de
+1. Continuar em Produtos, mas extrair apenas construcao de query base/status/busca de
    `listar_produtos` e `listar_produtos_vendaveis`.
 2. Manter endpoints, payloads, permissoes, tenant e paginacao iguais.
 3. Nao misturar com estoque, PDV, fiscal, cadastro em lote ou regras de preco.

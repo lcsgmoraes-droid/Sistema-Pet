@@ -122,9 +122,11 @@ from .produtos.core import (
 )
 from .produtos.listagem import (
     _aplicar_filtro_fornecedor_produto,
+    _aplicar_filtros_basicos_produtos,
     _departamento_id_produto,
     _enriquecer_produto_listagem,
     _fornecedor_nome_produto,
+    _load_options_listagem_produtos,
     _mapa_reservas_ativas_multitenant,
     _nome_area_produto,
     _normalizar_paginacao_produtos,
@@ -1047,14 +1049,14 @@ def listar_produtos_vendaveis(
         for palavra in _palavras_busca_produto(termo_busca):
             query = query.filter(search_conditions(palavra))
 
-    if categoria_id:
-        query = query.filter(Produto.categoria_id == categoria_id)
-
-    if marca_id:
-        query = query.filter(Produto.marca_id == marca_id)
-
-    if departamento_id:
-        query = query.filter(Produto.departamento_id == departamento_id)
+    query = _aplicar_filtros_basicos_produtos(
+        query,
+        categoria_id=categoria_id,
+        marca_id=marca_id,
+        departamento_id=departamento_id,
+        estoque_baixo=estoque_baixo,
+        em_promocao=em_promocao,
+    )
 
     fornecedor_ids_filtro, filtro_fornecedor_por_grupo = _resolver_fornecedor_ids_filtro_produto(
         db,
@@ -1069,30 +1071,14 @@ def listar_produtos_vendaveis(
         filtro_por_grupo=filtro_fornecedor_por_grupo,
     )
 
-    if estoque_baixo:
-        query = query.filter(Produto.estoque_atual <= Produto.estoque_minimo)
-
-    if em_promocao:
-        agora = datetime.now()
-        query = query.filter(
-            Produto.preco_promocional.isnot(None),
-            or_(Produto.promocao_inicio.is_(None), Produto.promocao_inicio <= agora),
-            or_(Produto.promocao_fim.is_(None), Produto.promocao_fim >= agora),
-        )
-
     total = query.count() if contar_total else None
 
     # OrdenaÃ§Ã£o inteligente: prioriza match exato no cÃ³digo
     order_clause = _build_produto_search_order_clause(termo_busca)
-    load_options = [
-        joinedload(Produto.categoria),
-        joinedload(Produto.marca),
-        noload(Produto.lotes),
-    ]
-    if incluir_imagens:
-        load_options.append(joinedload(Produto.imagens))
-    else:
-        load_options.append(noload(Produto.imagens))
+    load_options = _load_options_listagem_produtos(
+        incluir_imagens=incluir_imagens,
+        incluir_lotes=False,
+    )
 
     # QUERY FINAL
     produtos = (
@@ -1209,14 +1195,14 @@ def listar_produtos(
         for palavra in _palavras_busca_produto(termo_busca):
             query = query.filter(search_conditions(palavra))
 
-    if categoria_id:
-        query = query.filter(Produto.categoria_id == categoria_id)
-
-    if marca_id:
-        query = query.filter(Produto.marca_id == marca_id)
-
-    if departamento_id:
-        query = query.filter(Produto.departamento_id == departamento_id)
+    query = _aplicar_filtros_basicos_produtos(
+        query,
+        categoria_id=categoria_id,
+        marca_id=marca_id,
+        departamento_id=departamento_id,
+        estoque_baixo=estoque_baixo,
+        em_promocao=em_promocao,
+    )
 
     fornecedor_ids_filtro, filtro_fornecedor_por_grupo = _resolver_fornecedor_ids_filtro_produto(
         db,
@@ -1231,17 +1217,6 @@ def listar_produtos(
         filtro_por_grupo=filtro_fornecedor_por_grupo,
     )
 
-    if estoque_baixo:
-        query = query.filter(Produto.estoque_atual <= Produto.estoque_minimo)
-
-    if em_promocao:
-        agora = datetime.now()
-        query = query.filter(
-            Produto.preco_promocional.isnot(None),
-            or_(Produto.promocao_inicio.is_(None), Produto.promocao_inicio <= agora),
-            or_(Produto.promocao_fim.is_(None), Produto.promocao_fim >= agora),
-        )
-
     # TOTAL
     total = query.count()
 
@@ -1252,12 +1227,10 @@ def listar_produtos(
 
     order_clause = _build_produto_search_order_clause(termo_busca)
 
-    load_options = [
-        joinedload(Produto.categoria),
-        joinedload(Produto.marca),
-        joinedload(Produto.imagens) if incluir_imagens else noload(Produto.imagens),
-        joinedload(Produto.lotes) if incluir_lotes else noload(Produto.lotes),
-    ]
+    load_options = _load_options_listagem_produtos(
+        incluir_imagens=incluir_imagens,
+        incluir_lotes=incluir_lotes,
+    )
 
     # QUERY FINAL COM RELACIONAMENTOS
     produtos = (

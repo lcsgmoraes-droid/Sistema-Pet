@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 from types import SimpleNamespace
 
 import pytest
@@ -9,8 +10,10 @@ os.environ["DEBUG"] = "false"
 
 from app.produtos.listagem import (
     _aplicar_filtro_fornecedor_produto,
+    _aplicar_filtros_basicos_produtos,
     _departamento_id_produto,
     _fornecedor_nome_produto,
+    _load_options_listagem_produtos,
     _nome_area_produto,
     _normalizar_paginacao_produtos,
     _palavras_busca_produto,
@@ -225,6 +228,39 @@ def test_aplicar_filtro_fornecedor_produto_ignora_quando_nao_ha_filtro():
     assert query.filters == []
 
 
+def test_aplicar_filtros_basicos_produtos_ignora_quando_nao_ha_filtros():
+    query = _FakeProdutoQuery()
+
+    resultado = _aplicar_filtros_basicos_produtos(
+        query,
+        categoria_id=None,
+        marca_id=None,
+        departamento_id=None,
+        estoque_baixo=False,
+        em_promocao=False,
+    )
+
+    assert resultado is query
+    assert query.filters == []
+
+
+def test_aplicar_filtros_basicos_produtos_aplica_filtros_disponiveis():
+    query = _FakeProdutoQuery()
+
+    resultado = _aplicar_filtros_basicos_produtos(
+        query,
+        categoria_id=1,
+        marca_id=2,
+        departamento_id=3,
+        estoque_baixo=True,
+        em_promocao=True,
+        referencia=datetime(2026, 6, 8, 10, 0, 0),
+    )
+
+    assert resultado is query
+    assert len(query.filters) == 5
+
+
 def test_normalizar_paginacao_produtos_limita_page_size_e_calcula_offset():
     assert _normalizar_paginacao_produtos(page=3, page_size=500, max_page_size=200) == (
         3,
@@ -239,3 +275,21 @@ def test_normalizar_paginacao_produtos_corrige_valores_minimos():
         1,
         0,
     )
+
+
+def test_load_options_listagem_produtos_monta_lista_nova_com_relacionamentos_base():
+    opcoes = _load_options_listagem_produtos(incluir_imagens=True, incluir_lotes=False)
+    outra_lista = _load_options_listagem_produtos(incluir_imagens=True, incluir_lotes=False)
+
+    assert opcoes is not outra_lista
+    assert len(opcoes) == 4
+    assert all(str(opcao.path).startswith("ORM Path[Mapper[Produto(produtos)]") for opcao in opcoes)
+
+
+def test_load_options_listagem_produtos_preserva_quantidade_ao_alternar_flags():
+    sem_imagens_com_lotes = _load_options_listagem_produtos(
+        incluir_imagens=False,
+        incluir_lotes=True,
+    )
+
+    assert len(sem_imagens_com_lotes) == 4

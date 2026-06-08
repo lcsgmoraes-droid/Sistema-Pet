@@ -6,7 +6,7 @@ from typing import Any, List, Optional
 
 from fastapi import HTTPException
 from sqlalchemy import and_, or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload, noload
 
 from app.models import Cliente, FornecedorGrupo
 from app.partner_utils import is_partner_owned
@@ -41,6 +41,19 @@ def _normalizar_paginacao_produtos(
     page_size = min(max(page_size, 1), max_page_size)
     offset = (page - 1) * page_size
     return page, page_size, offset
+
+
+def _load_options_listagem_produtos(
+    *,
+    incluir_imagens: bool,
+    incluir_lotes: bool,
+) -> list[Any]:
+    return [
+        joinedload(Produto.categoria),
+        joinedload(Produto.marca),
+        joinedload(Produto.imagens) if incluir_imagens else noload(Produto.imagens),
+        joinedload(Produto.lotes) if incluir_lotes else noload(Produto.lotes),
+    ]
 
 
 def _resolver_fornecedor_ids_filtro_produto(
@@ -106,6 +119,39 @@ def _aplicar_filtro_fornecedor_produto(
             ),
         )
     )
+
+
+def _aplicar_filtros_basicos_produtos(
+    query: Any,
+    *,
+    categoria_id: Optional[int],
+    marca_id: Optional[int],
+    departamento_id: Optional[int],
+    estoque_baixo: Optional[bool],
+    em_promocao: Optional[bool],
+    referencia: Optional[datetime] = None,
+) -> Any:
+    if categoria_id:
+        query = query.filter(Produto.categoria_id == categoria_id)
+
+    if marca_id:
+        query = query.filter(Produto.marca_id == marca_id)
+
+    if departamento_id:
+        query = query.filter(Produto.departamento_id == departamento_id)
+
+    if estoque_baixo:
+        query = query.filter(Produto.estoque_atual <= Produto.estoque_minimo)
+
+    if em_promocao:
+        agora = referencia or datetime.now()
+        query = query.filter(
+            Produto.preco_promocional.isnot(None),
+            or_(Produto.promocao_inicio.is_(None), Produto.promocao_inicio <= agora),
+            or_(Produto.promocao_fim.is_(None), Produto.promocao_fim >= agora),
+        )
+
+    return query
 
 
 def _as_float_optional(valor: Any) -> Optional[float]:
