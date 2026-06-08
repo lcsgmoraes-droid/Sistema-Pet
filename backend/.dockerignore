@@ -43,6 +43,8 @@ docs/
 # Backups
 backup*/
 *.backup
+*.bak
+*.bak/
 
 # Logs locais
 *.log
