@@ -1,0 +1,298 @@
+"""Helpers de produto usados no processamento de notas de entrada."""
+
+from __future__ import annotations
+
+import logging
+import re
+from difflib import SequenceMatcher
+from typing import Any, Dict, Optional
+
+from sqlalchemy import or_
+from sqlalchemy.orm import Session
+
+from app.produtos_models import NotaEntradaItem, Produto, ProdutoFornecedor
+
+logger = logging.getLogger(__name__)
+
+
+def _valor_preenchido(valor) -> bool:
+    if valor is None:
+        return False
+    if isinstance(valor, str):
+        return bool(valor.strip())
+    return True
+
+
+def _aplicar_dados_fiscais_item_no_produto(produto, item, sobrescrever: bool = False) -> bool:
+    """Atualiza dados fiscais somente quando o item realmente trouxe o campo."""
+    atualizou = False
+
+    def aplicar_texto(campo: str) -> None:
+        nonlocal atualizou
+        valor_item = getattr(item, campo, None)
+        if not _valor_preenchido(valor_item):
+            return
+        valor_produto = getattr(produto, campo, None)
+        if sobrescrever or not _valor_preenchido(valor_produto):
+            setattr(produto, campo, valor_item)
+            atualizou = True
+
+    def aplicar_aliquota(campo: str) -> None:
+        nonlocal atualizou
+        valor_item = getattr(item, campo, None)
+        if valor_item is None:
+            return
+        if not sobrescrever and float(valor_item or 0) == 0:
+            return
+        valor_produto = getattr(produto, campo, None)
+        if sobrescrever or valor_produto is None:
+            setattr(produto, campo, valor_item)
+            atualizou = True
+
+    for campo_texto in ("ncm", "cfop", "cest", "origem"):
+        aplicar_texto(campo_texto)
+
+    for campo_aliquota in ("aliquota_icms", "aliquota_pis", "aliquota_cofins"):
+        aplicar_aliquota(campo_aliquota)
+
+    return atualizou
+
+
+def gerar_sku_automatico(prefixo: str, db: Session, user_id: int) -> str:
+    """
+    Gera um SKU unico automaticamente para produtos sem codigo.
+
+    Formato: {PREFIXO}-{NUMERO_SEQUENCIAL}
+    Exemplo: PROD-00001
+    """
+    ultimo_produto = db.query(Produto).filter(
+        Produto.user_id == user_id,
+        Produto.codigo.like(f"{prefixo}-%")
+    ).order_by(Produto.id.desc()).first()
+
+    if ultimo_produto:
+        try:
+            ultimo_numero = int(ultimo_produto.codigo.split("-")[-1])
+            proximo_numero = ultimo_numero + 1
+        except ValueError:
+            proximo_numero = 1
+    else:
+        proximo_numero = 1
+
+    novo_sku = f"{prefixo}-{proximo_numero:05d}"
+
+    existe = db.query(Produto).filter(
+        Produto.codigo == novo_sku,
+        Produto.user_id == user_id
+    ).first()
+
+    if existe:
+        novo_sku = f"{prefixo}-{proximo_numero + 1:05d}"
+
+    return novo_sku
+
+
+def calcular_similaridade(texto1: str, texto2: str) -> float:
+    """Calcula similaridade entre dois textos (0-1)."""
+    if not texto1 or not texto2:
+        return 0.0
+    return SequenceMatcher(None, texto1.lower(), texto2.lower()).ratio()
+
+
+def normalizar_codigo_barras(valor: Optional[str]) -> str:
+    if not valor:
+        return ""
+    return re.sub(r"\D", "", str(valor))
+
+
+def _codigo_barras_valido_nf(valor: Optional[str]) -> str:
+    texto = str(valor or "").strip()
+    if not texto:
+        return ""
+    if texto.upper().replace(" ", "") == "SEMGTIN":
+        return ""
+    return normalizar_codigo_barras(texto)
+
+
+def _codigos_barras_nf(item: Any) -> Dict[str, str]:
+    ean = _codigo_barras_valido_nf(getattr(item, "ean", None))
+    ean_tributario = _codigo_barras_valido_nf(getattr(item, "ean_tributario", None))
+    return {
+        "ean": ean,
+        "ean_tributario": ean_tributario,
+        "principal": ean_tributario or ean,
+    }
+
+
+def _preencher_campo_codigo_barras_vazio(produto: Produto, campo: str, valor: str) -> bool:
+    if not valor:
+        return False
+    atual = _codigo_barras_valido_nf(getattr(produto, campo, None))
+    if atual:
+        return False
+    setattr(produto, campo, valor)
+    return True
+
+
+def _aplicar_codigos_barras_item_no_produto(produto: Produto, item: NotaEntradaItem) -> bool:
+    """Preenche codigos vindos da NF-e sem sobrescrever cadastro divergente."""
+    codigos = _codigos_barras_nf(item)
+    atualizou = False
+
+    atualizou = _preencher_campo_codigo_barras_vazio(produto, "gtin_ean", codigos["ean"]) or atualizou
+    atualizou = _preencher_campo_codigo_barras_vazio(
+        produto,
+        "gtin_ean_tributario",
+        codigos["ean_tributario"],
+    ) or atualizou
+    atualizou = _preencher_campo_codigo_barras_vazio(produto, "codigo_barras", codigos["principal"]) or atualizou
+
+    if atualizou:
+        logger.info(
+            "Codigos de barras da NF aplicados ao produto %s: ean=%s ean_tributario=%s principal=%s",
+            getattr(produto, "codigo", None),
+            codigos["ean"] or "-",
+            codigos["ean_tributario"] or "-",
+            codigos["principal"] or "-",
+        )
+
+    return atualizou
+
+
+def _montar_divergencia_codigo_barras_item(item: NotaEntradaItem) -> Dict[str, Any]:
+    if not item or not item.produto:
+        return {"tem_divergencia": False, "mensagens": []}
+
+    codigos_nf = _codigos_barras_nf(item)
+    produto = item.produto
+    pares = [
+        ("codigo_barras", "Codigo de barras principal", codigos_nf["principal"]),
+        ("gtin_ean", "EAN comercial", codigos_nf["ean"]),
+        ("gtin_ean_tributario", "EAN fiscal", codigos_nf["ean_tributario"]),
+    ]
+    mensagens = []
+
+    for campo, label, valor_nf in pares:
+        valor_produto = _codigo_barras_valido_nf(getattr(produto, campo, None))
+        if valor_nf and valor_produto and valor_nf != valor_produto:
+            mensagens.append(f"{label}: NF={valor_nf} vs cadastro={valor_produto}")
+
+    return {"tem_divergencia": bool(mensagens), "mensagens": mensagens}
+
+
+def obter_detalhe_vinculo_item(item: NotaEntradaItem) -> Dict[str, Optional[str]]:
+    """Identifica por qual referencia o item da NF-e coincide com o produto vinculado."""
+    if not item or not item.produto_id or not item.produto:
+        return {"origem": None, "referencia": None}
+
+    referencia_nf_codigo = (item.codigo_produto or "").strip()
+    referencias_nf_ean = [
+        _codigo_barras_valido_nf(getattr(item, "ean_tributario", None)),
+        _codigo_barras_valido_nf(item.ean),
+    ]
+    produto_codigo = (item.produto.codigo or "").strip()
+
+    produto_codigos_barras = {
+        normalizar_codigo_barras(item.produto.codigo_barras),
+        normalizar_codigo_barras(getattr(item.produto, "gtin_ean", None)),
+        normalizar_codigo_barras(getattr(item.produto, "gtin_ean_tributario", None)),
+    }
+    produto_codigos_barras.discard("")
+
+    for referencia_nf_ean in referencias_nf_ean:
+        if referencia_nf_ean and referencia_nf_ean in produto_codigos_barras:
+            return {"origem": "codigo_barras", "referencia": referencia_nf_ean}
+
+    if referencia_nf_codigo and referencia_nf_codigo == produto_codigo:
+        return {"origem": "sku", "referencia": referencia_nf_codigo}
+
+    codigo_nf_normalizado = normalizar_codigo_barras(referencia_nf_codigo)
+    if codigo_nf_normalizado and codigo_nf_normalizado in produto_codigos_barras:
+        return {"origem": "codigo_barras", "referencia": codigo_nf_normalizado}
+
+    return {"origem": None, "referencia": None}
+
+
+def encontrar_produto_similar(
+    descricao: str,
+    codigo: str,
+    db: Session,
+    tenant_id=None,
+    fornecedor_id: int = None,
+    ean: Optional[str] = None,
+    ean_tributario: Optional[str] = None,
+) -> tuple:
+    """
+    Encontra produto similar no banco (ativo OU inativo).
+
+    Retorna (produto, confianca, foi_encontrado_inativo, origem_match, referencia_match).
+    Matching por similaridade de nome foi removido para evitar vinculos errados.
+    """
+    if codigo:
+        query = db.query(Produto).filter(Produto.codigo == codigo)
+        if tenant_id is not None:
+            query = query.filter(Produto.tenant_id == tenant_id)
+
+        if fornecedor_id:
+            query_fornecedor = query.join(
+                ProdutoFornecedor,
+                ProdutoFornecedor.produto_id == Produto.id
+            ).filter(
+                ProdutoFornecedor.fornecedor_id == fornecedor_id,
+                ProdutoFornecedor.ativo == True,
+            )
+            if tenant_id is not None:
+                query_fornecedor = query.join(
+                    ProdutoFornecedor,
+                    ProdutoFornecedor.produto_id == Produto.id
+                ).filter(
+                    ProdutoFornecedor.fornecedor_id == fornecedor_id,
+                    ProdutoFornecedor.ativo == True,
+                    ProdutoFornecedor.tenant_id == tenant_id,
+                )
+
+            produto_com_fornecedor = query_fornecedor.first()
+
+            if produto_com_fornecedor:
+                foi_inativo = not produto_com_fornecedor.ativo
+                logger.info("Match por SKU + Fornecedor: %s", produto_com_fornecedor.nome)
+                return (produto_com_fornecedor, 1.0, foi_inativo, "sku", codigo)
+
+        produto = query.first()
+        if produto:
+            foi_inativo = not produto.ativo
+            logger.info("Match por SKU: %s", produto.nome)
+            return (produto, 1.0, foi_inativo, "sku", codigo)
+
+    referencias_codigo_barras = []
+    ean_tributario_normalizado = _codigo_barras_valido_nf(ean_tributario)
+    ean_normalizado = _codigo_barras_valido_nf(ean)
+    codigo_normalizado = normalizar_codigo_barras(codigo)
+
+    if ean_tributario_normalizado:
+        referencias_codigo_barras.append(ean_tributario_normalizado)
+    if ean_normalizado and ean_normalizado not in referencias_codigo_barras:
+        referencias_codigo_barras.append(ean_normalizado)
+    if codigo_normalizado and codigo_normalizado not in referencias_codigo_barras:
+        referencias_codigo_barras.append(codigo_normalizado)
+
+    for referencia in referencias_codigo_barras:
+        query = db.query(Produto).filter(
+            or_(
+                Produto.codigo_barras == referencia,
+                Produto.gtin_ean == referencia,
+                Produto.gtin_ean_tributario == referencia,
+            )
+        )
+        if tenant_id is not None:
+            query = query.filter(Produto.tenant_id == tenant_id)
+
+        produto = query.first()
+
+        if produto:
+            foi_inativo = not produto.ativo
+            logger.info("Match por EAN: %s", produto.nome)
+            return (produto, 1.0, foi_inativo, "codigo_barras", referencia)
+
+    logger.info("Nenhum match encontrado para: %s (SKU: %s)", descricao[:50], codigo)
+    return (None, 0, False, None, None)
