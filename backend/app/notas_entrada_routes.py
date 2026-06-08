@@ -18,8 +18,6 @@ from pydantic import BaseModel, Field
 import xml.etree.ElementTree as ET
 import re
 
-from app.clientes_routes import gerar_codigo_cliente
-
 from .db import get_session
 from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
@@ -71,6 +69,10 @@ from .notas_entrada.fiscal import (
     calcular_quantidade_custo_efetivos,
     detectar_multiplicador_pack,
     extrair_resumo_fiscal_xml,
+)
+from .notas_entrada.fornecedores import (
+    criar_fornecedor_automatico,
+    gerar_prefixo_fornecedor,
 )
 from .notas_entrada.produtos import (
     _aplicar_codigos_barras_item_no_produto,
@@ -391,111 +393,6 @@ def parse_nfe_xml(xml_content: str) -> dict:
         raise ValueError(f"Erro ao processar XML: {str(e)}")
 
 
-def gerar_prefixo_fornecedor(nome: str) -> str:
-    """
-    Gera um prefixo baseado no nome do fornecedor
-    Ex: Megazoo -> MGZ, Reino das Aves -> RA
-    """
-    # Remover palavras comuns
-    palavras_ignorar = {'ltda', 'sa', 'me', 'epp', 'eireli', 'comercio', 'industria', 'distribuidora', 'de', 'da', 'do', 'das', 'dos', 'e'}
-    palavras = [p for p in nome.lower().split() if p not in palavras_ignorar]
-    
-    if not palavras:
-        return nome[:3].upper()
-    
-    # Se tiver uma palavra, pega as 3 primeiras letras
-    if len(palavras) == 1:
-        return palavras[0][:3].upper()
-    
-    # Se tiver 2-3 palavras, pega a primeira letra de cada
-    if len(palavras) <= 3:
-        return ''.join([p[0] for p in palavras]).upper()
-    
-    # Se tiver mais de 3, pega as mais significativas (maiores)
-    palavras_ordenadas = sorted(palavras, key=len, reverse=True)[:3]
-    return ''.join([p[0] for p in palavras_ordenadas]).upper()
-
-
-def criar_fornecedor_automatico(dados_xml: dict, db: Session, current_user, tenant_id: int) -> tuple:
-    """
-    Cria um fornecedor automaticamente a partir dos dados do XML
-    Se jÃ¡ existir um fornecedor inativo com o mesmo CNPJ, reativa ele
-    Retorna (fornecedor, foi_criado_agora)
-    """
-    cnpj = dados_xml['fornecedor_cnpj']
-    
-    # Verificar se jÃ¡ existe (ativo ou inativo)
-    fornecedor = db.query(Cliente).filter(Cliente.cnpj == cnpj).first()
-    
-    if fornecedor:
-        # Se estiver inativo, reativar e atualizar dados
-        if not fornecedor.ativo:
-            logger.info(f"ðŸ”„ Reativando fornecedor inativo: {fornecedor.nome}")
-            fornecedor.ativo = True
-            fornecedor.nome = dados_xml['fornecedor_nome']
-            fornecedor.razao_social = dados_xml['fornecedor_nome']
-            fornecedor.nome_fantasia = dados_xml.get('fornecedor_fantasia', '')
-            fornecedor.inscricao_estadual = dados_xml.get('fornecedor_ie', '')
-            fornecedor.endereco = dados_xml.get('fornecedor_endereco', '')
-            fornecedor.numero = dados_xml.get('fornecedor_numero', '')
-            fornecedor.bairro = dados_xml.get('fornecedor_bairro', '')
-            fornecedor.cidade = dados_xml.get('fornecedor_cidade', '')
-            fornecedor.estado = dados_xml.get('fornecedor_uf', '')
-            fornecedor.cep = dados_xml.get('fornecedor_cep', '')
-            fornecedor.telefone = dados_xml.get('fornecedor_telefone', '')
-            
-            # Se nÃ£o tem cÃ³digo, gerar agora
-            if not fornecedor.codigo:
-                fornecedor.codigo = gerar_codigo_cliente(db, 'fornecedor', 'PJ', tenant_id)
-            
-            db.commit()
-            db.refresh(fornecedor)
-            logger.info(f"âœ… Fornecedor reativado: {fornecedor.nome} (CÃ³digo: {fornecedor.codigo})")
-            return (fornecedor, True)
-        
-        # Se jÃ¡ estÃ¡ ativo, verificar se tem cÃ³digo
-        if not fornecedor.codigo:
-            fornecedor.codigo = gerar_codigo_cliente(db, 'fornecedor', 'PJ', tenant_id)
-            db.commit()
-            db.refresh(fornecedor)
-            logger.info(f"âœ… CÃ³digo gerado para fornecedor existente: {fornecedor.nome} (CÃ³digo: {fornecedor.codigo})")
-        
-        return (fornecedor, False)
-    
-    # Gerar cÃ³digo para novo fornecedor
-    codigo = gerar_codigo_cliente(db, 'fornecedor', 'PJ', tenant_id)
-    
-    # Criar novo fornecedor
-    fornecedor = Cliente(
-        tipo_cadastro='fornecedor',
-        tipo_pessoa='PJ',
-        nome=dados_xml['fornecedor_nome'],
-        razao_social=dados_xml['fornecedor_nome'],
-        nome_fantasia=dados_xml.get('fornecedor_fantasia', ''),
-        cnpj=cnpj,
-        inscricao_estadual=dados_xml.get('fornecedor_ie', ''),
-        endereco=dados_xml.get('fornecedor_endereco', ''),
-        numero=dados_xml.get('fornecedor_numero', ''),
-        bairro=dados_xml.get('fornecedor_bairro', ''),
-        cidade=dados_xml.get('fornecedor_cidade', ''),
-        estado=dados_xml.get('fornecedor_uf', ''),
-        cep=dados_xml.get('fornecedor_cep', ''),
-        telefone=dados_xml.get('fornecedor_telefone', ''),
-        codigo=codigo,
-        ativo=True,
-        user_id=current_user.id,
-        tenant_id=tenant_id
-    )
-    
-    db.add(fornecedor)
-    db.commit()
-    db.refresh(fornecedor)
-    
-    logger.info(f"âœ… Fornecedor criado automaticamente: {fornecedor.nome}")
-    
-    return (fornecedor, True)
-
-
 def criar_contas_pagar_da_nota(nota: NotaEntrada, dados_xml: dict, db: Session, user_id: int, tenant_id: str) -> List[int]:
     """
     Cria contas a pagar automaticamente com base nas duplicatas do XML
@@ -636,6 +533,7 @@ async def upload_xml(
         logger.info(f"ðŸ”Ž Buscando fornecedor por CNPJ: {dados_nfe['fornecedor_cnpj']}...")
         fornecedor = db.query(Cliente).filter(
             Cliente.cnpj == dados_nfe['fornecedor_cnpj'],
+            Cliente.tenant_id == tenant_id,
             Cliente.ativo == True
         ).first()
         
@@ -1006,6 +904,8 @@ async def upload_lote_xml(
     Upload de mÃºltiplos XMLs de NF-e e processamento em lote
     Retorna resumo de sucessos e erros
     """
+    current_user, tenant_id = user_and_tenant
+
     logger.info(f"ðŸ“¦ Upload em lote - {len(files)} arquivos")
     logger.info(f"   - UsuÃ¡rio: {current_user.email}")
     
@@ -1053,12 +953,13 @@ async def upload_lote_xml(
             
             # Buscar ou criar fornecedor
             fornecedor = db.query(Cliente).filter(
-                Cliente.cnpj == dados_nfe['fornecedor_cnpj']
+                Cliente.cnpj == dados_nfe['fornecedor_cnpj'],
+                Cliente.tenant_id == tenant_id,
             ).first()
             
             fornecedor_criado = False
             if not fornecedor:
-                fornecedor, fornecedor_criado = criar_fornecedor_automatico(dados_nfe, db)
+                fornecedor, fornecedor_criado = criar_fornecedor_automatico(dados_nfe, db, current_user, tenant_id)
             
             # Criar nota
             nota = NotaEntrada(
@@ -1076,7 +977,8 @@ async def upload_lote_xml(
                 valor_total=dados_nfe['valor_total'],
                 xml_content=xml_str,
                 status='pendente',
-                user_id=current_user.id
+                user_id=current_user.id,
+                tenant_id=tenant_id
             )
             
             db.add(nota)
@@ -1093,7 +995,7 @@ async def upload_lote_xml(
                     item_data['codigo_produto'],
                     db,
                     tenant_id=tenant_id,
-                    fornecedor_id=None,
+                    fornecedor_id=fornecedor.id if fornecedor else None,
                     ean=item_data.get('ean'),
                     ean_tributario=item_data.get('ean_tributario'),
                 )
@@ -1130,7 +1032,8 @@ async def upload_lote_xml(
                     produto_id=produto_id,
                     vinculado=vinculado,
                     confianca_vinculo=confianca,
-                    status=item_status
+                    status=item_status,
+                    tenant_id=tenant_id
                 )
                 db.add(item)
             
@@ -3255,6 +3158,7 @@ def importar_docs_sefaz(docs: list, tenant_id_str: str, db) -> dict:
             # Buscar ou criar fornecedor
             fornecedor = db.query(Cliente).filter(
                 Cliente.cnpj == dados_nfe["fornecedor_cnpj"],
+                Cliente.tenant_id == tenant_id_str,
                 Cliente.ativo == True
             ).first()
 
