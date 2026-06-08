@@ -25,28 +25,29 @@ from datetime import datetime
 from decimal import Decimal
 
 from .db import Base
-from .base_models import BaseTenantModel
+from .base_models import BaseTenantModel, TenantScoped
 
 
 # ==============================================================================
 # EMPRESA_PARAMETROS - Configurações por empresa (Ajuste #2)
 # ==============================================================================
 
-class EmpresaParametros(Base):
+class EmpresaParametros(TenantScoped, Base):
     """
     Parâmetros configuráveis por empresa/tenant.
     
     Ajuste #2: Tolerância não pode ser hardcoded - cada empresa decide.
     Suporta clientes com arrendondamentos diferentes (redes grandes, pequenos negócios).
     
-    ⚠️ IMPORTANTE: Não herda de BaseTenantModel para evitar conflito created_at/criado_em.
+    Mantém esquema próprio (id autoincrement, criado_em/atualizado_em) por isso
+    não herda BaseTenantModel; adota o mixin TenantScoped para entrar no filtro
+    global de tenant (tenant_id vem do mixin, schema idêntico).
     """
     __tablename__ = "empresa_parametros"
     __table_args__ = {'extend_existing': True}
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
-    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
-    
+
     # Tolerâncias de conciliação (configuráveis)
     tolerancia_conciliacao = Column(
         Numeric(10, 2), 
@@ -107,21 +108,22 @@ class EmpresaParametros(Base):
 # ADQUIRENTE_TEMPLATE - Templates para parsear CSVs (Ajuste #11)
 # ==============================================================================
 
-class AdquirenteTemplate(Base):
+class AdquirenteTemplate(TenantScoped, Base):
     """
     Template configurável para parsear arquivos de diferentes adquirentes.
     
     Ajuste #11: Cada operadora tem formato diferente - parser deve ser configurável.
     Suporta: Stone, Cielo, Rede, Getnet, SafraPay, PagSeguro, Mercado Pago, etc.
     
-    ⚠️ IMPORTANTE: Não herda de BaseTenantModel para evitar conflito created_at/criado_em.
+    Mantém esquema próprio (criado_em/atualizado_em) por isso não herda
+    BaseTenantModel; adota o mixin TenantScoped para entrar no filtro global de
+    tenant (tenant_id vem do mixin, schema idêntico).
     """
     __tablename__ = "adquirentes_templates"
     __table_args__ = {'extend_existing': True}
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
-    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
-    
+
     # Identificação
     nome = Column(String(100), nullable=False, comment="Stone, Cielo, Rede, Getnet, etc")
     tipo_arquivo = Column(String(50), nullable=False, comment="recebimentos, pagamentos, vendas")
@@ -168,22 +170,22 @@ class AdquirenteTemplate(Base):
 # ARQUIVO_EVIDENCIA - Armazena metadados dos arquivos (Ajuste #6)
 # ==============================================================================
 
-class ArquivoEvidencia(Base):
+class ArquivoEvidencia(TenantScoped, Base):
     """
     Metadados dos arquivos importados.
     
     Ajuste #6: Nunca apagar informações importadas - arquivos são evidências.
     Necessário para: auditoria, conferência futura, reprocessamento, rastreabilidade.
     
-    ⚠️ IMPORTANTE: Este modelo NÃO herda de BaseTenantModel para evitar conflito
-    de colunas (criado_em vs created_at). Gerencia tenant_id manualmente.
+    Mantém esquema próprio (criado_em) por isso não herda BaseTenantModel; adota
+    o mixin TenantScoped para entrar no filtro global de tenant (tenant_id vem do
+    mixin, schema idêntico).
     """
     __tablename__ = "arquivos_evidencia"
     __table_args__ = {'extend_existing': True}
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
-    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
-    
+
     # Identificação
     nome_original = Column(String(255), nullable=False)
     tipo_arquivo = Column(String(50), nullable=False, comment="ofx, recebimentos, pagamentos, vendas")
@@ -231,21 +233,22 @@ class ArquivoEvidencia(Base):
 # CONCILIACAO_IMPORTACAO - Dados brutos importados (Ajuste #2 - Separação)
 # ==============================================================================
 
-class ConciliacaoImportacao(Base):
+class ConciliacaoImportacao(TenantScoped, Base):
     """
     Dados brutos importados (OFX, CSVs).
     
     Ajuste #2: Importação ≠ Processamento.
     Esta tabela apenas ARMAZENA dados, NÃO altera financeiro.
     
-    ⚠️ IMPORTANTE: Não herda de BaseTenantModel para evitar conflito created_at/criado_em.
+    Mantém esquema próprio (criado_em) por isso não herda BaseTenantModel; adota
+    o mixin TenantScoped para entrar no filtro global de tenant (tenant_id vem do
+    mixin, schema idêntico).
     """
     __tablename__ = "conciliacao_importacoes"
     __table_args__ = {'extend_existing': True}
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
-    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
-    
+
     # Referências
     arquivo_evidencia_id = Column(Integer, ForeignKey('arquivos_evidencia.id', ondelete='RESTRICT'), nullable=False)
     adquirente_template_id = Column(Integer, ForeignKey('adquirentes_templates.id', ondelete='RESTRICT'), nullable=True)
@@ -621,7 +624,7 @@ class ConciliacaoRecebimento(BaseTenantModel):
 # CONCILIACAO_METRICAS - KPIs de saúde do sistema
 # ==============================================================================
 
-class ConciliacaoMetrica(Base):
+class ConciliacaoMetrica(TenantScoped, Base):
     """
     Tabela para armazenar métricas diárias de amarração automática.
     
@@ -631,14 +634,15 @@ class ConciliacaoMetrica(Base):
     
     Permite gráficos históricos e alertas proativos.
     
-    NOTA: Não herda de BaseTenantModel porque tem estrutura customizada (criado_em ao invés de created_at)
+    NOTA: Mantém esquema próprio (criado_em em vez de created_at) por isso não
+    herda BaseTenantModel; adota o mixin TenantScoped para entrar no filtro global
+    de tenant (tenant_id vem do mixin, schema idêntico).
     """
     __tablename__ = "conciliacao_metricas"
     __table_args__ = {'extend_existing': True}
-    
+
     id = Column(Integer, primary_key=True, autoincrement=True, index=True)
-    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
-    
+
     # Data da métrica
     data_referencia = Column(Date, nullable=False, index=True, comment="Data dos recebimentos processados")
     

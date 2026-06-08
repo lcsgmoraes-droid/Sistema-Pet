@@ -9,9 +9,15 @@ modelos que herdam de ``BaseTenantModel``: ele injeta ``WHERE tenant_id = ?``
 automaticamente e LEVANTA ``RuntimeError`` se uma query rodar sem tenant no
 contexto.
 
-Modelos que têm coluna ``tenant_id`` mas herdam ``Base`` diretamente ficam FORA
-dessa rede: não recebem o filtro automático e não disparam o fail-fast. Eles
-dependem de um ``WHERE tenant_id == ...`` escrito à mão em cada query. Um único
+Há duas formas de um modelo entrar nessa rede:
+- herdar ``BaseTenantModel`` (modelos novos: traz id + timestamps + tenant_id); ou
+- adotar o mixin ``TenantScoped`` (modelos legados que têm esquema próprio, ex.:
+  ``id`` autoincrement e ``criado_em``/``atualizado_em``) — ``class X(TenantScoped, Base)``
+  sem alterar o schema.
+
+Modelos que têm coluna ``tenant_id`` mas herdam ``Base`` diretamente (sem o mixin)
+ficam FORA dessa rede: não recebem o filtro automático e não disparam o fail-fast.
+Eles dependem de um ``WHERE tenant_id == ...`` escrito à mão em cada query. Um único
 esquecimento vaza dados entre tenants (lojas) — o pior bug possível num ERP.
 
 Este teste percorre TODOS os modelos mapeados e garante, de forma mecânica, que
@@ -25,11 +31,15 @@ Como funciona (padrão "ratchet" / catraca)
   (ou seja, código novo que reintroduz o problema).
 - ``test_baseline_de_debito_so_encolhe`` FALHA se um item da baseline já tiver
   sido corrigido mas não removido da lista — forçando a baseline a só diminuir.
-- Meta de longo prazo: esvaziar ``KNOWN_BASE_TENANT_DEBT`` migrando cada modelo
-  para ``BaseTenantModel`` (e ``tenant_id`` NOT NULL), até a lista ficar vazia.
+- Meta de longo prazo: esvaziar ``KNOWN_BASE_TENANT_DEBT`` levando cada modelo
+  para o filtro automático (via ``TenantScoped`` ou ``BaseTenantModel``), até a
+  lista ficar vazia.
 
-Ao migrar um modelo: troque ``class X(Base)`` por ``class X(BaseTenantModel)``,
-gere a migration Alembic correspondente e REMOVA a tabela daqui.
+Ao migrar um modelo legado com esquema próprio: troque ``class X(Base)`` por
+``class X(TenantScoped, Base)`` e remova a declaração própria de ``tenant_id``
+(passa a vir do mixin). Se a definição de ``tenant_id`` for idêntica à do mixin
+(UUID, NOT NULL, indexada), NÃO há mudança de schema/Alembic. Depois REMOVA a
+tabela daqui.
 """
 import importlib
 import os
@@ -79,12 +89,9 @@ KNOWN_BASE_TENANT_DEBT = frozenset(
         # app/comissoes_models.py
         "comissoes_itens",   # tenant_id NULLABLE
         "comissoes_vendas",
-        # app/conciliacao_models.py
-        "adquirentes_templates",
-        "arquivos_evidencia",
-        "conciliacao_importacoes",
-        "conciliacao_metricas",
-        "empresa_parametros",
+        # app/conciliacao_models.py — MIGRADO para TenantScoped (PR conciliacao):
+        #   adquirentes_templates, arquivos_evidencia, conciliacao_importacoes,
+        #   conciliacao_metricas, empresa_parametros
         # app/duplicatas_ignoradas_models.py
         "duplicatas_ignoradas",
         # app/ia/aba7_models.py
@@ -174,13 +181,15 @@ def _exposed_tenant_models() -> dict:
     Retorna {tablename: (nome_da_classe, tenant_id_nullable)} para todo modelo
     mapeado que tem coluna tenant_id mas NAO herda de BaseTenantModel.
     """
-    from app.base_models import BaseTenantModel
+    from app.base_models import BaseTenantModel, TenantScoped
     from app.db import Base
 
     exposed = {}
     for mapper in Base.registry.mappers:
         cls = mapper.class_
-        if issubclass(cls, BaseTenantModel):
+        # "Protegido" = coberto pelo filtro automatico: herda BaseTenantModel
+        # (modelos modernos) ou adota o mixin TenantScoped (legados).
+        if issubclass(cls, (BaseTenantModel, TenantScoped)):
             continue
         columns = {col.key for col in mapper.columns}
         if "tenant_id" not in columns:
