@@ -108,6 +108,16 @@ Tela piloto:
 - Backend/Produtos: fatia de 2026-06-07 extraiu helpers puros de codigo de barras/EAN para `app/produtos/codigo_barras.py`, com teste unitario dedicado e comportamento das rotas preservado.
 - Backend/Produtos: fatia de 2026-06-07 extraiu os schemas Pydantic de produtos para `app/produtos/schemas.py`, removendo cerca de 700 linhas do router sem alterar contratos de API.
 - Backend/Produtos: fatia de 2026-06-07 extraiu normalizacoes centrais, validadores de tenant/entidades e helpers de relatorio para `app/produtos/core.py`, `app/produtos/validators.py` e `app/produtos/relatorios.py`, com testes unitarios dedicados e reducao adicional do router.
+- Backend/Notas de entrada: fatia de 2026-06-07 extraiu helpers fiscais/XML e regras de conferencia/lotes para `app/notas_entrada/fiscal.py` e `app/notas_entrada/conferencia.py`, mantendo imports compativeis no router e testes focados para custo efetivo, pack, conferencia, validade e lotes.
+- Backend/Notas de entrada: fatia de 2026-06-07 extraiu helpers de produto, SKU, EAN/codigo de barras e vinculo automatico para `app/notas_entrada/produtos.py`, mantendo os nomes reexportados pelo router e testes dedicados para normalizacao/divergencia de codigos fiscais.
+- Backend/Notas de entrada: fatia de 2026-06-07 extraiu helpers de fornecedor automatico para `app/notas_entrada/fornecedores.py`, adicionou testes de prefixo/criacao e corrigiu o upload em lote para inicializar usuario/tenant e gravar `tenant_id` em notas e itens.
+- Backend/Notas de entrada: fatia de 2026-06-07 moveu a sugestao de SKU/produto para `app/notas_entrada/produtos.py`, reduzindo mais o router e mantendo testes de SKU apontando para o modulo dedicado.
+- Backend/Notas de entrada: fatia de 2026-06-07 moveu a criacao de contas a pagar da NF para `app/notas_entrada/financeiro.py`, mantendo contrato de classificacao aprendida e teste unitario para duplicatas parceladas.
+- Backend/Notas de entrada: fatia de 2026-06-08 moveu o parser XML NF-e para `app/notas_entrada/xml_parser.py`, preservando o import `parse_nfe_xml` no router para compatibilidade com rotas e testes existentes.
+- Backend/Notas de entrada: fatia de 2026-06-08 moveu os schemas Pydantic para `app/notas_entrada/schemas.py`, mantendo os mesmos nomes importados pelo router e reduzindo acoplamento entre contratos e handlers.
+- Backend/Notas de entrada: fatia de 2026-06-08 moveu a importacao automatica de docs SEFAZ para `app/notas_entrada/sefaz_importer.py`, mantendo `importar_docs_sefaz` reexportado pelo router para nao quebrar chamadas existentes.
+- Backend/Notas de entrada: fatia de 2026-06-08 moveu rotas de rateio da nota e do item para `app/notas_entrada/rateio_routes.py`, mantendo o prefixo publico pelo `include_router` do router principal.
+- Backend/Notas de entrada: fatia de 2026-06-08 moveu rotas de vinculo, desvinculo, sugestao de SKU e criacao de produto por item para `app/notas_entrada/itens_produto_routes.py`, preservando contratos e reduzindo o router principal para `1824` linhas.
 - Testes/fixtures: a base legada de testes agora roda sem PostgreSQL local usando SQLite em memoria, reexporta `tenant_factory`, `user_factory`, `auth_headers` e `client`, e cria usuarios com bcrypt/vinculo `UserTenant` para validar o fluxo multitenant atual.
 - Produtos/Estoque: tela de movimentacoes voltou a exibir "Lancar granel" para produtos elegiveis e manteve balanco manual permitido em produto granel para ajuste de inventario.
 - Pessoas: listagem ganhou selecao em massa e fluxo de fusao de 2 cadastros, transferindo vinculos/historico para o principal e inativando o duplicado.
@@ -198,14 +208,14 @@ Inventario atualizado em 2026-06-07, excluindo testes e migracoes Alembic da fil
 - 54 arquivos de aplicacao acima de 1000 linhas, prioridade de refatoracao.
 - 22 arquivos de aplicacao acima de 1500 linhas, criticidade alta.
 - 12 arquivos de aplicacao acima de 2000 linhas.
-- 5 arquivos de aplicacao acima de 3000 linhas.
+- 4 arquivos de aplicacao acima de 3000 linhas.
 
 Top criticos ainda pendentes no inventario de 2026-06-07:
 
 | Linhas | Arquivo | Prioridade |
 | --- | --- | --- |
 | 5289 | `backend/app/produtos_routes.py` | Critico |
-| 3852 | `backend/app/notas_entrada_routes.py` | Critico |
+| 1824 | `backend/app/notas_entrada_routes.py` | Em reducao por fatias |
 | 3576 | `backend/app/pedidos_compra_routes.py` | Critico |
 | 3459 | `backend/app/campaigns/routes.py` | Critico |
 | 3107 | `backend/app/vendas/service.py` | Critico |
