@@ -16,14 +16,43 @@ DEPLOY_EVENT_RECORDED=0
 HEAD_BEFORE=""
 HEAD_AFTER=""
 backup_dir=""
+db_backup_dir=""
+db_backup_file=""
 DEPLOY_LOCK_FILE="${DEPLOY_LOCK_FILE:-/tmp/petshop-deploy-in-progress}"
 
 log() {
   printf '\n[%s] %s\n' "$(date '+%Y-%m-%d %H:%M:%S')" "$*"
 }
 
+print_rollback_hint() {
+  # Só imprime se um backup de banco já foi gerado nesta execução.
+  [[ -n "$db_backup_file" && -s "$db_backup_file" ]] || return 0
+  cat >&2 <<HINT
+
+==================== ROLLBACK MANUAL DISPONIVEL ====================
+Um backup do banco foi gerado ANTES das migrations. Para reverter,
+rode manualmente (com cautela, confirmando o escopo):
+
+  1) Restaurar o banco ao estado pre-migration:
+     docker compose -f $COMPOSE_FILE exec -T postgres \\
+       pg_restore -U petshop_admin -d petshop_prod --clean --if-exists \\
+       < "$db_backup_file"
+
+  2) Reverter o codigo ao commit anterior:
+     git -C "$APP_DIR" reset --hard ${HEAD_BEFORE:-HEAD}
+
+  3) Reconstruir e subir os servicos:
+     docker compose -f $COMPOSE_FILE up -d --build backend worker-bling nginx
+
+  Dump:        $db_backup_file
+  Git (antes): ${HEAD_BEFORE:-desconhecido}
+===================================================================
+HINT
+}
+
 fail() {
   printf '\nERRO: %s\n' "$*" >&2
+  print_rollback_hint
   write_deploy_event "failed" "$CURRENT_STEP" "$*" || true
   exit 1
 }
@@ -98,6 +127,7 @@ audit_step() {
 on_error() {
   local exit_code=$?
   local line="${1:-unknown}"
+  print_rollback_hint
   if [[ "$DEPLOY_EVENT_RECORDED" != "1" ]]; then
     write_deploy_event "failed" "$CURRENT_STEP" "Falha inesperada na linha ${line}; exit ${exit_code}" || true
   fi
@@ -310,6 +340,27 @@ wait_for \
   "cd '$APP_DIR' && docker compose -f '$COMPOSE_FILE' exec -T postgres pg_isready -U petshop_admin -d petshop_prod" \
   24 \
   5
+
+mark_step "backup_banco"
+audit_step "Gerando backup do banco (pg_dump) antes das migrations"
+log "Gerando backup do banco (pg_dump) antes das migrations"
+db_backup_file="$db_backup_dir/petshop_prod_$(date '+%Y%m%d_%H%M%S').dump"
+if ! docker compose -f "$COMPOSE_FILE" exec -T postgres \
+      pg_dump -U petshop_admin -d petshop_prod -F c >"$db_backup_file"; then
+  rm -f "$db_backup_file"
+  db_backup_file=""
+  fail "Falha ao gerar backup do banco (pg_dump). Abortando ANTES das migrations."
+fi
+if [[ ! -s "$db_backup_file" ]]; then
+  rm -f "$db_backup_file"
+  db_backup_file=""
+  fail "Backup do banco ficou vazio. Abortando ANTES das migrations."
+fi
+printf '%s\n' "$db_backup_file" >"$backup_dir/db_backup_path.txt"
+log "Backup do banco salvo: $db_backup_file"
+# Retencao: manter apenas os ultimos DB_BACKUP_KEEP dumps (default 10).
+db_backup_keep="${DB_BACKUP_KEEP:-10}"
+ls -1t "$db_backup_dir"/*.dump 2>/dev/null | tail -n +"$((db_backup_keep + 1))" | xargs -r rm -f || true
 
 mark_step "migrar_banco"
 audit_step "Aplicando migrations Alembic"
