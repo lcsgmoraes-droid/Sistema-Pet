@@ -14,6 +14,20 @@ from app.services.kit_estoque_service import KitEstoqueService
 logger = logging.getLogger(__name__)
 
 
+def _palavras_busca_produto(termo: Optional[str]) -> list[str]:
+    if not termo:
+        return []
+    return [palavra.strip() for palavra in termo.split() if palavra.strip()]
+
+
+def _tipos_base_listagem(include_variations: bool, termo_busca: Optional[str]) -> list[str]:
+    if not include_variations:
+        return ["SIMPLES"]
+    if (termo_busca or "").strip():
+        return ["SIMPLES", "PAI", "KIT", "VARIACAO"]
+    return ["SIMPLES", "PAI", "KIT"]
+
+
 def _as_float_optional(valor: Any) -> Optional[float]:
     if valor in (None, ""):
         return None

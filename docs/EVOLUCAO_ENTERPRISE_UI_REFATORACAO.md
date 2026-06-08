@@ -108,6 +108,7 @@ Tela piloto:
 - Backend/Produtos: fatia de 2026-06-07 extraiu helpers puros de codigo de barras/EAN para `app/produtos/codigo_barras.py`, com teste unitario dedicado e comportamento das rotas preservado.
 - Backend/Produtos: fatia de 2026-06-07 extraiu os schemas Pydantic de produtos para `app/produtos/schemas.py`, removendo cerca de 700 linhas do router sem alterar contratos de API.
 - Backend/Produtos: fatia de 2026-06-07 extraiu normalizacoes centrais, validadores de tenant/entidades e helpers de relatorio para `app/produtos/core.py`, `app/produtos/validators.py` e `app/produtos/relatorios.py`, com testes unitarios dedicados e reducao adicional do router.
+- Backend/Produtos: fatia de 2026-06-08 extraiu helpers puros de palavras de busca e tipos base de listagem para `app/produtos/listagem.py`, removendo duplicacao entre listagem, vendaveis e relatorios sem alterar filtros.
 - Backend/Notas de entrada: fatia de 2026-06-07 extraiu helpers fiscais/XML e regras de conferencia/lotes para `app/notas_entrada/fiscal.py` e `app/notas_entrada/conferencia.py`, mantendo imports compativeis no router e testes focados para custo efetivo, pack, conferencia, validade e lotes.
 - Backend/Notas de entrada: fatia de 2026-06-07 extraiu helpers de produto, SKU, EAN/codigo de barras e vinculo automatico para `app/notas_entrada/produtos.py`, mantendo os nomes reexportados pelo router e testes dedicados para normalizacao/divergencia de codigos fiscais.
 - Backend/Notas de entrada: fatia de 2026-06-07 extraiu helpers de fornecedor automatico para `app/notas_entrada/fornecedores.py`, adicionou testes de prefixo/criacao e corrigiu o upload em lote para inicializar usuario/tenant e gravar `tenant_id` em notas e itens.
@@ -1030,7 +1031,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-20: `EcommerceMVP.jsx` extraiu estado e operacoes de checkout/pagamento para `frontend/src/pages/ecommerce/useEcommerceCheckout.js`, mantendo cupom, endereco, resumo, idempotencia, tracking e finalizacao em hook dedicado, reduzindo o arquivo para 983 linhas. Proximo passo: separar autenticacao/perfil ou finalizar esta rodada para merge controlado.
 - 2026-05-20: `EcommerceMVP.jsx` extraiu autenticacao, perfil e recuperacao de senha para `frontend/src/pages/ecommerce/useEcommerceCustomer.js`, mantendo login, cadastro, sessao, CEPs do perfil e sincronizacao do carrinho apos autenticar em hook dedicado, reduzindo o arquivo para 637 linhas. Proximo passo: revisar o PR para merge/deploy controlado ou escolher outro hotspot.
 - 2026-05-20: `EcommerceMVP.jsx` extraiu os estilos internos para `frontend/src/pages/ecommerce/ecommerceMvpStyles.js`, mantendo a mesma API de `styles={S}` usada pelas telas do storefront e reduzindo o arquivo para 553 linhas. Proximo passo: revisar o PR para merge/deploy controlado.
-- 2026-06-03: `produtos_routes.py` retomou a frente de arquivos grandes extraindo helpers de listagem, promocao exibida no PDV, reservas multitenant, area/fornecedor e valorizacao para `backend/app/produtos/listagem.py`, reduzindo o router de 6275 para 6003 linhas com testes focados de listagem/validade/busca preservados. Proximo passo: extrair construcao de queries/filtros de `listar_produtos` e `listar_produtos_vendaveis`, sem mexer em estoque, fiscal, PDV ou regras de preco.
+- 2026-06-03: `produtos_routes.py` retomou a frente de arquivos grandes extraindo helpers de listagem, promocao exibida no PDV, reservas multitenant, area/fornecedor e valorizacao para `backend/app/produtos/listagem.py`, reduzindo o router de 6275 para 6003 linhas com testes focados de listagem/validade/busca preservados. Proximo passo: extrair resolucao de filtros de fornecedor/grupo e aplicacao de filtros comuns de `listar_produtos` e `listar_produtos_vendaveis`, sem mexer em estoque, fiscal, PDV ou regras de preco.
 
 ### Nao fazer nesta onda
 
@@ -1392,7 +1393,7 @@ Este documento mapeia telas, rotas e CTAs principais de negócio. Ele cobre bem 
   - `frontend/src/pages/ClientesNovo.jsx` com `4197` linhas
   - `frontend/src/pages/ProdutosNovo.jsx` com `4032` linhas
   - `backend/app/veterinario_routes.py` com `4780` linhas
-  - `backend/app/produtos_routes.py` com `4212` linhas
+  - `backend/app/produtos_routes.py` com `5000` linhas
   - `backend/app/campaigns/routes.py` com `3445` linhas
   - `backend/app/notas_entrada_routes.py` com `3184` linhas
 

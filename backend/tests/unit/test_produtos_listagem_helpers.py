@@ -8,7 +8,9 @@ from app.produtos.listagem import (
     _departamento_id_produto,
     _fornecedor_nome_produto,
     _nome_area_produto,
+    _palavras_busca_produto,
     _resolver_metricas_valorizacao_produto,
+    _tipos_base_listagem,
 )
 
 
@@ -78,3 +80,27 @@ def test_resolver_metricas_valorizacao_produto_simples_preserva_reservas():
         "valor_custo_total": 36.0,
         "valor_venda_total": 72.0,
     }
+
+
+def test_palavras_busca_produto_remove_espacos_extras():
+    assert _palavras_busca_produto("  racao   gato  85g ") == ["racao", "gato", "85g"]
+
+
+def test_palavras_busca_produto_aceita_termo_vazio():
+    assert _palavras_busca_produto(None) == []
+    assert _palavras_busca_produto("   ") == []
+
+
+def test_tipos_base_listagem_preserva_variacoes_apenas_em_busca():
+    assert _tipos_base_listagem(include_variations=False, termo_busca="racao") == ["SIMPLES"]
+    assert _tipos_base_listagem(include_variations=True, termo_busca=None) == [
+        "SIMPLES",
+        "PAI",
+        "KIT",
+    ]
+    assert _tipos_base_listagem(include_variations=True, termo_busca="racao") == [
+        "SIMPLES",
+        "PAI",
+        "KIT",
+        "VARIACAO",
+    ]

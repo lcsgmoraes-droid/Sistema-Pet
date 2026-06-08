@@ -122,8 +122,10 @@ from .produtos.listagem import (
     _fornecedor_nome_produto,
     _mapa_reservas_ativas_multitenant,
     _nome_area_produto,
+    _palavras_busca_produto,
     _resolver_metricas_valorizacao_produto,
     _resolver_promocao_erp_produto,
+    _tipos_base_listagem,
 )
 from .produtos.racao import (
     _normalizar_classificacao_racao,
@@ -1059,8 +1061,7 @@ def listar_produtos_vendaveis(
         # Busca por múltiplas palavras: todas as palavras precisam aparecer (qualquer ordem)
         # Ex: "golden castrado" acha "Ração Golden Gato Castrado Salmão"
         search_conditions = _produto_search_conditions if contar_total else _produto_search_conditions_fast
-        palavras = [p.strip() for p in termo_busca.split() if p.strip()]
-        for palavra in palavras:
+        for palavra in _palavras_busca_produto(termo_busca):
             query = query.filter(search_conditions(palavra))
 
     if categoria_id:
@@ -1227,17 +1228,9 @@ def listar_produtos(
             Produto.tipo_produto == tipo_produto
         )
     else:
-        # Quando houver busca com include_variations, incluir VARIACAO para permitir
-        # pesquisa direta por SKU/nome da variação.
-        if include_variations and termo_busca:
-            tipos_base = ['SIMPLES', 'PAI', 'KIT', 'VARIACAO']
-        else:
-            # Checkbox desmarcado: mostrar apenas produtos simples.
-            tipos_base = ['SIMPLES', 'PAI', 'KIT'] if include_variations else ['SIMPLES']
-
         query = db.query(Produto).filter(
             Produto.tenant_id.in_(access_ids),
-            Produto.tipo_produto.in_(tipos_base)
+            Produto.tipo_produto.in_(_tipos_base_listagem(include_variations, termo_busca))
         )
 
     # Aplicar filtro de ativo (se especificado)
@@ -1256,8 +1249,7 @@ def listar_produtos(
         # Busca por múltiplas palavras: todas as palavras precisam aparecer (qualquer ordem)
         # Ex: "special dog senior" encontra "Racao Special Dog Ultralife Senior"
         search_conditions = _produto_search_conditions if busca_completa else _produto_search_conditions_fast
-        palavras = [p.strip() for p in termo_busca.split() if p.strip()]
-        for palavra in palavras:
+        for palavra in _palavras_busca_produto(termo_busca):
             query = query.filter(search_conditions(palavra))
 
     if categoria_id:
@@ -3361,8 +3353,7 @@ def relatorio_validade_proxima(
         query_base = query_base.filter(func.coalesce(ProdutoLote.quantidade_disponivel, 0) > 0)
 
     if termo_busca:
-        palavras = [p.strip() for p in termo_busca.split() if p.strip()]
-        for palavra in palavras:
+        for palavra in _palavras_busca_produto(termo_busca):
             busca_pattern = f"%{palavra}%"
             if PRODUTO_SKU_COLUMN is None:
                 query_base = query_base.filter(
@@ -3712,8 +3703,7 @@ def relatorio_valorizacao_estoque(
             query = query.filter(Produto.ativo.is_(False))
 
     if termo_busca:
-        palavras = [p.strip() for p in termo_busca.split() if p.strip()]
-        for palavra in palavras:
+        for palavra in _palavras_busca_produto(termo_busca):
             busca_pattern = f"%{palavra}%"
             if PRODUTO_SKU_COLUMN is None:
                 query = query.filter(
