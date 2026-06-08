@@ -13,6 +13,7 @@ if str(BACKEND_DIR) not in sys.path:
     sys.path.insert(0, str(BACKEND_DIR))
 
 from app import notas_entrada_routes as routes  # noqa: E402
+from app.notas_entrada import produtos as produtos_helpers  # noqa: E402
 
 
 def _criar_item(codigo_produto: str):
@@ -37,17 +38,17 @@ def test_montar_sugestao_sku_marca_codigo_fornecedor_como_ocupado(monkeypatch):
     }
 
     monkeypatch.setattr(
-        routes,
+        produtos_helpers,
         "calcular_composicao_custos_nota",
         lambda nota: {7: {"custo_aquisicao_unitario": 5.0}},
     )
     monkeypatch.setattr(
-        routes,
+        produtos_helpers,
         "_buscar_produto_por_codigo_global",
         lambda db, codigo: catalogo.get((codigo or "").strip()),
     )
     monkeypatch.setattr(
-        routes,
+        produtos_helpers,
         "gerar_sku_automatico",
         lambda prefixo, db, user_id: f"{prefixo}-00001",
     )
@@ -69,12 +70,12 @@ def test_montar_sugestao_sku_marca_codigo_fornecedor_como_ocupado(monkeypatch):
 
 def test_montar_sugestao_sku_retorna_codigo_original_quando_esta_livre(monkeypatch):
     monkeypatch.setattr(
-        routes,
+        produtos_helpers,
         "calcular_composicao_custos_nota",
         lambda nota: {7: {"custo_aquisicao_unitario": 5.0}},
     )
     monkeypatch.setattr(
-        routes,
+        produtos_helpers,
         "_buscar_produto_por_codigo_global",
         lambda db, codigo: None,
     )
