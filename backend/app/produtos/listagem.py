@@ -4,14 +4,108 @@ import logging
 from datetime import datetime
 from typing import Any, List, Optional
 
+from fastapi import HTTPException
+from sqlalchemy import and_, or_
 from sqlalchemy.orm import Session
 
+from app.models import Cliente, FornecedorGrupo
 from app.partner_utils import is_partner_owned
-from app.produtos_models import Produto
+from app.produtos_models import Produto, ProdutoFornecedor
 from app.services.kit_estoque_service import KitEstoqueService
 
 
 logger = logging.getLogger(__name__)
+
+
+def _palavras_busca_produto(termo: Optional[str]) -> list[str]:
+    if not termo:
+        return []
+    return [palavra.strip() for palavra in termo.split() if palavra.strip()]
+
+
+def _tipos_base_listagem(include_variations: bool, termo_busca: Optional[str]) -> list[str]:
+    if not include_variations:
+        return ["SIMPLES"]
+    if (termo_busca or "").strip():
+        return ["SIMPLES", "PAI", "KIT", "VARIACAO"]
+    return ["SIMPLES", "PAI", "KIT"]
+
+
+def _normalizar_paginacao_produtos(
+    page: int,
+    page_size: int,
+    *,
+    max_page_size: int,
+) -> tuple[int, int, int]:
+    page = max(page, 1)
+    page_size = min(max(page_size, 1), max_page_size)
+    offset = (page - 1) * page_size
+    return page, page_size, offset
+
+
+def _resolver_fornecedor_ids_filtro_produto(
+    db: Session,
+    *,
+    tenant_id: str,
+    fornecedor_id: Optional[int],
+    fornecedor_grupo_id: Optional[int],
+    tenant_ids_fornecedores: Optional[List[str]] = None,
+) -> tuple[list[int], bool]:
+    if fornecedor_grupo_id:
+        grupo = db.query(FornecedorGrupo).filter(
+            FornecedorGrupo.id == fornecedor_grupo_id,
+            FornecedorGrupo.tenant_id == tenant_id,
+            FornecedorGrupo.ativo.is_(True),
+        ).first()
+        if not grupo:
+            raise HTTPException(status_code=404, detail="Grupo de fornecedor nao encontrado")
+
+        tenant_refs = [
+            str(tenant_ref)
+            for tenant_ref in (tenant_ids_fornecedores or [tenant_id])
+            if tenant_ref is not None
+        ] or [tenant_id]
+
+        fornecedor_ids = [
+            fornecedor_id_grupo
+            for (fornecedor_id_grupo,) in db.query(Cliente.id).filter(
+                Cliente.tenant_id.in_(tenant_refs),
+                Cliente.tipo_cadastro == "fornecedor",
+                Cliente.fornecedor_grupo_id == grupo.id,
+                Cliente.ativo.is_(True),
+            ).all()
+        ]
+        return fornecedor_ids, True
+
+    if fornecedor_id:
+        return [fornecedor_id], False
+
+    return [], False
+
+
+def _aplicar_filtro_fornecedor_produto(
+    query: Any,
+    *,
+    fornecedor_ids: list[int],
+    filtro_por_grupo: bool,
+) -> Any:
+    if filtro_por_grupo and not fornecedor_ids:
+        return query.filter(Produto.id == -1)
+
+    if not fornecedor_ids:
+        return query
+
+    return query.filter(
+        or_(
+            Produto.fornecedor_id.in_(fornecedor_ids),
+            Produto.fornecedores_alternativos.any(
+                and_(
+                    ProdutoFornecedor.fornecedor_id.in_(fornecedor_ids),
+                    ProdutoFornecedor.ativo == True,
+                )
+            ),
+        )
+    )
 
 
 def _as_float_optional(valor: Any) -> Optional[float]:

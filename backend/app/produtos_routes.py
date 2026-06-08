@@ -23,7 +23,7 @@ from app.config import settings
 from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
 from .security.permissions_decorator import require_permission
-from .models import User, Cliente, FornecedorGrupo
+from .models import User, Cliente
 from app.partner_utils import get_all_accessible_tenant_ids
 from .vendas_models import Venda, VendaItem
 from .produtos_models import (
@@ -107,6 +107,10 @@ from .produtos.codigo_barras import (
     gerar_codigo_barras_ean13,
     validar_codigo_barras_ean13,
 )
+from .produtos.categorias import (
+    _calcular_niveis_categorias,
+    _construir_arvore_categorias,
+)
 from .produtos.core import (
     _aplicar_status_ativo_produto,
     _nome_indica_granel,
@@ -117,14 +121,20 @@ from .produtos.core import (
     _produto_sku_value,
 )
 from .produtos.listagem import (
+    _aplicar_filtro_fornecedor_produto,
     _departamento_id_produto,
     _enriquecer_produto_listagem,
     _fornecedor_nome_produto,
     _mapa_reservas_ativas_multitenant,
     _nome_area_produto,
+    _normalizar_paginacao_produtos,
+    _palavras_busca_produto,
     _resolver_metricas_valorizacao_produto,
+    _resolver_fornecedor_ids_filtro_produto,
     _resolver_promocao_erp_produto,
+    _tipos_base_listagem,
 )
+from .produtos.lotes import _consumir_lotes_fifo_produto
 from .produtos.racao import (
     _normalizar_classificacao_racao,
     _normalizar_payload_racao,
@@ -149,6 +159,12 @@ from .produtos.validators import (
     _validar_pode_inativar_produto,
     _validar_sku_unico,
     _validar_tenant_e_obter_usuario,
+)
+from .produtos.fornecedores import (
+    OPERACOES_FORNECEDOR_LOTE,
+    _aplicar_fornecedor_produto_lote,
+    _garantir_fornecedor_principal_quando_unico,
+    _validar_fornecedor_produto_lote,
 )
 
 # Configurar logger
@@ -268,24 +284,7 @@ def listar_categorias(
             )
         }
 
-    niveis_cache: dict[int, int] = {}
-
-    def calcular_nivel_em_memoria(categoria_id: int) -> int:
-        nivel_cache = niveis_cache.get(categoria_id)
-        if nivel_cache is not None:
-            return nivel_cache
-
-        nivel = 1
-        atual = categoria_por_id.get(categoria_id)
-        visitados = set()
-
-        while atual and atual.categoria_pai_id and atual.categoria_pai_id not in visitados:
-            visitados.add(atual.id)
-            nivel += 1
-            atual = categoria_por_id.get(atual.categoria_pai_id)
-
-        niveis_cache[categoria_id] = nivel
-        return nivel
+    niveis_por_categoria = _calcular_niveis_categorias(categoria_por_id)
 
     # Calcular nÃ­vel e contadores para cada categoria sem N+1
     resultado = []
@@ -303,7 +302,7 @@ def listar_categorias(
             "ativo": cat.ativo,
             "created_at": cat.created_at,
             "updated_at": cat.updated_at,
-            "nivel": calcular_nivel_em_memoria(cat.id),
+            "nivel": niveis_por_categoria.get(cat.id, 1),
             "total_filhos": int(total_filhos_por_categoria.get(cat.id, 0) or 0),
             "total_produtos": int(total_produtos_por_categoria.get(cat.id, 0) or 0),
         }
@@ -336,24 +335,7 @@ def listar_categorias_hierarquia(
         Categoria.ativo == True
     ).order_by(Categoria.ordem, Categoria.nome).all()
 
-    # Construir Ã¡rvore
-    def construir_arvore(pai_id=None):
-        resultado = []
-        for cat in categorias:
-            if cat.categoria_pai_id == pai_id:
-                item = {
-                    "id": cat.id,
-                    "nome": cat.nome,
-                    "descricao": cat.descricao,
-                    "icone": cat.icone,
-                    "cor": cat.cor,
-                    "ordem": cat.ordem,
-                    "subcategorias": construir_arvore(cat.id)
-                }
-                resultado.append(item)
-        return resultado
-
-    return construir_arvore()
+    return _construir_arvore_categorias(categorias)
 
 
 @router.get("/categorias/{categoria_id}", response_model=CategoriaResponse)
@@ -1042,8 +1024,11 @@ def listar_produtos_vendaveis(
     Produtos PAI nÃ£o aparecem pois nÃ£o sÃ£o vendÃ¡veis diretamente.
     """
     user, tenant_id = user_and_tenant
-    page = max(page, 1)
-    page_size = min(max(page_size, 1), 100)
+    page, page_size, offset = _normalizar_paginacao_produtos(
+        page,
+        page_size,
+        max_page_size=100,
+    )
 
     # QUERY BASE - Produtos vendÃ¡veis (incluindo KIT)
     query = db.query(Produto).filter(
@@ -1059,8 +1044,7 @@ def listar_produtos_vendaveis(
         # Busca por múltiplas palavras: todas as palavras precisam aparecer (qualquer ordem)
         # Ex: "golden castrado" acha "Ração Golden Gato Castrado Salmão"
         search_conditions = _produto_search_conditions if contar_total else _produto_search_conditions_fast
-        palavras = [p.strip() for p in termo_busca.split() if p.strip()]
-        for palavra in palavras:
+        for palavra in _palavras_busca_produto(termo_busca):
             query = query.filter(search_conditions(palavra))
 
     if categoria_id:
@@ -1072,42 +1056,18 @@ def listar_produtos_vendaveis(
     if departamento_id:
         query = query.filter(Produto.departamento_id == departamento_id)
 
-    fornecedor_ids_filtro = []
-    if fornecedor_grupo_id:
-        grupo = db.query(FornecedorGrupo).filter(
-            FornecedorGrupo.id == fornecedor_grupo_id,
-            FornecedorGrupo.tenant_id == tenant_id,
-            FornecedorGrupo.ativo.is_(True),
-        ).first()
-        if not grupo:
-            raise HTTPException(status_code=404, detail="Grupo de fornecedor nao encontrado")
-
-        fornecedor_ids_filtro = [
-            fornecedor_id_grupo
-            for (fornecedor_id_grupo,) in db.query(Cliente.id).filter(
-                Cliente.tenant_id == tenant_id,
-                Cliente.tipo_cadastro == "fornecedor",
-                Cliente.fornecedor_grupo_id == grupo.id,
-                Cliente.ativo.is_(True),
-            ).all()
-        ]
-    elif fornecedor_id:
-        fornecedor_ids_filtro = [fornecedor_id]
-
-    if fornecedor_grupo_id and not fornecedor_ids_filtro:
-        query = query.filter(Produto.id == -1)
-    elif fornecedor_ids_filtro:
-        query = query.filter(
-            or_(
-                Produto.fornecedor_id.in_(fornecedor_ids_filtro),
-                Produto.fornecedores_alternativos.any(
-                    and_(
-                        ProdutoFornecedor.fornecedor_id.in_(fornecedor_ids_filtro),
-                        ProdutoFornecedor.ativo == True,
-                    )
-                ),
-            )
-        )
+    fornecedor_ids_filtro, filtro_fornecedor_por_grupo = _resolver_fornecedor_ids_filtro_produto(
+        db,
+        tenant_id=tenant_id,
+        fornecedor_id=fornecedor_id,
+        fornecedor_grupo_id=fornecedor_grupo_id,
+        tenant_ids_fornecedores=[tenant_id],
+    )
+    query = _aplicar_filtro_fornecedor_produto(
+        query,
+        fornecedor_ids=fornecedor_ids_filtro,
+        filtro_por_grupo=filtro_fornecedor_por_grupo,
+    )
 
     if estoque_baixo:
         query = query.filter(Produto.estoque_atual <= Produto.estoque_minimo)
@@ -1120,8 +1080,6 @@ def listar_produtos_vendaveis(
             or_(Produto.promocao_fim.is_(None), Produto.promocao_fim >= agora),
         )
 
-    # PAGINAÃ‡ÃƒO
-    offset = (page - 1) * page_size
     total = query.count() if contar_total else None
 
     # OrdenaÃ§Ã£o inteligente: prioriza match exato no cÃ³digo
@@ -1227,17 +1185,9 @@ def listar_produtos(
             Produto.tipo_produto == tipo_produto
         )
     else:
-        # Quando houver busca com include_variations, incluir VARIACAO para permitir
-        # pesquisa direta por SKU/nome da variação.
-        if include_variations and termo_busca:
-            tipos_base = ['SIMPLES', 'PAI', 'KIT', 'VARIACAO']
-        else:
-            # Checkbox desmarcado: mostrar apenas produtos simples.
-            tipos_base = ['SIMPLES', 'PAI', 'KIT'] if include_variations else ['SIMPLES']
-
         query = db.query(Produto).filter(
             Produto.tenant_id.in_(access_ids),
-            Produto.tipo_produto.in_(tipos_base)
+            Produto.tipo_produto.in_(_tipos_base_listagem(include_variations, termo_busca))
         )
 
     # Aplicar filtro de ativo (se especificado)
@@ -1256,8 +1206,7 @@ def listar_produtos(
         # Busca por múltiplas palavras: todas as palavras precisam aparecer (qualquer ordem)
         # Ex: "special dog senior" encontra "Racao Special Dog Ultralife Senior"
         search_conditions = _produto_search_conditions if busca_completa else _produto_search_conditions_fast
-        palavras = [p.strip() for p in termo_busca.split() if p.strip()]
-        for palavra in palavras:
+        for palavra in _palavras_busca_produto(termo_busca):
             query = query.filter(search_conditions(palavra))
 
     if categoria_id:
@@ -1269,42 +1218,18 @@ def listar_produtos(
     if departamento_id:
         query = query.filter(Produto.departamento_id == departamento_id)
 
-    fornecedor_ids_filtro = []
-    if fornecedor_grupo_id:
-        grupo = db.query(FornecedorGrupo).filter(
-            FornecedorGrupo.id == fornecedor_grupo_id,
-            FornecedorGrupo.tenant_id == tenant_id,
-            FornecedorGrupo.ativo.is_(True),
-        ).first()
-        if not grupo:
-            raise HTTPException(status_code=404, detail="Grupo de fornecedor nao encontrado")
-
-        fornecedor_ids_filtro = [
-            fornecedor_id_grupo
-            for (fornecedor_id_grupo,) in db.query(Cliente.id).filter(
-                Cliente.tenant_id.in_(access_ids),
-                Cliente.tipo_cadastro == "fornecedor",
-                Cliente.fornecedor_grupo_id == grupo.id,
-                Cliente.ativo.is_(True),
-            ).all()
-        ]
-    elif fornecedor_id:
-        fornecedor_ids_filtro = [fornecedor_id]
-
-    if fornecedor_grupo_id and not fornecedor_ids_filtro:
-        query = query.filter(Produto.id == -1)
-    elif fornecedor_ids_filtro:
-        query = query.filter(
-            or_(
-                Produto.fornecedor_id.in_(fornecedor_ids_filtro),
-                Produto.fornecedores_alternativos.any(
-                    and_(
-                        ProdutoFornecedor.fornecedor_id.in_(fornecedor_ids_filtro),
-                        ProdutoFornecedor.ativo == True,
-                    )
-                ),
-            )
-        )
+    fornecedor_ids_filtro, filtro_fornecedor_por_grupo = _resolver_fornecedor_ids_filtro_produto(
+        db,
+        tenant_id=tenant_id,
+        fornecedor_id=fornecedor_id,
+        fornecedor_grupo_id=fornecedor_grupo_id,
+        tenant_ids_fornecedores=access_ids,
+    )
+    query = _aplicar_filtro_fornecedor_produto(
+        query,
+        fornecedor_ids=fornecedor_ids_filtro,
+        filtro_por_grupo=filtro_fornecedor_por_grupo,
+    )
 
     if estoque_baixo:
         query = query.filter(Produto.estoque_atual <= Produto.estoque_minimo)
@@ -1954,199 +1879,6 @@ def atualizar_produto(
 # ============================================================================
 # ATUALIZAÃ‡ÃƒO EM LOTE
 # ============================================================================
-
-OPERACOES_FORNECEDOR_LOTE = {"adicionar", "definir_principal", "remover"}
-
-
-def _validar_fornecedor_produto_lote(
-    db: Session,
-    fornecedor_id: Optional[int],
-    tenant_id,
-) -> Optional[Cliente]:
-    if fornecedor_id is None:
-        return None
-
-    fornecedor = db.query(Cliente).filter(
-        Cliente.id == fornecedor_id,
-        Cliente.tenant_id == tenant_id,
-        Cliente.tipo_cadastro == "fornecedor",
-    ).first()
-
-    if not fornecedor:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Fornecedor nao encontrado ou nao e do tipo fornecedor",
-        )
-
-    return fornecedor
-
-
-def _obter_vinculo_fornecedor_lote(
-    db: Session,
-    produto_id: int,
-    fornecedor_id: int,
-    tenant_id,
-) -> Optional[ProdutoFornecedor]:
-    return db.query(ProdutoFornecedor).filter(
-        ProdutoFornecedor.produto_id == produto_id,
-        ProdutoFornecedor.fornecedor_id == fornecedor_id,
-        ProdutoFornecedor.tenant_id == tenant_id,
-    ).first()
-
-
-def _promover_fornecedor_principal_lote(
-    db: Session,
-    produto: Produto,
-    tenant_id,
-    fornecedor_id_ignorado: Optional[int] = None,
-) -> bool:
-    query = db.query(ProdutoFornecedor).filter(
-        ProdutoFornecedor.produto_id == produto.id,
-        ProdutoFornecedor.tenant_id == tenant_id,
-        ProdutoFornecedor.ativo == True,
-    )
-
-    if fornecedor_id_ignorado is not None:
-        query = query.filter(ProdutoFornecedor.fornecedor_id != fornecedor_id_ignorado)
-
-    proximo_vinculo = query.order_by(
-        ProdutoFornecedor.e_principal.desc(),
-        ProdutoFornecedor.created_at.asc(),
-    ).first()
-
-    if proximo_vinculo:
-        proximo_vinculo.e_principal = True
-        produto.fornecedor_id = proximo_vinculo.fornecedor_id
-        return True
-
-    produto.fornecedor_id = None
-    return True
-
-
-def _remover_fornecedores_produto_lote(
-    db: Session,
-    produto: Produto,
-    tenant_id,
-    fornecedor_id: Optional[int] = None,
-) -> bool:
-    query = db.query(ProdutoFornecedor).filter(
-        ProdutoFornecedor.produto_id == produto.id,
-        ProdutoFornecedor.tenant_id == tenant_id,
-    )
-
-    if fornecedor_id is not None:
-        query = query.filter(ProdutoFornecedor.fornecedor_id == fornecedor_id)
-
-    vinculos = query.all()
-    alterado = bool(vinculos)
-
-    if fornecedor_id is None:
-        if produto.fornecedor_id is not None:
-            alterado = True
-        for vinculo in vinculos:
-            db.delete(vinculo)
-        produto.fornecedor_id = None
-        return alterado
-
-    era_principal = any(bool(vinculo.e_principal) for vinculo in vinculos) or produto.fornecedor_id == fornecedor_id
-
-    for vinculo in vinculos:
-        db.delete(vinculo)
-
-    if not alterado and not era_principal:
-        return False
-
-    if era_principal:
-        _promover_fornecedor_principal_lote(
-            db,
-            produto,
-            tenant_id,
-            fornecedor_id_ignorado=fornecedor_id,
-        )
-
-    return True
-
-
-def _aplicar_fornecedor_produto_lote(
-    db: Session,
-    produto: Produto,
-    fornecedor_id: Optional[int],
-    operacao: str,
-    tenant_id,
-    remover_outros: bool = False,
-) -> bool:
-    vinculo = (
-        _obter_vinculo_fornecedor_lote(db, produto.id, fornecedor_id, tenant_id)
-        if fornecedor_id is not None
-        else None
-    )
-
-    if operacao == "adicionar":
-        if fornecedor_id is None:
-            return False
-        if vinculo:
-            alterado = not bool(vinculo.ativo)
-            if vinculo.e_principal and produto.fornecedor_id != fornecedor_id:
-                vinculo.e_principal = False
-                alterado = True
-            vinculo.ativo = True
-            vinculo.updated_at = datetime.utcnow()
-            return alterado
-
-        db.add(ProdutoFornecedor(
-            produto_id=produto.id,
-            fornecedor_id=fornecedor_id,
-            e_principal=False,
-            ativo=True,
-            tenant_id=tenant_id,
-        ))
-        return True
-
-    if operacao == "definir_principal":
-        if fornecedor_id is None:
-            return False
-
-        if remover_outros:
-            outros_vinculos = db.query(ProdutoFornecedor).filter(
-                ProdutoFornecedor.produto_id == produto.id,
-                ProdutoFornecedor.tenant_id == tenant_id,
-                ProdutoFornecedor.fornecedor_id != fornecedor_id,
-            ).all()
-            for outro_vinculo in outros_vinculos:
-                db.delete(outro_vinculo)
-        else:
-            db.query(ProdutoFornecedor).filter(
-                ProdutoFornecedor.produto_id == produto.id,
-                ProdutoFornecedor.tenant_id == tenant_id,
-                ProdutoFornecedor.e_principal == True,
-            ).update({"e_principal": False})
-
-        if vinculo:
-            vinculo.ativo = True
-            vinculo.e_principal = True
-            vinculo.updated_at = datetime.utcnow()
-        else:
-            db.add(ProdutoFornecedor(
-                produto_id=produto.id,
-                fornecedor_id=fornecedor_id,
-                e_principal=True,
-                ativo=True,
-                tenant_id=tenant_id,
-            ))
-
-        produto.fornecedor_id = fornecedor_id
-        return True
-
-    if operacao == "remover":
-        return _remover_fornecedores_produto_lote(
-            db,
-            produto,
-            tenant_id,
-            fornecedor_id=fornecedor_id,
-        )
-
-    return False
-
 
 @router.patch("/atualizar-lote")
 def atualizar_produtos_lote(
@@ -2853,34 +2585,7 @@ def saida_estoque_fifo(
         )
 
     # Consumir lotes usando FIFO
-    quantidade_restante = saida.quantidade
-    lotes_consumidos = []
-
-    for lote in lotes:
-        if quantidade_restante <= 0:
-            break
-
-        if lote.quantidade_disponivel >= quantidade_restante:
-            # Este lote tem quantidade suficiente
-            lote.quantidade_disponivel -= quantidade_restante
-            lotes_consumidos.append({
-                "lote_id": lote.id,
-                "nome_lote": lote.nome_lote,
-                "quantidade_consumida": quantidade_restante,
-                "data_validade": lote.data_validade.isoformat() if lote.data_validade else None
-            })
-            quantidade_restante = 0
-        else:
-            # Consumir todo este lote e continuar
-            quantidade_consumida = lote.quantidade_disponivel
-            lotes_consumidos.append({
-                "lote_id": lote.id,
-                "nome_lote": lote.nome_lote,
-                "quantidade_consumida": quantidade_consumida,
-                "data_validade": lote.data_validade.isoformat() if lote.data_validade else None
-            })
-            quantidade_restante -= quantidade_consumida
-            lote.quantidade_disponivel = 0
+    lotes_consumidos = _consumir_lotes_fifo_produto(lotes, saida.quantidade)
 
     # Atualizar estoque do produto
     estoque_anterior = produto.estoque_atual
@@ -2950,8 +2655,11 @@ def relatorio_movimentacoes(
 
     _current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     access_ids = get_all_accessible_tenant_ids(db, tenant_id)
-    page = max(page, 1)
-    page_size = min(max(page_size, 1), 200)
+    page, page_size, offset = _normalizar_paginacao_produtos(
+        page,
+        page_size,
+        max_page_size=200,
+    )
 
     query = db.query(EstoqueMovimentacao).join(Produto).filter(
         EstoqueMovimentacao.tenant_id == tenant_id,
@@ -3000,7 +2708,7 @@ def relatorio_movimentacoes(
     ).order_by(EstoqueMovimentacao.created_at.desc(), EstoqueMovimentacao.id.desc())
 
     if not export_all:
-        query = query.offset((page - 1) * page_size).limit(page_size)
+        query = query.offset(offset).limit(page_size)
 
     movimentacoes_resultado = query.all()
     promocoes_por_chave = _mapear_promocoes_movimentacoes(
@@ -3093,8 +2801,11 @@ def relatorio_vendas_produto(
 
     _current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     access_ids = get_all_accessible_tenant_ids(db, tenant_id)
-    page = max(page, 1)
-    page_size = min(max(page_size, 1), 50)
+    page, page_size, offset = _normalizar_paginacao_produtos(
+        page,
+        page_size,
+        max_page_size=50,
+    )
 
     produto = db.query(Produto).options(
         joinedload(Produto.categoria),
@@ -3144,7 +2855,7 @@ def relatorio_vendas_produto(
         Venda.data_venda.desc(),
         Venda.numero_venda.desc(),
         VendaItem.id.desc(),
-    ).offset((page - 1) * page_size).limit(page_size).all()
+    ).offset(offset).limit(page_size).all()
 
     historico = []
     for item in historico_rows:
@@ -3339,8 +3050,11 @@ def relatorio_validade_proxima(
     _current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     access_ids = get_all_accessible_tenant_ids(db, tenant_id)
     termo_busca = (busca or "").strip()
-    page = max(page, 1)
-    page_size = min(max(page_size, 1), 200)
+    page, page_size, offset = _normalizar_paginacao_produtos(
+        page,
+        page_size,
+        max_page_size=200,
+    )
     dias = max(dias, 0)
     agora = datetime.utcnow()
     data_limite = agora + timedelta(days=dias)
@@ -3361,8 +3075,7 @@ def relatorio_validade_proxima(
         query_base = query_base.filter(func.coalesce(ProdutoLote.quantidade_disponivel, 0) > 0)
 
     if termo_busca:
-        palavras = [p.strip() for p in termo_busca.split() if p.strip()]
-        for palavra in palavras:
+        for palavra in _palavras_busca_produto(termo_busca):
             busca_pattern = f"%{palavra}%"
             if PRODUTO_SKU_COLUMN is None:
                 query_base = query_base.filter(
@@ -3435,7 +3148,7 @@ def relatorio_validade_proxima(
         query = query.order_by(ProdutoLote.data_validade.asc(), Produto.nome.asc())
 
     resultados = (
-        query.offset((page - 1) * page_size)
+        query.offset(offset)
         .limit(page_size)
         .all()
     )
@@ -3680,8 +3393,11 @@ def relatorio_valorizacao_estoque(
     """
     _current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     termo_busca = (busca or "").strip()
-    page = max(page, 1)
-    page_size = min(max(page_size, 1), 200)
+    page, page_size, offset = _normalizar_paginacao_produtos(
+        page,
+        page_size,
+        max_page_size=200,
+    )
 
     access_ids = get_all_accessible_tenant_ids(db, tenant_id)
 
@@ -3712,8 +3428,7 @@ def relatorio_valorizacao_estoque(
             query = query.filter(Produto.ativo.is_(False))
 
     if termo_busca:
-        palavras = [p.strip() for p in termo_busca.split() if p.strip()]
-        for palavra in palavras:
+        for palavra in _palavras_busca_produto(termo_busca):
             busca_pattern = f"%{palavra}%"
             if PRODUTO_SKU_COLUMN is None:
                 query = query.filter(
@@ -3847,7 +3562,6 @@ def relatorio_valorizacao_estoque(
 
     total = len(itens_processados)
     pages = (total + page_size - 1) // page_size if total else 0
-    offset = (page - 1) * page_size
     pagina_items = itens_processados[offset : offset + page_size]
 
     areas = sorted(
@@ -4173,26 +3887,6 @@ def deletar_imagem(
 # ==========================================
 # ENDPOINTS - FORNECEDORES
 # ==========================================
-
-def _garantir_fornecedor_principal_quando_unico(db: Session, produto: Produto, tenant_id) -> None:
-    """Marca automaticamente como principal quando ha um unico fornecedor ativo."""
-    vinculos_ativos = db.query(ProdutoFornecedor).filter(
-        ProdutoFornecedor.produto_id == produto.id,
-        ProdutoFornecedor.tenant_id == tenant_id,
-        ProdutoFornecedor.ativo == True,
-    ).order_by(ProdutoFornecedor.id.asc()).all()
-
-    if not vinculos_ativos:
-        produto.fornecedor_id = None
-        return
-
-    if len(vinculos_ativos) != 1:
-        return
-
-    vinculo_unico = vinculos_ativos[0]
-    vinculo_unico.e_principal = True
-    produto.fornecedor_id = vinculo_unico.fornecedor_id
-
 
 @router.post("/{produto_id}/fornecedores", response_model=FornecedorVinculoResponse)
 def vincular_fornecedor(
