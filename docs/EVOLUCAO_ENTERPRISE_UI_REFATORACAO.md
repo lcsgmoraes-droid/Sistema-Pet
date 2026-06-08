@@ -114,6 +114,7 @@ Tela piloto:
 - Backend/Produtos: fatia de 2026-06-08 extraiu helpers de vinculo de fornecedores para `app/produtos/fornecedores.py`, cobrindo fornecedor principal unico e operacoes em lote com teste unitario dedicado.
 - Backend/Produtos: fatia de 2026-06-08 extraiu consumo FIFO de lotes para `app/produtos/lotes.py`, preservando o payload legado da rota de saida e adicionando testes unitarios para consumo parcial, consumo em multiplos lotes e quantidade zero.
 - Backend/Produtos: fatia de 2026-06-08 extraiu helpers de hierarquia de categorias para `app/produtos/categorias.py`, preservando os decorators das rotas no router principal e adicionando testes unitarios para nivel, ciclo e arvore.
+- Backend/Produtos: fatia de 2026-06-08 extraiu a montagem de load options e filtros basicos de `listar_produtos` e `listar_produtos_vendaveis` para `app/produtos/listagem.py`, preservando imagens/lotes opcionais e reduzindo o router para `4677` linhas.
 - Backend/Notas de entrada: fatia de 2026-06-07 extraiu helpers fiscais/XML e regras de conferencia/lotes para `app/notas_entrada/fiscal.py` e `app/notas_entrada/conferencia.py`, mantendo imports compativeis no router e testes focados para custo efetivo, pack, conferencia, validade e lotes.
 - Backend/Notas de entrada: fatia de 2026-06-07 extraiu helpers de produto, SKU, EAN/codigo de barras e vinculo automatico para `app/notas_entrada/produtos.py`, mantendo os nomes reexportados pelo router e testes dedicados para normalizacao/divergencia de codigos fiscais.
 - Backend/Notas de entrada: fatia de 2026-06-07 extraiu helpers de fornecedor automatico para `app/notas_entrada/fornecedores.py`, adicionou testes de prefixo/criacao e corrigiu o upload em lote para inicializar usuario/tenant e gravar `tenant_id` em notas e itens.
@@ -220,7 +221,7 @@ Top criticos ainda pendentes no inventario de 2026-06-07:
 
 | Linhas | Arquivo | Prioridade |
 | --- | --- | --- |
-| 4704 | `backend/app/produtos_routes.py` | Critico |
+| 4677 | `backend/app/produtos_routes.py` | Critico |
 | 1824 | `backend/app/notas_entrada_routes.py` | Em reducao por fatias |
 | 3576 | `backend/app/pedidos_compra_routes.py` | Critico |
 | 3459 | `backend/app/campaigns/routes.py` | Critico |
@@ -245,7 +246,7 @@ Top criticos ainda pendentes no inventario de 2026-06-07:
 
 | Linhas | Arquivo | Prioridade |
 | --- | --- | --- |
-| 4704 | `backend/app/produtos_routes.py` | Critico |
+| 4677 | `backend/app/produtos_routes.py` | Critico |
 | 621 | `frontend/src/components/EntradaXML.jsx` | Atencao |
 | 4064 | `backend/app/estoque_routes.py` | Critico |
 | 1980 | `frontend/src/components/VendasFinanceiro.jsx` | Critico |
@@ -669,7 +670,7 @@ Para cada dominio sensivel:
 
 | Arquivo | Linhas aprox. | Risco |
 | --- | ---: | --- |
-| `backend/app/produtos_routes.py` | 4704 | Muito alto |
+| `backend/app/produtos_routes.py` | 4677 | Muito alto |
 | `backend/app/estoque_routes.py` | 4064 | Muito alto |
 | `backend/app/notas_entrada_routes.py` | 3411 | Alto |
 | `backend/app/campaigns/routes.py` | 3295 | Alto |
@@ -1036,7 +1037,7 @@ Objetivo: parar de resolver cada tela como se fosse unica. Esta onda nao tenta "
 - 2026-05-20: `EcommerceMVP.jsx` extraiu estado e operacoes de checkout/pagamento para `frontend/src/pages/ecommerce/useEcommerceCheckout.js`, mantendo cupom, endereco, resumo, idempotencia, tracking e finalizacao em hook dedicado, reduzindo o arquivo para 983 linhas. Proximo passo: separar autenticacao/perfil ou finalizar esta rodada para merge controlado.
 - 2026-05-20: `EcommerceMVP.jsx` extraiu autenticacao, perfil e recuperacao de senha para `frontend/src/pages/ecommerce/useEcommerceCustomer.js`, mantendo login, cadastro, sessao, CEPs do perfil e sincronizacao do carrinho apos autenticar em hook dedicado, reduzindo o arquivo para 637 linhas. Proximo passo: revisar o PR para merge/deploy controlado ou escolher outro hotspot.
 - 2026-05-20: `EcommerceMVP.jsx` extraiu os estilos internos para `frontend/src/pages/ecommerce/ecommerceMvpStyles.js`, mantendo a mesma API de `styles={S}` usada pelas telas do storefront e reduzindo o arquivo para 553 linhas. Proximo passo: revisar o PR para merge/deploy controlado.
-- 2026-06-03: `produtos_routes.py` retomou a frente de arquivos grandes extraindo helpers de listagem, promocao exibida no PDV, reservas multitenant, area/fornecedor e valorizacao para `backend/app/produtos/listagem.py`, reduzindo o router de 6275 para 6003 linhas com testes focados de listagem/validade/busca preservados. Proximo passo: extrair montagem de load options e ordenacao de `listar_produtos` e `listar_produtos_vendaveis`, sem mexer em estoque, fiscal, PDV ou regras de preco.
+- 2026-06-03: `produtos_routes.py` retomou a frente de arquivos grandes extraindo helpers de listagem, promocao exibida no PDV, reservas multitenant, area/fornecedor e valorizacao para `backend/app/produtos/listagem.py`, reduzindo o router de 6275 para 6003 linhas com testes focados de listagem/validade/busca preservados. A fatia de 2026-06-08 concluiu a extracao da montagem de load options e dos filtros basicos das listagens, deixando o router com 4677 linhas. Proximo passo: extrair apenas construcao de query base/status/busca de `listar_produtos` e `listar_produtos_vendaveis`, sem mexer em estoque, fiscal, PDV ou regras de preco.
 
 ### Nao fazer nesta onda
 
@@ -1398,7 +1399,7 @@ Este documento mapeia telas, rotas e CTAs principais de negócio. Ele cobre bem 
   - `frontend/src/pages/ClientesNovo.jsx` com `4197` linhas
   - `frontend/src/pages/ProdutosNovo.jsx` com `4032` linhas
   - `backend/app/veterinario_routes.py` com `4780` linhas
-  - `backend/app/produtos_routes.py` com `4704` linhas
+  - `backend/app/produtos_routes.py` com `4677` linhas
   - `backend/app/campaigns/routes.py` com `3445` linhas
   - `backend/app/notas_entrada_routes.py` com `3184` linhas
 
