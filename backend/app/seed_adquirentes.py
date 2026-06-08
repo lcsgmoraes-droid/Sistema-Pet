@@ -5,10 +5,11 @@ Criar templates básicos para Stone, Cielo e Rede.
 Usuário não precisa cadastrar manualmente.
 """
 
-import json
+from datetime import datetime
 
 from sqlalchemy.orm import Session
-from app.financeiro_models import TemplateAdquirente
+
+from app.conciliacao_models import AdquirenteTemplate
 
 
 def criar_templates_adquirentes(db: Session, tenant_id: str):
@@ -23,21 +24,14 @@ def criar_templates_adquirentes(db: Session, tenant_id: str):
         # STONE - Template v1.0
         # ========================================
         {
-            "nome_adquirente": "STONE",
-            "tipo_relatorio": "recebimentos",
-            "auto_aplicar": True,
-            "palavras_chave": ["STONE ID", "DATA DA VENDA", "VALOR LIQUIDO"],
-            "colunas_obrigatorias": [
-                "STONE ID",
-                "DATA DA VENDA",
-                "VALOR BRUTO",
-                "VALOR LIQUIDO",
-            ],
+            "nome": "STONE",
+            "tipo_arquivo": "recebimentos",
+            "ativo": True,
+            "separador": ";",
+            "encoding": "utf-8",
+            "tem_header": True,
+            "pular_linhas": 0,
             "mapeamento": {
-                "separador": ";",
-                "encoding": "utf-8",
-                "tem_header": True,
-                "pular_linhas": 0,
                 "nsu": {
                     "coluna": "STONE ID",
                     "transformacao": "nsu",
@@ -101,20 +95,18 @@ def criar_templates_adquirentes(db: Session, tenant_id: str):
         # CIELO - Template v1.0
         # ========================================
         {
-            "nome_adquirente": "CIELO",
-            "tipo_relatorio": "recebimentos",
-            "auto_aplicar": True,
-            "palavras_chave": ["NSU", "DT_VENDA", "VLR_LIQUIDO"],
-            "colunas_obrigatorias": ["NSU", "DT_VENDA", "VLR_BRUTO", "VLR_LIQUIDO"],
+            "nome": "CIELO",
+            "tipo_arquivo": "vendas",
+            "ativo": True,
+            "separador": ",",
+            "encoding": "latin1",
+            "tem_header": True,
+            "pular_linhas": 0,
             "mapeamento": {
-                "separador": ",",
-                "encoding": "latin1",
-                "tem_header": True,
-                "pular_linhas": 0,
                 "nsu": {"coluna": "NSU", "transformacao": "nsu", "obrigatorio": True},
                 "data_venda": {
                     "coluna": "DT_VENDA",
-                    "transformacao": "data_us",  # YYYY-MM-DD
+                    "transformacao": "data_us",
                     "obrigatorio": True,
                 },
                 "data_pagamento": {
@@ -124,7 +116,7 @@ def criar_templates_adquirentes(db: Session, tenant_id: str):
                 },
                 "valor_bruto": {
                     "coluna": "VLR_BRUTO",
-                    "transformacao": "monetario_us",  # 1234.56
+                    "transformacao": "monetario_us",
                     "obrigatorio": True,
                 },
                 "taxa_mdr": {
@@ -165,21 +157,14 @@ def criar_templates_adquirentes(db: Session, tenant_id: str):
         # REDE - Template v1.0
         # ========================================
         {
-            "nome_adquirente": "REDE",
-            "tipo_relatorio": "recebimentos",
-            "auto_aplicar": True,
-            "palavras_chave": ["NSU", "Data da Venda", "Valor a Receber"],
-            "colunas_obrigatorias": [
-                "NSU",
-                "Data da Venda",
-                "Valor da Transação",
-                "Valor a Receber",
-            ],
+            "nome": "REDE",
+            "tipo_arquivo": "recebimentos",
+            "ativo": True,
+            "separador": ";",
+            "encoding": "utf-8",
+            "tem_header": True,
+            "pular_linhas": 1,
             "mapeamento": {
-                "separador": ";",
-                "encoding": "utf-8",
-                "tem_header": True,
-                "pular_linhas": 1,  # Pula primeira linha (cabeçalho extra)
                 "nsu": {"coluna": "NSU", "transformacao": "nsu", "obrigatorio": True},
                 "data_venda": {
                     "coluna": "Data da Venda",
@@ -235,34 +220,33 @@ def criar_templates_adquirentes(db: Session, tenant_id: str):
     templates_criados = []
 
     for template_data in templates:
-        # Verificar se já existe
+        # tenant_id tambem entra no filtro global, mas fica explicito aqui.
         existente = (
-            db.query(TemplateAdquirente)
+            db.query(AdquirenteTemplate)
             .filter(
-                TemplateAdquirente.tenant_id == tenant_id,
-                TemplateAdquirente.nome_adquirente == template_data["nome_adquirente"],
-                TemplateAdquirente.tipo_relatorio == template_data["tipo_relatorio"],
+                AdquirenteTemplate.tenant_id == tenant_id,
+                AdquirenteTemplate.nome == template_data["nome"],
+                AdquirenteTemplate.tipo_arquivo == template_data["tipo_arquivo"],
             )
             .first()
         )
 
         if not existente:
-            template = TemplateAdquirente(
+            template = AdquirenteTemplate(
                 tenant_id=tenant_id,
-                nome_adquirente=template_data["nome_adquirente"],
-                tipo_relatorio=template_data["tipo_relatorio"],
-                mapeamento=json.dumps(template_data["mapeamento"], ensure_ascii=False),
-                palavras_chave=json.dumps(
-                    template_data["palavras_chave"], ensure_ascii=False
-                ),
-                colunas_obrigatorias=json.dumps(
-                    template_data["colunas_obrigatorias"],
-                    ensure_ascii=False,
-                ),
-                auto_aplicar=template_data["auto_aplicar"],
+                nome=template_data["nome"],
+                tipo_arquivo=template_data["tipo_arquivo"],
+                ativo=template_data["ativo"],
+                separador=template_data["separador"],
+                encoding=template_data["encoding"],
+                tem_header=template_data["tem_header"],
+                pular_linhas=template_data["pular_linhas"],
+                mapeamento=template_data["mapeamento"],
+                transformacoes=template_data["transformacoes"],
+                criado_em=datetime.utcnow(),
             )
             db.add(template)
-            templates_criados.append(template_data["nome_adquirente"])
+            templates_criados.append(template_data["nome"])
 
     db.commit()
 
