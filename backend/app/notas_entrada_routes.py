@@ -11,7 +11,7 @@ Funcionalidades:
 """
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query, Form
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_, func, desc
+from sqlalchemy import and_, desc
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from pydantic import BaseModel, Field
@@ -27,8 +27,7 @@ from .produtos_models import (
     NotaEntrada, NotaEntradaItem, ProdutoHistoricoPreco,
     ProdutoFornecedor
 )
-from .financeiro_models import ContaPagar, TipoDespesa
-from .financeiro.contas_pagar_classificacao import aplicar_classificacao_aprendida_conta_pagar
+from .financeiro_models import ContaPagar
 from .fiscal_patterns import aplicar_inteligencia_fiscal, identificar_padrao_fiscal
 from .notas_entrada_pdf_parser import (
     PDFEntradaFornecedor,
@@ -69,6 +68,10 @@ from .notas_entrada.fiscal import (
     calcular_quantidade_custo_efetivos,
     detectar_multiplicador_pack,
     extrair_resumo_fiscal_xml,
+)
+from .notas_entrada.financeiro import (
+    _obter_tipo_produto_revenda_id,
+    criar_contas_pagar_da_nota,
 )
 from .notas_entrada.fornecedores import (
     criar_fornecedor_automatico,
@@ -119,28 +122,6 @@ class NotaEntradaResponse(BaseModel):
     divergencias_count: Optional[int] = 0
     
     model_config = {"from_attributes": True}
-
-
-def _obter_tipo_produto_revenda_id(db: Session, tenant_id) -> Optional[int]:
-    nomes_prioritarios = [
-        "Produto para Revenda",
-        "Fornecedor de Produto para Revenda",
-    ]
-    for nome in nomes_prioritarios:
-        tipo = db.query(TipoDespesa).filter(
-            TipoDespesa.tenant_id == tenant_id,
-            func.lower(TipoDespesa.nome) == nome.lower(),
-            TipoDespesa.ativo.is_(True),
-        ).first()
-        if tipo:
-            return tipo.id
-
-    tipo = db.query(TipoDespesa).filter(
-        TipoDespesa.tenant_id == tenant_id,
-        TipoDespesa.nome.ilike("%produto%revenda%"),
-        TipoDespesa.ativo.is_(True),
-    ).order_by(TipoDespesa.nome.asc()).first()
-    return tipo.id if tipo else None
 
 
 class ConferenciaItemPayload(BaseModel):
@@ -395,77 +376,6 @@ def parse_nfe_xml(xml_content: str) -> dict:
         raise ValueError(f"Erro ao fazer parse do XML: {str(e)}")
     except Exception as e:
         raise ValueError(f"Erro ao processar XML: {str(e)}")
-
-
-def criar_contas_pagar_da_nota(nota: NotaEntrada, dados_xml: dict, db: Session, user_id: int, tenant_id: str) -> List[int]:
-    """
-    Cria contas a pagar automaticamente com base nas duplicatas do XML
-    FASE 4: IntegraÃ§Ã£o NF-e â†’ Financeiro
-    Retorna lista de IDs das contas criadas
-    """
-    logger.info(f"ðŸ’° Gerando contas a pagar para nota {nota.numero_nota}...")
-    
-    contas_criadas = []
-    
-    # Buscar duplicatas no XML (tag <dup>)
-    duplicatas = dados_xml.get('duplicatas', [])
-    
-    if not duplicatas:
-        # Se nÃ£o tem duplicatas, criar uma Ãºnica conta com vencimento em 30 dias
-        logger.info("   âš ï¸ Sem duplicatas no XML, criando conta Ãºnica com vencimento +30 dias")
-        duplicatas = [{
-            'numero': f"{nota.numero_nota}-1",
-            'vencimento': datetime.now() + timedelta(days=30),
-            'valor': nota.valor_total
-        }]
-    
-    total_duplicatas = len(duplicatas)
-    eh_parcelado = total_duplicatas > 1
-    tipo_produto_revenda_id = _obter_tipo_produto_revenda_id(db, tenant_id)
-    
-    for idx, dup in enumerate(duplicatas, 1):
-        try:
-            # Valor vem em reais do XML, usar Decimal para precisÃ£o
-            from decimal import Decimal
-            valor_reais = Decimal(str(dup['valor']))
-            
-            # Criar conta a pagar
-            conta = ContaPagar(
-                fornecedor_id=nota.fornecedor_id,
-                tipo_despesa_id=tipo_produto_revenda_id,
-                descricao=f"NF-e {nota.numero_nota} - Parcela {dup['numero']}",
-                valor_original=valor_reais,
-                valor_final=valor_reais,
-                valor_pago=Decimal('0'),
-                data_emissao=nota.data_emissao,
-                data_vencimento=dup['vencimento'],
-                status='pendente',
-                eh_parcelado=eh_parcelado,
-                numero_parcela=idx if eh_parcelado else None,
-                total_parcelas=total_duplicatas if eh_parcelado else None,
-                nota_entrada_id=nota.id,
-                nfe_numero=str(nota.numero_nota),
-                documento=dup.get('numero', ''),  # NÃºmero da duplicata do XML (n1, n2, etc)
-                percentual_online=nota.percentual_online or 0,  # Herdar rateio da nota
-                percentual_loja=nota.percentual_loja or 100,
-                user_id=user_id,
-                tenant_id=tenant_id
-            )
-            aplicar_classificacao_aprendida_conta_pagar(db, tenant_id, conta)
-            
-            db.add(conta)
-            db.flush()
-            
-            contas_criadas.append(conta.id)
-            
-            logger.info(f"   âœ… Conta criada: {dup['numero']} - R$ {dup['valor']:.2f} - Venc: {dup['vencimento'].strftime('%d/%m/%Y')}")
-            
-        except Exception as e:
-            logger.error(f"   âŒ Erro ao criar conta da duplicata {dup.get('numero')}: {str(e)}")
-            raise
-    
-    logger.info(f"âœ… Total de contas criadas: {len(contas_criadas)}")
-    return contas_criadas
 
 
 # ============================================================================

@@ -45,9 +45,9 @@ def test_criacao_manual_de_conta_pagar_usa_classificacao_aprendida():
 
 
 def test_contas_de_nf_entrada_usam_classificacao_aprendida_por_fornecedor():
-    source = _source("backend/app/notas_entrada_routes.py")
+    source = _source("backend/app/notas_entrada/financeiro.py")
     gerar_contas = source.split("def criar_contas_pagar_da_nota(", 1)[1].split(
-        "# ============================================================================\n# UPLOAD DE XML",
+        "logger.info(\"Total de contas criadas:",
         1,
     )[0]
 
