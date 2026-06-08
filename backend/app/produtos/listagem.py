@@ -31,6 +31,18 @@ def _tipos_base_listagem(include_variations: bool, termo_busca: Optional[str]) -
     return ["SIMPLES", "PAI", "KIT"]
 
 
+def _normalizar_paginacao_produtos(
+    page: int,
+    page_size: int,
+    *,
+    max_page_size: int,
+) -> tuple[int, int, int]:
+    page = max(page, 1)
+    page_size = min(max(page_size, 1), max_page_size)
+    offset = (page - 1) * page_size
+    return page, page_size, offset
+
+
 def _resolver_fornecedor_ids_filtro_produto(
     db: Session,
     *,

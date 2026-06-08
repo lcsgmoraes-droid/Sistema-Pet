@@ -12,6 +12,7 @@ from app.produtos.listagem import (
     _departamento_id_produto,
     _fornecedor_nome_produto,
     _nome_area_produto,
+    _normalizar_paginacao_produtos,
     _palavras_busca_produto,
     _resolver_metricas_valorizacao_produto,
     _resolver_fornecedor_ids_filtro_produto,
@@ -222,3 +223,19 @@ def test_aplicar_filtro_fornecedor_produto_ignora_quando_nao_ha_filtro():
 
     assert resultado is query
     assert query.filters == []
+
+
+def test_normalizar_paginacao_produtos_limita_page_size_e_calcula_offset():
+    assert _normalizar_paginacao_produtos(page=3, page_size=500, max_page_size=200) == (
+        3,
+        200,
+        400,
+    )
+
+
+def test_normalizar_paginacao_produtos_corrige_valores_minimos():
+    assert _normalizar_paginacao_produtos(page=-2, page_size=0, max_page_size=50) == (
+        1,
+        1,
+        0,
+    )

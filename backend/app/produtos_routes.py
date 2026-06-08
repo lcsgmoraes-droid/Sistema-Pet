@@ -123,6 +123,7 @@ from .produtos.listagem import (
     _fornecedor_nome_produto,
     _mapa_reservas_ativas_multitenant,
     _nome_area_produto,
+    _normalizar_paginacao_produtos,
     _palavras_busca_produto,
     _resolver_metricas_valorizacao_produto,
     _resolver_fornecedor_ids_filtro_produto,
@@ -1046,8 +1047,11 @@ def listar_produtos_vendaveis(
     Produtos PAI nÃ£o aparecem pois nÃ£o sÃ£o vendÃ¡veis diretamente.
     """
     user, tenant_id = user_and_tenant
-    page = max(page, 1)
-    page_size = min(max(page_size, 1), 100)
+    page, page_size, offset = _normalizar_paginacao_produtos(
+        page,
+        page_size,
+        max_page_size=100,
+    )
 
     # QUERY BASE - Produtos vendÃ¡veis (incluindo KIT)
     query = db.query(Produto).filter(
@@ -1099,8 +1103,6 @@ def listar_produtos_vendaveis(
             or_(Produto.promocao_fim.is_(None), Produto.promocao_fim >= agora),
         )
 
-    # PAGINAÃ‡ÃƒO
-    offset = (page - 1) * page_size
     total = query.count() if contar_total else None
 
     # OrdenaÃ§Ã£o inteligente: prioriza match exato no cÃ³digo
@@ -2896,8 +2898,11 @@ def relatorio_movimentacoes(
 
     _current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     access_ids = get_all_accessible_tenant_ids(db, tenant_id)
-    page = max(page, 1)
-    page_size = min(max(page_size, 1), 200)
+    page, page_size, offset = _normalizar_paginacao_produtos(
+        page,
+        page_size,
+        max_page_size=200,
+    )
 
     query = db.query(EstoqueMovimentacao).join(Produto).filter(
         EstoqueMovimentacao.tenant_id == tenant_id,
@@ -2946,7 +2951,7 @@ def relatorio_movimentacoes(
     ).order_by(EstoqueMovimentacao.created_at.desc(), EstoqueMovimentacao.id.desc())
 
     if not export_all:
-        query = query.offset((page - 1) * page_size).limit(page_size)
+        query = query.offset(offset).limit(page_size)
 
     movimentacoes_resultado = query.all()
     promocoes_por_chave = _mapear_promocoes_movimentacoes(
@@ -3039,8 +3044,11 @@ def relatorio_vendas_produto(
 
     _current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     access_ids = get_all_accessible_tenant_ids(db, tenant_id)
-    page = max(page, 1)
-    page_size = min(max(page_size, 1), 50)
+    page, page_size, offset = _normalizar_paginacao_produtos(
+        page,
+        page_size,
+        max_page_size=50,
+    )
 
     produto = db.query(Produto).options(
         joinedload(Produto.categoria),
@@ -3090,7 +3098,7 @@ def relatorio_vendas_produto(
         Venda.data_venda.desc(),
         Venda.numero_venda.desc(),
         VendaItem.id.desc(),
-    ).offset((page - 1) * page_size).limit(page_size).all()
+    ).offset(offset).limit(page_size).all()
 
     historico = []
     for item in historico_rows:
@@ -3285,8 +3293,11 @@ def relatorio_validade_proxima(
     _current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     access_ids = get_all_accessible_tenant_ids(db, tenant_id)
     termo_busca = (busca or "").strip()
-    page = max(page, 1)
-    page_size = min(max(page_size, 1), 200)
+    page, page_size, offset = _normalizar_paginacao_produtos(
+        page,
+        page_size,
+        max_page_size=200,
+    )
     dias = max(dias, 0)
     agora = datetime.utcnow()
     data_limite = agora + timedelta(days=dias)
@@ -3380,7 +3391,7 @@ def relatorio_validade_proxima(
         query = query.order_by(ProdutoLote.data_validade.asc(), Produto.nome.asc())
 
     resultados = (
-        query.offset((page - 1) * page_size)
+        query.offset(offset)
         .limit(page_size)
         .all()
     )
@@ -3625,8 +3636,11 @@ def relatorio_valorizacao_estoque(
     """
     _current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     termo_busca = (busca or "").strip()
-    page = max(page, 1)
-    page_size = min(max(page_size, 1), 200)
+    page, page_size, offset = _normalizar_paginacao_produtos(
+        page,
+        page_size,
+        max_page_size=200,
+    )
 
     access_ids = get_all_accessible_tenant_ids(db, tenant_id)
 
@@ -3791,7 +3805,6 @@ def relatorio_valorizacao_estoque(
 
     total = len(itens_processados)
     pages = (total + page_size - 1) // page_size if total else 0
-    offset = (page - 1) * page_size
     pagina_items = itens_processados[offset : offset + page_size]
 
     areas = sorted(
