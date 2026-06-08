@@ -22,9 +22,8 @@ def criar_templates_adquirentes(db: Session, tenant_id: str):
         # STONE - Template v1.0
         # ========================================
         {
-            "adquirente": "STONE",
-            "versao": "1.0",
-            "descricao": "Template padrão Stone - Extrato de Recebimentos",
+            "nome": "STONE",
+            "tipo_arquivo": "recebimentos",  # Extrato de Recebimentos
             "ativo": True,
             "separador": ";",
             "encoding": "utf-8",
@@ -95,9 +94,8 @@ def criar_templates_adquirentes(db: Session, tenant_id: str):
         # CIELO - Template v1.0
         # ========================================
         {
-            "adquirente": "CIELO",
-            "versao": "1.0",
-            "descricao": "Template padrão Cielo - Extrato de Vendas",
+            "nome": "CIELO",
+            "tipo_arquivo": "vendas",  # Extrato de Vendas
             "ativo": True,
             "separador": ",",
             "encoding": "latin1",
@@ -163,9 +161,8 @@ def criar_templates_adquirentes(db: Session, tenant_id: str):
         # REDE - Template v1.0
         # ========================================
         {
-            "adquirente": "REDE",
-            "versao": "1.0",
-            "descricao": "Template padrão Rede - Extrato de Recebimentos",
+            "nome": "REDE",
+            "tipo_arquivo": "recebimentos",  # Extrato de Recebimentos
             "ativo": True,
             "separador": ";",
             "encoding": "utf-8",
@@ -231,19 +228,19 @@ def criar_templates_adquirentes(db: Session, tenant_id: str):
     templates_criados = []
     
     for template_data in templates:
-        # Verificar se já existe
+        # Verificar se já existe (tenant_id também é injetado pelo filtro global,
+        # mas mantemos explícito para deixar a intenção clara).
         existente = db.query(AdquirenteTemplate).filter(
             AdquirenteTemplate.tenant_id == tenant_id,
-            AdquirenteTemplate.adquirente == template_data["adquirente"],
-            AdquirenteTemplate.versao == template_data["versao"]
+            AdquirenteTemplate.nome == template_data["nome"],
+            AdquirenteTemplate.tipo_arquivo == template_data["tipo_arquivo"]
         ).first()
-        
+
         if not existente:
             template = AdquirenteTemplate(
                 tenant_id=tenant_id,
-                adquirente=template_data["adquirente"],
-                versao=template_data["versao"],
-                descricao=template_data["descricao"],
+                nome=template_data["nome"],
+                tipo_arquivo=template_data["tipo_arquivo"],
                 ativo=template_data["ativo"],
                 separador=template_data["separador"],
                 encoding=template_data["encoding"],
@@ -254,7 +251,7 @@ def criar_templates_adquirentes(db: Session, tenant_id: str):
                 criado_em=datetime.utcnow()
             )
             db.add(template)
-            templates_criados.append(template_data["adquirente"])
+            templates_criados.append(template_data["nome"])
     
     db.commit()
     
