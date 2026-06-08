@@ -114,6 +114,7 @@ Tela piloto:
 - Backend/Notas de entrada: fatia de 2026-06-07 moveu a sugestao de SKU/produto para `app/notas_entrada/produtos.py`, reduzindo mais o router e mantendo testes de SKU apontando para o modulo dedicado.
 - Backend/Notas de entrada: fatia de 2026-06-07 moveu a criacao de contas a pagar da NF para `app/notas_entrada/financeiro.py`, mantendo contrato de classificacao aprendida e teste unitario para duplicatas parceladas.
 - Backend/Notas de entrada: fatia de 2026-06-08 moveu o parser XML NF-e para `app/notas_entrada/xml_parser.py`, preservando o import `parse_nfe_xml` no router para compatibilidade com rotas e testes existentes.
+- Backend/Notas de entrada: fatia de 2026-06-08 moveu os schemas Pydantic para `app/notas_entrada/schemas.py`, mantendo os mesmos nomes importados pelo router e reduzindo acoplamento entre contratos e handlers.
 - Testes/fixtures: a base legada de testes agora roda sem PostgreSQL local usando SQLite em memoria, reexporta `tenant_factory`, `user_factory`, `auth_headers` e `client`, e cria usuarios com bcrypt/vinculo `UserTenant` para validar o fluxo multitenant atual.
 - Produtos/Estoque: tela de movimentacoes voltou a exibir "Lancar granel" para produtos elegiveis e manteve balanco manual permitido em produto granel para ajuste de inventario.
 - Pessoas: listagem ganhou selecao em massa e fluxo de fusao de 2 cadastros, transferindo vinculos/historico para o principal e inativando o duplicado.
@@ -211,7 +212,7 @@ Top criticos ainda pendentes no inventario de 2026-06-07:
 | Linhas | Arquivo | Prioridade |
 | --- | --- | --- |
 | 5289 | `backend/app/produtos_routes.py` | Critico |
-| 2772 | `backend/app/notas_entrada_routes.py` | Critico, em reducao por fatias |
+| 2711 | `backend/app/notas_entrada_routes.py` | Critico, em reducao por fatias |
 | 3576 | `backend/app/pedidos_compra_routes.py` | Critico |
 | 3459 | `backend/app/campaigns/routes.py` | Critico |
 | 3107 | `backend/app/vendas/service.py` | Critico |

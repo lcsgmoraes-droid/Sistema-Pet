@@ -14,7 +14,6 @@ from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, desc
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
-from pydantic import BaseModel, Field
 import re
 
 from .db import get_session
@@ -91,6 +90,16 @@ from .notas_entrada.produtos import (
     normalizar_codigo_barras,
     obter_detalhe_vinculo_item,
 )
+from .notas_entrada.schemas import (
+    AtualizarPrecoRequest,
+    ConferenciaItemPayload,
+    ConferenciaNotaPayload,
+    CriarProdutoRequest,
+    NotaEntradaResponse,
+    ProcessarConfig,
+    RateioItemRequest,
+    RateioNotaRequest,
+)
 from .notas_entrada.xml_parser import parse_nfe_xml
 from .services.produto_service import normalizar_sku_produto
 
@@ -98,44 +107,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/notas-entrada", tags=["Notas de Entrada (XML)"])
-
-# ============================================================================
-# SCHEMAS
-# ============================================================================
-
-class NotaEntradaResponse(BaseModel):
-    id: int
-    numero_nota: str
-    serie: str
-    chave_acesso: str
-    fornecedor_nome: str
-    fornecedor_cnpj: str
-    fornecedor_id: Optional[int] = None
-    data_emissao: datetime
-    valor_total: float
-    status: str
-    produtos_vinculados: Optional[int] = 0
-    produtos_nao_vinculados: Optional[int] = 0
-    entrada_estoque_realizada: Optional[bool] = False
-    conferencia_status: Optional[str] = "nao_iniciada"
-    divergencias_count: Optional[int] = 0
-    
-    model_config = {"from_attributes": True}
-
-
-class ConferenciaItemPayload(BaseModel):
-    item_id: int
-    quantidade_conferida: float
-    quantidade_avariada: float = 0
-    observacao_conferencia: Optional[str] = None
-    acao_sugerida: Optional[str] = "sem_acao"
-
-
-class ConferenciaNotaPayload(BaseModel):
-    itens: List[ConferenciaItemPayload]
-    observacao_geral: Optional[str] = None
-
-
 
 # ============================================================================
 # UPLOAD DE XML
@@ -1288,10 +1259,6 @@ def desvincular_produto(
 # CONFIGURAR RATEIO DA NOTA (100% ONLINE, 100% LOJA, OU PARCIAL)
 # ============================================================================
 
-class RateioNotaRequest(BaseModel):
-    tipo_rateio: str  # 'online', 'loja', 'parcial'
-
-
 @router.post("/{nota_id}/rateio")
 def configurar_rateio_nota(
     nota_id: int,
@@ -1370,10 +1337,6 @@ def configurar_rateio_nota(
 # ============================================================================
 # CONFIGURAR QUANTIDADE ONLINE DE UM ITEM (PARA RATEIO PARCIAL)
 # ============================================================================
-
-class RateioItemRequest(BaseModel):
-    quantidade_online: float  # Quantidade que Ã© do online
-
 
 @router.post("/{nota_id}/itens/{item_id}/rateio")
 def configurar_rateio_item(
@@ -1612,10 +1575,6 @@ def preview_processamento(
 # ATUALIZAR PREÃ‡OS DOS PRODUTOS
 # ============================================================================
 
-class AtualizarPrecoRequest(BaseModel):
-    produto_id: int
-    preco_venda: float
-
 @router.post("/{nota_id}/atualizar-precos")
 def atualizar_precos_produtos(
     nota_id: int,
@@ -1690,13 +1649,6 @@ def atualizar_precos_produtos(
 # ============================================================================
 # DAR ENTRADA NO ESTOQUE
 # ============================================================================
-
-class ProcessarConfig(BaseModel):
-    # chave = str(item_id), valor = multiplicador (ex: {"42": 10})
-    multiplicadores_override: dict = Field(default_factory=dict)
-    # chave = str(item_id), valor = custo unitário manual a aplicar no sistema
-    custos_override: dict = Field(default_factory=dict)
-
 
 @router.post("/{nota_id}/processar")
 def processar_entrada_estoque(
@@ -2312,19 +2264,6 @@ def sugerir_sku(
 # ============================================================================
 # CRIAR PRODUTO A PARTIR DO ITEM DA NOTA
 # ============================================================================
-
-class CriarProdutoRequest(BaseModel):
-    sku: str
-    nome: str
-    descricao: Optional[str] = None
-    preco_custo: float
-    preco_venda: float
-    margem_lucro: Optional[float] = None
-    categoria_id: Optional[int] = None
-    marca_id: Optional[int] = None
-    estoque_minimo: Optional[int] = 10
-    estoque_maximo: Optional[int] = 100
-
 
 @router.post("/{nota_id}/itens/{item_id}/criar-produto")
 def criar_produto_from_item(
