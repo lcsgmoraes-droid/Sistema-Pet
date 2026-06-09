@@ -16,6 +16,7 @@ from app.events.event_trace_legacy import (
 )
 from app.config import JWT_SECRET_KEY
 from app.auth.core import ALGORITHM
+from app.tenancy.context import set_current_tenant, clear_current_tenant
 
 router = APIRouter(prefix="/ecommerce", tags=["ecommerce"])
 
@@ -111,6 +112,9 @@ async def checkout_real(request: Request):
     db = SessionLocal()
 
     try:
+        # Define a loja no contexto p/ o filtro global de tenant: o checkout_service
+        # consulta Pedido (agora TenantScoped) e exige tenant no contexto (fail-fast).
+        set_current_tenant(UUID(tenant_id))
         items = payload.get("items") or payload.get("itens") or []
 
         service = CheckoutService(db)
@@ -162,6 +166,7 @@ async def checkout_real(request: Request):
         }
 
     finally:
+        clear_current_tenant()
         db.close()
 
 

@@ -4,11 +4,12 @@ from sqlalchemy.orm.attributes import flag_modified
 from datetime import datetime
 
 from app.db import Base
+from app.base_models import TenantScoped
 from app.domain.policies.pedido_policy import PedidoPolicy
 from app.domain.value_objects.money import Money
 
 
-class Pedido(Base):
+class Pedido(TenantScoped, Base):
     """
     Aggregate root do Ecommerce.
     Pedido nasce antes do evento.
@@ -20,7 +21,7 @@ class Pedido(Base):
 
     pedido_id = Column(String, unique=True, index=True)  # ID público
     cliente_id = Column(Integer, nullable=False)
-    tenant_id = Column(String(36), nullable=False, index=True)
+    # tenant_id (UUID NOT NULL, indexado) vem do mixin TenantScoped → filtro global.
 
     total = Column(Float, nullable=False)
 
@@ -119,7 +120,7 @@ class Pedido(Base):
 
 # ===== PedidoItem (Checkout Engine v1) =====
 
-class PedidoItem(Base):
+class PedidoItem(TenantScoped, Base):
     __tablename__ = "pedido_itens"
 
     id = Column(Integer, primary_key=True, index=True)
@@ -134,6 +135,6 @@ class PedidoItem(Base):
 
     subtotal = Column(Float, nullable=False)
 
-    tenant_id = Column(String(36), nullable=False, index=True)
+    # tenant_id (UUID NOT NULL, indexado) vem do mixin TenantScoped → filtro global.
 
     created_at = Column(DateTime, default=datetime.utcnow)
