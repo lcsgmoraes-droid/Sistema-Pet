@@ -98,11 +98,8 @@ KNOWN_BASE_TENANT_DEBT = frozenset(
         "dre_periodos",  # tenant_id NULLABLE
         # app/kit_config_fiscal_models.py
         "kit_config_fiscal",
-        # app/lgpd_models.py
-        "data_subject_requests",
-        # app/models.py
-        "assinaturas_modulos",
-        "ecommerce_notify_requests",
+        # app/lgpd_models.py — data_subject_requests MIGRADO (Leva 2: String→UUID + TenantScoped)
+        # app/models.py — assinaturas_modulos, ecommerce_notify_requests MIGRADOS (Leva 2: String→UUID)
         # app/models_configuracao_custo_moto.py
         "configuracoes_custo_moto",
         # app/opcoes_racao_models.py — MIGRADO para TenantScoped (PR opcoes/duplicatas):
@@ -116,6 +113,8 @@ KNOWN_BASE_TENANT_DEBT = frozenset(
         # app/produto_config_fiscal_models.py
         "produto_config_fiscal",
         # app/simples_nacional_models.py
+        # ATENCAO: tabela simples_nacional_mensal NAO existe em producao (modelo sem
+        # migration de criacao). Conversao String->UUID adiada ate criar a tabela.
         "simples_nacional_mensal",
         # app/template_models.py
         "tenant_template_installs",
