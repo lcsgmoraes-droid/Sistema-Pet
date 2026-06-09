@@ -92,8 +92,7 @@ KNOWN_BASE_TENANT_DEBT = frozenset(
         # app/conciliacao_models.py — MIGRADO para TenantScoped (PR conciliacao):
         #   adquirentes_templates, arquivos_evidencia, conciliacao_importacoes,
         #   conciliacao_metricas, empresa_parametros
-        # app/duplicatas_ignoradas_models.py
-        "duplicatas_ignoradas",
+        # app/duplicatas_ignoradas_models.py — MIGRADO para TenantScoped (PR opcoes/duplicatas)
         # app/ia/aba7_models.py
         "dre_periodos",  # tenant_id NULLABLE
         # app/kit_config_fiscal_models.py
@@ -105,13 +104,8 @@ KNOWN_BASE_TENANT_DEBT = frozenset(
         "ecommerce_notify_requests",
         # app/models_configuracao_custo_moto.py
         "configuracoes_custo_moto",
-        # app/opcoes_racao_models.py
-        "apresentacoes_peso",
-        "fases_publico",
-        "linhas_racao",
-        "portes_animal",
-        "sabores_proteina",
-        "tipos_tratamento",
+        # app/opcoes_racao_models.py — MIGRADO para TenantScoped (PR opcoes/duplicatas):
+        #   apresentacoes_peso, fases_publico, linhas_racao, portes_animal, sabores_proteina, tipos_tratamento
         # app/ops_models.py  (avaliar: globais de operação? se sim, mover para INTENTIONALLY_GLOBAL)
         "ops_alerts",        # tenant_id NULLABLE
         "ops_error_events",  # tenant_id NULLABLE
