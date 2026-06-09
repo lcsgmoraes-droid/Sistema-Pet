@@ -62,6 +62,18 @@ os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-min-32-chars-long-for-s
 INTENTIONALLY_GLOBAL_TENANT_TABLES = frozenset(
     {
         "user_sessions",  # sessões não são tenant-scoped (já na whitelist do filtro)
+        # Observabilidade/operação: cross-tenant POR DESIGN, tenant_id é etiqueta
+        # nullable. Lidas só pelo cockpit admin (/admin/observabilidade, protegido por
+        # require_admin, com visão cross-tenant) e escritas pelo middleware de captura
+        # de erros (roda inclusive antes de haver tenant, ex.: falha de login). Isolar
+        # por tenant quebraria o painel de admin e a captura de eventos sem tenant.
+        "ops_alerts",
+        "ops_error_events",
+        # Fila persistente de webhooks do Bling: o worker (process_pending_bling_pedido_
+        # webhooks) faz claim cross-tenant SEM tenant no contexto (roda fora de request
+        # HTTP); o webhook público enfileira sem sessão. tenant_id é etiqueta nullable.
+        # Isolar por tenant quebraria o claim do worker (fail-fast em query sem contexto).
+        "bling_pedido_webhook_events",
     }
 )
 
@@ -104,9 +116,8 @@ KNOWN_BASE_TENANT_DEBT = frozenset(
         "configuracoes_custo_moto",
         # app/opcoes_racao_models.py — MIGRADO para TenantScoped (PR opcoes/duplicatas):
         #   apresentacoes_peso, fases_publico, linhas_racao, portes_animal, sabores_proteina, tipos_tratamento
-        # app/ops_models.py  (avaliar: globais de operação? se sim, mover para INTENTIONALLY_GLOBAL)
-        "ops_alerts",        # tenant_id NULLABLE
-        "ops_error_events",  # tenant_id NULLABLE
+        # app/ops_models.py — ops_alerts, ops_error_events DECLARADOS INTENCIONALMENTE
+        # GLOBAIS (observabilidade admin cross-tenant) → ver INTENTIONALLY_GLOBAL_TENANT_TABLES.
         # app/pedido_models.py — MIGRADOS (Leva 3: String→UUID + TenantScoped; checkout_real
         # passou a chamar set_current_tenant antes de consultar Pedido)
         # app/produto_config_fiscal_models.py
@@ -119,8 +130,9 @@ KNOWN_BASE_TENANT_DEBT = frozenset(
         "tenant_template_item_installs",
         # app/variacao_config_fiscal_models.py
         "variacao_config_fiscal",
-        # app/bling_pedido_webhook_queue_models.py
-        "bling_pedido_webhook_events",  # tenant_id NULLABLE
+        # app/bling_pedido_webhook_queue_models.py — bling_pedido_webhook_events
+        # DECLARADO INTENCIONALMENTE GLOBAL (fila de worker cross-tenant) → ver
+        # INTENTIONALLY_GLOBAL_TENANT_TABLES.
         # app/whatsapp/models.py
         "tenant_whatsapp_config",
         "whatsapp_ia_messages",
@@ -144,9 +156,8 @@ KNOWN_NULLABLE_TENANT_DEBT = frozenset(
     {
         "comissoes_itens",
         "dre_periodos",
-        "ops_alerts",
-        "ops_error_events",
-        "bling_pedido_webhook_events",
+        # ops_alerts, ops_error_events e bling_pedido_webhook_events saíram daqui:
+        # agora são INTENTIONALLY_GLOBAL (nullable é esperado em tabela global).
     }
 )
 
