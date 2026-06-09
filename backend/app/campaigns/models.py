@@ -34,6 +34,15 @@ from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.sql import func
 
 from app.db import Base  # Base declarative já existente no projeto
+from app.base_models import TenantScoped
+
+# NOTA (isolamento multi-tenant): alguns modelos abaixo herdam TenantScoped além de Base,
+# entrando no filtro global de tenant + fail-fast (app/tenancy/filters.py).
+# Diferente do padrão usual (remover tenant_id e herdar a coluna do mixin), AQUI a coluna
+# tenant_id é MANTIDA como já estava — porque é UUID NOT NULL já coberta por índice composto
+# (tenant_id é a 1ª coluna) ou faz parte da chave primária (campaign_locks). A coluna local
+# sobrescreve a do mixin (declared_attr), então NÃO há mudança de schema/migration: o mixin
+# atua apenas como marcador para o filtro. Ver tests/multi_tenant/test_tenant_model_registry.py.
 
 
 # ---------------------------------------------------------------------------
@@ -287,7 +296,7 @@ class CampaignExecution(Base):
 # 4. campaign_run_log — resumo por execução de job
 # ---------------------------------------------------------------------------
 
-class CampaignRunLog(Base):
+class CampaignRunLog(TenantScoped, Base):
     """
     Resumo de cada execução de job. Imutável — não usar UPDATE.
 
@@ -319,7 +328,7 @@ class CampaignRunLog(Base):
 # 5. campaign_locks — mutex de campanhas
 # ---------------------------------------------------------------------------
 
-class CampaignLock(Base):
+class CampaignLock(TenantScoped, Base):
     """
     Mutex para garantir que apenas 1 worker execute um tipo de campanha
     por tenant ao mesmo tempo.
@@ -344,7 +353,7 @@ class CampaignLock(Base):
 # 6. loyalty_stamps — carimbos de fidelidade
 # ---------------------------------------------------------------------------
 
-class LoyaltyStamp(Base):
+class LoyaltyStamp(TenantScoped, Base):
     """
     Cada linha representa 1 carimbo ganho pelo cliente.
 
@@ -506,7 +515,7 @@ class CouponRedemption(Base):
 # 10. customer_rank_history — histórico mensal de ranking
 # ---------------------------------------------------------------------------
 
-class CustomerRankHistory(Base):
+class CustomerRankHistory(TenantScoped, Base):
     """
     Snapshot mensal do nível de cada cliente.
 
@@ -597,7 +606,7 @@ class NotificationQueue(Base):
 # 12. notification_log — histórico de envios (imutável)
 # ---------------------------------------------------------------------------
 
-class NotificationLog(Base):
+class NotificationLog(TenantScoped, Base):
     """
     Histórico imutável de cada tentativa de envio.
 
@@ -716,7 +725,7 @@ class DrawingEntry(Base):
 # Customer Merge Log — registro de unificações cross-canal
 # ---------------------------------------------------------------------------
 
-class CustomerMergeLog(Base):
+class CustomerMergeLog(TenantScoped, Base):
     """
     Registra cada unificação de clientes feita via CPF/telefone/e-mail.
     O campo snapshot_json guarda os IDs das linhas movidas, permitindo desfazer.
