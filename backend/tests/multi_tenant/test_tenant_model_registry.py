@@ -107,9 +107,8 @@ KNOWN_BASE_TENANT_DEBT = frozenset(
         # app/ops_models.py  (avaliar: globais de operação? se sim, mover para INTENTIONALLY_GLOBAL)
         "ops_alerts",        # tenant_id NULLABLE
         "ops_error_events",  # tenant_id NULLABLE
-        # app/pedido_models.py
-        "pedidos",
-        "pedido_itens",
+        # app/pedido_models.py — MIGRADOS (Leva 3: String→UUID + TenantScoped; checkout_real
+        # passou a chamar set_current_tenant antes de consultar Pedido)
         # app/produto_config_fiscal_models.py
         "produto_config_fiscal",
         # app/simples_nacional_models.py
