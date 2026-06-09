@@ -2,8 +2,8 @@ from types import SimpleNamespace
 
 import pytest
 
-import app.estoque_routes as estoque_routes
-from app.estoque_routes import _registrar_lote_entrada
+from app import estoque_entrada_manual_routes
+from app.estoque_entrada_manual_routes import _registrar_lote_entrada
 
 
 class _FakeQuery:
@@ -83,7 +83,7 @@ def test_registrar_lote_entrada_cria_lote_novo_quando_nao_existe(monkeypatch):
                 setattr(self, chave, valor)
             self.id = None
 
-    monkeypatch.setattr(estoque_routes, "ProdutoLote", ProdutoLoteFake)
+    monkeypatch.setattr(estoque_entrada_manual_routes, "ProdutoLote", ProdutoLoteFake)
 
     produto = SimpleNamespace(
         id=6745,
