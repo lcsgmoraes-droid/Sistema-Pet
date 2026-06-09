@@ -13,9 +13,9 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.simples_nacional_models import SimplesNacionalMensal
 from app.empresa_config_fiscal_models import EmpresaConfigFiscal
-from app.ia.aba7_models import DREPeriodo
 from app.financeiro_models import ContaPagar, CategoriaFinanceira
 from app.services.fechamento_simples_service import fechar_simples_mensal
+from app.services.dre_periodo_tenant_scope import buscar_periodo_dre_do_tenant
 from sqlalchemy import func
 
 
@@ -83,15 +83,8 @@ def buscar_fechamento(
     
     # Se não existe, cria temporariamente para visualização (sem commit)
     if not registro:
-        # Buscar dados do DRE
-        periodo_dre = (
-            db.query(DREPeriodo)
-            .filter(
-                DREPeriodo.mes == mes,
-                DREPeriodo.ano == ano
-            )
-            .first()
-        )
+        # Buscar dados do DRE (ESCOPADO À LOJA — isolamento multi-tenant)
+        periodo_dre = buscar_periodo_dre_do_tenant(db, tenant_id, mes, ano)
         
         faturamento_sistema = float(periodo_dre.receita_bruta) if periodo_dre and periodo_dre.receita_bruta else 0.0
         imposto_estimado = float(periodo_dre.impostos) if periodo_dre and periodo_dre.impostos else 0.0

@@ -6,10 +6,10 @@ quando uma NF for autorizada.
 from decimal import Decimal
 from datetime import date, datetime, timedelta
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
 
 from app.empresa_config_fiscal_models import EmpresaConfigFiscal
 from app.ia.aba7_models import DREPeriodo
+from app.services.dre_periodo_tenant_scope import buscar_periodo_dre_do_tenant
 
 
 def gerar_provisao_simples_por_nf(
@@ -70,25 +70,20 @@ def gerar_provisao_simples_por_nf(
     competencia_mes = data_emissao.month
     competencia_ano = data_emissao.year
     
-    # 4. Buscar período DRE correspondente
-    periodo = (
-        db.query(DREPeriodo)
-        .filter(
-            and_(
-                DREPeriodo.mes == competencia_mes,
-                DREPeriodo.ano == competencia_ano
-            )
-        )
-        .first()
-    )
+    # 4. Buscar período DRE correspondente (ESCOPADO À LOJA — isolamento multi-tenant)
+    periodo = buscar_periodo_dre_do_tenant(db, tenant_id, competencia_mes, competencia_ano)
     
     # 5. Se o período não existir, criar
     if not periodo:
-        # Buscar usuario_id se não fornecido
+        # Buscar usuario_id se não fornecido — restrito aos usuários DESTA loja
         if not usuario_id:
             from app.models import User
-            usuario = db.query(User).first()
-            usuario_id = usuario.id if usuario else 1
+            usuario = (
+                db.query(User)
+                .filter(User.tenant_id == tenant_id)
+                .first()
+            )
+            usuario_id = usuario.id if usuario else None
         
         # Calcular datas do período
         data_inicio = datetime(competencia_ano, competencia_mes, 1).date()
@@ -98,6 +93,7 @@ def gerar_provisao_simples_por_nf(
             data_fim = (datetime(competencia_ano, competencia_mes + 1, 1) - timedelta(days=1)).date()
         
         periodo = DREPeriodo(
+            tenant_id=tenant_id,
             usuario_id=usuario_id,
             data_inicio=data_inicio,
             data_fim=data_fim,

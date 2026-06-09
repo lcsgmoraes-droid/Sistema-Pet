@@ -6,12 +6,12 @@ Calcula alíquota efetiva e sugere nova alíquota para próximo mês.
 from decimal import Decimal
 from datetime import date
 from sqlalchemy.orm import Session
-from sqlalchemy import func, extract, and_
+from sqlalchemy import func, extract
 
 from app.simples_nacional_models import SimplesNacionalMensal
 from app.empresa_config_fiscal_models import EmpresaConfigFiscal
-from app.ia.aba7_models import DREPeriodo
 from app.financeiro_models import ContaPagar, CategoriaFinanceira
+from app.services.dre_periodo_tenant_scope import buscar_periodo_dre_do_tenant
 
 
 def fechar_simples_mensal(
@@ -64,16 +64,9 @@ def fechar_simples_mensal(
         )
         db.add(registro)
     
-    # 2️⃣ Buscar faturamento do sistema via DRE
+    # 2️⃣ Buscar faturamento do sistema via DRE (ESCOPADO À LOJA — isolamento multi-tenant)
     # O faturamento real está no DRE (receita_bruta)
-    periodo_dre = (
-        db.query(DREPeriodo)
-        .filter(
-            DREPeriodo.mes == mes,
-            DREPeriodo.ano == ano
-        )
-        .first()
-    )
+    periodo_dre = buscar_periodo_dre_do_tenant(db, tenant_id, mes, ano)
     
     if periodo_dre and periodo_dre.receita_bruta:
         registro.faturamento_sistema = periodo_dre.receita_bruta

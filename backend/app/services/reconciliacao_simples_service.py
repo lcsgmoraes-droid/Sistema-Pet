@@ -6,10 +6,9 @@ Substitui provisões por valores reais e gera ajustes no DRE.
 from decimal import Decimal
 from datetime import date
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, extract, func
 
-from app.ia.aba7_models import DREPeriodo
 from app.empresa_config_fiscal_models import EmpresaConfigFiscal
+from app.services.dre_periodo_tenant_scope import buscar_periodo_dre_do_tenant
 
 
 def reconciliar_das_simples(
@@ -45,17 +44,8 @@ def reconciliar_das_simples(
     
     valor_das = Decimal(str(valor_das))
     
-    # 1️⃣ Buscar período DRE correspondente
-    periodo = (
-        db.query(DREPeriodo)
-        .filter(
-            and_(
-                DREPeriodo.mes == mes_competencia,
-                DREPeriodo.ano == ano_competencia
-            )
-        )
-        .first()
-    )
+    # 1️⃣ Buscar período DRE correspondente (ESCOPADO À LOJA — isolamento multi-tenant)
+    periodo = buscar_periodo_dre_do_tenant(db, tenant_id, mes_competencia, ano_competencia)
     
     if not periodo:
         return {
