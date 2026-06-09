@@ -1,12 +1,12 @@
 from types import SimpleNamespace
 
-from app.estoque_routes import (
+from app.estoque_movimentacoes_context import (
     _canal_pedido_integrado,
     _contexto_venda_pedido_integrado,
     _label_canal_movimentacao,
     _observacao_exibicao_movimentacao_bling,
-    listar_movimentacoes_produto,
 )
+from app.estoque_movimentacoes_consulta_routes import listar_movimentacoes_produto
 
 
 def test_label_canal_movimentacao_traduz_shopee():
