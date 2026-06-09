@@ -111,10 +111,9 @@ KNOWN_BASE_TENANT_DEBT = frozenset(
         # passou a chamar set_current_tenant antes de consultar Pedido)
         # app/produto_config_fiscal_models.py
         "produto_config_fiscal",
-        # app/simples_nacional_models.py
-        # ATENCAO: tabela simples_nacional_mensal NAO existe em producao (modelo sem
-        # migration de criacao). Conversao String->UUID adiada ate criar a tabela.
-        "simples_nacional_mensal",
+        # app/simples_nacional_models.py — simples_nacional_mensal MIGRADO para
+        # TenantScoped (tabela colocada sob o Alembic + tenant_id String->UUID; antes
+        # nao existia em producao por falta de migration de criacao).
         # app/template_models.py
         "tenant_template_installs",
         "tenant_template_item_installs",

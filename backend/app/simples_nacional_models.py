@@ -2,21 +2,26 @@
 Model para histórico mensal do Simples Nacional
 """
 
-from sqlalchemy import Column, Integer, String, Numeric, Boolean, DateTime, Text, UniqueConstraint
+from sqlalchemy import Column, Integer, Numeric, Boolean, DateTime, Text, UniqueConstraint
 from sqlalchemy.sql import func
 from app.db import Base
+from app.base_models import TenantScoped
 
 
-class SimplesNacionalMensal(Base):
+class SimplesNacionalMensal(TenantScoped, Base):
     """
     Histórico mensal do Simples Nacional.
     Registra faturamento, impostos e alíquota efetiva de cada mês.
+
+    Mantém esquema próprio (``id`` autoincrement, ``created_at``/``updated_at``), por
+    isso adota o mixin ``TenantScoped`` em vez de ``BaseTenantModel`` — entra no filtro
+    global de tenant com ``tenant_id`` vindo do mixin (UUID NOT NULL, indexado).
     """
     
     __tablename__ = "simples_nacional_mensal"
     
     id = Column(Integer, primary_key=True)
-    tenant_id = Column(String, nullable=False, index=True)
+    # tenant_id vem do mixin TenantScoped (UUID NOT NULL, indexado)
     
     # Competência
     mes = Column(Integer, nullable=False)
