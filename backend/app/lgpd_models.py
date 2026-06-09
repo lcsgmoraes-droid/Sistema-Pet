@@ -1,15 +1,17 @@
 from datetime import datetime, timezone
 
 from sqlalchemy import Column, DateTime, Index, Integer, String, Text
+from sqlalchemy.dialects.postgresql import UUID
 
 from app.db import Base
+from app.base_models import TenantScoped
 
 
 def utcnow():
     return datetime.now(timezone.utc)
 
 
-class DataSubjectRequest(Base):
+class DataSubjectRequest(TenantScoped, Base):
     """Operational request made by a data subject or on their behalf."""
 
     __tablename__ = "data_subject_requests"
@@ -21,7 +23,9 @@ class DataSubjectRequest(Base):
     )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    tenant_id = Column(String(64), nullable=False)
+    # índice composto (ix_data_subject_requests_*) já cobre tenant_id; mantido local
+    # como UUID — TenantScoped entra como marcador do filtro global de tenant.
+    tenant_id = Column(UUID(as_uuid=True), nullable=False)
 
     subject_type = Column(String(50), nullable=False)  # customer, user, contact
     subject_id = Column(String(255), nullable=False)

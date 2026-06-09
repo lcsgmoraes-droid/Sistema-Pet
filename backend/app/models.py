@@ -7,7 +7,7 @@ from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship, deferred
 from app.db import Base
-from app.base_models import BaseTenantModel
+from app.base_models import BaseTenantModel, TenantScoped
 import sqlalchemy as sa
 
 
@@ -660,12 +660,12 @@ class Tenant(Base):
         return f"<Tenant(id={self.id}, name={self.name})>"
 
 
-class AssinaturaModulo(Base):
+class AssinaturaModulo(TenantScoped, Base):
     """Assinaturas de módulos premium por tenant."""
     __tablename__ = 'assinaturas_modulos'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    tenant_id = Column(String(36), nullable=False, index=True)
+    # tenant_id (UUID NOT NULL, indexado) vem do mixin TenantScoped → filtro global de tenant.
     modulo = Column(String(50), nullable=False)  # entregas, campanhas, whatsapp...
     status = Column(String(20), nullable=False, server_default='ativo')  # ativo | cancelado | expirado
     valor_mensal = Column(Numeric(10, 2), nullable=True)
@@ -680,12 +680,12 @@ class AssinaturaModulo(Base):
         return f"<AssinaturaModulo(tenant={self.tenant_id}, modulo={self.modulo}, status={self.status})>"
 
 
-class EcommerceNotifyRequest(Base):
+class EcommerceNotifyRequest(TenantScoped, Base):
     """Solicitações de aviso 'Avise-me quando chegar' do e-commerce."""
     __tablename__ = 'ecommerce_notify_requests'
 
     id = Column(Integer, primary_key=True, autoincrement=True)
-    tenant_id = Column(String(36), nullable=False, index=True)
+    # tenant_id (UUID NOT NULL, indexado) vem do mixin TenantScoped → filtro global de tenant.
     product_id = Column(Integer, nullable=False, index=True)
     product_name = Column(String(255), nullable=True)
     email = Column(String(255), nullable=False)
