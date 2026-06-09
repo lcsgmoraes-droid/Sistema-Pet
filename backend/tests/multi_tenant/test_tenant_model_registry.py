@@ -71,20 +71,21 @@ INTENTIONALLY_GLOBAL_TENANT_TABLES = frozenset(
 KNOWN_BASE_TENANT_DEBT = frozenset(
     {
         # app/campaigns/models.py
+        # MIGRADOS para TenantScoped na Leva 1 (sem mudança de schema — a coluna
+        # tenant_id foi mantida, pois já é UUID NOT NULL coberta por índice composto
+        # ou é parte da PK; o mixin entra só como marcador do filtro):
+        #   campaign_locks, campaign_run_log, customer_merge_logs,
+        #   customer_rank_history, loyalty_stamps, notification_log.
+        # Os demais seguem expostos (worker/scheduler consultam sem contexto de tenant
+        # → exigem refatorar os jobs antes de migrar).
         "campaigns",
         "campaign_event_queue",
         "campaign_executions",
-        "campaign_locks",
-        "campaign_run_log",
         "cashback_transactions",
         "coupons",
         "coupon_redemptions",
-        "customer_merge_logs",
-        "customer_rank_history",
         "drawings",
         "drawing_entries",
-        "loyalty_stamps",
-        "notification_log",
         "notification_queue",
         # app/comissoes_models.py
         # comissoes_vendas → MIGRADO para TenantScoped (PR comissoes)
