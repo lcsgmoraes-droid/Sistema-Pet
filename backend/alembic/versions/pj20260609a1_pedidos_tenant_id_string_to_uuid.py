@@ -8,7 +8,7 @@ e seguro. O Postgres reconstroi os indices da coluna automaticamente.
 Pre-requisito de codigo (mesmo PR): a rota ecommerce.checkout_real passou a chamar
 set_current_tenant antes de consultar Pedido (checkout_service), evitando fail-fast.
 
-Revision ID: pi20260609a1
+Revision ID: pj20260609a1
 Revises: ph20260609a1
 Create Date: 2026-06-09 13:00:00.000000
 """
@@ -20,7 +20,7 @@ import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 
 
-revision: str = "pi20260609a1"
+revision: str = "pj20260609a1"
 down_revision: Union[str, None] = "ph20260609a1"
 branch_labels: Union[str, Sequence[str], None] = None
 depends_on: Union[str, Sequence[str], None] = None
