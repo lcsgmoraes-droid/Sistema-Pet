@@ -56,14 +56,14 @@ def gerar_provisao_simples_por_nf(
             "motivo": "Simples Nacional não está ativo"
         }
     
-    if not config.simples_aliquota_vigente:
+    if not config.aliquota_simples_vigente:
         return {
             "sucesso": False,
             "motivo": "Alíquota não configurada"
         }
     
     # 2. Calcular valor da provisão
-    aliquota = Decimal(str(config.simples_aliquota_vigente)) / Decimal("100")
+    aliquota = Decimal(str(config.aliquota_simples_vigente)) / Decimal("100")
     valor_provisao = (Decimal(str(valor_nf)) * aliquota).quantize(Decimal("0.01"))
     
     # 3. Identificar competência
@@ -147,7 +147,7 @@ def gerar_provisao_simples_por_nf(
         "ano": competencia_ano,
         "valor_provisao": float(valor_provisao),
         "impostos_total": float(periodo.impostos),
-        "aliquota": float(config.simples_aliquota_vigente),
+        "aliquota": float(config.aliquota_simples_vigente),
         "anexo": config.simples_anexo
     }
 

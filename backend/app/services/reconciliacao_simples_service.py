@@ -111,7 +111,7 @@ def reconciliar_das_simples(
     sugestao_aliquota = None
     if config and aliquota_efetiva_real:
         # Guardar alíquota anterior
-        aliquota_anterior = config.simples_aliquota_vigente
+        aliquota_anterior = config.aliquota_simples_vigente
         
         # Sugerir nova alíquota (arredondada para cima)
         import math
@@ -119,7 +119,7 @@ def reconciliar_das_simples(
         
         # Atualizar automaticamente se diferença > 0.5%
         if abs(sugestao_aliquota - float(aliquota_anterior or 0)) > 0.5:
-            config.simples_aliquota_vigente = Decimal(str(sugestao_aliquota))
+            config.aliquota_simples_vigente = Decimal(str(sugestao_aliquota))
             config.simples_ultima_atualizacao = date.today()
     
     # Commit
@@ -136,9 +136,9 @@ def reconciliar_das_simples(
         "tipo_ajuste": "positivo" if diferenca > 0 else ("negativo" if diferenca < 0 else "sem_ajuste"),
         "impostos_final": float(periodo.impostos),
         "aliquota_efetiva_real": aliquota_efetiva_real,
-        "aliquota_anterior": float(config.simples_aliquota_vigente) if config else None,
+        "aliquota_anterior": float(config.aliquota_simples_vigente) if config else None,
         "sugestao_aliquota": sugestao_aliquota,
-        "aliquota_atualizada_automaticamente": sugestao_aliquota != float(config.simples_aliquota_vigente) if config and sugestao_aliquota else False
+        "aliquota_atualizada_automaticamente": sugestao_aliquota != float(config.aliquota_simples_vigente) if config and sugestao_aliquota else False
     }
 
 

@@ -136,10 +136,10 @@ def fechar_simples_mensal(
         
         if config:
             # Guardar alíquota anterior
-            aliquota_anterior = config.simples_aliquota_vigente
+            aliquota_anterior = config.aliquota_simples_vigente
             
             # Atualizar para a sugestão
-            config.simples_aliquota_vigente = Decimal(str(sugestao))
+            config.aliquota_simples_vigente = Decimal(str(sugestao))
             config.simples_ultima_atualizacao = date.today()
             
             # Adicionar observação sobre mudança
