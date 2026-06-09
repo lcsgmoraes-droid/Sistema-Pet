@@ -169,7 +169,16 @@ def _validate_production_settings(settings: Any, errors: List[str]) -> None:
             f"[PRODUCTION] SQL Audit level inadequado (valor: {sql_audit_level})\n"
             f"             Em produção, SQL_AUDIT_ENFORCE_LEVEL DEVE ser 'error' ou 'strict'"
         )
-    
+
+    # 5. Chave dedicada de criptografia de PAGAMENTO obrigatória
+    payment_key = (os.getenv('PAYMENT_CONFIG_ENCRYPTION_KEY') or os.getenv('ENCRYPTION_KEY') or '').strip()
+    if not payment_key:
+        errors.append(
+            "[PRODUCTION] PAYMENT_CONFIG_ENCRYPTION_KEY ausente\n"
+            "             Em produção a chave dedicada de criptografia de pagamento é\n"
+            "             OBRIGATÓRIA (sem fallback para JWT_SECRET_KEY nem literal embutido)."
+        )
+
     logger.info("🔒 Validação de produção executada")
 
 

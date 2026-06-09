@@ -79,13 +79,19 @@ def _normalize_tenant_id(tenant_id: str | UUID) -> UUID:
 
 
 def _secret_key() -> str:
-    return (
-        os.getenv("PAYMENT_CONFIG_ENCRYPTION_KEY")
-        or os.getenv("ENCRYPTION_KEY")
-        or os.getenv("JWT_SECRET_KEY")
-        or JWT_SECRET_KEY
-        or "corepet-local-payment-config-key"
-    ).strip()
+    # Chave dedicada de criptografia dos segredos de pagamento.
+    key = (os.getenv("PAYMENT_CONFIG_ENCRYPTION_KEY") or os.getenv("ENCRYPTION_KEY") or "").strip()
+    if key:
+        return key
+    # Em PRODUCAO e OBRIGATORIA: nada de cair para a chave de login (JWT_SECRET_KEY)
+    # nem para um literal embutido no codigo (que seria um segredo publico).
+    if (os.getenv("ENVIRONMENT") or "").strip().lower() == "production":
+        raise RuntimeError(
+            "PAYMENT_CONFIG_ENCRYPTION_KEY (ou ENCRYPTION_KEY) e obrigatorio em producao "
+            "para criptografar segredos de pagamento."
+        )
+    # Apenas DEV/teste: conveniencia local (nunca em producao).
+    return (os.getenv("JWT_SECRET_KEY") or JWT_SECRET_KEY or "corepet-dev-only-payment-key").strip()
 
 
 def _fernet_key() -> bytes:
