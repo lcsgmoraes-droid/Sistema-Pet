@@ -84,8 +84,8 @@ def projetar_caixa(
     if simples:
         if simples.aliquota_sugerida:
             aliquota_simples = Decimal(str(simples.aliquota_sugerida))
-        elif simples.aliquota_vigente:
-            aliquota_simples = Decimal(str(simples.aliquota_vigente))
+        elif simples.aliquota_efetiva:
+            aliquota_simples = Decimal(str(simples.aliquota_efetiva))
 
     # 🔹 Folha de pagamento média (despesas com pessoal)
     folha_media = (
