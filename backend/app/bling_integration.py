@@ -186,7 +186,7 @@ def _resolver_fiscal_item_nfe(db: Session, venda, item_venda) -> Dict[str, Optio
             getattr(produto, "origem", None),
         ),
         "cfop": _primeiro_texto_fiscal(
-            getattr(kit_fiscal, "cfop", None),
+            getattr(kit_fiscal, "cfop_venda", None),
             getattr(produto_fiscal, "cfop_venda", None),
             getattr(produto, "cfop", None),
             "5102",

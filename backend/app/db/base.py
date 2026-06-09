@@ -13,6 +13,9 @@ from app.fiscal_models import (  # noqa
     KitConfigFiscal,
     ProdutoConfigFiscal,
 )
+# variacao_config_fiscal não tem cópia em fiscal_models/: importar o módulo canônico
+# direto para registrar a tabela no metadata do Alembic.
+from app.variacao_config_fiscal_models import VariacaoConfigFiscal  # noqa
 
 # Importando produtos
 from app.produtos_models import Produto, Marca, Categoria  # noqa
