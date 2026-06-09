@@ -35,6 +35,12 @@ TENANT_WHITELIST_TABLES = {
     'user_tenants',    # Necessário para /auth/select-tenant
     'permissions',     # Permissões globais do sistema
     'audit_logs',      # Pode precisar registrar eventos sem tenant
+    # Observabilidade/operação — globais POR DESIGN (cross-tenant, tenant_id = etiqueta
+    # nullable). Alinhado com INTENTIONALLY_GLOBAL_TENANT_TABLES na catraca
+    # (tests/multi_tenant/test_tenant_model_registry.py).
+    'ops_alerts',                  # cockpit admin (require_admin), visão cross-tenant
+    'ops_error_events',            # captura de erros (roda antes de haver tenant)
+    'bling_pedido_webhook_events', # fila de worker: claim cross-tenant sem contexto
 }
 
 
