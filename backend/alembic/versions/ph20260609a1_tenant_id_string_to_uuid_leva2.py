@@ -1,8 +1,8 @@
 """tenant_id String -> UUID em 4 tabelas (Leva 2 multi-tenant)
 
 Converte a coluna tenant_id de texto para UUID em data_subject_requests,
-simples_nacional_mensal, assinaturas_modulos e ecommerce_notify_requests,
-para que adotem o mixin TenantScoped (filtro global de tenant + fail-fast).
+assinaturas_modulos e ecommerce_notify_requests, para que adotem o mixin
+TenantScoped (filtro global de tenant + fail-fast).
 Os valores ja estao em formato UUID (validado em producao antes do deploy);
 o cast tenant_id::uuid e seguro. O Postgres reconstroi os indices da coluna
 automaticamente na mudanca de tipo.
@@ -29,7 +29,6 @@ depends_on: Union[str, Sequence[str], None] = None
 # existing_type no upgrade e como destino no downgrade.
 _TABELAS = (
     ("data_subject_requests", sa.String(length=64)),
-    ("simples_nacional_mensal", sa.String()),
     ("assinaturas_modulos", sa.String(length=36)),
     ("ecommerce_notify_requests", sa.String(length=36)),
 )
