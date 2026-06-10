@@ -547,12 +547,15 @@ class ComissaoConfiguracao(Base):
     updated_at = Column(DateTime, nullable=True, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
-class ComissaoItem(Base):
+class ComissaoItem(TenantScoped, Base):
     """
     Detalhamento de comissões por item de venda.
     Armazena cálculo detalhado com custos, descontos e status de pagamento.
     
-    ⚠️ NOTA: tenant_id é NULLABLE no schema original (inconsistência)
+    Mantém esquema próprio (id autoincrement, data_criacao/data_atualizacao) por isso
+    não herda BaseTenantModel; adota o mixin TenantScoped para entrar no filtro global
+    de tenant. tenant_id vem do mixin (UUID NOT NULL indexado, idêntico ao anterior — a
+    coluna foi tornada NOT NULL pela migration pm20260609a1, com backfill via venda).
     """
     __tablename__ = "comissoes_itens"
     __table_args__ = {'extend_existing': True}
@@ -566,7 +569,7 @@ class ComissaoItem(Base):
     produto_id = Column(Integer, nullable=True)
     categoria_id = Column(Integer, nullable=True)
     subcategoria_id = Column(Integer, nullable=True)
-    tenant_id = Column(UUID(as_uuid=True), nullable=True, index=True)  # ⚠️ NULLABLE
+    # tenant_id: herdado do mixin TenantScoped (UUID NOT NULL, indexado).
     
     # Data e valores base
     data_venda = Column(Date, nullable=False, index=True)

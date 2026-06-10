@@ -99,9 +99,9 @@ KNOWN_BASE_TENANT_DEBT = frozenset(
         "drawings",
         "drawing_entries",
         "notification_queue",
-        # app/comissoes_models.py
-        # comissoes_vendas → MIGRADO para TenantScoped (PR comissoes)
-        "comissoes_itens",   # tenant_id NULLABLE: requer backfill + ALTER NOT NULL antes de migrar
+        # app/comissoes_models.py — comissoes_vendas e comissoes_itens MIGRADOS para
+        # TenantScoped (comissoes_itens: backfill tenant_id via venda + ALTER NOT NULL,
+        # migration pm20260609a1).
         # app/conciliacao_models.py — MIGRADO para TenantScoped (PR conciliacao):
         #   adquirentes_templates, arquivos_evidencia, conciliacao_importacoes,
         #   conciliacao_metricas, empresa_parametros
@@ -155,7 +155,6 @@ KNOWN_BASE_TENANT_DEBT = frozenset(
 # Ao tornar NOT NULL + herdar BaseTenantModel, remova daqui e de KNOWN_BASE_TENANT_DEBT.
 KNOWN_NULLABLE_TENANT_DEBT = frozenset(
     {
-        "comissoes_itens",
         "dre_periodos",
         # ops_alerts, ops_error_events e bling_pedido_webhook_events saíram daqui:
         # agora são INTENTIONALLY_GLOBAL (nullable é esperado em tabela global).
