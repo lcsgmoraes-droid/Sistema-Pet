@@ -37,6 +37,7 @@ from app.db.base_class import Base
 # Importar todos os models (o db.base já faz isso, mas explícito é melhor)
 import app.models  # User, Cliente, etc (arquivo models.py)
 import app.fiscal_models  # Models fiscais (diretório fiscal_models/)
+import app.variacao_config_fiscal_models  # variacao_config_fiscal (top-level, sem cópia em fiscal_models/)
 import app.produtos_models
 import app.vendas_models
 import app.caixa_models

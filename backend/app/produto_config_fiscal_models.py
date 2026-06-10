@@ -1,18 +1,26 @@
 from sqlalchemy import (
     Column, Integer, String, Numeric, Boolean, DateTime, ForeignKey, Text
 )
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
+
 from .db import Base
+from .base_models import TenantScoped
 
 
-class ProdutoConfigFiscal(Base):
+class ProdutoConfigFiscal(TenantScoped, Base):
+    """
+    Configuração fiscal de produto (V2). Definição ORM canônica e ÚNICA, alinhada
+    ao schema real (migration ``bda1c213cae2``). Antes existia uma cópia idêntica
+    em ``app/fiscal_models/produto_config_fiscal.py``.
+
+    Mantém esquema próprio (``id`` autoincrement, ``created_at``/``updated_at``) por
+    isso não herda ``BaseTenantModel``; adota o mixin ``TenantScoped`` para entrar no
+    filtro global de tenant (``tenant_id`` vem do mixin: UUID NOT NULL, indexado —
+    schema idêntico ao que já estava na tabela).
+    """
     __tablename__ = "produto_config_fiscal"
 
     id = Column(Integer, primary_key=True)
-
-    # Multi-tenant
-    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
 
     # Vínculo com produto
     produto_id = Column(Integer, ForeignKey("produtos.id"), nullable=False, unique=True)

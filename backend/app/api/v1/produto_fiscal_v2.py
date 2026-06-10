@@ -148,7 +148,7 @@ def get_fiscal_kit(
                 "origem_mercadoria": kit_fiscal_v2.origem_mercadoria,
                 "ncm": kit_fiscal_v2.ncm,
                 "cest": kit_fiscal_v2.cest,
-                "cfop": kit_fiscal_v2.cfop,
+                "cfop": kit_fiscal_v2.cfop_venda,
                 "cst_icms": kit_fiscal_v2.cst_icms,
                 "icms_aliquota": float(kit_fiscal_v2.icms_aliquota) if kit_fiscal_v2.icms_aliquota is not None else None,
                 "icms_st": kit_fiscal_v2.icms_st or False,
@@ -286,7 +286,7 @@ def put_fiscal_kit(
     fiscal.origem_mercadoria = payload.get("origem_mercadoria")
     fiscal.ncm = payload.get("ncm")
     fiscal.cest = payload.get("cest")
-    fiscal.cfop = payload.get("cfop")
+    fiscal.cfop_venda = payload.get("cfop")
 
     fiscal.cst_icms = payload.get("cst_icms")
     fiscal.icms_aliquota = payload.get("icms_aliquota")

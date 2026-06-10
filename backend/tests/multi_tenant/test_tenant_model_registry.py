@@ -108,8 +108,10 @@ KNOWN_BASE_TENANT_DEBT = frozenset(
         # app/duplicatas_ignoradas_models.py — MIGRADO para TenantScoped (PR opcoes/duplicatas)
         # app/ia/aba7_models.py
         "dre_periodos",  # tenant_id NULLABLE
-        # app/kit_config_fiscal_models.py
-        "kit_config_fiscal",
+        # app/kit_config_fiscal_models.py, produto_config_fiscal_models.py,
+        # variacao_config_fiscal_models.py — CONSOLIDADOS + TenantScoped (def ORM unica
+        # top-level, copias em fiscal_models/ removidas; variacao tenant_id Integer->UUID
+        # via migration pk20260609a1). Empresa tambem consolidado (dup removida).
         # app/lgpd_models.py — data_subject_requests MIGRADO (Leva 2: String→UUID + TenantScoped)
         # app/models.py — assinaturas_modulos, ecommerce_notify_requests MIGRADOS (Leva 2: String→UUID)
         # app/models_configuracao_custo_moto.py
@@ -120,16 +122,14 @@ KNOWN_BASE_TENANT_DEBT = frozenset(
         # GLOBAIS (observabilidade admin cross-tenant) → ver INTENTIONALLY_GLOBAL_TENANT_TABLES.
         # app/pedido_models.py — MIGRADOS (Leva 3: String→UUID + TenantScoped; checkout_real
         # passou a chamar set_current_tenant antes de consultar Pedido)
-        # app/produto_config_fiscal_models.py
-        "produto_config_fiscal",
+        # (produto_config_fiscal: ver nota da consolidacao fiscal acima)
         # app/simples_nacional_models.py — simples_nacional_mensal MIGRADO para
         # TenantScoped (tabela colocada sob o Alembic + tenant_id String->UUID; antes
         # nao existia em producao por falta de migration de criacao).
         # app/template_models.py
         "tenant_template_installs",
         "tenant_template_item_installs",
-        # app/variacao_config_fiscal_models.py
-        "variacao_config_fiscal",
+        # (variacao_config_fiscal: ver nota da consolidacao fiscal acima)
         # app/bling_pedido_webhook_queue_models.py — bling_pedido_webhook_events
         # DECLARADO INTENCIONALMENTE GLOBAL (fila de worker cross-tenant) → ver
         # INTENTIONALLY_GLOBAL_TENANT_TABLES.
@@ -256,3 +256,25 @@ def test_tenant_id_nullable_apenas_na_baseline_conhecida():
         "vazamento/dados orfaos).\n"
         f"Novos nullable: {novos_nullable}"
     )
+
+
+def test_empresa_config_fiscal_consolidado_sem_duplicata():
+    """Consolidação fiscal: a cópia stale de EmpresaConfigFiscal (Integer tenant_id) em
+    app/fiscal_models/ foi removida. O app deve mapear UMA única classe para
+    'empresa_config_fiscal' — a canônica top-level (BaseTenantModel/UUID), que é a que o
+    db/base.py registra no Alembic."""
+    _load_all_models()
+    from app.db import Base
+    from app.empresa_config_fiscal_models import EmpresaConfigFiscal
+
+    mapeadas = [
+        mapper.class_
+        for mapper in Base.registry.mappers
+        if getattr(mapper.class_, "__tablename__", None) == "empresa_config_fiscal"
+    ]
+    assert mapeadas == [EmpresaConfigFiscal], (
+        "Esperava exatamente UMA classe mapeada para 'empresa_config_fiscal' "
+        f"(a canônica top-level). Encontradas: {mapeadas}"
+    )
+    tenant_type = str(Base.metadata.tables["empresa_config_fiscal"].c.tenant_id.type)
+    assert "UUID" in tenant_type.upper(), tenant_type
