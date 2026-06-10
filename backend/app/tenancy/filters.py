@@ -41,6 +41,11 @@ TENANT_WHITELIST_TABLES = {
     'ops_alerts',                  # cockpit admin (require_admin), visão cross-tenant
     'ops_error_events',            # captura de erros (roda antes de haver tenant)
     'bling_pedido_webhook_events', # fila de worker: claim cross-tenant sem contexto
+    # Filas do motor de campanhas: o worker/sender faz claim cross-tenant (SELECT FOR
+    # UPDATE SKIP LOCKED) fora de request, sem tenant no contexto. A engine seta o tenant
+    # por evento ao processar (engine.py). Alinhado com INTENTIONALLY_GLOBAL_TENANT_TABLES.
+    'campaign_event_queue',        # fila de eventos: worker.process_batch claim cross-tenant
+    'notification_queue',          # fila de notificações: notification_sender claim cross-tenant
 }
 
 

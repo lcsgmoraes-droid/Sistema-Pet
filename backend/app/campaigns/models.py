@@ -206,7 +206,7 @@ class CampaignEventQueue(Base):
 # 2. campaigns — configuração de campanhas (parâmetros no banco, não em código)
 # ---------------------------------------------------------------------------
 
-class Campaign(Base):
+class Campaign(TenantScoped, Base):
     """
     Configuração de campanhas. Mudar parâmetro não exige deploy.
 
@@ -392,7 +392,7 @@ class LoyaltyStamp(TenantScoped, Base):
 # 7. cashback_transactions — ledger append-only
 # ---------------------------------------------------------------------------
 
-class CashbackTransaction(Base):
+class CashbackTransaction(TenantScoped, Base):
     """
     Ledger imutável de cashback. Saldo real = SUM(amount) por cliente.
 
@@ -433,7 +433,7 @@ class CashbackTransaction(Base):
 # 8. coupons — configuração de cupons
 # ---------------------------------------------------------------------------
 
-class Coupon(Base):
+class Coupon(TenantScoped, Base):
     """
     Cada cupom gerado pelo motor ou manualmente.
 
@@ -645,7 +645,7 @@ class NotificationLog(TenantScoped, Base):
 # 13. drawings — sorteios
 # ---------------------------------------------------------------------------
 
-class Drawing(Base):
+class Drawing(TenantScoped, Base):
     """
     Sorteio auditável.
 
@@ -691,7 +691,7 @@ class Drawing(Base):
 # 14. drawing_entries — participantes do sorteio
 # ---------------------------------------------------------------------------
 
-class DrawingEntry(Base):
+class DrawingEntry(TenantScoped, Base):
     """
     Cada participante confirmado em um sorteio.
 
