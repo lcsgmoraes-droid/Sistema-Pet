@@ -1,4 +1,4 @@
-from app.base_models import BaseTenantModel
+from app.base_models import BaseTenantModel, TenantScoped
 """
 ABA 7: DRE Inteligente - Modelos
 Demonstração de Resultado do Exercício com análise de rentabilidade
@@ -11,15 +11,16 @@ from datetime import datetime
 from app.db import Base
 
 
-class DREPeriodo(Base):
+class DREPeriodo(TenantScoped, Base):
     """Armazena DRE calculado para um período"""
     __tablename__ = "dre_periodos"
     __table_args__ = {'extend_existing': True}
-    
+
     id = Column(Integer, primary_key=True, index=True)
-    # Nullable temporariamente ate saneamento/backfill completo de dre_periodos.
-    tenant_id = Column(UUID(as_uuid=True), nullable=True, index=True)
-    usuario_id = Column(Integer, index=True)  # Multi-tenant
+    # tenant_id (UUID, NOT NULL, index) vem do mixin TenantScoped → entra no filtro
+    # global de tenant + fail-fast. A migration of20260512a1 já criou a coluna/índice
+    # (ix_dre_periodos_tenant_id) e o backfill; a migration pn20260610a1 sela com NOT NULL.
+    usuario_id = Column(Integer, index=True)  # dono legado (mantido p/ compat. de leitura)
     
     # Período
     data_inicio = Column(Date, nullable=False)

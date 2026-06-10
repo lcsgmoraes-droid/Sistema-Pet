@@ -112,8 +112,12 @@ KNOWN_BASE_TENANT_DEBT = frozenset(
         #   adquirentes_templates, arquivos_evidencia, conciliacao_importacoes,
         #   conciliacao_metricas, empresa_parametros
         # app/duplicatas_ignoradas_models.py — MIGRADO para TenantScoped (PR opcoes/duplicatas)
-        # app/ia/aba7_models.py
-        "dre_periodos",  # tenant_id NULLABLE
+        # app/ia/aba7_models.py — dre_periodos MIGRADO para TenantScoped (Option A: coluna local
+        # removida, herda do mixin). Pré-requisitos no mesmo PR: 10 rotas de dre_ia_routes.py
+        # migradas para get_current_user_and_tenant (estabelecem o contexto); backfill 100% via
+        # usuario_id->users.tenant_id + ALTER tenant_id NOT NULL (migration pn20260610a1). O helper
+        # buscar_periodo_dre_do_tenant segue válido (com backfill 100%, o ramo usuario_id do OR fica
+        # redundante mas inócuo). Demais sites (engines/serviços/helper) já tinham contexto.
         # app/kit_config_fiscal_models.py, produto_config_fiscal_models.py,
         # variacao_config_fiscal_models.py — CONSOLIDADOS + TenantScoped (def ORM unica
         # top-level, copias em fiscal_models/ removidas; variacao tenant_id Integer->UUID
@@ -161,7 +165,7 @@ KNOWN_BASE_TENANT_DEBT = frozenset(
 # Ao tornar NOT NULL + herdar BaseTenantModel, remova daqui e de KNOWN_BASE_TENANT_DEBT.
 KNOWN_NULLABLE_TENANT_DEBT = frozenset(
     {
-        "dre_periodos",
+        # VAZIO. dre_periodos saiu: tenant_id agora NOT NULL (migration pn20260610a1) + TenantScoped.
         # ops_alerts, ops_error_events e bling_pedido_webhook_events saíram daqui:
         # agora são INTENTIONALLY_GLOBAL (nullable é esperado em tabela global).
     }

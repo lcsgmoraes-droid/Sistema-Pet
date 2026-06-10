@@ -8,13 +8,18 @@ from app.ia.aba7_dre_detalhada_models import DREDetalheCanal
 from app.ia.aba7_models import DREPeriodo
 
 
-def test_dre_periodo_model_ainda_nao_e_tenant_scoped():
+def test_dre_periodo_model_agora_e_tenant_scoped():
+    from app.base_models import TenantScoped
+
     columns = set(DREPeriodo.__table__.columns.keys())
 
     assert DREPeriodo.__tablename__ == "dre_periodos"
+    # Adota o mixin TenantScoped (entra no filtro global + fail-fast); mantém esquema
+    # próprio (id autoincrement, usuario_id legado), por isso NÃO é BaseTenantModel.
+    assert issubclass(DREPeriodo, TenantScoped)
     assert not issubclass(DREPeriodo, BaseTenantModel)
     assert "tenant_id" in columns
-    assert DREPeriodo.__table__.columns["tenant_id"].nullable is True
+    assert DREPeriodo.__table__.columns["tenant_id"].nullable is False
     assert "usuario_id" in columns
     assert "status" in columns
     assert "fechado" not in columns
