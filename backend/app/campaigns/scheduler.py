@@ -30,6 +30,7 @@ from apscheduler.triggers.cron import CronTrigger
 from apscheduler.triggers.interval import IntervalTrigger
 
 from app.db import SessionLocal
+from app.tenancy.context import clear_current_tenant, set_current_tenant
 from app.campaigns.models import CampaignEventQueue, EventOriginEnum
 from app.campaigns.worker import CampaignWorker
 
@@ -184,21 +185,34 @@ class CampaignScheduler:
         from datetime import datetime, timezone as _tz
         from app.campaigns.models import Drawing, DrawingEntry, DrawingStatusEnum
         from app.campaigns.notification_service import enqueue_email
+        from app.models import Tenant
         import hashlib, random as _random, uuid as _uuid
 
         db = SessionLocal()
         try:
             now = datetime.now(_tz.utc)
-            due = (
-                db.query(Drawing)
-                .filter(
-                    Drawing.auto_execute == True,
-                    Drawing.status == DrawingStatusEnum.open,
-                    Drawing.draw_date <= now,
-                )
-                .all()
-            )
+            # Itera os tenants ativos e descobre os sorteios devidos COM contexto de
+            # tenant (sob TenantScoped, um SELECT global em Drawing dispara fail-fast).
+            tenants = db.query(Tenant.id).filter(Tenant.status == "active").all()
+            due = []
+            for (tenant_id_raw,) in tenants:
+                set_current_tenant(_uuid.UUID(str(tenant_id_raw)))
+                try:
+                    due.extend(
+                        db.query(Drawing)
+                        .filter(
+                            Drawing.auto_execute == True,
+                            Drawing.status == DrawingStatusEnum.open,
+                            Drawing.draw_date <= now,
+                        )
+                        .all()
+                    )
+                finally:
+                    clear_current_tenant()
             for drawing in due:
+                # Cada sorteio é processado sob o contexto da sua loja (queries em
+                # DrawingEntry/Cliente e enfileiramento de e-mail ficam escopados).
+                set_current_tenant(_uuid.UUID(str(drawing.tenant_id)))
                 try:
                     entries = (
                         db.query(DrawingEntry)
@@ -255,6 +269,8 @@ class CampaignScheduler:
                     )
                 except Exception as draw_exc:
                     logger.exception("[AutoDrawings] Erro no sorteio %d: %s", drawing.id, draw_exc)
+                finally:
+                    clear_current_tenant()
             db.commit()
         except Exception as exc:
             logger.exception("[AutoDrawings] Erro geral: %s", exc)
@@ -282,6 +298,7 @@ class CampaignScheduler:
             period = last_month.strftime("%Y-%m")
 
             for tenant in tenants:
+                set_current_tenant(uuid.UUID(str(tenant.id)))
                 try:
                     # Checar se tem destaque automático ativado
                     campanha = (
@@ -398,6 +415,8 @@ class CampaignScheduler:
                 except Exception as tenant_exc:
                     logger.exception("[AutoDestaque] Erro no tenant %s: %s", tenant.id, tenant_exc)
                     db.rollback()
+                finally:
+                    clear_current_tenant()
         except Exception as exc:
             logger.exception("[AutoDestaque] Erro geral: %s", exc)
         finally:
@@ -411,6 +430,7 @@ class CampaignScheduler:
             tenants = db.query(Tenant).filter(Tenant.status == "active").all()
             seeded = 0
             for tenant in tenants:
+                set_current_tenant(uuid.UUID(str(tenant.id)))
                 try:
                     count = seed_campaigns_for_tenant(db, tenant.id)
                     if count > 0:
@@ -421,6 +441,8 @@ class CampaignScheduler:
                         )
                 except Exception as exc:
                     logger.warning("[CampaignScheduler] Erro ao seed tenant %s: %s", tenant.id, exc)
+                finally:
+                    clear_current_tenant()
             if seeded:
                 logger.info("[CampaignScheduler] Auto-seed concluído: %d campanha(s) criada(s) no total", seeded)
         except Exception as exc:
@@ -491,6 +513,7 @@ class CampaignScheduler:
             tenants = db.query(Tenant).filter(Tenant.status == "active").all()
 
             for tenant in tenants:
+                set_current_tenant(uuid.UUID(str(tenant.id)))
                 try:
                     # Lê configuração: quantos dias antes de alertar
                     cashback_campaign = (
@@ -616,6 +639,8 @@ class CampaignScheduler:
                 except Exception as tenant_exc:
                     logger.exception("[CashbackExpiration] Erro no tenant %s: %s", tenant.id, tenant_exc)
                     db.rollback()
+                finally:
+                    clear_current_tenant()
 
         except Exception as exc:
             logger.exception("[CashbackExpiration] Erro geral: %s", exc)

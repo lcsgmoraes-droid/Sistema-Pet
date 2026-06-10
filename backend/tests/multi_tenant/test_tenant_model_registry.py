@@ -74,6 +74,13 @@ INTENTIONALLY_GLOBAL_TENANT_TABLES = frozenset(
         # HTTP); o webhook público enfileira sem sessão. tenant_id é etiqueta nullable.
         # Isolar por tenant quebraria o claim do worker (fail-fast em query sem contexto).
         "bling_pedido_webhook_events",
+        # Filas do motor de campanhas: o worker (worker.process_batch) e o sender
+        # (notification_sender.process_batch) fazem claim cross-tenant (SELECT FOR UPDATE
+        # SKIP LOCKED) fora de request, sem tenant no contexto; a engine seta o tenant por
+        # evento ao processar (engine.process_event). Isolar quebraria o claim do worker.
+        # Espelhado em TENANT_WHITELIST_TABLES (app/tenancy/filters.py).
+        "campaign_event_queue",
+        "notification_queue",
     }
 )
 
@@ -91,15 +98,13 @@ KNOWN_BASE_TENANT_DEBT = frozenset(
         # Também MIGRADOS (Option B): campaign_executions e coupon_redemptions — não são
         # tocados pelo worker/scheduler (só por rotas com contexto); os 2 backfills offline
         # passaram a iterar tenants com set_current_tenant.
-        # Os demais seguem expostos (worker/scheduler consultam sem contexto de tenant
-        # → exigem refatorar os jobs antes de migrar).
-        "campaigns",
-        "campaign_event_queue",
-        "cashback_transactions",
-        "coupons",
-        "drawings",
-        "drawing_entries",
-        "notification_queue",
+        # MIGRADOS para TenantScoped (Option B, sem mudança de schema — coluna tenant_id
+        # mantida, já UUID NOT NULL coberta por índice composto): campaigns,
+        # cashback_transactions, coupons, drawings, drawing_entries. Pré-requisito feito:
+        # o scheduler (app/campaigns/scheduler.py) passou a chamar set_current_tenant por
+        # iteração nos jobs de background (auto_drawings agora itera tenants; destaque/seed/
+        # cashback setam o contexto por tenant). As filas campaign_event_queue e
+        # notification_queue foram declaradas INTENTIONALLY_GLOBAL (claim cross-tenant).
         # app/comissoes_models.py — comissoes_vendas e comissoes_itens MIGRADOS para
         # TenantScoped (comissoes_itens: backfill tenant_id via venda + ALTER NOT NULL,
         # migration pm20260609a1).
