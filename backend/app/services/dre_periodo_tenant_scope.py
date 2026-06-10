@@ -53,3 +53,21 @@ def tenant_id_do_usuario(db: Session, usuario_id):
     if usuario_id is None:
         return None
     return db.query(User.tenant_id).filter(User.id == usuario_id).scalar()
+
+
+def tenant_id_para_escrita_dre(db: Session, usuario_id):
+    """Tenant a GRAVAR ao criar um ``DREPeriodo``.
+
+    Prefere o tenant ATIVO do contexto (o que a rota estabeleceu via
+    ``get_current_user_and_tenant``) — assim a linha nasce com o MESMO tenant que a lê,
+    evitando o descasamento ``users.tenant_id`` (loja "casa") vs. tenant ativo do JWT em
+    usuários multi-loja (onde o DRE criado iria para a loja errada e "sumiria" do contexto
+    que o criou, sob o filtro TenantScoped). Fallback: o tenant "casa" do usuário, para
+    chamadas fora de request (sem contexto de tenant).
+    """
+    from app.tenancy.context import get_current_tenant
+
+    contexto = get_current_tenant()
+    if contexto is not None:
+        return contexto
+    return tenant_id_do_usuario(db, usuario_id)

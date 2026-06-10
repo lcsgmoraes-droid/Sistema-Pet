@@ -22,6 +22,7 @@ from app.ia.aba7_models import DREPeriodo
 from app.services.dre_periodo_tenant_scope import (
     buscar_periodo_dre_do_tenant,
     tenant_id_do_usuario,
+    tenant_id_para_escrita_dre,
 )
 from app.tenancy.context import clear_current_tenant, set_current_tenant
 
@@ -164,6 +165,25 @@ def test_tenant_id_do_usuario_resolve_e_trata_ausencias():
         assert tenant_id_do_usuario(db, None) is None
         # usuário inexistente -> None
         assert tenant_id_do_usuario(db, 999) is None
+    finally:
+        db.close()
+        clear_current_tenant()
+
+
+def test_tenant_id_para_escrita_usa_contexto_ativo():
+    """A ESCRITA usa o tenant ATIVO do contexto (não a 'casa' do usuário), evitando o
+    descasamento que faria o DRE de um usuário multi-loja nascer na loja errada e sumir.
+    """
+    engine = _engine()
+    db = sessionmaker(bind=engine)()
+    try:
+        # Usuário 1 tem casa = TENANT_A, mas opera no contexto da loja B -> grava B.
+        set_current_tenant(TENANT_B)
+        assert tenant_id_para_escrita_dre(db, 1) == TENANT_B
+
+        # Sem contexto (chamada fora de request) -> fallback para a 'casa' do usuário.
+        clear_current_tenant()
+        assert tenant_id_para_escrita_dre(db, 1) == TENANT_A
     finally:
         db.close()
         clear_current_tenant()
