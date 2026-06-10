@@ -8,6 +8,7 @@ Seguranca por token interno dedicado.
 import os
 import io
 import asyncio
+import uuid as _uuid_mod
 from typing import Literal, Optional
 
 import httpx
@@ -17,6 +18,7 @@ from sqlalchemy.orm import Session
 from openai import OpenAI
 
 from app.db import get_session
+from app.tenancy.context import clear_current_tenant, set_current_tenant
 from app.whatsapp.webhook import normalize_phone, process_incoming_message
 from app.whatsapp.handoff_manager import HandoffManager
 from app.whatsapp.models import WhatsAppSession, TenantWhatsAppConfig
@@ -206,6 +208,19 @@ async def ingest_message(
     """
     _validate_internal_token(x_internal_token)
 
+    try:
+        tid = _uuid_mod.UUID(tenant_id)
+    except ValueError:
+        raise HTTPException(status_code=400, detail="tenant_id inválido")
+
+    set_current_tenant(tid)
+    try:
+        return await _ingest_message_inner(tenant_id, tid, payload, db)
+    finally:
+        clear_current_tenant()
+
+
+async def _ingest_message_inner(tenant_id: str, tid, payload: InternalIngestRequest, db: Session):
     normalized_phone = normalize_phone(payload.phone)
     if not normalized_phone:
         raise HTTPException(status_code=400, detail="Telefone invalido")

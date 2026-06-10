@@ -149,10 +149,9 @@ KNOWN_BASE_TENANT_DEBT = frozenset(
         "whatsapp_ia_messages",
         "whatsapp_ia_metrics",
         "whatsapp_ia_sessions",
-        # app/whatsapp/models_handoff.py
-        "whatsapp_agents",
-        "whatsapp_handoffs",
-        "whatsapp_internal_notes",
+        # app/whatsapp/models_handoff.py — MIGRADOS para TenantScoped (Leva 1, zero schema change;
+        # UUID FK mantido no class body; routers whatsapp_handoff + analytics_router +
+        # orchestrator_internal migrados para get_current_user_and_tenant / set_current_tenant)
         # app/whatsapp/security.py
         "data_access_logs",
         "data_deletion_requests",

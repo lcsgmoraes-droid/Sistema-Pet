@@ -16,6 +16,7 @@ from datetime import UTC, datetime
 
 from app.db import get_session as get_db
 from app.auth import get_current_user
+from app.auth.dependencies import get_current_user_and_tenant
 from app.models import User
 from app.whatsapp.models_handoff import WhatsAppAgent, WhatsAppHandoff, WhatsAppInternalNote
 from app.whatsapp.schemas_handoff import (
@@ -38,6 +39,10 @@ from app.whatsapp.websocket import (
 )
 
 router = APIRouter(prefix="/whatsapp", tags=["WhatsApp Handoff - Sprint 4"])
+
+
+async def _usuario_handoff(user_and_tenant=Depends(get_current_user_and_tenant)) -> User:
+    return user_and_tenant[0]
 
 
 def _uuid_to_str(value):
@@ -85,7 +90,7 @@ def _serialize_note(note: WhatsAppInternalNote) -> dict:
 async def create_agent(
     agent_data: WhatsAppAgentCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_handoff)
 ):
     """
     Criar novo agente (atendente humano)
@@ -122,7 +127,7 @@ async def create_agent(
 async def list_agents(
     status: Optional[str] = Query(None, description="Filtrar por status: available, busy, offline"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_handoff)
 ):
     """
     Listar todos os agentes
@@ -142,7 +147,7 @@ async def list_agents(
 async def get_agent(
     agent_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_handoff)
 ):
     """
     Buscar agente por ID
@@ -165,7 +170,7 @@ async def update_agent(
     agent_id: str,
     agent_data: WhatsAppAgentUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_handoff)
 ):
     """
     Atualizar dados do agente
@@ -203,7 +208,7 @@ async def update_agent(
 async def delete_agent(
     agent_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_handoff)
 ):
     """
     Deletar agente
@@ -250,7 +255,7 @@ async def list_handoffs(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_handoff)
 ):
     """
     Listar handoffs (transferências para humano)
@@ -281,7 +286,7 @@ async def list_pending_handoffs(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_handoff)
 ):
     """
     Listar apenas handoffs pendentes (aguardando atendimento)
@@ -303,7 +308,7 @@ async def list_pending_handoffs(
 async def get_handoff(
     handoff_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_handoff)
 ):
     """
     Buscar handoff por ID
@@ -326,7 +331,7 @@ async def assign_handoff(
     handoff_id: str,
     assign_data: WhatsAppHandoffAssign,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_handoff)
 ):
     """
     Atribuir handoff para um agente
@@ -407,7 +412,7 @@ async def resolve_handoff(
     handoff_id: str,
     resolve_data: WhatsAppHandoffResolve,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_handoff)
 ):
     """
     Marcar handoff como resolvido
@@ -464,7 +469,7 @@ async def create_note(
     handoff_id: str,
     note_data: WhatsAppInternalNoteCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_handoff)
 ):
     """
     Adicionar nota interna ao handoff
@@ -509,7 +514,7 @@ async def create_note(
 async def list_notes(
     handoff_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_handoff)
 ):
     """
     Listar notas de um handoff
@@ -539,7 +544,7 @@ async def list_notes(
 @router.get("/handoffs/dashboard/stats", response_model=HandoffStats)
 async def get_handoff_stats(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_handoff)
 ):
     """
     Estatísticas do dashboard de handoffs
@@ -603,7 +608,7 @@ async def get_handoff_stats(
 @router.post("/test-sentiment")
 async def test_sentiment(
     data: dict,
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_handoff)
 ):
     """
     Testar análise de sentimento (debug)

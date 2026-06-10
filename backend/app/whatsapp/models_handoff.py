@@ -9,12 +9,14 @@ from datetime import datetime
 import uuid
 
 from app.db import Base
+from app.base_models import TenantScoped
 
 
-class WhatsAppAgent(Base):
+class WhatsAppAgent(TenantScoped, Base):
     """Atendentes humanos disponíveis para WhatsApp"""
     __tablename__ = "whatsapp_agents"
-    
+    __table_args__ = {'extend_existing': True}
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
@@ -40,10 +42,11 @@ class WhatsAppAgent(Base):
     handoffs = relationship("WhatsAppHandoff", back_populates="agent")
 
 
-class WhatsAppHandoff(Base):
+class WhatsAppHandoff(TenantScoped, Base):
     """Transferências de conversa para atendente humano"""
     __tablename__ = "whatsapp_handoffs"
-    
+    __table_args__ = {'extend_existing': True}
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
     session_id = Column(UUID(as_uuid=True), ForeignKey("whatsapp_ia_sessions.id"), nullable=False)
@@ -107,10 +110,11 @@ class WhatsAppHandoff(Base):
         self.assigned_to = value
 
 
-class WhatsAppInternalNote(Base):
+class WhatsAppInternalNote(TenantScoped, Base):
     """Notas internas dos atendentes sobre conversas"""
     __tablename__ = "whatsapp_internal_notes"
-    
+    __table_args__ = {'extend_existing': True}
+
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
     handoff_id = Column(UUID(as_uuid=True), ForeignKey("whatsapp_handoffs.id"), nullable=False)

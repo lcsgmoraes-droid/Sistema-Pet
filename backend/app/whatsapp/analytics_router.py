@@ -8,13 +8,17 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.db import get_session
-from app.auth.core import get_current_user
+from app.auth.dependencies import get_current_user_and_tenant
 from app.models import User
 from app.whatsapp.analytics import WhatsAppAnalyticsService
 from pydantic import BaseModel, Field
 
 
 router = APIRouter(prefix="/whatsapp/analytics", tags=["WhatsApp Analytics"])
+
+
+async def _usuario_analytics(user_and_tenant=Depends(get_current_user_and_tenant)) -> User:
+    return user_and_tenant[0]
 
 
 class DateRangeQuery(BaseModel):
@@ -34,7 +38,7 @@ def get_dashboard_metrics(
     start_date: Optional[str] = Query(None, description="Data início (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="Data fim (YYYY-MM-DD)"),
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_analytics)
 ):
     """
     📊 **Dashboard Completo de Métricas**
@@ -87,7 +91,7 @@ def get_conversation_trends(
     start_date: Optional[str] = Query(None, description="Data início (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="Data fim (YYYY-MM-DD)"),
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_analytics)
 ):
     """
     📈 **Tendências de Conversas**
@@ -139,7 +143,7 @@ def get_agent_performance(
     start_date: Optional[str] = Query(None, description="Data início (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="Data fim (YYYY-MM-DD)"),
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_analytics)
 ):
     """
     👥 **Performance de Atendentes**
@@ -186,7 +190,7 @@ def get_nps_score(
     start_date: Optional[str] = Query(None, description="Data início (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="Data fim (YYYY-MM-DD)"),
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_analytics)
 ):
     """
     ⭐ **Net Promoter Score (NPS)**
@@ -249,7 +253,7 @@ def get_handoff_analysis(
     start_date: Optional[str] = Query(None, description="Data início (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="Data fim (YYYY-MM-DD)"),
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_analytics)
 ):
     """
     🤝 **Análise de Handoffs**
@@ -296,7 +300,7 @@ def get_cost_analysis(
     start_date: Optional[str] = Query(None, description="Data início (YYYY-MM-DD)"),
     end_date: Optional[str] = Query(None, description="Data fim (YYYY-MM-DD)"),
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_analytics)
 ):
     """
     💰 **Análise de Custos**
@@ -344,7 +348,7 @@ def export_report(
     end_date: Optional[str] = Query(None, description="Data fim (YYYY-MM-DD)"),
     format: str = Query("json", description="Formato: json, csv, pdf"),
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_analytics)
 ):
     """
     📥 **Exportar Relatório**
@@ -411,7 +415,7 @@ def export_report(
 @router.get("/summary")
 def get_quick_summary(
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_analytics)
 ):
     """
     ⚡ **Resumo Rápido (Últimas 24h)**
