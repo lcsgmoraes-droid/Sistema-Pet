@@ -12,6 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.utils.correlation import current_correlation_id
 from app.whatsapp.models import TenantWhatsAppConfig, WhatsAppSession, WhatsAppMessage
+from app.whatsapp.tenant_context import whatsapp_tenant_context
 
 logger = logging.getLogger(__name__)
 
@@ -237,6 +238,27 @@ async def send_whatsapp_message(
     image_url: Optional[str] = None,
     sent_by_user_id: Optional[str] = None
 ) -> Optional[WhatsAppMessage]:
+    with whatsapp_tenant_context(tenant_id):
+        return await _send_whatsapp_message_with_context(
+            db=db,
+            tenant_id=tenant_id,
+            session_id=session_id,
+            message=message,
+            message_type=message_type,
+            image_url=image_url,
+            sent_by_user_id=sent_by_user_id,
+        )
+
+
+async def _send_whatsapp_message_with_context(
+    db: Session,
+    tenant_id: str,
+    session_id: str,
+    message: str,
+    message_type: str = "text",
+    image_url: Optional[str] = None,
+    sent_by_user_id: Optional[str] = None
+) -> Optional[WhatsAppMessage]:
     """
     Envia mensagem via WhatsApp e registra no banco.
     
@@ -347,6 +369,21 @@ async def send_notificacao_entrega(
     cliente_phone: str,
     mensagem: str
 ) -> bool:
+    with whatsapp_tenant_context(tenant_id):
+        return await _send_notificacao_entrega_with_context(
+            db=db,
+            tenant_id=tenant_id,
+            cliente_phone=cliente_phone,
+            mensagem=mensagem,
+        )
+
+
+async def _send_notificacao_entrega_with_context(
+    db: Session,
+    tenant_id: str,
+    cliente_phone: str,
+    mensagem: str
+) -> bool:
     """
     Envia notificação de entrega (integra com sistema existente).
     
@@ -399,6 +436,23 @@ async def send_notificacao_entrega(
 # ============================================================================
 
 async def send_bulk_messages(
+    db: Session,
+    tenant_id: str,
+    recipients: list[str],
+    message: str,
+    template_name: Optional[str] = None
+) -> Dict[str, int]:
+    with whatsapp_tenant_context(tenant_id):
+        return await _send_bulk_messages_with_context(
+            db=db,
+            tenant_id=tenant_id,
+            recipients=recipients,
+            message=message,
+            template_name=template_name,
+        )
+
+
+async def _send_bulk_messages_with_context(
     db: Session,
     tenant_id: str,
     recipients: list[str],

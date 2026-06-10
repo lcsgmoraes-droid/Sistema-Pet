@@ -27,6 +27,7 @@ from .veterinario_exames_ia import (
 )
 from .veterinario_financeiro import _as_float
 from .whatsapp.models import TenantWhatsAppConfig
+from .whatsapp.tenant_context import whatsapp_tenant_context
 
 
 # Em producao o backend roda em /app/app/*.py, entao `parents[1]` aponta para
@@ -36,11 +37,12 @@ UPLOADS_DIR = Path(__file__).resolve().parents[1] / "uploads" / "veterinario" / 
 
 
 def _resolve_vet_openai_config(db: Session, tenant_id) -> tuple[str, str]:
-    config = (
-        db.query(TenantWhatsAppConfig)
-        .filter(TenantWhatsAppConfig.tenant_id == str(tenant_id))
-        .first()
-    )
+    with whatsapp_tenant_context(tenant_id):
+        config = (
+            db.query(TenantWhatsAppConfig)
+            .filter(TenantWhatsAppConfig.tenant_id == str(tenant_id))
+            .first()
+        )
     api_key = ""
     model = "gpt-4o-mini"
     if config and config.openai_api_key:

@@ -9,6 +9,8 @@ from datetime import datetime, timedelta
 import unicodedata
 import logging
 
+from app.whatsapp.tenant_context import whatsapp_tenant_context
+
 logger = logging.getLogger(__name__)
 
 
@@ -274,6 +276,10 @@ class ToolExecutor:
         Returns:
             Dicionário com resultado da execução
         """
+        with whatsapp_tenant_context(self.tenant_id):
+            return self._execute_tool_with_context(tool_name, arguments)
+
+    def _execute_tool_with_context(self, tool_name: str, arguments: Dict[str, Any]) -> Dict[str, Any]:
         try:
             logger.info(f"Executando tool: {tool_name} com args: {arguments}")
             

@@ -8,10 +8,12 @@ Models para integração WhatsApp + IA:
 - WhatsAppMetric: Métricas de uso
 """
 from sqlalchemy import Column, String, Boolean, DateTime, Text, Integer, Float, ForeignKey, Time
+from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime
 import uuid
 
+from app.base_models import TenantScoped
 from app.db import Base
 
 
@@ -20,13 +22,13 @@ def generate_uuid():
     return str(uuid.uuid4())
 
 
-class TenantWhatsAppConfig(Base):
+class TenantWhatsAppConfig(TenantScoped, Base):
     """Configuração WhatsApp por Tenant"""
     __tablename__ = "tenant_whatsapp_config"
     __table_args__ = {'extend_existing': True}
     
     id = Column(String, primary_key=True, default=generate_uuid)
-    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False)
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
     
     # Provider Config
     provider = Column(String(50), default="360dialog")  # 360dialog, z-api, twilio
@@ -61,13 +63,13 @@ class TenantWhatsAppConfig(Base):
         return f"<TenantWhatsAppConfig(tenant_id={self.tenant_id}, provider={self.provider})>"
 
 
-class WhatsAppSession(Base):
+class WhatsAppSession(TenantScoped, Base):
     """Sessão de conversa WhatsApp"""
     __tablename__ = "whatsapp_ia_sessions"
     __table_args__ = {'extend_existing': True}
     
     id = Column(String, primary_key=True, default=generate_uuid)
-    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False)
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
     cliente_id = Column(Integer, ForeignKey("clientes.id"))
     phone_number = Column(String(20), nullable=False)
     
@@ -93,14 +95,14 @@ class WhatsAppSession(Base):
         return f"<WhatsAppSession(id={self.id}, phone={self.phone_number}, status={self.status})>"
 
 
-class WhatsAppMessage(Base):
+class WhatsAppMessage(TenantScoped, Base):
     """Mensagem individual"""
     __tablename__ = "whatsapp_ia_messages"
     __table_args__ = {'extend_existing': True}
     
     id = Column(String, primary_key=True, default=generate_uuid)
     session_id = Column(String, ForeignKey("whatsapp_ia_sessions.id"), nullable=False)
-    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False)
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
     
     # Message Info
     tipo = Column(String(10), nullable=False)  # recebida, enviada
@@ -132,13 +134,13 @@ class WhatsAppMessage(Base):
         return f"<WhatsAppMessage(id={self.id}, tipo={self.tipo}, intent={self.intent_detected})>"
 
 
-class WhatsAppMetric(Base):
+class WhatsAppMetric(TenantScoped, Base):
     """Métricas de uso"""
     __tablename__ = "whatsapp_ia_metrics"
     __table_args__ = {'extend_existing': True}
     
     id = Column(String, primary_key=True, default=generate_uuid)
-    tenant_id = Column(String, ForeignKey("tenants.id"), nullable=False)
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
     
     # Metric Type
     metric_type = Column(String(50), nullable=False)  # message_count, ai_call, conversion, etc

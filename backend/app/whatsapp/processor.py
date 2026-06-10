@@ -24,6 +24,7 @@ from app.ai.llm_client import LLMClient, PromptBuilder, AVAILABLE_FUNCTIONS_PHAS
 from app.whatsapp.sender import send_whatsapp_message
 from app.whatsapp.models import WhatsAppSession, WhatsAppMessage, WhatsAppMetric, TenantWhatsAppConfig
 from app.whatsapp.handoff_manager import HandoffManager
+from app.whatsapp.tenant_context import whatsapp_tenant_context
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +39,10 @@ class MessageProcessor:
         self.tenant_id = tenant_id
         
         # Buscar config
-        config = db.query(TenantWhatsAppConfig).filter(
-            TenantWhatsAppConfig.tenant_id == tenant_id
-        ).first()
+        with whatsapp_tenant_context(tenant_id):
+            config = db.query(TenantWhatsAppConfig).filter(
+                TenantWhatsAppConfig.tenant_id == tenant_id
+            ).first()
 
         fallback_openai_key = os.getenv("OPENAI_API_KEY", "")
         if not config:
@@ -87,6 +89,19 @@ class MessageProcessor:
         return any(trigger in text for trigger in triggers)
     
     async def process_message(
+        self,
+        session_id: str,
+        message_id: str,
+        message_content: str
+    ) -> Dict[str, Any]:
+        with whatsapp_tenant_context(self.tenant_id):
+            return await self._process_message_with_context(
+                session_id=session_id,
+                message_id=message_id,
+                message_content=message_content,
+            )
+
+    async def _process_message_with_context(
         self,
         session_id: str,
         message_id: str,
@@ -516,6 +531,10 @@ class MessageProcessor:
         }
     
     async def _log_metric(self, metric_type: str, value: float):
+        with whatsapp_tenant_context(self.tenant_id):
+            return await self._log_metric_with_context(metric_type, value)
+
+    async def _log_metric_with_context(self, metric_type: str, value: float):
         """Registra métrica no banco."""
         try:
             metric = WhatsAppMetric(

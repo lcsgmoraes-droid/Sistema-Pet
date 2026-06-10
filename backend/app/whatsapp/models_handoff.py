@@ -49,7 +49,7 @@ class WhatsAppHandoff(TenantScoped, Base):
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
-    session_id = Column(UUID(as_uuid=True), ForeignKey("whatsapp_ia_sessions.id"), nullable=False)
+    session_id = Column(String, ForeignKey("whatsapp_ia_sessions.id"), nullable=False)
     
     phone_number = Column(String(20), nullable=False)
     customer_name = Column(String(200))
@@ -118,7 +118,7 @@ class WhatsAppInternalNote(TenantScoped, Base):
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
     handoff_id = Column(UUID(as_uuid=True), ForeignKey("whatsapp_handoffs.id"), nullable=False)
-    session_id = Column(UUID(as_uuid=True), ForeignKey("whatsapp_ia_sessions.id"), nullable=False)
+    session_id = Column(String, ForeignKey("whatsapp_ia_sessions.id"), nullable=False)
     agent_id = Column(UUID(as_uuid=True), ForeignKey("whatsapp_agents.id"), nullable=False)
     
     note = Column(Text, nullable=False)
