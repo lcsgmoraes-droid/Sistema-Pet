@@ -202,9 +202,10 @@ def test_migration_downgrade_remove_indices_e_coluna():
     }.intersection(_index_names(engine))
 
 
-def test_dre_periodo_model_expoe_tenant_id_nullable():
+def test_dre_periodo_model_tenant_id_not_null():
+    # Pós-migração pn20260610a1: tenant_id NOT NULL (mixin TenantScoped).
     assert "tenant_id" in DREPeriodo.__table__.columns
-    assert DREPeriodo.__table__.columns["tenant_id"].nullable is True
+    assert DREPeriodo.__table__.columns["tenant_id"].nullable is False
 
 
 def _dre_engine():

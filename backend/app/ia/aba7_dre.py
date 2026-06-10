@@ -18,7 +18,7 @@ from app.ia.aba7_models import (
     DREComparacao,
     DREInsight
 )
-from app.services.dre_periodo_tenant_scope import tenant_id_do_usuario
+from app.services.dre_periodo_tenant_scope import tenant_id_para_escrita_dre
 
 
 class DREService:
@@ -192,7 +192,7 @@ class DREService:
         else:
             dre = DREPeriodo(
                 usuario_id=usuario_id,
-                tenant_id=tenant_id_do_usuario(self.db, usuario_id),
+                tenant_id=tenant_id_para_escrita_dre(self.db, usuario_id),
                 data_inicio=data_inicio,
                 data_fim=data_fim,
                 mes=data_inicio.month,

@@ -20,6 +20,19 @@ from app.ia.aba7_models import DREPeriodo, DREProduto, DREInsight
 router = APIRouter(prefix="/ia/dre", tags=["IA - DRE Inteligente"])
 
 
+async def _usuario_dre(
+    user_tenant: tuple = Depends(get_current_user_and_tenant),
+) -> User:
+    """Dependency das rotas de DRE que tocam DREPeriodo (tenant-scoped).
+
+    Reusa a dependency oficial multi-tenant (valida o tenant_id no JWT e estabelece o
+    contexto via set_current_tenant) e devolve só o ``User`` — assim o corpo das rotas
+    continua usando ``current_user`` como antes, mas agora COM contexto de tenant ativo
+    (sem ele, todo SELECT em DREPeriodo daria [ORM FAIL-FAST] após a migração TenantScoped).
+    """
+    return user_tenant[0]
+
+
 # ==================== SCHEMAS ====================
 
 class DREResumo(BaseModel):
@@ -127,7 +140,7 @@ class CalcularDRERequest(BaseModel):
 @router.post("/calcular", response_model=DRECompleto)
 async def calcular_dre(
     request: CalcularDRERequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(_usuario_dre),
     db: Session = Depends(get_db)
 ):
     """Calcula DRE para um período"""
@@ -161,7 +174,7 @@ async def listar_canais(current_user: User = Depends(get_current_user)):
 @router.get("/listar", response_model=List[DREResumo])
 async def listar_dres(
     limit: int = Query(12, ge=1, le=100),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(_usuario_dre),
     db: Session = Depends(get_db)
 ):
     """Lista DREs calculados"""
@@ -176,7 +189,7 @@ async def listar_dres(
 @router.get("/{dre_id}", response_model=DRECompleto)
 async def obter_dre(
     dre_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(_usuario_dre),
     db: Session = Depends(get_db)
 ):
     """Obtém DRE completo"""
@@ -194,7 +207,7 @@ async def obter_dre(
 @router.get("/{dre_id}/produtos", response_model=List[ProdutoRentabilidade])
 async def obter_produtos_rentabilidade(
     dre_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(_usuario_dre),
     db: Session = Depends(get_db)
 ):
     """Obtém ranking de produtos por rentabilidade"""
@@ -209,7 +222,7 @@ async def obter_produtos_rentabilidade(
 @router.get("/{dre_id}/categorias", response_model=List[CategoriaRentabilidade])
 async def obter_categorias_rentabilidade(
     dre_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(_usuario_dre),
     db: Session = Depends(get_db)
 ):
     """Obtém análise por categoria"""
@@ -224,7 +237,7 @@ async def obter_categorias_rentabilidade(
 @router.get("/{dre_id}/insights", response_model=List[InsightDRE])
 async def obter_insights(
     dre_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(_usuario_dre),
     db: Session = Depends(get_db)
 ):
     """Obtém insights automáticos"""
@@ -240,7 +253,7 @@ async def obter_insights(
 async def comparar_periodos(
     dre1_id: int,
     dre2_id: int,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(_usuario_dre),
     db: Session = Depends(get_db)
 ):
     """Compara dois períodos"""
@@ -343,7 +356,7 @@ async def listar_setores(
 
 @router.post("/calcular-mes-atual", response_model=DRECompleto)
 async def calcular_mes_atual(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(_usuario_dre),
     db: Session = Depends(get_db)
 ):
     """Calcula DRE do mês atual (atalho)"""
@@ -363,7 +376,7 @@ async def calcular_mes_atual(
 
 @router.post("/calcular-mes-passado", response_model=DRECompleto)
 async def calcular_mes_passado(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(_usuario_dre),
     db: Session = Depends(get_db)
 ):
     """Calcula DRE do mês passado completo (atalho)"""
@@ -389,7 +402,7 @@ async def calcular_mes_passado(
 @router.get("/{dre_id}/anomalias")
 def obter_anomalias_dre(
     dre_id: int,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_usuario_dre),
     db: Session = Depends(get_db)
 ):
     """
@@ -428,7 +441,7 @@ def obter_anomalias_dre(
 @router.post("/{dre_id}/recalcular-anomalias")
 def recalcular_anomalias(
     dre_id: int,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_usuario_dre),
     db: Session = Depends(get_db)
 ):
     """Força recálculo de detecção de anomalias"""
@@ -461,7 +474,7 @@ def exportar_dre_pdf(
     dre_id: int,
     incluir_produtos: bool = Query(True, description="Incluir análise de produtos"),
     incluir_categorias: bool = Query(True, description="Incluir análise de categorias"),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_usuario_dre),
     db: Session = Depends(get_db)
 ):
     """
@@ -507,7 +520,7 @@ def exportar_dre_pdf(
 @router.get("/{dre_id}/exportar/excel")
 def exportar_dre_excel(
     dre_id: int,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_usuario_dre),
     db: Session = Depends(get_db)
 ):
     """
@@ -603,7 +616,7 @@ class CalcularDREConsolidadoRequest(BaseModel):
 @router.post("/calcular-por-canal")
 def calcular_dre_por_canal(
     dados: CalcularDRECanalRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_usuario_dre),
     db: Session = Depends(get_db)
 ):
     """
@@ -641,7 +654,7 @@ def calcular_dre_por_canal(
 @router.post("/calcular-consolidado")
 def calcular_dre_consolidado(
     dados: CalcularDREConsolidadoRequest,
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_usuario_dre),
     db: Session = Depends(get_db)
 ):
     """
@@ -683,7 +696,7 @@ def calcular_dre_consolidado(
 def listar_dres_por_canal(
     data_inicio: date = Query(..., description="Data início (YYYY-MM-DD)"),
     data_fim: date = Query(..., description="Data fim (YYYY-MM-DD)"),
-    current_user: dict = Depends(get_current_user),
+    current_user: dict = Depends(_usuario_dre),
     db: Session = Depends(get_db)
 ):
     """
