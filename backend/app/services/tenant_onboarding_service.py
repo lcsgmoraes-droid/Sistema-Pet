@@ -2721,6 +2721,21 @@ def onboard_tenant_defaults(
         dry_run=dry_run,
     )
 
+    # As tabelas de auditoria de onboarding (tenant_template_installs / _item_installs)
+    # sao TenantScoped: as queries ORM internas exigem um tenant no contexto. Estabelecemos
+    # o contexto do tenant alvo aqui (salvando o anterior e restaurando no fim), para que
+    # TODO caller funcione sem setar manualmente: o signup (que ja seta o mesmo tenant) fica
+    # intacto, e o CLI run_tenant_onboarding e os testes passam a ter contexto -- sem
+    # perturbar o contexto de quem chamou.
+    from uuid import UUID as _UUID
+    from app.tenancy.context import (
+        clear_current_tenant as _clear_tenant,
+        get_current_tenant as _get_tenant,
+        set_current_tenant as _set_tenant,
+    )
+
+    _tenant_anterior = _get_tenant()
+    _set_tenant(_UUID(tenant_id_str))
     try:
         return _run_onboarding_steps(
             db,
@@ -2735,3 +2750,8 @@ def onboard_tenant_defaults(
         )
     except SQLAlchemyError as exc:
         raise TenantOnboardingError(f"Falha no onboarding do tenant {tenant_id_str}: {exc}") from exc
+    finally:
+        if _tenant_anterior is not None:
+            _set_tenant(_tenant_anterior)
+        else:
+            _clear_tenant()

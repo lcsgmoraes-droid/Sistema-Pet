@@ -4,6 +4,7 @@ from sqlalchemy import Boolean, Column, DateTime, Integer, JSON, String, Text, U
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.db import Base
+from app.base_models import TenantScoped
 
 
 class TemplateBundle(Base):
@@ -53,8 +54,12 @@ class TemplateItem(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
 
-class TenantTemplateInstall(Base):
-    """Audit record for template bundles applied to a tenant."""
+class TenantTemplateInstall(TenantScoped, Base):
+    """Audit record for template bundles applied to a tenant.
+
+    tenant_id vem do mixin TenantScoped (UUID NOT NULL, indexado) -> entra no filtro
+    global de tenant. Schema identico ao anterior; sem migration.
+    """
 
     __tablename__ = "tenant_template_installs"
     __table_args__ = (
@@ -68,7 +73,7 @@ class TenantTemplateInstall(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    # tenant_id: herdado do mixin TenantScoped (UUID NOT NULL, indexado).
     bundle_code = Column(String(80), nullable=False, index=True)
     bundle_version = Column(String(40), nullable=False, index=True)
     status = Column(String(40), nullable=False, default="completed")
@@ -79,8 +84,12 @@ class TenantTemplateInstall(Base):
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 
 
-class TenantTemplateItemInstall(Base):
-    """Item-level link between a global template item and a tenant-owned copy."""
+class TenantTemplateItemInstall(TenantScoped, Base):
+    """Item-level link between a global template item and a tenant-owned copy.
+
+    tenant_id vem do mixin TenantScoped (UUID NOT NULL, indexado) -> entra no filtro
+    global de tenant. Schema identico ao anterior; sem migration.
+    """
 
     __tablename__ = "tenant_template_item_installs"
     __table_args__ = (
@@ -96,7 +105,7 @@ class TenantTemplateItemInstall(Base):
     )
 
     id = Column(Integer, primary_key=True, index=True)
-    tenant_id = Column(UUID(as_uuid=True), nullable=False, index=True)
+    # tenant_id: herdado do mixin TenantScoped (UUID NOT NULL, indexado).
     bundle_code = Column(String(80), nullable=False, index=True)
     bundle_version = Column(String(40), nullable=False, index=True)
     item_type = Column(String(80), nullable=False, index=True)

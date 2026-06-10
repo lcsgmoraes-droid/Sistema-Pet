@@ -440,45 +440,78 @@ def backfill_coupon_redemptions_venda_ids(
     tenant_id=None,
     window_hours: int = 12,
 ) -> dict[str, Any]:
-    query = db.query(CouponRedemption).filter(CouponRedemption.venda_id.is_(None))
-    if tenant_id is not None:
-        query = query.filter(CouponRedemption.tenant_id == tenant_id)
+    # coupon_redemptions e TenantScoped (filtro global + fail-fast): toda query ORM
+    # precisa de um tenant no contexto. Quando tenant_id e None (backfill de TODOS os
+    # tenants), iteramos cada tenant setando o contexto por iteracao (a enumeracao usa a
+    # tabela tenants, global/whitelist, segura sem contexto -- padrao de app/main.py).
+    from uuid import UUID as _UUID
+    from app.models import Tenant
+    from app.tenancy.context import clear_current_tenant, set_current_tenant
 
-    redemptions = query.order_by(CouponRedemption.id.asc()).all()
-    filled: list[dict[str, int]] = []
-    ambiguous: list[dict[str, Any]] = []
-    skipped: list[int] = []
+    if tenant_id is None:
+        filled: list[dict[str, int]] = []
+        ambiguous: list[dict[str, Any]] = []
+        skipped: list[int] = []
+        for (tid_raw,) in db.query(Tenant.id).all():
+            try:
+                tid = _UUID(str(tid_raw))
+            except (TypeError, ValueError):
+                continue
+            parcial = backfill_coupon_redemptions_venda_ids(
+                db, tenant_id=tid, window_hours=window_hours
+            )
+            filled.extend(parcial["filled"])
+            ambiguous.extend(parcial["ambiguous"])
+            skipped.extend(parcial["skipped"])
+        return {"filled": filled, "ambiguous": ambiguous, "skipped": skipped}
 
-    for redemption in redemptions:
-        candidates = find_coupon_redemption_candidates_for_backfill(
-            db,
-            redemption=redemption,
-            window_hours=window_hours,
+    set_current_tenant(tenant_id if isinstance(tenant_id, _UUID) else _UUID(str(tenant_id)))
+    try:
+        redemptions = (
+            db.query(CouponRedemption)
+            .filter(
+                CouponRedemption.venda_id.is_(None),
+                CouponRedemption.tenant_id == tenant_id,
+            )
+            .order_by(CouponRedemption.id.asc())
+            .all()
         )
-        if len(candidates) == 1:
-            redemption.venda_id = candidates[0]
-            filled.append(
-                {
-                    "redemption_id": int(redemption.id),
-                    "venda_id": int(candidates[0]),
-                }
+        filled: list[dict[str, int]] = []
+        ambiguous: list[dict[str, Any]] = []
+        skipped: list[int] = []
+
+        for redemption in redemptions:
+            candidates = find_coupon_redemption_candidates_for_backfill(
+                db,
+                redemption=redemption,
+                window_hours=window_hours,
             )
-            continue
+            if len(candidates) == 1:
+                redemption.venda_id = candidates[0]
+                filled.append(
+                    {
+                        "redemption_id": int(redemption.id),
+                        "venda_id": int(candidates[0]),
+                    }
+                )
+                continue
 
-        if len(candidates) > 1:
-            ambiguous.append(
-                {
-                    "redemption_id": int(redemption.id),
-                    "candidate_venda_ids": candidates,
-                }
-            )
-            continue
+            if len(candidates) > 1:
+                ambiguous.append(
+                    {
+                        "redemption_id": int(redemption.id),
+                        "candidate_venda_ids": candidates,
+                    }
+                )
+                continue
 
-        skipped.append(int(redemption.id))
+            skipped.append(int(redemption.id))
 
-    db.flush()
-    return {
-        "filled": filled,
-        "ambiguous": ambiguous,
-        "skipped": skipped,
-    }
+        db.flush()
+        return {
+            "filled": filled,
+            "ambiguous": ambiguous,
+            "skipped": skipped,
+        }
+    finally:
+        clear_current_tenant()
