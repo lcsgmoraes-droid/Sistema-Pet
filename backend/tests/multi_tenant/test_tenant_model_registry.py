@@ -114,8 +114,9 @@ KNOWN_BASE_TENANT_DEBT = frozenset(
         # via migration pk20260609a1). Empresa tambem consolidado (dup removida).
         # app/lgpd_models.py — data_subject_requests MIGRADO (Leva 2: String→UUID + TenantScoped)
         # app/models.py — assinaturas_modulos, ecommerce_notify_requests MIGRADOS (Leva 2: String→UUID)
-        # app/models_configuracao_custo_moto.py
-        "configuracoes_custo_moto",
+        # app/models_configuracao_custo_moto.py — configuracoes_custo_moto MIGRADO para
+        # TenantScoped (tenant_id String(36)/FK->tenants.id convertido p/ UUID; FK removida,
+        # unique preservado; migration pl20260609a1). Dup morto custo_moto.py/models removido.
         # app/opcoes_racao_models.py — MIGRADO para TenantScoped (PR opcoes/duplicatas):
         #   apresentacoes_peso, fases_publico, linhas_racao, portes_animal, sabores_proteina, tipos_tratamento
         # app/ops_models.py — ops_alerts, ops_error_events DECLARADOS INTENCIONALMENTE
