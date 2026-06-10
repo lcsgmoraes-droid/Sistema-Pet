@@ -117,6 +117,7 @@ def gerar_provisao_trabalhista_mensal(
         
         periodo = DREPeriodo(
             usuario_id=usuario_id,
+            tenant_id=tenant_id,
             data_inicio=date(ano, mes, 1),
             data_fim=date(ano, mes, ultimo_dia),
             mes=mes,

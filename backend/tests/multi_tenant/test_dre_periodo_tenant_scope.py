@@ -20,7 +20,10 @@ from sqlalchemy.orm import sessionmaker
 
 import app.main  # noqa: F401  (garante o registro completo dos modelos ORM)
 from app.ia.aba7_models import DREPeriodo
-from app.services.dre_periodo_tenant_scope import buscar_periodo_dre_do_tenant
+from app.services.dre_periodo_tenant_scope import (
+    buscar_periodo_dre_do_tenant,
+    tenant_id_do_usuario,
+)
 from app.tenancy.context import clear_current_tenant
 
 
@@ -145,6 +148,26 @@ def test_helper_nao_inventa_periodo_de_outra_loja():
         # um terceiro tenant sem nenhum período -> deve devolver None, não o de A/B.
         TENANT_C = UUID("cccccccc-cccc-cccc-cccc-cccccccccccc")
         assert buscar_periodo_dre_do_tenant(db, TENANT_C, 5, 2026) is None
+    finally:
+        db.close()
+        clear_current_tenant()
+
+
+def test_tenant_id_do_usuario_resolve_e_trata_ausencias():
+    """O helper de CRIAÇÃO resolve o tenant 'casa' do usuário (mesma lógica do backfill).
+
+    Garante que novos DREPeriodo criados pelos serviços (aba7_dre/aba7_dre_canal)
+    nasçam com tenant_id em vez de nulo — e que ausências não inventem dono.
+    """
+    engine = _engine()
+    db = sessionmaker(bind=engine)()
+    try:
+        assert tenant_id_do_usuario(db, 1) == TENANT_A
+        assert tenant_id_do_usuario(db, 2) == TENANT_B
+        # usuario_id None -> None (não inventa tenant; a linha segue como antes)
+        assert tenant_id_do_usuario(db, None) is None
+        # usuário inexistente -> None
+        assert tenant_id_do_usuario(db, 999) is None
     finally:
         db.close()
         clear_current_tenant()

@@ -39,3 +39,17 @@ def buscar_periodo_dre_do_tenant(db: Session, tenant_id, mes: int, ano: int):
         )
         .first()
     )
+
+
+def tenant_id_do_usuario(db: Session, usuario_id):
+    """Resolve o ``tenant_id`` "casa" do usuário (mesma lógica do backfill de
+    ``dre_periodos`` na migration ``of20260512a1``).
+
+    Usado para GRAVAR ``tenant_id`` ao CRIAR um ``DREPeriodo`` a partir de fluxos que
+    só conhecem ``usuario_id`` (aba7_dre / aba7_dre_canal) — assim novas linhas nascem
+    com dono, em vez de ``tenant_id`` nulo. Retorna ``None`` se não resolver
+    (``usuario_id`` nulo ou usuário sem tenant); nesse caso a linha segue como antes.
+    """
+    if usuario_id is None:
+        return None
+    return db.query(User.tenant_id).filter(User.id == usuario_id).scalar()

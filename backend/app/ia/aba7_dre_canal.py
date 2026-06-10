@@ -11,6 +11,7 @@ import json
 
 from app.ia.aba7_models import DREPeriodo
 from app.ia.aba7_dre import DREService
+from app.services.dre_periodo_tenant_scope import tenant_id_do_usuario
 
 
 class DRECanalService:
@@ -193,6 +194,7 @@ class DRECanalService:
         else:
             dre = DREPeriodo(
                 usuario_id=usuario_id,
+                tenant_id=tenant_id_do_usuario(self.db, usuario_id),
                 data_inicio=data_inicio,
                 data_fim=data_fim,
                 mes=data_inicio.month,
@@ -317,6 +319,7 @@ class DRECanalService:
         else:
             dre = DREPeriodo(
                 usuario_id=usuario_id,
+                tenant_id=tenant_id_do_usuario(self.db, usuario_id),
                 data_inicio=data_inicio,
                 data_fim=data_fim,
                 mes=data_inicio.month,
