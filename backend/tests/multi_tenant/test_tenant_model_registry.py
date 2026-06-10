@@ -88,14 +88,15 @@ KNOWN_BASE_TENANT_DEBT = frozenset(
         # ou é parte da PK; o mixin entra só como marcador do filtro):
         #   campaign_locks, campaign_run_log, customer_merge_logs,
         #   customer_rank_history, loyalty_stamps, notification_log.
+        # Também MIGRADOS (Option B): campaign_executions e coupon_redemptions — não são
+        # tocados pelo worker/scheduler (só por rotas com contexto); os 2 backfills offline
+        # passaram a iterar tenants com set_current_tenant.
         # Os demais seguem expostos (worker/scheduler consultam sem contexto de tenant
         # → exigem refatorar os jobs antes de migrar).
         "campaigns",
         "campaign_event_queue",
-        "campaign_executions",
         "cashback_transactions",
         "coupons",
-        "coupon_redemptions",
         "drawings",
         "drawing_entries",
         "notification_queue",
@@ -127,9 +128,9 @@ KNOWN_BASE_TENANT_DEBT = frozenset(
         # app/simples_nacional_models.py — simples_nacional_mensal MIGRADO para
         # TenantScoped (tabela colocada sob o Alembic + tenant_id String->UUID; antes
         # nao existia em producao por falta de migration de criacao).
-        # app/template_models.py
-        "tenant_template_installs",
-        "tenant_template_item_installs",
+        # app/template_models.py — tenant_template_installs e tenant_template_item_installs
+        # MIGRADOS para TenantScoped (Padrão a, sem migration). onboard_tenant_defaults
+        # passou a estabelecer o contexto do tenant (salva/restaura) → CLI e testes cobertos.
         # (variacao_config_fiscal: ver nota da consolidacao fiscal acima)
         # app/bling_pedido_webhook_queue_models.py — bling_pedido_webhook_events
         # DECLARADO INTENCIONALMENTE GLOBAL (fila de worker cross-tenant) → ver

@@ -252,7 +252,7 @@ class Campaign(Base):
 # 3. campaign_executions — recompensas concedidas (imutável, idempotente)
 # ---------------------------------------------------------------------------
 
-class CampaignExecution(Base):
+class CampaignExecution(TenantScoped, Base):
     """
     Registro imutável de cada recompensa concedida.
 
@@ -484,7 +484,7 @@ class Coupon(Base):
 # 9. coupon_redemptions — uso real de cupons (append-only)
 # ---------------------------------------------------------------------------
 
-class CouponRedemption(Base):
+class CouponRedemption(TenantScoped, Base):
     """
     Registro imutável de cada uso de cupom.
 

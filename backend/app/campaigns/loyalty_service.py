@@ -687,38 +687,61 @@ def backfill_loyalty_reward_consumption_meta(
     *,
     tenant_id=None,
 ) -> dict[str, int]:
-    query = db.query(CampaignExecution).filter(
-        CampaignExecution.reference_period.like("cycle-%"),
-    )
-    if tenant_id is not None:
-        query = query.filter(CampaignExecution.tenant_id == tenant_id)
+    # campaign_executions e TenantScoped: query ORM exige tenant no contexto. tenant_id
+    # None => itera todos os tenants (enumerados via tabela tenants, global/whitelist)
+    # com contexto proprio por iteracao.
+    from uuid import UUID as _UUID
+    from app.models import Tenant
+    from app.tenancy.context import clear_current_tenant, set_current_tenant
 
-    executions = query.order_by(CampaignExecution.id.asc()).all()
-    updated = 0
+    if tenant_id is None:
+        updated_total = 0
+        for (tid_raw,) in db.query(Tenant.id).all():
+            try:
+                tid = _UUID(str(tid_raw))
+            except (TypeError, ValueError):
+                continue
+            updated_total += backfill_loyalty_reward_consumption_meta(db, tenant_id=tid)["updated"]
+        return {"updated": updated_total}
 
-    for execution in executions:
-        reward_meta = dict(execution.reward_meta or {})
-        if "consumed_stamps" in reward_meta and "stamps_to_complete_snapshot" in reward_meta:
-            continue
-
-        campaign = (
-            db.query(Campaign)
+    set_current_tenant(tenant_id if isinstance(tenant_id, _UUID) else _UUID(str(tenant_id)))
+    try:
+        executions = (
+            db.query(CampaignExecution)
             .filter(
-                Campaign.id == execution.campaign_id,
-                Campaign.tenant_id == execution.tenant_id,
+                CampaignExecution.reference_period.like("cycle-%"),
+                CampaignExecution.tenant_id == tenant_id,
             )
-            .first()
+            .order_by(CampaignExecution.id.asc())
+            .all()
         )
-        stamps_to_complete = int(
-            ((campaign.params if campaign else {}) or {}).get("stamps_to_complete", 10) or 0
-        )
-        reward_meta["consumed_stamps"] = max(stamps_to_complete, 0)
-        reward_meta["stamps_to_complete_snapshot"] = max(stamps_to_complete, 0)
-        execution.reward_meta = reward_meta
-        updated += 1
+        updated = 0
 
-    db.flush()
-    return {"updated": updated}
+        for execution in executions:
+            reward_meta = dict(execution.reward_meta or {})
+            if "consumed_stamps" in reward_meta and "stamps_to_complete_snapshot" in reward_meta:
+                continue
+
+            campaign = (
+                db.query(Campaign)
+                .filter(
+                    Campaign.id == execution.campaign_id,
+                    Campaign.tenant_id == execution.tenant_id,
+                )
+                .first()
+            )
+            stamps_to_complete = int(
+                ((campaign.params if campaign else {}) or {}).get("stamps_to_complete", 10) or 0
+            )
+            reward_meta["consumed_stamps"] = max(stamps_to_complete, 0)
+            reward_meta["stamps_to_complete_snapshot"] = max(stamps_to_complete, 0)
+            execution.reward_meta = reward_meta
+            updated += 1
+
+        db.flush()
+        return {"updated": updated}
+    finally:
+        clear_current_tenant()
 
 
 def _give_loyalty_reward(
