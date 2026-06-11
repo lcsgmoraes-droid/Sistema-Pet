@@ -151,6 +151,24 @@ def test_tenant_filter_marker_injects_tenant_id(raw_sql_session):
     assert [row.id for row in rows] == [1]
 
 
+def test_tenant_safe_sql_syncs_rls_tenant_before_execute(raw_sql_session, monkeypatch):
+    calls = []
+
+    def fake_sync(db, tenant_id=None):
+        calls.append((db, tenant_id))
+
+    monkeypatch.setattr("app.utils.tenant_safe_sql.sync_rls_tenant", fake_sync)
+
+    rows = execute_tenant_safe_all(
+        raw_sql_session,
+        "SELECT id FROM vendas WHERE {tenant_filter} ORDER BY id",
+        tenant_id=TENANT_1,
+    )
+
+    assert [row.id for row in rows] == [1]
+    assert calls == [(raw_sql_session, TENANT_1)]
+
+
 def test_text_clause_bindparams_are_preserved(raw_sql_session):
     stmt = text(
         "SELECT id FROM vendas WHERE id IN :ids AND {tenant_filter} ORDER BY id"
