@@ -71,7 +71,6 @@ from app.conciliacao_routes import router as conciliacao_router
 from app.conciliacao_bancaria_routes import router as conciliacao_bancaria_router
 from app.conciliacao_aba1_routes import router as conciliacao_aba1_router
 from app.conciliacao_historico_routes import router as conciliacao_historico_router
-from app.stone_routes import router as stone_router
 from app.financeiro_routes import router as financeiro_router
 from app.contas_bancarias_routes import router as contas_bancarias_router
 from app.admin_routes import router as admin_router
@@ -886,7 +885,6 @@ app.include_router(tipo_despesa_router, tags=["Cadastros - Tipo de Despesa"])
 app.include_router(contas_receber_router, tags=["Financeiro - Contas a Receber"], dependencies=_module_dependencies("financeiro_erp"))
 app.include_router(conciliacao_cartao_router, tags=["Financeiro - Conciliação de Cartão"], dependencies=_module_dependencies("financeiro_erp"))
 app.include_router(conciliacao_bancaria_router, tags=["Conciliação Bancária - OFX"], dependencies=_module_dependencies("financeiro_erp"))
-app.include_router(stone_router, tags=["Stone - Pagamentos & Conciliação"], dependencies=_module_dependencies("financeiro_erp"))
 app.include_router(conciliacao_router, tags=["Conciliação de Pagamentos"], dependencies=_module_dependencies("financeiro_erp"))
 app.include_router(conciliacao_aba1_router, tags=["Conciliação Vendas - Aba 1 V2"], dependencies=_module_dependencies("financeiro_erp"))
 app.include_router(conciliacao_historico_router, tags=["Conciliação - Histórico"], dependencies=_module_dependencies("financeiro_erp"))

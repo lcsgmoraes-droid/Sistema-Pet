@@ -192,8 +192,8 @@ class StoneConfig(BaseTenantModel):
     # ── Stone Connect (Pagar.me) ─────────────────────────────────────────────
     # secret_key no campo client_id: formato sk_* obtido em https://id.pagar.me/
     # (deixamos client_id/client_secret para manter compatibilidade com código existente)
-    client_id = Column(String(200), nullable=False)       # sk_* do Pagar.me (Stone Connect)
-    client_secret = Column(String(200), nullable=False)   # reservado / pode ser vazio
+    client_id = Column(String(200), nullable=True)
+    client_secret = Column(String(200), nullable=True)
     merchant_id = Column(String(200), nullable=True)      # não obrigatório no Connect
     webhook_secret = Column(String(200))                  # para validar webhooks
 
@@ -214,14 +214,14 @@ class StoneConfig(BaseTenantModel):
     sandbox = Column(Boolean, default=False)  # Stone Connect não tem sandbox
 
     # ── Configurações de pagamento ───────────────────────────────────────────
-    enable_pix = Column(Boolean, default=True)
-    enable_credit_card = Column(Boolean, default=True)
+    enable_pix = Column(Boolean, default=False)
+    enable_credit_card = Column(Boolean, default=False)
     enable_debit_card = Column(Boolean, default=False)
     max_installments = Column(Integer, default=12)
 
     # ── Webhook ────────────────────────────────────────────────────────────────
     webhook_url = Column(String(500))
-    webhook_enabled = Column(Boolean, default=True)
+    webhook_enabled = Column(Boolean, default=False)
 
     # ── POS (maquininha) ─────────────────────────────────────────────────────
     # Número de série da maquininha principal. Aparece no adesivo da máquina
@@ -229,7 +229,7 @@ class StoneConfig(BaseTenantModel):
     pos_serial_number = Column(String(50), nullable=True)
 
     # Status
-    active = Column(Boolean, default=True)
+    active = Column(Boolean, default=False)
 
     # Auditoria
     user_id = Column(Integer, ForeignKey('users.id'), nullable=False)

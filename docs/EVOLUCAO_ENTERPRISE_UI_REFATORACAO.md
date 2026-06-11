@@ -235,7 +235,7 @@ Top criticos ainda pendentes no inventario de 2026-06-07:
 | 2067 | `backend/app/vendas_routes.py` | Critico |
 | 1969 | `backend/app/routes/app_mobile_routes.py` | Critico |
 | 1816 | `backend/app/dashboard_routes.py` | Critico |
-| 1784 | `backend/app/stone_routes.py` | Critico |
+| removido | `backend/app/stone_routes.py` | Integração Stone online removida na frente 1.5 |
 | 1766 | `backend/app/integracao_bling_pedido_routes.py` | Critico |
 | 1752 | `backend/app/services/bling_flow_monitor_service.py` | Critico |
 | 1643 | `backend/app/dre_canais_routes.py` | Critico |
