@@ -125,7 +125,7 @@ async def receive_webhook(
         ).first()
     
     if not config:
-        logger.warning(f"Tenant {tenant_id} sem configuração")
+        logger.warning("Tenant sem configuracao WhatsApp")
         raise HTTPException(status_code=404, detail="Tenant não configurado")
     
     # 2. Validar assinatura (se configurada)
