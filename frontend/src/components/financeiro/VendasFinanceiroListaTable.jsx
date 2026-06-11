@@ -377,12 +377,31 @@ export default function VendasFinanceiroListaTable({
   onReprocessarVenda,
   onToggleSelecaoTodasVendas,
   onToggleSelecaoVenda,
+  onVendaRowRef,
   reprocessandoRentabilidade = false,
   todasVendasFiltradasSelecionadas = false,
+  vendaReprocessadaFocoId = null,
   vendas = [],
+  vendasReprocessadasIds = new Set(),
   vendasSelecionadasIds = new Set(),
   vendasExpandidas,
 }) {
+  const getVendaRowClassName = (venda) => {
+    const vendaId = Number(venda?.id);
+    const destacada = vendasReprocessadasIds.has(vendaId);
+    const foco = vendaId === Number(vendaReprocessadaFocoId);
+
+    return [
+      getCanalConfig(venda).rowClassName,
+      destacada
+        ? "bg-amber-100/80 shadow-[inset_0_0_0_2px_rgba(245,158,11,0.55)] hover:bg-amber-100"
+        : "",
+      foco ? "animate-pulse" : "",
+    ]
+      .filter(Boolean)
+      .join(" ");
+  };
+
   const columns = [
     {
       key: "selecionar",
@@ -617,12 +636,17 @@ export default function VendasFinanceiroListaTable({
       data={vendas}
       emptyMessage="Nenhuma venda encontrada"
       getRowKey={(venda) => venda.id}
+      getRowRef={
+        onVendaRowRef
+          ? (venda, _rowIndex, element) => onVendaRowRef(venda.id, element)
+          : undefined
+      }
       isRowExpanded={(venda) => vendasExpandidas.has(venda.id)}
       onRowClick={(venda) => onToggleVenda(venda.id)}
       renderExpandedRow={(venda, _rowIndex, colSpan) => (
         <ItensVendaDetalhes colSpan={colSpan} formatarMoeda={formatarMoeda} venda={venda} />
       )}
-      rowClassName={(venda) => getCanalConfig(venda).rowClassName}
+      rowClassName={getVendaRowClassName}
       tableClassName="min-w-[1480px] text-xs"
       theadClassName="bg-gray-100"
     />
