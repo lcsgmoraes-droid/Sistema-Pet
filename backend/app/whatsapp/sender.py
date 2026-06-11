@@ -17,6 +17,58 @@ from app.whatsapp.tenant_context import whatsapp_tenant_context
 logger = logging.getLogger(__name__)
 
 
+def _resolve_provider(config: Optional[TenantWhatsAppConfig], tenant_id: str) -> str:
+    if not config:
+        fallback_provider = os.getenv("WHATSAPP_DEFAULT_PROVIDER", "waha").lower()
+        logger.warning(
+            "Tenant %s sem configuração WhatsApp; usando fallback provider=%s",
+            tenant_id,
+            fallback_provider,
+        )
+        return fallback_provider
+
+    return (config.provider or "360dialog").lower()
+
+
+def _build_whatsapp_client(db: Session, tenant_id: str) -> Optional[Any]:
+    config = db.query(TenantWhatsAppConfig).filter(
+        TenantWhatsAppConfig.tenant_id == tenant_id
+    ).first()
+
+    provider = _resolve_provider(config, tenant_id)
+    if provider == "waha":
+        waha_url = os.getenv("WAHA_BASE_URL", "http://waha:3000")
+        waha_key = os.getenv("WAHA_API_KEY", "")
+        return WahaClient(api_key=waha_key, base_url=waha_url)
+
+    api_key_360 = (config.api_key if config else None) or os.getenv("WHATSAPP_360DIALOG_API_KEY", "")
+    if not api_key_360:
+        logger.error(f"Tenant {tenant_id} sem API key configurada")
+        return None
+
+    return Dialog360Client(api_key=api_key_360)
+
+
+async def _send_api_message(
+    client_obj: Any,
+    session: WhatsAppSession,
+    message: str,
+    message_type: str,
+    image_url: Optional[str],
+) -> Dict[str, Any]:
+    if message_type == "image" and image_url:
+        return await client_obj.send_image_message(
+            to=session.phone_number,
+            image_url=image_url,
+            caption=message,
+        )
+
+    return await client_obj.send_text_message(
+        to=session.phone_number,
+        message=message,
+    )
+
+
 # ============================================================================
 # CLIENT 360DIALOG
 # ============================================================================
@@ -275,33 +327,10 @@ async def _send_whatsapp_message_with_context(
         WhatsAppMessage criada ou None se falhar
     """
     try:
-        # 1. Buscar config e sessão
-        config = db.query(TenantWhatsAppConfig).filter(
-            TenantWhatsAppConfig.tenant_id == tenant_id
-        ).first()
-        
-        if not config:
-            fallback_provider = os.getenv("WHATSAPP_DEFAULT_PROVIDER", "waha").lower()
-            logger.warning(
-                "Tenant %s sem configuração WhatsApp; usando fallback provider=%s",
-                tenant_id,
-                fallback_provider,
-            )
-            provider = fallback_provider
-        else:
-            provider = (config.provider or "360dialog").lower()
-
-        # Escolher cliente conforme provider
-        if provider == "waha":
-            waha_url = os.getenv("WAHA_BASE_URL", "http://waha:3000")
-            waha_key = os.getenv("WAHA_API_KEY", "")
-            client_obj = WahaClient(api_key=waha_key, base_url=waha_url)
-        else:
-            api_key_360 = (config.api_key if config else None) or os.getenv("WHATSAPP_360DIALOG_API_KEY", "")
-            if not api_key_360:
-                logger.error(f"Tenant {tenant_id} sem API key configurada")
-                return None
-            client_obj = Dialog360Client(api_key=api_key_360)
+        # 1. Buscar config/cliente e sessão
+        client_obj = _build_whatsapp_client(db, tenant_id)
+        if not client_obj:
+            return None
         
         session = db.query(WhatsAppSession).get(session_id)
         if not session:
@@ -309,17 +338,13 @@ async def _send_whatsapp_message_with_context(
             return None
         
         # 2. Enviar via API
-        if message_type == "image" and image_url:
-            response = await client_obj.send_image_message(
-                to=session.phone_number,
-                image_url=image_url,
-                caption=message
-            )
-        else:
-            response = await client_obj.send_text_message(
-                to=session.phone_number,
-                message=message
-            )
+        response = await _send_api_message(
+            client_obj=client_obj,
+            session=session,
+            message=message,
+            message_type=message_type,
+            image_url=image_url,
+        )
         
         # 3. Extrair message_id da resposta
         whatsapp_message_id = response.get("messages", [{}])[0].get("id")
