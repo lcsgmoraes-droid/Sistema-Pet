@@ -820,14 +820,15 @@ class TestBehavior:
             WHERE {{tenant_filter}}
         """)
         
-        # Deletar tudo
+        # Deletar tudo dentro de um SAVEPOINT explicito. A fixture de tabela faz
+        # commit no setup; em SQLite, rollback simples apos isso nao preserva o
+        # estado inicial do teste.
+        checkpoint = db_session.begin_nested()
         execute_tenant_safe(db_session, f"""
             DELETE FROM {test_table_name}
             WHERE {{tenant_filter}}
         """)
-        
-        # Rollback (fixture faz isso automaticamente)
-        db_session.rollback()
+        checkpoint.rollback()
         
         # Contar registros após rollback
         count_after = execute_tenant_safe_scalar(db_session, f"""
