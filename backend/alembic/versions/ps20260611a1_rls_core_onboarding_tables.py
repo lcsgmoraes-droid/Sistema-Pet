@@ -28,66 +28,68 @@ RLS_TENANT_PREDICATE = (
 )
 
 
-def _bind():
-    return op.get_bind()
-
-
-def _inspector():
-    return sa.inspect(_bind())
-
-
-def _table_exists(table_name: str) -> bool:
-    return _inspector().has_table(table_name)
-
-
 def _policy_name(table_name: str) -> str:
     return f"{table_name}_tenant_isolation"
 
 
-def _is_postgresql() -> bool:
-    bind = _bind()
-    return bind.dialect.name == "postgresql"
+def _postgresql_bind():
+    bind = op.get_bind()
+    if bind.dialect.name != "postgresql":
+        return None
+    return bind
 
 
-def _enable_rls(table_name: str) -> None:
-    if not _table_exists(table_name):
-        return
+def _existing_targets(bind) -> list[str]:
+    inspector = sa.inspect(bind)
+    return [
+        table_name
+        for table_name in CORE_ONBOARDING_TABLES
+        if inspector.has_table(table_name)
+    ]
 
+
+def _upgrade_commands(table_name: str) -> tuple[str, ...]:
     policy_name = _policy_name(table_name)
-    op.execute(f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY")
-    op.execute(f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY")
-    op.execute(f"DROP POLICY IF EXISTS {policy_name} ON {table_name}")
-    op.execute(
+    return (
+        f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY",
+        f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY",
+        f"DROP POLICY IF EXISTS {policy_name} ON {table_name}",
         f"""
         CREATE POLICY {policy_name}
         ON {table_name}
         USING ({RLS_TENANT_PREDICATE})
         WITH CHECK ({RLS_TENANT_PREDICATE})
-        """
+        """,
     )
 
 
-def _disable_rls(table_name: str) -> None:
-    if not _table_exists(table_name):
-        return
-
+def _downgrade_commands(table_name: str) -> tuple[str, str, str]:
     policy_name = _policy_name(table_name)
-    op.execute(f"DROP POLICY IF EXISTS {policy_name} ON {table_name}")
-    op.execute(f"ALTER TABLE {table_name} NO FORCE ROW LEVEL SECURITY")
-    op.execute(f"ALTER TABLE {table_name} DISABLE ROW LEVEL SECURITY")
+    return (
+        f"DROP POLICY IF EXISTS {policy_name} ON {table_name}",
+        f"ALTER TABLE {table_name} NO FORCE ROW LEVEL SECURITY",
+        f"ALTER TABLE {table_name} DISABLE ROW LEVEL SECURITY",
+    )
+
+
+def _execute(commands: tuple[str, ...]) -> None:
+    for sql in commands:
+        op.execute(sql)
 
 
 def upgrade() -> None:
-    if not _is_postgresql():
+    bind = _postgresql_bind()
+    if bind is None:
         return
 
-    for table_name in CORE_ONBOARDING_TABLES:
-        _enable_rls(table_name)
+    for table_name in _existing_targets(bind):
+        _execute(_upgrade_commands(table_name))
 
 
 def downgrade() -> None:
-    if not _is_postgresql():
+    bind = _postgresql_bind()
+    if bind is None:
         return
 
-    for table_name in reversed(CORE_ONBOARDING_TABLES):
-        _disable_rls(table_name)
+    for table_name in reversed(_existing_targets(bind)):
+        _execute(_downgrade_commands(table_name))

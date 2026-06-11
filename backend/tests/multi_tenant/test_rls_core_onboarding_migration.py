@@ -1,89 +1,96 @@
 from pathlib import Path
-import importlib.util
+import runpy
 
 
-MIGRATION_PATH = (
-    Path(__file__).resolve().parents[2]
-    / "alembic"
-    / "versions"
-    / "ps20260611a1_rls_core_onboarding_tables.py"
+MIGRATION_PATH = Path(__file__).resolve().parents[2] / Path(
+    "alembic/versions/ps20260611a1_rls_core_onboarding_tables.py"
 )
 
-CORE_ONBOARDING_RLS_TABLES = (
-    "formas_pagamento",
-    "especies",
-    "racas",
-)
-
-
-def test_rls_core_onboarding_migration_exists_and_chains_from_canary_head():
-    assert MIGRATION_PATH.exists()
-
-    source = MIGRATION_PATH.read_text(encoding="utf-8")
-
-    assert 'revision = "ps20260611a1"' in source
-    assert 'down_revision = "pr20260611a1"' in source
-    assert 'bind.dialect.name == "postgresql"' in source
+RLS_TABLES = ("formas_pagamento", "especies", "racas")
+TENANT_PREDICATE = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid"
 
 
 def _load_migration():
-    spec = importlib.util.spec_from_file_location("rls_core_onboarding", MIGRATION_PATH)
-    migration = importlib.util.module_from_spec(spec)
-    assert spec.loader is not None
-    spec.loader.exec_module(migration)
-    return migration
+    return runpy.run_path(str(MIGRATION_PATH))
 
 
-def test_rls_core_onboarding_enables_force_and_policy_for_each_table(monkeypatch):
+def _run_and_collect(monkeypatch, action: str, tables=RLS_TABLES) -> str:
     migration = _load_migration()
-    executed = []
+    fake_bind = object()
+    commands = []
+    migration_globals = migration[action].__globals__
 
-    monkeypatch.setattr(migration, "_is_postgresql", lambda: True)
-    monkeypatch.setattr(migration, "_table_exists", lambda table_name: True)
-    monkeypatch.setattr(migration.op, "execute", lambda sql: executed.append(str(sql)))
+    monkeypatch.setitem(migration_globals, "_postgresql_bind", lambda: fake_bind)
+    monkeypatch.setitem(migration_globals, "_existing_targets", lambda bind: list(tables))
+    monkeypatch.setattr(migration_globals["op"], "execute", commands.append)
 
-    migration.upgrade()
+    migration[action]()
 
-    source = "\n".join(executed)
-
-    for table in CORE_ONBOARDING_RLS_TABLES:
-        assert f"ALTER TABLE {table} ENABLE ROW LEVEL SECURITY" in source
-        assert f"ALTER TABLE {table} FORCE ROW LEVEL SECURITY" in source
-        assert f"CREATE POLICY {table}_tenant_isolation" in source
-        assert f"ON {table}" in source
-
-    assert "current_setting('app.tenant_id', true)" in source
-    assert "WITH CHECK" in source
-    assert "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid" in source
+    return "\n".join(str(command) for command in commands)
 
 
-def test_rls_core_onboarding_downgrade_removes_policies_before_disabling_rls(monkeypatch):
+def test_rls_core_onboarding_migration_is_linear_successor_of_template_canary():
+    assert MIGRATION_PATH.exists()
+
+    source = MIGRATION_PATH.read_text(encoding="utf-8")
+    expected_metadata = {
+        'revision = "ps20260611a1"',
+        'down_revision = "pr20260611a1"',
+        '"formas_pagamento"',
+        '"especies"',
+        '"racas"',
+        "postgresql",
+    }
+
+    for snippet in expected_metadata:
+        assert snippet in source
+
+
+def test_rls_core_onboarding_upgrade_emits_tenant_policy_for_existing_targets(monkeypatch):
+    emitted_sql = _run_and_collect(monkeypatch, "upgrade")
+
+    assert emitted_sql.count("ENABLE ROW LEVEL SECURITY") == len(RLS_TABLES)
+    assert emitted_sql.count("FORCE ROW LEVEL SECURITY") == len(RLS_TABLES)
+    assert emitted_sql.count("CREATE POLICY") == len(RLS_TABLES)
+    assert emitted_sql.count("WITH CHECK") == len(RLS_TABLES)
+    assert TENANT_PREDICATE in emitted_sql
+
+    for table_name in RLS_TABLES:
+        assert f"{table_name}_tenant_isolation" in emitted_sql
+        assert f"ON {table_name}" in emitted_sql
+
+
+def test_rls_core_onboarding_downgrade_removes_child_policy_first(monkeypatch):
+    emitted_sql = _run_and_collect(monkeypatch, "downgrade")
+
+    assert emitted_sql.index("DROP POLICY IF EXISTS racas_tenant_isolation") < emitted_sql.index(
+        "DROP POLICY IF EXISTS especies_tenant_isolation"
+    )
+
+    for table_name in RLS_TABLES:
+        assert f"DROP POLICY IF EXISTS {table_name}_tenant_isolation ON {table_name}" in emitted_sql
+        assert f"ALTER TABLE {table_name} NO FORCE ROW LEVEL SECURITY" in emitted_sql
+        assert f"ALTER TABLE {table_name} DISABLE ROW LEVEL SECURITY" in emitted_sql
+
+
+def test_rls_core_onboarding_skips_tables_missing_from_older_databases(monkeypatch):
+    emitted_sql = _run_and_collect(monkeypatch, "upgrade", tables=("especies",))
+
+    assert "ON especies" in emitted_sql
+    assert "formas_pagamento" not in emitted_sql
+    assert "ON racas" not in emitted_sql
+
+
+def test_rls_core_onboarding_is_noop_when_alembic_is_not_using_postgresql(monkeypatch):
     migration = _load_migration()
-    executed = []
+    migration_globals = migration["upgrade"].__globals__
 
-    monkeypatch.setattr(migration, "_is_postgresql", lambda: True)
-    monkeypatch.setattr(migration, "_table_exists", lambda table_name: True)
-    monkeypatch.setattr(migration.op, "execute", lambda sql: executed.append(str(sql)))
-
-    migration.downgrade()
-
-    source = "\n".join(executed)
-
-    for table in CORE_ONBOARDING_RLS_TABLES:
-        assert f"DROP POLICY IF EXISTS {table}_tenant_isolation ON {table}" in source
-        assert f"ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY" in source
-        assert f"ALTER TABLE {table} DISABLE ROW LEVEL SECURITY" in source
-
-
-def test_rls_core_onboarding_is_noop_outside_postgresql(monkeypatch):
-    migration = _load_migration()
-
-    monkeypatch.setattr(migration, "_is_postgresql", lambda: False)
+    monkeypatch.setitem(migration_globals, "_postgresql_bind", lambda: None)
     monkeypatch.setattr(
-        migration.op,
+        migration_globals["op"],
         "execute",
         lambda sql: (_ for _ in ()).throw(AssertionError("unexpected SQL")),
     )
 
-    migration.upgrade()
-    migration.downgrade()
+    migration["upgrade"]()
+    migration["downgrade"]()
