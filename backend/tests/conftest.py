@@ -60,7 +60,14 @@ def _create_engine_kwargs(database_url: str) -> dict:
 
 def _create_sqlite_schema(engine) -> None:
     from app.db import Base
-    from app import caixa_models, models, produtos_models, vendas_models  # noqa: F401
+    from app import (  # noqa: F401
+        caixa_models,
+        dre_plano_contas_models,
+        financeiro_models,
+        models,
+        produtos_models,
+        vendas_models,
+    )
 
     Base.metadata.create_all(engine)
     from app.db.migration_check import _get_alembic_head

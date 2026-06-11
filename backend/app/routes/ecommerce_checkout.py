@@ -9,12 +9,11 @@ import random
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Header, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from sqlalchemy import text
 
 from app.db import get_session
 from app.financeiro_models import FormaPagamento
 from app.idempotency_models import IdempotencyKey
-from app.models import Cliente, Tenant, User
+from app.models import ConfiguracaoEntrega, Tenant, User
 from app.pedido_models import Pedido, PedidoItem
 from app.routes.ecommerce_auth import _activate_user_tenant_context, _get_current_ecommerce_user
 from app.services.ecommerce_payment_config import get_active_mercado_pago_runtime_config
@@ -96,20 +95,24 @@ def _normalize_text(value: str | None) -> str:
 
 def _frete_local_por_cidade(db: Session, tenant_id: str, cidade_destino: str) -> dict:
     cidade_loja_raw = None
+    previous_tenant = get_current_tenant()
     try:
-        result = db.execute(
-            text("""
-                SELECT cidade
-                FROM configuracoes_entrega
-                WHERE tenant_id = :tenant_id
-                LIMIT 1
-            """),
-            {"tenant_id": tenant_id},
-        ).fetchone()
-        if result:
-            cidade_loja_raw = result[0]
+        tenant_uuid = UUID(str(tenant_id))
+        set_current_tenant(tenant_uuid)
+        config = (
+            db.query(ConfiguracaoEntrega)
+            .filter(ConfiguracaoEntrega.tenant_id == tenant_uuid)
+            .first()
+        )
+        if config:
+            cidade_loja_raw = config.cidade
     except Exception:
         cidade_loja_raw = None
+    finally:
+        if previous_tenant is None:
+            clear_current_tenant()
+        else:
+            set_current_tenant(previous_tenant)
 
     cidade_loja = _normalize_text(cidade_loja_raw)
     destino = _normalize_text(cidade_destino)
@@ -411,7 +414,7 @@ def listar_formas_pagamento(
         db.query(FormaPagamento)
         .filter(
             FormaPagamento.tenant_id == tenant_id,
-            FormaPagamento.ativo == True,
+            FormaPagamento.ativo.is_(True),
         )
         .order_by(FormaPagamento.nome)
         .all()
