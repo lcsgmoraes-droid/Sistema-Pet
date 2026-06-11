@@ -1,3 +1,6 @@
+import { AlertTriangle, Plus, Trash2 } from "lucide-react";
+import { buildEmptyClienteAlertaPdv } from "../../utils/clienteAlertasPdv";
+
 const ClientesNovoComplementaresStep = ({
   formData,
   setFormData,
@@ -5,6 +8,30 @@ const ClientesNovoComplementaresStep = ({
   abrirModalEndereco,
   removerEndereco,
 }) => {
+  const alertasPdv = Array.isArray(formData.alertas_pdv)
+    ? formData.alertas_pdv
+    : [];
+
+  const setAlertasPdv = (alertas) => {
+    setFormData({ ...formData, alertas_pdv: alertas });
+  };
+
+  const atualizarAlerta = (index, field, value) => {
+    setAlertasPdv(
+      alertasPdv.map((alerta, alertaIndex) =>
+        alertaIndex === index ? { ...alerta, [field]: value } : alerta,
+      ),
+    );
+  };
+
+  const adicionarAlerta = () => {
+    setAlertasPdv([...alertasPdv, buildEmptyClienteAlertaPdv()]);
+  };
+
+  const removerAlerta = (index) => {
+    setAlertasPdv(alertasPdv.filter((_, alertaIndex) => alertaIndex !== index));
+  };
+
   return (
     <div className="space-y-4">
       <h3 className="text-lg font-semibold text-gray-900 mb-4">
@@ -168,20 +195,106 @@ const ClientesNovoComplementaresStep = ({
         )}
       </div>
 
-      <div>
-        <label className="block text-sm font-medium text-gray-700 mb-1">
-          Marcacoes / Tags
-        </label>
-        <input
-          type="text"
-          value={formData.tags}
-          onChange={(e) => setFormData({ ...formData, tags: e.target.value })}
-          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-          placeholder="Ex: Bom pagador, Cliente fiel, VIP"
-        />
-        <p className="text-xs text-gray-500 mt-1">
-          Separe por virgula para multiplas tags
-        </p>
+      <div className="border-b pb-4 mb-4">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <h4 className="flex items-center gap-2 text-md font-semibold text-gray-800">
+            <AlertTriangle className="h-4 w-4 text-amber-600" />
+            Alertas do PDV
+          </h4>
+          <button
+            type="button"
+            onClick={adicionarAlerta}
+            className="inline-flex items-center gap-2 rounded-lg bg-amber-600 px-3 py-2 text-sm font-medium text-white transition-colors hover:bg-amber-700"
+          >
+            <Plus className="h-4 w-4" />
+            Adicionar alerta
+          </button>
+        </div>
+
+        {alertasPdv.length > 0 ? (
+          <div className="space-y-3">
+            {alertasPdv.map((alerta, index) => (
+              <div
+                key={index}
+                className="rounded-lg border border-amber-200 bg-amber-50 p-3"
+              >
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-[minmax(0,1fr)_150px_auto] md:items-start">
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-gray-700">
+                      Tag
+                    </span>
+                    <input
+                      type="text"
+                      value={alerta.titulo || ""}
+                      onChange={(e) =>
+                        atualizarAlerta(index, "titulo", e.target.value)
+                      }
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-transparent focus:ring-2 focus:ring-amber-500"
+                      placeholder="Preco especial"
+                    />
+                  </label>
+
+                  <label className="block">
+                    <span className="mb-1 block text-sm font-medium text-gray-700">
+                      Prioridade
+                    </span>
+                    <select
+                      value={alerta.prioridade || "aviso"}
+                      onChange={(e) =>
+                        atualizarAlerta(index, "prioridade", e.target.value)
+                      }
+                      className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-transparent focus:ring-2 focus:ring-amber-500"
+                    >
+                      <option value="aviso">Aviso</option>
+                      <option value="importante">Importante</option>
+                      <option value="info">Info</option>
+                    </select>
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={() => removerAlerta(index)}
+                    className="inline-flex h-10 w-10 items-center justify-center rounded-lg text-red-600 transition-colors hover:bg-red-50 md:mt-6"
+                    title="Remover alerta"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+
+                <label className="mt-3 block">
+                  <span className="mb-1 block text-sm font-medium text-gray-700">
+                    Mensagem
+                  </span>
+                  <textarea
+                    value={alerta.mensagem || ""}
+                    onChange={(e) =>
+                      atualizarAlerta(index, "mensagem", e.target.value)
+                    }
+                    className="w-full rounded-lg border border-gray-300 px-3 py-2 outline-none focus:border-transparent focus:ring-2 focus:ring-amber-500"
+                    rows="2"
+                    placeholder="Cliente tem preco especial na racao X: fazer por R$ 120,00"
+                  />
+                </label>
+
+                <label className="mt-2 inline-flex items-center gap-2 text-sm text-gray-700">
+                  <input
+                    type="checkbox"
+                    checked={alerta.ativo !== false}
+                    onChange={(e) =>
+                      atualizarAlerta(index, "ativo", e.target.checked)
+                    }
+                    className="h-4 w-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                  />
+                  Ativo no PDV
+                </label>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="rounded-lg border border-dashed border-amber-200 bg-amber-50 px-4 py-5 text-center text-sm text-amber-800">
+            Nenhum alerta cadastrado
+          </div>
+        )}
       </div>
 
       <div>
