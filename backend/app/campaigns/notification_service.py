@@ -29,6 +29,7 @@ from app.campaigns.models import (
     NotificationQueue,
 )
 from app.whatsapp.security import DataPrivacyConsent
+from app.whatsapp.tenant_context import whatsapp_tenant_context
 
 logger = logging.getLogger(__name__)
 
@@ -53,20 +54,21 @@ def _customer_allows_contact(
         return True
 
     consent_types = _CONSENT_ALIASES.get(consent_type, (consent_type,))
-    latest = (
-        db.query(DataPrivacyConsent)
-        .filter(
-            DataPrivacyConsent.tenant_id == str(tenant_id),
-            DataPrivacyConsent.subject_type == "customer",
-            DataPrivacyConsent.subject_id == str(customer_id),
-            DataPrivacyConsent.consent_type.in_(consent_types),
+    with whatsapp_tenant_context(tenant_id):
+        latest = (
+            db.query(DataPrivacyConsent)
+            .filter(
+                DataPrivacyConsent.tenant_id == str(tenant_id),
+                DataPrivacyConsent.subject_type == "customer",
+                DataPrivacyConsent.subject_id == str(customer_id),
+                DataPrivacyConsent.consent_type.in_(consent_types),
+            )
+            .order_by(
+                DataPrivacyConsent.created_at.desc(),
+                DataPrivacyConsent.id.desc(),
+            )
+            .first()
         )
-        .order_by(
-            DataPrivacyConsent.created_at.desc(),
-            DataPrivacyConsent.id.desc(),
-        )
-        .first()
-    )
 
     if not latest:
         return True

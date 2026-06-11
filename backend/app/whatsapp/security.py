@@ -10,8 +10,10 @@ import hashlib
 import secrets
 from sqlalchemy.orm import Session
 from sqlalchemy import Column, String, DateTime, Text, Boolean, Integer
+from app.base_models import TenantScoped
 from app.db import Base
 from app.utils.logger import logger
+from app.whatsapp.tenant_context import whatsapp_tenant_context
 
 
 def generate_uuid():
@@ -120,13 +122,12 @@ class RateLimiter:
 # 3. LGPD Compliance - Modelos
 # ============================================================================
 
-class DataPrivacyConsent(Base):
+class DataPrivacyConsent(TenantScoped, Base):
     """Registro de consentimento LGPD"""
     __tablename__ = "data_privacy_consents"
     __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    tenant_id = Column(String, nullable=False)
     
     # Subject
     subject_type = Column(String(50), nullable=False)  # customer, user, contact
@@ -153,13 +154,12 @@ class DataPrivacyConsent(Base):
         return f"<DataPrivacyConsent(subject={self.subject_type}:{self.subject_id}, type={self.consent_type})>"
 
 
-class DataAccessLog(Base):
+class DataAccessLog(TenantScoped, Base):
     """Log de acesso a dados sensíveis (LGPD Art. 37)"""
     __tablename__ = "data_access_logs"
     __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    tenant_id = Column(String, nullable=False)
     
     # Subject
     subject_type = Column(String(50), nullable=False)
@@ -183,13 +183,12 @@ class DataAccessLog(Base):
         return f"<DataAccessLog(user={self.accessed_by_user_id}, access={self.access_type}, resource={self.resource_type})>"
 
 
-class DataDeletionRequest(Base):
+class DataDeletionRequest(TenantScoped, Base):
     """Solicitações de exclusão de dados (Direito ao Esquecimento)"""
     __tablename__ = "data_deletion_requests"
     __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    tenant_id = Column(String, nullable=False)
     
     # Subject
     subject_type = Column(String(50), nullable=False)
@@ -220,13 +219,12 @@ class DataDeletionRequest(Base):
 # 4. Security Audit Log
 # ============================================================================
 
-class SecurityAuditLog(Base):
+class SecurityAuditLog(TenantScoped, Base):
     """Log de eventos de segurança"""
     __tablename__ = "security_audit_logs"
     __table_args__ = {'extend_existing': True}
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    tenant_id = Column(String, nullable=False)
     
     # Event
     event_type = Column(String(100), nullable=False)  # login, logout, failed_login, permission_denied, etc
@@ -277,22 +275,23 @@ class LGPDService:
     ) -> DataPrivacyConsent:
         """Registra consentimento do titular"""
         
-        consent = DataPrivacyConsent(
-            tenant_id=self.tenant_id,
-            subject_type=subject_type,
-            subject_id=subject_id,
-            phone_number=phone_number,
-            consent_type=consent_type,
-            consent_given=consent_given,
-            consent_text=consent_text,
-            ip_address=ip_address,
-            user_agent=user_agent
-        )
+        with whatsapp_tenant_context(self.tenant_id):
+            consent = DataPrivacyConsent(
+                tenant_id=self.tenant_id,
+                subject_type=subject_type,
+                subject_id=subject_id,
+                phone_number=phone_number,
+                consent_type=consent_type,
+                consent_given=consent_given,
+                consent_text=consent_text,
+                ip_address=ip_address,
+                user_agent=user_agent
+            )
         
-        self.db.add(consent)
-        self.db.commit()
+            self.db.add(consent)
+            self.db.commit()
         
-        return consent
+            return consent
     
     def check_consent(
         self,
@@ -301,15 +300,16 @@ class LGPDService:
     ) -> bool:
         """Verifica se há consentimento válido"""
         
-        consent = self.db.query(DataPrivacyConsent).filter(
-            DataPrivacyConsent.tenant_id == self.tenant_id,
-            DataPrivacyConsent.subject_id == subject_id,
-            DataPrivacyConsent.consent_type == consent_type,
-            DataPrivacyConsent.consent_given == True,
-            DataPrivacyConsent.revoked_at.is_(None)
-        ).first()
+        with whatsapp_tenant_context(self.tenant_id):
+            consent = self.db.query(DataPrivacyConsent).filter(
+                DataPrivacyConsent.tenant_id == self.tenant_id,
+                DataPrivacyConsent.subject_id == subject_id,
+                DataPrivacyConsent.consent_type == consent_type,
+                DataPrivacyConsent.consent_given == True,
+                DataPrivacyConsent.revoked_at.is_(None)
+            ).first()
         
-        return consent is not None
+            return consent is not None
     
     def revoke_consent(
         self,
@@ -318,19 +318,20 @@ class LGPDService:
     ) -> bool:
         """Revoga consentimento"""
         
-        consents = self.db.query(DataPrivacyConsent).filter(
-            DataPrivacyConsent.tenant_id == self.tenant_id,
-            DataPrivacyConsent.subject_id == subject_id,
-            DataPrivacyConsent.consent_type == consent_type,
-            DataPrivacyConsent.revoked_at.is_(None)
-        ).all()
+        with whatsapp_tenant_context(self.tenant_id):
+            consents = self.db.query(DataPrivacyConsent).filter(
+                DataPrivacyConsent.tenant_id == self.tenant_id,
+                DataPrivacyConsent.subject_id == subject_id,
+                DataPrivacyConsent.consent_type == consent_type,
+                DataPrivacyConsent.revoked_at.is_(None)
+            ).all()
         
-        for consent in consents:
-            consent.revoked_at = datetime.utcnow()
+            for consent in consents:
+                consent.revoked_at = datetime.utcnow()
         
-        self.db.commit()
+            self.db.commit()
         
-        return len(consents) > 0
+            return len(consents) > 0
     
     def log_data_access(
         self,
@@ -345,20 +346,21 @@ class LGPDService:
     ):
         """Registra acesso a dados sensíveis"""
         
-        log = DataAccessLog(
-            tenant_id=self.tenant_id,
-            subject_type=subject_type,
-            subject_id=subject_id,
-            accessed_by_user_id=accessed_by_user_id,
-            access_type=access_type,
-            resource_type=resource_type,
-            resource_id=resource_id,
-            ip_address=ip_address,
-            justification=justification
-        )
+        with whatsapp_tenant_context(self.tenant_id):
+            log = DataAccessLog(
+                tenant_id=self.tenant_id,
+                subject_type=subject_type,
+                subject_id=subject_id,
+                accessed_by_user_id=accessed_by_user_id,
+                access_type=access_type,
+                resource_type=resource_type,
+                resource_id=resource_id,
+                ip_address=ip_address,
+                justification=justification
+            )
         
-        self.db.add(log)
-        self.db.commit()
+            self.db.add(log)
+            self.db.commit()
     
     def request_data_deletion(
         self,
@@ -370,20 +372,21 @@ class LGPDService:
     ) -> DataDeletionRequest:
         """Cria solicitação de exclusão de dados"""
         
-        request = DataDeletionRequest(
-            tenant_id=self.tenant_id,
-            subject_type=subject_type,
-            subject_id=subject_id,
-            contact_phone=contact_phone,
-            contact_email=contact_email,
-            reason=reason,
-            status="pending"
-        )
+        with whatsapp_tenant_context(self.tenant_id):
+            request = DataDeletionRequest(
+                tenant_id=self.tenant_id,
+                subject_type=subject_type,
+                subject_id=subject_id,
+                contact_phone=contact_phone,
+                contact_email=contact_email,
+                reason=reason,
+                status="pending"
+            )
         
-        self.db.add(request)
-        self.db.commit()
+            self.db.add(request)
+            self.db.commit()
         
-        return request
+            return request
     
     def process_deletion_request(
         self,
@@ -394,26 +397,27 @@ class LGPDService:
     ):
         """Processa solicitação de exclusão"""
         
-        request = self.db.query(DataDeletionRequest).filter(
-            DataDeletionRequest.id == request_id,
-            DataDeletionRequest.tenant_id == self.tenant_id
-        ).first()
+        with whatsapp_tenant_context(self.tenant_id):
+            request = self.db.query(DataDeletionRequest).filter(
+                DataDeletionRequest.id == request_id,
+                DataDeletionRequest.tenant_id == self.tenant_id
+            ).first()
         
-        if not request:
-            raise ValueError("Solicitação não encontrada")
+            if not request:
+                raise ValueError("Solicitação não encontrada")
         
-        if approved:
-            request.status = "approved"
-            request.processed_by_user_id = processed_by_user_id
-            request.processed_at = datetime.utcnow()
-            # TODO: Executar exclusão dos dados
-        else:
-            request.status = "rejected"
-            request.rejection_reason = rejection_reason
-            request.processed_by_user_id = processed_by_user_id
-            request.processed_at = datetime.utcnow()
+            if approved:
+                request.status = "approved"
+                request.processed_by_user_id = processed_by_user_id
+                request.processed_at = datetime.utcnow()
+                # TODO: Executar exclusão dos dados
+            else:
+                request.status = "rejected"
+                request.rejection_reason = rejection_reason
+                request.processed_by_user_id = processed_by_user_id
+                request.processed_at = datetime.utcnow()
         
-        self.db.commit()
+            self.db.commit()
     
     def export_user_data(
         self,
