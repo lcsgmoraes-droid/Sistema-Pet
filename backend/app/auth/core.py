@@ -5,6 +5,7 @@ Core de Autenticação JWT
 Funções principais para autenticação JWT e gerenciamento de usuários.
 """
 from datetime import datetime, timedelta
+import os
 from typing import Optional
 from jose import JWTError, jwt
 import bcrypt
@@ -16,7 +17,12 @@ from app.config import JWT_SECRET_KEY
 
 # Configurações JWT
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_DAYS = 7
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "15"))
+ACCESS_TOKEN_EXPIRE_SECONDS = ACCESS_TOKEN_EXPIRE_MINUTES * 60
+REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
+
+# Backward-compatible name used as the persisted session lifetime.
+ACCESS_TOKEN_EXPIRE_DAYS = REFRESH_TOKEN_EXPIRE_DAYS
 
 security = HTTPBearer()
 
@@ -73,14 +79,16 @@ def create_access_token(
         to_encode["tenant_id"] = str(tenant_id)
     if role:
         to_encode["role"] = role
+    if to_encode.get("tenant_id") is not None:
+        to_encode["tenant_id"] = str(to_encode["tenant_id"])
     
     # Definir expiração
     if expires_delta:
         expire = datetime.utcnow() + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(days=ACCESS_TOKEN_EXPIRE_DAYS)
+        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     
-    to_encode.update({"exp": expire})
+    to_encode.update({"exp": expire, "typ": "access"})
     
     # Adicionar JTI se fornecido (para logout remoto/controle de sessões)
     if jti:
@@ -88,6 +96,44 @@ def create_access_token(
     
     encoded_jwt = jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
+
+
+def create_refresh_token(
+    data: dict,
+    expires_delta: Optional[timedelta] = None,
+    expires_at: Optional[datetime] = None,
+    jti: Optional[str] = None,
+    tenant_id: Optional[str] = None,
+    role: Optional[str] = None
+) -> str:
+    """
+    Cria refresh token JWT atrelado a uma sessao persistida por JTI.
+    """
+    to_encode = data.copy()
+
+    if "sub" in to_encode:
+        to_encode["sub"] = str(to_encode["sub"])
+
+    if tenant_id:
+        to_encode["tenant_id"] = str(tenant_id)
+    if role:
+        to_encode["role"] = role
+    if to_encode.get("tenant_id") is not None:
+        to_encode["tenant_id"] = str(to_encode["tenant_id"])
+
+    if expires_at:
+        expire = expires_at
+    elif expires_delta:
+        expire = datetime.utcnow() + expires_delta
+    else:
+        expire = datetime.utcnow() + timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
+
+    to_encode.update({"exp": expire, "typ": "refresh"})
+
+    if jti:
+        to_encode["jti"] = jti
+
+    return jwt.encode(to_encode, JWT_SECRET_KEY, algorithm=ALGORITHM)
 
 
 def get_current_user(
@@ -119,6 +165,9 @@ def get_current_user(
         user_id = payload.get("sub")
         jti = payload.get("jti")  # JWT ID para validação de sessão
         
+        if payload.get("typ", "access") != "access":
+            raise credentials_exception
+
         if user_id is None:
             raise credentials_exception
         
@@ -174,6 +223,9 @@ def get_current_user_from_token(token: str, session: DBSession) -> models.User:
         user_id = payload.get("sub")
         jti = payload.get("jti")
         
+        if payload.get("typ", "access") != "access":
+            raise credentials_exception
+
         if user_id is None:
             raise credentials_exception
         

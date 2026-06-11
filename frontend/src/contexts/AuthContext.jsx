@@ -3,7 +3,7 @@
  */
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import api from '../api';
-import { clearAuthTokens, getAccessToken, setAccessToken, setTempToken } from '../auth/tokenStorage';
+import { clearAuthTokens, getAccessToken, setAccessToken, setRefreshToken, setTempToken } from '../auth/tokenStorage';
 
 const AuthContext = createContext();
 
@@ -93,7 +93,11 @@ export const AuthProvider = ({ children }) => {
     );
 
     const finalToken = selectResponse.data.access_token;
+    const finalRefreshToken = selectResponse.data.refresh_token;
     setAccessToken(finalToken);
+    if (finalRefreshToken) {
+      setRefreshToken(finalRefreshToken);
+    }
     localStorage.setItem('selectedTenant', JSON.stringify(tenants[0]));
 
     const userResponse = await api.get('/auth/me-multitenant');

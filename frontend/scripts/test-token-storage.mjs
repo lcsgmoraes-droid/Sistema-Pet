@@ -2,7 +2,9 @@ import assert from 'node:assert/strict';
 import {
   clearAuthTokens,
   getAccessToken,
+  getRefreshToken,
   setAccessToken,
+  setRefreshToken,
 } from '../src/auth/tokenStorage.js';
 
 class MemoryStorage {
@@ -49,6 +51,8 @@ clearAuthTokens();
 
 assert.equal(globalThis.localStorage.getItem('access_token'), null);
 assert.equal(globalThis.sessionStorage.getItem('access_token'), null);
+assert.equal(globalThis.localStorage.getItem('refresh_token'), null);
+assert.equal(globalThis.sessionStorage.getItem('refresh_token'), null);
 
 globalThis.localStorage.setItem('token', 'token-legado');
 newTab();
@@ -60,4 +64,23 @@ assert.equal(
 );
 assert.equal(globalThis.localStorage.getItem('access_token'), 'token-legado');
 assert.equal(globalThis.localStorage.getItem('token'), null);
+
+setRefreshToken('refresh-para-nova-aba');
+newTab();
+
+assert.equal(
+  getRefreshToken(),
+  'refresh-para-nova-aba',
+  'uma nova aba deve reaproveitar o refresh token persistido'
+);
+assert.equal(
+  globalThis.sessionStorage.getItem('refresh_token'),
+  'refresh-para-nova-aba',
+  'a nova aba deve hidratar o refresh token no sessionStorage'
+);
+
+clearAuthTokens();
+
+assert.equal(globalThis.localStorage.getItem('refresh_token'), null);
+assert.equal(globalThis.sessionStorage.getItem('refresh_token'), null);
 
