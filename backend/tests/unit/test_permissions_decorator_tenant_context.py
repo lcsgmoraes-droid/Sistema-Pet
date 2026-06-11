@@ -2,13 +2,20 @@ import uuid
 from types import SimpleNamespace
 
 from app.security.permissions_decorator import require_permission
+from app.security import permissions_service
 from app.tenancy.context import clear_current_tenant, get_current_tenant
 
 
-def test_require_permission_reapplies_tenant_context_for_sync_route():
+def test_require_permission_reapplies_tenant_context_for_sync_route(monkeypatch):
     clear_current_tenant()
     tenant_id = uuid.uuid4()
-    admin_user = SimpleNamespace(id=123, is_admin=True)
+    admin_user = SimpleNamespace(id=123, is_admin=False)
+
+    monkeypatch.setattr(
+        permissions_service,
+        "get_user_permissions",
+        lambda db, user_id, checked_tenant_id: {"clientes.visualizar"},
+    )
 
     @require_permission("clientes.visualizar")
     def endpoint(db, user_and_tenant):

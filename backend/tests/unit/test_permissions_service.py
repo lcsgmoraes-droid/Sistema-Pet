@@ -38,3 +38,30 @@ def test_check_permission_still_denies_unrelated_permission(monkeypatch):
             tenant_id=uuid.uuid4(),
             current_user=SimpleNamespace(id=1, is_admin=False),
         )
+
+
+def test_check_permission_does_not_use_global_admin_as_tenant_permission(monkeypatch):
+    tenant_id = uuid.uuid4()
+    calls = []
+
+    def fake_user_permissions(db, user_id, checked_tenant_id):
+        calls.append((user_id, checked_tenant_id))
+        return set()
+
+    monkeypatch.setattr(
+        permissions_service,
+        "get_user_permissions",
+        fake_user_permissions,
+    )
+
+    with pytest.raises(HTTPException) as exc_info:
+        permissions_service.check_permission(
+            db=object(),
+            user_id=1,
+            permission="usuarios.manage",
+            tenant_id=tenant_id,
+            current_user=SimpleNamespace(id=1, is_admin=True),
+        )
+
+    assert exc_info.value.status_code == 403
+    assert calls == [(1, tenant_id)]

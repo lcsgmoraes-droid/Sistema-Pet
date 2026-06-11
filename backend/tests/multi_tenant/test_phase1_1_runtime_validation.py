@@ -278,6 +278,7 @@ def test_auth_multitenant_flow_nao_quebra_com_roles_fora_da_whitelist(monkeypatc
     user_tenant = auth_db_session.query(UserTenant).filter(UserTenant.user_id == user.id).one()
 
     assert user.tenant_id == tenant_id
+    assert user.is_admin is False
     assert tenant.plan == "basico"
     assert role.tenant_id == tenant_id
     assert user_tenant.tenant_id == tenant_id
