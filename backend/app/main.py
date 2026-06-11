@@ -1071,15 +1071,14 @@ def on_startup():
     # ============================================================================
     # 2️⃣ PRÉ-PROD BLOCO 3: Validação de Migrations
     # ============================================================================
-    # TEMPORARIAMENTE DESABILITADO PARA DESENVOLVIMENTO
-    # try:
-    #     # Usar engine do db module
-    #     from app.db import engine
-    #     ensure_db_ready(engine)
-    #     logger.info("✅ [PRÉ-PROD] Database migrations check passed")
-    # except Exception as e:
-    #     logger.error(f"❌ [PRÉ-PROD] Database migrations check failed: {str(e)}")
-    #     raise  # Bloqueia inicialização
+    try:
+        # Usar engine do db module
+        from app.db import engine
+        ensure_db_ready(engine)
+        logger.info("✅ [PRÉ-PROD] Database migrations check passed")
+    except Exception as e:
+        logger.error(f"❌ [PRÉ-PROD] Database migrations check failed: {str(e)}")
+        raise  # Bloqueia inicialização
 
     # ============================================================================
     # 3️⃣ Inicialização de Serviços
