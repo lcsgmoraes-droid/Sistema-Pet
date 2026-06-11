@@ -288,6 +288,7 @@ class Cliente(BaseTenantModel):
 
     # Outros
     observacoes = Column(Text, nullable=True)
+    alertas_pdv = Column(JSON, nullable=True)
     ativo = Column(Boolean, default=True)
 
     # 💰 Crédito de devoluções
