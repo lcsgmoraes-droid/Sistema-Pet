@@ -20,6 +20,8 @@ from app.services.bling_flow_monitor_service import obter_resumo_monitoramento
 router = APIRouter(prefix="/health", tags=["Health & Monitoring"])
 logger = logging.getLogger(__name__)
 
+WHATSAPP_ACTIVE_SESSIONS_COUNT_SQL = "SELECT count(*) FROM whatsapp_ia_sessions WHERE status = :status"
+
 
 def _scalar_count(db: Session, sql: str, params: dict | None = None) -> int:
     return int(db.execute(text(sql), params or {}).scalar() or 0)
@@ -184,7 +186,7 @@ async def detailed_health(db: Session = Depends(get_session)) -> Dict[str, Any]:
         # Sessões ativas
         active_sessions = _scalar_count(
             db,
-            "SELECT count(*) FROM whatsapp_ia_sessions WHERE status = :status",
+            WHATSAPP_ACTIVE_SESSIONS_COUNT_SQL,
             {"status": "active"},
         )
         
@@ -277,7 +279,7 @@ async def application_metrics(db: Session = Depends(get_session)) -> Dict[str, A
         total_sessions = _scalar_count(db, "SELECT count(*) FROM whatsapp_ia_sessions")
         active_sessions = _scalar_count(
             db,
-            "SELECT count(*) FROM whatsapp_ia_sessions WHERE status = :status",
+            WHATSAPP_ACTIVE_SESSIONS_COUNT_SQL,
             {"status": "active"},
         )
         
@@ -337,7 +339,7 @@ async def prometheus_metrics(db: Session = Depends(get_session)) -> str:
         total_sessions = _scalar_count(db, "SELECT count(*) FROM whatsapp_ia_sessions")
         active_sessions = _scalar_count(
             db,
-            "SELECT count(*) FROM whatsapp_ia_sessions WHERE status = :status",
+            WHATSAPP_ACTIVE_SESSIONS_COUNT_SQL,
             {"status": "active"},
         )
         total_messages = _scalar_count(db, "SELECT count(*) FROM whatsapp_ia_messages")
