@@ -18,6 +18,10 @@ import VendasResultadoComposicaoPanel from "./financeiro/VendasResultadoComposic
 import VendasResumoTabelasPanel from "./financeiro/VendasResumoTabelasPanel";
 import { CANAL_LOJA_FISICA, normalizeSalesChannel } from "../utils/salesChannel";
 import {
+  REPROCESSAMENTO_DESTAQUE_MS,
+  montarFeedbackReprocessamentoVendas,
+} from "./financeiro/vendasReprocessamentoFeedback";
+import {
   ajustarVendaImposto,
   calcularAnaliseInteligenteVendas,
   calcularAnalisePromocoesFinanceiro,
@@ -136,6 +140,12 @@ export default function VendasFinanceiro() {
   const [mostrarImpostoTodasVendas, setMostrarImpostoTodasVendas] = useState(true);
   const [vendasSelecionadasIds, setVendasSelecionadasIds] = useState(new Set());
   const [reprocessandoRentabilidade, setReprocessandoRentabilidade] = useState(false);
+  const [feedbackReprocessamento, setFeedbackReprocessamento] = useState({
+    ids: new Set(),
+    focoId: null,
+    token: 0,
+  });
+  const linhasVendasRefs = useRef(new Map());
   const [mostrarConfigFeriados, setMostrarConfigFeriados] = useState(false);
   const [feriadosCustomizados, setFeriadosCustomizados] = useState(
     carregarFeriadosCustomizados,
@@ -672,6 +682,32 @@ export default function VendasFinanceiro() {
     });
   };
 
+  const registrarLinhaVendaReprocessada = (vendaId, element) => {
+    const idNormalizado = Number(vendaId);
+    if (!Number.isFinite(idNormalizado) || idNormalizado <= 0) return;
+
+    if (element) {
+      linhasVendasRefs.current.set(idNormalizado, element);
+    } else {
+      linhasVendasRefs.current.delete(idNormalizado);
+    }
+  };
+
+  const aplicarFeedbackReprocessamento = (vendaIds) => {
+    const feedback = montarFeedbackReprocessamentoVendas({
+      vendaIds,
+      vendasVisiveis: listaVendasFiltrada,
+    });
+
+    if (!feedback.ids.length) return;
+
+    setFeedbackReprocessamento((prev) => ({
+      ids: new Set(feedback.ids),
+      focoId: feedback.focoId,
+      token: prev.token + 1,
+    }));
+  };
+
   const reprocessarRentabilidadeVendas = async ({ vendaIds = null, periodo = false } = {}) => {
     const ids = Array.isArray(vendaIds)
       ? vendaIds.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)
@@ -716,9 +752,13 @@ export default function VendasFinanceiro() {
         payload,
       );
       const total = Number(data?.total_reprocessado || 0);
+      const vendasReprocessadasIds = Array.isArray(data?.vendas)
+        ? data.vendas.map((venda) => venda?.venda_id)
+        : ids;
       toast.success(`${total} venda(s) reprocessada(s).`, { id: toastId });
       setVendasSelecionadasIds(new Set());
       await carregarDados();
+      aplicarFeedbackReprocessamento(vendasReprocessadasIds);
     } catch (error) {
       console.error("Erro ao reprocessar rentabilidade:", error);
       toast.error(
@@ -772,6 +812,39 @@ export default function VendasFinanceiro() {
       return idsMantidos.length === prev.size ? prev : new Set(idsMantidos);
     });
   }, [listaVendasFiltrada]);
+
+  useEffect(() => {
+    if (!feedbackReprocessamento.token || !feedbackReprocessamento.ids.size) return undefined;
+
+    const feedbackAtual = montarFeedbackReprocessamentoVendas({
+      vendaIds: Array.from(feedbackReprocessamento.ids),
+      vendasVisiveis: listaVendasFiltrada,
+    });
+    const focoId = feedbackAtual.focoId || feedbackReprocessamento.focoId;
+    const linhaFoco = focoId ? linhasVendasRefs.current.get(focoId) : null;
+
+    if (linhaFoco) {
+      const rolarParaLinha = () => {
+        linhaFoco.scrollIntoView({
+          behavior: "smooth",
+          block: "center",
+          inline: "nearest",
+        });
+      };
+
+      if (globalThis.requestAnimationFrame) {
+        globalThis.requestAnimationFrame(rolarParaLinha);
+      } else {
+        globalThis.setTimeout(rolarParaLinha, 0);
+      }
+    }
+
+    const timeoutId = globalThis.setTimeout(() => {
+      setFeedbackReprocessamento({ ids: new Set(), focoId: null, token: 0 });
+    }, REPROCESSAMENTO_DESTAQUE_MS);
+
+    return () => globalThis.clearTimeout(timeoutId);
+  }, [feedbackReprocessamento, listaVendasFiltrada]);
 
   useEffect(() => {
     if (!podeVerFinanceiroCompleto) {
@@ -1005,6 +1078,7 @@ export default function VendasFinanceiro() {
           }
           onToggleSelecaoTodasVendas={toggleSelecaoTodasVendas}
           onToggleSelecaoVenda={toggleSelecaoVenda}
+          onVendaRowRef={registrarLinhaVendaReprocessada}
           reprocessandoRentabilidade={reprocessandoRentabilidade}
           setFiltroCanalVenda={setFiltroCanalVenda}
           setFiltroStatusLista={setFiltroStatusLista}
@@ -1013,6 +1087,8 @@ export default function VendasFinanceiro() {
           toggleVendaExpandida={toggleVendaExpandida}
           totalVendasPeriodoReprocessamento={listaVendasPorCanal.length}
           totalVendasSelecionadas={vendasSelecionadas.length}
+          vendaReprocessadaFocoId={feedbackReprocessamento.focoId}
+          vendasReprocessadasIds={feedbackReprocessamento.ids}
           vendasSelecionadasIds={vendasSelecionadasIds}
           vendasExpandidas={vendasExpandidas}
         />

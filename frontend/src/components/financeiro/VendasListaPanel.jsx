@@ -68,6 +68,7 @@ export default function VendasListaPanel({
   onReprocessarVenda,
   onToggleSelecaoTodasVendas,
   onToggleSelecaoVenda,
+  onVendaRowRef,
   reprocessandoRentabilidade,
   setFiltroCanalVenda,
   setFiltroStatusLista,
@@ -76,6 +77,8 @@ export default function VendasListaPanel({
   toggleVendaExpandida,
   totalVendasPeriodoReprocessamento,
   totalVendasSelecionadas,
+  vendaReprocessadaFocoId,
+  vendasReprocessadasIds,
   vendasSelecionadasIds,
   vendasExpandidas,
 }) {
@@ -246,9 +249,12 @@ export default function VendasListaPanel({
         onToggleVenda={toggleVendaExpandida}
         onToggleSelecaoTodasVendas={onToggleSelecaoTodasVendas}
         onToggleSelecaoVenda={onToggleSelecaoVenda}
+        onVendaRowRef={onVendaRowRef}
         reprocessandoRentabilidade={reprocessandoRentabilidade}
         todasVendasFiltradasSelecionadas={todasVendasFiltradasSelecionadas}
+        vendaReprocessadaFocoId={vendaReprocessadaFocoId}
         vendas={listaVendasFiltrada}
+        vendasReprocessadasIds={vendasReprocessadasIds}
         vendasSelecionadasIds={vendasSelecionadasIds}
         vendasExpandidas={vendasExpandidas}
       />
