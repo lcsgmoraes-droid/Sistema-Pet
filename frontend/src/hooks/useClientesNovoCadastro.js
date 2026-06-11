@@ -4,6 +4,7 @@ import api from "../api";
 import { debugLog } from "../utils/debug";
 import { useModulos } from "../contexts/ModulosContext";
 import { useClientesNovoEnderecos } from "./useClientesNovoEnderecos";
+import { normalizeClienteAlertasPdv } from "../utils/clienteAlertasPdv";
 
 const STEPS = [
   { number: 1, title: "Informacoes do cliente" },
@@ -62,6 +63,7 @@ function buildNovoClienteFormData(tipoCadastro, tipoPessoa) {
     recebe_repasse: false,
     gera_conta_pagar: false,
     observacoes: "",
+    alertas_pdv: [],
     tags: "",
   };
 }
@@ -119,6 +121,7 @@ function buildClienteFormData(cliente) {
     recebe_repasse: cliente.recebe_repasse || false,
     gera_conta_pagar: cliente.gera_conta_pagar || false,
     observacoes: cliente.observacoes || "",
+    alertas_pdv: normalizeClienteAlertasPdv(cliente.alertas_pdv),
     tags: "",
   };
 }
@@ -483,6 +486,7 @@ export function useClientesNovoCadastro({
       }
 
       const { celular_whatsapp, tags, ...clienteData } = formData;
+      clienteData.alertas_pdv = normalizeClienteAlertasPdv(clienteData.alertas_pdv);
 
       if (clienteData.is_entregador) {
         if (clienteData.tipo_cadastro === "funcionario") {
@@ -588,6 +592,7 @@ export function useClientesNovoCadastro({
         dia_semana_acerto: "Dia da Semana para Acerto",
         dia_mes_acerto: "Dia do Mes para Acerto",
         tipo_vinculo_entrega: "Tipo de Vinculo",
+        alertas_pdv: "Alertas do PDV",
       };
 
       let mensagemErro = "";

@@ -10,6 +10,7 @@ import CustomerIdentity from './ui/CustomerIdentity';
 import PetIdentity from './ui/PetIdentity';
 import ProductIdentity from './ui/ProductIdentity';
 import SaleReference from './ui/SaleReference';
+import { getClienteAlertasPdvAtivos } from '../utils/clienteAlertasPdv';
 
 /**
  * Widget de informações do cliente para PDV
@@ -31,6 +32,7 @@ export default function ClienteInfoWidget({ clienteId }) {
 
   // Estados de expansão das seções
   const [expandido, setExpandido] = useState({
+    alertasCliente: true,
     resumo: false,
     pets: false,
     alertasVet: false,
@@ -161,6 +163,7 @@ export default function ClienteInfoWidget({ clienteId }) {
     produtos_relacionados,
     padroes_sazonais
   } = info;
+  const alertasCliente = getClienteAlertasPdvAtivos(cliente);
 
   return (
     <div className="bg-white rounded-lg shadow-md overflow-hidden max-h-[85vh] overflow-y-auto">
@@ -216,6 +219,35 @@ export default function ClienteInfoWidget({ clienteId }) {
           </div>
         </div>
       </div>
+
+      {alertasCliente.length > 0 && (
+        <SecaoCollapsible
+          titulo="Alertas do Cliente"
+          icone={<FiAlertCircle />}
+          expandido={expandido.alertasCliente}
+          onToggle={() => toggleSecao('alertasCliente')}
+          badge={alertasCliente.length}
+          badgeColor="bg-amber-500"
+        >
+          <div className="space-y-2">
+            {alertasCliente.map((alerta, idx) => (
+              <div
+                key={`${alerta.titulo}_${idx}`}
+                className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2"
+              >
+                <p className="text-sm font-semibold text-amber-900">
+                  {alerta.titulo}
+                </p>
+                {alerta.mensagem && (
+                  <p className="mt-1 whitespace-pre-wrap break-words text-xs text-amber-800">
+                    {alerta.mensagem}
+                  </p>
+                )}
+              </div>
+            ))}
+          </div>
+        </SecaoCollapsible>
+      )}
 
       {/* RESUMO FINANCEIRO */}
       <SecaoCollapsible

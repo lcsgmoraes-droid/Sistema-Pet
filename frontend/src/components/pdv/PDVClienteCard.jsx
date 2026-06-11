@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { useLocation } from "react-router-dom";
 import { formatBRL, formatMoneyBRL } from "../../utils/formatters";
+import { getClienteAlertasPdvAtivos } from "../../utils/clienteAlertasPdv";
 import { buildPdvCouponTooltip } from "../../utils/pdvCouponTooltip";
 import { buildReturnTo } from "../../utils/petReturnFlow";
 import PessoaSelector from "../clientes/PessoaSelector";
@@ -217,6 +218,49 @@ function ClienteCreditoResumo({ creditoCliente }) {
       <div className="mt-1 text-xs text-blue-700">
         Este credito pode ser usado como forma de pagamento
       </div>
+    </div>
+  );
+}
+
+function alertaPdvClasses(prioridade) {
+  if (prioridade === "importante") {
+    return "border-red-200 bg-red-50 text-red-900";
+  }
+  if (prioridade === "info") {
+    return "border-blue-200 bg-blue-50 text-blue-900";
+  }
+  return "border-amber-200 bg-amber-50 text-amber-900";
+}
+
+function ClienteAlertasPdv({ cliente }) {
+  const alertas = getClienteAlertasPdvAtivos(cliente);
+
+  if (alertas.length === 0) {
+    return null;
+  }
+
+  return (
+    <div className="space-y-2">
+      {alertas.map((alerta, index) => (
+        <div
+          key={`${alerta.titulo}-${index}`}
+          className={`rounded-lg border px-3 py-2 text-sm ${alertaPdvClasses(
+            alerta.prioridade,
+          )}`}
+        >
+          <div className="flex min-w-0 items-start gap-2">
+            <AlertTriangle className="mt-0.5 h-4 w-4 flex-shrink-0" />
+            <div className="min-w-0">
+              <div className="font-semibold leading-tight">{alerta.titulo}</div>
+              {alerta.mensagem && (
+                <div className="mt-0.5 whitespace-pre-wrap break-words text-xs leading-snug">
+                  {alerta.mensagem}
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }
@@ -459,6 +503,8 @@ export default function PDVClienteCard({
             saldoCarimbos={saldoCarimbos}
             telefoneCliente={telefoneCliente}
           />
+
+          <ClienteAlertasPdv cliente={cliente} />
 
           <ClienteAcoesResumo
             modoVisualizacao={modoVisualizacao}

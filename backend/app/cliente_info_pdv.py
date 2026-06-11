@@ -17,6 +17,7 @@ from app.vendas_models import Venda, VendaItem
 from app.produtos_models import Produto
 from app.auth import get_current_user, get_current_user_and_tenant
 from app.veterinario_models import ExameVet
+from app.services.cliente_alertas_pdv import alertas_pdv_ativos
 
 router = APIRouter(prefix="/clientes", tags=["clientes"])
 
@@ -424,7 +425,8 @@ def get_cliente_info_pdv(
             "numero": cliente.numero,
             "bairro": cliente.bairro,
             "cidade": cliente.cidade,
-            "estado": cliente.estado
+            "estado": cliente.estado,
+            "alertas_pdv": alertas_pdv_ativos(getattr(cliente, "alertas_pdv", None)),
         },
         "resumo_financeiro": resumo_financeiro,
         "pets": pets_info,

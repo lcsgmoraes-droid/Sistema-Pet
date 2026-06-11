@@ -35,6 +35,7 @@ from app.services.pessoa_duplicate_service import (
     executar_fusoes_automaticas_pessoas_duplicadas,
     listar_sugestoes_duplicidade_pessoas,
 )
+from app.services.cliente_alertas_pdv import normalizar_alertas_pdv
 
 logger = logging.getLogger(__name__)
 
@@ -342,8 +343,13 @@ class ClienteCreate(BaseModel):
     data_ultimo_acerto: Optional[str] = None  # Data do Ãºltimo acerto (YYYY-MM-DD)
     
     observacoes: Optional[str] = None
+    alertas_pdv: List[dict] = Field(default_factory=list)
 
     model_config = {"from_attributes": True}
+
+    @validator("alertas_pdv", pre=True, always=True)
+    def normalize_alertas_pdv(cls, v):
+        return normalizar_alertas_pdv(v)
     
     @validator('email', 'cpf', 'telefone', 'celular', 'cep', 'endereco', 'numero', 
                'complemento', 'bairro', 'cidade', 'estado', 'observacoes',
@@ -440,9 +446,14 @@ class ClienteUpdate(BaseModel):
     controla_dre: Optional[bool] = None  # True = vai para DRE, False = nÃ£o classifica (produtos p/ revenda)
     
     observacoes: Optional[str] = None
+    alertas_pdv: Optional[List[dict]] = None
     ativo: Optional[bool] = None
 
     model_config = {"from_attributes": True}
+
+    @validator("alertas_pdv", pre=True)
+    def normalize_alertas_pdv(cls, v):
+        return normalizar_alertas_pdv(v)
     
     @validator('email', 'cpf', 'telefone', 'celular', 'cep', 'endereco', 'numero', 
                'complemento', 'bairro', 'cidade', 'estado', 'observacoes',
@@ -530,6 +541,7 @@ class ClienteResponse(BaseModel):
     controla_dre: bool = True  # True = vai para DRE, False = nÃ£o classifica (produtos p/ revenda)
     
     observacoes: Optional[str] = None
+    alertas_pdv: List[dict] = Field(default_factory=list)
     ativo: bool = True
     credito: Optional[Decimal] = Decimal('0.00')
     created_at: dt
@@ -556,6 +568,10 @@ class ClienteResponse(BaseModel):
             except:
                 return None
         return v
+
+    @validator("alertas_pdv", pre=True, always=True)
+    def normalize_alertas_pdv(cls, v):
+        return normalizar_alertas_pdv(v)
 
     @validator('pets', pre=True)
     def filter_active_pets(cls, v):
@@ -1359,6 +1375,7 @@ def update_cliente(
         "celular": cliente.celular,
         "parceiro_ativo": cliente.parceiro_ativo if hasattr(cliente, 'parceiro_ativo') else False,
         "data_fechamento_comissao": cliente.data_fechamento_comissao,
+        "alertas_pdv": normalizar_alertas_pdv(getattr(cliente, "alertas_pdv", None)),
         "ativo": cliente.ativo,
         "created_at": cliente.created_at,
         "updated_at": cliente.updated_at,
