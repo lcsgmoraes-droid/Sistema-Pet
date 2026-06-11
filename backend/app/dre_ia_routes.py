@@ -271,7 +271,7 @@ async def comparar_periodos(
 @router.get("/indices-mercado")
 async def obter_indices_mercado(
     setor: str = Query('pet_shop', description="Setor a consultar"),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(_usuario_dre),
     db: Session = Depends(get_db)
 ):
     """Obtém índices de mercado (benchmarks) para comparação"""
@@ -332,7 +332,7 @@ async def obter_indices_mercado(
 
 @router.get("/setores-disponiveis")
 async def listar_setores(
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(_usuario_dre),
     db: Session = Depends(get_db)
 ):
     """Lista setores disponíveis com índices de mercado"""
@@ -753,7 +753,7 @@ class DREDetalheResponse(BaseModel):
 @router.post("/calcular-detalhado", response_model=DREDetalheResponse)
 async def calcular_dre_detalhado(
     request: CalcularDREDetalhadadRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(_usuario_dre),
     db: Session = Depends(get_db)
 ):
     """
@@ -780,7 +780,7 @@ async def calcular_dre_detalhado(
 @router.post("/consolidado")
 async def calcular_dre_consolidado(
     request: dict,  # {data_inicio, data_fim, canais: [lista de canais]}
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(_usuario_dre),
     db: Session = Depends(get_db)
 ):
     """
@@ -835,7 +835,7 @@ class AlocarDespesaRequest(BaseModel):
 @router.post("/alocar-despesa")
 async def alocar_despesa(
     request: AlocarDespesaRequest,
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(_usuario_dre),
     db: Session = Depends(get_db)
 ):
     """
