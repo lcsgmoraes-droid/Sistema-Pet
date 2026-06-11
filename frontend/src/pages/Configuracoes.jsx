@@ -73,7 +73,7 @@ const cards = [
   },
   {
     title: "Integracoes",
-    description: "Stone, maquininha e conectores externos",
+    description: "Conectores externos ativos",
     icon: FiCreditCard,
     link: "/configuracoes/integracoes",
     color: "green",

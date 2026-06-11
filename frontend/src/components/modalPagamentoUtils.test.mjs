@@ -98,18 +98,18 @@ test("calcula dados auxiliares da venda sem depender do modal", () => {
   assert.equal(devePerguntarNotaFiscal({ status: "aberta" }), false);
 });
 
-test("identifica formas compativeis com envio para Stone POS", () => {
-  assert.equal(ehFormaPagamentoStonePos({ tipo: "cartao_credito" }), true);
-  assert.equal(ehFormaPagamentoStonePos({ tipo: "cartao_debito" }), true);
-  assert.equal(ehFormaPagamentoStonePos({ nome: "Pix" }), true);
+test("bloqueia envio para Stone POS porque a integracao foi descontinuada", () => {
+  assert.equal(ehFormaPagamentoStonePos({ tipo: "cartao_credito" }), false);
+  assert.equal(ehFormaPagamentoStonePos({ tipo: "cartao_debito" }), false);
+  assert.equal(ehFormaPagamentoStonePos({ nome: "Pix" }), false);
   assert.equal(ehFormaPagamentoStonePos({ tipo: "dinheiro" }), false);
 
-  assert.equal(mapearTipoPagamentoStonePos({ tipo: "cartao_credito" }), "credit");
-  assert.equal(mapearTipoPagamentoStonePos({ tipo: "cartao_debito" }), "debit");
-  assert.equal(mapearTipoPagamentoStonePos({ nome: "Pix QR Code" }), "pix");
+  assert.equal(mapearTipoPagamentoStonePos({ tipo: "cartao_credito" }), null);
+  assert.equal(mapearTipoPagamentoStonePos({ tipo: "cartao_debito" }), null);
+  assert.equal(mapearTipoPagamentoStonePos({ nome: "Pix QR Code" }), null);
 });
 
-test("libera Stone POS somente para venda sem pagamentos manuais", () => {
+test("nao libera Stone POS mesmo para venda sem pagamentos manuais", () => {
   const forma = { tipo: "cartao_credito" };
   assert.deepEqual(
     podeEnviarPagamentoStonePos({
@@ -119,7 +119,10 @@ test("libera Stone POS somente para venda sem pagamentos manuais", () => {
       valorRestante: 100,
       stonePedidoPendente: false,
     }),
-    { podeEnviar: true, motivo: "" },
+    {
+      podeEnviar: false,
+      motivo: "Integracao Stone POS descontinuada.",
+    },
   );
   assert.deepEqual(
     podeEnviarPagamentoStonePos({
@@ -131,7 +134,7 @@ test("libera Stone POS somente para venda sem pagamentos manuais", () => {
     }),
     {
       podeEnviar: false,
-      motivo: "Remova os pagamentos manuais antes de enviar para a Stone.",
+      motivo: "Integracao Stone POS descontinuada.",
     },
   );
 });
