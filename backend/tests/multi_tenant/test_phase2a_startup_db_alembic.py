@@ -1,3 +1,4 @@
+import ast
 import importlib
 import importlib.util
 import sys
@@ -42,6 +43,31 @@ def _set_runtime_environment(monkeypatch, environment, debug="false"):
 
 def _raise_head_error(*_args, **_kwargs):
     raise RuntimeError("head unavailable")
+
+
+def test_app_startup_calls_database_migration_guard():
+    main_path = Path(__file__).resolve().parents[2] / "app" / "main.py"
+    main_source = main_path.read_text(encoding="utf-8")
+    tree = ast.parse(main_source)
+    startup = next(
+        node for node in tree.body
+        if isinstance(node, ast.FunctionDef) and node.name == "on_startup"
+    )
+
+    ensure_calls = [
+        node for node in ast.walk(startup)
+        if isinstance(node, ast.Call)
+        and isinstance(node.func, ast.Name)
+        and node.func.id == "ensure_db_ready"
+    ]
+
+    assert ensure_calls, "on_startup deve chamar ensure_db_ready(engine)"
+    assert any(
+        call.args
+        and isinstance(call.args[0], ast.Name)
+        and call.args[0].id == "engine"
+        for call in ensure_calls
+    )
 
 
 def test_app_main_imports_with_debug_false_and_runtime_modules_loaded(monkeypatch):
