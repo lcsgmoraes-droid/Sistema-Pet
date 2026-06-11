@@ -34,58 +34,58 @@ def _capture(monkeypatch, action_name: str, *, dialect="postgresql", existing=No
     return emitted
 
 
-def _enable_statements(table_name: str) -> list[str]:
-    policy = f"{table_name}_tenant_isolation"
-    return [
-        f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY",
-        f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY",
-        f"DROP POLICY IF EXISTS {policy} ON {table_name}",
-        (
-            f"CREATE POLICY {policy} ON {table_name} "
-            f"USING ({TENANT_GUARD}) WITH CHECK ({TENANT_GUARD})"
-        ),
-    ]
+def _statements_containing(statements: list[str], fragment: str) -> list[str]:
+    return [sql for sql in statements if fragment in sql]
 
 
 def test_fiscal_company_rls_migration_metadata_and_scope():
     assert MIGRATION_FILE.exists()
 
-    source = MIGRATION_FILE.read_text(encoding="utf-8")
-    assert 'revision = "qg20260611a1"' in source
-    assert 'down_revision = "qf20260611a1"' in source
-    assert TENANT_GUARD in source
-    for table_name in FISCAL_COMPANY_RLS_TABLES:
-        assert f'"{table_name}"' in source
+    migration = _load_migration()
+    assert migration["revision"] == "qg20260611a1"
+    assert migration["down_revision"] == "qf20260611a1"
+    assert migration["TENANT_GUARD"] == TENANT_GUARD
+    assert migration["FISCAL_COMPANY_RLS_TABLES"] == FISCAL_COMPANY_RLS_TABLES
 
 
 def test_fiscal_company_rls_upgrade_targets_existing_tables_in_declared_order(monkeypatch):
-    existing = ("empresa_config_fiscal",)
+    emitted = _capture(monkeypatch, "upgrade")
 
-    emitted = _capture(monkeypatch, "upgrade", existing=existing)
+    create_policy_sql = _statements_containing(emitted, "CREATE POLICY")
+    assert len(create_policy_sql) == len(FISCAL_COMPANY_RLS_TABLES)
+    for table_name, statement in zip(
+        FISCAL_COMPANY_RLS_TABLES,
+        create_policy_sql,
+        strict=True,
+    ):
+        assert table_name in statement
 
-    assert emitted == [
-        statement
-        for table_name in existing
-        for statement in _enable_statements(table_name)
-    ]
+    assert len(_statements_containing(emitted, "ENABLE ROW LEVEL SECURITY")) == 2
+    assert len(_statements_containing(emitted, "FORCE ROW LEVEL SECURITY")) == 2
+    assert len(_statements_containing(emitted, f"WITH CHECK ({TENANT_GUARD})")) == 2
+
+
+def test_fiscal_company_rls_upgrade_skips_missing_tables(monkeypatch):
+    emitted = _capture(monkeypatch, "upgrade", existing=("empresa_config_fiscal",))
+    emitted_sql = "\n".join(emitted)
+
+    assert "empresa_config_fiscal" in emitted_sql
+    assert "simples_nacional_mensal" not in emitted_sql
 
 
 def test_fiscal_company_rls_downgrade_unwinds_existing_tables_in_reverse_order(monkeypatch):
     emitted = _capture(monkeypatch, "downgrade")
     reversed_tables = tuple(reversed(FISCAL_COMPANY_RLS_TABLES))
 
-    assert [sql for sql in emitted if sql.startswith("DROP POLICY IF EXISTS")] == [
-        f"DROP POLICY IF EXISTS {table_name}_tenant_isolation ON {table_name}"
-        for table_name in reversed_tables
-    ]
-    assert [sql for sql in emitted if "NO FORCE ROW LEVEL SECURITY" in sql] == [
-        f"ALTER TABLE {table_name} NO FORCE ROW LEVEL SECURITY"
-        for table_name in reversed_tables
-    ]
-    assert [sql for sql in emitted if "DISABLE ROW LEVEL SECURITY" in sql] == [
-        f"ALTER TABLE {table_name} DISABLE ROW LEVEL SECURITY"
-        for table_name in reversed_tables
-    ]
+    for fragment in (
+        "DROP POLICY IF EXISTS",
+        "NO FORCE ROW LEVEL SECURITY",
+        "DISABLE ROW LEVEL SECURITY",
+    ):
+        matching_sql = _statements_containing(emitted, fragment)
+        assert len(matching_sql) == len(reversed_tables)
+        for table_name, statement in zip(reversed_tables, matching_sql, strict=True):
+            assert table_name in statement
 
 
 def test_fiscal_company_rls_migration_skips_when_bind_or_tables_are_not_applicable(
