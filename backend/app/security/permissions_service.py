@@ -4,7 +4,6 @@ from uuid import UUID
 from typing import Optional
 
 from app.tenancy.context import get_current_tenant
-from app.auth import get_current_user
 from app.auth.permission_dependencies import expand_permissions
 from app.models import UserTenant, RolePermission, Permission, User
 
@@ -17,7 +16,7 @@ def get_user_permissions(db: Session, user_id: int, tenant_id: UUID) -> set[str]
         .filter(
             UserTenant.user_id == user_id,
             UserTenant.tenant_id == tenant_id,
-            UserTenant.is_active == True,
+            UserTenant.is_active.is_(True),
             RolePermission.tenant_id == tenant_id,
         )
         .all()
@@ -41,12 +40,8 @@ def check_permission(
         permission: Código da permissão (ex: "produtos.visualizar")
         tenant_id: UUID do tenant (opcional, usa contexto se não fornecido)
     """
-    # Verifica se o usuário é admin - admins têm todas as permissões
-    user = current_user
-    if user is None:
-        user = db.query(User).filter(User.id == user_id).first()
-    if user and user.is_admin:
-        return  # Admin tem acesso total, não precisa verificar permissões
+    # Administrador de loja e definido por role/permissao no tenant selecionado.
+    # O flag global User.is_admin fica reservado para rotas operacionais do sistema.
     
     # Se tenant_id não foi passado, tenta pegar do contexto
     if tenant_id is None:
