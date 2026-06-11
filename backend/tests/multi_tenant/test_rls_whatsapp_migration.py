@@ -1,0 +1,105 @@
+import runpy
+from pathlib import Path
+from types import SimpleNamespace
+
+
+MIGRATION_FILE = Path(__file__).resolve().parents[2] / "alembic" / "versions" / (
+    "qf20260611a1_rls_whatsapp_tables.py"
+)
+
+WHATSAPP_RLS_TABLES = (
+    "tenant_whatsapp_config",
+    "whatsapp_ia_sessions",
+    "whatsapp_ia_messages",
+    "whatsapp_ia_metrics",
+    "whatsapp_agents",
+    "whatsapp_handoffs",
+    "whatsapp_internal_notes",
+    "data_privacy_consents",
+    "data_access_logs",
+    "data_deletion_requests",
+    "security_audit_logs",
+)
+
+TENANT_GUARD = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid"
+
+
+def _load_migration():
+    return runpy.run_path(str(MIGRATION_FILE))
+
+
+def _capture(monkeypatch, action_name: str, *, dialect="postgresql", existing=None):
+    migration = _load_migration()
+    emitted: list[str] = []
+    present = set(WHATSAPP_RLS_TABLES if existing is None else existing)
+    bind = SimpleNamespace(dialect=SimpleNamespace(name=dialect))
+    inspector = SimpleNamespace(has_table=lambda table_name: table_name in present)
+
+    monkeypatch.setattr(migration["op"], "get_bind", lambda: bind)
+    monkeypatch.setattr(migration["op"], "execute", lambda sql: emitted.append(str(sql)))
+    monkeypatch.setattr(migration["sa"], "inspect", lambda _bind: inspector)
+
+    migration[action_name]()
+    return emitted
+
+
+def _enable_statements(table_name: str) -> list[str]:
+    policy = f"{table_name}_tenant_isolation"
+    return [
+        f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY",
+        f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY",
+        f"DROP POLICY IF EXISTS {policy} ON {table_name}",
+        (
+            f"CREATE POLICY {policy} ON {table_name} "
+            f"USING ({TENANT_GUARD}) WITH CHECK ({TENANT_GUARD})"
+        ),
+    ]
+
+
+def test_whatsapp_rls_migration_metadata_and_scope():
+    assert MIGRATION_FILE.exists()
+
+    source = MIGRATION_FILE.read_text(encoding="utf-8")
+    assert 'revision = "qf20260611a1"' in source
+    assert 'down_revision = "qd20260611a1"' in source
+    assert TENANT_GUARD in source
+    for table_name in WHATSAPP_RLS_TABLES:
+        assert f'"{table_name}"' in source
+
+
+def test_whatsapp_rls_upgrade_targets_existing_tables_in_declared_order(monkeypatch):
+    existing = (
+        "tenant_whatsapp_config",
+        "whatsapp_internal_notes",
+        "data_access_logs",
+        "security_audit_logs",
+    )
+
+    emitted = _capture(monkeypatch, "upgrade", existing=existing)
+
+    assert emitted == [
+        statement
+        for table_name in existing
+        for statement in _enable_statements(table_name)
+    ]
+
+
+def test_whatsapp_rls_downgrade_unwinds_existing_tables_in_reverse_order(monkeypatch):
+    emitted = _capture(monkeypatch, "downgrade")
+
+    assert (
+        emitted[0]
+        == "DROP POLICY IF EXISTS security_audit_logs_tenant_isolation ON security_audit_logs"
+    )
+    assert emitted[-1] == "ALTER TABLE tenant_whatsapp_config DISABLE ROW LEVEL SECURITY"
+    assert emitted.count("ALTER TABLE whatsapp_ia_messages NO FORCE ROW LEVEL SECURITY") == 1
+    assert [sql for sql in emitted if "DISABLE ROW LEVEL SECURITY" in sql] == [
+        f"ALTER TABLE {table_name} DISABLE ROW LEVEL SECURITY"
+        for table_name in reversed(WHATSAPP_RLS_TABLES)
+    ]
+
+
+def test_whatsapp_rls_migration_skips_when_bind_or_tables_are_not_applicable(monkeypatch):
+    for kwargs in ({"dialect": "sqlite"}, {"existing": ()}):
+        assert _capture(monkeypatch, "upgrade", **kwargs) == []
+        assert _capture(monkeypatch, "downgrade", **kwargs) == []
