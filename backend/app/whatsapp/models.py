@@ -17,6 +17,9 @@ from app.base_models import TenantScoped
 from app.db import Base
 
 
+TENANTS_ID_FK = "tenants.id"
+
+
 def generate_uuid():
     """Gera UUID como string"""
     return str(uuid.uuid4())
@@ -28,7 +31,7 @@ class TenantWhatsAppConfig(TenantScoped, Base):
     __table_args__ = {'extend_existing': True}
     
     id = Column(String, primary_key=True, default=generate_uuid)
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey(TENANTS_ID_FK), nullable=False)
     
     # Provider Config
     provider = Column(String(50), default="360dialog")  # 360dialog, z-api, twilio
@@ -69,7 +72,7 @@ class WhatsAppSession(TenantScoped, Base):
     __table_args__ = {'extend_existing': True}
     
     id = Column(String, primary_key=True, default=generate_uuid)
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey(TENANTS_ID_FK), nullable=False)
     cliente_id = Column(Integer, ForeignKey("clientes.id"))
     phone_number = Column(String(20), nullable=False)
     
@@ -102,7 +105,7 @@ class WhatsAppMessage(TenantScoped, Base):
     
     id = Column(String, primary_key=True, default=generate_uuid)
     session_id = Column(String, ForeignKey("whatsapp_ia_sessions.id"), nullable=False)
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey(TENANTS_ID_FK), nullable=False)
     
     # Message Info
     tipo = Column(String(10), nullable=False)  # recebida, enviada
@@ -140,7 +143,7 @@ class WhatsAppMetric(TenantScoped, Base):
     __table_args__ = {'extend_existing': True}
     
     id = Column(String, primary_key=True, default=generate_uuid)
-    tenant_id = Column(UUID(as_uuid=True), ForeignKey("tenants.id"), nullable=False)
+    tenant_id = Column(UUID(as_uuid=True), ForeignKey(TENANTS_ID_FK), nullable=False)
     
     # Metric Type
     metric_type = Column(String(50), nullable=False)  # message_count, ai_call, conversion, etc
