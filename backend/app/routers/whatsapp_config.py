@@ -40,7 +40,7 @@ def get_whatsapp_config(
     Busca configuração WhatsApp do tenant.
     """
     try:
-        logger.info(f"📡 GET /api/whatsapp/config - tenant={tenant_id}")
+        logger.info("GET /api/whatsapp/config")
         
         config = db.query(TenantWhatsAppConfig).filter(
             TenantWhatsAppConfig.tenant_id == tenant_id

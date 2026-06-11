@@ -76,7 +76,7 @@ async def webhook_verification(
     
     Você deve retornar hub.challenge se verify_token estiver correto.
     """
-    logger.info(f"Verificação webhook recebida: tenant={tenant_id}, mode={hub_mode}")
+    logger.info("Verificacao webhook recebida")
     
     # Buscar config do tenant
     with whatsapp_tenant_context(tenant_id):
@@ -85,12 +85,12 @@ async def webhook_verification(
         ).first()
     
     if not config or not config.webhook_secret:
-        logger.warning(f"Tenant {tenant_id} sem configuração WhatsApp")
+        logger.warning("Tenant sem configuracao WhatsApp")
         raise HTTPException(status_code=404, detail="Configuração não encontrada")
     
     # Validar verify token
     if hub_mode == "subscribe" and hub_verify_token == config.webhook_secret:
-        logger.info(f"✅ Webhook verificado com sucesso: tenant={tenant_id}")
+        logger.info("Webhook verificado com sucesso")
         return int(hub_challenge)  # Meta espera número
     
     logger.warning(f"❌ Falha na verificação: token inválido")
@@ -137,7 +137,7 @@ async def receive_webhook(
         signature = signature.replace("sha256=", "")
         
         if not validate_webhook_signature(body, signature, config.webhook_secret):
-            logger.warning(f"❌ Assinatura inválida: tenant={tenant_id}")
+            logger.warning("Assinatura invalida no webhook")
             raise HTTPException(status_code=403, detail="Assinatura inválida")
     
     # 3. Parsear payload JSON
