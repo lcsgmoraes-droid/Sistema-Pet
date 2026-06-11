@@ -86,16 +86,19 @@ def test_whatsapp_rls_upgrade_targets_existing_tables_in_declared_order(monkeypa
 
 def test_whatsapp_rls_downgrade_unwinds_existing_tables_in_reverse_order(monkeypatch):
     emitted = _capture(monkeypatch, "downgrade")
+    reversed_tables = tuple(reversed(WHATSAPP_RLS_TABLES))
 
-    assert (
-        emitted[0]
-        == "DROP POLICY IF EXISTS security_audit_logs_tenant_isolation ON security_audit_logs"
-    )
-    assert emitted[-1] == "ALTER TABLE tenant_whatsapp_config DISABLE ROW LEVEL SECURITY"
-    assert emitted.count("ALTER TABLE whatsapp_ia_messages NO FORCE ROW LEVEL SECURITY") == 1
+    assert [sql for sql in emitted if sql.startswith("DROP POLICY IF EXISTS")] == [
+        f"DROP POLICY IF EXISTS {table_name}_tenant_isolation ON {table_name}"
+        for table_name in reversed_tables
+    ]
+    assert [sql for sql in emitted if "NO FORCE ROW LEVEL SECURITY" in sql] == [
+        f"ALTER TABLE {table_name} NO FORCE ROW LEVEL SECURITY"
+        for table_name in reversed_tables
+    ]
     assert [sql for sql in emitted if "DISABLE ROW LEVEL SECURITY" in sql] == [
         f"ALTER TABLE {table_name} DISABLE ROW LEVEL SECURITY"
-        for table_name in reversed(WHATSAPP_RLS_TABLES)
+        for table_name in reversed_tables
     ]
 
 
