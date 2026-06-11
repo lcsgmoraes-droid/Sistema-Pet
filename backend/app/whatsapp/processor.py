@@ -24,6 +24,7 @@ from app.ai.llm_client import LLMClient, PromptBuilder, AVAILABLE_FUNCTIONS_PHAS
 from app.whatsapp.sender import send_whatsapp_message
 from app.whatsapp.models import WhatsAppSession, WhatsAppMessage, WhatsAppMetric, TenantWhatsAppConfig
 from app.whatsapp.handoff_manager import HandoffManager
+from app.whatsapp.tenant_context import whatsapp_tenant_context
 
 logger = logging.getLogger(__name__)
 
@@ -38,9 +39,10 @@ class MessageProcessor:
         self.tenant_id = tenant_id
         
         # Buscar config
-        config = db.query(TenantWhatsAppConfig).filter(
-            TenantWhatsAppConfig.tenant_id == tenant_id
-        ).first()
+        with whatsapp_tenant_context(tenant_id):
+            config = db.query(TenantWhatsAppConfig).filter(
+                TenantWhatsAppConfig.tenant_id == tenant_id
+            ).first()
 
         fallback_openai_key = os.getenv("OPENAI_API_KEY", "")
         if not config:
@@ -85,8 +87,117 @@ class MessageProcessor:
             "transferir para humano",
         ]
         return any(trigger in text for trigger in triggers)
+
+    async def _build_context(self, session_id: str, message_content: str) -> Dict[str, Any]:
+        try:
+            return await self.context_builder.build_context(
+                tenant_id=self.tenant_id,
+                session_id=session_id,
+                message=message_content,
+            )
+        except Exception as context_error:
+            logger.warning(f"Falha ao construir contexto, seguindo com contexto mínimo: {context_error}")
+            self.db.rollback()
+            return {}
+
+    async def _detect_intent(self, message_content: str, context: Dict[str, Any]) -> tuple[str, float]:
+        if not self.ai_enabled:
+            return "geral", 0.6
+
+        intent_result = await self.intent_classifier.classify(
+            message=message_content,
+            context=context,
+        )
+        return intent_result["intent"], intent_result["confidence"]
+
+    def _save_message_intent(self, message_id: str, intent: str) -> None:
+        msg = self.db.query(WhatsAppMessage).get(message_id)
+        if not msg:
+            return
+
+        try:
+            msg.intent_detected = intent
+            self.db.commit()
+        except Exception as intent_save_error:
+            logger.warning(f"Falha ao salvar intent na mensagem: {intent_save_error}")
+            self.db.rollback()
+
+    def _save_session_intent(self, session_id: str, intent: str) -> None:
+        session = self.db.query(WhatsAppSession).get(session_id)
+        if not session:
+            return
+
+        try:
+            session.last_intent = intent
+            self.db.commit()
+        except Exception as session_save_error:
+            logger.warning(f"Falha ao salvar intent na sessão: {session_save_error}")
+            self.db.rollback()
+
+    def _save_detected_intent(self, message_id: str, session_id: str, intent: str) -> None:
+        self._save_message_intent(message_id, intent)
+        self._save_session_intent(session_id, intent)
+
+    async def _maybe_transfer_to_human(
+        self,
+        session_id: str,
+        message_content: str,
+        intent: str,
+        confidence: float,
+    ) -> Optional[Dict[str, Any]]:
+        if self._is_explicit_human_request(message_content):
+            return await self._transfer_to_human(
+                session_id=session_id,
+                reason="manual_request",
+                reason_details="Pedido explícito do cliente por atendente humano",
+            )
+
+        if self.router.should_transfer_to_human(intent, confidence):
+            return await self._transfer_to_human(session_id, intent)
+
+        return None
+
+    async def _send_basic_mode_response(self, session_id: str, intent: str) -> Dict[str, Any]:
+        return await self._send_response(
+            session_id=session_id,
+            response=(
+                "Recebi sua mensagem e já vou te ajudar. "
+                "No momento estou em modo básico e em seguida um atendente assume se necessário."
+            ),
+            intent=intent,
+            model_used="fallback_no_openai",
+            tokens_input=0,
+            tokens_output=0,
+            processing_time_ms=0,
+        )
+
+    async def _handle_processing_error(self, session_id: str, error: Exception) -> Dict[str, Any]:
+        logger.error(f"❌ Erro ao processar mensagem: {error}")
+        self.db.rollback()
+        fallback_message = await send_whatsapp_message(
+            db=self.db,
+            tenant_id=self.tenant_id,
+            session_id=session_id,
+            message="Recebi sua mensagem e já estou te atendendo. Pode me enviar novamente em texto curto?",
+        )
+        if fallback_message:
+            return {"action": "fallback_responded", "error": str(error)}
+        return {"action": "error", "error": str(error)}
     
     async def process_message(
+        self,
+        session_id: str,
+        message_id: str,
+        message_content: str
+    ) -> Dict[str, Any]:
+        with whatsapp_tenant_context(self.tenant_id):
+            return await self._process_message_with_context(
+                session_id=session_id,
+                message_id=message_id,
+                message_content=message_content,
+            )
+
+    async def _process_message_with_context(
         self,
         session_id: str,
         message_id: str,
@@ -114,59 +225,23 @@ class MessageProcessor:
                 return {"action": "skipped", "reason": "auto_response_disabled"}
             
             # 1. Construir contexto
-            try:
-                context = await self.context_builder.build_context(
-                    tenant_id=self.tenant_id,
-                    session_id=session_id,
-                    message=message_content
-                )
-            except Exception as context_error:
-                logger.warning(f"Falha ao construir contexto, seguindo com contexto mínimo: {context_error}")
-                self.db.rollback()
-                context = {}
+            context = await self._build_context(session_id, message_content)
 
             # 2. Classificar intenção
-            if self.ai_enabled:
-                intent_result = await self.intent_classifier.classify(
-                    message=message_content,
-                    context=context
-                )
-                intent = intent_result["intent"]
-                confidence = intent_result["confidence"]
-            else:
-                intent = "geral"
-                confidence = 0.6
+            intent, confidence = await self._detect_intent(message_content, context)
             
-            # Atualizar mensagem com intent detectado
-            msg = self.db.query(WhatsAppMessage).get(message_id)
-            if msg:
-                try:
-                    msg.intent_detected = intent
-                    self.db.commit()
-                except Exception as intent_save_error:
-                    logger.warning(f"Falha ao salvar intent na mensagem: {intent_save_error}")
-                    self.db.rollback()
-            
-            # Atualizar sessão com último intent
-            session = self.db.query(WhatsAppSession).get(session_id)
-            if session:
-                try:
-                    session.last_intent = intent
-                    self.db.commit()
-                except Exception as session_save_error:
-                    logger.warning(f"Falha ao salvar intent na sessão: {session_save_error}")
-                    self.db.rollback()
+            # Atualizar mensagem e sessão com intent detectado
+            self._save_detected_intent(message_id, session_id, intent)
             
             # 3. Verificar se deve transferir para humano
-            if self._is_explicit_human_request(message_content):
-                return await self._transfer_to_human(
-                    session_id=session_id,
-                    reason="manual_request",
-                    reason_details="Pedido explícito do cliente por atendente humano"
-                )
-
-            if self.router.should_transfer_to_human(intent, confidence):
-                return await self._transfer_to_human(session_id, intent)
+            transfer_result = await self._maybe_transfer_to_human(
+                session_id=session_id,
+                message_content=message_content,
+                intent=intent,
+                confidence=confidence,
+            )
+            if transfer_result:
+                return transfer_result
             
             # 4. Resposta rápida (sem IA) para intents simples
             quick_response = self.router.get_quick_response(
@@ -187,18 +262,7 @@ class MessageProcessor:
             
             # 5. Processar com IA
             if not self.ai_enabled:
-                return await self._send_response(
-                    session_id=session_id,
-                    response=(
-                        "Recebi sua mensagem e já vou te ajudar. "
-                        "No momento estou em modo básico e em seguida um atendente assume se necessário."
-                    ),
-                    intent=intent,
-                    model_used="fallback_no_openai",
-                    tokens_input=0,
-                    tokens_output=0,
-                    processing_time_ms=0
-                )
+                return await self._send_basic_mode_response(session_id, intent)
 
             return await self._process_with_ai(
                 session_id=session_id,
@@ -208,18 +272,7 @@ class MessageProcessor:
             )
             
         except Exception as e:
-            logger.error(f"❌ Erro ao processar mensagem: {e}")
-            self.db.rollback()
-            # Fallback operacional: tenta responder mesmo com erro interno.
-            fallback_message = await send_whatsapp_message(
-                db=self.db,
-                tenant_id=self.tenant_id,
-                session_id=session_id,
-                message="Recebi sua mensagem e já estou te atendendo. Pode me enviar novamente em texto curto?"
-            )
-            if fallback_message:
-                return {"action": "fallback_responded", "error": str(e)}
-            return {"action": "error", "error": str(e)}
+            return await self._handle_processing_error(session_id, e)
         
         finally:
             # Registrar métrica
@@ -516,6 +569,10 @@ class MessageProcessor:
         }
     
     async def _log_metric(self, metric_type: str, value: float):
+        with whatsapp_tenant_context(self.tenant_id):
+            return await self._log_metric_with_context(metric_type, value)
+
+    async def _log_metric_with_context(self, metric_type: str, value: float):
         """Registra métrica no banco."""
         try:
             metric = WhatsAppMetric(

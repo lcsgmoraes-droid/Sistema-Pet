@@ -8,6 +8,7 @@ from dataclasses import dataclass, field
 from sqlalchemy.orm import Session
 from app.whatsapp.models import WhatsAppSession, WhatsAppMessage
 from app.whatsapp.intents import IntentType
+from app.whatsapp.tenant_context import whatsapp_tenant_context
 import logging
 
 logger = logging.getLogger(__name__)
@@ -98,6 +99,21 @@ class ContextManager:
         self._cleanup_interval_minutes = 30
     
     def get_or_create_context(
+        self,
+        db: Session,
+        phone_number: str,
+        tenant_id: str,
+        session_id: Optional[str] = None
+    ) -> ConversationContext:
+        with whatsapp_tenant_context(tenant_id):
+            return self._get_or_create_context_with_context(
+                db=db,
+                phone_number=phone_number,
+                tenant_id=tenant_id,
+                session_id=session_id,
+            )
+
+    def _get_or_create_context_with_context(
         self,
         db: Session,
         phone_number: str,

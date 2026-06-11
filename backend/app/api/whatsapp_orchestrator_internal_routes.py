@@ -8,6 +8,7 @@ Seguranca por token interno dedicado.
 import os
 import io
 import asyncio
+import uuid as _uuid_mod
 from typing import Literal, Optional
 
 import httpx
@@ -17,6 +18,7 @@ from sqlalchemy.orm import Session
 from openai import OpenAI
 
 from app.db import get_session
+from app.tenancy.context import clear_current_tenant, set_current_tenant
 from app.whatsapp.webhook import normalize_phone, process_incoming_message
 from app.whatsapp.handoff_manager import HandoffManager
 from app.whatsapp.models import WhatsAppSession, TenantWhatsAppConfig
@@ -189,7 +191,77 @@ def _validate_internal_token(x_internal_token: Optional[str]) -> None:
         )
 
 
-@router.post("/{tenant_id}/ingest", response_model=InternalIngestResponse)
+def _parse_tenant_uuid(tenant_id: str) -> _uuid_mod.UUID:
+    try:
+        return _uuid_mod.UUID(tenant_id)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="tenant_id inválido") from exc
+
+
+async def _enrich_payload_media(payload: InternalIngestRequest, api_key: str) -> None:
+    if payload.message_type == "audio" and not (payload.transcription_text or "").strip():
+        payload.transcription_text = await _transcribe_audio_from_media_url(
+            media_url=(payload.media_url or "").strip(),
+            api_key=api_key,
+        )
+        return
+
+    if payload.message_type == "image" and not (payload.image_analysis_text or "").strip():
+        payload.image_analysis_text = await _analyze_image_from_media_url(
+            media_url=(payload.media_url or "").strip(),
+            caption=(payload.caption or "").strip(),
+            api_key=api_key,
+        )
+
+
+def _latest_session_for_phone(
+    db: Session,
+    tenant_uuid: _uuid_mod.UUID,
+    normalized_phone: str,
+) -> Optional[WhatsAppSession]:
+    return (
+        db.query(WhatsAppSession)
+        .filter(
+            WhatsAppSession.tenant_id == tenant_uuid,
+            WhatsAppSession.phone_number == normalized_phone,
+        )
+        .order_by(WhatsAppSession.last_message_at.desc())
+        .first()
+    )
+
+
+def _ensure_handoff_for_human_request(
+    db: Session,
+    tenant_id: str,
+    tenant_uuid: _uuid_mod.UUID,
+    normalized_phone: str,
+    message_content: str,
+) -> None:
+    if not _is_explicit_human_request(message_content):
+        return
+
+    session = _latest_session_for_phone(db, tenant_uuid, normalized_phone)
+    if not session:
+        return
+
+    handoff_manager = HandoffManager(db, tenant_id)
+    if handoff_manager.get_active_handoff(session.id):
+        return
+
+    handoff_manager.create_handoff(
+        session_id=session.id,
+        phone_number=normalized_phone,
+        reason="manual_request",
+        priority="high",
+        reason_details="Pedido explícito via canal interno: atendimento humano",
+    )
+
+
+@router.post(
+    "/{tenant_id}/ingest",
+    response_model=InternalIngestResponse,
+    responses={400: {"description": "tenant_id, telefone ou conteudo invalido"}},
+)
 async def ingest_message(
     tenant_id: str,
     payload: InternalIngestRequest,
@@ -206,23 +278,27 @@ async def ingest_message(
     """
     _validate_internal_token(x_internal_token)
 
+    tenant_uuid = _parse_tenant_uuid(tenant_id)
+    set_current_tenant(tenant_uuid)
+    try:
+        return await _ingest_message_inner(tenant_id, tenant_uuid, payload, db)
+    finally:
+        clear_current_tenant()
+
+
+async def _ingest_message_inner(
+    tenant_id: str,
+    tenant_uuid: _uuid_mod.UUID,
+    payload: InternalIngestRequest,
+    db: Session,
+):
     normalized_phone = normalize_phone(payload.phone)
     if not normalized_phone:
         raise HTTPException(status_code=400, detail="Telefone invalido")
 
     # Tenta enriquecer audio/imagem com IA quando o orquestrador nao enviou transcricao/analise.
     api_key = _resolve_openai_api_key(db, tenant_id)
-    if payload.message_type == "audio" and not (payload.transcription_text or "").strip():
-        payload.transcription_text = await _transcribe_audio_from_media_url(
-            media_url=(payload.media_url or "").strip(),
-            api_key=api_key,
-        )
-    if payload.message_type == "image" and not (payload.image_analysis_text or "").strip():
-        payload.image_analysis_text = await _analyze_image_from_media_url(
-            media_url=(payload.media_url or "").strip(),
-            caption=(payload.caption or "").strip(),
-            api_key=api_key,
-        )
+    await _enrich_payload_media(payload, api_key)
 
     message_content = _build_message_content(payload)
     if not message_content:
@@ -239,29 +315,14 @@ async def ingest_message(
     )
 
     # Fallback operacional: cria handoff direto quando o cliente pedir humano,
-    # mesmo se o processor de IA estiver indisponível.
-    if _is_explicit_human_request(message_content):
-        session = (
-            db.query(WhatsAppSession)
-            .filter(
-                WhatsAppSession.tenant_id == tenant_id,
-                WhatsAppSession.phone_number == normalized_phone,
-            )
-            .order_by(WhatsAppSession.last_message_at.desc())
-            .first()
-        )
-
-        if session:
-            handoff_manager = HandoffManager(db, tenant_id)
-            active_handoff = handoff_manager.get_active_handoff(session.id)
-            if not active_handoff:
-                handoff_manager.create_handoff(
-                    session_id=session.id,
-                    phone_number=normalized_phone,
-                    reason="manual_request",
-                    priority="high",
-                    reason_details="Pedido explícito via canal interno: atendimento humano",
-                )
+    # mesmo se o processor de IA estiver indisponivel.
+    _ensure_handoff_for_human_request(
+        db=db,
+        tenant_id=tenant_id,
+        tenant_uuid=tenant_uuid,
+        normalized_phone=normalized_phone,
+        message_content=message_content,
+    )
 
     return InternalIngestResponse(
         success=True,

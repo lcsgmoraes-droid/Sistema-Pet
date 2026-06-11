@@ -8,8 +8,6 @@ import logging
 
 from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
-from app.models import User
-
 from app.whatsapp.schemas import (
     TenantWhatsAppConfigCreate,
     TenantWhatsAppConfigUpdate,
@@ -25,18 +23,22 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/whatsapp", tags=["WhatsApp"])
 
 
+async def _tenant_whatsapp(user_and_tenant=Depends(get_current_user_and_tenant)):
+    return user_and_tenant[1]
+
+
 # ============================================================================
 # CONFIGURAÇÃO
 # ============================================================================
 
 @router.get("/config", response_model=TenantWhatsAppConfigResponse)
 async def get_config(
-    current_user: User = Depends(get_current_user_and_tenant),
+    tenant_id=Depends(_tenant_whatsapp),
     db: Session = Depends(get_session)
 ):
     """Obtém configuração WhatsApp do tenant"""
     config = db.query(TenantWhatsAppConfig).filter(
-        TenantWhatsAppConfig.tenant_id == current_user.tenant_id
+        TenantWhatsAppConfig.tenant_id == tenant_id
     ).first()
     
     if not config:
@@ -148,14 +150,14 @@ async def get_ultimas_mensagens_cliente(
 @router.post("/config", response_model=TenantWhatsAppConfigResponse, status_code=201)
 async def create_config(
     config_data: TenantWhatsAppConfigCreate,
-    current_user: User = Depends(get_current_user_and_tenant),
+    tenant_id=Depends(_tenant_whatsapp),
     db: Session = Depends(get_session)
 ):
     """Cria configuração WhatsApp"""
     
     # Verificar se já existe
     existing = db.query(TenantWhatsAppConfig).filter(
-        TenantWhatsAppConfig.tenant_id == current_user.tenant_id
+        TenantWhatsAppConfig.tenant_id == tenant_id
     ).first()
     
     if existing:
@@ -166,7 +168,7 @@ async def create_config(
     
     # Criar nova configuração
     new_config = TenantWhatsAppConfig(
-        tenant_id=current_user.tenant_id,
+        tenant_id=tenant_id,
         **config_data.model_dump()
     )
     
@@ -180,13 +182,13 @@ async def create_config(
 @router.put("/config", response_model=TenantWhatsAppConfigResponse)
 async def update_config(
     config_data: TenantWhatsAppConfigUpdate,
-    current_user: User = Depends(get_current_user_and_tenant),
+    tenant_id=Depends(_tenant_whatsapp),
     db: Session = Depends(get_session)
 ):
     """Atualiza configuração WhatsApp"""
     
     config = db.query(TenantWhatsAppConfig).filter(
-        TenantWhatsAppConfig.tenant_id == current_user.tenant_id
+        TenantWhatsAppConfig.tenant_id == tenant_id
     ).first()
     
     if not config:
@@ -204,13 +206,13 @@ async def update_config(
 
 @router.delete("/config", status_code=204)
 async def delete_config(
-    current_user: User = Depends(get_current_user_and_tenant),
+    tenant_id=Depends(_tenant_whatsapp),
     db: Session = Depends(get_session)
 ):
     """Remove configuração WhatsApp"""
     
     config = db.query(TenantWhatsAppConfig).filter(
-        TenantWhatsAppConfig.tenant_id == current_user.tenant_id
+        TenantWhatsAppConfig.tenant_id == tenant_id
     ).first()
     
     if not config:
@@ -222,7 +224,7 @@ async def delete_config(
 
 @router.get("/config/stats", response_model=WhatsAppStatsResponse)
 async def get_stats(
-    current_user: User = Depends(get_current_user_and_tenant),
+    tenant_id=Depends(_tenant_whatsapp),
     db: Session = Depends(get_session)
 ):
     """Obtém estatísticas de uso"""
@@ -276,7 +278,7 @@ async def webhook(
 async def test_tool(
     tool_name: str,
     arguments: Dict[str, Any],
-    current_user: User = Depends(get_current_user_and_tenant),
+    tenant_id=Depends(_tenant_whatsapp),
     db: Session = Depends(get_session)
 ):
     """
@@ -296,7 +298,7 @@ async def test_tool(
     
     try:
         # Executar tool
-        executor = ToolExecutor(db, current_user.tenant_id)
+        executor = ToolExecutor(db, tenant_id)
         result = executor.execute_tool(tool_name, arguments)
         
         return {
@@ -340,7 +342,7 @@ async def list_tools(
 async def test_message(
     message: str,
     phone_number: str = "5511999999999",
-    current_user: User = Depends(get_current_user_and_tenant),
+    tenant_id=Depends(_tenant_whatsapp),
     db: Session = Depends(get_session)
 ):
     """
@@ -351,7 +353,7 @@ async def test_message(
     
     try:
         # Processar mensagem
-        ai_service = get_ai_service(db, current_user.tenant_id)
+        ai_service = get_ai_service(db, tenant_id)
         result = await ai_service.process_message(
             message=message,
             phone_number=phone_number
@@ -372,7 +374,7 @@ async def test_message(
 async def test_conversation(
     messages: list[str],
     phone_number: str = "5511999999999",
-    current_user: User = Depends(get_current_user_and_tenant),
+    tenant_id=Depends(_tenant_whatsapp),
     db: Session = Depends(get_session)
 ):
     """
@@ -391,7 +393,7 @@ async def test_conversation(
     """
     
     try:
-        ai_service = get_ai_service(db, current_user.tenant_id)
+        ai_service = get_ai_service(db, tenant_id)
         
         conversation = []
         session_id = None

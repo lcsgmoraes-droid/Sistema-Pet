@@ -17,10 +17,14 @@ import time
 
 from app.db import engine, get_session
 from app.services.bling_flow_monitor_service import obter_resumo_monitoramento
-from app.whatsapp.models import WhatsAppSession, WhatsAppMessage
-
 router = APIRouter(prefix="/health", tags=["Health & Monitoring"])
 logger = logging.getLogger(__name__)
+
+WHATSAPP_ACTIVE_SESSIONS_COUNT_SQL = "SELECT count(*) FROM whatsapp_ia_sessions WHERE status = :status"
+
+
+def _scalar_count(db: Session, sql: str, params: dict | None = None) -> int:
+    return int(db.execute(text(sql), params or {}).scalar() or 0)
 
 
 @router.get("")
@@ -180,15 +184,19 @@ async def detailed_health(db: Session = Depends(get_session)) -> Dict[str, Any]:
     # 3. Application Metrics
     try:
         # Sessões ativas
-        active_sessions = db.query(WhatsAppSession).filter(
-            WhatsAppSession.status == 'active'
-        ).count()
+        active_sessions = _scalar_count(
+            db,
+            WHATSAPP_ACTIVE_SESSIONS_COUNT_SQL,
+            {"status": "active"},
+        )
         
         # Total de mensagens hoje
         today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-        messages_today = db.query(WhatsAppMessage).filter(
-            WhatsAppMessage.created_at >= today_start
-        ).count()
+        messages_today = _scalar_count(
+            db,
+            "SELECT count(*) FROM whatsapp_ia_messages WHERE created_at >= :today_start",
+            {"today_start": today_start},
+        )
         
         health_status["checks"]["application"] = {
             "status": "healthy",
@@ -268,22 +276,28 @@ async def application_metrics(db: Session = Depends(get_session)) -> Dict[str, A
     
     try:
         # Sessões
-        total_sessions = db.query(WhatsAppSession).count()
-        active_sessions = db.query(WhatsAppSession).filter(
-            WhatsAppSession.status == 'active'
-        ).count()
+        total_sessions = _scalar_count(db, "SELECT count(*) FROM whatsapp_ia_sessions")
+        active_sessions = _scalar_count(
+            db,
+            WHATSAPP_ACTIVE_SESSIONS_COUNT_SQL,
+            {"status": "active"},
+        )
         
         # Mensagens
-        total_messages = db.query(WhatsAppMessage).count()
+        total_messages = _scalar_count(db, "SELECT count(*) FROM whatsapp_ia_messages")
         
         # Por período (últimas 24h)
         day_ago = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
-        sessions_24h = db.query(WhatsAppSession).filter(
-            WhatsAppSession.started_at >= day_ago
-        ).count()
-        messages_24h = db.query(WhatsAppMessage).filter(
-            WhatsAppMessage.created_at >= day_ago
-        ).count()
+        sessions_24h = _scalar_count(
+            db,
+            "SELECT count(*) FROM whatsapp_ia_sessions WHERE started_at >= :day_ago",
+            {"day_ago": day_ago},
+        )
+        messages_24h = _scalar_count(
+            db,
+            "SELECT count(*) FROM whatsapp_ia_messages WHERE created_at >= :day_ago",
+            {"day_ago": day_ago},
+        )
         
         return {
             "timestamp": datetime.utcnow().isoformat(),
@@ -322,11 +336,13 @@ async def prometheus_metrics(db: Session = Depends(get_session)) -> str:
     
     try:
         # Coleta métricas
-        total_sessions = db.query(WhatsAppSession).count()
-        active_sessions = db.query(WhatsAppSession).filter(
-            WhatsAppSession.status == 'active'
-        ).count()
-        total_messages = db.query(WhatsAppMessage).count()
+        total_sessions = _scalar_count(db, "SELECT count(*) FROM whatsapp_ia_sessions")
+        active_sessions = _scalar_count(
+            db,
+            WHATSAPP_ACTIVE_SESSIONS_COUNT_SQL,
+            {"status": "active"},
+        )
+        total_messages = _scalar_count(db, "SELECT count(*) FROM whatsapp_ia_messages")
         
         # Formato Prometheus
         metrics = f"""# HELP whatsapp_sessions_total Total number of WhatsApp sessions

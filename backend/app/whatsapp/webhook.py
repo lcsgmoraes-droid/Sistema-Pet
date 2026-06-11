@@ -19,6 +19,7 @@ from datetime import datetime
 from app.db import get_session as get_db
 from app.whatsapp.models import TenantWhatsAppConfig, WhatsAppSession, WhatsAppMessage
 from app.whatsapp.schemas import Webhook360DialogPayload
+from app.whatsapp.tenant_context import whatsapp_tenant_context
 from app.models import Cliente
 
 logger = logging.getLogger(__name__)
@@ -75,20 +76,21 @@ async def webhook_verification(
     
     Você deve retornar hub.challenge se verify_token estiver correto.
     """
-    logger.info(f"Verificação webhook recebida: tenant={tenant_id}, mode={hub_mode}")
+    logger.info("Verificacao webhook recebida")
     
     # Buscar config do tenant
-    config = db.query(TenantWhatsAppConfig).filter(
-        TenantWhatsAppConfig.tenant_id == tenant_id
-    ).first()
+    with whatsapp_tenant_context(tenant_id):
+        config = db.query(TenantWhatsAppConfig).filter(
+            TenantWhatsAppConfig.tenant_id == tenant_id
+        ).first()
     
     if not config or not config.webhook_secret:
-        logger.warning(f"Tenant {tenant_id} sem configuração WhatsApp")
+        logger.warning("Tenant sem configuracao WhatsApp")
         raise HTTPException(status_code=404, detail="Configuração não encontrada")
     
     # Validar verify token
     if hub_mode == "subscribe" and hub_verify_token == config.webhook_secret:
-        logger.info(f"✅ Webhook verificado com sucesso: tenant={tenant_id}")
+        logger.info("Webhook verificado com sucesso")
         return int(hub_challenge)  # Meta espera número
     
     logger.warning(f"❌ Falha na verificação: token inválido")
@@ -117,12 +119,13 @@ async def receive_webhook(
     5. Retorna 200 OK imediatamente
     """
     # 1. Buscar config do tenant
-    config = db.query(TenantWhatsAppConfig).filter(
-        TenantWhatsAppConfig.tenant_id == tenant_id
-    ).first()
+    with whatsapp_tenant_context(tenant_id):
+        config = db.query(TenantWhatsAppConfig).filter(
+            TenantWhatsAppConfig.tenant_id == tenant_id
+        ).first()
     
     if not config:
-        logger.warning(f"Tenant {tenant_id} sem configuração")
+        logger.warning("Tenant sem configuracao WhatsApp")
         raise HTTPException(status_code=404, detail="Tenant não configurado")
     
     # 2. Validar assinatura (se configurada)
@@ -134,7 +137,7 @@ async def receive_webhook(
         signature = signature.replace("sha256=", "")
         
         if not validate_webhook_signature(body, signature, config.webhook_secret):
-            logger.warning(f"❌ Assinatura inválida: tenant={tenant_id}")
+            logger.warning("Assinatura invalida no webhook")
             raise HTTPException(status_code=403, detail="Assinatura inválida")
     
     # 3. Parsear payload JSON
@@ -306,12 +309,13 @@ async def process_incoming_message(
         try:
             from app.whatsapp.processor import MessageProcessor
             
-            processor = MessageProcessor(db=db, tenant_id=tenant_id)
-            result = await processor.process_message(
-                session_id=session.id,
-                message_id=message.id,
-                message_content=message_content
-            )
+            with whatsapp_tenant_context(tenant_id):
+                processor = MessageProcessor(db=db, tenant_id=tenant_id)
+                result = await processor.process_message(
+                    session_id=session.id,
+                    message_id=message.id,
+                    message_content=message_content
+                )
             
             logger.info(f"✅ Processamento concluído: {result.get('action')}")
             
@@ -345,6 +349,15 @@ def normalize_phone(phone: str) -> str:
 
 
 def get_or_create_session(
+    db: Session,
+    tenant_id: str,
+    phone: str
+) -> WhatsAppSession:
+    with whatsapp_tenant_context(tenant_id):
+        return _get_or_create_session_with_context(db, tenant_id, phone)
+
+
+def _get_or_create_session_with_context(
     db: Session,
     tenant_id: str,
     phone: str

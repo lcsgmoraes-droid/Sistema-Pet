@@ -20,6 +20,7 @@ from app.whatsapp.tools import TOOLS_DEFINITIONS, ToolExecutor
 from app.whatsapp.templates import ResponseFormatter
 from app.whatsapp.sentiment import get_sentiment_analyzer
 from app.whatsapp.handoff_manager import get_handoff_manager
+from app.whatsapp.tenant_context import whatsapp_tenant_context
 
 logger = logging.getLogger(__name__)
 
@@ -39,9 +40,10 @@ class AIService:
     
     def _load_config(self) -> Optional[TenantWhatsAppConfig]:
         """Carrega configuração do tenant"""
-        config = self.db.query(TenantWhatsAppConfig).filter(
-            TenantWhatsAppConfig.tenant_id == self.tenant_id
-        ).first()
+        with whatsapp_tenant_context(self.tenant_id):
+            config = self.db.query(TenantWhatsAppConfig).filter(
+                TenantWhatsAppConfig.tenant_id == self.tenant_id
+            ).first()
         
         if not config:
             logger.error(f"Configuração WhatsApp não encontrada para tenant {self.tenant_id}")
@@ -62,6 +64,15 @@ class AIService:
             return None
     
     async def process_message(
+        self,
+        message: str,
+        phone_number: str,
+        session_id: Optional[str] = None
+    ) -> Dict[str, Any]:
+        with whatsapp_tenant_context(self.tenant_id):
+            return await self._process_message_with_context(message, phone_number, session_id)
+
+    async def _process_message_with_context(
         self,
         message: str,
         phone_number: str,

@@ -9,8 +9,7 @@ from typing import Optional
 import logging
 
 from app.db import get_session as get_db
-from app.auth import get_current_user
-from app.models import User
+from app.auth.dependencies import get_current_user_and_tenant
 from app.whatsapp.models import TenantWhatsAppConfig
 from app.whatsapp.schemas import (
     TenantWhatsAppConfigBase,
@@ -24,23 +23,27 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/whatsapp/config", tags=["WhatsApp Config"])
 
 
+async def _tenant_whatsapp_config(user_and_tenant=Depends(get_current_user_and_tenant)):
+    return user_and_tenant[1]
+
+
 # ============================================================================
 # GET CONFIG
 # ============================================================================
 
 @router.get("", response_model=Optional[TenantWhatsAppConfigResponse])
 def get_whatsapp_config(
-    current_user: User = Depends(get_current_user),
+    tenant_id=Depends(_tenant_whatsapp_config),
     db: Session = Depends(get_db)
 ):
     """
     Busca configuração WhatsApp do tenant.
     """
     try:
-        logger.info(f"📡 GET /api/whatsapp/config - tenant={current_user.tenant_id}")
+        logger.info("GET /api/whatsapp/config")
         
         config = db.query(TenantWhatsAppConfig).filter(
-            TenantWhatsAppConfig.tenant_id == current_user.tenant_id
+            TenantWhatsAppConfig.tenant_id == tenant_id
         ).first()
         
         if config:
@@ -63,7 +66,7 @@ def get_whatsapp_config(
 @router.post("", response_model=TenantWhatsAppConfigResponse)
 def create_whatsapp_config(
     data: TenantWhatsAppConfigBase,  # Alterado de Create para Base (não precisa tenant_id)
-    current_user: User = Depends(get_current_user),
+    tenant_id=Depends(_tenant_whatsapp_config),
     db: Session = Depends(get_db)
 ):
     """
@@ -72,7 +75,7 @@ def create_whatsapp_config(
     """
     # Verificar se já existe
     existing = db.query(TenantWhatsAppConfig).filter(
-        TenantWhatsAppConfig.tenant_id == current_user.tenant_id
+        TenantWhatsAppConfig.tenant_id == tenant_id
     ).first()
     
     if existing:
@@ -80,7 +83,7 @@ def create_whatsapp_config(
     
     # Criar
     config = TenantWhatsAppConfig(
-        tenant_id=current_user.tenant_id,
+        tenant_id=tenant_id,
         **data.model_dump()
     )
     
@@ -88,7 +91,7 @@ def create_whatsapp_config(
     db.commit()
     db.refresh(config)
     
-    logger.info(f"✅ Config WhatsApp criada: tenant={current_user.tenant_id}")
+    logger.info(f"✅ Config WhatsApp criada: tenant={tenant_id}")
     
     return config
 
@@ -100,14 +103,14 @@ def create_whatsapp_config(
 @router.put("", response_model=TenantWhatsAppConfigResponse)
 def update_whatsapp_config(
     data: TenantWhatsAppConfigUpdate,
-    current_user: User = Depends(get_current_user),
+    tenant_id=Depends(_tenant_whatsapp_config),
     db: Session = Depends(get_db)
 ):
     """
     Atualiza configuração WhatsApp do tenant.
     """
     config = db.query(TenantWhatsAppConfig).filter(
-        TenantWhatsAppConfig.tenant_id == current_user.tenant_id
+        TenantWhatsAppConfig.tenant_id == tenant_id
     ).first()
     
     if not config:
@@ -122,7 +125,7 @@ def update_whatsapp_config(
     db.commit()
     db.refresh(config)
     
-    logger.info(f"✅ Config WhatsApp atualizada: tenant={current_user.tenant_id}")
+    logger.info(f"✅ Config WhatsApp atualizada: tenant={tenant_id}")
     
     return config
 
@@ -133,14 +136,14 @@ def update_whatsapp_config(
 
 @router.delete("")
 def delete_whatsapp_config(
-    current_user: User = Depends(get_current_user),
+    tenant_id=Depends(_tenant_whatsapp_config),
     db: Session = Depends(get_db)
 ):
     """
     Deleta configuração WhatsApp do tenant.
     """
     config = db.query(TenantWhatsAppConfig).filter(
-        TenantWhatsAppConfig.tenant_id == current_user.tenant_id
+        TenantWhatsAppConfig.tenant_id == tenant_id
     ).first()
     
     if not config:
@@ -149,7 +152,7 @@ def delete_whatsapp_config(
     db.delete(config)
     db.commit()
     
-    logger.info(f"🗑️ Config WhatsApp deletada: tenant={current_user.tenant_id}")
+    logger.info(f"🗑️ Config WhatsApp deletada: tenant={tenant_id}")
     
     return {"message": "Configuração deletada com sucesso"}
 
@@ -160,7 +163,7 @@ def delete_whatsapp_config(
 
 @router.post("/test-webhook")
 async def test_webhook_connection(
-    current_user: User = Depends(get_current_user),
+    tenant_id=Depends(_tenant_whatsapp_config),
     db: Session = Depends(get_db)
 ):
     """
@@ -169,7 +172,7 @@ async def test_webhook_connection(
     Envia mensagem de teste para o número configurado.
     """
     config = db.query(TenantWhatsAppConfig).filter(
-        TenantWhatsAppConfig.tenant_id == current_user.tenant_id
+        TenantWhatsAppConfig.tenant_id == tenant_id
     ).first()
     
     if not config or not config.api_key:
@@ -206,7 +209,7 @@ async def test_webhook_connection(
 
 @router.get("/stats")
 def get_whatsapp_stats(
-    current_user: User = Depends(get_current_user),
+    tenant_id=Depends(_tenant_whatsapp_config),
     db: Session = Depends(get_db)
 ):
     """
@@ -216,7 +219,6 @@ def get_whatsapp_stats(
     from sqlalchemy import func
     from datetime import datetime, timedelta
     
-    tenant_id = current_user.tenant_id
     hoje = datetime.now().date()
     
     # Sessões ativas

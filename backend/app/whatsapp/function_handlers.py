@@ -8,6 +8,8 @@ from typing import Dict, Any, List, Optional
 import logging
 from datetime import datetime
 
+from app.whatsapp.tenant_context import whatsapp_tenant_context
+
 logger = logging.getLogger(__name__)
 
 
@@ -398,26 +400,27 @@ def transferir_para_humano(
     from app.whatsapp.models import WhatsAppSession
     
     try:
-        session = db.query(WhatsAppSession).filter(
-            WhatsAppSession.id == session_id,
-            WhatsAppSession.tenant_id == tenant_id
-        ).first()
+        with whatsapp_tenant_context(tenant_id):
+            session = db.query(WhatsAppSession).filter(
+                WhatsAppSession.id == session_id,
+                WhatsAppSession.tenant_id == tenant_id
+            ).first()
         
-        if not session:
-            return {"transferido": False, "error": "Sessão não encontrada"}
+            if not session:
+                return {"transferido": False, "error": "Sessão não encontrada"}
         
-        # Atualizar status
-        session.status = "waiting_human"
+            # Atualizar status
+            session.status = "waiting_human"
         
-        # Adicionar contexto
-        context = session.context_data or {}
-        context["transfer_reason"] = motivo
-        context["transfer_priority"] = prioridade
-        context["transfer_timestamp"] = datetime.now().isoformat()
+            # Adicionar contexto
+            context = session.context_data or {}
+            context["transfer_reason"] = motivo
+            context["transfer_priority"] = prioridade
+            context["transfer_timestamp"] = datetime.now().isoformat()
         
-        session.context_data = context
+            session.context_data = context
         
-        db.commit()
+            db.commit()
         
         result = {
             "transferido": True,

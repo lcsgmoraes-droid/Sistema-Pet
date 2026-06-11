@@ -20,6 +20,7 @@ from app.models import Cliente
 from app.produtos_models import Produto
 from app.vendas_models import Venda, VendaItem
 from app.whatsapp.models import TenantWhatsAppConfig, WhatsAppSession, WhatsAppMessage
+from app.whatsapp.tenant_context import whatsapp_tenant_context
 from app.cache.cache_manager import cache
 
 logger = logging.getLogger(__name__)
@@ -34,6 +35,15 @@ class ContextBuilder:
         self.db = db
     
     async def build_context(
+        self,
+        tenant_id: str,
+        session_id: str,
+        message: str
+    ) -> Dict[str, Any]:
+        with whatsapp_tenant_context(tenant_id):
+            return await self._build_context_with_context(tenant_id, session_id, message)
+
+    async def _build_context_with_context(
         self,
         tenant_id: str,
         session_id: str,

@@ -144,15 +144,14 @@ KNOWN_BASE_TENANT_DEBT = frozenset(
         # app/bling_pedido_webhook_queue_models.py — bling_pedido_webhook_events
         # DECLARADO INTENCIONALMENTE GLOBAL (fila de worker cross-tenant) → ver
         # INTENTIONALLY_GLOBAL_TENANT_TABLES.
-        # app/whatsapp/models.py
-        "tenant_whatsapp_config",
-        "whatsapp_ia_messages",
-        "whatsapp_ia_metrics",
-        "whatsapp_ia_sessions",
-        # app/whatsapp/models_handoff.py
-        "whatsapp_agents",
-        "whatsapp_handoffs",
-        "whatsapp_internal_notes",
+        # app/whatsapp/models.py — MIGRADOS para TenantScoped (Leva 2; tenant_id UUID NOT NULL
+        # validado read-only em prod: tenant_whatsapp_config=1 linha, demais vazias; migration
+        # po20260610a1 fica idempotente para bancos antigos com tenant_id textual). IDs de
+        # sessao/mensagem/config/metrica continuam texto nesta leva, alinhados ao schema real.
+        # app/whatsapp/models_handoff.py — MIGRADOS para TenantScoped (Leva 1, zero schema change;
+        # session_id texto mantido no class body, alinhado a whatsapp_ia_sessions.id; routers
+        # whatsapp_handoff + analytics_router + orchestrator_internal migrados para
+        # get_current_user_and_tenant / set_current_tenant)
         # app/whatsapp/security.py
         "data_access_logs",
         "data_deletion_requests",
