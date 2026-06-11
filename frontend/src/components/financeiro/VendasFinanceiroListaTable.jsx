@@ -5,6 +5,7 @@ import {
   ChevronRight,
   CreditCard,
   ExternalLink,
+  RefreshCw,
   ShoppingCart,
   Smartphone,
   Store,
@@ -371,11 +372,54 @@ export default function VendasFinanceiroListaTable({
   formatarData,
   formatarMoeda,
   getStatusVendaMeta,
+  algumasVendasFiltradasSelecionadas = false,
   onToggleVenda,
+  onReprocessarVenda,
+  onToggleSelecaoTodasVendas,
+  onToggleSelecaoVenda,
+  reprocessandoRentabilidade = false,
+  todasVendasFiltradasSelecionadas = false,
   vendas = [],
+  vendasSelecionadasIds = new Set(),
   vendasExpandidas,
 }) {
   const columns = [
+    {
+      key: "selecionar",
+      headerClassName: "w-10",
+      className: "w-10",
+      renderHeader: () => (
+        <th
+          className="w-10 px-2 py-2 text-center"
+          title={
+            algumasVendasFiltradasSelecionadas
+              ? "Algumas vendas selecionadas"
+              : "Selecionar vendas visiveis"
+          }
+        >
+          <input
+            type="checkbox"
+            checked={todasVendasFiltradasSelecionadas}
+            aria-checked={
+              algumasVendasFiltradasSelecionadas ? "mixed" : todasVendasFiltradasSelecionadas
+            }
+            onChange={(event) => onToggleSelecaoTodasVendas?.(event.target.checked)}
+            onClick={(event) => event.stopPropagation()}
+            className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+          />
+        </th>
+      ),
+      render: (venda) => (
+        <input
+          type="checkbox"
+          checked={vendasSelecionadasIds.has(venda.id)}
+          onChange={(event) => onToggleSelecaoVenda?.(venda.id, event.target.checked)}
+          onClick={(event) => event.stopPropagation()}
+          className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+          title="Selecionar venda"
+        />
+      ),
+    },
     {
       key: "expandir",
       header: "",
@@ -543,6 +587,28 @@ export default function VendasFinanceiroListaTable({
         <StatusVendaCell getStatusVendaMeta={getStatusVendaMeta} status={venda.status} />
       ),
     },
+    {
+      key: "reprocessar",
+      header: "",
+      align: "center",
+      headerClassName: "w-12",
+      className: "w-12",
+      title: "Reprocessar custo desta venda",
+      render: (venda) => (
+        <button
+          type="button"
+          disabled={reprocessandoRentabilidade}
+          onClick={(event) => {
+            event.stopPropagation();
+            onReprocessarVenda?.(venda);
+          }}
+          className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 shadow-sm transition hover:border-blue-200 hover:bg-blue-50 hover:text-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+          title="Reprocessar custo desta venda"
+        >
+          <RefreshCw className="h-4 w-4" />
+        </button>
+      ),
+    },
   ];
 
   return (
@@ -557,7 +623,7 @@ export default function VendasFinanceiroListaTable({
         <ItensVendaDetalhes colSpan={colSpan} formatarMoeda={formatarMoeda} venda={venda} />
       )}
       rowClassName={(venda) => getCanalConfig(venda).rowClassName}
-      tableClassName="min-w-[1500px]"
+      tableClassName="min-w-[1480px] text-xs"
       theadClassName="bg-gray-100"
     />
   );

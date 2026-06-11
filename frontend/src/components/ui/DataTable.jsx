@@ -1,4 +1,4 @@
-import { cloneElement, Fragment, isValidElement } from "react";
+import { cloneElement, Fragment, isValidElement, useEffect, useRef, useState } from "react";
 
 const ALIGN_CLASSES = {
   center: "text-center",
@@ -82,10 +82,81 @@ export default function DataTable({
   rowClassName = "",
 }) {
   const colSpan = Math.max(columns.length, 1);
+  const topScrollRef = useRef(null);
+  const bottomScrollRef = useRef(null);
+  const tableRef = useRef(null);
+  const syncingScrollRef = useRef(false);
+  const [scrollMetrics, setScrollMetrics] = useState({ clientWidth: 0, scrollWidth: 0 });
+
+  useEffect(() => {
+    const medirTabela = () => {
+      const table = tableRef.current;
+      const scrollContainer = bottomScrollRef.current;
+      if (!table || !scrollContainer) return;
+
+      setScrollMetrics({
+        clientWidth: scrollContainer.clientWidth,
+        scrollWidth: table.scrollWidth,
+      });
+    };
+
+    medirTabela();
+
+    const ResizeObserverImpl = globalThis.ResizeObserver;
+    const observers = [];
+    if (ResizeObserverImpl && tableRef.current && bottomScrollRef.current) {
+      const tableObserver = new ResizeObserverImpl(medirTabela);
+      const containerObserver = new ResizeObserverImpl(medirTabela);
+      tableObserver.observe(tableRef.current);
+      containerObserver.observe(bottomScrollRef.current);
+      observers.push(tableObserver, containerObserver);
+    }
+
+    globalThis.addEventListener?.("resize", medirTabela);
+    return () => {
+      observers.forEach((observer) => observer.disconnect());
+      globalThis.removeEventListener?.("resize", medirTabela);
+    };
+  }, [columns, data, loading]);
+
+  const sincronizarRolagem = (origem, destino) => {
+    if (!origem || !destino || syncingScrollRef.current) return;
+    syncingScrollRef.current = true;
+    destino.scrollLeft = origem.scrollLeft;
+    const liberarSincronizacao = () => {
+      syncingScrollRef.current = false;
+    };
+    if (globalThis.requestAnimationFrame) {
+      globalThis.requestAnimationFrame(liberarSincronizacao);
+    } else {
+      globalThis.setTimeout(liberarSincronizacao, 0);
+    }
+  };
+
+  const mostrarBarraSuperior =
+    scrollMetrics.scrollWidth > 0 &&
+    scrollMetrics.clientWidth > 0 &&
+    scrollMetrics.scrollWidth > scrollMetrics.clientWidth + 1;
 
   return (
-    <div className="erp-data-table-wrap overflow-x-auto">
+    <div className="erp-data-table">
+      {mostrarBarraSuperior && (
+        <div
+          ref={topScrollRef}
+          onScroll={() => sincronizarRolagem(topScrollRef.current, bottomScrollRef.current)}
+          className="sticky top-0 z-30 h-4 overflow-x-auto overflow-y-hidden border-b border-slate-100 bg-white"
+          aria-hidden="true"
+        >
+          <div style={{ width: scrollMetrics.scrollWidth, height: 1 }} />
+        </div>
+      )}
+      <div
+        ref={bottomScrollRef}
+        onScroll={() => sincronizarRolagem(bottomScrollRef.current, topScrollRef.current)}
+        className="erp-data-table-wrap overflow-x-auto"
+      >
       <table
+        ref={tableRef}
         className={[
           "w-full border-collapse text-sm",
           tableClassName,
@@ -163,6 +234,7 @@ export default function DataTable({
           )}
         </tbody>
       </table>
+      </div>
     </div>
   );
 }
