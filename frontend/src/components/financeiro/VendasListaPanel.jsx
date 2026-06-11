@@ -1,3 +1,6 @@
+import { useEffect, useRef, useState } from "react";
+import { ChevronDown, RefreshCw } from "lucide-react";
+import ActionButton from "../ui/ActionButton";
 import MetricCard from "../ui/MetricCard";
 import MetricGrid from "../ui/MetricGrid";
 import VendasFinanceiroListaTable from "./VendasFinanceiroListaTable";
@@ -59,13 +62,45 @@ export default function VendasListaPanel({
   listaVendasFiltrada,
   listaVendasVisiveis,
   mostrarImpostoTodasVendas,
+  algumasVendasFiltradasSelecionadas,
+  onReprocessarPeriodo,
+  onReprocessarSelecionadas,
+  onReprocessarVenda,
+  onToggleSelecaoTodasVendas,
+  onToggleSelecaoVenda,
+  reprocessandoRentabilidade,
   setFiltroCanalVenda,
   setFiltroStatusLista,
   setMostrarImpostoTodasVendas,
+  todasVendasFiltradasSelecionadas,
   toggleVendaExpandida,
+  totalVendasPeriodoReprocessamento,
+  totalVendasSelecionadas,
+  vendasSelecionadasIds,
   vendasExpandidas,
 }) {
   const resumoCanais = montarResumoCanais(listaVendasVisiveis);
+  const [menuReprocessamentoAberto, setMenuReprocessamentoAberto] = useState(false);
+  const menuReprocessamentoRef = useRef(null);
+
+  useEffect(() => {
+    const fecharAoClicarFora = (event) => {
+      if (
+        menuReprocessamentoRef.current &&
+        !menuReprocessamentoRef.current.contains(event.target)
+      ) {
+        setMenuReprocessamentoAberto(false);
+      }
+    };
+
+    document.addEventListener("mousedown", fecharAoClicarFora);
+    return () => document.removeEventListener("mousedown", fecharAoClicarFora);
+  }, []);
+
+  const executarAcaoReprocessamento = (acao) => {
+    setMenuReprocessamentoAberto(false);
+    acao?.();
+  };
 
   return (
     <div className="rounded-lg bg-white shadow">
@@ -149,8 +184,45 @@ export default function VendasListaPanel({
             Mostrar TUDO com imposto
           </label>
         </div>
-        <div className="text-xs text-slate-500 sm:text-sm">
-          Mostrando {listaVendasFiltrada.length} de {listaVendasVisiveis.length} venda(s)
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-end">
+          <div className="text-xs text-slate-500 sm:text-sm">
+            Mostrando {listaVendasFiltrada.length} de {listaVendasVisiveis.length} venda(s)
+            {totalVendasSelecionadas > 0 ? ` | ${totalVendasSelecionadas} selecionada(s)` : ""}
+          </div>
+          <div className="relative" ref={menuReprocessamentoRef}>
+            <ActionButton
+              className="w-full justify-center sm:w-auto"
+              disabled={reprocessandoRentabilidade}
+              icon={RefreshCw}
+              intent="edit"
+              loading={reprocessandoRentabilidade}
+              onClick={() => setMenuReprocessamentoAberto((prev) => !prev)}
+              title="Abrir opcoes de reprocessamento"
+            >
+              Reprocessar
+              <ChevronDown className="h-4 w-4" aria-hidden="true" />
+            </ActionButton>
+            {menuReprocessamentoAberto && (
+              <div className="absolute right-0 z-40 mt-2 w-72 overflow-hidden rounded-lg border border-slate-200 bg-white text-sm shadow-lg">
+                <button
+                  type="button"
+                  disabled={totalVendasSelecionadas === 0 || reprocessandoRentabilidade}
+                  onClick={() => executarAcaoReprocessamento(onReprocessarSelecionadas)}
+                  className="w-full px-4 py-3 text-left font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                >
+                  Reprocessar selecionadas ({totalVendasSelecionadas})
+                </button>
+                <button
+                  type="button"
+                  disabled={totalVendasPeriodoReprocessamento === 0 || reprocessandoRentabilidade}
+                  onClick={() => executarAcaoReprocessamento(onReprocessarPeriodo)}
+                  className="w-full border-t border-slate-100 px-4 py-3 text-left font-medium text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:text-slate-400"
+                >
+                  Reprocessar periodo ({totalVendasPeriodoReprocessamento})
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
       <MetricGrid className="border-b border-gray-100 bg-slate-50 px-3 py-3 sm:grid-cols-2 sm:px-4 md:grid-cols-4 xl:grid-cols-8">
@@ -169,8 +241,15 @@ export default function VendasListaPanel({
         formatarData={formatarData}
         formatarMoeda={formatarMoeda}
         getStatusVendaMeta={getStatusVendaMeta}
+        algumasVendasFiltradasSelecionadas={algumasVendasFiltradasSelecionadas}
+        onReprocessarVenda={onReprocessarVenda}
         onToggleVenda={toggleVendaExpandida}
+        onToggleSelecaoTodasVendas={onToggleSelecaoTodasVendas}
+        onToggleSelecaoVenda={onToggleSelecaoVenda}
+        reprocessandoRentabilidade={reprocessandoRentabilidade}
+        todasVendasFiltradasSelecionadas={todasVendasFiltradasSelecionadas}
         vendas={listaVendasFiltrada}
+        vendasSelecionadasIds={vendasSelecionadasIds}
         vendasExpandidas={vendasExpandidas}
       />
     </div>

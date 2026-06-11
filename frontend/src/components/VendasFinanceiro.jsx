@@ -134,6 +134,8 @@ export default function VendasFinanceiro() {
   const [filtroStatusLista, setFiltroStatusLista] = useState("");
   const [filtroCanalVenda, setFiltroCanalVenda] = useState("");
   const [mostrarImpostoTodasVendas, setMostrarImpostoTodasVendas] = useState(true);
+  const [vendasSelecionadasIds, setVendasSelecionadasIds] = useState(new Set());
+  const [reprocessandoRentabilidade, setReprocessandoRentabilidade] = useState(false);
   const [mostrarConfigFeriados, setMostrarConfigFeriados] = useState(false);
   const [feriadosCustomizados, setFeriadosCustomizados] = useState(
     carregarFeriadosCustomizados,
@@ -379,6 +381,18 @@ export default function VendasFinanceiro() {
     if (filtroStatusLista !== "em_aberto") return listaVendasPorCanal;
     return listaVendasPorCanal.filter(vendaEstaEmAberto);
   }, [filtroStatusLista, listaVendasPorCanal]);
+
+  const vendasSelecionadas = useMemo(
+    () => listaVendasFiltrada.filter((venda) => vendasSelecionadasIds.has(venda.id)),
+    [listaVendasFiltrada, vendasSelecionadasIds],
+  );
+
+  const todasVendasFiltradasSelecionadas =
+    listaVendasFiltrada.length > 0 &&
+    listaVendasFiltrada.every((venda) => vendasSelecionadasIds.has(venda.id));
+
+  const algumasVendasFiltradasSelecionadas =
+    vendasSelecionadas.length > 0 && !todasVendasFiltradasSelecionadas;
 
   const vendasResumoPeriodo = useMemo(() => listaVendasVisiveis, [listaVendasVisiveis]);
 
@@ -632,6 +646,90 @@ export default function VendasFinanceiro() {
     }
   };
 
+  const toggleSelecaoVenda = (vendaId, selecionada) => {
+    setVendasSelecionadasIds((prev) => {
+      const proximo = new Set(prev);
+      if (selecionada) {
+        proximo.add(vendaId);
+      } else {
+        proximo.delete(vendaId);
+      }
+      return proximo;
+    });
+  };
+
+  const toggleSelecaoTodasVendas = (selecionar) => {
+    setVendasSelecionadasIds((prev) => {
+      const proximo = new Set(prev);
+      listaVendasFiltrada.forEach((venda) => {
+        if (selecionar) {
+          proximo.add(venda.id);
+        } else {
+          proximo.delete(venda.id);
+        }
+      });
+      return proximo;
+    });
+  };
+
+  const reprocessarRentabilidadeVendas = async ({ vendaIds = null, periodo = false } = {}) => {
+    const ids = Array.isArray(vendaIds)
+      ? vendaIds.map((id) => Number(id)).filter((id) => Number.isFinite(id) && id > 0)
+      : [];
+    const quantidade = periodo ? listaVendasPorCanal.length : ids.length;
+
+    if (periodo && (!dataInicio || !dataFim)) {
+      toast.error("Selecione um periodo para reprocessar.");
+      return;
+    }
+
+    if (quantidade <= 0) {
+      toast.error(periodo ? "Nao ha vendas no periodo atual." : "Selecione pelo menos uma venda.");
+      return;
+    }
+
+    const descricaoEscopo = periodo
+      ? `do periodo ${formatarData(dataInicio)} ate ${formatarData(dataFim)}`
+      : "selecionada(s)";
+    const confirmou = globalThis.confirm(
+      `Reprocessar ${quantidade} venda(s) ${descricaoEscopo}?\n\n` +
+        "Isso atualiza o custo das movimentacoes de estoque da venda para o custo atual do produto e recalcula custo, lucro e margem.",
+    );
+
+    if (!confirmou) return;
+
+    const toastId = "reprocessar-rentabilidade-vendas";
+    setReprocessandoRentabilidade(true);
+    toast.loading("Reprocessando rentabilidade das vendas...", { id: toastId });
+
+    try {
+      const payload = periodo
+        ? {
+            data_inicio: dataInicio,
+            data_fim: dataFim,
+            ...(filtroCanalVenda ? { canal_venda: filtroCanalVenda } : {}),
+          }
+        : { venda_ids: ids };
+
+      const { data } = await api.post(
+        "/relatorios/vendas/reprocessar-rentabilidade",
+        payload,
+      );
+      const total = Number(data?.total_reprocessado || 0);
+      toast.success(`${total} venda(s) reprocessada(s).`, { id: toastId });
+      setVendasSelecionadasIds(new Set());
+      await carregarDados();
+    } catch (error) {
+      console.error("Erro ao reprocessar rentabilidade:", error);
+      toast.error(
+        error?.response?.data?.detail || "Nao foi possivel reprocessar as vendas.",
+        { id: toastId },
+      );
+    } finally {
+      setReprocessandoRentabilidade(false);
+    }
+  };
+
   const calcularAnaliseInteligente = () => {
     const analise = calcularAnaliseInteligenteVendas({
       produtosAnalise,
@@ -666,6 +764,14 @@ export default function VendasFinanceiro() {
     abaAtiva,
     podeVerFinanceiroCompleto,
   ]);
+
+  useEffect(() => {
+    const idsVisiveis = new Set(listaVendasFiltrada.map((venda) => venda.id));
+    setVendasSelecionadasIds((prev) => {
+      const idsMantidos = Array.from(prev).filter((id) => idsVisiveis.has(id));
+      return idsMantidos.length === prev.size ? prev : new Set(idsMantidos);
+    });
+  }, [listaVendasFiltrada]);
 
   useEffect(() => {
     if (!podeVerFinanceiroCompleto) {
@@ -887,10 +993,27 @@ export default function VendasFinanceiro() {
           listaVendasFiltrada={listaVendasFiltrada}
           listaVendasVisiveis={listaVendasVisiveis}
           mostrarImpostoTodasVendas={mostrarImpostoTodasVendas}
+          algumasVendasFiltradasSelecionadas={algumasVendasFiltradasSelecionadas}
+          onReprocessarPeriodo={() => reprocessarRentabilidadeVendas({ periodo: true })}
+          onReprocessarSelecionadas={() =>
+            reprocessarRentabilidadeVendas({
+              vendaIds: vendasSelecionadas.map((venda) => venda.id),
+            })
+          }
+          onReprocessarVenda={(venda) =>
+            reprocessarRentabilidadeVendas({ vendaIds: [venda.id] })
+          }
+          onToggleSelecaoTodasVendas={toggleSelecaoTodasVendas}
+          onToggleSelecaoVenda={toggleSelecaoVenda}
+          reprocessandoRentabilidade={reprocessandoRentabilidade}
           setFiltroCanalVenda={setFiltroCanalVenda}
           setFiltroStatusLista={setFiltroStatusLista}
           setMostrarImpostoTodasVendas={setMostrarImpostoTodasVendas}
+          todasVendasFiltradasSelecionadas={todasVendasFiltradasSelecionadas}
           toggleVendaExpandida={toggleVendaExpandida}
+          totalVendasPeriodoReprocessamento={listaVendasPorCanal.length}
+          totalVendasSelecionadas={vendasSelecionadas.length}
+          vendasSelecionadasIds={vendasSelecionadasIds}
           vendasExpandidas={vendasExpandidas}
         />
       )}
