@@ -152,11 +152,9 @@ KNOWN_BASE_TENANT_DEBT = frozenset(
         # session_id texto mantido no class body, alinhado a whatsapp_ia_sessions.id; routers
         # whatsapp_handoff + analytics_router + orchestrator_internal migrados para
         # get_current_user_and_tenant / set_current_tenant)
-        # app/whatsapp/security.py
-        "data_access_logs",
-        "data_deletion_requests",
-        "data_privacy_consents",
-        "security_audit_logs",
+        # app/whatsapp/security.py — MIGRADOS para TenantScoped (Leva 3; tenant_id
+        # String/Text->UUID; validado read-only em prod: 12 linhas totais, zero
+        # tenant_id nulo/invalido; sem FK tenant preexistente).
     }
 )
 

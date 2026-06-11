@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.lgpd_models import DataSubjectRequest
 from app.whatsapp.security import DataAccessLog, DataDeletionRequest, DataPrivacyConsent
+from app.whatsapp.tenant_context import whatsapp_tenant_context
 
 
 DEFAULT_REQUEST_DUE_DAYS = 15
@@ -88,40 +89,41 @@ class PrivacyOpsService:
         user_agent: str | None = None,
         revoke_previous: bool = True,
     ) -> DataPrivacyConsent:
-        now = utcnow()
-        if revoke_previous:
-            previous = (
-                self.db.query(DataPrivacyConsent)
-                .filter(
-                    DataPrivacyConsent.tenant_id == self.tenant_id,
-                    DataPrivacyConsent.subject_type == subject_type,
-                    DataPrivacyConsent.subject_id == str(subject_id),
-                    DataPrivacyConsent.consent_type == consent_type,
-                    DataPrivacyConsent.revoked_at.is_(None),
+        with whatsapp_tenant_context(self.tenant_id):
+            now = utcnow()
+            if revoke_previous:
+                previous = (
+                    self.db.query(DataPrivacyConsent)
+                    .filter(
+                        DataPrivacyConsent.tenant_id == self.tenant_id,
+                        DataPrivacyConsent.subject_type == subject_type,
+                        DataPrivacyConsent.subject_id == str(subject_id),
+                        DataPrivacyConsent.consent_type == consent_type,
+                        DataPrivacyConsent.revoked_at.is_(None),
+                    )
+                    .all()
                 )
-                .all()
-            )
-            for item in previous:
-                item.revoked_at = now
-                item.revoke_reason = "substituido_por_novo_registro"
+                for item in previous:
+                    item.revoked_at = now
+                    item.revoke_reason = "substituido_por_novo_registro"
 
-        consent = DataPrivacyConsent(
-            tenant_id=self.tenant_id,
-            subject_type=subject_type,
-            subject_id=str(subject_id),
-            phone_number=phone_number,
-            email=email,
-            consent_type=consent_type,
-            consent_given=bool(consent_given),
-            consent_text=consent_text,
-            ip_address=ip_address,
-            user_agent=user_agent,
-            created_at=now,
-            updated_at=now,
-        )
-        self.db.add(consent)
-        self.db.flush()
-        return consent
+            consent = DataPrivacyConsent(
+                tenant_id=self.tenant_id,
+                subject_type=subject_type,
+                subject_id=str(subject_id),
+                phone_number=phone_number,
+                email=email,
+                consent_type=consent_type,
+                consent_given=bool(consent_given),
+                consent_text=consent_text,
+                ip_address=ip_address,
+                user_agent=user_agent,
+                created_at=now,
+                updated_at=now,
+            )
+            self.db.add(consent)
+            self.db.flush()
+            return consent
 
     def set_customer_preferences(
         self,

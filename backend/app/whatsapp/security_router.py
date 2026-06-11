@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 
 from app.db import get_session
-from app.auth.core import get_current_user
+from app.auth.dependencies import get_current_user_and_tenant
 from app.models import User
 from app.whatsapp.security import (
     LGPDService,
@@ -22,6 +22,14 @@ from app.whatsapp.security import (
 
 
 router = APIRouter(prefix="/whatsapp/security", tags=["WhatsApp Security & LGPD"])
+
+
+async def _usuario_whatsapp_security(user_and_tenant=Depends(get_current_user_and_tenant)) -> User:
+    return user_and_tenant[0]
+
+
+async def _tenant_whatsapp_security(user_and_tenant=Depends(get_current_user_and_tenant)):
+    return user_and_tenant[1]
 
 
 # ============================================================================
@@ -69,7 +77,8 @@ def record_consent(
     consent_data: ConsentRequest,
     request: Request,
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_whatsapp_security),
+    tenant_id=Depends(_tenant_whatsapp_security)
 ):
     """
     📝 **Registrar Consentimento LGPD**
@@ -84,7 +93,7 @@ def record_consent(
     **Obrigatório por lei:** Art. 7º e 8º da LGPD
     """
     
-    lgpd_service = LGPDService(db, str(current_user.tenant_id))
+    lgpd_service = LGPDService(db, str(tenant_id))
     
     try:
         consent = lgpd_service.record_consent(
@@ -113,7 +122,8 @@ def record_consent(
 def check_consent(
     check_data: ConsentCheckRequest,
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_whatsapp_security),
+    tenant_id=Depends(_tenant_whatsapp_security)
 ):
     """
     ✅ **Verificar Consentimento**
@@ -125,7 +135,7 @@ def check_consent(
     - `consent_date`: Data do consentimento (se existir)
     """
     
-    lgpd_service = LGPDService(db, str(current_user.tenant_id))
+    lgpd_service = LGPDService(db, str(tenant_id))
     
     has_consent = lgpd_service.check_consent(
         subject_id=check_data.subject_id,
@@ -143,7 +153,8 @@ def check_consent(
 def revoke_consent(
     check_data: ConsentCheckRequest,
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_whatsapp_security),
+    tenant_id=Depends(_tenant_whatsapp_security)
 ):
     """
     ❌ **Revogar Consentimento**
@@ -154,7 +165,7 @@ def revoke_consent(
     relacionado ao tipo de consentimento revogado.
     """
     
-    lgpd_service = LGPDService(db, str(current_user.tenant_id))
+    lgpd_service = LGPDService(db, str(tenant_id))
     
     revoked = lgpd_service.revoke_consent(
         subject_id=check_data.subject_id,
@@ -176,7 +187,8 @@ def revoke_consent(
 def request_data_deletion(
     deletion_data: DataDeletionRequestCreate,
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_whatsapp_security),
+    tenant_id=Depends(_tenant_whatsapp_security)
 ):
     """
     🗑️ **Solicitar Exclusão de Dados (Direito ao Esquecimento)**
@@ -192,7 +204,7 @@ def request_data_deletion(
     4. Exclusão efetiva (se aprovado)
     """
     
-    lgpd_service = LGPDService(db, str(current_user.tenant_id))
+    lgpd_service = LGPDService(db, str(tenant_id))
     
     try:
         request_obj = lgpd_service.request_data_deletion(
@@ -217,7 +229,8 @@ def request_data_deletion(
 def list_deletion_requests(
     status: Optional[str] = None,
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_whatsapp_security),
+    tenant_id=Depends(_tenant_whatsapp_security)
 ):
     """
     📋 **Listar Solicitações de Exclusão**
@@ -229,7 +242,7 @@ def list_deletion_requests(
     """
     
     query = db.query(DataDeletionRequest).filter(
-        DataDeletionRequest.tenant_id == str(current_user.tenant_id)
+        DataDeletionRequest.tenant_id == str(tenant_id)
     )
     
     if status:
@@ -260,7 +273,8 @@ def approve_deletion_request(
     request_id: str,
     approval: DataDeletionApproval,
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_whatsapp_security),
+    tenant_id=Depends(_tenant_whatsapp_security)
 ):
     """
     ✅/❌ **Aprovar/Rejeitar Solicitação de Exclusão**
@@ -271,7 +285,7 @@ def approve_deletion_request(
     **Rejeição:** Requer justificativa (ex: obrigação legal de retenção)
     """
     
-    lgpd_service = LGPDService(db, str(current_user.tenant_id))
+    lgpd_service = LGPDService(db, str(tenant_id))
     
     try:
         lgpd_service.process_deletion_request(
@@ -296,7 +310,8 @@ def approve_deletion_request(
 def export_user_data(
     export_data: DataExportRequest,
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_whatsapp_security),
+    tenant_id=Depends(_tenant_whatsapp_security)
 ):
     """
     📦 **Exportar Dados do Usuário (Direito à Portabilidade)**
@@ -312,7 +327,7 @@ def export_user_data(
     - Logs de acesso
     """
     
-    lgpd_service = LGPDService(db, str(current_user.tenant_id))
+    lgpd_service = LGPDService(db, str(tenant_id))
     
     try:
         data = lgpd_service.export_user_data(
@@ -346,7 +361,8 @@ def get_security_logs(
     severity: Optional[str] = None,
     limit: int = 100,
     db: Session = Depends(get_session),
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_whatsapp_security),
+    tenant_id=Depends(_tenant_whatsapp_security)
 ):
     """
     🔍 **Logs de Auditoria de Segurança**
@@ -362,7 +378,7 @@ def get_security_logs(
     from app.whatsapp.security import SecurityAuditLog
     
     query = db.query(SecurityAuditLog).filter(
-        SecurityAuditLog.tenant_id == str(current_user.tenant_id)
+        SecurityAuditLog.tenant_id == str(tenant_id)
     )
     
     if event_type:
@@ -421,7 +437,8 @@ def validate_webhook_signature(
 
 @router.post("/webhook/generate-secret")
 def generate_webhook_secret(
-    current_user: User = Depends(get_current_user)
+    current_user: User = Depends(_usuario_whatsapp_security),
+    tenant_id=Depends(_tenant_whatsapp_security)
 ):
     """
     🔑 **Gerar Secret para Webhook**
