@@ -63,6 +63,7 @@ def _create_sqlite_schema(engine) -> None:
     from app import (  # noqa: F401
         caixa_models,
         dre_plano_contas_models,
+        financeiro_models,
         models,
         produtos_models,
         vendas_models,

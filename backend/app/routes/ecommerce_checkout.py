@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session
 from app.db import get_session
 from app.financeiro_models import FormaPagamento
 from app.idempotency_models import IdempotencyKey
-from app.models import Cliente, ConfiguracaoEntrega, Tenant, User
+from app.models import ConfiguracaoEntrega, Tenant, User
 from app.pedido_models import Pedido, PedidoItem
 from app.routes.ecommerce_auth import _activate_user_tenant_context, _get_current_ecommerce_user
 from app.services.ecommerce_payment_config import get_active_mercado_pago_runtime_config
@@ -97,10 +97,11 @@ def _frete_local_por_cidade(db: Session, tenant_id: str, cidade_destino: str) ->
     cidade_loja_raw = None
     previous_tenant = get_current_tenant()
     try:
-        set_current_tenant(UUID(str(tenant_id)))
+        tenant_uuid = UUID(str(tenant_id))
+        set_current_tenant(tenant_uuid)
         config = (
             db.query(ConfiguracaoEntrega)
-            .filter(ConfiguracaoEntrega.tenant_id == tenant_id)
+            .filter(ConfiguracaoEntrega.tenant_id == tenant_uuid)
             .first()
         )
         if config:
@@ -413,7 +414,7 @@ def listar_formas_pagamento(
         db.query(FormaPagamento)
         .filter(
             FormaPagamento.tenant_id == tenant_id,
-            FormaPagamento.ativo == True,
+            FormaPagamento.ativo.is_(True),
         )
         .order_by(FormaPagamento.nome)
         .all()

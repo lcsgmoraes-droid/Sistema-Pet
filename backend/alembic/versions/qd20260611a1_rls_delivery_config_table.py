@@ -1,7 +1,7 @@
 """enable RLS on delivery configuration tenant table
 
 Revision ID: qd20260611a1
-Revises: qc20260611a1
+Revises: qe20260611a1
 Create Date: 2026-06-11
 """
 
@@ -12,49 +12,51 @@ import sqlalchemy as sa
 
 
 revision = "qd20260611a1"
-down_revision = "qc20260611a1"
+down_revision = "qe20260611a1"
 branch_labels = None
 depends_on = None
 
 
-DELIVERY_CONFIG_TABLES = ("configuracoes_entrega",)
-TENANT_POLICY = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid"
-
-UPGRADE_SQL = (
-    "ALTER TABLE {table} ENABLE ROW LEVEL SECURITY",
-    "ALTER TABLE {table} FORCE ROW LEVEL SECURITY",
-    "DROP POLICY IF EXISTS {policy} ON {table}",
-    "CREATE POLICY {policy} ON {table} USING ({guard}) WITH CHECK ({guard})",
-)
-DOWNGRADE_SQL = (
-    "DROP POLICY IF EXISTS {policy} ON {table}",
-    "ALTER TABLE {table} NO FORCE ROW LEVEL SECURITY",
-    "ALTER TABLE {table} DISABLE ROW LEVEL SECURITY",
-)
+TABLE_NAME = "configuracoes_entrega"
+POLICY_NAME = f"{TABLE_NAME}_tenant_isolation"
+TENANT_GUARD = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid"
 
 
-def _run_policy_templates(sql_templates: tuple[str, ...], table_names: tuple[str, ...]) -> None:
+def _should_skip() -> bool:
     bind = op.get_bind()
-    if bind.dialect.name != "postgresql":
-        return
+    return bind.dialect.name != "postgresql" or not sa.inspect(bind).has_table(TABLE_NAME)
 
-    inspector = sa.inspect(bind)
-    for table_name in table_names:
-        if not inspector.has_table(table_name):
-            continue
 
-        values = {
-            "table": table_name,
-            "policy": f"{table_name}_tenant_isolation",
-            "guard": TENANT_POLICY,
-        }
-        for template in sql_templates:
-            op.execute(template.format(**values))
+def _execute_all(statements: list[str]) -> None:
+    for statement in statements:
+        op.execute(statement)
 
 
 def upgrade() -> None:
-    _run_policy_templates(UPGRADE_SQL, DELIVERY_CONFIG_TABLES)
+    if _should_skip():
+        return
+
+    _execute_all(
+        [
+            f"ALTER TABLE {TABLE_NAME} ENABLE ROW LEVEL SECURITY",
+            f"ALTER TABLE {TABLE_NAME} FORCE ROW LEVEL SECURITY",
+            f"DROP POLICY IF EXISTS {POLICY_NAME} ON {TABLE_NAME}",
+            (
+                f"CREATE POLICY {POLICY_NAME} ON {TABLE_NAME} "
+                f"USING ({TENANT_GUARD}) WITH CHECK ({TENANT_GUARD})"
+            ),
+        ]
+    )
 
 
 def downgrade() -> None:
-    _run_policy_templates(DOWNGRADE_SQL, tuple(reversed(DELIVERY_CONFIG_TABLES)))
+    if _should_skip():
+        return
+
+    _execute_all(
+        [
+            f"DROP POLICY IF EXISTS {POLICY_NAME} ON {TABLE_NAME}",
+            f"ALTER TABLE {TABLE_NAME} NO FORCE ROW LEVEL SECURITY",
+            f"ALTER TABLE {TABLE_NAME} DISABLE ROW LEVEL SECURITY",
+        ]
+    )
