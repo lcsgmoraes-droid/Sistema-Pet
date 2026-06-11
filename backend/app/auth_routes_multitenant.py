@@ -12,7 +12,7 @@ from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import jwt
+from jose import JWTError, jwt
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy.orm import Session
 
@@ -21,12 +21,13 @@ from app.models import User, Tenant, Role, Permission, RolePermission, UserTenan
 from app.auth import (
     verify_password, 
     create_access_token, 
+    create_refresh_token,
     get_current_user,
     hash_password
 )
 from app.auth.permission_dependencies import expand_permissions
 from app.config import JWT_SECRET_KEY as SECRET_KEY
-from app.auth.core import ALGORITHM, ACCESS_TOKEN_EXPIRE_DAYS
+from app.auth.core import ALGORITHM, ACCESS_TOKEN_EXPIRE_DAYS, ACCESS_TOKEN_EXPIRE_SECONDS
 from app.session_manager import create_session, validate_session, revoke_session, revoke_all_sessions, get_active_sessions, get_session_by_jti
 from app.auth.dependencies import get_current_user_and_tenant
 from app.services.email_service import send_email
@@ -165,7 +166,9 @@ class RegisterRequest(BaseModel):
 
 class LoginResponse(BaseModel):
     access_token: Optional[str] = None
+    refresh_token: Optional[str] = None
     token_type: str
+    expires_in: Optional[int] = None
     user: dict
     tenants: List[dict]
     requires_email_verification: bool = False
@@ -178,8 +181,21 @@ class SelectTenantRequest(BaseModel):
 
 class SelectTenantResponse(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str
+    expires_in: int
     tenant: dict
+
+
+class RefreshTokenRequest(BaseModel):
+    refresh_token: str
+
+
+class RefreshTokenResponse(BaseModel):
+    access_token: str
+    refresh_token: str
+    token_type: str
+    expires_in: int
 
 
 class ForgotPasswordRequest(BaseModel):
@@ -245,6 +261,63 @@ def _password_reset_token_matches(stored_token: str | None, received_token: str 
 
 def _now_utc() -> datetime:
     return datetime.now(timezone.utc)
+
+
+def _session_expiry_utc(db_session) -> datetime:
+    expires_at = db_session.expires_at
+    if expires_at.tzinfo is None:
+        return expires_at.replace(tzinfo=timezone.utc)
+    return expires_at
+
+
+def _create_token_pair(user_id: int, token_jti: str, expires_at: datetime, tenant_id: str | None = None) -> tuple[str, str]:
+    token_data = {
+        "sub": str(user_id),
+        "jti": token_jti,
+        "tenant_id": str(tenant_id) if tenant_id else None,
+    }
+    access_token = create_access_token(data=token_data)
+    refresh_token = create_refresh_token(data=token_data, expires_at=expires_at)
+    return access_token, refresh_token
+
+
+def _auth_payload(access_token: str, refresh_token: str) -> dict:
+    return {
+        "access_token": access_token,
+        "refresh_token": refresh_token,
+        "token_type": "bearer",
+        "expires_in": ACCESS_TOKEN_EXPIRE_SECONDS,
+    }
+
+
+def _validate_refresh_tenant(db: Session, user_id: int, tenant_id: str | None):
+    if not tenant_id:
+        return None
+
+    try:
+        tenant_uuid = uuid.UUID(str(tenant_id))
+    except (ValueError, TypeError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Tenant invalido no refresh token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    user_tenant = db.query(UserTenant).filter(
+        UserTenant.user_id == user_id,
+        UserTenant.tenant_id == tenant_uuid,
+        UserTenant.is_active == True,
+    ).first()
+
+    tenant = db.query(Tenant).filter(Tenant.id == str(tenant_uuid)).first()
+    tenant_status = str(getattr(tenant, "status", "") or "").strip().lower()
+    if not user_tenant or not tenant or tenant_status not in {"active", "ativo"}:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Tenant inativo ou indisponivel",
+        )
+
+    return tenant_uuid
 
 
 def _mark_user_consent(user: User, request: Request, terms_version: str | None, privacy_version: str | None) -> None:
@@ -556,18 +629,15 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
     
     # Criar token inicial (sem tenant_id - usuário precisa selecionar)
     token_jti = db_session.token_jti
-    access_token = create_access_token(
-        data={
-            "sub": str(user.id),
-            "jti": token_jti,
-            "tenant_id": None
-        }
+    access_token, refresh_token = _create_token_pair(
+        user.id,
+        token_jti,
+        _session_expiry_utc(db_session),
     )
     
     # Retornar dados do usuário e tenant
     return LoginResponse(
-        access_token=access_token,
-        token_type="bearer",
+        **_auth_payload(access_token, refresh_token),
         user={
             "id": user.id,
             "name": user.nome,
@@ -640,12 +710,10 @@ def login_multitenant(request: Request, credentials: LoginRequest, db: Session =
     
     # Usar o JTI gerado pela sessão
     token_jti = db_session.token_jti
-    access_token = create_access_token(
-        data={
-            "sub": str(user.id),
-            "jti": token_jti,
-            "tenant_id": None
-        }
+    access_token, refresh_token = _create_token_pair(
+        user.id,
+        token_jti,
+        _session_expiry_utc(db_session),
     )
     
     tenants_list = []
@@ -659,8 +727,7 @@ def login_multitenant(request: Request, credentials: LoginRequest, db: Session =
             })
     
     return LoginResponse(
-        access_token=access_token,
-        token_type="bearer",
+        **_auth_payload(access_token, refresh_token),
         user={
             "id": user.id,
             "name": user.nome,
@@ -670,6 +737,66 @@ def login_multitenant(request: Request, credentials: LoginRequest, db: Session =
         },
         tenants=tenants_list
     )
+
+
+@router.post("/refresh", response_model=RefreshTokenResponse)
+def refresh_access_token(payload: RefreshTokenRequest, db: Session = Depends(get_session)):
+    """
+    Renova o access token curto usando um refresh token atrelado a sessao ativa.
+    """
+    credentials_exception = HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Refresh token invalido ou expirado",
+        headers={"WWW-Authenticate": "Bearer"},
+    )
+
+    try:
+        token_payload = jwt.decode(payload.refresh_token, SECRET_KEY, algorithms=[ALGORITHM])
+    except JWTError:
+        raise credentials_exception
+
+    if token_payload.get("typ") != "refresh":
+        raise credentials_exception
+
+    user_id = token_payload.get("sub")
+    token_jti = token_payload.get("jti")
+    tenant_id = token_payload.get("tenant_id")
+
+    if not user_id or not token_jti:
+        raise credentials_exception
+
+    try:
+        user_id_int = int(user_id)
+    except (TypeError, ValueError):
+        raise credentials_exception
+
+    if not validate_session(db, token_jti):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Session revoked or expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    db_session = get_session_by_jti(db, token_jti)
+    if not db_session or db_session.user_id != user_id_int:
+        raise credentials_exception
+
+    user = db.query(User).filter(User.id == user_id_int).first()
+    if not user or not user.is_active:
+        raise credentials_exception
+
+    tenant_uuid = _validate_refresh_tenant(db, user_id_int, tenant_id)
+    if tenant_uuid and db_session.tenant_id and str(db_session.tenant_id) != str(tenant_uuid):
+        raise credentials_exception
+
+    access_token, refresh_token = _create_token_pair(
+        user_id_int,
+        token_jti,
+        _session_expiry_utc(db_session),
+        str(tenant_uuid) if tenant_uuid else None,
+    )
+
+    return RefreshTokenResponse(**_auth_payload(access_token, refresh_token))
 
 
 @router.post("/verify-email")
@@ -891,12 +1018,11 @@ def select_tenant(
     db.commit()
     
     # Gerar NOVO token COM tenant_id (MESMO JTI)
-    access_token = create_access_token(
-        data={
-            "sub": str(current_user.id),
-            "jti": token_jti,
-            "tenant_id": str(tenant_uuid)
-        }
+    access_token, refresh_token = _create_token_pair(
+        current_user.id,
+        token_jti,
+        _session_expiry_utc(db_session),
+        str(tenant_uuid),
     )
     
     # log_audit(
@@ -911,8 +1037,7 @@ def select_tenant(
     # )
     
     return SelectTenantResponse(
-        access_token=access_token,
-        token_type="bearer",
+        **_auth_payload(access_token, refresh_token),
         tenant={
             "id": str(tenant.id),
             "name": tenant.name,

@@ -2,7 +2,14 @@
  * API Client - Axios Multi-Tenant
  */
 import axios from 'axios';
-import { clearAuthTokens, getAccessToken } from './auth/tokenStorage';
+import {
+  clearAuthTokens,
+  getAccessToken,
+  getRefreshToken,
+  setAccessToken,
+  setRefreshToken,
+} from './auth/tokenStorage';
+import { createRefreshManager } from './auth/refreshManager';
 
 const isDevelopment = import.meta.env.DEV;
 const isProduction = import.meta.env.PROD;
@@ -21,6 +28,13 @@ const PUBLIC_PATH_PREFIXES = [
   '/planos',
   '/app',
   '/ecommerce',
+];
+const REFRESH_RETRY_EXCLUDED_ENDPOINTS = [
+  '/auth/login-multitenant',
+  '/auth/register',
+  '/auth/select-tenant',
+  '/auth/refresh',
+  '/auth/logout-multitenant',
 ];
 
 const debugLog = (...args) => {
@@ -42,6 +56,21 @@ const isPublicBrowserPath = () => {
   );
 };
 
+const isRefreshRetryEligible = (config) => {
+  const url = config?.url || '';
+  return !REFRESH_RETRY_EXCLUDED_ENDPOINTS.some((endpoint) => url.includes(endpoint));
+};
+
+const handleAuthExpired = () => {
+  const isPublicPath = isPublicBrowserPath();
+  clearAuthTokens();
+  localStorage.removeItem('tenants');
+  localStorage.removeItem('selectedTenant');
+  if (!isPublicPath) {
+    globalThis.location.href = '/login';
+  }
+};
+
 if (isProduction && API_URL !== '/api') {
   console.error('[API Config] Em producao, VITE_API_URL deve ser "/api". Valor atual:', API_URL);
 }
@@ -56,6 +85,18 @@ const api = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+});
+
+const refreshManager = createRefreshManager({
+  refreshRequest: (refreshToken) => axios.post(
+    `${API_URL}/auth/refresh`,
+    { refresh_token: refreshToken },
+    { headers: { 'Content-Type': 'application/json' } }
+  ),
+  getRefreshToken,
+  setAccessToken,
+  setRefreshToken,
+  clearAuthTokens,
 });
 
 api.interceptors.request.use(
@@ -89,8 +130,9 @@ api.interceptors.response.use(
     });
     return response;
   },
-  (error) => {
+  async (error) => {
     const status = error.response?.status;
+    const originalRequest = error.config || {};
 
     debugWarn('[API Response Error]', {
       status,
@@ -99,13 +141,20 @@ api.interceptors.response.use(
     });
 
     if (status === 401) {
-      const isPublicPath = isPublicBrowserPath();
-      clearAuthTokens();
-      localStorage.removeItem('tenants');
-      localStorage.removeItem('selectedTenant');
-      if (!isPublicPath) {
-        globalThis.location.href = '/login';
+      if (!originalRequest._retry && isRefreshRetryEligible(originalRequest) && getRefreshToken()) {
+        originalRequest._retry = true;
+        try {
+          const accessToken = await refreshManager.refreshAccessToken();
+          originalRequest.headers = originalRequest.headers || {};
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+          return api(originalRequest);
+        } catch (refreshError) {
+          handleAuthExpired();
+          return Promise.reject(refreshError);
+        }
       }
+
+      handleAuthExpired();
     }
 
     if (status === 403) {

@@ -8,7 +8,7 @@ import sys
 import os
 
 import pytest
-from sqlalchemy import create_engine
+from sqlalchemy import create_engine, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PostgreSQLUUID
 from sqlalchemy.ext.compiler import compiles
 from sqlalchemy.orm import sessionmaker
@@ -63,6 +63,15 @@ def _create_sqlite_schema(engine) -> None:
     from app import caixa_models, models, produtos_models, vendas_models  # noqa: F401
 
     Base.metadata.create_all(engine)
+    from app.db.migration_check import _get_alembic_head
+
+    with engine.begin() as conn:
+        conn.execute(text("CREATE TABLE IF NOT EXISTS alembic_version (version_num VARCHAR(64) NOT NULL)"))
+        conn.execute(text("DELETE FROM alembic_version"))
+        conn.execute(
+            text("INSERT INTO alembic_version (version_num) VALUES (:version)"),
+            {"version": _get_alembic_head(engine)},
+        )
 
 
 @pytest.fixture(autouse=True)
@@ -85,11 +94,17 @@ def dummy_fixture():
 
 
 @pytest.fixture
-def client(db_session):
+def client(db_session, db_engine, monkeypatch):
     """FastAPI test client wired to the isolated test session."""
     from fastapi.testclient import TestClient
 
+    import app.db as app_db
+    import app.db.core as app_db_core
     from app.db import get_session
+
+    monkeypatch.setattr(app_db, "engine", db_engine)
+    monkeypatch.setattr(app_db_core, "engine", db_engine)
+
     from app.main import app
 
     def override_get_session():

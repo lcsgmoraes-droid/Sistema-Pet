@@ -8,6 +8,7 @@
     "build": "vite build --mode production",
     "build:dev": "vite build --mode development",
     "test:auth-storage": "node scripts/test-token-storage.mjs",
+    "test:auth-refresh": "node scripts/test-refresh-manager.mjs",
     "test:corepet-branding": "node scripts/test-corepet-branding.mjs",
     "test:ecommerce-orders-followup": "node scripts/test-ecommerce-orders-followup.mjs",
     "test:pdv-online-order-actions": "node scripts/test-pdv-online-order-actions.mjs",

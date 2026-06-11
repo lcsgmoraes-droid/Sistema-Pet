@@ -1,5 +1,12 @@
 import axios from "axios";
-import { clearAuthTokens, getAccessToken } from "../auth/tokenStorage";
+import {
+  clearAuthTokens,
+  getAccessToken,
+  getRefreshToken,
+  setAccessToken,
+  setRefreshToken,
+} from "../auth/tokenStorage";
+import { createRefreshManager } from "../auth/refreshManager";
 
 const configuredApiUrl = import.meta.env.VITE_API_URL;
 const baseURL = import.meta.env.DEV ? "/api" : (configuredApiUrl || "/api");
@@ -15,6 +22,13 @@ const PUBLIC_PATH_PREFIXES = [
   "/app",
   "/ecommerce",
 ];
+const REFRESH_RETRY_EXCLUDED_ENDPOINTS = [
+  "/auth/login-multitenant",
+  "/auth/register",
+  "/auth/select-tenant",
+  "/auth/refresh",
+  "/auth/logout-multitenant",
+];
 
 function isPublicBrowserPath() {
   const path = window.location.pathname || "/";
@@ -23,8 +37,40 @@ function isPublicBrowserPath() {
   );
 }
 
+function isRefreshRetryEligible(config) {
+  const url = config?.url || "";
+  return !REFRESH_RETRY_EXCLUDED_ENDPOINTS.some((endpoint) => url.includes(endpoint));
+}
+
+function handleAuthExpired() {
+  const isPublicPath = isPublicBrowserPath();
+  if (!isPublicPath) {
+    console.warn("Sessao invalida ou tenant nao selecionado");
+  }
+
+  clearAuthTokens();
+  localStorage.removeItem("tenants");
+  localStorage.removeItem("selectedTenant");
+
+  if (!isPublicPath) {
+    window.location.href = "/login";
+  }
+}
+
 export const api = axios.create({
   baseURL,
+});
+
+const refreshManager = createRefreshManager({
+  refreshRequest: (refreshToken) => axios.post(
+    `${baseURL}/auth/refresh`,
+    { refresh_token: refreshToken },
+    { headers: { "Content-Type": "application/json" } },
+  ),
+  getRefreshToken,
+  setAccessToken,
+  setRefreshToken,
+  clearAuthTokens,
 });
 
 api.interceptors.request.use(
@@ -42,22 +88,25 @@ api.interceptors.request.use(
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
+  async (error) => {
     const status = error.response?.status;
+    const originalRequest = error.config || {};
 
     if (status === 401) {
-      const isPublicPath = isPublicBrowserPath();
-      if (!isPublicPath) {
-        console.warn("Sessao invalida ou tenant nao selecionado");
+      if (!originalRequest._retry && isRefreshRetryEligible(originalRequest) && getRefreshToken()) {
+        originalRequest._retry = true;
+        try {
+          const accessToken = await refreshManager.refreshAccessToken();
+          originalRequest.headers = originalRequest.headers || {};
+          originalRequest.headers.Authorization = `Bearer ${accessToken}`;
+          return api(originalRequest);
+        } catch (refreshError) {
+          handleAuthExpired();
+          return Promise.reject(refreshError);
+        }
       }
 
-      clearAuthTokens();
-      localStorage.removeItem("tenants");
-      localStorage.removeItem("selectedTenant");
-
-      if (!isPublicPath) {
-        window.location.href = "/login";
-      }
+      handleAuthExpired();
     }
 
     if (status === 403) {
@@ -67,3 +116,5 @@ api.interceptors.response.use(
     return Promise.reject(error);
   }
 );
+
+export default api;
