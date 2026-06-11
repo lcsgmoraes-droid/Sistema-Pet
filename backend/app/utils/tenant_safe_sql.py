@@ -16,6 +16,7 @@ from sqlalchemy.engine import Result
 from sqlalchemy.orm import Session
 
 from app.tenancy.context import get_current_tenant_id
+from app.tenancy.rls import sync_rls_tenant
 
 
 TENANT_FILTER_MARKER = "{tenant_filter}"
@@ -243,6 +244,7 @@ def execute_tenant_safe(
         )
 
     try:
+        sync_rls_tenant(db, resolved_tenant_id)
         statement = text(sql_text)
         bindparams = _sql_bindparams(sql)
         if bindparams:

@@ -18,6 +18,7 @@ from sqlalchemy.orm import with_loader_criteria
 import logging
 
 from app.tenancy.context import get_current_tenant
+from app.tenancy.rls import sync_rls_tenant
 
 
 logger = logging.getLogger(__name__)
@@ -97,15 +98,16 @@ def _add_tenant_filter(execute_state):
     Raises:
         RuntimeError: Query em tabela multi-tenant sem tenant_id no contexto
     """
-    # Permitir operações que não são SELECT (INSERT, UPDATE, DELETE)
+    # Sincroniza o contexto RLS antes de qualquer comando ORM, inclusive DML.
+    tenant_id = get_current_tenant()
+    sync_rls_tenant(execute_state.session, tenant_id)
+
     if not execute_state.is_select:
         return
 
     # Import lazy para evitar ciclo app.base_models -> app.db -> filters -> app.base_models
     # quando modulos/modelos sao importados diretamente em testes e utilitarios.
     from app.base_models import BaseTenantModel, TenantScoped
-
-    tenant_id = get_current_tenant()
 
     if tenant_id is not None:
         # CASO 1: Tenant presente → aplicar filtro normalmente.
