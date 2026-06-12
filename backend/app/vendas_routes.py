@@ -13,31 +13,28 @@ Rotas da API para o módulo de Vendas (PDV)
 import logging
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_, or_, func, desc
+from sqlalchemy import or_, func, desc
 from datetime import datetime, timedelta, date
 from decimal import Decimal
 from typing import List, Optional
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 import json
 
 from .db import get_session
-from .db.transaction import transactional_session
-from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
 from .idempotency import idempotent  # ← IDEMPOTÊNCIA
 from .security.permissions_decorator import require_permission
 from .vendas_models import (
-    Venda, VendaItem, VendaPagamento, VendaBaixa
+    Venda, VendaItem, VendaPagamento
 )
-from .models import Cliente, User
-from .produtos_models import Produto, ProdutoLote, EstoqueMovimentacao, ProdutoKitComponente
-from .financeiro_models import ContaReceber, FormaPagamento, LancamentoManual
+from .models import Cliente
+from .produtos_models import Produto
+from .financeiro_models import ContaReceber
 from .audit_log import log_action
 from .utils.logger import logger as struct_logger, set_user_id
 from .estoque.service import EstoqueService
 from .caixa.service import CaixaService
-from .financeiro import ContasReceberService
-from .utils.security_helpers import safe_get_produto, safe_get_cliente, safe_get_conta_bancaria, get_by_id_user
+from .utils.security_helpers import safe_get_produto, safe_get_cliente
 from .services.opportunity_background_processor import get_opportunity_processor
 from .services.venda_rentabilidade_snapshot_service import (
     get_or_build_venda_rentabilidade_snapshot,
@@ -976,7 +973,7 @@ async def finalizar_venda(
     # Log de sucesso
     struct_logger.info(
         event="FINALIZE_SUCCESS",
-        message=f"Venda finalizada com sucesso",
+        message="Venda finalizada com sucesso",
         venda_id=venda_id,
         numero_venda=resultado['venda']['numero_venda'],
         status=resultado['venda']['status'],
@@ -1106,6 +1103,7 @@ async def finalizar_venda(
                 if produto and pet and produto.tem_recorrencia and produto.intervalo_dias:
                     # Verificar se já existe lembrete PENDENTE para este produto+pet
                     lembrete_existente = db.query(Lembrete).filter(
+                        Lembrete.tenant_id == tenant_id,
                         Lembrete.cliente_id == venda.cliente_id,
                         Lembrete.pet_id == item.pet_id,
                         Lembrete.produto_id == item.produto_id,
@@ -1143,6 +1141,7 @@ async def finalizar_venda(
                             data_notificacao = data_proxima - timedelta(days=7)
 
                             novo_lembrete = Lembrete(
+                                tenant_id=tenant_id,
                                 user_id=current_user.id,
                                 cliente_id=venda.cliente_id,
                                 pet_id=item.pet_id,
@@ -1180,6 +1179,7 @@ async def finalizar_venda(
                         }]
 
                         novo_lembrete = Lembrete(
+                            tenant_id=tenant_id,
                             user_id=current_user.id,
                             cliente_id=venda.cliente_id,
                             pet_id=item.pet_id,
@@ -1235,7 +1235,7 @@ async def finalizar_venda(
     total_pago = sum(float(p.valor) for p in venda.pagamentos) if venda.pagamentos else 0
     struct_logger.info(
         event="FINALIZE_COMPLETE",
-        message=f"Venda finalizada completamente (com comissões e lembretes)",
+        message="Venda finalizada completamente (com comissões e lembretes)",
         venda_id=venda_id,
         numero_venda=venda.numero_venda,
         status_final=venda.status,
@@ -1412,7 +1412,7 @@ def reabrir_venda(
 
                 struct_logger.info(
                     event="COMMISSION_CANCELLED",
-                    message=f"Comissões canceladas com sucesso",
+                    message="Comissões canceladas com sucesso",
                     venda_id=venda.id,
                     count=comissoes_removidas
                 )
@@ -1853,11 +1853,11 @@ def excluir_pagamento(
     # Atualizar status da venda
     if total_pago == 0:
         venda.status = 'aberta'
-        logger.info(f"DEBUG: Mudou status para ABERTA (total_pago = 0)")
+        logger.info("DEBUG: Mudou status para ABERTA (total_pago = 0)")
         invalidate_venda_rentabilidade_snapshot(venda)
     elif total_pago >= total_venda:
         venda.status = 'finalizada'
-        logger.info(f"DEBUG: Mudou status para FINALIZADA (total_pago >= total_venda)")
+        logger.info("DEBUG: Mudou status para FINALIZADA (total_pago >= total_venda)")
         get_or_build_venda_rentabilidade_snapshot(
             venda,
             db,
@@ -1867,7 +1867,7 @@ def excluir_pagamento(
         )
     else:
         venda.status = 'baixa_parcial'
-        logger.info(f"DEBUG: Mudou status para BAIXA_PARCIAL")
+        logger.info("DEBUG: Mudou status para BAIXA_PARCIAL")
         get_or_build_venda_rentabilidade_snapshot(
             venda,
             db,
@@ -1999,19 +1999,19 @@ def registrar_devolucao(
         logger.info(f"📦 Itens para devolução: {len(itens_devolucao)}")
 
         if not caixa_id and not gerar_credito:
-            logger.info(f"❌ Caixa ID não fornecido para devolução em dinheiro")
+            logger.info("❌ Caixa ID não fornecido para devolução em dinheiro")
             raise HTTPException(status_code=400, detail='ID do caixa é obrigatório para devolução em dinheiro')
 
         if not itens_devolucao:
-            logger.info(f"❌ Nenhum item selecionado")
+            logger.info("❌ Nenhum item selecionado")
             raise HTTPException(status_code=400, detail='Nenhum item selecionado para devolução')
 
         if not motivo:
-            logger.info(f"❌ Motivo não fornecido")
+            logger.info("❌ Motivo não fornecido")
             raise HTTPException(status_code=400, detail='Motivo da devolução é obrigatório')
 
         # Verificar se o caixa existe e está aberto (apenas se for devolução em dinheiro)
-        from app.caixa_models import Caixa, MovimentacaoCaixa
+        from app.caixa_models import Caixa
         caixa = None
         if not gerar_credito:
             caixa = db.query(Caixa).filter_by(id=caixa_id, status='aberto').first()
@@ -2041,7 +2041,7 @@ def registrar_devolucao(
 
                 # Devolver componente ao estoque
                 try:
-                    resultado_estorno = EstoqueService.estornar_estoque(
+                    EstoqueService.estornar_estoque(
                         produto_id=produto_id,
                         quantidade=quantidade_devolvida,
                         motivo='devolucao',
@@ -2109,7 +2109,7 @@ def registrar_devolucao(
                 # Devolver ao estoque
                 if item_venda.produto_id:
                     try:
-                        resultado_estorno = EstoqueService.estornar_estoque(
+                        EstoqueService.estornar_estoque(
                             produto_id=item_venda.produto_id,
                             quantidade=quantidade_devolvida,
                             motivo='devolucao',
@@ -2155,7 +2155,6 @@ def registrar_devolucao(
                 )
 
             # 🔒 SEGURANÇA: Validar que o cliente pertence ao usuário
-            from app.models import Cliente
             cliente = safe_get_cliente(db, venda.cliente_id, current_user.id)
 
             # Adicionar crédito ao cliente
@@ -2315,7 +2314,7 @@ def registrar_devolucao(
         else:
             venda.observacoes = historico.lstrip()
 
-        logger.info(f"📝 Histórico de devolução adicionado às observações da venda")
+        logger.info("📝 Histórico de devolução adicionado às observações da venda")
 
         # Registrar auditoria da devolução
         tipo_devolucao = "Crédito ao cliente" if gerar_credito else "Dinheiro"
@@ -2340,7 +2339,6 @@ def registrar_devolucao(
         }
 
         if gerar_credito:
-            from app.models import Cliente
             # 🔒 SEGURANÇA: Validar que o cliente pertence ao usuário
             cliente = safe_get_cliente(db, venda.cliente_id, current_user.id)
             resultado['credito_cliente'] = float(cliente.credito)
@@ -2348,7 +2346,7 @@ def registrar_devolucao(
         else:
             resultado['movimentacao_caixa_id'] = movimentacao['movimentacao_id']
 
-        logger.info(f"✅ Devolução concluída com sucesso!")
+        logger.info("✅ Devolução concluída com sucesso!")
         logger.info(f"{'='*80}\n")
         return resultado
 
@@ -2356,12 +2354,12 @@ def registrar_devolucao(
         raise
     except Exception as e:
         logger.info(f"\n{'='*80}")
-        logger.info(f"🚨 ERRO CRÍTICO NA DEVOLUÇÃO:")
+        logger.info("🚨 ERRO CRÍTICO NA DEVOLUÇÃO:")
         logger.info(f"{'='*80}")
         logger.info(f"Tipo: {type(e).__name__}")
         logger.info(f"Mensagem: {str(e)}")
         import traceback
-        logger.info(f"Traceback completo:")
+        logger.info("Traceback completo:")
         traceback.print_exc()
         logger.info(f"{'='*80}\n")
         db.rollback()
