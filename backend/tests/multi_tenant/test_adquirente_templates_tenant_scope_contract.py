@@ -22,20 +22,23 @@ def test_admin_seed_adquirentes_uses_selected_tenant_dependency():
 def test_seed_adquirentes_matches_current_template_model_schema():
     source = _source("app/seed_adquirentes.py")
 
-    assert '"nome": "STONE"' in source
-    assert '"nome": "CIELO"' in source
-    assert '"nome": "REDE"' in source
-    assert source.count('"tipo_arquivo": "recebimentos"') == 3
-    assert 'AdquirenteTemplate.nome == template_data["nome"]' in source
-    assert 'AdquirenteTemplate.tipo_arquivo == template_data["tipo_arquivo"]' in source
-    assert 'nome=template_data["nome"]' in source
-    assert 'tipo_arquivo=template_data["tipo_arquivo"]' in source
+    assert "from app.financeiro_models import TemplateAdquirente" in source
+    assert '"nome_adquirente": "STONE"' in source
+    assert '"nome_adquirente": "CIELO"' in source
+    assert '"nome_adquirente": "REDE"' in source
+    assert source.count('"tipo_relatorio": "recebimentos"') == 3
+    assert 'TemplateAdquirente.nome_adquirente == template_data["nome_adquirente"]' in source
+    assert 'TemplateAdquirente.tipo_relatorio == template_data["tipo_relatorio"]' in source
+    assert 'nome_adquirente=template_data["nome_adquirente"]' in source
+    assert 'tipo_relatorio=template_data["tipo_relatorio"]' in source
 
     for stale_fragment in (
-        "AdquirenteTemplate.adquirente",
-        "AdquirenteTemplate.versao",
-        "adquirente=template_data",
-        "versao=template_data",
-        "descricao=template_data",
+        "from app.conciliacao_models import AdquirenteTemplate",
+        "AdquirenteTemplate.",
+        'adquirente=template_data["adquirente"]',
+        'versao=template_data["versao"]',
+        'descricao=template_data["descricao"]',
+        'nome=template_data["nome"]',
+        'tipo_arquivo=template_data["tipo_arquivo"]',
     ):
         assert stale_fragment not in source
