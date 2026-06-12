@@ -1398,7 +1398,10 @@ class VendaService:
                 if operadora_id and numero_parcelas > 1:
                     from app.operadoras_models import OperadoraCartao
                     
-                    operadora = db.query(OperadoraCartao).filter_by(id=operadora_id).first()
+                    operadora = db.query(OperadoraCartao).filter(
+                        OperadoraCartao.id == operadora_id,
+                        OperadoraCartao.tenant_id == tenant_id
+                    ).first()
                     if not operadora:
                         raise HTTPException(
                             status_code=400,
