@@ -67,9 +67,10 @@ def gerar_provisao_ferias_e_13_mensal(
         .filter(
             Cliente.tenant_id == tenant_id,
             Cliente.tipo_cadastro == "funcionario",  # Funcionários
-            Cliente.ativo == True,
+            Cliente.ativo.is_(True),
             Cliente.cargo_id.isnot(None),
-            Cargo.ativo == True
+            Cargo.tenant_id == tenant_id,
+            Cargo.ativo.is_(True)
         )
         .all()
     )
@@ -262,7 +263,7 @@ def calcular_provisao_acumulada(
         ):
             lancamentos_periodo.append(lanc)
     
-    total_acumulado = sum(l.despesas_pessoal or 0 for l in lancamentos_periodo)
+    total_acumulado = sum(lancamento.despesas_pessoal or 0 for lancamento in lancamentos_periodo)
     
     return {
         "periodo": f"{mes_inicio}/{ano_inicio} a {mes_fim}/{ano_fim}",
