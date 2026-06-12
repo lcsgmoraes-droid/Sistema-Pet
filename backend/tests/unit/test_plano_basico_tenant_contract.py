@@ -202,7 +202,7 @@ def test_modulos_admin_activation_sets_target_tenant_context(monkeypatch):
     )
 
     assert response == {"ok": True, "modulo": "campanhas", "tenant_id": TENANT_ALVO_MODULO}
-    assert tenant_context_calls[0] == TENANT_ALVO_MODULO
+    assert tenant_context_calls == [TENANT_ALVO_MODULO]
     assert db.added[0].tenant_id == TENANT_ALVO_MODULO
     assert db.committed is True
 
