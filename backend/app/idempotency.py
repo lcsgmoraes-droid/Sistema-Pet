@@ -37,6 +37,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_
 
 from app.idempotency_models import IdempotencyKey
+from app.tenancy.context import get_current_tenant
 
 logger = logging.getLogger(__name__)
 
@@ -58,16 +59,37 @@ def _compute_request_hash(body: dict, path_params: dict) -> str:
     return hashlib.sha256(serialized.encode('utf-8')).hexdigest()
 
 
-def _cleanup_expired_keys(db: Session, user_id: int):
+def _normalize_tenant_id(value):
+    if value is None or value == "":
+        return None
+    if isinstance(value, uuid.UUID):
+        return value
+    return uuid.UUID(str(value))
+
+
+def _extract_user_tenant_pair(value):
+    if not isinstance(value, tuple) or len(value) < 2:
+        return None, None
+
+    user = value[0]
+    tenant_id = _normalize_tenant_id(value[1])
+    if user is None or tenant_id is None or not hasattr(user, "id"):
+        return None, None
+    return user, tenant_id
+
+
+def _cleanup_expired_keys(db: Session, user_id: int, tenant_id, now: datetime | None = None):
     """
     Remove chaves de idempotência expiradas (mais de 24h)
     Executado automaticamente antes de criar nova chave
     """
     try:
-        expiration_time = datetime.utcnow() - timedelta(hours=IDEMPOTENCY_EXPIRATION_HOURS)
+        resolved_tenant_id = _normalize_tenant_id(tenant_id)
+        expiration_time = (now or datetime.utcnow()) - timedelta(hours=IDEMPOTENCY_EXPIRATION_HOURS)
         deleted = db.query(IdempotencyKey).filter(
             and_(
                 IdempotencyKey.user_id == user_id,
+                IdempotencyKey.tenant_id == resolved_tenant_id,
                 IdempotencyKey.created_at < expiration_time
             )
         ).delete(synchronize_session=False)
@@ -111,6 +133,7 @@ def idempotent(require_key: bool = True):
             request: Optional[Request] = None
             db: Optional[Session] = None
             current_user = None
+            tenant_id = None
             
             # Buscar Request, Session e User nos kwargs
             for arg in args:
@@ -126,9 +149,24 @@ def idempotent(require_key: bool = True):
                     db = value
                 elif key in ('current_user', 'user'):
                     current_user = value
+                elif key in ('user_and_tenant', 'current_user_and_tenant'):
+                    extracted_user, extracted_tenant = _extract_user_tenant_pair(value)
+                    if extracted_user is not None:
+                        current_user = extracted_user
+                    if extracted_tenant is not None:
+                        tenant_id = extracted_tenant
+
+                if current_user is None or tenant_id is None:
+                    extracted_user, extracted_tenant = _extract_user_tenant_pair(value)
+                    if current_user is None and extracted_user is not None:
+                        current_user = extracted_user
+                    if tenant_id is None and extracted_tenant is not None:
+                        tenant_id = extracted_tenant
             
             # Se não temos os componentes necessários, executa normalmente
-            if not request or not db or not current_user:
+            tenant_id = _normalize_tenant_id(tenant_id or get_current_tenant())
+
+            if not request or not db or not current_user or tenant_id is None:
                 logger.warning("⚠️ Idempotência: componentes não encontrados, executando sem proteção")
                 return await func(*args, **kwargs)
             
@@ -172,12 +210,13 @@ def idempotent(require_key: bool = True):
             request_hash = _compute_request_hash(body, path_params)
             
             # Limpar chaves expiradas (otimização)
-            _cleanup_expired_keys(db, user_id)
+            _cleanup_expired_keys(db, user_id, tenant_id)
             
             # Buscar chave existente
             existing_key = db.query(IdempotencyKey).filter(
                 and_(
                     IdempotencyKey.user_id == user_id,
+                    IdempotencyKey.tenant_id == tenant_id,
                     IdempotencyKey.chave_idempotencia == idempotency_key
                 )
             ).first()
@@ -229,6 +268,7 @@ def idempotent(require_key: bool = True):
             # Cenário 2: Nova chave - criar registro
             else:
                 new_key = IdempotencyKey(
+                    tenant_id=tenant_id,
                     user_id=user_id,
                     endpoint=endpoint,
                     chave_idempotencia=idempotency_key,
