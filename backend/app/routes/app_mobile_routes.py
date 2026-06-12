@@ -2112,7 +2112,10 @@ def rastreio_entrega(
     # Buscar parada de entrega associada a esta venda
     parada = (
         db.query(RotaEntregaParada)
-        .filter(RotaEntregaParada.venda_id == venda.id)
+        .filter(
+            RotaEntregaParada.venda_id == venda.id,
+            RotaEntregaParada.tenant_id == tenant_id,
+        )
         .first()
     )
 
@@ -2124,7 +2127,14 @@ def rastreio_entrega(
             "rota": None,
         }
 
-    rota = db.query(RotaEntrega).filter(RotaEntrega.id == parada.rota_id).first()
+    rota = (
+        db.query(RotaEntrega)
+        .filter(
+            RotaEntrega.id == parada.rota_id,
+            RotaEntrega.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not rota:
         return {
             "status_pedido": pedido.status,
@@ -2136,7 +2146,10 @@ def rastreio_entrega(
     # Buscar todas as paradas da rota para calcular progresso
     todas_paradas = (
         db.query(RotaEntregaParada)
-        .filter(RotaEntregaParada.rota_id == rota.id)
+        .filter(
+            RotaEntregaParada.rota_id == rota.id,
+            RotaEntregaParada.tenant_id == tenant_id,
+        )
         .order_by(RotaEntregaParada.ordem)
         .all()
     )
@@ -2158,10 +2171,10 @@ def rastreio_entrega(
                 """
                 SELECT lat_atual, lon_atual, localizacao_atualizada_em
                 FROM rotas_entrega
-                WHERE id = :rid
+                WHERE id = :rid AND tenant_id = :tenant
                 """
             ),
-            {"rid": rota.id},
+            {"rid": rota.id, "tenant": tenant_id},
         ).fetchone()
 
         if rota_posicao and rota_posicao[0] is not None and rota_posicao[1] is not None:
@@ -2174,8 +2187,12 @@ def rastreio_entrega(
         else:
             for p in reversed(todas_paradas):
                 result = db.execute(
-                    text("SELECT lat_entrega, lon_entrega FROM rotas_entrega_paradas WHERE id = :pid"),
-                    {"pid": p.id}
+                    text(
+                        "SELECT lat_entrega, lon_entrega "
+                        "FROM rotas_entrega_paradas "
+                        "WHERE id = :pid AND tenant_id = :tenant"
+                    ),
+                    {"pid": p.id, "tenant": tenant_id},
                 ).fetchone()
                 if result and result[0] is not None and result[1] is not None:
                     ultima_posicao = {
@@ -2190,7 +2207,14 @@ def rastreio_entrega(
 
     entregador_nome = None
     if rota.entregador_id:
-        entregador = db.query(Cliente).filter(Cliente.id == rota.entregador_id).first()
+        entregador = (
+            db.query(Cliente)
+            .filter(
+                Cliente.id == rota.entregador_id,
+                Cliente.tenant_id == tenant_id,
+            )
+            .first()
+        )
         if entregador:
             entregador_nome = entregador.nome
 
