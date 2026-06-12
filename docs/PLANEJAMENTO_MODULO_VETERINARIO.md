@@ -1231,7 +1231,7 @@ PRONTUÁRIO / LGPD
 17. ❌ Banco de protocolos veterinários reutilizáveis
 
 ### Fase 4 — Multi-Tenant Avançado
-18. ❌ Tabela `vet_partner_link` e arquitetura de eventos entre tenants
+18. 🔶 Tabela `vet_partner_link` e arquitetura de eventos entre tenants — tabela criada e protegida por RLS bilateral (`empresa_tenant_id`/`vet_tenant_id`); falta evoluir a arquitetura de eventos entre tenants
 19. ❌ `organization_type` (petshop / veterinary_clinic / grooming / hospital)
 20. ❌ IA clínica coletiva (dados anonimizados multi-tenant)
 
