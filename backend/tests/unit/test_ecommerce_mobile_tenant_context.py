@@ -218,6 +218,16 @@ def test_checkout_finalizar_reactivates_tenant_before_gateway_lookup():
     )
 
 
+def test_app_mobile_rastreio_entrega_sql_cru_filtra_gps_por_tenant():
+    source = " ".join(inspect.getsource(app_mobile_routes.rastreio_entrega).split())
+
+    assert "FROM rotas_entrega WHERE id = :rid AND tenant_id = :tenant" in source
+    assert "FROM rotas_entrega_paradas" in source
+    assert "WHERE id = :pid AND tenant_id = :tenant" in source
+    assert '{"rid": rota.id, "tenant": tenant_id}' in source
+    assert '{"pid": p.id, "tenant": tenant_id}' in source
+
+
 def test_get_entregador_cliente_uses_validated_ecommerce_user_context():
     tenant_id = uuid4()
     user = SimpleNamespace(id=123, tenant_id=tenant_id, is_active=True)
