@@ -10,10 +10,10 @@ from datetime import date, datetime
 import csv
 import io
 
-from sqlalchemy import text
 from sqlalchemy.orm import Session
-from ..db import SessionLocal, get_session
+from ..db import get_session
 from ..auth.dependencies import get_current_user_and_tenant
+from ..utils.tenant_safe_sql import execute_tenant_safe
 
 router = APIRouter(prefix="/relatorios-comissoes", tags=["Relatórios de Comissões"])
 
@@ -46,13 +46,12 @@ def relatorio_margem_produto(
             SUM(ci.valor_custo) as total_custo,
             SUM(ci.valor_comissao_gerada) as total_comissao
         FROM comissoes_itens ci
-        JOIN produtos p ON ci.produto_id = p.id
-        LEFT JOIN categorias c ON p.categoria_id = c.id
-        WHERE ci.tenant_id = :tenant_id
-          AND p.tenant_id = :tenant_id
+        JOIN produtos p ON ci.produto_id = p.id AND p.tenant_id = ci.tenant_id
+        LEFT JOIN categorias c ON p.categoria_id = c.id AND c.tenant_id = ci.tenant_id
+        WHERE ci.{tenant_filter}
     '''
     
-    params_dict = {'tenant_id': str(tenant_id)}
+    params_dict = {}
     
     if data_inicio:
         query += ' AND ci.data_venda >= :data_inicio'
@@ -73,7 +72,7 @@ def relatorio_margem_produto(
     query += ' GROUP BY p.id, p.nome, c.nome ORDER BY total_venda DESC'
     
     logger.warning(f"🔍 [RELATORIO-MARGEM-PRODUTO] Query params: {params_dict}")
-    result = db.execute(text(query), params_dict)
+    result = execute_tenant_safe(db, query, params_dict, tenant_id=tenant_id)
     resultados = result.fetchall()
     logger.warning(f"🔍 [RELATORIO-MARGEM-PRODUTO] Resultados encontrados: {len(resultados)}")
     
@@ -192,12 +191,11 @@ def ranking_funcionarios(
             COUNT(ci.id) as quantidade_comissoes,
             AVG(ci.valor_comissao_gerada) as media_comissao
         FROM comissoes_itens ci
-        JOIN clientes f ON ci.funcionario_id = f.id
-        WHERE ci.tenant_id = :tenant_id
-          AND f.tenant_id = :tenant_id
+        JOIN clientes f ON ci.funcionario_id = f.id AND f.tenant_id = ci.tenant_id
+        WHERE ci.{tenant_filter}
     '''
     
-    params_dict = {'tenant_id': str(tenant_id)}
+    params_dict = {}
     
     if data_inicio:
         query += ' AND ci.data_venda >= :data_inicio'
@@ -210,7 +208,7 @@ def ranking_funcionarios(
     query += ' GROUP BY f.id, f.nome ORDER BY total_comissao DESC LIMIT :limite'
     params_dict['limite'] = limite
     
-    result = db.execute(text(query), params_dict)
+    result = execute_tenant_safe(db, query, params_dict, tenant_id=tenant_id)
     resultados = result.fetchall()
     
     ranking = [
@@ -256,13 +254,12 @@ def ranking_produtos(
             COUNT(ci.id) as quantidade_vendas,
             SUM(ci.valor_base_calculo) as total_venda
         FROM comissoes_itens ci
-        JOIN produtos p ON ci.produto_id = p.id
-        LEFT JOIN categorias c ON p.categoria_id = c.id
-        WHERE ci.tenant_id = :tenant_id
-          AND p.tenant_id = :tenant_id
+        JOIN produtos p ON ci.produto_id = p.id AND p.tenant_id = ci.tenant_id
+        LEFT JOIN categorias c ON p.categoria_id = c.id AND c.tenant_id = ci.tenant_id
+        WHERE ci.{tenant_filter}
     '''
     
-    params_dict = {'tenant_id': str(tenant_id)}
+    params_dict = {}
     
     if data_inicio:
         query += ' AND ci.data_venda >= :data_inicio'
@@ -275,7 +272,7 @@ def ranking_produtos(
     query += ' GROUP BY p.id, p.nome, c.nome ORDER BY total_comissao DESC LIMIT :limite'
     params_dict['limite'] = limite
     
-    result = db.execute(text(query), params_dict)
+    result = execute_tenant_safe(db, query, params_dict, tenant_id=tenant_id)
     resultados = result.fetchall()
     
     ranking = [
@@ -320,14 +317,12 @@ def ranking_categorias(
             COUNT(ci.id) as quantidade_comissoes,
             SUM(ci.valor_base_calculo) as total_venda
         FROM comissoes_itens ci
-        JOIN produtos p ON ci.produto_id = p.id
-        JOIN categorias c ON p.categoria_id = c.id
-        WHERE ci.tenant_id = :tenant_id
-          AND p.tenant_id = :tenant_id
-          AND c.tenant_id = :tenant_id
+        JOIN produtos p ON ci.produto_id = p.id AND p.tenant_id = ci.tenant_id
+        JOIN categorias c ON p.categoria_id = c.id AND c.tenant_id = ci.tenant_id
+        WHERE ci.{tenant_filter}
     '''
     
-    params_dict = {'tenant_id': str(tenant_id)}
+    params_dict = {}
     
     if data_inicio:
         query += ' AND ci.data_venda >= :data_inicio'
@@ -339,7 +334,7 @@ def ranking_categorias(
     
     query += ' GROUP BY c.id, c.nome ORDER BY total_comissao DESC'
     
-    result = db.execute(text(query), params_dict)
+    result = execute_tenant_safe(db, query, params_dict, tenant_id=tenant_id)
     resultados = result.fetchall()
     
     total_geral = sum(float(row[2] or 0) for row in resultados)  # total_comissao
@@ -388,7 +383,7 @@ def visao_dre(
             SUM(ci.valor_comissao_gerada) as despesa_comissao,
             COUNT(ci.id) as quantidade_operacoes
         FROM comissoes_itens ci
-        WHERE ci.tenant_id = :tenant_id
+        WHERE ci.{tenant_filter}
           AND CAST(strftime('%Y', ci.data_venda) AS INTEGER) = :ano
           AND CAST(strftime('%m', ci.data_venda) AS INTEGER) BETWEEN :mes_inicio AND :mes_fim
           AND ci.status IN ('pendente', 'paga')
@@ -396,7 +391,12 @@ def visao_dre(
         ORDER BY mes
     '''
     
-    result = db.execute(text(query), {'tenant_id': str(tenant_id), 'ano': ano, 'mes_inicio': mes_inicio, 'mes_fim': mes_fim})
+    result = execute_tenant_safe(
+        db,
+        query,
+        {'ano': ano, 'mes_inicio': mes_inicio, 'mes_fim': mes_fim},
+        tenant_id=tenant_id,
+    )
     resultados = result.fetchall()
     
     meses_nomes = ['', 'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
