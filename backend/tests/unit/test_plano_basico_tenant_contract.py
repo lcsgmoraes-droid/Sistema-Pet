@@ -115,6 +115,46 @@ class _FakeDb:
         return _FakeQuery(model)
 
 
+TENANT_ALVO_MODULO = "11111111-1111-1111-1111-111111111111"
+
+
+class _FakeAdminModuleQuery:
+    def __init__(self, db, model):
+        self.db = db
+        self.model = model
+
+    def filter(self, *criteria):
+        self.criteria = criteria
+        return self
+
+    def first(self):
+        if self.model is Tenant:
+            return self.db.tenant
+        if self.model is AssinaturaModulo:
+            return None
+        return None
+
+
+class _FakeAdminModuleDb:
+    def __init__(self):
+        self.tenant = SimpleNamespace(
+            id=TENANT_ALVO_MODULO,
+            plan="basico",
+            modulos_ativos="[]",
+        )
+        self.added = []
+        self.committed = False
+
+    def query(self, model):
+        return _FakeAdminModuleQuery(self, model)
+
+    def add(self, row):
+        self.added.append(row)
+
+    def commit(self):
+        self.committed = True
+
+
 def test_modulos_status_uses_selected_tenant_not_user_home_tenant():
     user = SimpleNamespace(id=1, tenant_id="tenant-antigo")
 
@@ -132,6 +172,39 @@ def test_modulos_status_uses_selected_tenant_not_user_home_tenant():
     assert response["trial_padrao"]["libera_premium_automaticamente"] is False
     assert response["assinatura"]["pagamento_integrado"] is False
     assert response["assinatura"]["contratacao"]["modelo"] == "manual_assistida"
+
+
+def test_modulos_admin_activation_sets_target_tenant_context(monkeypatch):
+    tenant_context_calls = []
+    monkeypatch.setattr(
+        modulos_routes,
+        "set_current_tenant",
+        lambda tenant_id: tenant_context_calls.append(str(tenant_id)),
+        raising=False,
+    )
+    monkeypatch.setattr(modulos_routes, "get_current_tenant", lambda: None, raising=False)
+    monkeypatch.setattr(
+        modulos_routes,
+        "clear_current_tenant",
+        lambda: tenant_context_calls.append("cleared"),
+        raising=False,
+    )
+    monkeypatch.setattr(modulos_routes, "log_business_event", lambda **_kwargs: None)
+
+    db = _FakeAdminModuleDb()
+    current_user = SimpleNamespace(id=7, is_superadmin=True, is_system_admin=False)
+
+    response = modulos_routes.ativar_modulo(
+        "campanhas",
+        TENANT_ALVO_MODULO,
+        current_user=current_user,
+        db=db,
+    )
+
+    assert response == {"ok": True, "modulo": "campanhas", "tenant_id": TENANT_ALVO_MODULO}
+    assert tenant_context_calls[0] == TENANT_ALVO_MODULO
+    assert db.added[0].tenant_id == TENANT_ALVO_MODULO
+    assert db.committed is True
 
 
 def test_premium_routers_remain_gated_in_main():
