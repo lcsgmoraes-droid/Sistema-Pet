@@ -10,7 +10,6 @@ REGRAS:
 """
 
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
 from typing import Dict, List, Optional
 from decimal import Decimal
 import json
@@ -18,6 +17,7 @@ import logging
 
 from app.produtos_models import Produto, ProdutoLote, EstoqueMovimentacao
 from app.models import User
+from app.tenancy.rls import sync_rls_tenant
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +90,8 @@ class EstoqueService:
         """Valida regra de estoque negativo e registra alerta quando permitido."""
         if estoque_anterior >= quantidade:
             return
+
+        sync_rls_tenant(db, tenant_id)
 
         from app.models import Tenant
         tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
