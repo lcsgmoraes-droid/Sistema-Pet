@@ -16,6 +16,7 @@ from app.produtos_models import (
     ProdutoKitComponente,
     ProdutoListaPreco,
 )
+from app.utils.tenant_safe_sql import execute_tenant_safe
 
 
 CAMPOS_CADASTRAIS_FUSAO: list[tuple[str, str]] = [
@@ -584,15 +585,18 @@ def executar_fusao_produtos(
         "produto_granel_vinculos": _mesclar_vinculos_granel(db, principal.id, duplicado.id, tenant_id),
     }
 
-    db.execute(
-        text(
-            """
-            delete from duplicatas_ignoradas
-            where produto_id_1 in (:principal_id, :duplicado_id)
-               or produto_id_2 in (:principal_id, :duplicado_id)
-            """
-        ),
+    execute_tenant_safe(
+        db,
+        """
+        delete from duplicatas_ignoradas
+        where {tenant_filter}
+          and (
+            produto_id_1 in (:principal_id, :duplicado_id)
+            or produto_id_2 in (:principal_id, :duplicado_id)
+          )
+        """,
         {"principal_id": principal.id, "duplicado_id": duplicado.id},
+        tenant_id=tenant_id,
     )
 
     transferidos_genericos = _transferir_referencias_genericas(

@@ -40,6 +40,7 @@ TENANT_SCOPED_TABLES = {
     "contas_bancarias",
     "categorias_financeiras",
     "departamentos",
+    "duplicatas_ignoradas",
     "dre_categorias",
     "dre_lancamentos",
     "dre_plano_contas",
