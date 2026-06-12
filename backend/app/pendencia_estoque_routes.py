@@ -4,15 +4,15 @@ Lista de espera para produtos sem estoque com notificação automática
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, desc
-from typing import Optional, List
+from sqlalchemy import and_, desc
+from typing import Optional
 from datetime import datetime
 from pydantic import BaseModel
 
 from app.db import get_session
 from app.auth import get_current_user_and_tenant
 from app.pendencia_estoque_models import PendenciaEstoque
-from app.models import Cliente, User
+from app.models import Cliente
 from app.produtos_models import Produto
 
 router = APIRouter(prefix="/pendencias-estoque", tags=["Pendências de Estoque"])
@@ -355,7 +355,12 @@ def dashboard_pendencias(
     
     produtos_detalhes = []
     for produto_id, total, qtd in produtos_mais_aguardados:
-        produto = db.query(Produto).filter(Produto.id == produto_id).first()
+        produto = db.query(Produto).filter(
+            and_(
+                Produto.id == produto_id,
+                Produto.tenant_id == tenant
+            )
+        ).first()
         if produto:
             produtos_detalhes.append({
                 'produto_id': produto_id,

@@ -5,12 +5,12 @@ Verifica e notifica clientes quando produtos entram no estoque
 from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from datetime import datetime
-from typing import List, Dict
+from typing import Dict
 import logging
 
 from app.pendencia_estoque_models import PendenciaEstoque
 from app.produtos_models import Produto
-from app.models import Cliente
+from app.tenancy.rls import sync_rls_tenant
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,8 @@ def verificar_e_notificar_pendencias(
     """
     logger.info(f"🔔 Verificando pendências para produto {produto_id} (qtd: {quantidade_entrada})")
     
+    sync_rls_tenant(db, tenant_id)
+
     # Buscar produto
     produto = db.query(Produto).filter(
         and_(
@@ -216,7 +218,9 @@ def enviar_whatsapp_pendencia(
 def marcar_pendencia_finalizada(
     db: Session,
     pendencia_id: int,
-    venda_id: int
+    venda_id: int,
+    *,
+    tenant_id: str
 ) -> bool:
     """
     Marca uma pendência como finalizada quando o cliente efetua a compra.
@@ -230,8 +234,13 @@ def marcar_pendencia_finalizada(
         True se atualizado com sucesso
     """
     try:
+        sync_rls_tenant(db, tenant_id)
+
         pendencia = db.query(PendenciaEstoque).filter(
-            PendenciaEstoque.id == pendencia_id
+            and_(
+                PendenciaEstoque.id == pendencia_id,
+                PendenciaEstoque.tenant_id == tenant_id
+            )
         ).first()
         
         if not pendencia:
