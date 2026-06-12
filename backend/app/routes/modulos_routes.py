@@ -6,6 +6,7 @@ GET /modulos/status — retorna quais módulos estão ativos para o tenant logad
 import json
 import logging
 from datetime import datetime, timezone
+from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -19,6 +20,7 @@ from app.services.business_audit_service import (
     build_plan_activation_metadata,
     log_business_event,
 )
+from app.tenancy.context import set_current_tenant
 
 logger = logging.getLogger(__name__)
 
@@ -59,6 +61,12 @@ PLANOS_TODOS_MODULOS = frozenset(["premium", "enterprise", "full", "completo"])
 PLANOS_BASICOS = frozenset(["basico", "básico", "base", "basic"])
 TRIAL_DIAS_PADRAO = 30
 ASSINATURA_STATUS_VALIDOS = frozenset(["trial", "active", "expired", "blocked", "canceled"])
+
+
+def _set_tenant_context_for_target(tenant_id: str) -> str:
+    tenant_uuid = UUID(str(tenant_id))
+    set_current_tenant(tenant_uuid)
+    return str(tenant_uuid)
 
 
 def _datetime_utc(value: datetime | None) -> datetime | None:
@@ -245,6 +253,8 @@ def ativar_modulo(
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id_alvo).first()
     if not tenant:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Tenant não encontrado")
+
+    tenant_id_alvo = _set_tenant_context_for_target(str(tenant.id))
 
     # Atualiza campo JSON no tenant
     modulos_atuais: list[str] = []
