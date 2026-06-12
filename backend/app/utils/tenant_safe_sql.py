@@ -90,6 +90,8 @@ TENANT_SCOPED_TABLES = {
     "vet_internacoes",
     "vet_itens_prescricao",
     "vet_medicamentos_catalogo",
+    "vet_orcamento_itens",
+    "vet_orcamentos",
     "vet_perfil_comportamental",
     "vet_peso_registros",
     "vet_prescricoes",
