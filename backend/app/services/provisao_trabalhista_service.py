@@ -50,9 +50,10 @@ def gerar_provisao_trabalhista_mensal(
         .filter(
             Cliente.tenant_id == tenant_id,
             Cliente.tipo_cadastro == "funcionario",
-            Cliente.ativo == True,
+            Cliente.ativo.is_(True),
             Cliente.cargo_id.isnot(None),
-            Cargo.ativo == True
+            Cargo.tenant_id == tenant_id,
+            Cargo.ativo.is_(True)
         )
         .all()
     )
@@ -190,7 +191,7 @@ Baseada em {len(funcionarios)} funcionário(s) ativo(s)
         novo_detalhamento += f"   Folha gerencial:R$ {det['total_folha']:>10,.2f}\n"
         novo_detalhamento += f"   INSS:    R$ {det['inss']:>10,.2f}\n"
         novo_detalhamento += f"   FGTS:    R$ {det['fgts']:>10,.2f}\n"
-        novo_detalhamento += f"   ───────────────────────────────────────\n"
+        novo_detalhamento += "   ───────────────────────────────────────\n"
     
     novo_detalhamento += f"""
 TOTAIS:
