@@ -4,10 +4,10 @@ Rota administrativa: Inicializar templates de adquirentes
 Executar UMA VEZ ao configurar o sistema ou adicionar novo tenant.
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from app.db import get_session
-from app.auth_routes_multitenant import get_current_user
+from app.auth import get_current_user_and_tenant
 from app.seed_adquirentes import criar_templates_adquirentes
 
 router = APIRouter(prefix="/admin", tags=["Administração"])
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/admin", tags=["Administração"])
 @router.post("/seed/adquirentes")
 def seed_adquirentes_templates(
     db: Session = Depends(get_session),
-    current_user: dict = Depends(get_current_user)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Cria templates básicos de operadoras (Stone, Cielo, Rede).
@@ -24,12 +24,9 @@ def seed_adquirentes_templates(
     Executa UMA VEZ ao inicializar sistema.
     Não duplica se já existir.
     
-    Requer: Usuário autenticado (tenant_id)
+    Requer: usuário autenticado com tenant selecionado.
     """
-    
-    tenant_id = current_user.get('tenant_id')
-    if not tenant_id:
-        raise HTTPException(status_code=401, detail="Tenant não identificado")
+    _current_user, tenant_id = user_and_tenant
     
     resultado = criar_templates_adquirentes(db, tenant_id)
     
@@ -37,5 +34,5 @@ def seed_adquirentes_templates(
         "success": True,
         "message": "Templates de adquirentes inicializados",
         "total_criados": resultado["total_criados"],
-        "adquirentes": resultado["adquirentes"]
+        "adquirentes": resultado["adquirentes"],
     }
