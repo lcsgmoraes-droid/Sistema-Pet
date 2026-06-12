@@ -11,14 +11,12 @@ Criado em: 09/02/2026
 
 from fastapi import APIRouter, HTTPException, Depends
 from typing import Optional, Dict, List, Any
-from datetime import date, datetime
-from decimal import Decimal
+from datetime import date
 from pydantic import BaseModel
 import logging
 from sqlalchemy.orm import Session
-from sqlalchemy import text
 from app.utils.tenant_safe_sql import execute_tenant_safe
-from app.tenancy.context import set_tenant_context, get_current_tenant_id
+from app.tenancy.context import set_tenant_context
 
 from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
@@ -83,7 +81,7 @@ async def diagnosticar_comissoes(
         # ============================================================
         
         filtros_venda = []
-        params = {'tenant_id': tenant_id, 'limite': limite}
+        params = {'limite': limite}
         
         if data_inicio:
             filtros_venda.append("v.data_venda >= :data_inicio")
@@ -113,7 +111,7 @@ async def diagnosticar_comissoes(
                     WHEN NOT EXISTS (
                         SELECT 1 FROM comissoes_itens ci 
                         WHERE ci.venda_id = v.id 
-                        AND ci.tenant_id = CAST(:tenant_id AS UUID)
+                        AND ci.{{tenant_filter}}
                     ) THEN 'SEM_COMISSAO_GERADA'
                     ELSE 'OUTRO_PROBLEMA'
                 END as problema,
@@ -123,7 +121,7 @@ async def diagnosticar_comissoes(
                         (cc.tipo = 'funcionario' AND cc.referencia_id = v.funcionario_id)
                         OR cc.tipo = 'geral'
                     )
-                    AND cc.tenant_id = CAST(:tenant_id AS UUID)
+                    AND cc.{{tenant_filter}}
                 ) as tem_configuracao,
                 EXISTS (
                     SELECT 1 FROM comissoes_configuracao cc
@@ -132,22 +130,27 @@ async def diagnosticar_comissoes(
                         OR cc.tipo = 'geral'
                     )
                     AND cc.ativo = true
-                    AND cc.tenant_id = CAST(:tenant_id AS UUID)
+                    AND cc.{{tenant_filter}}
                 ) as config_ativa
             FROM vendas v
             WHERE v.status = 'finalizada'
-              AND v.tenant_id = CAST(:tenant_id AS UUID)
+              AND v.{{tenant_filter}}
               AND {where_vendas}
               AND NOT EXISTS (
                   SELECT 1 FROM comissoes_itens ci 
                   WHERE ci.venda_id = v.id 
-                  AND ci.tenant_id = CAST(:tenant_id AS UUID)
+                  AND ci.{{tenant_filter}}
               )
             ORDER BY v.data_venda DESC, v.id DESC
             LIMIT :limite
         """
         
-        result_vendas = db.execute(text(query_vendas_sem_comissao), params)
+        result_vendas = execute_tenant_safe(
+            db,
+            query_vendas_sem_comissao,
+            params,
+            tenant_id=tenant_id,
+        )
         vendas_sem_comissao = []
         
         for row in result_vendas.fetchall():
@@ -180,21 +183,22 @@ async def diagnosticar_comissoes(
                 v.data_venda,
                 v.status as venda_status
             FROM comissoes_itens ci
-            JOIN vendas v ON ci.venda_id = v.id
-            LEFT JOIN users u ON ci.funcionario_id = u.id
+            JOIN vendas v ON ci.venda_id = v.id AND v.tenant_id = ci.tenant_id
+            LEFT JOIN users u ON ci.funcionario_id = u.id AND u.tenant_id = ci.tenant_id
             WHERE ci.comissao_provisionada = FALSE
               AND ci.valor_comissao_gerada > 0
               AND ci.status = 'pendente'
               AND v.status IN ('finalizada', 'baixa_parcial')
-              AND ci.tenant_id = CAST(:tenant_id AS UUID)
-              AND v.tenant_id = CAST(:tenant_id AS UUID)
+              AND ci.{tenant_filter}
             ORDER BY v.data_venda DESC, ci.id DESC
             LIMIT :limite
         """
         
-        result_nao_prov = db.execute(
-            text(query_nao_provisionadas), 
-            {'tenant_id': tenant_id, 'limite': limite}
+        result_nao_prov = execute_tenant_safe(
+            db,
+            query_nao_provisionadas,
+            {'limite': limite},
+            tenant_id=tenant_id,
         )
         
         comissoes_nao_provisionadas = []
@@ -588,7 +592,7 @@ async def diagnosticar_venda_especifica(
         
         if len(configuracoes) > 0:
             acoes.append({
-                'endpoint': f'POST /comissoes/diagnostico/gerar-comissoes',
+                'endpoint': 'POST /comissoes/diagnostico/gerar-comissoes',
                 'body': {'vendas_ids': [venda_id]},
                 'descricao': 'Gerar comissões faltantes'
             })

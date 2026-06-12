@@ -10,23 +10,21 @@ Mantém snapshot imutável: valor_comissao NUNCA é alterado
 """
 
 from fastapi import APIRouter, Query, HTTPException, Depends
-from typing import Optional, Dict, Any, List
+from typing import Optional, Dict, List
 from datetime import date, datetime
 import logging
 from decimal import Decimal
 from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy import bindparam, text
 
 from .db import SessionLocal, get_session
-from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
-from .models import User, Cliente
+from .models import Cliente
 from .financeiro_models import (
     ContaPagar, Pagamento, CategoriaFinanceira, FormaPagamento,
     MovimentacaoFinanceira, ContaBancaria
 )
 from .comissoes_avancadas_models import (
-    FiltrosConferencia,
     ConferenciaComFiltrosResponse,
     FecharComPagamentoResponse,
     ListaFormasPagamento,
@@ -38,6 +36,7 @@ from .utils.auditoria_compensacao import (
     criar_json_auditoria_compensacao,
     formatar_observacao_simples_compensacao
 )
+from .utils.tenant_safe_sql import execute_tenant_safe
 
 router = APIRouter(prefix="/comissoes", tags=["comissoes-avancadas"])
 
@@ -97,13 +96,16 @@ def conferencia_com_filtros_avancados(
             }
         )
         
+        _, tenant_id = _user_and_tenant
         db = SessionLocal()
         
         try:
             # 1. Buscar dados do funcionário
-            result = db.execute(
-                text("SELECT id, nome, tipo_cadastro FROM clientes WHERE id = :funcionario_id"),
-                {"funcionario_id": funcionario_id}
+            result = execute_tenant_safe(
+                db,
+                "SELECT id, nome, tipo_cadastro FROM clientes WHERE id = :funcionario_id AND {tenant_filter}",
+                {"funcionario_id": funcionario_id},
+                tenant_id=tenant_id,
             )
             func_row = result.fetchone()
             
@@ -136,10 +138,11 @@ def conferencia_com_filtros_avancados(
                     cat.nome as nome_categoria,
                     v.cliente_id
                 FROM comissoes_itens ci
-                LEFT JOIN produtos p ON ci.produto_id = p.id
-                LEFT JOIN categorias cat ON ci.categoria_id = cat.id
-                LEFT JOIN vendas v ON ci.venda_id = v.id
-                WHERE ci.funcionario_id = :funcionario_id 
+                LEFT JOIN produtos p ON ci.produto_id = p.id AND p.tenant_id = ci.tenant_id
+                LEFT JOIN categorias cat ON ci.categoria_id = cat.id AND cat.tenant_id = ci.tenant_id
+                LEFT JOIN vendas v ON ci.venda_id = v.id AND v.tenant_id = ci.tenant_id
+                WHERE ci.{tenant_filter}
+                  AND ci.funcionario_id = :funcionario_id
                   AND ci.status = 'pendente'
             """
             
@@ -164,7 +167,7 @@ def conferencia_com_filtros_avancados(
             
             query += " ORDER BY ci.data_venda ASC, ci.id ASC"
             
-            result = db.execute(text(query), params)
+            result = execute_tenant_safe(db, query, params, tenant_id=tenant_id)
             rows = result.fetchall()
             
             # 3. Buscar nomes dos clientes
@@ -172,9 +175,14 @@ def conferencia_com_filtros_avancados(
             clientes_map = {}
             
             if cliente_ids:
-                result_clientes = db.execute(
-                    text("SELECT id, nome FROM clientes WHERE id = ANY(:ids)"),
-                    {"ids": cliente_ids}
+                stmt_clientes = text(
+                    "SELECT id, nome FROM clientes WHERE id IN :ids AND {tenant_filter}"
+                ).bindparams(bindparam("ids", expanding=True))
+                result_clientes = execute_tenant_safe(
+                    db,
+                    stmt_clientes,
+                    {"ids": tuple(cliente_ids)},
+                    tenant_id=tenant_id,
                 )
                 for cliente in result_clientes.fetchall():
                     clientes_map[cliente.id] = cliente.nome
@@ -182,9 +190,11 @@ def conferencia_com_filtros_avancados(
             # 4. Buscar nome do grupo de produto se filtrado
             grupo_nome = None
             if grupo_produto:
-                result_grupo = db.execute(
-                    text("SELECT nome FROM categorias WHERE id = :id"),
-                    {"id": grupo_produto}
+                result_grupo = execute_tenant_safe(
+                    db,
+                    "SELECT nome FROM categorias WHERE id = :id AND {tenant_filter}",
+                    {"id": grupo_produto},
+                    tenant_id=tenant_id,
                 )
                 grupo_row = result_grupo.fetchone()
                 grupo_nome = grupo_row.nome if grupo_row else None
@@ -192,9 +202,11 @@ def conferencia_com_filtros_avancados(
             # 5. Buscar nome do produto se filtrado
             produto_nome = None
             if produto_id:
-                result_produto = db.execute(
-                    text("SELECT nome FROM produtos WHERE id = :id"),
-                    {"id": produto_id}
+                result_produto = execute_tenant_safe(
+                    db,
+                    "SELECT nome FROM produtos WHERE id = :id AND {tenant_filter}",
+                    {"id": produto_id},
+                    tenant_id=tenant_id,
                 )
                 prod_row = result_produto.fetchone()
                 produto_nome = prod_row.nome if prod_row else None
@@ -424,9 +436,11 @@ async def fechar_com_pagamento_parcial(
         
         for comissao_id in comissoes_ids:
             # Buscar comissão
-            result = db.execute(
-                text("SELECT id, funcionario_id, valor_comissao_gerada, status FROM comissoes_itens WHERE id = :id"),
-                {"id": comissao_id}
+            result = execute_tenant_safe(
+                db,
+                "SELECT id, funcionario_id, valor_comissao_gerada, status FROM comissoes_itens WHERE id = :id AND {tenant_filter}",
+                {"id": comissao_id},
+                tenant_id=tenant_id,
             )
             
             comissao_row = result.fetchone()
@@ -554,9 +568,11 @@ async def fechar_com_pagamento_parcial(
         total_processadas = 0
         
         for comissao_id in comissoes_ids:
-            result_comissao = db.execute(
-                text("SELECT id, valor_comissao_gerada, status FROM comissoes_itens WHERE id = :id"),
-                {"id": comissao_id}
+            result_comissao = execute_tenant_safe(
+                db,
+                "SELECT id, valor_comissao_gerada, status FROM comissoes_itens WHERE id = :id AND {tenant_filter}",
+                {"id": comissao_id},
+                tenant_id=tenant_id,
             )
             
             comissao_row = result_comissao.fetchone()
@@ -583,7 +599,7 @@ async def fechar_com_pagamento_parcial(
                 obs_pagamento = observacoes
             
             # Atualizar comissão
-            db.execute(text("""
+            execute_tenant_safe(db, """
                 UPDATE comissoes_itens 
                 SET status = :status,
                     data_pagamento = :data_pagamento,
@@ -594,14 +610,15 @@ async def fechar_com_pagamento_parcial(
                     observacao_pagamento = :observacao,
                     data_atualizacao = CURRENT_TIMESTAMP
                 WHERE id = :id
-            """), {
+                  AND {tenant_filter}
+            """, {
                 "status": status_comissao,
                 "data_pagamento": str(data_pagamento),
                 "forma_pagamento": forma_pagamento,
                 "valor_pago": valor_liquido,
                 "observacao": obs_pagamento,
                 "id": comissao_id
-            })
+            }, tenant_id=tenant_id)
             
             total_processadas += 1
             valor_total_pago += valor_liquido
@@ -647,7 +664,7 @@ async def fechar_com_pagamento_parcial(
         periodo = f"{data_pagamento.strftime('%m/%Y')}"
         descricao_conta = f"Comissão - {funcionario_nome} - {periodo}"
         if valor_compensado > 0:
-            descricao_conta += f" (c/ compensação)"
+            descricao_conta += " (c/ compensação)"
         
         conta_pagar = ContaPagar(
             descricao=descricao_conta,
