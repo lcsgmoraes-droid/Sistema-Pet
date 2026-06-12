@@ -19,6 +19,7 @@ from app.schemas.opportunity_events import OpportunityEventPayload, OpportunityE
 from app.domain.opportunity_events import OpportunityEventType
 from app.db import SessionLocal
 from app.opportunity_events_models import OpportunityEvent, OpportunityEventTypeEnum
+from app.tenancy.context import clear_current_tenant, get_current_tenant, set_current_tenant
 
 
 # Logger estruturado para eventos de oportunidade
@@ -42,7 +43,10 @@ def _persist_event(payload: OpportunityEventPayload, event_id: str) -> bool:
         - Sempre loga resultado
         - Retorna rapidamente
     """
+    session = None
+    previous_tenant = get_current_tenant()
     try:
+        set_current_tenant(payload.tenant_id)
         session = SessionLocal()
         
         # Mapear event_type da domain para o enum do modelo
@@ -64,7 +68,7 @@ def _persist_event(payload: OpportunityEventPayload, event_id: str) -> bool:
             event_type=event_type_enum,
             user_id=payload.user_id,
             contexto=payload.contexto,
-            metadata={
+            extra_data={
                 "tipo": payload.tipo.value if hasattr(payload.tipo, 'value') else payload.tipo,
                 "cliente_id": str(payload.cliente_id) if payload.cliente_id else None,
                 "produto_origem_id": payload.produto_origem_id,
@@ -85,7 +89,6 @@ def _persist_event(payload: OpportunityEventPayload, event_id: str) -> bool:
             }
         )
         
-        session.close()
         return True
     
     except Exception as e:
@@ -100,6 +103,13 @@ def _persist_event(payload: OpportunityEventPayload, event_id: str) -> bool:
             exc_info=True
         )
         return False
+    finally:
+        if session is not None:
+            session.close()
+        if previous_tenant is None:
+            clear_current_tenant()
+        else:
+            set_current_tenant(previous_tenant)
 
 
 def register_event(payload: OpportunityEventPayload) -> OpportunityEventResponse:

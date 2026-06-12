@@ -58,6 +58,8 @@ TENANT_SCOPED_TABLES = {
     "notas_entrada_itens",
     "notas_saida",
     "notas_saida_itens",
+    "opportunities",
+    "opportunity_events",
     "pedido_itens",
     "pedidos",
     "pedidos_compra",
