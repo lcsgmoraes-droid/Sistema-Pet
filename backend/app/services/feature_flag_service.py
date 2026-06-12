@@ -13,6 +13,7 @@ from uuid import UUID
 from sqlalchemy.orm import Session
 
 from app.models import FeatureFlag
+from app.tenancy.rls import sync_rls_tenant
 
 
 class FeatureFlagCache:
@@ -109,6 +110,8 @@ def is_feature_enabled(
             return cached_value
     
     try:
+        sync_rls_tenant(db, tenant_id)
+
         # Busca no banco de dados
         feature_flag = db.query(FeatureFlag).filter(
             FeatureFlag.tenant_id == tenant_id,
@@ -154,6 +157,8 @@ def set_feature_flag(
     Note:
         Automaticamente invalida o cache para essa flag.
     """
+    sync_rls_tenant(db, tenant_id)
+
     # Busca flag existente
     feature_flag = db.query(FeatureFlag).filter(
         FeatureFlag.tenant_id == tenant_id,
@@ -192,6 +197,8 @@ def get_all_feature_flags(db: Session, tenant_id: UUID) -> Dict[str, bool]:
     Returns:
         Dict[str, bool]: Dicionário {feature_key: enabled}
     """
+    sync_rls_tenant(db, tenant_id)
+
     flags = db.query(FeatureFlag).filter(
         FeatureFlag.tenant_id == tenant_id
     ).all()
