@@ -7,16 +7,34 @@ Fornece dados para relatórios, dashboards e análise de performance futura.
 REGRA: Apenas SELECT (zero mutations).
 Todas as queries filtram por tenant_id automaticamente.
 """
+from contextlib import contextmanager
 from datetime import datetime, timedelta
-from typing import Optional, Dict, List, Tuple
+from typing import Any, Dict, Iterator, List, Optional
 from uuid import UUID
 
+import sqlalchemy
 from sqlalchemy import func, and_, select
 from sqlalchemy.orm import Session
 
 from app.db import SessionLocal
 from app.opportunity_events_models import OpportunityEvent, OpportunityEventTypeEnum
-from app.opportunities_models import Opportunity
+from app.tenancy.context import clear_current_tenant, get_current_tenant, set_current_tenant
+from app.utils.logger import logger
+
+
+@contextmanager
+def _session_for_tenant(tenant_id: UUID) -> Iterator[Session]:
+    previous_tenant = get_current_tenant()
+    set_current_tenant(tenant_id)
+    session = SessionLocal()
+    try:
+        yield session
+    finally:
+        session.close()
+        if previous_tenant is None:
+            clear_current_tenant()
+        else:
+            set_current_tenant(previous_tenant)
 
 
 def count_events_by_type(
@@ -50,25 +68,23 @@ def count_events_by_type(
         end_date = datetime.utcnow()
     
     try:
-        session = SessionLocal()
-        
-        query = (
-            select(
-                OpportunityEvent.event_type,
-                func.count(OpportunityEvent.id).label('count')
-            )
-            .where(
-                and_(
-                    OpportunityEvent.tenant_id == tenant_id,
-                    OpportunityEvent.created_at >= start_date,
-                    OpportunityEvent.created_at <= end_date
+        with _session_for_tenant(tenant_id) as session:
+            query = (
+                select(
+                    OpportunityEvent.event_type,
+                    func.count(OpportunityEvent.id).label('count')
                 )
+                .where(
+                    and_(
+                        OpportunityEvent.tenant_id == tenant_id,
+                        OpportunityEvent.created_at >= start_date,
+                        OpportunityEvent.created_at <= end_date
+                    )
+                )
+                .group_by(OpportunityEvent.event_type)
             )
-            .group_by(OpportunityEvent.event_type)
-        )
-        
-        results = session.execute(query).fetchall()
-        session.close()
+
+            results = session.execute(query).fetchall()
         
         return {
             row[0].value: row[1]
@@ -113,32 +129,29 @@ def conversion_rate_by_type(
         end_date = datetime.utcnow()
     
     try:
-        session = SessionLocal()
-        
-        # Total de eventos convertidas
-        total_convertidas = session.query(
-            func.count(OpportunityEvent.id)
-        ).filter(
-            and_(
-                OpportunityEvent.tenant_id == tenant_id,
-                OpportunityEvent.event_type == OpportunityEventTypeEnum.CONVERTIDA,
-                OpportunityEvent.created_at >= start_date,
-                OpportunityEvent.created_at <= end_date
-            )
-        ).scalar() or 0
-        
-        # Total de todos os eventos
-        total_eventos = session.query(
-            func.count(OpportunityEvent.id)
-        ).filter(
-            and_(
-                OpportunityEvent.tenant_id == tenant_id,
-                OpportunityEvent.created_at >= start_date,
-                OpportunityEvent.created_at <= end_date
-            )
-        ).scalar() or 0
-        
-        session.close()
+        with _session_for_tenant(tenant_id) as session:
+            # Total de eventos convertidas
+            total_convertidas = session.query(
+                func.count(OpportunityEvent.id)
+            ).filter(
+                and_(
+                    OpportunityEvent.tenant_id == tenant_id,
+                    OpportunityEvent.event_type == OpportunityEventTypeEnum.CONVERTIDA,
+                    OpportunityEvent.created_at >= start_date,
+                    OpportunityEvent.created_at <= end_date
+                )
+            ).scalar() or 0
+
+            # Total de todos os eventos
+            total_eventos = session.query(
+                func.count(OpportunityEvent.id)
+            ).filter(
+                and_(
+                    OpportunityEvent.tenant_id == tenant_id,
+                    OpportunityEvent.created_at >= start_date,
+                    OpportunityEvent.created_at <= end_date
+                )
+            ).scalar() or 0
         
         if total_eventos == 0:
             return {"overall_conversion_rate": 0.0}
@@ -159,7 +172,7 @@ def conversion_rate_by_type(
 def top_products_converted(
     tenant_id: UUID,
     limit: int = 10
-) -> List[Dict[str, any]]:
+) -> List[Dict[str, Any]]:
     """
     Produtos mais frequentemente CONVERTIDOS (adicionados ao carrinho).
     
@@ -184,26 +197,24 @@ def top_products_converted(
         ]
     """
     try:
-        session = SessionLocal()
-        
-        query = (
-            select(
-                OpportunityEvent.metadata['produto_sugerido_id'].astext.label('produto_id'),
-                func.count(OpportunityEvent.id).label('count')
-            )
-            .where(
-                and_(
-                    OpportunityEvent.tenant_id == tenant_id,
-                    OpportunityEvent.event_type == OpportunityEventTypeEnum.CONVERTIDA
+        with _session_for_tenant(tenant_id) as session:
+            query = (
+                select(
+                    OpportunityEvent.extra_data['produto_sugerido_id'].astext.label('produto_id'),
+                    func.count(OpportunityEvent.id).label('count')
                 )
+                .where(
+                    and_(
+                        OpportunityEvent.tenant_id == tenant_id,
+                        OpportunityEvent.event_type == OpportunityEventTypeEnum.CONVERTIDA
+                    )
+                )
+                .group_by(OpportunityEvent.extra_data['produto_sugerido_id'].astext)
+                .order_by(func.count(OpportunityEvent.id).desc())
+                .limit(limit)
             )
-            .group_by(OpportunityEvent.metadata['produto_sugerido_id'].astext)
-            .order_by(func.count(OpportunityEvent.id).desc())
-            .limit(limit)
-        )
-        
-        results = session.execute(query).fetchall()
-        session.close()
+
+            results = session.execute(query).fetchall()
         
         return [
             {
@@ -221,7 +232,7 @@ def top_products_converted(
 def top_products_ignored(
     tenant_id: UUID,
     limit: int = 10
-) -> List[Dict[str, any]]:
+) -> List[Dict[str, Any]]:
     """
     Produtos mais frequentemente IGNORADOS (rejeitados sem alternativa).
     
@@ -245,26 +256,24 @@ def top_products_ignored(
         ]
     """
     try:
-        session = SessionLocal()
-        
-        query = (
-            select(
-                OpportunityEvent.metadata['produto_sugerido_id'].astext.label('produto_id'),
-                func.count(OpportunityEvent.id).label('count')
-            )
-            .where(
-                and_(
-                    OpportunityEvent.tenant_id == tenant_id,
-                    OpportunityEvent.event_type == OpportunityEventTypeEnum.REJEITADA
+        with _session_for_tenant(tenant_id) as session:
+            query = (
+                select(
+                    OpportunityEvent.extra_data['produto_sugerido_id'].astext.label('produto_id'),
+                    func.count(OpportunityEvent.id).label('count')
                 )
+                .where(
+                    and_(
+                        OpportunityEvent.tenant_id == tenant_id,
+                        OpportunityEvent.event_type == OpportunityEventTypeEnum.REJEITADA
+                    )
+                )
+                .group_by(OpportunityEvent.extra_data['produto_sugerido_id'].astext)
+                .order_by(func.count(OpportunityEvent.id).desc())
+                .limit(limit)
             )
-            .group_by(OpportunityEvent.metadata['produto_sugerido_id'].astext)
-            .order_by(func.count(OpportunityEvent.id).desc())
-            .limit(limit)
-        )
-        
-        results = session.execute(query).fetchall()
-        session.close()
+
+            results = session.execute(query).fetchall()
         
         return [
             {
@@ -283,7 +292,7 @@ def operator_event_summary(
     tenant_id: UUID,
     start_date: Optional[datetime] = None,
     end_date: Optional[datetime] = None
-) -> List[Dict[str, any]]:
+) -> List[Dict[str, Any]]:
     """
     Resumo de ações de cada operador (caixa) no período.
     
@@ -318,45 +327,43 @@ def operator_event_summary(
         end_date = datetime.utcnow()
     
     try:
-        session = SessionLocal()
-        
-        # Aggregate por operador
-        query = (
-            select(
-                OpportunityEvent.user_id,
-                func.count(OpportunityEvent.id).label('total'),
-                func.sum(
-                    func.cast(
-                        OpportunityEvent.event_type == OpportunityEventTypeEnum.CONVERTIDA,
-                        sqlalchemy.Integer
-                    )
-                ).label('convertidas'),
-                func.sum(
-                    func.cast(
-                        OpportunityEvent.event_type == OpportunityEventTypeEnum.REFINADA,
-                        sqlalchemy.Integer
-                    )
-                ).label('refinadas'),
-                func.sum(
-                    func.cast(
-                        OpportunityEvent.event_type == OpportunityEventTypeEnum.REJEITADA,
-                        sqlalchemy.Integer
-                    )
-                ).label('rejeitadas')
-            )
-            .where(
-                and_(
-                    OpportunityEvent.tenant_id == tenant_id,
-                    OpportunityEvent.created_at >= start_date,
-                    OpportunityEvent.created_at <= end_date
+        with _session_for_tenant(tenant_id) as session:
+            # Aggregate por operador
+            query = (
+                select(
+                    OpportunityEvent.user_id,
+                    func.count(OpportunityEvent.id).label('total'),
+                    func.sum(
+                        func.cast(
+                            OpportunityEvent.event_type == OpportunityEventTypeEnum.CONVERTIDA,
+                            sqlalchemy.Integer
+                        )
+                    ).label('convertidas'),
+                    func.sum(
+                        func.cast(
+                            OpportunityEvent.event_type == OpportunityEventTypeEnum.REFINADA,
+                            sqlalchemy.Integer
+                        )
+                    ).label('refinadas'),
+                    func.sum(
+                        func.cast(
+                            OpportunityEvent.event_type == OpportunityEventTypeEnum.REJEITADA,
+                            sqlalchemy.Integer
+                        )
+                    ).label('rejeitadas')
                 )
+                .where(
+                    and_(
+                        OpportunityEvent.tenant_id == tenant_id,
+                        OpportunityEvent.created_at >= start_date,
+                        OpportunityEvent.created_at <= end_date
+                    )
+                )
+                .group_by(OpportunityEvent.user_id)
+                .order_by(func.count(OpportunityEvent.id).desc())
             )
-            .group_by(OpportunityEvent.user_id)
-            .order_by(func.count(OpportunityEvent.id).desc())
-        )
-        
-        results = session.execute(query).fetchall()
-        session.close()
+
+            results = session.execute(query).fetchall()
         
         summary = []
         for row in results:
@@ -384,7 +391,7 @@ def operator_event_summary(
 def get_metrics_dashboard_summary(
     tenant_id: UUID,
     days: int = 30
-) -> Dict[str, any]:
+) -> Dict[str, Any]:
     """
     Resumo consolidado para dashboard de métricas.
     
@@ -452,8 +459,3 @@ def get_metrics_dashboard_summary(
     except Exception as e:
         logger.info(f"Erro ao gerar resumo do dashboard: {str(e)}")
         return {}
-
-
-# Import no final para evitar circular imports
-import sqlalchemy
-from app.utils.logger import logger
