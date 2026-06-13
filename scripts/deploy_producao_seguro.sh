@@ -61,6 +61,35 @@ require_cmd() {
   command -v "$1" >/dev/null 2>&1 || fail "Comando obrigatorio nao encontrado: $1"
 }
 
+require_node_runtime() {
+  local node_check
+
+  command -v node >/dev/null 2>&1 || fail "Comando obrigatorio nao encontrado: node"
+
+  node_check="$(
+    node - <<'NODE' 2>&1
+const version = process.versions.node;
+const [major, minor, patch] = version.split(".").map(Number);
+const ok =
+  (major === 20 && (minor > 19 || (minor === 19 && patch >= 4))) ||
+  (major === 22 && minor >= 12) ||
+  major > 22;
+
+if (!ok) {
+  console.error(
+    `Node.js incompativel para deploy: v${version}. ` +
+      "Use Node >=20.19.4 ou Node >=22.12.0 antes de atualizar o codigo."
+  );
+  process.exit(1);
+}
+
+console.log(`Node.js compativel para deploy: v${version}`);
+NODE
+  )" || fail "$node_check"
+
+  log "$node_check"
+}
+
 mark_step() {
   CURRENT_STEP="$1"
 }
@@ -189,6 +218,7 @@ require_cmd docker
 require_cmd npm
 require_cmd curl
 require_cmd python3
+require_node_runtime
 
 cd "$APP_DIR"
 touch "$DEPLOY_LOCK_FILE" || true
