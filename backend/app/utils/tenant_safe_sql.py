@@ -26,6 +26,7 @@ TENANT_SCOPED_TABLES = {
     "agendamentos",
     "caixa",
     "caixa_movimentacoes",
+    "bling_notas_fiscais_cache",
     "categorias",
     "cliente_segmentos",
     "clientes",

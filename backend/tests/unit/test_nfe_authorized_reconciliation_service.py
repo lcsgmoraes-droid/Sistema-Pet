@@ -1,16 +1,20 @@
 from types import SimpleNamespace
+from uuid import UUID
 
+import app.services.nfe_authorized_reconciliation_service as service
 from app.services.nfe_authorized_reconciliation_service import (
     executar_reconciliacao_automatica_nfes_autorizadas,
     listar_tenants_com_nfes_autorizadas_recentes,
     reconciliar_nf_autorizada_cache,
 )
 from app.middlewares.request_context import clear_request_context, get_request_id
+from app.tenancy.context import clear_current_tenant, get_current_tenant, set_current_tenant
 from app.utils.logger import clear_context
 
 
 def teardown_function():
     clear_request_context()
+    clear_current_tenant()
     clear_context()
 
 
@@ -210,8 +214,6 @@ def test_reconciliar_nf_autorizada_cache_reprocessa_quando_so_existe_baixa_legad
 
 
 def test_executar_reconciliacao_automatica_nfes_autorizadas_inclui_correlacao(monkeypatch):
-    import app.services.nfe_authorized_reconciliation_service as service
-
     monkeypatch.setattr(service, "listar_tenants_com_nfes_autorizadas_recentes", lambda *args, **kwargs: [])
 
     resultado = executar_reconciliacao_automatica_nfes_autorizadas(object(), dias=3)
@@ -220,9 +222,41 @@ def test_executar_reconciliacao_automatica_nfes_autorizadas_inclui_correlacao(mo
     assert get_request_id() is None
 
 
-def test_listar_tenants_com_nfes_autorizadas_recentes_usa_sql_global_autorizado(monkeypatch):
-    import app.services.nfe_authorized_reconciliation_service as service
+def test_executar_reconciliacao_automatica_nfes_autorizadas_ativa_contexto_por_tenant(monkeypatch):
+    tenant_a = UUID("33333333-3333-4333-8333-333333333333")
+    tenant_b = UUID("44444444-4444-4444-8444-444444444444")
+    previous_tenant = UUID("99999999-9999-4999-8999-999999999999")
+    vistos = []
 
+    monkeypatch.setattr(
+        service,
+        "listar_tenants_com_nfes_autorizadas_recentes",
+        lambda *args, **kwargs: [str(tenant_a), str(tenant_b)],
+    )
+
+    def fake_reconciliar(db, tenant_id, **kwargs):
+        vistos.append((str(tenant_id), get_current_tenant()))
+        return {
+            "tenant_id": str(tenant_id),
+            "notas_reconciliadas": 0,
+        }
+
+    monkeypatch.setattr(service, "reconciliar_nfes_autorizadas_recentes", fake_reconciliar)
+
+    set_current_tenant(previous_tenant)
+
+    resultado = executar_reconciliacao_automatica_nfes_autorizadas(
+        object(),
+        dias=3,
+        _correlation_context_applied=True,
+    )
+
+    assert resultado["tenants_processados"] == 2
+    assert vistos == [(str(tenant_a), tenant_a), (str(tenant_b), tenant_b)]
+    assert get_current_tenant() == previous_tenant
+
+
+def test_listar_tenants_com_nfes_autorizadas_recentes_usa_sql_global_autorizado(monkeypatch):
     chamadas = []
 
     def fake_execute(db, sql, params=None, **kwargs):

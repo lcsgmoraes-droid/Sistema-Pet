@@ -6,6 +6,7 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.nfe_cache_models import BlingNotaFiscalCache
+from app.tenancy.context import tenant_context
 from app.utils.correlation import current_correlation_id, operation_correlation_context
 from app.utils.logger import logger
 from app.utils.tenant_safe_sql import execute_tenant_safe_all
@@ -179,14 +180,15 @@ def executar_reconciliacao_automatica_nfes_pendentes(
 
     for tenant_id in tenant_ids:
         try:
-            resultados.append(
-                reconciliar_nfes_pendentes_recentes(
-                    db,
-                    tenant_id,
-                    dias=dias,
-                    limite_notas=limite_notas_por_tenant,
+            with tenant_context(tenant_id):
+                resultados.append(
+                    reconciliar_nfes_pendentes_recentes(
+                        db,
+                        tenant_id,
+                        dias=dias,
+                        limite_notas=limite_notas_por_tenant,
+                    )
                 )
-            )
         except Exception as exc:
             logger.warning(
                 "nfe_pendentes_reconciliacao",

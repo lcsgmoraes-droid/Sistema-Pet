@@ -10,6 +10,7 @@ from app.pedido_integrado_item_models import PedidoIntegradoItem
 from app.pedido_integrado_models import PedidoIntegrado
 from app.produtos_models import EstoqueMovimentacao
 from app.services.pedido_integrado_consolidation_service import localizar_pedido_por_bling_id
+from app.tenancy.context import tenant_context
 from app.utils.tenant_safe_sql import execute_tenant_safe_all
 from app.utils.correlation import current_correlation_id, operation_correlation_context
 from app.utils.logger import logger
@@ -478,14 +479,15 @@ def executar_reconciliacao_automatica_nfes_autorizadas(
 
     for tenant_id in tenant_ids:
         try:
-            resultados.append(
-                reconciliar_nfes_autorizadas_recentes(
-                    db,
-                    tenant_id,
-                    dias=dias,
-                    limite_notas=limite_notas_por_tenant,
+            with tenant_context(tenant_id):
+                resultados.append(
+                    reconciliar_nfes_autorizadas_recentes(
+                        db,
+                        tenant_id,
+                        dias=dias,
+                        limite_notas=limite_notas_por_tenant,
+                    )
                 )
-            )
         except Exception as exc:
             logger.warning(
                 "nfe_auth_reconcile",
