@@ -29,6 +29,7 @@ from app.services.custo_entrega_service import calcular_custo_entrega
 from app.services.custo_moto_service import calcular_custo_moto
 from app.services.google_maps_service import calcular_distancia_km, calcular_rota_otimizada
 from app.services.notificacao_entrega_service import notificar_inicio_rota, notificar_proximo_cliente
+from app.services.app_access_profile_service import get_cliente_for_app_profile_or_none
 from app.models_configuracao_custo_moto import ConfiguracaoCustoMoto
 from app.session_manager import get_session_by_jti
 from app.tenancy.context import clear_current_tenant, set_current_tenant
@@ -132,15 +133,7 @@ def _validate_ecommerce_entregador_actor(
     user = _get_current_ecommerce_user(credentials=credentials, db=db)
     tenant_id = UUID(str(user.tenant_id))
     set_current_tenant(tenant_id)
-    cliente = (
-        db.query(Cliente)
-        .filter(
-            Cliente.tenant_id == tenant_id,
-            Cliente.user_id == user.id,
-            Cliente.is_entregador == True,
-        )
-        .first()
-    )
+    cliente = get_cliente_for_app_profile_or_none(db, user, "entregador")
     if not cliente:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

@@ -26,6 +26,7 @@ def _pessoa(**kwargs):
         "celular": None,
         "codigo": None,
         "ativo": True,
+        "is_entregador": False,
         "credito": 0,
         "endereco": None,
         "cidade": None,
@@ -57,6 +58,38 @@ def test_avaliar_par_bloqueia_fusao_automatica_quando_documentos_conflitam():
 
     assert decisao.pode_fundir_automaticamente is False
     assert "cnpj_conflitante" in decisao.motivos_bloqueio
+
+
+def test_avaliar_par_permite_fusao_automatica_entre_cliente_e_funcionario_sem_conflitos():
+    cliente = _pessoa(id=10, nome="William", tipo_cadastro="cliente")
+    funcionario = _pessoa(id=11, nome="william", tipo_cadastro="funcionario")
+
+    decisao = avaliar_par_duplicidade_pessoas(cliente, funcionario)
+
+    assert decisao.pode_fundir_automaticamente is True
+    assert decisao.motivos_bloqueio == []
+
+
+def test_escolher_pessoa_principal_prefere_funcionario_ativo_ao_cliente_ativo():
+    cliente = _pessoa(
+        id=10,
+        nome="William",
+        tipo_cadastro="cliente",
+        email="william@example.com",
+    )
+    funcionario = _pessoa(
+        id=11,
+        nome="William",
+        tipo_cadastro="funcionario",
+        ativo=True,
+    )
+
+    principal = escolher_pessoa_principal(
+        [cliente, funcionario],
+        referencias_por_id={10: 20, 11: 0},
+    )
+
+    assert principal is funcionario
 
 
 def test_escolher_pessoa_principal_prefere_ativo_com_historico_e_dados():

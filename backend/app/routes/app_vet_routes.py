@@ -9,12 +9,13 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import func, or_
+from sqlalchemy import or_
 from sqlalchemy.orm import Session, joinedload
 
 from app.db import get_session
 from app.models import Cliente, Pet, User
 from app.routes.ecommerce_auth import _activate_user_tenant_context, _get_current_ecommerce_user
+from app.services.app_access_profile_service import get_cliente_for_app_profile_or_none
 from app.veterinario_agendamentos import (
     _agendamento_to_dict,
     _garantir_sem_conflitos_agendamento,
@@ -57,24 +58,7 @@ class CriarAgendamentoConsultaMobilePayload(BaseModel):
 
 def _get_mobile_veterinario_or_403(db: Session, current_user: User) -> tuple[Cliente, str]:
     tenant_id = str(_activate_user_tenant_context(current_user))
-    email = (getattr(current_user, "email", None) or "").strip().lower()
-
-    query = db.query(Cliente).filter(
-        Cliente.tenant_id == tenant_id,
-        Cliente.tipo_cadastro == "veterinario",
-        Cliente.ativo == True,  # noqa: E712
-    )
-    if email:
-        query = query.filter(
-            or_(
-                Cliente.user_id == current_user.id,
-                func.lower(Cliente.email) == email,
-            )
-        )
-    else:
-        query = query.filter(Cliente.user_id == current_user.id)
-
-    veterinario = query.order_by(Cliente.id.asc()).first()
+    veterinario = get_cliente_for_app_profile_or_none(db, current_user, "veterinario")
     if not veterinario:
         raise HTTPException(status_code=403, detail="Usuario nao possui perfil veterinario neste tenant")
 

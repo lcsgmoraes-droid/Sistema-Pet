@@ -13,6 +13,16 @@ export interface AuthResponse extends AuthTokens {
   email_verification_sent?: boolean;
 }
 
+export type AppProfileType = "cliente" | "entregador" | "veterinario" | "funcionario";
+
+export interface AppAccessProfile {
+  type: AppProfileType;
+  label: string;
+  cliente_id?: number | null;
+  nome?: string | null;
+  source?: string | null;
+}
+
 export interface EcommerceUser {
   id: number;
   email: string;
@@ -36,7 +46,9 @@ export interface EcommerceUser {
   // perfil operacional veterinario
   is_veterinario?: boolean;
   veterinario_id?: number | null;
-  perfil_operacional?: "cliente" | "entregador" | "veterinario" | "funcionario";
+  perfil_operacional?: AppProfileType;
+  selected_profile?: AppProfileType;
+  available_profiles?: AppAccessProfile[];
 }
 
 // =====================

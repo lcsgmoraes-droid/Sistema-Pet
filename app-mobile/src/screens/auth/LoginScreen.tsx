@@ -14,13 +14,14 @@ import KeyboardSafeScrollView from '../../components/KeyboardSafeScrollView';
 import SelectedStoreBanner from '../../components/SelectedStoreBanner';
 import { useAuthStore } from '../../store/auth.store';
 import { CORES, ESPACO, FONTE, RAIO } from '../../theme';
+import { AppProfileType } from '../../types';
 
 export default function LoginScreen({ navigation }: any) {
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
   const [mostrarSenha, setMostrarSenha] = useState(false);
   const [carregando, setCarregando] = useState(false);
-  const { login } = useAuthStore();
+  const { login, pendingProfiles, needsProfileSelection, selectProfile } = useAuthStore();
 
   async function handleLogin() {
     if (!email.trim() || !senha.trim()) {
@@ -35,6 +36,18 @@ export default function LoginScreen({ navigation }: any) {
         err?.response?.data?.detail === 'Incorrect username or password'
           ? 'E-mail ou senha incorretos.'
           : err?.response?.data?.detail || 'Erro ao fazer login. Tente novamente.';
+      Alert.alert('Erro', msg);
+    } finally {
+      setCarregando(false);
+    }
+  }
+
+  async function handleSelectProfile(profileType: AppProfileType) {
+    setCarregando(true);
+    try {
+      await selectProfile(profileType);
+    } catch (err: any) {
+      const msg = err?.response?.data?.detail || 'Erro ao selecionar acesso. Tente novamente.';
       Alert.alert('Erro', msg);
     } finally {
       setCarregando(false);
@@ -94,6 +107,22 @@ export default function LoginScreen({ navigation }: any) {
               <Text style={styles.botaoTexto}>Entrar</Text>
             )}
           </TouchableOpacity>
+
+          {needsProfileSelection && pendingProfiles.length > 1 && (
+            <View style={styles.profileBox}>
+              <Text style={styles.profileTitle}>Escolha como entrar</Text>
+              {pendingProfiles.map((profile) => (
+                <TouchableOpacity
+                  key={profile.type}
+                  style={styles.profileButton}
+                  onPress={() => handleSelectProfile(profile.type)}
+                  disabled={carregando}
+                >
+                  <Text style={styles.profileButtonText}>{profile.label || profile.type}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          )}
 
           <TouchableOpacity
             style={styles.linkSecundario}
@@ -262,4 +291,31 @@ const styles = StyleSheet.create({
     backgroundColor: CORES.fundo,
   },
   iconeOlho: { padding: ESPACO.sm },
+  profileBox: {
+    borderWidth: 1,
+    borderColor: CORES.borda,
+    borderRadius: RAIO.md,
+    padding: ESPACO.md,
+    marginTop: ESPACO.md,
+    gap: ESPACO.sm,
+    backgroundColor: CORES.fundo,
+  },
+  profileTitle: {
+    fontSize: FONTE.normal,
+    fontWeight: '700',
+    color: CORES.texto,
+  },
+  profileButton: {
+    borderWidth: 1,
+    borderColor: CORES.primario,
+    borderRadius: RAIO.md,
+    paddingVertical: ESPACO.sm + 2,
+    alignItems: 'center',
+    backgroundColor: CORES.superficie,
+  },
+  profileButtonText: {
+    color: CORES.primario,
+    fontSize: FONTE.normal,
+    fontWeight: '700',
+  },
 });

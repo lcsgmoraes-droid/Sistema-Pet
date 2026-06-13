@@ -31,6 +31,12 @@ from app.services.auth_security import (
     remaining_lock_seconds,
 )
 from app.services.pessoa_merge_service import transferir_referencias_pessoa
+from app.services.app_access_profile_service import (
+    apply_selected_profile_flags,
+    build_available_profiles_for_clientes,
+    normalize_profile_type,
+    resolve_user_app_profiles,
+)
 from app.tenancy.context import set_current_tenant
 
 
@@ -94,6 +100,10 @@ class EcommerceProfileUpdateRequest(BaseModel):
     entrega_bairro: str | None = None
     entrega_cidade: str | None = None
     entrega_estado: str | None = None
+
+
+class EcommerceSelectProfileRequest(BaseModel):
+    profile_type: str = Field(description="cliente | funcionario | entregador | veterinario")
 
 
 def _normalize_tenant_uuid(raw_tenant_id: str | None) -> UUID | None:
@@ -446,6 +456,10 @@ def _get_current_ecommerce_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Tenant inativo ou indisponivel",
         )
+
+    active_profile = normalize_profile_type(payload.get("active_profile"))
+    if active_profile:
+        setattr(user, "_active_app_profile", active_profile)
 
     return user
 
@@ -890,8 +904,17 @@ def _ensure_active_store_access(db: Session, user: User, tenant_id: str) -> User
     return vinculo
 
 
-def _serialize_profile(user: User, cliente: Cliente | None) -> dict:
+def _serialize_profile(
+    user: User,
+    cliente: Cliente | None,
+    db: Session | None = None,
+    selected_profile: str | None = None,
+) -> dict:
     delivery = _extract_ecommerce_delivery_details(cliente)
+    if db is not None:
+        available_profiles = resolve_user_app_profiles(db, user, include_cliente=cliente)
+    else:
+        available_profiles = build_available_profiles_for_clientes(user, [cliente] if cliente else [])
     is_entregador = bool(getattr(cliente, "is_entregador", False)) if cliente else False
     is_veterinario = bool(
         cliente
@@ -911,7 +934,7 @@ def _serialize_profile(user: User, cliente: Cliente | None) -> dict:
         perfil_operacional = "funcionario"
     else:
         perfil_operacional = "cliente"
-    return {
+    payload = {
         "id": user.id,
         "email": user.email,
         "email_verified": user.email_verified,
@@ -945,7 +968,10 @@ def _serialize_profile(user: User, cliente: Cliente | None) -> dict:
         "is_veterinario": is_veterinario,
         "veterinario_id": cliente.id if (cliente and is_veterinario) else None,
         "perfil_operacional": perfil_operacional,
+        "selected_profile": perfil_operacional,
+        "available_profiles": available_profiles,
     }
+    return apply_selected_profile_flags(payload, available_profiles, selected_profile or perfil_operacional)
 
 
 @router.post("/registrar")
@@ -1034,7 +1060,7 @@ def registrar_cliente(payload: EcommerceRegisterRequest, request: Request, db: S
             "token_type": "bearer",
             "requires_email_verification": True,
             "email_verification_sent": True,
-            "user": _serialize_profile(user, cliente),
+            "user": _serialize_profile(user, cliente, db),
         }
 
     access_token = create_access_token(
@@ -1050,7 +1076,7 @@ def registrar_cliente(payload: EcommerceRegisterRequest, request: Request, db: S
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "user": _serialize_profile(user, cliente),
+        "user": _serialize_profile(user, cliente, db),
     }
 
 
@@ -1111,7 +1137,7 @@ def login_cliente(payload: EcommerceLoginRequest, request: Request, db: Session 
     return {
         "access_token": access_token,
         "token_type": "bearer",
-        "user": _serialize_profile(user, cliente),
+        "user": _serialize_profile(user, cliente, db),
     }
 
 
@@ -1204,7 +1230,12 @@ def me(current_user: User = Depends(_get_current_ecommerce_user), db: Session = 
         .filter(Cliente.tenant_id == tenant_id, Cliente.user_id == current_user.id)
         .first()
     )
-    data = _serialize_profile(current_user, cliente)
+    data = _serialize_profile(
+        current_user,
+        cliente,
+        db,
+        selected_profile=getattr(current_user, "_active_app_profile", None),
+    )
     data["is_active"] = current_user.is_active
     return data
 
@@ -1213,7 +1244,48 @@ def me(current_user: User = Depends(_get_current_ecommerce_user), db: Session = 
 def obter_perfil(current_user: User = Depends(_get_current_ecommerce_user), db: Session = Depends(get_session)):
     cliente = _get_or_create_cliente_for_user(db, current_user)
     db.commit()
-    return _serialize_profile(current_user, cliente)
+    return _serialize_profile(
+        current_user,
+        cliente,
+        db,
+        selected_profile=getattr(current_user, "_active_app_profile", None),
+    )
+
+
+@router.post("/select-profile")
+def selecionar_perfil_app(
+    payload: EcommerceSelectProfileRequest,
+    current_user: User = Depends(_get_current_ecommerce_user),
+    db: Session = Depends(get_session),
+):
+    profile_type = normalize_profile_type(payload.profile_type)
+    if not profile_type:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Perfil de app invalido")
+
+    cliente = _get_or_create_cliente_for_user(db, current_user)
+    db.commit()
+    db.refresh(cliente)
+
+    available_profiles = resolve_user_app_profiles(db, current_user, include_cliente=cliente)
+    if profile_type not in {profile["type"] for profile in available_profiles}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Perfil de app nao liberado")
+
+    access_token = create_access_token(
+        data={
+            "sub": str(current_user.id),
+            "email": current_user.email,
+            "token_type": "ecommerce_customer",
+            "active_profile": profile_type,
+        },
+        tenant_id=str(current_user.tenant_id),
+        role="customer",
+    )
+
+    return {
+        "access_token": access_token,
+        "token_type": "bearer",
+        "user": _serialize_profile(current_user, cliente, db, selected_profile=profile_type),
+    }
 
 
 @router.put("/perfil")
@@ -1348,7 +1420,12 @@ def atualizar_perfil(
     db.commit()
     db.refresh(current_user)
     db.refresh(cliente)
-    return _serialize_profile(current_user, cliente)
+    return _serialize_profile(
+        current_user,
+        cliente,
+        db,
+        selected_profile=getattr(current_user, "_active_app_profile", None),
+    )
 
 
 @router.get("/meus-cupons")

@@ -16,6 +16,11 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.services.ferias_service import conceder_ferias
 from app.services.decimo_terceiro_service import pagar_decimo_terceiro
 from app.services.remuneracao_service import calcular_composicao_remuneracao
+from app.services.app_access_profile_service import (
+    build_available_profiles_for_clientes,
+    list_explicit_app_access_profiles,
+    sync_cliente_app_access_profiles,
+)
 
 router = APIRouter(prefix="/funcionarios", tags=["RH - Funcionários"])
 
@@ -34,6 +39,7 @@ class FuncionarioCreate(BaseModel):
     complemento_modo: str = Field(default="automatico", pattern="^(automatico|manual|nenhum)$")
     complemento_fixo_valor: Decimal = Field(default=Decimal("0.00"), ge=0)
     remuneracao_observacoes: Optional[str] = None
+    app_access_profiles: Optional[List[str]] = None
 
     model_config = {"from_attributes": True}
 
@@ -51,6 +57,7 @@ class FuncionarioUpdate(BaseModel):
     complemento_modo: Optional[str] = Field(None, pattern="^(automatico|manual|nenhum)$")
     complemento_fixo_valor: Optional[Decimal] = Field(None, ge=0)
     remuneracao_observacoes: Optional[str] = None
+    app_access_profiles: Optional[List[str]] = None
 
     model_config = {"from_attributes": True}
 
@@ -103,6 +110,7 @@ class FuncionarioResponse(BaseModel):
     complemento_modo: str
     complemento_fixo_valor: Decimal
     remuneracao_observacoes: Optional[str]
+    app_access_profiles: List[str] = Field(default_factory=list)
     remuneracao: Optional[RemuneracaoResponse] = None
 
     model_config = {"from_attributes": True}
@@ -119,7 +127,11 @@ def _cargo_dict(cargo: Optional[Cargo]) -> Optional[dict]:
     }
 
 
-def _funcionario_response_dict(funcionario: Cliente, cargo: Optional[Cargo]) -> dict:
+def _funcionario_response_dict(
+    funcionario: Cliente,
+    cargo: Optional[Cargo],
+    app_access_profiles: Optional[List[str]] = None,
+) -> dict:
     return {
         "id": funcionario.id,
         "codigo": funcionario.codigo,
@@ -135,8 +147,47 @@ def _funcionario_response_dict(funcionario: Cliente, cargo: Optional[Cargo]) -> 
         "complemento_modo": funcionario.complemento_modo or "automatico",
         "complemento_fixo_valor": funcionario.complemento_fixo_valor or Decimal("0.00"),
         "remuneracao_observacoes": funcionario.remuneracao_observacoes,
+        "app_access_profiles": app_access_profiles or [],
         "remuneracao": calcular_composicao_remuneracao(cargo, funcionario) if cargo else None,
     }
+
+
+def _funcionario_app_access_profiles(db: Session, tenant_id, funcionario: Cliente) -> List[str]:
+    grants = list_explicit_app_access_profiles(
+        db,
+        tenant_id=tenant_id,
+        user_id=funcionario.user_id,
+        cliente_ids=[funcionario.id],
+    )
+    profiles = build_available_profiles_for_clientes(None, [funcionario], explicit_grants=grants)
+    return [profile["type"] for profile in profiles]
+
+
+def _aplicar_app_access_profiles(
+    db: Session,
+    *,
+    tenant_id,
+    funcionario: Cliente,
+    profile_types: Optional[List[str]],
+    user_id: int,
+) -> None:
+    if profile_types is None:
+        return
+
+    profiles = sync_cliente_app_access_profiles(
+        db,
+        tenant_id=tenant_id,
+        cliente=funcionario,
+        profile_types=profile_types,
+        granted_by_user_id=user_id,
+    )
+    if "entregador" in profiles:
+        funcionario.is_entregador = True
+        funcionario.entregador_ativo = True
+        funcionario.tipo_vinculo_entrega = "funcionario"
+        funcionario.is_terceirizado = False
+    else:
+        funcionario.is_entregador = False
 
 
 def _buscar_cargo_funcionario(db: Session, tenant_id, cargo_id: Optional[int]) -> Optional[Cargo]:
@@ -229,7 +280,11 @@ async def listar_funcionarios(
         cargos_por_id = {cargo.id: cargo for cargo in cargos}
 
     return [
-        FuncionarioResponse(**_funcionario_response_dict(func, cargos_por_id.get(func.cargo_id)))
+        FuncionarioResponse(**_funcionario_response_dict(
+            func,
+            cargos_por_id.get(func.cargo_id),
+            _funcionario_app_access_profiles(db, tenant_id, func),
+        ))
         for func in funcionarios
     ]
 
@@ -255,7 +310,11 @@ async def obter_funcionario(
         raise HTTPException(status_code=404, detail="Funcionário não encontrado")
 
     cargo = _buscar_cargo_funcionario(db, tenant_id, funcionario.cargo_id)
-    return FuncionarioResponse(**_funcionario_response_dict(funcionario, cargo))
+    return FuncionarioResponse(**_funcionario_response_dict(
+        funcionario,
+        cargo,
+        _funcionario_app_access_profiles(db, tenant_id, funcionario),
+    ))
 
 
 @router.get("/{funcionario_id}/remuneracao", response_model=RemuneracaoResponse)
@@ -345,10 +404,22 @@ async def criar_funcionario(
     )
 
     db.add(funcionario)
+    db.flush()
+    _aplicar_app_access_profiles(
+        db,
+        tenant_id=tenant_id,
+        funcionario=funcionario,
+        profile_types=funcionario_data.app_access_profiles,
+        user_id=user.id,
+    )
     db.commit()
     db.refresh(funcionario)
 
-    return FuncionarioResponse(**_funcionario_response_dict(funcionario, cargo))
+    return FuncionarioResponse(**_funcionario_response_dict(
+        funcionario,
+        cargo,
+        _funcionario_app_access_profiles(db, tenant_id, funcionario),
+    ))
 
 
 @router.put("/{funcionario_id}", response_model=FuncionarioResponse)
@@ -399,6 +470,7 @@ async def atualizar_funcionario(
 
     # Atualizar campos
     update_data = funcionario_data.model_dump(exclude_unset=True)
+    app_access_profiles = update_data.pop("app_access_profiles", None)
     for field, value in update_data.items():
         if field == "nome" and value:
             setattr(funcionario, field, value.strip())
@@ -409,11 +481,55 @@ async def atualizar_funcionario(
         else:
             setattr(funcionario, field, value)
 
+    _aplicar_app_access_profiles(
+        db,
+        tenant_id=tenant_id,
+        funcionario=funcionario,
+        profile_types=app_access_profiles,
+        user_id=user.id,
+    )
+
     db.commit()
     db.refresh(funcionario)
 
     cargo = _buscar_cargo_funcionario(db, tenant_id, funcionario.cargo_id)
-    return FuncionarioResponse(**_funcionario_response_dict(funcionario, cargo))
+    return FuncionarioResponse(**_funcionario_response_dict(
+        funcionario,
+        cargo,
+        _funcionario_app_access_profiles(db, tenant_id, funcionario),
+    ))
+
+
+@router.post("/{funcionario_id}/ativar", response_model=FuncionarioResponse)
+async def ativar_funcionario(
+    funcionario_id: int,
+    db: Session = Depends(get_session),
+    current_user_and_tenant=Depends(get_current_user_and_tenant)
+):
+    """
+    Reativa um funcionario inativo.
+    """
+    user, tenant_id = current_user_and_tenant
+
+    funcionario = db.query(Cliente).filter(
+        Cliente.id == funcionario_id,
+        Cliente.tenant_id == tenant_id,
+        Cliente.tipo_cadastro == "funcionario"
+    ).first()
+
+    if not funcionario:
+        raise HTTPException(status_code=404, detail="Funcionário não encontrado")
+
+    funcionario.ativo = True
+    db.commit()
+    db.refresh(funcionario)
+
+    cargo = _buscar_cargo_funcionario(db, tenant_id, funcionario.cargo_id)
+    return FuncionarioResponse(**_funcionario_response_dict(
+        funcionario,
+        cargo,
+        _funcionario_app_access_profiles(db, tenant_id, funcionario),
+    ))
 
 
 @router.delete("/{funcionario_id}")

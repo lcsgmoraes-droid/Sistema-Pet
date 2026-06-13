@@ -76,6 +76,19 @@ def _score_completude(pessoa: Any) -> int:
     return sum(1 for campo in CAMPOS_COMPLETUDE if _valor_preenchido(getattr(pessoa, campo, None)))
 
 
+def _prioridade_perfil_pessoa(pessoa: Any) -> int:
+    if not bool(getattr(pessoa, "ativo", False)):
+        return 0
+    tipo_cadastro = str(getattr(pessoa, "tipo_cadastro", "") or "").strip().casefold()
+    if tipo_cadastro == "funcionario":
+        return 3
+    if tipo_cadastro == "veterinario":
+        return 2
+    if bool(getattr(pessoa, "is_entregador", False)):
+        return 1
+    return 0
+
+
 def avaliar_par_duplicidade_pessoas(pessoa_a: Any, pessoa_b: Any) -> DecisaoDuplicidadePessoa:
     chave_a = normalizar_nome_pessoa(getattr(pessoa_a, "nome", ""))
     chave_b = normalizar_nome_pessoa(getattr(pessoa_b, "nome", ""))
@@ -108,12 +121,13 @@ def escolher_pessoa_principal(
 
     referencias_por_id = referencias_por_id or {}
 
-    def chave(pessoa: Any) -> tuple[int, int, int, int]:
+    def chave(pessoa: Any) -> tuple[int, int, int, int, int]:
         pessoa_id = int(getattr(pessoa, "id", 0) or 0)
         ativa = 1 if bool(getattr(pessoa, "ativo", False)) else 0
+        perfil_operacional = _prioridade_perfil_pessoa(pessoa)
         referencias = int(referencias_por_id.get(pessoa_id, 0) or 0)
         completude = _score_completude(pessoa)
-        return (ativa, referencias, completude, -pessoa_id)
+        return (ativa, perfil_operacional, referencias, completude, -pessoa_id)
 
     return max(pessoas_lista, key=chave)
 
