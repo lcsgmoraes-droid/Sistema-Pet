@@ -84,7 +84,7 @@ export function usePDVCarrinhoItens({
   const alterarQuantidade = (index, delta) => {
     const novosItens = vendaAtual.itens.map((item, itemIndex) =>
       itemIndex === index
-        ? recalcularSubtotalItem(item, Math.max(1, item.quantidade + delta))
+        ? recalcularSubtotalItem(item, item.quantidade + delta)
         : item,
     );
 
