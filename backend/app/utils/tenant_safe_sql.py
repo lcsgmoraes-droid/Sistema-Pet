@@ -67,6 +67,7 @@ TENANT_SCOPED_TABLES = {
     "pets",
     "portes_animal",
     "produtos",
+    "produto_fornecedores",
     "produtos_historico_precos",
     "produto_lotes",
     "racas",
