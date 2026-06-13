@@ -671,9 +671,9 @@ def _remover_ids_do_snapshot_sem_vinculo_cache(tenant_id, produto_ids: list[int]
     _write_shared_snapshot("sem_vinculo", tenant_id, payload)
 
 
-def _executar_reconciliacao_geral_em_background(limit: Optional[int]) -> None:
+def _executar_reconciliacao_geral_em_background(limit: Optional[int], tenant_id) -> None:
     try:
-        resultado = BlingSyncService.reconcile_all_products(limit=limit)
+        resultado = BlingSyncService.reconcile_all_products(limit=limit, tenant_id=tenant_id)
         with _reconciliacao_geral_lock:
             _reconciliacao_geral_estado["result"] = {
                 "ok": True,
@@ -2403,7 +2403,12 @@ def reconciliar_recentes(
     user_and_tenant = Depends(get_current_user_and_tenant)
 ):
     """Confere novamente produtos alterados recentemente ou com erro."""
-    return BlingSyncService.reconcile_recent_products(minutes=body.minutes, limit=body.limit)
+    _current_user, tenant_id = user_and_tenant
+    return BlingSyncService.reconcile_recent_products(
+        minutes=body.minutes,
+        limit=body.limit,
+        tenant_id=tenant_id,
+    )
 
 
 @router.post("/reconciliar-geral")
@@ -2414,6 +2419,7 @@ def reconciliar_geral(
 ):
     """Inicia auditoria ampla em segundo plano para evitar travamento por timeout."""
     limite = body.limit if body else None
+    _current_user, tenant_id = user_and_tenant
 
     with _reconciliacao_geral_lock:
         if _reconciliacao_geral_estado["running"]:
@@ -2430,7 +2436,7 @@ def reconciliar_geral(
 
     worker = threading.Thread(
         target=_executar_reconciliacao_geral_em_background,
-        args=(limite,),
+        args=(limite, tenant_id),
         daemon=True,
     )
     worker.start()
