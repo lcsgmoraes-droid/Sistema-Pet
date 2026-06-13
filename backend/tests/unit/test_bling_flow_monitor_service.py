@@ -3,6 +3,7 @@ from datetime import datetime
 from types import SimpleNamespace
 from unittest.mock import Mock
 
+from app.services import bling_flow_monitor_service
 from app.services.bling_flow_monitor_service import (
     _build_incident_key,
     _nf_detectada_combina_com_pedido,
@@ -17,10 +18,91 @@ from app.services.bling_flow_monitor_service import (
 )
 
 
+class _FakeFlowSession:
+    def __init__(self):
+        self.events = []
+        self.added = []
+
+    def add(self, item):
+        self.events.append("add")
+        item.id = 123
+        self.added.append(item)
+
+    def flush(self):
+        self.events.append("flush")
+
+
+class _EmptyFlowQuery:
+    def __init__(self, session):
+        self.session = session
+
+    def filter(self, *args):
+        self.session.events.append("filter")
+        return self
+
+    def order_by(self, *args):
+        self.session.events.append("order_by")
+        return self
+
+    def first(self):
+        self.session.events.append("first")
+        return None
+
+
+class _FakeIncidentSession(_FakeFlowSession):
+    def query(self, model):
+        self.events.append("query")
+        return _EmptyFlowQuery(self)
+
+
 def test_json_safe_converte_decimal_para_float():
     payload = _json_safe({"valor_total": Decimal("41.18"), "itens": [Decimal("2.00")]})
 
     assert payload == {"valor_total": 41.18, "itens": [2.0]}
+
+
+def test_registrar_evento_syncs_rls_tenant_before_flush(monkeypatch):
+    session = _FakeFlowSession()
+
+    def fake_sync(db, tenant_id):
+        session.events.append(("sync", db, tenant_id))
+
+    monkeypatch.setattr(bling_flow_monitor_service, "sync_rls_tenant", fake_sync, raising=False)
+
+    event_id = bling_flow_monitor_service.registrar_evento(
+        tenant_id="11111111-1111-1111-1111-111111111111",
+        source="scheduler",
+        event_type="invoice.lookup.failed",
+        db=session,
+    )
+
+    assert event_id == 123
+    assert session.events[0] == ("sync", session, "11111111-1111-1111-1111-111111111111")
+    assert session.events[-1] == "flush"
+
+
+def test_abrir_incidente_syncs_rls_tenant_before_query(monkeypatch):
+    session = _FakeIncidentSession()
+
+    def fake_sync(db, tenant_id):
+        session.events.append(("sync", db, tenant_id))
+
+    monkeypatch.setattr(bling_flow_monitor_service, "sync_rls_tenant", fake_sync, raising=False)
+
+    incidente = bling_flow_monitor_service.abrir_incidente(
+        tenant_id="22222222-2222-2222-2222-222222222222",
+        code="SKU_SEM_PRODUTO_LOCAL",
+        severity="medium",
+        title="SKU sem produto local",
+        message="SKU nao encontrado no catalogo local",
+        suggested_action="Revise o cadastro do produto",
+        auto_fixable=False,
+        db=session,
+    )
+
+    assert incidente is session.added[0]
+    assert session.events[0] == ("sync", session, "22222222-2222-2222-2222-222222222222")
+    assert session.events[1] == "query"
 
 
 def test_build_incident_key_usa_referencias_principais():

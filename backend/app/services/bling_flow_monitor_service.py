@@ -22,6 +22,7 @@ from app.services.pedido_integrado_duplicate_review_service import (
     reconciliar_fluxo_pedido_integrado,
 )
 from app.services.pedido_integrado_consolidation_service import localizar_pedido_por_bling_id
+from app.tenancy.rls import sync_rls_tenant
 from app.utils.correlation import current_correlation_id, operation_correlation_context
 from app.utils.logger import logger
 
@@ -58,6 +59,11 @@ _NF_RECENTES_CACHE_SECONDS = 300
 _NF_RECENTES_ENRICH_LIMIT = 60
 _NF_RECENTES_ENRICH_DELAY_SECONDS = 0.35
 _nf_recentes_cache: dict[tuple[str, int], dict] = {}
+
+
+def _sync_bling_flow_rls(db: Session, tenant_id) -> None:
+    if tenant_id:
+        sync_rls_tenant(db, tenant_id)
 
 
 def _garantir_registry_sqlalchemy_auditoria() -> None:
@@ -1088,6 +1094,7 @@ def registrar_evento(
     session = db or SessionLocal()
 
     try:
+        _sync_bling_flow_rls(session, tenant_id)
         evento = BlingFlowEvent(
             tenant_id=tenant_id,
             source=source,
@@ -1151,6 +1158,7 @@ def abrir_incidente(
     )
 
     try:
+        _sync_bling_flow_rls(session, tenant_id)
         incidente = (
             session.query(BlingFlowIncident)
             .filter(
@@ -1222,6 +1230,7 @@ def resolver_incidente_por_id(
     *,
     resolution_note: str | None = None,
 ) -> BlingFlowIncident | None:
+    _sync_bling_flow_rls(db, tenant_id)
     incidente = (
         db.query(BlingFlowIncident)
         .filter(
@@ -1255,6 +1264,7 @@ def resolver_incidentes_relacionados(
     nf_bling_id: str | None = None,
     resolution_note: str | None = None,
 ) -> int:
+    _sync_bling_flow_rls(db, tenant_id)
     query = db.query(BlingFlowIncident).filter(
         BlingFlowIncident.tenant_id == tenant_id,
         BlingFlowIncident.status.in_(OPEN_INCIDENT_STATUSES),
@@ -1670,6 +1680,7 @@ def auditar_fluxo_bling(
             return result
 
     _garantir_registry_sqlalchemy_auditoria()
+    _sync_bling_flow_rls(db, tenant_id)
     cutoff = _utcnow() - timedelta(days=max(1, dias))
     query = db.query(PedidoIntegrado).filter(
         PedidoIntegrado.criado_em >= cutoff,
@@ -1905,6 +1916,7 @@ def auditar_fluxo_bling(
 
 
 def obter_resumo_monitoramento(db: Session, *, tenant_id=None) -> dict:
+    _sync_bling_flow_rls(db, tenant_id)
     incidentes_query = db.query(BlingFlowIncident).filter(BlingFlowIncident.status == "open")
     eventos_query = db.query(BlingFlowEvent)
     if tenant_id:
