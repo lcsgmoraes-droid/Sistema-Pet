@@ -191,6 +191,8 @@ TENANT_TABLES = {
     "pedidos",
     "pedidos_compra",
     "pedidos_compra_itens",
+    "pedidos_integrados",
+    "pedidos_integrados_itens",
     
     # Configurações por tenant
     "usuarios",
