@@ -173,6 +173,7 @@ TENANT_TABLES = {
     # Financeiro
     "contas_pagar",
     "contas_receber",
+    "ecommerce_payment_gateway_configs",
     "lancamentos_financeiros",
     "caixa_movimentacoes",
     "conciliacao_cartao",

@@ -19,15 +19,19 @@ from cryptography.fernet import Fernet
 from fastapi import HTTPException, status
 import requests
 from sqlalchemy import text
+from sqlalchemy.exc import NoResultFound
 from sqlalchemy.orm import Session
 
 from app.config import JWT_SECRET_KEY
 from app.ecommerce_payment_models import EcommercePaymentGatewayConfig
+from app.utils.tenant_safe_sql import execute_tenant_safe_one
 
 
 MERCADO_PAGO_PROVIDER = "mercadopago"
 VALID_ENVIRONMENTS = {"production", "sandbox"}
 SECRET_PREFIX = "fernet:"
+WEBHOOK_TOKEN_RLS_SETTING = "app.payment_webhook_token"
+_SET_WEBHOOK_TOKEN_SQL = text("SELECT set_config(:setting_name, :setting_value, true)")
 OAUTH_AUTH_URL = "https://auth.mercadopago.com/authorization"
 OAUTH_TOKEN_URL = "https://api.mercadopago.com/oauth/token"
 OAUTH_STATE_TTL_SECONDS = 15 * 60
@@ -76,6 +80,32 @@ def _frontend_base_url() -> str:
 
 def _normalize_tenant_id(tenant_id: str | UUID) -> UUID:
     return tenant_id if isinstance(tenant_id, UUID) else UUID(str(tenant_id))
+
+
+def _dialect_name(db: Session) -> str:
+    bind = db.get_bind()
+    return str(bind.dialect.name)
+
+
+def sync_mercado_pago_webhook_token(db: Session, webhook_token: str) -> bool:
+    """
+    Sync the public Mercado Pago webhook token into a PostgreSQL transaction setting.
+
+    The RLS policy uses this only to resolve the tenant before app.tenant_id exists.
+    The setting is transaction-local and restricted by the provider/token predicate.
+    """
+    token = str(webhook_token or "").strip()
+    if not token or _dialect_name(db) != "postgresql":
+        return False
+
+    db.connection().execute(
+        _SET_WEBHOOK_TOKEN_SQL,
+        {
+            "setting_name": WEBHOOK_TOKEN_RLS_SETTING,
+            "setting_value": token,
+        },
+    )
+    return True
 
 
 def _secret_key() -> str:
@@ -390,24 +420,43 @@ def resolve_mercado_pago_tenant_id_from_webhook_token(
     if not token:
         return None
 
-    row = db.execute(
-        text(
+    sync_mercado_pago_webhook_token(db, token)
+    try:
+        row = execute_tenant_safe_one(
+            db,
             """
             SELECT tenant_id
             FROM ecommerce_payment_gateway_configs
             WHERE provider = :provider
               AND webhook_token = :webhook_token
             LIMIT 1
-            """
-        ),
-        {
-            "provider": MERCADO_PAGO_PROVIDER,
-            "webhook_token": token,
-        },
-    ).first()
+            """,
+            {
+                "provider": MERCADO_PAGO_PROVIDER,
+                "webhook_token": token,
+            },
+            require_tenant=False,
+            allow_global=True,
+            global_reason=(
+                "Webhook Mercado Pago precisa resolver tenant pelo token antes "
+                "do contexto tenant."
+            ),
+        )
+    except NoResultFound:
+        return None
+
     if not row:
         return None
-    return str(row[0])
+    if isinstance(row, dict):
+        return str(row.get("tenant_id")) if row.get("tenant_id") else None
+    mapping = getattr(row, "_mapping", None)
+    if mapping and mapping.get("tenant_id"):
+        return str(mapping["tenant_id"])
+    try:
+        return str(row[0])
+    except (IndexError, KeyError, TypeError):
+        tenant_id = getattr(row, "tenant_id", None)
+        return str(tenant_id) if tenant_id else None
 
 
 def _effective_webhook_secret(config: Any | None) -> str:

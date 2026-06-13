@@ -199,28 +199,78 @@ def test_preferencia_usa_webhook_especifico_do_tenant():
     assert payload["metadata"]["tenant_id"] == "180d9cbf-5dcb-4676-bf11-dcbd91ed444b"
 
 
-def test_webhook_tenant_resolve_tenant_por_token_sem_orm_fail_fast():
+def test_sync_webhook_token_configura_setting_rls_transacional_no_postgres():
+    import app.services.ecommerce_payment_config as service
+
     captured = {}
 
-    class Result:
-        def first(self):
-            return ("180d9cbf-5dcb-4676-bf11-dcbd91ed444b",)
-
-    class Db:
+    class Connection:
         def execute(self, statement, params):
             captured["statement"] = str(statement)
             captured["params"] = params
-            return Result()
 
-    tenant_id = resolve_mercado_pago_tenant_id_from_webhook_token(Db(), " mp_abc123 ")
+    class Db:
+        def get_bind(self):
+            return SimpleNamespace(dialect=SimpleNamespace(name="postgresql"))
+
+        def connection(self):
+            return Connection()
+
+    synced = service.sync_mercado_pago_webhook_token(Db(), " mp_abc123 ")
+
+    assert synced is True
+    assert "set_config" in captured["statement"]
+    assert "true" in captured["statement"]
+    assert captured["params"] == {
+        "setting_name": "app.payment_webhook_token",
+        "setting_value": "mp_abc123",
+    }
+
+
+def test_sync_webhook_token_ignora_bancos_sem_rls():
+    import app.services.ecommerce_payment_config as service
+
+    class Db:
+        def get_bind(self):
+            return SimpleNamespace(dialect=SimpleNamespace(name="sqlite"))
+
+        def connection(self):  # pragma: no cover - falha se for chamado
+            raise AssertionError("sqlite nao deve tentar set_config")
+
+    assert service.sync_mercado_pago_webhook_token(Db(), "mp_abc123") is False
+
+
+def test_webhook_tenant_resolve_tenant_por_token_com_sql_tenant_safe(monkeypatch):
+    import app.services.ecommerce_payment_config as service
+
+    captured = {}
+
+    def fake_sync(db, token):
+        captured["sync"] = {"db": db, "token": token}
+        return True
+
+    def fake_execute(db, sql, params=None, **kwargs):
+        captured["execute"] = {"db": db, "sql": sql, "params": params or {}, **kwargs}
+        return ("180d9cbf-5dcb-4676-bf11-dcbd91ed444b",)
+
+    monkeypatch.setattr(service, "sync_mercado_pago_webhook_token", fake_sync)
+    monkeypatch.setattr(service, "execute_tenant_safe_one", fake_execute)
+
+    db = object()
+    tenant_id = resolve_mercado_pago_tenant_id_from_webhook_token(db, " mp_abc123 ")
 
     assert tenant_id == "180d9cbf-5dcb-4676-bf11-dcbd91ed444b"
-    assert "ecommerce_payment_gateway_configs" in captured["statement"]
-    assert "webhook_token" in captured["statement"]
-    assert captured["params"] == {
+    assert captured["sync"] == {"db": db, "token": "mp_abc123"}
+    assert captured["execute"]["db"] is db
+    assert "ecommerce_payment_gateway_configs" in captured["execute"]["sql"]
+    assert "webhook_token" in captured["execute"]["sql"]
+    assert captured["execute"]["params"] == {
         "provider": "mercadopago",
         "webhook_token": "mp_abc123",
     }
+    assert captured["execute"]["require_tenant"] is False
+    assert captured["execute"]["allow_global"] is True
+    assert captured["execute"]["global_reason"]
 
 
 def test_webhook_tenant_ativa_contexto_antes_de_carregar_runtime_config():
