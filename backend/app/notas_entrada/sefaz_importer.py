@@ -6,6 +6,7 @@ from uuid import UUID
 from ..models import Cliente, User
 from ..produtos_models import NotaEntrada, NotaEntradaItem
 from ..services.sefaz_tenant_config_service import SefazTenantConfigService
+from ..tenancy.context import tenant_context
 from .fornecedores import criar_fornecedor_automatico
 from .produtos import encontrar_produto_similar
 from .xml_parser import parse_nfe_xml
@@ -14,6 +15,17 @@ logger = logging.getLogger(__name__)
 
 
 def importar_docs_sefaz(docs: list, tenant_id_str: str, db) -> dict:
+    try:
+        tenant_uuid = UUID(tenant_id_str)
+    except ValueError:
+        logger.warning(f"[SEFAZ] tenant_id invalido: {tenant_id_str}")
+        return {"importadas": 0, "duplicadas": 0, "erros": len(docs), "saidas_descartadas": 0}
+
+    with tenant_context(tenant_uuid):
+        return _importar_docs_sefaz_scoped(docs, tenant_id_str, db)
+
+
+def _importar_docs_sefaz_scoped(docs: list, tenant_id_str: str, db) -> dict:
     """
     Importa documentos retornados pela SEFAZ para a tabela notas_entrada.
 
@@ -42,12 +54,6 @@ def importar_docs_sefaz(docs: list, tenant_id_str: str, db) -> dict:
         )
 
     # Buscar um usuario sistema do tenant para associar as notas
-    try:
-        UUID(tenant_id_str)
-    except ValueError:
-        logger.warning(f"[SEFAZ] tenant_id invalido: {tenant_id_str}")
-        return {"importadas": 0, "duplicadas": 0, "erros": len(docs), "saidas_descartadas": 0}
-
     user_sistema = db.query(User).filter(
         User.tenant_id == tenant_id_str
     ).order_by(User.id).first()
