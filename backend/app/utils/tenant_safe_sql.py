@@ -49,6 +49,7 @@ TENANT_SCOPED_TABLES = {
     "estoque_reservas",
     "especies",
     "formas_pagamento",
+    "granel_conversoes",
     "linhas_racao",
     "lancamentos_financeiros",
     "lancamentos_manuais",
