@@ -46,6 +46,7 @@ TENANT_SCOPED_TABLES = {
     "dre_lancamentos",
     "dre_plano_contas",
     "dre_subcategorias",
+    "ecommerce_payment_gateway_configs",
     "estoque_movimentacoes",
     "estoque_reservas",
     "especies",
