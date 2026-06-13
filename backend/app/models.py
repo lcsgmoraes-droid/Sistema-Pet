@@ -737,6 +737,41 @@ class UserTenant(BaseTenantModel):
         return f"<UserTenant(user_id={self.user_id}, tenant_id={self.tenant_id}, role_id={self.role_id})>"
 
 
+class AppAccessProfile(BaseTenantModel):
+    """Perfil operacional do app liberado para uma pessoa."""
+    __tablename__ = 'app_access_profiles'
+    __table_args__ = (
+        UniqueConstraint(
+            'tenant_id',
+            'cliente_id',
+            'profile_type',
+            name='uq_app_access_profiles_tenant_cliente_profile',
+        ),
+        Index(
+            'ix_app_access_profiles_tenant_user_profile',
+            'tenant_id',
+            'user_id',
+            'profile_type',
+        ),
+    )
+
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=True, index=True)
+    cliente_id = Column(Integer, ForeignKey('clientes.id'), nullable=False, index=True)
+    profile_type = Column(String(30), nullable=False, index=True)
+    is_active = Column(Boolean, nullable=False, default=True, server_default='true')
+    granted_by_user_id = Column(Integer, ForeignKey('users.id'), nullable=True)
+    notes = Column(Text, nullable=True)
+
+    cliente = relationship("Cliente", foreign_keys=[cliente_id])
+    user = relationship("User", foreign_keys=[user_id])
+
+    def __repr__(self):
+        return (
+            f"<AppAccessProfile(cliente_id={self.cliente_id}, "
+            f"profile_type={self.profile_type}, tenant_id={self.tenant_id})>"
+        )
+
+
 class RolePermission(BaseTenantModel):
     """Vínculo Role ↔ Permission por tenant"""
     __tablename__ = 'role_permissions'

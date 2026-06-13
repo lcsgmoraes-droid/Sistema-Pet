@@ -1,6 +1,6 @@
 import * as SecureStore from 'expo-secure-store';
 import api from './api';
-import { AuthResponse, EcommerceUser } from '../types';
+import { AppProfileType, AuthResponse, EcommerceUser } from '../types';
 
 // ─────────────────────────────────────────────────────────────
 // Todos os endpoints usam os mesmos do e-commerce (token_type = ecommerce_customer)
@@ -35,6 +35,16 @@ export async function register(
     accepted_privacy: acceptedPrivacy,
   }, {
     headers: { 'X-Client-Channel': 'app' },
+  });
+  if (data.access_token) {
+    await SecureStore.setItemAsync('auth_token', data.access_token);
+  }
+  return data;
+}
+
+export async function selectProfile(profileType: AppProfileType): Promise<AuthResponse> {
+  const { data } = await api.post<AuthResponse>('/ecommerce/auth/select-profile', {
+    profile_type: profileType,
   });
   if (data.access_token) {
     await SecureStore.setItemAsync('auth_token', data.access_token);

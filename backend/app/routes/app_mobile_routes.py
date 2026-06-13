@@ -39,6 +39,7 @@ from app.routes.ecommerce_auth import (
     _get_current_ecommerce_user,
     _get_or_create_cliente_for_user,
 )
+from app.services.app_access_profile_service import get_cliente_for_app_profile_or_none
 from app.bling_estoque_sync import sincronizar_bling_background
 from app.services.validade_campanha_service import (
     mapear_ofertas_validade_por_produto,
@@ -292,16 +293,7 @@ def _get_cliente_or_404(db: Session, user: User) -> Cliente:
 
 def _get_funcionario_operacional_or_403(db: Session, user: User) -> tuple[Cliente, str]:
     tenant_id = _activate_user_tenant_context(user)
-    funcionario = (
-        db.query(Cliente)
-        .filter(
-            Cliente.tenant_id == tenant_id,
-            Cliente.user_id == user.id,
-            Cliente.tipo_cadastro == "funcionario",
-            Cliente.ativo == True,
-        )
-        .first()
-    )
+    funcionario = get_cliente_for_app_profile_or_none(db, user, "funcionario")
     if not funcionario:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

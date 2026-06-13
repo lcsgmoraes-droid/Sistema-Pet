@@ -15,9 +15,10 @@ import { useAuthStore } from "../../store/auth.store";
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from "../../theme";
 import { PONTOS } from "../../config";
 import { formatarMoeda } from "../../utils/format";
+import { AppProfileType } from "../../types";
 
 export default function ProfileScreen() {
-  const { user, logout, updateUser } = useAuthStore();
+  const { user, logout, updateUser, selectProfile } = useAuthStore();
   const [editando, setEditando] = useState(false);
   const [editandoEndereco, setEditandoEndereco] = useState(false);
   const [nome, setNome] = useState(user?.nome ?? "");
@@ -31,6 +32,7 @@ export default function ProfileScreen() {
   const [estado, setEstado] = useState(user?.estado ?? "");
   const [buscandoCep, setBuscandoCep] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  const [trocandoPerfil, setTrocandoPerfil] = useState(false);
 
   useEffect(() => {
     setNome(user?.nome ?? "");
@@ -49,6 +51,8 @@ export default function ProfileScreen() {
   const enderecoCompleto = user?.cidade
     ? `${user?.endereco ?? ""}, ${user?.numero ?? "s/n"} - ${user?.bairro ?? ""} - ${user?.cidade}/${user?.estado ?? ""}`
     : null;
+  const available_profiles = user?.available_profiles ?? [];
+  const perfilAtual = user?.selected_profile ?? user?.perfil_operacional ?? "cliente";
 
   async function buscarCep(value: string) {
     const numeros = value.replace(/\D/g, "");
@@ -120,6 +124,24 @@ export default function ProfileScreen() {
     }
   }
 
+  async function trocarPerfil(profileType: AppProfileType) {
+    if (profileType === perfilAtual) return;
+
+    setTrocandoPerfil(true);
+    try {
+      await selectProfile(profileType);
+      Alert.alert("Pronto", "Acesso alterado com sucesso.");
+    } catch (err: any) {
+      const mensagem =
+        err?.response?.data?.detail ||
+        err?.message ||
+        "Nao foi possivel trocar o acesso.";
+      Alert.alert("Erro", String(mensagem));
+    } finally {
+      setTrocandoPerfil(false);
+    }
+  }
+
   function handleLogout() {
     Alert.alert("Sair", "Deseja sair da sua conta?", [
       { text: "Cancelar", style: "cancel" },
@@ -158,6 +180,37 @@ export default function ProfileScreen() {
             </Text>
           </View>
         </View>
+
+        {available_profiles.length > 1 && (
+          <View style={styles.secao}>
+            <Text style={styles.secaoTitulo}>Trocar perfil</Text>
+            <View style={styles.perfisGrid}>
+              {available_profiles.map((profile) => {
+                const selecionado = profile.type === perfilAtual;
+                return (
+                  <TouchableOpacity
+                    key={profile.type}
+                    style={[
+                      styles.perfilBotao,
+                      selecionado && styles.perfilBotaoAtivo,
+                    ]}
+                    onPress={() => trocarPerfil(profile.type)}
+                    disabled={selecionado || trocandoPerfil}
+                  >
+                    <Text
+                      style={[
+                        styles.perfilBotaoTexto,
+                        selecionado && styles.perfilBotaoTextoAtivo,
+                      ]}
+                    >
+                      {profile.label || profile.type}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </View>
+        )}
 
         <View style={styles.secao}>
           <View style={styles.secaoHeader}>
@@ -431,6 +484,31 @@ const styles = StyleSheet.create({
     marginBottom: ESPACO.md,
   },
   secaoTitulo: { fontSize: FONTE.grande, fontWeight: "bold", color: CORES.texto },
+  perfisGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: ESPACO.sm,
+    marginTop: ESPACO.md,
+  },
+  perfilBotao: {
+    borderWidth: 1,
+    borderColor: CORES.primario,
+    borderRadius: RAIO.md,
+    paddingHorizontal: ESPACO.md,
+    paddingVertical: ESPACO.sm,
+    backgroundColor: CORES.superficie,
+  },
+  perfilBotaoAtivo: {
+    backgroundColor: CORES.primario,
+  },
+  perfilBotaoTexto: {
+    color: CORES.primario,
+    fontSize: FONTE.normal,
+    fontWeight: "700",
+  },
+  perfilBotaoTextoAtivo: {
+    color: "#fff",
+  },
   editarTexto: { color: CORES.primario, fontWeight: "500" },
   infoRow: { flexDirection: "row", justifyContent: "space-between", marginBottom: ESPACO.sm },
   infoLabel: { fontSize: FONTE.normal, color: CORES.textoSecundario },

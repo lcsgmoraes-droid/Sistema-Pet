@@ -14,6 +14,7 @@ const funcionarioPadrao = () => ({
   complemento_modo: "automatico",
   complemento_fixo_valor: 0,
   remuneracao_observacoes: "",
+  app_access_profiles: ["funcionario"],
 });
 
 const valorOuNull = (valor) => {
@@ -64,6 +65,10 @@ export default function Funcionarios() {
       complemento_modo: funcionario.complemento_modo || "automatico",
       complemento_fixo_valor: funcionario.complemento_fixo_valor ?? 0,
       remuneracao_observacoes: funcionario.remuneracao_observacoes || "",
+      app_access_profiles:
+        funcionario.app_access_profiles?.length
+          ? funcionario.app_access_profiles
+          : ["funcionario"],
     });
   };
 
@@ -85,6 +90,7 @@ export default function Funcionarios() {
       complemento_modo: form.complemento_modo || "automatico",
       complemento_fixo_valor: Number(form.complemento_fixo_valor || 0),
       remuneracao_observacoes: form.remuneracao_observacoes?.trim() || null,
+      app_access_profiles: form.app_access_profiles || [],
     };
 
     try {
@@ -106,6 +112,22 @@ export default function Funcionarios() {
     if (!window.confirm("Deseja inativar este funcionario?")) return;
     await api.delete(`/funcionarios/${id}`);
     carregar();
+  };
+
+  const ativar = async (id) => {
+    if (!window.confirm("Deseja ativar este funcionario?")) return;
+    await api.post(`/funcionarios/${id}/ativar`);
+    carregar();
+  };
+
+  const alternarAppAccess = (profileType) => {
+    const atuais = new Set(form.app_access_profiles || []);
+    if (atuais.has(profileType)) {
+      atuais.delete(profileType);
+    } else {
+      atuais.add(profileType);
+    }
+    setForm({ ...form, app_access_profiles: Array.from(atuais) });
   };
 
   const listaFiltrada = funcionarios.filter((f) => {
@@ -267,6 +289,14 @@ export default function Funcionarios() {
                         Inativar
                       </button>
                     )}
+                    {!f.ativo && (
+                      <button
+                        className="px-3 py-1.5 text-xs font-medium rounded-md bg-green-50 text-green-700 hover:bg-green-100 border border-green-200 transition-colors"
+                        onClick={() => ativar(f.id)}
+                      >
+                        Ativar
+                      </button>
+                    )}
                   </div>
                 </td>
               </tr>
@@ -329,6 +359,30 @@ export default function Funcionarios() {
                 </option>
               ))}
             </select>
+
+            <div className="md:col-span-2 border rounded-md p-3 bg-gray-50">
+              <h4 className="font-semibold text-gray-800 mb-2">Acessos do app</h4>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                {[
+                  ["cliente", "Cliente"],
+                  ["funcionario", "Funcionario"],
+                  ["entregador", "Entregador"],
+                  ["veterinario", "Veterinario"],
+                ].map(([profileType, label]) => (
+                  <label
+                    key={profileType}
+                    className="flex items-center gap-2 rounded border border-gray-200 bg-white px-3 py-2 text-sm text-gray-700"
+                  >
+                    <input
+                      type="checkbox"
+                      checked={(form.app_access_profiles || []).includes(profileType)}
+                      onChange={() => alternarAppAccess(profileType)}
+                    />
+                    <span>{label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
 
             <div className="md:col-span-2 border-t pt-4">
               <h4 className="font-semibold text-gray-800 mb-3">Composicao de remuneracao</h4>
