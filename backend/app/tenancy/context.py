@@ -1,4 +1,5 @@
 from contextvars import ContextVar
+from contextlib import contextmanager
 from typing import Optional
 from uuid import UUID
 from starlette.middleware.base import BaseHTTPMiddleware
@@ -17,6 +18,20 @@ def clear_current_tenant():
 
 def get_current_tenant() -> Optional[UUID]:
     return _current_tenant.get()
+
+
+@contextmanager
+def tenant_context(tenant_id):
+    previous_tenant = get_current_tenant()
+    tenant_uuid = UUID(str(tenant_id))
+    set_current_tenant(tenant_uuid)
+    try:
+        yield tenant_uuid
+    finally:
+        if previous_tenant is None:
+            clear_current_tenant()
+        else:
+            set_current_tenant(previous_tenant)
 
 # Aliases
 set_tenant_context = set_current_tenant

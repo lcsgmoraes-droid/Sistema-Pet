@@ -1,13 +1,16 @@
 from datetime import datetime
 from types import SimpleNamespace
+from uuid import UUID
 
 import app.services.nfe_pending_reconciliation_service as service
 from app.middlewares.request_context import clear_request_context, get_request_id
+from app.tenancy.context import clear_current_tenant, get_current_tenant, set_current_tenant
 from app.utils.logger import clear_context
 
 
 def teardown_function():
     clear_request_context()
+    clear_current_tenant()
     clear_context()
 
 
@@ -77,6 +80,42 @@ def test_executar_reconciliacao_automatica_nfes_pendentes_inclui_correlacao(monk
 
     assert resultado["correlation_id"].startswith("job.nfe-pending-reconciliation-")
     assert get_request_id() is None
+
+
+def test_executar_reconciliacao_automatica_nfes_pendentes_ativa_contexto_por_tenant(monkeypatch):
+    tenant_a = UUID("11111111-1111-4111-8111-111111111111")
+    tenant_b = UUID("22222222-2222-4222-8222-222222222222")
+    previous_tenant = UUID("99999999-9999-4999-8999-999999999999")
+    vistos = []
+
+    monkeypatch.setattr(
+        service,
+        "listar_tenants_com_nfes_pendentes_recentes",
+        lambda *args, **kwargs: [str(tenant_a), str(tenant_b)],
+    )
+
+    def fake_reconciliar(db, tenant_id, **kwargs):
+        vistos.append((str(tenant_id), get_current_tenant()))
+        return {
+            "tenant_id": str(tenant_id),
+            "pendentes_antes": 0,
+            "pendentes_depois": 0,
+            "pendentes_atualizadas": 0,
+        }
+
+    monkeypatch.setattr(service, "reconciliar_nfes_pendentes_recentes", fake_reconciliar)
+
+    set_current_tenant(previous_tenant)
+
+    resultado = service.executar_reconciliacao_automatica_nfes_pendentes(
+        object(),
+        dias=3,
+        _correlation_context_applied=True,
+    )
+
+    assert resultado["tenants_processados"] == 2
+    assert vistos == [(str(tenant_a), tenant_a), (str(tenant_b), tenant_b)]
+    assert get_current_tenant() == previous_tenant
 
 
 def test_listar_tenants_com_nfes_pendentes_recentes_usa_sql_global_autorizado(monkeypatch):
