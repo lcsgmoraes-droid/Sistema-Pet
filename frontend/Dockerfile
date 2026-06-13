@@ -3,8 +3,8 @@
 # Sistema Pet Shop Pro - Interface Web
 # ============================================================================
 
-# Usar Node 18 como base
-FROM node:18-alpine
+# Usar Node 22 LTS como base
+FROM node:22-alpine
 
 # Definir diretório de trabalho
 WORKDIR /app

@@ -120,6 +120,7 @@ sudo -n /usr/local/sbin/petshop-deploy-producao
 
 Esse script:
 - bloqueia se o Git estiver sujo
+- bloqueia antes de atualizar o codigo se o Node.js do host nao atender `>=20.19.4` ou `>=22.12.0`
 - atualiza o codigo para `origin/main`
 - impede `frontend/dist` e `runtime` versionados
 - gera o frontend em `runtime/frontend/dist`
@@ -127,6 +128,13 @@ Esse script:
 - sobe `postgres`, `backend` e `nginx`
 - valida `/health/watchdog` e `/api/health`
 - termina falhando se o Git ficar sujo
+
+### Runtime Node.js de producao
+
+- O build frontend de producao requer Node.js 22 LTS no host de deploy.
+- O script `scripts/deploy_producao_seguro.sh` bloqueia o deploy antes de atualizar o codigo quando o Node local nao atende `>=20.19.4` ou `>=22.12.0`.
+- A producao nao deve voltar para Node 18 enquanto o frontend estiver em Vite 8.
+- Atualizacao de Node no servidor de producao exige autorizacao explicita do Lucas antes de qualquer comando com `sudo` ou mudanca no host.
 
 ---
 
