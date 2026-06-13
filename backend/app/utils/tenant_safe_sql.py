@@ -55,6 +55,7 @@ TENANT_SCOPED_TABLES = {
     "linhas_racao",
     "lancamentos_financeiros",
     "lancamentos_manuais",
+    "locais_estoque",
     "movimentacoes_financeiras",
     "marcas",
     "notas_entrada",

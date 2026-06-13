@@ -167,6 +167,7 @@ TENANT_TABLES = {
     "produto_bling_sync",
     "produto_bling_sync_queue",
     "produtos_historico_precos",
+    "locais_estoque",
     "estoque_movimentacoes",
     "estoque_reservas",
     
