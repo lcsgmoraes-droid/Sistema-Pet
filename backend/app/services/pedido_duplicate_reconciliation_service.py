@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.pedido_integrado_models import PedidoIntegrado
@@ -9,6 +10,8 @@ from app.services.pedido_integrado_duplicate_review_service import (
     consolidar_duplicidades_seguras_pedido,
     listar_grupos_duplicados_pedido_loja,
 )
+from app.tenancy.context import tenant_context
+from app.utils.tenant_safe_sql import execute_tenant_safe_all
 from app.utils.correlation import current_correlation_id, operation_correlation_context
 from app.utils.logger import logger
 
@@ -24,17 +27,24 @@ def _limite_data_recentes(dias: int) -> datetime:
 
 def listar_tenants_com_duplicidades_recentes(db: Session, *, dias: int) -> list:
     cutoff = _limite_data_recentes(dias)
+    rows = execute_tenant_safe_all(
+        db,
+        text(
+            """
+            SELECT DISTINCT tenant_id
+            FROM pedidos_integrados
+            WHERE status != 'mesclado'
+              AND criado_em >= :cutoff
+            """
+        ),
+        {"dias": dias, "cutoff": cutoff},
+        require_tenant=False,
+        allow_global=True,
+        global_reason="Job global de duplicidades de pedidos integrados precisa descobrir tenants antes do contexto ativo.",
+    )
     return [
         tenant_id
-        for (tenant_id,) in (
-            db.query(PedidoIntegrado.tenant_id)
-            .filter(
-                PedidoIntegrado.status != "mesclado",
-                PedidoIntegrado.criado_em >= cutoff,
-            )
-            .distinct()
-            .all()
-        )
+        for (tenant_id,) in rows
         if tenant_id is not None
     ]
 
@@ -193,12 +203,13 @@ def executar_reconciliacao_automatica_duplicidades_pedidos(
     erros_total = 0
 
     for tenant_id in tenants:
-        resultado = reconciliar_duplicidades_recentes_pedido_loja(
-            db,
-            tenant_id,
-            dias=dias,
-            limite_grupos=limite_grupos_por_tenant,
-        )
+        with tenant_context(tenant_id):
+            resultado = reconciliar_duplicidades_recentes_pedido_loja(
+                db,
+                tenant_id,
+                dias=dias,
+                limite_grupos=limite_grupos_por_tenant,
+            )
         resultados.append(resultado)
         grupos_mapeados_total += int(resultado.get("grupos_mapeados") or 0)
         grupos_consolidados_total += int(resultado.get("grupos_consolidados") or 0)

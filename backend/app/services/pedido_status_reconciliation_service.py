@@ -3,11 +3,13 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 import time
 
-from sqlalchemy import func
+from sqlalchemy import func, text
 from sqlalchemy.orm import Session
 
 from app.pedido_integrado_item_models import PedidoIntegradoItem
 from app.pedido_integrado_models import PedidoIntegrado
+from app.tenancy.context import tenant_context
+from app.utils.tenant_safe_sql import execute_tenant_safe_all
 from app.utils.correlation import current_correlation_id, operation_correlation_context
 from app.utils.logger import logger
 
@@ -69,19 +71,27 @@ def _contar_pedidos_recentes_reconciliaveis(db: Session, tenant_id, *, dias: int
 
 
 def listar_tenants_com_pedidos_reconciliaveis(db: Session, *, dias: int) -> list:
+    rows = execute_tenant_safe_all(
+        db,
+        text(
+            """
+            SELECT DISTINCT tenant_id
+            FROM pedidos_integrados
+            WHERE pedido_bling_id IS NOT NULL
+              AND length(trim(pedido_bling_id)) > 0
+              AND criado_em >= :cutoff
+              AND status IN ('aberto', 'confirmado', 'expirado')
+            """
+        ),
+        {"dias": dias, "cutoff": _limite_data_recentes(dias)},
+        require_tenant=False,
+        allow_global=True,
+        global_reason="Job global de pedidos integrados reconciliaveis precisa descobrir tenants antes do contexto ativo.",
+    )
     return [
         tenant_id
-        for (tenant_id,) in (
-            db.query(PedidoIntegrado.tenant_id)
-            .filter(
-                PedidoIntegrado.pedido_bling_id.isnot(None),
-                func.length(func.trim(PedidoIntegrado.pedido_bling_id)) > 0,
-                PedidoIntegrado.criado_em >= _limite_data_recentes(dias),
-                PedidoIntegrado.status.in_(_STATUS_PEDIDOS_RECONCILIAVEIS),
-            )
-            .distinct()
-            .all()
-        )
+        for (tenant_id,) in rows
+        if tenant_id is not None
     ]
 
 
@@ -445,14 +455,15 @@ def executar_reconciliacao_automatica_status_pedidos(
 
     for tenant_id in tenant_ids:
         try:
-            resultados.append(
-                reconciliar_status_pedidos_recentes(
-                    db,
-                    tenant_id,
-                    dias=dias,
-                    limite_pedidos=limite_pedidos_por_tenant,
+            with tenant_context(tenant_id):
+                resultados.append(
+                    reconciliar_status_pedidos_recentes(
+                        db,
+                        tenant_id,
+                        dias=dias,
+                        limite_pedidos=limite_pedidos_por_tenant,
+                    )
                 )
-            )
         except Exception as exc:
             logger.warning(
                 "pedido_status_reconciliacao",

@@ -66,6 +66,8 @@ TENANT_SCOPED_TABLES = {
     "pedidos",
     "pedidos_compra",
     "pedidos_compra_itens",
+    "pedidos_integrados",
+    "pedidos_integrados_itens",
     "pets",
     "portes_animal",
     "produtos",
