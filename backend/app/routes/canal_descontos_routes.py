@@ -13,11 +13,11 @@ from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session as get_db
+from app.utils.tenant_safe_sql import execute_tenant_safe
 
 router = APIRouter(prefix="/canal-descontos", tags=["canal-descontos"])
 
@@ -72,12 +72,12 @@ def _campanha_ativa_conflitante(
     - Período nulo é tratado como aberto (infinito).
     - Conflito existe quando os intervalos se sobrepõem.
     """
-    return db.execute(
-        text(
-            """
+    return execute_tenant_safe(
+        db,
+        """
             SELECT id, nome, data_inicio, data_fim
             FROM canal_descontos
-            WHERE tenant_id = :tid
+            WHERE {tenant_filter}
               AND canal = :canal
               AND ativo = TRUE
               AND (:excluir_id IS NULL OR id <> :excluir_id)
@@ -85,15 +85,14 @@ def _campanha_ativa_conflitante(
               AND COALESCE(data_fim, 'infinity'::timestamp) >= COALESCE(:novo_inicio, '-infinity'::timestamp)
             ORDER BY created_at DESC
             LIMIT 1
-            """
-        ),
+            """,
         {
-            "tid": tenant_id,
             "canal": canal,
             "excluir_id": excluir_id,
             "novo_inicio": data_inicio,
             "novo_fim": data_fim,
         },
+        tenant_id=tenant_id,
     ).fetchone()
 
 
@@ -139,13 +138,13 @@ def listar_descontos(
 ):
     """Lista todos os descontos de canal do tenant."""
     _, tenant_id = auth
-    query = "SELECT * FROM canal_descontos WHERE tenant_id = :tid"
-    params = {"tid": str(tenant_id)}
+    query = "SELECT * FROM canal_descontos WHERE {tenant_filter}"
+    params = {}
     if canal:
         query += " AND canal = :canal"
         params["canal"] = canal
     query += " ORDER BY canal, created_at DESC"
-    rows = db.execute(text(query), params).fetchall()
+    rows = execute_tenant_safe(db, query, params, tenant_id=tenant_id).fetchall()
     return [dict(r._mapping) for r in rows]
 
 
@@ -173,14 +172,15 @@ def criar_desconto(
             data_fim=payload.data_fim,
         )
 
-    row = db.execute(
-        text("""
+    row = execute_tenant_safe(
+        db,
+        """
             INSERT INTO canal_descontos (tenant_id, canal, nome, desconto_pct, ativo, data_inicio, data_fim)
-            VALUES (:tid, :canal, :nome, :pct, :ativo, :inicio, :fim)
+            VALUES (:tenant_id, :canal, :nome, :pct, :ativo, :inicio, :fim)
             RETURNING *
-        """),
+        """,
         {
-            "tid": str(tenant_id),
+            "tenant_id": str(tenant_id),
             "canal": payload.canal,
             "nome": payload.nome,
             "pct": payload.desconto_pct,
@@ -188,6 +188,8 @@ def criar_desconto(
             "inicio": payload.data_inicio,
             "fim": payload.data_fim,
         },
+        tenant_id=tenant_id,
+        require_tenant=False,
     ).fetchone()
     db.commit()
     return dict(row._mapping)
@@ -202,15 +204,15 @@ def atualizar_desconto(
 ):
     """Atualiza um desconto existente."""
     _, tenant_id = auth
-    existing = db.execute(
-        text(
-            """
+    existing = execute_tenant_safe(
+        db,
+        """
             SELECT id, canal, ativo, data_inicio, data_fim
             FROM canal_descontos
-            WHERE id = :id AND tenant_id = :tid
-            """
-        ),
-        {"id": desconto_id, "tid": str(tenant_id)},
+            WHERE id = :id AND {tenant_filter}
+            """,
+        {"id": desconto_id},
+        tenant_id=tenant_id,
     ).fetchone()
     if not existing:
         raise HTTPException(status_code=404, detail="Desconto não encontrado.")
@@ -232,7 +234,7 @@ def atualizar_desconto(
         )
 
     sets = []
-    params: dict = {"id": desconto_id, "tid": str(tenant_id), "now": datetime.now(timezone.utc)}
+    params: dict = {"id": desconto_id, "now": datetime.now(timezone.utc)}
     if payload.nome is not None:
         sets.append("nome = :nome"); params["nome"] = payload.nome
     if payload.desconto_pct is not None:
@@ -248,9 +250,11 @@ def atualizar_desconto(
         raise HTTPException(status_code=422, detail="Nenhum campo para atualizar.")
 
     sets.append("updated_at = :now")
-    row = db.execute(
-        text(f"UPDATE canal_descontos SET {', '.join(sets)} WHERE id = :id AND tenant_id = :tid RETURNING *"),
+    row = execute_tenant_safe(
+        db,
+        f"UPDATE canal_descontos SET {', '.join(sets)} WHERE id = :id AND {{tenant_filter}} RETURNING *",
         params,
+        tenant_id=tenant_id,
     ).fetchone()
     db.commit()
     return dict(row._mapping)
@@ -264,9 +268,11 @@ def remover_desconto(
 ):
     """Remove um desconto de canal."""
     _, tenant_id = auth
-    result = db.execute(
-        text("DELETE FROM canal_descontos WHERE id = :id AND tenant_id = :tid"),
-        {"id": desconto_id, "tid": str(tenant_id)},
+    result = execute_tenant_safe(
+        db,
+        "DELETE FROM canal_descontos WHERE id = :id AND {tenant_filter}",
+        {"id": desconto_id},
+        tenant_id=tenant_id,
     )
     db.commit()
     if result.rowcount == 0:
@@ -285,16 +291,18 @@ def desconto_ativo_canal(
     """
     _, tenant_id = auth
     agora = datetime.now(timezone.utc)
-    row = db.execute(
-        text("""
+    row = execute_tenant_safe(
+        db,
+        """
             SELECT desconto_pct, nome FROM canal_descontos
-            WHERE tenant_id = :tid AND canal = :canal AND ativo = TRUE
+            WHERE {tenant_filter} AND canal = :canal AND ativo = TRUE
               AND (data_inicio IS NULL OR data_inicio <= :agora)
               AND (data_fim IS NULL OR data_fim >= :agora)
             ORDER BY desconto_pct DESC
             LIMIT 1
-        """),
-        {"tid": str(tenant_id), "canal": canal, "agora": agora},
+        """,
+        {"canal": canal, "agora": agora},
+        tenant_id=tenant_id,
     ).fetchone()
     if not row:
         return {"tem_desconto": False, "desconto_pct": 0}

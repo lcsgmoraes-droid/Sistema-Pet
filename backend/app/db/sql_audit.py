@@ -180,6 +180,7 @@ TENANT_TABLES = {
     "conciliacao_cartao",
     
     # Clientes/Pets
+    "canal_descontos",
     "clientes",
     "pets",
     "agendamentos",
