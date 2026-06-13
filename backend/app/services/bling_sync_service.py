@@ -21,8 +21,8 @@ from app.bling_integration import BlingAPI
 from app.db import SessionLocal
 from app.models import Tenant
 from app.produtos_models import Produto, ProdutoBlingSync, ProdutoBlingSyncQueue
-from app.tenancy.context import clear_current_tenant, set_current_tenant
-from app.utils.tenant_safe_sql import execute_tenant_safe_one
+from app.tenancy.context import get_current_tenant, tenant_context
+from app.utils.tenant_safe_sql import execute_tenant_safe_all, execute_tenant_safe_one
 
 logger = logging.getLogger(__name__)
 
@@ -363,6 +363,105 @@ def _buscar_item_bling_para_produto(bling: BlingAPI, codigo_busca: str, nome_bus
 
 def utc_now() -> datetime:
     return datetime.now(UTC).replace(tzinfo=None)
+
+
+def _first_column_values(rows) -> list[Any]:
+    values: list[Any] = []
+    for row in rows:
+        if isinstance(row, (tuple, list)):
+            values.append(row[0])
+            continue
+        mapping = getattr(row, "_mapping", None)
+        if mapping:
+            values.append(next(iter(mapping.values())))
+            continue
+        values.append(row)
+    return values
+
+
+def _positive_limit(limit: Optional[int]) -> Optional[int]:
+    if limit is None:
+        return None
+    return max(int(limit or 0), 0)
+
+
+def _remaining_limit(limit: Optional[int], processed: int) -> Optional[int]:
+    total_limit = _positive_limit(limit)
+    if total_limit is None:
+        return None
+    return max(total_limit - processed, 0)
+
+
+def _tenant_scope_or_current(tenant_id=None):
+    return tenant_id if tenant_id is not None else get_current_tenant()
+
+
+def listar_tenants_com_produto_bling_sync_recentes(db: Session, *, minutes: int) -> list[Any]:
+    cutoff = utc_now() - timedelta(minutes=max(int(minutes or 1), 1))
+    rows = execute_tenant_safe_all(
+        db,
+        """
+        SELECT DISTINCT tenant_id
+        FROM produto_bling_sync
+        WHERE sincronizar IS TRUE
+          AND bling_produto_id IS NOT NULL
+          AND bling_produto_id <> ''
+          AND (
+                updated_at >= :cutoff
+                OR status IN ('erro', 'pendente')
+              )
+        ORDER BY tenant_id
+        """,
+        {"cutoff": cutoff},
+        require_tenant=False,
+        allow_global=True,
+        global_reason="Job global Bling produto recentes precisa descobrir tenants com produtos alterados ou pendentes.",
+    )
+    return _first_column_values(rows)
+
+
+def listar_tenants_com_produto_bling_sync_ativo(db: Session) -> list[Any]:
+    rows = execute_tenant_safe_all(
+        db,
+        """
+        SELECT DISTINCT tenant_id
+        FROM produto_bling_sync
+        WHERE sincronizar IS TRUE
+          AND bling_produto_id IS NOT NULL
+          AND bling_produto_id <> ''
+        ORDER BY tenant_id
+        """,
+        require_tenant=False,
+        allow_global=True,
+        global_reason="Job global Bling produto ativo precisa descobrir tenants com produtos vinculados.",
+    )
+    return _first_column_values(rows)
+
+
+def listar_tenants_com_produtos_sem_vinculo_bling(db: Session) -> list[Any]:
+    rows = execute_tenant_safe_all(
+        db,
+        """
+        SELECT DISTINCT p.tenant_id
+        FROM produtos p
+        LEFT JOIN produto_bling_sync s
+          ON s.produto_id = p.id
+         AND s.tenant_id = p.tenant_id
+        WHERE p.codigo IS NOT NULL
+          AND p.codigo <> ''
+          AND COALESCE(p.tipo_produto, '') <> 'PAI'
+          AND (
+                s.id IS NULL
+                OR s.bling_produto_id IS NULL
+                OR s.bling_produto_id = ''
+              )
+        ORDER BY p.tenant_id
+        """,
+        require_tenant=False,
+        allow_global=True,
+        global_reason="Job global Bling auto-link precisa descobrir tenants com produtos sem vinculo.",
+    )
+    return _first_column_values(rows)
 
 
 class BlingSyncService:
@@ -857,34 +956,34 @@ class BlingSyncService:
                     logger.warning("[BLING SYNC] Ignorando tenant_id invalido na fila: %s", tenant_id_raw)
                     continue
 
-                set_current_tenant(tenant_uuid)
-                restante = max(0, limit - processados)
-                filas = db.query(ProdutoBlingSyncQueue).filter(
-                    ProdutoBlingSyncQueue.tenant_id == tenant_uuid,
-                    ProdutoBlingSyncQueue.status.in_(["pendente", "erro"]),
-                    ProdutoBlingSyncQueue.proxima_tentativa_em.isnot(None),
-                    ProdutoBlingSyncQueue.proxima_tentativa_em <= now,
-                ).order_by(
-                    ProdutoBlingSyncQueue.forcar_sync.desc(),
-                    ProdutoBlingSyncQueue.proxima_tentativa_em.asc(),
-                    ProdutoBlingSyncQueue.updated_at.asc(),
-                ).limit(restante).all()
+                with tenant_context(tenant_uuid):
+                    restante = max(0, limit - processados)
+                    filas = db.query(ProdutoBlingSyncQueue).filter(
+                        ProdutoBlingSyncQueue.tenant_id == tenant_uuid,
+                        ProdutoBlingSyncQueue.status.in_(["pendente", "erro"]),
+                        ProdutoBlingSyncQueue.proxima_tentativa_em.isnot(None),
+                        ProdutoBlingSyncQueue.proxima_tentativa_em <= now,
+                    ).order_by(
+                        ProdutoBlingSyncQueue.forcar_sync.desc(),
+                        ProdutoBlingSyncQueue.proxima_tentativa_em.asc(),
+                        ProdutoBlingSyncQueue.updated_at.asc(),
+                    ).limit(restante).all()
 
-                for fila in filas:
-                    result = BlingSyncService.process_queue_item(db, fila)
-                    processados += 1
-                    if result.get("ok"):
-                        sucessos += 1
-                    else:
-                        erros += 1
-                        if result.get("rate_limited"):
-                            rate_limited = True
-                            cooldown_seconds = float(result.get("cooldown_seconds") or 0.0)
-                            break
-                        if result.get("auth_invalid"):
-                            auth_invalid = True
-                            auth_detail = result.get("detail")
-                            break
+                    for fila in filas:
+                        result = BlingSyncService.process_queue_item(db, fila)
+                        processados += 1
+                        if result.get("ok"):
+                            sucessos += 1
+                        else:
+                            erros += 1
+                            if result.get("rate_limited"):
+                                rate_limited = True
+                                cooldown_seconds = float(result.get("cooldown_seconds") or 0.0)
+                                break
+                            if result.get("auth_invalid"):
+                                auth_invalid = True
+                                auth_detail = result.get("detail")
+                                break
 
                 if rate_limited or auth_invalid:
                     break
@@ -904,7 +1003,6 @@ class BlingSyncService:
             logger.exception("[BLING SYNC] Erro ao processar fila pendente")
             return {"processados": 0, "sucessos": 0, "erros": 1}
         finally:
-            clear_current_tenant()
             db.close()
 
     @staticmethod
@@ -1122,82 +1220,178 @@ class BlingSyncService:
             db.close()
 
     @staticmethod
-    def reconcile_recent_products(minutes: int = 30, limit: int = 100) -> Dict[str, Any]:
-        db = SessionLocal()
-        cutoff = utc_now() - timedelta(minutes=minutes)
-        try:
-            syncs = db.query(ProdutoBlingSync).filter(
+    def _listar_produto_ids_reconciliacao_recente(
+        db: Session,
+        tenant_id,
+        *,
+        minutes: int,
+        limit: Optional[int],
+    ) -> list[int]:
+        cutoff = utc_now() - timedelta(minutes=max(int(minutes or 1), 1))
+        query = (
+            db.query(ProdutoBlingSync.produto_id)
+            .filter(
+                ProdutoBlingSync.tenant_id == tenant_id,
                 ProdutoBlingSync.sincronizar == True,
                 ProdutoBlingSync.bling_produto_id.isnot(None),
+                ProdutoBlingSync.bling_produto_id != "",
                 (
                     (ProdutoBlingSync.updated_at >= cutoff)
                     | (ProdutoBlingSync.status.in_(["erro", "pendente"]))
-                )
-            ).order_by(ProdutoBlingSync.updated_at.desc()).limit(limit).all()
-
-            produto_ids = [sync.produto_id for sync in syncs]
-        finally:
-            db.close()
-
-        divergencias = 0
-        rate_limited = False
-        cooldown_seconds = 0.0
-        for produto_id in produto_ids:
-            result = BlingSyncService.reconcile_product(produto_id)
-            if result.get("rate_limited"):
-                rate_limited = True
-                cooldown_seconds = float(result.get("cooldown_seconds") or 0.0)
-                break
-            if result.get("ok") and abs(result.get("divergencia", 0)) >= DIVERGENCIA_MINIMA:
-                divergencias += 1
-
-        return {
-            "avaliados": len(produto_ids),
-            "divergencias": divergencias,
-            "rate_limited": rate_limited,
-            "cooldown_seconds": cooldown_seconds,
-        }
+                ),
+            )
+            .order_by(ProdutoBlingSync.updated_at.desc(), ProdutoBlingSync.produto_id.asc())
+        )
+        positive_limit = _positive_limit(limit)
+        if positive_limit is not None:
+            query = query.limit(positive_limit)
+        return [int(produto_id) for (produto_id,) in query.all()]
 
     @staticmethod
-    def reconcile_all_products(limit: Optional[int] = None, force_sync: bool = False) -> Dict[str, Any]:
-        db = SessionLocal()
-        try:
-            query = db.query(ProdutoBlingSync).filter(
+    def _listar_produto_ids_reconciliacao_geral(
+        db: Session,
+        tenant_id,
+        *,
+        limit: Optional[int],
+    ) -> list[int]:
+        query = (
+            db.query(ProdutoBlingSync.produto_id)
+            .filter(
+                ProdutoBlingSync.tenant_id == tenant_id,
                 ProdutoBlingSync.sincronizar == True,
                 ProdutoBlingSync.bling_produto_id.isnot(None),
-            ).order_by(ProdutoBlingSync.produto_id.asc())
-            if limit:
-                query = query.limit(limit)
-            produto_ids = [sync.produto_id for sync in query.all()]
+                ProdutoBlingSync.bling_produto_id != "",
+            )
+            .order_by(ProdutoBlingSync.produto_id.asc())
+        )
+        positive_limit = _positive_limit(limit)
+        if positive_limit is not None:
+            query = query.limit(positive_limit)
+        return [int(produto_id) for (produto_id,) in query.all()]
+
+    @staticmethod
+    def reconcile_recent_products(
+        minutes: int = 30,
+        limit: int = 100,
+        tenant_id: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        db = SessionLocal()
+        try:
+            tenant_scope = _tenant_scope_or_current(tenant_id)
+            tenant_ids = (
+                [tenant_scope]
+                if tenant_scope is not None
+                else listar_tenants_com_produto_bling_sync_recentes(db, minutes=minutes)
+            )
+            avaliados = 0
+            divergencias = 0
+            tenants_processados = 0
+            rate_limited = False
+            cooldown_seconds = 0.0
+
+            for tenant in tenant_ids:
+                remaining = _remaining_limit(limit, avaliados)
+                if remaining == 0:
+                    break
+
+                with tenant_context(tenant) as scoped_tenant:
+                    produto_ids = BlingSyncService._listar_produto_ids_reconciliacao_recente(
+                        db,
+                        scoped_tenant,
+                        minutes=minutes,
+                        limit=remaining,
+                    )
+                    if produto_ids:
+                        tenants_processados += 1
+
+                    for produto_id in produto_ids:
+                        result = BlingSyncService.reconcile_product(produto_id)
+                        avaliados += 1
+                        if result.get("rate_limited"):
+                            rate_limited = True
+                            cooldown_seconds = float(result.get("cooldown_seconds") or 0.0)
+                            break
+                        if result.get("ok") and abs(result.get("divergencia", 0)) >= DIVERGENCIA_MINIMA:
+                            divergencias += 1
+
+                if rate_limited:
+                    break
+
+            return {
+                "avaliados": avaliados,
+                "divergencias": divergencias,
+                "rate_limited": rate_limited,
+                "cooldown_seconds": cooldown_seconds,
+                "tenants_processados": tenants_processados,
+            }
         finally:
             db.close()
 
-        divergencias = 0
-        rate_limited = False
-        cooldown_seconds = 0.0
-        for produto_id in produto_ids:
-            result = BlingSyncService.reconcile_product(produto_id, force_sync=force_sync)
-            if result.get("rate_limited"):
-                rate_limited = True
-                cooldown_seconds = float(result.get("cooldown_seconds") or 0.0)
-                break
-            if result.get("ok") and abs(result.get("divergencia", 0)) >= DIVERGENCIA_MINIMA:
-                divergencias += 1
+    @staticmethod
+    def reconcile_all_products(
+        limit: Optional[int] = None,
+        force_sync: bool = False,
+        tenant_id: Optional[Any] = None,
+    ) -> Dict[str, Any]:
+        db = SessionLocal()
+        try:
+            tenant_scope = _tenant_scope_or_current(tenant_id)
+            tenant_ids = (
+                [tenant_scope]
+                if tenant_scope is not None
+                else listar_tenants_com_produto_bling_sync_ativo(db)
+            )
+            avaliados = 0
+            divergencias = 0
+            tenants_processados = 0
+            rate_limited = False
+            cooldown_seconds = 0.0
 
-        return {
-            "avaliados": len(produto_ids),
-            "divergencias": divergencias,
-            "rate_limited": rate_limited,
-            "cooldown_seconds": cooldown_seconds,
-        }
+            for tenant in tenant_ids:
+                remaining = _remaining_limit(limit, avaliados)
+                if remaining == 0:
+                    break
+
+                with tenant_context(tenant) as scoped_tenant:
+                    produto_ids = BlingSyncService._listar_produto_ids_reconciliacao_geral(
+                        db,
+                        scoped_tenant,
+                        limit=remaining,
+                    )
+                    if produto_ids:
+                        tenants_processados += 1
+
+                    for produto_id in produto_ids:
+                        result = BlingSyncService.reconcile_product(produto_id, force_sync=force_sync)
+                        avaliados += 1
+                        if result.get("rate_limited"):
+                            rate_limited = True
+                            cooldown_seconds = float(result.get("cooldown_seconds") or 0.0)
+                            break
+                        if result.get("ok") and abs(result.get("divergencia", 0)) >= DIVERGENCIA_MINIMA:
+                            divergencias += 1
+
+                if rate_limited:
+                    break
+
+            return {
+                "avaliados": avaliados,
+                "divergencias": divergencias,
+                "rate_limited": rate_limited,
+                "cooldown_seconds": cooldown_seconds,
+                "tenants_processados": tenants_processados,
+            }
+        finally:
+            db.close()
 
     @staticmethod
-    def auto_link_by_sku(limit: int = 500) -> Dict[str, Any]:
+    def _auto_link_by_sku_for_tenant(tenant_id, limit: int) -> Dict[str, Any]:
         db = SessionLocal()
         try:
             subq_vinculados = (
                 db.query(ProdutoBlingSync.produto_id)
                 .filter(
+                    ProdutoBlingSync.tenant_id == tenant_id,
                     ProdutoBlingSync.bling_produto_id.isnot(None),
                     ProdutoBlingSync.bling_produto_id != "",
                 )
@@ -1207,6 +1401,7 @@ class BlingSyncService:
             produtos = (
                 db.query(Produto)
                 .filter(
+                    Produto.tenant_id == tenant_id,
                     Produto.codigo.isnot(None),
                     Produto.codigo != "",
                     Produto.tipo_produto != "PAI",
@@ -1270,6 +1465,35 @@ class BlingSyncService:
             return {"processados": 0, "vinculados": 0, "nao_encontrados": 0, "erros": 1, "detail": str(error)}
         finally:
             db.close()
+
+    @staticmethod
+    def auto_link_by_sku(limit: int = 500, tenant_id: Optional[Any] = None) -> Dict[str, Any]:
+        tenant_scope = _tenant_scope_or_current(tenant_id)
+        if tenant_scope is not None:
+            with tenant_context(tenant_scope) as scoped_tenant:
+                return BlingSyncService._auto_link_by_sku_for_tenant(scoped_tenant, limit)
+
+        db = SessionLocal()
+        try:
+            tenant_ids = listar_tenants_com_produtos_sem_vinculo_bling(db)
+        finally:
+            db.close()
+
+        total = {"processados": 0, "vinculados": 0, "nao_encontrados": 0, "erros": 0}
+        for tenant in tenant_ids:
+            remaining = _remaining_limit(limit, int(total["processados"]))
+            if remaining == 0:
+                break
+            with tenant_context(tenant) as scoped_tenant:
+                result = BlingSyncService._auto_link_by_sku_for_tenant(scoped_tenant, int(remaining or 0))
+
+            for key in total:
+                total[key] += int(result.get(key) or 0)
+
+            if int(result.get("erros") or 0):
+                break
+
+        return total
 
     @staticmethod
     def run_nightly_forced_link_and_sync(link_limit: int = 500, sync_limit: int = 1000) -> Dict[str, Any]:

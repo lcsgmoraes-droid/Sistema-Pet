@@ -72,6 +72,8 @@ TENANT_SCOPED_TABLES = {
     "portes_animal",
     "produtos",
     "produto_fornecedores",
+    "produto_bling_sync",
+    "produto_bling_sync_queue",
     "produtos_atributos",
     "produtos_atributos_opcoes",
     "produtos_historico_precos",
