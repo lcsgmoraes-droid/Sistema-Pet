@@ -179,7 +179,7 @@ async def listar_funcionarios_com_comissao(
         from .tenancy.context import set_tenant_context
         
         # Extrair tenant_id do contexto
-        current_user, tenant_id = user_and_tenant
+        _current_user, tenant_id = user_and_tenant
         
         # 🔒 CRÍTICO: Garantir que contexto está configurado
         set_tenant_context(tenant_id)
@@ -249,7 +249,7 @@ async def buscar_configuracoes_funcionario(
         from .tenancy.context import set_tenant_context
         
         # Extrair tenant_id e configurar contexto
-        current_user, tenant_id = user_and_tenant
+        _current_user, tenant_id = user_and_tenant
         set_tenant_context(tenant_id)
         
         db = SessionLocal()
@@ -635,10 +635,10 @@ async def deletar_configuracao(
     try:
         # Extrair tenant_id e configurar contexto
         from .tenancy.context import set_tenant_context
-        current_user, tenant_id = user_and_tenant
+        _current_user, tenant_id = user_and_tenant
         set_tenant_context(tenant_id)
         
-        success = ComissoesConfig.deletar(config_id)
+        success = ComissoesConfig.deletar(config_id, tenant_id=tenant_id)
         
         if not success:
             raise HTTPException(
@@ -703,7 +703,8 @@ async def duplicar_configuracao(
         count = ComissoesConfig.duplicar_configuracao(
             funcionario_origem_id=request.funcionario_origem_id,
             funcionario_destino_id=request.funcionario_destino_id,
-            usuario_id=current_user.id
+            usuario_id=current_user.id,
+            tenant_id=tenant_id,
         )
         
         return {
@@ -735,11 +736,17 @@ async def buscar_configuracao_aplicavel(
     Segue hierarquia: Produto > Subcategoria > Categoria
     """
     try:
+        from .tenancy.context import set_tenant_context
+
+        _current_user, tenant_id = user_and_tenant
+        set_tenant_context(tenant_id)
+
         config = ComissoesConfig.buscar_configuracao(
             funcionario_id=funcionario_id,
             produto_id=produto_id,
             categoria_id=categoria_id,
-            subcategoria_id=subcategoria_id
+            subcategoria_id=subcategoria_id,
+            tenant_id=tenant_id,
         )
         
         if not config:

@@ -36,6 +36,7 @@ from app.services.pessoa_duplicate_service import (
     listar_sugestoes_duplicidade_pessoas,
 )
 from app.services.cliente_alertas_pdv import normalizar_alertas_pdv
+from app.utils.tenant_safe_sql import execute_tenant_safe
 
 logger = logging.getLogger(__name__)
 
@@ -1317,29 +1318,35 @@ def update_cliente(
             from sqlalchemy import text
             
             # Contar comissÃµes ativas antes de desativar
-            result = db.execute(
-                text("""
+            result = execute_tenant_safe(
+                db,
+                """
                     SELECT COUNT(*) 
                     FROM comissoes_configuracao 
                     WHERE funcionario_id = :funcionario_id 
                     AND (ativo = 1 OR ativo IS NULL)
-                """),
-                {"funcionario_id": cliente_id}
+                    AND {tenant_filter}
+                """,
+                {"funcionario_id": cliente_id},
+                tenant_id=tenant_id,
             )
             comissoes_desativadas_count = result.fetchone()[0]
             
             # Desativar comissÃµes (preservando histÃ³rico)
             if comissoes_desativadas_count > 0:
-                db.execute(
-                    text("""
+                execute_tenant_safe(
+                    db,
+                    """
                         UPDATE comissoes_configuracao 
                         SET ativo = 0,
                             data_atualizacao = CURRENT_TIMESTAMP,
                             usuario_atualizacao = :usuario_id
                         WHERE funcionario_id = :funcionario_id 
                         AND (ativo = 1 OR ativo IS NULL)
-                    """),
-                    {"funcionario_id": cliente_id, "usuario_id": current_user.id}
+                        AND {tenant_filter}
+                    """,
+                    {"funcionario_id": cliente_id, "usuario_id": current_user.id},
+                    tenant_id=tenant_id,
                 )
     
     # Salvar estado antigo para auditoria
