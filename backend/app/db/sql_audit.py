@@ -220,6 +220,7 @@ TENANT_TABLES = {
     # Relatórios
     "dre_lancamentos",
     "dre_plano_contas",
+    "indices_mercado",
 }
 
 # Tabelas de sistema que NÃO precisam de tenant_filter
