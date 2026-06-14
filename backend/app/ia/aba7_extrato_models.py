@@ -6,7 +6,7 @@ Referência: ROADMAP_IA_AMBICOES.md (linhas 1-250)
 NOTA: CategoriaFinanceira já existe em financeiro_models.py e será estendida via migração
 """
 
-from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, ForeignKey, JSON, Numeric
+from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, ForeignKey, JSON, Numeric, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from app.db import Base
@@ -200,9 +200,12 @@ class ConfiguracaoTributaria(BaseTenantModel):
     Usado para cálculo automático de impostos na DRE.
     """
     __tablename__ = 'configuracao_tributaria'
+    __table_args__ = (
+        UniqueConstraint("tenant_id", name="uq_configuracao_tributaria_tenant_id"),
+    )
     
     id = Column(Integer, primary_key=True, index=True)
-    usuario_id = Column(Integer, ForeignKey('users.id'), nullable=False, unique=True)
+    usuario_id = Column(Integer, ForeignKey('users.id'), nullable=False)
     
     # Regime tributário
     regime = Column(String(50), nullable=False)  # 'simples_nacional', 'lucro_presumido', 'lucro_real', 'mei'

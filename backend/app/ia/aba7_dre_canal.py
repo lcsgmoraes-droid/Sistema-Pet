@@ -141,7 +141,7 @@ class DRECanalService:
         from app.ia.aba7_tributacao import CalculadoraTributaria
         calculadora_impostos = CalculadoraTributaria(self.db)
         resultado_impostos = calculadora_impostos.calcular_impostos(
-            usuario_id=usuario_id,
+            tenant_id=tenant_id_para_escrita_dre(self.db, usuario_id),
             receita_bruta=receita_bruta,
             receita_liquida=receita_liquida,
             lucro_operacional=lucro_operacional

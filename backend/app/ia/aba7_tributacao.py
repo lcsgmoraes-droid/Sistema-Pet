@@ -4,6 +4,7 @@ Suporta: Simples Nacional, Lucro Presumido, Lucro Real, MEI
 """
 
 from typing import Dict, Optional, Tuple
+from types import SimpleNamespace
 from sqlalchemy.orm import Session
 from datetime import date
 
@@ -16,17 +17,17 @@ class CalculadoraTributaria:
     def __init__(self, db: Session):
         self.db = db
     
-    def obter_configuracao(self, usuario_id: int) -> Optional[ConfiguracaoTributaria]:
+    def obter_configuracao(self, tenant_id) -> Optional[ConfiguracaoTributaria]:
         """Busca configuração tributária do usuário"""
         return (
             self.db.query(ConfiguracaoTributaria)
-            .filter(ConfiguracaoTributaria.usuario_id == usuario_id)
+            .filter(ConfiguracaoTributaria.tenant_id == tenant_id)
             .first()
         )
     
     def calcular_impostos(
         self,
-        usuario_id: int,
+        tenant_id,
         receita_bruta: float,
         receita_liquida: float,
         lucro_operacional: float
@@ -50,7 +51,7 @@ class CalculadoraTributaria:
                 'regime': str
             }
         """
-        config = self.obter_configuracao(usuario_id)
+        config = self.obter_configuracao(tenant_id=tenant_id)
         
         if not config:
             # Sem configuração, estima 8% (Simples Nacional médio)
@@ -254,15 +255,19 @@ class CalculadoraTributaria:
     
     def salvar_configuracao(
         self,
-        usuario_id: int,
+        tenant_id,
+        user_id: int,
         regime: str,
         **kwargs
     ) -> ConfiguracaoTributaria:
         """Cria ou atualiza configuração tributária"""
-        config = self.obter_configuracao(usuario_id)
+        config = self.obter_configuracao(tenant_id=tenant_id)
         
         if not config:
-            config = ConfiguracaoTributaria(usuario_id=usuario_id)
+            config = ConfiguracaoTributaria(
+                tenant_id=tenant_id,
+                usuario_id=user_id,
+            )
             self.db.add(config)
         
         # Atualizar campos
@@ -305,10 +310,31 @@ class CalculadoraTributaria:
         self.db.commit()
         self.db.refresh(config)
         return config
+
+    def _configuracao_simulada(self, config, regime: str) -> SimpleNamespace:
+        """Copia a configuracao para simular regime sem alterar a linha persistida."""
+        campos = (
+            "anexo_simples",
+            "faixa_simples",
+            "aliquota_efetiva_simples",
+            "presuncao_lucro_percentual",
+            "aliquota_irpj",
+            "aliquota_adicional_irpj",
+            "aliquota_csll",
+            "aliquota_pis",
+            "aliquota_cofins",
+            "incluir_icms_dre",
+            "incluir_iss_dre",
+            "aliquota_icms",
+            "aliquota_iss",
+        )
+        dados = {campo: getattr(config, campo, None) for campo in campos}
+        dados["regime"] = regime
+        return SimpleNamespace(**dados)
     
     def estimar_economia_regime(
         self,
-        usuario_id: int,
+        tenant_id,
         receita_bruta: float,
         lucro_operacional: float
     ) -> Dict:
@@ -324,35 +350,42 @@ class CalculadoraTributaria:
                 'economia_anual_estimada': 2400
             }
         """
-        config = self.obter_configuracao(usuario_id)
+        config = self.obter_configuracao(tenant_id=tenant_id)
+        regime_atual = config.regime if config else None
         
         if not config:
             # Criar config temporária com valores padrão
-            config = ConfiguracaoTributaria(
-                usuario_id=usuario_id,
+            config = SimpleNamespace(
                 regime='simples_nacional',
+                anexo_simples=None,
+                faixa_simples=None,
                 aliquota_efetiva_simples=8.54,
                 presuncao_lucro_percentual=8.0,
                 aliquota_irpj=0.15,
+                aliquota_adicional_irpj=0.10,
                 aliquota_csll=0.09,
                 aliquota_pis=0.0065,
-                aliquota_cofins=0.03
+                aliquota_cofins=0.03,
+                incluir_icms_dre=False,
+                incluir_iss_dre=False,
+                aliquota_icms=None,
+                aliquota_iss=None,
             )
         
         # Simular cada regime
-        config_temp = config
-        
-        # Simples Nacional
-        config_temp.regime = 'simples_nacional'
-        simples = self._calcular_simples_nacional(config_temp, receita_bruta)
-        
-        # Lucro Presumido
-        config_temp.regime = 'lucro_presumido'
-        presumido = self._calcular_lucro_presumido(config_temp, receita_bruta)
-        
-        # Lucro Real
-        config_temp.regime = 'lucro_real'
-        real = self._calcular_lucro_real(config_temp, receita_bruta, lucro_operacional)
+        simples = self._calcular_simples_nacional(
+            self._configuracao_simulada(config, 'simples_nacional'),
+            receita_bruta,
+        )
+        presumido = self._calcular_lucro_presumido(
+            self._configuracao_simulada(config, 'lucro_presumido'),
+            receita_bruta,
+        )
+        real = self._calcular_lucro_real(
+            self._configuracao_simulada(config, 'lucro_real'),
+            receita_bruta,
+            lucro_operacional,
+        )
         
         # Encontrar o melhor
         opcoes = {
@@ -383,5 +416,5 @@ class CalculadoraTributaria:
             'recomendacao': melhor_regime,
             'economia_mensal_estimada': economia_mensal,
             'economia_anual_estimada': economia_anual,
-            'regime_atual': config.regime if self.obter_configuracao(usuario_id) else None
+            'regime_atual': regime_atual
         }
