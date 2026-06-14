@@ -576,7 +576,7 @@ def reenviar_email(
         raise HTTPException(status_code=404, detail="Email não encontrado")
     
     try:
-        resultado = EmailQueueService.reenviar_email(db, email_id)
+        resultado = EmailQueueService.reenviar_email(db, email_id, tenant_id=tenant_id)
         return resultado
     except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
@@ -594,7 +594,7 @@ def processar_fila_manual(
     current_user, tenant_id = user_and_tenant
     
     try:
-        resultado = EmailQueueService.processar_fila(db, limite=limite)
+        resultado = EmailQueueService.processar_fila(db, limite=limite, tenant_id=tenant_id)
         return {
             "sucesso": True,
             "processados": resultado['processados'],
