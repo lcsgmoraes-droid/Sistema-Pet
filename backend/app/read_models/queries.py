@@ -15,7 +15,7 @@ import logging
 from datetime import date, datetime, timedelta
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, func
+from sqlalchemy import desc, func, inspect, text
 
 from .models import VendasResumoDiario, PerformanceParceiro, ReceitaMensal
 
@@ -462,10 +462,18 @@ def verificar_saude_read_models(db: Session) -> Dict[str, Any]:
         Exception: Se houver problema ao acessar read models
     """
     try:
-        # Testa acesso a cada read model
-        db.query(VendasResumoDiario).first()
-        db.query(ReceitaMensal).first()
-        db.query(PerformanceParceiro).first()
+        db.execute(text("SELECT 1"))
+
+        inspector = inspect(db.get_bind())
+        missing_tables = [
+            model.__tablename__
+            for model in (VendasResumoDiario, ReceitaMensal, PerformanceParceiro)
+            if not inspector.has_table(model.__tablename__)
+        ]
+        if missing_tables:
+            raise RuntimeError(
+                f"Read models ausentes no schema: {', '.join(missing_tables)}"
+            )
         
         logger.info("✅ Health check: Read models acessíveis")
         
