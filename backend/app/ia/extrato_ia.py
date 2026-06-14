@@ -20,8 +20,9 @@ class MotorCategorizacaoIA:
     Motor de categorização automática com aprendizado.
     """
     
-    def __init__(self, db: Session):
+    def __init__(self, db: Session, tenant_id):
         self.db = db
+        self.tenant_id = tenant_id
         self.nlp = ExtratoNLP()
     
     def categorizar_transacao(
@@ -67,8 +68,9 @@ class MotorCategorizacaoIA:
         # Buscar alternativas
         alternativas = []
         for padrao in padroes[1:4]:  # Top 3 alternativas
-            categoria = self.db.query(CategoriaFinanceira).filter_by(
-                id=padrao.categoria_financeira_id
+            categoria = self.db.query(CategoriaFinanceira).filter(
+                CategoriaFinanceira.tenant_id == self.tenant_id,
+                CategoriaFinanceira.id == padrao.categoria_financeira_id
             ).first()
             
             if categoria:
@@ -101,6 +103,7 @@ class MotorCategorizacaoIA:
         Ordena por confiança decrescente.
         """
         query = self.db.query(PadraoCategoriacaoIA).filter(
+            PadraoCategoriacaoIA.tenant_id == self.tenant_id,
             PadraoCategoriacaoIA.ativo == True,
             PadraoCategoriacaoIA.tipo_lancamento == tipo_lancamento
         )
@@ -203,6 +206,7 @@ class MotorCategorizacaoIA:
         if categoria_sugerida:
             # Buscar categoria por grupo DRE
             categoria = self.db.query(CategoriaFinanceira).filter(
+                CategoriaFinanceira.tenant_id == self.tenant_id,
                 CategoriaFinanceira.grupo_dre == categoria_sugerida,
                 CategoriaFinanceira.tipo == tipo
             ).first()
@@ -221,6 +225,7 @@ class MotorCategorizacaoIA:
         palavras = dados_nlp.get('palavras_chave', [])
         if palavras:
             categorias = self.db.query(CategoriaFinanceira).filter(
+                CategoriaFinanceira.tenant_id == self.tenant_id,
                 CategoriaFinanceira.tipo == tipo,
                 CategoriaFinanceira.palavras_chave.isnot(None)
             ).all()
@@ -287,8 +292,9 @@ class MotorCategorizacaoIA:
         """
         Validação humana: atualiza padrões e confiança.
         """
-        lancamento = self.db.query(LancamentoImportado).filter_by(
-            id=lancamento_id
+        lancamento = self.db.query(LancamentoImportado).filter(
+            LancamentoImportado.tenant_id == self.tenant_id,
+            LancamentoImportado.id == lancamento_id
         ).first()
         
         if not lancamento:
@@ -321,7 +327,10 @@ class MotorCategorizacaoIA:
     
     def _incrementar_acerto(self, padrao_id: int):
         """Incrementa contador de acertos e atualiza confiança."""
-        padrao = self.db.query(PadraoCategoriacaoIA).filter_by(id=padrao_id).first()
+        padrao = self.db.query(PadraoCategoriacaoIA).filter(
+            PadraoCategoriacaoIA.tenant_id == self.tenant_id,
+            PadraoCategoriacaoIA.id == padrao_id,
+        ).first()
         if padrao:
             padrao.total_aplicacoes += 1
             padrao.total_acertos += 1
@@ -330,7 +339,10 @@ class MotorCategorizacaoIA:
     
     def _incrementar_erro(self, padrao_id: int):
         """Incrementa contador de erros e atualiza confiança."""
-        padrao = self.db.query(PadraoCategoriacaoIA).filter_by(id=padrao_id).first()
+        padrao = self.db.query(PadraoCategoriacaoIA).filter(
+            PadraoCategoriacaoIA.tenant_id == self.tenant_id,
+            PadraoCategoriacaoIA.id == padrao_id,
+        ).first()
         if padrao:
             padrao.total_aplicacoes += 1
             padrao.total_erros += 1
@@ -350,8 +362,9 @@ class MotorCategorizacaoIA:
         """
         Cria novo padrão a partir de validação humana.
         """
-        categoria = self.db.query(CategoriaFinanceira).filter_by(
-            id=categoria_id
+        categoria = self.db.query(CategoriaFinanceira).filter(
+            CategoriaFinanceira.tenant_id == self.tenant_id,
+            CategoriaFinanceira.id == categoria_id
         ).first()
         
         if not categoria:
@@ -359,6 +372,7 @@ class MotorCategorizacaoIA:
         
         # Verificar se já existe padrão similar
         padroes_existentes = self.db.query(PadraoCategoriacaoIA).filter(
+            PadraoCategoriacaoIA.tenant_id == self.tenant_id,
             PadraoCategoriacaoIA.categoria_financeira_id == categoria_id,
             PadraoCategoriacaoIA.tipo_lancamento == lancamento.tipo
         ).all()
@@ -385,6 +399,8 @@ class MotorCategorizacaoIA:
         
         # Criar novo padrão
         novo_padrao = PadraoCategoriacaoIA(
+            tenant_id=self.tenant_id,
+            usuario_id=lancamento.usuario_id,
             tipo_transacao=lancamento.tipo_transacao,
             beneficiario_pattern=lancamento.beneficiario_extraido,
             cnpj_cpf=lancamento.cnpj_cpf_extraido,
@@ -428,16 +444,23 @@ class MotorCategorizacaoIA:
         """
         Retorna estatísticas do sistema de IA.
         """
-        total_padroes = self.db.query(func.count(PadraoCategoriacaoIA.id)).scalar()
+        total_padroes = self.db.query(func.count(PadraoCategoriacaoIA.id)).filter(
+            PadraoCategoriacaoIA.tenant_id == self.tenant_id
+        ).scalar()
         padroes_ativos = self.db.query(func.count(PadraoCategoriacaoIA.id)).filter(
+            PadraoCategoriacaoIA.tenant_id == self.tenant_id,
             PadraoCategoriacaoIA.ativo == True
         ).scalar()
         
-        total_lancamentos = self.db.query(func.count(LancamentoImportado.id)).scalar()
+        total_lancamentos = self.db.query(func.count(LancamentoImportado.id)).filter(
+            LancamentoImportado.tenant_id == self.tenant_id
+        ).scalar()
         aprovados = self.db.query(func.count(LancamentoImportado.id)).filter(
+            LancamentoImportado.tenant_id == self.tenant_id,
             LancamentoImportado.status_validacao == 'aprovado'
         ).scalar()
         pendentes = self.db.query(func.count(LancamentoImportado.id)).filter(
+            LancamentoImportado.tenant_id == self.tenant_id,
             LancamentoImportado.status_validacao == 'pendente'
         ).scalar()
         
@@ -445,16 +468,17 @@ class MotorCategorizacaoIA:
         confianca_media = self.db.query(
             func.avg(PadraoCategoriacaoIA.confianca_atual)
         ).filter(
+            PadraoCategoriacaoIA.tenant_id == self.tenant_id,
             PadraoCategoriacaoIA.ativo == True
         ).scalar() or 0.0
         
         # Taxa de acerto global
         total_aplicacoes = self.db.query(
             func.sum(PadraoCategoriacaoIA.total_aplicacoes)
-        ).scalar() or 0
+        ).filter(PadraoCategoriacaoIA.tenant_id == self.tenant_id).scalar() or 0
         total_acertos = self.db.query(
             func.sum(PadraoCategoriacaoIA.total_acertos)
-        ).scalar() or 0
+        ).filter(PadraoCategoriacaoIA.tenant_id == self.tenant_id).scalar() or 0
         
         taxa_acerto_global = total_acertos / total_aplicacoes if total_aplicacoes > 0 else 0.0
         

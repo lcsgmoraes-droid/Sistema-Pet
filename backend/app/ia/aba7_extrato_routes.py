@@ -10,7 +10,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime
 
-from app.auth import get_current_user_and_tenant, get_current_user
+from app.auth import get_current_user_and_tenant
 from app.db import get_session as get_db
 from app.ia.extrato_service import ServicoImportacaoExtrato
 from app.ia.extrato_ia import MotorCategorizacaoIA
@@ -129,6 +129,7 @@ async def upload_extrato(
         resultado = servico.importar_extrato(
             arquivo=conteudo,
             nome_arquivo=arquivo.filename,
+            user_id=current_user.id,
             tenant_id=tenant_id,
             conta_bancaria_id=conta_bancaria_id
         )
@@ -174,7 +175,7 @@ def validar_lancamento(
     """
     current_user, tenant_id = user_and_tenant
     try:
-        ia = MotorCategorizacaoIA(db)
+        ia = MotorCategorizacaoIA(db, tenant_id=tenant_id)
         ia.validar_categorizacao(
             lancamento_id=request.lancamento_id,
             aprovado=request.aprovado,
@@ -189,17 +190,18 @@ def validar_lancamento(
 def validar_lote(
     request: ValidacaoLoteRequest,
     db: Session = Depends(get_db),
-    current_user = Depends(get_current_user)
+    user_and_tenant=Depends(get_current_user_and_tenant)
 ):
     """
     Valida múltiplos lançamentos de uma vez.
     Útil para aprovar todas sugestões com alta confiança.
     """
+    current_user, tenant_id = user_and_tenant
     try:
         servico = ServicoImportacaoExtrato(db)
         servico.validar_lote(
             lancamento_ids=request.lancamento_ids,
-            user_id=current_user.id,
+            tenant_id=tenant_id,
             aprovar=request.aprovar
         )
         return {
@@ -222,7 +224,9 @@ def listar_padroes(
     Permite gerenciar (editar, desativar) padrões.
     """
     current_user, tenant_id = user_and_tenant
-    query = db.query(PadraoCategoriacaoIA)
+    query = db.query(PadraoCategoriacaoIA).filter(
+        PadraoCategoriacaoIA.tenant_id == tenant_id
+    )
     
     if apenas_ativos:
         query = query.filter(PadraoCategoriacaoIA.ativo == True)
@@ -268,7 +272,10 @@ def ativar_desativar_padrao(
     Ativa ou desativa um padrão de categorização.
     """
     current_user, tenant_id = user_and_tenant
-    padrao = db.query(PadraoCategoriacaoIA).filter_by(id=padrao_id).first()
+    padrao = db.query(PadraoCategoriacaoIA).filter(
+        PadraoCategoriacaoIA.tenant_id == tenant_id,
+        PadraoCategoriacaoIA.id == padrao_id,
+    ).first()
     
     if not padrao:
         raise HTTPException(status_code=404, detail="Padrão não encontrado")
@@ -292,7 +299,10 @@ def deletar_padrao(
     Deleta um padrão de categorização.
     """
     current_user, tenant_id = user_and_tenant
-    padrao = db.query(PadraoCategoriacaoIA).filter_by(id=padrao_id).first()
+    padrao = db.query(PadraoCategoriacaoIA).filter(
+        PadraoCategoriacaoIA.tenant_id == tenant_id,
+        PadraoCategoriacaoIA.id == padrao_id,
+    ).first()
     
     if not padrao:
         raise HTTPException(status_code=404, detail="Padrão não encontrado")
@@ -313,7 +323,7 @@ def obter_estatisticas(
     Mostra efetividade do aprendizado.
     """
     current_user, tenant_id = user_and_tenant
-    ia = MotorCategorizacaoIA(db)
+    ia = MotorCategorizacaoIA(db, tenant_id=tenant_id)
     stats = ia.obter_estatisticas()
     return EstatisticasIA(**stats)
 
@@ -346,7 +356,8 @@ def criar_lancamento_manual(
     try:
         servico = ServicoImportacaoExtrato(db)
         lancamento_manual_id = servico.criar_lancamento_financeiro(
-            lancamento_importado_id=lancamento_id
+            lancamento_importado_id=lancamento_id,
+            tenant_id=tenant_id
         )
         return {
             "success": True,
