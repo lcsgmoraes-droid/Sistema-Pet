@@ -8,10 +8,25 @@ import logging
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 from app.db import SessionLocal
-from app.utils.tenant_safe_sql import execute_tenant_safe
+from app.tenancy.context import get_current_tenant_id
+from app.utils.tenant_safe_sql import TenantSafeSQLError, execute_tenant_safe
 
 # Logger
 logger = logging.getLogger(__name__)
+
+
+def _require_tenant_id(tenant_id=None):
+    resolved_tenant_id = tenant_id if tenant_id is not None else get_current_tenant_id()
+    if resolved_tenant_id is None or resolved_tenant_id == "":
+        raise TenantSafeSQLError(
+            "tenant_id ausente em comissoes_models. Informe tenant_id ou configure "
+            "app.tenancy.context antes de acessar configuracoes de comissao."
+        )
+    return resolved_tenant_id
+
+
+def _row_to_dict(row) -> Dict[str, Any]:
+    return dict(row._mapping) if hasattr(row, "_mapping") else dict(row)
 
 
 class ComissoesConfig:
@@ -59,8 +74,8 @@ class ComissoesConfig:
             db.close()
     
     @staticmethod
-    def buscar_configuracao(funcionario_id: int, produto_id: int, categoria_id: int = None, 
-                           subcategoria_id: int = None) -> Optional[Dict[str, Any]]:
+    def buscar_configuracao(funcionario_id: int, produto_id: int, categoria_id: int = None,
+                           subcategoria_id: int = None, tenant_id=None) -> Optional[Dict[str, Any]]:
         """
         Busca configuração de comissão aplicável para um produto
         Segue hierarquia: Produto > Subcategoria > Categoria > Regra geral
@@ -74,77 +89,86 @@ class ComissoesConfig:
         Returns:
             Configuração encontrada ou None
         """
+        tenant_id = _require_tenant_id(tenant_id)
         db = SessionLocal()
         try:
             # 1. Tentar buscar por produto específico
-            result = db.execute(
+            result = execute_tenant_safe(db,
                 text('''
                     SELECT * FROM comissoes_configuracao
                     WHERE funcionario_id = :funcionario_id 
                     AND tipo = 'produto' 
                     AND referencia_id = :produto_id
                     AND ativo = 1
+                    AND {tenant_filter}
                     LIMIT 1
                 '''),
-                {"funcionario_id": funcionario_id, "produto_id": produto_id}
+                {"funcionario_id": funcionario_id, "produto_id": produto_id},
+                tenant_id=tenant_id,
             )
             
             config = result.fetchone()
             if config:
-                return dict(config)
+                return _row_to_dict(config)
             
             # 2. Tentar buscar por subcategoria
             if subcategoria_id:
-                result = db.execute(
+                result = execute_tenant_safe(db,
                     text('''
                         SELECT * FROM comissoes_configuracao
                         WHERE funcionario_id = :funcionario_id 
                         AND tipo = 'subcategoria' 
                         AND referencia_id = :subcategoria_id
                         AND ativo = 1
+                        AND {tenant_filter}
                         LIMIT 1
                     '''),
-                    {"funcionario_id": funcionario_id, "subcategoria_id": subcategoria_id}
+                    {"funcionario_id": funcionario_id, "subcategoria_id": subcategoria_id},
+                    tenant_id=tenant_id,
                 )
                 
                 config = result.fetchone()
                 if config:
-                    return dict(config)
+                    return _row_to_dict(config)
             
             # 3. Tentar buscar por categoria
             if categoria_id:
-                result = db.execute(
+                result = execute_tenant_safe(db,
                     text('''
                         SELECT * FROM comissoes_configuracao
                         WHERE funcionario_id = :funcionario_id 
                         AND tipo = 'categoria' 
                         AND referencia_id = :categoria_id
                         AND ativo = 1
+                        AND {tenant_filter}
                         LIMIT 1
                     '''),
-                    {"funcionario_id": funcionario_id, "categoria_id": categoria_id}
+                    {"funcionario_id": funcionario_id, "categoria_id": categoria_id},
+                    tenant_id=tenant_id,
                 )
                 
                 config = result.fetchone()
                 if config:
-                    return dict(config)
+                    return _row_to_dict(config)
 
             # 4. Tentar buscar regra geral do funcionario
-            result = db.execute(
+            result = execute_tenant_safe(db,
                 text('''
                     SELECT * FROM comissoes_configuracao
                     WHERE funcionario_id = :funcionario_id
                     AND tipo = 'geral'
                     AND referencia_id = 0
                     AND ativo = 1
+                    AND {tenant_filter}
                     LIMIT 1
                 '''),
-                {"funcionario_id": funcionario_id}
+                {"funcionario_id": funcionario_id},
+                tenant_id=tenant_id,
             )
 
             config = result.fetchone()
             if config:
-                return dict(config)
+                return _row_to_dict(config)
             
             return None
         finally:
@@ -223,7 +247,7 @@ class ComissoesConfig:
             db.close()
     
     @staticmethod
-    def deletar(config_id: int) -> bool:
+    def deletar(config_id: int, tenant_id=None) -> bool:
         """
         Deleta (desativa) uma configuração de comissão
         
@@ -233,16 +257,14 @@ class ComissoesConfig:
         Returns:
             True se deletou com sucesso
         """
-        from .db import SessionLocal
-        from sqlalchemy import text
-        
+        tenant_id = _require_tenant_id(tenant_id)
         db = SessionLocal()
         try:
             result = execute_tenant_safe(db, """
                 UPDATE comissoes_configuracao SET ativo = false
                 WHERE id = :config_id
                 AND {tenant_filter}
-            """, {'config_id': config_id})
+            """, {'config_id': config_id}, tenant_id=tenant_id)
             
             success = result.rowcount > 0
             db.commit()
@@ -253,7 +275,7 @@ class ComissoesConfig:
     
     @staticmethod
     def duplicar_configuracao(funcionario_origem_id: int, funcionario_destino_id: int,
-                            usuario_id: int = None) -> int:
+                            usuario_id: int = None, tenant_id=None) -> int:
         """
         Duplica todas as configurações de um funcionário para outro
         
@@ -265,33 +287,37 @@ class ComissoesConfig:
         Returns:
             Quantidade de configurações duplicadas
         """
+        tenant_id = _require_tenant_id(tenant_id)
         db = SessionLocal()
         try:
             # Buscar todas as configs do funcionário origem
-            result = db.execute(
+            result = execute_tenant_safe(db,
                 text('''
                     SELECT * FROM comissoes_configuracao
                     WHERE funcionario_id = :funcionario_origem_id AND ativo = 1
+                    AND {tenant_filter}
                 '''),
-                {"funcionario_origem_id": funcionario_origem_id}
+                {"funcionario_origem_id": funcionario_origem_id},
+                tenant_id=tenant_id,
             )
             
             configs = result.fetchall()
             count = 0
             
-            for config in configs:
+            for row in configs:
+                config = _row_to_dict(row)
                 try:
-                    db.execute(
+                    execute_tenant_safe(db,
                         text('''
                             INSERT INTO comissoes_configuracao (
                                 funcionario_id, tipo, referencia_id, tipo_calculo, percentual,
                                 percentual_loja, desconta_taxa_cartao, desconta_impostos,
                                 desconta_taxa_entrega, permite_edicao_venda, observacoes,
-                                usuario_criacao
+                                usuario_criacao, tenant_id
                             ) VALUES (:funcionario_destino_id, :tipo, :referencia_id, :tipo_calculo, :percentual,
                                      :percentual_loja, :desconta_taxa_cartao, :desconta_impostos,
                                      :desconta_taxa_entrega, :permite_edicao_venda, :observacoes,
-                                     :usuario_id)
+                                     :usuario_id, :tenant_id)
                         '''),
                         {
                             "funcionario_destino_id": funcionario_destino_id,
@@ -305,8 +331,11 @@ class ComissoesConfig:
                             "desconta_taxa_entrega": config['desconta_taxa_entrega'],
                             "permite_edicao_venda": config['permite_edicao_venda'],
                             "observacoes": f"Duplicado de funcionário {funcionario_origem_id}",
-                            "usuario_id": usuario_id
-                        }
+                            "usuario_id": usuario_id,
+                            "tenant_id": tenant_id,
+                        },
+                        tenant_id=tenant_id,
+                        require_tenant=False,
                     )
                     count += 1
                 except IntegrityError:
@@ -513,12 +542,11 @@ from app.db import Base
 from app.base_models import TenantScoped
 
 
-class ComissaoConfiguracao(Base):
+class ComissaoConfiguracao(TenantScoped, Base):
     """
     Configuração de percentuais de comissão por funcionário.
-    Define regras de cálculo (tipo: categoria, produto, serviço, etc.)
-    
-    ⚠️ NOTA: Esta tabela NÃO possui tenant_id no schema original
+    Define regras de cálculo (tipo: categoria, produto, serviço, etc.).
+    tenant_id vem do mixin TenantScoped; migrations legadas fazem o backfill via cliente.
     """
     __tablename__ = "comissoes_configuracao"
     __table_args__ = {'extend_existing': True}

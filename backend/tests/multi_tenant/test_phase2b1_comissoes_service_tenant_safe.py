@@ -1,4 +1,5 @@
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 from sqlalchemy import create_engine, text
@@ -453,3 +454,52 @@ def test_mesmo_funcionario_e_referencia_em_tenants_diferentes_nao_cruza_config(d
 
     assert float(config_a["percentual"]) == pytest.approx(10.0)
     assert float(config_b["percentual"]) == pytest.approx(90.0)
+
+
+def test_comissao_configuracao_model_declares_tenant_id():
+    from app.comissoes_models import ComissaoConfiguracao
+
+    assert "tenant_id" in ComissaoConfiguracao.__table__.columns
+
+
+def test_legacy_comissoes_config_busca_respeita_tenant_explicito(db_session, monkeypatch):
+    import app.comissoes_models as comissoes_models
+
+    monkeypatch.setattr(db_session, "close", lambda: None)
+    monkeypatch.setattr(comissoes_models, "SessionLocal", lambda: db_session)
+
+    config_a = comissoes_models.ComissoesConfig.buscar_configuracao(
+        FUNCIONARIO_ID,
+        PRODUTO_ID,
+        tenant_id=TENANT_A,
+    )
+    config_b = comissoes_models.ComissoesConfig.buscar_configuracao(
+        FUNCIONARIO_ID,
+        PRODUTO_ID,
+        tenant_id=TENANT_B,
+    )
+
+    assert float(config_a["percentual"]) == pytest.approx(10.0)
+    assert float(config_b["percentual"]) == pytest.approx(90.0)
+
+
+def _method_source(source: str, method_name: str, next_marker: str) -> str:
+    start = source.index(f"def {method_name}")
+    end = source.index(next_marker, start)
+    return source[start:end]
+
+
+def test_legacy_comissoes_config_route_methods_use_tenant_safe_sql():
+    source = (
+        Path(__file__).resolve().parents[2] / "app" / "comissoes_models.py"
+    ).read_text(encoding="utf-8")
+
+    route_method_blocks = [
+        _method_source(source, "buscar_configuracao", "def criar_ou_atualizar"),
+        _method_source(source, "deletar", "def duplicar_configuracao"),
+        _method_source(source, "duplicar_configuracao", "class ComissoesItens"),
+    ]
+    for method_block in route_method_blocks:
+        assert "tenant_id" in method_block
+        assert "execute_tenant_safe" in method_block
+        assert "db.execute(" not in method_block

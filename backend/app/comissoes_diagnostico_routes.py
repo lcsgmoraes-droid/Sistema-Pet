@@ -512,9 +512,9 @@ async def diagnosticar_venda_especifica(
                     ELSE 'Global'
                 END as referencia_nome
             FROM comissoes_configuracao cc
-            LEFT JOIN produtos p ON cc.tipo = 'produto' AND cc.referencia_id = p.id
-            LEFT JOIN categorias c ON cc.tipo = 'categoria' AND cc.referencia_id = c.id
-            WHERE cc.funcionario_id = :func_id AND {tenant_filter}
+            LEFT JOIN produtos p ON cc.tipo = 'produto' AND cc.referencia_id = p.id AND p.tenant_id = cc.tenant_id
+            LEFT JOIN categorias c ON cc.tipo = 'categoria' AND cc.referencia_id = c.id AND c.tenant_id = cc.tenant_id
+            WHERE cc.funcionario_id = :func_id AND cc.{tenant_filter}
         """, {'func_id': venda_info['funcionario_id']})
         
         for row in result_config.fetchall():
