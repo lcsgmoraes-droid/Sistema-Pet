@@ -50,6 +50,7 @@ TENANT_SCOPED_TABLES = {
     "dre_comparacoes",
     "dre_insights",
     "dre_lancamentos",
+    "dre_periodos",
     "dre_plano_contas",
     "dre_produtos",
     "dre_subcategorias",
