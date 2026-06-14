@@ -214,6 +214,8 @@ TENANT_TABLES = {
     "whatsapp_messages",
     "whatsapp_contacts",
     "conversas_ia",
+    "mensagens_chat",
+    "contexto_financeiro_chat",
     
     # Relatórios
     "dre_lancamentos",
