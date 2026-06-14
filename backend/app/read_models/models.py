@@ -35,7 +35,7 @@ class VendasResumoDiario(BaseTenantModel):
     __tablename__ = 'read_vendas_resumo_diario'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    data = Column(Date, nullable=False, unique=True, index=True)
+    data = Column(Date, nullable=False, index=True)
     
     # Métricas agregadas
     quantidade_aberta = Column(Integer, default=0)
@@ -51,7 +51,7 @@ class VendasResumoDiario(BaseTenantModel):
     
     # Índice para otimizar consultas por período
     __table_args__ = (
-        Index('idx_vendas_resumo_data', 'data'),
+        Index('uq_read_vendas_resumo_tenant_data', 'tenant_id', 'data', unique=True),
     )
     
     def calcular_ticket_medio(self):
@@ -112,8 +112,8 @@ class PerformanceParceiro(BaseTenantModel):
     
     # Índices compostos para otimizar consultas
     __table_args__ = (
-        Index('idx_perf_func_mes', 'funcionario_id', 'mes_referencia'),
-        Index('idx_perf_mes_ranking', 'mes_referencia', 'ranking_mes'),
+        Index('uq_read_perf_tenant_func_mes', 'tenant_id', 'funcionario_id', 'mes_referencia', unique=True),
+        Index('idx_perf_tenant_mes_ranking', 'tenant_id', 'mes_referencia', 'ranking_mes'),
     )
     
     def calcular_metricas(self):
@@ -163,7 +163,7 @@ class ReceitaMensal(BaseTenantModel):
     __tablename__ = 'read_receita_mensal'
     
     id = Column(Integer, primary_key=True, autoincrement=True)
-    mes_referencia = Column(Date, nullable=False, unique=True, index=True)  # Primeiro dia do mês
+    mes_referencia = Column(Date, nullable=False, index=True)  # Primeiro dia do mês
     
     # Métricas financeiras
     receita_bruta = Column(DECIMAL(12, 2), default=0)
@@ -183,7 +183,7 @@ class ReceitaMensal(BaseTenantModel):
     
     # Índice para ordenação cronológica
     __table_args__ = (
-        Index('idx_receita_mes', 'mes_referencia'),
+        Index('uq_read_receita_tenant_mes', 'tenant_id', 'mes_referencia', unique=True),
     )
     
     def calcular_metricas(self):

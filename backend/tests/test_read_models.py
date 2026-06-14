@@ -14,6 +14,7 @@ ESTRATÉGIA:
 import pytest
 from datetime import date, datetime
 from decimal import Decimal
+from uuid import UUID
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -21,6 +22,10 @@ from app.db import Base
 from app.domain.events.venda_events import VendaCriada, VendaFinalizada, VendaCancelada
 from app.read_models.models import VendasResumoDiario, PerformanceParceiro, ReceitaMensal
 from app.read_models.handlers import VendaReadModelHandler
+
+
+TENANT_A = UUID("11111111-1111-1111-1111-111111111111")
+TENANT_B = UUID("22222222-2222-2222-2222-222222222222")
 
 
 # ===== FIXTURES =====
@@ -42,6 +47,12 @@ def db_session(engine):
     session.close()
 
 
+@pytest.fixture(autouse=True)
+def read_models_tenant_context(tenant_context):
+    """Ativa um tenant padrao para os testes legados de read models."""
+    tenant_context(TENANT_A)
+
+
 @pytest.fixture
 def handler(db_session):
     """Cria handler de read models para testes"""
@@ -49,6 +60,60 @@ def handler(db_session):
 
 
 # ===== TESTES DE VENDA CRIADA =====
+
+def test_venda_criada_mantem_resumo_isolado_por_tenant(handler, db_session, tenant_context):
+    """
+    DADO duas lojas diferentes
+    QUANDO uma VendaCriada e processada no mesmo dia para cada loja
+    ENTAO cada tenant deve ter seu proprio resumo diario
+    """
+    hoje = date.today()
+
+    tenant_context(TENANT_A)
+    handler.on_venda_criada(
+        VendaCriada(
+            venda_id=1,
+            numero_venda="VEN-20260614-A",
+            user_id=1,
+            cliente_id=10,
+            funcionario_id=5,
+            total=100.00,
+            quantidade_itens=3,
+            tem_entrega=False,
+        )
+    )
+
+    tenant_context(TENANT_B)
+    handler.on_venda_criada(
+        VendaCriada(
+            venda_id=2,
+            numero_venda="VEN-20260614-B",
+            user_id=2,
+            cliente_id=20,
+            funcionario_id=6,
+            total=200.00,
+            quantidade_itens=2,
+            tem_entrega=False,
+        )
+    )
+
+    tenant_context(TENANT_A)
+    resumo_a = db_session.query(VendasResumoDiario).filter(
+        VendasResumoDiario.data == hoje
+    ).first()
+
+    tenant_context(TENANT_B)
+    resumo_b = db_session.query(VendasResumoDiario).filter(
+        VendasResumoDiario.data == hoje
+    ).first()
+
+    assert resumo_a is not None
+    assert resumo_b is not None
+    assert resumo_a.id != resumo_b.id
+    assert resumo_a.tenant_id == TENANT_A
+    assert resumo_b.tenant_id == TENANT_B
+    assert resumo_a.quantidade_aberta == 1
+    assert resumo_b.quantidade_aberta == 1
 
 def test_evento_venda_criada_atualiza_resumo_diario(handler, db_session):
     """
@@ -466,7 +531,7 @@ def test_multiplos_funcionarios_ranking(handler, db_session):
 
 # ===== TESTES DE ROBUSTEZ =====
 
-def test_handler_nao_falha_em_caso_de_erro(handler, db_session, caplog):
+def test_handler_nao_falha_em_caso_de_erro(handler, db_session, caplog, monkeypatch):
     """
     DADO um handler configurado
     QUANDO ocorre erro no processamento
@@ -476,8 +541,10 @@ def test_handler_nao_falha_em_caso_de_erro(handler, db_session, caplog):
     import logging
     caplog.set_level(logging.ERROR)
     
-    # Forçar erro fechando a sessão
-    db_session.close()
+    def falhar_execute(*args, **kwargs):
+        raise RuntimeError("falha simulada")
+
+    monkeypatch.setattr(db_session, "execute", falhar_execute)
     
     evento = VendaCriada(
         venda_id=999,
@@ -494,7 +561,7 @@ def test_handler_nao_falha_em_caso_de_erro(handler, db_session, caplog):
     handler.on_venda_criada(evento)
     
     # Assert - Erro deve ser logado
-    assert "Erro ao processar VendaCriada" in caplog.text
+    assert "Erro VendaCriada" in caplog.text
 
 
 if __name__ == "__main__":

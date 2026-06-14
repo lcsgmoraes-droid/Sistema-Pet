@@ -15,6 +15,7 @@ import logging
 from datetime import date, datetime
 from decimal import Decimal
 from typing import Optional
+from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
@@ -22,6 +23,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from app.domain.events.venda_events import VendaCriada, VendaFinalizada, VendaCancelada
 from .models import VendasResumoDiario, PerformanceParceiro, ReceitaMensal
 from app.core.side_effects_guard import suppress_in_replay
+from app.tenancy.context import get_current_tenant_id
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +41,14 @@ class VendaReadModelHandler:
     def __init__(self, db: Session):
         self.db = db
         logger.debug("🎯 VendaReadModelHandler (v5.3 idempotente) inicializado")
+
+    def _require_tenant_id(self) -> UUID:
+        tenant_id = get_current_tenant_id()
+        if tenant_id is None:
+            raise RuntimeError(
+                "tenant_id ausente no contexto ao atualizar read models de venda"
+            )
+        return tenant_id if isinstance(tenant_id, UUID) else UUID(str(tenant_id))
     
     def on_venda_criada(self, evento: VendaCriada) -> None:
         """
@@ -49,6 +59,7 @@ class VendaReadModelHandler:
         try:
             logger.info(f"📊 [IDEMPOTENTE] VendaCriada: {evento.venda_id}")
             
+            tenant_id = self._require_tenant_id()
             hoje = date.today()
             
             # Buscar estado atual
@@ -58,6 +69,7 @@ class VendaReadModelHandler:
             
             # Calcular novo estado (idempotente - não usar +=)
             valores = {
+                'tenant_id': tenant_id,
                 'data': hoje,
                 'quantidade_aberta': (resumo_atual.quantidade_aberta if resumo_atual else 0) + 1,
                 'quantidade_finalizada': resumo_atual.quantidade_finalizada if resumo_atual else 0,
@@ -69,7 +81,7 @@ class VendaReadModelHandler:
             # UPSERT
             stmt = sqlite_insert(VendasResumoDiario).values(**valores)
             stmt = stmt.on_conflict_do_update(
-                index_elements=['data'],
+                index_elements=['tenant_id', 'data'],
                 set_={'quantidade_aberta': valores['quantidade_aberta']}
             )
             self.db.execute(stmt)
@@ -166,11 +178,13 @@ class VendaReadModelHandler:
     
     def _upsert_resumo_diario_finalizada(self, data: date, total: Decimal) -> None:
         """UPSERT idempotente para finalização"""
+        tenant_id = self._require_tenant_id()
         resumo_atual = self.db.query(VendasResumoDiario).filter(
             VendasResumoDiario.data == data
         ).first()
         
         valores = {
+            'tenant_id': tenant_id,
             'data': data,
             'quantidade_aberta': max(0, (resumo_atual.quantidade_aberta if resumo_atual else 1) - 1),
             'quantidade_finalizada': (resumo_atual.quantidade_finalizada if resumo_atual else 0) + 1,
@@ -187,7 +201,7 @@ class VendaReadModelHandler:
         
         stmt = sqlite_insert(VendasResumoDiario).values(**valores)
         stmt = stmt.on_conflict_do_update(
-            index_elements=['data'],
+            index_elements=['tenant_id', 'data'],
             set_={
                 'quantidade_aberta': valores['quantidade_aberta'],
                 'quantidade_finalizada': valores['quantidade_finalizada'],
@@ -199,11 +213,13 @@ class VendaReadModelHandler:
     
     def _upsert_resumo_diario_cancelada(self, data: date, total: Decimal) -> None:
         """UPSERT idempotente para cancelamento"""
+        tenant_id = self._require_tenant_id()
         resumo_atual = self.db.query(VendasResumoDiario).filter(
             VendasResumoDiario.data == data
         ).first()
         
         valores = {
+            'tenant_id': tenant_id,
             'data': data,
             'quantidade_aberta': resumo_atual.quantidade_aberta if resumo_atual else 0,
             'quantidade_finalizada': resumo_atual.quantidade_finalizada if resumo_atual else 0,
@@ -214,7 +230,7 @@ class VendaReadModelHandler:
         
         stmt = sqlite_insert(VendasResumoDiario).values(**valores)
         stmt = stmt.on_conflict_do_update(
-            index_elements=['data'],
+            index_elements=['tenant_id', 'data'],
             set_={
                 'quantidade_cancelada': valores['quantidade_cancelada'],
                 'total_cancelado': valores['total_cancelado'],
@@ -230,6 +246,7 @@ class VendaReadModelHandler:
         operacao: str
     ) -> None:
         """UPSERT idempotente para performance"""
+        tenant_id = self._require_tenant_id()
         perf_atual = self.db.query(PerformanceParceiro).filter(
             PerformanceParceiro.funcionario_id == funcionario_id,
             PerformanceParceiro.mes_referencia == mes_referencia
@@ -237,6 +254,7 @@ class VendaReadModelHandler:
         
         if operacao == 'finalizada':
             valores = {
+                'tenant_id': tenant_id,
                 'funcionario_id': funcionario_id,
                 'mes_referencia': mes_referencia,
                 'quantidade_vendas': (perf_atual.quantidade_vendas if perf_atual else 0) + 1,
@@ -245,6 +263,7 @@ class VendaReadModelHandler:
             }
         else:  # cancelada
             valores = {
+                'tenant_id': tenant_id,
                 'funcionario_id': funcionario_id,
                 'mes_referencia': mes_referencia,
                 'quantidade_vendas': perf_atual.quantidade_vendas if perf_atual else 0,
@@ -254,16 +273,22 @@ class VendaReadModelHandler:
         
         # Calcular taxa de cancelamento
         if valores['quantidade_vendas'] > 0:
+            valores['ticket_medio'] = valores['total_vendido'] / valores['quantidade_vendas']
+        else:
+            valores['ticket_medio'] = Decimal('0')
+
+        if valores['quantidade_vendas'] > 0:
             valores['taxa_cancelamento'] = (valores['vendas_canceladas'] / valores['quantidade_vendas']) * 100
         else:
             valores['taxa_cancelamento'] = Decimal('0')
         
         stmt = sqlite_insert(PerformanceParceiro).values(**valores)
         stmt = stmt.on_conflict_do_update(
-            index_elements=['funcionario_id', 'mes_referencia'],
+            index_elements=['tenant_id', 'funcionario_id', 'mes_referencia'],
             set_={
                 'quantidade_vendas': valores['quantidade_vendas'],
                 'total_vendido': valores['total_vendido'],
+                'ticket_medio': valores['ticket_medio'],
                 'vendas_canceladas': valores['vendas_canceladas'],
                 'taxa_cancelamento': valores['taxa_cancelamento'],
             }
@@ -277,12 +302,14 @@ class VendaReadModelHandler:
         operacao: str
     ) -> None:
         """UPSERT idempotente para receita mensal"""
+        tenant_id = self._require_tenant_id()
         receita_atual = self.db.query(ReceitaMensal).filter(
             ReceitaMensal.mes_referencia == mes_referencia
         ).first()
         
         if operacao == 'finalizada':
             valores = {
+                'tenant_id': tenant_id,
                 'mes_referencia': mes_referencia,
                 'receita_bruta': (receita_atual.receita_bruta if receita_atual else Decimal('0')) + total,
                 'quantidade_vendas': (receita_atual.quantidade_vendas if receita_atual else 0) + 1,
@@ -291,6 +318,7 @@ class VendaReadModelHandler:
             }
         else:  # cancelada
             valores = {
+                'tenant_id': tenant_id,
                 'mes_referencia': mes_referencia,
                 'receita_bruta': receita_atual.receita_bruta if receita_atual else Decimal('0'),
                 'quantidade_vendas': receita_atual.quantidade_vendas if receita_atual else 0,
@@ -303,7 +331,7 @@ class VendaReadModelHandler:
         
         stmt = sqlite_insert(ReceitaMensal).values(**valores)
         stmt = stmt.on_conflict_do_update(
-            index_elements=['mes_referencia'],
+            index_elements=['tenant_id', 'mes_referencia'],
             set_={
                 'receita_bruta': valores['receita_bruta'],
                 'quantidade_vendas': valores['quantidade_vendas'],
