@@ -53,3 +53,16 @@ def test_operational_mobile_navigators_expose_profile_switch_in_header():
     assert "HeaderProfileActions" in funcionario
     assert "HeaderProfileActions" in entregador
     assert "HeaderProfileActions" in veterinario
+
+
+def test_mobile_profile_switch_is_visible_and_refreshes_profiles_before_alert():
+    actions = read_repo("app-mobile/src/components/HeaderProfileActions.tsx")
+    home = read_repo("app-mobile/src/screens/HomeScreen.tsx")
+
+    assert "alwaysShowSwitch" in actions
+    assert "alwaysShowSwitch = true" in actions
+    assert "getProfile" in actions
+    assert "updateUser" in actions
+    assert "Sem outros acessos" in actions
+    assert "HeaderProfileActions" in home
+    assert "alwaysShowSwitch" in home

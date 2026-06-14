@@ -10,6 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from 'react-native';
+import HeaderProfileActions from '../components/HeaderProfileActions';
 import { listarProdutos } from '../services/shop.service';
 import { useAuthStore } from '../store/auth.store';
 import { CORES, ESPACO, FONTE, RAIO, SOMBRA } from '../theme';
@@ -60,17 +61,25 @@ export default function HomeScreen() {
       }
     >
       <View style={styles.header}>
-        <View>
+        <View style={styles.headerText}>
           <Text style={styles.saudacao}>Ola, {primeiroNome}!</Text>
           <Text style={styles.subSaudacao}>Bem-vindo ao pet shop</Text>
         </View>
-        <TouchableOpacity
-          style={styles.pontosCard}
-          onPress={() => navigation.navigate('Beneficios')}
-        >
-          <Ionicons name="trophy" size={16} color={CORES.pontos} />
-          <Text style={styles.pontosTexto}>{pontos} pts</Text>
-        </TouchableOpacity>
+        <View style={styles.headerActions}>
+          <TouchableOpacity
+            style={styles.pontosCard}
+            onPress={() => navigation.navigate('Beneficios')}
+          >
+            <Ionicons name="trophy" size={16} color={CORES.pontos} />
+            <Text style={styles.pontosTexto}>{pontos} pts</Text>
+          </TouchableOpacity>
+          <HeaderProfileActions
+            alwaysShowSwitch
+            color={CORES.primario}
+            logoutContextLabel="cliente"
+            showLogout={false}
+          />
+        </View>
       </View>
 
       <TouchableOpacity
@@ -222,7 +231,10 @@ const styles = StyleSheet.create({
     padding: ESPACO.lg,
     paddingTop: ESPACO.xl,
     backgroundColor: CORES.superficie,
+    gap: ESPACO.md,
   },
+  headerText: { flex: 1 },
+  headerActions: { alignItems: 'flex-end', gap: ESPACO.xs },
   saudacao: { fontSize: FONTE.grande, fontWeight: 'bold', color: CORES.texto },
   subSaudacao: { fontSize: FONTE.normal, color: CORES.textoSecundario, marginTop: 2 },
   pontosCard: {
