@@ -95,6 +95,7 @@ TENANT_SCOPED_TABLES = {
     "tipos_tratamento",
     "sabores_proteina",
     "apresentacoes_peso",
+    "indices_mercado",
     "subcategorias",
     "tenant_template_item_installs",
     "tenant_template_installs",
