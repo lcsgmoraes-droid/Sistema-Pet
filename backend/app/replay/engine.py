@@ -35,12 +35,14 @@ import logging
 from datetime import datetime, timezone
 from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, asdict
+from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from app.domain.events.event_store import EventStore
 from app.core.replay_context import enable_replay_mode, disable_replay_mode
 from app.read_models.handlers_v53_idempotente import VendaReadModelHandler
+from app.tenancy.context import tenant_context
 
 logger = logging.getLogger(__name__)
 
@@ -262,19 +264,22 @@ def _process_batch(handler: VendaReadModelHandler, eventos: List[Dict[str, Any]]
                 from app.domain.events.venda_events import VendaCriada
                 payload = evento_dict['payload']
                 evento = VendaCriada(**payload)
-                handler.on_venda_criada(evento)
+                with tenant_context(_extract_event_tenant_id(evento_dict)):
+                    handler.on_venda_criada(evento)
                 
             elif event_type == 'VendaFinalizada':
                 from app.domain.events.venda_events import VendaFinalizada
                 payload = evento_dict['payload']
                 evento = VendaFinalizada(**payload)
-                handler.on_venda_finalizada(evento)
+                with tenant_context(_extract_event_tenant_id(evento_dict)):
+                    handler.on_venda_finalizada(evento)
                 
             elif event_type == 'VendaCancelada':
                 from app.domain.events.venda_events import VendaCancelada
                 payload = evento_dict['payload']
                 evento = VendaCancelada(**payload)
-                handler.on_venda_cancelada(evento)
+                with tenant_context(_extract_event_tenant_id(evento_dict)):
+                    handler.on_venda_cancelada(evento)
                 
             else:
                 logger.warning(f"⚠️  Tipo de evento desconhecido: {event_type}")
@@ -282,6 +287,28 @@ def _process_batch(handler: VendaReadModelHandler, eventos: List[Dict[str, Any]]
         except Exception as e:
             logger.error(f"❌ Erro processando evento {evento_dict.get('id')}: {e}", exc_info=True)
             raise
+
+
+def _extract_event_tenant_id(evento_dict: Dict[str, Any]) -> UUID:
+    """
+    Resolve o tenant do evento antes de atualizar read models tenant-scoped.
+    """
+    payload = evento_dict.get('payload') or {}
+    metadata = evento_dict.get('metadata') or {}
+    metadados = payload.get('metadados') or {}
+
+    for source in (evento_dict, payload, metadados, metadata):
+        if not isinstance(source, dict):
+            continue
+        tenant_id = source.get('tenant_id')
+        if tenant_id:
+            return UUID(str(tenant_id))
+
+    event_id = evento_dict.get('id') or payload.get('event_id') or '<sem id>'
+    event_type = evento_dict.get('event_type') or '<sem tipo>'
+    raise RuntimeError(
+        f"tenant_id ausente no evento {event_id} ({event_type}) para replay de read models"
+    )
 
 
 def _log_replay_start(db: Session, filters: Dict[str, Any]) -> None:
