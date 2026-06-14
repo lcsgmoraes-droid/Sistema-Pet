@@ -8,7 +8,7 @@ Versão: 1.0.0 (2026-02-14)
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, or_, desc, text
+from sqlalchemy import func, and_, or_, desc
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 from datetime import datetime, timedelta
@@ -17,6 +17,7 @@ import json
 from .db import get_session
 from .auth.dependencies import get_current_user_and_tenant
 from .produtos_models import Produto, Marca
+from .utils.tenant_safe_sql import execute_tenant_safe
 from .vendas_models import VendaItem, Venda
 
 router = APIRouter(prefix="/racoes/ml", tags=["Machine Learning - Rações"])
@@ -400,25 +401,27 @@ async def prever_demanda(
     
     for segmento, produto_ids in segmentos_dict.items():
         # Buscar vendas mensais
-        vendas_mensais = db.execute(
-            text("""
+        vendas_mensais = execute_tenant_safe(
+            db,
+            """
                 SELECT 
                     DATE_TRUNC('month', v.data_venda) as mes,
                     SUM(vi.quantidade) as quantidade_total
                 FROM vendas v
                 INNER JOIN venda_itens vi ON vi.venda_id = v.id
-                WHERE v.tenant_id = :tenant_id
+                WHERE v.{tenant_filter}
+                    AND vi.{tenant_filter}
                     AND vi.produto_id = ANY(:produto_ids)
                     AND v.data_venda >= :data_limite
                     AND v.status != 'cancelada'
                 GROUP BY DATE_TRUNC('month', v.data_venda)
                 ORDER BY mes ASC
-            """),
+            """,
             {
-                "tenant_id": tenant_id,
                 "produto_ids": produto_ids,
                 "data_limite": data_limite
-            }
+            },
+            tenant_id=tenant_id,
         ).fetchall()
         
         if len(vendas_mensais) < 2:
