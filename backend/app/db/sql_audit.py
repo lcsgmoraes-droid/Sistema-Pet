@@ -189,6 +189,8 @@ TENANT_TABLES = {
     "agendamentos",
     
     # Notas Fiscais
+    "nota_fiscal_item_rateio_canal",
+    "nota_fiscal_rateio_canal",
     "notas_entrada",
     "notas_entrada_itens",
     "notas_saida",
