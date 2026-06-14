@@ -468,12 +468,19 @@ class EmailTemplate(BaseTenantModel):
     Suporta placeholders Mustache-style para substituição dinâmica.
     """
     __tablename__ = "emails_templates"
+    __table_args__ = (
+        UniqueConstraint(
+            "tenant_id",
+            "codigo",
+            name="uq_emails_templates_tenant_codigo",
+        ),
+    )
 
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)  # Multi-tenant
 
     # Identificação
-    codigo = Column(String(50), nullable=False, unique=True, index=True)  # ACERTO_PARCEIRO, BOAS_VINDAS, etc
+    codigo = Column(String(50), nullable=False, index=True)  # ACERTO_PARCEIRO, BOAS_VINDAS, etc
     nome = Column(String(255), nullable=False)  # Nome descritivo
     descricao = Column(Text, nullable=True)
 
