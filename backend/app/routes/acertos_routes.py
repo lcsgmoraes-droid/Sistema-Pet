@@ -121,6 +121,7 @@ def gerar_acerto(
             db=db,
             parceiro_id=request.parceiro_id,
             tenant_id=tenant_id,
+            user_id=current_user.id,
             data_acerto=request.data_acerto,
             forcar_manual=request.forcar_manual
         )

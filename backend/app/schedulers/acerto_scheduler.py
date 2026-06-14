@@ -13,6 +13,7 @@ from app.db import SessionLocal
 from app.models import Cliente, Tenant
 from app.services.acerto_service import AcertoService, EmailQueueService, EmailService
 from app.tenancy.context import tenant_context
+from app.tenancy.rls import sync_rls_tenant
 
 logger = logging.getLogger(__name__)
 
@@ -82,9 +83,11 @@ class AcertoScheduler:
                 continue
 
             with tenant_context(tenant_id):
+                sync_rls_tenant(db, tenant_id)
                 parceiros_elegiveis = db.query(Cliente).filter(
                     Cliente.parceiro_ativo == True,
                     Cliente.parceiro_notificar == True,
+                    Cliente.tenant_id == tenant_id,
                     Cliente.parceiro_dia_acerto == dia_hoje,
                     Cliente.parceiro_tipo_acerto.in_(['mensal', 'quinzenal', 'semanal'])
                 ).all()
@@ -103,6 +106,7 @@ class AcertoScheduler:
                         resultado = AcertoService.gerar_acerto(
                             db=db,
                             parceiro_id=parceiro.id,
+                            tenant_id=tenant_id,
                             user_id=parceiro.user_id,
                             data_acerto=None,
                             forcar_manual=False

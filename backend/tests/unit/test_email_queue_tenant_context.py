@@ -177,6 +177,19 @@ def test_processar_fila_global_processa_tenants_ativos_com_contexto(monkeypatch)
     assert get_current_tenant() is None
 
 
+def test_gerar_acerto_usa_tenant_id_no_contrato_filtros_e_escrita():
+    params = inspect.signature(acerto_service.AcertoService.gerar_acerto).parameters
+    source = inspect.getsource(acerto_service.AcertoService.gerar_acerto)
+
+    assert "tenant_id" in params
+    assert "user_id" in params
+    assert "sync_rls_tenant(db, tenant_id)" in source
+    assert "Cliente.tenant_id == tenant_id" in source
+    assert "AcertoParceiro.tenant_id == tenant_id" in source
+    assert "ComissaoItem.tenant_id == tenant_id" in source
+    assert "tenant_id=tenant_id" in source
+
+
 def test_rotas_e_scheduler_usam_api_de_email_com_tenant_explicito():
     reenviar_source = inspect.getsource(acertos_routes.reenviar_email)
     manual_source = inspect.getsource(acertos_routes.processar_fila_manual)
@@ -192,3 +205,6 @@ def test_scheduler_acertos_diarios_processa_parceiros_por_tenant():
 
     assert "db.query(Tenant.id)" in source
     assert "with tenant_context" in source
+    assert "sync_rls_tenant(db, tenant_id)" in source
+    assert "Cliente.tenant_id == tenant_id" in source
+    assert "tenant_id=tenant_id" in source
