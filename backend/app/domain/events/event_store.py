@@ -24,6 +24,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text
 
 from .base import DomainEvent
+from app.tenancy.context import get_current_tenant_id
 
 logger = logging.getLogger(__name__)
 
@@ -81,10 +82,14 @@ class EventStore:
             # Preparar dados
             aggregate_id = aggregate_id or event.event_id
             payload = json.dumps(event.to_dict(), default=str)
-            metadata = json.dumps({
+            metadata_dict = {
                 'source': 'application',
                 'version': '1.0',
-            })
+            }
+            tenant_id = get_current_tenant_id()
+            if tenant_id:
+                metadata_dict['tenant_id'] = str(tenant_id)
+            metadata = json.dumps(metadata_dict)
             
             # Gerar próximo sequence_number
             result = self.db.execute(text("""

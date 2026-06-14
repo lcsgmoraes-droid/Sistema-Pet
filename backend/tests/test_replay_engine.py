@@ -13,14 +13,37 @@ Valida:
 import pytest
 from datetime import date, datetime
 from decimal import Decimal
+from uuid import UUID
 from unittest.mock import Mock, patch
 from sqlalchemy.orm import Session
 
 from app.replay import replay_events, ReplayStats
+from app.replay.engine import _process_batch
 from app.core.replay_context import is_replay_mode, reset_replay_mode
 from app.domain.events.event_store import EventStore
 from app.domain.events.venda_events import VendaCriada, VendaFinalizada, VendaCancelada
 from app.read_models.models import VendasResumoDiario, PerformanceParceiro, ReceitaMensal
+from app.tenancy.context import clear_current_tenant, get_current_tenant, set_current_tenant
+
+
+TENANT_REPLAY = UUID("33333333-3333-3333-3333-333333333333")
+TENANT_PREVIOUS = UUID("44444444-4444-4444-4444-444444444444")
+
+
+def _eventos_com_tenant(eventos, tenant_id=TENANT_REPLAY):
+    for evento in eventos:
+        payload = evento.setdefault('payload', {})
+        if evento.get('event_type') == 'VendaCriada':
+            payload.setdefault('numero_venda', f"V{payload.get('venda_id', 1)}")
+            payload.setdefault('user_id', 1)
+            payload.setdefault('cliente_id', 10)
+            payload.setdefault('funcionario_id', 5)
+            payload.setdefault('total', 100.0)
+            payload.setdefault('quantidade_itens', 1)
+            payload.setdefault('tem_entrega', False)
+
+        payload.setdefault('metadados', {})['tenant_id'] = str(tenant_id)
+    return eventos
 
 
 @pytest.fixture(autouse=True)
@@ -171,7 +194,7 @@ class TestReplayEngineCore:
         ]
         
         mock_store = Mock()
-        mock_store.get_events.return_value = eventos
+        mock_store.get_events.return_value = _eventos_com_tenant(eventos)
         mock_store_class.return_value = mock_store
         
         mock_handler = Mock()
@@ -218,7 +241,7 @@ class TestReplayEngineCore:
         ]
         
         mock_store = Mock()
-        mock_store.get_events.return_value = eventos
+        mock_store.get_events.return_value = _eventos_com_tenant(eventos)
         mock_store_class.return_value = mock_store
         
         mock_handler = Mock()
@@ -275,7 +298,7 @@ class TestReplayEngineCore:
         ]
         
         mock_store = Mock()
-        mock_store.get_events.return_value = eventos
+        mock_store.get_events.return_value = _eventos_com_tenant(eventos)
         mock_store_class.return_value = mock_store
         
         mock_handler = Mock()
@@ -331,7 +354,7 @@ class TestReplayIdempotencia:
         ]
         
         mock_store = Mock()
-        mock_store.get_events.return_value = eventos
+        mock_store.get_events.return_value = _eventos_com_tenant(eventos)
         mock_store_class.return_value = mock_store
         
         mock_handler = Mock()
@@ -345,7 +368,7 @@ class TestReplayIdempotencia:
         assert stats1.total_events == stats2.total_events
         assert stats1.batches_processed == stats2.batches_processed
         assert mock_handler.on_venda_criada.call_count == 2  # Chamado 2x
-        assert db_session.commit.call_count >= 4  # 2 replays + 2 auditorias
+        assert db_session.commit.call_count >= 2  # 2 replays; auditorias estao mockadas
 
 
 class TestReplayModeContext:
@@ -388,7 +411,7 @@ class TestReplayModeContext:
         ]
         
         mock_store = Mock()
-        mock_store.get_events.return_value = eventos
+        mock_store.get_events.return_value = _eventos_com_tenant(eventos)
         mock_store_class.return_value = mock_store
         
         replay_mode_during_processing = []
@@ -446,7 +469,7 @@ class TestReplayModeContext:
         ]
         
         mock_store = Mock()
-        mock_store.get_events.return_value = eventos
+        mock_store.get_events.return_value = _eventos_com_tenant(eventos)
         mock_store_class.return_value = mock_store
         
         mock_handler = Mock()
@@ -461,6 +484,53 @@ class TestReplayModeContext:
         
         # Replay mode deve estar desativado após erro
         assert is_replay_mode() is False
+
+    def test_process_batch_aplica_tenant_do_evento_e_restaura_contexto_anterior(self):
+        """
+        DADO um evento de venda com tenant_id em metadados
+        QUANDO o replay processa o batch
+        ENTAO o handler deve rodar com esse tenant ativo sem vazar contexto
+        """
+        tenants_vistos = []
+
+        class HandlerCapturandoTenant:
+            def on_venda_finalizada(self, evento):
+                tenants_vistos.append((get_current_tenant(), evento.venda_id))
+
+        clear_current_tenant()
+        set_current_tenant(TENANT_PREVIOUS)
+        try:
+            eventos = [
+                {
+                    "id": "event-tenant-1",
+                    "event_type": "VendaFinalizada",
+                    "payload": {
+                        "venda_id": 101,
+                        "numero_venda": "VEN-20260614-0101",
+                        "user_id": 1,
+                        "user_nome": "Replay",
+                        "cliente_id": 10,
+                        "funcionario_id": 5,
+                        "total": 100.0,
+                        "total_pago": 100.0,
+                        "status": "finalizada",
+                        "formas_pagamento": ["pix"],
+                        "estoque_baixado": True,
+                        "caixa_movimentado": True,
+                        "contas_baixadas": 1,
+                        "timestamp": datetime.now().isoformat(),
+                        "event_id": "event-tenant-1",
+                        "metadados": {"tenant_id": str(TENANT_REPLAY)},
+                    },
+                }
+            ]
+
+            _process_batch(HandlerCapturandoTenant(), eventos)
+
+            assert tenants_vistos == [(TENANT_REPLAY, 101)]
+            assert get_current_tenant() == TENANT_PREVIOUS
+        finally:
+            clear_current_tenant()
 
 
 class TestReplayBatchProcessing:
@@ -503,7 +573,7 @@ class TestReplayBatchProcessing:
             })
         
         mock_store = Mock()
-        mock_store.get_events.return_value = eventos
+        mock_store.get_events.return_value = _eventos_com_tenant(eventos)
         mock_store_class.return_value = mock_store
         
         mock_handler = Mock()
@@ -572,7 +642,7 @@ class TestReplayBatchProcessing:
         ]
         
         mock_store = Mock()
-        mock_store.get_events.return_value = eventos
+        mock_store.get_events.return_value = _eventos_com_tenant(eventos)
         mock_store_class.return_value = mock_store
         
         # Handler falha no segundo evento
@@ -633,7 +703,7 @@ class TestReplayStats:
         } for i in range(100)]
         
         mock_store = Mock()
-        mock_store.get_events.return_value = eventos
+        mock_store.get_events.return_value = _eventos_com_tenant(eventos)
         mock_store_class.return_value = mock_store
         
         mock_handler = Mock()

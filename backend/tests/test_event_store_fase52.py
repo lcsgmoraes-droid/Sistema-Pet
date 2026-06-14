@@ -24,6 +24,7 @@ from datetime import datetime
 from pathlib import Path
 from dataclasses import dataclass
 from typing import Optional
+from uuid import UUID
 
 # Imports do sistema
 import sys
@@ -31,6 +32,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.domain.events.base import DomainEvent
 from app.domain.events.event_store import EventStore
+from app.tenancy.context import clear_current_tenant, set_current_tenant
 
 
 # ============================================================================
@@ -135,6 +137,9 @@ class PagamentoRecebidoTeste(DomainEvent):
     valor: float
 
 
+TENANT_EVENT_STORE = UUID("55555555-5555-5555-5555-555555555555")
+
+
 # ============================================================================
 # TESTES DE PERSISTÊNCIA BÁSICA
 # ============================================================================
@@ -169,6 +174,33 @@ def test_append_evento_simples(mock_db_session):
     assert persisted.sequence_number > 0
     assert persisted.event_id == evento.event_id
     print(f"✅ Evento persistido com sequence_number={persisted.sequence_number}")
+
+
+def test_append_grava_tenant_atual_no_metadata_para_replay(mock_db_session):
+    """
+    Testa que eventos novos carregam tenant_id no metadata para replay tenant-aware.
+    """
+    store = EventStore(mock_db_session)
+    evento = VendaCriadaTeste(
+        venda_id="venda_tenant",
+        total=75.00,
+        user_id=1
+    )
+
+    clear_current_tenant()
+    set_current_tenant(TENANT_EVENT_STORE)
+    try:
+        store.append(
+            event=evento,
+            user_id=1,
+            aggregate_type='venda',
+            aggregate_id='venda_tenant'
+        )
+        [persisted] = store.get_events()
+
+        assert persisted['metadata']['tenant_id'] == str(TENANT_EVENT_STORE)
+    finally:
+        clear_current_tenant()
 
 
 def test_sequence_number_monotonic(mock_db_session):
