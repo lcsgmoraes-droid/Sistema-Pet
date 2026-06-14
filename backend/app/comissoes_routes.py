@@ -13,6 +13,8 @@ from .auth.dependencies import get_current_user_and_tenant
 from .models import User
 from .comissoes_models import ComissoesConfig, ComissoesItens, ComissoesConfigSistema
 from .utils.tenant_safe_sql import execute_tenant_safe
+from .tenancy.context import get_current_tenant_id
+from .tenancy.rls import sync_rls_tenant
 
 # Configurar logger
 logger = logging.getLogger(__name__)
@@ -28,14 +30,23 @@ def ensure_comissoes_config_schema(db) -> None:
     if _comissoes_schema_checked:
         return
 
+    tenant_id = get_current_tenant_id()
+    if tenant_id:
+        sync_rls_tenant(db, tenant_id)
+
     db.execute(text("ALTER TABLE comissoes_configuracao ADD COLUMN IF NOT EXISTS tenant_id uuid"))
-    db.execute(text("""
-        UPDATE comissoes_configuracao cc
-        SET tenant_id = c.tenant_id
-        FROM clientes c
-        WHERE cc.funcionario_id = c.id
-          AND cc.tenant_id IS NULL
-    """))
+    if tenant_id:
+        db.execute(
+            text("""
+                UPDATE comissoes_configuracao cc
+                SET tenant_id = c.tenant_id
+                FROM clientes c
+                WHERE cc.funcionario_id = c.id
+                  AND c.tenant_id = :tenant_id
+                  AND cc.tenant_id IS NULL
+            """),
+            {"tenant_id": str(tenant_id)},
+        )
     db.execute(text(
         "CREATE INDEX IF NOT EXISTS ix_comissoes_configuracao_tenant_id "
         "ON comissoes_configuracao (tenant_id)"

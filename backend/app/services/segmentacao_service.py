@@ -13,6 +13,7 @@ import json
 from app.models import Cliente
 from app.vendas_models import Venda
 from app.financeiro_models import ContaReceber
+from app.utils.tenant_safe_sql import execute_tenant_safe
 
 
 class SegmentacaoService:
@@ -491,15 +492,17 @@ class SegmentacaoService:
                     cs.metricas,
                     cs.updated_at
                 FROM cliente_segmentos cs
-                JOIN clientes c ON cs.cliente_id = c.id
-                WHERE cs.tenant_id = :tenant_id 
+                JOIN clientes c ON cs.cliente_id = c.id AND c.{tenant_filter}
+                WHERE cs.{tenant_filter}
                 AND cs.segmento = :segmento
                 ORDER BY cs.updated_at DESC
             """)
             
-            results = db.execute(
+            results = execute_tenant_safe(
+                db,
                 query,
-                {'tenant_id': tenant_id, 'segmento': segmento_filtro}
+                {'segmento': segmento_filtro},
+                tenant_id=tenant_id,
             ).fetchall()
         else:
             query = text("""
@@ -512,12 +515,17 @@ class SegmentacaoService:
                     cs.metricas,
                     cs.updated_at
                 FROM cliente_segmentos cs
-                JOIN clientes c ON cs.cliente_id = c.id
-                WHERE cs.tenant_id = :tenant_id
+                JOIN clientes c ON cs.cliente_id = c.id AND c.{tenant_filter}
+                WHERE cs.{tenant_filter}
                 ORDER BY cs.updated_at DESC
             """)
             
-            results = db.execute(query, {'tenant_id': tenant_id}).fetchall()
+            results = execute_tenant_safe(
+                db,
+                query,
+                {},
+                tenant_id=tenant_id,
+            ).fetchall()
         
         segmentos = []
         for row in results:
