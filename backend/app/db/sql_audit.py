@@ -223,6 +223,7 @@ TENANT_TABLES = {
     # Relatórios
     "dre_categorias_analise",
     "dre_comparacoes",
+    "dre_detalhe_canais",
     "dre_insights",
     "dre_lancamentos",
     "dre_periodos",

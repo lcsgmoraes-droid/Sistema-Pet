@@ -48,6 +48,7 @@ TENANT_SCOPED_TABLES = {
     "dre_categorias",
     "dre_categorias_analise",
     "dre_comparacoes",
+    "dre_detalhe_canais",
     "dre_insights",
     "dre_lancamentos",
     "dre_periodos",

@@ -15,6 +15,7 @@ from app.vendas_models import Venda, VendaItem
 from app.produtos_models import Produto
 from app.financeiro_models import LancamentoManual
 from app.services.dre_periodo_tenant_scope import tenant_id_para_escrita_dre
+from app.tenancy.rls import sync_rls_tenant
 
 
 class DREDetalhadaService:
@@ -44,9 +45,15 @@ class DREDetalhadaService:
         Receitas vêm das vendas do canal
         Despesas de vendas (taxas, comissões) são específicas do canal
         """
+        tenant_id = tenant_id_para_escrita_dre(self.db, usuario_id)
+        if tenant_id is None:
+            raise ValueError("tenant_id e obrigatorio para calcular DRE detalhado por canal")
+        sync_rls_tenant(self.db, tenant_id)
+
         # 1. Receitas do canal
         vendas_canal = self.db.query(Venda).filter(
             Venda.user_id == usuario_id,
+            Venda.tenant_id == tenant_id,
             Venda.data_venda >= data_inicio,
             Venda.data_venda <= data_fim,
             Venda.status.in_(['finalizada', 'cancelada']),
@@ -61,9 +68,15 @@ class DREDetalhadaService:
         # 2. CMV do canal
         custo_produtos = 0
         for venda in vendas_canal:
-            itens = self.db.query(VendaItem).filter(VendaItem.venda_id == venda.id).all()
+            itens = self.db.query(VendaItem).filter(
+                VendaItem.venda_id == venda.id,
+                VendaItem.tenant_id == tenant_id,
+            ).all()
             for item in itens:
-                produto = self.db.query(Produto).filter(Produto.id == item.produto_id).first()
+                produto = self.db.query(Produto).filter(
+                    Produto.id == item.produto_id,
+                    Produto.tenant_id == tenant_id,
+                ).first()
                 if produto and produto.preco_custo:
                     custo_produtos += (produto.preco_custo * item.quantidade)
         
@@ -79,6 +92,7 @@ class DREDetalhadaService:
         # Taxas ML/Shopee, Comissões, Fretes pagos, Cancelamentos, Cupons
         despesas_vendas_especificas = self.db.query(func.sum(LancamentoManual.valor)).filter(
             LancamentoManual.usuario_id == usuario_id,
+            LancamentoManual.tenant_id == tenant_id,
             LancamentoManual.data >= data_inicio,
             LancamentoManual.data <= data_fim,
             LancamentoManual.tipo == 'saida',
@@ -88,6 +102,7 @@ class DREDetalhadaService:
         # 3.2 Campanhas Ads específicas do canal
         campanhas_ads = self.db.query(func.sum(LancamentoManual.valor)).filter(
             LancamentoManual.usuario_id == usuario_id,
+            LancamentoManual.tenant_id == tenant_id,
             LancamentoManual.data >= data_inicio,
             LancamentoManual.data <= data_fim,
             LancamentoManual.tipo == 'saida',
@@ -100,6 +115,7 @@ class DREDetalhadaService:
         # 4. Despesas alocadas manualmente (proporcional ou fixo)
         alocacoes = self.db.query(AlocacaoDespesaCanal).filter(
             AlocacaoDespesaCanal.usuario_id == usuario_id,
+            AlocacaoDespesaCanal.tenant_id == tenant_id,
             AlocacaoDespesaCanal.data_inicio == data_inicio,
             AlocacaoDespesaCanal.data_fim == data_fim
         ).all()
@@ -129,6 +145,7 @@ class DREDetalhadaService:
                     # Pega total de receita de todos os canais no período
                     total_receita = self.db.query(func.sum(Venda.total)).filter(
                         Venda.user_id == usuario_id,
+                        Venda.tenant_id == tenant_id,
                         Venda.data_venda >= data_inicio,
                         Venda.data_venda <= data_fim,
                         Venda.status.in_(['finalizada', 'cancelada'])
@@ -156,7 +173,7 @@ class DREDetalhadaService:
         # 6. Impostos
         calculadora = CalculadoraTributaria(self.db)
         resultado_impostos = calculadora.calcular_impostos(
-            tenant_id=tenant_id_para_escrita_dre(self.db, usuario_id),
+            tenant_id=tenant_id,
             receita_bruta=receita_bruta,
             receita_liquida=receita_liquida,
             lucro_operacional=lucro_operacional
@@ -184,6 +201,7 @@ class DREDetalhadaService:
         # 8. Salvar
         dre_existente = self.db.query(DREDetalheCanal).filter(
             DREDetalheCanal.usuario_id == usuario_id,
+            DREDetalheCanal.tenant_id == tenant_id,
             DREDetalheCanal.data_inicio == data_inicio,
             DREDetalheCanal.data_fim == data_fim,
             DREDetalheCanal.canal == canal
@@ -193,6 +211,7 @@ class DREDetalhadaService:
             dre = dre_existente
         else:
             dre = DREDetalheCanal(
+                tenant_id=tenant_id,
                 usuario_id=usuario_id,
                 data_inicio=data_inicio,
                 data_fim=data_fim,
@@ -386,7 +405,13 @@ class DREDetalhadaService:
                 'mercado_livre': {'valor': 2000, 'percentual': 28.57}
             }
         """
+        tenant_id = tenant_id_para_escrita_dre(self.db, usuario_id)
+        if tenant_id is None:
+            raise ValueError("tenant_id e obrigatorio para salvar alocacao de despesa por canal")
+        sync_rls_tenant(self.db, tenant_id)
+
         alocacao = AlocacaoDespesaCanal(
+            tenant_id=tenant_id,
             usuario_id=usuario_id,
             data_inicio=data_inicio,
             data_fim=data_fim,
