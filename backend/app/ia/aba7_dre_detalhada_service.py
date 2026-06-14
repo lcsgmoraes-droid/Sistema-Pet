@@ -14,6 +14,7 @@ from app.ia.aba7_tributacao import CalculadoraTributaria
 from app.vendas_models import Venda, VendaItem
 from app.produtos_models import Produto
 from app.financeiro_models import LancamentoManual
+from app.services.dre_periodo_tenant_scope import tenant_id_para_escrita_dre
 
 
 class DREDetalhadaService:
@@ -155,7 +156,7 @@ class DREDetalhadaService:
         # 6. Impostos
         calculadora = CalculadoraTributaria(self.db)
         resultado_impostos = calculadora.calcular_impostos(
-            usuario_id=usuario_id,
+            tenant_id=tenant_id_para_escrita_dre(self.db, usuario_id),
             receita_bruta=receita_bruta,
             receita_liquida=receita_liquida,
             lucro_operacional=lucro_operacional

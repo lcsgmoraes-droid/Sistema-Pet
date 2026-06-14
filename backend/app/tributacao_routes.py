@@ -85,7 +85,7 @@ def obter_configuracao(
     """Busca configuração tributária do usuário atual"""
     current_user, tenant_id = user_and_tenant
     calculadora = CalculadoraTributaria(db)
-    config = calculadora.obter_configuracao(tenant_id)
+    config = calculadora.obter_configuracao(tenant_id=tenant_id)
     
     if not config:
         return None
@@ -113,6 +113,7 @@ def salvar_configuracao(
     
     config = calculadora.salvar_configuracao(
         tenant_id=tenant_id,
+        user_id=current_user.id,
         regime=dados.regime,
         anexo_simples=dados.anexo_simples,
         faixa_simples=dados.faixa_simples,
