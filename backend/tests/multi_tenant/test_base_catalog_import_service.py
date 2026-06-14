@@ -5,6 +5,7 @@ from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from sqlalchemy.pool import StaticPool
 
+from app.services import base_catalog_import_service
 from app.services.base_catalog_import_service import (
     BaseCatalogImportError,
     import_base_catalog,
@@ -712,6 +713,71 @@ def test_import_remaps_product_relations_and_images(catalog_session):
     assert TARGET_TENANT in image["url"]
     assert f"/{predecessor['id']}/" in image["url"]
     assert one_target_product(catalog_session)["imagem_principal"] == image["url"]
+
+
+def test_import_syncs_rls_context_for_source_and_target_product_relations(catalog_session, monkeypatch):
+    _seed_basic_catalog(catalog_session)
+    _insert_source_product(
+        catalog_session,
+        product_id=104,
+        codigo="BASE-KIT",
+        nome="Kit Base",
+        tipo_produto="KIT",
+        tipo_kit="VIRTUAL",
+    )
+    _insert_source_product(
+        catalog_session,
+        product_id=105,
+        codigo="BASE-GRANEL",
+        nome="Granel Base",
+        e_granel=1,
+    )
+    catalog_session.execute(
+        text(
+            """
+            INSERT INTO produto_kit_componentes (id, tenant_id, kit_id, produto_componente_id, quantidade, opcional, ordem)
+            VALUES (2001, :tenant, 104, 101, 2, 0, 1)
+            """
+        ),
+        {"tenant": SOURCE_TENANT},
+    )
+    catalog_session.execute(
+        text(
+            """
+            INSERT INTO produto_granel_vinculos (id, tenant_id, produto_origem_id, produto_granel_id, ativo, observacao, user_id)
+            VALUES (3001, :tenant, 101, 105, 1, 'granel', 1)
+            """
+        ),
+        {"tenant": SOURCE_TENANT},
+    )
+    catalog_session.commit()
+
+    synced_tenants = []
+
+    def fake_sync_rls_tenant(db, tenant_id=None):
+        synced_tenants.append(str(tenant_id))
+        return True
+
+    monkeypatch.setattr(
+        base_catalog_import_service,
+        "sync_rls_tenant",
+        fake_sync_rls_tenant,
+        raising=False,
+    )
+
+    import_base_catalog(
+        db=catalog_session,
+        source_tenant_id=SOURCE_TENANT,
+        target_tenant_id=TARGET_TENANT,
+        user_id=10,
+        dry_run=False,
+        image_copier=fake_image_copier,
+    )
+
+    assert SOURCE_TENANT in synced_tenants
+    assert TARGET_TENANT in synced_tenants
+    assert synced_tenants.count(SOURCE_TENANT) >= 3
+    assert synced_tenants.count(TARGET_TENANT) >= 3
 
 
 def test_import_is_idempotent_and_preserves_target_edits(catalog_session):

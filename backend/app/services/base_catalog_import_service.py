@@ -9,6 +9,8 @@ from sqlalchemy import inspect, text
 from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
+from app.tenancy.rls import sync_rls_tenant
+
 
 DEFAULT_BASE_CATALOG_SOURCE_EMAIL = "atacadaopetpp@gmail.com"
 DEFAULT_BASE_CATALOG_BUNDLE_CODE = "catalogo-base-loja-lucas"
@@ -145,6 +147,7 @@ def _template_code(item_type: str, source_id: int) -> str:
 def _select_rows(db: Session, table_name: str, tenant_id: str) -> list[dict[str, Any]]:
     if not _table_exists(db, table_name):
         return []
+    sync_rls_tenant(db, tenant_id)
     order_clause = "ORDER BY id" if "id" in _columns(db, table_name) else ""
     rows = db.execute(
         text(f"SELECT * FROM {table_name} WHERE CAST(tenant_id AS TEXT) = :tenant_id {order_clause}"),
@@ -165,6 +168,7 @@ def _get_mapping(
 ) -> int | None:
     if not _table_exists(db, "tenant_template_item_installs"):
         return None
+    sync_rls_tenant(db, tenant_id)
     return db.execute(
         text(
             """
@@ -217,6 +221,7 @@ def _record_mapping(
     if existing:
         return
     now = _now()
+    sync_rls_tenant(db, tenant_id)
     db.execute(
         text(
             """
@@ -247,6 +252,7 @@ def _record_install(db: Session, user_id: int, result: BaseCatalogImportResult) 
     if result.dry_run or not _table_exists(db, "tenant_template_installs"):
         return
     summary = json.dumps(result.to_dict(), ensure_ascii=False, sort_keys=True)
+    sync_rls_tenant(db, result.target_tenant_id)
     existing_id = db.execute(
         text(
             """
@@ -326,6 +332,9 @@ def _insert_and_lookup(
         filtered["created_at"] = _now()
     if "updated_at" in table_columns and "updated_at" not in filtered:
         filtered["updated_at"] = _now()
+    tenant_id = filtered.get("tenant_id") or lookup_params.get("tenant_id")
+    if tenant_id:
+        sync_rls_tenant(db, tenant_id)
     column_sql = ", ".join(filtered)
     param_sql = ", ".join(f":{key}" for key in filtered)
     db.execute(text(f"INSERT INTO {table_name} ({column_sql}) VALUES ({param_sql})"), filtered)
@@ -336,6 +345,7 @@ def _insert_and_lookup(
 
 
 def _existing_id_by_name(db: Session, table_name: str, tenant_id: str, name: str) -> int | None:
+    sync_rls_tenant(db, tenant_id)
     return db.execute(
         text(
             f"""
@@ -459,6 +469,7 @@ def _find_existing_category_id(
     name: str,
     department_id: int | None,
 ) -> int | None:
+    sync_rls_tenant(db, tenant_id)
     return db.execute(
         text(
             """
@@ -515,7 +526,9 @@ def _link_category_parents(
     *,
     rows: list[dict[str, Any]],
     mapping: dict[int, int],
+    target_tenant_id: str,
 ) -> None:
+    sync_rls_tenant(db, target_tenant_id)
     for row in rows:
         source_parent_id = row.get("categoria_pai_id")
         if not source_parent_id:
@@ -524,8 +537,19 @@ def _link_category_parents(
         target_parent_id = mapping.get(int(source_parent_id))
         if target_id and target_parent_id:
             db.execute(
-                text("UPDATE categorias SET categoria_pai_id=:parent_id WHERE id=:id"),
-                {"id": target_id, "parent_id": target_parent_id},
+                text(
+                    """
+                    UPDATE categorias
+                       SET categoria_pai_id=:parent_id
+                     WHERE id=:id
+                       AND CAST(tenant_id AS TEXT)=:tenant_id
+                    """
+                ),
+                {
+                    "id": target_id,
+                    "parent_id": target_parent_id,
+                    "tenant_id": target_tenant_id,
+                },
             )
 
 
@@ -601,7 +625,12 @@ def _copy_categories(
         result.bump("created", "categorias")
 
     if not result.dry_run:
-        _link_category_parents(db, rows=rows, mapping=mapping)
+        _link_category_parents(
+            db,
+            rows=rows,
+            mapping=mapping,
+            target_tenant_id=target_tenant_id,
+        )
     return mapping
 
 
@@ -708,6 +737,7 @@ def _copy_option_table(
             continue
 
         if table_name == "apresentacoes_peso":
+            sync_rls_tenant(db, target_tenant_id)
             existing_id = db.execute(
                 text(
                     """
@@ -826,6 +856,7 @@ def _find_existing_product_id(
     tenant_id: str,
     codigo: str,
 ) -> int | None:
+    sync_rls_tenant(db, tenant_id)
     return db.execute(
         text(
             """
@@ -878,7 +909,9 @@ def _link_product_hierarchy(
     *,
     source_products: dict[int, dict[str, Any]],
     mapping: dict[int, int],
+    target_tenant_id: str,
 ) -> None:
+    sync_rls_tenant(db, target_tenant_id)
     for source_id, row in source_products.items():
         target_id = mapping.get(source_id)
         if not target_id:
@@ -895,10 +928,12 @@ def _link_product_hierarchy(
                        SET produto_pai_id = :produto_pai_id,
                            produto_predecessor_id = :produto_predecessor_id
                      WHERE id = :id
+                       AND CAST(tenant_id AS TEXT) = :tenant_id
                     """
                 ),
                 {
                     "id": target_id,
+                    "tenant_id": target_tenant_id,
                     "produto_pai_id": parent_target_id,
                     "produto_predecessor_id": predecessor_target_id,
                 },
@@ -978,7 +1013,12 @@ def _copy_products(
         result.bump("created", "produtos")
 
     if not result.dry_run:
-        _link_product_hierarchy(db, source_products=source_by_id, mapping=mapping)
+        _link_product_hierarchy(
+            db,
+            source_products=source_by_id,
+            mapping=mapping,
+            target_tenant_id=target_tenant_id,
+        )
     return mapping, source_by_id
 
 
@@ -1125,6 +1165,7 @@ def _find_existing_product_image_id(
     produto_id: int,
     url: str,
 ) -> int | None:
+    sync_rls_tenant(db, tenant_id)
     return db.execute(
         text(
             """
@@ -1246,11 +1287,28 @@ def _copy_product_image_row(
     return (target_product_id, new_url) if _is_main_source_image(row, source_products) else None
 
 
-def _update_main_product_images(db: Session, main_urls_by_target_product: dict[int, str]) -> None:
+def _update_main_product_images(
+    db: Session,
+    main_urls_by_target_product: dict[int, str],
+    *,
+    target_tenant_id: str,
+) -> None:
+    sync_rls_tenant(db, target_tenant_id)
     for target_product_id, new_url in main_urls_by_target_product.items():
         db.execute(
-            text("UPDATE produtos SET imagem_principal=:url WHERE id=:id"),
-            {"id": target_product_id, "url": new_url},
+            text(
+                """
+                UPDATE produtos
+                   SET imagem_principal=:url
+                 WHERE id=:id
+                   AND CAST(tenant_id AS TEXT)=:tenant_id
+                """
+            ),
+            {
+                "id": target_product_id,
+                "url": new_url,
+                "tenant_id": target_tenant_id,
+            },
         )
 
 
@@ -1287,7 +1345,11 @@ def _copy_product_images(
             target_product_id, new_url = main_image
             main_urls_by_target_product[target_product_id] = new_url
 
-    _update_main_product_images(db, main_urls_by_target_product)
+    _update_main_product_images(
+        db,
+        main_urls_by_target_product,
+        target_tenant_id=target_tenant_id,
+    )
 
 
 def _relation_exists(
@@ -1300,6 +1362,7 @@ def _relation_exists(
     second_column: str,
     second_id: int,
 ) -> bool:
+    sync_rls_tenant(db, tenant_id)
     return bool(
         db.execute(
             text(
