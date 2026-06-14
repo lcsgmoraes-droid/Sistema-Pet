@@ -13,7 +13,7 @@ WHITELIST:
 """
 
 from sqlalchemy.orm import Session
-from sqlalchemy import event, inspect
+from sqlalchemy import event, inspect, or_, select
 from sqlalchemy.orm import with_loader_criteria
 import logging
 
@@ -48,6 +48,36 @@ TENANT_WHITELIST_TABLES = {
     'campaign_event_queue',        # fila de eventos: worker.process_batch claim cross-tenant
     'notification_queue',          # fila de notificações: notification_sender claim cross-tenant
 }
+
+
+PARTNER_READABLE_TENANT_TABLES = {
+    "clientes",
+    "pets",
+    "produtos",
+}
+
+
+def _tenant_read_filter(cls, tenant_id):
+    if getattr(cls, "__tablename__", None) not in PARTNER_READABLE_TENANT_TABLES:
+        return cls.tenant_id == tenant_id
+
+    from app.veterinario_models import VetPartnerLink
+
+    partner_tenant_ids = select(VetPartnerLink.empresa_tenant_id).where(
+        VetPartnerLink.vet_tenant_id == tenant_id,
+        VetPartnerLink.ativo.is_(True),
+    )
+    return or_(cls.tenant_id == tenant_id, cls.tenant_id.in_(partner_tenant_ids))
+
+
+def _supports_partner_read_filter(session) -> bool:
+    try:
+        bind = session.get_bind()
+    except Exception as exc:
+        logger.debug("[ORM TENANT FILTER] Nao foi possivel obter bind da sessao: %s", exc)
+        return False
+
+    return getattr(getattr(bind, "dialect", None), "name", None) == "postgresql"
 
 
 def _get_query_primary_table(execute_state):
@@ -114,11 +144,19 @@ def _add_tenant_filter(execute_state):
         # Dois alvos: BaseTenantModel (modelos modernos) e TenantScoped (modelos
         # legados que herdam Base direto mas adotam o mixin). Cada entidade casa
         # com exatamente um dos criterios (BaseTenantModel nao herda TenantScoped).
+        if _supports_partner_read_filter(execute_state.session):
+            base_tenant_filter = lambda cls: _tenant_read_filter(cls, tenant_id)
+            track_base_closure_variables = False
+        else:
+            base_tenant_filter = lambda cls: cls.tenant_id == tenant_id
+            track_base_closure_variables = True
+
         execute_state.statement = execute_state.statement.options(
             with_loader_criteria(
                 BaseTenantModel,
-                lambda cls: cls.tenant_id == tenant_id,
+                base_tenant_filter,
                 include_aliases=True,
+                track_closure_variables=track_base_closure_variables,
             ),
             with_loader_criteria(
                 TenantScoped,
