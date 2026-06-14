@@ -126,6 +126,7 @@ TENANT_SCOPED_TABLES = {
     "vet_procedimentos_consulta",
     "vet_protocolos_vacinas",
     "vet_vacinas_registros",
+    "venda_baixas",
     "venda_itens",
     "venda_pagamentos",
     "vendas",
