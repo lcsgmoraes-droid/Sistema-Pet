@@ -36,3 +36,20 @@ def test_mobile_login_and_profile_render_profile_switching_controls():
     assert "selectProfile" in login
     assert "Trocar perfil" in profile
     assert "available_profiles" in profile
+
+
+def test_operational_mobile_navigators_expose_profile_switch_in_header():
+    actions_path = REPO_ROOT / "app-mobile/src/components/HeaderProfileActions.tsx"
+    assert actions_path.exists(), "operational app headers need an in-session profile switch"
+
+    actions = actions_path.read_text(encoding="utf-8")
+    funcionario = read_repo("app-mobile/src/navigation/FuncionarioNavigator.tsx")
+    entregador = read_repo("app-mobile/src/navigation/EntregadorNavigator.tsx")
+    veterinario = read_repo("app-mobile/src/navigation/VeterinarioNavigator.tsx")
+
+    assert "available_profiles" in actions
+    assert "selectProfile" in actions
+    assert "Trocar" in actions
+    assert "HeaderProfileActions" in funcionario
+    assert "HeaderProfileActions" in entregador
+    assert "HeaderProfileActions" in veterinario
