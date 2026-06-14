@@ -222,6 +222,7 @@ TENANT_TABLES = {
     "dre_comparacoes",
     "dre_insights",
     "dre_lancamentos",
+    "dre_periodos",
     "dre_plano_contas",
     "dre_produtos",
     "indices_mercado",
