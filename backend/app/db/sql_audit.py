@@ -218,8 +218,12 @@ TENANT_TABLES = {
     "contexto_financeiro_chat",
     
     # Relatórios
+    "dre_categorias_analise",
+    "dre_comparacoes",
+    "dre_insights",
     "dre_lancamentos",
     "dre_plano_contas",
+    "dre_produtos",
     "indices_mercado",
 }
 
