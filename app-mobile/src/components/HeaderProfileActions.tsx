@@ -1,38 +1,60 @@
 import { Ionicons } from "@expo/vector-icons";
-import React from "react";
+import React, { useState } from "react";
 import { Alert, StyleSheet, Text, TouchableOpacity, View } from "react-native";
+import * as AuthService from "../services/auth.service";
 import { useAuthStore } from "../store/auth.store";
 
 type HeaderProfileActionsProps = {
   logoutContextLabel: string;
   color?: string;
+  alwaysShowSwitch?: boolean;
+  showLogout?: boolean;
 };
 
 export default function HeaderProfileActions({
   logoutContextLabel,
   color = "#fff",
+  alwaysShowSwitch = true,
+  showLogout = true,
 }: HeaderProfileActionsProps) {
-  const { user, logout, selectProfile } = useAuthStore();
+  const { user, logout, selectProfile, updateUser } = useAuthStore();
+  const [loadingProfiles, setLoadingProfiles] = useState(false);
   const available_profiles = user?.available_profiles ?? [];
   const currentProfile = user?.selected_profile ?? user?.perfil_operacional ?? "cliente";
-  const canSwitch = available_profiles.length > 1;
+  const canSwitch = alwaysShowSwitch || available_profiles.length > 1;
 
-  const trocarPerfil = () => {
-    const profileOptions = available_profiles
-      .filter((profile) => profile.type !== currentProfile)
-      .map((profile) => ({
-        text: profile.label,
-        onPress: () => {
-          selectProfile(profile.type).catch(() => {
-            Alert.alert("Erro", "Nao foi possivel trocar o perfil agora.");
-          });
-        },
-      }));
+  const trocarPerfil = async () => {
+    setLoadingProfiles(true);
+    try {
+      const freshUser = await AuthService.getProfile();
+      updateUser(freshUser);
+      const freshProfiles = freshUser.available_profiles ?? [];
+      const freshCurrentProfile = freshUser.selected_profile ?? freshUser.perfil_operacional ?? currentProfile;
+      const profileOptions = freshProfiles
+        .filter((profile) => profile.type !== freshCurrentProfile)
+        .map((profile) => ({
+          text: profile.label,
+          onPress: () => {
+            selectProfile(profile.type).catch(() => {
+              Alert.alert("Erro", "Nao foi possivel trocar o perfil agora.");
+            });
+          },
+        }));
 
-    Alert.alert("Trocar perfil", "Escolha como entrar no app.", [
-      ...profileOptions,
-      { text: "Cancelar", style: "cancel" },
-    ]);
+      if (profileOptions.length === 0) {
+        Alert.alert("Trocar perfil", "Sem outros acessos liberados para esta conta.");
+        return;
+      }
+
+      Alert.alert("Trocar perfil", "Escolha como entrar no app.", [
+        ...profileOptions,
+        { text: "Cancelar", style: "cancel" },
+      ]);
+    } catch {
+      Alert.alert("Erro", "Nao foi possivel carregar os acessos agora.");
+    } finally {
+      setLoadingProfiles(false);
+    }
   };
 
   const confirmarLogout = () => {
@@ -57,18 +79,23 @@ export default function HeaderProfileActions({
           accessibilityLabel="Trocar perfil do app"
           onPress={trocarPerfil}
           style={styles.action}
+          disabled={loadingProfiles}
         >
           <Ionicons name="swap-horizontal-outline" size={18} color={color} />
-          <Text style={[styles.text, { color }]}>Trocar</Text>
+          <Text style={[styles.text, { color }]}>
+            {loadingProfiles ? "..." : "Trocar"}
+          </Text>
         </TouchableOpacity>
       )}
-      <TouchableOpacity
-        accessibilityLabel="Sair da conta"
-        onPress={confirmarLogout}
-        style={styles.action}
-      >
-        <Text style={[styles.text, { color }]}>Sair</Text>
-      </TouchableOpacity>
+      {showLogout && (
+        <TouchableOpacity
+          accessibilityLabel="Sair da conta"
+          onPress={confirmarLogout}
+          style={styles.action}
+        >
+          <Text style={[styles.text, { color }]}>Sair</Text>
+        </TouchableOpacity>
+      )}
     </View>
   );
 }
