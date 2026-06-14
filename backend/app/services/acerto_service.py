@@ -5,13 +5,16 @@ Consolidação periódica automática de comissões com compensação de dívida
 from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
+from uuid import UUID
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
 import json
 import re
 
-from app.models import Cliente, AcertoParceiro, EmailTemplate, EmailEnvio
+from app.models import Cliente, AcertoParceiro, EmailTemplate, EmailEnvio, Tenant
 from app.db import get_session
+from app.tenancy.context import get_current_tenant, tenant_context
+from app.tenancy.rls import sync_rls_tenant
 from app.utils.logger import logger
 
 
@@ -360,6 +363,13 @@ class EmailQueueService:
     """Serviço para gerenciamento de fila de emails com governança"""
     
     @staticmethod
+    def _resolver_tenant_id(tenant_id=None) -> Optional[UUID]:
+        resolved = get_current_tenant() if tenant_id is None else tenant_id
+        if resolved is None or resolved == "":
+            return None
+        return UUID(str(resolved))
+
+    @staticmethod
     def enfileirar_email(
         db: Session,
         parceiro_id: int,
@@ -411,7 +421,21 @@ class EmailQueueService:
         return email_envio
     
     @staticmethod
-    def processar_fila(db: Session, limite: int = 10) -> Dict:
+    def processar_fila(db: Session, limite: int = 10, tenant_id=None) -> Dict:
+        tenant_uuid = EmailQueueService._resolver_tenant_id(tenant_id)
+        if tenant_uuid is None:
+            raise ValueError("tenant_id e obrigatorio para processar a fila de emails")
+
+        with tenant_context(tenant_uuid) as scoped_tenant:
+            sync_rls_tenant(db, scoped_tenant)
+            return EmailQueueService._processar_fila_tenant(
+                db,
+                limite=limite,
+                scoped_tenant=scoped_tenant,
+            )
+
+    @staticmethod
+    def _processar_fila_tenant(db: Session, limite: int = 10, scoped_tenant=None) -> Dict:
         """
         Processa emails pendentes na fila.
         
@@ -428,7 +452,8 @@ class EmailQueueService:
         emails_pendentes = db.query(EmailEnvio).filter(
             EmailEnvio.status == 'pendente',
             EmailEnvio.tentativas < EmailEnvio.max_tentativas,
-            EmailEnvio.proxima_tentativa <= agora
+            EmailEnvio.proxima_tentativa <= agora,
+            EmailEnvio.tenant_id == scoped_tenant
         ).order_by(EmailEnvio.data_enfileiramento).limit(limite).all()
         
         enviados = 0
@@ -488,9 +513,73 @@ class EmailQueueService:
             "enviados": enviados,
             "erros": erros
         }
+
+    @staticmethod
+    def processar_fila_global(db: Session, limite: int = 10) -> Dict:
+        """
+        Processa a fila de emails tenant por tenant.
+
+        Uso esperado para schedulers globais, sem request HTTP autenticada.
+        """
+        tenant_rows = (
+            db.query(Tenant.id)
+            .filter(Tenant.status == "active")
+            .order_by(Tenant.created_at.asc())
+            .all()
+        )
+
+        processados = 0
+        enviados = 0
+        erros = 0
+        tenants_processados = 0
+
+        for row in tenant_rows:
+            if processados >= limite:
+                break
+
+            tenant_id_raw = row[0] if isinstance(row, tuple) else getattr(row, "id", row)
+            try:
+                tenant_uuid = UUID(str(tenant_id_raw))
+            except (TypeError, ValueError):
+                logger.warning("[EMAIL] Ignorando tenant_id invalido na fila: %s", tenant_id_raw)
+                continue
+
+            restante = max(0, limite - processados)
+            with tenant_context(tenant_uuid):
+                resultado = EmailQueueService.processar_fila(
+                    db,
+                    limite=restante,
+                    tenant_id=tenant_uuid,
+                )
+
+            processados += int(resultado.get("processados", 0) or 0)
+            enviados += int(resultado.get("enviados", 0) or 0)
+            erros += int(resultado.get("erros", 0) or 0)
+            tenants_processados += 1
+
+        return {
+            "processados": processados,
+            "enviados": enviados,
+            "erros": erros,
+            "tenants_processados": tenants_processados,
+        }
     
     @staticmethod
-    def reenviar_email(db: Session, email_id: int) -> Dict:
+    def reenviar_email(db: Session, email_id: int, tenant_id=None) -> Dict:
+        tenant_uuid = EmailQueueService._resolver_tenant_id(tenant_id)
+        if tenant_uuid is None:
+            raise ValueError("tenant_id e obrigatorio para reenviar email")
+
+        with tenant_context(tenant_uuid) as scoped_tenant:
+            sync_rls_tenant(db, scoped_tenant)
+            return EmailQueueService._reenviar_email_tenant(
+                db,
+                email_id=email_id,
+                scoped_tenant=scoped_tenant,
+            )
+
+    @staticmethod
+    def _reenviar_email_tenant(db: Session, email_id: int, scoped_tenant=None) -> Dict:
         """
         Reenvia um email que falhou anteriormente.
         
@@ -501,7 +590,10 @@ class EmailQueueService:
         Returns:
             Dict com resultado do reenvio
         """
-        email = db.query(EmailEnvio).filter(EmailEnvio.id == email_id).first()
+        email = db.query(EmailEnvio).filter(
+            EmailEnvio.id == email_id,
+            EmailEnvio.tenant_id == scoped_tenant
+        ).first()
         
         if not email:
             raise ValueError(f"Email {email_id} não encontrado")

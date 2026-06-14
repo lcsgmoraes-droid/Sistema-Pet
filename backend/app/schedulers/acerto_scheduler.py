@@ -5,12 +5,14 @@ Execução diária para processamento automático de acertos configurados
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from datetime import datetime
+from uuid import UUID
 from sqlalchemy.orm import Session
 import logging
 
 from app.db import SessionLocal
-from app.models import Cliente
+from app.models import Cliente, Tenant
 from app.services.acerto_service import AcertoService, EmailQueueService, EmailService
+from app.tenancy.context import tenant_context
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +60,115 @@ class AcertoScheduler:
         logger.info("   - Fila de emails: a cada 5 minutos")
         logger.info("   - Ajuste media entregas: último dia do mês às 23:00")
     
+    def _processar_acertos_diarios_por_tenant(self, db: Session, dia_hoje: int):
+        tenant_rows = (
+            db.query(Tenant.id)
+            .filter(Tenant.status == "active")
+            .order_by(Tenant.created_at.asc())
+            .all()
+        )
+
+        acertos_gerados = 0
+        acertos_pulados = 0
+        erros = 0
+        parceiros_total = 0
+
+        for row in tenant_rows:
+            tenant_id_raw = row[0] if isinstance(row, tuple) else getattr(row, "id", row)
+            try:
+                tenant_id = UUID(str(tenant_id_raw))
+            except (TypeError, ValueError):
+                logger.warning("[SCHEDULER] Ignorando tenant_id invalido em acertos: %s", tenant_id_raw)
+                continue
+
+            with tenant_context(tenant_id):
+                parceiros_elegiveis = db.query(Cliente).filter(
+                    Cliente.parceiro_ativo == True,
+                    Cliente.parceiro_notificar == True,
+                    Cliente.parceiro_dia_acerto == dia_hoje,
+                    Cliente.parceiro_tipo_acerto.in_(['mensal', 'quinzenal', 'semanal'])
+                ).all()
+
+                parceiros_total += len(parceiros_elegiveis)
+                logger.info(
+                    "[INFO] Parceiros elegiveis hoje no tenant %s: %s",
+                    tenant_id,
+                    len(parceiros_elegiveis),
+                )
+
+                for parceiro in parceiros_elegiveis:
+                    try:
+                        logger.info(f"   Processando: {parceiro.nome} (ID: {parceiro.id})")
+
+                        resultado = AcertoService.gerar_acerto(
+                            db=db,
+                            parceiro_id=parceiro.id,
+                            user_id=parceiro.user_id,
+                            data_acerto=None,
+                            forcar_manual=False
+                        )
+
+                        if resultado.get('idempotente'):
+                            logger.info(f"      [SKIP] Acerto ja existente (idempotencia)")
+                            acertos_pulados += 1
+                            continue
+
+                        logger.info(f"      [OK] Acerto gerado: ID {resultado['acerto_id']}")
+                        logger.info(f"         Comissoes: {resultado['comissoes_fechadas']}")
+                        logger.info(f"         Valor liquido: R$ {resultado['valor_liquido']:.2f}")
+
+                        acertos_gerados += 1
+
+                        if parceiro.parceiro_notificar and resultado.get('dados_email'):
+                            try:
+                                assunto, corpo_html, corpo_texto = EmailService.renderizar_template(
+                                    db=db,
+                                    codigo_template='ACERTO_PARCEIRO',
+                                    placeholders=resultado['dados_email'],
+                                    user_id=parceiro.user_id
+                                )
+
+                                destinatarios = []
+                                if parceiro.parceiro_email_principal or parceiro.email:
+                                    destinatarios.append(parceiro.parceiro_email_principal or parceiro.email)
+
+                                if parceiro.parceiro_emails_copia:
+                                    emails_copia = [
+                                        e.strip()
+                                        for e in parceiro.parceiro_emails_copia.split(',')
+                                        if e.strip()
+                                    ]
+                                    destinatarios.extend(emails_copia)
+
+                                if destinatarios:
+                                    EmailQueueService.enfileirar_email(
+                                        db=db,
+                                        parceiro_id=parceiro.id,
+                                        user_id=parceiro.user_id,
+                                        assunto=assunto,
+                                        corpo_html=corpo_html,
+                                        corpo_texto=corpo_texto,
+                                        destinatarios=destinatarios,
+                                        acerto_id=resultado['acerto_id']
+                                    )
+
+                                    logger.info(f"      [EMAIL] Enfileirado para: {', '.join(destinatarios)}")
+
+                            except Exception as e:
+                                logger.error(f"      [ERROR] Erro ao enfileirar email: {str(e)}")
+
+                    except Exception as e:
+                        logger.error(f"   [ERROR] Erro ao processar {parceiro.nome}: {str(e)}")
+                        erros += 1
+
+        logger.info("=" * 60)
+        logger.info(f"[DONE] Processamento concluido:")
+        logger.info(f"   - Parceiros elegiveis: {parceiros_total}")
+        logger.info(f"   - Acertos gerados: {acertos_gerados}")
+        logger.info(f"   - Acertos pulados (idempotencia): {acertos_pulados}")
+        logger.info(f"   - Erros: {erros}")
+        logger.info("=" * 60)
+
     def processar_acertos_diarios(self):
         """
         Job executado diariamente às 00:05.
@@ -69,96 +180,7 @@ class AcertoScheduler:
         dia_hoje = datetime.now().day
         
         try:
-            # Buscar parceiros elegíveis
-            parceiros_elegiveis = db.query(Cliente).filter(
-                Cliente.parceiro_ativo == True,
-                Cliente.parceiro_notificar == True,
-                Cliente.parceiro_dia_acerto == dia_hoje,
-                Cliente.parceiro_tipo_acerto.in_(['mensal', 'quinzenal', 'semanal'])
-            ).all()
-            
-            logger.info(f"[INFO] Parceiros elegiveis hoje: {len(parceiros_elegiveis)}")
-            
-            acertos_gerados = 0
-            acertos_pulados = 0
-            erros = 0
-            
-            for parceiro in parceiros_elegiveis:
-                try:
-                    logger.info(f"   Processando: {parceiro.nome} (ID: {parceiro.id})")
-                    
-                    # Gerar acerto
-                    resultado = AcertoService.gerar_acerto(
-                        db=db,
-                        parceiro_id=parceiro.id,
-                        user_id=parceiro.user_id,
-                        data_acerto=None,  # Usa data atual
-                        forcar_manual=False
-                    )
-                    
-                    if resultado.get('idempotente'):
-                        # Já foi gerado anteriormente
-                        logger.info(f"      [SKIP] Acerto ja existente (idempotencia)")
-                        acertos_pulados += 1
-                        continue
-                    
-                    logger.info(f"      [OK] Acerto gerado: ID {resultado['acerto_id']}")
-                    logger.info(f"         Comissoes: {resultado['comissoes_fechadas']}")
-                    logger.info(f"         Valor liquido: R$ {resultado['valor_liquido']:.2f}")
-                    
-                    acertos_gerados += 1
-                    
-                    # Enfileirar email se configurado
-                    if parceiro.parceiro_notificar and resultado.get('dados_email'):
-                        try:
-                            # Renderizar template
-                            assunto, corpo_html, corpo_texto = EmailService.renderizar_template(
-                                db=db,
-                                codigo_template='ACERTO_PARCEIRO',
-                                placeholders=resultado['dados_email'],
-                                user_id=parceiro.user_id
-                            )
-                            
-                            # Preparar destinatários
-                            destinatarios = []
-                            if parceiro.parceiro_email_principal or parceiro.email:
-                                destinatarios.append(parceiro.parceiro_email_principal or parceiro.email)
-                            
-                            if parceiro.parceiro_emails_copia:
-                                emails_copia = [e.strip() for e in parceiro.parceiro_emails_copia.split(',') if e.strip()]
-                                destinatarios.extend(emails_copia)
-                            
-                            if destinatarios:
-                                # Enfileirar
-                                EmailQueueService.enfileirar_email(
-                                    db=db,
-                                    parceiro_id=parceiro.id,
-                                    user_id=parceiro.user_id,
-                                    assunto=assunto,
-                                    corpo_html=corpo_html,
-                                    corpo_texto=corpo_texto,
-                                    destinatarios=destinatarios,
-                                    acerto_id=resultado['acerto_id']
-                                )
-                                
-                                logger.info(f"      [EMAIL] Enfileirado para: {', '.join(destinatarios)}")
-                        
-                        except Exception as e:
-                            # Erro no email não deve quebrar o acerto
-                            logger.error(f"      [ERROR] Erro ao enfileirar email: {str(e)}")
-                
-                except Exception as e:
-                    logger.error(f"   [ERROR] Erro ao processar {parceiro.nome}: {str(e)}")
-                    erros += 1
-            
-            # Resumo
-            logger.info("=" * 60)
-            logger.info(f"[DONE] Processamento concluido:")
-            logger.info(f"   - Acertos gerados: {acertos_gerados}")
-            logger.info(f"   - Acertos pulados (idempotencia): {acertos_pulados}")
-            logger.info(f"   - Erros: {erros}")
-            logger.info("=" * 60)
-        
+            self._processar_acertos_diarios_por_tenant(db, dia_hoje)
         except Exception as e:
             logger.error(f"[CRITICAL] Erro critico no processamento de acertos: {str(e)}")
             import traceback
@@ -175,7 +197,7 @@ class AcertoScheduler:
         db = SessionLocal()
         
         try:
-            resultado = EmailQueueService.processar_fila(db, limite=20)
+            resultado = EmailQueueService.processar_fila_global(db, limite=20)
             
             if resultado['processados'] > 0:
                 logger.info(f"[EMAIL] Fila de emails processada:")
