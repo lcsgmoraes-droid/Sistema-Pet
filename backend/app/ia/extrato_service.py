@@ -32,13 +32,13 @@ class ServicoImportacaoExtrato:
         self.db = db
         self.parser = ExtratoParser()
         self.nlp = ExtratoNLP()
-        self.ia = MotorCategorizacaoIA(db)
     
     def importar_extrato(
         self,
         arquivo: bytes,
         nome_arquivo: str,
         user_id: int,
+        tenant_id,
         conta_bancaria_id: Optional[int] = None
     ) -> Dict:
         """
@@ -58,8 +58,9 @@ class ServicoImportacaoExtrato:
         
         # 1. Verificar hash do arquivo (evitar duplicatas)
         hash_arquivo = self._calcular_hash(arquivo)
-        arquivo_existente = self.db.query(ArquivoExtratoImportado).filter_by(
-            hash_arquivo=hash_arquivo
+        arquivo_existente = self.db.query(ArquivoExtratoImportado).filter(
+            ArquivoExtratoImportado.tenant_id == tenant_id,
+            ArquivoExtratoImportado.hash_arquivo == hash_arquivo
         ).first()
         
         if arquivo_existente:
@@ -76,12 +77,13 @@ class ServicoImportacaoExtrato:
         
         # 3. Criar registro do arquivo
         arquivo_registro = ArquivoExtratoImportado(
+            tenant_id=tenant_id,
             nome_arquivo=nome_arquivo,
             tipo_arquivo=metadados['formato'],
             hash_arquivo=hash_arquivo,
             banco_detectado=metadados['banco'],
             total_transacoes=len(transacoes),
-            user_id=user_id,
+            usuario_id=user_id,
             conta_bancaria_id=conta_bancaria_id,
             data_upload=datetime.now(),
             status='processando'
@@ -90,6 +92,7 @@ class ServicoImportacaoExtrato:
         self.db.flush()
         
         # 4. Processar cada transação
+        ia = MotorCategorizacaoIA(self.db, tenant_id=tenant_id)
         total_categorizadas = 0
         total_necessitam_revisao = 0
         duplicadas = 0
@@ -100,8 +103,9 @@ class ServicoImportacaoExtrato:
                 t['data'], t['descricao'], t['valor']
             )
             
-            existe = self.db.query(LancamentoImportado).filter_by(
-                hash_transacao=hash_transacao
+            existe = self.db.query(LancamentoImportado).filter(
+                LancamentoImportado.tenant_id == tenant_id,
+                LancamentoImportado.hash_transacao == hash_transacao
             ).first()
             
             if existe:
@@ -112,7 +116,7 @@ class ServicoImportacaoExtrato:
             dados_nlp = self.nlp.extrair_dados(t['descricao'])
             
             # IA: categorizar
-            resultado_ia = self.ia.categorizar_transacao(
+            resultado_ia = ia.categorizar_transacao(
                 data=t['data'],
                 descricao=t['descricao'],
                 valor=t['valor'],
@@ -124,11 +128,13 @@ class ServicoImportacaoExtrato:
                 data=t['data'],
                 valor=t['valor'],
                 tipo=t['tipo'],
-                cnpj_cpf=dados_nlp['cnpj'] or dados_nlp['cpf']
+                cnpj_cpf=dados_nlp['cnpj'] or dados_nlp['cpf'],
+                tenant_id=tenant_id
             )
             
             # Criar lançamento importado
             lancamento = LancamentoImportado(
+                tenant_id=tenant_id,
                 arquivo_id=arquivo_registro.id,
                 data_transacao=t['data'],
                 descricao_original=t['descricao'],
@@ -149,7 +155,7 @@ class ServicoImportacaoExtrato:
                 linkagem_automatica=linkagem.get('automatica', False),
                 confianca_linkagem=linkagem.get('confianca', 0.0),
                 hash_transacao=hash_transacao,
-                user_id=user_id
+                usuario_id=user_id
             )
             
             self.db.add(lancamento)
@@ -182,7 +188,8 @@ class ServicoImportacaoExtrato:
         data: datetime,
         valor: float,
         tipo: str,
-        cnpj_cpf: Optional[str]
+        cnpj_cpf: Optional[str],
+        tenant_id
     ) -> Dict:
         """
         Tenta vincular transação com contas a pagar/receber.
@@ -206,10 +213,11 @@ class ServicoImportacaoExtrato:
         if tipo == 'saida':
             # Buscar conta a pagar
             query = self.db.query(ContaPagar).filter(
+                ContaPagar.tenant_id == tenant_id,
                 ContaPagar.data_vencimento >= data_min,
                 ContaPagar.data_vencimento <= data_max,
-                ContaPagar.valor_total >= valor_min,
-                ContaPagar.valor_total <= valor_max,
+                ContaPagar.valor_final >= valor_min,
+                ContaPagar.valor_final <= valor_max,
                 ContaPagar.status != 'pago'
             )
             
@@ -223,7 +231,7 @@ class ServicoImportacaoExtrato:
             if conta:
                 # Verificar confiança
                 confianca = self._calcular_confianca_linkagem(
-                    data, valor, conta.data_vencimento, float(conta.valor_total)
+                    data, valor, conta.data_vencimento, float(conta.valor_final)
                 )
                 
                 return {
@@ -236,10 +244,11 @@ class ServicoImportacaoExtrato:
         elif tipo == 'entrada':
             # Buscar conta a receber
             query = self.db.query(ContaReceber).filter(
+                ContaReceber.tenant_id == tenant_id,
                 ContaReceber.data_vencimento >= data_min,
                 ContaReceber.data_vencimento <= data_max,
-                ContaReceber.valor_total >= valor_min,
-                ContaReceber.valor_total <= valor_max,
+                ContaReceber.valor_final >= valor_min,
+                ContaReceber.valor_final <= valor_max,
                 ContaReceber.status != 'recebido'
             )
             
@@ -247,7 +256,7 @@ class ServicoImportacaoExtrato:
             
             if conta:
                 confianca = self._calcular_confianca_linkagem(
-                    data, valor, conta.data_vencimento, float(conta.valor_total)
+                    data, valor, conta.data_vencimento, float(conta.valor_final)
                 )
                 
                 return {
@@ -293,14 +302,14 @@ class ServicoImportacaoExtrato:
     
     def listar_lancamentos_pendentes(
         self,
-        user_id: int,
+        tenant_id,
         limite: int = 50
     ) -> List[Dict]:
         """
         Lista lançamentos que necessitam validação.
         """
         lancamentos = self.db.query(LancamentoImportado).filter(
-            LancamentoImportado.user_id == user_id,
+            LancamentoImportado.tenant_id == tenant_id,
             LancamentoImportado.status_validacao == 'pendente'
         ).order_by(
             LancamentoImportado.confianca_ia.asc(),  # Menor confiança primeiro
@@ -311,8 +320,9 @@ class ServicoImportacaoExtrato:
         for lanc in lancamentos:
             categoria = None
             if lanc.categoria_financeira_id:
-                categoria = self.db.query(CategoriaFinanceira).filter_by(
-                    id=lanc.categoria_financeira_id
+                categoria = self.db.query(CategoriaFinanceira).filter(
+                    CategoriaFinanceira.tenant_id == tenant_id,
+                    CategoriaFinanceira.id == lanc.categoria_financeira_id
                 ).first()
             
             resultado.append({
@@ -341,27 +351,30 @@ class ServicoImportacaoExtrato:
     def validar_lote(
         self,
         lancamento_ids: List[int],
-        user_id: int,
+        tenant_id,
         aprovar: bool = True
     ):
         """
         Valida múltiplos lançamentos de uma vez.
         """
+        ia = MotorCategorizacaoIA(self.db, tenant_id=tenant_id)
         for lanc_id in lancamento_ids:
-            self.ia.validar_categorizacao(
+            ia.validar_categorizacao(
                 lancamento_id=lanc_id,
                 aprovado=aprovar
             )
     
     def criar_lancamento_financeiro(
         self,
-        lancamento_importado_id: int
+        lancamento_importado_id: int,
+        tenant_id
     ):
         """
         Cria lançamento manual a partir de importado validado.
         """
-        importado = self.db.query(LancamentoImportado).filter_by(
-            id=lancamento_importado_id
+        importado = self.db.query(LancamentoImportado).filter(
+            LancamentoImportado.tenant_id == tenant_id,
+            LancamentoImportado.id == lancamento_importado_id
         ).first()
         
         if not importado:
@@ -378,19 +391,20 @@ class ServicoImportacaoExtrato:
         
         # Criar lançamento manual
         lancamento = LancamentoManual(
+            tenant_id=tenant_id,
             descricao=importado.descricao_original,
             valor=importado.valor,
             tipo=importado.tipo,
             data_lancamento=importado.data_transacao,
             categoria_id=categoria_id,
-            user_id=importado.user_id,
+            user_id=importado.usuario_id,
             observacoes=f"Importado de extrato bancário (#{importado.arquivo_id})"
         )
         
         self.db.add(lancamento)
         
         # Marcar como processado
-        importado.lancamento_manual_criado_id = lancamento.id
+        importado.lancamento_manual_id = lancamento.id
         
         self.db.commit()
         
@@ -398,13 +412,13 @@ class ServicoImportacaoExtrato:
     
     def obter_historico_importacoes(
         self,
-        user_id: int
+        tenant_id
     ) -> List[Dict]:
         """
         Lista histórico de arquivos importados.
         """
-        arquivos = self.db.query(ArquivoExtratoImportado).filter_by(
-            user_id=user_id
+        arquivos = self.db.query(ArquivoExtratoImportado).filter(
+            ArquivoExtratoImportado.tenant_id == tenant_id
         ).order_by(
             ArquivoExtratoImportado.data_upload.desc()
         ).all()
