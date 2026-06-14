@@ -79,6 +79,7 @@ class AcertoService:
     def gerar_acerto(
         db: Session,
         parceiro_id: int,
+        tenant_id: UUID,
         user_id: int,
         data_acerto: Optional[datetime] = None,
         forcar_manual: bool = False
@@ -108,11 +109,13 @@ class AcertoService:
         """
         if data_acerto is None:
             data_acerto = datetime.now()
+
+        sync_rls_tenant(db, tenant_id)
         
         # 1. VALIDAR PARCEIRO
         parceiro = db.query(Cliente).filter(
             Cliente.id == parceiro_id,
-            Cliente.user_id == user_id,
+            Cliente.tenant_id == tenant_id,
             Cliente.parceiro_ativo == True
         ).first()
         
@@ -134,6 +137,7 @@ class AcertoService:
         # 3. **IDEMPOTÊNCIA** - Verificar se já existe acerto neste período
         acerto_existente = db.query(AcertoParceiro).filter(
             AcertoParceiro.parceiro_id == parceiro_id,
+            AcertoParceiro.tenant_id == tenant_id,
             AcertoParceiro.user_id == user_id,
             AcertoParceiro.periodo_inicio == periodo_inicio,
             AcertoParceiro.periodo_fim == periodo_fim,
@@ -160,6 +164,7 @@ class AcertoService:
         
         comissoes_pendentes = db.query(ComissaoItem).filter(
             ComissaoItem.parceiro_id == parceiro_id,
+            ComissaoItem.tenant_id == tenant_id,
             ComissaoItem.status != 'pago',
             ComissaoItem.created_at >= periodo_inicio,
             ComissaoItem.created_at <= periodo_fim
@@ -174,6 +179,7 @@ class AcertoService:
             
             acerto = AcertoParceiro(
                 parceiro_id=parceiro_id,
+                tenant_id=tenant_id,
                 user_id=user_id,
                 data_acerto=data_acerto,
                 periodo_inicio=periodo_inicio,
@@ -233,6 +239,7 @@ class AcertoService:
         
         acerto = AcertoParceiro(
             parceiro_id=parceiro_id,
+            tenant_id=tenant_id,
             user_id=user_id,
             data_acerto=data_acerto,
             periodo_inicio=periodo_inicio,
