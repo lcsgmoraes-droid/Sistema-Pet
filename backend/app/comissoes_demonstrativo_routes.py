@@ -21,11 +21,10 @@ from app.utils.tenant_safe_sql import execute_tenant_safe
 
 from app.utils.logger import StructuredLogger
 from app.db import get_session, SessionLocal
-from app.auth import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
-from app.models import User, Cliente
+from app.models import Cliente
 from app.financeiro_models import (
-    ContaPagar, LancamentoManual, CategoriaFinanceira, MovimentacaoFinanceira, ContaBancaria
+    ContaPagar, LancamentoManual, CategoriaFinanceira
 )
 
 # Logger padrão para logs simples

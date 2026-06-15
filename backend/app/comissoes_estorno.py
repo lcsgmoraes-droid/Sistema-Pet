@@ -2,8 +2,9 @@
 Serviço de Estorno de Comissões
 Sprint 3 - Hardening Financeiro - Passo 1
 """
+from contextlib import contextmanager
 from datetime import datetime
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 import logging
 
 from sqlalchemy import text, bindparam
@@ -50,7 +51,7 @@ def estornar_comissoes_venda(
     # Log estruturado
     struct_logger.info(
         event="COMMISSION_REFUND_START",
-        message=f"Iniciando estorno de comissões",
+        message="Iniciando estorno de comissões",
         venda_id=venda_id,
         motivo=motivo
     )
@@ -184,9 +185,6 @@ def estornar_comissoes_venda(
         # Fechar conexão apenas se foi criada aqui
         if not conn_externa:
             db.close()
-
-
-from contextlib import contextmanager
 
 @contextmanager
 def _no_op_context():

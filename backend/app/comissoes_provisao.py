@@ -12,7 +12,7 @@ CONCEITO-CHAVE: Comissão é DESPESA por COMPETÊNCIA, não depende de pagamento
 import logging
 from decimal import Decimal
 from datetime import date, datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 from sqlalchemy import inspect
 from sqlalchemy.orm import Session
 from app.tenancy.context import get_current_tenant_id

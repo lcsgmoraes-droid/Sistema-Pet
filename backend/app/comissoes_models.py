@@ -5,9 +5,10 @@ from datetime import datetime
 from typing import Optional, List, Dict, Any
 import logging
 
-from sqlalchemy import text
+from sqlalchemy import Boolean, Column, Date, DateTime, ForeignKey, Integer, Numeric, String, Text, text
 from sqlalchemy.exc import IntegrityError
-from app.db import SessionLocal
+from app.base_models import TenantScoped
+from app.db import Base, SessionLocal
 from app.tenancy.context import get_current_tenant_id
 from app.utils.tenant_safe_sql import TenantSafeSQLError, execute_tenant_safe
 
@@ -535,12 +536,6 @@ class ComissoesConfigSistema:
 # MODELS SQLAlchemy
 # Schema baseado em RELATORIO_SCHEMA_TABELAS_ORFAS.md - Fase 5.4
 # ====================
-
-from sqlalchemy import Column, Integer, String, Numeric, Boolean, DateTime, Date, ForeignKey, Text
-from sqlalchemy.dialects.postgresql import UUID
-from app.db import Base
-from app.base_models import TenantScoped
-
 
 class ComissaoConfiguracao(TenantScoped, Base):
     """
