@@ -11,6 +11,9 @@ class _FakeField:
     def __eq__(self, other):
         return ("eq", other)
 
+    def is_(self, other):
+        return ("is", other)
+
     def asc(self):
         return ("asc", self)
 

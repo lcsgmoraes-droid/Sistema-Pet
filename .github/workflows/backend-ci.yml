@@ -115,6 +115,10 @@ jobs:
         run: |
           ruff check app/notas_entrada
 
+      - name: Produtos lint (blocking)
+        run: |
+          ruff check app/produtos
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"

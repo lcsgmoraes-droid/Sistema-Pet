@@ -138,3 +138,10 @@ def test_backend_ci_has_blocking_notas_entrada_lint_step():
 
     assert "Notas entrada lint (blocking)" in source
     assert "ruff check app/notas_entrada" in source
+
+
+def test_backend_ci_has_blocking_produtos_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Produtos lint (blocking)" in source
+    assert "ruff check app/produtos" in source
