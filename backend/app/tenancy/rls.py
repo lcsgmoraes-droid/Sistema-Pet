@@ -12,11 +12,15 @@ from app.tenancy.context import get_current_tenant
 
 
 RLS_TENANT_SETTING = "app.tenant_id"
+RLS_AUTH_USER_SETTING = "app.auth_user_id"
+RLS_AUTH_EMAIL_SETTING = "app.auth_email"
 _SET_CONFIG_SQL = text("SELECT set_config(:setting_name, :setting_value, true)")
 _UNSET = object()
 
 
 def _dialect_name(db: ORMSession) -> str:
+    if not hasattr(db, "get_bind"):
+        return ""
     bind = db.get_bind()
     return str(bind.dialect.name)
 
@@ -28,6 +32,20 @@ def _resolve_tenant_value(tenant_id: Any) -> str:
     return str(UUID(str(resolved)))
 
 
+def _set_transaction_setting(db: ORMSession, setting_name: str, setting_value: str) -> bool:
+    if _dialect_name(db) != "postgresql":
+        return False
+
+    db.connection().execute(
+        _SET_CONFIG_SQL,
+        {
+            "setting_name": setting_name,
+            "setting_value": setting_value,
+        },
+    )
+    return True
+
+
 def sync_rls_tenant(db: ORMSession, tenant_id: Any = _UNSET) -> bool:
     """
     Sync the Python tenant context into PostgreSQL transaction-local settings.
@@ -36,17 +54,20 @@ def sync_rls_tenant(db: ORMSession, tenant_id: Any = _UNSET) -> bool:
     The setting is transaction-local (third set_config argument = true), so it
     does not leak through pooled connections after commit/rollback.
     """
-    if _dialect_name(db) != "postgresql":
-        return False
+    return _set_transaction_setting(db, RLS_TENANT_SETTING, _resolve_tenant_value(tenant_id))
 
-    db.connection().execute(
-        _SET_CONFIG_SQL,
-        {
-            "setting_name": RLS_TENANT_SETTING,
-            "setting_value": _resolve_tenant_value(tenant_id),
-        },
-    )
-    return True
+
+def sync_rls_auth_user(db: ORMSession, user_id: Any) -> bool:
+    if user_id is None or user_id == "":
+        setting_value = ""
+    else:
+        setting_value = str(int(user_id))
+    return _set_transaction_setting(db, RLS_AUTH_USER_SETTING, setting_value)
+
+
+def sync_rls_auth_email(db: ORMSession, email: Any) -> bool:
+    setting_value = str(email or "").strip().lower()
+    return _set_transaction_setting(db, RLS_AUTH_EMAIL_SETTING, setting_value)
 
 
 def _sync_rls_before_flush(session, flush_context, instances) -> None:

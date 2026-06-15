@@ -152,6 +152,7 @@ def get_current_user(
         HTTPException 401: Se token inválido ou usuário inativo
     """
     from app.session_manager import validate_session
+    from app.tenancy.rls import sync_rls_auth_user
     
     token = credentials.credentials
     credentials_exception = HTTPException(
@@ -188,6 +189,7 @@ def get_current_user(
         raise credentials_exception
     
     # Buscar usuário no banco
+    sync_rls_auth_user(session, user_id)
     user = session.query(models.User).filter(models.User.id == user_id).first()
     
     if user is None or not user.is_active:
@@ -212,6 +214,7 @@ def get_current_user_from_token(token: str, session: DBSession) -> models.User:
         HTTPException 401: Se token inválido
     """
     from app.session_manager import validate_session
+    from app.tenancy.rls import sync_rls_auth_user
     
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
@@ -244,6 +247,7 @@ def get_current_user_from_token(token: str, session: DBSession) -> models.User:
     except JWTError:
         raise credentials_exception
     
+    sync_rls_auth_user(session, user_id)
     user = session.query(models.User).filter(models.User.id == user_id).first()
     
     if user is None or not user.is_active:

@@ -13,6 +13,7 @@ from app.security.permissions_decorator import require_permission
 from app.models import User, UserTenant, Role
 from app.services.business_audit_service import build_user_access_metadata, log_business_event
 from app.session_manager import revoke_all_sessions
+from app.tenancy.rls import sync_rls_auth_email, sync_rls_auth_user
 
 router = APIRouter(prefix="/usuarios", tags=["Usuários"])
 
@@ -44,6 +45,7 @@ class UserResponse(BaseModel):
 
 def _email_ja_cadastrado_globalmente(db: Session, email: str) -> bool:
     """Users.email tem unicidade global; a checagem precisa ignorar o filtro de tenant."""
+    sync_rls_auth_email(db, email)
     row = db.execute(
         text("SELECT id FROM users WHERE lower(email) = :email LIMIT 1"),
         {"email": email},
@@ -273,6 +275,7 @@ def atualizar_status_usuario(
     previous_status = bool(vinculo.is_active)
     vinculo.is_active = payload.is_active
 
+    sync_rls_auth_user(db, user_id)
     user = db.query(User).filter(User.id == user_id).first()
     if user:
         if payload.is_active:
