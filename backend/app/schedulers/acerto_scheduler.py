@@ -85,8 +85,8 @@ class AcertoScheduler:
             with tenant_context(tenant_id):
                 sync_rls_tenant(db, tenant_id)
                 parceiros_elegiveis = db.query(Cliente).filter(
-                    Cliente.parceiro_ativo == True,
-                    Cliente.parceiro_notificar == True,
+                    Cliente.parceiro_ativo.is_(True),
+                    Cliente.parceiro_notificar.is_(True),
                     Cliente.tenant_id == tenant_id,
                     Cliente.parceiro_dia_acerto == dia_hoje,
                     Cliente.parceiro_tipo_acerto.in_(['mensal', 'quinzenal', 'semanal'])
@@ -113,7 +113,7 @@ class AcertoScheduler:
                         )
 
                         if resultado.get('idempotente'):
-                            logger.info(f"      [SKIP] Acerto ja existente (idempotencia)")
+                            logger.info("      [SKIP] Acerto ja existente (idempotencia)")
                             acertos_pulados += 1
                             continue
 
@@ -166,7 +166,7 @@ class AcertoScheduler:
                         erros += 1
 
         logger.info("=" * 60)
-        logger.info(f"[DONE] Processamento concluido:")
+        logger.info("[DONE] Processamento concluido:")
         logger.info(f"   - Parceiros elegiveis: {parceiros_total}")
         logger.info(f"   - Acertos gerados: {acertos_gerados}")
         logger.info(f"   - Acertos pulados (idempotencia): {acertos_pulados}")
@@ -204,7 +204,7 @@ class AcertoScheduler:
             resultado = EmailQueueService.processar_fila_global(db, limite=20)
             
             if resultado['processados'] > 0:
-                logger.info(f"[EMAIL] Fila de emails processada:")
+                logger.info("[EMAIL] Fila de emails processada:")
                 logger.info(f"   - Processados: {resultado['processados']}")
                 logger.info(f"   - Enviados: {resultado['enviados']}")
                 logger.info(f"   - Erros: {resultado['erros']}")

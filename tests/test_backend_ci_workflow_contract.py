@@ -152,3 +152,10 @@ def test_backend_ci_has_blocking_insights_lint_step():
 
     assert "Insights lint (blocking)" in source
     assert "ruff check app/insights" in source
+
+
+def test_backend_ci_has_blocking_schedulers_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Schedulers lint (blocking)" in source
+    assert "ruff check app/schedulers" in source
