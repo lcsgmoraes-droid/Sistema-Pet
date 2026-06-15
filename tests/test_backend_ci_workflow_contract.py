@@ -124,3 +124,10 @@ def test_backend_ci_has_blocking_scripts_lint_step():
 
     assert "Scripts lint (blocking)" in source
     assert "ruff check app/scripts" in source
+
+
+def test_backend_ci_has_blocking_middlewares_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Middlewares lint (blocking)" in source
+    assert "ruff check app/middlewares" in source

@@ -107,6 +107,10 @@ jobs:
         run: |
           ruff check app/scripts
 
+      - name: Middlewares lint (blocking)
+        run: |
+          ruff check app/middlewares
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"
