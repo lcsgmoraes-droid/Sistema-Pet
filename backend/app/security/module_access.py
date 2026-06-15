@@ -12,7 +12,7 @@ from app.auth.core import ALGORITHM, get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
 from app.config import JWT_SECRET_KEY
 from app.db import get_session
-from app.models import AssinaturaModulo, Tenant, User
+from app.models import AssinaturaModulo, Tenant
 from app.routes.modulos_routes import MODULOS_PREMIUM, _resolver_modulos_ativos
 
 optional_security = HTTPBearer(auto_error=False)

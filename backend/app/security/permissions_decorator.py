@@ -1,12 +1,9 @@
 from functools import wraps
-from fastapi import Depends, HTTPException, status
+from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
-from inspect import signature
 import asyncio
 from uuid import UUID
 
-from app.db import get_session as get_db
-from app.auth import get_current_user
 from app.security.permissions_service import check_permission
 from app.tenancy.context import set_current_tenant
 
