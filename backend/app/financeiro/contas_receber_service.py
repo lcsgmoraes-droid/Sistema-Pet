@@ -62,8 +62,7 @@ DATA: 2025-01-23
 import logging
 from typing import Dict, Any, List, Optional
 from decimal import Decimal
-from datetime import datetime, date, timedelta
-from fastapi import HTTPException
+from datetime import date, timedelta
 from sqlalchemy.orm import Session
 
 # Logger
@@ -125,8 +124,7 @@ class ContasReceberService:
         """
         # Imports locais para evitar circular dependency
         from app.financeiro_models import (
-            ContaReceber, FormaPagamento, LancamentoManual,
-            CategoriaFinanceira
+            FormaPagamento, CategoriaFinanceira
         )
 
         logger.debug(
@@ -152,7 +150,7 @@ class ContasReceberService:
             )
             db.add(categoria_receitas)
             db.flush()
-            logger.info(f"📁 Categoria 'Receitas de Vendas' criada automaticamente")
+            logger.info("📁 Categoria 'Receitas de Vendas' criada automaticamente")
 
         for pag in pagamentos:
             # Suportar tanto dict quanto objeto
@@ -333,12 +331,12 @@ class ContasReceberService:
             status_conta = 'recebido'
             valor_recebido = valor
             data_recebimento = date.today()
-            logger.debug(f"✅ Pagamento à vista: criando conta recebida automaticamente")
+            logger.debug("✅ Pagamento à vista: criando conta recebida automaticamente")
         else:
             status_conta = 'pendente'
             valor_recebido = Decimal('0')
             data_recebimento = None
-            logger.debug(f"⏳ Pagamento a prazo: criando conta pendente")
+            logger.debug("⏳ Pagamento a prazo: criando conta pendente")
 
         # Garantir valores não-nulos para campos obrigatórios
         canal_venda = getattr(venda, 'canal', None) or 'loja_fisica'
