@@ -135,6 +135,10 @@ jobs:
         run: |
           ruff check app/financeiro
 
+      - name: Routers lint (blocking)
+        run: |
+          ruff check app/routers
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"

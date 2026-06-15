@@ -11,11 +11,10 @@ Endpoints para gerenciamento de transferências para atendimento humano:
 from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_
+from sqlalchemy import and_
 from datetime import UTC, datetime
 
 from app.db import get_session as get_db
-from app.auth import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
 from app.models import User
 from app.whatsapp.models_handoff import WhatsAppAgent, WhatsAppHandoff, WhatsAppInternalNote
@@ -28,13 +27,11 @@ from app.whatsapp.schemas_handoff import (
     WhatsAppHandoffResolve,
     WhatsAppInternalNoteCreate,
     WhatsAppInternalNoteResponse,
-    HandoffDashboardResponse,
     HandoffStats
 )
 from app.whatsapp.sentiment import SentimentAnalyzer
-from app.whatsapp.handoff_manager import HandoffManager
 from app.whatsapp.websocket import (
-    emit_new_handoff, emit_handoff_assigned, 
+    emit_handoff_assigned,
     emit_handoff_resolved, emit_agent_status_change
 )
 

@@ -13,7 +13,6 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.whatsapp.models import TenantWhatsAppConfig
 from app.whatsapp.schemas import (
     TenantWhatsAppConfigBase,
-    TenantWhatsAppConfigCreate,
     TenantWhatsAppConfigUpdate,
     TenantWhatsAppConfigResponse
 )
@@ -217,7 +216,7 @@ def get_whatsapp_stats(
     """
     from app.whatsapp.models import WhatsAppSession, WhatsAppMessage, WhatsAppMetric
     from sqlalchemy import func
-    from datetime import datetime, timedelta
+    from datetime import datetime
     
     hoje = datetime.now().date()
     
