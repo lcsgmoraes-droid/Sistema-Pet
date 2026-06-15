@@ -3,7 +3,7 @@ import os
 import re
 from uuid import UUID
 
-from fastapi import APIRouter, Request, HTTPException, Depends, Query
+from fastapi import APIRouter, Request, Depends, Query
 from sqlalchemy import not_, exists, or_
 from sqlalchemy.orm import Session
 from datetime import datetime, timezone, timedelta

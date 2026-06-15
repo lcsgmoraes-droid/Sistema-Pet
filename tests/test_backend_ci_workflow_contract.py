@@ -279,3 +279,48 @@ def test_backend_ci_has_blocking_routes_lint_step():
 
     assert "Routes lint (blocking)" in source
     assert "ruff check app/routes" in source
+
+
+def test_backend_ci_has_blocking_bling_root_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Bling root lint (blocking)" in source
+    assert (
+        "ruff check app/bling_estoque_sync.py app/bling_flow_monitor_models.py "
+        "app/bling_flow_monitor_routes.py app/bling_integration.py "
+        "app/bling_oauth_routes.py app/bling_pedido_webhook_queue_models.py "
+        "app/bling_routes.py app/bling_sync_routes.py app/integracao_bling_models.py "
+        "app/integracao_bling_nf_routes.py app/integracao_bling_pedido_routes.py "
+        "app/integracao_bling_webhook_routes.py"
+    ) in source
+
+
+def test_backend_ci_has_blocking_operational_root_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Operational root lint (blocking)" in source
+    assert (
+        "ruff check app/health_router.py app/session_manager.py app/idempotency.py "
+        "app/idempotency_models.py app/encryption.py app/audit.py app/audit_log.py"
+    ) in source
+
+
+def test_backend_ci_has_blocking_empresa_root_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Empresa root lint (blocking)" in source
+    assert (
+        "ruff check app/empresa_routes.py app/empresa_config_routes.py "
+        "app/empresa_config_fiscal_models.py app/empresa_config_geral_models.py "
+        "app/config.py app/constants.py"
+    ) in source
+
+
+def test_backend_ci_has_blocking_access_root_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Access root lint (blocking)" in source
+    assert (
+        "ruff check app/canais.py app/partner_utils.py app/permissions_routes.py "
+        "app/roles_routes.py app/cargos_routes.py app/cargo_models.py"
+    ) in source

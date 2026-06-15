@@ -6,7 +6,6 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
-from decimal import Decimal
 
 from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant

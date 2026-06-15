@@ -120,7 +120,7 @@ async def listar_cargos(
         Cliente,
         (Cargo.id == Cliente.cargo_id) &
         (Cliente.tipo_cadastro == 'funcionario') &
-        (Cliente.ativo == True)
+        Cliente.ativo.is_(True)
     ).filter(
         Cargo.tenant_id == tenant_id
     )
@@ -164,7 +164,7 @@ async def obter_cargo(
         Cliente.tenant_id == tenant_id,
         Cliente.cargo_id == cargo_id,
         Cliente.tipo_cadastro == "funcionario",
-        Cliente.ativo == True
+        Cliente.ativo.is_(True)
     ).count()
     
     return CargoResponse(**_cargo_response_dict(cargo, total_funcionarios))
@@ -185,7 +185,7 @@ async def criar_cargo(
     cargo_existente = db.query(Cargo).filter(
         Cargo.tenant_id == tenant_id,
         func.lower(Cargo.nome) == func.lower(cargo_data.nome),
-        Cargo.ativo == True
+        Cargo.ativo.is_(True)
     ).first()
     
     if cargo_existente:
@@ -246,7 +246,7 @@ async def atualizar_cargo(
             Cargo.tenant_id == tenant_id,
             func.lower(Cargo.nome) == func.lower(cargo_data.nome),
             Cargo.id != cargo_id,
-            Cargo.ativo == True
+            Cargo.ativo.is_(True)
         ).first()
         
         if cargo_existente:
@@ -274,7 +274,7 @@ async def atualizar_cargo(
         Cliente.tenant_id == tenant_id,
         Cliente.cargo_id == cargo_id,
         Cliente.tipo_cadastro == "funcionario",
-        Cliente.ativo == True
+        Cliente.ativo.is_(True)
     ).count()
     
     return CargoResponse(**_cargo_response_dict(cargo, total_funcionarios))
@@ -331,7 +331,7 @@ async def deletar_cargo(
         Cliente.tenant_id == tenant_id,
         Cliente.cargo_id == cargo_id,
         Cliente.tipo_cadastro == "funcionario",
-        Cliente.ativo == True
+        Cliente.ativo.is_(True)
     ).count()
     
     if funcionarios_ativos > 0:

@@ -1,11 +1,11 @@
-from app.base_models import BaseTenantModel
 """
 Modelo para controle de Idempotência
 Garante que requisições duplicadas não gerem efeitos colaterais duplicados
 """
 from sqlalchemy import Column, Integer, String, Text, DateTime, Index
 from sqlalchemy.sql import func
-from app.db import Base
+
+from app.base_models import BaseTenantModel
 
 
 class IdempotencyKey(BaseTenantModel):

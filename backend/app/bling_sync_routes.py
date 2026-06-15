@@ -6,7 +6,7 @@ Fluxo:
 1. Venda Loja Física (PDV) → Atualiza Sistema → Envia para Bling
 2. Venda Online (Bling) → Webhook → Atualiza Sistema
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 from sqlalchemy.orm import Session, joinedload, aliased
 from sqlalchemy import and_, or_, func, desc
 from typing import Any, List, Optional
@@ -14,16 +14,13 @@ from datetime import UTC, datetime, timedelta
 from pydantic import BaseModel, Field
 from pathlib import Path
 import json
-import asyncio
 import threading
 import re
 import time
 import os
 
 from .db import get_session
-from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
-from .models import User
 from .produtos_models import (
     Produto,
     ProdutoBlingSync,
@@ -575,7 +572,7 @@ def _build_sync_problem_query(
         .filter(
             Produto.tenant_id == tenant_id,
             ProdutoBlingSync.tenant_id == tenant_id,
-            ProdutoBlingSync.sincronizar == True,
+            ProdutoBlingSync.sincronizar.is_(True),
         )
         .filter(
             or_(
@@ -1432,6 +1429,8 @@ def configurar_sincronizacao(
     """
     logger.info(f"⚙️ Configurando sync - Produto {config.produto_id}")
     
+    _current_user, tenant_id = user_and_tenant
+
     # Verificar se produto existe
     produto = db.query(Produto).filter(
         Produto.id == config.produto_id,
@@ -1659,7 +1658,7 @@ def importar_imagens_dos_produtos_bling(
         )
         .filter(
             Produto.tenant_id == tenant_id,
-            Produto.situacao == True,
+            Produto.situacao.is_(True),
             Produto.tipo_produto != "PAI",
             Produto.codigo.isnot(None),
             Produto.codigo != "",
@@ -2273,7 +2272,7 @@ def status_sincronizacao(
     ).filter(
         Produto.tenant_id == tenant_id,
         ProdutoBlingSync.tenant_id == tenant_id,
-        ProdutoBlingSync.sincronizar == True
+        ProdutoBlingSync.sincronizar.is_(True)
     )
 
     if busca:

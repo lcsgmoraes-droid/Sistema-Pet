@@ -3,7 +3,7 @@ Gerenciamento de Sessões - LGPD Compliance
 Sistema de logout remoto e controle de dispositivos ativos
 """
 from sqlalchemy.orm import Session as DBSession
-from app.models import UserSession, User
+from app.models import UserSession
 from datetime import datetime, timezone, timedelta
 from typing import Optional, List, Dict, Any
 import uuid
@@ -60,7 +60,7 @@ def get_active_sessions(db: DBSession, user_id: int) -> List[UserSession]:
     now = datetime.now(timezone.utc)
     return db.query(UserSession).filter(
         UserSession.user_id == user_id,
-        UserSession.revoked == False,
+        UserSession.revoked.is_(False),
         UserSession.expires_at > now
     ).order_by(UserSession.last_activity_at.desc()).all()
 
@@ -147,7 +147,7 @@ def revoke_all_sessions(
     """
     query = db.query(UserSession).filter(
         UserSession.user_id == user_id,
-        UserSession.revoked == False
+        UserSession.revoked.is_(False)
     )
     
     if except_jti:

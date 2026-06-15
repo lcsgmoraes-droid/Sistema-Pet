@@ -3,12 +3,8 @@ Modelo de Cargo para RH
 Define salários base e percentuais de encargos trabalhistas
 """
 
-from sqlalchemy import Column, Integer, String, Numeric, Boolean, DateTime, Text
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import relationship
-from datetime import datetime
+from sqlalchemy import Column, String, Numeric, Boolean, Text
 
-from app.db import Base
 from app.base_models import BaseTenantModel
 
 
