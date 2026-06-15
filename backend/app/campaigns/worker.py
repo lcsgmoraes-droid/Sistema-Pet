@@ -15,10 +15,8 @@ Uso:
 """
 
 import logging
-from datetime import datetime
 from typing import Callable
 
-from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.campaigns.engine import CampaignEngine

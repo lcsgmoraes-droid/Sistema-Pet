@@ -40,10 +40,9 @@ Rotas implementadas:
 """
 
 import logging
-import json as _json
 import uuid as _uuid
-from datetime import datetime, date, timezone
-from typing import Optional, List
+from datetime import datetime, date, timezone, timedelta
+from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel
@@ -75,7 +74,6 @@ from app.campaigns.models import (
     DrawingEntry,
     DrawingStatusEnum,
     NotificationQueue,
-    NotificationChannelEnum,
     NotificationStatusEnum,
     CustomerMergeLog,
 )
@@ -133,7 +131,7 @@ def _resolver_customer_id_campanhas(db: Session, *, tenant_id, customer_ref) -> 
             .filter(
                 Cliente.tenant_id == tenant_id,
                 Cliente.id == int(ref_text),
-                Cliente.ativo == True,
+                Cliente.ativo.is_(True),
             )
             .first()
         )
@@ -145,7 +143,7 @@ def _resolver_customer_id_campanhas(db: Session, *, tenant_id, customer_ref) -> 
         .filter(
             Cliente.tenant_id == tenant_id,
             Cliente.codigo == ref_text,
-            Cliente.ativo == True,
+            Cliente.ativo.is_(True),
         )
         .first()
     )
@@ -730,7 +728,7 @@ def buscar_clientes_campanhas(
         db.query(Cliente)
         .filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.ativo == True,
+            Cliente.ativo.is_(True),
             (
                 Cliente.nome.ilike(termo)
                 | Cliente.codigo.ilike(termo)
@@ -790,7 +788,7 @@ def gestor_clientes_por_tipo(
             db.query(Cliente)
             .filter(
                 Cliente.tenant_id == tenant_id,
-                Cliente.ativo == True,
+                Cliente.ativo.is_(True),
                 Cliente.id.in_(customer_ids),
             )
             .all()
@@ -830,7 +828,7 @@ def gestor_clientes_por_tipo(
         rows = (
             db.query(Cliente, subq.c.saldo)
             .join(subq, Cliente.id == subq.c.customer_id)
-            .filter(Cliente.tenant_id == tenant_id, Cliente.ativo == True)
+            .filter(Cliente.tenant_id == tenant_id, Cliente.ativo.is_(True))
             .order_by(subq.c.saldo.desc())
             .limit(limit)
             .all()
@@ -858,7 +856,7 @@ def gestor_clientes_por_tipo(
         rows = (
             db.query(Cliente, subq.c.total)
             .join(subq, Cliente.id == subq.c.customer_id)
-            .filter(Cliente.tenant_id == tenant_id, Cliente.ativo == True)
+            .filter(Cliente.tenant_id == tenant_id, Cliente.ativo.is_(True))
             .order_by(subq.c.total.desc())
             .limit(limit)
             .all()
@@ -879,7 +877,7 @@ def gestor_clientes_por_tipo(
             .filter(
                 CustomerRankHistory.tenant_id == tenant_id,
                 CustomerRankHistory.period == periodo_atual,
-                Cliente.ativo == True,
+                Cliente.ativo.is_(True),
             )
             .order_by(CustomerRankHistory.total_spent.desc())
             .limit(limit)
@@ -1839,7 +1837,6 @@ def relatorio_campanhas(
     Retorna créditos (purchase_completed) e resgates (resgate em venda).
     Usado na aba Relatórios em Campanhas.
     """
-    from sqlalchemy import func as sqlfunc
     from app.models import Cliente
     from app.vendas_models import Venda
 
@@ -2623,7 +2620,7 @@ def calcular_destaque_mensal(
                         "pulado": lista[0],
                         "eleito": candidato,
                         "posicao_eleito": i + 1,  # 2, 3, ...
-                        "motivo": f"1º colocado já venceu em outra categoria",
+                        "motivo": "1º colocado já venceu em outra categoria",
                     })
                 break
 

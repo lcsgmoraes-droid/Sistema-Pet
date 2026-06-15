@@ -28,7 +28,7 @@ import logging
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 
-from sqlalchemy import distinct, func, text
+from sqlalchemy import distinct, func
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 from sqlalchemy.orm import Session
 

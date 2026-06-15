@@ -186,7 +186,9 @@ class CampaignScheduler:
         from app.campaigns.models import Drawing, DrawingEntry, DrawingStatusEnum
         from app.campaigns.notification_service import enqueue_email
         from app.models import Tenant
-        import hashlib, random as _random, uuid as _uuid
+        import hashlib
+        import random as _random
+        import uuid as _uuid
 
         db = SessionLocal()
         try:
@@ -201,7 +203,7 @@ class CampaignScheduler:
                     due.extend(
                         db.query(Drawing)
                         .filter(
-                            Drawing.auto_execute == True,
+                            Drawing.auto_execute.is_(True),
                             Drawing.status == DrawingStatusEnum.open,
                             Drawing.draw_date <= now,
                         )
@@ -284,7 +286,7 @@ class CampaignScheduler:
         para tenants que têm auto_destaque_mensal=True na campanha ranking_monthly.
         """
         from datetime import datetime, timezone as _tz, timedelta
-        from app.campaigns.models import Campaign, CampaignTypeEnum, Coupon, CouponStatusEnum
+        from app.campaigns.models import Campaign, CampaignTypeEnum, Coupon
         from app.campaigns.coupon_service import create_coupon
         from app.campaigns.notification_service import enqueue_email
         from app.models import Tenant
@@ -319,7 +321,6 @@ class CampaignScheduler:
                     from app.vendas_models import Venda
                     from app.models import Cliente
                     from sqlalchemy import func as sqlfunc
-                    from app.core.security import get_user_tenant_from_db
                     from app.models import User
 
                     agg = (
@@ -494,12 +495,9 @@ class CampaignScheduler:
            próximos X dias (configurável via scheduler_config / alerta_dias_expiracao_cashback)
         """
         from datetime import timedelta, timezone
-        from decimal import Decimal
-        from sqlalchemy import and_, or_
         from app.campaigns.models import (
             CashbackTransaction, CashbackSourceTypeEnum,
             Campaign, CampaignTypeEnum, NotificationQueue,
-            NotificationChannelEnum, NotificationStatusEnum,
         )
         from app.campaigns.notification_service import enqueue_email
         from app.models import Cliente, Tenant
