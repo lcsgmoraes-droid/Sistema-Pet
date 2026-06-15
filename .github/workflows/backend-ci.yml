@@ -71,6 +71,10 @@ jobs:
         run: |
           ruff check app/utils
 
+      - name: Constants lint (blocking)
+        run: |
+          ruff check app/constants
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"
