@@ -365,6 +365,19 @@ def test_backend_ci_has_blocking_financial_root_lint_step():
     ) in source
 
 
+def test_backend_ci_has_blocking_comissoes_root_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Comissoes root lint (blocking)" in source
+    assert (
+        "ruff check app/comissoes_avancadas_models.py "
+        "app/comissoes_avancadas_routes.py app/comissoes_demonstrativo_routes.py "
+        "app/comissoes_diagnostico_routes.py app/comissoes_estorno.py "
+        "app/comissoes_models.py app/comissoes_provisao.py "
+        "app/comissoes_routes.py app/comissoes_service.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_veterinario_root_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

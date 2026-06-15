@@ -1,16 +1,13 @@
 """
 Rotas para o módulo de Comissões
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Body
-from typing import List, Optional, Dict, Any
+from fastapi import APIRouter, Depends, HTTPException, status
+from typing import List, Optional
 from pydantic import BaseModel
-from datetime import datetime
 import logging
 from sqlalchemy import text
 
-from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
-from .models import User
 from .comissoes_models import ComissoesConfig, ComissoesItens, ComissoesConfigSistema
 from .utils.tenant_safe_sql import execute_tenant_safe
 from .tenancy.context import get_current_tenant_id
@@ -147,8 +144,8 @@ async def listar_funcionarios(
                 Cliente.data_fechamento_comissao
             ).filter(
                 and_(
-                    Cliente.parceiro_ativo == True,
-                    Cliente.ativo == True
+                    Cliente.parceiro_ativo.is_(True),
+                    Cliente.ativo.is_(True)
                 )
             ).order_by(Cliente.nome)
             
@@ -186,7 +183,6 @@ async def listar_funcionarios_com_comissao(
     """
     try:
         from .db import SessionLocal
-        from sqlalchemy import text
         from .tenancy.context import set_tenant_context
         
         # Extrair tenant_id do contexto
@@ -614,7 +610,7 @@ async def criar_configuracoes_batch(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail="Banco de dados ocupado. Tente novamente em alguns segundos."
             )
-        except Exception as e:
+        except Exception:
             db.rollback()
             raise
         finally:
@@ -904,7 +900,6 @@ async def get_arvore_produtos(
     """
     try:
         from .db import SessionLocal
-        from sqlalchemy import text
         from .tenancy.context import set_tenant_context
         
         # Extrair tenant_id e configurar contexto

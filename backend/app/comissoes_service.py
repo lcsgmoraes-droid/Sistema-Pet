@@ -4,7 +4,7 @@ Chamado ao finalizar vendas para calcular e registrar comissões
 """
 import logging
 from decimal import Decimal
-from typing import Optional, Dict, List
+from typing import Optional, Dict
 from datetime import datetime
 from app.utils.logger import StructuredLogger
 from app.tenancy.context import get_current_tenant_id, set_tenant_context
@@ -344,7 +344,7 @@ def gerar_comissoes_venda(
             # 🔒 SNAPSHOT FINANCEIRO JÁ EXISTE - BLOQUEIO DE RECÁLCULO
             struct_logger.warning(
                 "COMMISSION_RECALCULATION_BLOCKED",
-                f"Tentativa de recalcular comissão bloqueada - snapshot financeiro imutável",
+                "Tentativa de recalcular comissão bloqueada - snapshot financeiro imutável",
                 venda_id=venda_id,
                 funcionario_id=funcionario_id,
                 parcela=parcela_numero,
@@ -450,7 +450,7 @@ def gerar_comissoes_venda(
             item_norm['valor_liquido'] = item_norm['valor_bruto'] - item_norm['desconto_item']
             soma_valores_liquidos += item_norm['valor_liquido']
         
-        logger.info(f"📊 ETAPA 1 - Normalização:")
+        logger.info("📊 ETAPA 1 - Normalização:")
         logger.info(f"   Soma valores BRUTOS: R$ {float(soma_valores_brutos):.2f}")
         logger.info(f"   Desconto total: R$ {float(desconto_total_venda):.2f}")
         logger.info(f"   Soma valores LÍQUIDOS: R$ {float(soma_valores_liquidos):.2f}")
@@ -517,7 +517,7 @@ def gerar_comissoes_venda(
                         if taxa_parcela:
                             taxa_percentual = Decimal(str(taxa_parcela))
                             logger.info(f"💳 Taxa cartão parcelado ({num_parcelas}x): {float(taxa_percentual)}%")
-                    except:
+                    except Exception:
                         pass
             
                 taxa_cartao_percentual = taxa_percentual
@@ -580,15 +580,15 @@ def gerar_comissoes_venda(
                         logger.info(f"🚚 Custo operacional {entregador_data[1]}: R$ {float(custo_operacional_entrega):.2f}")
                     else:
                         custo_operacional_entrega = Decimal('0')
-                        logger.info(f"🚚 Entregador sem custo operacional configurado")
+                        logger.info("🚚 Entregador sem custo operacional configurado")
                 else:
                     custo_operacional_entrega = Decimal('0')
-                    logger.info(f"🚚 Venda sem entregador definido")
+                    logger.info("🚚 Venda sem entregador definido")
             except Exception as e:
                 logger.warning(f"⚠️ Erro ao buscar custo operacional do entregador: {str(e)}")
                 custo_operacional_entrega = Decimal('0')
         
-        logger.info(f"📊 ETAPA 2 - Custos Globais:")
+        logger.info("📊 ETAPA 2 - Custos Globais:")
         logger.info(f"   Taxa cartão TOTAL: R$ {float(taxa_cartao_total):.2f}")
         logger.info(f"   Impostos TOTAL: R$ {float(impostos_total):.2f}")
         logger.info(f"   Proporção produtos: {float(proporcao_produtos)*100:.1f}%")
@@ -677,7 +677,7 @@ def gerar_comissoes_venda(
                     valor_base_comissionada = valor_base_original * proporcao_pagamento
                     calculo['valor_comissao'] = float(valor_base_comissionada)
                     
-                    logger.info(f"💰 COMISSÃO PROPORCIONAL:")
+                    logger.info("💰 COMISSÃO PROPORCIONAL:")
                     logger.info(f"   Valor total venda: R$ {float(total_venda_decimal):.2f}")
                     logger.info(f"   Valor pago: R$ {float(valor_pago_decimal):.2f}")
                     logger.info(f"   Percentual aplicado: {float(percentual_proporcional):.2f}%")
@@ -801,7 +801,7 @@ def gerar_comissoes_venda(
             from app.comissoes_provisao import provisionar_comissoes_venda
             
             if tenant_id:
-                logger.info(f"🎯 Iniciando provisão automática de comissões (PASSO 2)...")
+                logger.info("🎯 Iniciando provisão automática de comissões (PASSO 2)...")
                 
                 # Definir contexto de tenant antes de chamar provisionar_comissoes_venda
                 set_tenant_context(tenant_id)
