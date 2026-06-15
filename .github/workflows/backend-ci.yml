@@ -127,6 +127,10 @@ jobs:
         run: |
           ruff check app/schedulers
 
+      - name: Audit lint (blocking)
+        run: |
+          ruff check app/audit
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"
