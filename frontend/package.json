@@ -43,6 +43,9 @@
     "write-excel-file": "^4.0.2",
     "zustand": "^5.0.11"
   },
+  "overrides": {
+    "ws": "8.21.0"
+  },
   "devDependencies": {
     "@types/react": "^18.2.0",
     "@types/react-dom": "^18.2.0",
