@@ -53,7 +53,7 @@ def _load_existing_snapshot(raw_snapshot: Any) -> Optional[Dict[str, Any]]:
 
 def _get_formas_pagamento_map(db: Session, tenant_id: Any) -> Dict[str, FormaPagamento]:
     formas = db.query(FormaPagamento).filter(
-        and_(FormaPagamento.tenant_id == tenant_id, FormaPagamento.ativo == True)
+        and_(FormaPagamento.tenant_id == tenant_id, FormaPagamento.ativo.is_(True))
     ).all()
     return {_normalize_forma_pagamento(fp.nome): fp for fp in formas}
 

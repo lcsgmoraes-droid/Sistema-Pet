@@ -140,7 +140,7 @@ def buscar_contas_nao_conciliadas(
     """
     query = db.query(ContaReceber).filter(
         ContaReceber.tenant_id == tenant_id,
-        ContaReceber.conciliado == False,
+        ContaReceber.conciliado.is_(False),
         ContaReceber.nsu.isnot(None),  # Apenas contas com NSU
     )
     

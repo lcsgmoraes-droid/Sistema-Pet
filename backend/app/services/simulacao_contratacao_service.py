@@ -4,8 +4,8 @@ Calcula impacto financeiro de contratar um funcionário SEM gravar no banco.
 """
 
 from decimal import Decimal
-from datetime import date, datetime
-from typing import List, Dict, Optional
+from datetime import date
+from typing import Dict, Optional
 
 
 def simular_contratacao(

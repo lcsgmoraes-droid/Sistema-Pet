@@ -8,7 +8,6 @@ import requests
 from decimal import Decimal
 from typing import Dict, Any, List, Tuple
 from app.config import GOOGLE_MAPS_API_KEY
-from app.utils.logger import logger
 
 
 # URLs da API

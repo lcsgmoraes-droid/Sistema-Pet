@@ -7,7 +7,7 @@ from datetime import datetime, timedelta, date
 from typing import Dict, List, Optional, Tuple
 from uuid import UUID
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, or_
+from sqlalchemy import func
 import json
 
 from app.models import Cliente
@@ -65,8 +65,6 @@ class SegmentacaoService:
         hoje = date.today()
         data_limite_90d = hoje - timedelta(days=SegmentacaoService.PERIODO_ATUAL_DIAS)
         data_limite_180d = hoje - timedelta(days=SegmentacaoService.PERIODO_ATUAL_DIAS * 2)
-        data_limite_novo = hoje - timedelta(days=SegmentacaoService.NOVO_DIAS_MAXIMOS)
-        
         # 1. Vendas nos últimos 90 dias
         vendas_90d = db.query(
             func.sum(Venda.total).label('total'),
@@ -352,7 +350,7 @@ class SegmentacaoService:
         # Buscar clientes ativos
         query = db.query(Cliente).filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.ativo == True
+            Cliente.ativo.is_(True)
         )
         
         if limit:

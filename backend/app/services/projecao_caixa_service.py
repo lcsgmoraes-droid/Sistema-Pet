@@ -10,7 +10,6 @@ from sqlalchemy import func
 from sqlalchemy.orm import Session
 
 from app.ia.aba7_dre_detalhada_models import DREDetalheCanal
-from app.financeiro_models import ContaPagar
 from app.simples_nacional_models import SimplesNacionalMensal
 
 

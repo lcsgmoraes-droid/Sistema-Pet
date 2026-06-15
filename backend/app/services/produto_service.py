@@ -1,12 +1,12 @@
 """
 Serviço de Produto - Centraliza regras de negócio
 """
-from typing import Dict, Any, List
+from typing import Dict, Any
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 import logging
 
-from ..produtos_models import Produto, Categoria, Marca, ProdutoKitComponente
+from ..produtos_models import Produto, ProdutoKitComponente
 
 logger = logging.getLogger(__name__)
 

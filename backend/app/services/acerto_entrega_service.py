@@ -214,14 +214,12 @@ def processar_acertos_do_dia(db: Session, tenant_id: int) -> list[Dict]:
     Executado pelo job diário.
     Não duplica processamento (verifica data_ultimo_acerto).
     """
-    hoje = date.today()
-    
     # Busca entregadores ativos com acerto configurado
     entregadores = db.query(Cliente).filter(
         and_(
             Cliente.tenant_id == tenant_id,
-            Cliente.is_entregador == True,
-            Cliente.entregador_ativo == True,
+            Cliente.is_entregador.is_(True),
+            Cliente.entregador_ativo.is_(True),
             Cliente.tipo_acerto_entrega.isnot(None)
         )
     ).all()
@@ -263,8 +261,8 @@ def ajustar_media_entregas_mensal(db: Session, tenant_id: int, mes: int, ano: in
         and_(
             Cliente.tenant_id == tenant_id,
             Cliente.tipo_cadastro == "funcionario",
-            Cliente.is_entregador == True,
-            Cliente.controla_rh == True,
+            Cliente.is_entregador.is_(True),
+            Cliente.controla_rh.is_(True),
             Cliente.media_entregas_configurada.isnot(None)
         )
     ).all()

@@ -237,3 +237,10 @@ def test_backend_ci_has_blocking_clean_package_lint_steps():
     for step_name, command in expected_steps:
         assert step_name in source
         assert command in source
+
+
+def test_backend_ci_has_blocking_services_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Services lint (blocking)" in source
+    assert "ruff check app/services" in source

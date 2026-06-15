@@ -15,7 +15,6 @@ Quando 13º é pago (1ª ou 2ª parcela):
 
 from decimal import Decimal
 from sqlalchemy.orm import Session
-from sqlalchemy import func
 from datetime import date, datetime
 import calendar
 
@@ -79,7 +78,7 @@ def pagar_decimo_terceiro(
             Cliente.id == funcionario_id,
             Cliente.tenant_id == tenant_id,
             Cliente.tipo_cadastro == "funcionario",
-            Cliente.ativo == True
+            Cliente.ativo.is_(True)
         )
         .first()
     )

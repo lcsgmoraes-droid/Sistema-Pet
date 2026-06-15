@@ -175,7 +175,7 @@ def find_app_profile_clientes_for_user(
 
     add(include_cliente)
 
-    query = db.query(Cliente).filter(Cliente.tenant_id == tenant_id, Cliente.ativo == True)
+    query = db.query(Cliente).filter(Cliente.tenant_id == tenant_id, Cliente.ativo.is_(True))
     filters = [Cliente.user_id == user.id]
     email = (getattr(user, "email", None) or "").strip().casefold()
     if email:
@@ -217,7 +217,7 @@ def list_explicit_app_access_profiles(
     return (
         query.filter(
             AppAccessProfile.tenant_id == tenant_id,
-            AppAccessProfile.is_active == True,
+            AppAccessProfile.is_active.is_(True),
             or_(*filters),
         )
         .order_by(AppAccessProfile.id.asc())
@@ -278,7 +278,7 @@ def get_cliente_for_app_profile_or_none(
         query.filter(
             Cliente.tenant_id == tenant_id,
             Cliente.id == cliente_id,
-            Cliente.ativo == True,
+            Cliente.ativo.is_(True),
         )
         .first()
     )
