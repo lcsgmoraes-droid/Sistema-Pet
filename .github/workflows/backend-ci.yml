@@ -183,6 +183,10 @@ jobs:
         run: |
           ruff check app/services
 
+      - name: Campaigns lint (blocking)
+        run: |
+          ruff check app/campaigns
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"

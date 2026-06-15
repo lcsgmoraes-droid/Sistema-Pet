@@ -31,10 +31,8 @@ from app.campaigns.models import (
     CAMPAIGN_TRIGGER_EVENTS,
     Campaign,
     CampaignEventQueue,
-    CampaignExecution,
     CampaignRunLog,
     CampaignStatusEnum,
-    EventOriginEnum,
 )
 from app.campaigns.channel_scope import (
     campaign_allows_sale_channel,

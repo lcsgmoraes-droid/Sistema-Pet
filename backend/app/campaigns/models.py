@@ -12,9 +12,6 @@ Princípios:
 """
 
 import enum
-import uuid
-from datetime import datetime
-from decimal import Decimal
 
 from sqlalchemy import (
     BigInteger,
@@ -22,7 +19,6 @@ from sqlalchemy import (
     Column,
     DateTime,
     Enum,
-    ForeignKey,
     Index,
     Integer,
     Numeric,

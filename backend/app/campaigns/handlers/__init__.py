@@ -20,8 +20,6 @@ Handlers disponíveis:
   ranking     → ranking_monthly
 """
 
-from typing import Optional
-
 from app.campaigns.models import CampaignTypeEnum
 
 

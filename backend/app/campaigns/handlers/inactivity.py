@@ -38,7 +38,7 @@ from app.campaigns.models import (
     CampaignExecution,
     CampaignTypeEnum,
 )
-from app.campaigns.notification_service import enqueue_email, enqueue_push
+from app.campaigns.notification_service import enqueue_email
 
 logger = logging.getLogger(__name__)
 
