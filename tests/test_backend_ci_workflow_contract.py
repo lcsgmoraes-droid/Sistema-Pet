@@ -201,3 +201,10 @@ def test_backend_ci_has_blocking_banho_tosa_api_lint_step():
 
     assert "Banho Tosa API lint (blocking)" in source
     assert "ruff check app/banho_tosa_api" in source
+
+
+def test_backend_ci_has_blocking_estoque_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Estoque lint (blocking)" in source
+    assert "ruff check app/estoque" in source
