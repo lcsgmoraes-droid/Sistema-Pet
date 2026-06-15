@@ -14,9 +14,7 @@ from .venda_events import VendaCriada, VendaFinalizada, VendaCancelada
 from .handlers import (
     LogEventHandler,
     AuditoriaEventHandler,
-    IAEventHandler,
-    NotificacaoEventHandler,
-    IntegracaoEventHandler
+    IAEventHandler
 )
 from .kit_handler import KitEstoqueEventHandler
 

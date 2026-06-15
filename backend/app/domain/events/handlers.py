@@ -17,9 +17,7 @@ TIPOS DE HANDLERS:
 """
 
 import logging
-from datetime import datetime
 from typing import Optional
-from sqlalchemy.orm import Session
 
 from .base import DomainEvent
 from .venda_events import VendaCriada, VendaFinalizada, VendaCancelada
@@ -191,7 +189,7 @@ class IAEventHandler:
     @staticmethod
     def on_venda_criada(event: VendaCriada) -> None:
         """Placeholder: Análise de IA ao criar venda"""
-        logger.debug(f"🤖 [IA] VendaCriada processada (placeholder)")
+        logger.debug("🤖 [IA] VendaCriada processada (placeholder)")
         # TODO: Implementar análise de IA
         # - Recomendar produtos complementares
         # - Prever probabilidade de finalização
@@ -200,7 +198,7 @@ class IAEventHandler:
     @staticmethod
     def on_venda_finalizada(event: VendaFinalizada) -> None:
         """Placeholder: Análise de IA ao finalizar venda"""
-        logger.debug(f"🤖 [IA] VendaFinalizada processada (placeholder)")
+        logger.debug("🤖 [IA] VendaFinalizada processada (placeholder)")
         # TODO: Implementar análise de IA
         # - Atualizar modelo de previsão de vendas
         # - Analisar padrões de compra do cliente
@@ -209,7 +207,7 @@ class IAEventHandler:
     @staticmethod
     def on_venda_cancelada(event: VendaCancelada) -> None:
         """Placeholder: Análise de IA ao cancelar venda"""
-        logger.debug(f"🤖 [IA] VendaCancelada processada (placeholder)")
+        logger.debug("🤖 [IA] VendaCancelada processada (placeholder)")
         # TODO: Implementar análise de IA
         # - Detectar padrões de cancelamento
         # - Identificar problemas operacionais

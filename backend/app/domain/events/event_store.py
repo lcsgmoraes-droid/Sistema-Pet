@@ -18,7 +18,6 @@ FASE 5.2 - Event Store Enhanced:
 
 import logging
 import json
-from datetime import datetime
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import text

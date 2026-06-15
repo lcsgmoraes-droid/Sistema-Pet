@@ -180,3 +180,10 @@ def test_backend_ci_has_blocking_routers_lint_step():
 
     assert "Routers lint (blocking)" in source
     assert "ruff check app/routers" in source
+
+
+def test_backend_ci_has_blocking_domain_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Domain lint (blocking)" in source
+    assert "ruff check app/domain" in source

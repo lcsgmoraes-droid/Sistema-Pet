@@ -9,7 +9,7 @@ from sqlalchemy.orm import Session
 
 from app.domain.events.venda_events import VendaFinalizada, VendaCancelada
 from app.services.kit_estoque_service import KitEstoqueService
-from app.vendas_models import Venda, VendaItem
+from app.vendas_models import VendaItem
 from app.db import get_session
 
 logger = logging.getLogger(__name__)
