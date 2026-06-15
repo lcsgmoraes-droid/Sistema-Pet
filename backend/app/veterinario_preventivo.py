@@ -70,11 +70,11 @@ def montar_calendario_preventivo(db, tenant_id, especie: str | None = None) -> d
 
     query_protocolos = db.query(ProtocoloVacina).filter(
         ProtocoloVacina.tenant_id == tenant_id,
-        ProtocoloVacina.ativo == True,  # noqa
+        ProtocoloVacina.ativo.is_(True),
     )
     if aliases:
         query_protocolos = query_protocolos.filter(
-            (ProtocoloVacina.especie == None) |
+            ProtocoloVacina.especie.is_(None) |
             (ProtocoloVacina.especie == "") |
             or_(*[ProtocoloVacina.especie.ilike(f"%{alias}%") for alias in aliases])
         )

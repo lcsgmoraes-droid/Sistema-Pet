@@ -200,7 +200,7 @@ def _resumo_financeiro_insumos(insumos: Optional[list]) -> dict:
 def _obter_regra_financeira_veterinaria(db: Session, tenant_id) -> dict:
     link = db.query(VetPartnerLink).filter(
         VetPartnerLink.vet_tenant_id == str(tenant_id),
-        VetPartnerLink.ativo == True,
+        VetPartnerLink.ativo.is_(True),
     ).order_by(VetPartnerLink.id.desc()).first()
 
     if link and link.tipo_relacao == "parceiro":
@@ -259,8 +259,8 @@ def _obter_dre_subcategoria_receita_padrao(db: Session, tenant_id) -> int:
     ).filter(
         DRESubcategoria.tenant_id == str(tenant_id),
         DRECategoria.tenant_id == str(tenant_id),
-        DRESubcategoria.ativo == True,
-        DRECategoria.ativo == True,
+        DRESubcategoria.ativo.is_(True),
+        DRECategoria.ativo.is_(True),
         DRECategoria.natureza == NaturezaDRE.RECEITA,
     ).order_by(DRECategoria.ordem.asc(), DRESubcategoria.id.asc()).first()
     return subcategoria.id if subcategoria else 1

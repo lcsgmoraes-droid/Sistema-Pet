@@ -76,7 +76,7 @@ def _get_partner_tenant_ids(db: Session, tenant_id) -> list:
     """Retorna lista de empresa_tenant_ids onde este vet e parceiro ativo."""
     links = db.query(VetPartnerLink).filter(
         VetPartnerLink.vet_tenant_id == str(tenant_id),
-        VetPartnerLink.ativo == True,
+        VetPartnerLink.ativo.is_(True),
     ).all()
     return [link.empresa_tenant_id for link in links]
 

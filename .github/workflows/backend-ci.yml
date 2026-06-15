@@ -235,6 +235,10 @@ jobs:
         run: |
           ruff check app/contas_bancarias_routes.py app/contas_pagar_routes.py app/contas_receber_routes.py app/lancamentos_routes.py app/operadoras_models.py app/operadoras_routes.py app/formas_pagamento_models.py app/formas_pagamento_routes.py
 
+      - name: Veterinario root lint (blocking)
+        run: |
+          ruff check app/veterinario_acompanhamento_routes.py app/veterinario_agenda_routes.py app/veterinario_agendamentos.py app/veterinario_calendar.py app/veterinario_catalogo_routes.py app/veterinario_clinico.py app/veterinario_consultas_routes.py app/veterinario_core.py app/veterinario_exames_arquivos.py app/veterinario_exames_ia.py app/veterinario_exames_routes.py app/veterinario_extratos.py app/veterinario_extratos_routes.py app/veterinario_financeiro.py app/veterinario_ia.py app/veterinario_ia_routes.py app/veterinario_internacao.py app/veterinario_internacao_routes.py app/veterinario_models.py app/veterinario_orcamentos.py app/veterinario_orcamentos_routes.py app/veterinario_parcerias_routes.py app/veterinario_preventivo.py app/veterinario_relatorios_routes.py app/veterinario_routes.py app/veterinario_schemas.py app/veterinario_serializers.py app/pdf_veterinario.py
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"

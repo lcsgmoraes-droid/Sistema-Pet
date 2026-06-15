@@ -68,7 +68,7 @@ def _status_vacinal_pet(db: Session, pet: Pet, tenant_id) -> dict:
     especies_pet = _aliases_especie_vet(pet.especie or "")
     protocolos = db.query(ProtocoloVacina).filter(
         ProtocoloVacina.tenant_id == tenant_id,
-        ProtocoloVacina.ativo == True,
+        ProtocoloVacina.ativo.is_(True),
     ).all()
     protocolos_ativos = [
         protocolo for protocolo in protocolos

@@ -201,8 +201,8 @@ def listar_produtos_estoque(
     _, tenant_id = _get_tenant(current)
     q = db.query(Produto).filter(
         Produto.tenant_id == str(tenant_id),
-        Produto.ativo == True,
-        Produto.situacao == True,
+        Produto.ativo.is_(True),
+        Produto.situacao.is_(True),
     )
     if busca:
         termo = f"%{busca}%"

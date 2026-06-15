@@ -65,7 +65,7 @@ def resolver_veterinario_por_usuario(db: Session, tenant_id, user: Optional[User
         .filter(
             Cliente.tenant_id == tenant_id,
             Cliente.tipo_cadastro == "veterinario",
-            Cliente.ativo == True,
+            Cliente.ativo.is_(True),
             func.lower(Cliente.email) == email,
         )
         .order_by(Cliente.id.asc())

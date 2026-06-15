@@ -55,7 +55,7 @@ def listar_veterinarios(
         .filter(
             Cliente.tenant_id == tenant_id,
             Cliente.tipo_cadastro == "veterinario",
-            Cliente.ativo == True,
+            Cliente.ativo.is_(True),
         )
         .order_by(Cliente.nome)
         .all()
@@ -75,7 +75,7 @@ def listar_consultorios(
     _, tenant_id = _get_tenant(current)
     q = db.query(ConsultorioVet).filter(ConsultorioVet.tenant_id == tenant_id)
     if ativos_only:
-        q = q.filter(ConsultorioVet.ativo == True)
+        q = q.filter(ConsultorioVet.ativo.is_(True))
     return q.order_by(ConsultorioVet.ordem.asc(), ConsultorioVet.nome.asc()).all()
 
 
@@ -208,7 +208,7 @@ def listar_pets_vet(
         db.query(Pet)
         .join(Cliente)
         .options(joinedload(Pet.cliente))
-        .filter(Cliente.tenant_id.in_(tenant_ids), Pet.ativo == True)
+        .filter(Cliente.tenant_id.in_(tenant_ids), Pet.ativo.is_(True))
     )
 
     if cliente_id:
