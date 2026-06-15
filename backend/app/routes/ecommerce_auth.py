@@ -38,6 +38,7 @@ from app.services.app_access_profile_service import (
     resolve_user_app_profiles,
 )
 from app.tenancy.context import set_current_tenant
+from app.tenancy.rls import sync_rls_auth_email, sync_rls_auth_user
 
 
 router = APIRouter(prefix="/ecommerce/auth", tags=["ecommerce-auth"])
@@ -426,6 +427,7 @@ def _get_current_ecommerce_user(
         raise credentials_exception
 
     set_current_tenant(tenant_id)
+    sync_rls_auth_user(db, user_id)
 
     user = (
         db.query(User)
@@ -986,6 +988,7 @@ def registrar_cliente(payload: EcommerceRegisterRequest, request: Request, db: S
             detail="Aceite os Termos de Uso e a Politica de Privacidade para criar a conta.",
         )
 
+    sync_rls_auth_email(db, email)
     existing = db.query(User).filter(User.email == email).first()
     if existing:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Email já cadastrado")

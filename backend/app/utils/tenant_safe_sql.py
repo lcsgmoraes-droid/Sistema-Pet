@@ -106,6 +106,7 @@ TENANT_SCOPED_TABLES = {
     "tenant_template_item_installs",
     "tenant_template_installs",
     "tipo_despesas",
+    "user_tenants",
     "users",
     "vet_agendamentos",
     "vet_catalogo_procedimentos",

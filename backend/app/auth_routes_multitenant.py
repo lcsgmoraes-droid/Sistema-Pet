@@ -46,6 +46,7 @@ from app.services.auth_security import (
 )
 from app.services.tenant_onboarding_service import onboard_tenant_defaults
 from app.tenancy.context import clear_tenant_context, set_tenant_context
+from app.tenancy.rls import sync_rls_auth_email, sync_rls_auth_user
 # from app.audit import log_audit  # TODO: Fix audit import conflict
 
 logger = logging.getLogger(__name__)
@@ -466,6 +467,7 @@ def register(request: Request, payload: RegisterRequest, db: Session = Depends(g
             detail="Aceite os Termos de Uso e a Politica de Privacidade para criar a conta.",
         )
 
+    sync_rls_auth_email(db, email)
     existing = db.query(User).filter(User.email == email).first()
     if existing:
         raise HTTPException(
@@ -656,6 +658,7 @@ def login_multitenant(request: Request, credentials: LoginRequest, db: Session =
     Token gerado SEM tenant_id.
     """
     email = credentials.email.strip().lower()
+    sync_rls_auth_email(db, email)
     user = db.query(User).filter(User.email == email).first()
 
     if user and is_user_locked(user):
@@ -688,6 +691,7 @@ def login_multitenant(request: Request, credentials: LoginRequest, db: Session =
         )
 
     register_successful_login(db, user, request)
+    sync_rls_auth_user(db, user.id)
 
     user_tenants = db.query(UserTenant).filter(
         UserTenant.user_id == user.id
@@ -781,6 +785,7 @@ def refresh_access_token(payload: RefreshTokenRequest, db: Session = Depends(get
     if not db_session or db_session.user_id != user_id_int:
         raise credentials_exception
 
+    sync_rls_auth_user(db, user_id_int)
     user = db.query(User).filter(User.id == user_id_int).first()
     if not user or not user.is_active:
         raise credentials_exception
@@ -808,6 +813,7 @@ def verify_email(payload: VerifyEmailRequest, request: Request, db: Session = De
             detail="Informe o e-mail para confirmar a conta",
         )
 
+    sync_rls_auth_email(db, email)
     token_hash = _hash_token(payload.token.strip())
     query = db.query(User).filter(
         User.email == email,
@@ -836,7 +842,9 @@ def resend_verification(
     db: Session = Depends(get_session),
 ):
     generic_response = {"message": "Se o email precisar de confirmacao, enviaremos um novo link."}
-    user = db.query(User).filter(User.email == payload.email.strip().lower()).first()
+    email = payload.email.strip().lower()
+    sync_rls_auth_email(db, email)
+    user = db.query(User).filter(User.email == email).first()
 
     if not user or not user.is_active or user.email_verified:
         return generic_response
@@ -863,6 +871,7 @@ def forgot_password(
     generic_response = {"message": "Se o email existir, enviaremos instrucoes de recuperacao."}
     email = payload.email.strip().lower()
 
+    sync_rls_auth_email(db, email)
     user = db.query(User).filter(User.email == email).first()
 
     if not user or not user.is_active:
@@ -914,6 +923,7 @@ def reset_password(
             detail="Informe o e-mail para redefinir a senha",
         )
 
+    sync_rls_auth_email(db, email)
     user = db.query(User).filter(User.email == email).first()
 
     if not user or not user.reset_token_expires:
@@ -952,6 +962,7 @@ def select_tenant(
     REUTILIZA a sessão criada no login.
     """
     from uuid import UUID
+    sync_rls_auth_user(db, current_user.id)
     
     try:
         tenant_uuid = UUID(body.tenant_id)
