@@ -196,8 +196,8 @@ def _validate_test_settings(settings: Any, errors: List[str]) -> None:
     # Verificar se não está usando banco de produção
     if 'production' in database_url.lower() or 'prod' in database_url.lower():
         errors.append(
-            f"[TEST] Ambiente de teste NÃO DEVE usar banco de produção\n"
-            f"       DATABASE_URL contém 'production' ou 'prod'"
+            "[TEST] Ambiente de teste NÃO DEVE usar banco de produção\n"
+            "       DATABASE_URL contém 'production' ou 'prod'"
         )
     
     logger.info("🧪 Validação de teste executada")
@@ -218,8 +218,8 @@ def _validate_development_settings(settings: Any, errors: List[str]) -> None:
     # Verificar se não está usando banco de produção
     if 'production' in database_url.lower() or 'prod' in database_url.lower():
         errors.append(
-            f"[DEVELOPMENT] Ambiente de desenvolvimento NÃO DEVE usar banco de produção\n"
-            f"              DATABASE_URL contém 'production' ou 'prod'"
+            "[DEVELOPMENT] Ambiente de desenvolvimento NÃO DEVE usar banco de produção\n"
+            "              DATABASE_URL contém 'production' ou 'prod'"
         )
     
     logger.info("🛠️  Validação de desenvolvimento executada")

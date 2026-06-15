@@ -40,3 +40,10 @@ def test_backend_ci_has_blocking_security_lint_step():
 
     assert "Security lint (blocking)" in source
     assert "ruff check app/security" in source
+
+
+def test_backend_ci_has_blocking_core_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Core lint (blocking)" in source
+    assert "ruff check app/core" in source
