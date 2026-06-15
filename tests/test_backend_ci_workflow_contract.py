@@ -103,3 +103,10 @@ def test_backend_ci_has_blocking_fiscal_models_lint_step():
 
     assert "Fiscal models lint (blocking)" in source
     assert "ruff check app/fiscal_models" in source
+
+
+def test_backend_ci_has_blocking_caixa_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Caixa lint (blocking)" in source
+    assert "ruff check app/caixa" in source

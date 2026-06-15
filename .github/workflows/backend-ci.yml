@@ -95,6 +95,10 @@ jobs:
         run: |
           ruff check app/fiscal_models
 
+      - name: Caixa lint (blocking)
+        run: |
+          ruff check app/caixa
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"

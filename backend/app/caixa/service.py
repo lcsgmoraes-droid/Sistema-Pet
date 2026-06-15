@@ -69,7 +69,6 @@ DATA: 2025-01-23
 import logging
 from typing import Dict, Any, Optional
 from decimal import Decimal
-from datetime import datetime
 from fastapi import HTTPException
 from sqlalchemy.orm import Session
 
@@ -455,7 +454,6 @@ def calcular_saldo_caixa(caixa_id: int, db: Session) -> Decimal:
         Saldo calculado (saldo_inicial + entradas - saídas)
     """
     from app.caixa_models import Caixa, MovimentacaoCaixa
-    from sqlalchemy import func
     
     caixa = db.query(Caixa).filter(Caixa.id == caixa_id).first()
     if not caixa:
