@@ -33,7 +33,8 @@ def test_tenant_filter_declares_partner_readable_models_and_vet_link_guard():
     assert "VetPartnerLink.empresa_tenant_id" in source
     assert "VetPartnerLink.vet_tenant_id" in source
     assert "VetPartnerLink.ativo.is_(True)" in source
-    assert "lambda cls: _tenant_read_filter(cls, tenant_id)" in source
+    assert "def base_tenant_filter(cls):" in source
+    assert "_tenant_read_filter(cls, tenant_id)" in source
     assert "track_base_closure_variables = False" in source
     assert "track_closure_variables=track_base_closure_variables" in source
 

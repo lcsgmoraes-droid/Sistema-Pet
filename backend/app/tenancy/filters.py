@@ -13,7 +13,7 @@ WHITELIST:
 """
 
 from sqlalchemy.orm import Session
-from sqlalchemy import event, inspect, or_, select
+from sqlalchemy import event, or_, select
 from sqlalchemy.orm import with_loader_criteria
 import logging
 
@@ -145,10 +145,14 @@ def _add_tenant_filter(execute_state):
         # legados que herdam Base direto mas adotam o mixin). Cada entidade casa
         # com exatamente um dos criterios (BaseTenantModel nao herda TenantScoped).
         if _supports_partner_read_filter(execute_state.session):
-            base_tenant_filter = lambda cls: _tenant_read_filter(cls, tenant_id)
+            def base_tenant_filter(cls):
+                return _tenant_read_filter(cls, tenant_id)
+
             track_base_closure_variables = False
         else:
-            base_tenant_filter = lambda cls: cls.tenant_id == tenant_id
+            def base_tenant_filter(cls):
+                return cls.tenant_id == tenant_id
+
             track_base_closure_variables = True
 
         execute_state.statement = execute_state.statement.options(
@@ -179,7 +183,6 @@ def _add_tenant_filter(execute_state):
         
         # Se tabela não está na whitelist, verificar se herda de BaseTenantModel
         # Percorrer todas as classes mapeadas para encontrar a tabela
-        from sqlalchemy.orm import class_mapper
         from app.db import Base
 
         for mapper in Base.registry.mappers:
@@ -204,9 +207,9 @@ def _add_tenant_filter(execute_state):
     # CASO 3: Não foi possível determinar a tabela
     # Por segurança, FAIL-FAST (melhor falhar do que vazar dados)
     error_msg = (
-        f"[ORM FAIL-FAST] Não foi possível determinar a tabela da query e tenant_id está ausente. "
-        f"Por segurança, a query foi bloqueada. "
-        f"Certifique-se de usar get_current_user_and_tenant() em rotas multi-tenant."
+        "[ORM FAIL-FAST] Não foi possível determinar a tabela da query e tenant_id está ausente. "
+        "Por segurança, a query foi bloqueada. "
+        "Certifique-se de usar get_current_user_and_tenant() em rotas multi-tenant."
     )
     logger.error(error_msg)
     raise RuntimeError(error_msg)
