@@ -110,3 +110,10 @@ def test_backend_ci_has_blocking_caixa_lint_step():
 
     assert "Caixa lint (blocking)" in source
     assert "ruff check app/caixa" in source
+
+
+def test_backend_ci_has_blocking_parsers_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Parsers lint (blocking)" in source
+    assert "ruff check app/parsers" in source

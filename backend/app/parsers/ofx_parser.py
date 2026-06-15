@@ -5,7 +5,7 @@ Suporta OFX 1.x (SGML) e 2.x (XML)
 
 import re
 from datetime import datetime
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from typing import List, Dict, Optional
 from xml.etree import ElementTree as ET
 
@@ -110,7 +110,7 @@ class OFXParser:
             return None
         try:
             return Decimal(valor_str.strip())
-        except:
+        except (AttributeError, InvalidOperation, ValueError):
             return None
     
     @staticmethod
@@ -183,9 +183,6 @@ class OFXParser:
         
         try:
             root = ET.fromstring(conteudo)
-            
-            # Namespace OFX 2.x
-            ns = {'ofx': 'http://www.ofx.net/ofx/OFX200'}
             
             # Tenta com e sem namespace
             for prefix in ['ofx:', '']:
