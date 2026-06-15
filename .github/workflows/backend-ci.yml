@@ -39,6 +39,10 @@ jobs:
           pip install -r requirements.txt
           pip install pytest pytest-cov pytest-asyncio ruff mypy
 
+      - name: Tenancy lint (blocking)
+        run: |
+          ruff check app/tenancy tests/unit/test_rls_no_debt_guard.py tests/multi_tenant/test_tenant_model_registry.py
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"
