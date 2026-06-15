@@ -29,7 +29,6 @@ from app.ai.engine import AIEngine, AIEngineFactory
 from app.ai.contracts import AIResponse, AIContext
 from app.ai.insight_explainer.adapter import InsightAIAdapter
 from app.ai.insight_explainer.prompts import InsightPromptLibrary
-from app.ai.prompt_builder import AIPromptBuilder
 
 
 logger = logging.getLogger(__name__)
@@ -246,10 +245,10 @@ class InsightExplanationService:
             )
             
             sugestao = (
-                f"Entre em contato via WhatsApp em tom amigável, perguntando "
-                f"como está o pet dele e oferecendo ajuda. Considere uma "
-                f"promoção especial de 'volta' caso ele mencione preço como "
-                f"motivo do afastamento."
+                "Entre em contato via WhatsApp em tom amigável, perguntando "
+                "como está o pet dele e oferecendo ajuda. Considere uma "
+                "promoção especial de 'volta' caso ele mencione preço como "
+                "motivo do afastamento."
             )
             
         elif insight.tipo == TipoInsight.CLIENTE_INATIVO:
@@ -264,10 +263,10 @@ class InsightExplanationService:
             )
             
             sugestao = (
-                f"Crie uma campanha de reconquista personalizada com desconto "
-                f"especial 'para clientes antigos'. Use múltiplos canais "
-                f"(WhatsApp + email) e destaque novidades no estoque desde a "
-                f"última visita."
+                "Crie uma campanha de reconquista personalizada com desconto "
+                "especial 'para clientes antigos'. Use múltiplos canais "
+                "(WhatsApp + email) e destaque novidades no estoque desde a "
+                "última visita."
             )
             
         elif insight.tipo == TipoInsight.PRODUTOS_COMPRADOS_JUNTOS:
@@ -314,9 +313,9 @@ class InsightExplanationService:
             )
             
             sugestao = (
-                f"Ofereça benefícios exclusivos: desconto permanente de 10%, "
-                f"prioridade em novos produtos, brindes surpresa ocasionais. "
-                f"Mantenha relacionamento próximo e personalizado."
+                "Ofereça benefícios exclusivos: desconto permanente de 10%, "
+                "prioridade em novos produtos, brindes surpresa ocasionais. "
+                "Mantenha relacionamento próximo e personalizado."
             )
             
         elif insight.tipo == TipoInsight.CLIENTE_EM_RISCO_CHURN:
@@ -330,9 +329,9 @@ class InsightExplanationService:
             )
             
             sugestao = (
-                f"Ação urgente: contato imediato da gerência, oferta especial "
-                f"de retenção, pesquisa de satisfação para entender problemas. "
-                f"Prioridade máxima nas próximas 48 horas."
+                "Ação urgente: contato imediato da gerência, oferta especial "
+                "de retenção, pesquisa de satisfação para entender problemas. "
+                "Prioridade máxima nas próximas 48 horas."
             )
             
         elif insight.tipo == TipoInsight.PRODUTO_TOP_VENDAS:
@@ -346,22 +345,22 @@ class InsightExplanationService:
             )
             
             sugestao = (
-                f"Garanta estoque adequado, negocie melhores condições com "
-                f"fornecedor devido ao volume, considere criar kits com este "
-                f"produto como âncora. Use-o como destaque em campanhas."
+                "Garanta estoque adequado, negocie melhores condições com "
+                "fornecedor devido ao volume, considere criar kits com este "
+                "produto como âncora. Use-o como destaque em campanhas."
             )
             
         else:
             # Genérico para tipos não mapeados
             explicacao = (
-                f"Este insight identificou um padrão relevante que merece "
-                f"atenção. Baseado nos dados históricos e comportamento "
-                f"observado, há uma oportunidade de ação."
+                "Este insight identificou um padrão relevante que merece "
+                "atenção. Baseado nos dados históricos e comportamento "
+                "observado, há uma oportunidade de ação."
             )
             
             sugestao = (
-                f"Analise os dados em detalhes e defina uma ação específica "
-                f"baseada no contexto do seu negócio e prioridades atuais."
+                "Analise os dados em detalhes e defina uma ação específica "
+                "baseada no contexto do seu negócio e prioridades atuais."
             )
         
         return explicacao, sugestao

@@ -124,15 +124,15 @@ def exibir_resposta(resposta, numero_exemplo: int, titulo: str):
     print("\n" + "="*80)
     logger.info(f"EXEMPLO {numero_exemplo}: {titulo}")
     print("="*80)
-    logger.info(f"\n📝 RESPOSTA:")
+    logger.info("\n📝 RESPOSTA:")
     print(resposta.resposta)
-    logger.info(f"\n📊 METADADOS:")
+    logger.info("\n📊 METADADOS:")
     logger.info(f"   - Intenção: {resposta.intencao_detectada}")
     logger.info(f"   - Confiança: {resposta.confianca:.2%}")
     logger.info(f"   - Fontes: {', '.join(resposta.fontes_utilizadas)}")
     logger.info(f"   - Tempo: {resposta.tempo_processamento_ms}ms")
     logger.info(f"   - Origem: {resposta.origem}")
-    logger.info(f"\n💡 CONTEXTO USADO:")
+    logger.info("\n💡 CONTEXTO USADO:")
     for chave, valor in resposta.contexto_usado.items():
         logger.info(f"   - {chave}: {'✓' if valor else '✗'}")
 

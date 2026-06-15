@@ -12,8 +12,7 @@ Não usa IA para detectar intenção (isso seria overhead desnecessário).
 """
 
 import re
-from typing import Dict, List, Any, Optional
-from datetime import datetime
+from typing import Dict, List, Any
 
 from .models import (
     OperatorChatContext,

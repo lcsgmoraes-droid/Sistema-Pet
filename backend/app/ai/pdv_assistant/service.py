@@ -21,9 +21,8 @@ RESPONSABILIDADES:
 - Limitação de sugestões
 """
 
-from typing import List, Dict, Any, Optional
+from typing import List, Optional
 from datetime import datetime, timedelta
-from decimal import Decimal
 import logging
 
 from sqlalchemy.orm import Session
@@ -37,7 +36,6 @@ from app.ai.pdv_assistant.models import (
 from app.ai.pdv_assistant.selector import PDVInsightSelector
 from app.ai.pdv_assistant.prompts import PDVPromptLibrary
 from app.ai.engine import AIEngine, AIEngineFactory
-from app.ai.prompt_builder import AIPromptBuilder
 from app.insights.models import Insight
 from app.insights.engine import InsightEngine
 
@@ -240,7 +238,6 @@ class PDVAIService:
         Returns:
             Sugestão gerada ou None se não for possível gerar
         """
-        from app.insights.models import TipoInsight
         
         # Mapear tipo de insight para tipo de sugestão PDV
         tipo_sugestao = self._mapear_tipo_insight(insight.tipo)

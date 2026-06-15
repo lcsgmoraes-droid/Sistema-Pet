@@ -2,7 +2,7 @@
 Rollout Orchestrator Service
 Orquestra estratégias de rollout e monitora performance
 """
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import List, Dict, Optional
 from uuid import UUID, uuid4
 import random
@@ -19,9 +19,7 @@ from app.ai.versioning.events import (
     RolloutPlanCreated,
     RolloutStarted,
     RolloutStepCompleted,
-    RolloutPaused,
     RolloutCompleted,
-    RolloutFailed,
     VersionRegressionDetected,
     AutoRollbackTriggered,
 )
@@ -357,7 +355,7 @@ class RolloutOrchestrator:
                     rolled_back_by="auto_rollback",
                     reason="Performance regression detected",
                 )
-            except Exception as e:
+            except Exception:
                 # Log error mas continua
                 pass
         

@@ -8,9 +8,10 @@ COMO USAR:
 """
 
 import asyncio
+import importlib
 import os
 import sys
-from typing import List, Tuple
+from typing import Tuple
 from pathlib import Path
 from app.utils.logger import logger
 
@@ -32,19 +33,14 @@ os.environ["DAILY_COST_LIMIT_USD"] = "5.00"
 async def teste_1_importacoes() -> Tuple[bool, str]:
     """Testa se todas as importações estão corretas"""
     try:
-        from app.ai.providers import (
-            IAIProvider,
-            ProviderType,
-            ProviderRequest,
-            ProviderResponse,
-            MockAIProvider,
-            OpenAIProvider,
-            ProviderFactory,
-            get_provider,
+        modules = (
+            "app.ai.providers",
+            "app.ai.settings",
+            "app.ai.cost_control",
+            "app.ai.engine",
         )
-        from app.ai.settings import AISettings
-        from app.ai.cost_control import get_cost_controller
-        from app.ai.engine import AIEngine, AIEngineFactory
+        for module in modules:
+            importlib.import_module(module)
         
         return True, "Todas as importações OK"
     except Exception as e:
@@ -54,7 +50,7 @@ async def teste_1_importacoes() -> Tuple[bool, str]:
 async def teste_2_settings() -> Tuple[bool, str]:
     """Testa configurações"""
     try:
-        from app.ai.settings import AISettings, AIProviderType
+        from app.ai.settings import AISettings
         
         # Verificar que as settings foram carregadas
         assert hasattr(AISettings, "PROVIDER")
@@ -64,7 +60,7 @@ async def teste_2_settings() -> Tuple[bool, str]:
         assert hasattr(AISettings, "ENABLE_FALLBACK")
         
         # Verificar que validate() existe e retorna algo
-        result = AISettings.validate()
+        AISettings.validate()
         
         return True, f"Configurações OK (provider: {AISettings.PROVIDER.value})"
     except AssertionError as e:
@@ -140,7 +136,7 @@ async def teste_4_openai_provider() -> Tuple[bool, str]:
 async def teste_5_provider_factory() -> Tuple[bool, str]:
     """Testa ProviderFactory"""
     try:
-        from app.ai.providers import ProviderFactory, ProviderType
+        from app.ai.providers import ProviderFactory
         
         # Resetar factory
         ProviderFactory.reset()

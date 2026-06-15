@@ -11,8 +11,6 @@ from app.ai.governance.models import (
     ChangeRequestStatus,
     ChangeImpactLevel,
     QualityReport,
-    QualityGate,
-    ChangeApprovalPolicy,
     DEFAULT_APPROVAL_POLICY,
 )
 from app.ai.governance.events import (

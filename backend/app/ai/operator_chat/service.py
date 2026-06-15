@@ -26,7 +26,6 @@ import time
 
 from .models import (
     OperatorChatContext,
-    OperatorMessage,
     OperatorChatResponse,
     FONTE_HEURISTICA,
     FONTE_INSIGHT,
@@ -34,7 +33,6 @@ from .models import (
     FONTE_READ_MODEL,
 )
 from .adapter import preparar_contexto_completo
-from .prompts import obter_prompt_formatado
 
 
 logger = logging.getLogger(__name__)
@@ -103,12 +101,6 @@ class OperatorChatService:
             logger.info(
                 f"[OperatorChat] Intenção detectada: {intencao.intencao} "
                 f"(confiança: {intencao.confianca:.2f})"
-            )
-            
-            prompt_formatado = obter_prompt_formatado(
-                intencao.intencao,
-                pergunta,
-                contexto_formatado
             )
             
             # 4. Gerar resposta (MOCK por enquanto)

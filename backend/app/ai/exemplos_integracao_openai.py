@@ -19,7 +19,6 @@ EXECUÇÃO:
 
 import asyncio
 import os
-from typing import Dict, Any
 
 # Configurar ENV antes de importar (para testes)
 os.environ.setdefault("AI_PROVIDER", "mock")
@@ -27,7 +26,7 @@ os.environ.setdefault("MAX_TOKENS", "300")
 os.environ.setdefault("TIMEOUT_SECONDS", "5")
 
 from backend.app.ai.engine import AIEngine, AIEngineFactory
-from backend.app.ai.settings import AISettings
+from backend.app.ai.settings import AIProviderType, AISettings
 from backend.app.ai.cost_control import get_cost_controller
 from app.utils.logger import logger
 
@@ -66,15 +65,15 @@ async def exemplo_1_uso_basico():
     )
     
     # Exibir resultado
-    logger.info(f"\n📊 Resposta:")
+    logger.info("\n📊 Resposta:")
     logger.info(f"   {response.resposta}\n")
-    logger.info(f"💡 Explicação:")
+    logger.info("💡 Explicação:")
     logger.info(f"   {response.explicacao}\n")
     logger.info(f"📚 Fonte de Dados: {response.fonte_dados}")
     logger.info(f"🎯 Confiança: {response.confianca:.0%}")
     
     # Metadados (auditoria)
-    logger.info(f"\n🔍 Metadados:")
+    logger.info("\n🔍 Metadados:")
     logger.info(f"   Provider: {response.metadata.get('provider', 'N/A')}")
     logger.info(f"   Modelo: {response.metadata.get('model', 'N/A')}")
     logger.info(f"   Tokens: {response.metadata.get('tokens', 0)}")
@@ -101,7 +100,7 @@ async def exemplo_2_controle_custo():
     tenant_id = 1
     can_proceed, reason = cost_controller.check_can_proceed(tenant_id)
     
-    logger.info(f"\n💰 Status do Limite de Custo:")
+    logger.info("\n💰 Status do Limite de Custo:")
     logger.info(f"   Pode processar: {can_proceed}")
     logger.info(f"   Razão: {reason}")
     
@@ -124,12 +123,12 @@ async def exemplo_2_controle_custo():
             tenant_id=tenant_id
         )
         
-        logger.info(f"\n✅ Resposta gerada com sucesso")
+        logger.info("\n✅ Resposta gerada com sucesso")
         logger.info(f"   Custo desta operação: ${response.metadata.get('cost_usd', 0):.4f}")
         
         # Obter resumo de uso
         usage_summary = cost_controller.get_usage_summary(tenant_id)
-        logger.info(f"\n📊 Uso Acumulado do Dia:")
+        logger.info("\n📊 Uso Acumulado do Dia:")
         logger.info(f"   Total de tokens: {usage_summary['total_tokens']}")
         logger.info(f"   Total de custo: ${usage_summary['total_cost']:.4f}")
         logger.info(f"   Requisições: {usage_summary['request_count']}")
@@ -183,7 +182,7 @@ async def exemplo_3_fallback():
         else:
             logger.info("\n✅ Provider principal funcionou normalmente")
         
-        logger.info(f"\n📊 Resposta:")
+        logger.info("\n📊 Resposta:")
         logger.info(f"   {response.resposta}")
         
     except Exception as e:
@@ -275,7 +274,7 @@ async def exemplo_5_multiplas_requisicoes():
     engine = AIEngineFactory.create_production_engine()
     tenant_id = 1
     
-    logger.info(f"\n🔄 Processando 5 requisições sequenciais...")
+    logger.info("\n🔄 Processando 5 requisições sequenciais...")
     
     for i in range(5):
         context = {
@@ -302,7 +301,7 @@ async def exemplo_5_multiplas_requisicoes():
     cost_controller = get_cost_controller()
     summary = cost_controller.get_usage_summary(tenant_id)
     
-    logger.info(f"\n📊 Resumo Final:")
+    logger.info("\n📊 Resumo Final:")
     logger.info(f"   Total de requisições: {summary['request_count']}")
     logger.info(f"   Total de tokens: {summary['total_tokens']}")
     logger.info(f"   Custo total: ${summary['total_cost']:.4f}")
@@ -321,7 +320,7 @@ async def main():
     print("=" * 70)
     
     # Exibir configuração atual
-    logger.info(f"\n⚙️ Configuração Atual:")
+    logger.info("\n⚙️ Configuração Atual:")
     logger.info(f"   Provider: {AISettings.PROVIDER.value}")
     logger.info(f"   Modelo: {AISettings.OPENAI_MODEL}")
     logger.info(f"   Max Tokens: {AISettings.MAX_TOKENS}")
@@ -329,7 +328,7 @@ async def main():
     logger.info(f"   Limite Diário: ${AISettings.DAILY_COST_LIMIT_USD:.2f}")
     logger.info(f"   Fallback: {AISettings.ENABLE_FALLBACK}")
     
-    if AISettings.PROVIDER == ProviderType.OPENAI:
+    if AISettings.PROVIDER == AIProviderType.OPENAI:
         api_key = AISettings.OPENAI_API_KEY
         logger.info(f"   API Key: {'Configurada ✅' if api_key else 'NÃO configurada ❌'}")
     

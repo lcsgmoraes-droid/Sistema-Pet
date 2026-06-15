@@ -150,7 +150,7 @@ ENTITIES: {"produto": "ração", "marca": "golden", "tipo": "filhote"}
                     try:
                         import json
                         result["entities"] = json.loads(entities_str)
-                    except:
+                    except Exception:
                         result["entities"] = {}
             
             return result
