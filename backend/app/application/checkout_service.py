@@ -1,6 +1,6 @@
 import uuid
 from uuid import uuid4
-from uuid import UUID, NAMESPACE_DNS, uuid5
+from uuid import UUID
 import hashlib
 import json
 from datetime import datetime
