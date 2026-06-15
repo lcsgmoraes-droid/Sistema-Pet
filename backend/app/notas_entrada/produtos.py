@@ -394,7 +394,7 @@ def encontrar_produto_similar(
                 ProdutoFornecedor.produto_id == Produto.id
             ).filter(
                 ProdutoFornecedor.fornecedor_id == fornecedor_id,
-                ProdutoFornecedor.ativo == True,
+                ProdutoFornecedor.ativo.is_(True),
             )
             if tenant_id is not None:
                 query_fornecedor = query.join(
@@ -402,7 +402,7 @@ def encontrar_produto_similar(
                     ProdutoFornecedor.produto_id == Produto.id
                 ).filter(
                     ProdutoFornecedor.fornecedor_id == fornecedor_id,
-                    ProdutoFornecedor.ativo == True,
+                    ProdutoFornecedor.ativo.is_(True),
                     ProdutoFornecedor.tenant_id == tenant_id,
                 )
 
