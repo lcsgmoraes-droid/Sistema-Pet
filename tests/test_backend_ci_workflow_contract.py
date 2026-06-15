@@ -208,3 +208,10 @@ def test_backend_ci_has_blocking_estoque_lint_step():
 
     assert "Estoque lint (blocking)" in source
     assert "ruff check app/estoque" in source
+
+
+def test_backend_ci_has_blocking_configuracoes_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Configuracoes lint (blocking)" in source
+    assert "ruff check app/configuracoes" in source
