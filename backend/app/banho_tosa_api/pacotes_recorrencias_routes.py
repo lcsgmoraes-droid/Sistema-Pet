@@ -34,7 +34,7 @@ def listar_recorrencias(
     _, tenant_id = _get_tenant(current)
     query = query_recorrencias(db, tenant_id)
     if ativos_only:
-        query = query.filter(BanhoTosaRecorrencia.ativo == True)
+        query = query.filter(BanhoTosaRecorrencia.ativo.is_(True))
     itens = query.order_by(BanhoTosaRecorrencia.proxima_execucao.asc()).limit(limit).all()
     return [serializar_recorrencia(item) for item in itens]
 

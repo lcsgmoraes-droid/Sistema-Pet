@@ -30,7 +30,7 @@ STATUS_ATENDIMENTO_FINAIS = {"entregue", "cancelado", "no_show"}
 def obter_ou_criar_configuracao(db: Session, tenant_id) -> BanhoTosaConfiguracao:
     config = (
         db.query(BanhoTosaConfiguracao)
-        .filter(BanhoTosaConfiguracao.tenant_id == tenant_id, BanhoTosaConfiguracao.ativo == True)
+        .filter(BanhoTosaConfiguracao.tenant_id == tenant_id, BanhoTosaConfiguracao.ativo.is_(True))
         .order_by(BanhoTosaConfiguracao.id.asc())
         .first()
     )
@@ -54,7 +54,7 @@ def validar_cliente_pet(db: Session, tenant_id, cliente_id: int, pet_id: int) ->
     cliente = db.query(Cliente).filter(
         Cliente.id == cliente_id,
         Cliente.tenant_id == tenant_id,
-        Cliente.ativo == True,
+        Cliente.ativo.is_(True),
     ).first()
     if not cliente:
         raise HTTPException(status_code=404, detail="Tutor nao encontrado")
@@ -63,7 +63,7 @@ def validar_cliente_pet(db: Session, tenant_id, cliente_id: int, pet_id: int) ->
         Pet.id == pet_id,
         Pet.tenant_id == tenant_id,
         Pet.cliente_id == cliente_id,
-        Pet.ativo == True,
+        Pet.ativo.is_(True),
     ).first()
     if not pet:
         raise HTTPException(status_code=404, detail="Pet nao encontrado para esse tutor")

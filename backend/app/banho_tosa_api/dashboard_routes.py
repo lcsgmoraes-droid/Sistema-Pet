@@ -75,12 +75,12 @@ def obter_dashboard(
 
     servicos_ativos = db.query(func.count(BanhoTosaServico.id)).filter(
         BanhoTosaServico.tenant_id == tenant_id,
-        BanhoTosaServico.ativo == True,
+        BanhoTosaServico.ativo.is_(True),
     ).scalar() or 0
 
     recursos_ativos = db.query(func.count(BanhoTosaRecurso.id)).filter(
         BanhoTosaRecurso.tenant_id == tenant_id,
-        BanhoTosaRecurso.ativo == True,
+        BanhoTosaRecurso.ativo.is_(True),
     ).scalar() or 0
     nps = calcular_nps_periodo(db, tenant_id, inicio, fim)
 

@@ -25,7 +25,7 @@ def listar_funcionarios_apoio(
     _, tenant_id = _get_tenant(current)
     query = db.query(Cliente).filter(
         Cliente.tenant_id == tenant_id,
-        Cliente.ativo == True,
+        Cliente.ativo.is_(True),
         Cliente.tipo_cadastro.in_(["funcionario", "veterinario", "outro"]),
     )
 
@@ -54,8 +54,8 @@ def listar_produtos_estoque_apoio(
     _, tenant_id = _get_tenant(current)
     query = db.query(Produto).filter(
         Produto.tenant_id == str(tenant_id),
-        Produto.ativo == True,
-        Produto.situacao == True,
+        Produto.ativo.is_(True),
+        Produto.situacao.is_(True),
     )
 
     if busca:

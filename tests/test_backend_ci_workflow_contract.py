@@ -194,3 +194,10 @@ def test_backend_ci_has_blocking_read_models_lint_step():
 
     assert "Read models lint (blocking)" in source
     assert "ruff check app/read_models" in source
+
+
+def test_backend_ci_has_blocking_banho_tosa_api_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Banho Tosa API lint (blocking)" in source
+    assert "ruff check app/banho_tosa_api" in source

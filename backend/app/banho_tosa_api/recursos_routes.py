@@ -32,7 +32,7 @@ def listar_recursos(
     _, tenant_id = _get_tenant(current)
     query = db.query(BanhoTosaRecurso).filter(BanhoTosaRecurso.tenant_id == tenant_id)
     if ativos_only:
-        query = query.filter(BanhoTosaRecurso.ativo == True)
+        query = query.filter(BanhoTosaRecurso.ativo.is_(True))
     if tipo:
         query = query.filter(BanhoTosaRecurso.tipo == tipo)
     return query.order_by(BanhoTosaRecurso.tipo.asc(), BanhoTosaRecurso.nome.asc()).all()

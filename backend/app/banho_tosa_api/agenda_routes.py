@@ -87,7 +87,7 @@ def criar_agendamento(
             servico = db.query(BanhoTosaServico).filter(
                 BanhoTosaServico.id == item.servico_id,
                 BanhoTosaServico.tenant_id == tenant_id,
-                BanhoTosaServico.ativo == True,
+                BanhoTosaServico.ativo.is_(True),
             ).first()
             if not servico:
                 raise HTTPException(status_code=404, detail="Servico nao encontrado")
