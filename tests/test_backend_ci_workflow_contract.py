@@ -112,6 +112,13 @@ def test_backend_ci_has_blocking_caixa_lint_step():
     assert "ruff check app/caixa" in source
 
 
+def test_backend_ci_has_blocking_caixa_root_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Caixa root lint (blocking)" in source
+    assert "ruff check app/caixa_models.py app/caixa_routes.py app/calculadora_racao.py" in source
+
+
 def test_backend_ci_has_blocking_parsers_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
