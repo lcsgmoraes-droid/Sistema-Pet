@@ -219,6 +219,10 @@ jobs:
         run: |
           ruff check app/canais.py app/partner_utils.py app/permissions_routes.py app/roles_routes.py app/cargos_routes.py app/cargo_models.py
 
+      - name: Financial root lint (blocking)
+        run: |
+          ruff check app/contas_bancarias_routes.py app/contas_pagar_routes.py app/contas_receber_routes.py app/lancamentos_routes.py app/operadoras_models.py app/operadoras_routes.py app/formas_pagamento_models.py app/formas_pagamento_routes.py
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"

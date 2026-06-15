@@ -1,4 +1,3 @@
-from app.base_models import BaseTenantModel
 """
 Models para Formas de Pagamento e Taxas por Parcela
 Utilizado para análise de vendas no PDV
@@ -7,6 +6,8 @@ Utilizado para análise de vendas no PDV
 from sqlalchemy import Column, Integer, String, Numeric, Boolean, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime
+
+from app.base_models import BaseTenantModel
 from .db import Base
 
 

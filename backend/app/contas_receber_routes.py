@@ -7,19 +7,17 @@ from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import and_, or_, func, desc
 from typing import List, Optional
-from datetime import datetime, date, timedelta
+from datetime import date, timedelta
 from pydantic import BaseModel
 from decimal import Decimal
 
 from .db import get_session
-from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
 from .idempotency import idempotent  # ← IDEMPOTÊNCIA
-from .models import User, Cliente
+from .models import Cliente
 from .financeiro_models import (
-    ContaReceber, Recebimento, CategoriaFinanceira, FormaPagamento, LancamentoManual
+    ContaReceber, Recebimento, LancamentoManual
 )
-from .domain.validators.dre_validator import validar_categoria_financeira_dre
 from .domain.dre.lancamento_dre_sync import atualizar_dre_por_lancamento
 from .dre_plano_contas_models import DRESubcategoria
 
@@ -769,7 +767,7 @@ async def processar_recorrencias_contas_receber(
     # Buscar contas recorrentes que precisam gerar nova conta
     contas_recorrentes = db.query(ContaReceber).filter(
         and_(
-            ContaReceber.eh_recorrente == True,
+            ContaReceber.eh_recorrente.is_(True),
             ContaReceber.proxima_recorrencia <= hoje,
             or_(
                 ContaReceber.data_fim_recorrencia.is_(None),
