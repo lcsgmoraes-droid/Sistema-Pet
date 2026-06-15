@@ -37,7 +37,6 @@ from typing import Optional, List, Dict, Any
 from dataclasses import dataclass, asdict
 from uuid import UUID
 from sqlalchemy.orm import Session
-from sqlalchemy import text
 
 from app.domain.events.event_store import EventStore
 from app.core.replay_context import enable_replay_mode, disable_replay_mode
@@ -224,7 +223,7 @@ def replay_events(
             end_time=end_time
         )
         
-        logger.info(f"✅ REPLAY CONCLUÍDO!")
+        logger.info("✅ REPLAY CONCLUÍDO!")
         logger.info(f"📊 Estatísticas: {events_processed} eventos em {batches_processed} batches ({duration:.2f}s)")
         
         # Registrar sucesso

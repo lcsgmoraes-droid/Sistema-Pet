@@ -79,6 +79,10 @@ jobs:
         run: |
           ruff check app/cache
 
+      - name: Replay lint (blocking)
+        run: |
+          ruff check app/replay
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"
