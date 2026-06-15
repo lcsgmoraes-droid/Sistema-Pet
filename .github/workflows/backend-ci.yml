@@ -123,6 +123,10 @@ jobs:
         run: |
           ruff check app/insights
 
+      - name: Schedulers lint (blocking)
+        run: |
+          ruff check app/schedulers
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"
