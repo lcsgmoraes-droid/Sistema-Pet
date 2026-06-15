@@ -136,6 +136,29 @@ def _run_alembic(database_url: URL, *args: str) -> None:
     )
 
 
+def _assert_rls_no_debt(database_url: URL) -> None:
+    env = os.environ.copy()
+    env.update(
+        {
+            "DATABASE_URL": database_url.render_as_string(hide_password=False),
+            "ENVIRONMENT": "testing",
+            "ENV": "testing",
+            "DEBUG": "false",
+            "JWT_SECRET_KEY": "migration-smoke-secret-key-with-more-than-32-characters",
+            "EMAIL_VERIFICATION_REQUIRED": "false",
+            "BLING_SYNC_SCHEDULER_ENABLED": "false",
+            "SEFAZ_IMPORTACAO_AUTOMATICA": "false",
+        }
+    )
+    env["PYTHONPATH"] = str(BACKEND_DIR)
+    subprocess.run(
+        [sys.executable, "scripts/check_rls_no_debt.py"],
+        cwd=BACKEND_DIR,
+        env=env,
+        check=True,
+    )
+
+
 def _expected_head(database_url: URL) -> str:
     env = os.environ.copy()
     env.setdefault("DATABASE_URL", database_url.render_as_string(hide_password=False))
@@ -210,6 +233,7 @@ def main() -> int:
             print(f"migration_smoke_upgrade label={database.label} target=head")
             _run_alembic(target_url, "upgrade", "head")
             _assert_database_at_head(target_url, expected_head)
+            _assert_rls_no_debt(target_url)
             print(f"migration_smoke_status label={database.label} status=ok")
         finally:
             if keep_databases:

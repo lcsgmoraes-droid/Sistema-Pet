@@ -397,6 +397,12 @@ audit_step "Aplicando migrations Alembic"
 log "Aplicando migrations Alembic"
 docker compose -f "$COMPOSE_FILE" run --rm --no-deps backend alembic upgrade head
 
+mark_step "validar_rls_no_debt"
+audit_step "Validando guard RLS no-debt"
+log "Validando guard RLS no-debt"
+docker compose -f "$COMPOSE_FILE" run --rm --no-deps -e PYTHONPATH=/app backend \
+  python scripts/check_rls_no_debt.py
+
 mark_step "subir_servicos"
 audit_step "Subindo backend e worker"
 log "Subindo backend e worker"
