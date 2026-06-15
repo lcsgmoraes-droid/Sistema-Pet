@@ -19,3 +19,10 @@ def test_backend_ci_has_blocking_auth_lint_step():
 
     assert "Auth lint (blocking)" in source
     assert "ruff check app/auth app/auth_routes_multitenant.py app/usuarios_routes.py" in source
+
+
+def test_backend_ci_has_blocking_db_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Database lint (blocking)" in source
+    assert "ruff check app/db" in source

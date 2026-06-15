@@ -47,6 +47,10 @@ jobs:
         run: |
           ruff check app/auth app/auth_routes_multitenant.py app/usuarios_routes.py
 
+      - name: Database lint (blocking)
+        run: |
+          ruff check app/db
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"

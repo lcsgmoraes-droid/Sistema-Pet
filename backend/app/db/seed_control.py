@@ -32,8 +32,6 @@ from typing import Optional, Callable
 from datetime import datetime
 from sqlalchemy import Table, Column, String, DateTime, MetaData, text
 from sqlalchemy.orm import Session
-from sqlalchemy.engine import Engine
-from sqlalchemy.exc import ProgrammingError, OperationalError
 
 logger = logging.getLogger(__name__)
 

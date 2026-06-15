@@ -21,10 +21,9 @@ import traceback
 import re
 import os
 from datetime import datetime
-from typing import Any, Optional, List, Tuple
+from typing import Any, List, Tuple
 from sqlalchemy import event
 from sqlalchemy.engine import Engine, Connection
-from sqlalchemy.engine.cursor import CursorResult
 
 
 # =============================================================================
