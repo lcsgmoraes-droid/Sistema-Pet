@@ -1,7 +1,14 @@
 from datetime import datetime
 from types import SimpleNamespace
+from uuid import uuid4
 
-from app.api.endpoints.rotas_entrega import _sincronizar_venda_entregue_por_parada
+from app.api.endpoints.rotas_entrega import (
+    DeliveryActor,
+    marcar_parada_nao_entregue,
+    _sincronizar_venda_entregue_por_parada,
+)
+from app.rotas_entrega_models import RotaEntrega, RotaEntregaParada
+from app.vendas_models import Venda
 from app.vendas_routes import _resolver_status_entrega_atualizacao
 
 
@@ -39,4 +46,123 @@ def test_sincronizar_parada_entregue_atualiza_venda_para_pdv():
     assert parada.data_entrega == entrega_em
     assert venda.status_entrega == "entregue"
     assert venda.data_entrega == entrega_em
+
+
+class _EntregaQueryFake:
+    def __init__(self, db, model):
+        self.db = db
+        self.model = model
+
+    def filter(self, *args, **kwargs):
+        return self
+
+    def first(self):
+        if self.model is RotaEntrega:
+            return self.db.rota
+        if self.model is RotaEntregaParada:
+            return self.db.parada
+        if self.model is Venda:
+            return self.db.venda
+        return None
+
+    def count(self):
+        if self.model is RotaEntregaParada:
+            return len(self.db.paradas_restantes)
+        return 0
+
+
+class _EntregaDbFake:
+    def __init__(self, rota, parada, venda, paradas_restantes):
+        self.rota = rota
+        self.parada = parada
+        self.venda = venda
+        self.paradas_restantes = list(paradas_restantes)
+        self.deleted = []
+        self.pending_delete = []
+        self.commits = 0
+
+    def query(self, model):
+        return _EntregaQueryFake(self, model)
+
+    def delete(self, obj):
+        self.deleted.append(obj)
+        self.pending_delete.append(obj)
+
+    def flush(self):
+        for obj in self.pending_delete:
+            if obj in self.paradas_restantes:
+                self.paradas_restantes.remove(obj)
+        self.pending_delete.clear()
+
+    def commit(self):
+        self.commits += 1
+
+
+def _actor(tenant_id):
+    return DeliveryActor(user=SimpleNamespace(id=1), tenant_id=tenant_id)
+
+
+def test_nao_entregue_remove_rota_quando_ultima_parada_fica_fora_da_rota():
+    tenant_id = uuid4()
+    rota = SimpleNamespace(id=292, tenant_id=tenant_id, status="em_rota")
+    parada = SimpleNamespace(
+        id=10,
+        rota_id=rota.id,
+        venda_id=20,
+        tenant_id=tenant_id,
+        observacoes=None,
+    )
+    venda = SimpleNamespace(id=20, tenant_id=tenant_id, status_entrega="em_rota")
+    db = _EntregaDbFake(rota=rota, parada=parada, venda=venda, paradas_restantes=[parada])
+
+    resposta = marcar_parada_nao_entregue(
+        rota_id=str(rota.id),
+        parada_id=parada.id,
+        motivo="cliente ausente",
+        db=db,
+        actor=_actor(tenant_id),
+    )
+
+    assert venda.status_entrega == "pendente"
+    assert parada in db.deleted
+    assert rota in db.deleted
+    assert resposta["rota_removida"] is True
+
+
+def test_nao_entregue_preserva_rota_quando_ainda_tem_paradas():
+    tenant_id = uuid4()
+    rota = SimpleNamespace(id=298, tenant_id=tenant_id, status="em_rota")
+    parada_removida = SimpleNamespace(
+        id=11,
+        rota_id=rota.id,
+        venda_id=21,
+        tenant_id=tenant_id,
+        observacoes=None,
+    )
+    parada_restante = SimpleNamespace(
+        id=12,
+        rota_id=rota.id,
+        venda_id=22,
+        tenant_id=tenant_id,
+        observacoes=None,
+    )
+    venda = SimpleNamespace(id=21, tenant_id=tenant_id, status_entrega="em_rota")
+    db = _EntregaDbFake(
+        rota=rota,
+        parada=parada_removida,
+        venda=venda,
+        paradas_restantes=[parada_removida, parada_restante],
+    )
+
+    resposta = marcar_parada_nao_entregue(
+        rota_id=str(rota.id),
+        parada_id=parada_removida.id,
+        motivo="cliente ausente",
+        db=db,
+        actor=_actor(tenant_id),
+    )
+
+    assert parada_removida in db.deleted
+    assert rota not in db.deleted
+    assert resposta["rota_removida"] is False
 
