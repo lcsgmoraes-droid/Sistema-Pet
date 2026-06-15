@@ -26,3 +26,10 @@ def test_backend_ci_has_blocking_db_lint_step():
 
     assert "Database lint (blocking)" in source
     assert "ruff check app/db" in source
+
+
+def test_backend_ci_has_blocking_schemas_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Schemas lint (blocking)" in source
+    assert "ruff check app/schemas" in source

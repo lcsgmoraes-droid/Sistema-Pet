@@ -51,6 +51,10 @@ jobs:
         run: |
           ruff check app/db
 
+      - name: Schemas lint (blocking)
+        run: |
+          ruff check app/schemas
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"
