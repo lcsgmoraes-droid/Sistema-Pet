@@ -89,3 +89,10 @@ def test_backend_ci_has_blocking_application_lint_step():
 
     assert "Application lint (blocking)" in source
     assert "ruff check app/application" in source
+
+
+def test_backend_ci_has_blocking_analytics_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Analytics lint (blocking)" in source
+    assert "ruff check app/analytics" in source
