@@ -54,7 +54,7 @@ def executar_acerto_manual(
     entregador = db.query(Cliente).filter(
         Cliente.id == entregador_id,
         Cliente.tenant_id == tenant.id,
-        Cliente.is_entregador == True
+        Cliente.is_entregador.is_(True)
     ).first()
     
     if not entregador:
@@ -95,8 +95,8 @@ def listar_acertos_pendentes(
     entregadores = db.query(Cliente).filter(
         and_(
             Cliente.tenant_id == tenant.id,
-            Cliente.is_entregador == True,
-            Cliente.entregador_ativo == True,
+            Cliente.is_entregador.is_(True),
+            Cliente.entregador_ativo.is_(True),
             Cliente.tipo_acerto_entrega.isnot(None)
         )
     ).all()
@@ -134,7 +134,7 @@ def historico_acerto(
     entregador = db.query(Cliente).filter(
         Cliente.id == entregador_id,
         Cliente.tenant_id == tenant.id,
-        Cliente.is_entregador == True
+        Cliente.is_entregador.is_(True)
     ).first()
     
     if not entregador:

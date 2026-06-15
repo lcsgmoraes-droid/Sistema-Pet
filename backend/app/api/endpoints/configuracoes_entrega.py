@@ -4,7 +4,7 @@ Sprint 1 BLOCO 3 - Configuração Global de Entregas
 """
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func, text
+from sqlalchemy import text
 
 from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
@@ -71,9 +71,9 @@ def get_configuracao_entrega(
         from app.models import Cliente
         entregador_padrao = db.query(Cliente).filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.entregador_padrao == True,
-            Cliente.entregador_ativo == True,
-            Cliente.ativo == True
+            Cliente.entregador_padrao.is_(True),
+            Cliente.entregador_ativo.is_(True),
+            Cliente.ativo.is_(True)
         ).first()
 
         # Cria configuração padrão com entregador padrão se existir
@@ -97,9 +97,9 @@ def get_configuracao_entrega(
         from app.models import Cliente
         entregador_padrao = db.query(Cliente).filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.entregador_padrao == True,
-            Cliente.entregador_ativo == True,
-            Cliente.ativo == True
+            Cliente.entregador_padrao.is_(True),
+            Cliente.entregador_ativo.is_(True),
+            Cliente.ativo.is_(True)
         ).first()
 
         updated = False

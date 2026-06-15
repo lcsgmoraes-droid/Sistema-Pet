@@ -3,7 +3,7 @@ WhatsApp IA - Sprint 3 Endpoints
 Core IA Features: Intent detection, AI processing, metrics
 """
 from datetime import datetime, timedelta
-from typing import Optional, Dict, Any, Union
+from typing import Optional, Dict, Union
 from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
@@ -11,7 +11,7 @@ from pydantic import BaseModel, field_serializer
 
 from app.db import get_session as get_db
 from app.auth import get_current_user_and_tenant
-from app.whatsapp.intents import detect_intent_with_confidence, IntentType, intent_detector
+from app.whatsapp.intents import detect_intent_with_confidence, intent_detector
 from app.whatsapp.ai_service import get_ai_service
 from app.whatsapp.metrics import get_metrics_analyzer
 

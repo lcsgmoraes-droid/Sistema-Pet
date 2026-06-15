@@ -195,6 +195,10 @@ jobs:
         run: |
           ruff check app/whatsapp
 
+      - name: API lint (blocking)
+        run: |
+          ruff check app/api
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"

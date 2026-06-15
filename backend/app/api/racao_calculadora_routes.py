@@ -13,7 +13,6 @@ IMPORTANTE:
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 import logging
-from typing import Dict, Any
 
 from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
@@ -135,7 +134,7 @@ async def calcular_consumo_racao(
         # Valida se houve erro no cálculo
         if resultado.get("consumo_diario_gramas", 0) == 0:
             # Serviço retornou erro, mas ainda é válido (fail-safe)
-            logger.warning(f"Cálculo retornou valores zero - possível erro de validação")
+            logger.warning("Cálculo retornou valores zero - possível erro de validação")
         
         # Log do resultado
         logger.info(

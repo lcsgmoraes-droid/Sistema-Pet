@@ -10,7 +10,6 @@
 #
 # ============================================================================
 
-"""
 # [DESATIVADO - PRESERVADO PARA REFERÊNCIA]
 #
 # Rotas de API para métricas de oportunidades.
@@ -22,8 +21,6 @@
 #
 # IMPORTANTE: Todas as rotas filtram automaticamente por tenant_id da requisição,
 # garantindo isolamento multi-tenant seguro.
-"""
-
 # from fastapi import APIRouter, Depends, HTTPException, status
 # from sqlalchemy.orm import Session
 # from typing import Dict, List, Any
@@ -310,4 +307,3 @@
 #             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
 #             detail=f"Erro ao buscar sumário do dashboard: {str(e)}",
 #         )
-"""

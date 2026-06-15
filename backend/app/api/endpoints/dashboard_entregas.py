@@ -4,11 +4,8 @@ Endpoint que retorna indicadores financeiros consolidados
 """
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy import false, func
 from datetime import date
-from decimal import Decimal
-from typing import Optional
-import os
 from app.db import get_session
 from app.auth.dependencies import get_current_user_and_tenant
 from app.rotas_entrega_models import RotaEntrega
@@ -313,7 +310,7 @@ def analises_ia(
         .filter(RotaEntrega.tenant_id == tenant_id)
         .filter(RotaEntrega.status == "concluida")
         .filter(RotaEntrega.data_conclusao.between(data_inicio, data_fim))
-        .filter(RotaEntrega.moto_da_loja == False)  # Excluir moto da loja
+        .filter(RotaEntrega.moto_da_loja == false())  # Excluir moto da loja
         .group_by(Cliente.nome)
         .having(func.count(RotaEntrega.id) >= 3)  # Mínimo 3 entregas
     ).all()
@@ -327,7 +324,7 @@ def analises_ia(
                 diferenca = custo_ent - custo_medio_geral
                 analises.append({
                     "tipo": "alerta",
-                    "titulo": f"Entregador com custo elevado",
+                    "titulo": "Entregador com custo elevado",
                     "mensagem": f"⚠️ Entregador {ent.entregador_nome}: Custo médio R$ {custo_ent:.2f} "
                                f"(média geral: R$ {custo_medio_geral:.2f}). "
                                f"Diferença: R$ {diferenca:.2f} acima do padrão.",
@@ -482,7 +479,7 @@ def sugestoes_ia(
         .filter(RotaEntrega.tenant_id == tenant_id)
         .filter(RotaEntrega.status == "concluida")
         .filter(RotaEntrega.data_conclusao.between(data_inicio, data_fim))
-        .filter(RotaEntrega.moto_da_loja == False)  # Excluir moto da loja
+        .filter(RotaEntrega.moto_da_loja.is_(False))  # Excluir moto da loja
         .group_by(Cliente.nome)
         .having(func.count(RotaEntrega.id) >= 3)
         .order_by(func.avg(RotaEntrega.custo_real).asc())

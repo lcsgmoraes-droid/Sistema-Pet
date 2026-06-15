@@ -265,3 +265,10 @@ def test_backend_ci_has_blocking_whatsapp_lint_step():
 
     assert "WhatsApp lint (blocking)" in source
     assert "ruff check app/whatsapp" in source
+
+
+def test_backend_ci_has_blocking_api_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "API lint (blocking)" in source
+    assert "ruff check app/api" in source
