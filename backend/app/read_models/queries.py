@@ -15,7 +15,7 @@ import logging
 from datetime import date, datetime, timedelta
 from typing import List, Optional, Dict, Any
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, func, inspect, text
+from sqlalchemy import desc, inspect, text
 
 from .models import VendasResumoDiario, PerformanceParceiro, ReceitaMensal
 

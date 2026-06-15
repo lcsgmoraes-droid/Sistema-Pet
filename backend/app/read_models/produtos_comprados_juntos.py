@@ -24,11 +24,11 @@ Algoritmo:
 NÃO persiste dados - trabalha apenas com eventos em memória.
 """
 
-from typing import List, Dict, Optional, Set
+from typing import List, Dict, Optional
 from datetime import datetime, timedelta
 from collections import defaultdict
 
-from app.events import VendaRealizadaEvent, ProdutoVendidoEvent
+from app.events import ProdutoVendidoEvent
 from .base_read_model import BaseReadModel
 
 

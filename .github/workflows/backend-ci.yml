@@ -143,6 +143,10 @@ jobs:
         run: |
           ruff check app/domain
 
+      - name: Read models lint (blocking)
+        run: |
+          ruff check app/read_models
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"

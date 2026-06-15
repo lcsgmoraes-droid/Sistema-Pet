@@ -12,12 +12,10 @@ Este arquivo substitui handlers.py com versão Fase 5.3.
 """
 
 import logging
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
-from typing import Optional
 from uuid import UUID
 from sqlalchemy.orm import Session
-from sqlalchemy import text
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from app.domain.events.venda_events import VendaCriada, VendaFinalizada, VendaCancelada

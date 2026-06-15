@@ -187,3 +187,10 @@ def test_backend_ci_has_blocking_domain_lint_step():
 
     assert "Domain lint (blocking)" in source
     assert "ruff check app/domain" in source
+
+
+def test_backend_ci_has_blocking_read_models_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Read models lint (blocking)" in source
+    assert "ruff check app/read_models" in source

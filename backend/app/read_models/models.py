@@ -1,4 +1,3 @@
-from app.base_models import BaseTenantModel
 """
 Read Models - Modelos de Leitura CQRS
 ======================================
@@ -12,10 +11,11 @@ IMPORTANTE:
 - Podem ter índices otimizados para consultas específicas
 """
 
-from sqlalchemy import Column, Integer, String, Float, Date, DateTime, DECIMAL, Index
-from sqlalchemy.sql import func
 from datetime import datetime
-from app.db import Base
+
+from sqlalchemy import Column, Integer, Date, DateTime, DECIMAL, Index
+
+from app.base_models import BaseTenantModel
 
 
 class VendasResumoDiario(BaseTenantModel):

@@ -180,7 +180,7 @@ def rebuild_read_models_zero_downtime(
             # Tentar cleanup (schema temporário pode ter virado _old)
             try:
                 drop_temp_schema(db)
-            except:
+            except Exception:
                 pass
             
             return RebuildResult(
@@ -282,7 +282,6 @@ class _temp_schema_context:
     
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Restaura nomes originais das tabelas"""
-        from app.read_models import models
         
         logger.info("🔀 Restaurando nomes originais das tabelas...")
         
