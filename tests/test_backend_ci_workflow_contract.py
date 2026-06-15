@@ -203,6 +203,26 @@ def test_backend_ci_has_blocking_banho_tosa_api_lint_step():
     assert "ruff check app/banho_tosa_api" in source
 
 
+def test_backend_ci_has_blocking_banho_tosa_root_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Banho Tosa root lint (blocking)" in source
+    assert (
+        "ruff check app/banho_tosa_agenda_capacity.py "
+        "app/banho_tosa_agenda_slots.py app/banho_tosa_avaliacoes_metrics.py "
+        "app/banho_tosa_cancelamento.py app/banho_tosa_custos.py "
+        "app/banho_tosa_custos_helpers.py app/banho_tosa_custos_reais.py "
+        "app/banho_tosa_custos_reais_helpers.py app/banho_tosa_datetime.py "
+        "app/banho_tosa_defaults.py app/banho_tosa_fechamento.py "
+        "app/banho_tosa_fotos_storage.py app/banho_tosa_models.py "
+        "app/banho_tosa_pacotes.py app/banho_tosa_pacotes_serializers.py "
+        "app/banho_tosa_relatorios.py app/banho_tosa_relatorios_helpers.py "
+        "app/banho_tosa_retornos.py app/banho_tosa_retornos_notificacoes.py "
+        "app/banho_tosa_retornos_templates.py app/banho_tosa_routes.py "
+        "app/banho_tosa_schemas.py app/banho_tosa_vendas.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_estoque_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

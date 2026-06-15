@@ -46,7 +46,7 @@ def sugerir_slots_agenda(
 def _listar_recursos(db: Session, tenant_id, recurso_id: Optional[int]) -> list[BanhoTosaRecurso]:
     query = db.query(BanhoTosaRecurso).filter(
         BanhoTosaRecurso.tenant_id == tenant_id,
-        BanhoTosaRecurso.ativo == True,
+        BanhoTosaRecurso.ativo.is_(True),
     )
     if recurso_id:
         query = query.filter(BanhoTosaRecurso.id == recurso_id)

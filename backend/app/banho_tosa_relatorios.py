@@ -221,4 +221,4 @@ def _ordenar_margem(grupos) -> list[dict]:
 
 
 def _listar_recursos(db: Session, tenant_id):
-    return db.query(BanhoTosaRecurso).filter(BanhoTosaRecurso.tenant_id == tenant_id, BanhoTosaRecurso.ativo == True).all()
+    return db.query(BanhoTosaRecurso).filter(BanhoTosaRecurso.tenant_id == tenant_id, BanhoTosaRecurso.ativo.is_(True)).all()
