@@ -31,13 +31,11 @@ ENDPOINTS:
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from typing import Optional, List, Dict, Any
-from datetime import date, datetime
+from datetime import date
 import logging
 
 from app.db import SessionLocal
-from app.auth import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
-from app.models import User
 from app.read_models import queries
 
 logger = logging.getLogger(__name__)
