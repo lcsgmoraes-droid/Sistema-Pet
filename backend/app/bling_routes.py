@@ -4,20 +4,12 @@ Rotas para gerenciar integração com Bling
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from app.db import get_session
-from app.auth import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
-from app.models import User
 from app.bling_integration import BlingAPI
 from app.bling_flow_monitor_models import BlingFlowEvent, BlingFlowIncident
 from app.bling_flow_monitor_routes import (
     _enriquecer_registros_contexto,
-    _mapa_numeros_pedidos,
-    _mapa_numeros_notas_cache,
-    _nf_numero_payload,
-    _numero_pedido_loja_payload,
-    _primeiro_preenchido,
     _serializar_data_monitor,
-    _texto,
 )
 from app.services.bling_flow_monitor_service import (
     auditar_fluxo_bling,
@@ -90,7 +82,6 @@ async def testar_conexao(
     """
     Testa a conexão com a API do Bling e retorna status + info de renovação
     """
-    from datetime import datetime
     from pathlib import Path
     import json
     

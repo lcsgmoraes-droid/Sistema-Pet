@@ -3,10 +3,7 @@ Modelo de Configuração Geral da Empresa
 Contém parâmetros de negócio, margens e indicadores
 """
 
-from sqlalchemy import Column, Integer, String, Numeric, Boolean, DateTime, Text
-from sqlalchemy.sql import func
-from datetime import datetime
-from .db import Base
+from sqlalchemy import Column, Integer, String, Numeric, Boolean, Text
 from .base_models import BaseTenantModel
 
 

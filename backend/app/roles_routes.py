@@ -5,7 +5,6 @@ from pydantic import BaseModel
 
 from app.db import get_session as get_db
 from app.auth import get_current_user_and_tenant
-from app.tenancy.context import get_current_tenant
 from app.security.permissions_decorator import require_permission
 from app.models import Role, Permission, RolePermission, UserTenant
 

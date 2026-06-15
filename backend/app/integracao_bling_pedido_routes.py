@@ -1715,7 +1715,7 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                     message="NF identificada no pedido atualizado e vinculada localmente.",
                     link_source="pedido.updated",
                 )
-                erros_estoque = _confirmar_pedido(
+                _confirmar_pedido(
                     db=db,
                     pedido=pedido,
                     itens=itens,
@@ -1785,7 +1785,7 @@ def processar_pedido_bling_payload(body: dict, db: Session):
                     payload_atual=pedido.payload,
                     ultima_nf=_ultima_nf_payload_efetiva(pedido.payload) or None,
                 )
-                erros_estoque = _confirmar_pedido(
+                _confirmar_pedido(
                     db=db,
                     pedido=pedido,
                     itens=itens,

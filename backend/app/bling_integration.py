@@ -464,7 +464,6 @@ class BlingAPI:
                 with open(TOKEN_CONTROL_FILE, 'r') as f:
                     control_data = json.load(f)
                 
-                ultima_renovacao = datetime.fromisoformat(control_data.get('ultima_renovacao', '2020-01-01'))
                 proxima_renovacao = datetime.fromisoformat(control_data.get('proxima_renovacao', '2020-01-01'))
                 
                 # Se passou do horário de renovação OU se está perto de expirar (5 horas)
@@ -618,7 +617,7 @@ class BlingAPI:
             # Tenta listar notas (limite 1 para ser rápido)
             self._request("GET", "/nfe", data={"limite": 1})
             return True
-        except:
+        except Exception:
             return False
     
     def emitir_nota_fiscal(self, venda, tipo_nota: str = "nfce", db: Session = None, transmitir: Optional[bool] = None) -> Dict:
@@ -702,7 +701,7 @@ class BlingAPI:
                 try:
                     # Endpoint para enviar nota para SEFAZ (mesmo endpoint base)
                     envio_response = self._request("POST", f"{endpoint}/{nota_id}/enviar")
-                    logger.info(f"✅ Nota enviada para SEFAZ!")
+                    logger.info("✅ Nota enviada para SEFAZ!")
                     logger.info(f"Resposta: {envio_response}")
                     response["transmissao"] = {
                         "success": True,

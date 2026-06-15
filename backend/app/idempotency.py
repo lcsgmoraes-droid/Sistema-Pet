@@ -200,7 +200,7 @@ def idempotent(require_key: bool = True):
             # Processar body da requisição
             try:
                 body = await request.json() if request.method in ['POST', 'PUT', 'PATCH'] else {}
-            except:
+            except Exception:
                 body = {}
             
             # Path parameters (ex: venda_id)
@@ -242,7 +242,7 @@ def idempotent(require_key: bool = True):
                 
                 # Status: failed (falhou anteriormente)
                 if existing_key.status == 'failed':
-                    logger.info(f"♻️ Idempotência: reprocessando requisição que falhou anteriormente")
+                    logger.info("♻️ Idempotência: reprocessando requisição que falhou anteriormente")
                     # Permite reprocessamento de requisições que falharam
                     existing_key.status = 'processing'
                     existing_key.completed_at = None

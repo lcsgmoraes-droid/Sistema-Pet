@@ -2,7 +2,6 @@
 Módulo de Criptografia - LGPD Compliance
 Criptografa/descriptografa dados sensíveis
 """
-import os
 from cryptography.fernet import Fernet
 from app.config import ENCRYPTION_KEY
 from app.utils.logger import logger

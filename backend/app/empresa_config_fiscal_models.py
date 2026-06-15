@@ -1,9 +1,7 @@
 from sqlalchemy import (
-    Column, Integer, String, Numeric, Boolean, DateTime, ForeignKey, Identity, Text
+    Column, Integer, String, Numeric, Boolean, Text
 )
-from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy.sql import func
-from .db import Base
+from sqlalchemy.dialects.postgresql import JSONB
 from .base_models import BaseTenantModel
 
 

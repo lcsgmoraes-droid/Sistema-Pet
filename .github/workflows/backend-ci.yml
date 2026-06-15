@@ -203,6 +203,22 @@ jobs:
         run: |
           ruff check app/routes
 
+      - name: Bling root lint (blocking)
+        run: |
+          ruff check app/bling_estoque_sync.py app/bling_flow_monitor_models.py app/bling_flow_monitor_routes.py app/bling_integration.py app/bling_oauth_routes.py app/bling_pedido_webhook_queue_models.py app/bling_routes.py app/bling_sync_routes.py app/integracao_bling_models.py app/integracao_bling_nf_routes.py app/integracao_bling_pedido_routes.py app/integracao_bling_webhook_routes.py
+
+      - name: Operational root lint (blocking)
+        run: |
+          ruff check app/health_router.py app/session_manager.py app/idempotency.py app/idempotency_models.py app/encryption.py app/audit.py app/audit_log.py
+
+      - name: Empresa root lint (blocking)
+        run: |
+          ruff check app/empresa_routes.py app/empresa_config_routes.py app/empresa_config_fiscal_models.py app/empresa_config_geral_models.py app/config.py app/constants.py
+
+      - name: Access root lint (blocking)
+        run: |
+          ruff check app/canais.py app/partner_utils.py app/permissions_routes.py app/roles_routes.py app/cargos_routes.py app/cargo_models.py
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"
