@@ -145,3 +145,10 @@ def test_backend_ci_has_blocking_produtos_lint_step():
 
     assert "Produtos lint (blocking)" in source
     assert "ruff check app/produtos" in source
+
+
+def test_backend_ci_has_blocking_insights_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Insights lint (blocking)" in source
+    assert "ruff check app/insights" in source
