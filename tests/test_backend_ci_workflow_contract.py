@@ -68,3 +68,10 @@ def test_backend_ci_has_blocking_constants_lint_step():
 
     assert "Constants lint (blocking)" in source
     assert "ruff check app/constants" in source
+
+
+def test_backend_ci_has_blocking_cache_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Cache lint (blocking)" in source
+    assert "ruff check app/cache" in source
