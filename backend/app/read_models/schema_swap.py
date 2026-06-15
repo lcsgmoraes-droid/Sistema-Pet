@@ -26,7 +26,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import text, inspect
 
 from app.read_models.models import VendasResumoDiario, PerformanceParceiro, ReceitaMensal
-from app.db import Base, engine
+from app.db import engine
 
 logger = logging.getLogger(__name__)
 
