@@ -4,7 +4,7 @@ Decide quando transferir, atribui atendentes, gerencia fila
 """
 from typing import Optional, Tuple, List, Dict
 from sqlalchemy.orm import Session
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
 import logging
 
@@ -333,7 +333,7 @@ class HandoffManager:
         agents = self.db.query(WhatsAppAgent).filter(
             WhatsAppAgent.tenant_id == self.tenant_id,
             WhatsAppAgent.status == "online",
-            WhatsAppAgent.auto_assign == True
+            WhatsAppAgent.auto_assign.is_(True)
         ).all()
         
         if not agents:

@@ -4,7 +4,7 @@ WhatsApp Schemas - Pydantic
 Schemas de request/response para API WhatsApp
 """
 from pydantic import BaseModel, ConfigDict, Field, field_validator
-from typing import Optional, List, Dict, Any, Union
+from typing import Optional, List, Dict, Any
 from datetime import datetime, time
 from enum import Enum
 from uuid import UUID

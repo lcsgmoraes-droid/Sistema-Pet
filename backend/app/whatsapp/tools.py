@@ -2,7 +2,7 @@
 Tool Calling - Functions para OpenAI buscar dados reais do sistema
 Permite que a IA consulte produtos, horários, pedidos, etc.
 """
-from typing import List, Dict, Any, Optional
+from typing import Dict, Any, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from datetime import datetime, timedelta
@@ -362,7 +362,7 @@ class ToolExecutor:
                 Produto.categoria_id,
             ).filter(
                 Produto.tenant_id == self.tenant_id,
-                Produto.situacao == True,
+                Produto.situacao.is_(True),
                 Produto.tipo_produto != 'PAI',
             )
 
@@ -491,7 +491,7 @@ class ToolExecutor:
             else:
                 try:
                     data_obj = datetime.strptime(data, "%Y-%m-%d").date()
-                except:
+                except ValueError:
                     data_obj = datetime.now().date()
             
             # Gerar horários disponíveis (mock)
@@ -727,7 +727,7 @@ class ToolExecutor:
             try:
                 data_obj = datetime.strptime(data, "%Y-%m-%d")
                 data_formatada = data_obj.strftime("%d/%m/%Y")
-            except:
+            except ValueError:
                 data_formatada = data
             
             return {
@@ -936,7 +936,7 @@ Previsão: 1-2 dias úteis"""
                 f"R$ {item['preco_unitario']:.2f} cada = R$ {item['subtotal']:.2f}"
             )
         
-        linhas.append(f"\n━━━━━━━━━━━━━━━━")
+        linhas.append("\n━━━━━━━━━━━━━━━━")
         linhas.append(f"Total: R$ {carrinho['total']:.2f}")
         
         return "\n".join(linhas)

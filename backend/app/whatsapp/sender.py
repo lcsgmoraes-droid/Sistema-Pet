@@ -4,6 +4,8 @@ WhatsApp Message Sender (360dialog)
 Envia mensagens via API do 360dialog.
 Trata erros, retries, registra no banco.
 """
+import os
+
 import httpx
 import logging
 from typing import Optional, Dict, Any
@@ -219,8 +221,6 @@ class Dialog360Client:
 # CLIENT WAHA (piloto local)
 # ============================================================================
 
-import os
-
 class WahaClient:
     """
     Cliente HTTP para WAHA (WhatsApp HTTP API - piloto local).
@@ -427,7 +427,7 @@ async def _send_notificacao_entrega_with_context(
         # 1. Verificar se WhatsApp está habilitado
         config = db.query(TenantWhatsAppConfig).filter(
             TenantWhatsAppConfig.tenant_id == tenant_id,
-            TenantWhatsAppConfig.notificacoes_entrega_enabled == True
+            TenantWhatsAppConfig.notificacoes_entrega_enabled.is_(True)
         ).first()
         
         if not config:

@@ -7,11 +7,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
 from sqlalchemy import func, and_
 from sqlalchemy.orm import Session
-from app.whatsapp.models import (
-    WhatsAppSession,
-    WhatsAppMessage,
-    TenantWhatsAppConfig
-)
+from app.whatsapp.models import WhatsAppMessage, WhatsAppSession
 from app.whatsapp.models_handoff import WhatsAppHandoff
 
 
@@ -315,10 +311,10 @@ class WhatsAppAnalyticsService:
         # Performance por agente
         from app.whatsapp.models_handoff import WhatsAppAgent
         
-        agents = self.db.query(WhatsAppAgent).filter(
+        agents_query = self.db.query(WhatsAppAgent).filter(
             WhatsAppAgent.tenant_id == self.tenant_id,
-            WhatsAppAgent.is_active == True
-        ).all()
+        )
+        agents = agents_query.filter(WhatsAppAgent.is_active.is_(True)).all()
         
         performance_list = []
         

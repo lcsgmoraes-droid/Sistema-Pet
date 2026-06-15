@@ -105,7 +105,7 @@ DATA: 2025-01-23
 """
 
 import logging
-from typing import Dict, Any, List, Optional
+from typing import Any, Dict, List, Optional
 from decimal import Decimal
 from datetime import datetime, date, timedelta
 from fastapi import HTTPException
@@ -113,6 +113,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc, or_, func, String
 import json
 from uuid import UUID
+
+from app.produtos_models import Produto as Produto
+from app.vendas_models import Venda as Venda, VendaItem as VendaItem, VendaPagamento as VendaPagamento
 
 # Timezone Brasília
 from app.utils.timezone import now_brasilia
@@ -221,7 +224,7 @@ class VendaService:
             HTTPException(400): Validação falhou (sem itens, etc)
         """
         from app.vendas_models import Venda, VendaItem
-        from app.financeiro_models import ContaReceber, LancamentoManual, CategoriaFinanceira
+        from app.financeiro_models import LancamentoManual, CategoriaFinanceira
         from app.audit_log import log_action
         
         logger.info(f"📝 Criando nova venda para user_id={user_id}")
@@ -568,7 +571,7 @@ class VendaService:
             
         except HTTPException:
             db.rollback()
-            logger.error(f"❌ HTTPException ao criar venda - Rollback executado")
+            logger.error("❌ HTTPException ao criar venda - Rollback executado")
             raise
             
         except Exception as e:
@@ -681,7 +684,7 @@ class VendaService:
                     tenant_id=tenant_id,
                     db=db,
                     documento=venda_codigo,
-                    observacao=f"KIT FÍSICO - Estoque próprio (componentes já foram baixados na montagem)"
+                    observacao="KIT FÍSICO - Estoque próprio (componentes já foram baixados na montagem)"
                 )
                 
                 resultados.append({
@@ -849,7 +852,7 @@ class VendaService:
             HTTPException(404): Venda não encontrada
             HTTPException(400): Venda já está cancelada
         """
-        from app.vendas_models import Venda, VendaItem, VendaPagamento
+        from app.vendas_models import Venda, VendaItem
         from app.estoque.service import EstoqueService
         from app.caixa_models import MovimentacaoCaixa
         from app.financeiro_models import ContaReceber, LancamentoManual, MovimentacaoFinanceira, ContaBancaria
@@ -1212,7 +1215,7 @@ class VendaService:
         if ultima_venda:
             try:
                 seq = int(ultima_venda.numero_venda[-4:]) + 1
-            except:
+            except (TypeError, ValueError):
                 seq = 1
         else:
             seq = 1
@@ -1301,7 +1304,6 @@ class VendaService:
         from app.campaigns.coupon_service import consume_coupon_redemption
         from app.vendas_models import Venda, VendaPagamento
         from app.models import Cliente
-        from app.estoque.service import EstoqueService
         from app.caixa.service import CaixaService
         from app.financeiro import ContasReceberService
         from app.financeiro_models import LancamentoManual, CategoriaFinanceira
@@ -1588,7 +1590,7 @@ class VendaService:
                 # Pagamento completo
                 venda.status = 'finalizada'
                 venda.data_finalizacao = now_brasilia()
-                logger.info(f"✅ Venda FINALIZADA - Pagamento completo")
+                logger.info("✅ Venda FINALIZADA - Pagamento completo")
             elif total_pagamentos > 0:
                 # Pagamento parcial
                 venda.status = 'baixa_parcial'
@@ -1697,9 +1699,9 @@ class VendaService:
             deve_baixar_estoque = (status_anterior != 'aberta')
             
             if deve_baixar_estoque:
-                logger.info(f"📦 Baixando estoque (venda não veio de status aberta)")
+                logger.info("📦 Baixando estoque (venda não veio de status aberta)")
             else:
-                logger.info(f"ℹ️  Estoque NÃO será baixado (já foi baixado quando venda estava aberta)")
+                logger.info("ℹ️  Estoque NÃO será baixado (já foi baixado quando venda estava aberta)")
             
             for item in venda.itens:
                 if item.tipo == 'produto':
@@ -2046,7 +2048,6 @@ class VendaService:
                 db.rollback()  # Rollback apenas das contas (venda já commitada)
             
             # 🚚 Criar contas a pagar de entrega (taxa entregador + custo operacional)
-            contas_pagar_entrega_ids = []
             try:
                 resultado_entrega = processar_contas_pagar_entrega(
                     venda=venda,
@@ -2055,7 +2056,6 @@ class VendaService:
                     db=db
                 )
                 if resultado_entrega['success']:
-                    contas_pagar_entrega_ids = resultado_entrega['contas_criadas']
                     db.commit()  # Commit separado para contas a pagar
                     logger.info(
                         f"🚚 Contas a pagar de entrega criadas: {resultado_entrega['total_contas']} conta(s), "
@@ -2066,7 +2066,6 @@ class VendaService:
                 db.rollback()  # Rollback apenas das contas (venda já commitada)
             
             # 💳 Criar contas a pagar de taxas de pagamento
-            contas_pagar_taxas_ids = []
             logger.info(f"💳 Iniciando processamento de taxas de pagamento - Venda #{venda.numero_venda}")
             try:
                 pagamentos_para_taxas = [
@@ -2092,7 +2091,6 @@ class VendaService:
                 logger.info(f"💳 Resultado do processamento: {resultado_taxas}")
                 
                 if resultado_taxas['success']:
-                    contas_pagar_taxas_ids = resultado_taxas['contas_criadas']
                     db.commit()  # Commit separado para contas a pagar
                     logger.info(
                         f"💳 Contas a pagar de taxas criadas: {resultado_taxas['total_contas']} conta(s), "
@@ -2269,7 +2267,7 @@ def processar_lembretes_venda(
         }
     
     try:
-        from app.produtos_models import Produto, Lembrete
+        from app.produtos_models import Produto
         from app.models import Pet
         
         lembretes_criados = []
@@ -2481,60 +2479,6 @@ def processar_contas_pagar_entrega(
         }
 
 
-def gerar_dre_competencia_venda(
-    venda_id: int,
-    user_id: int,
-    tenant_id: str,
-    db: Session
-) -> Dict[str, Any]:
-    """
-    Gera lançamentos de DRE por competência para uma venda (PASSO 1 - Sprint 5).
-    
-    Esta função é chamada no PRIMEIRO MOMENTO em que a venda se torna EFETIVADA
-    (ou seja, quando passa a ter qualquer valor recebido, parcial ou total).
-    
-    Operações executadas:
-    1. Lançar RECEITA (100% do valor bruto) na DRE
-    2. Lançar CMV (custo total dos produtos) na DRE
-    3. Lançar DESCONTO (se houver) na DRE
-    
-    GARANTIAS:
-    - ✅ Idempotente: verifica se DRE já foi gerada (campo venda.dre_gerada)
-    - ✅ Multi-tenant: todos os lançamentos isolados por tenant_id
-    - ✅ Regime de competência: gera no momento da efetivação, não no pagamento
-    - ✅ Atomicidade: chamada dentro da transação principal
-    
-    Args:
-        venda_id: ID da venda
-        user_id: ID do usuário (para auditoria)
-        tenant_id: UUID do tenant (isolamento multi-tenant)
-        db: Sessão do SQLAlchemy (NÃO faz commit, apenas flush)
-        
-    Returns:
-        Dict com resultado:
-        {
-            'success': bool,
-            'lancamentos_criados': int,
-            'receita_gerada': float,
-            'cmv_gerado': float,
-            'desconto_gerado': float,
-            'message': str
-        }
-        
-    Raises:
-        HTTPException: Se venda não encontrada ou subcategorias DRE inválidas
-        
-    Exemplo:
-        >>> resultado = gerar_dre_competencia_venda(
-        ...     venda_id=120,
-        ...     user_id=1,
-        ...     tenant_id="uuid-tenant",
-        ...     db=db
-        ... )
-        >>> logger.info(f"DRE gerada: {resultado['lancamentos_criados']} lançamentos")
-    """
-
-
 def processar_contas_pagar_taxas(
     venda: 'Venda',
     pagamentos: List[Any],
@@ -2580,7 +2524,6 @@ def processar_contas_pagar_taxas(
     from app.dre_plano_contas_models import DRESubcategoria
     from decimal import Decimal
     from datetime import date
-    import json
     
     if not pagamentos:
         return {
@@ -2635,7 +2578,7 @@ def processar_contas_pagar_taxas(
             # Buscar configuração da forma de pagamento
             forma_pag = db.query(FormaPagamento).filter(
                 FormaPagamento.tenant_id == tenant_id,
-                FormaPagamento.ativo == True
+                FormaPagamento.ativo.is_(True)
             ).filter(
                 (FormaPagamento.nome == pagamento.forma_pagamento) |
                 (FormaPagamento.tipo == pagamento.forma_pagamento) |
@@ -2693,7 +2636,7 @@ def processar_contas_pagar_taxas(
             subcategoria_taxa = db.query(DRESubcategoria).filter(
                 DRESubcategoria.tenant_id == tenant_id,
                 DRESubcategoria.nome == nome_subcategoria,
-                DRESubcategoria.ativo == True
+                DRESubcategoria.ativo.is_(True)
             ).first()
             
             # Se não encontrar com canal, tentar genérico
@@ -2701,7 +2644,7 @@ def processar_contas_pagar_taxas(
                 subcategoria_taxa = db.query(DRESubcategoria).filter(
                     DRESubcategoria.tenant_id == tenant_id,
                     DRESubcategoria.nome == nome_subcategoria_base,
-                    DRESubcategoria.ativo == True
+                    DRESubcategoria.ativo.is_(True)
                 ).first()
             
             if not subcategoria_taxa:
@@ -2821,8 +2764,7 @@ def gerar_dre_competencia_venda(
         ... )
         >>> logger.info(f"DRE gerada: {resultado['lancamentos_criados']} lançamentos")
     """
-    from app.vendas_models import Venda, VendaItem
-    from app.produtos_models import Produto
+    from app.vendas_models import Venda
     from app.domain.dre.lancamento_dre_sync import atualizar_dre_por_lancamento
     from app.dre_plano_contas_models import DRESubcategoria, NaturezaDRE
     
@@ -2889,14 +2831,14 @@ def gerar_dre_competencia_venda(
         subcat_receita = db.query(DRESubcategoria).filter(
             DRESubcategoria.tenant_id == tenant_uuid,
             DRESubcategoria.nome.ilike('%receita%venda%'),
-            DRESubcategoria.ativo == True
+            DRESubcategoria.ativo.is_(True)
         ).first()
         
         if not subcat_receita:
             # Tentar buscar qualquer receita
             subcat_receita = db.query(DRESubcategoria).filter(
                 DRESubcategoria.tenant_id == tenant_uuid,
-                DRESubcategoria.ativo == True
+                DRESubcategoria.ativo.is_(True)
             ).join(DRESubcategoria.categoria).filter(
                 func.lower(func.cast(DRESubcategoria.categoria.property.mapper.class_.natureza, String)).like('%receita%')
             ).first()
@@ -2911,7 +2853,7 @@ def gerar_dre_competencia_venda(
         subcat_cmv = db.query(DRESubcategoria).filter(
             DRESubcategoria.tenant_id == tenant_uuid,
             DRESubcategoria.nome.ilike('%cmv%'),
-            DRESubcategoria.ativo == True
+            DRESubcategoria.ativo.is_(True)
         ).first()
         
         if not subcat_cmv:
@@ -2919,7 +2861,7 @@ def gerar_dre_competencia_venda(
             subcat_cmv = db.query(DRESubcategoria).filter(
                 DRESubcategoria.tenant_id == tenant_uuid,
                 DRESubcategoria.nome.ilike('%custo%produto%'),
-                DRESubcategoria.ativo == True
+                DRESubcategoria.ativo.is_(True)
             ).first()
         
         if not subcat_cmv:
@@ -2932,7 +2874,7 @@ def gerar_dre_competencia_venda(
         subcat_desconto = db.query(DRESubcategoria).filter(
             DRESubcategoria.tenant_id == tenant_uuid,
             DRESubcategoria.nome.ilike('%desconto%'),
-            DRESubcategoria.ativo == True
+            DRESubcategoria.ativo.is_(True)
         ).first()
         
         if not subcat_desconto:
@@ -2940,7 +2882,7 @@ def gerar_dre_competencia_venda(
             subcat_desconto = db.query(DRESubcategoria).filter(
                 DRESubcategoria.tenant_id == tenant_uuid,
                 DRESubcategoria.nome.ilike('%dedu%'),
-                DRESubcategoria.ativo == True
+                DRESubcategoria.ativo.is_(True)
             ).first()
         
         logger.info(
@@ -2955,7 +2897,7 @@ def gerar_dre_competencia_venda(
                 query = db.query(DRESubcategoria).filter(
                     DRESubcategoria.tenant_id == tenant_uuid,
                     DRESubcategoria.nome.ilike(padrao),
-                    DRESubcategoria.ativo == True,
+                    DRESubcategoria.ativo.is_(True),
                 )
                 if natureza is not None:
                     query = query.filter(DRESubcategoria.categoria.has(natureza=natureza))

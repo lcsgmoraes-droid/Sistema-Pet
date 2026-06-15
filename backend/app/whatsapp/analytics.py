@@ -9,8 +9,7 @@ from sqlalchemy import func, and_
 from sqlalchemy.orm import Session
 from app.whatsapp.models import (
     WhatsAppSession,
-    WhatsAppMessage,
-    TenantWhatsAppConfig
+    WhatsAppMessage
 )
 from app.whatsapp.models_handoff import WhatsAppHandoff
 
@@ -317,7 +316,7 @@ class WhatsAppAnalyticsService:
         
         agents = self.db.query(WhatsAppAgent).filter(
             WhatsAppAgent.tenant_id == self.tenant_id,
-            WhatsAppAgent.is_active == True
+            WhatsAppAgent.is_active.is_(True)
         ).all()
         
         performance_list = []

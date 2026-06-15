@@ -2,7 +2,7 @@
 Sistema de Notificações Proativas via WhatsApp
 Envia mensagens automáticas para clientes (entregas, lembretes, promoções)
 """
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 import logging

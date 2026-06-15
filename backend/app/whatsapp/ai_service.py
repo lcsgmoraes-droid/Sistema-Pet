@@ -11,8 +11,7 @@ from datetime import datetime
 
 from app.whatsapp.models import (
     TenantWhatsAppConfig,
-    WhatsAppSession,
-    WhatsAppMessage
+    WhatsAppSession
 )
 from app.whatsapp.intents import detect_intent_with_confidence, IntentType
 from app.whatsapp.context_manager import context_manager, ConversationContext
@@ -353,7 +352,7 @@ class AIService:
                     try:
                         import json
                         function_args = json.loads(tool_call.function.arguments)
-                    except:
+                    except Exception:
                         function_args = {}
                     
                     logger.info(f"Executando tool: {function_name} com args: {function_args}")
@@ -465,7 +464,7 @@ class AIService:
         # Adicionar contexto do cliente se disponível
         if context.customer_data:
             customer = context.customer_data
-            base_prompt += f"\n**Cliente identificado:**\n"
+            base_prompt += "\n**Cliente identificado:**\n"
             base_prompt += f"- Nome: {customer.get('name', 'Não informado')}\n"
             if customer.get('pets'):
                 base_prompt += f"- Pets: {', '.join([p['name'] for p in customer['pets']])}\n"

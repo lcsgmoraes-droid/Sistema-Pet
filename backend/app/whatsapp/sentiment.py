@@ -2,7 +2,7 @@
 Sentiment Analyzer - Análise de sentimento para detecção de frustração
 Detecta quando cliente está insatisfeito e precisa de atendente humano
 """
-from typing import Dict, List, Tuple
+from typing import Dict, List
 from decimal import Decimal
 import logging
 

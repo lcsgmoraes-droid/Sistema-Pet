@@ -251,3 +251,17 @@ def test_backend_ci_has_blocking_campaigns_lint_step():
 
     assert "Campaigns lint (blocking)" in source
     assert "ruff check app/campaigns" in source
+
+
+def test_backend_ci_has_blocking_vendas_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Vendas lint (blocking)" in source
+    assert "ruff check app/vendas" in source
+
+
+def test_backend_ci_has_blocking_whatsapp_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "WhatsApp lint (blocking)" in source
+    assert "ruff check app/whatsapp" in source

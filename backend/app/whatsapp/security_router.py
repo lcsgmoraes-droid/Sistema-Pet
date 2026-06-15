@@ -14,9 +14,7 @@ from app.auth.dependencies import get_current_user_and_tenant
 from app.models import User
 from app.whatsapp.security import (
     LGPDService,
-    SecurityAuditService,
     WebhookSignatureValidator,
-    DataPrivacyConsent,
     DataDeletionRequest
 )
 

@@ -187,6 +187,14 @@ jobs:
         run: |
           ruff check app/campaigns
 
+      - name: Vendas lint (blocking)
+        run: |
+          ruff check app/vendas
+
+      - name: WhatsApp lint (blocking)
+        run: |
+          ruff check app/whatsapp
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"

@@ -3,7 +3,7 @@
 # Sistema de segurança, LGPD e proteção de dados
 # ============================================================================
 
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Optional, Dict, Any
 import hmac
 import hashlib
@@ -305,7 +305,7 @@ class LGPDService:
                 DataPrivacyConsent.tenant_id == self.tenant_id,
                 DataPrivacyConsent.subject_id == subject_id,
                 DataPrivacyConsent.consent_type == consent_type,
-                DataPrivacyConsent.consent_given == True,
+                DataPrivacyConsent.consent_given.is_(True),
                 DataPrivacyConsent.revoked_at.is_(None)
             ).first()
         
