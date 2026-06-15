@@ -17,7 +17,7 @@ Arquitetura:
 - Eventos concretos: VendaRealizadaEvent, ProdutoVendidoEvent, etc.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from typing import Optional, Dict, Any
 from decimal import Decimal
