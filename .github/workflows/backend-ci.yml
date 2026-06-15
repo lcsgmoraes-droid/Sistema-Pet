@@ -103,6 +103,10 @@ jobs:
         run: |
           ruff check app/caixa
 
+      - name: Caixa root lint (blocking)
+        run: |
+          ruff check app/caixa_models.py app/caixa_routes.py app/calculadora_racao.py
+
       - name: Parsers lint (blocking)
         run: |
           ruff check app/parsers

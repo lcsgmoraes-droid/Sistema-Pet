@@ -1,11 +1,12 @@
-from app.base_models import BaseTenantModel
 """
 Models para o Sistema de Controle de Caixa
 """
-from sqlalchemy import Column, Integer, String, Float, DateTime, Text, ForeignKey
-from sqlalchemy.orm import relationship
 from datetime import datetime
-from app.db import Base
+
+from sqlalchemy import Column, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy.orm import relationship
+
+from app.base_models import BaseTenantModel
 from app.utils.serialization import safe_decimal_to_float, safe_datetime_to_iso
 
 

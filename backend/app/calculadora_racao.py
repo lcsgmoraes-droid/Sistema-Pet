@@ -11,8 +11,7 @@ import json
 import logging
 
 from .db import get_session
-from .auth import get_current_user, get_current_user_and_tenant
-from .models import User
+from .auth import get_current_user_and_tenant
 from .partner_utils import get_all_accessible_tenant_ids
 from .produtos_models import Categoria, Marca, Produto
 from .security.permissions_decorator import require_permission
@@ -346,7 +345,7 @@ def calcular_quantidade_diaria(
     # PRIORIDADE 1: Usar tabela da embalagem se disponível
     if tabela_consumo_json:
         try:
-            logger.info(f"🔍 DEBUG: Processando tabela_consumo...")
+            logger.info("🔍 DEBUG: Processando tabela_consumo...")
             tabela = json.loads(tabela_consumo_json)
             logger.info(f"🔍 DEBUG: Tabela parseada: {tabela}")
             
@@ -411,7 +410,7 @@ def calcular_quantidade_diaria(
                 
                 # Para adulto: usar coluna 'adulto' ou primeira disponível
                 else:
-                    logger.info(f"🔍 DEBUG: Modo ADULTO")
+                    logger.info("🔍 DEBUG: Modo ADULTO")
                     quantidade = consumos.get('adulto', list(consumos.values())[0] if consumos else 0)
                     logger.info(f"🔍 DEBUG: Quantidade adulto: {quantidade}g")
                 
@@ -429,7 +428,7 @@ def calcular_quantidade_diaria(
                     
                     return round(quantidade, 2)
                 else:
-                    logger.warning(f"⚠️ Quantidade não encontrada ou zero na tabela")
+                    logger.warning("⚠️ Quantidade não encontrada ou zero na tabela")
             
             # Formato antigo (compatibilidade)
             else:

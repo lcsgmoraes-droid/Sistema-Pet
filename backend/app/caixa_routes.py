@@ -3,22 +3,19 @@ Rotas para o Sistema de Controle de Caixa
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Request
 from fastapi.responses import StreamingResponse
+from sqlalchemy import and_, func
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, func
-from typing import Optional, List
+from typing import Optional
 from datetime import datetime, date
 from pydantic import BaseModel
 
 from app.db import get_session
-from app.auth import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
 from app.idempotency import idempotent  # ← IDEMPOTÊNCIA
 from app.caixa_models import Caixa, MovimentacaoCaixa
 from app.financeiro_models import ContaPagar, TipoDespesa
 from app.domain.dre.lancamento_dre_sync import atualizar_dre_por_lancamento
-from app.models import User
 from app.pdf_caixa import gerar_pdf_fechamento_caixa
-from app.utils.security_helpers import safe_get_caixa
 
 router = APIRouter(prefix='/caixas', tags=['caixas'])
 
