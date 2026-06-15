@@ -12,10 +12,9 @@ CONFIGURAÇÃO:
 """
 
 import time
-from collections import defaultdict
 from typing import Dict, Tuple
 from starlette.middleware.base import BaseHTTPMiddleware
-from fastapi import Request, Response
+from fastapi import Request
 from fastapi.responses import JSONResponse
 
 
@@ -29,6 +28,7 @@ RATE_LIMIT_AUTH_WINDOW = 60
 
 RATE_LIMIT_API_MAX = 100         # APIs: 100 req/min (uso normal)
 RATE_LIMIT_API_WINDOW = 60
+RATE_LIMIT_CLEANUP_WINDOW = max(RATE_LIMIT_AUTH_WINDOW, RATE_LIMIT_API_WINDOW) * 2
 
 # Rotas de autenticação (limite mais restritivo)
 AUTH_ROUTES = [
@@ -135,7 +135,7 @@ class RateLimitStore:
         now = time.time()
         expired_keys = [
             key for key, (window_start, _) in self.store.items()
-            if now - window_start >= RATE_LIMIT_WINDOW * 2  # 2x para segurança
+            if now - window_start >= RATE_LIMIT_CLEANUP_WINDOW
         ]
         for key in expired_keys:
             del self.store[key]
@@ -170,19 +170,16 @@ class RateLimitMiddleware(BaseHTTPMiddleware):
         # Determinar tipo de rota e limites
         max_requests = None
         window = None
-        route_type = None
         
         # Rotas de autenticação (limite restritivo)
         if any(path.startswith(auth_route) for auth_route in AUTH_ROUTES):
             max_requests = RATE_LIMIT_AUTH_MAX
             window = RATE_LIMIT_AUTH_WINDOW
-            route_type = "auth"
         
         # Rotas de API (limite normal)
         elif any(path.startswith(api_route) for api_route in API_ROUTES):
             max_requests = RATE_LIMIT_API_MAX
             window = RATE_LIMIT_API_WINDOW
-            route_type = "api"
         
         # Sem rate limit para outras rotas
         if max_requests is None:
