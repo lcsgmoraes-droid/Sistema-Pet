@@ -11,7 +11,6 @@ from app.pedido_integrado_models import PedidoIntegrado
 from app.produtos_models import EstoqueMovimentacao
 from app.services.pedido_integrado_consolidation_service import (
     escolher_pedido_canonico,
-    listar_pedidos_por_numero_loja,
     loja_id_do_payload,
     numero_pedido_loja_do_payload,
     pedido_tem_nf_deterministica,

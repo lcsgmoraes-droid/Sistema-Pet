@@ -92,7 +92,7 @@ class GeradorVariacoesService:
         # ========================================
         atributos = db.query(ProdutoAtributo).filter(
             ProdutoAtributo.produto_pai_id == produto_pai_id,
-            ProdutoAtributo.ativo == True
+            ProdutoAtributo.ativo.is_(True)
         ).order_by(ProdutoAtributo.ordem).all()
         
         if not atributos:
@@ -108,7 +108,7 @@ class GeradorVariacoesService:
         for atributo in atributos:
             opcoes = db.query(ProdutoAtributoOpcao).filter(
                 ProdutoAtributoOpcao.atributo_id == atributo.id,
-                ProdutoAtributoOpcao.ativo == True
+                ProdutoAtributoOpcao.ativo.is_(True)
             ).order_by(ProdutoAtributoOpcao.ordem).all()
             
             if not opcoes:
@@ -162,7 +162,7 @@ class GeradorVariacoesService:
             # Commit da transação
             db.commit()
             
-            logger.info(f"🎉 Processo concluído!")
+            logger.info("🎉 Processo concluído!")
             logger.info(f"  ✅ {len(variacoes_criadas)} variações criadas")
             logger.info(f"  ⏭️ {variacoes_ignoradas} variações já existentes")
             
@@ -195,7 +195,7 @@ class GeradorVariacoesService:
         variacoes = db.query(Produto).filter(
             Produto.produto_pai_id == produto_pai_id,
             Produto.tipo_produto == 'VARIACAO',
-            Produto.ativo == True
+            Produto.ativo.is_(True)
         ).all()
         
         # IDs das opções da combinação atual

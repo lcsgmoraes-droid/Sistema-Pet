@@ -11,7 +11,7 @@ import re
 import tempfile
 import threading
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from uuid import UUID
 
 from sqlalchemy import desc, func
@@ -1069,7 +1069,7 @@ class BlingSyncService:
                     .outerjoin(latest_ids, latest_ids.c.produto_id == ProdutoBlingSync.produto_id)
                     .outerjoin(fila_atual, fila_atual.id == latest_ids.c.queue_id)
                     .filter(
-                        ProdutoBlingSync.sincronizar == True,
+                        ProdutoBlingSync.sincronizar.is_(True),
                         ProdutoBlingSync.status == "erro",
                         ProdutoBlingSync.erro_mensagem.isnot(None),
                         ProdutoBlingSync.erro_mensagem != "",
@@ -1232,7 +1232,7 @@ class BlingSyncService:
             db.query(ProdutoBlingSync.produto_id)
             .filter(
                 ProdutoBlingSync.tenant_id == tenant_id,
-                ProdutoBlingSync.sincronizar == True,
+                ProdutoBlingSync.sincronizar.is_(True),
                 ProdutoBlingSync.bling_produto_id.isnot(None),
                 ProdutoBlingSync.bling_produto_id != "",
                 (
@@ -1258,7 +1258,7 @@ class BlingSyncService:
             db.query(ProdutoBlingSync.produto_id)
             .filter(
                 ProdutoBlingSync.tenant_id == tenant_id,
-                ProdutoBlingSync.sincronizar == True,
+                ProdutoBlingSync.sincronizar.is_(True),
                 ProdutoBlingSync.bling_produto_id.isnot(None),
                 ProdutoBlingSync.bling_produto_id != "",
             )
@@ -1519,7 +1519,7 @@ class BlingSyncService:
             ProdutoBlingSyncQueue.status.in_(["pendente", "erro", "processando"])
         ).count()
         com_erro = sync_query.filter(ProdutoBlingSync.status == "erro").count()
-        ativos = sync_query.filter(ProdutoBlingSync.sincronizar == True).count()
+        ativos = sync_query.filter(ProdutoBlingSync.sincronizar.is_(True)).count()
         divergentes = sync_query.filter(
             ProdutoBlingSync.ultima_divergencia.isnot(None)
         ).filter(

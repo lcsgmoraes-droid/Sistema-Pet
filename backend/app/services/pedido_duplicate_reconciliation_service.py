@@ -5,7 +5,6 @@ from datetime import datetime, timedelta
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from app.pedido_integrado_models import PedidoIntegrado
 from app.services.pedido_integrado_duplicate_review_service import (
     consolidar_duplicidades_seguras_pedido,
     listar_grupos_duplicados_pedido_loja,

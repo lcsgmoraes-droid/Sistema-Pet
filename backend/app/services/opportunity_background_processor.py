@@ -19,7 +19,7 @@ Estrutura preparada para:
 
 from typing import Dict, List, Any, Optional, Tuple
 from uuid import UUID
-from datetime import datetime, timedelta
+from datetime import datetime
 import threading
 import time
 
@@ -81,7 +81,7 @@ class OpportunityBackgroundProcessor:
             if cliente_id:
                 self._processar_contexto_cliente()
             
-        except Exception as e:
+        except Exception:
             # Fail-safe: Silenciar qualquer erro, nunca afeta PDV
             pass
     
@@ -117,7 +117,7 @@ class OpportunityBackgroundProcessor:
             if self.itens_carrinho:
                 self._processar_carrinho_adicionado()
             
-        except Exception as e:
+        except Exception:
             # Fail-safe: Silenciar qualquer erro, nunca afeta PDV
             pass
     
@@ -155,7 +155,7 @@ class OpportunityBackgroundProcessor:
             # Fase futura: Detecção de objeções, retenção IA
             self._processar_carrinho_removido()
             
-        except Exception as e:
+        except Exception:
             # Fail-safe: Silenciar qualquer erro, nunca afeta PDV
             pass
     

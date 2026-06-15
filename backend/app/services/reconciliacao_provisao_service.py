@@ -14,11 +14,10 @@ Por ora, este serviço registra o conceito e estará pronto quando a estrutura f
 """
 
 from decimal import Decimal
-from sqlalchemy import func, and_, extract
+from sqlalchemy import and_
 from sqlalchemy.orm import Session
 
 from app.ia.aba7_models import DREPeriodo
-from app.financeiro_models import CategoriaFinanceira
 
 
 def reconciliar_provisao(
@@ -121,7 +120,6 @@ def reconciliar_provisao(
         periodo.margem_liquida_percent = (periodo.lucro_liquido / periodo.receita_liquida) * 100
     
     # Registrar no detalhamento (para rastreabilidade)
-    import json
     detalhamento_atual = periodo.impostos_detalhamento or ""
     
     novo_lancamento = f"\n[{nome_real}] R$ {valor_real:.2f} - {observacao_real}"

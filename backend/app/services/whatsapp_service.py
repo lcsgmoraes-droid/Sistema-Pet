@@ -5,7 +5,6 @@ Abstração para envio de mensagens WhatsApp.
 Permite trocar provedor sem refatorar o sistema.
 """
 import logging
-from typing import Optional
 
 logger = logging.getLogger(__name__)
 

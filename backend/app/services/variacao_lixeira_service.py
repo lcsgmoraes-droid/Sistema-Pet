@@ -4,7 +4,7 @@ Service de Domínio - Lixeira de Variações
 Responsável por gerenciar exclusão lógica (soft delete) e
 restauração de produtos do tipo VARIACAO.
 """
-from typing import List, Optional
+from typing import List
 from sqlalchemy.orm import Session
 from datetime import datetime
 import logging
@@ -169,7 +169,7 @@ class VariacaoLixeiraService:
             
             logger.info(f"✅ Variação restaurada: {variacao.nome}")
             logger.info(f"   ID: {variacao.id}")
-            logger.info(f"   Status: Ativa novamente")
+            logger.info("   Status: Ativa novamente")
             
             return variacao
             
@@ -199,7 +199,7 @@ class VariacaoLixeiraService:
         variacoes = db.query(Produto).filter(
             Produto.produto_pai_id == produto_pai_id,
             Produto.tipo_produto == 'VARIACAO',
-            Produto.ativo == True,
+            Produto.ativo.is_(True),
             Produto.deleted_at.is_(None),
             Produto.user_id == user_id
         ).order_by(Produto.nome).all()
@@ -229,7 +229,7 @@ class VariacaoLixeiraService:
         variacoes = db.query(Produto).filter(
             Produto.produto_pai_id == produto_pai_id,
             Produto.tipo_produto == 'VARIACAO',
-            Produto.ativo == False,
+            Produto.ativo.is_(False),
             Produto.deleted_at.isnot(None),
             Produto.user_id == user_id
         ).order_by(Produto.deleted_at.desc()).all()
@@ -260,7 +260,7 @@ class VariacaoLixeiraService:
         ativas = db.query(Produto).filter(
             Produto.produto_pai_id == produto_pai_id,
             Produto.tipo_produto == 'VARIACAO',
-            Produto.ativo == True,
+            Produto.ativo.is_(True),
             Produto.deleted_at.is_(None),
             Produto.user_id == user_id
         ).count()
@@ -269,7 +269,7 @@ class VariacaoLixeiraService:
         excluidas = db.query(Produto).filter(
             Produto.produto_pai_id == produto_pai_id,
             Produto.tipo_produto == 'VARIACAO',
-            Produto.ativo == False,
+            Produto.ativo.is_(False),
             Produto.deleted_at.isnot(None),
             Produto.user_id == user_id
         ).count()

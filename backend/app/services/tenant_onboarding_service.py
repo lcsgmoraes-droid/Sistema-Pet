@@ -821,7 +821,7 @@ def _query_template_items(db: Session, bundle_code: str, bundle_version: str) ->
         .filter(
             TemplateItem.bundle_code == bundle_code,
             TemplateItem.bundle_version == bundle_version,
-            TemplateItem.active == True,
+            TemplateItem.active.is_(True),
         )
         .order_by(TemplateItem.sort_order.asc(), TemplateItem.id.asc())
         .all()

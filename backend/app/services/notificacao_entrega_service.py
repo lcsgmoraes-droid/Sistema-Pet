@@ -11,8 +11,6 @@ Mensagem padrão única para todos os casos.
 AJUSTES FINOS: Controle de duplicidade, normalização de tempo, limite de produtos.
 """
 from sqlalchemy.orm import Session
-from sqlalchemy import and_
-from datetime import datetime, timedelta
 from typing import Optional
 import logging
 

@@ -165,7 +165,7 @@ def listar_sugestoes_duplicidade_pessoas(
     pessoas = (
         db.query(Cliente)
         .filter(Cliente.tenant_id == tenant_id)
-        .filter(Cliente.ativo == True)
+        .filter(Cliente.ativo.is_(True))
         .filter(func.length(func.trim(func.coalesce(Cliente.nome, ""))) > 0)
         .order_by(Cliente.nome.asc(), Cliente.id.asc())
         .all()
@@ -205,7 +205,7 @@ def executar_fusoes_automaticas_pessoas_duplicadas(
     query = (
         db.query(Cliente)
         .filter(Cliente.tenant_id == tenant_id)
-        .filter(Cliente.ativo == True)
+        .filter(Cliente.ativo.is_(True))
         .filter(func.length(func.trim(func.coalesce(Cliente.nome, ""))) > 0)
         .order_by(Cliente.nome.asc(), Cliente.id.asc())
     )

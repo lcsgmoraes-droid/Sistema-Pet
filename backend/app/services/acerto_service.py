@@ -7,12 +7,9 @@ from decimal import Decimal
 from typing import Dict, List, Optional, Tuple
 from uuid import UUID
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, or_
 import json
-import re
 
 from app.models import Cliente, AcertoParceiro, EmailTemplate, EmailEnvio, Tenant
-from app.db import get_session
 from app.tenancy.context import get_current_tenant, tenant_context
 from app.tenancy.rls import sync_rls_tenant
 from app.utils.logger import logger
@@ -116,7 +113,7 @@ class AcertoService:
         parceiro = db.query(Cliente).filter(
             Cliente.id == parceiro_id,
             Cliente.tenant_id == tenant_id,
-            Cliente.parceiro_ativo == True
+            Cliente.parceiro_ativo.is_(True)
         ).first()
         
         if not parceiro:
@@ -311,7 +308,7 @@ class EmailService:
         template = db.query(EmailTemplate).filter(
             EmailTemplate.codigo == codigo_template,
             EmailTemplate.user_id == user_id,
-            EmailTemplate.ativo == True
+            EmailTemplate.ativo.is_(True)
         ).first()
         
         if not template:
@@ -353,7 +350,7 @@ class EmailService:
             Dict com status do envio
         """
         # PLACEHOLDER: Implementar integração real
-        logger.info(f"📧 EMAIL SIMULADO")
+        logger.info("📧 EMAIL SIMULADO")
         logger.info(f"Para: {', '.join(destinatarios)}")
         logger.info(f"Assunto: {assunto}")
         logger.info(f"Corpo HTML: {len(corpo_html)} caracteres")
