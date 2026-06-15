@@ -5,9 +5,9 @@ Queries de Auditoria - Fase 5.6
 Funções de consulta read-only ao log de auditoria.
 """
 
-from typing import Optional, List, Tuple, Dict, Any
+from typing import Optional
 from datetime import datetime
-from sqlalchemy import func, desc, and_, or_
+from sqlalchemy import desc, and_
 from sqlalchemy.orm import Session
 import json
 
