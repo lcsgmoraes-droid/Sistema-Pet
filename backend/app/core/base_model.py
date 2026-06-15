@@ -1,11 +1,11 @@
-from app.base_models import BaseTenantModel
 """
 Base Model with common fields for all tables
 """
 from sqlalchemy import Column, Integer, DateTime
 from sqlalchemy.orm import declared_attr
 from sqlalchemy.sql import func
-from app.db import Base
+
+from app.base_models import BaseTenantModel
 
 
 class BaseModel(BaseTenantModel):
