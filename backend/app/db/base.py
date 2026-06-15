@@ -1,5 +1,7 @@
 from app.db.base_class import Base
 
+__all__ = ["Base"]
+
 # Importar TODOS os models aqui para o Alembic enxergar
 # Importando models principais (do arquivo app/models.py)
 from app.models import User, UserSession, Cliente, UserTenant, Pet, Especie, Raca  # noqa
