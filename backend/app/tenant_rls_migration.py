@@ -84,11 +84,15 @@ def _policy_name(table_name: str) -> str:
 
 
 def _partner_policy_names(table_name: str) -> list[str]:
-    return [f"{table_name}_{suffix}" for suffix, _ in _PARTNER_POLICY_ORDER]
+    return _custom_policy_names(table_name, _PARTNER_POLICY_ORDER)
 
 
 def _auth_policy_names(table_name: str) -> list[str]:
-    return [f"{table_name}_{suffix}" for suffix, _ in _AUTH_POLICY_ORDER[table_name]]
+    return _custom_policy_names(table_name, _AUTH_POLICY_ORDER[table_name])
+
+
+def _custom_policy_names(table_name: str, policy_order: Sequence[tuple[str, str]]) -> list[str]:
+    return [f"{table_name}_{suffix}" for suffix, _ in policy_order]
 
 
 def iter_tenant_rls_statements(table_name: str, *, enable: bool) -> Iterator[str]:
@@ -109,15 +113,20 @@ def iter_tenant_rls_statements(table_name: str, *, enable: bool) -> Iterator[str
         yield f"ALTER TABLE {table_name} DISABLE ROW LEVEL SECURITY"
 
 
-def iter_partner_readable_rls_statements(table_name: str, *, enable: bool) -> Iterator[str]:
-    policy_names = _partner_policy_names(table_name)
+def _iter_custom_rls_statements(
+    table_name: str,
+    *,
+    enable: bool,
+    policy_names: Sequence[str],
+    policy_order: Sequence[tuple[str, str]],
+) -> Iterator[str]:
     if enable:
         yield f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY"
         yield f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY"
         yield f"DROP POLICY IF EXISTS {_policy_name(table_name)} ON {table_name}"
         for policy_name in policy_names:
             yield f"DROP POLICY IF EXISTS {policy_name} ON {table_name}"
-        for policy_name, (_, clause) in zip(policy_names, _PARTNER_POLICY_ORDER, strict=True):
+        for policy_name, (_, clause) in zip(policy_names, policy_order, strict=True):
             yield f"CREATE POLICY {policy_name} ON {table_name} {clause}"
         return
 
@@ -125,24 +134,24 @@ def iter_partner_readable_rls_statements(table_name: str, *, enable: bool) -> It
         yield f"DROP POLICY IF EXISTS {policy_name} ON {table_name}"
     yield f"ALTER TABLE {table_name} NO FORCE ROW LEVEL SECURITY"
     yield f"ALTER TABLE {table_name} DISABLE ROW LEVEL SECURITY"
+
+
+def iter_partner_readable_rls_statements(table_name: str, *, enable: bool) -> Iterator[str]:
+    yield from _iter_custom_rls_statements(
+        table_name,
+        enable=enable,
+        policy_names=_partner_policy_names(table_name),
+        policy_order=_PARTNER_POLICY_ORDER,
+    )
 
 
 def iter_auth_users_rls_statements(table_name: str, *, enable: bool) -> Iterator[str]:
-    policy_names = _auth_policy_names(table_name)
-    if enable:
-        yield f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY"
-        yield f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY"
-        yield f"DROP POLICY IF EXISTS {_policy_name(table_name)} ON {table_name}"
-        for policy_name in policy_names:
-            yield f"DROP POLICY IF EXISTS {policy_name} ON {table_name}"
-        for policy_name, (_, clause) in zip(policy_names, _AUTH_POLICY_ORDER[table_name], strict=True):
-            yield f"CREATE POLICY {policy_name} ON {table_name} {clause}"
-        return
-
-    for policy_name in reversed(policy_names):
-        yield f"DROP POLICY IF EXISTS {policy_name} ON {table_name}"
-    yield f"ALTER TABLE {table_name} NO FORCE ROW LEVEL SECURITY"
-    yield f"ALTER TABLE {table_name} DISABLE ROW LEVEL SECURITY"
+    yield from _iter_custom_rls_statements(
+        table_name,
+        enable=enable,
+        policy_names=_auth_policy_names(table_name),
+        policy_order=_AUTH_POLICY_ORDER[table_name],
+    )
 
 
 def apply_tenant_rls(

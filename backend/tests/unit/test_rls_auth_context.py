@@ -1,26 +1,4 @@
-from types import SimpleNamespace
-
-
-class FakeConnection:
-    def __init__(self):
-        self.calls = []
-
-    def execute(self, statement, params=None):
-        self.calls.append((str(statement), dict(params or {})))
-
-
-class FakeSession:
-    def __init__(self, dialect_name):
-        self.bind = SimpleNamespace(
-            dialect=SimpleNamespace(name=dialect_name),
-        )
-        self.connection_obj = FakeConnection()
-
-    def get_bind(self):
-        return self.bind
-
-    def connection(self):
-        return self.connection_obj
+from tests.unit.test_rls_tenant_context import FakeSession
 
 
 def test_rls_auth_user_sync_sets_transaction_local_user_id_on_postgresql():
