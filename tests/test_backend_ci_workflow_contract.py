@@ -54,3 +54,10 @@ def test_backend_ci_has_blocking_events_lint_step():
 
     assert "Events lint (blocking)" in source
     assert "ruff check app/events" in source
+
+
+def test_backend_ci_has_blocking_utils_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Utils lint (blocking)" in source
+    assert "ruff check app/utils" in source
