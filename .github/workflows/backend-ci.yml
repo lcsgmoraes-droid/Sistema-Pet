@@ -159,6 +159,26 @@ jobs:
         run: |
           ruff check app/configuracoes
 
+      - name: Database package lint (blocking)
+        run: |
+          ruff check app/database
+
+      - name: DRE lint (blocking)
+        run: |
+          ruff check app/dre
+
+      - name: Migrations lint (blocking)
+        run: |
+          ruff check app/migrations
+
+      - name: Banho Tosa model parts lint (blocking)
+        run: |
+          ruff check app/banho_tosa_model_parts
+
+      - name: Banho Tosa schema parts lint (blocking)
+        run: |
+          ruff check app/banho_tosa_schema_parts
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"

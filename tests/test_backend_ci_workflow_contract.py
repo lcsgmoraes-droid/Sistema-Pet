@@ -215,3 +215,25 @@ def test_backend_ci_has_blocking_configuracoes_lint_step():
 
     assert "Configuracoes lint (blocking)" in source
     assert "ruff check app/configuracoes" in source
+
+
+def test_backend_ci_has_blocking_clean_package_lint_steps():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    expected_steps = [
+        ("Database package lint (blocking)", "ruff check app/database"),
+        ("DRE lint (blocking)", "ruff check app/dre"),
+        ("Migrations lint (blocking)", "ruff check app/migrations"),
+        (
+            "Banho Tosa model parts lint (blocking)",
+            "ruff check app/banho_tosa_model_parts",
+        ),
+        (
+            "Banho Tosa schema parts lint (blocking)",
+            "ruff check app/banho_tosa_schema_parts",
+        ),
+    ]
+
+    for step_name, command in expected_steps:
+        assert step_name in source
+        assert command in source
