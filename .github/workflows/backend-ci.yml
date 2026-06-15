@@ -43,6 +43,10 @@ jobs:
         run: |
           ruff check app/tenancy tests/unit/test_rls_no_debt_guard.py tests/multi_tenant/test_tenant_model_registry.py
 
+      - name: Auth lint (blocking)
+        run: |
+          ruff check app/auth app/auth_routes_multitenant.py app/usuarios_routes.py
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"
