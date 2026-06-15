@@ -82,3 +82,10 @@ def test_backend_ci_has_blocking_replay_lint_step():
 
     assert "Replay lint (blocking)" in source
     assert "ruff check app/replay" in source
+
+
+def test_backend_ci_has_blocking_application_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Application lint (blocking)" in source
+    assert "ruff check app/application" in source
