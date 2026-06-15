@@ -106,7 +106,7 @@ def _validar_pode_inativar_produto(db: Session, produto: Produto, tenant_id):
     variacoes_ativas = db.query(Produto).filter(
         Produto.produto_pai_id == produto.id,
         Produto.tenant_id == tenant_id,
-        Produto.ativo == True,
+        Produto.ativo.is_(True),
     ).count()
 
     if variacoes_ativas > 0:

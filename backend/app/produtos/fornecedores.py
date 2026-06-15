@@ -58,7 +58,7 @@ def _promover_fornecedor_principal_lote(
     query = db.query(ProdutoFornecedor).filter(
         ProdutoFornecedor.produto_id == produto.id,
         ProdutoFornecedor.tenant_id == tenant_id,
-        ProdutoFornecedor.ativo == True,
+        ProdutoFornecedor.ativo.is_(True),
     )
 
     if fornecedor_id_ignorado is not None:
@@ -173,7 +173,7 @@ def _aplicar_fornecedor_produto_lote(
             db.query(ProdutoFornecedor).filter(
                 ProdutoFornecedor.produto_id == produto.id,
                 ProdutoFornecedor.tenant_id == tenant_id,
-                ProdutoFornecedor.e_principal == True,
+                ProdutoFornecedor.e_principal.is_(True),
             ).update({"e_principal": False})
 
         if vinculo:
@@ -208,7 +208,7 @@ def _garantir_fornecedor_principal_quando_unico(db: Session, produto: Produto, t
     vinculos_ativos = db.query(ProdutoFornecedor).filter(
         ProdutoFornecedor.produto_id == produto.id,
         ProdutoFornecedor.tenant_id == tenant_id,
-        ProdutoFornecedor.ativo == True,
+        ProdutoFornecedor.ativo.is_(True),
     ).order_by(ProdutoFornecedor.id.asc()).all()
 
     if not vinculos_ativos:

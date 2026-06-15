@@ -114,7 +114,7 @@ def _aplicar_filtro_fornecedor_produto(
             Produto.fornecedores_alternativos.any(
                 and_(
                     ProdutoFornecedor.fornecedor_id.in_(fornecedor_ids),
-                    ProdutoFornecedor.ativo == True,
+                    ProdutoFornecedor.ativo.is_(True),
                 )
             ),
         )
