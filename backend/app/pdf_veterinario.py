@@ -3,7 +3,6 @@ from datetime import datetime
 from io import BytesIO
 from xml.sax.saxutils import escape
 
-from reportlab.graphics import renderPDF
 from reportlab.graphics.barcode import qr
 from reportlab.graphics.shapes import Drawing
 from reportlab.lib import colors

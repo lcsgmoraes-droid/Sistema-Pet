@@ -10,7 +10,6 @@ from sqlalchemy.orm import Session, joinedload
 from .models import Cliente
 from .veterinario_core import (
     _normalizar_data_hora_agendada_vet,
-    _normalizar_datetime_vet,
     _serializar_data_hora_agendada_vet,
     _serializar_datetime_vet,
     _vet_now,
@@ -74,7 +73,7 @@ def _validar_veterinario_agendamento(db: Session, tenant_id, veterinario_id: Opt
         Cliente.id == veterinario_id,
         Cliente.tenant_id == tenant_id,
         Cliente.tipo_cadastro == "veterinario",
-        Cliente.ativo == True,
+        Cliente.ativo.is_(True),
     ).first()
     if not veterinario:
         raise HTTPException(status_code=422, detail="Veterinario selecionado nao foi encontrado ou esta inativo")
@@ -88,7 +87,7 @@ def _validar_consultorio_agendamento(db: Session, tenant_id, consultorio_id: Opt
     consultorio = db.query(ConsultorioVet).filter(
         ConsultorioVet.id == consultorio_id,
         ConsultorioVet.tenant_id == tenant_id,
-        ConsultorioVet.ativo == True,
+        ConsultorioVet.ativo.is_(True),
     ).first()
     if not consultorio:
         raise HTTPException(status_code=422, detail="Consultorio selecionado nao foi encontrado ou esta inativo")

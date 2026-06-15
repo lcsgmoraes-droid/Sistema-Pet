@@ -114,7 +114,7 @@ def dashboard_vet(
         ConsultaVet, ConsultaVet.id == ProcedimentoConsulta.consulta_id
     ).filter(
         ProcedimentoConsulta.tenant_id == tenant_id,
-        ProcedimentoConsulta.realizado == True,
+        ProcedimentoConsulta.realizado.is_(True),
         func.date(ConsultaVet.created_at) >= janela_30d,
     ).all()
     regra_financeira = _obter_regra_financeira_veterinaria(db, tenant_id)
@@ -188,7 +188,7 @@ def relatorio_clinico_vet(
         ConsultaVet, ConsultaVet.id == ProcedimentoConsulta.consulta_id
     ).filter(
         ProcedimentoConsulta.tenant_id == tenant_id,
-        ProcedimentoConsulta.realizado == True,
+        ProcedimentoConsulta.realizado.is_(True),
         func.date(ConsultaVet.created_at) >= data_inicio,
     ).all()
 

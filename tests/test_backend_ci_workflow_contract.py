@@ -365,6 +365,29 @@ def test_backend_ci_has_blocking_financial_root_lint_step():
     ) in source
 
 
+def test_backend_ci_has_blocking_veterinario_root_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Veterinario root lint (blocking)" in source
+    assert (
+        "ruff check app/veterinario_acompanhamento_routes.py "
+        "app/veterinario_agenda_routes.py app/veterinario_agendamentos.py "
+        "app/veterinario_calendar.py app/veterinario_catalogo_routes.py "
+        "app/veterinario_clinico.py app/veterinario_consultas_routes.py "
+        "app/veterinario_core.py app/veterinario_exames_arquivos.py "
+        "app/veterinario_exames_ia.py app/veterinario_exames_routes.py "
+        "app/veterinario_extratos.py app/veterinario_extratos_routes.py "
+        "app/veterinario_financeiro.py app/veterinario_ia.py "
+        "app/veterinario_ia_routes.py app/veterinario_internacao.py "
+        "app/veterinario_internacao_routes.py app/veterinario_models.py "
+        "app/veterinario_orcamentos.py app/veterinario_orcamentos_routes.py "
+        "app/veterinario_parcerias_routes.py app/veterinario_preventivo.py "
+        "app/veterinario_relatorios_routes.py app/veterinario_routes.py "
+        "app/veterinario_schemas.py app/veterinario_serializers.py "
+        "app/pdf_veterinario.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_ai_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

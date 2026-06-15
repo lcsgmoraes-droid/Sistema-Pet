@@ -143,7 +143,7 @@ def _buscar_catalogos(db: Session, tenant_id, catalogo_ids: set[int]) -> dict[in
     catalogos = db.query(CatalogoProcedimento).filter(
         CatalogoProcedimento.tenant_id == tenant_id,
         CatalogoProcedimento.id.in_(catalogo_ids),
-        CatalogoProcedimento.ativo == True,
+        CatalogoProcedimento.ativo.is_(True),
     ).all()
     return {catalogo.id: catalogo for catalogo in catalogos}
 
