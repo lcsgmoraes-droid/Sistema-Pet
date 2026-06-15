@@ -53,7 +53,7 @@ def avancar_recorrencia(db: Session, tenant_id, recorrencia_id: int, data_base: 
 def _sugestoes_recorrencias(db: Session, tenant_id, hoje: date, dias: int) -> list[dict]:
     limite = hoje + timedelta(days=max(dias, 0))
     recorrencias = query_recorrencias(db, tenant_id).filter(
-        BanhoTosaRecorrencia.ativo == True,
+        BanhoTosaRecorrencia.ativo.is_(True),
         BanhoTosaRecorrencia.proxima_execucao <= limite,
     ).order_by(BanhoTosaRecorrencia.proxima_execucao.asc()).limit(200).all()
     itens = []

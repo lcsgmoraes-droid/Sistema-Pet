@@ -139,7 +139,7 @@ def _obter_parametro_porte(db: Session, tenant_id, atendimento: BanhoTosaAtendim
         return None
     return db.query(BanhoTosaParametroPorte).filter(
         BanhoTosaParametroPorte.tenant_id == tenant_id,
-        BanhoTosaParametroPorte.ativo == True,
+        BanhoTosaParametroPorte.ativo.is_(True),
         func.lower(BanhoTosaParametroPorte.porte) == porte,
     ).first()
 

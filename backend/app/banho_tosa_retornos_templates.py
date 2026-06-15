@@ -20,7 +20,7 @@ def listar_templates_retorno(db: Session, tenant_id, *, tipo_retorno: str | None
     if canal:
         query = query.filter(BanhoTosaRetornoTemplate.canal == normalizar_canal(canal))
     if ativos_only:
-        query = query.filter(BanhoTosaRetornoTemplate.ativo == True)
+        query = query.filter(BanhoTosaRetornoTemplate.ativo.is_(True))
     return query.order_by(BanhoTosaRetornoTemplate.nome.asc()).all()
 
 
@@ -54,7 +54,7 @@ def obter_template_retorno(db: Session, tenant_id, template_id: int, *, ativo: b
         BanhoTosaRetornoTemplate.tenant_id == tenant_id,
     )
     if ativo:
-        query = query.filter(BanhoTosaRetornoTemplate.ativo == True)
+        query = query.filter(BanhoTosaRetornoTemplate.ativo.is_(True))
     template = query.first()
     if not template:
         raise HTTPException(status_code=404, detail="Template de retorno nao encontrado.")

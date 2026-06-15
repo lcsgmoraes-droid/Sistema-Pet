@@ -50,7 +50,7 @@ def validar_capacidade_agenda(
     recurso = db.query(BanhoTosaRecurso).filter(
         BanhoTosaRecurso.id == recurso_id,
         BanhoTosaRecurso.tenant_id == tenant_id,
-        BanhoTosaRecurso.ativo == True,
+        BanhoTosaRecurso.ativo.is_(True),
     ).first()
     if not recurso:
         raise HTTPException(status_code=404, detail="Recurso nao encontrado ou inativo")
@@ -71,7 +71,7 @@ def montar_capacidade_dia(db: Session, tenant_id, data_ref: date) -> dict:
 
     recursos = db.query(BanhoTosaRecurso).filter(
         BanhoTosaRecurso.tenant_id == tenant_id,
-        BanhoTosaRecurso.ativo == True,
+        BanhoTosaRecurso.ativo.is_(True),
     ).order_by(BanhoTosaRecurso.tipo.asc(), BanhoTosaRecurso.nome.asc()).all()
 
     agendamentos = (
