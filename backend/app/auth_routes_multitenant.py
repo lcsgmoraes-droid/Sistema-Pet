@@ -307,7 +307,7 @@ def _validate_refresh_tenant(db: Session, user_id: int, tenant_id: str | None):
     user_tenant = db.query(UserTenant).filter(
         UserTenant.user_id == user_id,
         UserTenant.tenant_id == tenant_uuid,
-        UserTenant.is_active == True,
+        UserTenant.is_active.is_(True),
     ).first()
 
     tenant = db.query(Tenant).filter(Tenant.id == str(tenant_uuid)).first()
@@ -975,7 +975,7 @@ def select_tenant(
     user_tenant = db.query(UserTenant).filter(
         UserTenant.user_id == current_user.id,
         UserTenant.tenant_id == tenant_uuid,
-        UserTenant.is_active == True,
+        UserTenant.is_active.is_(True),
     ).first()
     
     if not user_tenant:
@@ -1078,7 +1078,7 @@ def get_me_multitenant(
         .filter(
             UserTenant.user_id == current_user.id,
             UserTenant.tenant_id == tenant_id,
-            UserTenant.is_active == True,
+            UserTenant.is_active.is_(True),
         )
         .first()
     )

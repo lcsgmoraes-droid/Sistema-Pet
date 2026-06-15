@@ -285,7 +285,7 @@ def atualizar_status_usuario(
                 db.query(UserTenant)
                 .filter(
                     UserTenant.user_id == user_id,
-                    UserTenant.is_active == True,
+                    UserTenant.is_active.is_(True),
                 )
                 .count()
                 > 0

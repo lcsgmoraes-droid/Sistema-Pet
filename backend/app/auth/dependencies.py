@@ -98,7 +98,7 @@ async def get_current_user_and_tenant(
         user_tenant = db.query(UserTenant).filter(
             UserTenant.user_id == user.id,
             UserTenant.tenant_id == tenant_id,
-            UserTenant.is_active == True,
+            UserTenant.is_active.is_(True),
         ).first()
 
         if not user_tenant:
