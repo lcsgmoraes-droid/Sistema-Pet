@@ -10,12 +10,11 @@ Segurança:
 - Fail-safe (erro = lista vazia / sucesso silencioso)
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import func
 from typing import List, Dict, Any, Optional
 from uuid import UUID
-from datetime import datetime
 from pydantic import BaseModel
 
 from app.db import get_session

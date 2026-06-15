@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 from typing import Optional
 
 from app.db import get_session
-from app.models import User
 from app.auth import get_current_user_and_tenant
 from app.services.segmentacao_service import SegmentacaoService
 from app.schemas.segmentacao import (
@@ -17,8 +16,7 @@ from app.schemas.segmentacao import (
     RecalcularTodosResponse,
     ListarSegmentosResponse,
     EstatisticasSegmentosResponse,
-    MetricasCliente,
-    DetalheProcessamento
+    MetricasCliente
 )
 
 
@@ -206,7 +204,6 @@ def obter_estatisticas_segmentos(
     current_user, tenant_id = user_and_tenant
     try:
         from sqlalchemy import text
-        from datetime import datetime
         
         # Buscar distribuição
         query = text("""

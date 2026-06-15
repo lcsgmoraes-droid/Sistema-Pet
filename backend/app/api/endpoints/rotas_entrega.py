@@ -6,7 +6,7 @@ from fastapi.security import HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from sqlalchemy import text
+from sqlalchemy import or_, text
 from datetime import datetime
 from decimal import Decimal
 from math import radians, sin, cos, sqrt, atan2
@@ -95,7 +95,7 @@ def _validate_admin_delivery_actor(
         .filter(
             UserTenant.user_id == user.id,
             UserTenant.tenant_id == tenant_id,
-            UserTenant.is_active == True,
+            UserTenant.is_active.is_(True),
         )
         .first()
     )
@@ -263,7 +263,6 @@ def listar_rotas(
     """
     from sqlalchemy.orm import joinedload
     from app.vendas_models import Venda
-    from app.models import Cliente
 
     user, tenant_id = user_and_tenant
     ensure_rotas_entrega_schema(db)
@@ -375,9 +374,9 @@ def listar_vendas_pendentes_entrega(
     # Exclui: 'em_rota', 'entregue', 'cancelada'
     vendas = db.query(Venda).filter(
         Venda.tenant_id == tenant_id,
-        Venda.tem_entrega == True,
+        Venda.tem_entrega.is_(True),
         # Aceita apenas vendas pendentes (ainda não entraram em rota)
-        (Venda.status_entrega == 'pendente') | (Venda.status_entrega == None)
+        (Venda.status_entrega == 'pendente') | Venda.status_entrega.is_(None)
     ).order_by(
         # Primeiro: vendas com ordem otimizada
         Venda.ordem_entrega_otimizada.asc().nullslast(),
@@ -514,7 +513,7 @@ def otimizar_vendas_pendentes(
     # CRITÉRIO: tem_entrega = true E status_entrega NÃO é 'entregue' ou 'cancelada'
     vendas = db.query(Venda).filter(
         Venda.tenant_id == tenant_id,
-        Venda.tem_entrega == True,
+        Venda.tem_entrega.is_(True),
         ~Venda.status_entrega.in_(["entregue", "cancelada"]),
         Venda.endereco_entrega.isnot(None)
     ).order_by(Venda.created_at.asc()).all()
@@ -561,7 +560,7 @@ def otimizar_vendas_pendentes(
         logger.info(f"📋 Ordem final: {ordem_vendas}")
 
         return {
-            "message": f"Rotas otimizadas com sucesso! Ordem salva no banco.",
+            "message": "Rotas otimizadas com sucesso! Ordem salva no banco.",
             "total_otimizado": len(ordem_indices),
             "ordem": ordem_vendas
         }
@@ -610,7 +609,7 @@ def otimizar_vendas_selecionadas(
     vendas = db.query(Venda).filter(
         Venda.tenant_id == tenant_id,
         Venda.id.in_(payload.venda_ids),
-        Venda.tem_entrega == True,
+        Venda.tem_entrega.is_(True),
         Venda.endereco_entrega.isnot(None)
     ).order_by(Venda.created_at.asc()).all()
 
@@ -796,8 +795,8 @@ def criar_rota(
     entregador = db.query(Cliente).filter(
         Cliente.id == entregador_id,
         Cliente.tenant_id == tenant_id,
-        Cliente.is_entregador == True,
-        Cliente.entregador_ativo == True
+        Cliente.is_entregador.is_(True),
+        Cliente.entregador_ativo.is_(True)
     ).first()
 
     if not entregador:
@@ -817,10 +816,10 @@ def criar_rota(
         )
         if actor.entregador is not None:
             vendas_query = vendas_query.filter(
-                Venda.tem_entrega == True,
-                or_(Venda.status_entrega == "pendente", Venda.status_entrega == None),
+                Venda.tem_entrega.is_(True),
+                or_(Venda.status_entrega == "pendente", Venda.status_entrega.is_(None)),
                 Venda.endereco_entrega.isnot(None),
-                or_(Venda.entregador_id == actor.entregador.id, Venda.entregador_id == None),
+                or_(Venda.entregador_id == actor.entregador.id, Venda.entregador_id.is_(None)),
             )
         vendas = vendas_query.all()
 
@@ -954,10 +953,10 @@ def criar_rota(
     )
     if actor.entregador is not None:
         venda_query = venda_query.filter(
-            Venda.tem_entrega == True,
-            or_(Venda.status_entrega == "pendente", Venda.status_entrega == None),
+            Venda.tem_entrega.is_(True),
+            or_(Venda.status_entrega == "pendente", Venda.status_entrega.is_(None)),
             Venda.endereco_entrega.isnot(None),
-            or_(Venda.entregador_id == actor.entregador.id, Venda.entregador_id == None),
+            or_(Venda.entregador_id == actor.entregador.id, Venda.entregador_id.is_(None)),
         )
     venda = venda_query.first()
 
