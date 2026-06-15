@@ -3,7 +3,7 @@ AI Change Management Events - Domain Events
 Eventos de aprovação e governança de mudanças
 """
 from datetime import datetime
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, List
 from pydantic import BaseModel, Field
 from uuid import UUID
 

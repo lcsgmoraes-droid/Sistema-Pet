@@ -225,7 +225,7 @@ class ContextBuilder:
                 Produto.estoque_atual
             ).filter(
                 Produto.tenant_id == tenant_id,
-                Produto.ativo == True
+                Produto.ativo.is_(True)
             )
             
             # Aplicar filtros de busca
@@ -271,7 +271,7 @@ class ContextBuilder:
             Venda, Venda.id == VendaItem.venda_id
         ).filter(
             Produto.tenant_id == tenant_id,
-            Produto.ativo == True,
+            Produto.ativo.is_(True),
             Venda.data_venda >= trinta_dias
         ).group_by(
             Produto.id

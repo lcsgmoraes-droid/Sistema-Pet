@@ -8,12 +8,10 @@ em diferentes cenários reais.
 import asyncio
 from datetime import datetime
 from decimal import Decimal
-from typing import List
 
 from app.ai.pdv_assistant.models import (
     PDVContext,
     ItemVendaPDV,
-    PDVSugestao,
 )
 from app.ai.pdv_assistant.service import PDVAIService
 from app.utils.logger import logger
@@ -236,7 +234,7 @@ async def executar_exemplo(
     logger.info(f"EXEMPLO: {nome}")
     logger.info(f"{'='*80}")
     
-    logger.info(f"\n📋 CONTEXTO:")
+    logger.info("\n📋 CONTEXTO:")
     logger.info(f"  Vendedor: {pdv_context.vendedor_nome}")
     if pdv_context.tem_cliente_identificado:
         logger.info(f"  Cliente: {pdv_context.cliente_nome}")
@@ -244,7 +242,7 @@ async def executar_exemplo(
     logger.info(f"  Total parcial: R$ {pdv_context.total_parcial:.2f}")
     
     if pdv_context.itens:
-        logger.info(f"\n  Produtos:")
+        logger.info("\n  Produtos:")
         for item in pdv_context.itens:
             logger.info(f"    • {item.nome_produto} - R$ {item.valor_total:.2f}")
     
@@ -252,7 +250,7 @@ async def executar_exemplo(
     service = PDVAIService(db=db_session, use_mock=True)
     
     # Gerar sugestões
-    logger.info(f"\n🤖 GERANDO SUGESTÕES...")
+    logger.info("\n🤖 GERANDO SUGESTÕES...")
     sugestoes = await service.sugerir_para_pdv(pdv_context)
     
     # Exibir sugestões

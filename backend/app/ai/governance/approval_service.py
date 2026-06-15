@@ -2,7 +2,6 @@
 Approval Service
 Gerencia fluxo de aprovações multi-role
 """
-from datetime import datetime
 from typing import Dict, List, Optional
 from uuid import UUID, uuid4
 
@@ -11,9 +10,7 @@ from app.ai.governance.models import (
     ApprovalRecord,
     ApprovalRole,
     ApprovalDecision,
-    AIChangeRequest,
     ChangeRequestStatus,
-    ChangeApprovalPolicy,
     DEFAULT_APPROVAL_POLICY,
 )
 from app.ai.governance.events import (

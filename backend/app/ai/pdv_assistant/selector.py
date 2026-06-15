@@ -8,7 +8,7 @@ Responsável por:
 - Evitar sobrecarga de informação para o operador
 """
 
-from typing import List, Optional
+from typing import List
 from datetime import datetime
 import logging
 
@@ -138,8 +138,8 @@ class PDVInsightSelector:
                 cliente_id_insight = insight.dados_contexto.get("cliente_id")
                 if cliente_id_insight and cliente_id_insight != pdv_context.cliente_id:
                     logger.debug(
-                        f"[PDVInsightSelector] Ignorando insight - "
-                        f"cliente diferente"
+                        "[PDVInsightSelector] Ignorando insight - "
+                        "cliente diferente"
                     )
                     continue
             
@@ -147,8 +147,8 @@ class PDVInsightSelector:
             if insight.tipo == TipoInsight.PRODUTOS_COMPRADOS_JUNTOS:
                 if pdv_context.quantidade_itens == 0:
                     logger.debug(
-                        f"[PDVInsightSelector] Ignorando insight de produtos juntos "
-                        f"- venda vazia"
+                        "[PDVInsightSelector] Ignorando insight de produtos juntos "
+                        "- venda vazia"
                     )
                     continue
                 
@@ -158,8 +158,8 @@ class PDVInsightSelector:
                 
                 if not any(p in produtos_venda for p in produtos_insight):
                     logger.debug(
-                        f"[PDVInsightSelector] Ignorando insight de produtos juntos "
-                        f"- produtos não relacionados"
+                        "[PDVInsightSelector] Ignorando insight de produtos juntos "
+                        "- produtos não relacionados"
                     )
                     continue
             

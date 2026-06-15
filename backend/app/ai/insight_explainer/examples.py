@@ -100,18 +100,18 @@ async def exemplo_cliente_atrasado():
     print("\n" + "=" * 80)
     logger.info("🤖 EXPLICAÇÃO DA IA (COMPREENSÍVEL):")
     print("=" * 80)
-    logger.info(f"\n📌 TÍTULO:")
+    logger.info("\n📌 TÍTULO:")
     logger.info(f"   {explicacao.titulo}")
     
-    logger.info(f"\n💡 EXPLICAÇÃO:")
+    logger.info("\n💡 EXPLICAÇÃO:")
     logger.info(f"   {explicacao.explicacao}")
     
-    logger.info(f"\n🎯 SUGESTÃO DE AÇÃO:")
+    logger.info("\n🎯 SUGESTÃO DE AÇÃO:")
     logger.info(f"   {explicacao.sugestao}")
     
     logger.info(f"\n📊 CONFIANÇA: {explicacao.confianca * 100:.1f}%")
     
-    logger.info(f"\n📋 FONTE DOS DADOS:")
+    logger.info("\n📋 FONTE DOS DADOS:")
     for fonte in explicacao.fonte_dados:
         logger.info(f"   - {fonte}")
     

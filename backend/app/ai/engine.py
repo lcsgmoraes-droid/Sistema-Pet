@@ -17,7 +17,6 @@ from app.ai.providers import (
     ProviderException,
     ProviderTimeoutException,
     ProviderRateLimitException,
-    ProviderCostLimitException,
     MockAIProvider
 )
 from app.ai.settings import AISettings

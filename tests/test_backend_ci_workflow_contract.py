@@ -336,3 +336,10 @@ def test_backend_ci_has_blocking_financial_root_lint_step():
         "app/operadoras_models.py app/operadoras_routes.py "
         "app/formas_pagamento_models.py app/formas_pagamento_routes.py"
     ) in source
+
+
+def test_backend_ci_has_blocking_ai_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "AI lint (blocking)" in source
+    assert "ruff check app/ai" in source

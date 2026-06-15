@@ -6,9 +6,8 @@ Demonstra como usar o AIEngine para interpretar insights gerados pelo sistema.
 
 import asyncio
 from datetime import datetime, timedelta
-from typing import Dict, Any
 
-from app.ai.engine import AIEngine, AIEngineFactory
+from app.ai.engine import AIEngineFactory
 from app.ai.contracts import AIContext
 from app.utils.logger import logger
 

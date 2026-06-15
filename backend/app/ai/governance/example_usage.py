@@ -2,7 +2,6 @@
 Example: AI Change Management & Approval Flow
 Demonstração completa do framework de governança
 """
-from uuid import uuid4
 from datetime import datetime, timedelta
 
 from app.ai.versioning.models import ComponentType, ComponentVersion, VersionStatus
@@ -162,7 +161,7 @@ def example_complete_change_flow():
         evaluation_period_end=datetime.utcnow(),
     )
     
-    logger.info(f"✓ Quality Gates avaliados:")
+    logger.info("✓ Quality Gates avaliados:")
     logger.info(f"  Total gates: {len(quality_report.gates_evaluated)}")
     logger.info(f"  Passed: {quality_report.total_gates_passed}")
     logger.info(f"  Failed: {quality_report.total_gates_failed}")
@@ -188,7 +187,7 @@ def example_complete_change_flow():
         submitted_by="dev@petshop.com",
     )
     
-    logger.info(f"✓ Submetido para revisão")
+    logger.info("✓ Submetido para revisão")
     logger.info(f"  Status: {change_request.status.value}")
     
     # ========================================
@@ -200,7 +199,7 @@ def example_complete_change_flow():
         change_request_id=change_request.id,
     )
     
-    logger.info(f"✓ Approval Flow criado")
+    logger.info("✓ Approval Flow criado")
     logger.info(f"  Required roles: {[r.value for r in approval_flow.applicable_rule.required_roles]}")
     logger.info(f"  Min approvals: {approval_flow.applicable_rule.min_approvals}")
     logger.info(f"  Require all roles: {approval_flow.applicable_rule.require_all_roles}")
@@ -260,7 +259,7 @@ def example_complete_change_flow():
     
     status = approval_service.get_approval_status_summary(change_request.id)
     
-    logger.info(f"✓ Approval Status:")
+    logger.info("✓ Approval Status:")
     logger.info(f"  Complete: {status['is_complete']}")
     logger.info(f"  Approved: {status['is_approved']}")
     logger.info(f"  Approvals received: {status['approved_count']}/{status['min_approvals']}")
@@ -281,7 +280,7 @@ def example_complete_change_flow():
             promoted_by="ops.lead@petshop.com",
         )
         
-        logger.info(f"✓ Versão promovida para PRODUÇÃO")
+        logger.info("✓ Versão promovida para PRODUÇÃO")
         logger.info(f"  Version: {version.version_name}")
         logger.info(f"  Status: {version.status.value}")
         logger.info(f"  Change Request: {change_request.id}")
@@ -335,7 +334,6 @@ def example_rejection_flow():
     event_store = InMemoryEventStore()
     version_registry = VersionRegistry(event_store)
     change_management = ChangeManagementService(event_store, version_registry)
-    approval_service = ApprovalService(event_store, change_management)
     
     print("\n" + "=" * 80)
     logger.info("EXEMPLO: FLUXO COM REJEIÇÃO")
@@ -394,7 +392,7 @@ def example_rejection_flow():
         evaluation_period_end=datetime.utcnow(),
     )
     
-    logger.info(f"✗ Quality Gates FAILED:")
+    logger.info("✗ Quality Gates FAILED:")
     logger.info(f"  All mandatory passed: {quality_report.all_mandatory_gates_passed}")
     logger.info(f"  Failed: {quality_report.total_gates_failed}")
     

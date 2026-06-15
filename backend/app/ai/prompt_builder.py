@@ -6,7 +6,6 @@ Garante que todos os contextos sejam formatados de forma padronizada.
 """
 
 from typing import Dict, Any, List
-import json
 from datetime import datetime
 
 from app.ai.contracts import IAIPromptBuilder

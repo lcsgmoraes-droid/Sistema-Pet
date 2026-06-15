@@ -2,8 +2,6 @@
 Example: AI Versioning Framework Usage
 Demonstração completa do framework de versionamento
 """
-from uuid import uuid4
-from datetime import datetime
 
 from app.ai.versioning.models import (
     ComponentType,
@@ -14,7 +12,6 @@ from app.ai.versioning.models import (
 )
 from app.ai.versioning.registry import VersionRegistry
 from app.ai.versioning.orchestrator import RolloutOrchestrator
-from app.ai.versioning.integration import VersionedDecisionService
 from app.utils.logger import logger
 
 
@@ -149,7 +146,7 @@ def example_complete_workflow():
     
     plan = orchestrator.start_rollout(plan.id)
     
-    logger.info(f"✓ Rollout iniciado!")
+    logger.info("✓ Rollout iniciado!")
     logger.info(f"  Status: {plan.status.value}")
     logger.info(f"  Step atual: {plan.current_step}")
     logger.info(f"  Tenants iniciais: {plan.current_tenant_ids}")
@@ -173,7 +170,7 @@ def example_complete_workflow():
     # Check health
     health = orchestrator.check_rollout_health(plan.id)
     
-    logger.info(f"✓ Health check concluído:")
+    logger.info("✓ Health check concluído:")
     logger.info(f"  Total decisões: {health['total_decisions']}")
     logger.info(f"  Success rate: {health['avg_success_rate']:.2%}")
     logger.info(f"  Fallback rate: {health['avg_fallback_rate']:.2%}")
@@ -284,7 +281,7 @@ def example_canary_rollout():
     plan = orchestrator.start_rollout(plan.id)
     
     logger.info(f"✓ Canary iniciado em: {plan.current_tenant_ids}")
-    logger.info(f"  Monitorando performance antes de expandir...")
+    logger.info("  Monitorando performance antes de expandir...")
 
 
 def example_auto_rollback():
@@ -346,11 +343,11 @@ def example_auto_rollback():
     # Check health vai detectar regressão
     health = orchestrator.check_rollout_health(plan.id)
     
-    logger.info(f"✗ Performance detectada:")
+    logger.info("✗ Performance detectada:")
     logger.info(f"  Success rate: {health['avg_success_rate']:.2%} (threshold: 90%)")
     
     if 'action' in health and health['action'] == 'auto_rollback_triggered':
-        logger.info(f"\n✓ AUTO-ROLLBACK ACIONADO!")
+        logger.info("\n✓ AUTO-ROLLBACK ACIONADO!")
         logger.info(f"  Tenants revertidos: {plan.current_tenant_ids}")
         logger.info(f"  Razão: {plan.rollback_reason}")
         
