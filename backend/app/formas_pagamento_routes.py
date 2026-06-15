@@ -10,9 +10,7 @@ from datetime import datetime
 from decimal import Decimal
 
 from .db import get_session
-from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
-from .models import User
 from .formas_pagamento_models import FormaPagamentoTaxa, ConfiguracaoImposto
 from .financeiro_models import FormaPagamento
 from .produtos_models import Produto
@@ -21,16 +19,6 @@ from .security.permissions_decorator import require_any_permission, require_perm
 from app.utils.logger import logger
 
 router = APIRouter(prefix="/formas-pagamento", tags=["Formas de Pagamento"])
-
-
-def get_session():
-    """Dependency para obter sessão do banco"""
-    from .db import SessionLocal
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 
 # ===== SCHEMAS =====
@@ -384,8 +372,6 @@ def analisar_venda(
         # ===== 5. BUSCAR IMPOSTO PADRÃO =====
         imposto_percentual = 0
         imposto_valor = 0
-        imposto_nome = ""
-        imposto_origem = "cadastro"
         
         try:
             # 🔹 Prioridade 1: Simples Nacional (se ativo)
@@ -402,28 +388,22 @@ def analisar_venda(
             ):
                 imposto_percentual = float(config_fiscal.aliquota_simples_vigente)
                 imposto_valor = subtotal * (imposto_percentual / 100)
-                imposto_nome = f"Simples Nacional - Anexo {config_fiscal.simples_anexo or 'I'}"
-                imposto_origem = "fiscal"
             else:
                 # 🔹 Prioridade 2: Imposto padrão cadastrado
                 config_imposto = db.query(ConfiguracaoImposto).filter(
                     ConfiguracaoImposto.tenant_id == tenant_id,
-                    ConfiguracaoImposto.ativo == True,
-                    ConfiguracaoImposto.padrao == True
+                    ConfiguracaoImposto.ativo.is_(True),
+                    ConfiguracaoImposto.padrao.is_(True)
                 ).first()
                 
                 if config_imposto:
                     imposto_percentual = float(config_imposto.percentual)
                     imposto_valor = subtotal * (imposto_percentual / 100)
-                    imposto_nome = config_imposto.nome
-                    imposto_origem = "cadastro"
         except Exception as e:
             logger.error(f"❌ Erro ao buscar configuração fiscal: {e}")
             # Continuar sem impostos em caso de erro
             imposto_percentual = 0
             imposto_valor = 0
-            imposto_nome = "Sem imposto"
-            imposto_origem = "erro"
         
         # ===== 6. CALCULAR COMISSAO REAL DO VENDEDOR/PARCEIRO =====
         comissao_total = 0
@@ -679,7 +659,7 @@ def listar_impostos(
     
     # Buscar impostos cadastrados
     impostos = db.query(ConfiguracaoImposto).filter(
-        ConfiguracaoImposto.ativo == True
+        ConfiguracaoImposto.ativo.is_(True)
     ).all()
     
     resultado = [i.to_dict() for i in impostos]

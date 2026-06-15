@@ -3,16 +3,14 @@ Routes para gerenciamento de contas bancárias
 """
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, func, desc
+from sqlalchemy import and_, desc
 from typing import List, Optional
 from datetime import datetime
 from decimal import Decimal
 from pydantic import BaseModel, Field
 
 from app.db import get_session
-from app.auth import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
-from app.models import User
 from app.financeiro_models import ContaBancaria, MovimentacaoFinanceira
 
 router = APIRouter(prefix="/contas-bancarias", tags=["Contas Bancárias"])
@@ -94,7 +92,7 @@ def listar_contas(
     query = db.query(ContaBancaria).filter(ContaBancaria.tenant_id == tenant_id)
     
     if apenas_ativas:
-        query = query.filter(ContaBancaria.ativa == True)
+        query = query.filter(ContaBancaria.ativa.is_(True))
     
     contas = query.order_by(ContaBancaria.nome).all()
     
@@ -427,7 +425,7 @@ def resumo_saldos(
     contas = db.query(ContaBancaria).filter(
         and_(
             ContaBancaria.tenant_id == tenant_id,
-            ContaBancaria.ativa == True
+            ContaBancaria.ativa.is_(True)
         )
     ).all()
     

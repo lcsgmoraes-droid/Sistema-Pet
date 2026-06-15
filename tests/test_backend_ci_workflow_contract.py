@@ -324,3 +324,15 @@ def test_backend_ci_has_blocking_access_root_lint_step():
         "ruff check app/canais.py app/partner_utils.py app/permissions_routes.py "
         "app/roles_routes.py app/cargos_routes.py app/cargo_models.py"
     ) in source
+
+
+def test_backend_ci_has_blocking_financial_root_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Financial root lint (blocking)" in source
+    assert (
+        "ruff check app/contas_bancarias_routes.py app/contas_pagar_routes.py "
+        "app/contas_receber_routes.py app/lancamentos_routes.py "
+        "app/operadoras_models.py app/operadoras_routes.py "
+        "app/formas_pagamento_models.py app/formas_pagamento_routes.py"
+    ) in source

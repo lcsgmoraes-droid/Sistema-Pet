@@ -4,9 +4,7 @@ Gerenciamento de operadoras (Stone, Cielo, Rede, Getnet, Sumup, etc)
 """
 
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Numeric, Text, ForeignKey
-from sqlalchemy.orm import relationship
 from datetime import datetime
-from app.db import Base
 from app.base_models import BaseTenantModel
 from app.utils.serialization import safe_decimal_to_float, safe_datetime_to_iso
 

@@ -4,14 +4,13 @@ Rotas para Lançamentos Manuais e Recorrentes do Fluxo de Caixa
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, extract
-from datetime import datetime, timedelta
+from sqlalchemy import and_
+from datetime import datetime
 from typing import Optional, List
 from pydantic import BaseModel
 from decimal import Decimal
 
 from .db import get_session
-from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
 from app.utils.logger import logger
 from .financeiro_models import (
@@ -267,7 +266,7 @@ def listar_lancamentos_manuais(
     
     lancamentos = query.order_by(LancamentoManual.data_lancamento.desc()).all()
     
-    return [_build_lancamento_manual_response(l, db) for l in lancamentos]
+    return [_build_lancamento_manual_response(lancamento, db) for lancamento in lancamentos]
 
 
 @router.get("/manuais/{lancamento_id}", response_model=LancamentoManualResponse)
@@ -411,7 +410,7 @@ def listar_lancamentos_recorrentes(
     
     lancamentos = query.order_by(LancamentoRecorrente.descricao).all()
     
-    return [_build_lancamento_recorrente_response(l, db) for l in lancamentos]
+    return [_build_lancamento_recorrente_response(lancamento, db) for lancamento in lancamentos]
 
 
 @router.get("/recorrentes/{lancamento_id}", response_model=LancamentoRecorrenteResponse)

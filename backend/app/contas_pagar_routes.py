@@ -5,7 +5,7 @@ Gestão completa de despesas e pagamentos a fornecedores
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query, Request
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_, or_, func, desc, extract, select
+from sqlalchemy import and_, or_, func, select
 from typing import List, Optional
 from datetime import datetime, date, timedelta
 from pydantic import BaseModel, field_validator
@@ -14,17 +14,15 @@ import re
 import unicodedata
 
 from .db import get_session
-from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
 from .idempotency import idempotent  # ← IDEMPOTÊNCIA
-from .models import User, Cliente
+from .models import Cliente
 from .financeiro_models import (
     ContaPagar, Pagamento, CategoriaFinanceira, FormaPagamento, LancamentoManual,
     TipoDespesa,
     MovimentacaoFinanceira, ContaBancaria
 )
 from .produtos_models import NotaEntrada
-from .domain.validators.dre_validator import validar_categoria_financeira_dre
 from .domain.dre.lancamento_dre_sync import atualizar_dre_por_lancamento
 from .dre_plano_contas_models import DRESubcategoria
 from .financeiro.contas_pagar_origem import (
@@ -1974,7 +1972,7 @@ async def registrar_pagamento(
         forma_pagamento = db.query(FormaPagamento).filter(
             FormaPagamento.id == pagamento.forma_pagamento_id,
             FormaPagamento.tenant_id == tenant_id,
-            FormaPagamento.ativo == True,
+            FormaPagamento.ativo.is_(True),
         ).first()
 
         if not forma_pagamento:
@@ -2080,7 +2078,7 @@ async def registrar_pagamento(
         LancamentoManual.tipo == 'saida',
         LancamentoManual.status == 'previsto',
         LancamentoManual.valor == conta.valor_original,
-        LancamentoManual.gerado_automaticamente == True
+        LancamentoManual.gerado_automaticamente.is_(True)
     ).order_by(LancamentoManual.id.desc()).first()
     
     if lancamento:
@@ -2231,7 +2229,7 @@ async def processar_recorrencias_contas_pagar(
     # Buscar contas recorrentes que precisam manter a janela futura preenchida
     contas_recorrentes = db.query(ContaPagar).filter(
         and_(
-            ContaPagar.eh_recorrente == True,
+            ContaPagar.eh_recorrente.is_(True),
             ContaPagar.proxima_recorrencia <= limite_recorrencia,
             or_(
                 ContaPagar.data_fim_recorrencia.is_(None),

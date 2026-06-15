@@ -4,16 +4,14 @@ Gerenciamento de operadoras (Stone, Cielo, Rede, Getnet, Sumup, etc)
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func, and_
+from sqlalchemy.orm import Session
+from sqlalchemy import and_
 from sqlalchemy.exc import ProgrammingError
 from typing import List, Optional
 from pydantic import BaseModel, Field
 
 from app.db import get_session
-from app.auth import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
-from app.models import User
 from app.operadoras_models import OperadoraCartao
 from app.vendas_models import VendaPagamento
 from app.security.permissions_decorator import require_any_permission, require_permission
@@ -123,8 +121,8 @@ def validar_operadora_padrao_obrigatoria(
     query = db.query(OperadoraCartao).filter(
         and_(
             OperadoraCartao.tenant_id == tenant_id,
-            OperadoraCartao.padrao == True,
-            OperadoraCartao.ativo == True
+            OperadoraCartao.padrao.is_(True),
+            OperadoraCartao.ativo.is_(True)
         )
     )
     
@@ -208,7 +206,7 @@ def listar_operadoras(
     )
     
     if apenas_ativas:
-        query = query.filter(OperadoraCartao.ativo == True)
+        query = query.filter(OperadoraCartao.ativo.is_(True))
     
     try:
         operadoras = query.order_by(
@@ -242,8 +240,8 @@ def obter_operadora_padrao(
     operadora = db.query(OperadoraCartao).filter(
         and_(
             OperadoraCartao.tenant_id == tenant_id,
-            OperadoraCartao.padrao == True,
-            OperadoraCartao.ativo == True
+            OperadoraCartao.padrao.is_(True),
+            OperadoraCartao.ativo.is_(True)
         )
     ).first()
     
