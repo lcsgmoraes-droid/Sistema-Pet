@@ -18,7 +18,6 @@ from datetime import datetime
 
 from app.db import get_session as get_db
 from app.whatsapp.models import TenantWhatsAppConfig, WhatsAppSession, WhatsAppMessage
-from app.whatsapp.schemas import Webhook360DialogPayload
 from app.whatsapp.tenant_context import whatsapp_tenant_context
 from app.models import Cliente
 
@@ -93,7 +92,7 @@ async def webhook_verification(
         logger.info("Webhook verificado com sucesso")
         return int(hub_challenge)  # Meta espera número
     
-    logger.warning(f"❌ Falha na verificação: token inválido")
+    logger.warning("❌ Falha na verificação: token inválido")
     raise HTTPException(status_code=403, detail="Verificação falhou")
 
 
@@ -219,7 +218,6 @@ async def process_webhook_payload(
                     phone = msg.get("from")
                     whatsapp_msg_id = msg.get("id")
                     msg_type = msg.get("type")
-                    timestamp = msg.get("timestamp")
                     
                     # Suportar apenas texto por enquanto
                     if msg_type != "text":

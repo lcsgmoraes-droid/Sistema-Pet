@@ -53,7 +53,7 @@ def buscar_produto(
             Produto.categoria_id,
         ).filter(
             Produto.tenant_id == tenant_id,
-            Produto.situacao == True
+            Produto.situacao.is_(True)
         )
 
         # Filtrar por categoria (join com tabela Categoria)

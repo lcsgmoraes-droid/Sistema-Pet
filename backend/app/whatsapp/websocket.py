@@ -3,14 +3,11 @@ WebSocket Server para WhatsApp Atendimento
 Gerencia conexões Socket.IO para real-time updates
 """
 
-from fastapi import WebSocket, WebSocketDisconnect, Depends
+from fastapi import WebSocket
 from typing import Dict, Set
-import json
 import logging
 from datetime import datetime
 
-from app.db import get_session as get_db
-from app.auth import get_current_user_from_token
 from sqlalchemy.orm import Session
 
 logger = logging.getLogger(__name__)

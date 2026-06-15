@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 import json
 import logging
 
-from app.whatsapp.models import WhatsAppMetric, WhatsAppMessage, WhatsAppSession
+from app.whatsapp.models import WhatsAppMetric
 
 logger = logging.getLogger(__name__)
 
@@ -255,7 +255,7 @@ class MetricsAnalyzer:
                     metadata = json.loads(metric.metric_metadata)
                     if metadata.get("resolved_by") == "ai":
                         auto_count += 1
-                except:
+                except Exception:
                     pass
             
             return auto_count
@@ -289,7 +289,7 @@ class MetricsAnalyzer:
                     processing_time = metadata.get("processing_time_seconds", 0)
                     total_time += processing_time
                     count += 1
-                except:
+                except Exception:
                     pass
             
             return total_time / count if count > 0 else 0.0
@@ -319,7 +319,7 @@ class MetricsAnalyzer:
                     metadata = json.loads(metric.metric_metadata)
                     intent = metadata.get("intent", "desconhecido")
                     intent_counts[intent] = intent_counts.get(intent, 0) + 1
-                except:
+                except Exception:
                     pass
             
             # Ordenar e retornar top N
@@ -428,7 +428,7 @@ class MetricsAnalyzer:
                     
                     total_tokens["input"] += metadata.get("tokens_input", 0)
                     total_tokens["output"] += metadata.get("tokens_output", 0)
-                except:
+                except Exception:
                     pass
             
             return {

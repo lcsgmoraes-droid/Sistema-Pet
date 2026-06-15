@@ -2,7 +2,7 @@
 Sistema de Templates de Resposta
 Templates dinâmicos para respostas personalizadas da IA
 """
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 from app.whatsapp.intents import IntentType
 from datetime import datetime
 
@@ -230,7 +230,7 @@ class ResponseFormatter:
         
         try:
             return template.format(**kwargs)
-        except KeyError as e:
+        except KeyError:
             # Se faltar alguma variável, retornar template sem formatação
             return template
     

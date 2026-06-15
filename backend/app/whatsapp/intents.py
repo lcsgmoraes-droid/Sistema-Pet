@@ -199,7 +199,6 @@ class IntentDetector:
             # Pega a intenção com mais matches
             detected_intent = max(intent_scores, key=intent_scores.get)
             max_score = intent_scores[detected_intent]
-            total_possible = len(self.keywords[detected_intent])
             
             # Calcula confiança (0.0 a 1.0)
             # Quanto mais keywords encontradas, maior a confiança
