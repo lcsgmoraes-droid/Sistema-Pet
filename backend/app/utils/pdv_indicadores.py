@@ -3,13 +3,11 @@ Utilitário para cálculo de indicadores de venda no PDV
 Analisa margem, impostos e classifica venda como saudável/alerta/crítico
 """
 
-from decimal import Decimal
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 from sqlalchemy.orm import Session
 
 from app.empresa_config_geral_models import EmpresaConfigGeral
-from app.empresa_config_fiscal_models import EmpresaConfigFiscal
-from app.formas_pagamento_models import FormaPagamentoTaxa, ConfiguracaoImposto
+from app.formas_pagamento_models import FormaPagamentoTaxa
 from app.financeiro_models import FormaPagamento
 
 
