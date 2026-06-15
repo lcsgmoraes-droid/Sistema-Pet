@@ -1714,13 +1714,24 @@ def marcar_parada_nao_entregue(
     # Remover parada da rota
     venda_id = parada.venda_id
     db.delete(parada)
+    db.flush()
+    paradas_restantes = db.query(RotaEntregaParada).filter(
+        RotaEntregaParada.rota_id == rota.id,
+        RotaEntregaParada.tenant_id == tenant_id,
+    ).count()
+    rota_removida = paradas_restantes == 0
+    if rota_removida:
+        db.delete(rota)
+
     db.commit()
 
     logger.info(f"Parada {parada_id} marcada como não entregue. Venda {venda_id} voltou para entregas em aberto.")
 
     return {
         "message": "Entrega marcada como não realizada. Venda voltou para entregas em aberto.",
-        "venda_id": venda_id
+        "venda_id": venda_id,
+        "rota_removida": rota_removida,
+        "paradas_restantes": paradas_restantes,
     }
 
 
