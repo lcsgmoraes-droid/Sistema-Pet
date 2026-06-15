@@ -103,6 +103,10 @@ jobs:
         run: |
           ruff check app/parsers
 
+      - name: Scripts lint (blocking)
+        run: |
+          ruff check app/scripts
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"

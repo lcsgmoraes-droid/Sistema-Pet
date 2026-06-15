@@ -7,7 +7,7 @@ Uso:
 """
 
 from sqlalchemy.orm import Session
-from sqlalchemy import text, or_
+from sqlalchemy import text
 from app.db import SessionLocal
 import logging
 
@@ -45,7 +45,7 @@ def migrar_fretes():
             
             if not subcategoria_row:
                 print(f"   ⚠️ Subcategoria 'Fretes sobre Vendas' não encontrada para tenant {tenant_id}")
-                print(f"   💡 Execute o seed: python -m app.scripts.seed_dre_plano_contas_petshop")
+                print("   💡 Execute o seed: python -m app.scripts.seed_dre_plano_contas_petshop")
                 continue
             
             subcategoria_id = subcategoria_row[0]
