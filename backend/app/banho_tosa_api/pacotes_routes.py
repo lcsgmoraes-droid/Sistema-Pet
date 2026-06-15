@@ -55,7 +55,7 @@ def listar_pacotes(
         BanhoTosaPacote.tenant_id == tenant_id
     )
     if ativos_only:
-        query = query.filter(BanhoTosaPacote.ativo == True)
+        query = query.filter(BanhoTosaPacote.ativo.is_(True))
     return [serializar_pacote(item) for item in query.order_by(BanhoTosaPacote.nome.asc()).all()]
 
 

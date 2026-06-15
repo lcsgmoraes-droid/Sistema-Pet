@@ -69,7 +69,7 @@ def validar_responsavel_recurso(db: Session, tenant_id, responsavel_id: Optional
         recurso = db.query(BanhoTosaRecurso).filter(
             BanhoTosaRecurso.id == recurso_id,
             BanhoTosaRecurso.tenant_id == tenant_id,
-            BanhoTosaRecurso.ativo == True,
+            BanhoTosaRecurso.ativo.is_(True),
         ).first()
         if not recurso:
             raise HTTPException(status_code=404, detail="Recurso nao encontrado")

@@ -31,7 +31,7 @@ def listar_parametros_porte(
     _, tenant_id = _get_tenant(current)
     query = db.query(BanhoTosaParametroPorte).filter(BanhoTosaParametroPorte.tenant_id == tenant_id)
     if ativos_only:
-        query = query.filter(BanhoTosaParametroPorte.ativo == True)
+        query = query.filter(BanhoTosaParametroPorte.ativo.is_(True))
     return query.order_by(BanhoTosaParametroPorte.peso_min_kg.asc().nullslast(), BanhoTosaParametroPorte.porte.asc()).all()
 
 

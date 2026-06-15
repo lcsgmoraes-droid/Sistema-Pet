@@ -147,6 +147,10 @@ jobs:
         run: |
           ruff check app/read_models
 
+      - name: Banho Tosa API lint (blocking)
+        run: |
+          ruff check app/banho_tosa_api
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"

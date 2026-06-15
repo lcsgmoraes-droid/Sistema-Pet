@@ -33,7 +33,7 @@ def listar_servicos(
     _, tenant_id = _get_tenant(current)
     query = db.query(BanhoTosaServico).filter(BanhoTosaServico.tenant_id == tenant_id)
     if ativos_only:
-        query = query.filter(BanhoTosaServico.ativo == True)
+        query = query.filter(BanhoTosaServico.ativo.is_(True))
     if categoria:
         query = query.filter(BanhoTosaServico.categoria == categoria)
     return query.order_by(BanhoTosaServico.categoria.asc(), BanhoTosaServico.nome.asc()).all()

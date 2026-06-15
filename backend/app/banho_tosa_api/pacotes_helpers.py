@@ -36,7 +36,7 @@ def obter_pacote(db: Session, tenant_id, pacote_id: int, ativo: bool = False):
         BanhoTosaPacote.tenant_id == tenant_id,
     )
     if ativo:
-        query = query.filter(BanhoTosaPacote.ativo == True)
+        query = query.filter(BanhoTosaPacote.ativo.is_(True))
     pacote = query.first()
     if not pacote:
         raise HTTPException(status_code=404, detail="Pacote nao encontrado.")
@@ -79,7 +79,7 @@ def validar_cliente_pet_credito(db: Session, tenant_id, cliente_id: int, pet_id:
     cliente = db.query(Cliente).filter(
         Cliente.id == cliente_id,
         Cliente.tenant_id == tenant_id,
-        Cliente.ativo == True,
+        Cliente.ativo.is_(True),
     ).first()
     if not cliente:
         raise HTTPException(status_code=404, detail="Tutor nao encontrado.")
