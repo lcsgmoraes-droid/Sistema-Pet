@@ -86,7 +86,6 @@ from .models import (
 
 from .engine import InsightEngine
 
-from app.utils.logger import logger
 from .rules import (
     regra_cliente_recorrente_atrasado,
     regra_cliente_inativo,

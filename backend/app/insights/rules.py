@@ -317,8 +317,8 @@ def regra_produtos_comprados_juntos(
                 'numero_sugestoes': len(sugestoes_filtradas)
             },
             acao_sugerida=(
-                f"Ofereça combo ou desconto ao comprar estes produtos juntos. "
-                f"Exiba sugestões no carrinho/checkout."
+                "Ofereça combo ou desconto ao comprar estes produtos juntos. "
+                "Exiba sugestões no carrinho/checkout."
             ),
             user_id=user_id
         )
@@ -398,8 +398,8 @@ def regra_kit_mais_vantajoso(
                     'vendas': kit['numero_vendas']
                 },
                 acao_sugerida=(
-                    f"Destaque a economia do kit em banners e emails. "
-                    f"Sugira o kit quando cliente adicionar componentes individuais."
+                    "Destaque a economia do kit em banners e emails. "
+                    "Sugira o kit quando cliente adicionar componentes individuais."
                 ),
                 user_id=user_id
             )
