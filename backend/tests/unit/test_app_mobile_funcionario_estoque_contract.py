@@ -39,7 +39,7 @@ def test_employee_stock_routes_search_erp_products_not_public_app_catalog():
 
     for block in (search_block, barcode_block):
         assert "Produto.tenant_id == tenant_id" in block
-        assert "Produto.ativo == True" in block
+        assert "Produto.ativo.is_(True)" in block
         assert "Produto.anunciar_app == True" not in block
         assert "Produto.is_sellable == True" not in block
 

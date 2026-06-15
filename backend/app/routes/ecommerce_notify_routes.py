@@ -9,7 +9,7 @@ from datetime import datetime, timezone
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
@@ -90,7 +90,7 @@ def registrar_avise_me(
             EcommerceNotifyRequest.tenant_id == tenant_id,
             EcommerceNotifyRequest.product_id == body.product_id,
             EcommerceNotifyRequest.email == email_lower,
-            EcommerceNotifyRequest.notified == False,
+            EcommerceNotifyRequest.notified.is_(False),
         )
         .first()
     )
@@ -126,7 +126,7 @@ def listar_pendentes(
         db.query(EcommerceNotifyRequest)
         .filter(
             EcommerceNotifyRequest.tenant_id == str(tenant_id),
-            EcommerceNotifyRequest.notified == False,
+            EcommerceNotifyRequest.notified.is_(False),
         )
         .order_by(EcommerceNotifyRequest.created_at.desc())
         .all()
@@ -182,7 +182,7 @@ def notificar_clientes_estoque_disponivel(
         .filter(
             EcommerceNotifyRequest.tenant_id == tenant_id,
             EcommerceNotifyRequest.product_id == product_id,
-            EcommerceNotifyRequest.notified == False,
+            EcommerceNotifyRequest.notified.is_(False),
         )
         .all()
     )

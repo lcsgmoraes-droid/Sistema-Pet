@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, Field
 from typing import Optional, List
 from datetime import datetime
-from decimal import Decimal
 
 from app.db import get_session
 from app.models import AcertoParceiro, EmailTemplate, Cliente, EmailEnvio
@@ -302,7 +301,7 @@ def listar_templates(
     query = db.query(EmailTemplate).filter(EmailTemplate.tenant_id == tenant_id)
     
     if apenas_ativos:
-        query = query.filter(EmailTemplate.ativo == True)
+        query = query.filter(EmailTemplate.ativo.is_(True))
     
     if categoria:
         query = query.filter(EmailTemplate.categoria == categoria)

@@ -70,7 +70,7 @@ def obter_calendario_banho_tosa(
     config = obter_ou_criar_configuracao(db, tenant_id)
     servicos = db.query(BanhoTosaServico).filter(
         BanhoTosaServico.tenant_id == tenant_id,
-        BanhoTosaServico.ativo == True,
+        BanhoTosaServico.ativo.is_(True),
     ).order_by(BanhoTosaServico.nome.asc()).all()
 
     if not getattr(config, "mostrar_calendario_cliente", False):
@@ -88,7 +88,7 @@ def obter_calendario_banho_tosa(
     slot_minutos = max(int(getattr(config, "intervalo_slot_minutos", None) or 30), 5)
     recursos = db.query(BanhoTosaRecurso).filter(
         BanhoTosaRecurso.tenant_id == tenant_id,
-        BanhoTosaRecurso.ativo == True,
+        BanhoTosaRecurso.ativo.is_(True),
     ).all()
     capacidade_total = sum(max(int(item.capacidade_simultanea or 1), 1) for item in recursos) or 1
     data_fim = inicio + timedelta(days=dias)

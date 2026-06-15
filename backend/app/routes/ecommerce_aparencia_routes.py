@@ -5,18 +5,17 @@ Permite upload de logo e até 3 banners rotativos para a loja virtual.
 import logging
 import re
 import shutil
-import uuid
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
+from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
-
-logger = logging.getLogger(__name__)
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
 from app.models import Tenant
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ecommerce-aparencia", tags=["ecommerce-aparencia"])
 

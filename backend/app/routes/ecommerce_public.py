@@ -325,7 +325,7 @@ def listar_produtos_publicos(
 
     base_filters = [
         Produto.tenant_id == tenant.id,
-        Produto.ativo == True,
+        Produto.ativo.is_(True),
         Produto.situacao.is_not(False),
         Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
     ]

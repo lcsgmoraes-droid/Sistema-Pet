@@ -542,7 +542,6 @@ def sync_diagnostico(
         )
 
     from app.notas_entrada_routes import importar_docs_sefaz
-    from app.services.sefaz_tenant_config_service import SefazTenantConfigService as _Cfg
 
     tenant_cnpj = "".join(c for c in str(cfg.get("cnpj", "")) if c.isdigit())
 

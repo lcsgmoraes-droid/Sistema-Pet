@@ -199,6 +199,10 @@ jobs:
         run: |
           ruff check app/api
 
+      - name: Routes lint (blocking)
+        run: |
+          ruff check app/routes
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"

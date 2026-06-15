@@ -7,7 +7,6 @@ from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
-from app.models import Tenant
 from app.pedido_models import Pedido, PedidoItem
 from app.routes.ecommerce_notify_routes import EcommerceNotifyRequest
 
@@ -63,7 +62,7 @@ def get_resumo(
         db.query(func.count(EcommerceNotifyRequest.id))
         .filter(
             EcommerceNotifyRequest.tenant_id == tid,
-            EcommerceNotifyRequest.notified == False,
+            EcommerceNotifyRequest.notified.is_(False),
         )
         .scalar()
         or 0
@@ -124,7 +123,7 @@ def get_demanda(
             .filter(
                 EcommerceNotifyRequest.tenant_id == tid,
                 EcommerceNotifyRequest.product_id == row.product_id,
-                EcommerceNotifyRequest.notified == False,
+                EcommerceNotifyRequest.notified.is_(False),
             )
             .scalar() or 0
         )

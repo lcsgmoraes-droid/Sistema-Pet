@@ -442,7 +442,7 @@ def _get_current_ecommerce_user(
         .filter(
             UserTenant.user_id == user.id,
             UserTenant.tenant_id == tenant_id,
-            UserTenant.is_active == True,
+            UserTenant.is_active.is_(True),
         )
         .first()
     )
@@ -642,10 +642,10 @@ def _find_operational_cliente_match(
         db.query(Cliente)
         .filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.ativo == True,
+            Cliente.ativo.is_(True),
             or_(
                 Cliente.tipo_cadastro.in_(["funcionario", "veterinario"]),
-                Cliente.is_entregador == True,
+                Cliente.is_entregador.is_(True),
             ),
         )
         .order_by(Cliente.id.asc())
@@ -1628,7 +1628,7 @@ def meu_extrato_cashback(
     Retorna o extrato de cashback do cliente autenticado no app.
     """
     from sqlalchemy import func as sqlfunc
-    from app.campaigns.models import CashbackTransaction, CashbackSourceTypeEnum
+    from app.campaigns.models import CashbackTransaction
 
     cliente = _get_or_create_cliente_for_user(db, current_user)
     tenant_id = current_user.tenant_id

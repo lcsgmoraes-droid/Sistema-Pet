@@ -14,7 +14,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile, status
 from pydantic import BaseModel, Field
-from sqlalchemy import and_, case, func, or_, text
+from sqlalchemy import and_, case, func, or_, text, true
 from sqlalchemy.orm import Session
 
 from app.caixa_models import Caixa
@@ -539,7 +539,7 @@ def _resolver_forma_pagamento_cartao_funcionario_pdv(
     forma_normalizada = "credito" if "credito" in forma_key else "debito"
     query = db.query(FormaPagamento).filter(
         FormaPagamento.tenant_id == tenant_id,
-        FormaPagamento.ativo == True,
+        FormaPagamento.ativo.is_(True),
     )
 
     if pagamento.forma_pagamento_id:
@@ -584,7 +584,7 @@ def _buscar_cliente_pdv_funcionario(db: Session, tenant_id: str, cliente_id: Opt
         .filter(
             Cliente.id == cliente_id,
             Cliente.tenant_id == tenant_id,
-            Cliente.ativo == True,
+            Cliente.ativo.is_(True),
         )
         .first()
     )
@@ -866,7 +866,7 @@ def _calcular_beneficios_funcionario_pdv(
             .filter(
                 Produto.id == item.produto_id,
                 Produto.tenant_id == tenant_id,
-                Produto.ativo == True,
+                Produto.ativo.is_(True),
                 Produto.situacao.is_not(False),
                 Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
             )
@@ -1152,7 +1152,7 @@ def _get_pet_owned_or_404(db: Session, pet_id: int, current_user: User) -> Pet:
             Pet.id == pet_id,
             Pet.tenant_id == str(current_user.tenant_id),
             Pet.cliente_id == cliente.id,
-            Pet.ativo == True,
+            Pet.ativo.is_(True),
         )
         .first()
     )
@@ -1177,7 +1177,7 @@ def listar_pets(
         .filter(
             Pet.tenant_id == str(current_user.tenant_id),
             Pet.cliente_id == cliente.id,
-            Pet.ativo == True,
+            Pet.ativo.is_(True),
         )
         .order_by(Pet.nome)
         .all()
@@ -1409,7 +1409,7 @@ def buscar_produtos_funcionario_estoque(
         db.query(Produto)
         .filter(
             Produto.tenant_id == tenant_id,
-            Produto.ativo == True,
+            Produto.ativo.is_(True),
             Produto.situacao.is_not(False),
             or_(*filtros_busca),
         )
@@ -1436,7 +1436,7 @@ def buscar_produto_funcionario_barcode(
         db.query(Produto)
         .filter(
             Produto.tenant_id == tenant_id,
-            Produto.ativo == True,
+            Produto.ativo.is_(True),
             Produto.situacao.is_not(False),
             or_(*_barcode_filters_for_produto(barcode)),
         )
@@ -1463,7 +1463,7 @@ def registrar_balanco_funcionario_estoque(
         .filter(
             Produto.id == payload.produto_id,
             Produto.tenant_id == tenant_id,
-            Produto.ativo == True,
+            Produto.ativo.is_(True),
             Produto.situacao.is_not(False),
         )
         .first()
@@ -1568,7 +1568,7 @@ def buscar_produtos_funcionario_pdv(
         db.query(Produto)
         .filter(
             Produto.tenant_id == tenant_id,
-            Produto.ativo == True,
+            Produto.ativo.is_(True),
             Produto.situacao.is_not(False),
             Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
             or_(*filtros),
@@ -1596,7 +1596,7 @@ def buscar_produto_funcionario_pdv_barcode(
         db.query(Produto)
         .filter(
             Produto.tenant_id == tenant_id,
-            Produto.ativo == True,
+            Produto.ativo == true(),
             Produto.situacao.is_not(False),
             Produto.tipo_produto.in_(["SIMPLES", "VARIACAO", "KIT"]),
             or_(*_barcode_filters_for_produto(barcode)),
@@ -1649,7 +1649,7 @@ def buscar_clientes_funcionario_pdv(
         db.query(Cliente)
         .filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.ativo == True,
+            Cliente.ativo.is_(True),
             or_(*filtros),
         )
         .order_by(Cliente.nome.asc(), Cliente.id.asc())
@@ -1691,7 +1691,7 @@ def listar_formas_pagamento_funcionario_pdv(
         db.query(FormaPagamento)
         .filter(
             FormaPagamento.tenant_id == tenant_id,
-            FormaPagamento.ativo == True,
+            FormaPagamento.ativo.is_(True),
         )
         .order_by(FormaPagamento.nome.asc())
         .all()
@@ -1961,10 +1961,10 @@ def buscar_produto_barcode(
         db.query(Produto)
         .filter(
             Produto.tenant_id == tenant_id,
-            Produto.ativo == True,
+            Produto.ativo.is_(True),
             Produto.situacao.is_not(False),
-            Produto.is_sellable == True,
-            Produto.anunciar_app == True,
+            Produto.is_sellable.is_(True),
+            Produto.anunciar_app.is_(True),
             or_(*filtros_codigo),
         )
         .order_by(prioridade_estoque.asc(), Produto.is_parent.asc(), Produto.id.asc())

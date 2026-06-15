@@ -272,3 +272,10 @@ def test_backend_ci_has_blocking_api_lint_step():
 
     assert "API lint (blocking)" in source
     assert "ruff check app/api" in source
+
+
+def test_backend_ci_has_blocking_routes_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Routes lint (blocking)" in source
+    assert "ruff check app/routes" in source
