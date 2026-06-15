@@ -104,7 +104,7 @@ def vincular_produto(
             db.query(ProdutoFornecedor)
             .filter(
                 ProdutoFornecedor.produto_id == produto_id,
-                ProdutoFornecedor.e_principal == True,
+                ProdutoFornecedor.e_principal.is_(True),
             )
             .first()
         )

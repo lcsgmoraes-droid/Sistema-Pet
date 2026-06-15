@@ -109,7 +109,7 @@ def _importar_docs_sefaz_scoped(docs: list, tenant_id_str: str, db) -> dict:
             fornecedor = db.query(Cliente).filter(
                 Cliente.cnpj == dados_nfe["fornecedor_cnpj"],
                 Cliente.tenant_id == tenant_id_str,
-                Cliente.ativo == True
+                Cliente.ativo.is_(True)
             ).first()
 
             if not fornecedor:
