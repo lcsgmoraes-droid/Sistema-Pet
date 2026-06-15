@@ -89,7 +89,10 @@ def test_funcionario_pdv_searches_sellable_erp_products_not_app_catalog():
 
     for block in (search_block, barcode_block):
         assert "Produto.tenant_id == tenant_id" in block
-        assert "Produto.ativo == True" in block
+        assert (
+            "Produto.ativo.is_(True)" in block
+            or "Produto.ativo == true()" in block
+        )
         assert "Produto.tipo_produto.in_" in block
         assert "Produto.anunciar_app" not in block
         assert "Produto.is_sellable" not in block
@@ -207,7 +210,7 @@ def test_funcionario_pdv_supports_credit_installments_from_erp_payment_rules():
 
     assert "FuncionarioPdvFormaPagamentoResponse" in backend
     assert "FormaPagamento.tenant_id == tenant_id" in backend
-    assert "FormaPagamento.ativo == True" in backend
+    assert "FormaPagamento.ativo.is_(True)" in backend
     assert "numero_parcelas" in backend
     assert "numero_parcelas: number" in types
     assert "FuncionarioPdvFormaPagamentoOpcao" in types

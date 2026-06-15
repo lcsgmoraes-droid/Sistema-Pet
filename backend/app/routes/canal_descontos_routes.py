@@ -236,15 +236,20 @@ def atualizar_desconto(
     sets = []
     params: dict = {"id": desconto_id, "now": datetime.now(timezone.utc)}
     if payload.nome is not None:
-        sets.append("nome = :nome"); params["nome"] = payload.nome
+        sets.append("nome = :nome")
+        params["nome"] = payload.nome
     if payload.desconto_pct is not None:
-        sets.append("desconto_pct = :pct"); params["pct"] = payload.desconto_pct
+        sets.append("desconto_pct = :pct")
+        params["pct"] = payload.desconto_pct
     if payload.ativo is not None:
-        sets.append("ativo = :ativo"); params["ativo"] = payload.ativo
+        sets.append("ativo = :ativo")
+        params["ativo"] = payload.ativo
     if payload.data_inicio is not None:
-        sets.append("data_inicio = :inicio"); params["inicio"] = payload.data_inicio
+        sets.append("data_inicio = :inicio")
+        params["inicio"] = payload.data_inicio
     if payload.data_fim is not None:
-        sets.append("data_fim = :fim"); params["fim"] = payload.data_fim
+        sets.append("data_fim = :fim")
+        params["fim"] = payload.data_fim
 
     if not sets:
         raise HTTPException(status_code=422, detail="Nenhum campo para atualizar.")

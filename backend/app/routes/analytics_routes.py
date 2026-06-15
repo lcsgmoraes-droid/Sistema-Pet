@@ -23,16 +23,16 @@ ENDPOINTS:
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from typing import Optional, List, Dict, Any
-from datetime import date, datetime, timedelta
+from datetime import date, datetime
 import logging
+import re
 
 from app.db import get_session
-from app.auth import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
-from app.models import User
 from app.read_models import queries
 
 logger = logging.getLogger(__name__)
+SAFE_LOG_TOKEN_RE = re.compile(r"[^a-zA-Z0-9_.:-]")
 
 # Router de analytics (read-only)
 router = APIRouter(
@@ -74,10 +74,16 @@ def log_analytics_request(
     params: Dict[str, Any]
 ) -> None:
     """Registra acesso a endpoint de analytics para auditoria"""
+    safe_endpoint = SAFE_LOG_TOKEN_RE.sub("_", str(endpoint))[:80]
+    safe_user_id = int(user_id)
+    safe_param_keys = ",".join(
+        SAFE_LOG_TOKEN_RE.sub("_", str(key))[:40] for key in sorted(params)
+    )
     logger.info(
-        f"📊 Analytics - Endpoint: {endpoint} | "
-        f"User: {user_id} | "
-        f"Params: {params}"
+        "Analytics - Endpoint: %s | User: %s | Param keys: %s",
+        safe_endpoint,
+        safe_user_id,
+        safe_param_keys,
     )
 
 
@@ -120,7 +126,7 @@ def get_resumo_diario(
     """
     log_analytics_request(
         "resumo-diario",
-        current_user.id,
+        user_and_tenant[0].id,
         {"data": data or date.today()}
     )
     
@@ -182,7 +188,7 @@ def get_receita_mensal(
     """
     log_analytics_request(
         "receita-mensal",
-        current_user.id,
+        user_and_tenant[0].id,
         {"mes_referencia": mes_referencia or date.today()}
     )
     
@@ -263,7 +269,7 @@ def get_ranking_parceiros(
     """
     log_analytics_request(
         "ranking-parceiros",
-        current_user.id,
+        user_and_tenant[0].id,
         {"mes_referencia": mes_referencia, "limite": limite}
     )
     
@@ -324,7 +330,7 @@ def get_estatisticas_gerais(
     """
     log_analytics_request(
         "estatisticas-gerais",
-        current_user.id,
+        user_and_tenant[0].id,
         {}
     )
     
@@ -382,7 +388,7 @@ def get_ultimos_dias(
     """
     log_analytics_request(
         "ultimos-dias",
-        current_user.id,
+        user_and_tenant[0].id,
         {"quantidade": quantidade}
     )
     
@@ -426,7 +432,7 @@ def get_resumo_periodo(
     
     log_analytics_request(
         "periodo",
-        current_user.id,
+        user_and_tenant[0].id,
         {"data_inicio": data_inicio, "data_fim": data_fim}
     )
     
@@ -486,7 +492,7 @@ def get_comparativo_receita(
     """
     log_analytics_request(
         "comparativo-receita",
-        current_user.id,
+        user_and_tenant[0].id,
         {"meses": meses}
     )
     
@@ -538,7 +544,7 @@ def get_performance_funcionario(
     """
     log_analytics_request(
         "performance-funcionario",
-        current_user.id,
+        user_and_tenant[0].id,
         {"funcionario_id": funcionario_id, "mes_referencia": mes_referencia}
     )
     

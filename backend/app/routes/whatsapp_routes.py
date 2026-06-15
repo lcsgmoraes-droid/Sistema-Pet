@@ -1,7 +1,7 @@
 """
 Rotas WhatsApp - Configuração, Webhook, Testes
 """
-from fastapi import APIRouter, Depends, HTTPException, Header
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import Optional, Dict, Any
 import logging

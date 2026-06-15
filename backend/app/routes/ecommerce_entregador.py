@@ -208,10 +208,10 @@ def listar_entregas_abertas(
         .options(joinedload(Venda.cliente))
         .filter(
             Venda.tenant_id == tenant_id,
-            Venda.tem_entrega == True,
-            or_(Venda.status_entrega == "pendente", Venda.status_entrega == None),
+            Venda.tem_entrega.is_(True),
+            or_(Venda.status_entrega == "pendente", Venda.status_entrega.is_(None)),
             Venda.endereco_entrega.isnot(None),
-            or_(Venda.entregador_id == cliente.id, Venda.entregador_id == None),
+            or_(Venda.entregador_id == cliente.id, Venda.entregador_id.is_(None)),
         )
         .order_by(Venda.ordem_entrega_otimizada.asc().nullslast(), Venda.created_at.asc())
         .all()
@@ -257,10 +257,10 @@ def otimizar_entregas_selecionadas(
         .filter(
             Venda.tenant_id == tenant_id,
             Venda.id.in_(payload.venda_ids),
-            Venda.tem_entrega == True,
-            or_(Venda.status_entrega == "pendente", Venda.status_entrega == None),
+            Venda.tem_entrega.is_(True),
+            or_(Venda.status_entrega == "pendente", Venda.status_entrega.is_(None)),
             Venda.endereco_entrega.isnot(None),
-            or_(Venda.entregador_id == cliente.id, Venda.entregador_id == None),
+            or_(Venda.entregador_id == cliente.id, Venda.entregador_id.is_(None)),
         )
         .order_by(Venda.created_at.asc())
         .all()
@@ -307,10 +307,10 @@ def criar_rota_por_entregador(
         .filter(
             Venda.tenant_id == tenant_id,
             Venda.id.in_(payload.venda_ids),
-            Venda.tem_entrega == True,
-            or_(Venda.status_entrega == "pendente", Venda.status_entrega == None),
+            Venda.tem_entrega.is_(True),
+            or_(Venda.status_entrega == "pendente", Venda.status_entrega.is_(None)),
             Venda.endereco_entrega.isnot(None),
-            or_(Venda.entregador_id == cliente.id, Venda.entregador_id == None),
+            or_(Venda.entregador_id == cliente.id, Venda.entregador_id.is_(None)),
         )
         .order_by(Venda.ordem_entrega_otimizada.asc().nullslast(), Venda.created_at.asc())
         .all()
@@ -655,8 +655,8 @@ def detalhes_venda_entregador(
         .filter(
             Venda.id == venda_id,
             Venda.tenant_id == tenant_id,
-            Venda.tem_entrega == True,
-            or_(Venda.entregador_id == cliente.id, Venda.entregador_id == None),
+            Venda.tem_entrega.is_(True),
+            or_(Venda.entregador_id == cliente.id, Venda.entregador_id.is_(None)),
         )
         .first()
     )

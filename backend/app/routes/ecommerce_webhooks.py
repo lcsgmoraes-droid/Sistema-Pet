@@ -300,7 +300,7 @@ def _mapear_forma_pagamento_ecommerce(
     base_query = db.query(FormaPagamento).filter(
         FormaPagamento.tenant_id == tenant_id,
         FormaPagamento.tipo == tipo,
-        FormaPagamento.ativo == True,
+        FormaPagamento.ativo.is_(True),
     )
 
     forma = None
@@ -328,7 +328,7 @@ def _mapear_forma_pagamento_ecommerce(
         forma = db.query(FormaPagamento).filter(
             FormaPagamento.tenant_id == tenant_id,
             FormaPagamento.tipo == "pix",
-            FormaPagamento.ativo == True,
+            FormaPagamento.ativo.is_(True),
         ).first()
 
     if forma:

@@ -1,5 +1,4 @@
 """Rotas Admin — Drive pickup: PDV acompanha clientes que chegaram no estacionamento."""
-from datetime import datetime
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
@@ -26,7 +25,7 @@ def listar_drive_aguardando(
         db.query(Pedido)
         .filter(
             Pedido.tenant_id == str(tenant_id),
-            Pedido.is_drive == True,
+            Pedido.is_drive.is_(True),
             Pedido.drive_chegou_at.isnot(None),
             Pedido.drive_entregue_at.is_(None),
         )
