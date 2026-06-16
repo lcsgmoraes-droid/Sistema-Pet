@@ -200,7 +200,9 @@ class BanhoTosaMaoObraInput(BaseModel):
 
 
 class BanhoTosaComissaoInput(BaseModel):
-    modelo: Literal["nenhum", "percentual_valor", "valor_fixo", "percentual_margem"] = "nenhum"
+    modelo: Literal["nenhum", "percentual_valor", "valor_fixo", "percentual_margem"] = (
+        "nenhum"
+    )
     valor_base: Decimal = Field(default=Decimal("0"), ge=0)
     percentual: Decimal = Field(default=Decimal("0"), ge=0)
     valor_fixo: Decimal = Field(default=Decimal("0"), ge=0)

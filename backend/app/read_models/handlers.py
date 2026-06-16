@@ -18,14 +18,14 @@ MUDANÇAS NA FASE 5.3:
 # REDIRECIONAR para versão idempotente
 from .handlers_v53_idempotente import (
     VendaReadModelHandler,
-    registrar_handlers_read_models
+    registrar_handlers_read_models,
 )
 
-__all__ = [
-    'VendaReadModelHandler',
-    'registrar_handlers_read_models'
-]
+__all__ = ["VendaReadModelHandler", "registrar_handlers_read_models"]
 
 import logging
+
 logger = logging.getLogger(__name__)
-logger.warning("⚠️  handlers.py DEPRECADO - redirecionando para handlers_v53_idempotente.py")
+logger.warning(
+    "⚠️  handlers.py DEPRECADO - redirecionando para handlers_v53_idempotente.py"
+)

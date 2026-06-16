@@ -1,6 +1,17 @@
 """Modelos de custos e taxi dog do Banho & Tosa."""
 
-from sqlalchemy import Column, DateTime, ForeignKey, Index, Integer, JSON, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Column,
+    DateTime,
+    ForeignKey,
+    Index,
+    Integer,
+    JSON,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import relationship
 
 from app.base_models import BaseTenantModel
@@ -9,11 +20,18 @@ from app.base_models import BaseTenantModel
 class BanhoTosaCustoSnapshot(BaseTenantModel):
     __tablename__ = "banho_tosa_custos_snapshot"
     __table_args__ = (
-        UniqueConstraint("tenant_id", "atendimento_id", name="uq_bt_custo_snapshot_atendimento"),
+        UniqueConstraint(
+            "tenant_id", "atendimento_id", name="uq_bt_custo_snapshot_atendimento"
+        ),
         Index("ix_bt_custos_tenant_atendimento", "tenant_id", "atendimento_id"),
     )
 
-    atendimento_id = Column(Integer, ForeignKey("banho_tosa_atendimentos.id", ondelete="CASCADE"), nullable=False, index=True)
+    atendimento_id = Column(
+        Integer,
+        ForeignKey("banho_tosa_atendimentos.id", ondelete="CASCADE"),
+        nullable=False,
+        index=True,
+    )
     valor_cobrado = Column(Numeric(12, 2), nullable=False, default=0)
     custo_insumos = Column(Numeric(12, 2), nullable=False, default=0)
     custo_agua = Column(Numeric(12, 2), nullable=False, default=0)
@@ -40,7 +58,9 @@ class BanhoTosaTaxiDog(BaseTenantModel):
 
     cliente_id = Column(Integer, ForeignKey("clientes.id"), nullable=False, index=True)
     pet_id = Column(Integer, ForeignKey("pets.id"), nullable=False, index=True)
-    agendamento_id = Column(Integer, ForeignKey("banho_tosa_agendamentos.id"), nullable=True, index=True)
+    agendamento_id = Column(
+        Integer, ForeignKey("banho_tosa_agendamentos.id"), nullable=True, index=True
+    )
     tipo = Column(String(20), nullable=False, default="ida_volta")
     status = Column(String(40), nullable=False, default="agendado", index=True)
     motorista_id = Column(Integer, ForeignKey("clientes.id"), nullable=True, index=True)

@@ -1,6 +1,4 @@
-from sqlalchemy import (
-    Column, Integer, Numeric, DateTime, UniqueConstraint
-)
+from sqlalchemy import Column, Integer, Numeric, DateTime, UniqueConstraint
 from sqlalchemy.sql import func
 from app.db.base_class import Base
 
@@ -18,7 +16,9 @@ class KitComposicao(Base):
 
     # Item que compõe o kit (produto ou variação)
     produto_item_id = Column(Integer, nullable=False)  # ForeignKey("produto.id")
-    variacao_item_id = Column(Integer, nullable=True)  # ForeignKey("produto_variacao.id")
+    variacao_item_id = Column(
+        Integer, nullable=True
+    )  # ForeignKey("produto_variacao.id")
 
     quantidade = Column(Numeric(10, 3), nullable=False, default=1)
 
@@ -30,6 +30,6 @@ class KitComposicao(Base):
             "produto_kit_id",
             "produto_item_id",
             "variacao_item_id",
-            name="uq_kit_composicao_item"
+            name="uq_kit_composicao_item",
         ),
     )
