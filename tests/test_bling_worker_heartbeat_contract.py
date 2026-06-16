@@ -16,6 +16,7 @@ def test_bling_worker_heartbeat_uses_app_data_not_public_tmp():
     worker_source = BLING_WORKER_SCRIPT.read_text(encoding="utf-8")
     compose_source = COMPOSE_PROD.read_text(encoding="utf-8")
     deploy_source = PROD_DEPLOY_SCRIPT.read_text(encoding="utf-8")
+    deploy_runtime_source = deploy_source.replace('\\"', '"').replace("\\$", "$")
 
     assert LEGACY_PUBLIC_TMP_HEARTBEAT not in worker_source
     assert LEGACY_PUBLIC_TMP_HEARTBEAT not in compose_source
@@ -29,5 +30,8 @@ def test_bling_worker_heartbeat_uses_app_data_not_public_tmp():
         f"BLING_WORKER_HEARTBEAT_PATH: ${{BLING_WORKER_HEARTBEAT_PATH:-{PROD_HEARTBEAT_PATH}}}"
         in compose_source
     )
+    assert (
+        'test -n "$BLING_WORKER_HEARTBEAT_PATH" && '
+        'test -f "$BLING_WORKER_HEARTBEAT_PATH"'
+    ) in deploy_runtime_source
     assert PROD_HEARTBEAT_PATH in compose_source
-    assert PROD_HEARTBEAT_PATH in deploy_source
