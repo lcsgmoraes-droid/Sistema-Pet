@@ -1,13 +1,12 @@
-from app.base_models import BaseTenantModel, TenantScoped
 """
 ABA 7: DRE Inteligente - Modelos
 Demonstração de Resultado do Exercício com análise de rentabilidade
 """
 
 from sqlalchemy import Column, Integer, String, Float, Date, ForeignKey, DateTime, Text, Boolean
-from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 from datetime import datetime
+from app.base_models import BaseTenantModel, TenantScoped
 from app.db import Base
 
 

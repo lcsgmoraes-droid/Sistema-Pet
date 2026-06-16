@@ -9,17 +9,15 @@ Funções prontas para usar:
 - gerar_alertas_caixa() - Alertas automáticos
 """
 
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, case
 import logging
-import json
-from decimal import Decimal
 
 # Imports de modelos
 from app.ia.aba5_models import FluxoCaixa, IndicesSaudeCaixa, ProjecaoFluxoCaixa
-from app.ia_config import Aba5Config, AlertasConfig
+from app.ia_config import Aba5Config
 from app.models import User
 
 # Logger
@@ -129,8 +127,6 @@ def calcular_indices_saude(
         # 4. CICLO OPERACIONAL
         # dias_para_receber: média de dias até receber de clientes
         # dias_para_pagar: média de dias até pagar fornecedores
-        
-        data_hoje = datetime.utcnow()
         
         # Contas a receber (estima 15 dias padrão)
         dias_para_receber = 15.0
@@ -715,7 +711,7 @@ def gerar_alertas_caixa(
             and_(
                 ProjecaoFluxoCaixa.usuario_id == usuario_id,
                 ProjecaoFluxoCaixa.tenant_id == tenant_id_resolvido,
-                ProjecaoFluxoCaixa.vai_faltar_caixa == True
+                ProjecaoFluxoCaixa.vai_faltar_caixa.is_(True)
             )
         ).order_by(ProjecaoFluxoCaixa.data_projetada).first()
         

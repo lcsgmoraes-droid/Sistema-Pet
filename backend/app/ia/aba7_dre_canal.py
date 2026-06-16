@@ -5,7 +5,7 @@ Loja Física, Mercado Livre, Shopee, Amazon
 
 from typing import List, Dict, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_
+from sqlalchemy import func
 from datetime import date
 import json
 

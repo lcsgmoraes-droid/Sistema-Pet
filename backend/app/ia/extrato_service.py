@@ -6,16 +6,14 @@ Referência: ROADMAP_IA_AMBICOES.md (implementação completa)
 """
 
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, func
-from typing import Dict, List, Optional, BinaryIO
+from typing import Dict, List, Optional
 from datetime import datetime, timedelta
 import hashlib
 from decimal import Decimal
 
 from app.ia.aba7_extrato_models import (
     ArquivoExtratoImportado,
-    LancamentoImportado,
-    PadraoCategoriacaoIA
+    LancamentoImportado
 )
 from app.ia.extrato_parser import ExtratoParser
 from app.ia.extrato_nlp import ExtratoNLP

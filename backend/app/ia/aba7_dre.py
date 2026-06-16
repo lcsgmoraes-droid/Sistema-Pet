@@ -3,11 +3,10 @@ ABA 7: DRE Inteligente - Lógica de Negócio
 Cálculo e análise de Demonstração de Resultado do Exercício
 """
 
-from typing import List, Dict, Any, Optional, Tuple
+from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, or_, desc
-from datetime import datetime, timedelta, date
-from dateutil.relativedelta import relativedelta
+from sqlalchemy import func, desc
+from datetime import datetime, date
 import json
 
 from app.utils.logger import logger
@@ -15,7 +14,6 @@ from app.ia.aba7_models import (
     DREPeriodo,
     DREProduto,
     DRECategoriaAnalise,
-    DREComparacao,
     DREInsight
 )
 from app.services.dre_periodo_tenant_scope import tenant_id_para_escrita_dre
@@ -235,7 +233,7 @@ class DREService:
         # 10. Detectar anomalias (valores fora do padrão)
         from app.ia.aba7_anomalias import DetectorAnomalias
         detector = DetectorAnomalias(self.db)
-        anomalias = detector.detectar_anomalias_periodo(usuario_id, dre.id)
+        detector.detectar_anomalias_periodo(usuario_id, dre.id)
         
         return dre
     
@@ -345,7 +343,6 @@ class DREService:
         data_fim: date
     ):
         """Calcula rentabilidade por categoria"""
-        from app.models import Venda, VendaItem, Produto
         
         # Limpar análises antigas
         self.db.query(DRECategoriaAnalise).filter(
@@ -412,7 +409,7 @@ class DREService:
         # Buscar índices de mercado (pet_shop por padrão)
         indices = self.db.query(IndicesMercado).filter(
             IndicesMercado.setor == 'pet_shop',
-            IndicesMercado.ativo == True
+            IndicesMercado.ativo.is_(True)
         ).first()
         
         if not indices:
@@ -494,7 +491,7 @@ class DREService:
                 'titulo': '📊 Margem Bruta Baixa',
                 'descricao': f'Margem bruta de {dre.margem_bruta_percent:.1f}% vs ideal de {indices.margem_bruta_ideal_min}-{indices.margem_bruta_ideal_max}%. Problema nos preços ou custos de compra.',
                 'impacto': 'medio',
-                'acao_sugerida': f'Aumente margem bruta: 1) Revise precificação (calcule markup correto), 2) Foque produtos premium (margem >60%), 3) Reduza mix de commodities.',
+                'acao_sugerida': 'Aumente margem bruta: 1) Revise precificação (calcule markup correto), 2) Foque produtos premium (margem >60%), 3) Reduza mix de commodities.',
                 'impacto_estimado': (diferenca / 100) * dre.receita_liquida if dre.receita_liquida > 0 else 0
             })
         
@@ -539,7 +536,7 @@ class DREService:
                     'titulo': '🏢 Despesas Administrativas Altas',
                     'descricao': f'Despesas administrativas em {perc_admin:.1f}% (ideal: até {indices.despesas_admin_ideal_max}%). Principais vilões: aluguel, salários, água, luz.',
                     'impacto': 'medio',
-                    'acao_sugerida': f'Reduza admin: 1) Renegocie aluguel (meta: -10%), 2) Revise quadro de funcionários, 3) Economize energia (LED, ar-condicionado), 4) Considere coworking ou local menor.',
+                    'acao_sugerida': 'Reduza admin: 1) Renegocie aluguel (meta: -10%), 2) Revise quadro de funcionários, 3) Economize energia (LED, ar-condicionado), 4) Considere coworking ou local menor.',
                     'impacto_estimado': (diferenca / 100) * dre.receita_liquida
                 })
         

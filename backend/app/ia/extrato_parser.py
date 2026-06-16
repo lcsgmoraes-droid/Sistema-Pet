@@ -6,7 +6,6 @@ Referência: ROADMAP_IA_AMBICOES.md (linhas 1-250)
 """
 
 import pandas as pd
-import openpyxl
 import csv
 import hashlib
 import re
@@ -192,7 +191,7 @@ class ExtratoParser:
                         'valor': abs(valor),
                         'tipo': 'entrada' if valor > 0 else 'saida'
                     })
-                except:
+                except Exception:
                     continue
             
             return transacoes
@@ -249,7 +248,7 @@ class ExtratoParser:
                         'valor': abs(valor),
                         'tipo': 'entrada' if valor > 0 else 'saida'
                     })
-                except:
+                except Exception:
                     continue
             
             return transacoes
@@ -427,7 +426,7 @@ class ExtratoParser:
         for fmt in formatos:
             try:
                 return datetime.strptime(valor_str, fmt)
-            except:
+            except Exception:
                 continue
         
         return None
@@ -459,7 +458,7 @@ class ExtratoParser:
         
         try:
             return float(valor_str)
-        except:
+        except Exception:
             return 0.0
     
     def _extrair_transacoes_texto(self, texto: str) -> List[Dict]:

@@ -3,10 +3,9 @@ ABA 7: Sistema Tributário - Cálculo de Impostos
 Suporta: Simples Nacional, Lucro Presumido, Lucro Real, MEI
 """
 
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional
 from types import SimpleNamespace
 from sqlalchemy.orm import Session
-from datetime import date
 
 from app.ia.aba7_extrato_models import ConfiguracaoTributaria
 

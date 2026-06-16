@@ -9,7 +9,7 @@ from sqlalchemy import func
 from datetime import date
 import json
 
-from app.ia.aba7_dre_detalhada_models import DREDetalheCanal, DREConsolidado, AlocacaoDespesaCanal
+from app.ia.aba7_dre_detalhada_models import DREDetalheCanal, AlocacaoDespesaCanal
 from app.ia.aba7_tributacao import CalculadoraTributaria
 from app.vendas_models import Venda, VendaItem
 from app.produtos_models import Produto

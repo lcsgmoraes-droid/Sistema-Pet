@@ -1,4 +1,3 @@
-from app.base_models import BaseTenantModel
 """
 Modelos para ABA 7 - Importação de Extrato Bancário com IA
 Referência: ROADMAP_IA_AMBICOES.md (linhas 1-250)
@@ -9,7 +8,8 @@ NOTA: CategoriaFinanceira já existe em financeiro_models.py e será estendida v
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Text, ForeignKey, JSON, Numeric, UniqueConstraint
 from sqlalchemy.orm import relationship
 from datetime import datetime
-from app.db import Base
+
+from app.base_models import BaseTenantModel
 
 
 class PadraoCategoriacaoIA(BaseTenantModel):

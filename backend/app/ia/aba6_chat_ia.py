@@ -9,13 +9,11 @@ from typing import List, Dict, Any, Optional
 from sqlalchemy.orm import Session
 from datetime import datetime, timedelta, date
 import os
-import json
-from decimal import Decimal
 import re
 import unicodedata
 
 from app.utils.logger import logger
-from app.ia.aba6_models import Conversa, MensagemChat, ContextoFinanceiro
+from app.ia.aba6_models import Conversa, MensagemChat
 from app.ia.aba5_fluxo_caixa import (
     calcular_indices_saude,
     obter_projecoes_proximos_dias,

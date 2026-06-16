@@ -1,4 +1,3 @@
-from app.base_models import BaseTenantModel
 """
 ABA 5: Fluxo de Caixa Preditivo - Modelos SQLAlchemy
 
@@ -8,10 +7,10 @@ Modelos de banco de dados para:
 - ProjecaoFluxoCaixa: Projeções futuras
 """
 
-from sqlalchemy import Column, Integer, Float, String, DateTime, Boolean, Text, ForeignKey, Index
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Integer, Float, String, DateTime, Boolean, ForeignKey, Index
 from datetime import datetime
-from app.db import Base
+
+from app.base_models import BaseTenantModel
 
 
 class FluxoCaixa(BaseTenantModel):

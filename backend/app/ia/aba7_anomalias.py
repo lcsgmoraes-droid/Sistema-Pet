@@ -3,12 +3,9 @@ ABA 7: Detecção de Anomalias em DRE
 Identifica valores fora do padrão usando estatística
 """
 
-from typing import List, Dict, Tuple, Optional
+from typing import List, Dict, Optional
 from sqlalchemy.orm import Session
-from sqlalchemy import func
-from datetime import date, datetime
 from statistics import mean, stdev
-import math
 
 from app.ia.aba7_models import DREPeriodo, DREInsight
 
@@ -300,7 +297,7 @@ class DetectorAnomalias:
                 DREInsight.dre_periodo_id == dre_periodo_id,
                 DREInsight.usuario_id == usuario_id,
                 DREInsight.tipo == 'alerta',
-                DREInsight.foi_lido == False
+                DREInsight.foi_lido.is_(False)
             )
             .order_by(DREInsight.impacto.desc(), DREInsight.criado_em.desc())
             .all()

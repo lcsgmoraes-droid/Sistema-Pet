@@ -11,7 +11,7 @@ lembrando informações como mês/ano em análise, última simulação, etc.
 - Apenas leitura/escrita de contexto
 """
 
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 
 
 class MemoriaConversacionalIA:

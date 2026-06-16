@@ -1,4 +1,3 @@
-from app.base_models import BaseTenantModel
 """
 ABA 8: Modelos para Otimização de Entregas
 
@@ -8,10 +7,10 @@ Modelos de banco de dados para:
 - HistoricoEntregas: Log de entregas realizadas
 """
 
-from sqlalchemy import Column, Integer, Float, String, DateTime, Boolean, Text, ForeignKey, JSON
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Integer, Float, String, DateTime, Boolean, Text, ForeignKey
 from datetime import datetime
-from app.db import Base
+
+from app.base_models import BaseTenantModel
 
 
 class Rota(BaseTenantModel):

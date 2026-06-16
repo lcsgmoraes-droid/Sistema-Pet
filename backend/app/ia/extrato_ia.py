@@ -6,9 +6,9 @@ Referência: ALGORITMOS_ABA_5_6_7_8.md (linhas 201-450)
 """
 
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, func
-from typing import Dict, List, Optional, Tuple
-from datetime import datetime, timedelta
+from sqlalchemy import func
+from typing import Dict, List, Optional
+from datetime import datetime
 from app.ia.aba7_extrato_models import PadraoCategoriacaoIA, LancamentoImportado
 from app.ia.extrato_nlp import ExtratoNLP
 from app.financeiro_models import CategoriaFinanceira
@@ -104,7 +104,7 @@ class MotorCategorizacaoIA:
         """
         query = self.db.query(PadraoCategoriacaoIA).filter(
             PadraoCategoriacaoIA.tenant_id == self.tenant_id,
-            PadraoCategoriacaoIA.ativo == True,
+            PadraoCategoriacaoIA.ativo.is_(True),
             PadraoCategoriacaoIA.tipo_lancamento == tipo_lancamento
         )
         
@@ -241,7 +241,7 @@ class MotorCategorizacaoIA:
                     if matches > melhor_score:
                         melhor_score = matches
                         melhor_match = cat
-                except:
+                except Exception:
                     continue
             
             if melhor_match:
@@ -449,7 +449,7 @@ class MotorCategorizacaoIA:
         ).scalar()
         padroes_ativos = self.db.query(func.count(PadraoCategoriacaoIA.id)).filter(
             PadraoCategoriacaoIA.tenant_id == self.tenant_id,
-            PadraoCategoriacaoIA.ativo == True
+            PadraoCategoriacaoIA.ativo.is_(True)
         ).scalar()
         
         total_lancamentos = self.db.query(func.count(LancamentoImportado.id)).filter(
@@ -469,7 +469,7 @@ class MotorCategorizacaoIA:
             func.avg(PadraoCategoriacaoIA.confianca_atual)
         ).filter(
             PadraoCategoriacaoIA.tenant_id == self.tenant_id,
-            PadraoCategoriacaoIA.ativo == True
+            PadraoCategoriacaoIA.ativo.is_(True)
         ).scalar() or 0.0
         
         # Taxa de acerto global
