@@ -7,6 +7,7 @@ ROOT = Path(__file__).resolve().parents[1]
 COMPOSE_PROD = ROOT / "docker-compose.prod.yml"
 PROD_DEPLOY_SCRIPT = ROOT / "scripts" / "deploy_producao_seguro.sh"
 BLING_WORKER_SCRIPT = ROOT / "backend" / "scripts" / "run_bling_worker.py"
+BACKEND_REQUIREMENTS = ROOT / "backend" / "requirements.txt"
 GITIGNORE = ROOT / ".gitignore"
 
 LEGACY_PUBLIC_TMP_HEARTBEAT = "/".join(("", "tmp", "bling_worker_heartbeat"))
@@ -38,3 +39,11 @@ def test_bling_worker_heartbeat_uses_app_data_not_public_tmp():
     ) in deploy_runtime_source
     assert PROD_HEARTBEAT_PATH in compose_source
     assert "backend/data/*" in gitignore_source
+
+
+def test_bling_worker_declares_tzlocal_runtime_dependency():
+    requirements_source = BACKEND_REQUIREMENTS.read_text(encoding="utf-8")
+
+    assert "APScheduler" in requirements_source
+    assert "tzlocal==5.3.1" in requirements_source
+    assert "tzlocal==5.4.1" not in requirements_source
