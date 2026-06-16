@@ -1,5 +1,5 @@
-
 from enum import Enum
+
 
 class CanalVenda(str, Enum):
     LOJA_FISICA = "loja_fisica"

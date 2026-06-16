@@ -30,11 +30,7 @@ def listar_permissions(
     """Lista todas as permissões disponíveis"""
     permissions = db.query(Permission).order_by(Permission.code).all()
     return [
-        {
-            "permission_id": p.id,
-            "nome": p.code,
-            "descricao": p.description
-        }
+        {"permission_id": p.id, "nome": p.code, "descricao": p.description}
         for p in permissions
     ]
 

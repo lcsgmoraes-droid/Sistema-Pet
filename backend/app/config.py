@@ -56,10 +56,10 @@ class Settings(BaseSettings):
 
     # Guard Rails (Pré-Prod Block 1)
     ENABLE_GUARDRAILS: bool = False
-    
+
     # Logging (Pré-Prod Block 1)
     LOG_LEVEL: str = "INFO"
-    
+
     # Alias para compatibilidade
     @property
     def ENV(self) -> str:
@@ -123,9 +123,7 @@ LOG_LEVEL = settings.LOG_LEVEL
 
 # CORS (esperado como list em alguns lugares)
 ALLOWED_ORIGINS: List[str] = [
-    origin.strip()
-    for origin in settings.ALLOWED_ORIGINS.split(",")
-    if origin.strip()
+    origin.strip() for origin in settings.ALLOWED_ORIGINS.split(",") if origin.strip()
 ]
 
 # ====== HELPERS ======
@@ -163,9 +161,7 @@ def get_database_url() -> str:
             "production and staging must use PostgreSQL."
         )
     if not database_url.startswith("postgresql"):
-        raise RuntimeError(
-            "Invalid database. This system supports PostgreSQL only."
-        )
+        raise RuntimeError("Invalid database. This system supports PostgreSQL only.")
     return database_url
 
 

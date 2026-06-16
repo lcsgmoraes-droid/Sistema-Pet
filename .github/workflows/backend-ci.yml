@@ -355,6 +355,10 @@ jobs:
         run: |
           ruff format --check app/analytics app/application app/cache app/configuracoes app/constants app/database app/events app/migrations app/replay app/utils
 
+      - name: Backend access config format (blocking)
+        run: |
+          ruff format --check app/canais.py app/partner_utils.py app/permissions_routes.py app/cargo_models.py app/empresa_config_fiscal_models.py app/empresa_config_geral_models.py app/config.py app/constants.py
+
       - name: Backend AI packages format (blocking)
         run: |
           ruff format --check app/ai app/ai_core

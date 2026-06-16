@@ -4,6 +4,7 @@ Utilitários de parceria entre tenants (pet shop <-> clínica veterinária).
 Permite que veterinários parceiros enxerguem dados do pet shop
 (clientes, pets, produtos) na interface principal.
 """
+
 from sqlalchemy.orm import Session
 from app.veterinario_models import VetPartnerLink
 
@@ -13,10 +14,14 @@ def get_empresa_tenant_ids(db: Session, tenant_id) -> list:
     Retorna os empresa_tenant_ids cujo vet_tenant_id é o atual e o vínculo está ativo.
     Ex: Maiara (vet) → retorna o tenant_id do pet shop parceiro.
     """
-    links = db.query(VetPartnerLink).filter(
-        VetPartnerLink.vet_tenant_id == str(tenant_id),
-        VetPartnerLink.ativo.is_(True),
-    ).all()
+    links = (
+        db.query(VetPartnerLink)
+        .filter(
+            VetPartnerLink.vet_tenant_id == str(tenant_id),
+            VetPartnerLink.ativo.is_(True),
+        )
+        .all()
+    )
     return [link.empresa_tenant_id for link in links]
 
 

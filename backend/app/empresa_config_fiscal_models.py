@@ -1,6 +1,4 @@
-from sqlalchemy import (
-    Column, Integer, String, Numeric, Boolean, Text
-)
+from sqlalchemy import Column, Integer, String, Numeric, Boolean, Text
 from sqlalchemy.dialects.postgresql import JSONB
 from .base_models import BaseTenantModel
 
@@ -10,6 +8,7 @@ class EmpresaConfigFiscal(BaseTenantModel):
     Configuração fiscal da empresa (multi-tenant)
     Define valores padrão de tributação que serão herdados pelos produtos
     """
+
     __tablename__ = "empresa_config_fiscal"
 
     # ID já vem do BaseTenantModel com Identity
@@ -19,7 +18,7 @@ class EmpresaConfigFiscal(BaseTenantModel):
     # Temporariamente sem FK até fiscal_estado_padrao ser recriado
     fiscal_estado_padrao_id = Column(
         Integer,
-        nullable=True  # Pode ser None se personalizado
+        nullable=True,  # Pode ser None se personalizado
     )
 
     uf = Column(String(2), nullable=False)
@@ -46,26 +45,36 @@ class EmpresaConfigFiscal(BaseTenantModel):
     iss_retido = Column(Boolean, default=False)
 
     herdado_do_estado = Column(Boolean, nullable=False, default=True)
-    
+
     # ============================
     # SIMPLES NACIONAL
     # ============================
     simples_ativo = Column(Boolean, default=False)
-    simples_anexo = Column(String(5), default='I')  # I, II, III, IV ou V
-    aliquota_simples_vigente = Column(Numeric(5, 2), default=0)  # Alíquota atual utilizada
-    aliquota_simples_sugerida = Column(Numeric(5, 2), default=0)  # Sugestão baseada no histórico
-    
+    simples_anexo = Column(String(5), default="I")  # I, II, III, IV ou V
+    aliquota_simples_vigente = Column(
+        Numeric(5, 2), default=0
+    )  # Alíquota atual utilizada
+    aliquota_simples_sugerida = Column(
+        Numeric(5, 2), default=0
+    )  # Sugestão baseada no histórico
+
     # ============================
     # PROVISÕES TRABALHISTAS (NOVO)
     # ============================
-    folha_valor_base_mensal = Column(Numeric(10, 2), default=0)  # Valor total da folha mensal
-    inss_patronal_percentual = Column(Numeric(5, 2), default=20)  # % INSS patronal (padrão 20%)
+    folha_valor_base_mensal = Column(
+        Numeric(10, 2), default=0
+    )  # Valor total da folha mensal
+    inss_patronal_percentual = Column(
+        Numeric(5, 2), default=20
+    )  # % INSS patronal (padrão 20%)
     fgts_percentual = Column(Numeric(5, 2), default=8)  # % FGTS (padrão 8%)
-    
+
     # ============================
     # CNAE - Descrições e Secundários
     # ============================
     cnae_descricao = Column(Text)  # Descrição do CNAE principal
-    cnaes_secundarios = Column(JSONB)  # Lista de CNAEs secundários [{codigo, descricao}]
+    cnaes_secundarios = Column(
+        JSONB
+    )  # Lista de CNAEs secundários [{codigo, descricao}]
 
     # created_at e updated_at já vêm do BaseTenantModel
