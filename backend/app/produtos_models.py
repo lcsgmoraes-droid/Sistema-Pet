@@ -8,9 +8,7 @@ from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Date, 
 from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship
 from datetime import datetime
-from .db import Base
 from .base_models import BaseTenantModel
-from .models import User, Cliente  # Importar models existentes
 from .services.product_image_storage import build_product_thumbnail_url
 
 
@@ -380,11 +378,15 @@ class Produto(BaseTenantModel):
         if not self.controle_lote or not self.lotes:
             return self.data_validade
         
-        lotes_ativos = [l for l in self.lotes if l.status == 'ativo' and l.quantidade_disponivel > 0]
+        lotes_ativos = [
+            lote
+            for lote in self.lotes
+            if lote.status == 'ativo' and lote.quantidade_disponivel > 0
+        ]
         if not lotes_ativos:
             return None
         
-        return min(l.data_validade for l in lotes_ativos)
+        return min(lote.data_validade for lote in lotes_ativos)
 
     @property
     def imagem_principal_thumbnail(self):

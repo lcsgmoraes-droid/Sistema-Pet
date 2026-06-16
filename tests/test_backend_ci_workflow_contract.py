@@ -154,6 +154,17 @@ def test_backend_ci_has_blocking_produtos_lint_step():
     assert "ruff check app/produtos" in source
 
 
+def test_backend_ci_has_blocking_produtos_root_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Produtos root lint (blocking)" in source
+    assert (
+        "ruff check app/categorias_routes.py app/fiscal_catalogo_produtos_models.py "
+        "app/importacao_produtos.py app/produto_config_fiscal_models.py "
+        "app/produtos_models.py app/produtos_routes.py app/subcategorias_routes.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_insights_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

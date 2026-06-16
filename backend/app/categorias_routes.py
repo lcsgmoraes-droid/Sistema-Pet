@@ -150,10 +150,10 @@ def listar_categorias(
         query = query.filter(CategoriaFinanceira.tipo == tipo)
     
     if apenas_ativas:
-        query = query.filter(CategoriaFinanceira.ativo == True)
+        query = query.filter(CategoriaFinanceira.ativo.is_(True))
     
     if apenas_raiz:
-        query = query.filter(CategoriaFinanceira.categoria_pai_id == None)
+        query = query.filter(CategoriaFinanceira.categoria_pai_id.is_(None))
     elif categoria_pai_id is not None:
         query = query.filter(CategoriaFinanceira.categoria_pai_id == categoria_pai_id)
     
@@ -191,7 +191,7 @@ def listar_categorias_arvore(
         query = query.filter(CategoriaFinanceira.tipo == tipo)
     
     if apenas_ativas:
-        query = query.filter(CategoriaFinanceira.ativo == True)
+        query = query.filter(CategoriaFinanceira.ativo.is_(True))
     
     categorias = query.all()
     
@@ -367,7 +367,7 @@ def deletar_categoria(
     subcategorias_ativas = db.query(CategoriaFinanceira).filter(
         and_(
             CategoriaFinanceira.categoria_pai_id == categoria_id,
-            CategoriaFinanceira.ativo == True
+            CategoriaFinanceira.ativo.is_(True)
         )
     ).count()
     

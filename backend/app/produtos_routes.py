@@ -11,47 +11,36 @@ Inclui: Categorias, Marcas, Departamentos, Produtos, Lotes, FIFO, CÃ³digo de B
 """
 
 from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File
-from sqlalchemy.orm import Session, joinedload, noload
-from sqlalchemy import func, text, or_, and_, case
-from typing import Any, List, Optional
+from sqlalchemy.orm import Session, joinedload
+from sqlalchemy import func, or_, and_, case
+from typing import List, Optional
 from datetime import datetime, timedelta
 import logging
 import traceback
 
 from .db import get_session
 from app.config import settings
-from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
 from .security.permissions_decorator import require_permission
-from .models import User, Cliente
+from .models import Cliente
 from app.partner_utils import get_all_accessible_tenant_ids
 from .vendas_models import Venda, VendaItem
 from .produtos_models import (
     Categoria, Marca, Departamento, Produto, ProdutoLote,
-    ProdutoImagem, ProdutoFornecedor, ListaPreco, ProdutoListaPreco,
-    EstoqueMovimentacao, ProdutoHistoricoPreco, NotaEntrada,
-    CampanhaValidadeAutomatica, CampanhaValidadeExclusao,
-    ProdutoKitComponente  # Sprint 4: ComposiÃ§Ã£o de KIT
+    ProdutoImagem, ProdutoFornecedor, EstoqueMovimentacao, ProdutoHistoricoPreco, ProdutoKitComponente  # Sprint 4: ComposiÃ§Ã£o de KIT
 )
 from .produtos.schemas import (
-    CategoriaBase,
     CategoriaCreate,
     CategoriaUpdate,
     CategoriaResponse,
-    MarcaBase,
     MarcaCreate,
     MarcaUpdate,
     MarcaResponse,
-    DepartamentoBase,
     DepartamentoCreate,
     DepartamentoUpdate,
     DepartamentoResponse,
     GerarCodigoBarrasRequest,
     GerarCodigoBarrasResponse,
-    KitComponenteBase,
-    KitComponenteCreate,
-    KitComponenteResponse,
-    ProdutoBase,
     ProdutoCreate,
     ProdutoUpdate,
     ProdutoAtivoUpdate,
@@ -59,7 +48,6 @@ from .produtos.schemas import (
     ProdutoFusaoExecutarRequest,
     ImagemUploadResponse,
     LoteResponse,
-    LoteValidadeResumoResponse,
     ProdutoResponse,
     ProdutosPaginadosResponse,
     RelatorioValorizacaoEstoqueItem,
@@ -83,7 +71,6 @@ from .produtos.schemas import (
 
 # Service Layer
 from .services.produto_service import ProdutoService
-from .services.kit_estoque_service import KitEstoqueService  # Sprint 4: ComposiÃ§Ã£o de KIT
 from .services.product_image_storage import (
     delete_product_image_assets,
     prepare_product_image_variants,
@@ -154,10 +141,8 @@ from .produtos.validade import (
     _mapa_validade_proxima_produtos,
 )
 from .produtos.validators import (
-    _obter_categoria_ou_404,
     _obter_marca_ou_404,
     _obter_produto_ou_404,
-    _validar_codigo_barras_unico,
     _validar_pode_inativar_produto,
     _validar_sku_unico,
     _validar_tenant_e_obter_usuario,
@@ -197,7 +182,7 @@ def criar_categoria(
         pai = db.query(Categoria).filter(
             Categoria.id == categoria.categoria_pai_id,
             Categoria.tenant_id == tenant_id,
-            Categoria.ativo == True
+            Categoria.ativo.is_(True)
         ).first()
         if not pai:
             raise HTTPException(
@@ -244,7 +229,7 @@ def listar_categorias(
     # O frontend vai construir a Ã¡rvore hierÃ¡rquica
     query = db.query(Categoria).filter(
         Categoria.tenant_id == tenant_id,
-        Categoria.ativo == True
+        Categoria.ativo.is_(True)
     )
 
     categorias = (
@@ -263,7 +248,7 @@ def listar_categorias(
             db.query(Categoria.categoria_pai_id, func.count(Categoria.id))
             .filter(
                 Categoria.tenant_id == tenant_id,
-                Categoria.ativo == True,
+                Categoria.ativo.is_(True),
                 Categoria.categoria_pai_id.isnot(None),
             )
             .group_by(Categoria.categoria_pai_id)
@@ -334,7 +319,7 @@ def listar_categorias_hierarquia(
     # Buscar todas as categorias ativas
     categorias = db.query(Categoria).filter(
         Categoria.tenant_id == tenant_id,
-        Categoria.ativo == True
+        Categoria.ativo.is_(True)
     ).order_by(Categoria.ordem, Categoria.nome).all()
 
     return _construir_arvore_categorias(categorias)
@@ -354,7 +339,7 @@ def obter_categoria(
     categoria = db.query(Categoria).filter(
         Categoria.id == categoria_id,
         Categoria.tenant_id == tenant_id,
-        Categoria.ativo == True
+        Categoria.ativo.is_(True)
     ).first()
 
     if not categoria:
@@ -378,7 +363,7 @@ def atualizar_categoria(
     categoria = db.query(Categoria).filter(
         Categoria.id == categoria_id,
         Categoria.tenant_id == tenant_id,
-        Categoria.ativo == True
+        Categoria.ativo.is_(True)
     ).first()
 
     if not categoria:
@@ -396,7 +381,7 @@ def atualizar_categoria(
         pai = db.query(Categoria).filter(
             Categoria.id == categoria_update.categoria_pai_id,
             Categoria.tenant_id == tenant_id,
-            Categoria.ativo == True
+            Categoria.ativo.is_(True)
         ).first()
         if not pai:
             raise HTTPException(
@@ -430,7 +415,7 @@ def deletar_categoria(
     categoria = db.query(Categoria).filter(
         Categoria.id == categoria_id,
         Categoria.tenant_id == tenant_id,
-        Categoria.ativo == True
+        Categoria.ativo.is_(True)
     ).first()
 
     if not categoria:
@@ -440,7 +425,7 @@ def deletar_categoria(
     subcategorias = db.query(Categoria).filter(
         Categoria.categoria_pai_id == categoria_id,
         Categoria.tenant_id == tenant_id,
-        Categoria.ativo == True
+        Categoria.ativo.is_(True)
     ).count()
 
     if subcategorias > 0:
@@ -453,7 +438,7 @@ def deletar_categoria(
     produtos_count = db.query(Produto).filter(
         Produto.categoria_id == categoria_id,
         Produto.tenant_id == tenant_id,
-        Produto.ativo == True
+        Produto.ativo.is_(True)
     ).count()
 
     if produtos_count > 0:
@@ -511,7 +496,7 @@ def listar_marcas(
 
     query = db.query(Marca).filter(
         Marca.tenant_id == tenant_id,
-        Marca.ativo == True
+        Marca.ativo.is_(True)
     )
 
     if busca:
@@ -574,7 +559,7 @@ def deletar_marca(
     marca = db.query(Marca).filter(
         Marca.id == marca_id,
         Marca.tenant_id == tenant_id,
-        Marca.ativo == True
+        Marca.ativo.is_(True)
     ).first()
 
     if not marca:
@@ -584,7 +569,7 @@ def deletar_marca(
     produtos_count = db.query(Produto).filter(
         Produto.marca_id == marca_id,
         Produto.tenant_id == tenant_id,
-        Produto.ativo == True
+        Produto.ativo.is_(True)
     ).count()
 
     if produtos_count > 0:
@@ -643,7 +628,7 @@ def listar_departamentos(
 
     query = db.query(Departamento).filter(
         Departamento.tenant_id == tenant_id,
-        Departamento.ativo == True
+        Departamento.ativo.is_(True)
     )
 
     if busca:
@@ -668,7 +653,7 @@ def obter_departamento(
     departamento = db.query(Departamento).filter(
         Departamento.id == departamento_id,
         Departamento.tenant_id == tenant_id,
-        Departamento.ativo == True
+        Departamento.ativo.is_(True)
     ).first()
 
     if not departamento:
@@ -692,7 +677,7 @@ def atualizar_departamento(
     departamento = db.query(Departamento).filter(
         Departamento.id == departamento_id,
         Departamento.tenant_id == tenant_id,
-        Departamento.ativo == True
+        Departamento.ativo.is_(True)
     ).first()
 
     if not departamento:
@@ -723,7 +708,7 @@ def deletar_departamento(
     departamento = db.query(Departamento).filter(
         Departamento.id == departamento_id,
         Departamento.tenant_id == tenant_id,
-        Departamento.ativo == True
+        Departamento.ativo.is_(True)
     ).first()
 
     if not departamento:
@@ -733,7 +718,7 @@ def deletar_departamento(
     produtos_count = db.query(Produto).filter(
         Produto.departamento_id == departamento_id,
         Produto.tenant_id == tenant_id,
-        Produto.ativo == True
+        Produto.ativo.is_(True)
     ).count()
 
     if produtos_count > 0:
@@ -885,7 +870,7 @@ def criar_produto(
         categoria = db.query(Categoria).filter(
             Categoria.id == produto.categoria_id,
             Categoria.tenant_id == tenant_id,
-            Categoria.ativo == True
+            Categoria.ativo.is_(True)
         ).first()
         if not categoria:
             raise HTTPException(status_code=404, detail="Categoria nÃ£o encontrada")
@@ -895,7 +880,7 @@ def criar_produto(
         marca = db.query(Marca).filter(
             Marca.id == produto.marca_id,
             Marca.tenant_id == tenant_id,
-            Marca.ativo == True
+            Marca.ativo.is_(True)
         ).first()
         if not marca:
             raise HTTPException(status_code=404, detail="Marca nÃ£o encontrada")
@@ -927,7 +912,7 @@ def criar_produto(
             Produto.tenant_id == tenant_id,
             Produto.produto_pai_id == produto.produto_pai_id,
             Produto.variation_signature == variation_sig,
-            Produto.ativo == True
+            Produto.ativo.is_(True)
         ).first()
 
         if variacao_existente:
@@ -1035,7 +1020,7 @@ def listar_produtos_vendaveis(
     # QUERY BASE - Produtos vendÃ¡veis (incluindo KIT)
     query = db.query(Produto).filter(
         Produto.tenant_id == tenant_id,
-        Produto.ativo == True,
+        Produto.ativo.is_(True),
         Produto.tipo_produto.in_(['SIMPLES', 'VARIACAO', 'KIT'])  # KIT Ã© vendÃ¡vel!
     )
 
@@ -1257,7 +1242,7 @@ def listar_produtos(
             total_variacoes = db.query(func.count(Produto.id)).filter(
                 Produto.produto_pai_id == produto.id,
                 Produto.tipo_produto == 'VARIACAO',
-                Produto.ativo == True
+                Produto.ativo.is_(True)
             ).scalar()
             produto.total_variacoes = total_variacoes or 0
 
@@ -1277,7 +1262,7 @@ def listar_produtos(
             variacoes = db.query(Produto).filter(
                 Produto.produto_pai_id == produto.id,
                 Produto.tipo_produto == 'VARIACAO',
-                Produto.ativo == True
+                Produto.ativo.is_(True)
             ).options(*load_options).order_by(Produto.nome).all()
             validade_por_variacao = _mapa_validade_proxima_produtos(
                 db,
@@ -1343,7 +1328,7 @@ def listar_variacoes_produto(
     variacoes = db.query(Produto).filter(
         Produto.produto_pai_id == produto_id,
         Produto.tipo_produto == 'VARIACAO',
-        Produto.ativo == True,  # Filtrar apenas variaÃ§Ãµes ativas
+        Produto.ativo.is_(True),  # Filtrar apenas variaÃ§Ãµes ativas
         Produto.tenant_id == tenant_id
     ).options(
         joinedload(Produto.imagens),
@@ -1387,7 +1372,7 @@ def listar_variacoes_excluidas(
     variacoes_excluidas = db.query(Produto).filter(
         Produto.produto_pai_id == produto_id,
         Produto.tipo_produto == 'VARIACAO',
-        Produto.ativo == False,  # Apenas inativas (excluÃ­das)
+        Produto.ativo.is_(False),  # Apenas inativas (excluÃ­das)
         Produto.tenant_id == tenant_id
     ).options(
         joinedload(Produto.imagens),
@@ -1705,7 +1690,7 @@ def atualizar_produto(
             Produto.produto_pai_id == produto.produto_pai_id,
             Produto.variation_signature == dados_recebidos['variation_signature'],
             Produto.id != produto_id,  # Excluir o prÃ³prio produto
-            Produto.ativo == True
+            Produto.ativo.is_(True)
         ).first()
 
         if variacao_existente:
@@ -2223,7 +2208,7 @@ def criar_lote(
     produto = db.query(Produto).filter(
         Produto.id == produto_id,
         Produto.tenant_id == tenant_id,
-        Produto.ativo == True
+        Produto.ativo.is_(True)
     ).first()
 
     if not produto:
@@ -2427,7 +2412,7 @@ def entrada_estoque(
     produto = db.query(Produto).filter(
         Produto.id == produto_id,
         Produto.tenant_id == tenant_id,
-        Produto.ativo == True
+        Produto.ativo.is_(True)
     ).first()
 
     if not produto:
@@ -2525,7 +2510,7 @@ def saida_estoque_fifo(
     produto = db.query(Produto).filter(
         Produto.id == produto_id,
         Produto.tenant_id == tenant_id,
-        Produto.ativo == True
+        Produto.ativo.is_(True)
     ).first()
 
     if not produto:
@@ -3442,7 +3427,7 @@ def relatorio_valorizacao_estoque(
                 Produto.fornecedores_alternativos.any(
                     and_(
                         ProdutoFornecedor.fornecedor_id == fornecedor_id,
-                        ProdutoFornecedor.ativo == True,
+                        ProdutoFornecedor.ativo.is_(True),
                     )
                 ),
             )
@@ -3645,7 +3630,7 @@ async def upload_imagem_produto(
         tem_principal = db.query(ProdutoImagem).filter(
             ProdutoImagem.tenant_id == tenant_id,
             ProdutoImagem.produto_id == produto_id,
-            ProdutoImagem.e_principal == True
+            ProdutoImagem.e_principal.is_(True)
         ).first()
 
         # Primeira imagem Ã© principal automaticamente
@@ -3761,7 +3746,7 @@ def atualizar_imagem(
         db.query(ProdutoImagem).filter(
             ProdutoImagem.tenant_id == tenant_id,
             ProdutoImagem.produto_id == imagem.produto_id,
-            ProdutoImagem.e_principal == True
+            ProdutoImagem.e_principal.is_(True)
         ).update({"e_principal": False})
         imagem.produto.imagem_principal = imagem.url
 
@@ -3884,7 +3869,7 @@ def vincular_fornecedor(
         produto = db.query(Produto).filter(
             Produto.id == produto_id,
             Produto.tenant_id == tenant_id,
-            Produto.situacao == True
+            Produto.situacao.is_(True)
         ).first()
 
         if not produto:
@@ -3919,7 +3904,7 @@ def vincular_fornecedor(
         ).first()
 
         if vinculo_existente:
-            logger.error(f"[FORNECEDOR] VÃ­nculo jÃ¡ existe")
+            logger.error("[FORNECEDOR] VÃ­nculo jÃ¡ existe")
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="Fornecedor jÃ¡ vinculado a este produto"
@@ -3928,24 +3913,24 @@ def vincular_fornecedor(
         vinculos_ativos_existentes = db.query(ProdutoFornecedor).filter(
             ProdutoFornecedor.produto_id == produto_id,
             ProdutoFornecedor.tenant_id == tenant_id,
-            ProdutoFornecedor.ativo == True,
+            ProdutoFornecedor.ativo.is_(True),
         ).count()
         sera_principal = bool(dados.e_principal) or vinculos_ativos_existentes == 0
 
         # Se for marcar como principal, desmarcar outros
         if sera_principal:
-            logger.info(f"[FORNECEDOR] Desmarcando outros fornecedores principais")
+            logger.info("[FORNECEDOR] Desmarcando outros fornecedores principais")
             db.query(ProdutoFornecedor).filter(
                 ProdutoFornecedor.produto_id == produto_id,
                 ProdutoFornecedor.tenant_id == tenant_id,
-                ProdutoFornecedor.e_principal == True
+                ProdutoFornecedor.e_principal.is_(True)
             ).update({"e_principal": False})
 
             # Atualizar fornecedor_id do produto
             produto.fornecedor_id = dados.fornecedor_id
 
         # Criar vÃ­nculo
-        logger.info(f"[FORNECEDOR] Criando vÃ­nculo no banco")
+        logger.info("[FORNECEDOR] Criando vÃ­nculo no banco")
         novo_vinculo = ProdutoFornecedor(
             produto_id=produto_id,
             fornecedor_id=dados.fornecedor_id,
@@ -3984,7 +3969,7 @@ def vincular_fornecedor(
             fornecedor_telefone=fornecedor.telefone or fornecedor.celular
         )
 
-        logger.info(f"[FORNECEDOR] âœ… VÃ­nculo completado com sucesso")
+        logger.info("[FORNECEDOR] âœ… VÃ­nculo completado com sucesso")
         return response
 
     except HTTPException:
@@ -4030,7 +4015,7 @@ def listar_fornecedores_produto(
     )
 
     if apenas_ativos:
-        query = query.filter(ProdutoFornecedor.ativo == True)
+        query = query.filter(ProdutoFornecedor.ativo.is_(True))
 
     vinculos = query.order_by(
         ProdutoFornecedor.e_principal.desc(),
@@ -4104,7 +4089,7 @@ def atualizar_vinculo_fornecedor(
         db.query(ProdutoFornecedor).filter(
             ProdutoFornecedor.produto_id == vinculo.produto_id,
             ProdutoFornecedor.tenant_id == tenant_id,
-            ProdutoFornecedor.e_principal == True
+            ProdutoFornecedor.e_principal.is_(True)
         ).update({"e_principal": False})
 
         if produto:
@@ -4198,7 +4183,7 @@ def desvincular_fornecedor(
             ProdutoFornecedor.produto_id == produto_id,
             ProdutoFornecedor.tenant_id == tenant_id,
             ProdutoFornecedor.id != vinculo_id,
-            ProdutoFornecedor.ativo == True
+            ProdutoFornecedor.ativo.is_(True)
         ).first()
 
         if outro_vinculo:
@@ -4346,7 +4331,7 @@ async def classificar_produto_ia(
         porte = db.query(PorteAnimal).filter(
             PorteAnimal.tenant_id == tenant_id,
             PorteAnimal.nome == nome_porte,
-            PorteAnimal.ativo == True
+            PorteAnimal.ativo.is_(True)
         ).first()
         if porte:
             produto.porte_animal_id = porte.id
@@ -4359,7 +4344,7 @@ async def classificar_produto_ia(
         fase = db.query(FasePublico).filter(
             FasePublico.tenant_id == tenant_id,
             FasePublico.nome == nome_fase,
-            FasePublico.ativo == True
+            FasePublico.ativo.is_(True)
         ).first()
         if fase:
             produto.fase_publico_id = fase.id
@@ -4372,7 +4357,7 @@ async def classificar_produto_ia(
         tratamento = db.query(TipoTratamento).filter(
             TipoTratamento.tenant_id == tenant_id,
             TipoTratamento.nome == nome_tratamento,
-            TipoTratamento.ativo == True
+            TipoTratamento.ativo.is_(True)
         ).first()
         if tratamento:
             produto.tipo_tratamento_id = tratamento.id
@@ -4383,7 +4368,7 @@ async def classificar_produto_ia(
         sabor = db.query(SaborProteina).filter(
             SaborProteina.tenant_id == tenant_id,
             SaborProteina.nome == resultado["sabor_proteina"],
-            SaborProteina.ativo == True
+            SaborProteina.ativo.is_(True)
         ).first()
         if sabor:
             produto.sabor_proteina_id = sabor.id
@@ -4394,7 +4379,7 @@ async def classificar_produto_ia(
         linha = db.query(LinhaRacao).filter(
             LinhaRacao.tenant_id == tenant_id,
             LinhaRacao.nome == resultado["linha_racao"],
-            LinhaRacao.ativo == True
+            LinhaRacao.ativo.is_(True)
         ).first()
         if linha:
             produto.linha_racao_id = linha.id
@@ -4439,8 +4424,8 @@ async def classificar_lote_produtos(
     # Montar query
     query = db.query(Produto).filter(
         Produto.tenant_id == tenant_id,
-        Produto.ativo == True,
-        Produto.auto_classificar_nome == True
+        Produto.ativo.is_(True),
+        Produto.auto_classificar_nome.is_(True)
     )
 
     # Filtrar por IDs especÃ­ficos se fornecido
@@ -4450,9 +4435,9 @@ async def classificar_lote_produtos(
     # Filtrar apenas produtos sem classificaÃ§Ã£o completa
     if apenas_sem_classificacao:
         query = query.filter(
-            (Produto.porte_animal == None) |
-            (Produto.fase_publico == None) |
-            (Produto.sabor_proteina == None)
+            (Produto.porte_animal.is_(None)) |
+            (Produto.fase_publico.is_(None)) |
+            (Produto.sabor_proteina.is_(None))
         )
 
     produtos = query.limit(100).all()  # Limite de seguranÃ§a
@@ -4558,7 +4543,7 @@ async def listar_racoes_sem_classificacao(
             joinedload(Produto.marca)
         ).filter(
             Produto.tenant_id == tenant_id,
-            Produto.ativo == True
+            Produto.ativo.is_(True)
         )
 
         # Filtro: Ã© raÃ§Ã£o E estÃ¡ incompleta
@@ -4566,23 +4551,23 @@ async def listar_racoes_sem_classificacao(
 
         # Montar filtros dinamicamente baseado em campos que existem
         filtros_incompletos = []
-        filtros_incompletos.append(Produto.especies_indicadas == None)
+        filtros_incompletos.append(Produto.especies_indicadas.is_(None))
 
         # Adicionar filtros apenas para campos que existem no modelo
         if hasattr(Produto, 'porte_animal_id'):
-            filtros_incompletos.append(Produto.porte_animal_id == None)
-            logger.info(f"[racao/alertas] Campo 'porte_animal_id' encontrado no modelo")
+            filtros_incompletos.append(Produto.porte_animal_id.is_(None))
+            logger.info("[racao/alertas] Campo 'porte_animal_id' encontrado no modelo")
         else:
-            logger.warning(f"[racao/alertas] Campo 'porte_animal_id' NÃƒO existe no modelo")
+            logger.warning("[racao/alertas] Campo 'porte_animal_id' NÃƒO existe no modelo")
 
         if hasattr(Produto, 'fase_publico_id'):
-            filtros_incompletos.append(Produto.fase_publico_id == None)
-            logger.info(f"[racao/alertas] Campo 'fase_publico_id' encontrado no modelo")
+            filtros_incompletos.append(Produto.fase_publico_id.is_(None))
+            logger.info("[racao/alertas] Campo 'fase_publico_id' encontrado no modelo")
         else:
-            logger.warning(f"[racao/alertas] Campo 'fase_publico_id' NÃƒO existe no modelo")
+            logger.warning("[racao/alertas] Campo 'fase_publico_id' NÃƒO existe no modelo")
 
-        filtros_incompletos.append(Produto.sabor_proteina == None)
-        filtros_incompletos.append(Produto.peso_embalagem == None)
+        filtros_incompletos.append(Produto.sabor_proteina.is_(None))
+        filtros_incompletos.append(Produto.peso_embalagem.is_(None))
 
         # Aplicar filtro OR (pelo menos um campo faltando)
         query = query.filter(or_(*filtros_incompletos))

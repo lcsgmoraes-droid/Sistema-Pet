@@ -135,6 +135,10 @@ jobs:
         run: |
           ruff check app/produtos
 
+      - name: Produtos root lint (blocking)
+        run: |
+          ruff check app/categorias_routes.py app/fiscal_catalogo_produtos_models.py app/importacao_produtos.py app/produto_config_fiscal_models.py app/produtos_models.py app/produtos_routes.py app/subcategorias_routes.py
+
       - name: Insights lint (blocking)
         run: |
           ruff check app/insights
