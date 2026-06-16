@@ -6,9 +6,8 @@ Contas a Pagar, Contas a Receber, Categorias, Formas de Pagamento
 from sqlalchemy import Column, Integer, String, Float, Boolean, DateTime, Date, Text, ForeignKey, Numeric, func
 from sqlalchemy.orm import relationship
 from datetime import datetime
-from .db import Base
 from .base_models import BaseTenantModel
-from app.utils.serialization import safe_decimal_to_float, safe_datetime_to_iso
+from app.dre_plano_contas_models import DRESubcategoria
 
 
 class CategoriaFinanceira(BaseTenantModel):
@@ -694,7 +693,7 @@ class RegraConciliacao(BaseTenantModel):
     
     # Relationships
     fornecedor = relationship("Cliente", foreign_keys=[fornecedor_id])
-    categoria_dre = relationship("DRESubcategoria", foreign_keys=[categoria_dre_id])
+    categoria_dre = relationship(DRESubcategoria, foreign_keys=[categoria_dre_id])
 
 
 class ProvisaoAutomatica(BaseTenantModel):

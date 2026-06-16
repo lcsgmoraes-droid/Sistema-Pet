@@ -157,6 +157,20 @@ def test_backend_ci_has_blocking_compras_fiscais_root_lint_step():
     ) in source
 
 
+def test_backend_ci_has_blocking_fiscal_nf_rateio_root_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Fiscal NF rateio root lint (blocking)" in source
+    assert (
+        "ruff check app/fiscal_estado_padrao_models.py app/fiscal_patterns.py "
+        "app/nf_item_rateio_canal_models.py app/nf_item_rateio_validator.py "
+        "app/nf_rateio_canal_models.py app/nfe_cache_models.py "
+        "app/nota_fiscal_item_rateio_routes.py "
+        "app/nota_fiscal_rateio_helper.py app/nota_fiscal_rateio_routes.py "
+        "app/nota_fiscal_tipos.py app/notas_entrada_pdf_parser.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_produtos_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
@@ -438,10 +452,11 @@ def test_backend_ci_has_blocking_financial_root_lint_step():
 
     assert "Financial root lint (blocking)" in source
     assert (
-        "ruff check app/contas_bancarias_routes.py app/contas_pagar_routes.py "
-        "app/contas_receber_routes.py app/lancamentos_routes.py "
-        "app/operadoras_models.py app/operadoras_routes.py "
-        "app/formas_pagamento_models.py app/formas_pagamento_routes.py"
+        "ruff check app/financeiro_models.py app/contas_bancarias_routes.py "
+        "app/contas_pagar_routes.py app/contas_receber_routes.py "
+        "app/lancamentos_routes.py app/operadoras_models.py "
+        "app/operadoras_routes.py app/formas_pagamento_models.py "
+        "app/formas_pagamento_routes.py"
     ) in source
 
 
