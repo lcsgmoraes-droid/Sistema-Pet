@@ -50,6 +50,7 @@ def _load_migration():
 
 def _run_migration(migration, engine, action):
     with engine.begin() as connection:
+
         def execute(statement):
             if isinstance(statement, str):
                 return connection.execute(text(statement))

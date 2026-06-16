@@ -2,8 +2,11 @@ from pathlib import Path
 import runpy
 
 
-MIGRATION_FILE = Path(__file__).resolve().parents[2] / "alembic" / "versions" / (
-    "px20260611a1_rls_campaign_core_tables.py"
+MIGRATION_FILE = (
+    Path(__file__).resolve().parents[2]
+    / "alembic"
+    / "versions"
+    / ("px20260611a1_rls_campaign_core_tables.py")
 )
 
 CAMPAIGN_CORE_TABLES = (
@@ -42,7 +45,9 @@ def _emit_sql(monkeypatch, action_name: str, available_tables=CAMPAIGN_CORE_TABL
     statements: list[str] = []
 
     monkeypatch.setattr(migration["op"], "get_bind", lambda: bind)
-    monkeypatch.setattr(migration["op"], "execute", lambda sql: statements.append(str(sql)))
+    monkeypatch.setattr(
+        migration["op"], "execute", lambda sql: statements.append(str(sql))
+    )
     monkeypatch.setattr(migration["sa"], "inspect", lambda received_bind: inspector)
 
     migration[action_name]()
@@ -74,7 +79,10 @@ def test_campaign_core_upgrade_enables_rls_only_for_existing_targets(monkeypatch
     assert emitted.count("WITH CHECK") == len(existing)
 
     for table_name in existing:
-        assert f"DROP POLICY IF EXISTS {table_name}_tenant_isolation ON {table_name}" in emitted
+        assert (
+            f"DROP POLICY IF EXISTS {table_name}_tenant_isolation ON {table_name}"
+            in emitted
+        )
         assert f"CREATE POLICY {table_name}_tenant_isolation ON {table_name}" in emitted
 
 

@@ -53,10 +53,14 @@ def test_rls_template_canary_enables_force_and_policy_for_each_table(monkeypatch
 
     assert "current_setting('app.tenant_id', true)" in source
     assert "WITH CHECK" in source
-    assert "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid" in source
+    assert (
+        "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid" in source
+    )
 
 
-def test_rls_template_canary_downgrade_removes_policies_before_disabling_rls(monkeypatch):
+def test_rls_template_canary_downgrade_removes_policies_before_disabling_rls(
+    monkeypatch,
+):
     migration = _load_migration()
     executed = []
 

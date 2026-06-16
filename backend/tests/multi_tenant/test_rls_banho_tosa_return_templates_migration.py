@@ -44,7 +44,9 @@ def test_banho_tosa_return_templates_rls_upgrade_skips_missing_tables(monkeypatc
     assert _capture(monkeypatch, "upgrade", existing=()) == []
 
 
-def test_banho_tosa_return_templates_rls_downgrade_unwinds_in_reverse_order(monkeypatch):
+def test_banho_tosa_return_templates_rls_downgrade_unwinds_in_reverse_order(
+    monkeypatch,
+):
     assert_downgrade_unwinds_in_reverse_order(
         _capture(monkeypatch, "downgrade"),
         BANHO_TOSA_RETURN_TEMPLATE_RLS_TABLES,

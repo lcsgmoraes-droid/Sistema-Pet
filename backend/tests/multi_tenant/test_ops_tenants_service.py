@@ -187,7 +187,10 @@ def test_list_ops_tenants_returns_counts_and_catalog_status(ops_tenants_session)
 
 
 def test_apply_base_catalog_import_requires_explicit_confirmation(ops_tenants_session):
-    from app.services.ops_tenants_service import OpsTenantActionError, apply_base_catalog_import
+    from app.services.ops_tenants_service import (
+        OpsTenantActionError,
+        apply_base_catalog_import,
+    )
 
     with pytest.raises(OpsTenantActionError, match="confirmacao"):
         apply_base_catalog_import(
@@ -218,16 +221,20 @@ def test_update_ops_tenant_commercial_state_changes_safe_fields(ops_tenants_sess
     assert tenant["billing_status"] == "past_due"
     assert tenant["subscription_source"] == "manual"
 
-    row = ops_tenants_session.execute(
-        text(
-            """
+    row = (
+        ops_tenants_session.execute(
+            text(
+                """
             SELECT status, plan, billing_status, subscription_source
             FROM tenants
             WHERE id = :tenant_id
             """
-        ),
-        {"tenant_id": TARGET_TENANT},
-    ).mappings().first()
+            ),
+            {"tenant_id": TARGET_TENANT},
+        )
+        .mappings()
+        .first()
+    )
     assert dict(row) == {
         "status": "suspended",
         "plan": "premium",
@@ -237,7 +244,10 @@ def test_update_ops_tenant_commercial_state_changes_safe_fields(ops_tenants_sess
 
 
 def test_update_ops_tenant_commercial_state_rejects_invalid_values(ops_tenants_session):
-    from app.services.ops_tenants_service import OpsTenantActionError, update_ops_tenant_commercial_state
+    from app.services.ops_tenants_service import (
+        OpsTenantActionError,
+        update_ops_tenant_commercial_state,
+    )
 
     with pytest.raises(OpsTenantActionError, match="Plano invalido"):
         update_ops_tenant_commercial_state(
@@ -247,7 +257,9 @@ def test_update_ops_tenant_commercial_state_rejects_invalid_values(ops_tenants_s
         )
 
 
-def test_preview_base_catalog_import_uses_lucas_store_as_source(ops_tenants_session, monkeypatch):
+def test_preview_base_catalog_import_uses_lucas_store_as_source(
+    ops_tenants_session, monkeypatch
+):
     from app.services import ops_tenants_service
 
     calls = []
@@ -266,9 +278,13 @@ def test_preview_base_catalog_import_uses_lucas_store_as_source(ops_tenants_sess
             "errors": [],
         }
 
-    monkeypatch.setattr(ops_tenants_service, "import_base_catalog", fake_import_base_catalog)
+    monkeypatch.setattr(
+        ops_tenants_service, "import_base_catalog", fake_import_base_catalog
+    )
 
-    result = ops_tenants_service.preview_base_catalog_import(ops_tenants_session, tenant_id=TARGET_TENANT)
+    result = ops_tenants_service.preview_base_catalog_import(
+        ops_tenants_session, tenant_id=TARGET_TENANT
+    )
 
     assert result["dry_run"] is True
     assert calls[0]["source_tenant_id"] == SOURCE_TENANT

@@ -18,7 +18,16 @@ import app.tenancy.filters as tenant_filters
 import app.database.orm_guards as orm_guards
 from app.auth.core import ALGORITHM
 from app.auth.dependencies import get_current_user_and_tenant
-from app.models import AuditLog, Permission, Role, RolePermission, Tenant, User, UserSession, UserTenant
+from app.models import (
+    AuditLog,
+    Permission,
+    Role,
+    RolePermission,
+    Tenant,
+    User,
+    UserSession,
+    UserTenant,
+)
 from app.produtos_models import Produto
 from app.tenancy.context import clear_current_tenant, set_current_tenant
 
@@ -81,7 +90,9 @@ def test_app_main_import_diagnostico():
         importlib.import_module("app.main")
     except ModuleNotFoundError as exc:
         if exc.name == "alembic.config":
-            pytest.xfail("Ambiente local nao resolveu alembic.config; runtime app.main nao foi validado aqui.")
+            pytest.xfail(
+                "Ambiente local nao resolveu alembic.config; runtime app.main nao foi validado aqui."
+            )
         raise
 
     assert event.contains(Session, "do_orm_execute", tenant_filters._add_tenant_filter)
@@ -219,7 +230,9 @@ def test_user_select_update_sem_tenant_e_insert_sem_tenant_bloqueado(auth_db_ses
         auth_db_session.flush()
 
 
-def test_auth_multitenant_flow_nao_quebra_com_roles_fora_da_whitelist(monkeypatch, auth_db_session):
+def test_auth_multitenant_flow_nao_quebra_com_roles_fora_da_whitelist(
+    monkeypatch, auth_db_session
+):
     calls = []
 
     def fake_onboard(db, tenant_id, user_id, **kwargs):
@@ -275,14 +288,21 @@ def test_auth_multitenant_flow_nao_quebra_com_roles_fora_da_whitelist(monkeypatc
     assert calls == [(tenant_id, user.id, False, True)]
     set_current_tenant(tenant_id)
     role = auth_db_session.query(Role).filter(Role.tenant_id == tenant_id).one()
-    user_tenant = auth_db_session.query(UserTenant).filter(UserTenant.user_id == user.id).one()
+    user_tenant = (
+        auth_db_session.query(UserTenant).filter(UserTenant.user_id == user.id).one()
+    )
 
     assert user.tenant_id == tenant_id
     assert user.is_admin is False
     assert tenant.plan == "basico"
     assert role.tenant_id == tenant_id
     assert user_tenant.tenant_id == tenant_id
-    assert auth_db_session.query(RolePermission).filter(RolePermission.tenant_id == tenant_id).count() == 2
+    assert (
+        auth_db_session.query(RolePermission)
+        .filter(RolePermission.tenant_id == tenant_id)
+        .count()
+        == 2
+    )
 
     clear_current_tenant()
     login_response = auth_routes.login_multitenant(
@@ -295,7 +315,9 @@ def test_auth_multitenant_flow_nao_quebra_com_roles_fora_da_whitelist(monkeypatc
     )
     assert len(login_response.tenants) == 1
 
-    credentials = HTTPAuthorizationCredentials(scheme="Bearer", credentials=login_response.access_token)
+    credentials = HTTPAuthorizationCredentials(
+        scheme="Bearer", credentials=login_response.access_token
+    )
     selected = auth_routes.select_tenant(
         request=_request("/auth/select-tenant"),
         body=auth_routes.SelectTenantRequest(tenant_id=str(tenant_id)),
@@ -303,7 +325,9 @@ def test_auth_multitenant_flow_nao_quebra_com_roles_fora_da_whitelist(monkeypatc
         db=auth_db_session,
         current_user=user,
     )
-    token_payload = jwt.decode(selected.access_token, auth_routes.SECRET_KEY, algorithms=[ALGORITHM])
+    token_payload = jwt.decode(
+        selected.access_token, auth_routes.SECRET_KEY, algorithms=[ALGORITHM]
+    )
     assert token_payload["tenant_id"] == str(tenant_id)
 
     set_current_tenant(tenant_id)
@@ -408,7 +432,9 @@ def test_rotas_criticas_usam_dependency_tenant_oficial():
         assert "current_user.tenant_id" not in source
 
 
-def test_register_fails_closed_when_required_onboarding_fails(monkeypatch, auth_db_session):
+def test_register_fails_closed_when_required_onboarding_fails(
+    monkeypatch, auth_db_session
+):
     def fail_onboard(db, tenant_id, user_id, **kwargs):
         assert kwargs.get("strict_required") is True
         raise RuntimeError("Onboarding obrigatorio incompleto")

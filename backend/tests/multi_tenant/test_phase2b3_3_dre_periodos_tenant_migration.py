@@ -28,7 +28,9 @@ MIGRATION_PATH = (
 
 
 def _load_migration():
-    spec = importlib.util.spec_from_file_location("migration_dre_periodos_tenant", MIGRATION_PATH)
+    spec = importlib.util.spec_from_file_location(
+        "migration_dre_periodos_tenant", MIGRATION_PATH
+    )
     module = importlib.util.module_from_spec(spec)
     assert spec.loader is not None
     fake_alembic = types.ModuleType("alembic")
@@ -64,11 +66,15 @@ class _FakeOp:
             type_sql = "TEXT"
         nullable_sql = "" if column.nullable else " NOT NULL"
         self.connection.execute(
-            text(f"ALTER TABLE {table_name} ADD COLUMN {column.name} {type_sql}{nullable_sql}")
+            text(
+                f"ALTER TABLE {table_name} ADD COLUMN {column.name} {type_sql}{nullable_sql}"
+            )
         )
 
     def drop_column(self, table_name, column_name):
-        self.connection.execute(text(f"ALTER TABLE {table_name} DROP COLUMN {column_name}"))
+        self.connection.execute(
+            text(f"ALTER TABLE {table_name} DROP COLUMN {column_name}")
+        )
 
 
 @contextmanager
@@ -159,13 +165,17 @@ def test_migration_upgrade_adiciona_tenant_id_nullable_e_backfill():
     with _patched_ops(migration, engine):
         migration.upgrade()
 
-    columns = {column["name"]: column for column in inspect(engine).get_columns("dre_periodos")}
+    columns = {
+        column["name"]: column for column in inspect(engine).get_columns("dre_periodos")
+    }
     assert "tenant_id" in columns
     assert columns["tenant_id"]["nullable"] is True
 
-    rows = engine.connect().execute(
-        text("SELECT id, tenant_id FROM dre_periodos ORDER BY id")
-    ).fetchall()
+    rows = (
+        engine.connect()
+        .execute(text("SELECT id, tenant_id FROM dre_periodos ORDER BY id"))
+        .fetchall()
+    )
     assert rows[0].tenant_id == _tenant_str(TENANT_A)
     assert rows[1].tenant_id is None
     assert rows[2].tenant_id is None

@@ -11,7 +11,9 @@ from tests.multi_tenant.rls_migration_helpers import (
 
 
 MIGRATION_FILE = migration_path("sx20260613a1_rls_canal_descontos.py")
-ROUTES_FILE = Path(__file__).resolve().parents[2] / "app" / "routes" / "canal_descontos_routes.py"
+ROUTES_FILE = (
+    Path(__file__).resolve().parents[2] / "app" / "routes" / "canal_descontos_routes.py"
+)
 
 CANAL_DESCONTOS_RLS_TABLES = ("canal_descontos",)
 

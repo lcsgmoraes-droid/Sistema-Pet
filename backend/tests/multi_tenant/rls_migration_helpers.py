@@ -3,7 +3,9 @@ from pathlib import Path
 from types import SimpleNamespace
 
 
-TENANT_RLS_GUARD = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid"
+TENANT_RLS_GUARD = (
+    "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid"
+)
 
 
 def migration_path(filename: str) -> Path:
@@ -30,7 +32,9 @@ def capture_migration_sql(
     inspector = SimpleNamespace(has_table=lambda table_name: table_name in present)
 
     monkeypatch.setattr(migration["op"], "get_bind", lambda: bind)
-    monkeypatch.setattr(migration["op"], "execute", lambda sql: emitted.append(str(sql)))
+    monkeypatch.setattr(
+        migration["op"], "execute", lambda sql: emitted.append(str(sql))
+    )
     monkeypatch.setattr(migration["sa"], "inspect", lambda _bind: inspector)
 
     migration[action_name]()
@@ -67,9 +71,15 @@ def assert_upgrade_emits_rls_for_declared_tables(
     for table_name, statement in zip(table_names, create_policy_sql, strict=True):
         assert table_name in statement
 
-    assert len(statements_containing(emitted, "ENABLE ROW LEVEL SECURITY")) == len(table_names)
-    assert len(statements_containing(emitted, "FORCE ROW LEVEL SECURITY")) == len(table_names)
-    assert len(statements_containing(emitted, f"WITH CHECK ({TENANT_RLS_GUARD})")) == len(table_names)
+    assert len(statements_containing(emitted, "ENABLE ROW LEVEL SECURITY")) == len(
+        table_names
+    )
+    assert len(statements_containing(emitted, "FORCE ROW LEVEL SECURITY")) == len(
+        table_names
+    )
+    assert len(
+        statements_containing(emitted, f"WITH CHECK ({TENANT_RLS_GUARD})")
+    ) == len(table_names)
 
 
 def assert_downgrade_unwinds_in_reverse_order(

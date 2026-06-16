@@ -2,10 +2,15 @@ from pathlib import Path
 import runpy
 
 
-MIGRATION_FILE = Path(__file__).resolve().parents[2].joinpath(
-    "alembic",
-    "versions",
-    "pu20260611a1_rls_ration_options_tables.py",
+MIGRATION_FILE = (
+    Path(__file__)
+    .resolve()
+    .parents[2]
+    .joinpath(
+        "alembic",
+        "versions",
+        "pu20260611a1_rls_ration_options_tables.py",
+    )
 )
 
 RATION_OPTION_TABLES = (
@@ -36,7 +41,9 @@ def _collect_statements(monkeypatch, action_name: str, available_tables=None) ->
         "_existing_option_tables",
         lambda bind: frozenset(available_tables or RATION_OPTION_TABLES),
     )
-    monkeypatch.setattr(action_globals["op"], "execute", lambda sql: statements.append(str(sql)))
+    monkeypatch.setattr(
+        action_globals["op"], "execute", lambda sql: statements.append(str(sql))
+    )
 
     action()
 
@@ -69,7 +76,10 @@ def test_rls_ration_options_upgrade_targets_only_existing_tables(monkeypatch):
     assert TENANT_GUARD in emitted
 
     for table_name in present:
-        assert f"DROP POLICY IF EXISTS {table_name}_tenant_isolation ON {table_name}" in emitted
+        assert (
+            f"DROP POLICY IF EXISTS {table_name}_tenant_isolation ON {table_name}"
+            in emitted
+        )
         assert f"CREATE POLICY {table_name}_tenant_isolation ON {table_name}" in emitted
 
     for skipped_table in set(RATION_OPTION_TABLES) - set(present):

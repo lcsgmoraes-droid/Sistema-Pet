@@ -3,8 +3,11 @@ import runpy
 from types import SimpleNamespace
 
 
-MIGRATION_FILE = Path(__file__).resolve().parents[2] / "alembic" / "versions" / (
-    "qa20260611a1_rls_campaign_history_tables.py"
+MIGRATION_FILE = (
+    Path(__file__).resolve().parents[2]
+    / "alembic"
+    / "versions"
+    / ("qa20260611a1_rls_campaign_history_tables.py")
 )
 
 HISTORY_TABLES = (
@@ -20,7 +23,9 @@ def _load_migration():
     return runpy.run_path(str(MIGRATION_FILE))
 
 
-def _run_and_capture(monkeypatch, action: str, *, dialect="postgresql", existing=HISTORY_TABLES):
+def _run_and_capture(
+    monkeypatch, action: str, *, dialect="postgresql", existing=HISTORY_TABLES
+):
     migration = _load_migration()
     statements: list[str] = []
 
@@ -30,7 +35,9 @@ def _run_and_capture(monkeypatch, action: str, *, dialect="postgresql", existing
 
     bind = SimpleNamespace(dialect=SimpleNamespace(name=dialect))
     monkeypatch.setattr(migration["op"], "get_bind", lambda: bind)
-    monkeypatch.setattr(migration["op"], "execute", lambda sql: statements.append(str(sql)))
+    monkeypatch.setattr(
+        migration["op"], "execute", lambda sql: statements.append(str(sql))
+    )
     monkeypatch.setattr(migration["sa"], "inspect", lambda received_bind: _Inspector())
 
     migration[action]()
@@ -59,7 +66,10 @@ def test_campaign_history_upgrade_targets_only_existing_history_tables(monkeypat
     assert emitted.count("CREATE POLICY") == len(existing)
 
     for table_name in existing:
-        assert f"DROP POLICY IF EXISTS {table_name}_tenant_isolation ON {table_name}" in emitted
+        assert (
+            f"DROP POLICY IF EXISTS {table_name}_tenant_isolation ON {table_name}"
+            in emitted
+        )
         assert f"USING ({TENANT_MATCH}) WITH CHECK ({TENANT_MATCH})" in emitted
 
 

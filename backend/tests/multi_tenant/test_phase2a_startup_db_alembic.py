@@ -26,7 +26,9 @@ def _semantic_listener_count(event_name, module_name, function_name):
 def _sqlite_engine_with_alembic_version(version="phase2a_head"):
     engine = create_engine("sqlite:///:memory:")
     with engine.begin() as conn:
-        conn.execute(text("CREATE TABLE alembic_version (version_num VARCHAR(64) NOT NULL)"))
+        conn.execute(
+            text("CREATE TABLE alembic_version (version_num VARCHAR(64) NOT NULL)")
+        )
         conn.execute(
             text("INSERT INTO alembic_version (version_num) VALUES (:version)"),
             {"version": version},
@@ -50,12 +52,14 @@ def test_app_startup_calls_database_migration_guard():
     main_source = main_path.read_text(encoding="utf-8")
     tree = ast.parse(main_source)
     startup = next(
-        node for node in tree.body
+        node
+        for node in tree.body
         if isinstance(node, ast.FunctionDef) and node.name == "on_startup"
     )
 
     ensure_calls = [
-        node for node in ast.walk(startup)
+        node
+        for node in ast.walk(startup)
         if isinstance(node, ast.Call)
         and isinstance(node.func, ast.Name)
         and node.func.id == "ensure_db_ready"
@@ -63,9 +67,7 @@ def test_app_startup_calls_database_migration_guard():
 
     assert ensure_calls, "on_startup deve chamar ensure_db_ready(engine)"
     assert any(
-        call.args
-        and isinstance(call.args[0], ast.Name)
-        and call.args[0].id == "engine"
+        call.args and isinstance(call.args[0], ast.Name) and call.args[0].id == "engine"
         for call in ensure_calls
     )
 
@@ -176,7 +178,9 @@ def test_alembic_external_import_is_lazy_and_explicit():
 
     assert hasattr(migration_check, "ensure_db_ready")
     try:
-        config_cls, script_directory_cls, migration_context_cls = migration_check._load_external_alembic()
+        config_cls, script_directory_cls, migration_context_cls = (
+            migration_check._load_external_alembic()
+        )
     except RuntimeError as exc:
         assert "backend/alembic" in str(exc)
         assert "pacote externo" in str(exc).lower()
@@ -231,4 +235,7 @@ def test_ensure_db_ready_tolerates_alembic_head_failure_only_in_dev_or_test(
     migration_check.ensure_db_ready(engine)
 
     assert "Could not determine Alembic head" in caplog.text
-    assert "Skipping head comparison only because this environment is development/test/local" in caplog.text
+    assert (
+        "Skipping head comparison only because this environment is development/test/local"
+        in caplog.text
+    )

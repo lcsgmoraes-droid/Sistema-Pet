@@ -47,7 +47,9 @@ def test_vet_partner_link_rls_migration_metadata_and_scope():
     assert migration["POLICY_NAMES"] == POLICY_NAMES
 
 
-def test_vet_partner_link_rls_upgrade_uses_bilateral_read_and_empresa_write(monkeypatch):
+def test_vet_partner_link_rls_upgrade_uses_bilateral_read_and_empresa_write(
+    monkeypatch,
+):
     emitted = _capture(monkeypatch, "upgrade")
 
     assert emitted == [

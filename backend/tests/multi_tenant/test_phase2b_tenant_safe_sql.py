@@ -24,14 +24,17 @@ def raw_sql_session():
     SessionLocal = sessionmaker(bind=engine)
     session = SessionLocal()
 
-    session.execute(text("""
+    session.execute(
+        text("""
         CREATE TABLE vendas (
             id INTEGER PRIMARY KEY,
             tenant_id TEXT NOT NULL,
             status TEXT
         )
-    """))
-    session.execute(text("""
+    """)
+    )
+    session.execute(
+        text("""
         CREATE TABLE venda_pagamentos (
             id INTEGER PRIMARY KEY,
             tenant_id TEXT NOT NULL,
@@ -40,8 +43,10 @@ def raw_sql_session():
             valor NUMERIC,
             data_pagamento TEXT
         )
-    """))
-    session.execute(text("""
+    """)
+    )
+    session.execute(
+        text("""
         CREATE TABLE clientes (
             id INTEGER PRIMARY KEY,
             tenant_id TEXT NOT NULL,
@@ -49,9 +54,12 @@ def raw_sql_session():
             ativo BOOLEAN,
             celular TEXT
         )
-    """))
+    """)
+    )
     session.execute(
-        text("INSERT INTO vendas (id, tenant_id, status) VALUES (:id, :tenant_id, :status)"),
+        text(
+            "INSERT INTO vendas (id, tenant_id, status) VALUES (:id, :tenant_id, :status)"
+        ),
         [
             {"id": 1, "tenant_id": TENANT_1, "status": "finalizada"},
             {"id": 2, "tenant_id": TENANT_2, "status": "finalizada"},

@@ -27,8 +27,13 @@ def test_seed_adquirentes_matches_current_template_model_schema():
     assert '"nome_adquirente": "CIELO"' in source
     assert '"nome_adquirente": "REDE"' in source
     assert source.count('"tipo_relatorio": "recebimentos"') == 3
-    assert 'TemplateAdquirente.nome_adquirente == template_data["nome_adquirente"]' in source
-    assert 'TemplateAdquirente.tipo_relatorio == template_data["tipo_relatorio"]' in source
+    assert (
+        'TemplateAdquirente.nome_adquirente == template_data["nome_adquirente"]'
+        in source
+    )
+    assert (
+        'TemplateAdquirente.tipo_relatorio == template_data["tipo_relatorio"]' in source
+    )
     assert 'nome_adquirente=template_data["nome_adquirente"]' in source
     assert 'tipo_relatorio=template_data["tipo_relatorio"]' in source
 

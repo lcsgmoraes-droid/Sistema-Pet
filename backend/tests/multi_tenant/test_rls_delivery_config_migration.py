@@ -15,7 +15,9 @@ def _load_with_fake_bind(monkeypatch, *, dialect="postgresql", table_exists=True
     module = runpy.run_path(str(MIGRATION))
     emitted: list[str] = []
     bind = SimpleNamespace(dialect=SimpleNamespace(name=dialect))
-    inspector = SimpleNamespace(has_table=lambda name: table_exists and name == "configuracoes_entrega")
+    inspector = SimpleNamespace(
+        has_table=lambda name: table_exists and name == "configuracoes_entrega"
+    )
 
     monkeypatch.setattr(module["op"], "get_bind", lambda: bind)
     monkeypatch.setattr(module["op"], "execute", emitted.append)

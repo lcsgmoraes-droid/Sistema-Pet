@@ -44,7 +44,9 @@ def test_purchase_order_invoice_links_rls_upgrade_skips_missing_tables(monkeypat
     assert _capture(monkeypatch, "upgrade", existing=()) == []
 
 
-def test_purchase_order_invoice_links_rls_downgrade_unwinds_in_reverse_order(monkeypatch):
+def test_purchase_order_invoice_links_rls_downgrade_unwinds_in_reverse_order(
+    monkeypatch,
+):
     assert_downgrade_unwinds_in_reverse_order(
         _capture(monkeypatch, "downgrade"),
         PURCHASE_ORDER_INVOICE_LINKS_RLS_TABLES,

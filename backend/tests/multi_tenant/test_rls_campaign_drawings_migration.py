@@ -3,8 +3,11 @@ import runpy
 from types import SimpleNamespace
 
 
-MIGRATION_FILE = Path(__file__).resolve().parents[2] / "alembic" / "versions" / (
-    "pz20260611a1_rls_campaign_drawings_tables.py"
+MIGRATION_FILE = (
+    Path(__file__).resolve().parents[2]
+    / "alembic"
+    / "versions"
+    / ("pz20260611a1_rls_campaign_drawings_tables.py")
 )
 
 DRAWING_TABLES = (
@@ -24,7 +27,9 @@ def _load_migration():
     return runpy.run_path(str(MIGRATION_FILE))
 
 
-def _capture(monkeypatch, action_name: str, *, dialect="postgresql", tables=DRAWING_TABLES):
+def _capture(
+    monkeypatch, action_name: str, *, dialect="postgresql", tables=DRAWING_TABLES
+):
     migration = _load_migration()
     statements: list[str] = []
 
@@ -33,7 +38,9 @@ def _capture(monkeypatch, action_name: str, *, dialect="postgresql", tables=DRAW
             return table_name in tables
 
     monkeypatch.setattr(migration["op"], "get_bind", lambda: _Bind(dialect))
-    monkeypatch.setattr(migration["op"], "execute", lambda sql: statements.append(str(sql)))
+    monkeypatch.setattr(
+        migration["op"], "execute", lambda sql: statements.append(str(sql))
+    )
     monkeypatch.setattr(migration["sa"], "inspect", lambda bind: _Inspector())
 
     migration[action_name]()
@@ -66,7 +73,9 @@ def test_campaign_drawings_upgrade_scopes_each_existing_drawing_table(monkeypatc
 
 def test_campaign_drawings_downgrade_handles_entries_before_drawings(monkeypatch):
     statements = _capture(monkeypatch, "downgrade")
-    policy_drops = [sql for sql in statements if sql.startswith("DROP POLICY IF EXISTS")]
+    policy_drops = [
+        sql for sql in statements if sql.startswith("DROP POLICY IF EXISTS")
+    ]
 
     assert policy_drops == [
         "DROP POLICY IF EXISTS drawing_entries_tenant_isolation ON drawing_entries",
