@@ -28,3 +28,15 @@ def test_host_watchdog_counts_only_http_status_5xx_not_response_size():
     assert 'match($0, /" 50[0-9] /)' in script
     assert status_pattern.search(response_200_with_500_bytes) is None
     assert status_pattern.search(real_502_response) is not None
+
+
+def test_host_watchdog_does_not_restart_for_historical_5xx_when_health_is_ok():
+    script = _watchdog_script_text()
+
+    assert "web_health_failed=false" in script
+    assert "web_health_failed=true" in script
+    assert (
+        'if [[ "$web_health_failed" == "true" '
+        '&& "$nginx_5xx_count" -ge "$NGINX_5XX_THRESHOLD" ]]; then'
+    ) in script
+    assert "5xx recentes sem falha ativa; sem restart" in script

@@ -184,14 +184,19 @@ nginx_5xx_count="$(
 )"
 
 healthy=true
+web_health_failed=false
+nginx_5xx_active_failure=false
+nginx_5xx_warning=false
 reasons=()
 
 if [[ "$backend_health" != "healthy" ]]; then
   healthy=false
+  web_health_failed=true
   reasons+=("backend_${backend_health}")
 fi
 if [[ "$nginx_health" != "healthy" ]]; then
   healthy=false
+  web_health_failed=true
   reasons+=("nginx_${nginx_health}")
 fi
 if [[ "$worker_health" != "healthy" ]]; then
@@ -204,19 +209,26 @@ if [[ "$postgres_health" != "healthy" ]]; then
 fi
 if [[ "$public_ok" != "true" ]]; then
   healthy=false
+  web_health_failed=true
   reasons+=("public_watchdog_failed")
 fi
 if [[ "$internal_ok" != "true" ]]; then
   healthy=false
+  web_health_failed=true
   reasons+=("internal_watchdog_failed")
 fi
-if (( nginx_5xx_count >= NGINX_5XX_THRESHOLD )); then
+if [[ "$web_health_failed" == "true" && "$nginx_5xx_count" -ge "$NGINX_5XX_THRESHOLD" ]]; then
+  nginx_5xx_active_failure=true
   healthy=false
   reasons+=("nginx_5xx_${nginx_5xx_count}")
+elif (( nginx_5xx_count >= NGINX_5XX_THRESHOLD )); then
+  nginx_5xx_warning=true
 fi
 
 if [[ "$healthy" == "true" ]]; then
-  if (( failures > 0 )) || [[ "$LOG_HEALTHY" == "true" ]]; then
+  if [[ "$nginx_5xx_warning" == "true" ]]; then
+    json_event "warning" "5xx recentes sem falha ativa; sem restart"
+  elif (( failures > 0 )) || [[ "$LOG_HEALTHY" == "true" ]]; then
     json_event "healthy" "Health recuperado/normal"
   fi
   failures=0
@@ -258,14 +270,14 @@ actions=()
 if [[ "$postgres_health" != "healthy" ]]; then
   actions+=("postgres_unhealthy_no_auto_restart")
 else
-  if [[ "$backend_health" != "healthy" || "$public_ok" != "true" || "$internal_ok" != "true" || "$nginx_5xx_count" -ge "$NGINX_5XX_THRESHOLD" ]]; then
+  if [[ "$backend_health" != "healthy" || "$public_ok" != "true" || "$internal_ok" != "true" || "$nginx_5xx_active_failure" == "true" ]]; then
     log "Reiniciando backend por falha: $reason_text"
     compose restart backend
     actions+=("restart_backend")
     sleep 20
   fi
 
-  if ! curl_ok "$PUBLIC_WATCHDOG_URL" || [[ "$nginx_health" != "healthy" || "$nginx_5xx_count" -ge "$NGINX_5XX_THRESHOLD" ]]; then
+  if ! curl_ok "$PUBLIC_WATCHDOG_URL" || [[ "$nginx_health" != "healthy" || "$nginx_5xx_active_failure" == "true" ]]; then
     log "Reiniciando nginx por falha publica/nginx"
     compose restart nginx
     actions+=("restart_nginx")
