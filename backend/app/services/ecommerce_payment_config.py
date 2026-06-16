@@ -110,7 +110,9 @@ def sync_mercado_pago_webhook_token(db: Session, webhook_token: str) -> bool:
 
 def _secret_key() -> str:
     # Chave dedicada de criptografia dos segredos de pagamento.
-    key = (os.getenv("PAYMENT_CONFIG_ENCRYPTION_KEY") or os.getenv("ENCRYPTION_KEY") or "").strip()
+    key = (
+        os.getenv("PAYMENT_CONFIG_ENCRYPTION_KEY") or os.getenv("ENCRYPTION_KEY") or ""
+    ).strip()
     if key:
         return key
     # Em PRODUCAO e OBRIGATORIA: nada de cair para a chave de login (JWT_SECRET_KEY)
@@ -121,7 +123,9 @@ def _secret_key() -> str:
             "para criptografar segredos de pagamento."
         )
     # Apenas DEV/teste: conveniencia local (nunca em producao).
-    return (os.getenv("JWT_SECRET_KEY") or JWT_SECRET_KEY or "corepet-dev-only-payment-key").strip()
+    return (
+        os.getenv("JWT_SECRET_KEY") or JWT_SECRET_KEY or "corepet-dev-only-payment-key"
+    ).strip()
 
 
 def _fernet_key() -> bytes:
@@ -185,7 +189,9 @@ def build_mercado_pago_oauth_redirect_uri(*, base_url: str | None = None) -> str
     return f"{base}/api/ecommerce-payment-config/mercadopago/oauth/callback"
 
 
-def build_mercado_pago_oauth_return_url(status_value: str, *, message: str | None = None) -> str:
+def build_mercado_pago_oauth_return_url(
+    status_value: str, *, message: str | None = None
+) -> str:
     base = _frontend_base_url()
     params = {"mercadopago_oauth": status_value}
     if message:
@@ -269,9 +275,13 @@ def encode_mercado_pago_oauth_state(
         "exp": expires_at,
         "nonce": secrets.token_urlsafe(16),
     }
-    payload_raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    payload_raw = json.dumps(payload, sort_keys=True, separators=(",", ":")).encode(
+        "utf-8"
+    )
     payload_part = _b64url_encode(payload_raw)
-    signature = hmac.new(_secret_key().encode("utf-8"), payload_part.encode("ascii"), hashlib.sha256).digest()
+    signature = hmac.new(
+        _secret_key().encode("utf-8"), payload_part.encode("ascii"), hashlib.sha256
+    ).digest()
     return f"{payload_part}.{_b64url_encode(signature)}"
 
 
@@ -280,7 +290,9 @@ def validate_mercado_pago_oauth_state(state: str | None) -> dict[str, Any] | Non
     if not raw or "." not in raw:
         return None
     payload_part, signature_part = raw.split(".", 1)
-    expected = hmac.new(_secret_key().encode("utf-8"), payload_part.encode("ascii"), hashlib.sha256).digest()
+    expected = hmac.new(
+        _secret_key().encode("utf-8"), payload_part.encode("ascii"), hashlib.sha256
+    ).digest()
     try:
         received = _b64url_decode(signature_part)
     except Exception:
@@ -345,7 +357,9 @@ def exchange_mercado_pago_oauth_code(
         "code": str(code or "").strip(),
         "grant_type": "authorization_code",
         "redirect_uri": redirect_uri,
-        "test_token": "true" if _normalize_environment(environment) == "sandbox" else "false",
+        "test_token": "true"
+        if _normalize_environment(environment) == "sandbox"
+        else "false",
     }
     response = http_post(
         OAUTH_TOKEN_URL,
@@ -462,7 +476,10 @@ def resolve_mercado_pago_tenant_id_from_webhook_token(
 def _effective_webhook_secret(config: Any | None) -> str:
     if not config:
         return _global_mercado_pago_webhook_secret()
-    return decrypt_secret(getattr(config, "webhook_secret_encrypted", None)) or _global_mercado_pago_webhook_secret()
+    return (
+        decrypt_secret(getattr(config, "webhook_secret_encrypted", None))
+        or _global_mercado_pago_webhook_secret()
+    )
 
 
 def save_mercado_pago_oauth_tokens(
@@ -734,7 +751,9 @@ def serialize_mercado_pago_config(
             "oauth_connected": False,
             "oauth_connected_at": None,
             "mercado_pago_user_id": None,
-            "oauth_redirect_uri": build_mercado_pago_oauth_redirect_uri(base_url=base_url),
+            "oauth_redirect_uri": build_mercado_pago_oauth_redirect_uri(
+                base_url=base_url
+            ),
             "webhook_url": build_mercado_pago_webhook_url(token, base_url=base_url),
             "updated_at": None,
         }
@@ -762,6 +781,10 @@ def serialize_mercado_pago_config(
         ),
         "mercado_pago_user_id": getattr(config, "mercado_pago_user_id", None),
         "oauth_redirect_uri": build_mercado_pago_oauth_redirect_uri(base_url=base_url),
-        "webhook_url": build_mercado_pago_webhook_url(config.webhook_token, base_url=base_url),
-        "updated_at": config.updated_at.isoformat() if getattr(config, "updated_at", None) else None,
+        "webhook_url": build_mercado_pago_webhook_url(
+            config.webhook_token, base_url=base_url
+        ),
+        "updated_at": config.updated_at.isoformat()
+        if getattr(config, "updated_at", None)
+        else None,
     }

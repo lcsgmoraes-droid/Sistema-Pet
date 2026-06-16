@@ -12,6 +12,7 @@ Este helper centraliza o escopo correto: o período pertence à loja se o
 A segunda condição garante que períodos legados (com `tenant_id` ainda nulo)
 continuem sendo encontrados pela própria loja — e só por ela.
 """
+
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 

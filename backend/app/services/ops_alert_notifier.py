@@ -65,10 +65,14 @@ def _notification_log_path() -> str:
 
 def _min_severity() -> str:
     raw = (
-        os.getenv("OPS_ALERT_MIN_SEVERITY")
-        or os.getenv("OPS_ALERT_WEBHOOK_MIN_SEVERITY")
-        or "critical"
-    ).strip().lower()
+        (
+            os.getenv("OPS_ALERT_MIN_SEVERITY")
+            or os.getenv("OPS_ALERT_WEBHOOK_MIN_SEVERITY")
+            or "critical"
+        )
+        .strip()
+        .lower()
+    )
     return raw if raw in _SEVERITY_ORDER else "critical"
 
 
@@ -86,8 +90,15 @@ def _severity_allows(alert: dict[str, Any], min_severity: str) -> bool:
 
 
 def _notification_key(alert: dict[str, Any]) -> str:
-    alert_key = str(alert.get("alert_key") or alert.get("id") or alert.get("kind") or "ops_alert")
-    latest = str(alert.get("latest_event_at") or alert.get("latest_at") or alert.get("last_seen_at") or "")
+    alert_key = str(
+        alert.get("alert_key") or alert.get("id") or alert.get("kind") or "ops_alert"
+    )
+    latest = str(
+        alert.get("latest_event_at")
+        or alert.get("latest_at")
+        or alert.get("last_seen_at")
+        or ""
+    )
     severity = str(alert.get("severity") or "info")
     return f"{alert_key}:{severity}:{latest}"
 
@@ -119,7 +130,12 @@ def _email_body(alerts: list[dict[str, Any]], min_severity: str) -> tuple[str, s
     ]
     html_items = []
     for alert in alerts:
-        key = str(alert.get("alert_key") or alert.get("id") or alert.get("kind") or "ops_alert")
+        key = str(
+            alert.get("alert_key")
+            or alert.get("id")
+            or alert.get("kind")
+            or "ops_alert"
+        )
         severity = str(alert.get("severity") or "info")
         title = str(alert.get("title") or key)
         detail = str(alert.get("detail") or "")
@@ -150,7 +166,11 @@ def _email_body(alerts: list[dict[str, Any]], min_severity: str) -> tuple[str, s
             + (f"<br><span>Detalhe: {escape(detail)}</span>" if detail else "")
             + (f"<br><span>Acao recomendada: {escape(action)}</span>" if action else "")
             + (f"<br><span>Rota: {escape(path)}</span>" if path else "")
-            + (f"<br><span>Request ID: {escape(request_id)}</span>" if request_id else "")
+            + (
+                f"<br><span>Request ID: {escape(request_id)}</span>"
+                if request_id
+                else ""
+            )
             + "</li>"
         )
 
@@ -160,9 +180,7 @@ def _email_body(alerts: list[dict[str, Any]], min_severity: str) -> tuple[str, s
         "<h2>CorePet Ops - alerta operacional</h2>"
         f"<p><strong>Severidade minima:</strong> {escape(min_severity)}</p>"
         f"<p><strong>Gerado em:</strong> {escape(_utcnow_iso())}</p>"
-        "<ul>"
-        + "".join(html_items)
-        + "</ul>"
+        "<ul>" + "".join(html_items) + "</ul>"
         "</body></html>"
     )
     return html_body, text_body
@@ -189,7 +207,11 @@ def _read_sent_keys(max_lines: int = 5000) -> set[str]:
             item = json.loads(line)
         except json.JSONDecodeError:
             continue
-        if isinstance(item, dict) and item.get("notification_key") and item.get("status") == "sent":
+        if (
+            isinstance(item, dict)
+            and item.get("notification_key")
+            and item.get("status") == "sent"
+        ):
             keys.add(str(item["notification_key"]))
     return keys
 
@@ -304,7 +326,11 @@ def notify_ops_alerts(alerts: list[dict[str, Any]]) -> dict[str, Any]:
         return result
 
     _append_sent_log([key for key, _ in pending])
-    result["status"] = "sent" if result["failed_webhook"] == 0 and result["failed_email"] == 0 else "partial"
+    result["status"] = (
+        "sent"
+        if result["failed_webhook"] == 0 and result["failed_email"] == 0
+        else "partial"
+    )
     result["sent"] = len(pending)
     result["failed"] = len(pending) if result["status"] == "partial" else 0
     return result

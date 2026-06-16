@@ -59,7 +59,9 @@ def _webhook_tenant_id() -> UUID | None:
 
 
 def _canonical_payload(payload: dict) -> str:
-    return json.dumps(payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str)
+    return json.dumps(
+        payload, ensure_ascii=False, sort_keys=True, separators=(",", ":"), default=str
+    )
 
 
 def _extract_metadata(payload: dict) -> dict[str, str | None]:
@@ -73,12 +75,15 @@ def _extract_metadata(payload: dict) -> dict[str, str | None]:
         or envelope.get("idEvento")
         or envelope.get("id_evento")
     )
-    event_type = _text(
-        envelope.get("event")
-        or envelope.get("event_type")
-        or envelope.get("tipo")
-        or envelope.get("type")
-    ) or "legacy"
+    event_type = (
+        _text(
+            envelope.get("event")
+            or envelope.get("event_type")
+            or envelope.get("tipo")
+            or envelope.get("type")
+        )
+        or "legacy"
+    )
 
     pedido_bling_id = _text(
         data.get("id")
@@ -90,7 +95,9 @@ def _extract_metadata(payload: dict) -> dict[str, str | None]:
     if event_id:
         dedupe_key = f"event:{event_id}"
     else:
-        digest = hashlib.sha256(_canonical_payload(envelope).encode("utf-8")).hexdigest()
+        digest = hashlib.sha256(
+            _canonical_payload(envelope).encode("utf-8")
+        ).hexdigest()
         dedupe_key = f"payload:{digest[:88]}"
 
     return {
@@ -105,7 +112,15 @@ def _summarize_response(value: Any) -> dict:
     if isinstance(value, dict):
         return {
             key: value.get(key)
-            for key in ("status", "acao", "motivo", "pedido_id", "erros_estoque", "request_id", "correlation_id")
+            for key in (
+                "status",
+                "acao",
+                "motivo",
+                "pedido_id",
+                "erros_estoque",
+                "request_id",
+                "correlation_id",
+            )
             if key in value
         }
     return {"result": str(value)[:300]}
@@ -183,7 +198,9 @@ def enqueue_bling_pedido_webhook(db: Session, payload: dict) -> dict[str, Any]:
 
 def _claim_next_event(db: Session) -> BlingPedidoWebhookEvent | None:
     now = _utcnow()
-    stale_after = now - timedelta(seconds=_env_int("BLING_PEDIDO_WEBHOOK_PROCESSING_TIMEOUT_SECONDS", 10 * 60))
+    stale_after = now - timedelta(
+        seconds=_env_int("BLING_PEDIDO_WEBHOOK_PROCESSING_TIMEOUT_SECONDS", 10 * 60)
+    )
     _mark_exhausted_processing_events_dead(db, stale_after=stale_after, now=now)
 
     event = (
@@ -199,7 +216,10 @@ def _claim_next_event(db: Session) -> BlingPedidoWebhookEvent | None:
             BlingPedidoWebhookEvent.next_attempt_at <= now,
             BlingPedidoWebhookEvent.attempts < BlingPedidoWebhookEvent.max_attempts,
         )
-        .order_by(BlingPedidoWebhookEvent.next_attempt_at.asc(), BlingPedidoWebhookEvent.id.asc())
+        .order_by(
+            BlingPedidoWebhookEvent.next_attempt_at.asc(),
+            BlingPedidoWebhookEvent.id.asc(),
+        )
         .with_for_update(skip_locked=True)
         .first()
     )
@@ -216,7 +236,9 @@ def _claim_next_event(db: Session) -> BlingPedidoWebhookEvent | None:
     return event
 
 
-def _mark_exhausted_processing_events_dead(db: Session, *, stale_after: datetime, now: datetime) -> int:
+def _mark_exhausted_processing_events_dead(
+    db: Session, *, stale_after: datetime, now: datetime
+) -> int:
     updated = (
         db.query(BlingPedidoWebhookEvent)
         .filter(
@@ -267,9 +289,13 @@ def _mark_failed(db: Session, event_id: int, exc: Exception) -> None:
     db.commit()
 
 
-def process_pending_bling_pedido_webhooks(db: Session, *, limit: int | None = None) -> dict[str, Any]:
+def process_pending_bling_pedido_webhooks(
+    db: Session, *, limit: int | None = None
+) -> dict[str, Any]:
     """Processa webhooks pendentes fora da request HTTP."""
-    safe_limit = max(1, min(int(limit or _env_int("BLING_PEDIDO_WEBHOOK_QUEUE_LIMIT", 20)), 100))
+    safe_limit = max(
+        1, min(int(limit or _env_int("BLING_PEDIDO_WEBHOOK_QUEUE_LIMIT", 20)), 100)
+    )
     processed = 0
     failed = 0
     dead = 0
@@ -281,7 +307,9 @@ def process_pending_bling_pedido_webhooks(db: Session, *, limit: int | None = No
 
         correlation_id = _event_correlation_id(event)
         try:
-            from app.integracao_bling_pedido_routes import processar_pedido_bling_payload
+            from app.integracao_bling_pedido_routes import (
+                processar_pedido_bling_payload,
+            )
 
             with operation_correlation_context(
                 "job.bling_pedido_webhook",
@@ -323,8 +351,7 @@ def get_bling_pedido_webhook_queue_snapshot(db: Session) -> dict[str, Any]:
         .all()
     )
     counts: dict[str, int] = {
-        str(status or "unknown"): int(total or 0)
-        for status, total in rows
+        str(status or "unknown"): int(total or 0) for status, total in rows
     }
     open_statuses = [STATUS_PENDING, STATUS_PROCESSING, STATUS_FAILED, STATUS_DEAD]
     tenant_rows = (
@@ -360,14 +387,23 @@ def get_bling_pedido_webhook_queue_snapshot(db: Session) -> dict[str, Any]:
         if status_key in open_statuses:
             item[status_key] = int(total or 0)
         item["total_open"] += int(total or 0)
-        if oldest_at and (not item["oldest_open_at"] or oldest_at.isoformat() < item["oldest_open_at"]):
+        if oldest_at and (
+            not item["oldest_open_at"] or oldest_at.isoformat() < item["oldest_open_at"]
+        ):
             item["oldest_open_at"] = oldest_at.isoformat()
-        if latest_at and (not item["latest_event_at"] or latest_at.isoformat() > item["latest_event_at"]):
+        if latest_at and (
+            not item["latest_event_at"]
+            or latest_at.isoformat() > item["latest_event_at"]
+        ):
             item["latest_event_at"] = latest_at.isoformat()
 
     by_tenant = sorted(
         tenants.values(),
-        key=lambda item: (int(item.get("dead") or 0), int(item.get("failed") or 0), int(item.get("total_open") or 0)),
+        key=lambda item: (
+            int(item.get("dead") or 0),
+            int(item.get("failed") or 0),
+            int(item.get("total_open") or 0),
+        ),
         reverse=True,
     )
     return {

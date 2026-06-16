@@ -664,6 +664,16 @@ def test_backend_ci_has_blocking_backend_api_banho_tosa_format_step():
     assert "ruff format --check app/api app/banho_tosa_api" in source
 
 
+def test_backend_ci_has_blocking_backend_services_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend services format (blocking)" in source
+    assert (
+        "ruff format --check app/services --exclude app/services/sefaz_service.py"
+        in source
+    )
+
+
 def test_backend_ci_has_blocking_backend_multi_tenant_tests_format_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

@@ -223,7 +223,10 @@ def obter_mapas_exclusao_validade(
     tenant_ids: Iterable,
     *,
     produto_ids: Optional[Iterable[int]] = None,
-) -> tuple[dict[tuple[str, int], CampanhaValidadeExclusao], dict[tuple[str, int], CampanhaValidadeExclusao]]:
+) -> tuple[
+    dict[tuple[str, int], CampanhaValidadeExclusao],
+    dict[tuple[str, int], CampanhaValidadeExclusao],
+]:
     tenant_values = [tenant_id for tenant_id in tenant_ids if tenant_id]
     if not tenant_values:
         return {}, {}
@@ -251,7 +254,9 @@ def obter_mapas_exclusao_validade(
 def resolver_preco_regular_canal(produto: Produto, canal: Optional[str]) -> float:
     canal_normalizado = _normalizar_canal(canal)
     if canal_normalizado == "app":
-        base = produto.preco_app if produto.preco_app is not None else produto.preco_venda
+        base = (
+            produto.preco_app if produto.preco_app is not None else produto.preco_venda
+        )
     else:
         base = (
             produto.preco_ecommerce
@@ -272,7 +277,9 @@ def resolver_preco_promocional_manual(
     candidatos: list[float] = []
 
     if canal_normalizado == "app" and produto.preco_app_promo is not None:
-        if _janela_ativa(produto.preco_app_promo_inicio, produto.preco_app_promo_fim, agora):
+        if _janela_ativa(
+            produto.preco_app_promo_inicio, produto.preco_app_promo_fim, agora
+        ):
             candidatos.append(float(produto.preco_app_promo))
 
     if canal_normalizado == "ecommerce" and produto.preco_ecommerce_promo is not None:
@@ -319,7 +326,9 @@ def construir_oferta_validade(
         exclusion_id=(
             int(exclusao_lote.id)
             if exclusao_lote
-            else int(exclusao_produto.id) if exclusao_produto else None
+            else int(exclusao_produto.id)
+            if exclusao_produto
+            else None
         ),
     )
 
@@ -356,10 +365,19 @@ def resolver_preco_publico_produto(
 ) -> CatalogPricingResult:
     canal_normalizado = _normalizar_canal(canal)
     regular_price = resolver_preco_regular_canal(produto, canal_normalizado)
-    manual_promotional_price = resolver_preco_promocional_manual(produto, canal_normalizado)
+    manual_promotional_price = resolver_preco_promocional_manual(
+        produto, canal_normalizado
+    )
 
-    if validity_offer and validity_offer.active and validity_offer.promotional_price is not None:
-        if manual_promotional_price is None or validity_offer.promotional_price < manual_promotional_price:
+    if (
+        validity_offer
+        and validity_offer.active
+        and validity_offer.promotional_price is not None
+    ):
+        if (
+            manual_promotional_price is None
+            or validity_offer.promotional_price < manual_promotional_price
+        ):
             return CatalogPricingResult(
                 regular_price=regular_price,
                 promotional_price=validity_offer.promotional_price,
@@ -369,7 +387,10 @@ def resolver_preco_publico_produto(
                 validity_offer=validity_offer,
             )
 
-    if manual_promotional_price is not None and manual_promotional_price < regular_price:
+    if (
+        manual_promotional_price is not None
+        and manual_promotional_price < regular_price
+    ):
         return CatalogPricingResult(
             regular_price=regular_price,
             promotional_price=manual_promotional_price,

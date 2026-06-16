@@ -131,7 +131,11 @@ def _extract_identity(request: Request) -> dict[str, Any]:
         tenant_source = fallback_source
 
     context_tenant_id = _uuid_text(_current_tenant_text())
-    if not tenant_id and context_tenant_id and _path_allows_context_tenant(request.url.path):
+    if (
+        not tenant_id
+        and context_tenant_id
+        and _path_allows_context_tenant(request.url.path)
+    ):
         tenant_id = context_tenant_id
         tenant_source = "tenant_context"
 
@@ -217,7 +221,9 @@ def _event_created_at(event: dict[str, Any]) -> datetime | None:
     return _parse_dt(str(event.get("created_at") or ""))
 
 
-def _read_recent_events(max_lines: int = ERROR_EVENT_REPORT_MAX_READ_LINES) -> list[dict[str, Any]]:
+def _read_recent_events(
+    max_lines: int = ERROR_EVENT_REPORT_MAX_READ_LINES,
+) -> list[dict[str, Any]]:
     if not os.path.exists(ERROR_EVENT_LOG_PATH):
         return []
 
@@ -344,10 +350,14 @@ def summarize_error_events(
 
     by_tenant = Counter(str(event.get("tenant_id") or "sem_tenant") for event in events)
     by_path = Counter(str(event.get("path") or "sem_path") for event in events)
-    by_status = Counter(str(event.get("status_code") or "sem_status") for event in events)
+    by_status = Counter(
+        str(event.get("status_code") or "sem_status") for event in events
+    )
     errors_5xx = sum(1 for event in events if int(event.get("status_code") or 0) >= 500)
     slow_requests = sum(
-        1 for event in events if float(event.get("duration_ms") or 0) >= SLOW_REQUEST_EVENT_MS
+        1
+        for event in events
+        if float(event.get("duration_ms") or 0) >= SLOW_REQUEST_EVENT_MS
     )
 
     latest = list(reversed(events))[:20]
@@ -381,7 +391,10 @@ def get_error_events(
 ) -> list[dict[str, Any]]:
     if db is not None:
         try:
-            from app.services.ops_persistence_service import query_error_events, sync_error_events_to_db
+            from app.services.ops_persistence_service import (
+                query_error_events,
+                sync_error_events_to_db,
+            )
 
             sync_error_events_to_db(db, _read_recent_events())
             return query_error_events(

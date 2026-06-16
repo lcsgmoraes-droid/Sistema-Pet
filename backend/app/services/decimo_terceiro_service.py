@@ -25,6 +25,7 @@ from app.cargo_models import Cargo
 from app.services.remuneracao_service import calcular_composicao_remuneracao
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -37,7 +38,7 @@ def pagar_decimo_terceiro(
     ano: int,
     usuario_id: int = None,
     data_pagamento: date = None,
-    descricao_parcela: str = None
+    descricao_parcela: str = None,
 ) -> dict:
     """
     Paga 13º salário (parcial ou total).
@@ -78,7 +79,7 @@ def pagar_decimo_terceiro(
             Cliente.id == funcionario_id,
             Cliente.tenant_id == tenant_id,
             Cliente.tipo_cadastro == "funcionario",
-            Cliente.ativo.is_(True)
+            Cliente.ativo.is_(True),
         )
         .first()
     )
@@ -92,13 +93,13 @@ def pagar_decimo_terceiro(
         raise Exception("Funcionário não possui cargo definido")
 
     cargo = (
-        db.query(Cargo)
-        .filter_by(id=funcionario.cargo_id, tenant_id=tenant_id)
-        .first()
+        db.query(Cargo).filter_by(id=funcionario.cargo_id, tenant_id=tenant_id).first()
     )
 
     if not cargo:
-        logger.error(f"[13º SALARIO] Cargo não encontrado - cargo_id={funcionario.cargo_id}")
+        logger.error(
+            f"[13º SALARIO] Cargo não encontrado - cargo_id={funcionario.cargo_id}"
+        )
         raise Exception("Cargo não encontrado")
 
     logger.info(
@@ -119,19 +120,13 @@ def pagar_decimo_terceiro(
     # 3️⃣ Buscar categorias
     cat_13_provisao = (
         db.query(CategoriaFinanceira)
-        .filter_by(
-            tenant_id=tenant_id,
-            nome="Provisão de 13º Salário"
-        )
+        .filter_by(tenant_id=tenant_id, nome="Provisão de 13º Salário")
         .first()
     )
 
     cat_13_pago = (
         db.query(CategoriaFinanceira)
-        .filter_by(
-            tenant_id=tenant_id,
-            nome="13º Salário Pago"
-        )
+        .filter_by(tenant_id=tenant_id, nome="13º Salário Pago")
         .first()
     )
 
@@ -163,9 +158,7 @@ def pagar_decimo_terceiro(
     else:
         provisao_13 = Decimal("0.00")
 
-    logger.info(
-        f"[13º SALARIO] Provisão acumulada: R$ {provisao_13:.2f}"
-    )
+    logger.info(f"[13º SALARIO] Provisão acumulada: R$ {provisao_13:.2f}")
 
     # 5️⃣ Consumir provisão (até o limite disponível)
     consumo = min(valor_real, provisao_13)
@@ -182,14 +175,12 @@ def pagar_decimo_terceiro(
             data_inicio=date(ano, mes, 1),
             data_fim=ultima_data_mes,
             canal="provisao_consumo_13",
-            despesas_pessoal=-float(consumo)
+            despesas_pessoal=-float(consumo),
         )
 
         db.add(baixa)
 
-        logger.info(
-            f"[13º SALARIO] Baixa de provisão gerada: R$ -{consumo:.2f}"
-        )
+        logger.info(f"[13º SALARIO] Baixa de provisão gerada: R$ -{consumo:.2f}")
 
     # 6️⃣ Calcular diferença e gerar ajuste se necessário
     diferenca = valor_real - consumo
@@ -203,7 +194,7 @@ def pagar_decimo_terceiro(
             data_inicio=date(ano, mes, 1),
             data_fim=ultima_data_mes,
             canal="ajuste_13",
-            despesas_pessoal=float(diferenca)
+            despesas_pessoal=float(diferenca),
         )
 
         db.add(ajuste)
@@ -238,15 +229,14 @@ def pagar_decimo_terceiro(
         data_emissao=date(ano, mes, 1),
         data_vencimento=data_pagamento,
         status="pendente",
-        observacoes=f"13º Salário ({percentual}%) - {mes}/{ano}\nProvisão consumida: R$ {consumo:.2f}"
+        observacoes=f"13º Salário ({percentual}%) - {mes}/{ano}\nProvisão consumida: R$ {consumo:.2f}",
     )
 
     db.add(conta)
     db.flush()
 
     logger.info(
-        f"[13º SALARIO] Conta a pagar gerada - "
-        f"ID={conta.id}, Valor=R$ {valor_real:.2f}"
+        f"[13º SALARIO] Conta a pagar gerada - ID={conta.id}, Valor=R$ {valor_real:.2f}"
     )
 
     # 8️⃣ Commit
@@ -263,24 +253,21 @@ def pagar_decimo_terceiro(
         "funcionario": {
             "id": funcionario.id,
             "nome": funcionario.nome,
-            "salario": float(salario)
+            "salario": float(salario),
         },
         "valores": {
             "percentual": float(percentual),
-            "valor_calculado": float(valor_real)
+            "valor_calculado": float(valor_real),
         },
-        "provisao": {
-            "disponivel": float(provisao_13),
-            "consumida": float(consumo)
-        },
+        "provisao": {"disponivel": float(provisao_13), "consumida": float(consumo)},
         "ajuste": float(diferenca) if abs(diferenca) > Decimal("0.01") else 0,
         "conta_pagar": {
             "id": conta.id,
             "valor": float(valor_real),
             "vencimento": data_pagamento.isoformat(),
             "status": "pendente",
-            "descricao": descricao_parcela
-        }
+            "descricao": descricao_parcela,
+        },
     }
 
 
@@ -290,7 +277,7 @@ def cancelar_decimo_terceiro(
     conta_pagar_id: int,
     mes: int,
     ano: int,
-    usuario_id: int = None
+    usuario_id: int = None,
 ) -> dict:
     """
     Cancela pagamento de 13º (estorna provisão).
@@ -309,18 +296,11 @@ def cancelar_decimo_terceiro(
         dict com resultado do cancelamento
     """
 
-    logger.info(
-        f"[13º SALARIO] Cancelando pagamento - conta_pagar_id={conta_pagar_id}"
-    )
+    logger.info(f"[13º SALARIO] Cancelando pagamento - conta_pagar_id={conta_pagar_id}")
 
     # Buscar conta
     conta = (
-        db.query(ContaPagar)
-        .filter_by(
-            id=conta_pagar_id,
-            tenant_id=tenant_id
-        )
-        .first()
+        db.query(ContaPagar).filter_by(id=conta_pagar_id, tenant_id=tenant_id).first()
     )
 
     if not conta:
@@ -344,19 +324,17 @@ def cancelar_decimo_terceiro(
         data_inicio=date(ano, mes, 1),
         data_fim=ultima_data_mes,
         canal="estorno_13",
-        despesas_pessoal=float(conta.valor_original)  # Devolve provisão
+        despesas_pessoal=float(conta.valor_original),  # Devolve provisão
     )
 
     db.add(estorno)
     db.commit()
 
-    logger.info(
-        f"[13º SALARIO] ✅ Pagamento cancelado - conta={conta_pagar_id}"
-    )
+    logger.info(f"[13º SALARIO] ✅ Pagamento cancelado - conta={conta_pagar_id}")
 
     return {
         "sucesso": True,
         "mensagem": "13º cancelado e provisão estornada",
         "conta_id": conta.id,
-        "valor_estornado": float(conta.valor_original)
+        "valor_estornado": float(conta.valor_original),
     }

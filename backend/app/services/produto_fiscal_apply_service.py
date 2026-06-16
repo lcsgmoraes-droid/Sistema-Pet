@@ -3,10 +3,7 @@ from app.produto_config_fiscal_models import ProdutoConfigFiscal
 
 
 def aplicar_sugestao_fiscal_produto(
-    db: Session,
-    tenant_id: int,
-    produto_id: int,
-    sugestao: dict
+    db: Session, tenant_id: int, produto_id: int, sugestao: dict
 ):
     """
     Aplica manualmente uma sugestão fiscal ao produto.
@@ -16,7 +13,7 @@ def aplicar_sugestao_fiscal_produto(
         db.query(ProdutoConfigFiscal)
         .filter(
             ProdutoConfigFiscal.produto_id == produto_id,
-            ProdutoConfigFiscal.tenant_id == tenant_id
+            ProdutoConfigFiscal.tenant_id == tenant_id,
         )
         .first()
     )
@@ -26,7 +23,7 @@ def aplicar_sugestao_fiscal_produto(
             tenant_id=tenant_id,
             produto_id=produto_id,
             empresa_config_fiscal_id=sugestao.get("empresa_config_fiscal_id"),
-            herdado_da_empresa=False
+            herdado_da_empresa=False,
         )
         db.add(config)
 

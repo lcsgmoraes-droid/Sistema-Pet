@@ -73,7 +73,11 @@ def _valor_preenchido(valor: Any) -> bool:
 
 
 def _score_completude(pessoa: Any) -> int:
-    return sum(1 for campo in CAMPOS_COMPLETUDE if _valor_preenchido(getattr(pessoa, campo, None)))
+    return sum(
+        1
+        for campo in CAMPOS_COMPLETUDE
+        if _valor_preenchido(getattr(pessoa, campo, None))
+    )
 
 
 def _prioridade_perfil_pessoa(pessoa: Any) -> int:
@@ -89,7 +93,9 @@ def _prioridade_perfil_pessoa(pessoa: Any) -> int:
     return 0
 
 
-def avaliar_par_duplicidade_pessoas(pessoa_a: Any, pessoa_b: Any) -> DecisaoDuplicidadePessoa:
+def avaliar_par_duplicidade_pessoas(
+    pessoa_a: Any, pessoa_b: Any
+) -> DecisaoDuplicidadePessoa:
     chave_a = normalizar_nome_pessoa(getattr(pessoa_a, "nome", ""))
     chave_b = normalizar_nome_pessoa(getattr(pessoa_b, "nome", ""))
     motivos: list[str] = []
@@ -214,7 +220,11 @@ def executar_fusoes_automaticas_pessoas_duplicadas(
     grupos = _grupos_por_nome_normalizado(pessoas)
     if nome:
         chave_nome_filtro = normalizar_nome_pessoa(nome)
-        grupos = {chave_nome_filtro: grupos.get(chave_nome_filtro, [])} if chave_nome_filtro else {}
+        grupos = (
+            {chave_nome_filtro: grupos.get(chave_nome_filtro, [])}
+            if chave_nome_filtro
+            else {}
+        )
 
     fusoes = []
     sugestoes = []
@@ -225,7 +235,11 @@ def executar_fusoes_automaticas_pessoas_duplicadas(
         principal = escolher_pessoa_principal(grupo)
         for duplicado in grupo:
             if len(fusoes) >= limit:
-                return {"automaticas": fusoes, "sugestoes": sugestoes, "total_automaticas": len(fusoes)}
+                return {
+                    "automaticas": fusoes,
+                    "sugestoes": sugestoes,
+                    "total_automaticas": len(fusoes),
+                }
             if int(duplicado.id) == int(principal.id):
                 continue
 
@@ -251,7 +265,12 @@ def executar_fusoes_automaticas_pessoas_duplicadas(
                     user_id=user_id,
                     observacao="Fusao automatica por nome 100% igual e sem conflitos fortes.",
                 )
-                principal = db.query(Cliente).filter(Cliente.id == resultado["principal"]["id"]).first() or principal
+                principal = (
+                    db.query(Cliente)
+                    .filter(Cliente.id == resultado["principal"]["id"])
+                    .first()
+                    or principal
+                )
                 fusoes.append(
                     {
                         "chave_nome": chave_nome,
@@ -261,7 +280,9 @@ def executar_fusoes_automaticas_pessoas_duplicadas(
                 )
             except Exception as exc:
                 db.rollback()
-                logger.exception("Erro ao executar fusao automatica de pessoas duplicadas")
+                logger.exception(
+                    "Erro ao executar fusao automatica de pessoas duplicadas"
+                )
                 sugestoes.append(
                     {
                         "chave_nome": chave_nome,

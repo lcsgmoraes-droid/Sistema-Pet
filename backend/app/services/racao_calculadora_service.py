@@ -9,8 +9,8 @@ REGRAS:
 - Baseado em médias nutricionais realistas
 - Todos os cálculos documentados
 
-IMPORTANTE: 
-Este serviço NÃO usa IA ainda. 
+IMPORTANTE:
+Este serviço NÃO usa IA ainda.
 O campo contexto_ia é preparado para futura integração.
 """
 
@@ -31,34 +31,34 @@ logger = logging.getLogger(__name__)
 # Fator de atividade metabólica por fase de vida
 FATOR_FASE = {
     "filhote": 1.5,  # Filhotes precisam ~50% a mais
-    "adulto": 1.0,   # Baseline
-    "idoso": 0.85    # Idosos precisam ~15% menos
+    "adulto": 1.0,  # Baseline
+    "idoso": 0.85,  # Idosos precisam ~15% menos
 }
 
 # Fator de ajuste por tipo de ração (densidade calórica)
 # Rações premium são mais calóricas, logo precisa-se menos quantidade
 FATOR_TIPO_RACAO = {
-    "standard": 1.2,      # Menos calórica, precisa mais quantidade
-    "premium": 1.0,       # Baseline
-    "super_premium": 0.85 # Mais calórica, precisa menos quantidade
+    "standard": 1.2,  # Menos calórica, precisa mais quantidade
+    "premium": 1.0,  # Baseline
+    "super_premium": 0.85,  # Mais calórica, precisa menos quantidade
 }
 
 # Consumo base por kg de peso (em gramas/dia) para cães adultos
 # Considera porte porque metabolismo varia
 CONSUMO_BASE_CAO = {
-    "mini": 40,      # até 5kg - metabolismo mais acelerado
-    "pequeno": 35,   # 5-10kg
-    "medio": 30,     # 10-25kg
-    "grande": 25     # 25kg+ - metabolismo mais lento proporcionalmente
+    "mini": 40,  # até 5kg - metabolismo mais acelerado
+    "pequeno": 35,  # 5-10kg
+    "medio": 30,  # 10-25kg
+    "grande": 25,  # 25kg+ - metabolismo mais lento proporcionalmente
 }
 
 # Consumo base por kg de peso (em gramas/dia) para gatos adultos
 # Gatos tem metabolismo mais uniforme independente do porte
 CONSUMO_BASE_GATO = {
-    "mini": 35,      # até 3kg
-    "pequeno": 30,   # 3-5kg
-    "medio": 28,     # 5-7kg  (raro mas existe)
-    "grande": 25     # 7kg+   (raro mas existe)
+    "mini": 35,  # até 3kg
+    "pequeno": 30,  # 3-5kg
+    "medio": 28,  # 5-7kg  (raro mas existe)
+    "grande": 25,  # 7kg+   (raro mas existe)
 }
 
 
@@ -66,62 +66,72 @@ def _ler_tabela_consumo(
     tabela_consumo_json: Optional[str],
     peso_pet_kg: float,
     idade_meses: Optional[int],
-    nivel_atividade: str = "normal"
+    nivel_atividade: str = "normal",
 ) -> Optional[float]:
     """
     Lê a tabela de consumo do produto (dados da embalagem).
     Retorna quantidade em gramas/dia ou None se não conseguir ler.
-    
+
     Baseado na lógica da calculadora antiga (calculadora_racao.py).
     """
     if not tabela_consumo_json:
         return None
-    
+
     try:
-        logger.info(f"🔍 Processando tabela_consumo para pet {peso_pet_kg}kg, idade {idade_meses}m...")
+        logger.info(
+            f"🔍 Processando tabela_consumo para pet {peso_pet_kg}kg, idade {idade_meses}m..."
+        )
         tabela = json.loads(tabela_consumo_json)
         logger.debug(f"📋 Tabela parseada: {tabela}")
-        
+
         # Formato novo: {"tipo": "filhote_peso_adulto", "dados": {"5kg": {"4m": 125, "6m": 130}}}
         if "tipo" in tabela and "dados" in tabela:
             tipo_tabela = tabela["tipo"]
             dados = tabela["dados"]
-            logger.debug(f"Tipo tabela: {tipo_tabela}, Dados keys: {list(dados.keys())}")
-            
+            logger.debug(
+                f"Tipo tabela: {tipo_tabela}, Dados keys: {list(dados.keys())}"
+            )
+
             # Encontrar peso mais próximo
             pesos_disponiveis = []
             for peso_str in dados.keys():
-                peso_num = float(peso_str.replace('kg', '').replace('g', '').strip())
+                peso_num = float(peso_str.replace("kg", "").replace("g", "").strip())
                 pesos_disponiveis.append(peso_num)
-            
+
             if not pesos_disponiveis:
                 logger.warning("Nenhum peso encontrado na tabela")
                 return None
-            
+
             # Peso mais próximo
             peso_tabela = min(pesos_disponiveis, key=lambda x: abs(x - peso_pet_kg))
-            
+
             # Buscar a chave correspondente ao peso
             peso_key = None
             for k in dados.keys():
-                peso_k = float(k.replace('kg', '').replace('g', '').strip())
+                peso_k = float(k.replace("kg", "").replace("g", "").strip())
                 if peso_k == peso_tabela:
                     peso_key = k
                     break
-            
+
             if not peso_key:
                 logger.warning(f"Chave não encontrada para peso {peso_tabela}kg")
                 return None
-            
-            logger.debug(f"Pet {peso_pet_kg}kg -> Usando linha da tabela: {peso_key} ({peso_tabela}kg)")
-            
+
+            logger.debug(
+                f"Pet {peso_pet_kg}kg -> Usando linha da tabela: {peso_key} ({peso_tabela}kg)"
+            )
+
             consumos = dados[peso_key]
             logger.debug(f"Consumos disponíveis: {consumos}")
-            
+
             quantidade = 0
-            
+
             # Para filhote: buscar pela idade (até 18 meses inclusive)
-            if tipo_tabela == "filhote_peso_adulto" and idade_meses and idade_meses <= 18:
+            if (
+                tipo_tabela == "filhote_peso_adulto"
+                and idade_meses
+                and idade_meses <= 18
+            ):
                 logger.debug(f"Modo FILHOTE - idade {idade_meses}m")
                 idade_key = f"{idade_meses}m"
                 if idade_key in consumos:
@@ -129,60 +139,74 @@ def _ler_tabela_consumo(
                     logger.debug(f"Encontrou idade exata {idade_key}: {quantidade}g")
                 else:
                     # Buscar idade mais próxima
-                    idades_disponiveis = [int(k.replace('m', '')) for k in consumos.keys() if k != 'adulto' and 'm' in k]
+                    idades_disponiveis = [
+                        int(k.replace("m", ""))
+                        for k in consumos.keys()
+                        if k != "adulto" and "m" in k
+                    ]
                     if idades_disponiveis:
-                        idade_proxima = min(idades_disponiveis, key=lambda x: abs(x - idade_meses))
+                        idade_proxima = min(
+                            idades_disponiveis, key=lambda x: abs(x - idade_meses)
+                        )
                         quantidade = consumos[f"{idade_proxima}m"]
-                        logger.debug(f"Usando idade mais próxima {idade_proxima}m: {quantidade}g")
+                        logger.debug(
+                            f"Usando idade mais próxima {idade_proxima}m: {quantidade}g"
+                        )
                     else:
-                        quantidade = consumos.get('adulto', 0)
+                        quantidade = consumos.get("adulto", 0)
                         logger.debug(f"Sem idades, usando adulto: {quantidade}g")
             else:
                 # Para adulto: usar coluna 'adulto'
                 logger.debug("Modo ADULTO")
-                quantidade = consumos.get('adulto', list(consumos.values())[0] if consumos else 0)
+                quantidade = consumos.get(
+                    "adulto", list(consumos.values())[0] if consumos else 0
+                )
                 logger.debug(f"Quantidade adulto: {quantidade}g")
-            
+
             if quantidade and quantidade > 0:
-                logger.info(f"✅ Tabela da embalagem: {quantidade}g/dia para {peso_pet_kg}kg")
-                
+                logger.info(
+                    f"✅ Tabela da embalagem: {quantidade}g/dia para {peso_pet_kg}kg"
+                )
+
                 # Ajustar por nível de atividade
                 if nivel_atividade == "alto":
                     quantidade *= 1.1  # +10%
                 elif nivel_atividade == "baixo":
                     quantidade *= 0.9  # -10%
-                
+
                 return round(quantidade, 2)
             else:
                 logger.warning("Quantidade não encontrada ou zero na tabela")
                 return None
-        
+
         # Formato antigo (compatibilidade)
         else:
             logger.debug("Usando formato antigo de tabela")
             # Código do formato antigo omitido por brevidade
             return None
-            
+
     except Exception as e:
         logger.warning(f"⚠️ Erro ao ler tabela_consumo: {e}")
         return None
-    
+
     return None
 
 
-def calcular_racao(payload: Dict[str, Any], tabela_consumo_json: Optional[str] = None) -> Dict[str, Any]:
+def calcular_racao(
+    payload: Dict[str, Any], tabela_consumo_json: Optional[str] = None
+) -> Dict[str, Any]:
     """
     Calcula consumo de ração, durabilidade do pacote e custos.
-    
+
     Args:
         payload: Dicionário com dados do animal e da ração
                  (ver RacaoCalculadoraInput para estrutura)
         tabela_consumo_json: JSON opcional com tabela de consumo do produto
-    
+
     Returns:
         Dicionário com resultados (ver RacaoCalculadoraOutput)
         Nunca retorna None - sempre retorna resultado ou valores padrão
-    
+
     Cálculo:
         PRIORIDADE 1: Usar tabela_consumo do produto (se disponível)
         FALLBACK: Calcular com fórmulas genéricas:
@@ -200,7 +224,7 @@ def calcular_racao(payload: Dict[str, Any], tabela_consumo_json: Optional[str] =
         except Exception as e:
             logger.error(f"Erro na validação de entrada: {e}")
             return _retornar_erro_validacao(str(e))
-        
+
         # Extrai valores validados
         especie = entrada.especie
         peso_kg = entrada.peso_kg
@@ -210,69 +234,81 @@ def calcular_racao(payload: Dict[str, Any], tabela_consumo_json: Optional[str] =
         tipo_racao = entrada.tipo_racao
         peso_pacote_kg = entrada.peso_pacote_kg
         preco_pacote = entrada.preco_pacote
-        
+
         # ====================================
         # ETAPA 1: Consumo Diário
         # ====================================
         # PRIORIDADE: Tentar ler da tabela de consumo do produto
         consumo_diario_gramas = None
-        
+
         if tabela_consumo_json:
             logger.info("🔍 Tentando usar tabela de consumo do produto...")
             consumo_diario_gramas = _ler_tabela_consumo(
                 tabela_consumo_json=tabela_consumo_json,
                 peso_pet_kg=peso_kg,
                 idade_meses=idade_meses,
-                nivel_atividade="normal"  # Pode ser parametrizado no futuro
+                nivel_atividade="normal",  # Pode ser parametrizado no futuro
             )
-            
+
             if consumo_diario_gramas:
-                logger.info(f"✅ Usando tabela da embalagem: {consumo_diario_gramas}g/dia")
-        
+                logger.info(
+                    f"✅ Usando tabela da embalagem: {consumo_diario_gramas}g/dia"
+                )
+
         # FALLBACK: Calcular com fórmulas genéricas
         if not consumo_diario_gramas:
             logger.info("📊 Usando cálculo genérico (tabela não disponível)")
-            
+
             # Seleciona tabela de consumo baseada na espécie
             if especie == "cao":
                 consumo_base_por_kg = CONSUMO_BASE_CAO.get(porte, 30)
             else:  # gato
                 consumo_base_por_kg = CONSUMO_BASE_GATO.get(porte, 30)
-            
+
             consumo_base = peso_kg * consumo_base_por_kg
-            logger.debug(f"Consumo base: {peso_kg}kg * {consumo_base_por_kg}g/kg = {consumo_base}g/dia")
-            
+            logger.debug(
+                f"Consumo base: {peso_kg}kg * {consumo_base_por_kg}g/kg = {consumo_base}g/dia"
+            )
+
             # Ajuste por Fase de Vida
             fator_fase = FATOR_FASE.get(fase, 1.0)
             consumo_com_fase = consumo_base * fator_fase
-            logger.debug(f"Ajuste fase ({fase}): {consumo_base}g * {fator_fase} = {consumo_com_fase}g/dia")
-            
+            logger.debug(
+                f"Ajuste fase ({fase}): {consumo_base}g * {fator_fase} = {consumo_com_fase}g/dia"
+            )
+
             # Ajuste por Tipo de Ração
             fator_racao = FATOR_TIPO_RACAO.get(tipo_racao, 1.0)
             consumo_diario_gramas = consumo_com_fase * fator_racao
-            logger.debug(f"Ajuste ração ({tipo_racao}): {consumo_com_fase}g * {fator_racao} = {consumo_diario_gramas}g/dia")
-        
+            logger.debug(
+                f"Ajuste ração ({tipo_racao}): {consumo_com_fase}g * {fator_racao} = {consumo_diario_gramas}g/dia"
+            )
+
         # Arredonda para 2 casas decimais
         consumo_diario_gramas = round(consumo_diario_gramas, 2)
-        
+
         # ====================================
         # ETAPA 4: Durabilidade do Pacote
         # ====================================
         peso_pacote_gramas = peso_pacote_kg * 1000
         duracao_pacote_dias = peso_pacote_gramas / consumo_diario_gramas
         duracao_pacote_dias = round(duracao_pacote_dias, 2)
-        logger.debug(f"Durabilidade: {peso_pacote_gramas}g / {consumo_diario_gramas}g/dia = {duracao_pacote_dias} dias")
-        
+        logger.debug(
+            f"Durabilidade: {peso_pacote_gramas}g / {consumo_diario_gramas}g/dia = {duracao_pacote_dias} dias"
+        )
+
         # ====================================
         # ETAPA 5: Custos
         # ====================================
         custo_diario = preco_pacote / duracao_pacote_dias
         custo_diario = round(custo_diario, 2)
-        
+
         custo_mensal = custo_diario * 30
         custo_mensal = round(custo_mensal, 2)
-        logger.debug(f"Custo diário: R$ {custo_diario} | Custo mensal: R$ {custo_mensal}")
-        
+        logger.debug(
+            f"Custo diário: R$ {custo_diario} | Custo mensal: R$ {custo_mensal}"
+        )
+
         # ====================================
         # ETAPA 6: Observações
         # ====================================
@@ -282,9 +318,9 @@ def calcular_racao(payload: Dict[str, Any], tabela_consumo_json: Optional[str] =
             porte=porte,
             peso_kg=peso_kg,
             consumo_diario_gramas=consumo_diario_gramas,
-            tipo_racao=tipo_racao
+            tipo_racao=tipo_racao,
         )
-        
+
         # ====================================
         # ETAPA 7: Contexto para IA (FUTURO)
         # ====================================
@@ -296,9 +332,9 @@ def calcular_racao(payload: Dict[str, Any], tabela_consumo_json: Optional[str] =
             duracao_pacote_dias=duracao_pacote_dias,
             custo_diario=custo_diario,
             custo_mensal=custo_mensal,
-            observacoes=observacoes
+            observacoes=observacoes,
         )
-        
+
         # ====================================
         # RETORNO
         # ====================================
@@ -308,12 +344,14 @@ def calcular_racao(payload: Dict[str, Any], tabela_consumo_json: Optional[str] =
             custo_diario=custo_diario,
             custo_mensal=custo_mensal,
             observacoes=observacoes,
-            contexto_ia=contexto_ia
+            contexto_ia=contexto_ia,
         )
-        
-        logger.info(f"Cálculo concluído: {consumo_diario_gramas}g/dia, R$ {custo_mensal}/mês")
+
+        logger.info(
+            f"Cálculo concluído: {consumo_diario_gramas}g/dia, R$ {custo_mensal}/mês"
+        )
         return resultado.model_dump()
-        
+
     except Exception as e:
         # FAIL-SAFE: Nunca quebra, sempre retorna algo utilizável
         logger.error(f"Erro no cálculo de ração: {e}", exc_info=True)
@@ -326,11 +364,11 @@ def _gerar_observacoes(
     porte: str,
     peso_kg: float,
     consumo_diario_gramas: float,
-    tipo_racao: str
+    tipo_racao: str,
 ) -> str:
     """
     Gera observações personalizadas sobre o cálculo.
-    
+
     Inclui:
     - Descrição do perfil do animal
     - Recomendações de fracionamento
@@ -339,28 +377,30 @@ def _gerar_observacoes(
     """
     # Nomenclaturas amigáveis
     especie_nome = "Cão" if especie == "cao" else "Gato"
-    fase_nome = {"filhote": "Filhote", "adulto": "Adulto", "idoso": "Idoso"}.get(fase, fase.title())
+    fase_nome = {"filhote": "Filhote", "adulto": "Adulto", "idoso": "Idoso"}.get(
+        fase, fase.title()
+    )
     porte_nome = {
         "mini": "mini",
         "pequeno": "pequeno",
         "medio": "médio",
-        "grande": "grande"
+        "grande": "grande",
     }.get(porte, porte)
-    
+
     tipo_racao_nome = {
         "standard": "Standard",
         "premium": "Premium",
-        "super_premium": "Super Premium"
+        "super_premium": "Super Premium",
     }.get(tipo_racao, tipo_racao.title())
-    
+
     observacoes_partes = []
-    
+
     # Perfil básico
     observacoes_partes.append(
         f"{especie_nome} de porte {porte_nome}, {fase_nome.lower()}, pesando {peso_kg}kg. "
         f"Consome aproximadamente {consumo_diario_gramas}g/dia de ração {tipo_racao_nome}."
     )
-    
+
     # Recomendações de fracionamento por fase
     if fase == "filhote":
         observacoes_partes.append(
@@ -374,7 +414,7 @@ def _gerar_observacoes(
         observacoes_partes.append(
             "Para idosos, considere 2-3 refeições menores para facilitar a digestão."
         )
-    
+
     # Alertas específicos por tipo de ração
     if tipo_racao == "standard":
         observacoes_partes.append(
@@ -384,14 +424,18 @@ def _gerar_observacoes(
         observacoes_partes.append(
             "Rações super premium são mais concentradas nutricionalmente, requerendo menor quantidade."
         )
-    
+
     # Alerta de peso (possível obesidade)
     if especie == "cao":
         if porte == "pequeno" and peso_kg > 10:
-            observacoes_partes.append("⚠️ Peso acima da média para o porte. Consulte um veterinário.")
+            observacoes_partes.append(
+                "⚠️ Peso acima da média para o porte. Consulte um veterinário."
+            )
         elif porte == "medio" and peso_kg > 25:
-            observacoes_partes.append("⚠️ Peso acima da média para o porte. Consulte um veterinário.")
-    
+            observacoes_partes.append(
+                "⚠️ Peso acima da média para o porte. Consulte um veterinário."
+            )
+
     return " ".join(observacoes_partes)
 
 
@@ -401,15 +445,15 @@ def _preparar_contexto_ia(
     duracao_pacote_dias: float,
     custo_diario: float,
     custo_mensal: float,
-    observacoes: str
+    observacoes: str,
 ) -> Dict[str, Any]:
     """
     Prepara contexto estruturado para futura integração com IA.
-    
-    IMPORTANTE: 
+
+    IMPORTANTE:
     Esta função NÃO chama IA.
     Apenas organiza os dados para facilitar integração futura.
-    
+
     Retorna:
         - resumo_textual: String descritiva pronta para contexto de IA
         - dados_estruturados: Todos os dados calculados organizados
@@ -422,7 +466,7 @@ def _preparar_contexto_ia(
         f"Um pacote de {entrada.peso_pacote_kg}kg (R$ {entrada.preco_pacote:.2f}) dura "
         f"{duracao_pacote_dias:.1f} dias, com custo mensal de R$ {custo_mensal:.2f}."
     )
-    
+
     # Dados estruturados completos
     dados_estruturados = {
         # Input original
@@ -433,27 +477,26 @@ def _preparar_contexto_ia(
             "porte": entrada.porte,
             "tipo_racao": entrada.tipo_racao,
             "peso_pacote_kg": entrada.peso_pacote_kg,
-            "preco_pacote": entrada.preco_pacote
+            "preco_pacote": entrada.preco_pacote,
         },
         # Resultados calculados
         "resultados": {
             "consumo_diario_gramas": consumo_diario_gramas,
             "duracao_pacote_dias": duracao_pacote_dias,
             "custo_diario": custo_diario,
-            "custo_mensal": custo_mensal
+            "custo_mensal": custo_mensal,
         },
         # Métricas derivadas (úteis para IA fazer comparações)
         "metricas": {
             "custo_por_kg": round(entrada.preco_pacote / entrada.peso_pacote_kg, 2),
-            "gramas_por_real": round((entrada.peso_pacote_kg * 1000) / entrada.preco_pacote, 2),
-            "consumo_mensal_kg": round((consumo_diario_gramas * 30) / 1000, 2)
-        }
+            "gramas_por_real": round(
+                (entrada.peso_pacote_kg * 1000) / entrada.preco_pacote, 2
+            ),
+            "consumo_mensal_kg": round((consumo_diario_gramas * 30) / 1000, 2),
+        },
     }
-    
-    return {
-        "resumo_textual": resumo_textual,
-        "dados_estruturados": dados_estruturados
-    }
+
+    return {"resumo_textual": resumo_textual, "dados_estruturados": dados_estruturados}
 
 
 def _retornar_erro_validacao(mensagem_erro: str) -> Dict[str, Any]:
@@ -469,8 +512,8 @@ def _retornar_erro_validacao(mensagem_erro: str) -> Dict[str, Any]:
         "observacoes": f"❌ Erro de validação: {mensagem_erro}. Verifique os dados fornecidos.",
         "contexto_ia": {
             "resumo_textual": f"Erro de validação: {mensagem_erro}",
-            "dados_estruturados": {"erro": mensagem_erro, "tipo": "validacao"}
-        }
+            "dados_estruturados": {"erro": mensagem_erro, "tipo": "validacao"},
+        },
     }
 
 
@@ -487,8 +530,8 @@ def _retornar_erro_generico(mensagem_erro: str) -> Dict[str, Any]:
         "observacoes": "❌ Erro ao calcular ração. Por favor, tente novamente ou contate o suporte.",
         "contexto_ia": {
             "resumo_textual": f"Erro no cálculo: {mensagem_erro}",
-            "dados_estruturados": {"erro": mensagem_erro, "tipo": "generico"}
-        }
+            "dados_estruturados": {"erro": mensagem_erro, "tipo": "generico"},
+        },
     }
 
 

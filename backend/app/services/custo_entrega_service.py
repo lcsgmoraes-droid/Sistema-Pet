@@ -19,7 +19,9 @@ def calcular_custo_moto(km: Decimal) -> Decimal:
     return Decimal("0.00")
 
 
-def calcular_custo_entrega(entregador: Cliente | None, km: Decimal, tentativas: int, moto_da_loja: bool) -> Decimal:
+def calcular_custo_entrega(
+    entregador: Cliente | None, km: Decimal, tentativas: int, moto_da_loja: bool
+) -> Decimal:
     """
     Calcula o custo REAL da entrega (gerencial).
     """
@@ -31,10 +33,16 @@ def calcular_custo_entrega(entregador: Cliente | None, km: Decimal, tentativas: 
 
     # 1️⃣ RATEIO RH (FUNCIONÁRIO)
     elif entregador.controla_rh:
-        if not entregador.media_entregas_configurada or entregador.media_entregas_configurada == 0:
+        if (
+            not entregador.media_entregas_configurada
+            or entregador.media_entregas_configurada == 0
+        ):
             custo_base = Decimal("0")
         else:
-            custo_mensal = entregador.custo_rh_ajustado or calcular_custo_total_funcionario(entregador)
+            custo_mensal = (
+                entregador.custo_rh_ajustado
+                or calcular_custo_total_funcionario(entregador)
+            )
             custo_base = custo_mensal / Decimal(entregador.media_entregas_configurada)
 
     # 2️⃣ TAXA FIXA

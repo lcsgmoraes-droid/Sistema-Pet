@@ -62,7 +62,9 @@ def _normalize_remote_image_url(value: Optional[str]) -> Optional[str]:
 
 
 def _score_image_candidate(url: str, path: tuple[str, ...]) -> int:
-    normalized_path = [segment.strip().lower() for segment in path if str(segment or "").strip()]
+    normalized_path = [
+        segment.strip().lower() for segment in path if str(segment or "").strip()
+    ]
     path_text = " ".join(normalized_path)
     parsed = urlparse(url)
     url_path = (parsed.path or "").lower()
@@ -75,10 +77,16 @@ def _score_image_candidate(url: str, path: tuple[str, ...]) -> int:
 
     if any(url_path.endswith(extension) for extension in _IMAGE_EXTENSIONS):
         score += 35
-    elif any(marker in url_path for marker in ("/image", "/images/", "/imagem", "/media/", "/thumb")):
+    elif any(
+        marker in url_path
+        for marker in ("/image", "/images/", "/imagem", "/media/", "/thumb")
+    ):
         score += 18
 
-    if any(marker in url_query for marker in ("image", "imagem", "img", "thumb", "photo", "foto")):
+    if any(
+        marker in url_query
+        for marker in ("image", "imagem", "img", "thumb", "photo", "foto")
+    ):
         score += 8
 
     if "produto" in path_text or "product" in path_text:
@@ -87,7 +95,9 @@ def _score_image_candidate(url: str, path: tuple[str, ...]) -> int:
     return score
 
 
-def _collect_image_candidates(node, path: tuple[str, ...], collected: list[tuple[int, str]]) -> None:
+def _collect_image_candidates(
+    node, path: tuple[str, ...], collected: list[tuple[int, str]]
+) -> None:
     if isinstance(node, dict):
         for key, value in node.items():
             _collect_image_candidates(value, (*path, str(key)), collected)
@@ -172,10 +182,22 @@ def attach_remote_image_to_product(
         for existing_image in existing_images:
             existing_image.e_principal = False
 
-    has_primary = any(bool(getattr(existing_image, "e_principal", False)) for existing_image in existing_images)
+    has_primary = any(
+        bool(getattr(existing_image, "e_principal", False))
+        for existing_image in existing_images
+    )
     has_main_url = bool(str(getattr(produto, "imagem_principal", "") or "").strip())
     should_be_primary = force_primary or (not has_primary and not has_main_url)
-    next_order = max((int(getattr(existing_image, "ordem", 0) or 0) for existing_image in existing_images), default=0) + 1
+    next_order = (
+        max(
+            (
+                int(getattr(existing_image, "ordem", 0) or 0)
+                for existing_image in existing_images
+            ),
+            default=0,
+        )
+        + 1
+    )
 
     new_image = ProdutoImagem(
         tenant_id=tenant_id,

@@ -117,7 +117,9 @@ def _table_exists(db: Session, table_name: str) -> bool:
 def _columns(db: Session, table_name: str) -> set[str]:
     if not _table_exists(db, table_name):
         return set()
-    return {column["name"] for column in inspect(db.connection()).get_columns(table_name)}
+    return {
+        column["name"] for column in inspect(db.connection()).get_columns(table_name)
+    }
 
 
 def _tenant_exists(db: Session, tenant_id: str) -> bool:
@@ -131,13 +133,19 @@ def _tenant_exists(db: Session, tenant_id: str) -> bool:
     )
 
 
-def _validate_tenants(db: Session, source_tenant_id: str, target_tenant_id: str) -> None:
+def _validate_tenants(
+    db: Session, source_tenant_id: str, target_tenant_id: str
+) -> None:
     if source_tenant_id == target_tenant_id:
         raise BaseCatalogImportError("Tenant fonte e destino nao podem ser iguais.")
     if not _tenant_exists(db, source_tenant_id):
-        raise BaseCatalogImportError(f"Tenant fonte nao encontrado: {source_tenant_id}.")
+        raise BaseCatalogImportError(
+            f"Tenant fonte nao encontrado: {source_tenant_id}."
+        )
     if not _tenant_exists(db, target_tenant_id):
-        raise BaseCatalogImportError(f"Tenant destino nao encontrado: {target_tenant_id}.")
+        raise BaseCatalogImportError(
+            f"Tenant destino nao encontrado: {target_tenant_id}."
+        )
 
 
 def _template_code(item_type: str, source_id: int) -> str:
@@ -150,7 +158,9 @@ def _select_rows(db: Session, table_name: str, tenant_id: str) -> list[dict[str,
     sync_rls_tenant(db, tenant_id)
     order_clause = "ORDER BY id" if "id" in _columns(db, table_name) else ""
     rows = db.execute(
-        text(f"SELECT * FROM {table_name} WHERE CAST(tenant_id AS TEXT) = :tenant_id {order_clause}"),
+        text(
+            f"SELECT * FROM {table_name} WHERE CAST(tenant_id AS TEXT) = :tenant_id {order_clause}"
+        ),
         {"tenant_id": tenant_id},
     ).mappings()
     return [dict(row) for row in rows]
@@ -327,7 +337,11 @@ def _insert_and_lookup(
     lookup_params: dict[str, Any],
 ) -> int:
     table_columns = _columns(db, table_name)
-    filtered = {key: value for key, value in values.items() if key in table_columns and key != "id"}
+    filtered = {
+        key: value
+        for key, value in values.items()
+        if key in table_columns and key != "id"
+    }
     if "created_at" in table_columns and "created_at" not in filtered:
         filtered["created_at"] = _now()
     if "updated_at" in table_columns and "updated_at" not in filtered:
@@ -337,14 +351,20 @@ def _insert_and_lookup(
         sync_rls_tenant(db, tenant_id)
     column_sql = ", ".join(filtered)
     param_sql = ", ".join(f":{key}" for key in filtered)
-    db.execute(text(f"INSERT INTO {table_name} ({column_sql}) VALUES ({param_sql})"), filtered)
+    db.execute(
+        text(f"INSERT INTO {table_name} ({column_sql}) VALUES ({param_sql})"), filtered
+    )
     created_id = db.execute(text(lookup_sql), lookup_params).scalar()
     if not created_id:
-        raise BaseCatalogImportError(f"Nao foi possivel localizar registro criado em {table_name}.")
+        raise BaseCatalogImportError(
+            f"Nao foi possivel localizar registro criado em {table_name}."
+        )
     return int(created_id)
 
 
-def _existing_id_by_name(db: Session, table_name: str, tenant_id: str, name: str) -> int | None:
+def _existing_id_by_name(
+    db: Session, table_name: str, tenant_id: str, name: str
+) -> int | None:
     sync_rls_tenant(db, tenant_id)
     return db.execute(
         text(
@@ -384,7 +404,9 @@ def _copy_departments(
             mapping[source_id] = int(mapped_id)
             result.bump("skipped", "departamentos")
             continue
-        existing_id = _existing_id_by_name(db, "departamentos", target_tenant_id, row["nome"])
+        existing_id = _existing_id_by_name(
+            db, "departamentos", target_tenant_id, row["nome"]
+        )
         if existing_id:
             mapping[source_id] = int(existing_id)
             if not result.dry_run:
@@ -579,7 +601,11 @@ def _copy_categories(
             mapping[source_id] = int(mapped_id)
             result.bump("skipped", "categorias")
             continue
-        target_department_id = department_map.get(int(row["departamento_id"])) if row.get("departamento_id") else None
+        target_department_id = (
+            department_map.get(int(row["departamento_id"]))
+            if row.get("departamento_id")
+            else None
+        )
         existing_id = _find_existing_category_id(
             db,
             tenant_id=target_tenant_id,
@@ -755,7 +781,9 @@ def _copy_option_table(
             """
             lookup_params = {"tenant_id": target_tenant_id, "peso_kg": row["peso_kg"]}
         else:
-            existing_id = _existing_id_by_name(db, table_name, target_tenant_id, row["nome"])
+            existing_id = _existing_id_by_name(
+                db, table_name, target_tenant_id, row["nome"]
+            )
             lookup_sql = f"""
                 SELECT id FROM {table_name}
                 WHERE CAST(tenant_id AS TEXT)=:tenant_id AND lower(trim(nome))=lower(trim(:nome))
@@ -821,9 +849,17 @@ def _sanitize_product_values(
     values = dict(row)
     values["tenant_id"] = target_tenant_id
     values["user_id"] = user_id
-    values["categoria_id"] = category_map.get(int(row["categoria_id"])) if row.get("categoria_id") else None
-    values["departamento_id"] = department_map.get(int(row["departamento_id"])) if row.get("departamento_id") else None
-    values["marca_id"] = brand_map.get(int(row["marca_id"])) if row.get("marca_id") else None
+    values["categoria_id"] = (
+        category_map.get(int(row["categoria_id"])) if row.get("categoria_id") else None
+    )
+    values["departamento_id"] = (
+        department_map.get(int(row["departamento_id"]))
+        if row.get("departamento_id")
+        else None
+    )
+    values["marca_id"] = (
+        brand_map.get(int(row["marca_id"])) if row.get("marca_id") else None
+    )
     values["produto_pai_id"] = None
     values["produto_predecessor_id"] = None
     values["imagem_principal"] = None
@@ -838,7 +874,11 @@ def _sanitize_product_values(
     }
     for field_name, item_type in option_field_map.items():
         source_value = row.get(field_name)
-        values[field_name] = option_maps.get(item_type, {}).get(int(source_value)) if source_value else None
+        values[field_name] = (
+            option_maps.get(item_type, {}).get(int(source_value))
+            if source_value
+            else None
+        )
 
     for field_name in PRODUCT_OPERATIONAL_ZERO_FIELDS:
         values[field_name] = 0
@@ -916,9 +956,15 @@ def _link_product_hierarchy(
         target_id = mapping.get(source_id)
         if not target_id:
             continue
-        parent_target_id = mapping.get(int(row["produto_pai_id"])) if row.get("produto_pai_id") else None
+        parent_target_id = (
+            mapping.get(int(row["produto_pai_id"]))
+            if row.get("produto_pai_id")
+            else None
+        )
         predecessor_target_id = (
-            mapping.get(int(row["produto_predecessor_id"])) if row.get("produto_predecessor_id") else None
+            mapping.get(int(row["produto_predecessor_id"]))
+            if row.get("produto_predecessor_id")
+            else None
         )
         if parent_target_id or predecessor_target_id:
             db.execute(
@@ -970,7 +1016,9 @@ def _copy_products(
             mapping[source_id] = int(mapped_id)
             result.bump("skipped", "produtos")
             continue
-        existing_id = _find_existing_product_id(db, tenant_id=target_tenant_id, codigo=row["codigo"])
+        existing_id = _find_existing_product_id(
+            db, tenant_id=target_tenant_id, codigo=row["codigo"]
+        )
         if existing_id:
             _record_or_skip_mapped_item(
                 db,
@@ -1043,7 +1091,9 @@ def _build_s3_copy_extra_args(settings: Any) -> dict[str, Any]:
         "CacheControl": "public, max-age=31536000, immutable",
         "MetadataDirective": "REPLACE",
     }
-    expected_owner = str(getattr(settings, "PRODUCT_IMAGE_S3_EXPECTED_BUCKET_OWNER", "") or "").strip()
+    expected_owner = str(
+        getattr(settings, "PRODUCT_IMAGE_S3_EXPECTED_BUCKET_OWNER", "") or ""
+    ).strip()
     if expected_owner:
         extra_args["ExpectedBucketOwner"] = expected_owner
         extra_args["ExpectedSourceBucketOwner"] = expected_owner
@@ -1057,7 +1107,9 @@ def _build_s3_image_copy_context(public_url: str) -> S3ImageCopyContext | None:
         is_s3_product_image_url,
     )
 
-    if get_product_image_storage_backend() != "s3" or not is_s3_product_image_url(public_url):
+    if get_product_image_storage_backend() != "s3" or not is_s3_product_image_url(
+        public_url
+    ):
         return None
 
     base_url = str(settings.PRODUCT_IMAGE_S3_PUBLIC_BASE_URL or "").strip().rstrip("/")
@@ -1072,8 +1124,12 @@ def _build_s3_image_copy_context(public_url: str) -> S3ImageCopyContext | None:
         "s3",
         region_name=str(settings.PRODUCT_IMAGE_S3_REGION or "").strip() or None,
         endpoint_url=str(settings.PRODUCT_IMAGE_S3_ENDPOINT_URL or "").strip() or None,
-        aws_access_key_id=str(settings.PRODUCT_IMAGE_S3_ACCESS_KEY_ID or "").strip() or None,
-        aws_secret_access_key=str(settings.PRODUCT_IMAGE_S3_SECRET_ACCESS_KEY or "").strip() or None,
+        aws_access_key_id=str(settings.PRODUCT_IMAGE_S3_ACCESS_KEY_ID or "").strip()
+        or None,
+        aws_secret_access_key=str(
+            settings.PRODUCT_IMAGE_S3_SECRET_ACCESS_KEY or ""
+        ).strip()
+        or None,
         config=BotoConfig(
             signature_version="s3v4",
             s3={
@@ -1102,7 +1158,10 @@ def _copy_s3_product_image_object(
     destination_url: str,
 ) -> None:
     context.client.copy(
-        {"Bucket": context.bucket, "Key": _s3_key_from_public_url(context.base_url, source_url)},
+        {
+            "Bucket": context.bucket,
+            "Key": _s3_key_from_public_url(context.base_url, source_url),
+        },
         context.bucket,
         _s3_key_from_public_url(context.base_url, destination_url),
         ExtraArgs=context.extra_args,
@@ -1119,7 +1178,10 @@ def _copy_s3_product_image_variants(
 
     url_pairs = (
         (public_url, rewritten_url),
-        (build_product_thumbnail_url(public_url), build_product_thumbnail_url(rewritten_url)),
+        (
+            build_product_thumbnail_url(public_url),
+            build_product_thumbnail_url(rewritten_url),
+        ),
     )
     for source_url, destination_url in url_pairs:
         if source_url and destination_url:
@@ -1151,9 +1213,13 @@ def copy_product_image_url(
     try:
         context = _build_s3_image_copy_context(public_url)
         if context:
-            _copy_s3_product_image_variants(context, public_url=public_url, rewritten_url=rewritten)
+            _copy_s3_product_image_variants(
+                context, public_url=public_url, rewritten_url=rewritten
+            )
     except Exception as exc:
-        raise BaseCatalogImportError(f"Falha ao copiar imagem de produto: {exc}") from exc
+        raise BaseCatalogImportError(
+            f"Falha ao copiar imagem de produto: {exc}"
+        ) from exc
 
     return rewritten
 
@@ -1189,7 +1255,9 @@ def _create_product_image(
     url: str,
 ) -> int:
     values = dict(row)
-    values.update({"tenant_id": target_tenant_id, "produto_id": target_product_id, "url": url})
+    values.update(
+        {"tenant_id": target_tenant_id, "produto_id": target_product_id, "url": url}
+    )
     return _insert_and_lookup(
         db,
         table_name="produto_imagens",
@@ -1201,13 +1269,22 @@ def _create_product_image(
               AND url=:url
             LIMIT 1
         """,
-        lookup_params={"tenant_id": target_tenant_id, "produto_id": target_product_id, "url": url},
+        lookup_params={
+            "tenant_id": target_tenant_id,
+            "produto_id": target_product_id,
+            "url": url,
+        },
     )
 
 
-def _is_main_source_image(row: dict[str, Any], source_products: dict[int, dict[str, Any]]) -> bool:
+def _is_main_source_image(
+    row: dict[str, Any], source_products: dict[int, dict[str, Any]]
+) -> bool:
     source_product = source_products.get(int(row["produto_id"])) or {}
-    return bool(row.get("e_principal") or row.get("url") == source_product.get("imagem_principal"))
+    return bool(
+        row.get("e_principal")
+        or row.get("url") == source_product.get("imagem_principal")
+    )
 
 
 def _count_copyable_product_images(
@@ -1284,7 +1361,11 @@ def _copy_product_image_row(
         target_id=int(target_id),
     )
     result.bump("skipped" if existing_id else "created", "produto_imagens")
-    return (target_product_id, new_url) if _is_main_source_image(row, source_products) else None
+    return (
+        (target_product_id, new_url)
+        if _is_main_source_image(row, source_products)
+        else None
+    )
 
 
 def _update_main_product_images(
@@ -1325,7 +1406,9 @@ def _copy_product_images(
 ) -> None:
     rows = _select_rows(db, "produto_imagens", source_tenant_id)
     if result.dry_run:
-        _count_copyable_product_images(rows, source_products=source_products, result=result)
+        _count_copyable_product_images(
+            rows, source_products=source_products, result=result
+        )
         return
 
     main_urls_by_target_product: dict[int, str] = {}
@@ -1586,7 +1669,9 @@ def import_base_catalog(
         bundle_version=bundle_version,
     )
     if not _table_exists(db, "tenant_template_item_installs"):
-        result.warnings.append("Tabela tenant_template_item_installs ausente; idempotencia limitada.")
+        result.warnings.append(
+            "Tabela tenant_template_item_installs ausente; idempotencia limitada."
+        )
 
     try:
         department_map = _copy_departments(

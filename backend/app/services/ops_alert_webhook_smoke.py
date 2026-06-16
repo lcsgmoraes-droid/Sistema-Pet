@@ -58,7 +58,9 @@ def main(argv: list[str] | None = None) -> int:
 
     result = notify_ops_alerts([_build_alert(args.label)])
     print(json.dumps(result, ensure_ascii=False, sort_keys=True))
-    return 0 if result.get("sent") or result.get("status") == "no_eligible_alerts" else 1
+    return (
+        0 if result.get("sent") or result.get("status") == "no_eligible_alerts" else 1
+    )
 
 
 if __name__ == "__main__":

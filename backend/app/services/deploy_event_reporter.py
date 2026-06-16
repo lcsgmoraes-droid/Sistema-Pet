@@ -36,7 +36,9 @@ def _event_created_at(event: dict[str, Any]) -> datetime | None:
     return _parse_dt(str(event.get("created_at") or ""))
 
 
-def _read_recent_deploy_events(max_lines: int = DEPLOY_EVENT_MAX_READ_LINES) -> list[dict[str, Any]]:
+def _read_recent_deploy_events(
+    max_lines: int = DEPLOY_EVENT_MAX_READ_LINES,
+) -> list[dict[str, Any]]:
     if not os.path.exists(DEPLOY_EVENT_LOG_PATH):
         return []
 
@@ -72,7 +74,10 @@ def _filter_deploy_events(
     normalized_status = status.lower() if status else None
 
     for event in events:
-        if normalized_status and str(event.get("status") or "").lower() != normalized_status:
+        if (
+            normalized_status
+            and str(event.get("status") or "").lower() != normalized_status
+        ):
             continue
 
         created_at = _event_created_at(event)
@@ -131,11 +136,19 @@ def summarize_deploy_events(
     by_status = Counter(str(event.get("status") or "unknown") for event in events)
     latest = list(reversed(events))[:10]
     last_success = next(
-        (event for event in reversed(events) if str(event.get("status") or "").lower() == "success"),
+        (
+            event
+            for event in reversed(events)
+            if str(event.get("status") or "").lower() == "success"
+        ),
         None,
     )
     last_failed = next(
-        (event for event in reversed(events) if str(event.get("status") or "").lower() == "failed"),
+        (
+            event
+            for event in reversed(events)
+            if str(event.get("status") or "").lower() == "failed"
+        ),
         None,
     )
 

@@ -174,7 +174,9 @@ def _produto_resumo(produto: Produto) -> dict[str, Any]:
     }
 
 
-def _obter_produtos(db: Session, tenant_id: Any, principal_id: int, duplicado_id: int) -> tuple[Produto, Produto]:
+def _obter_produtos(
+    db: Session, tenant_id: Any, principal_id: int, duplicado_id: int
+) -> tuple[Produto, Produto]:
     if principal_id == duplicado_id:
         raise ValueError("Selecione dois produtos diferentes para fundir.")
 
@@ -214,7 +216,10 @@ def _consultar_fks_produto(db: Session) -> list[dict[str, str]]:
             """
         )
     ).mappings()
-    return [{"table_name": row["table_name"], "column_name": row["column_name"]} for row in rows]
+    return [
+        {"table_name": row["table_name"], "column_name": row["column_name"]}
+        for row in rows
+    ]
 
 
 def _contar_referencias(db: Session, produto_id: int) -> list[dict[str, Any]]:
@@ -230,7 +235,9 @@ def _contar_referencias(db: Session, produto_id: int) -> list[dict[str, Any]]:
         )
         total = int(db.execute(sql, {"produto_id": produto_id}).scalar() or 0)
         if total:
-            referencias.append({"tabela": table_name, "campo": column_name, "total": total})
+            referencias.append(
+                {"tabela": table_name, "campo": column_name, "total": total}
+            )
     return referencias
 
 
@@ -249,7 +256,11 @@ def montar_preview_fusao_produtos(
         valor_duplicado = getattr(duplicado, campo, None)
         principal_vazio = _valor_vazio(valor_principal)
         duplicado_vazio = _valor_vazio(valor_duplicado)
-        conflito = not principal_vazio and not duplicado_vazio and not _valores_iguais(valor_principal, valor_duplicado)
+        conflito = (
+            not principal_vazio
+            and not duplicado_vazio
+            and not _valores_iguais(valor_principal, valor_duplicado)
+        )
 
         if principal_vazio and not duplicado_vazio:
             origem_padrao = "duplicado"
@@ -272,7 +283,8 @@ def montar_preview_fusao_produtos(
         campo: {
             "principal": float(getattr(principal, campo, None) or 0),
             "duplicado": float(getattr(duplicado, campo, None) or 0),
-            "final": float(getattr(principal, campo, None) or 0) + float(getattr(duplicado, campo, None) or 0),
+            "final": float(getattr(principal, campo, None) or 0)
+            + float(getattr(duplicado, campo, None) or 0),
         }
         for campo in ESTOQUE_SOMAR_CAMPOS
     }
@@ -309,24 +321,36 @@ def _gerar_codigo_merged_unico(db: Session, tenant_id: Any, duplicado: Produto) 
     return candidato
 
 
-def _copiar_campos_fiscais(primary: ProdutoConfigFiscal, duplicate: ProdutoConfigFiscal) -> None:
+def _copiar_campos_fiscais(
+    primary: ProdutoConfigFiscal, duplicate: ProdutoConfigFiscal
+) -> None:
     for column in ProdutoConfigFiscal.__table__.columns:
         name = column.name
         if name in {"id", "produto_id", "tenant_id", "created_at", "updated_at"}:
             continue
-        if _valor_vazio(getattr(primary, name, None)) and not _valor_vazio(getattr(duplicate, name, None)):
+        if _valor_vazio(getattr(primary, name, None)) and not _valor_vazio(
+            getattr(duplicate, name, None)
+        ):
             setattr(primary, name, getattr(duplicate, name))
 
 
-def _mesclar_config_fiscal(db: Session, principal_id: int, duplicado_id: int, tenant_id: Any) -> int:
+def _mesclar_config_fiscal(
+    db: Session, principal_id: int, duplicado_id: int, tenant_id: Any
+) -> int:
     primary = (
         db.query(ProdutoConfigFiscal)
-        .filter(ProdutoConfigFiscal.tenant_id == tenant_id, ProdutoConfigFiscal.produto_id == principal_id)
+        .filter(
+            ProdutoConfigFiscal.tenant_id == tenant_id,
+            ProdutoConfigFiscal.produto_id == principal_id,
+        )
         .first()
     )
     duplicate = (
         db.query(ProdutoConfigFiscal)
-        .filter(ProdutoConfigFiscal.tenant_id == tenant_id, ProdutoConfigFiscal.produto_id == duplicado_id)
+        .filter(
+            ProdutoConfigFiscal.tenant_id == tenant_id,
+            ProdutoConfigFiscal.produto_id == duplicado_id,
+        )
         .first()
     )
     if not duplicate:
@@ -339,11 +363,16 @@ def _mesclar_config_fiscal(db: Session, principal_id: int, duplicado_id: int, te
     return 1
 
 
-def _mesclar_fornecedores(db: Session, principal_id: int, duplicado_id: int, tenant_id: Any) -> int:
+def _mesclar_fornecedores(
+    db: Session, principal_id: int, duplicado_id: int, tenant_id: Any
+) -> int:
     transferidos = 0
     duplicados = (
         db.query(ProdutoFornecedor)
-        .filter(ProdutoFornecedor.tenant_id == tenant_id, ProdutoFornecedor.produto_id == duplicado_id)
+        .filter(
+            ProdutoFornecedor.tenant_id == tenant_id,
+            ProdutoFornecedor.produto_id == duplicado_id,
+        )
         .all()
     )
     for vinculo in duplicados:
@@ -357,8 +386,15 @@ def _mesclar_fornecedores(db: Session, principal_id: int, duplicado_id: int, ten
             .first()
         )
         if existente:
-            for campo in ("codigo_fornecedor", "preco_custo", "prazo_entrega", "estoque_fornecedor"):
-                if _valor_vazio(getattr(existente, campo, None)) and not _valor_vazio(getattr(vinculo, campo, None)):
+            for campo in (
+                "codigo_fornecedor",
+                "preco_custo",
+                "prazo_entrega",
+                "estoque_fornecedor",
+            ):
+                if _valor_vazio(getattr(existente, campo, None)) and not _valor_vazio(
+                    getattr(vinculo, campo, None)
+                ):
                     setattr(existente, campo, getattr(vinculo, campo))
             existente.e_principal = bool(existente.e_principal or vinculo.e_principal)
             existente.ativo = bool(existente.ativo or vinculo.ativo)
@@ -369,11 +405,16 @@ def _mesclar_fornecedores(db: Session, principal_id: int, duplicado_id: int, ten
     return transferidos
 
 
-def _mesclar_listas_preco(db: Session, principal_id: int, duplicado_id: int, tenant_id: Any) -> int:
+def _mesclar_listas_preco(
+    db: Session, principal_id: int, duplicado_id: int, tenant_id: Any
+) -> int:
     transferidos = 0
     duplicados = (
         db.query(ProdutoListaPreco)
-        .filter(ProdutoListaPreco.tenant_id == tenant_id, ProdutoListaPreco.produto_id == duplicado_id)
+        .filter(
+            ProdutoListaPreco.tenant_id == tenant_id,
+            ProdutoListaPreco.produto_id == duplicado_id,
+        )
         .all()
     )
     for item in duplicados:
@@ -399,21 +440,31 @@ def _mesclar_listas_preco(db: Session, principal_id: int, duplicado_id: int, ten
     return transferidos
 
 
-def _mesclar_bling_sync(db: Session, principal_id: int, duplicado_id: int, tenant_id: Any) -> int:
+def _mesclar_bling_sync(
+    db: Session, principal_id: int, duplicado_id: int, tenant_id: Any
+) -> int:
     primary = (
         db.query(ProdutoBlingSync)
-        .filter(ProdutoBlingSync.tenant_id == tenant_id, ProdutoBlingSync.produto_id == principal_id)
+        .filter(
+            ProdutoBlingSync.tenant_id == tenant_id,
+            ProdutoBlingSync.produto_id == principal_id,
+        )
         .first()
     )
     duplicate = (
         db.query(ProdutoBlingSync)
-        .filter(ProdutoBlingSync.tenant_id == tenant_id, ProdutoBlingSync.produto_id == duplicado_id)
+        .filter(
+            ProdutoBlingSync.tenant_id == tenant_id,
+            ProdutoBlingSync.produto_id == duplicado_id,
+        )
         .first()
     )
     if not duplicate:
         return 0
     if primary:
-        db.query(ProdutoBlingSyncQueue).filter(ProdutoBlingSyncQueue.sync_id == duplicate.id).update(
+        db.query(ProdutoBlingSyncQueue).filter(
+            ProdutoBlingSyncQueue.sync_id == duplicate.id
+        ).update(
             {ProdutoBlingSyncQueue.sync_id: primary.id},
             synchronize_session=False,
         )
@@ -421,7 +472,9 @@ def _mesclar_bling_sync(db: Session, principal_id: int, duplicado_id: int, tenan
             name = column.name
             if name in {"id", "produto_id", "tenant_id", "created_at", "updated_at"}:
                 continue
-            if _valor_vazio(getattr(primary, name, None)) and not _valor_vazio(getattr(duplicate, name, None)):
+            if _valor_vazio(getattr(primary, name, None)) and not _valor_vazio(
+                getattr(duplicate, name, None)
+            ):
                 setattr(primary, name, getattr(duplicate, name))
         db.delete(duplicate)
     else:
@@ -429,7 +482,9 @@ def _mesclar_bling_sync(db: Session, principal_id: int, duplicado_id: int, tenan
     return 1
 
 
-def _mesclar_componentes_kit(db: Session, principal_id: int, duplicado_id: int, tenant_id: Any) -> int:
+def _mesclar_componentes_kit(
+    db: Session, principal_id: int, duplicado_id: int, tenant_id: Any
+) -> int:
     alterados = 0
     componentes = (
         db.query(ProdutoKitComponente)
@@ -441,9 +496,13 @@ def _mesclar_componentes_kit(db: Session, principal_id: int, duplicado_id: int, 
         .all()
     )
     for componente in componentes:
-        novo_kit_id = principal_id if componente.kit_id == duplicado_id else componente.kit_id
+        novo_kit_id = (
+            principal_id if componente.kit_id == duplicado_id else componente.kit_id
+        )
         novo_componente_id = (
-            principal_id if componente.produto_componente_id == duplicado_id else componente.produto_componente_id
+            principal_id
+            if componente.produto_componente_id == duplicado_id
+            else componente.produto_componente_id
         )
 
         if novo_kit_id == novo_componente_id:
@@ -462,7 +521,9 @@ def _mesclar_componentes_kit(db: Session, principal_id: int, duplicado_id: int, 
             .first()
         )
         if existente:
-            existente.quantidade = float(existente.quantidade or 0) + float(componente.quantidade or 0)
+            existente.quantidade = float(existente.quantidade or 0) + float(
+                componente.quantidade or 0
+            )
             existente.opcional = bool(existente.opcional and componente.opcional)
             db.delete(componente)
         else:
@@ -472,7 +533,9 @@ def _mesclar_componentes_kit(db: Session, principal_id: int, duplicado_id: int, 
     return alterados
 
 
-def _mesclar_vinculos_granel(db: Session, principal_id: int, duplicado_id: int, tenant_id: Any) -> int:
+def _mesclar_vinculos_granel(
+    db: Session, principal_id: int, duplicado_id: int, tenant_id: Any
+) -> int:
     alterados = 0
     vinculos = (
         db.query(ProdutoGranelVinculo)
@@ -484,8 +547,16 @@ def _mesclar_vinculos_granel(db: Session, principal_id: int, duplicado_id: int, 
         .all()
     )
     for vinculo in vinculos:
-        nova_origem = principal_id if vinculo.produto_origem_id == duplicado_id else vinculo.produto_origem_id
-        novo_granel = principal_id if vinculo.produto_granel_id == duplicado_id else vinculo.produto_granel_id
+        nova_origem = (
+            principal_id
+            if vinculo.produto_origem_id == duplicado_id
+            else vinculo.produto_origem_id
+        )
+        novo_granel = (
+            principal_id
+            if vinculo.produto_granel_id == duplicado_id
+            else vinculo.produto_granel_id
+        )
 
         if nova_origem == novo_granel:
             db.delete(vinculo)
@@ -538,9 +609,13 @@ def _transferir_referencias_genericas(
                 f"update {_identificador(tabela)} set {_identificador(campo)} = :principal_id "
                 f"where {_identificador(campo)} = :duplicado_id"
             )
-        result = db.execute(sql, {"principal_id": principal_id, "duplicado_id": duplicado_id})
+        result = db.execute(
+            sql, {"principal_id": principal_id, "duplicado_id": duplicado_id}
+        )
         if result.rowcount:
-            transferencias.append({"tabela": tabela, "campo": campo, "total": int(result.rowcount)})
+            transferencias.append(
+                {"tabela": tabela, "campo": campo, "total": int(result.rowcount)}
+            )
     return transferencias
 
 
@@ -567,22 +642,45 @@ def executar_fusao_produtos(
         valor_duplicado = getattr(duplicado, campo, None)
         origem = decisoes_campos.get(campo)
         if origem not in {"principal", "duplicado"}:
-            origem = "duplicado" if _valor_vazio(valor_principal) and not _valor_vazio(valor_duplicado) else "principal"
+            origem = (
+                "duplicado"
+                if _valor_vazio(valor_principal) and not _valor_vazio(valor_duplicado)
+                else "principal"
+            )
 
         if origem == "duplicado" and not _valor_vazio(valor_duplicado):
             setattr(principal, campo, valor_duplicado)
-            campos_aplicados.append({"campo": campo, "label": label, "origem": "duplicado"})
+            campos_aplicados.append(
+                {"campo": campo, "label": label, "origem": "duplicado"}
+            )
 
     for campo in ESTOQUE_SOMAR_CAMPOS:
-        setattr(principal, campo, float(getattr(principal, campo, None) or 0) + float(getattr(duplicado, campo, None) or 0))
+        setattr(
+            principal,
+            campo,
+            float(getattr(principal, campo, None) or 0)
+            + float(getattr(duplicado, campo, None) or 0),
+        )
 
     transferidos_especiais = {
-        "produto_fornecedores": _mesclar_fornecedores(db, principal.id, duplicado.id, tenant_id),
-        "produto_listas_preco": _mesclar_listas_preco(db, principal.id, duplicado.id, tenant_id),
-        "produto_bling_sync": _mesclar_bling_sync(db, principal.id, duplicado.id, tenant_id),
-        "produto_config_fiscal": _mesclar_config_fiscal(db, principal.id, duplicado.id, tenant_id),
-        "produto_kit_componentes": _mesclar_componentes_kit(db, principal.id, duplicado.id, tenant_id),
-        "produto_granel_vinculos": _mesclar_vinculos_granel(db, principal.id, duplicado.id, tenant_id),
+        "produto_fornecedores": _mesclar_fornecedores(
+            db, principal.id, duplicado.id, tenant_id
+        ),
+        "produto_listas_preco": _mesclar_listas_preco(
+            db, principal.id, duplicado.id, tenant_id
+        ),
+        "produto_bling_sync": _mesclar_bling_sync(
+            db, principal.id, duplicado.id, tenant_id
+        ),
+        "produto_config_fiscal": _mesclar_config_fiscal(
+            db, principal.id, duplicado.id, tenant_id
+        ),
+        "produto_kit_componentes": _mesclar_componentes_kit(
+            db, principal.id, duplicado.id, tenant_id
+        ),
+        "produto_granel_vinculos": _mesclar_vinculos_granel(
+            db, principal.id, duplicado.id, tenant_id
+        ),
     }
 
     execute_tenant_safe(
@@ -621,8 +719,12 @@ def executar_fusao_produtos(
     )
     if observacao:
         nota_auditoria += f" Observacao: {observacao.strip()}"
-    principal.informacoes_adicionais_nf = (principal.informacoes_adicionais_nf or "") + nota_auditoria
-    duplicado.informacoes_adicionais_nf = (duplicado.informacoes_adicionais_nf or "") + nota_auditoria
+    principal.informacoes_adicionais_nf = (
+        principal.informacoes_adicionais_nf or ""
+    ) + nota_auditoria
+    duplicado.informacoes_adicionais_nf = (
+        duplicado.informacoes_adicionais_nf or ""
+    ) + nota_auditoria
     principal.updated_at = agora
     duplicado.updated_at = agora
 
@@ -636,7 +738,9 @@ def executar_fusao_produtos(
         "principal": _produto_resumo(principal),
         "duplicado_inativado": _produto_resumo(duplicado),
         "campos_aplicados": campos_aplicados,
-        "estoque_somado": {campo: getattr(principal, campo, None) for campo in ESTOQUE_SOMAR_CAMPOS},
+        "estoque_somado": {
+            campo: getattr(principal, campo, None) for campo in ESTOQUE_SOMAR_CAMPOS
+        },
         "transferidos_especiais": transferidos_especiais,
         "transferidos_genericos": transferidos_genericos,
     }

@@ -2,10 +2,7 @@ from decimal import Decimal, ROUND_HALF_UP
 
 
 def calcular_fiscal_item_pdv(
-    preco_unitario: Decimal,
-    quantidade: Decimal,
-    fiscal: dict,
-    aliquotas_empresa: dict
+    preco_unitario: Decimal, quantidade: Decimal, fiscal: dict, aliquotas_empresa: dict
 ):
     """
     Calcula os impostos de um item no PDV.
@@ -47,9 +44,9 @@ def calcular_fiscal_item_pdv(
             Decimal("0.01"), rounding=ROUND_HALF_UP
         )
 
-    total_impostos = (
-        icms_valor + icms_st_valor + pis_valor + cofins_valor
-    ).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+    total_impostos = (icms_valor + icms_st_valor + pis_valor + cofins_valor).quantize(
+        Decimal("0.01"), rounding=ROUND_HALF_UP
+    )
 
     return {
         "base_calculo": base_calculo,
@@ -57,5 +54,5 @@ def calcular_fiscal_item_pdv(
         "icms_st": icms_st_valor,
         "pis": pis_valor,
         "cofins": cofins_valor,
-        "total_impostos": total_impostos
+        "total_impostos": total_impostos,
     }

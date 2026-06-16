@@ -43,7 +43,9 @@ def _load_existing_snapshot(raw_snapshot: Any) -> Optional[Dict[str, Any]]:
         try:
             parsed = json.loads(raw_snapshot)
         except Exception:
-            logger.warning("Nao foi possivel desserializar rentabilidade_snapshot legado.")
+            logger.warning(
+                "Nao foi possivel desserializar rentabilidade_snapshot legado."
+            )
             return None
         if isinstance(parsed, dict):
             return parsed
@@ -52,9 +54,13 @@ def _load_existing_snapshot(raw_snapshot: Any) -> Optional[Dict[str, Any]]:
 
 
 def _get_formas_pagamento_map(db: Session, tenant_id: Any) -> Dict[str, FormaPagamento]:
-    formas = db.query(FormaPagamento).filter(
-        and_(FormaPagamento.tenant_id == tenant_id, FormaPagamento.ativo.is_(True))
-    ).all()
+    formas = (
+        db.query(FormaPagamento)
+        .filter(
+            and_(FormaPagamento.tenant_id == tenant_id, FormaPagamento.ativo.is_(True))
+        )
+        .all()
+    )
     return {_normalize_forma_pagamento(fp.nome): fp for fp in formas}
 
 
@@ -66,7 +72,9 @@ def _resolve_taxa_cartao_total(
 
     for pagamento in list(getattr(venda, "pagamentos", []) or []):
         taxa_percentual = 0.0
-        forma_pagamento = _normalize_forma_pagamento(getattr(pagamento, "forma_pagamento", None))
+        forma_pagamento = _normalize_forma_pagamento(
+            getattr(pagamento, "forma_pagamento", None)
+        )
         forma = formas_pagamento_map.get(forma_pagamento)
 
         if forma:
@@ -79,11 +87,15 @@ def _resolve_taxa_cartao_total(
 
             numero_parcelas = getattr(pagamento, "numero_parcelas", None)
             if isinstance(taxas_por_parcela, dict) and numero_parcelas:
-                taxa_percentual = _as_float(taxas_por_parcela.get(str(numero_parcelas), 0))
+                taxa_percentual = _as_float(
+                    taxas_por_parcela.get(str(numero_parcelas), 0)
+                )
             else:
                 taxa_percentual = _as_float(getattr(forma, "taxa_percentual", 0))
 
-        taxa_total += _as_float(getattr(pagamento, "valor", 0)) * taxa_percentual / 100.0
+        taxa_total += (
+            _as_float(getattr(pagamento, "valor", 0)) * taxa_percentual / 100.0
+        )
 
     return _round_money(taxa_total)
 
@@ -106,7 +118,9 @@ def _resolve_gateway_financials(venda: Any) -> Dict[str, Any]:
         has_gateway = True
         provider = provider or str(gateway_provider).strip().lower()
 
-        payment_id = getattr(pagamento, "gateway_payment_id", None) or getattr(pagamento, "numero_transacao", None)
+        payment_id = getattr(pagamento, "gateway_payment_id", None) or getattr(
+            pagamento, "numero_transacao", None
+        )
         if payment_id:
             payment_ids.append(str(payment_id))
 
@@ -136,8 +150,12 @@ def _resolve_gateway_financials(venda: Any) -> Dict[str, Any]:
         "gateway_provider": provider,
         "gateway_payment_ids": payment_ids,
         "taxa_gateway": _round_money(taxa_gateway) if has_fee else None,
-        "valor_liquido_gateway": _round_money(valor_liquido_gateway) if has_net else None,
-        "valor_bruto_gateway": _round_money(valor_bruto_gateway) if has_gateway else None,
+        "valor_liquido_gateway": _round_money(valor_liquido_gateway)
+        if has_net
+        else None,
+        "valor_bruto_gateway": _round_money(valor_bruto_gateway)
+        if has_gateway
+        else None,
     }
 
 
@@ -150,12 +168,16 @@ def _resolve_impostos_percentual(
         return _as_float(impostos_percentual)
 
     try:
-        config_fiscal = db.query(EmpresaConfigFiscal).filter(
-            EmpresaConfigFiscal.tenant_id == tenant_id
-        ).first()
+        config_fiscal = (
+            db.query(EmpresaConfigFiscal)
+            .filter(EmpresaConfigFiscal.tenant_id == tenant_id)
+            .first()
+        )
         return _as_float(getattr(config_fiscal, "aliquota_simples_vigente", 0))
     except Exception as exc:
-        logger.warning("Falha ao buscar configuracao fiscal para snapshot da venda: %s", exc)
+        logger.warning(
+            "Falha ao buscar configuracao fiscal para snapshot da venda: %s", exc
+        )
         return 0.0
 
 
@@ -169,12 +191,21 @@ def _resolve_comissao_total(
         return _round_money(comissao_total)
 
     try:
-        total = db.query(func.sum(ComissaoItem.valor_comissao)).filter(
-            and_(ComissaoItem.tenant_id == tenant_id, ComissaoItem.venda_id == venda_id)
-        ).scalar()
+        total = (
+            db.query(func.sum(ComissaoItem.valor_comissao))
+            .filter(
+                and_(
+                    ComissaoItem.tenant_id == tenant_id,
+                    ComissaoItem.venda_id == venda_id,
+                )
+            )
+            .scalar()
+        )
         return _round_money(total)
     except Exception as exc:
-        logger.warning("Falha ao buscar comissoes para snapshot da venda %s: %s", venda_id, exc)
+        logger.warning(
+            "Falha ao buscar comissoes para snapshot da venda %s: %s", venda_id, exc
+        )
         return 0.0
 
 
@@ -194,11 +225,15 @@ def _resolve_cupom_desconto(
     try:
         from app.campaigns.models import CouponRedemption
 
-        total = db.query(func.sum(CouponRedemption.discount_applied)).filter(
-            CouponRedemption.tenant_id == tenant_id,
-            CouponRedemption.venda_id == venda_id,
-            CouponRedemption.voided_at.is_(None),
-        ).scalar()
+        total = (
+            db.query(func.sum(CouponRedemption.discount_applied))
+            .filter(
+                CouponRedemption.tenant_id == tenant_id,
+                CouponRedemption.venda_id == venda_id,
+                CouponRedemption.voided_at.is_(None),
+            )
+            .scalar()
+        )
         return _round_money(total)
     except Exception as exc:
         logger.warning("Falha ao buscar uso de cupom da venda %s: %s", venda_id, exc)
@@ -213,11 +248,15 @@ def _resolve_cashback_resgatado(
     try:
         from app.campaigns.models import CashbackTransaction
 
-        total = db.query(func.sum(CashbackTransaction.amount)).filter(
-            CashbackTransaction.tenant_id == tenant_id,
-            CashbackTransaction.amount < 0,
-            CashbackTransaction.source_id == venda_id,
-        ).scalar()
+        total = (
+            db.query(func.sum(CashbackTransaction.amount))
+            .filter(
+                CashbackTransaction.tenant_id == tenant_id,
+                CashbackTransaction.amount < 0,
+                CashbackTransaction.source_id == venda_id,
+            )
+            .scalar()
+        )
         return _round_money(abs(total or 0))
     except Exception as exc:
         logger.warning("Falha ao buscar cashback da venda %s: %s", venda_id, exc)
@@ -259,12 +298,18 @@ def _resolve_taxa_operacional_entrega(
         return 0.0
 
     try:
-        entregador = db.query(Cliente).filter(
-            and_(Cliente.id == venda.entregador_id, Cliente.tenant_id == tenant_id)
-        ).first()
+        entregador = (
+            db.query(Cliente)
+            .filter(
+                and_(Cliente.id == venda.entregador_id, Cliente.tenant_id == tenant_id)
+            )
+            .first()
+        )
         return _round_money(getattr(entregador, "taxa_fixa_entrega", 0))
     except Exception as exc:
-        logger.warning("Falha ao buscar taxa operacional de entrega da venda %s: %s", venda.id, exc)
+        logger.warning(
+            "Falha ao buscar taxa operacional de entrega da venda %s: %s", venda.id, exc
+        )
         return 0.0
 
 
@@ -277,31 +322,42 @@ def _resolve_estoque_costs_map(
     if estoque_custos_por_produto is not None:
         return estoque_custos_por_produto
 
-    movimentos = db.query(EstoqueMovimentacao).filter(
-        and_(
-            EstoqueMovimentacao.tenant_id == tenant_id,
-            EstoqueMovimentacao.referencia_tipo == "venda",
-            EstoqueMovimentacao.referencia_id == venda_id,
-            EstoqueMovimentacao.tipo == "saida",
+    movimentos = (
+        db.query(EstoqueMovimentacao)
+        .filter(
+            and_(
+                EstoqueMovimentacao.tenant_id == tenant_id,
+                EstoqueMovimentacao.referencia_tipo == "venda",
+                EstoqueMovimentacao.referencia_id == venda_id,
+                EstoqueMovimentacao.tipo == "saida",
+            )
         )
-    ).all()
+        .all()
+    )
 
     mapa: Dict[int, Dict[str, float]] = {}
     for movimento in movimentos:
         if not movimento.produto_id:
             continue
-        atual = mapa.setdefault(movimento.produto_id, {"quantidade": 0.0, "valor_total": 0.0})
+        atual = mapa.setdefault(
+            movimento.produto_id, {"quantidade": 0.0, "valor_total": 0.0}
+        )
         atual["quantidade"] += abs(_as_float(getattr(movimento, "quantidade", 0)))
         atual["valor_total"] += abs(_as_float(getattr(movimento, "valor_total", 0)))
 
     return mapa
 
 
-def _resolve_custo_unitario_item(item: Any, estoque_custos_por_produto: Dict[int, Dict[str, float]]) -> float:
+def _resolve_custo_unitario_item(
+    item: Any, estoque_custos_por_produto: Dict[int, Dict[str, float]]
+) -> float:
     produto_id = getattr(item, "produto_id", None)
     info_mov = estoque_custos_por_produto.get(produto_id or 0)
     if info_mov and _as_float(info_mov.get("quantidade", 0)) > 0:
-        return _round_money(_as_float(info_mov.get("valor_total", 0)) / _as_float(info_mov.get("quantidade", 1)))
+        return _round_money(
+            _as_float(info_mov.get("valor_total", 0))
+            / _as_float(info_mov.get("quantidade", 1))
+        )
 
     produto = getattr(item, "produto", None)
     return _round_money(getattr(produto, "preco_custo", 0))
@@ -333,7 +389,9 @@ def build_venda_rentabilidade_snapshot(
         else _resolve_taxa_cartao_total(venda, formas_pagamento_map)
     )
     comissao_total = _resolve_comissao_total(db, tenant_id, venda.id, comissao_total)
-    impostos_percentual = _resolve_impostos_percentual(db, tenant_id, impostos_percentual)
+    impostos_percentual = _resolve_impostos_percentual(
+        db, tenant_id, impostos_percentual
+    )
     taxa_operacional_entrega = _resolve_taxa_operacional_entrega(
         db, tenant_id, venda, taxa_operacional_entrega
     )
@@ -353,8 +411,12 @@ def build_venda_rentabilidade_snapshot(
 
     desconto_bruto = _round_money(getattr(venda, "desconto_valor", 0))
     desconto_cupom_reclassificado = min(cupom_desconto, desconto_bruto)
-    venda_bruta = _round_money(_as_float(getattr(venda, "subtotal", 0)) + desconto_bruto)
-    desconto_total = _round_money(max(desconto_bruto - desconto_cupom_reclassificado, 0))
+    venda_bruta = _round_money(
+        _as_float(getattr(venda, "subtotal", 0)) + desconto_bruto
+    )
+    desconto_total = _round_money(
+        max(desconto_bruto - desconto_cupom_reclassificado, 0)
+    )
 
     itens_base = []
     subtotal_itens = 0.0
@@ -384,7 +446,9 @@ def build_venda_rentabilidade_snapshot(
     for item_base in itens_base:
         item = item_base["item"]
         subtotal_item = item_base["subtotal_item"]
-        percentual_item = (subtotal_item / subtotal_itens) if subtotal_itens > 0 else 0.0
+        percentual_item = (
+            (subtotal_item / subtotal_itens) if subtotal_itens > 0 else 0.0
+        )
 
         desconto_rateado = desconto_total * percentual_item
         taxa_loja_rateada = taxa_entrega_receita * percentual_item
@@ -393,7 +457,9 @@ def build_venda_rentabilidade_snapshot(
         taxa_cartao_rateada = taxa_cartao_total * percentual_item
         comissao_rateada = comissao_total * percentual_item
         campanha_rateada = custo_campanha * percentual_item
-        imposto_rateado = (subtotal_item + taxa_loja_rateada) * (impostos_percentual / 100.0)
+        imposto_rateado = (subtotal_item + taxa_loja_rateada) * (
+            impostos_percentual / 100.0
+        )
 
         valor_liquido_item = (
             subtotal_item
@@ -407,9 +473,19 @@ def build_venda_rentabilidade_snapshot(
             - campanha_rateada
         )
         lucro_item = valor_liquido_item - item_base["custo_item"]
-        margem_sobre_venda_item = (lucro_item / subtotal_item * 100.0) if subtotal_item > 0 else 0.0
-        margem_sobre_custo_item = (lucro_item / item_base["custo_item"] * 100.0) if item_base["custo_item"] > 0 else 0.0
-        lucro_unitario = (lucro_item / item_base["quantidade"]) if item_base["quantidade"] > 0 else 0.0
+        margem_sobre_venda_item = (
+            (lucro_item / subtotal_item * 100.0) if subtotal_item > 0 else 0.0
+        )
+        margem_sobre_custo_item = (
+            (lucro_item / item_base["custo_item"] * 100.0)
+            if item_base["custo_item"] > 0
+            else 0.0
+        )
+        lucro_unitario = (
+            (lucro_item / item_base["quantidade"])
+            if item_base["quantidade"] > 0
+            else 0.0
+        )
 
         produto = getattr(item, "produto", None)
         itens_snapshot.append(
@@ -463,8 +539,11 @@ def build_venda_rentabilidade_snapshot(
         "venda_id": getattr(venda, "id", None),
         "numero_venda": getattr(venda, "numero_venda", None),
         "status": getattr(venda, "status", None),
-        "data_venda": getattr(venda, "data_venda", None).isoformat() if getattr(venda, "data_venda", None) else None,
-        "cliente_nome": getattr(getattr(venda, "cliente", None), "nome", None) or "Sem cliente",
+        "data_venda": getattr(venda, "data_venda", None).isoformat()
+        if getattr(venda, "data_venda", None)
+        else None,
+        "cliente_nome": getattr(getattr(venda, "cliente", None), "nome", None)
+        or "Sem cliente",
         "venda_bruta": _round_money(venda_bruta),
         "taxa_loja": _round_money(taxa_entrega_receita),
         "desconto": _round_money(desconto_total),
@@ -509,7 +588,9 @@ def get_or_build_venda_rentabilidade_snapshot(
     status_atual = getattr(venda, "status", None)
 
     if not force_refresh and status_atual in FROZEN_STATUSES:
-        existing = _load_existing_snapshot(getattr(venda, "rentabilidade_snapshot", None))
+        existing = _load_existing_snapshot(
+            getattr(venda, "rentabilidade_snapshot", None)
+        )
         if existing and int(existing.get("snapshot_version") or 0) == SNAPSHOT_VERSION:
             return existing
 

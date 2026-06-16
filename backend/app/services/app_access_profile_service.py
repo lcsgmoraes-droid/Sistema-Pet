@@ -52,7 +52,9 @@ def _put_profile(
     profile_type = normalize_profile_type(profile_type)
     if not profile_type or not _is_active_cliente(cliente):
         return
-    profiles_by_type.setdefault(profile_type, _profile_dict(profile_type, cliente, source=source))
+    profiles_by_type.setdefault(
+        profile_type, _profile_dict(profile_type, cliente, source=source)
+    )
 
 
 def build_available_profiles_for_clientes(
@@ -71,14 +73,19 @@ def build_available_profiles_for_clientes(
         if cliente_id is not None:
             clientes_by_id[int(cliente_id)] = cliente
 
-        tipo_cadastro = str(getattr(cliente, "tipo_cadastro", "") or "").strip().casefold()
+        tipo_cadastro = (
+            str(getattr(cliente, "tipo_cadastro", "") or "").strip().casefold()
+        )
         if tipo_cadastro == "cliente":
             _put_profile(profiles_by_type, "cliente", cliente, source="cadastro")
         if tipo_cadastro == "funcionario":
             _put_profile(profiles_by_type, "funcionario", cliente, source="cadastro")
         if tipo_cadastro == "veterinario":
             _put_profile(profiles_by_type, "veterinario", cliente, source="cadastro")
-        if bool(getattr(cliente, "is_entregador", False)) and getattr(cliente, "entregador_ativo", True) is not False:
+        if (
+            bool(getattr(cliente, "is_entregador", False))
+            and getattr(cliente, "entregador_ativo", True) is not False
+        ):
             _put_profile(profiles_by_type, "entregador", cliente, source="cadastro")
 
     for grant in explicit_grants or []:
@@ -93,7 +100,9 @@ def build_available_profiles_for_clientes(
         _put_profile(profiles_by_type, profile_type, grant_cliente, source="liberado")
 
     if not profiles_by_type:
-        first_active = next((cliente for cliente in clientes if _is_active_cliente(cliente)), None)
+        first_active = next(
+            (cliente for cliente in clientes if _is_active_cliente(cliente)), None
+        )
         if first_active:
             _put_profile(profiles_by_type, "cliente", first_active, source="padrao")
 
@@ -125,7 +134,9 @@ def apply_selected_profile_flags(
             "cliente_id": cliente_id,
             "is_entregador": profile_type == "entregador",
             "is_funcionario": profile_type == "funcionario",
-            "funcionario_id": cliente_id if profile_type in {"entregador", "funcionario"} else None,
+            "funcionario_id": cliente_id
+            if profile_type in {"entregador", "funcionario"}
+            else None,
             "is_veterinario": profile_type == "veterinario",
             "veterinario_id": cliente_id if profile_type == "veterinario" else None,
             "perfil_operacional": profile_type,
@@ -175,7 +186,9 @@ def find_app_profile_clientes_for_user(
 
     add(include_cliente)
 
-    query = db.query(Cliente).filter(Cliente.tenant_id == tenant_id, Cliente.ativo.is_(True))
+    query = db.query(Cliente).filter(
+        Cliente.tenant_id == tenant_id, Cliente.ativo.is_(True)
+    )
     filters = [Cliente.user_id == user.id]
     email = (getattr(user, "email", None) or "").strip().casefold()
     if email:
@@ -232,7 +245,9 @@ def resolve_user_app_profiles(
     include_cliente: Cliente | None = None,
 ) -> list[dict[str, Any]]:
     tenant_id = str(getattr(user, "tenant_id", "") or "")
-    clientes = find_app_profile_clientes_for_user(db, user, include_cliente=include_cliente)
+    clientes = find_app_profile_clientes_for_user(
+        db, user, include_cliente=include_cliente
+    )
     grants = list_explicit_app_access_profiles(
         db,
         tenant_id=tenant_id,
@@ -259,7 +274,9 @@ def get_cliente_for_app_profile_or_none(
         user_id=user.id,
         cliente_ids=[cliente.id for cliente in clientes],
     )
-    profiles = build_available_profiles_for_clientes(user, clientes, explicit_grants=grants)
+    profiles = build_available_profiles_for_clientes(
+        user, clientes, explicit_grants=grants
+    )
     profile = next((item for item in profiles if item["type"] == normalized), None)
     cliente_id = profile.get("cliente_id") if profile else None
     if not cliente_id:
@@ -274,14 +291,11 @@ def get_cliente_for_app_profile_or_none(
     except (AttributeError, IndexError):
         return None
 
-    return (
-        query.filter(
-            Cliente.tenant_id == tenant_id,
-            Cliente.id == cliente_id,
-            Cliente.ativo.is_(True),
-        )
-        .first()
-    )
+    return query.filter(
+        Cliente.tenant_id == tenant_id,
+        Cliente.id == cliente_id,
+        Cliente.ativo.is_(True),
+    ).first()
 
 
 def sync_cliente_app_access_profiles(
@@ -327,4 +341,6 @@ def sync_cliente_app_access_profiles(
                 )
             )
 
-    return [profile_type for profile_type in PROFILE_ORDER if profile_type in normalized]
+    return [
+        profile_type for profile_type in PROFILE_ORDER if profile_type in normalized
+    ]

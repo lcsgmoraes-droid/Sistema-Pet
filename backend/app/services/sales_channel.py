@@ -50,7 +50,13 @@ def is_online_sales_channel(value: Any) -> bool:
 
 def benefit_channel_from_sales_channel(value: Any) -> str:
     channel = normalize_sales_channel(value, default=CANAL_LOJA_FISICA)
-    if channel in {CANAL_APP, CANAL_ECOMMERCE, CANAL_LOJA_FISICA, "banho_tosa", "veterinario"}:
+    if channel in {
+        CANAL_APP,
+        CANAL_ECOMMERCE,
+        CANAL_LOJA_FISICA,
+        "banho_tosa",
+        "veterinario",
+    }:
         return channel
     return CANAL_LOJA_FISICA
 

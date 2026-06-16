@@ -15,6 +15,7 @@ Responsabilidades:
 NÃO decide QUANDO sincronizar — isso é do scheduler (main.py)
 e do endpoint manual (sefaz_routes.py).
 """
+
 from __future__ import annotations
 
 import json
@@ -90,6 +91,7 @@ class SefazSyncCoordinator:
             # 2. Adquirir lock de arquivo — coordenação cross-worker
             try:
                 import fcntl
+
                 lock_f = open(_LOCK_FILE, "w")
                 try:
                     fcntl.flock(lock_f, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -227,27 +229,41 @@ class SefazSyncCoordinator:
         if erro_656:
             penalidade_min = PENALIDADE_656_MINUTOS
             proximo = now + timedelta(minutes=penalidade_min)
-            nsu_ult_retorno = str(nsu_sugerido_656 or cfg.get("ultimo_nsu", "000000000000000")).strip().zfill(15)
-            nsu_max_retorno = str(max_nsu_sugerido_656 or nsu_sugerido_656 or cfg.get("ultimo_nsu", "000000000000000")).strip().zfill(15)
+            nsu_ult_retorno = (
+                str(nsu_sugerido_656 or cfg.get("ultimo_nsu", "000000000000000"))
+                .strip()
+                .zfill(15)
+            )
+            nsu_max_retorno = (
+                str(
+                    max_nsu_sugerido_656
+                    or nsu_sugerido_656
+                    or cfg.get("ultimo_nsu", "000000000000000")
+                )
+                .strip()
+                .zfill(15)
+            )
             if nsu_sugerido_656:
                 cfg["ultimo_nsu"] = nsu_ult_retorno
             detalhe_656 = mensagem_erro_656 or "SEFAZ bloqueou por consumo indevido."
-            cfg.update({
-                "ultimo_sync_at": now_iso,
-                "_proximo_sync_permitido_at": proximo.isoformat(),
-                "_sync_bloqueado_656": True,
-                "ultimo_sync_status": "erro_656",
-                "ultimo_sync_mensagem": (
-                    f"{detalhe_656} "
-                    f"ultNSU={nsu_ult_retorno}, maxNSU={nsu_max_retorno}. "
-                    f"Próxima tentativa em {penalidade_min} min."
-                ),
-                "ultimo_sync_cstat": "656",
-                "ultimo_sync_xmotivo": detalhe_656,
-                "ultimo_sync_ult_nsu_retorno": nsu_ult_retorno,
-                "ultimo_sync_max_nsu_retorno": nsu_max_retorno,
-                "ultimo_sync_documentos": 0,
-            })
+            cfg.update(
+                {
+                    "ultimo_sync_at": now_iso,
+                    "_proximo_sync_permitido_at": proximo.isoformat(),
+                    "_sync_bloqueado_656": True,
+                    "ultimo_sync_status": "erro_656",
+                    "ultimo_sync_mensagem": (
+                        f"{detalhe_656} "
+                        f"ultNSU={nsu_ult_retorno}, maxNSU={nsu_max_retorno}. "
+                        f"Próxima tentativa em {penalidade_min} min."
+                    ),
+                    "ultimo_sync_cstat": "656",
+                    "ultimo_sync_xmotivo": detalhe_656,
+                    "ultimo_sync_ult_nsu_retorno": nsu_ult_retorno,
+                    "ultimo_sync_max_nsu_retorno": nsu_max_retorno,
+                    "ultimo_sync_documentos": 0,
+                }
+            )
             self._atomic_save(config_path, cfg)
             logger.warning(
                 f"[SEFAZ] [{reason}] ⏳ Tenant {tenant_id_str}: "
@@ -266,22 +282,30 @@ class SefazSyncCoordinator:
         if erro_generico:
             intervalo_erro_min = max(5, int(cfg.get("importacao_intervalo_min", 15)))
             proximo_erro = now + timedelta(minutes=intervalo_erro_min)
-            detalhe = mensagem_erro_generico or "Falha desconhecida na sincronização SEFAZ."
-            cfg.update({
-                "ultimo_sync_at": now_iso,
-                "_proximo_sync_permitido_at": proximo_erro.isoformat(),
-                "_sync_bloqueado_656": False,
-                "ultimo_sync_status": "erro",
-                "ultimo_sync_mensagem": (
-                    f"Falha na sincronização SEFAZ: {detalhe}. "
-                    f"Nova tentativa automática em {intervalo_erro_min} min."
-                ),
-                "ultimo_sync_cstat": None,
-                "ultimo_sync_xmotivo": detalhe,
-                "ultimo_sync_ult_nsu_retorno": str(cfg.get("ultimo_nsu", nsu_loop)).strip().zfill(15),
-                "ultimo_sync_max_nsu_retorno": str(cfg.get("ultimo_nsu", nsu_loop)).strip().zfill(15),
-                "ultimo_sync_documentos": 0,
-            })
+            detalhe = (
+                mensagem_erro_generico or "Falha desconhecida na sincronização SEFAZ."
+            )
+            cfg.update(
+                {
+                    "ultimo_sync_at": now_iso,
+                    "_proximo_sync_permitido_at": proximo_erro.isoformat(),
+                    "_sync_bloqueado_656": False,
+                    "ultimo_sync_status": "erro",
+                    "ultimo_sync_mensagem": (
+                        f"Falha na sincronização SEFAZ: {detalhe}. "
+                        f"Nova tentativa automática em {intervalo_erro_min} min."
+                    ),
+                    "ultimo_sync_cstat": None,
+                    "ultimo_sync_xmotivo": detalhe,
+                    "ultimo_sync_ult_nsu_retorno": str(cfg.get("ultimo_nsu", nsu_loop))
+                    .strip()
+                    .zfill(15),
+                    "ultimo_sync_max_nsu_retorno": str(cfg.get("ultimo_nsu", nsu_loop))
+                    .strip()
+                    .zfill(15),
+                    "ultimo_sync_documentos": 0,
+                }
+            )
             self._atomic_save(config_path, cfg)
             logger.warning(
                 f"[SEFAZ] [{reason}] ❌ Tenant {tenant_id_str}: erro real registrado. "
@@ -314,20 +338,28 @@ class SefazSyncCoordinator:
             else f"Nenhum documento novo. Próxima verificação em {intervalo_min} min."
         )
 
-        cfg.update({
-            "ultimo_sync_at": now_iso,
-            "_proximo_sync_permitido_at": proximo.isoformat(),
-            "_sync_bloqueado_656": False,
-            "backoff_index": backoff_index,
-            "ultimo_sync_status": "ok",
-            "ultimo_nsu": nsu_loop,
-            "ultimo_sync_cstat": str(resultado.get("c_stat", "ok")),
-            "ultimo_sync_xmotivo": str(resultado.get("x_motivo", "")),
-            "ultimo_sync_ult_nsu_retorno": str(resultado.get("ultimo_nsu", nsu_loop)).strip().zfill(15),
-            "ultimo_sync_max_nsu_retorno": str(resultado.get("max_nsu", nsu_loop)).strip().zfill(15),
-            "ultimo_sync_documentos": total_docs,
-            "ultimo_sync_mensagem": msg,
-        })
+        cfg.update(
+            {
+                "ultimo_sync_at": now_iso,
+                "_proximo_sync_permitido_at": proximo.isoformat(),
+                "_sync_bloqueado_656": False,
+                "backoff_index": backoff_index,
+                "ultimo_sync_status": "ok",
+                "ultimo_nsu": nsu_loop,
+                "ultimo_sync_cstat": str(resultado.get("c_stat", "ok")),
+                "ultimo_sync_xmotivo": str(resultado.get("x_motivo", "")),
+                "ultimo_sync_ult_nsu_retorno": str(
+                    resultado.get("ultimo_nsu", nsu_loop)
+                )
+                .strip()
+                .zfill(15),
+                "ultimo_sync_max_nsu_retorno": str(resultado.get("max_nsu", nsu_loop))
+                .strip()
+                .zfill(15),
+                "ultimo_sync_documentos": total_docs,
+                "ultimo_sync_mensagem": msg,
+            }
+        )
         self._atomic_save(config_path, cfg)
         logger.info(
             f"[SEFAZ] [{reason}] ✅ Tenant {tenant_id_str}: "

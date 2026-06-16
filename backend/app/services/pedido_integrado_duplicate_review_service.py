@@ -52,9 +52,13 @@ def _utcnow() -> datetime:
 
 def _item_key(item: PedidoIntegradoItem | dict | None) -> tuple[str | None, int]:
     item_dict = _dict(item)
-    sku = _text(getattr(item, "sku", None) if item is not None else item_dict.get("sku"))
+    sku = _text(
+        getattr(item, "sku", None) if item is not None else item_dict.get("sku")
+    )
     quantidade = _coerce_int(
-        getattr(item, "quantidade", None) if item is not None else item_dict.get("quantidade"),
+        getattr(item, "quantidade", None)
+        if item is not None
+        else item_dict.get("quantidade"),
         0,
     )
     return sku, quantidade
@@ -99,7 +103,9 @@ def _resumo_movimentacao(mov: EstoqueMovimentacao) -> dict:
     }
 
 
-def _agrupar_itens_por_pedido(db: Session, pedido_ids: list[int]) -> dict[int, list[PedidoIntegradoItem]]:
+def _agrupar_itens_por_pedido(
+    db: Session, pedido_ids: list[int]
+) -> dict[int, list[PedidoIntegradoItem]]:
     if not pedido_ids:
         return {}
     itens = (
@@ -114,7 +120,9 @@ def _agrupar_itens_por_pedido(db: Session, pedido_ids: list[int]) -> dict[int, l
     return dict(agrupados)
 
 
-def _agrupar_movimentos_por_pedido(db: Session, tenant_id, pedido_ids: list[int]) -> dict[int, list[EstoqueMovimentacao]]:
+def _agrupar_movimentos_por_pedido(
+    db: Session, tenant_id, pedido_ids: list[int]
+) -> dict[int, list[EstoqueMovimentacao]]:
     if not pedido_ids:
         return {}
     movimentos = (
@@ -145,13 +153,16 @@ def _resumir_pedido(
     loja_id = loja_id_do_payload(pedido)
     nf_numero = _numero_nf_pedido(pedido)
     nf_bling_id = _nf_bling_id_pedido(pedido)
-    movimentos_ativos = [mov for mov in movimentos if _text(getattr(mov, "status", None)) != "cancelado"]
+    movimentos_ativos = [
+        mov for mov in movimentos if _text(getattr(mov, "status", None)) != "cancelado"
+    ]
     itens_vendidos = [item for item in itens if getattr(item, "vendido_em", None)]
     itens_liberados = [item for item in itens if getattr(item, "liberado_em", None)]
     itens_reservados = [
         item
         for item in itens
-        if not getattr(item, "vendido_em", None) and not getattr(item, "liberado_em", None)
+        if not getattr(item, "vendido_em", None)
+        and not getattr(item, "liberado_em", None)
     ]
 
     motivos: list[str] = []
@@ -171,8 +182,13 @@ def _resumir_pedido(
                 motivos.append("nf_deterministica_divergente")
 
     if not motivos and itens_reservados and canonical_item_counter:
-        contador_reservas_duplicado = Counter(_item_key(item) for item in itens_reservados)
-        if all(canonical_item_counter.get(chave, 0) >= quantidade for chave, quantidade in contador_reservas_duplicado.items()):
+        contador_reservas_duplicado = Counter(
+            _item_key(item) for item in itens_reservados
+        )
+        if all(
+            canonical_item_counter.get(chave, 0) >= quantidade
+            for chave, quantidade in contador_reservas_duplicado.items()
+        ):
             recomendacao = "liberar_itens_redundantes"
         else:
             recomendacao = "transferir_itens_para_canonico"
@@ -205,7 +221,9 @@ def _resumir_pedido(
     }
 
 
-def _mesclar_payloads_pedido(canonico: PedidoIntegrado, duplicado: PedidoIntegrado, *, merged_at: datetime) -> None:
+def _mesclar_payloads_pedido(
+    canonico: PedidoIntegrado, duplicado: PedidoIntegrado, *, merged_at: datetime
+) -> None:
     from app.integracao_bling_pedido_routes import _consolidar_ultima_nf
 
     payload_canonico = dict(_dict(getattr(canonico, "payload", None)))
@@ -233,10 +251,20 @@ def _mesclar_payloads_pedido(canonico: PedidoIntegrado, duplicado: PedidoIntegra
     pedido_canonico_payload = _dict(payload_canonico.get("pedido"))
     pedido_duplicado_payload = _dict(payload_duplicado.get("pedido"))
     if pedido_duplicado_payload:
-        if not pedido_canonico_payload.get("itens") and pedido_duplicado_payload.get("itens"):
+        if not pedido_canonico_payload.get("itens") and pedido_duplicado_payload.get(
+            "itens"
+        ):
             pedido_canonico_payload["itens"] = pedido_duplicado_payload.get("itens")
-        for chave in ("numeroPedidoLoja", "numeroLoja", "numeroPedidoCanalVenda", "numeroPedidoCanal", "numeroPedidoMarketplace"):
-            if not pedido_canonico_payload.get(chave) and pedido_duplicado_payload.get(chave):
+        for chave in (
+            "numeroPedidoLoja",
+            "numeroLoja",
+            "numeroPedidoCanalVenda",
+            "numeroPedidoCanal",
+            "numeroPedidoMarketplace",
+        ):
+            if not pedido_canonico_payload.get(chave) and pedido_duplicado_payload.get(
+                chave
+            ):
                 pedido_canonico_payload[chave] = pedido_duplicado_payload.get(chave)
         payload_canonico["pedido"] = pedido_canonico_payload or pedido_duplicado_payload
 
@@ -281,7 +309,9 @@ def listar_grupos_duplicados_pedido_loja(
         grupos_duplicados = [
             grupo
             for grupo in grupos_duplicados
-            if any(int(getattr(pedido, "id", 0) or 0) in pedido_ids_set for pedido in grupo)
+            if any(
+                int(getattr(pedido, "id", 0) or 0) in pedido_ids_set for pedido in grupo
+            )
         ]
 
     if not grupos_duplicados:
@@ -299,7 +329,9 @@ def listar_grupos_duplicados_pedido_loja(
 
         itens_canonico = itens_por_pedido.get(int(canonico.id), [])
         movimentos_canonico = movimentos_por_pedido.get(int(canonico.id), [])
-        canonical_item_counter = Counter(_item_key(item) for item in itens_canonico if _item_key(item)[0])
+        canonical_item_counter = Counter(
+            _item_key(item) for item in itens_canonico if _item_key(item)[0]
+        )
         canonical_nf_key = (_nf_bling_id_pedido(canonico), _numero_nf_pedido(canonico))
 
         resumo_canonico = _resumir_pedido(
@@ -323,8 +355,12 @@ def listar_grupos_duplicados_pedido_loja(
                 )
             )
 
-        seguros = [item for item in duplicados if item.get("pode_mesclar_automaticamente")]
-        bloqueados = [item for item in duplicados if not item.get("pode_mesclar_automaticamente")]
+        seguros = [
+            item for item in duplicados if item.get("pode_mesclar_automaticamente")
+        ]
+        bloqueados = [
+            item for item in duplicados if not item.get("pode_mesclar_automaticamente")
+        ]
         resultados.append(
             {
                 "numero_pedido_loja": resumo_canonico.get("numero_pedido_loja"),
@@ -351,7 +387,9 @@ def listar_grupos_duplicados_pedido_loja(
         key=lambda item: (
             1 if item.get("pode_consolidar_automaticamente") else 0,
             _dt_iso(_dict(item.get("pedido_canonico")).get("criado_em")) or "",
-            _coerce_int(_dict(item.get("pedido_canonico")).get("pedido_bling_numero"), 0),
+            _coerce_int(
+                _dict(item.get("pedido_canonico")).get("pedido_bling_numero"), 0
+            ),
         ),
         reverse=True,
     )
@@ -374,7 +412,10 @@ def mapear_duplicidade_por_pedido_ids(
     mapa: dict[int, dict] = {}
     for grupo in grupos:
         pedido_canonico = _dict(grupo.get("pedido_canonico"))
-        todos = [pedido_canonico, *(_dict(item) for item in grupo.get("pedidos_duplicados") or [])]
+        todos = [
+            pedido_canonico,
+            *(_dict(item) for item in grupo.get("pedidos_duplicados") or []),
+        ]
         for pedido in todos:
             pedido_id = _coerce_int(pedido.get("id"), 0)
             if pedido_id <= 0:
@@ -385,12 +426,15 @@ def mapear_duplicidade_por_pedido_ids(
                 "loja_id": grupo.get("loja_id"),
                 "pedido_canonico": pedido_canonico,
                 "pedidos_duplicados": grupo.get("pedidos_duplicados") or [],
-                "pode_consolidar_automaticamente": grupo.get("pode_consolidar_automaticamente", False),
+                "pode_consolidar_automaticamente": grupo.get(
+                    "pode_consolidar_automaticamente", False
+                ),
                 "requer_revisao_manual": grupo.get("requer_revisao_manual", False),
                 "pedidos_seguro_ids": grupo.get("pedidos_seguro_ids") or [],
                 "pedidos_bloqueados_ids": grupo.get("pedidos_bloqueados_ids") or [],
                 "bloqueios": grupo.get("bloqueios") or [],
-                "pedido_atual_eh_canonico": pedido_id == _coerce_int(pedido_canonico.get("id"), 0),
+                "pedido_atual_eh_canonico": pedido_id
+                == _coerce_int(pedido_canonico.get("id"), 0),
             }
     return mapa
 
@@ -428,14 +472,17 @@ def consolidar_duplicidades_seguras_pedido(
         (
             item
             for item in grupos
-            if _coerce_int(_dict(item.get("pedido_canonico")).get("id"), 0) == int(pedido_canonico.id)
+            if _coerce_int(_dict(item.get("pedido_canonico")).get("id"), 0)
+            == int(pedido_canonico.id)
         ),
         None,
     )
     if not grupo:
         return {"success": False, "motivo": "pedido_sem_duplicidade_canonica"}
 
-    duplicados_seguro_ids = [int(item) for item in grupo.get("pedidos_seguro_ids") or [] if item]
+    duplicados_seguro_ids = [
+        int(item) for item in grupo.get("pedidos_seguro_ids") or [] if item
+    ]
     if not duplicados_seguro_ids:
         return {
             "success": False,
@@ -444,12 +491,21 @@ def consolidar_duplicidades_seguras_pedido(
         }
 
     from app.integracao_bling_pedido_routes import _sincronizar_itens_pedido_integrado
-    from app.services.bling_flow_monitor_service import registrar_evento, resolver_incidentes_relacionados
-    from app.services.pedido_integrado_consolidation_service import marcar_payload_como_mesclado
+    from app.services.bling_flow_monitor_service import (
+        registrar_evento,
+        resolver_incidentes_relacionados,
+    )
+    from app.services.pedido_integrado_consolidation_service import (
+        marcar_payload_como_mesclado,
+    )
 
     agora = _utcnow()
-    itens_canonico = _agrupar_itens_por_pedido(db, [int(pedido_canonico.id)]).get(int(pedido_canonico.id), [])
-    contador_canonico = Counter(_item_key(item) for item in itens_canonico if _item_key(item)[0])
+    itens_canonico = _agrupar_itens_por_pedido(db, [int(pedido_canonico.id)]).get(
+        int(pedido_canonico.id), []
+    )
+    contador_canonico = Counter(
+        _item_key(item) for item in itens_canonico if _item_key(item)[0]
+    )
     mesclados: list[dict] = []
 
     for duplicado_id in duplicados_seguro_ids:
@@ -464,15 +520,24 @@ def consolidar_duplicidades_seguras_pedido(
         if not duplicado:
             continue
 
-        itens_duplicado = _agrupar_itens_por_pedido(db, [duplicado_id]).get(duplicado_id, [])
-        movimentos_duplicado = _agrupar_movimentos_por_pedido(db, tenant_id, [duplicado_id]).get(duplicado_id, [])
+        itens_duplicado = _agrupar_itens_por_pedido(db, [duplicado_id]).get(
+            duplicado_id, []
+        )
+        movimentos_duplicado = _agrupar_movimentos_por_pedido(
+            db, tenant_id, [duplicado_id]
+        ).get(duplicado_id, [])
         if any(getattr(item, "vendido_em", None) for item in itens_duplicado):
             continue
-        if any(_text(getattr(mov, "status", None)) != "cancelado" for mov in movimentos_duplicado):
+        if any(
+            _text(getattr(mov, "status", None)) != "cancelado"
+            for mov in movimentos_duplicado
+        ):
             continue
 
         _mesclar_payloads_pedido(pedido_canonico, duplicado, merged_at=agora)
-        if (not pedido_canonico.canal or pedido_canonico.canal == "bling") and duplicado.canal:
+        if (
+            not pedido_canonico.canal or pedido_canonico.canal == "bling"
+        ) and duplicado.canal:
             pedido_canonico.canal = duplicado.canal
         if not pedido_canonico.pedido_bling_numero and duplicado.pedido_bling_numero:
             pedido_canonico.pedido_bling_numero = duplicado.pedido_bling_numero
@@ -487,7 +552,10 @@ def consolidar_duplicidades_seguras_pedido(
             if getattr(item, "vendido_em", None):
                 continue
 
-            if not getattr(item, "liberado_em", None) and contador_canonico.get(chave, 0) > 0:
+            if (
+                not getattr(item, "liberado_em", None)
+                and contador_canonico.get(chave, 0) > 0
+            ):
                 item.liberado_em = item.liberado_em or agora
                 contador_canonico[chave] = max(contador_canonico.get(chave, 0) - 1, 0)
                 itens_liberados += 1
@@ -501,7 +569,10 @@ def consolidar_duplicidades_seguras_pedido(
         itens_incorporados_payload = _sincronizar_itens_pedido_integrado(
             db,
             pedido=pedido_canonico,
-            itens_bling=_dict(_dict(getattr(duplicado, "payload", None)).get("pedido")).get("itens") or [],
+            itens_bling=_dict(
+                _dict(getattr(duplicado, "payload", None)).get("pedido")
+            ).get("itens")
+            or [],
         )
 
         duplicado.payload = marcar_payload_como_mesclado(
@@ -519,7 +590,9 @@ def consolidar_duplicidades_seguras_pedido(
         mesclados.append(
             {
                 "pedido_id": duplicado.id,
-                "pedido_bling_numero": _text(getattr(duplicado, "pedido_bling_numero", None)),
+                "pedido_bling_numero": _text(
+                    getattr(duplicado, "pedido_bling_numero", None)
+                ),
                 "itens_movidos": itens_movidos,
                 "itens_liberados": itens_liberados,
                 "itens_incorporados_payload": itens_incorporados_payload,
@@ -566,7 +639,9 @@ def consolidar_duplicidades_seguras_pedido(
     return {
         "success": True,
         "pedido_canonico_id": pedido_canonico.id,
-        "pedido_canonico_bling_numero": _text(getattr(pedido_canonico, "pedido_bling_numero", None)),
+        "pedido_canonico_bling_numero": _text(
+            getattr(pedido_canonico, "pedido_bling_numero", None)
+        ),
         "numero_pedido_loja": numero_pedido_loja_do_payload(pedido_canonico),
         "pedidos_mesclados": mesclados,
         "pedidos_bloqueados_ids": grupo.get("pedidos_bloqueados_ids") or [],
@@ -580,8 +655,14 @@ def reconciliar_fluxo_pedido_integrado(
     pedido_id: int,
 ) -> dict:
     from app.pedido_integrado_item_models import PedidoIntegradoItem
-    from app.services.bling_flow_monitor_service import _reconciliar_pedido_confirmado, registrar_evento, resolver_incidentes_relacionados
-    from app.services.pedido_status_reconciliation_service import reconciliar_status_pedido_local
+    from app.services.bling_flow_monitor_service import (
+        _reconciliar_pedido_confirmado,
+        registrar_evento,
+        resolver_incidentes_relacionados,
+    )
+    from app.services.pedido_status_reconciliation_service import (
+        reconciliar_status_pedido_local,
+    )
 
     pedido_base = (
         db.query(PedidoIntegrado)
@@ -595,7 +676,9 @@ def reconciliar_fluxo_pedido_integrado(
         return {"success": False, "motivo": "pedido_nao_encontrado"}
 
     pedido = resolver_pedido_canonico(db, pedido_base) or pedido_base
-    consolidacao = consolidar_duplicidades_seguras_pedido(db, tenant_id=tenant_id, pedido_id=pedido.id)
+    consolidacao = consolidar_duplicidades_seguras_pedido(
+        db, tenant_id=tenant_id, pedido_id=pedido.id
+    )
     if consolidacao.get("success"):
         pedido = (
             db.query(PedidoIntegrado)

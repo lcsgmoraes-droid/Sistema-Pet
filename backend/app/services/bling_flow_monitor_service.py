@@ -20,7 +20,9 @@ from app.services.pedido_integrado_duplicate_review_service import (
     consolidar_duplicidades_seguras_pedido,
     listar_grupos_duplicados_pedido_loja,
 )
-from app.services.pedido_integrado_consolidation_service import localizar_pedido_por_bling_id
+from app.services.pedido_integrado_consolidation_service import (
+    localizar_pedido_por_bling_id,
+)
 from app.tenancy.rls import sync_rls_tenant
 from app.utils.correlation import current_correlation_id, operation_correlation_context
 from app.utils.logger import logger
@@ -52,7 +54,9 @@ PEDIDO_MONITORED_INCIDENT_CODES = {
 EXTRA_MONITORED_INCIDENT_CODES = {
     "PEDIDO_DUPLICADO_POR_NUMERO_LOJA",
 }
-MONITORED_INCIDENT_CODES = PEDIDO_MONITORED_INCIDENT_CODES | EXTRA_MONITORED_INCIDENT_CODES
+MONITORED_INCIDENT_CODES = (
+    PEDIDO_MONITORED_INCIDENT_CODES | EXTRA_MONITORED_INCIDENT_CODES
+)
 NF_AUTHORIZED_CODES = {2, 5, 9}
 _NF_RECENTES_CACHE_SECONDS = 300
 _NF_RECENTES_ENRICH_LIMIT = 60
@@ -218,7 +222,9 @@ def registrar_vinculo_nf_pedido(
 ) -> int | None:
     payload_extra = _dict(_json_safe(payload or {}))
     nf_contexto = _ultima_nf(getattr(pedido, "payload", None))
-    nf_bling_id_resolvido = _nf_bling_id_valido(nf_bling_id) or _nf_bling_id_valido(nf_contexto.get("id"))
+    nf_bling_id_resolvido = _nf_bling_id_valido(nf_bling_id) or _nf_bling_id_valido(
+        nf_contexto.get("id")
+    )
     payload_base = {
         "pedido_bling_numero": _text(getattr(pedido, "pedido_bling_numero", None)),
         "numero_pedido_loja": _numero_pedido_loja_pedido(pedido),
@@ -428,7 +434,9 @@ def _resumir_nf_bling_recente(item: dict, modelo: int) -> dict:
     else:
         numero_pedido_loja = _extrair_numero_pedido_loja_nf(item)
 
-    pedido_ref = _dict(item.get("pedido") or item.get("pedidoVenda") or item.get("pedidoCompra"))
+    pedido_ref = _dict(
+        item.get("pedido") or item.get("pedidoVenda") or item.get("pedidoCompra")
+    )
     canal, canal_label = _canal_label_nf_contexto(item)
 
     return {
@@ -439,8 +447,13 @@ def _resumir_nf_bling_recente(item: dict, modelo: int) -> dict:
         "situacao_codigo": _coerce_int(item.get("situacao"), 0),
         "situacao": _text(item.get("descricaoSituacao") or item.get("situacao")),
         "chave": _text(item.get("chaveAcesso") or item.get("chave")),
-        "valor_total": item.get("valorNota") or item.get("valorTotalNf") or item.get("valorTotal") or item.get("valor_total"),
-        "data_emissao": _text(item.get("dataEmissao") or item.get("data_emissao") or item.get("data")),
+        "valor_total": item.get("valorNota")
+        or item.get("valorTotalNf")
+        or item.get("valorTotal")
+        or item.get("valor_total"),
+        "data_emissao": _text(
+            item.get("dataEmissao") or item.get("data_emissao") or item.get("data")
+        ),
         "numero_pedido_loja": _text(numero_pedido_loja),
         "loja_id": _loja_id_nf_contexto(item),
         "pedido_bling_id": _text(pedido_ref.get("id")),
@@ -466,7 +479,9 @@ def _enriquecer_resumo_nf_com_relacao(resumo: dict) -> dict:
             )
         )
     except Exception as exc:
-        logger.warning(f"[BLING FLOW MONITOR] Falha ao enriquecer NF recente {nf_id}: {exc}")
+        logger.warning(
+            f"[BLING FLOW MONITOR] Falha ao enriquecer NF recente {nf_id}: {exc}"
+        )
         return resumo
 
     nf_completa = _dict(relacao.get("nf_completa"))
@@ -487,9 +502,12 @@ def _enriquecer_resumo_nf_com_relacao(resumo: dict) -> dict:
 
     return {
         **resumo,
-        "pedido_bling_id": _text(relacao.get("pedido_bling_id")) or _text(resumo.get("pedido_bling_id")),
-        "pedido_bling_numero": _text(relacao.get("pedido_bling_numero")) or _text(resumo.get("pedido_bling_numero")),
-        "numero_pedido_loja": _text(relacao.get("numero_pedido_loja")) or _text(resumo.get("numero_pedido_loja")),
+        "pedido_bling_id": _text(relacao.get("pedido_bling_id"))
+        or _text(resumo.get("pedido_bling_id")),
+        "pedido_bling_numero": _text(relacao.get("pedido_bling_numero"))
+        or _text(resumo.get("pedido_bling_numero")),
+        "numero_pedido_loja": _text(relacao.get("numero_pedido_loja"))
+        or _text(resumo.get("numero_pedido_loja")),
         "loja_id": _loja_id_nf_contexto(nf_completa) or _text(resumo.get("loja_id")),
         "valor_total": valor_total,
         "canal": canal,
@@ -506,7 +524,9 @@ def _obter_nfs_recentes_cache_local(db: Session, *, tenant_id, dias: int) -> lis
             BlingNotaFiscalCache.data_emissao.isnot(None),
             BlingNotaFiscalCache.data_emissao >= data_inicial,
         )
-        .order_by(BlingNotaFiscalCache.data_emissao.desc(), BlingNotaFiscalCache.id.desc())
+        .order_by(
+            BlingNotaFiscalCache.data_emissao.desc(), BlingNotaFiscalCache.id.desc()
+        )
         .limit(_NF_RECENTES_ENRICH_LIMIT * 3)
         .all()
     )
@@ -523,15 +543,30 @@ def _obter_nfs_recentes_cache_local(db: Session, *, tenant_id, dias: int) -> lis
             "serie": _text(getattr(registro, "serie", None)),
             "modelo": getattr(registro, "modelo", None),
             "situacao": _text(getattr(registro, "status", None)),
-            "situacao_codigo": 5 if (_text(getattr(registro, "status", None)) or "").lower() == "autorizada" else 0,
+            "situacao_codigo": 5
+            if (_text(getattr(registro, "status", None)) or "").lower() == "autorizada"
+            else 0,
             "chave": _text(getattr(registro, "chave", None)),
             "valor_total": getattr(registro, "valor", None),
-            "data_emissao": getattr(registro, "data_emissao", None).isoformat() if getattr(registro, "data_emissao", None) else None,
+            "data_emissao": getattr(registro, "data_emissao", None).isoformat()
+            if getattr(registro, "data_emissao", None)
+            else None,
             "numero_pedido_loja": _text(getattr(registro, "numero_pedido_loja", None)),
-            "loja_id": _loja_id_nf_contexto(_dict(getattr(registro, "detalhe_payload", None)) or _dict(getattr(registro, "resumo_payload", None))),
+            "loja_id": _loja_id_nf_contexto(
+                _dict(getattr(registro, "detalhe_payload", None))
+                or _dict(getattr(registro, "resumo_payload", None))
+            ),
             "pedido_bling_id": _text(getattr(registro, "pedido_bling_id_ref", None)),
-            "pedido_bling_numero": _text(_dict(getattr(registro, "detalhe_payload", None)).get("pedido_bling_numero"))
-            or _text(_dict(getattr(registro, "resumo_payload", None)).get("pedido_bling_numero")),
+            "pedido_bling_numero": _text(
+                _dict(getattr(registro, "detalhe_payload", None)).get(
+                    "pedido_bling_numero"
+                )
+            )
+            or _text(
+                _dict(getattr(registro, "resumo_payload", None)).get(
+                    "pedido_bling_numero"
+                )
+            ),
             "canal": _text(getattr(registro, "canal", None)),
             "canal_label": _text(getattr(registro, "canal_label", None)),
         }
@@ -540,14 +575,24 @@ def _obter_nfs_recentes_cache_local(db: Session, *, tenant_id, dias: int) -> lis
     return notas
 
 
-def _obter_nfs_recentes_bling(*, tenant_id, dias: int, db: Session | None = None) -> list[dict]:
+def _obter_nfs_recentes_bling(
+    *, tenant_id, dias: int, db: Session | None = None
+) -> list[dict]:
     dias = max(1, min(int(dias or 1), 15))
     cache_key = (str(tenant_id or ""), dias)
     cache_atual = _nf_recentes_cache.get(cache_key)
-    if cache_atual and (monotonic() - cache_atual.get("ts_monotonic", 0)) <= _NF_RECENTES_CACHE_SECONDS:
+    if (
+        cache_atual
+        and (monotonic() - cache_atual.get("ts_monotonic", 0))
+        <= _NF_RECENTES_CACHE_SECONDS
+    ):
         return deepcopy(cache_atual.get("items") or [])
 
-    notas_cache_local = _obter_nfs_recentes_cache_local(db, tenant_id=tenant_id, dias=dias) if db else []
+    notas_cache_local = (
+        _obter_nfs_recentes_cache_local(db, tenant_id=tenant_id, dias=dias)
+        if db
+        else []
+    )
     if notas_cache_local:
         _nf_recentes_cache[cache_key] = {
             "ts_monotonic": monotonic(),
@@ -567,7 +612,9 @@ def _obter_nfs_recentes_bling(*, tenant_id, dias: int, db: Session | None = None
         try:
             resposta = listar_fn(data_inicial=data_inicial, data_final=data_final)
         except Exception as exc:
-            logger.warning(f"[BLING FLOW MONITOR] Falha ao listar notas recentes do Bling (modelo {modelo}): {exc}")
+            logger.warning(
+                f"[BLING FLOW MONITOR] Falha ao listar notas recentes do Bling (modelo {modelo}): {exc}"
+            )
             continue
 
         for index, bruto in enumerate(_list(_dict(resposta).get("data"))):
@@ -598,7 +645,9 @@ def _indexar_nfs_por_pedido_loja(notas: list[dict]) -> dict[str, list[dict]]:
         if not numero:
             continue
         mapa.setdefault(numero, [])
-        if not any(_text(item.get("id")) == _text(_dict(nf).get("id")) for item in mapa[numero]):
+        if not any(
+            _text(item.get("id")) == _text(_dict(nf).get("id")) for item in mapa[numero]
+        ):
             mapa[numero].append(_dict(nf))
 
     for numero, itens in mapa.items():
@@ -615,7 +664,9 @@ def _indexar_nfs_por_pedido_loja(notas: list[dict]) -> dict[str, list[dict]]:
     return mapa
 
 
-def _nf_detectada_combina_com_pedido(pedido: PedidoIntegrado, nf_contexto: dict | None) -> tuple[bool, dict]:
+def _nf_detectada_combina_com_pedido(
+    pedido: PedidoIntegrado, nf_contexto: dict | None
+) -> tuple[bool, dict]:
     nf_contexto = _dict(nf_contexto)
     if not nf_contexto:
         return False, {"motivo": "nf_nao_informada"}
@@ -668,7 +719,9 @@ def _nf_detectada_combina_com_pedido(pedido: PedidoIntegrado, nf_contexto: dict 
     }
 
 
-def _produto_por_sku(db: Session, tenant_id, sku: str) -> tuple[Produto | None, str | None]:
+def _produto_por_sku(
+    db: Session, tenant_id, sku: str
+) -> tuple[Produto | None, str | None]:
     if not sku:
         return None, None
 
@@ -778,13 +831,23 @@ def diagnosticar_pedido_integrado(
     incidentes: list[dict] = []
     nf = _ultima_nf(payload)
     nf_detectada = _dict(nf_detectada)
-    nfs_detectadas = [_dict(item) for item in (nfs_detectadas or []) if isinstance(item, dict)]
+    nfs_detectadas = [
+        _dict(item) for item in (nfs_detectadas or []) if isinstance(item, dict)
+    ]
     nf_auditavel = nf
-    if not _nf_contexto_autorizado(nf) and len(nfs_detectadas) == 1 and _nf_contexto_autorizado(nfs_detectadas[0]):
+    if (
+        not _nf_contexto_autorizado(nf)
+        and len(nfs_detectadas) == 1
+        and _nf_contexto_autorizado(nfs_detectadas[0])
+    ):
         nf_auditavel = nfs_detectadas[0]
     nf_local_id = _text(nf.get("id"))
     nf_local_numero = _text(nf.get("numero"))
-    movimentacoes_saida_nf = movimentacoes_saida if movimentacoes_saida_nf is None else int(movimentacoes_saida_nf)
+    movimentacoes_saida_nf = (
+        movimentacoes_saida
+        if movimentacoes_saida_nf is None
+        else int(movimentacoes_saida_nf)
+    )
 
     if not itens:
         incidentes.append(
@@ -849,7 +912,9 @@ def diagnosticar_pedido_integrado(
                         auto_fixable=True,
                         pedido=pedido,
                         sku=_text(item.sku),
-                        nf_bling_id=_text(_primeiro_preenchido(nf_auditavel.get("id"), nf.get("id"))),
+                        nf_bling_id=_text(
+                            _primeiro_preenchido(nf_auditavel.get("id"), nf.get("id"))
+                        ),
                     )
                 )
 
@@ -866,7 +931,9 @@ def diagnosticar_pedido_integrado(
                     suggested_action="Reconciliar as baixas pendentes do pedido confirmado.",
                     auto_fixable=True,
                     pedido=pedido,
-                    nf_bling_id=_text(_primeiro_preenchido(nf_auditavel.get("id"), nf.get("id"))),
+                    nf_bling_id=_text(
+                        _primeiro_preenchido(nf_auditavel.get("id"), nf.get("id"))
+                    ),
                     details={
                         "nf_detectada": _json_safe(nf_auditavel),
                         "itens_vendidos": len(itens_vendidos),
@@ -878,7 +945,9 @@ def diagnosticar_pedido_integrado(
 
     if pedido.status in {"cancelado", "expirado"}:
         for item in itens:
-            if not getattr(item, "liberado_em", None) and not getattr(item, "vendido_em", None):
+            if not getattr(item, "liberado_em", None) and not getattr(
+                item, "vendido_em", None
+            ):
                 incidentes.append(
                     _make_incident(
                         "RESERVA_ATIVA_EM_PEDIDO_FINALIZADO",
@@ -940,7 +1009,11 @@ def diagnosticar_pedido_integrado(
             nf_detectada_numero = _text(nf_detectada.get("numero"))
             nf_ja_vinculada = bool(
                 (nf_local_id and nf_detectada_id and nf_local_id == nf_detectada_id)
-                or (nf_local_numero and nf_detectada_numero and nf_local_numero == nf_detectada_numero)
+                or (
+                    nf_local_numero
+                    and nf_detectada_numero
+                    and nf_local_numero == nf_detectada_numero
+                )
             )
 
             if not nf_ja_vinculada:
@@ -976,7 +1049,9 @@ def diagnosticar_pedido_integrado(
                             pedido=pedido,
                             nf_bling_id=nf_detectada_id,
                             details={
-                                "numero_pedido_loja": _numero_pedido_loja_pedido(pedido),
+                                "numero_pedido_loja": _numero_pedido_loja_pedido(
+                                    pedido
+                                ),
                                 "canal_pedido": _canal_pedido_integrado(pedido),
                                 "total_pedido": _pedido_total(pedido),
                                 "nf_detectada": _json_safe(nf_detectada),
@@ -1020,8 +1095,14 @@ def _vincular_nf_detectada_ao_pedido(
             ),
             0,
         )
-        from app.integracao_bling_nf_routes import _consultar_relacao_nf_bling, _registrar_nf_no_pedido
-        from app.services.bling_nf_service import processar_nf_autorizada, processar_nf_cancelada
+        from app.integracao_bling_nf_routes import (
+            _consultar_relacao_nf_bling,
+            _registrar_nf_no_pedido,
+        )
+        from app.services.bling_nf_service import (
+            processar_nf_autorizada,
+            processar_nf_cancelada,
+        )
 
         relacao = _consultar_relacao_nf_bling(nf_id=nf_id, situacao_num=situacao_num)
         dados_nf = _dict(relacao.get("nf_completa")) or nf_detectada
@@ -1034,13 +1115,17 @@ def _vincular_nf_detectada_ao_pedido(
         db.add(pedido)
         db.flush()
 
-        itens = db.query(PedidoIntegradoItem).filter(
-            PedidoIntegradoItem.pedido_integrado_id == pedido.id
-        ).all()
+        itens = (
+            db.query(PedidoIntegradoItem)
+            .filter(PedidoIntegradoItem.pedido_integrado_id == pedido.id)
+            .all()
+        )
 
         acao = None
         if _nf_contexto_autorizado(nf_detectada):
-            acao = processar_nf_autorizada(db=db, pedido=pedido, itens=itens, nf_id=nf_id)
+            acao = processar_nf_autorizada(
+                db=db, pedido=pedido, itens=itens, nf_id=nf_id
+            )
         elif situacao_num == 4:
             acao = processar_nf_cancelada(db=db, pedido=pedido, itens=itens)
 
@@ -1048,7 +1133,8 @@ def _vincular_nf_detectada_ao_pedido(
             pedido=pedido,
             source="autofix",
             nf_bling_id=nf_id,
-            nf_numero=_text(dados_nf.get("numero")) or _text(nf_detectada.get("numero")),
+            nf_numero=_text(dados_nf.get("numero"))
+            or _text(nf_detectada.get("numero")),
             message="NF detectada pela auditoria foi vinculada automaticamente ao pedido",
             payload={
                 "link_source": "auditoria",
@@ -1063,7 +1149,8 @@ def _vincular_nf_detectada_ao_pedido(
             "pedido_bling_numero": pedido.pedido_bling_numero,
             "numero_pedido_loja": _numero_pedido_loja_pedido(pedido),
             "nf_id": nf_id,
-            "nf_numero": _text(dados_nf.get("numero")) or _text(nf_detectada.get("numero")),
+            "nf_numero": _text(dados_nf.get("numero"))
+            or _text(nf_detectada.get("numero")),
             "acao": _json_safe(acao),
         }
     except Exception as exc:
@@ -1121,7 +1208,9 @@ def registrar_evento(
     except Exception as exc:
         if own_session:
             session.rollback()
-        logger.warning(f"[BLING FLOW MONITOR] Falha ao registrar evento {event_type}: {exc}")
+        logger.warning(
+            f"[BLING FLOW MONITOR] Falha ao registrar evento {event_type}: {exc}"
+        )
         return None
     finally:
         if own_session:
@@ -1353,7 +1442,9 @@ def _resolver_incidentes_duplicidade_ausentes(
     return resolvidos
 
 
-def _recarregar_itens_do_pedido(db: Session, pedido: PedidoIntegrado) -> tuple[bool, dict]:
+def _recarregar_itens_do_pedido(
+    db: Session, pedido: PedidoIntegrado
+) -> tuple[bool, dict]:
     from app.bling_integration import BlingAPI
     from app.estoque_reserva_service import EstoqueReservaService
 
@@ -1366,9 +1457,11 @@ def _recarregar_itens_do_pedido(db: Session, pedido: PedidoIntegrado) -> tuple[b
         pedido.payload = {}
     pedido.payload["pedido"] = pedido_completo
 
-    existentes = db.query(PedidoIntegradoItem).filter(
-        PedidoIntegradoItem.pedido_integrado_id == pedido.id
-    ).count()
+    existentes = (
+        db.query(PedidoIntegradoItem)
+        .filter(PedidoIntegradoItem.pedido_integrado_id == pedido.id)
+        .count()
+    )
     if existentes:
         return True, {"itens_criados": 0, "motivo": "pedido_ja_possui_itens"}
 
@@ -1396,7 +1489,9 @@ def _recarregar_itens_do_pedido(db: Session, pedido: PedidoIntegrado) -> tuple[b
     return itens_criados > 0, {"itens_criados": itens_criados}
 
 
-def _liberar_reservas_pedido_finalizado(db: Session, pedido: PedidoIntegrado, itens: list[PedidoIntegradoItem]) -> tuple[bool, dict]:
+def _liberar_reservas_pedido_finalizado(
+    db: Session, pedido: PedidoIntegrado, itens: list[PedidoIntegradoItem]
+) -> tuple[bool, dict]:
     liberados = 0
     agora = _utcnow()
     for item in itens:
@@ -1408,7 +1503,9 @@ def _liberar_reservas_pedido_finalizado(db: Session, pedido: PedidoIntegrado, it
     return liberados > 0, {"itens_liberados": liberados}
 
 
-def _reconciliar_pedido_confirmado(db: Session, pedido: PedidoIntegrado, itens: list[PedidoIntegradoItem]) -> tuple[bool, dict]:
+def _reconciliar_pedido_confirmado(
+    db: Session, pedido: PedidoIntegrado, itens: list[PedidoIntegradoItem]
+) -> tuple[bool, dict]:
     from app.services.bling_nf_service import processar_nf_autorizada
 
     nf = _ultima_nf(getattr(pedido, "payload", None))
@@ -1432,7 +1529,9 @@ def _reconciliar_pedido_confirmado(db: Session, pedido: PedidoIntegrado, itens: 
                 )
                 .first()
             )
-            if nf_cache and not _nf_contexto_autorizado({"situacao": getattr(nf_cache, "status", None)}):
+            if nf_cache and not _nf_contexto_autorizado(
+                {"situacao": getattr(nf_cache, "status", None)}
+            ):
                 nf_cache = None
 
         if not nf_cache:
@@ -1455,25 +1554,36 @@ def _reconciliar_pedido_confirmado(db: Session, pedido: PedidoIntegrado, itens: 
                 notas_loja = [
                     nota
                     for nota in notas_loja
-                    if _nf_contexto_autorizado({"situacao": getattr(nota, "status", None)})
+                    if _nf_contexto_autorizado(
+                        {"situacao": getattr(nota, "status", None)}
+                    )
                 ]
                 if loja_id_pedido:
                     notas_loja = [
                         nota
                         for nota in notas_loja
                         if not _loja_id_nf_contexto(
-                            _dict(getattr(nota, "detalhe_payload", None)) or _dict(getattr(nota, "resumo_payload", None))
+                            _dict(getattr(nota, "detalhe_payload", None))
+                            or _dict(getattr(nota, "resumo_payload", None))
                         )
                         or _loja_id_nf_contexto(
-                            _dict(getattr(nota, "detalhe_payload", None)) or _dict(getattr(nota, "resumo_payload", None))
-                        ) == loja_id_pedido
+                            _dict(getattr(nota, "detalhe_payload", None))
+                            or _dict(getattr(nota, "resumo_payload", None))
+                        )
+                        == loja_id_pedido
                     ]
                 notas_unicas: dict[str, BlingNotaFiscalCache] = {}
                 for nota in notas_loja:
                     pedido_ref_nota = _text(getattr(nota, "pedido_bling_id_ref", None))
-                    if pedido_ref_nota and pedido_ref_nota != _text(getattr(pedido, "pedido_bling_id", None)):
+                    if pedido_ref_nota and pedido_ref_nota != _text(
+                        getattr(pedido, "pedido_bling_id", None)
+                    ):
                         continue
-                    chave = _nf_bling_id_valido(getattr(nota, "bling_id", None)) or _text(getattr(nota, "numero", None)) or ""
+                    chave = (
+                        _nf_bling_id_valido(getattr(nota, "bling_id", None))
+                        or _text(getattr(nota, "numero", None))
+                        or ""
+                    )
                     if chave and chave not in notas_unicas:
                         notas_unicas[chave] = nota
                 if len(notas_unicas) == 1:
@@ -1504,7 +1614,9 @@ def _reconciliar_pedido_confirmado(db: Session, pedido: PedidoIntegrado, itens: 
         db.flush()
 
         nf = _ultima_nf(getattr(pedido, "payload", None))
-        nf_id = _nf_bling_id_valido(_primeiro_preenchido(nf.get("id"), nf.get("nfe_id")))
+        nf_id = _nf_bling_id_valido(
+            _primeiro_preenchido(nf.get("id"), nf.get("nfe_id"))
+        )
         if not _nf_contexto_autorizado(nf) or not nf_id:
             return False, {
                 "motivo": "nf_cache_nao_consolidada_no_pedido",
@@ -1534,10 +1646,14 @@ def autocorrigir_incidente(db: Session, incidente: BlingFlowIncident) -> dict:
 
     pedido = None
     if incidente.pedido_integrado_id:
-        pedido = db.query(PedidoIntegrado).filter(
-            PedidoIntegrado.id == incidente.pedido_integrado_id,
-            PedidoIntegrado.tenant_id == incidente.tenant_id,
-        ).first()
+        pedido = (
+            db.query(PedidoIntegrado)
+            .filter(
+                PedidoIntegrado.id == incidente.pedido_integrado_id,
+                PedidoIntegrado.tenant_id == incidente.tenant_id,
+            )
+            .first()
+        )
     if not pedido and incidente.pedido_bling_id:
         pedido = localizar_pedido_por_bling_id(
             db,
@@ -1557,18 +1673,22 @@ def autocorrigir_incidente(db: Session, incidente: BlingFlowIncident) -> dict:
         elif pedido and incidente.code == "PEDIDO_SEM_ITENS":
             sucesso, detalhes = _recarregar_itens_do_pedido(db, pedido)
         elif pedido and incidente.code == "RESERVA_ATIVA_EM_PEDIDO_FINALIZADO":
-            itens = db.query(PedidoIntegradoItem).filter(
-                PedidoIntegradoItem.pedido_integrado_id == pedido.id
-            ).all()
+            itens = (
+                db.query(PedidoIntegradoItem)
+                .filter(PedidoIntegradoItem.pedido_integrado_id == pedido.id)
+                .all()
+            )
             sucesso, detalhes = _liberar_reservas_pedido_finalizado(db, pedido, itens)
         elif pedido and incidente.code in {
             "ITEM_NAO_CONFIRMADO_EM_PEDIDO_CONFIRMADO",
             "NF_AUTORIZADA_PEDIDO_NAO_CONFIRMADO",
             "PEDIDO_CONFIRMADO_SEM_BAIXA_ESTOQUE",
         }:
-            itens = db.query(PedidoIntegradoItem).filter(
-                PedidoIntegradoItem.pedido_integrado_id == pedido.id
-            ).all()
+            itens = (
+                db.query(PedidoIntegradoItem)
+                .filter(PedidoIntegradoItem.pedido_integrado_id == pedido.id)
+                .all()
+            )
             sucesso, detalhes = _reconciliar_pedido_confirmado(db, pedido, itens)
         elif pedido and incidente.code == "NF_ENCONTRADA_SEM_VINCULO_NO_PEDIDO":
             sucesso, detalhes = _vincular_nf_detectada_ao_pedido(
@@ -1702,13 +1822,17 @@ def auditar_fluxo_bling(
 
     for pedido in pedidos:
         try:
-            itens = db.query(PedidoIntegradoItem).filter(
-                PedidoIntegradoItem.pedido_integrado_id == pedido.id
-            ).all()
-            movimentacoes_saida, movimentacoes_saida_nf = _contar_movimentacoes_saida_nf(
-                db,
-                pedido,
-                payload=_dict(pedido.payload),
+            itens = (
+                db.query(PedidoIntegradoItem)
+                .filter(PedidoIntegradoItem.pedido_integrado_id == pedido.id)
+                .all()
+            )
+            movimentacoes_saida, movimentacoes_saida_nf = (
+                _contar_movimentacoes_saida_nf(
+                    db,
+                    pedido,
+                    payload=_dict(pedido.payload),
+                )
             )
 
             itens_sem_produto = []
@@ -1737,9 +1861,7 @@ def auditar_fluxo_bling(
             numero_pedido_loja = _numero_pedido_loja_pedido(pedido)
             precisa_auditar_nfs_recentes = bool(
                 numero_pedido_loja
-                and (
-                    pedido.status in {"aberto", "expirado", "confirmado"}
-                )
+                and (pedido.status in {"aberto", "expirado", "confirmado"})
             )
             if precisa_auditar_nfs_recentes:
                 if pedido.tenant_id not in nfs_recentes_por_tenant:
@@ -1749,7 +1871,9 @@ def auditar_fluxo_bling(
                             dias=max(1, min(dias, 5)),
                             db=db,
                         )
-                        nfs_recentes_por_tenant[pedido.tenant_id] = _indexar_nfs_por_pedido_loja(notas_recentes)
+                        nfs_recentes_por_tenant[pedido.tenant_id] = (
+                            _indexar_nfs_por_pedido_loja(notas_recentes)
+                        )
                     except Exception as exc:
                         nfs_recentes_por_tenant[pedido.tenant_id] = {}
                         registrar_evento(
@@ -1766,7 +1890,9 @@ def auditar_fluxo_bling(
                             payload={"numero_pedido_loja": numero_pedido_loja},
                             db=db,
                         )
-                nfs_detectadas = nfs_recentes_por_tenant.get(pedido.tenant_id, {}).get(numero_pedido_loja, [])
+                nfs_detectadas = nfs_recentes_por_tenant.get(pedido.tenant_id, {}).get(
+                    numero_pedido_loja, []
+                )
 
             incidentes = diagnosticar_pedido_integrado(
                 pedido,
@@ -1809,7 +1935,9 @@ def auditar_fluxo_bling(
                     if resultado.get("success"):
                         auto_fix_sucessos += 1
 
-            incidentes_resolvidos += _resolver_incidentes_ausentes(db, pedido, active_keys)
+            incidentes_resolvidos += _resolver_incidentes_ausentes(
+                db, pedido, active_keys
+            )
             db.commit()
         except Exception as exc:
             db.rollback()
@@ -1826,7 +1954,13 @@ def auditar_fluxo_bling(
                 pedido_bling_id=pedido.pedido_bling_id,
             )
 
-    tenant_ids_duplicidade = {tenant_id} if tenant_id else {pedido.tenant_id for pedido in pedidos if getattr(pedido, "tenant_id", None)}
+    tenant_ids_duplicidade = (
+        {tenant_id}
+        if tenant_id
+        else {
+            pedido.tenant_id for pedido in pedidos if getattr(pedido, "tenant_id", None)
+        }
+    )
     for duplicate_tenant_id in tenant_ids_duplicidade:
         duplicate_active_keys: set[str] = set()
         duplicate_groups = listar_grupos_duplicados_pedido_loja(
@@ -1871,7 +2005,9 @@ def auditar_fluxo_bling(
                     "pedidos_seguro_ids": seguros,
                     "pedidos_bloqueados_ids": bloqueados,
                     "bloqueios": grupo.get("bloqueios") or [],
-                    "pode_consolidar_automaticamente": grupo.get("pode_consolidar_automaticamente", False),
+                    "pode_consolidar_automaticamente": grupo.get(
+                        "pode_consolidar_automaticamente", False
+                    ),
                     "requer_revisao_manual": grupo.get("requer_revisao_manual", False),
                 },
                 source="auditoria",
@@ -1916,23 +2052,33 @@ def auditar_fluxo_bling(
 
 def obter_resumo_monitoramento(db: Session, *, tenant_id=None) -> dict:
     _sync_bling_flow_rls(db, tenant_id)
-    incidentes_query = db.query(BlingFlowIncident).filter(BlingFlowIncident.status == "open")
+    incidentes_query = db.query(BlingFlowIncident).filter(
+        BlingFlowIncident.status == "open"
+    )
     eventos_query = db.query(BlingFlowEvent)
     if tenant_id:
-        incidentes_query = incidentes_query.filter(BlingFlowIncident.tenant_id == tenant_id)
+        incidentes_query = incidentes_query.filter(
+            BlingFlowIncident.tenant_id == tenant_id
+        )
         eventos_query = eventos_query.filter(BlingFlowEvent.tenant_id == tenant_id)
 
     incidentes_abertos = incidentes_query.all()
-    eventos_recentes = eventos_query.order_by(
-        BlingFlowEvent.processed_at.desc(),
-        BlingFlowEvent.id.desc(),
-    ).limit(10).all()
+    eventos_recentes = (
+        eventos_query.order_by(
+            BlingFlowEvent.processed_at.desc(),
+            BlingFlowEvent.id.desc(),
+        )
+        .limit(10)
+        .all()
+    )
 
     por_severidade = Counter(inc.severity for inc in incidentes_abertos)
     por_codigo = Counter(inc.code for inc in incidentes_abertos)
 
     return {
-        "status": "critical" if por_severidade.get("critical") else ("warning" if incidentes_abertos else "healthy"),
+        "status": "critical"
+        if por_severidade.get("critical")
+        else ("warning" if incidentes_abertos else "healthy"),
         "incidentes_abertos": len(incidentes_abertos),
         "por_severidade": dict(por_severidade),
         "por_codigo": dict(por_codigo),
@@ -1953,7 +2099,9 @@ def obter_resumo_monitoramento(db: Session, *, tenant_id=None) -> dict:
     }
 
 
-def executar_auditoria_background(*, dias: int = 7, limite: int = 300, auto_fix: bool = True) -> dict:
+def executar_auditoria_background(
+    *, dias: int = 7, limite: int = 300, auto_fix: bool = True
+) -> dict:
     db = SessionLocal()
     try:
         resultado = auditar_fluxo_bling(db, dias=dias, limite=limite, auto_fix=auto_fix)

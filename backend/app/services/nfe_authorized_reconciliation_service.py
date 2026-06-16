@@ -9,7 +9,9 @@ from app.nfe_cache_models import BlingNotaFiscalCache
 from app.pedido_integrado_item_models import PedidoIntegradoItem
 from app.pedido_integrado_models import PedidoIntegrado
 from app.produtos_models import EstoqueMovimentacao
-from app.services.pedido_integrado_consolidation_service import localizar_pedido_por_bling_id
+from app.services.pedido_integrado_consolidation_service import (
+    localizar_pedido_por_bling_id,
+)
 from app.tenancy.context import tenant_context
 from app.utils.tenant_safe_sql import execute_tenant_safe_all
 from app.utils.correlation import current_correlation_id, operation_correlation_context
@@ -28,7 +30,9 @@ def _limite_data_recentes(dias: int) -> datetime:
 
 
 def _garantir_registry_sqlalchemy_reconciliacao() -> None:
-    from app.services.bling_flow_monitor_service import _garantir_registry_sqlalchemy_auditoria
+    from app.services.bling_flow_monitor_service import (
+        _garantir_registry_sqlalchemy_auditoria,
+    )
 
     _garantir_registry_sqlalchemy_auditoria()
 
@@ -66,13 +70,17 @@ def _buscar_nfes_autorizadas_recentes(
             BlingNotaFiscalCache.data_emissao >= _limite_data_recentes(dias),
             func.lower(BlingNotaFiscalCache.status).in_(_NFE_STATUS_AUTORIZADAS),
         )
-        .order_by(BlingNotaFiscalCache.data_emissao.desc(), BlingNotaFiscalCache.id.desc())
+        .order_by(
+            BlingNotaFiscalCache.data_emissao.desc(), BlingNotaFiscalCache.id.desc()
+        )
         .limit(max(int(limite_notas or 0), 1))
         .all()
     )
 
 
-def _deduplicar_registros_nfe_por_pedido(registros: list[BlingNotaFiscalCache]) -> list[BlingNotaFiscalCache]:
+def _deduplicar_registros_nfe_por_pedido(
+    registros: list[BlingNotaFiscalCache],
+) -> list[BlingNotaFiscalCache]:
     selecionados: list[BlingNotaFiscalCache] = []
     chaves_vistas: set[str] = set()
 
@@ -111,7 +119,10 @@ def listar_tenants_com_nfes_autorizadas_recentes(db: Session, *, dias: int) -> l
 
 
 def _extrair_referencias_nf_cache(registro: BlingNotaFiscalCache) -> dict:
-    from app.integracao_bling_nf_routes import _extrair_numero_pedido_loja_nf, _loja_id_nf_payload
+    from app.integracao_bling_nf_routes import (
+        _extrair_numero_pedido_loja_nf,
+        _loja_id_nf_payload,
+    )
 
     detalhe = _dict(getattr(registro, "detalhe_payload", None))
     resumo = _dict(getattr(registro, "resumo_payload", None))
@@ -126,7 +137,9 @@ def _extrair_referencias_nf_cache(registro: BlingNotaFiscalCache) -> dict:
 
     return {
         "nf_bling_id": _text(getattr(registro, "bling_id", None)),
-        "nf_numero": _text(getattr(registro, "numero", None)) or _text(detalhe.get("numero")) or _text(resumo.get("numero")),
+        "nf_numero": _text(getattr(registro, "numero", None))
+        or _text(detalhe.get("numero"))
+        or _text(resumo.get("numero")),
         "pedido_bling_id": (
             _text(getattr(registro, "pedido_bling_id_ref", None))
             or _text(pedido_ref.get("id"))
@@ -143,12 +156,12 @@ def _extrair_referencias_nf_cache(registro: BlingNotaFiscalCache) -> dict:
             or _extrair_numero_pedido_loja_nf(detalhe)
             or _extrair_numero_pedido_loja_nf(resumo)
         ),
-        "loja_id": (
-            _loja_id_nf_payload(detalhe)
-            or _loja_id_nf_payload(resumo)
-        ),
+        "loja_id": (_loja_id_nf_payload(detalhe) or _loja_id_nf_payload(resumo)),
         "dados_nf": detalhe or resumo or {},
-        "situacao_num": _coerce_int(_dict(detalhe.get("situacao")).get("id"), _coerce_int(detalhe.get("situacao"), 5)),
+        "situacao_num": _coerce_int(
+            _dict(detalhe.get("situacao")).get("id"),
+            _coerce_int(detalhe.get("situacao"), 5),
+        ),
     }
 
 
@@ -289,7 +302,9 @@ def reconciliar_nf_autorizada_cache(
         nf_numero=refs.get("nf_numero"),
     )
 
-    if not getattr(registro, "pedido_bling_id_ref", None) and getattr(pedido, "pedido_bling_id", None):
+    if not getattr(registro, "pedido_bling_id_ref", None) and getattr(
+        pedido, "pedido_bling_id", None
+    ):
         registro.pedido_bling_id_ref = pedido.pedido_bling_id
         db.add(registro)
 
@@ -464,7 +479,9 @@ def executar_reconciliacao_automatica_nfes_autorizadas(
     _correlation_context_applied: bool = False,
 ) -> dict:
     if not _correlation_context_applied:
-        with operation_correlation_context("job.nfe_authorized_reconciliation") as correlation_id:
+        with operation_correlation_context(
+            "job.nfe_authorized_reconciliation"
+        ) as correlation_id:
             result = executar_reconciliacao_automatica_nfes_autorizadas(
                 db,
                 dias=dias,
@@ -507,6 +524,8 @@ def executar_reconciliacao_automatica_nfes_autorizadas(
         "correlation_id": current_correlation_id("job.nfe_authorized_reconciliation"),
         "tenants_processados": len(resultados),
         "tenants_com_notas": len(tenant_ids),
-        "notas_reconciliadas_total": sum(int(item.get("notas_reconciliadas") or 0) for item in resultados),
+        "notas_reconciliadas_total": sum(
+            int(item.get("notas_reconciliadas") or 0) for item in resultados
+        ),
         "resultados": resultados,
     }

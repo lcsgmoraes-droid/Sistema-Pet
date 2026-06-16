@@ -38,7 +38,16 @@ COMMERCIAL_STATE_OPTIONS = {
         "canceled",
         "expired",
     },
-    "subscription_source": {"manual", "admin", "trial", "stripe", "asaas", "mercado_pago", "bling", "external"},
+    "subscription_source": {
+        "manual",
+        "admin",
+        "trial",
+        "stripe",
+        "asaas",
+        "mercado_pago",
+        "bling",
+        "external",
+    },
 }
 
 COMMERCIAL_STATE_LABELS = {
@@ -62,7 +71,9 @@ def _count_by_tenant(db: Session, table_name: str, tenant_id: str) -> int:
         return 0
     return int(
         db.execute(
-            text(f"SELECT COUNT(*) FROM {table_name} WHERE CAST(tenant_id AS TEXT) = :tenant_id"),
+            text(
+                f"SELECT COUNT(*) FROM {table_name} WHERE CAST(tenant_id AS TEXT) = :tenant_id"
+            ),
             {"tenant_id": tenant_id},
         ).scalar()
         or 0
@@ -94,23 +105,28 @@ def _principal_user(db: Session, tenant_id: str) -> dict[str, Any] | None:
     if not _table_exists(db, "users"):
         return None
 
-    row = db.execute(
-        text(
-            """
+    row = (
+        db.execute(
+            text(
+                """
             SELECT id, email, nome, is_active, is_admin
             FROM users
             WHERE CAST(tenant_id AS TEXT) = :tenant_id
             ORDER BY is_admin DESC, id ASC
             LIMIT 1
             """
-        ),
-        {"tenant_id": tenant_id},
-    ).mappings().first()
+            ),
+            {"tenant_id": tenant_id},
+        )
+        .mappings()
+        .first()
+    )
 
     if not row and _table_exists(db, "user_tenants"):
-        row = db.execute(
-            text(
-                """
+        row = (
+            db.execute(
+                text(
+                    """
                 SELECT u.id, u.email, u.nome, u.is_active, u.is_admin
                 FROM user_tenants ut
                 JOIN users u ON u.id = ut.user_id
@@ -118,9 +134,12 @@ def _principal_user(db: Session, tenant_id: str) -> dict[str, Any] | None:
                 ORDER BY u.is_admin DESC, u.id ASC
                 LIMIT 1
                 """
-            ),
-            {"tenant_id": tenant_id},
-        ).mappings().first()
+                ),
+                {"tenant_id": tenant_id},
+            )
+            .mappings()
+            .first()
+        )
 
     if not row:
         return None
@@ -145,9 +164,10 @@ def _base_catalog_status(db: Session, tenant_id: str) -> dict[str, Any]:
     if not _table_exists(db, "tenant_template_installs"):
         return empty
 
-    row = db.execute(
-        text(
-            """
+    row = (
+        db.execute(
+            text(
+                """
             SELECT status, updated_at, created_at, created_by_user_id
             FROM tenant_template_installs
             WHERE CAST(tenant_id AS TEXT) = :tenant_id
@@ -156,13 +176,16 @@ def _base_catalog_status(db: Session, tenant_id: str) -> dict[str, Any]:
             ORDER BY updated_at DESC, created_at DESC, id DESC
             LIMIT 1
             """
-        ),
-        {
-            "tenant_id": tenant_id,
-            "bundle_code": DEFAULT_BASE_CATALOG_BUNDLE_CODE,
-            "bundle_version": DEFAULT_BASE_CATALOG_BUNDLE_VERSION,
-        },
-    ).mappings().first()
+            ),
+            {
+                "tenant_id": tenant_id,
+                "bundle_code": DEFAULT_BASE_CATALOG_BUNDLE_CODE,
+                "bundle_version": DEFAULT_BASE_CATALOG_BUNDLE_VERSION,
+            },
+        )
+        .mappings()
+        .first()
+    )
     if not row:
         return empty
 
@@ -176,7 +199,10 @@ def _base_catalog_status(db: Session, tenant_id: str) -> dict[str, Any]:
 
 
 def _tenant_counts(db: Session, tenant_id: str) -> dict[str, int]:
-    counts = {label: _count_by_tenant(db, table_name, tenant_id) for label, table_name in COUNT_TABLES.items()}
+    counts = {
+        label: _count_by_tenant(db, table_name, tenant_id)
+        for label, table_name in COUNT_TABLES.items()
+    }
     counts["usuarios"] = _count_users(db, tenant_id)
     return counts
 
@@ -199,7 +225,9 @@ def _image_bytes(db: Session, tenant_id: str) -> int:
     )
 
 
-def _tenant_usage(db: Session, tenant_id: str, counts: dict[str, int]) -> dict[str, Any]:
+def _tenant_usage(
+    db: Session, tenant_id: str, counts: dict[str, int]
+) -> dict[str, Any]:
     image_bytes = _image_bytes(db, tenant_id)
     return {
         "records_total": sum(int(value or 0) for value in counts.values()),
@@ -243,18 +271,22 @@ def _tenant_row_to_item(db: Session, row: dict[str, Any]) -> dict[str, Any]:
 
 
 def _fetch_tenant_item(db: Session, tenant_id: str) -> dict[str, Any]:
-    row = db.execute(
-        text(
-            """
+    row = (
+        db.execute(
+            text(
+                """
             SELECT id, name, status, plan, billing_status, subscription_source,
                    subscription_activated_at, organization_type, created_at, updated_at
             FROM tenants
             WHERE CAST(id AS TEXT) = :tenant_id
             LIMIT 1
             """
-        ),
-        {"tenant_id": tenant_id},
-    ).mappings().first()
+            ),
+            {"tenant_id": tenant_id},
+        )
+        .mappings()
+        .first()
+    )
     if not row:
         raise OpsTenantActionError(f"Tenant nao encontrado: {tenant_id}.")
     return _tenant_row_to_item(db, dict(row))
@@ -268,12 +300,17 @@ def list_ops_tenants(
     limit: int = 100,
 ) -> dict[str, Any]:
     if not _table_exists(db, "tenants"):
-        return {"items": [], "summary": {"total": 0, "active": 0, "with_base_catalog": 0}}
+        return {
+            "items": [],
+            "summary": {"total": 0, "active": 0, "with_base_catalog": 0},
+        }
 
     clauses = []
     params: dict[str, Any] = {"limit": int(limit)}
     if search:
-        clauses.append("(lower(name) LIKE lower(:search) OR lower(CAST(id AS TEXT)) LIKE lower(:search))")
+        clauses.append(
+            "(lower(name) LIKE lower(:search) OR lower(CAST(id AS TEXT)) LIKE lower(:search))"
+        )
         params["search"] = f"%{search.strip()}%"
     if status:
         clauses.append("lower(status) = lower(:status)")
@@ -296,11 +333,23 @@ def list_ops_tenants(
     items = [_tenant_row_to_item(db, dict(row)) for row in rows]
     summary = {
         "total": len(items),
-        "active": sum(1 for item in items if str(item.get("status") or "").lower() in {"active", "ativo"}),
-        "with_base_catalog": sum(1 for item in items if item["base_catalog"]["installed"]),
-        "billing_attention": sum(1 for item in items if _is_billing_attention(item.get("billing_status"))),
-        "records_total": sum(int(item.get("usage", {}).get("records_total") or 0) for item in items),
-        "image_bytes": sum(int(item.get("usage", {}).get("image_bytes") or 0) for item in items),
+        "active": sum(
+            1
+            for item in items
+            if str(item.get("status") or "").lower() in {"active", "ativo"}
+        ),
+        "with_base_catalog": sum(
+            1 for item in items if item["base_catalog"]["installed"]
+        ),
+        "billing_attention": sum(
+            1 for item in items if _is_billing_attention(item.get("billing_status"))
+        ),
+        "records_total": sum(
+            int(item.get("usage", {}).get("records_total") or 0) for item in items
+        ),
+        "image_bytes": sum(
+            int(item.get("usage", {}).get("image_bytes") or 0) for item in items
+        ),
     }
     return {"items": items, "summary": summary}
 
@@ -308,10 +357,14 @@ def list_ops_tenants(
 def _normalize_commercial_value(field: str, value: Any) -> str:
     normalized = str(value or "").strip().lower()
     if not normalized:
-        raise OpsTenantActionError(f"{COMMERCIAL_STATE_LABELS[field]} nao pode ficar vazio.")
+        raise OpsTenantActionError(
+            f"{COMMERCIAL_STATE_LABELS[field]} nao pode ficar vazio."
+        )
     if normalized not in COMMERCIAL_STATE_OPTIONS[field]:
         allowed = ", ".join(sorted(COMMERCIAL_STATE_OPTIONS[field]))
-        raise OpsTenantActionError(f"{COMMERCIAL_STATE_LABELS[field]} invalido. Use um destes valores: {allowed}.")
+        raise OpsTenantActionError(
+            f"{COMMERCIAL_STATE_LABELS[field]} invalido. Use um destes valores: {allowed}."
+        )
     return normalized
 
 
@@ -347,7 +400,9 @@ def update_ops_tenant_commercial_state(
     return _fetch_tenant_item(db, target_tenant_id)
 
 
-def _resolve_source_tenant_id(db: Session, source_email: str = DEFAULT_BASE_CATALOG_SOURCE_EMAIL) -> str:
+def _resolve_source_tenant_id(
+    db: Session, source_email: str = DEFAULT_BASE_CATALOG_SOURCE_EMAIL
+) -> str:
     if not _table_exists(db, "users"):
         raise OpsTenantActionError("Tabela de usuarios ausente.")
 

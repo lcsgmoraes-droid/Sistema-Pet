@@ -55,7 +55,9 @@ def _local_base_dir() -> Path:
 
 
 def _local_public_prefix() -> str:
-    raw_path = str(settings.PRODUCT_IMAGE_LOCAL_BASE_DIR or "").replace("\\", "/").strip()
+    raw_path = (
+        str(settings.PRODUCT_IMAGE_LOCAL_BASE_DIR or "").replace("\\", "/").strip()
+    )
     segments = [segment for segment in raw_path.split("/") if segment not in {"", "."}]
     if not segments:
         return "/uploads/produtos"
@@ -132,9 +134,7 @@ def read_public_s3_product_image(storage_key: str) -> PublicProductImage:
     try:
         response = client.get_object(Bucket=bucket, Key=normalized_key)
     except Exception as exc:
-        error_code = str(
-            getattr(exc, "response", {}).get("Error", {}).get("Code", "")
-        )
+        error_code = str(getattr(exc, "response", {}).get("Error", {}).get("Code", ""))
         if error_code in {"404", "NoSuchKey", "NotFound"}:
             raise FileNotFoundError(normalized_key) from exc
         raise
@@ -171,8 +171,12 @@ def _get_s3_client():
         "s3",
         region_name=str(settings.PRODUCT_IMAGE_S3_REGION or "").strip() or None,
         endpoint_url=str(settings.PRODUCT_IMAGE_S3_ENDPOINT_URL or "").strip() or None,
-        aws_access_key_id=str(settings.PRODUCT_IMAGE_S3_ACCESS_KEY_ID or "").strip() or None,
-        aws_secret_access_key=str(settings.PRODUCT_IMAGE_S3_SECRET_ACCESS_KEY or "").strip() or None,
+        aws_access_key_id=str(settings.PRODUCT_IMAGE_S3_ACCESS_KEY_ID or "").strip()
+        or None,
+        aws_secret_access_key=str(
+            settings.PRODUCT_IMAGE_S3_SECRET_ACCESS_KEY or ""
+        ).strip()
+        or None,
         config=client_config,
     )
 
@@ -223,8 +227,12 @@ def prepare_product_image_variants(
                 image = image.convert("RGBA" if "A" in image.getbands() else "RGB")
 
             original_image = image.copy()
-            original_image.thumbnail((max_dimension, max_dimension), Image.Resampling.LANCZOS)
-            original_width, original_height = get_product_image_dimensions(original_image)
+            original_image.thumbnail(
+                (max_dimension, max_dimension), Image.Resampling.LANCZOS
+            )
+            original_width, original_height = get_product_image_dimensions(
+                original_image
+            )
 
             original_buffer = BytesIO()
             original_image.save(
@@ -236,7 +244,9 @@ def prepare_product_image_variants(
             original_bytes = original_buffer.getvalue()
 
             thumbnail_image = image.copy()
-            thumbnail_image.thumbnail((thumbnail_size, thumbnail_size), Image.Resampling.LANCZOS)
+            thumbnail_image.thumbnail(
+                (thumbnail_size, thumbnail_size), Image.Resampling.LANCZOS
+            )
             thumbnail_buffer = BytesIO()
             thumbnail_image.save(
                 thumbnail_buffer,
@@ -269,7 +279,9 @@ def _store_local_product_image(
     thumbnail_relative_key: str,
     prepared_image: PreparedProductImage,
 ) -> StoredProductImage:
-    original_url = _write_local_bytes(original_relative_key, prepared_image.original_bytes)
+    original_url = _write_local_bytes(
+        original_relative_key, prepared_image.original_bytes
+    )
     thumbnail_url = _write_local_bytes(
         thumbnail_relative_key,
         prepared_image.thumbnail_bytes,
@@ -326,10 +338,12 @@ def save_product_image_variants(
     *,
     image_token: Optional[str] = None,
 ) -> StoredProductImage:
-    _, original_relative_key, thumbnail_relative_key = build_product_image_relative_keys(
-        tenant_id,
-        produto_id,
-        image_token=image_token,
+    _, original_relative_key, thumbnail_relative_key = (
+        build_product_image_relative_keys(
+            tenant_id,
+            produto_id,
+            image_token=image_token,
+        )
     )
 
     if get_product_image_storage_backend() == "s3":

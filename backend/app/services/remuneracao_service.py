@@ -39,7 +39,9 @@ def _usa_encargos(cargo: Any) -> bool:
     return bool(_attr(cargo, "gera_encargos", True))
 
 
-def calcular_composicao_remuneracao(cargo: Any, funcionario: Any | None = None) -> dict[str, Decimal | str | bool]:
+def calcular_composicao_remuneracao(
+    cargo: Any, funcionario: Any | None = None
+) -> dict[str, Decimal | str | bool]:
     """Calcula composicao gerencial mensal de remuneracao.
 
     O salario base representa a folha/holerite. Descontos do funcionario reduzem
@@ -48,14 +50,19 @@ def calcular_composicao_remuneracao(cargo: Any, funcionario: Any | None = None) 
     """
 
     funcionario = funcionario or object()
-    salario_base = _money(_attr(funcionario, "salario_base_override", None) or _attr(cargo, "salario_base", 0))
+    salario_base = _money(
+        _attr(funcionario, "salario_base_override", None)
+        or _attr(cargo, "salario_base", 0)
+    )
     regime = _regime(cargo)
     usa_encargos = _usa_encargos(cargo)
 
     if usa_encargos:
         inss_funcionario_valor = _money(_attr(cargo, "inss_funcionario_valor", 0))
         if inss_funcionario_valor == Decimal("0.00"):
-            inss_funcionario_valor = _percentual(salario_base, _attr(cargo, "inss_funcionario_percentual", 0))
+            inss_funcionario_valor = _percentual(
+                salario_base, _attr(cargo, "inss_funcionario_percentual", 0)
+            )
         desconto_transporte = _money(_attr(cargo, "desconto_transporte_valor", 0))
         outros_descontos = _money(_attr(cargo, "outros_descontos_valor", 0))
     else:
@@ -63,10 +70,16 @@ def calcular_composicao_remuneracao(cargo: Any, funcionario: Any | None = None) 
         desconto_transporte = Decimal("0.00")
         outros_descontos = Decimal("0.00")
 
-    descontos_total = _money(inss_funcionario_valor + desconto_transporte + outros_descontos)
+    descontos_total = _money(
+        inss_funcionario_valor + desconto_transporte + outros_descontos
+    )
     liquido_holerite = _money(salario_base - descontos_total)
 
-    complemento_modo = str(_attr(funcionario, "complemento_modo", "automatico") or "automatico").strip().lower()
+    complemento_modo = (
+        str(_attr(funcionario, "complemento_modo", "automatico") or "automatico")
+        .strip()
+        .lower()
+    )
     liquido_combinado = _attr(funcionario, "liquido_combinado", None)
     complemento_fixo = _money(_attr(funcionario, "complemento_fixo_valor", 0))
 
@@ -75,16 +88,32 @@ def calcular_composicao_remuneracao(cargo: Any, funcionario: Any | None = None) 
     elif complemento_modo == "nenhum":
         complemento_interno = Decimal("0.00")
     elif liquido_combinado is not None:
-        complemento_interno = max(Decimal("0.00"), _money(liquido_combinado) - liquido_holerite)
+        complemento_interno = max(
+            Decimal("0.00"), _money(liquido_combinado) - liquido_holerite
+        )
     else:
         complemento_interno = Decimal("0.00")
 
     if usa_encargos:
-        inss_patronal = _percentual(salario_base, _attr(cargo, "inss_patronal_percentual", 0))
+        inss_patronal = _percentual(
+            salario_base, _attr(cargo, "inss_patronal_percentual", 0)
+        )
         fgts_empresa = _percentual(salario_base, _attr(cargo, "fgts_percentual", 0))
-        provisao_ferias = _money(salario_base / Decimal("12")) if bool(_attr(cargo, "gera_ferias", True)) else Decimal("0.00")
-        provisao_terco_ferias = _money(salario_base / Decimal("36")) if bool(_attr(cargo, "gera_ferias", True)) else Decimal("0.00")
-        provisao_13 = _money(salario_base / Decimal("12")) if bool(_attr(cargo, "gera_decimo_terceiro", True)) else Decimal("0.00")
+        provisao_ferias = (
+            _money(salario_base / Decimal("12"))
+            if bool(_attr(cargo, "gera_ferias", True))
+            else Decimal("0.00")
+        )
+        provisao_terco_ferias = (
+            _money(salario_base / Decimal("36"))
+            if bool(_attr(cargo, "gera_ferias", True))
+            else Decimal("0.00")
+        )
+        provisao_13 = (
+            _money(salario_base / Decimal("12"))
+            if bool(_attr(cargo, "gera_decimo_terceiro", True))
+            else Decimal("0.00")
+        )
     else:
         inss_patronal = Decimal("0.00")
         fgts_empresa = Decimal("0.00")
@@ -94,7 +123,9 @@ def calcular_composicao_remuneracao(cargo: Any, funcionario: Any | None = None) 
 
     encargos_total = _money(inss_patronal + fgts_empresa)
     provisoes_total = _money(provisao_ferias + provisao_terco_ferias + provisao_13)
-    custo_total = _money(salario_base + complemento_interno + encargos_total + provisoes_total)
+    custo_total = _money(
+        salario_base + complemento_interno + encargos_total + provisoes_total
+    )
 
     return {
         "regime_remuneracao": regime,
@@ -105,7 +136,9 @@ def calcular_composicao_remuneracao(cargo: Any, funcionario: Any | None = None) 
         "outros_descontos": outros_descontos,
         "descontos_funcionario_total": descontos_total,
         "liquido_holerite": liquido_holerite,
-        "liquido_combinado": _money(liquido_combinado) if liquido_combinado is not None else Decimal("0.00"),
+        "liquido_combinado": _money(liquido_combinado)
+        if liquido_combinado is not None
+        else Decimal("0.00"),
         "complemento_modo": complemento_modo,
         "complemento_interno": complemento_interno,
         "inss_patronal": inss_patronal,
