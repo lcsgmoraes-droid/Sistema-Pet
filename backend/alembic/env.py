@@ -1,6 +1,7 @@
+# ruff: noqa: E402
+
 from logging.config import fileConfig
 import sys
-import os
 from pathlib import Path
 
 from sqlalchemy import engine_from_config
@@ -62,10 +63,10 @@ import app.veterinario_models
 import app.ecommerce_payment_models
 
 # Stone (pagamentos)
-import app.stone_models
+import app.stone_models  # noqa: F401
 
 # IA models
-from app.ia import aba7_models, aba7_extrato_models
+from app.ia import aba7_extrato_models, aba7_models  # noqa: F401
 
 # Configurar metadata para autogenerate
 target_metadata = Base.metadata
