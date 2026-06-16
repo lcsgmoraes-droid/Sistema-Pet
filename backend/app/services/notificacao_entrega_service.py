@@ -27,6 +27,49 @@ from app.services.google_maps_service import calcular_tempo_estimado
 logger = logging.getLogger(__name__)
 
 
+def _positive_seconds(value) -> Optional[int]:
+    if not value:
+        return None
+
+    try:
+        seconds = int(value)
+    except (TypeError, ValueError):
+        return None
+
+    return seconds if seconds > 0 else None
+
+
+def _minutes_from_seconds(value) -> Optional[int]:
+    seconds = _positive_seconds(value)
+    if seconds is None:
+        return None
+    return int(seconds / 60)
+
+
+def _minutes_from_stop(parada: RotaEntregaParada) -> Optional[int]:
+    return _minutes_from_seconds(
+        getattr(parada, "tempo_acumulado", None)
+    ) or _minutes_from_seconds(getattr(parada, "tempo_estimado", None))
+
+
+def _forma_pagamento_venda(venda: Venda) -> str:
+    forma_pagamento = getattr(venda, "forma_pagamento", None)
+    if forma_pagamento:
+        return forma_pagamento
+
+    for pagamento in getattr(venda, "pagamentos", None) or []:
+        forma_pagamento = getattr(pagamento, "forma_pagamento", None)
+        if forma_pagamento:
+            return forma_pagamento
+
+    for baixa in getattr(venda, "baixas", None) or []:
+        forma_pagamento = getattr(baixa, "forma_pagamento", None)
+        if forma_pagamento:
+            return forma_pagamento
+
+    return "Não informado"
+
+
 def verificar_mensagem_ja_enviada(
     db: Session,
     tenant_id: int,
@@ -150,11 +193,7 @@ def notificar_inicio_rota(db: Session, rota_id: int, tenant_id: int) -> int:
             produtos = ["Pedido sem itens especificados"]
 
         # AJUSTE FINO #2: Calcular tempo estimado APENAS se rota foi otimizada
-        minutos = None
-        if primeira_parada.tempo_acumulado:
-            minutos = int(primeira_parada.tempo_acumulado / 60)
-        elif primeira_parada.tempo_estimado:
-            minutos = int(primeira_parada.tempo_estimado / 60)
+        minutos = _minutes_from_stop(primeira_parada)
 
         # Se minutos == 0, manter None (não enviar tempo fictício)
         if minutos == 0:
@@ -165,7 +204,7 @@ def notificar_inicio_rota(db: Session, rota_id: int, tenant_id: int) -> int:
             cliente_nome=cliente.nome,
             numero_pedido=str(venda.id),
             produtos=produtos,
-            forma_pagamento=venda.forma_pagamento or "Não informado",
+            forma_pagamento=_forma_pagamento_venda(venda),
             minutos=minutos,  # None se não otimizada, int se otimizada
         )
 
@@ -309,12 +348,18 @@ def notificar_proximo_cliente(
                 f"Erro ao calcular tempo real via Maps: {e}. Tentando fallback."
             )
             # Fallback: usar tempo da parada se disponível
-            if proxima_parada.tempo_estimado and proxima_parada.tempo_estimado > 0:
-                minutos = int(proxima_parada.tempo_estimado / 60)
-            elif proxima_parada.tempo_acumulado and proxima_parada.tempo_acumulado > 0:
+            minutos = _minutes_from_seconds(
+                getattr(proxima_parada, "tempo_estimado", None)
+            )
+            if minutos is None and _positive_seconds(
+                getattr(proxima_parada, "tempo_acumulado", None)
+            ):
                 # Calcular diferença do tempo acumulado
-                tempo_diff = proxima_parada.tempo_acumulado - (
-                    parada_atual.tempo_acumulado or 0
+                tempo_diff = _positive_seconds(
+                    getattr(proxima_parada, "tempo_acumulado", None)
+                ) - (
+                    _positive_seconds(getattr(parada_atual, "tempo_acumulado", None))
+                    or 0
                 )
                 if tempo_diff > 0:
                     minutos = int(tempo_diff / 60)
@@ -328,7 +373,7 @@ def notificar_proximo_cliente(
             cliente_nome=cliente.nome,
             numero_pedido=str(venda.id),
             produtos=produtos,
-            forma_pagamento=venda.forma_pagamento or "Não informado",
+            forma_pagamento=_forma_pagamento_venda(venda),
             minutos=minutos,  # None se não calculou, int se calculou
         )
 
