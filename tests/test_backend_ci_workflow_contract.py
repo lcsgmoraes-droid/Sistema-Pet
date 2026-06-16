@@ -147,6 +147,16 @@ def test_backend_ci_has_blocking_notas_entrada_lint_step():
     assert "ruff check app/notas_entrada" in source
 
 
+def test_backend_ci_has_blocking_compras_fiscais_root_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Compras fiscais root lint (blocking)" in source
+    assert (
+        "ruff check app/notas_entrada_routes.py app/nfe_routes.py "
+        "app/pedidos_compra_routes.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_produtos_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

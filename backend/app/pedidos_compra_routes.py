@@ -24,10 +24,10 @@ TODO - Integração com IA (Fase Futura):
    - Identificar padrões de preço
    - Recomendar melhores fornecedores por produto
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_, or_, func, desc
+from sqlalchemy import or_, func, desc
 from typing import Any, Dict, List, Optional
 from datetime import datetime, timedelta, timezone
 from pydantic import BaseModel, Field
@@ -42,9 +42,8 @@ from urllib.parse import quote
 from xml.sax.saxutils import escape
 
 from .db import get_session
-from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
-from .models import User, Cliente, FornecedorGrupo
+from .models import Cliente, FornecedorGrupo
 from .produtos_models import (
     Produto, ProdutoLote, EstoqueMovimentacao, 
     PedidoCompra, PedidoCompraItem, PedidoCompraNotaEntrada, ProdutoFornecedor, Marca,
@@ -473,7 +472,6 @@ def _gerar_pdf_pedido_bytes(
         from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
         from reportlab.lib.enums import TA_CENTER
-        from xml.sax.saxutils import escape
     except ImportError:
         raise HTTPException(
             status_code=500,
@@ -2038,7 +2036,7 @@ def exportar_excel(
 
     try:
         import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill
+        from openpyxl.styles import Font, PatternFill
     except ImportError:
         raise HTTPException(
             status_code=500, 
@@ -2170,7 +2168,7 @@ def exportar_pdf(
         from reportlab.lib.units import mm
         from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+        from reportlab.lib.enums import TA_CENTER
     except ImportError:
         raise HTTPException(
             status_code=500,
@@ -2422,18 +2420,18 @@ def sugerir_pedido_inteligente(
         Produto.marca_id == Marca.id
     ).filter(
         Produto.tenant_id == tenant_id,
-        Produto.ativo == True,
-        or_(Produto.participa_sugestao_compra == True, Produto.participa_sugestao_compra.is_(None)),
+        Produto.ativo,
+        or_(Produto.participa_sugestao_compra, Produto.participa_sugestao_compra.is_(None)),
         or_(Produto.e_granel.is_(False), Produto.e_granel.is_(None)),
         ~Produto.nome.ilike("%granel%"),
         ProdutoFornecedor.fornecedor_id.in_(fornecedor_ids),
-        ProdutoFornecedor.ativo == True
+        ProdutoFornecedor.ativo
     )
 
     if apenas_fornecedor_principal:
         produtos_fornecedor_query = produtos_fornecedor_query.filter(
             or_(
-                ProdutoFornecedor.e_principal == True,
+                ProdutoFornecedor.e_principal,
                 ProdutoFornecedor.fornecedor_id == Produto.fornecedor_id,
                 Produto.fornecedor_id.is_(None),
             ),
@@ -2858,7 +2856,6 @@ def _preco_custo_final_item_nf(item_nf: Any, composicoes_custo: Dict[int, Dict[s
 
 def _realizar_confronto_legado(pedido: PedidoCompra, nota, db: Session, tenant_id: int) -> dict:
     """Gera o confronto completo entre pedido e NF-e."""
-    from .produtos_models import NotaEntrada, NotaEntradaItem
 
     itens_confronto = []
     total_pedido = 0.0
@@ -3324,7 +3321,7 @@ def _buscar_pedido_finalizado_da_nota(db: Session, nota_id: int, pedido_id: int,
         .filter(
             PedidoCompraNotaEntrada.nota_entrada_id == nota_id,
             PedidoCompraNotaEntrada.tenant_id == tenant_id,
-            PedidoCompra.confronto_finalizado == True,
+            PedidoCompra.confronto_finalizado,
             PedidoCompra.id != pedido_id,
             PedidoCompra.tenant_id == tenant_id,
         )
@@ -3335,7 +3332,7 @@ def _buscar_pedido_finalizado_da_nota(db: Session, nota_id: int, pedido_id: int,
 
     return db.query(PedidoCompra).filter(
         PedidoCompra.nota_entrada_id == nota_id,
-        PedidoCompra.confronto_finalizado == True,
+        PedidoCompra.confronto_finalizado,
         PedidoCompra.id != pedido_id,
         PedidoCompra.tenant_id == tenant_id,
     ).first()
@@ -3886,7 +3883,7 @@ def finalizar_confronto(
 
     outro = db.query(PedidoCompra).filter(
         PedidoCompra.nota_entrada_id == pedido.nota_entrada_id,
-        PedidoCompra.confronto_finalizado == True,
+        PedidoCompra.confronto_finalizado,
         PedidoCompra.id != pedido_id,
         PedidoCompra.tenant_id == tenant_id
     ).first()

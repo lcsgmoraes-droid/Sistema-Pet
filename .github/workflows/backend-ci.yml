@@ -131,6 +131,10 @@ jobs:
         run: |
           ruff check app/notas_entrada
 
+      - name: Compras fiscais root lint (blocking)
+        run: |
+          ruff check app/notas_entrada_routes.py app/nfe_routes.py app/pedidos_compra_routes.py
+
       - name: Produtos lint (blocking)
         run: |
           ruff check app/produtos
