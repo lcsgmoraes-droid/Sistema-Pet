@@ -9,9 +9,8 @@ Um evento é registrado APENAS quando há interação consciente (clique em bot�
 Silêncio/inatividade NUNCA gera evento.
 """
 
-from sqlalchemy import Column, String, DateTime, ForeignKey, Index, Enum as SQLEnum, UUID
+from sqlalchemy import Column, String, Index, Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PostgresUUID
-from sqlalchemy.sql import func
 import enum
 from app.base_models import BaseTenantModel
 

@@ -7,10 +7,8 @@ NÃO integra com IA. NÃO gera sugestões automaticamente.
 Apenas estrutura de dados para rastreamento de oportunidades de negócio.
 """
 
-from sqlalchemy import Column, String, DateTime, ForeignKey, Index, Enum as SQLEnum
+from sqlalchemy import Column, String, Index, Enum as SQLEnum
 from sqlalchemy.dialects.postgresql import UUID, JSONB
-from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship
 import enum
 from app.base_models import BaseTenantModel
 

@@ -143,6 +143,10 @@ jobs:
         run: |
           ruff check app/compras_pendencias_models.py app/compras_pendencias_routes.py app/pedido_integrado_item_models.py app/pedido_integrado_models.py app/pedido_models.py app/pendencia_estoque_models.py app/pendencia_estoque_routes.py
 
+      - name: Admin LGPD simples ops root lint (blocking)
+        run: |
+          ruff check app/admin_fix_routes.py app/admin_routes.py app/lgpd_models.py app/lgpd_routes.py app/simples_nacional_models.py app/simples_routes.py app/opportunities_models.py app/opportunity_events_models.py app/ops_models.py
+
       - name: Produtos lint (blocking)
         run: |
           ruff check app/produtos
