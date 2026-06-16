@@ -4,13 +4,11 @@ Módulo para geração de PDF de fechamento de caixa
 from reportlab.lib.pagesizes import A4
 from reportlab.lib import colors
 from reportlab.lib.units import cm
-from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
-from reportlab.pdfgen import canvas
+from reportlab.lib.enums import TA_CENTER
 from datetime import datetime
 from io import BytesIO
-from decimal import Decimal
 
 
 def gerar_pdf_fechamento_caixa(caixa_data: dict, movimentacoes: list) -> BytesIO:
@@ -117,7 +115,6 @@ def gerar_pdf_fechamento_caixa(caixa_data: dict, movimentacoes: list) -> BytesIO
         resumo_data.append(['Saldo Declarado (Contado)', formatar_moeda(saldo_declarado)])
         
     if diferenca is not None:
-        cor_diferenca = colors.green if diferenca >= 0 else colors.red
         resumo_data.append(['Diferença', formatar_moeda(diferenca)])
     
     resumo_table = Table(resumo_data, colWidths=[12*cm, 5*cm])
@@ -260,7 +257,7 @@ def formatar_datetime(dt) -> str:
     if isinstance(dt, str):
         try:
             dt = datetime.fromisoformat(dt.replace('Z', '+00:00'))
-        except:
+        except ValueError:
             return dt
     return dt.strftime('%d/%m/%Y %H:%M')
 
@@ -272,5 +269,5 @@ def formatar_moeda(valor) -> str:
     try:
         valor_float = float(valor)
         return f"R$ {valor_float:,.2f}".replace(',', 'X').replace('.', ',').replace('X', '.')
-    except:
+    except (TypeError, ValueError):
         return 'R$ 0,00'

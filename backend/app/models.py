@@ -2,10 +2,12 @@
 Modelos do Banco de Dados - Sistema Pet Shop Pro
 SQLAlchemy ORM Models
 """
-from sqlalchemy import Column, Integer, String, BigInteger, Boolean, Float, Text, DateTime, Date, ForeignKey, JSON, DECIMAL, Numeric, UniqueConstraint, Index
+from enum import Enum as PyEnum
+
+from sqlalchemy import Column, Integer, String, Boolean, Float, Text, DateTime, Date, ForeignKey, JSON, DECIMAL, Numeric, UniqueConstraint, Index
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.sql import func
-from sqlalchemy.orm import relationship, deferred
+from sqlalchemy.orm import relationship
 from app.db import Base
 from app.base_models import BaseTenantModel, TenantScoped
 import sqlalchemy as sa
@@ -545,8 +547,6 @@ class EmailEnvio(BaseTenantModel):
 # ====================
 # WHATSAPP CRM
 # ====================
-
-from enum import Enum as PyEnum
 
 class DirecaoMensagem(str, PyEnum):
     """Direção da mensagem WhatsApp"""

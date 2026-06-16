@@ -12,7 +12,6 @@ from app.audit_log import log_login, log_logout, log_action
 from app.session_manager import create_session, revoke_all_sessions, get_active_sessions
 from datetime import datetime, timezone
 import pyotp
-import secrets
 
 router = APIRouter()
 

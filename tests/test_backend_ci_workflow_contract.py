@@ -570,6 +570,27 @@ def test_backend_ci_has_blocking_veterinario_root_lint_step():
     ) in source
 
 
+def test_backend_ci_has_blocking_residual_app_root_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Residual app root lint (blocking)" in source
+    assert (
+        "ruff check app/auditoria_provisoes_routes.py app/auth_routes.py "
+        "app/chat_routes.py app/criar_tabelas_formas_pagamento.py "
+        "app/lembretes.py app/models.py app/pdf_caixa.py "
+        "app/projecao_caixa_routes.py app/relatorio_vendas_routes.py "
+        "app/rotas_entrega_models.py app/simulacao_contratacao_routes.py "
+        "app/template_models.py app/vendas_models.py"
+    ) in source
+
+
+def test_backend_ci_has_blocking_multi_tenant_tests_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Multi tenant tests lint (blocking)" in source
+    assert "ruff check tests/multi_tenant" in source
+
+
 def test_backend_ci_has_blocking_ai_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

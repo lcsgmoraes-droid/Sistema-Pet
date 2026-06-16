@@ -10,7 +10,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from app.db import engine, SessionLocal
 from app.formas_pagamento_models import FormaPagamentoTaxa, ConfiguracaoImposto
 from app.financeiro_models import FormaPagamento
-from sqlalchemy import inspect, text
 from app.utils.logger import logger
 
 def criar_tabelas():
@@ -29,7 +28,7 @@ def criar_tabelas():
     try:
         # Verificar se já existe configuração padrão
         config_existente = db.query(ConfiguracaoImposto).filter(
-            ConfiguracaoImposto.padrao == True
+            ConfiguracaoImposto.padrao.is_(True)
         ).first()
         
         if not config_existente:
@@ -51,7 +50,7 @@ def criar_tabelas():
             logger.info("ℹ️  Configuração de imposto padrão já existe")
         
         # Verificar se existem formas de pagamento cadastradas
-        formas = db.query(FormaPagamento).filter(FormaPagamento.ativo == True).all()
+        formas = db.query(FormaPagamento).filter(FormaPagamento.ativo.is_(True)).all()
         
         if formas:
             logger.info(f"\n📋 Formas de pagamento cadastradas: {len(formas)}")
@@ -67,7 +66,7 @@ def criar_tabelas():
                 if qtd_taxas > 0:
                     logger.info(f"     ✓ {qtd_taxas} taxa(s) cadastrada(s)")
                 else:
-                    logger.info(f"     ⚠️  Nenhuma taxa cadastrada - configure no sistema")
+                    logger.info("     ⚠️  Nenhuma taxa cadastrada - configure no sistema")
             
             if len(formas) > 5:
                 logger.info(f"   ... e mais {len(formas) - 5} formas de pagamento")

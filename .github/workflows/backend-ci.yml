@@ -311,6 +311,14 @@ jobs:
         run: |
           ruff check app/veterinario_acompanhamento_routes.py app/veterinario_agenda_routes.py app/veterinario_agendamentos.py app/veterinario_calendar.py app/veterinario_catalogo_routes.py app/veterinario_clinico.py app/veterinario_consultas_routes.py app/veterinario_core.py app/veterinario_exames_arquivos.py app/veterinario_exames_ia.py app/veterinario_exames_routes.py app/veterinario_extratos.py app/veterinario_extratos_routes.py app/veterinario_financeiro.py app/veterinario_ia.py app/veterinario_ia_routes.py app/veterinario_internacao.py app/veterinario_internacao_routes.py app/veterinario_models.py app/veterinario_orcamentos.py app/veterinario_orcamentos_routes.py app/veterinario_parcerias_routes.py app/veterinario_preventivo.py app/veterinario_relatorios_routes.py app/veterinario_routes.py app/veterinario_schemas.py app/veterinario_serializers.py app/pdf_veterinario.py
 
+      - name: Residual app root lint (blocking)
+        run: |
+          ruff check app/auditoria_provisoes_routes.py app/auth_routes.py app/chat_routes.py app/criar_tabelas_formas_pagamento.py app/lembretes.py app/models.py app/pdf_caixa.py app/projecao_caixa_routes.py app/relatorio_vendas_routes.py app/rotas_entrega_models.py app/simulacao_contratacao_routes.py app/template_models.py app/vendas_models.py
+
+      - name: Multi tenant tests lint (blocking)
+        run: |
+          ruff check tests/multi_tenant
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"

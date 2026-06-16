@@ -19,7 +19,6 @@ from app.ia.aba6_chat_ia import (
     deletar_conversa_service,
     ChatIAService
 )
-from app.ia.aba6_models import Conversa, MensagemChat
 
 
 router = APIRouter(prefix="/chat", tags=["Chat IA"])
@@ -206,7 +205,6 @@ async def enviar_mensagem(
         
         if not tem_permissao:
             # Retornar mensagem de permissão negada
-            from app.ia.aba6_models import MensagemChat
             from datetime import datetime
             
             msg_usuario = {
