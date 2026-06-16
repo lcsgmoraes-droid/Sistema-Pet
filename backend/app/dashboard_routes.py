@@ -5,7 +5,7 @@ Endpoints para dados consolidados do sistema
 
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session, selectinload
-from sqlalchemy import Float, cast, func, and_, or_
+from sqlalchemy import func, and_, or_
 from datetime import datetime, date, time, timedelta
 from typing import Optional
 import logging
@@ -14,15 +14,11 @@ import calendar
 import re
 import unicodedata
 
-from uuid import UUID
 from .db import get_session
-from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
-from .models import User, Cliente
-from app.tenancy.context import get_current_tenant
-from .vendas_models import Venda, VendaPagamento, VendaItem
+from .models import Cliente
+from .vendas_models import Venda, VendaItem
 from .financeiro_models import ContaReceber, ContaPagar, CategoriaFinanceira, TipoDespesa
-from .caixa_models import Caixa
 from .produtos_models import Produto
 from .cargo_models import Cargo
 from .dre_plano_contas_models import DRESubcategoria

@@ -27,9 +27,7 @@ import logging
 from app.auth import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
-from app.models import User
 from app.ai.pdv_assistant import PDVContext, ItemVendaPDV, PDVAIService
-from app.ai.pdv_assistant.models import TipoPDVSugestao, PrioridadeSugestao
 
 
 logger = logging.getLogger(__name__)
@@ -346,6 +344,7 @@ async def gerar_sugestoes_pdv(
         Lista de sugestões ordenadas por prioridade
     """
     inicio = datetime.now()
+    current_user, _tenant_id = user_and_tenant
     
     try:
         logger.info(
@@ -447,6 +446,7 @@ async def preview_sugestoes_pdv(
         Lista de sugestões (simulação)
     """
     inicio = datetime.now()
+    current_user, _tenant_id = user_and_tenant
     
     try:
         logger.info(
@@ -524,6 +524,8 @@ async def health_check(
     Returns:
         Status do serviço
     """
+    current_user, _tenant_id = user_and_tenant
+
     return {
         "status": "ok",
         "service": "PDV AI Assistant",

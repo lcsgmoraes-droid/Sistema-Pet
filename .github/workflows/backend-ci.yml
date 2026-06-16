@@ -255,6 +255,10 @@ jobs:
         run: |
           ruff check app/ia_config.py app/ia_fluxo_routes.py app/ia_routes.py
 
+      - name: PDV dashboard root lint (blocking)
+        run: |
+          ruff check app/dashboard_routes.py app/pdv_ai_routes.py app/pdv_indicadores_routes.py
+
       - name: API lint (blocking)
         run: |
           ruff check app/api

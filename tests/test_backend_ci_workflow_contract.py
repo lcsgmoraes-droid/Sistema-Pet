@@ -467,6 +467,16 @@ def test_backend_ci_has_blocking_cadastros_operacionais_root_lint_step():
     ) in source
 
 
+def test_backend_ci_has_blocking_pdv_dashboard_root_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "PDV dashboard root lint (blocking)" in source
+    assert (
+        "ruff check app/dashboard_routes.py app/pdv_ai_routes.py "
+        "app/pdv_indicadores_routes.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_empresa_root_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
