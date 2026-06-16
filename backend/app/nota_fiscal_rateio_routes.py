@@ -1,10 +1,9 @@
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter
 from sqlalchemy.orm import Session
 from app.database.session import get_db
 from app.nota_fiscal_rateio_helper import validar_rateio_percentual
 from app.nf_rateio_canal_models import NotaFiscalRateioCanal
-from app.nota_fiscal_tipos import TipoNotaFiscal
 
 router = APIRouter(prefix="/notas-fiscais", tags=["Notas Fiscais - Rateio"])
 

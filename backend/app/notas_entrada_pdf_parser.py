@@ -6,7 +6,7 @@ from decimal import Decimal, InvalidOperation
 from hashlib import sha256
 from io import BytesIO
 import re
-from typing import Iterable, Optional
+from typing import Optional
 from xml.etree import ElementTree as ET
 
 import pdfplumber
