@@ -367,25 +367,12 @@ def test_backend_ci_has_blocking_financial_root_lint_step():
 
 def test_backend_ci_has_blocking_estoque_root_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+    estoque_files = sorted(
+        f"app/{path.name}" for path in (ROOT / "backend" / "app").glob("estoque_*.py")
+    )
 
     assert "Estoque root lint (blocking)" in source
-    assert (
-        "ruff check app/estoque_alertas_gerais_routes.py "
-        "app/estoque_alertas_routes.py app/estoque_entrada_manual_routes.py "
-        "app/estoque_granel_routes.py app/estoque_importacao_csv_routes.py "
-        "app/estoque_importacao_pdf_routes.py app/estoque_local_models.py "
-        "app/estoque_models.py app/estoque_movimentacoes_consulta_routes.py "
-        "app/estoque_movimentacoes_context.py "
-        "app/estoque_movimentacoes_edicao_routes.py "
-        "app/estoque_movimentacoes_manuais_routes.py "
-        "app/estoque_relatorios_routes.py app/estoque_reserva_service.py "
-        "app/estoque_routes.py app/estoque_saida_full_routes.py "
-        "app/estoque_saida_manual_routes.py "
-        "app/estoque_transferencia_parceiro_routes.py "
-        "app/estoque_transferencia_routes.py "
-        "app/estoque_transferencia_service.py app/estoque_validade_models.py "
-        "app/estoque_validade_routes.py app/estoque_validade_service.py"
-    ) in source
+    assert f"ruff check {' '.join(estoque_files)}" in source
 
 
 def test_backend_ci_has_blocking_comissoes_root_lint_step():
