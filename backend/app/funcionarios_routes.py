@@ -369,7 +369,7 @@ async def criar_funcionario(
         cpf_existente = db.query(Cliente).filter(
             Cliente.tenant_id == tenant_id,
             Cliente.cpf == funcionario_data.cpf,
-            Cliente.ativo == True
+            Cliente.ativo.is_(True)
         ).first()
 
         if cpf_existente:
@@ -459,7 +459,7 @@ async def atualizar_funcionario(
             Cliente.tenant_id == tenant_id,
             Cliente.cpf == funcionario_data.cpf,
             Cliente.id != funcionario_id,
-            Cliente.ativo == True
+            Cliente.ativo.is_(True)
         ).first()
 
         if cpf_existente:
@@ -584,7 +584,7 @@ async def api_conceder_ferias(
         Cliente.id == funcionario_id,
         Cliente.tenant_id == tenant_id,
         Cliente.tipo_cadastro == "funcionario",
-        Cliente.ativo == True
+        Cliente.ativo.is_(True)
     ).first()
 
     if not funcionario:
@@ -637,7 +637,7 @@ async def api_pagar_decimo_terceiro(
         Cliente.id == funcionario_id,
         Cliente.tenant_id == tenant_id,
         Cliente.tipo_cadastro == "funcionario",
-        Cliente.ativo == True
+        Cliente.ativo.is_(True)
     ).first()
 
     if not funcionario:

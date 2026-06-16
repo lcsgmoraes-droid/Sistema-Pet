@@ -2,16 +2,14 @@
 Rotas FastAPI - Configuração Tributária e Cálculo de Impostos
 """
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from typing import Optional, Dict
-from datetime import date
+from typing import Optional
 
 from app.auth import get_current_user_and_tenant
 from app.db import get_session as get_db
 from app.ia.aba7_tributacao import CalculadoraTributaria
-from app.ia.aba7_extrato_models import ConfiguracaoTributaria
 
 
 router = APIRouter(prefix="/tributacao", tags=["Tributação e Impostos"])

@@ -6,7 +6,7 @@ Gerenciamento completo de variações de produtos
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func
 from sqlalchemy.orm import Session
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Optional
 from pydantic import BaseModel, Field
 from datetime import datetime
 
@@ -326,7 +326,7 @@ def atualizar_variacao(
         try:
             from app.bling_estoque_sync import sincronizar_bling_background
             sincronizar_bling_background(variacao.id, variacao.estoque_atual, "edicao_variacao")
-        except Exception as e_sync:
+        except Exception:
             pass  # log silencioso para não quebrar resposta
     
     return variacao
