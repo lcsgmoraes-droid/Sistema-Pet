@@ -4,7 +4,10 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_current_user_and_tenant
 from app.banho_tosa_api.fluxo import normalizar_fluxo_etapas
 from app.banho_tosa_api.utils import obter_ou_criar_configuracao
-from app.banho_tosa_schemas import BanhoTosaConfiguracaoResponse, BanhoTosaConfiguracaoUpdate
+from app.banho_tosa_schemas import (
+    BanhoTosaConfiguracaoResponse,
+    BanhoTosaConfiguracaoUpdate,
+)
 from app.db import get_session
 from app.veterinario_core import _get_tenant
 

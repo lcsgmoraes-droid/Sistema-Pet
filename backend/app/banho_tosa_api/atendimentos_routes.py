@@ -64,12 +64,16 @@ def listar_atendimentos(
     if status:
         query = query.filter(BanhoTosaAtendimento.status == status)
 
-    atendimentos = query.order_by(BanhoTosaAtendimento.checkin_em.desc()).limit(limit).all()
+    atendimentos = (
+        query.order_by(BanhoTosaAtendimento.checkin_em.desc()).limit(limit).all()
+    )
     config = obter_ou_criar_configuracao(db, tenant_id)
     return [serializar_atendimento(item, config) for item in atendimentos]
 
 
-@router.get("/atendimentos/{atendimento_id}", response_model=BanhoTosaAtendimentoResponse)
+@router.get(
+    "/atendimentos/{atendimento_id}", response_model=BanhoTosaAtendimentoResponse
+)
 def obter_atendimento(
     atendimento_id: int,
     db: Session = Depends(get_session),
@@ -81,7 +85,9 @@ def obter_atendimento(
     return serializar_atendimento(atendimento, config)
 
 
-@router.patch("/atendimentos/{atendimento_id}/status", response_model=BanhoTosaAtendimentoResponse)
+@router.patch(
+    "/atendimentos/{atendimento_id}/status", response_model=BanhoTosaAtendimentoResponse
+)
 def atualizar_status_atendimento(
     atendimento_id: int,
     body: BanhoTosaAtendimentoStatusUpdate,
@@ -127,7 +133,10 @@ def cancelar_processo(
     )
 
 
-@router.post("/atendimentos/{atendimento_id}/mover-etapa", response_model=BanhoTosaAtendimentoResponse)
+@router.post(
+    "/atendimentos/{atendimento_id}/mover-etapa",
+    response_model=BanhoTosaAtendimentoResponse,
+)
 def mover_etapa_atendimento(
     atendimento_id: int,
     body: BanhoTosaMoverEtapaInput,
@@ -137,21 +146,28 @@ def mover_etapa_atendimento(
     current_user, tenant_id = _get_tenant(current)
     atendimento = obter_atendimento_ou_404(db, tenant_id, atendimento_id)
     if atendimento.status in STATUS_ATENDIMENTO_FINAIS:
-        raise HTTPException(status_code=422, detail="Atendimento finalizado nao aceita mudanca de etapa")
+        raise HTTPException(
+            status_code=422, detail="Atendimento finalizado nao aceita mudanca de etapa"
+        )
 
     tipo = body.tipo.strip().lower()
     config = obter_ou_criar_configuracao(db, tenant_id)
     fluxo = fluxo_da_config(config)
     etapas_validas = set(fluxo) | {"entregue"}
     if tipo not in etapas_validas:
-        raise HTTPException(status_code=422, detail="Etapa nao faz parte do fluxo configurado")
+        raise HTTPException(
+            status_code=422, detail="Etapa nao faz parte do fluxo configurado"
+        )
     if tipo in ETAPAS_OPERACIONAIS and body.iniciar_timer:
         validar_responsavel_recurso(db, tenant_id, body.responsavel_id, body.recurso_id)
 
     agora = datetime.now()
     if body.resetar_fluxo:
         if tipo != "chegou":
-            raise HTTPException(status_code=422, detail="Reset de fluxo deve retornar para a etapa chegou")
+            raise HTTPException(
+                status_code=422,
+                detail="Reset de fluxo deve retornar para a etapa chegou",
+            )
         for etapa in list(atendimento.etapas or []):
             db.delete(etapa)
         atendimento.status = "chegou"
@@ -163,13 +179,19 @@ def mover_etapa_atendimento(
         atendimento = obter_atendimento_ou_404(db, tenant_id, atendimento.id)
         return serializar_atendimento(atendimento, config)
 
-    etapas_abertas = db.query(BanhoTosaEtapa).filter(
-        BanhoTosaEtapa.tenant_id == tenant_id,
-        BanhoTosaEtapa.atendimento_id == atendimento.id,
-        BanhoTosaEtapa.fim_em.is_(None),
-    ).all()
+    etapas_abertas = (
+        db.query(BanhoTosaEtapa)
+        .filter(
+            BanhoTosaEtapa.tenant_id == tenant_id,
+            BanhoTosaEtapa.atendimento_id == atendimento.id,
+            BanhoTosaEtapa.fim_em.is_(None),
+        )
+        .all()
+    )
     if etapas_abertas and not body.finalizar_etapa_atual:
-        raise HTTPException(status_code=409, detail="Finalize a etapa aberta antes de iniciar outra")
+        raise HTTPException(
+            status_code=409, detail="Finalize a etapa aberta antes de iniciar outra"
+        )
     for etapa in etapas_abertas:
         fechar_etapa_aberta(etapa, fim=agora)
 
@@ -197,7 +219,11 @@ def mover_etapa_atendimento(
     return serializar_atendimento(atendimento, config)
 
 
-@router.post("/atendimentos/{atendimento_id}/etapas", response_model=BanhoTosaEtapaResponse, status_code=201)
+@router.post(
+    "/atendimentos/{atendimento_id}/etapas",
+    response_model=BanhoTosaEtapaResponse,
+    status_code=201,
+)
 def iniciar_etapa(
     atendimento_id: int,
     body: BanhoTosaEtapaCreate,
@@ -207,19 +233,30 @@ def iniciar_etapa(
     _, tenant_id = _get_tenant(current)
     atendimento = obter_atendimento_ou_404(db, tenant_id, atendimento_id)
     if atendimento.status in STATUS_ATENDIMENTO_FINAIS:
-        raise HTTPException(status_code=422, detail="Atendimento finalizado nao aceita nova etapa")
+        raise HTTPException(
+            status_code=422, detail="Atendimento finalizado nao aceita nova etapa"
+        )
 
     tipo = body.tipo.strip().lower()
     if tipo not in ETAPAS_OPERACIONAIS:
-        raise HTTPException(status_code=422, detail="Apenas etapas operacionais podem iniciar contador")
+        raise HTTPException(
+            status_code=422, detail="Apenas etapas operacionais podem iniciar contador"
+        )
 
-    etapa_aberta = db.query(BanhoTosaEtapa).filter(
-        BanhoTosaEtapa.tenant_id == tenant_id,
-        BanhoTosaEtapa.atendimento_id == atendimento.id,
-        BanhoTosaEtapa.fim_em.is_(None),
-    ).first()
+    etapa_aberta = (
+        db.query(BanhoTosaEtapa)
+        .filter(
+            BanhoTosaEtapa.tenant_id == tenant_id,
+            BanhoTosaEtapa.atendimento_id == atendimento.id,
+            BanhoTosaEtapa.fim_em.is_(None),
+        )
+        .first()
+    )
     if etapa_aberta:
-        raise HTTPException(status_code=409, detail="Finalize ou resete a etapa aberta antes de iniciar outra")
+        raise HTTPException(
+            status_code=409,
+            detail="Finalize ou resete a etapa aberta antes de iniciar outra",
+        )
 
     validar_responsavel_recurso(db, tenant_id, body.responsavel_id, body.recurso_id)
     config = obter_ou_criar_configuracao(db, tenant_id)
@@ -249,7 +286,10 @@ def iniciar_etapa(
     return serializar_etapa(etapa)
 
 
-@router.patch("/atendimentos/{atendimento_id}/etapas/{etapa_id}", response_model=BanhoTosaEtapaResponse)
+@router.patch(
+    "/atendimentos/{atendimento_id}/etapas/{etapa_id}",
+    response_model=BanhoTosaEtapaResponse,
+)
 def atualizar_etapa(
     atendimento_id: int,
     etapa_id: int,
@@ -278,7 +318,10 @@ def atualizar_etapa(
     return serializar_etapa(etapa)
 
 
-@router.post("/atendimentos/{atendimento_id}/etapas/{etapa_id}/resetar", response_model=BanhoTosaAtendimentoResponse)
+@router.post(
+    "/atendimentos/{atendimento_id}/etapas/{etapa_id}/resetar",
+    response_model=BanhoTosaAtendimentoResponse,
+)
 def resetar_etapa(
     atendimento_id: int,
     etapa_id: int,
@@ -288,10 +331,14 @@ def resetar_etapa(
     _, tenant_id = _get_tenant(current)
     atendimento = obter_atendimento_ou_404(db, tenant_id, atendimento_id)
     if atendimento.status in STATUS_ATENDIMENTO_FINAIS:
-        raise HTTPException(status_code=422, detail="Atendimento finalizado nao aceita reset de etapa")
+        raise HTTPException(
+            status_code=422, detail="Atendimento finalizado nao aceita reset de etapa"
+        )
     etapa = obter_etapa_ou_404(db, tenant_id, atendimento_id, etapa_id)
     if etapa.fim_em:
-        raise HTTPException(status_code=422, detail="Apenas etapa aberta pode ter contador resetado")
+        raise HTTPException(
+            status_code=422, detail="Apenas etapa aberta pode ter contador resetado"
+        )
 
     tipo = etapa.tipo
     db.delete(etapa)
@@ -302,7 +349,10 @@ def resetar_etapa(
     return serializar_atendimento(atendimento, config)
 
 
-@router.post("/atendimentos/{atendimento_id}/etapas/{etapa_id}/finalizar", response_model=BanhoTosaEtapaResponse)
+@router.post(
+    "/atendimentos/{atendimento_id}/etapas/{etapa_id}/finalizar",
+    response_model=BanhoTosaEtapaResponse,
+)
 def finalizar_etapa(
     atendimento_id: int,
     etapa_id: int,

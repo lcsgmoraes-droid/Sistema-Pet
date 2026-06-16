@@ -13,15 +13,12 @@ def aplicar_fiscal_produto(
     produto_id: int,
     sugestao: dict,
     db: Session = Depends(get_db),
-    tenant_id: int = Depends(get_current_tenant)
+    tenant_id: int = Depends(get_current_tenant),
 ):
     """
     Aplica manualmente a sugestão fiscal ao produto.
     """
     config = aplicar_sugestao_fiscal_produto(
-        db=db,
-        tenant_id=tenant_id,
-        produto_id=produto_id,
-        sugestao=sugestao
+        db=db, tenant_id=tenant_id, produto_id=produto_id, sugestao=sugestao
     )
     return {"status": "ok", "config_fiscal": config}

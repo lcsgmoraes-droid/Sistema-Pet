@@ -15,25 +15,39 @@ from app.models import Cliente
 
 
 def query_creditos(db: Session, tenant_id):
-    return db.query(BanhoTosaPacoteCredito).options(
-        joinedload(BanhoTosaPacoteCredito.pacote).joinedload(BanhoTosaPacote.servico),
-        joinedload(BanhoTosaPacoteCredito.cliente),
-        joinedload(BanhoTosaPacoteCredito.pet),
-    ).filter(BanhoTosaPacoteCredito.tenant_id == tenant_id)
+    return (
+        db.query(BanhoTosaPacoteCredito)
+        .options(
+            joinedload(BanhoTosaPacoteCredito.pacote).joinedload(
+                BanhoTosaPacote.servico
+            ),
+            joinedload(BanhoTosaPacoteCredito.cliente),
+            joinedload(BanhoTosaPacoteCredito.pet),
+        )
+        .filter(BanhoTosaPacoteCredito.tenant_id == tenant_id)
+    )
 
 
 def query_recorrencias(db: Session, tenant_id):
-    return db.query(BanhoTosaRecorrencia).options(
-        joinedload(BanhoTosaRecorrencia.cliente),
-        joinedload(BanhoTosaRecorrencia.pet),
-        joinedload(BanhoTosaRecorrencia.servico),
-    ).filter(BanhoTosaRecorrencia.tenant_id == tenant_id)
+    return (
+        db.query(BanhoTosaRecorrencia)
+        .options(
+            joinedload(BanhoTosaRecorrencia.cliente),
+            joinedload(BanhoTosaRecorrencia.pet),
+            joinedload(BanhoTosaRecorrencia.servico),
+        )
+        .filter(BanhoTosaRecorrencia.tenant_id == tenant_id)
+    )
 
 
 def obter_pacote(db: Session, tenant_id, pacote_id: int, ativo: bool = False):
-    query = db.query(BanhoTosaPacote).options(joinedload(BanhoTosaPacote.servico)).filter(
-        BanhoTosaPacote.id == pacote_id,
-        BanhoTosaPacote.tenant_id == tenant_id,
+    query = (
+        db.query(BanhoTosaPacote)
+        .options(joinedload(BanhoTosaPacote.servico))
+        .filter(
+            BanhoTosaPacote.id == pacote_id,
+            BanhoTosaPacote.tenant_id == tenant_id,
+        )
     )
     if ativo:
         query = query.filter(BanhoTosaPacote.ativo.is_(True))
@@ -44,7 +58,11 @@ def obter_pacote(db: Session, tenant_id, pacote_id: int, ativo: bool = False):
 
 
 def obter_credito(db: Session, tenant_id, credito_id: int):
-    credito = query_creditos(db, tenant_id).filter(BanhoTosaPacoteCredito.id == credito_id).first()
+    credito = (
+        query_creditos(db, tenant_id)
+        .filter(BanhoTosaPacoteCredito.id == credito_id)
+        .first()
+    )
     if not credito:
         raise HTTPException(status_code=404, detail="Credito de pacote nao encontrado.")
     return credito
@@ -53,15 +71,21 @@ def obter_credito(db: Session, tenant_id, credito_id: int):
 def validar_servico(db: Session, tenant_id, servico_id: Optional[int]) -> None:
     if not servico_id:
         return
-    servico = db.query(BanhoTosaServico.id).filter(
-        BanhoTosaServico.id == servico_id,
-        BanhoTosaServico.tenant_id == tenant_id,
-    ).first()
+    servico = (
+        db.query(BanhoTosaServico.id)
+        .filter(
+            BanhoTosaServico.id == servico_id,
+            BanhoTosaServico.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not servico:
         raise HTTPException(status_code=404, detail="Servico nao encontrado.")
 
 
-def validar_nome_pacote_disponivel(db: Session, tenant_id, nome: str, ignorar_id: Optional[int] = None) -> None:
+def validar_nome_pacote_disponivel(
+    db: Session, tenant_id, nome: str, ignorar_id: Optional[int] = None
+) -> None:
     query = db.query(BanhoTosaPacote.id).filter(
         BanhoTosaPacote.tenant_id == tenant_id,
         func.lower(BanhoTosaPacote.nome) == nome.lower(),
@@ -69,18 +93,26 @@ def validar_nome_pacote_disponivel(db: Session, tenant_id, nome: str, ignorar_id
     if ignorar_id:
         query = query.filter(BanhoTosaPacote.id != ignorar_id)
     if query.first():
-        raise HTTPException(status_code=409, detail="Ja existe um pacote com esse nome.")
+        raise HTTPException(
+            status_code=409, detail="Ja existe um pacote com esse nome."
+        )
 
 
-def validar_cliente_pet_credito(db: Session, tenant_id, cliente_id: int, pet_id: Optional[int]) -> None:
+def validar_cliente_pet_credito(
+    db: Session, tenant_id, cliente_id: int, pet_id: Optional[int]
+) -> None:
     if pet_id:
         validar_cliente_pet(db, tenant_id, cliente_id, pet_id)
         return
-    cliente = db.query(Cliente).filter(
-        Cliente.id == cliente_id,
-        Cliente.tenant_id == tenant_id,
-        Cliente.ativo.is_(True),
-    ).first()
+    cliente = (
+        db.query(Cliente)
+        .filter(
+            Cliente.id == cliente_id,
+            Cliente.tenant_id == tenant_id,
+            Cliente.ativo.is_(True),
+        )
+        .first()
+    )
     if not cliente:
         raise HTTPException(status_code=404, detail="Tutor nao encontrado.")
 

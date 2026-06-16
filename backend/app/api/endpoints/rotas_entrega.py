@@ -1,7 +1,15 @@
 from dataclasses import dataclass
 from uuid import UUID
 
-from fastapi import APIRouter, BackgroundTasks, Body, Depends, HTTPException, Query, status
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Body,
+    Depends,
+    HTTPException,
+    Query,
+    status,
+)
 from fastapi.security import HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from pydantic import BaseModel, Field
@@ -27,8 +35,14 @@ from app.schemas.rota_entrega import (
 )
 from app.services.custo_entrega_service import calcular_custo_entrega
 from app.services.custo_moto_service import calcular_custo_moto
-from app.services.google_maps_service import calcular_distancia_km, calcular_rota_otimizada
-from app.services.notificacao_entrega_service import notificar_inicio_rota, notificar_proximo_cliente
+from app.services.google_maps_service import (
+    calcular_distancia_km,
+    calcular_rota_otimizada,
+)
+from app.services.notificacao_entrega_service import (
+    notificar_inicio_rota,
+    notificar_proximo_cliente,
+)
 from app.services.app_access_profile_service import get_cliente_for_app_profile_or_none
 from app.models_configuracao_custo_moto import ConfiguracaoCustoMoto
 from app.session_manager import get_session_by_jti
@@ -47,7 +61,9 @@ class DeliveryActor:
 
 
 class RegistrarRecebimentoPayload(BaseModel):
-    forma_pagamento: str = Field(..., description="pix | cartao_debito | cartao_credito")
+    forma_pagamento: str = Field(
+        ..., description="pix | cartao_debito | cartao_credito"
+    )
     numero_parcelas: int = Field(1, ge=1, le=12)
 
 
@@ -55,7 +71,9 @@ def _tenant_status_is_active(status_value: object) -> bool:
     return str(status_value or "").strip().lower() in {"active", "ativo"}
 
 
-def _credentials_exception(detail: str = "Could not validate credentials") -> HTTPException:
+def _credentials_exception(
+    detail: str = "Could not validate credentials",
+) -> HTTPException:
     return HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail=detail,
@@ -65,7 +83,9 @@ def _credentials_exception(detail: str = "Could not validate credentials") -> HT
 
 def _decode_delivery_token(credentials: HTTPAuthorizationCredentials) -> dict:
     try:
-        return jwt.decode(credentials.credentials, JWT_SECRET_KEY, algorithms=[ALGORITHM])
+        return jwt.decode(
+            credentials.credentials, JWT_SECRET_KEY, algorithms=[ALGORITHM]
+        )
     except JWTError as exc:
         raise _credentials_exception() from exc
 
@@ -116,7 +136,9 @@ def _validate_admin_delivery_actor(
     if not db_session or db_session.user_id != user.id:
         raise _credentials_exception("Sessao invalida. Faca login novamente.")
     if db_session.tenant_id and str(db_session.tenant_id) != str(tenant_id):
-        raise _credentials_exception("Sessao pertence a outro tenant. Faca login novamente.")
+        raise _credentials_exception(
+            "Sessao pertence a outro tenant. Faca login novamente."
+        )
     if db_session.tenant_id is None:
         db_session.tenant_id = tenant_id
         db.flush()
@@ -173,27 +195,82 @@ def _rota_filters_for_actor(actor: DeliveryActor, rota_ref):
     return filters
 
 
-
 def ensure_rotas_entrega_schema(db: Session) -> None:
     """Compatibilidade de schema para rotas/paradas em ambientes legados."""
     global _rotas_schema_checked
     if _rotas_schema_checked:
         return
 
-    db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS km_inicial NUMERIC(10,2)"))
-    db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS km_final NUMERIC(10,2)"))
-    db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS token_rastreio VARCHAR(64)"))
-    db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS lat_atual NUMERIC(10,6)"))
-    db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS lon_atual NUMERIC(10,6)"))
-    db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS localizacao_atualizada_em TIMESTAMP"))
-    db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS distancia_total_km_real NUMERIC(10,3)"))
-    db.execute(text("ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS distancia_retorno_km_real NUMERIC(10,3)"))
-    db.execute(text("ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS observacoes TEXT"))
-    db.execute(text("ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS km_entrega NUMERIC(10,2)"))
-    db.execute(text("ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS lat_entrega NUMERIC(10,6)"))
-    db.execute(text("ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS lon_entrega NUMERIC(10,6)"))
-    db.execute(text("ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS distancia_trecho_real_km NUMERIC(10,3)"))
-    db.execute(text("ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS distancia_acumulada_real_km NUMERIC(10,3)"))
+    db.execute(
+        text(
+            "ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS km_inicial NUMERIC(10,2)"
+        )
+    )
+    db.execute(
+        text(
+            "ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS km_final NUMERIC(10,2)"
+        )
+    )
+    db.execute(
+        text(
+            "ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS token_rastreio VARCHAR(64)"
+        )
+    )
+    db.execute(
+        text(
+            "ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS lat_atual NUMERIC(10,6)"
+        )
+    )
+    db.execute(
+        text(
+            "ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS lon_atual NUMERIC(10,6)"
+        )
+    )
+    db.execute(
+        text(
+            "ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS localizacao_atualizada_em TIMESTAMP"
+        )
+    )
+    db.execute(
+        text(
+            "ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS distancia_total_km_real NUMERIC(10,3)"
+        )
+    )
+    db.execute(
+        text(
+            "ALTER TABLE rotas_entrega ADD COLUMN IF NOT EXISTS distancia_retorno_km_real NUMERIC(10,3)"
+        )
+    )
+    db.execute(
+        text(
+            "ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS observacoes TEXT"
+        )
+    )
+    db.execute(
+        text(
+            "ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS km_entrega NUMERIC(10,2)"
+        )
+    )
+    db.execute(
+        text(
+            "ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS lat_entrega NUMERIC(10,6)"
+        )
+    )
+    db.execute(
+        text(
+            "ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS lon_entrega NUMERIC(10,6)"
+        )
+    )
+    db.execute(
+        text(
+            "ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS distancia_trecho_real_km NUMERIC(10,3)"
+        )
+    )
+    db.execute(
+        text(
+            "ALTER TABLE rotas_entrega_paradas ADD COLUMN IF NOT EXISTS distancia_acumulada_real_km NUMERIC(10,3)"
+        )
+    )
     db.commit()
     _rotas_schema_checked = True
 
@@ -204,7 +281,10 @@ def _haversine_km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
 
     d_lat = radians(lat2 - lat1)
     d_lon = radians(lon2 - lon1)
-    a = sin(d_lat / 2) ** 2 + cos(radians(lat1)) * cos(radians(lat2)) * sin(d_lon / 2) ** 2
+    a = (
+        sin(d_lat / 2) ** 2
+        + cos(radians(lat1)) * cos(radians(lat2)) * sin(d_lon / 2) ** 2
+    )
     c = 2 * atan2(sqrt(a), sqrt(1 - a))
     return raio_terra_km * c
 
@@ -220,10 +300,14 @@ def _sincronizar_venda_entregue_por_parada(
     parada.status = "entregue"
     parada.data_entrega = entrega_em
 
-    venda = db.query(Venda).filter(
-        Venda.id == parada.venda_id,
-        Venda.tenant_id == tenant_id,
-    ).first()
+    venda = (
+        db.query(Venda)
+        .filter(
+            Venda.id == parada.venda_id,
+            Venda.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if venda:
         venda.status_entrega = "entregue"
         venda.data_entrega = entrega_em
@@ -231,14 +315,20 @@ def _sincronizar_venda_entregue_por_parada(
 
 
 def _contar_paradas_nao_entregues(db: Session, rota_id: int, tenant_id) -> int:
-    return db.query(RotaEntregaParada).filter(
-        RotaEntregaParada.rota_id == rota_id,
-        RotaEntregaParada.tenant_id == tenant_id,
-        RotaEntregaParada.status != "entregue",
-    ).count()
+    return (
+        db.query(RotaEntregaParada)
+        .filter(
+            RotaEntregaParada.rota_id == rota_id,
+            RotaEntregaParada.tenant_id == tenant_id,
+            RotaEntregaParada.status != "entregue",
+        )
+        .count()
+    )
 
 
-def _notificar_proximo_cliente_background(rota_id: int, parada_ordem: int, tenant_id) -> None:
+def _notificar_proximo_cliente_background(
+    rota_id: int, parada_ordem: int, tenant_id
+) -> None:
     try:
         set_current_tenant(tenant_id)
         with SessionLocal() as db:
@@ -253,7 +343,7 @@ def _notificar_proximo_cliente_background(rota_id: int, parada_ordem: int, tenan
 def listar_rotas(
     status: Optional[str] = Query(None, description="Filtrar por status"),
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Lista rotas de entrega do tenant.
@@ -267,16 +357,24 @@ def listar_rotas(
     user, tenant_id = user_and_tenant
     ensure_rotas_entrega_schema(db)
 
-    query = db.query(RotaEntrega).options(
-        joinedload(RotaEntrega.entregador),
-        joinedload(RotaEntrega.paradas).joinedload(RotaEntregaParada.venda).joinedload(Venda.cliente)
-    ).filter(RotaEntrega.tenant_id == tenant_id)
+    query = (
+        db.query(RotaEntrega)
+        .options(
+            joinedload(RotaEntrega.entregador),
+            joinedload(RotaEntrega.paradas)
+            .joinedload(RotaEntregaParada.venda)
+            .joinedload(Venda.cliente),
+        )
+        .filter(RotaEntrega.tenant_id == tenant_id)
+    )
 
     if status:
         query = query.filter(RotaEntrega.status == status)
     else:
         # Se não especificou status, mostra apenas rotas ativas (exclui concluídas)
-        query = query.filter(RotaEntrega.status.in_(['pendente', 'em_rota', 'em_andamento']))
+        query = query.filter(
+            RotaEntrega.status.in_(["pendente", "em_rota", "em_andamento"])
+        )
 
     # Ordenar: rotas com paradas otimizadas primeiro, depois por data
     rotas = query.order_by(RotaEntrega.created_at.asc()).all()
@@ -306,7 +404,9 @@ def listar_rotas(
             if loc[4] is not None:
                 total_real = float(loc[4])
                 retorno_real = float(loc[5] or 0)
-                rota.distancia_ate_ultima_entrega_km_real = max(total_real - retorno_real, 0)
+                rota.distancia_ate_ultima_entrega_km_real = max(
+                    total_real - retorno_real, 0
+                )
             if not token_rastreio:
                 token_rastreio = secrets.token_urlsafe(32)
                 db.execute(
@@ -353,7 +453,7 @@ def listar_rotas(
 @router.get("/vendas-pendentes/listar")
 def listar_vendas_pendentes_entrega(
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Lista vendas com entrega pendente (sem rota criada ainda).
@@ -372,32 +472,40 @@ def listar_vendas_pendentes_entrega(
     # Buscar vendas com entrega pendente
     # CRITÉRIO: tem_entrega = true E status_entrega = 'pendente' ou NULL
     # Exclui: 'em_rota', 'entregue', 'cancelada'
-    vendas = db.query(Venda).filter(
-        Venda.tenant_id == tenant_id,
-        Venda.tem_entrega.is_(True),
-        # Aceita apenas vendas pendentes (ainda não entraram em rota)
-        (Venda.status_entrega == 'pendente') | Venda.status_entrega.is_(None)
-    ).order_by(
-        # Primeiro: vendas com ordem otimizada
-        Venda.ordem_entrega_otimizada.asc().nullslast(),
-        # Depois: vendas novas por data
-        Venda.created_at.asc()
-    ).all()
+    vendas = (
+        db.query(Venda)
+        .filter(
+            Venda.tenant_id == tenant_id,
+            Venda.tem_entrega.is_(True),
+            # Aceita apenas vendas pendentes (ainda não entraram em rota)
+            (Venda.status_entrega == "pendente") | Venda.status_entrega.is_(None),
+        )
+        .order_by(
+            # Primeiro: vendas com ordem otimizada
+            Venda.ordem_entrega_otimizada.asc().nullslast(),
+            # Depois: vendas novas por data
+            Venda.created_at.asc(),
+        )
+        .all()
+    )
 
-    return [{
-        "id": v.id,
-        "numero_venda": v.numero_venda,
-        "cliente_id": v.cliente_id,
-        "cliente_nome": v.cliente.nome if v.cliente else "Cliente não cadastrado",
-        "endereco_entrega": v.endereco_entrega,
-        "taxa_entrega": float(v.taxa_entrega) if v.taxa_entrega else 0,
-        "distancia_km": float(v.distancia_km) if v.distancia_km else None,
-        "ordem_otimizada": v.ordem_entrega_otimizada,
-        "data_venda": v.data_venda.isoformat() if v.data_venda else None,
-        "total": float(v.total) if v.total else 0,
-        "entregador_id": v.entregador_id,
-        "entregador_nome": v.entregador.nome if v.entregador else None,
-    } for v in vendas]
+    return [
+        {
+            "id": v.id,
+            "numero_venda": v.numero_venda,
+            "cliente_id": v.cliente_id,
+            "cliente_nome": v.cliente.nome if v.cliente else "Cliente não cadastrado",
+            "endereco_entrega": v.endereco_entrega,
+            "taxa_entrega": float(v.taxa_entrega) if v.taxa_entrega else 0,
+            "distancia_km": float(v.distancia_km) if v.distancia_km else None,
+            "ordem_otimizada": v.ordem_entrega_otimizada,
+            "data_venda": v.data_venda.isoformat() if v.data_venda else None,
+            "total": float(v.total) if v.total else 0,
+            "entregador_id": v.entregador_id,
+            "entregador_nome": v.entregador.nome if v.entregador else None,
+        }
+        for v in vendas
+    ]
 
 
 @router.post("/{rota_id}/paradas/{parada_id}/registrar-recebimento")
@@ -423,9 +531,13 @@ def registrar_recebimento_entregador(
         raise HTTPException(status_code=400, detail="Forma de pagamento inválida")
 
     if forma != "cartao_credito" and payload.numero_parcelas != 1:
-        raise HTTPException(status_code=400, detail="Parcelas só são permitidas para cartão de crédito")
+        raise HTTPException(
+            status_code=400, detail="Parcelas só são permitidas para cartão de crédito"
+        )
 
-    rota = db.query(RotaEntrega).filter(*_rota_filters_for_actor(actor, rota_id)).first()
+    rota = (
+        db.query(RotaEntrega).filter(*_rota_filters_for_actor(actor, rota_id)).first()
+    )
     if not rota:
         raise HTTPException(status_code=404, detail="Rota nao encontrada")
 
@@ -441,7 +553,11 @@ def registrar_recebimento_entregador(
     if not parada:
         raise HTTPException(status_code=404, detail="Parada não encontrada")
 
-    venda = db.query(Venda).filter(Venda.id == parada.venda_id, Venda.tenant_id == tenant_id).first()
+    venda = (
+        db.query(Venda)
+        .filter(Venda.id == parada.venda_id, Venda.tenant_id == tenant_id)
+        .first()
+    )
     if not venda:
         raise HTTPException(status_code=404, detail="Venda não encontrada")
 
@@ -474,7 +590,7 @@ def registrar_recebimento_entregador(
 @router.post("/vendas-pendentes/otimizar")
 def otimizar_vendas_pendentes(
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Otimiza ordem de entrega das vendas pendentes usando Google Maps.
@@ -487,39 +603,53 @@ def otimizar_vendas_pendentes(
     user, tenant_id = user_and_tenant
 
     # Buscar configuração para ponto inicial
-    config = db.query(ConfiguracaoEntrega).filter(
-        ConfiguracaoEntrega.tenant_id == tenant_id
-    ).first()
+    config = (
+        db.query(ConfiguracaoEntrega)
+        .filter(ConfiguracaoEntrega.tenant_id == tenant_id)
+        .first()
+    )
 
     if not config or not config.logradouro:
         raise HTTPException(
             status_code=400,
-            detail="Configure o endereço da loja em Configurações > Entregas primeiro"
+            detail="Configure o endereço da loja em Configurações > Entregas primeiro",
         )
 
     # Montar endereço completo
-    origem = ", ".join(filter(None, [
-        config.logradouro,
-        config.numero,
-        config.bairro,
-        config.cidade,
-        config.estado,
-        config.cep
-    ]))
+    origem = ", ".join(
+        filter(
+            None,
+            [
+                config.logradouro,
+                config.numero,
+                config.bairro,
+                config.cidade,
+                config.estado,
+                config.cep,
+            ],
+        )
+    )
 
     logger.info(f"📍 Ponto de origem: {origem}")
 
     # Buscar TODAS as vendas pendentes (incluindo as já otimizadas - RE-otimizar)
     # CRITÉRIO: tem_entrega = true E status_entrega NÃO é 'entregue' ou 'cancelada'
-    vendas = db.query(Venda).filter(
-        Venda.tenant_id == tenant_id,
-        Venda.tem_entrega.is_(True),
-        ~Venda.status_entrega.in_(["entregue", "cancelada"]),
-        Venda.endereco_entrega.isnot(None)
-    ).order_by(Venda.created_at.asc()).all()
+    vendas = (
+        db.query(Venda)
+        .filter(
+            Venda.tenant_id == tenant_id,
+            Venda.tem_entrega.is_(True),
+            ~Venda.status_entrega.in_(["entregue", "cancelada"]),
+            Venda.endereco_entrega.isnot(None),
+        )
+        .order_by(Venda.created_at.asc())
+        .all()
+    )
 
     if not vendas:
-        raise HTTPException(status_code=404, detail="Nenhuma venda pendente para otimizar")
+        raise HTTPException(
+            status_code=404, detail="Nenhuma venda pendente para otimizar"
+        )
 
     logger.info(f"📦 Encontradas {len(vendas)} vendas para otimizar")
 
@@ -528,7 +658,10 @@ def otimizar_vendas_pendentes(
         vendas[0].ordem_entrega_otimizada = 1
         db.commit()
         logger.info("✅ Apenas 1 venda, ordem definida como 1")
-        return {"message": "Apenas 1 venda, ordem definida como 1", "total_otimizado": 1}
+        return {
+            "message": "Apenas 1 venda, ordem definida como 1",
+            "total_otimizado": 1,
+        }
 
     try:
         # Extrair endereços
@@ -549,7 +682,9 @@ def otimizar_vendas_pendentes(
             if indice_original < len(vendas):
                 venda = vendas[indice_original]
                 venda.ordem_entrega_otimizada = posicao
-                logger.info(f"   Posição {posicao}: Venda {venda.numero_venda} (índice {indice_original})")
+                logger.info(
+                    f"   Posição {posicao}: Venda {venda.numero_venda} (índice {indice_original})"
+                )
 
         db.commit()
 
@@ -562,7 +697,7 @@ def otimizar_vendas_pendentes(
         return {
             "message": "Rotas otimizadas com sucesso! Ordem salva no banco.",
             "total_otimizado": len(ordem_indices),
-            "ordem": ordem_vendas
+            "ordem": ordem_vendas,
         }
 
     except Exception as e:
@@ -579,7 +714,7 @@ class OtimizarSelecionadasRequest(BaseModel):
 def otimizar_vendas_selecionadas(
     payload: OtimizarSelecionadasRequest,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Otimiza a ordem de entrega apenas das vendas selecionadas (por IDs).
@@ -591,35 +726,56 @@ def otimizar_vendas_selecionadas(
     if not payload.venda_ids:
         raise HTTPException(status_code=400, detail="Nenhuma venda selecionada")
 
-    config = db.query(ConfiguracaoEntrega).filter(
-        ConfiguracaoEntrega.tenant_id == tenant_id
-    ).first()
+    config = (
+        db.query(ConfiguracaoEntrega)
+        .filter(ConfiguracaoEntrega.tenant_id == tenant_id)
+        .first()
+    )
 
     if not config or not config.logradouro:
         raise HTTPException(
             status_code=400,
-            detail="Configure o endereço da loja em Configurações > Entregas primeiro"
+            detail="Configure o endereço da loja em Configurações > Entregas primeiro",
         )
 
-    origem = ", ".join(filter(None, [
-        config.logradouro, config.numero, config.bairro,
-        config.cidade, config.estado, config.cep
-    ]))
+    origem = ", ".join(
+        filter(
+            None,
+            [
+                config.logradouro,
+                config.numero,
+                config.bairro,
+                config.cidade,
+                config.estado,
+                config.cep,
+            ],
+        )
+    )
 
-    vendas = db.query(Venda).filter(
-        Venda.tenant_id == tenant_id,
-        Venda.id.in_(payload.venda_ids),
-        Venda.tem_entrega.is_(True),
-        Venda.endereco_entrega.isnot(None)
-    ).order_by(Venda.created_at.asc()).all()
+    vendas = (
+        db.query(Venda)
+        .filter(
+            Venda.tenant_id == tenant_id,
+            Venda.id.in_(payload.venda_ids),
+            Venda.tem_entrega.is_(True),
+            Venda.endereco_entrega.isnot(None),
+        )
+        .order_by(Venda.created_at.asc())
+        .all()
+    )
 
     if not vendas:
-        raise HTTPException(status_code=404, detail="Nenhuma venda encontrada com os IDs fornecidos")
+        raise HTTPException(
+            status_code=404, detail="Nenhuma venda encontrada com os IDs fornecidos"
+        )
 
     if len(vendas) == 1:
         vendas[0].ordem_entrega_otimizada = 1
         db.commit()
-        return {"message": "Apenas 1 venda, ordem definida como 1", "total_otimizado": 1}
+        return {
+            "message": "Apenas 1 venda, ordem definida como 1",
+            "total_otimizado": 1,
+        }
 
     try:
         destinos = [v.endereco_entrega for v in vendas]
@@ -635,7 +791,7 @@ def otimizar_vendas_selecionadas(
         return {
             "message": f"Rotas otimizadas com sucesso! {len(ordem_indices)} entregas reordenadas.",
             "total_otimizado": len(ordem_indices),
-            "ordem": ordem_vendas
+            "ordem": ordem_vendas,
         }
 
     except Exception as e:
@@ -658,10 +814,17 @@ def obter_rota(
 
     from sqlalchemy.orm import joinedload
 
-    rota = db.query(RotaEntrega).options(
-        joinedload(RotaEntrega.entregador),
-        joinedload(RotaEntrega.paradas).joinedload(RotaEntregaParada.venda).joinedload(Venda.cliente),
-    ).filter(*_rota_filters_for_actor(actor, rota_id)).first()
+    rota = (
+        db.query(RotaEntrega)
+        .options(
+            joinedload(RotaEntrega.entregador),
+            joinedload(RotaEntrega.paradas)
+            .joinedload(RotaEntregaParada.venda)
+            .joinedload(Venda.cliente),
+        )
+        .filter(*_rota_filters_for_actor(actor, rota_id))
+        .first()
+    )
 
     if not rota:
         raise HTTPException(status_code=404, detail="Rota não encontrada")
@@ -687,7 +850,9 @@ def obter_rota(
         if loc[4] is not None:
             total_real = float(loc[4])
             retorno_real = float(loc[5] or 0)
-            rota.distancia_ate_ultima_entrega_km_real = max(total_real - retorno_real, 0)
+            rota.distancia_ate_ultima_entrega_km_real = max(
+                total_real - retorno_real, 0
+            )
         if not token_rastreio:
             token_rastreio = secrets.token_urlsafe(32)
             db.execute(
@@ -735,7 +900,7 @@ def atualizar_rota(
     rota_id: int,
     payload: RotaEntregaUpdate,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Atualiza dados de uma rota (status, observações, etc).
@@ -743,16 +908,19 @@ def atualizar_rota(
     user, tenant_id = user_and_tenant
     ensure_rotas_entrega_schema(db)
 
-    rota = db.query(RotaEntrega).filter(
-        RotaEntrega.id == rota_id,
-        RotaEntrega.tenant_id == tenant_id
-    ).first()
+    rota = (
+        db.query(RotaEntrega)
+        .filter(RotaEntrega.id == rota_id, RotaEntrega.tenant_id == tenant_id)
+        .first()
+    )
 
     if not rota:
         raise HTTPException(status_code=404, detail="Rota não encontrada")
 
     if rota.status == "concluida":
-        raise HTTPException(status_code=400, detail="Rota concluída não pode ser alterada")
+        raise HTTPException(
+            status_code=400, detail="Rota concluída não pode ser alterada"
+        )
 
     # Atualizar campos fornecidos
     for field, value in payload.model_dump(exclude_unset=True).items():
@@ -785,50 +953,64 @@ def criar_rota(
     """
     user = actor.user
     tenant_id = _activate_delivery_actor_tenant(actor)
-    entregador_id = actor.entregador.id if actor.entregador is not None else payload.entregador_id
+    entregador_id = (
+        actor.entregador.id if actor.entregador is not None else payload.entregador_id
+    )
     vendas_ids = payload.vendas_ids or payload.venda_ids
 
     # Validar entregador
     if not entregador_id:
         raise HTTPException(status_code=400, detail="Entregador invalido")
 
-    entregador = db.query(Cliente).filter(
-        Cliente.id == entregador_id,
-        Cliente.tenant_id == tenant_id,
-        Cliente.is_entregador.is_(True),
-        Cliente.entregador_ativo.is_(True)
-    ).first()
+    entregador = (
+        db.query(Cliente)
+        .filter(
+            Cliente.id == entregador_id,
+            Cliente.tenant_id == tenant_id,
+            Cliente.is_entregador.is_(True),
+            Cliente.entregador_ativo.is_(True),
+        )
+        .first()
+    )
 
     if not entregador:
         raise HTTPException(status_code=400, detail="Entregador inválido")
 
     # Buscar configuração de entrega para obter ponto inicial
-    config_entrega = db.query(ConfiguracaoEntrega).filter(
-        ConfiguracaoEntrega.tenant_id == tenant_id
-    ).first()
+    config_entrega = (
+        db.query(ConfiguracaoEntrega)
+        .filter(ConfiguracaoEntrega.tenant_id == tenant_id)
+        .first()
+    )
 
     # ETAPA 9.3: Modo rota múltipla (várias vendas)
     if vendas_ids and len(vendas_ids) > 0:
         # Buscar vendas
         vendas_query = db.query(Venda).filter(
-            Venda.id.in_(vendas_ids),
-            Venda.tenant_id == tenant_id
+            Venda.id.in_(vendas_ids), Venda.tenant_id == tenant_id
         )
         if actor.entregador is not None:
             vendas_query = vendas_query.filter(
                 Venda.tem_entrega.is_(True),
                 or_(Venda.status_entrega == "pendente", Venda.status_entrega.is_(None)),
                 Venda.endereco_entrega.isnot(None),
-                or_(Venda.entregador_id == actor.entregador.id, Venda.entregador_id.is_(None)),
+                or_(
+                    Venda.entregador_id == actor.entregador.id,
+                    Venda.entregador_id.is_(None),
+                ),
             )
         vendas = vendas_query.all()
 
         if len(vendas) != len(vendas_ids):
-            raise HTTPException(status_code=404, detail="Uma ou mais vendas não encontradas")
+            raise HTTPException(
+                status_code=404, detail="Uma ou mais vendas não encontradas"
+            )
 
         # Validar que todas têm endereço
         if not all(v.endereco_entrega for v in vendas):
-            raise HTTPException(status_code=400, detail="Todas as vendas devem ter endereço de entrega")
+            raise HTTPException(
+                status_code=400, detail="Todas as vendas devem ter endereço de entrega"
+            )
 
         # Criar rota principal (sem venda_id específica, pois são várias)
         rota = RotaEntrega(
@@ -850,14 +1032,17 @@ def criar_rota(
         # Definir pontos inicial e final
         # Montar endereço completo do ponto inicial a partir da configuração
         if config_entrega:
-            ponto_inicial = payload.ponto_inicial_rota or (
-                f"{config_entrega.logradouro or ''}"
-                f"{', ' + config_entrega.numero if config_entrega.numero else ''}"
-                f"{' - ' + config_entrega.complemento if config_entrega.complemento else ''}"
-                f"{' - ' + config_entrega.bairro if config_entrega.bairro else ''}"
-                f"{' - ' + config_entrega.cidade if config_entrega.cidade else ''}"
-                f"/{config_entrega.estado if config_entrega.estado else ''}"
-            ).strip()
+            ponto_inicial = (
+                payload.ponto_inicial_rota
+                or (
+                    f"{config_entrega.logradouro or ''}"
+                    f"{', ' + config_entrega.numero if config_entrega.numero else ''}"
+                    f"{' - ' + config_entrega.complemento if config_entrega.complemento else ''}"
+                    f"{' - ' + config_entrega.bairro if config_entrega.bairro else ''}"
+                    f"{' - ' + config_entrega.cidade if config_entrega.cidade else ''}"
+                    f"/{config_entrega.estado if config_entrega.estado else ''}"
+                ).strip()
+            )
         else:
             ponto_inicial = payload.ponto_inicial_rota
 
@@ -866,7 +1051,9 @@ def criar_rota(
         # Ponto final: por padrão é o mesmo do inicial (retorna à origem)
         if payload.retorna_origem is False:
             # Não retorna: ponto final é a última entrega
-            rota.ponto_final_rota = payload.ponto_final_rota or vendas[-1].endereco_entrega
+            rota.ponto_final_rota = (
+                payload.ponto_final_rota or vendas[-1].endereco_entrega
+            )
             rota.retorna_origem = False
         else:
             # Retorna à origem (padrão)
@@ -948,15 +1135,17 @@ def criar_rota(
     # Modo tradicional: rota com 1 venda apenas
     # Buscar venda para obter endereço de destino
     venda_query = db.query(Venda).filter(
-        Venda.id == payload.venda_id,
-        Venda.tenant_id == tenant_id
+        Venda.id == payload.venda_id, Venda.tenant_id == tenant_id
     )
     if actor.entregador is not None:
         venda_query = venda_query.filter(
             Venda.tem_entrega.is_(True),
             or_(Venda.status_entrega == "pendente", Venda.status_entrega.is_(None)),
             Venda.endereco_entrega.isnot(None),
-            or_(Venda.entregador_id == actor.entregador.id, Venda.entregador_id.is_(None)),
+            or_(
+                Venda.entregador_id == actor.entregador.id,
+                Venda.entregador_id.is_(None),
+            ),
         )
     venda = venda_query.first()
 
@@ -1026,7 +1215,9 @@ def fechar_rota(
     tenant_id = _activate_delivery_actor_tenant(actor)
     ensure_rotas_entrega_schema(db)
 
-    rota = db.query(RotaEntrega).filter(*_rota_filters_for_actor(actor, rota_id)).first()
+    rota = (
+        db.query(RotaEntrega).filter(*_rota_filters_for_actor(actor, rota_id)).first()
+    )
 
     if not rota:
         raise HTTPException(status_code=404, detail="Rota não encontrada")
@@ -1034,15 +1225,21 @@ def fechar_rota(
     if rota.status == "concluida":
         return obter_rota(rota_id=rota.id, db=db, actor=actor)
 
-    entregador = db.query(Cliente).filter(
-        Cliente.id == rota.entregador_id,
-        Cliente.tenant_id == tenant_id
-    ).first()
+    entregador = (
+        db.query(Cliente)
+        .filter(Cliente.id == rota.entregador_id, Cliente.tenant_id == tenant_id)
+        .first()
+    )
 
-    paradas = db.query(RotaEntregaParada).filter(
-        RotaEntregaParada.rota_id == rota.id,
-        RotaEntregaParada.tenant_id == tenant_id,
-    ).order_by(RotaEntregaParada.ordem).all()
+    paradas = (
+        db.query(RotaEntregaParada)
+        .filter(
+            RotaEntregaParada.rota_id == rota.id,
+            RotaEntregaParada.tenant_id == tenant_id,
+        )
+        .order_by(RotaEntregaParada.ordem)
+        .all()
+    )
 
     paradas_abertas = [p for p in paradas if p.status != "entregue"]
     if paradas_abertas:
@@ -1066,7 +1263,9 @@ def fechar_rota(
                 rota.distancia_real = distancia_calculada
                 logger.info(f"Distância calculada: {distancia_calculada} km")
             else:
-                logger.warning(f"KM final ({payload.km_final}) menor que inicial ({rota.km_inicial})")
+                logger.warning(
+                    f"KM final ({payload.km_final}) menor que inicial ({rota.km_inicial})"
+                )
 
     # Se não calculou automaticamente, usar valor informado
     if payload.distancia_real is not None and rota.distancia_real is None:
@@ -1098,10 +1297,14 @@ def fechar_rota(
             )
 
     if not paradas and rota.venda_id:
-        venda = db.query(Venda).filter(
-            Venda.id == rota.venda_id,
-            Venda.tenant_id == tenant_id,
-        ).first()
+        venda = (
+            db.query(Venda)
+            .filter(
+                Venda.id == rota.venda_id,
+                Venda.tenant_id == tenant_id,
+            )
+            .first()
+        )
         if venda:
             venda.status_entrega = "entregue"
             venda.data_entrega = venda.data_entrega or conclusao_em
@@ -1123,14 +1326,13 @@ def fechar_rota(
     # ETAPA 8 + 11.1: Se moto da loja, calcular e armazenar custo da moto separadamente
     rota.custo_moto = Decimal("0")
     if rota.moto_da_loja and km_para_custo:
-        config_moto = db.query(ConfiguracaoCustoMoto).filter(
-            ConfiguracaoCustoMoto.tenant_id == tenant_id
-        ).first()
+        config_moto = (
+            db.query(ConfiguracaoCustoMoto)
+            .filter(ConfiguracaoCustoMoto.tenant_id == tenant_id)
+            .first()
+        )
         if config_moto:
-            custo_moto = calcular_custo_moto(
-                config=config_moto,
-                km=km_para_custo
-            )
+            custo_moto = calcular_custo_moto(config=config_moto, km=km_para_custo)
             rota.custo_moto = custo_moto
             rota.custo_real += custo_moto
 
@@ -1149,7 +1351,7 @@ def fechar_rota(
 def listar_paradas_rota(
     rota_id: int,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     ETAPA 9.3 - Lista paradas de uma rota na ordem otimizada
@@ -1157,19 +1359,25 @@ def listar_paradas_rota(
     user, tenant_id = user_and_tenant
 
     # Validar que rota existe e pertence ao tenant
-    rota = db.query(RotaEntrega).filter(
-        RotaEntrega.id == rota_id,
-        RotaEntrega.tenant_id == tenant_id
-    ).first()
+    rota = (
+        db.query(RotaEntrega)
+        .filter(RotaEntrega.id == rota_id, RotaEntrega.tenant_id == tenant_id)
+        .first()
+    )
 
     if not rota:
         raise HTTPException(status_code=404, detail="Rota não encontrada")
 
     # Buscar paradas ordenadas
-    paradas = db.query(RotaEntregaParada).filter(
-        RotaEntregaParada.rota_id == rota_id,
-        RotaEntregaParada.tenant_id == tenant_id
-    ).order_by(RotaEntregaParada.ordem).all()
+    paradas = (
+        db.query(RotaEntregaParada)
+        .filter(
+            RotaEntregaParada.rota_id == rota_id,
+            RotaEntregaParada.tenant_id == tenant_id,
+        )
+        .order_by(RotaEntregaParada.ordem)
+        .all()
+    )
 
     return paradas
 
@@ -1197,31 +1405,40 @@ def reordenar_paradas(
         ordem_ids = nova_ordem.get("parada_ids") or nova_ordem.get("nova_ordem")
     else:
         ordem_ids = nova_ordem
-    if not isinstance(ordem_ids, list) or not all(isinstance(pid, int) for pid in ordem_ids):
+    if not isinstance(ordem_ids, list) or not all(
+        isinstance(pid, int) for pid in ordem_ids
+    ):
         raise HTTPException(status_code=400, detail="Lista de paradas invalida")
 
     # Validar que rota existe e pertence ao tenant
-    rota = db.query(RotaEntrega).filter(*_rota_filters_for_actor(actor, rota_id)).first()
+    rota = (
+        db.query(RotaEntrega).filter(*_rota_filters_for_actor(actor, rota_id)).first()
+    )
 
     if not rota:
         raise HTTPException(status_code=404, detail="Rota não encontrada")
 
     if rota.status == "concluida":
-        raise HTTPException(status_code=400, detail="Não é possível reordenar rota concluída")
+        raise HTTPException(
+            status_code=400, detail="Não é possível reordenar rota concluída"
+        )
 
     # Buscar todas as paradas
-    paradas = db.query(RotaEntregaParada).filter(
-        RotaEntregaParada.rota_id == rota.id,
-        RotaEntregaParada.tenant_id == tenant_id
-    ).all()
+    paradas = (
+        db.query(RotaEntregaParada)
+        .filter(
+            RotaEntregaParada.rota_id == rota.id,
+            RotaEntregaParada.tenant_id == tenant_id,
+        )
+        .all()
+    )
 
     paradas_dict = {p.id: p for p in paradas}
 
     # Validar que todos os IDs fornecidos existem
     if set(ordem_ids) != set(paradas_dict.keys()):
         raise HTTPException(
-            status_code=400,
-            detail="Lista de IDs não corresponde às paradas da rota"
+            status_code=400, detail="Lista de IDs não corresponde às paradas da rota"
         )
 
     # Atualizar ordem
@@ -1254,7 +1471,9 @@ def iniciar_rota(
     ensure_rotas_entrega_schema(db)
 
     # Validar rota
-    rota = db.query(RotaEntrega).filter(*_rota_filters_for_actor(actor, rota_id)).first()
+    rota = (
+        db.query(RotaEntrega).filter(*_rota_filters_for_actor(actor, rota_id)).first()
+    )
 
     if not rota:
         raise HTTPException(status_code=404, detail="Rota não encontrada")
@@ -1262,18 +1481,17 @@ def iniciar_rota(
     if rota.status != "pendente":
         raise HTTPException(
             status_code=400,
-            detail=f"Rota não pode ser iniciada. Status atual: {rota.status}"
+            detail=f"Rota não pode ser iniciada. Status atual: {rota.status}",
         )
 
     # Verificar se tem paradas
-    paradas_count = db.query(RotaEntregaParada).filter(
-        RotaEntregaParada.rota_id == rota.id
-    ).count()
+    paradas_count = (
+        db.query(RotaEntregaParada).filter(RotaEntregaParada.rota_id == rota.id).count()
+    )
 
     if paradas_count == 0:
         raise HTTPException(
-            status_code=400,
-            detail="Rota não possui paradas cadastradas"
+            status_code=400, detail="Rota não possui paradas cadastradas"
         )
 
     # Iniciar rota
@@ -1333,7 +1551,7 @@ def iniciar_rota(
 def reverter_inicio_rota(
     rota_id: int,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Reverte o início de uma rota, voltando para status pendente.
@@ -1343,10 +1561,11 @@ def reverter_inicio_rota(
     user, tenant_id = user_and_tenant
 
     # Validar rota
-    rota = db.query(RotaEntrega).filter(
-        RotaEntrega.id == rota_id,
-        RotaEntrega.tenant_id == tenant_id
-    ).first()
+    rota = (
+        db.query(RotaEntrega)
+        .filter(RotaEntrega.id == rota_id, RotaEntrega.tenant_id == tenant_id)
+        .first()
+    )
 
     if not rota:
         raise HTTPException(status_code=404, detail="Rota não encontrada")
@@ -1354,19 +1573,22 @@ def reverter_inicio_rota(
     if rota.status != "em_rota":
         raise HTTPException(
             status_code=400,
-            detail=f"Rota não pode ser revertida. Status atual: {rota.status}"
+            detail=f"Rota não pode ser revertida. Status atual: {rota.status}",
         )
 
     # Verificar se alguma parada já foi entregue
-    paradas_entregues = db.query(RotaEntregaParada).filter(
-        RotaEntregaParada.rota_id == rota_id,
-        RotaEntregaParada.status == "entregue"
-    ).count()
+    paradas_entregues = (
+        db.query(RotaEntregaParada)
+        .filter(
+            RotaEntregaParada.rota_id == rota_id, RotaEntregaParada.status == "entregue"
+        )
+        .count()
+    )
 
     if paradas_entregues > 0:
         raise HTTPException(
             status_code=400,
-            detail=f"Não é possível reverter. {paradas_entregues} entrega(s) já foi(foram) realizada(s)."
+            detail=f"Não é possível reverter. {paradas_entregues} entrega(s) já foi(foram) realizada(s).",
         )
 
     # Reverter status
@@ -1395,7 +1617,9 @@ def atualizar_localizacao_rota(
     tenant_id = _activate_delivery_actor_tenant(actor)
     ensure_rotas_entrega_schema(db)
 
-    rota = db.query(RotaEntrega).filter(*_rota_filters_for_actor(actor, rota_id)).first()
+    rota = (
+        db.query(RotaEntrega).filter(*_rota_filters_for_actor(actor, rota_id)).first()
+    )
 
     if not rota:
         raise HTTPException(status_code=404, detail="Rota não encontrada")
@@ -1416,7 +1640,9 @@ def atualizar_localizacao_rota(
 
     delta_km = 0.0
     if loc_anterior and loc_anterior[0] is not None and loc_anterior[1] is not None:
-        delta_km = _haversine_km(float(loc_anterior[0]), float(loc_anterior[1]), float(lat), float(lon))
+        delta_km = _haversine_km(
+            float(loc_anterior[0]), float(loc_anterior[1]), float(lat), float(lon)
+        )
         if delta_km < 0.003:
             delta_km = 0.0
         if delta_km > 5:
@@ -1451,18 +1677,21 @@ def atualizar_localizacao_rota(
                 {"delta": delta_km, "pid": parada_id, "tenant": tenant_id},
             )
 
-            acumulada_real = db.execute(
-                text(
-                    """
+            acumulada_real = (
+                db.execute(
+                    text(
+                        """
                     SELECT COALESCE(SUM(COALESCE(distancia_trecho_real_km, 0)), 0)
                     FROM rotas_entrega_paradas
                     WHERE rota_id = :rid
                       AND tenant_id = :tenant
                       AND ordem <= :ordem
                     """
-                ),
-                {"rid": rota.id, "tenant": tenant_id, "ordem": ordem_parada},
-            ).scalar() or 0
+                    ),
+                    {"rid": rota.id, "tenant": tenant_id, "ordem": ordem_parada},
+                ).scalar()
+                or 0
+            )
 
             db.execute(
                 text(
@@ -1535,7 +1764,9 @@ def marcar_parada_entregue(
     tenant_id = _activate_delivery_actor_tenant(actor)
 
     # Validar rota
-    rota = db.query(RotaEntrega).filter(*_rota_filters_for_actor(actor, rota_id)).first()
+    rota = (
+        db.query(RotaEntrega).filter(*_rota_filters_for_actor(actor, rota_id)).first()
+    )
 
     if not rota:
         raise HTTPException(status_code=404, detail="Rota não encontrada")
@@ -1550,11 +1781,15 @@ def marcar_parada_entregue(
         raise HTTPException(status_code=400, detail=detail)
 
     # Validar parada
-    parada = db.query(RotaEntregaParada).filter(
-        RotaEntregaParada.id == parada_id,
-        RotaEntregaParada.rota_id == rota.id,
-        RotaEntregaParada.tenant_id == tenant_id
-    ).first()
+    parada = (
+        db.query(RotaEntregaParada)
+        .filter(
+            RotaEntregaParada.id == parada_id,
+            RotaEntregaParada.rota_id == rota.id,
+            RotaEntregaParada.tenant_id == tenant_id,
+        )
+        .first()
+    )
 
     if not parada:
         raise HTTPException(status_code=404, detail="Parada não encontrada")
@@ -1601,7 +1836,9 @@ def marcar_parada_entregue(
                         "tenant": tenant_id,
                     },
                 )
-                logger.info(f"GPS da entrega {parada_id}: lat={lat_entrega}, lon={lon_entrega}")
+                logger.info(
+                    f"GPS da entrega {parada_id}: lat={lat_entrega}, lon={lon_entrega}"
+                )
             except Exception as e:
                 logger.warning(f"Não foi possível salvar GPS da entrega: {e}")
 
@@ -1618,7 +1855,9 @@ def marcar_parada_entregue(
                 )
                 notificou = False
             else:
-                notificou = notificar_proximo_cliente(db, rota.id, parada.ordem, tenant_id)
+                notificou = notificar_proximo_cliente(
+                    db, rota.id, parada.ordem, tenant_id
+                )
             if notificou:
                 mensagem += " Próximo cliente foi notificado."
         except Exception as e:
@@ -1643,7 +1882,7 @@ def adicionar_observacao_parada(
     parada_id: int,
     observacao: str,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Adiciona ou atualiza observação sobre uma parada/entrega.
@@ -1652,11 +1891,15 @@ def adicionar_observacao_parada(
     user, tenant_id = user_and_tenant
 
     # Validar parada
-    parada = db.query(RotaEntregaParada).filter(
-        RotaEntregaParada.id == parada_id,
-        RotaEntregaParada.rota_id == rota_id,
-        RotaEntregaParada.tenant_id == tenant_id
-    ).first()
+    parada = (
+        db.query(RotaEntregaParada)
+        .filter(
+            RotaEntregaParada.id == parada_id,
+            RotaEntregaParada.rota_id == rota_id,
+            RotaEntregaParada.tenant_id == tenant_id,
+        )
+        .first()
+    )
 
     if not parada:
         raise HTTPException(status_code=404, detail="Parada não encontrada")
@@ -1682,17 +1925,23 @@ def marcar_parada_nao_entregue(
     tenant_id = _activate_delivery_actor_tenant(actor)
 
     # Validar rota
-    rota = db.query(RotaEntrega).filter(*_rota_filters_for_actor(actor, rota_id)).first()
+    rota = (
+        db.query(RotaEntrega).filter(*_rota_filters_for_actor(actor, rota_id)).first()
+    )
 
     if not rota:
         raise HTTPException(status_code=404, detail="Rota não encontrada")
 
     # Validar parada
-    parada = db.query(RotaEntregaParada).filter(
-        RotaEntregaParada.id == parada_id,
-        RotaEntregaParada.rota_id == rota.id,
-        RotaEntregaParada.tenant_id == tenant_id
-    ).first()
+    parada = (
+        db.query(RotaEntregaParada)
+        .filter(
+            RotaEntregaParada.id == parada_id,
+            RotaEntregaParada.rota_id == rota.id,
+            RotaEntregaParada.tenant_id == tenant_id,
+        )
+        .first()
+    )
 
     if not parada:
         raise HTTPException(status_code=404, detail="Parada não encontrada")
@@ -1701,13 +1950,19 @@ def marcar_parada_nao_entregue(
     if motivo:
         obs_existente = parada.observacoes or ""
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M")
-        parada.observacoes = f"{obs_existente}\n[{timestamp}] Não entregue: {motivo}".strip()
+        parada.observacoes = (
+            f"{obs_existente}\n[{timestamp}] Não entregue: {motivo}".strip()
+        )
 
     # Reverter venda para status pendente (para aparecer na lista de entregas em aberto)
-    venda = db.query(Venda).filter(
-        Venda.id == parada.venda_id,
-        Venda.tenant_id == tenant_id,
-    ).first()
+    venda = (
+        db.query(Venda)
+        .filter(
+            Venda.id == parada.venda_id,
+            Venda.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if venda:
         venda.status_entrega = "pendente"
 
@@ -1715,17 +1970,23 @@ def marcar_parada_nao_entregue(
     venda_id = parada.venda_id
     db.delete(parada)
     db.flush()
-    paradas_restantes = db.query(RotaEntregaParada).filter(
-        RotaEntregaParada.rota_id == rota.id,
-        RotaEntregaParada.tenant_id == tenant_id,
-    ).count()
+    paradas_restantes = (
+        db.query(RotaEntregaParada)
+        .filter(
+            RotaEntregaParada.rota_id == rota.id,
+            RotaEntregaParada.tenant_id == tenant_id,
+        )
+        .count()
+    )
     rota_removida = paradas_restantes == 0
     if rota_removida:
         db.delete(rota)
 
     db.commit()
 
-    logger.info(f"Parada {parada_id} marcada como não entregue. Venda {venda_id} voltou para entregas em aberto.")
+    logger.info(
+        f"Parada {parada_id} marcada como não entregue. Venda {venda_id} voltou para entregas em aberto."
+    )
 
     return {
         "message": "Entrega marcada como não realizada. Venda voltou para entregas em aberto.",
@@ -1739,7 +2000,7 @@ def marcar_parada_nao_entregue(
 def excluir_rota(
     rota_id: int,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Exclui uma rota e reverte as vendas para status 'aberto' (voltam para listagem de entregas pendentes).
@@ -1752,10 +2013,11 @@ def excluir_rota(
     user, tenant_id = user_and_tenant
 
     # Buscar rota
-    rota = db.query(RotaEntrega).filter(
-        RotaEntrega.id == rota_id,
-        RotaEntrega.tenant_id == tenant_id
-    ).first()
+    rota = (
+        db.query(RotaEntrega)
+        .filter(RotaEntrega.id == rota_id, RotaEntrega.tenant_id == tenant_id)
+        .first()
+    )
 
     if not rota:
         raise HTTPException(status_code=404, detail="Rota não encontrada")
@@ -1764,23 +2026,31 @@ def excluir_rota(
     if rota.status in ["concluida", "cancelada"]:
         raise HTTPException(
             status_code=400,
-            detail=f"Não é possível excluir rota com status '{rota.status}'"
+            detail=f"Não é possível excluir rota com status '{rota.status}'",
         )
 
     # Buscar todas as paradas da rota
-    paradas = db.query(RotaEntregaParada).filter(
-        RotaEntregaParada.rota_id == rota_id,
-        RotaEntregaParada.tenant_id == tenant_id
-    ).all()
+    paradas = (
+        db.query(RotaEntregaParada)
+        .filter(
+            RotaEntregaParada.rota_id == rota_id,
+            RotaEntregaParada.tenant_id == tenant_id,
+        )
+        .all()
+    )
 
     # Reverter status das vendas para "pendente" (voltam para Entregas em Aberto)
     vendas_liberadas = []
     for parada in paradas:
         if parada.venda_id:
-            venda = db.query(Venda).filter(
-                Venda.id == parada.venda_id,
-                Venda.tenant_id == tenant_id,
-            ).first()
+            venda = (
+                db.query(Venda)
+                .filter(
+                    Venda.id == parada.venda_id,
+                    Venda.tenant_id == tenant_id,
+                )
+                .first()
+            )
             if venda:
                 venda.status_entrega = "pendente"
                 vendas_liberadas.append(venda.id)
@@ -1793,15 +2063,19 @@ def excluir_rota(
     db.delete(rota)
     db.commit()
 
-    logger.info(f"Rota #{rota_id} excluída. {len(vendas_liberadas)} vendas voltaram para listagem de entregas pendentes.")
+    logger.info(
+        f"Rota #{rota_id} excluída. {len(vendas_liberadas)} vendas voltaram para listagem de entregas pendentes."
+    )
 
     return {
         "message": "Rota excluída com sucesso",
         "vendas_liberadas": vendas_liberadas,
-        "total_vendas": len(vendas_liberadas)
+        "total_vendas": len(vendas_liberadas),
     }
 
+
 # ─── CENÁRIO 4: Rastreio público (sem autenticação) ───────────────────────────
+
 
 @router.get("/rastreio/{token}")
 def rastreio_publico(
@@ -1828,15 +2102,34 @@ def rastreio_publico(
     ).fetchone()
 
     if not rota_row:
-        raise HTTPException(status_code=404, detail="Rastreio não encontrado ou link inválido")
+        raise HTTPException(
+            status_code=404, detail="Rastreio não encontrado ou link inválido"
+        )
 
-    rota_id, rota_numero, rota_status, entregador_id, lat_atual, lon_atual, localizacao_atualizada_em, distancia_total_real, distancia_retorno_real = rota_row
-    entregador = db.query(Cliente).filter(Cliente.id == entregador_id).first() if entregador_id else None
+    (
+        rota_id,
+        rota_numero,
+        rota_status,
+        entregador_id,
+        lat_atual,
+        lon_atual,
+        localizacao_atualizada_em,
+        distancia_total_real,
+        distancia_retorno_real,
+    ) = rota_row
+    entregador = (
+        db.query(Cliente).filter(Cliente.id == entregador_id).first()
+        if entregador_id
+        else None
+    )
 
     # Buscar paradas com última posição GPS conhecida
-    paradas = db.query(RotaEntregaParada).filter(
-        RotaEntregaParada.rota_id == rota_id
-    ).order_by(RotaEntregaParada.ordem).all()
+    paradas = (
+        db.query(RotaEntregaParada)
+        .filter(RotaEntregaParada.rota_id == rota_id)
+        .order_by(RotaEntregaParada.ordem)
+        .all()
+    )
 
     dist_paradas = db.execute(
         text(
@@ -1857,7 +2150,9 @@ def rastreio_publico(
         ultima_posicao = {
             "lat": float(lat_atual),
             "lon": float(lon_atual),
-            "atualizada_em": localizacao_atualizada_em.isoformat() if localizacao_atualizada_em else None,
+            "atualizada_em": localizacao_atualizada_em.isoformat()
+            if localizacao_atualizada_em
+            else None,
             "fonte": "rota_atual",
         }
     else:
@@ -1866,8 +2161,10 @@ def rastreio_publico(
             lon = None
             try:
                 result = db.execute(
-                    text("SELECT lat_entrega, lon_entrega FROM rotas_entrega_paradas WHERE id = :pid"),
-                    {"pid": p.id}
+                    text(
+                        "SELECT lat_entrega, lon_entrega FROM rotas_entrega_paradas WHERE id = :pid"
+                    ),
+                    {"pid": p.id},
                 ).fetchone()
                 if result:
                     lat, lon = result
@@ -1877,7 +2174,9 @@ def rastreio_publico(
                 ultima_posicao = {
                     "lat": float(lat),
                     "lon": float(lon),
-                    "atualizada_em": p.data_entrega.isoformat() if p.data_entrega else None,
+                    "atualizada_em": p.data_entrega.isoformat()
+                    if p.data_entrega
+                    else None,
                     "fonte": "ultima_parada",
                 }
                 break
@@ -1892,10 +2191,16 @@ def rastreio_publico(
         "total_paradas": total,
         "entregues": entregues,
         "pendentes": total - entregues,
-        "distancia_total_km_real": float(distancia_total_real) if distancia_total_real is not None else None,
-        "distancia_retorno_km_real": float(distancia_retorno_real) if distancia_retorno_real is not None else None,
+        "distancia_total_km_real": float(distancia_total_real)
+        if distancia_total_real is not None
+        else None,
+        "distancia_retorno_km_real": float(distancia_retorno_real)
+        if distancia_retorno_real is not None
+        else None,
         "distancia_ate_ultima_entrega_km_real": (
-            max(float(distancia_total_real or 0) - float(distancia_retorno_real or 0), 0)
+            max(
+                float(distancia_total_real or 0) - float(distancia_retorno_real or 0), 0
+            )
             if distancia_total_real is not None
             else None
         ),
@@ -1907,10 +2212,14 @@ def rastreio_publico(
                 "status": p.status,
                 "data_entrega": p.data_entrega.isoformat() if p.data_entrega else None,
                 "distancia_trecho_real_km": (
-                    float(dist_por_parada[p.id][1]) if p.id in dist_por_parada and dist_por_parada[p.id][1] is not None else None
+                    float(dist_por_parada[p.id][1])
+                    if p.id in dist_por_parada and dist_por_parada[p.id][1] is not None
+                    else None
                 ),
                 "distancia_acumulada_real_km": (
-                    float(dist_por_parada[p.id][2]) if p.id in dist_por_parada and dist_por_parada[p.id][2] is not None else None
+                    float(dist_por_parada[p.id][2])
+                    if p.id in dist_por_parada and dist_por_parada[p.id][2] is not None
+                    else None
                 ),
             }
             for p in paradas

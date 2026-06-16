@@ -1,5 +1,5 @@
 # ⚠️  ROTAS DESATIVADAS — MÉTRICAS INTERNAS APENAS
-# 
+#
 # As rotas de métricas de oportunidades foram desativadas e não estão expostas
 # publicamente via API. O serviço de métricas (opportunity_metrics_service.py)
 # permanece disponível para uso interno e por processos em background.
@@ -24,7 +24,7 @@
 # from fastapi import APIRouter, Depends, HTTPException, status
 # from sqlalchemy.orm import Session
 # from typing import Dict, List, Any
-# 
+#
 # from app.database import get_db
 # from app.services.opportunity_metrics_service import (
 #     count_events_by_type,
@@ -36,14 +36,14 @@
 # )
 # from app.auth import get_current_user
 # from app.models import User
-# 
+#
 # router = APIRouter(
 #     prefix="/api/opportunities/metrics",
 #     tags=["opportunity-metrics"],
 #     dependencies=[Depends(get_current_user)],
 # )
-# 
-# 
+#
+#
 # @router.get("/events/by-type")
 # async def get_events_by_type(
 #     db: Session = Depends(get_db),
@@ -51,12 +51,12 @@
 # ) -> Dict[str, int]:
 #     """
 #     Retorna contagem de eventos por tipo.
-#     
+#
 #     **Tipos de evento:**
 #     - `convertida`: Operador adicionou oportunidade ao pedido
 #     - `refinada`: Operador clicou "Alternativa" (alternativa sugerida)
 #     - `rejeitada`: Operador clicou "Ignorar"
-#     
+#
 #     **Exemplo de resposta:**
 #     ```json
 #     {
@@ -65,7 +65,7 @@
 #         "rejeitada": 234
 #     }
 #     ```
-#     
+#
 #     **Isolamento:** Filtrado automaticamente por tenant_id do usuário
 #     """
 #     try:
@@ -76,8 +76,8 @@
 #             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
 #             detail=f"Erro ao buscar eventos por tipo: {str(e)}",
 #         )
-# 
-# 
+#
+#
 # @router.get("/conversion-rate")
 # async def get_conversion_rate(
 #     db: Session = Depends(get_db),
@@ -85,11 +85,11 @@
 # ) -> Dict[str, float]:
 #     """
 #     Retorna taxa de conversão geral e por tipo.
-#     
+#
 #     **Cálculo:**
 #     - Taxa geral = (eventos "convertida") / (total de eventos) * 100
 #     - Mostra também taxa de "refinada" (alternativa sugerida)
-#     
+#
 #     **Exemplo de resposta:**
 #     ```json
 #     {
@@ -100,7 +100,7 @@
 #         "total_events": 479
 #     }
 #     ```
-#     
+#
 #     **Uso:** Monitorar efetividade do sistema de recomendações
 #     """
 #     try:
@@ -111,8 +111,8 @@
 #             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
 #             detail=f"Erro ao calcular taxa de conversão: {str(e)}",
 #         )
-# 
-# 
+#
+#
 # @router.get("/top-products/converted")
 # async def get_top_converted_products(
 #     limit: int = 10,
@@ -121,10 +121,10 @@
 # ) -> List[Dict[str, Any]]:
 #     """
 #     Retorna top N produtos mais frequentemente aceitos em oportunidades.
-#     
+#
 #     **Parâmetros:**
 #     - `limit`: Número máximo de produtos (default: 10)
-#     
+#
 #     **Exemplo de resposta:**
 #     ```json
 #     [
@@ -142,7 +142,7 @@
 #         }
 #     ]
 #     ```
-#     
+#
 #     **Uso:** Identificar quais produtos geram mais interesse/confiança dos clientes
 #     """
 #     if limit < 1 or limit > 100:
@@ -150,7 +150,7 @@
 #             status_code=status.HTTP_400_BAD_REQUEST,
 #             detail="Limit deve estar entre 1 e 100",
 #         )
-#     
+#
 #     try:
 #         products = top_products_converted(db, current_user.tenant_id, limit)
 #         return products
@@ -159,8 +159,8 @@
 #             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
 #             detail=f"Erro ao buscar produtos convertidos: {str(e)}",
 #         )
-# 
-# 
+#
+#
 # @router.get("/top-products/ignored")
 # async def get_top_ignored_products(
 #     limit: int = 10,
@@ -169,10 +169,10 @@
 # ) -> List[Dict[str, Any]]:
 #     """
 #     Retorna top N produtos mais frequentemente rejeitados/ignorados.
-#     
+#
 #     **Parâmetros:**
 #     - `limit`: Número máximo de produtos (default: 10)
-#     
+#
 #     **Exemplo de resposta:**
 #     ```json
 #     [
@@ -184,7 +184,7 @@
 #         }
 #     ]
 #     ```
-#     
+#
 #     **Uso:** Identificar produtos com baixa aceitação para revisão de algoritmo
 #     """
 #     if limit < 1 or limit > 100:
@@ -192,7 +192,7 @@
 #             status_code=status.HTTP_400_BAD_REQUEST,
 #             detail="Limit deve estar entre 1 e 100",
 #         )
-#     
+#
 #     try:
 #         products = top_products_ignored(db, current_user.tenant_id, limit)
 #         return products
@@ -201,8 +201,8 @@
 #             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
 #             detail=f"Erro ao buscar produtos ignorados: {str(e)}",
 #         )
-# 
-# 
+#
+#
 # @router.get("/operators/summary")
 # async def get_operators_summary(
 #     db: Session = Depends(get_db),
@@ -210,7 +210,7 @@
 # ) -> List[Dict[str, Any]]:
 #     """
 #     Retorna sumário de performance de cada operador (caixa/atendente).
-#     
+#
 #     **Exemplo de resposta:**
 #     ```json
 #     [
@@ -236,8 +236,8 @@
 #         }
 #     ]
 #     ```
-#     
-#     **Uso:** 
+#
+#     **Uso:**
 #     - Monitorar tendências individuais de cada operador
 #     - Identificar operadores com taxas altas/baixas para treinamento
 #     - Avaliar consistência da aceitação entre equipes
@@ -250,8 +250,8 @@
 #             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
 #             detail=f"Erro ao buscar sumário de operadores: {str(e)}",
 #         )
-# 
-# 
+#
+#
 # @router.get("/dashboard/summary")
 # async def get_dashboard_summary(
 #     db: Session = Depends(get_db),
@@ -259,7 +259,7 @@
 # ) -> Dict[str, Any]:
 #     """
 #     Retorna consolidação de todas as métricas para dashboard executivo.
-#     
+#
 #     **Exemplo de resposta:**
 #     ```json
 #     {
@@ -296,7 +296,7 @@
 #         ]
 #     }
 #     ```
-#     
+#
 #     **Uso:** Exibição em painel único com overview de toda a performance
 #     """
 #     try:

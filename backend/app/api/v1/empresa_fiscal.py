@@ -2,6 +2,7 @@
 API de Configurações Fiscais e Dados da Empresa
 Permite configurar tributação padrão e dados cadastrais da empresa
 """
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -20,6 +21,7 @@ router = APIRouter(prefix="/empresa", tags=["Empresa - Configuração"])
 
 class EmpresaDadosBasicosUpdate(BaseModel):
     """Schema para atualização dos dados básicos da empresa"""
+
     name: Optional[str] = None  # Nome Fantasia
     razao_social: Optional[str] = None
     cnpj: Optional[str] = None
@@ -40,6 +42,7 @@ class EmpresaDadosBasicosUpdate(BaseModel):
 
 class EmpresaConfigFiscalUpdate(BaseModel):
     """Schema para atualização da configuração fiscal"""
+
     regime_tributario: Optional[str] = None
     cnae_principal: Optional[str] = None
     cnae_descricao: Optional[str] = None
@@ -72,12 +75,12 @@ def obter_dados_basicos_empresa(
     Retorna os dados básicos cadastrais da empresa (tenant).
     """
     _, tenant_id = user_and_tenant
-    
+
     tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
-    
+
     if not tenant:
         raise HTTPException(status_code=404, detail="Empresa não encontrada")
-    
+
     return {
         "name": tenant.name,
         "razao_social": tenant.razao_social,
@@ -109,28 +112,28 @@ def atualizar_dados_basicos_empresa(
     Atualiza os dados básicos cadastrais da empresa.
     """
     _, tenant_id = user_and_tenant
-    
+
     tenant = db.query(Tenant).filter(Tenant.id == str(tenant_id)).first()
-    
+
     if not tenant:
         raise HTTPException(status_code=404, detail="Empresa não encontrada")
-    
+
     # Atualizar campos
     update_data = data.dict(exclude_unset=True)
     for key, value in update_data.items():
         if hasattr(tenant, key):
             setattr(tenant, key, value)
-    
+
     db.commit()
     db.refresh(tenant)
-    
+
     return {
         "message": "Dados da empresa atualizados com sucesso",
         "empresa": {
             "name": tenant.name,
             "razao_social": tenant.razao_social,
             "cnpj": tenant.cnpj,
-        }
+        },
     }
 
 
@@ -165,7 +168,7 @@ def obter_config_fiscal_empresa(
             cfop_venda_interna="5102",
             cfop_venda_interestadual="6102",
             cfop_compra="1102",
-            herdado_do_estado=True
+            herdado_do_estado=True,
         )
         db.add(config)
         db.commit()
@@ -214,13 +217,13 @@ def atualizar_config_fiscal_empresa(
     if not config:
         raise HTTPException(
             status_code=404,
-            detail="Configuração fiscal não encontrada. Execute GET primeiro para criar."
+            detail="Configuração fiscal não encontrada. Execute GET primeiro para criar.",
         )
 
     # Atualizar campos
     update_data = data.dict(exclude_unset=True)
     logger.info(f"🔍 Dados recebidos para atualização fiscal: {update_data}")
-    
+
     for key, value in update_data.items():
         if hasattr(config, key):
             logger.info(f"  ✅ Atualizando {key} = {value}")
@@ -230,13 +233,13 @@ def atualizar_config_fiscal_empresa(
 
     # Marcar que não é mais herdado do estado (foi personalizado)
     config.herdado_do_estado = False
-    
+
     logger.info(f"💾 CNAE Descrição antes do commit: {config.cnae_descricao}")
     logger.info(f"💾 CNAEs Secundários antes do commit: {config.cnaes_secundarios}")
 
     db.commit()
     db.refresh(config)
-    
+
     logger.info(f"✅ CNAE Descrição após commit: {config.cnae_descricao}")
     logger.info(f"✅ CNAEs Secundários após commit: {config.cnaes_secundarios}")
 
@@ -253,11 +256,13 @@ def atualizar_config_fiscal_empresa(
             "aliquota_simples_vigente": float(config.aliquota_simples_vigente or 0),
             "aliquota_simples_sugerida": float(config.aliquota_simples_sugerida or 0),
             "icms_aliquota_interna": float(config.icms_aliquota_interna or 0),
-            "icms_aliquota_interestadual": float(config.icms_aliquota_interestadual or 0),
+            "icms_aliquota_interestadual": float(
+                config.icms_aliquota_interestadual or 0
+            ),
             "aplica_difal": config.aplica_difal,
             "cfop_venda_interna": config.cfop_venda_interna,
             "cfop_venda_interestadual": config.cfop_venda_interestadual,
             "cfop_compra": config.cfop_compra,
             "herdado_do_estado": config.herdado_do_estado,
-        }
+        },
     }

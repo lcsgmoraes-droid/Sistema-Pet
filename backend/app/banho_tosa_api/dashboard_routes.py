@@ -34,54 +34,97 @@ def obter_dashboard(
     inicio = datetime.combine(data_ref, time.min)
     fim = datetime.combine(data_ref, time.max)
 
-    agendamentos_abertos = db.query(func.count(BanhoTosaAgendamento.id)).filter(
-        BanhoTosaAgendamento.tenant_id == tenant_id,
-        BanhoTosaAgendamento.data_hora_inicio >= inicio,
-        BanhoTosaAgendamento.data_hora_inicio <= fim,
-        BanhoTosaAgendamento.status.notin_(["entregue", "cancelado", "no_show"]),
-    ).scalar() or 0
+    agendamentos_abertos = (
+        db.query(func.count(BanhoTosaAgendamento.id))
+        .filter(
+            BanhoTosaAgendamento.tenant_id == tenant_id,
+            BanhoTosaAgendamento.data_hora_inicio >= inicio,
+            BanhoTosaAgendamento.data_hora_inicio <= fim,
+            BanhoTosaAgendamento.status.notin_(["entregue", "cancelado", "no_show"]),
+        )
+        .scalar()
+        or 0
+    )
 
-    atendimentos_em_execucao = db.query(func.count(BanhoTosaAtendimento.id)).filter(
-        BanhoTosaAtendimento.tenant_id == tenant_id,
-        BanhoTosaAtendimento.status.notin_(list(STATUS_ATENDIMENTO_FINAIS | {"pronto"})),
-    ).scalar() or 0
+    atendimentos_em_execucao = (
+        db.query(func.count(BanhoTosaAtendimento.id))
+        .filter(
+            BanhoTosaAtendimento.tenant_id == tenant_id,
+            BanhoTosaAtendimento.status.notin_(
+                list(STATUS_ATENDIMENTO_FINAIS | {"pronto"})
+            ),
+        )
+        .scalar()
+        or 0
+    )
 
-    atendimentos_prontos = db.query(func.count(BanhoTosaAtendimento.id)).filter(
-        BanhoTosaAtendimento.tenant_id == tenant_id,
-        BanhoTosaAtendimento.status == "pronto",
-    ).scalar() or 0
+    atendimentos_prontos = (
+        db.query(func.count(BanhoTosaAtendimento.id))
+        .filter(
+            BanhoTosaAtendimento.tenant_id == tenant_id,
+            BanhoTosaAtendimento.status == "pronto",
+        )
+        .scalar()
+        or 0
+    )
 
-    atendimentos_prontos_sem_venda = db.query(func.count(BanhoTosaAtendimento.id)).filter(
-        BanhoTosaAtendimento.tenant_id == tenant_id,
-        BanhoTosaAtendimento.status == "pronto",
-        BanhoTosaAtendimento.venda_id.is_(None),
-        BanhoTosaAtendimento.pacote_credito_id.is_(None),
-    ).scalar() or 0
+    atendimentos_prontos_sem_venda = (
+        db.query(func.count(BanhoTosaAtendimento.id))
+        .filter(
+            BanhoTosaAtendimento.tenant_id == tenant_id,
+            BanhoTosaAtendimento.status == "pronto",
+            BanhoTosaAtendimento.venda_id.is_(None),
+            BanhoTosaAtendimento.pacote_credito_id.is_(None),
+        )
+        .scalar()
+        or 0
+    )
 
-    cobrancas_pendentes = db.query(func.count(BanhoTosaAtendimento.id)).join(
-        Venda,
-        BanhoTosaAtendimento.venda_id == Venda.id,
-    ).filter(
-        BanhoTosaAtendimento.tenant_id == tenant_id,
-        BanhoTosaAtendimento.status.in_(["pronto", "entregue"]),
-        Venda.status.in_(["aberta", "baixa_parcial"]),
-    ).scalar() or 0
+    cobrancas_pendentes = (
+        db.query(func.count(BanhoTosaAtendimento.id))
+        .join(
+            Venda,
+            BanhoTosaAtendimento.venda_id == Venda.id,
+        )
+        .filter(
+            BanhoTosaAtendimento.tenant_id == tenant_id,
+            BanhoTosaAtendimento.status.in_(["pronto", "entregue"]),
+            Venda.status.in_(["aberta", "baixa_parcial"]),
+        )
+        .scalar()
+        or 0
+    )
 
-    atendimentos_entregues = db.query(func.count(BanhoTosaAtendimento.id)).filter(
-        BanhoTosaAtendimento.tenant_id == tenant_id,
-        BanhoTosaAtendimento.entregue_em >= inicio,
-        BanhoTosaAtendimento.entregue_em <= fim,
-    ).scalar() or 0
+    atendimentos_entregues = (
+        db.query(func.count(BanhoTosaAtendimento.id))
+        .filter(
+            BanhoTosaAtendimento.tenant_id == tenant_id,
+            BanhoTosaAtendimento.entregue_em >= inicio,
+            BanhoTosaAtendimento.entregue_em <= fim,
+        )
+        .scalar()
+        or 0
+    )
 
-    servicos_ativos = db.query(func.count(BanhoTosaServico.id)).filter(
-        BanhoTosaServico.tenant_id == tenant_id,
-        BanhoTosaServico.ativo.is_(True),
-    ).scalar() or 0
+    servicos_ativos = (
+        db.query(func.count(BanhoTosaServico.id))
+        .filter(
+            BanhoTosaServico.tenant_id == tenant_id,
+            BanhoTosaServico.ativo.is_(True),
+        )
+        .scalar()
+        or 0
+    )
 
-    recursos_ativos = db.query(func.count(BanhoTosaRecurso.id)).filter(
-        BanhoTosaRecurso.tenant_id == tenant_id,
-        BanhoTosaRecurso.ativo.is_(True),
-    ).scalar() or 0
+    recursos_ativos = (
+        db.query(func.count(BanhoTosaRecurso.id))
+        .filter(
+            BanhoTosaRecurso.tenant_id == tenant_id,
+            BanhoTosaRecurso.ativo.is_(True),
+        )
+        .scalar()
+        or 0
+    )
     nps = calcular_nps_periodo(db, tenant_id, inicio, fim)
 
     return {

@@ -1,6 +1,7 @@
 """
 Endpoints de Acerto Financeiro de Entregas
 """
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from datetime import date
@@ -9,7 +10,7 @@ from app.auth import get_current_user_and_tenant
 from app.services.acerto_entrega_service import (
     executar_acerto_entregador,
     processar_acertos_do_dia,
-    ajustar_media_entregas_mensal
+    ajustar_media_entregas_mensal,
 )
 from app.models import Cliente
 
@@ -19,22 +20,22 @@ router = APIRouter(prefix="/acertos-entrega", tags=["Acertos de Entrega"])
 @router.post("/processar-dia")
 def processar_acertos_dia(
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Processa todos os acertos que vencem hoje.
-    
+
     Pode ser executado manualmente ou pelo job diário.
     Não duplica processamento.
     """
     user, tenant = user_and_tenant
-    
+
     resultados = processar_acertos_do_dia(db, tenant.id)
-    
+
     return {
         "data_processamento": date.today().isoformat(),
         "total_processados": len(resultados),
-        "acertos": resultados
+        "acertos": resultados,
     }
 
 
@@ -42,81 +43,92 @@ def processar_acertos_dia(
 def executar_acerto_manual(
     entregador_id: int,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Executa acerto de um entregador específico manualmente.
-    
+
     Ignora verificação de vencimento (forçado).
     """
     user, tenant = user_and_tenant
-    
-    entregador = db.query(Cliente).filter(
-        Cliente.id == entregador_id,
-        Cliente.tenant_id == tenant.id,
-        Cliente.is_entregador.is_(True)
-    ).first()
-    
+
+    entregador = (
+        db.query(Cliente)
+        .filter(
+            Cliente.id == entregador_id,
+            Cliente.tenant_id == tenant.id,
+            Cliente.is_entregador.is_(True),
+        )
+        .first()
+    )
+
     if not entregador:
         raise HTTPException(status_code=404, detail="Entregador não encontrado")
-    
+
     if not entregador.tipo_acerto_entrega:
         raise HTTPException(
-            status_code=400,
-            detail="Entregador não possui tipo de acerto configurado"
+            status_code=400, detail="Entregador não possui tipo de acerto configurado"
         )
-    
+
     # Força execução (ignora data de vencimento)
     resultado = executar_acerto_entregador(db, entregador)
-    
+
     if not resultado:
         return {
             "mensagem": "Nenhuma rota pendente de acerto",
-            "entregador": entregador.nome
+            "entregador": entregador.nome,
         }
-    
+
     return resultado
 
 
 @router.get("/pendentes")
 def listar_acertos_pendentes(
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Lista entregadores com acerto vencendo hoje.
     """
     user, tenant = user_and_tenant
     hoje = date.today()
-    
+
     from app.services.acerto_entrega_service import acerto_vence_hoje
     from sqlalchemy import and_
-    
-    entregadores = db.query(Cliente).filter(
-        and_(
-            Cliente.tenant_id == tenant.id,
-            Cliente.is_entregador.is_(True),
-            Cliente.entregador_ativo.is_(True),
-            Cliente.tipo_acerto_entrega.isnot(None)
+
+    entregadores = (
+        db.query(Cliente)
+        .filter(
+            and_(
+                Cliente.tenant_id == tenant.id,
+                Cliente.is_entregador.is_(True),
+                Cliente.entregador_ativo.is_(True),
+                Cliente.tipo_acerto_entrega.isnot(None),
+            )
         )
-    ).all()
-    
+        .all()
+    )
+
     pendentes = []
-    
+
     for entregador in entregadores:
         if acerto_vence_hoje(entregador, hoje):
-            pendentes.append({
-                "id": entregador.id,
-                "nome": entregador.nome,
-                "tipo_cadastro": entregador.tipo_cadastro,
-                "tipo_acerto": entregador.tipo_acerto_entrega,
-                "ultimo_acerto": entregador.data_ultimo_acerto.isoformat() if entregador.data_ultimo_acerto else None
-            })
-    
+            pendentes.append(
+                {
+                    "id": entregador.id,
+                    "nome": entregador.nome,
+                    "tipo_cadastro": entregador.tipo_cadastro,
+                    "tipo_acerto": entregador.tipo_acerto_entrega,
+                    "ultimo_acerto": entregador.data_ultimo_acerto.isoformat()
+                    if entregador.data_ultimo_acerto
+                    else None,
+                }
+            )
+
     return {
         "data": hoje.isoformat(),
         "total": len(pendentes),
-        "entregadores": pendentes
+        "entregadores": pendentes,
     }
 
 
@@ -124,30 +136,39 @@ def listar_acertos_pendentes(
 def historico_acerto(
     entregador_id: int,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Mostra histórico de acertos de um entregador.
     """
     user, tenant = user_and_tenant
-    
-    entregador = db.query(Cliente).filter(
-        Cliente.id == entregador_id,
-        Cliente.tenant_id == tenant.id,
-        Cliente.is_entregador.is_(True)
-    ).first()
-    
+
+    entregador = (
+        db.query(Cliente)
+        .filter(
+            Cliente.id == entregador_id,
+            Cliente.tenant_id == tenant.id,
+            Cliente.is_entregador.is_(True),
+        )
+        .first()
+    )
+
     if not entregador:
         raise HTTPException(status_code=404, detail="Entregador não encontrado")
-    
+
     from app.models import ContasPagar
-    
-    contas = db.query(ContasPagar).filter(
-        ContasPagar.tenant_id == tenant.id,
-        ContasPagar.fornecedor_id == entregador_id,
-        ContasPagar.tipo_documento == "ACERTO_ENTREGA"
-    ).order_by(ContasPagar.data_emissao.desc()).all()
-    
+
+    contas = (
+        db.query(ContasPagar)
+        .filter(
+            ContasPagar.tenant_id == tenant.id,
+            ContasPagar.fornecedor_id == entregador_id,
+            ContasPagar.tipo_documento == "ACERTO_ENTREGA",
+        )
+        .order_by(ContasPagar.data_emissao.desc())
+        .all()
+    )
+
     return {
         "entregador": {
             "id": entregador.id,
@@ -156,7 +177,9 @@ def historico_acerto(
             "controla_rh": entregador.controla_rh,
             "gera_cp_custo": entregador.gera_conta_pagar_custo_entrega,
             "tipo_acerto": entregador.tipo_acerto_entrega,
-            "ultimo_acerto": entregador.data_ultimo_acerto.isoformat() if entregador.data_ultimo_acerto else None
+            "ultimo_acerto": entregador.data_ultimo_acerto.isoformat()
+            if entregador.data_ultimo_acerto
+            else None,
         },
         "contas_pagar": [
             {
@@ -165,10 +188,10 @@ def historico_acerto(
                 "descricao": cp.descricao,
                 "data_emissao": cp.data_emissao.isoformat(),
                 "data_vencimento": cp.data_vencimento.isoformat(),
-                "status": cp.status
+                "status": cp.status,
             }
             for cp in contas
-        ]
+        ],
     }
 
 
@@ -177,28 +200,28 @@ def ajustar_media_entregas(
     mes: int = Query(..., ge=1, le=12, description="Mês a analisar (1-12)"),
     ano: int = Query(..., ge=2020, le=2100, description="Ano a analisar"),
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant),
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Ajusta a média de entregas configurada para entregadores funcionários com controla_rh.
-    
+
     Baseado nas entregas realmente realizadas no mês especificado.
     Se a diferença for maior que 20%, atualiza automaticamente a média configurada.
-    
+
     Args:
         mes: Mês a analisar (1-12)
         ano: Ano a analisar
     """
     user, tenant = user_and_tenant
-    
+
     resultados = ajustar_media_entregas_mensal(db, tenant.id, mes, ano)
-    
+
     total_ajustados = sum(1 for r in resultados if r["ajustado"])
-    
+
     return {
         "mes": mes,
         "ano": ano,
         "total_analisados": len(resultados),
         "total_ajustados": total_ajustados,
-        "detalhes": resultados
+        "detalhes": resultados,
     }

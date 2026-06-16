@@ -35,11 +35,19 @@ router = APIRouter()
 
 @router.post("/custos/simular", response_model=BanhoTosaCustoSnapshotResponse)
 def simular_custo(body: BanhoTosaCustoSimulacaoInput):
-    custo_insumos = calcular_custo_insumos([InsumoCusto(**item.model_dump()) for item in body.insumos])
+    custo_insumos = calcular_custo_insumos(
+        [InsumoCusto(**item.model_dump()) for item in body.insumos]
+    )
     custo_agua = calcular_custo_agua(**body.agua.model_dump())
-    custo_energia = calcular_custo_energia([EquipamentoUso(**item.model_dump()) for item in body.energia])
-    custo_mao_obra = calcular_custo_mao_obra([MaoObraEtapa(**item.model_dump()) for item in body.mao_obra])
-    custo_comissao = calcular_custo_comissao(ComissaoRegra(**body.comissao.model_dump()))
+    custo_energia = calcular_custo_energia(
+        [EquipamentoUso(**item.model_dump()) for item in body.energia]
+    )
+    custo_mao_obra = calcular_custo_mao_obra(
+        [MaoObraEtapa(**item.model_dump()) for item in body.mao_obra]
+    )
+    custo_comissao = calcular_custo_comissao(
+        ComissaoRegra(**body.comissao.model_dump())
+    )
     custo_taxi_dog = calcular_custo_taxi_dog(TaxiDogCusto(**body.taxi_dog.model_dump()))
 
     return calcular_snapshot_custo(
@@ -55,7 +63,10 @@ def simular_custo(body: BanhoTosaCustoSimulacaoInput):
     ).as_dict()
 
 
-@router.get("/custos/atendimentos/{atendimento_id}", response_model=BanhoTosaCustoAtendimentoResponse)
+@router.get(
+    "/custos/atendimentos/{atendimento_id}",
+    response_model=BanhoTosaCustoAtendimentoResponse,
+)
 def obter_custo_atendimento(
     atendimento_id: int,
     db: Session = Depends(get_session),
@@ -68,7 +79,10 @@ def obter_custo_atendimento(
     return snapshot
 
 
-@router.post("/custos/atendimentos/{atendimento_id}/recalcular", response_model=BanhoTosaCustoAtendimentoResponse)
+@router.post(
+    "/custos/atendimentos/{atendimento_id}/recalcular",
+    response_model=BanhoTosaCustoAtendimentoResponse,
+)
 def recalcular_custo_atendimento(
     atendimento_id: int,
     db: Session = Depends(get_session),

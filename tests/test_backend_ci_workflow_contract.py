@@ -657,6 +657,13 @@ def test_backend_ci_has_blocking_backend_domain_campaigns_vendas_format_step():
     assert "ruff format --check app/domain app/campaigns app/vendas" in source
 
 
+def test_backend_ci_has_blocking_backend_api_banho_tosa_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend api banho tosa format (blocking)" in source
+    assert "ruff format --check app/api app/banho_tosa_api" in source
+
+
 def test_backend_ci_has_blocking_alembic_env_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

@@ -35,11 +35,17 @@ def listar_recorrencias(
     query = query_recorrencias(db, tenant_id)
     if ativos_only:
         query = query.filter(BanhoTosaRecorrencia.ativo.is_(True))
-    itens = query.order_by(BanhoTosaRecorrencia.proxima_execucao.asc()).limit(limit).all()
+    itens = (
+        query.order_by(BanhoTosaRecorrencia.proxima_execucao.asc()).limit(limit).all()
+    )
     return [serializar_recorrencia(item) for item in itens]
 
 
-@router.post("/pacotes/recorrencias", response_model=BanhoTosaRecorrenciaResponse, status_code=201)
+@router.post(
+    "/pacotes/recorrencias",
+    response_model=BanhoTosaRecorrenciaResponse,
+    status_code=201,
+)
 def criar_recorrencia(
     body: BanhoTosaRecorrenciaCreate,
     db: Session = Depends(get_session),
@@ -50,15 +56,24 @@ def criar_recorrencia(
     validar_servico(db, tenant_id, body.servico_id)
     if body.pacote_credito_id:
         obter_credito(db, tenant_id, body.pacote_credito_id)
-    recorrencia = BanhoTosaRecorrencia(tenant_id=tenant_id, **body.model_dump(), ativo=True)
+    recorrencia = BanhoTosaRecorrencia(
+        tenant_id=tenant_id, **body.model_dump(), ativo=True
+    )
     db.add(recorrencia)
     db.commit()
     db.refresh(recorrencia)
-    item = query_recorrencias(db, tenant_id).filter(BanhoTosaRecorrencia.id == recorrencia.id).first()
+    item = (
+        query_recorrencias(db, tenant_id)
+        .filter(BanhoTosaRecorrencia.id == recorrencia.id)
+        .first()
+    )
     return serializar_recorrencia(item)
 
 
-@router.patch("/pacotes/recorrencias/{recorrencia_id}", response_model=BanhoTosaRecorrenciaResponse)
+@router.patch(
+    "/pacotes/recorrencias/{recorrencia_id}",
+    response_model=BanhoTosaRecorrenciaResponse,
+)
 def atualizar_recorrencia(
     recorrencia_id: int,
     body: BanhoTosaRecorrenciaUpdate,
@@ -66,7 +81,11 @@ def atualizar_recorrencia(
     current=Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = _get_tenant(current)
-    recorrencia = query_recorrencias(db, tenant_id).filter(BanhoTosaRecorrencia.id == recorrencia_id).first()
+    recorrencia = (
+        query_recorrencias(db, tenant_id)
+        .filter(BanhoTosaRecorrencia.id == recorrencia_id)
+        .first()
+    )
     if not recorrencia:
         raise HTTPException(status_code=404, detail="Recorrencia nao encontrada.")
     payload = body.model_dump(exclude_unset=True)

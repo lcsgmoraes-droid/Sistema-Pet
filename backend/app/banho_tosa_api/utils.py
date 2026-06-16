@@ -30,7 +30,10 @@ STATUS_ATENDIMENTO_FINAIS = {"entregue", "cancelado", "no_show"}
 def obter_ou_criar_configuracao(db: Session, tenant_id) -> BanhoTosaConfiguracao:
     config = (
         db.query(BanhoTosaConfiguracao)
-        .filter(BanhoTosaConfiguracao.tenant_id == tenant_id, BanhoTosaConfiguracao.ativo.is_(True))
+        .filter(
+            BanhoTosaConfiguracao.tenant_id == tenant_id,
+            BanhoTosaConfiguracao.ativo.is_(True),
+        )
         .order_by(BanhoTosaConfiguracao.id.asc())
         .first()
     )
@@ -50,23 +53,35 @@ def obter_ou_criar_configuracao(db: Session, tenant_id) -> BanhoTosaConfiguracao
     return config
 
 
-def validar_cliente_pet(db: Session, tenant_id, cliente_id: int, pet_id: int) -> tuple[Cliente, Pet]:
-    cliente = db.query(Cliente).filter(
-        Cliente.id == cliente_id,
-        Cliente.tenant_id == tenant_id,
-        Cliente.ativo.is_(True),
-    ).first()
+def validar_cliente_pet(
+    db: Session, tenant_id, cliente_id: int, pet_id: int
+) -> tuple[Cliente, Pet]:
+    cliente = (
+        db.query(Cliente)
+        .filter(
+            Cliente.id == cliente_id,
+            Cliente.tenant_id == tenant_id,
+            Cliente.ativo.is_(True),
+        )
+        .first()
+    )
     if not cliente:
         raise HTTPException(status_code=404, detail="Tutor nao encontrado")
 
-    pet = db.query(Pet).filter(
-        Pet.id == pet_id,
-        Pet.tenant_id == tenant_id,
-        Pet.cliente_id == cliente_id,
-        Pet.ativo.is_(True),
-    ).first()
+    pet = (
+        db.query(Pet)
+        .filter(
+            Pet.id == pet_id,
+            Pet.tenant_id == tenant_id,
+            Pet.cliente_id == cliente_id,
+            Pet.ativo.is_(True),
+        )
+        .first()
+    )
     if not pet:
-        raise HTTPException(status_code=404, detail="Pet nao encontrado para esse tutor")
+        raise HTTPException(
+            status_code=404, detail="Pet nao encontrado para esse tutor"
+        )
 
     return cliente, pet
 
@@ -123,8 +138,10 @@ def serializar_agendamento(agendamento: BanhoTosaAgendamento) -> dict:
         "observacoes": agendamento.observacoes,
         "valor_previsto": agendamento.valor_previsto,
         "taxi_dog_id": agendamento.taxi_dog_id,
-        "restricoes_veterinarias_snapshot": agendamento.restricoes_veterinarias_snapshot or {},
-        "perfil_comportamental_snapshot": agendamento.perfil_comportamental_snapshot or {},
+        "restricoes_veterinarias_snapshot": agendamento.restricoes_veterinarias_snapshot
+        or {},
+        "perfil_comportamental_snapshot": agendamento.perfil_comportamental_snapshot
+        or {},
         "servicos": agendamento.servicos,
     }
 
@@ -149,7 +166,13 @@ def serializar_atendimento(
     venda_total = safe_decimal_to_float(venda.total) if venda else None
     status_pagamento = None
     if venda:
-        status_pagamento = "pago" if valor_pago >= (venda_total or 0) else "parcial" if valor_pago > 0 else "pendente"
+        status_pagamento = (
+            "pago"
+            if valor_pago >= (venda_total or 0)
+            else "parcial"
+            if valor_pago > 0
+            else "pendente"
+        )
     estado = estado_operacional_atendimento(atendimento, config)
 
     payload = {
@@ -173,10 +196,12 @@ def serializar_atendimento(
         "observacoes_saida": atendimento.observacoes_saida,
         "restricoes_veterinarias_snapshot": (
             agendamento.restricoes_veterinarias_snapshot if agendamento else {}
-        ) or {},
+        )
+        or {},
         "perfil_comportamental_snapshot": (
             agendamento.perfil_comportamental_snapshot if agendamento else {}
-        ) or {},
+        )
+        or {},
         "ocorrencias": atendimento.ocorrencias or [],
         "venda_id": atendimento.venda_id,
         "venda_numero": venda.numero_venda if venda else None,
@@ -188,7 +213,9 @@ def serializar_atendimento(
         "conta_receber_id": atendimento.conta_receber_id,
         "pacote_credito_id": atendimento.pacote_credito_id,
         "pacote_movimento_id": atendimento.pacote_movimento_id,
-        "pacote_nome": pacote_credito.pacote.nome if pacote_credito and pacote_credito.pacote else None,
+        "pacote_nome": pacote_credito.pacote.nome
+        if pacote_credito and pacote_credito.pacote
+        else None,
         "pacote_saldo_creditos": (
             calcular_saldo_creditos(
                 pacote_credito.creditos_total,
@@ -198,23 +225,36 @@ def serializar_atendimento(
             if pacote_credito
             else None
         ),
-        "fechamento_alertas": _alertas_fechamento_atendimento(atendimento, venda, status_pagamento),
-        "pdv_url": f"/pdv?venda_id={atendimento.venda_id}" if atendimento.venda_id else None,
+        "fechamento_alertas": _alertas_fechamento_atendimento(
+            atendimento, venda, status_pagamento
+        ),
+        "pdv_url": f"/pdv?venda_id={atendimento.venda_id}"
+        if atendimento.venda_id
+        else None,
         "etapas": [serializar_etapa(etapa) for etapa in etapas],
     }
     payload.update(estado)
     return payload
 
 
-def _alertas_fechamento_atendimento(atendimento, venda, status_pagamento: Optional[str]) -> list[str]:
+def _alertas_fechamento_atendimento(
+    atendimento, venda, status_pagamento: Optional[str]
+) -> list[str]:
     if atendimento.pacote_credito_id:
         return []
     if not venda:
-        return ["Atendimento pronto/entregue sem venda vinculada."] if atendimento.status in {"pronto", "entregue"} else []
+        return (
+            ["Atendimento pronto/entregue sem venda vinculada."]
+            if atendimento.status in {"pronto", "entregue"}
+            else []
+        )
     alertas = []
     if venda.status == "cancelada":
         alertas.append("Venda vinculada foi cancelada.")
-    if atendimento.status in {"pronto", "entregue"} and venda.status in {"aberta", "baixa_parcial"}:
+    if atendimento.status in {"pronto", "entregue"} and venda.status in {
+        "aberta",
+        "baixa_parcial",
+    }:
         alertas.append("Cobranca ainda nao finalizada no PDV.")
     if status_pagamento in {"pendente", "parcial"}:
         alertas.append("Pagamento ainda nao cobre o valor total.")
@@ -242,15 +282,23 @@ def validar_conflito_agenda(
         BanhoTosaAgendamento.tenant_id == tenant_id,
         BanhoTosaAgendamento.status.notin_(list(STATUS_AGENDAMENTO_FINAIS)),
         BanhoTosaAgendamento.data_hora_inicio < fim,
-        func.coalesce(BanhoTosaAgendamento.data_hora_fim_prevista, BanhoTosaAgendamento.data_hora_inicio) > inicio,
+        func.coalesce(
+            BanhoTosaAgendamento.data_hora_fim_prevista,
+            BanhoTosaAgendamento.data_hora_inicio,
+        )
+        > inicio,
     )
     if ignorar_agendamento_id:
         query = query.filter(BanhoTosaAgendamento.id != ignorar_agendamento_id)
 
     conflitos = [BanhoTosaAgendamento.pet_id == pet_id]
     if profissional_principal_id:
-        conflitos.append(BanhoTosaAgendamento.profissional_principal_id == profissional_principal_id)
+        conflitos.append(
+            BanhoTosaAgendamento.profissional_principal_id == profissional_principal_id
+        )
 
     conflito = query.filter(or_(*conflitos)).first()
     if conflito:
-        raise HTTPException(status_code=409, detail="Ja existe conflito de agenda para esse horario")
+        raise HTTPException(
+            status_code=409, detail="Ja existe conflito de agenda para esse horario"
+        )

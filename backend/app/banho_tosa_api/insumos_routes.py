@@ -41,7 +41,11 @@ def listar_insumos_atendimento(
 ):
     _, tenant_id = _get_tenant(current)
     obter_atendimento_ou_404(db, tenant_id, atendimento_id)
-    insumos = query_insumos(db, tenant_id, atendimento_id).order_by(BanhoTosaInsumoUsado.id.desc()).all()
+    insumos = (
+        query_insumos(db, tenant_id, atendimento_id)
+        .order_by(BanhoTosaInsumoUsado.id.desc())
+        .all()
+    )
     return [serializar_insumo(item) for item in insumos]
 
 
@@ -63,15 +67,21 @@ def registrar_insumo_atendimento(
 
     quantidade_total = dec(body.quantidade_usada) + dec(body.quantidade_desperdicio)
     if quantidade_total <= 0:
-        raise HTTPException(status_code=422, detail="Informe quantidade usada ou desperdicio.")
+        raise HTTPException(
+            status_code=422, detail="Informe quantidade usada ou desperdicio."
+        )
 
     custo_unitario = body.custo_unitario_snapshot
     if custo_unitario is None:
         custo_unitario = Decimal(str(produto.preco_custo or 0))
 
-    insumo = query_insumos(db, tenant_id, atendimento_id).filter(
-        BanhoTosaInsumoUsado.produto_id == produto.id,
-    ).first()
+    insumo = (
+        query_insumos(db, tenant_id, atendimento_id)
+        .filter(
+            BanhoTosaInsumoUsado.produto_id == produto.id,
+        )
+        .first()
+    )
     if insumo and insumo.movimentacao_estoque_id:
         raise HTTPException(
             status_code=422,
@@ -80,7 +90,9 @@ def registrar_insumo_atendimento(
 
     quantidade_para_baixa = quantidade_total
     if insumo:
-        quantidade_para_baixa += dec(insumo.quantidade_usada) + dec(insumo.quantidade_desperdicio)
+        quantidade_para_baixa += dec(insumo.quantidade_usada) + dec(
+            insumo.quantidade_desperdicio
+        )
 
     if not insumo:
         insumo = BanhoTosaInsumoUsado(
@@ -92,7 +104,9 @@ def registrar_insumo_atendimento(
         db.add(insumo)
 
     insumo.quantidade_usada = dec(insumo.quantidade_usada) + dec(body.quantidade_usada)
-    insumo.quantidade_desperdicio = dec(insumo.quantidade_desperdicio) + dec(body.quantidade_desperdicio)
+    insumo.quantidade_desperdicio = dec(insumo.quantidade_desperdicio) + dec(
+        body.quantidade_desperdicio
+    )
     insumo.custo_unitario_snapshot = custo_unitario
     insumo.responsavel_id = body.responsavel_id
 
@@ -151,7 +165,9 @@ def estornar_estoque_insumo(
     user, tenant_id = _get_tenant(current)
     insumo = obter_insumo_ou_404(db, tenant_id, atendimento_id, insumo_id)
     if not insumo.movimentacao_estoque_id:
-        raise HTTPException(status_code=422, detail="Insumo nao possui baixa de estoque.")
+        raise HTTPException(
+            status_code=422, detail="Insumo nao possui baixa de estoque."
+        )
     if insumo.movimentacao_estorno_id:
         raise HTTPException(status_code=422, detail="Baixa de estoque ja estornada.")
 
@@ -171,7 +187,10 @@ def remover_insumo_atendimento(
     _, tenant_id = _get_tenant(current)
     insumo = obter_insumo_ou_404(db, tenant_id, atendimento_id, insumo_id)
     if insumo.movimentacao_estoque_id and not insumo.movimentacao_estorno_id:
-        raise HTTPException(status_code=422, detail="Insumo com baixa de estoque nao pode ser removido sem estorno.")
+        raise HTTPException(
+            status_code=422,
+            detail="Insumo com baixa de estoque nao pode ser removido sem estorno.",
+        )
 
     db.delete(insumo)
     db.commit()

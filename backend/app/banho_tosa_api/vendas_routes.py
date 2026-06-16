@@ -21,7 +21,9 @@ from app.veterinario_core import _get_tenant
 router = APIRouter()
 
 
-@router.get("/fechamentos/pendencias", response_model=BanhoTosaFechamentoPendenciasResponse)
+@router.get(
+    "/fechamentos/pendencias", response_model=BanhoTosaFechamentoPendenciasResponse
+)
 def listar_pendencias_de_fechamento(
     limit: int = Query(200, ge=1, le=500),
     db: Session = Depends(get_session),

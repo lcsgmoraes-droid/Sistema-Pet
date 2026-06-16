@@ -13,7 +13,9 @@ from app.veterinario_core import _get_tenant
 router = APIRouter()
 
 
-@router.get("/relatorios/operacional", response_model=BanhoTosaRelatorioOperacionalResponse)
+@router.get(
+    "/relatorios/operacional", response_model=BanhoTosaRelatorioOperacionalResponse
+)
 def relatorio_operacional_banho_tosa(
     data_inicio: date | None = Query(None),
     data_fim: date | None = Query(None),

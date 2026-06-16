@@ -12,7 +12,10 @@ router = APIRouter(prefix="/configuracoes/custo-moto", tags=["Custos da Moto"])
 
 
 @router.get("", response_model=ConfiguracaoCustoMotoResponse)
-def get_config(db: Session = Depends(get_session), user_and_tenant=Depends(get_current_user_and_tenant)):
+def get_config(
+    db: Session = Depends(get_session),
+    user_and_tenant=Depends(get_current_user_and_tenant),
+):
     user, tenant_id = user_and_tenant
     config = (
         db.query(ConfiguracaoCustoMoto)

@@ -60,7 +60,9 @@ def registrar_ocorrencia_atendimento(
     return ocorrencia
 
 
-@router.delete("/atendimentos/{atendimento_id}/ocorrencias/{ocorrencia_id}", status_code=204)
+@router.delete(
+    "/atendimentos/{atendimento_id}/ocorrencias/{ocorrencia_id}", status_code=204
+)
 def remover_ocorrencia_atendimento(
     atendimento_id: int,
     ocorrencia_id: str,
@@ -78,7 +80,9 @@ def remover_ocorrencia_atendimento(
     return Response(status_code=204)
 
 
-@router.get("/atendimentos/{atendimento_id}/fotos", response_model=list[BanhoTosaFotoResponse])
+@router.get(
+    "/atendimentos/{atendimento_id}/fotos", response_model=list[BanhoTosaFotoResponse]
+)
 def listar_fotos_atendimento(
     atendimento_id: int,
     db: Session = Depends(get_session),
@@ -86,14 +90,23 @@ def listar_fotos_atendimento(
 ):
     _, tenant_id = _get_tenant(current)
     _obter_atendimento_ou_404(db, tenant_id, atendimento_id)
-    fotos = db.query(BanhoTosaFoto).filter(
-        BanhoTosaFoto.tenant_id == tenant_id,
-        BanhoTosaFoto.atendimento_id == atendimento_id,
-    ).order_by(BanhoTosaFoto.id.desc()).all()
+    fotos = (
+        db.query(BanhoTosaFoto)
+        .filter(
+            BanhoTosaFoto.tenant_id == tenant_id,
+            BanhoTosaFoto.atendimento_id == atendimento_id,
+        )
+        .order_by(BanhoTosaFoto.id.desc())
+        .all()
+    )
     return [_serializar_foto(foto) for foto in fotos]
 
 
-@router.post("/atendimentos/{atendimento_id}/fotos", response_model=BanhoTosaFotoResponse, status_code=201)
+@router.post(
+    "/atendimentos/{atendimento_id}/fotos",
+    response_model=BanhoTosaFotoResponse,
+    status_code=201,
+)
 def registrar_foto_atendimento(
     atendimento_id: int,
     body: BanhoTosaFotoCreate,
@@ -116,7 +129,11 @@ def registrar_foto_atendimento(
     return _serializar_foto(foto)
 
 
-@router.post("/atendimentos/{atendimento_id}/fotos/upload", response_model=BanhoTosaFotoResponse, status_code=201)
+@router.post(
+    "/atendimentos/{atendimento_id}/fotos/upload",
+    response_model=BanhoTosaFotoResponse,
+    status_code=201,
+)
 async def upload_foto_atendimento(
     atendimento_id: int,
     tipo: str = Form("entrada"),
@@ -127,7 +144,9 @@ async def upload_foto_atendimento(
 ):
     user, tenant_id = _get_tenant(current)
     _obter_atendimento_ou_404(db, tenant_id, atendimento_id)
-    arquivo_salvo = await salvar_foto_banho_tosa_upload(tenant_id, atendimento_id, arquivo, tipo)
+    arquivo_salvo = await salvar_foto_banho_tosa_upload(
+        tenant_id, atendimento_id, arquivo, tipo
+    )
     foto = BanhoTosaFoto(
         tenant_id=tenant_id,
         atendimento_id=atendimento_id,
@@ -150,11 +169,15 @@ def remover_foto_atendimento(
     current=Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = _get_tenant(current)
-    foto = db.query(BanhoTosaFoto).filter(
-        BanhoTosaFoto.id == foto_id,
-        BanhoTosaFoto.tenant_id == tenant_id,
-        BanhoTosaFoto.atendimento_id == atendimento_id,
-    ).first()
+    foto = (
+        db.query(BanhoTosaFoto)
+        .filter(
+            BanhoTosaFoto.id == foto_id,
+            BanhoTosaFoto.tenant_id == tenant_id,
+            BanhoTosaFoto.atendimento_id == atendimento_id,
+        )
+        .first()
+    )
     if not foto:
         raise HTTPException(status_code=404, detail="Foto nao encontrada")
     remover_arquivos_foto_banho_tosa(foto.url)
@@ -176,10 +199,14 @@ def _serializar_foto(foto: BanhoTosaFoto) -> dict:
 
 
 def _obter_atendimento_ou_404(db: Session, tenant_id, atendimento_id: int):
-    atendimento = db.query(BanhoTosaAtendimento).filter(
-        BanhoTosaAtendimento.id == atendimento_id,
-        BanhoTosaAtendimento.tenant_id == tenant_id,
-    ).first()
+    atendimento = (
+        db.query(BanhoTosaAtendimento)
+        .filter(
+            BanhoTosaAtendimento.id == atendimento_id,
+            BanhoTosaAtendimento.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not atendimento:
         raise HTTPException(status_code=404, detail="Atendimento nao encontrado")
     return atendimento
@@ -188,7 +215,11 @@ def _obter_atendimento_ou_404(db: Session, tenant_id, atendimento_id: int):
 def _obter_responsavel(db: Session, tenant_id, responsavel_id: int | None):
     if not responsavel_id:
         return None
-    responsavel = db.query(Cliente).filter(Cliente.id == responsavel_id, Cliente.tenant_id == tenant_id).first()
+    responsavel = (
+        db.query(Cliente)
+        .filter(Cliente.id == responsavel_id, Cliente.tenant_id == tenant_id)
+        .first()
+    )
     if not responsavel:
         raise HTTPException(status_code=404, detail="Responsavel nao encontrado")
     return responsavel

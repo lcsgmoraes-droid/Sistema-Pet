@@ -43,10 +43,16 @@ def get_fiscal_produto(
                 "cest": fiscal_v2.cest,
                 "cfop_venda": fiscal_v2.cfop_venda,
                 "cst_icms": fiscal_v2.cst_icms,
-                "icms_aliquota": float(fiscal_v2.icms_aliquota) if fiscal_v2.icms_aliquota is not None else None,
+                "icms_aliquota": float(fiscal_v2.icms_aliquota)
+                if fiscal_v2.icms_aliquota is not None
+                else None,
                 "icms_st": fiscal_v2.icms_st or False,
-                "pis_aliquota": float(fiscal_v2.pis_aliquota) if fiscal_v2.pis_aliquota is not None else None,
-                "cofins_aliquota": float(fiscal_v2.cofins_aliquota) if fiscal_v2.cofins_aliquota is not None else None,
+                "pis_aliquota": float(fiscal_v2.pis_aliquota)
+                if fiscal_v2.pis_aliquota is not None
+                else None,
+                "cofins_aliquota": float(fiscal_v2.cofins_aliquota)
+                if fiscal_v2.cofins_aliquota is not None
+                else None,
             }
 
         produto = (
@@ -78,18 +84,25 @@ def get_fiscal_produto(
             "cest": getattr(produto, "cest", None),
             "cfop_venda": getattr(produto, "cfop", None),
             "cst_icms": None,
-            "icms_aliquota": float(getattr(produto, "aliquota_icms", 0) or 0) if getattr(produto, "aliquota_icms", None) is not None else None,
+            "icms_aliquota": float(getattr(produto, "aliquota_icms", 0) or 0)
+            if getattr(produto, "aliquota_icms", None) is not None
+            else None,
             "icms_st": False,
-            "pis_aliquota": float(getattr(produto, "aliquota_pis", 0) or 0) if getattr(produto, "aliquota_pis", None) is not None else None,
-            "cofins_aliquota": float(getattr(produto, "aliquota_cofins", 0) or 0) if getattr(produto, "aliquota_cofins", None) is not None else None,
+            "pis_aliquota": float(getattr(produto, "aliquota_pis", 0) or 0)
+            if getattr(produto, "aliquota_pis", None) is not None
+            else None,
+            "cofins_aliquota": float(getattr(produto, "aliquota_cofins", 0) or 0)
+            if getattr(produto, "aliquota_cofins", None) is not None
+            else None,
         }
-    
+
     except Exception as e:
         # Log do erro e retorno de estrutura vazia ao invés de 500
         import logging
+
         logger = logging.getLogger(__name__)
         logger.error(f"Erro ao buscar fiscal do produto {produto_id}: {str(e)}")
-        
+
         return {
             "origem": "erro",
             "herdado_da_empresa": False,
@@ -124,7 +137,7 @@ def get_fiscal_kit(
             .filter(
                 Produto.id == produto_id,
                 Produto.tenant_id == tenant_id,
-                Produto.tipo_produto == "KIT"
+                Produto.tipo_produto == "KIT",
             )
             .first()
         )
@@ -150,22 +163,29 @@ def get_fiscal_kit(
                 "cest": kit_fiscal_v2.cest,
                 "cfop": kit_fiscal_v2.cfop_venda,
                 "cst_icms": kit_fiscal_v2.cst_icms,
-                "icms_aliquota": float(kit_fiscal_v2.icms_aliquota) if kit_fiscal_v2.icms_aliquota is not None else None,
+                "icms_aliquota": float(kit_fiscal_v2.icms_aliquota)
+                if kit_fiscal_v2.icms_aliquota is not None
+                else None,
                 "icms_st": kit_fiscal_v2.icms_st or False,
-                "pis_aliquota": float(kit_fiscal_v2.pis_aliquota) if kit_fiscal_v2.pis_aliquota is not None else None,
-                "cofins_aliquota": float(kit_fiscal_v2.cofins_aliquota) if kit_fiscal_v2.cofins_aliquota is not None else None,
+                "pis_aliquota": float(kit_fiscal_v2.pis_aliquota)
+                if kit_fiscal_v2.pis_aliquota is not None
+                else None,
+                "cofins_aliquota": float(kit_fiscal_v2.cofins_aliquota)
+                if kit_fiscal_v2.cofins_aliquota is not None
+                else None,
             }
 
         # Fallback: retornar fiscal do produto
         return get_fiscal_produto(produto_id, db, tenant_id)
-    
+
     except HTTPException:
         raise
     except Exception as e:
         import logging
+
         logger = logging.getLogger(__name__)
         logger.error(f"Erro ao buscar fiscal do kit {produto_id}: {str(e)}")
-        
+
         return {
             "origem": "erro",
             "herdado_da_empresa": False,
@@ -218,15 +238,21 @@ def put_fiscal_produto(
     fiscal.cst_icms = payload.get("cst_icms") or None
     # Converter strings vazias para None em campos numéricos
     icms_aliq = payload.get("icms_aliquota")
-    fiscal.icms_aliquota = float(icms_aliq) if icms_aliq and str(icms_aliq).strip() else None
+    fiscal.icms_aliquota = (
+        float(icms_aliq) if icms_aliq and str(icms_aliq).strip() else None
+    )
     fiscal.icms_st = payload.get("icms_st")
 
     # Converter strings vazias para None em campos numéricos
     pis_aliq = payload.get("pis_aliquota")
-    fiscal.pis_aliquota = float(pis_aliq) if pis_aliq and str(pis_aliq).strip() else None
-    
+    fiscal.pis_aliquota = (
+        float(pis_aliq) if pis_aliq and str(pis_aliq).strip() else None
+    )
+
     cofins_aliq = payload.get("cofins_aliquota")
-    fiscal.cofins_aliquota = float(cofins_aliq) if cofins_aliq and str(cofins_aliq).strip() else None
+    fiscal.cofins_aliquota = (
+        float(cofins_aliq) if cofins_aliq and str(cofins_aliq).strip() else None
+    )
 
     fiscal.herdado_da_empresa = False
 
@@ -261,9 +287,7 @@ def put_fiscal_kit(
     )
 
     if not produto or produto.tipo_produto != "KIT":
-        return {
-            "error": "Produto informado não é um KIT"
-        }
+        return {"error": "Produto informado não é um KIT"}
 
     fiscal = (
         db.query(KitConfigFiscal)

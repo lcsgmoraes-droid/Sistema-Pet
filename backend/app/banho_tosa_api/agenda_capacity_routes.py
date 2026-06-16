@@ -27,7 +27,9 @@ def obter_capacidade_agenda(
     return montar_capacidade_dia(db, tenant_id, data_referencia)
 
 
-@router.get("/agendamentos/sugestoes-slots", response_model=list[BanhoTosaSlotSugestaoResponse])
+@router.get(
+    "/agendamentos/sugestoes-slots", response_model=list[BanhoTosaSlotSugestaoResponse]
+)
 def obter_sugestoes_slots(
     data_referencia: date = Query(...),
     duracao_minutos: int = Query(60, ge=5, le=720),

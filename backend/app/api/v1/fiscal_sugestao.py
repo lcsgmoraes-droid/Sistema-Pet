@@ -12,7 +12,7 @@ router = APIRouter(prefix="/fiscal/sugestao", tags=["Fiscal"])
 def sugestao_fiscal_produto(
     descricao: str,
     _user_and_tenant=Depends(get_current_user_and_tenant),
-    db: Session = Depends(get_db)
+    db: Session = Depends(get_db),
 ):
     """
     Endpoint de sugestão fiscal por descrição de produto.

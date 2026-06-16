@@ -35,7 +35,9 @@ def listar_recursos(
         query = query.filter(BanhoTosaRecurso.ativo.is_(True))
     if tipo:
         query = query.filter(BanhoTosaRecurso.tipo == tipo)
-    return query.order_by(BanhoTosaRecurso.tipo.asc(), BanhoTosaRecurso.nome.asc()).all()
+    return query.order_by(
+        BanhoTosaRecurso.tipo.asc(), BanhoTosaRecurso.nome.asc()
+    ).all()
 
 
 @router.post("/recursos", response_model=BanhoTosaRecursoResponse, status_code=201)
@@ -47,13 +49,19 @@ def criar_recurso(
     _, tenant_id = _get_tenant(current)
     nome = body.nome.strip()
     tipo = body.tipo.strip().lower()
-    existente = db.query(BanhoTosaRecurso).filter(
-        BanhoTosaRecurso.tenant_id == tenant_id,
-        func.lower(BanhoTosaRecurso.nome) == nome.lower(),
-        BanhoTosaRecurso.tipo == tipo,
-    ).first()
+    existente = (
+        db.query(BanhoTosaRecurso)
+        .filter(
+            BanhoTosaRecurso.tenant_id == tenant_id,
+            func.lower(BanhoTosaRecurso.nome) == nome.lower(),
+            BanhoTosaRecurso.tipo == tipo,
+        )
+        .first()
+    )
     if existente:
-        raise HTTPException(status_code=409, detail="Ja existe um recurso desse tipo com esse nome")
+        raise HTTPException(
+            status_code=409, detail="Ja existe um recurso desse tipo com esse nome"
+        )
 
     recurso = BanhoTosaRecurso(tenant_id=tenant_id, **body.model_dump())
     recurso.nome = nome
@@ -71,10 +79,14 @@ def excluir_recurso(
     current=Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = _get_tenant(current)
-    recurso = db.query(BanhoTosaRecurso).filter(
-        BanhoTosaRecurso.id == recurso_id,
-        BanhoTosaRecurso.tenant_id == tenant_id,
-    ).first()
+    recurso = (
+        db.query(BanhoTosaRecurso)
+        .filter(
+            BanhoTosaRecurso.id == recurso_id,
+            BanhoTosaRecurso.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not recurso:
         raise HTTPException(status_code=404, detail="Recurso nao encontrado")
 
@@ -109,6 +121,7 @@ def _recurso_tem_vinculos(db: Session, tenant_id, recurso_id: int) -> bool:
     ]
     return any(query.first() is not None for query in checks)
 
+
 @router.patch("/recursos/{recurso_id}", response_model=BanhoTosaRecursoResponse)
 def atualizar_recurso(
     recurso_id: int,
@@ -117,10 +130,14 @@ def atualizar_recurso(
     current=Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = _get_tenant(current)
-    recurso = db.query(BanhoTosaRecurso).filter(
-        BanhoTosaRecurso.id == recurso_id,
-        BanhoTosaRecurso.tenant_id == tenant_id,
-    ).first()
+    recurso = (
+        db.query(BanhoTosaRecurso)
+        .filter(
+            BanhoTosaRecurso.id == recurso_id,
+            BanhoTosaRecurso.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not recurso:
         raise HTTPException(status_code=404, detail="Recurso nao encontrado")
 

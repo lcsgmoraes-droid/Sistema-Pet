@@ -359,6 +359,10 @@ jobs:
         run: |
           ruff format --check app/domain app/campaigns app/vendas
 
+      - name: Backend api banho tosa format (blocking)
+        run: |
+          ruff format --check app/api app/banho_tosa_api
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"
