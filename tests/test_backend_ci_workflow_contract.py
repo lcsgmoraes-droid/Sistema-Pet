@@ -591,6 +591,13 @@ def test_backend_ci_has_blocking_multi_tenant_tests_lint_step():
     assert "ruff check tests/multi_tenant" in source
 
 
+def test_backend_ci_has_blocking_unit_tests_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Unit tests lint (blocking)" in source
+    assert "ruff check tests/unit" in source
+
+
 def test_backend_ci_has_blocking_alembic_env_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
