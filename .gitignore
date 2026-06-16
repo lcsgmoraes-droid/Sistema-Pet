@@ -34,6 +34,10 @@ backend/bling_token_control.json
 backend/uploads/*
 !backend/uploads/.gitkeep
 
+# Dados operacionais persistidos por volumes Docker
+backend/data/*
+!backend/data/.gitkeep
+
 # Node
 node_modules/
 frontend/node_modules/
