@@ -1,7 +1,6 @@
 """
 Testes de criação e isolamento de Tenants
 """
-import uuid
 # Import direto para evitar carregar app.__init__.py (que carrega IA/Prophet)
 import sys
 import os

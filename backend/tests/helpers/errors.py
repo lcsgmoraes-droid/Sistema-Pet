@@ -9,7 +9,6 @@ Exemplo de uso:
     assert_error_sanitized(response)
 """
 
-from unittest.mock import patch
 from typing import Any
 
 

@@ -12,8 +12,7 @@ ESTRATÉGIA:
 """
 
 import pytest
-from datetime import date, datetime
-from decimal import Decimal
+from datetime import date
 from uuid import UUID
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker

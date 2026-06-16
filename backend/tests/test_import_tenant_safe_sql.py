@@ -14,8 +14,15 @@ def test_import_module():
             TenantSafeSQLError
         )
         print("✅ Import successful!")
-        assert execute_tenant_safe is not None
-        assert TenantSafeSQLError is not None
+        imported_symbols = (
+            execute_tenant_safe,
+            execute_tenant_safe_scalar,
+            execute_tenant_safe_one,
+            execute_tenant_safe_first,
+            execute_tenant_safe_all,
+            TenantSafeSQLError,
+        )
+        assert all(symbol is not None for symbol in imported_symbols)
     except ImportError as e:
         print(f"❌ Import failed: {e}")
         raise

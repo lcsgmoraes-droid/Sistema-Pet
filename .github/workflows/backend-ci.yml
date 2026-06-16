@@ -331,6 +331,10 @@ jobs:
         run: |
           ruff check tests/domain tests/integration
 
+      - name: Backend tests lint (blocking)
+        run: |
+          ruff check tests
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"

@@ -11,8 +11,7 @@ Valida:
 """
 
 import pytest
-from datetime import date, datetime
-from decimal import Decimal
+from datetime import datetime
 from uuid import UUID
 from unittest.mock import Mock, patch
 from sqlalchemy.orm import Session
@@ -21,8 +20,6 @@ from app.replay import replay_events, ReplayStats
 from app.replay.engine import _process_batch
 from app.core.replay_context import is_replay_mode, reset_replay_mode
 from app.domain.events.event_store import EventStore
-from app.domain.events.venda_events import VendaCriada, VendaFinalizada, VendaCancelada
-from app.read_models.models import VendasResumoDiario, PerformanceParceiro, ReceitaMensal
 from app.tenancy.context import clear_current_tenant, get_current_tenant, set_current_tenant
 
 
@@ -305,7 +302,7 @@ class TestReplayEngineCore:
         mock_handler_class.return_value = mock_handler
         
         # Act
-        stats = replay_events(db_session, event_type='VendaFinalizada')
+        replay_events(db_session, event_type='VendaFinalizada')
         
         # Assert
         call_kwargs = mock_store.get_events.call_args[1]

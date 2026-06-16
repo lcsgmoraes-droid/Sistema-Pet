@@ -37,7 +37,7 @@ def test_login_returns_jwt_token(client, tenant_factory, user_factory):
     """
     tenant = tenant_factory()
     password = "TestPassword@123"
-    user = user_factory(
+    user_factory(
         tenant_id=tenant.id,
         email="login@test.com",
         password=password
@@ -233,7 +233,7 @@ def test_login_with_invalid_credentials_fails(client, tenant_factory, user_facto
     Protege: segurança de autenticação.
     """
     tenant = tenant_factory()
-    user = user_factory(
+    user_factory(
         tenant_id=tenant.id,
         email="valid@test.com",
         password="CorrectPassword@123"

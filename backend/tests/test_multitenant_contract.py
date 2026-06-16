@@ -42,12 +42,11 @@ CRITICIDADE: MÁXIMA (Segurança LGPD)
 
 import pytest
 from uuid import UUID, uuid4
-from sqlalchemy import inspect, text
-from sqlalchemy.orm import Session
+from sqlalchemy import inspect
 from sqlalchemy.exc import IntegrityError
 
 # Imports do sistema
-from app.db import Base, SessionLocal, engine
+from app.db import SessionLocal, engine
 from app.base_models import BaseTenantModel
 from app.models import Tenant, User, Role
 from app.produtos_models import Produto, EstoqueMovimentacao
@@ -77,6 +76,19 @@ try:
         DREInsight,
         IndicesMercado
     )
+    _IA_MODEL_IMPORTS = (
+        PadraoCategoriacaoIA,
+        LancamentoImportado,
+        ArquivoExtratoImportado,
+        HistoricoAtualizacaoDRE,
+        ConfiguracaoTributaria,
+        DREPeriodo,
+        DREProduto,
+        DRECategoriaAnalise,
+        DREComparacao,
+        DREInsight,
+        IndicesMercado,
+    )
 except ImportError as e:
     # Se os models de IA não existirem, continua sem eles
     # (ambiente de teste pode não ter todos os módulos)
@@ -103,7 +115,7 @@ def db_session():
     # Cleanup
     try:
         session.rollback()
-    except:
+    except Exception:
         pass
     finally:
         session.close()
@@ -221,11 +233,6 @@ def test_all_business_tables_have_tenant_id_column(db_session):
     ]
     
     # Tabelas que NÃO precisam de tenant_id (sistema/controle)
-    system_tables = [
-        'tenants',  # É a própria tabela de tenants!
-        'permissions',  # Permissões globais do sistema
-        'alembic_version',  # Controle de migrações
-    ]
     
     missing_tenant_id = []
     
@@ -657,7 +664,7 @@ def test_query_sem_contexto_retorna_vazio(db_session, tenant_a_id):
     # dependendo da implementação dos filtros (não é crítico pois cenário
     # é impossível em produção devido ao TenantSecurityMiddleware)
     try:
-        produtos = db_session.query(Produto).filter(Produto.id == produto_id).all()
+        db_session.query(Produto).filter(Produto.id == produto_id).all()
         # Sistema não quebrou - OK
     except Exception as e:
         assert False, f"❌ Sistema quebrou sem contexto: {e}"

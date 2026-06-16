@@ -11,11 +11,8 @@ Valida:
 """
 
 import pytest
-from datetime import date
-from decimal import Decimal
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from sqlalchemy.orm import Session
-from sqlalchemy import inspect
 
 from app.read_models.schema_swap import (
     create_temp_schema,
@@ -23,8 +20,7 @@ from app.read_models.schema_swap import (
     validate_schema,
     swap_schemas_atomic,
     SchemaValidation,
-    SwapResult,
-    READ_MODEL_TABLES
+    SwapResult
 )
 from app.read_models.rebuild import (
     rebuild_read_models_zero_downtime,

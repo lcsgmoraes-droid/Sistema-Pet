@@ -4,6 +4,7 @@ Configuração de fixtures para testes do Sistema Pet Shop
 import os
 import sys
 import pytest
+from fastapi.testclient import TestClient
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
 from datetime import datetime, timedelta
@@ -24,15 +25,26 @@ def _get_db_dependencies():
     # Importar apenas models básicos para testes
     from app.models import Tenant, User
     # Importar produtos_models para relationships funcionarem
-    from app import produtos_models
+    from app import produtos_models as _produtos_models
     # Importar apenas models que não têm dependências pesadas
-    from app import financeiro_models
-    from app import rotas_entrega_models
-    from app import opportunities_models
-    from app import opportunity_events_models
-    from app import dre_plano_contas_models
+    from app import financeiro_models as _financeiro_models
+    from app import rotas_entrega_models as _rotas_entrega_models
+    from app import opportunities_models as _opportunities_models
+    from app import opportunity_events_models as _opportunity_events_models
+    from app import dre_plano_contas_models as _dre_plano_contas_models
     # Importar todos os models do WhatsApp (sem services/OpenAI)
-    from app.whatsapp import models, models_handoff
+    from app.whatsapp import models as _whatsapp_models
+    from app.whatsapp import models_handoff as _whatsapp_models_handoff
+    _model_side_effects = (
+        _produtos_models,
+        _financeiro_models,
+        _rotas_entrega_models,
+        _opportunities_models,
+        _opportunity_events_models,
+        _dre_plano_contas_models,
+        _whatsapp_models,
+        _whatsapp_models_handoff,
+    )
     return Base, get_session, Tenant, User
 
 

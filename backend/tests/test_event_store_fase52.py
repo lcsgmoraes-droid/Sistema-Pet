@@ -20,10 +20,8 @@ COBERTURA:
 
 import pytest
 import sqlite3
-from datetime import datetime
 from pathlib import Path
 from dataclasses import dataclass
-from typing import Optional
 from uuid import UUID
 
 # Imports do sistema
@@ -288,7 +286,7 @@ def test_get_events_ordenado_por_sequence(mock_db_session):
     for i in range(1, len(retrieved)):
         assert retrieved[i]['sequence_number'] > retrieved[i-1]['sequence_number']
     
-    print(f"✅ Eventos ordenados por sequence_number")
+    print("✅ Eventos ordenados por sequence_number")
     print(f"   Sequência: {[e['sequence_number'] for e in retrieved]}")
 
 
@@ -443,7 +441,7 @@ def test_causation_id_rastreia_causa(mock_db_session):
         valor=100.0,
         causation_id=persisted_venda.event_id
     )
-    persisted_pagamento = store.append(evento_pagamento, user_id=1, aggregate_type='pagamento')
+    store.append(evento_pagamento, user_id=1, aggregate_type='pagamento')
     
     # Validar
     events = store.get_events()

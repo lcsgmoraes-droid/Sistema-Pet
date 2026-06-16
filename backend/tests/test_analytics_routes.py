@@ -1024,7 +1024,6 @@ def test_integracao_resumo_diario_real(client, override_auth):
     Valida que o endpoint retorna dados corretos quando há vendas no dia.
     """
     from unittest.mock import patch
-    from datetime import date
     
     # Arrange - Mock de dados de resumo diário
     mock_resumo = {
@@ -1065,7 +1064,7 @@ def test_token_expirado_retorna_401(client, override_db):
     ENTÃO deve retornar 401 Unauthorized
     """
     from jose import jwt
-    from datetime import datetime, timedelta
+    from datetime import timedelta
     from app.config import JWT_SECRET_KEY
     from app.auth.core import ALGORITHM
     
@@ -1124,7 +1123,7 @@ def test_token_sem_tenant_id_retorna_401(client, override_db):
     ENTÃO deve retornar 401 com mensagem específica
     """
     from jose import jwt
-    from datetime import datetime, timedelta
+    from datetime import timedelta
     from app.config import JWT_SECRET_KEY
     from app.auth.core import ALGORITHM
     
@@ -1360,7 +1359,7 @@ def test_rate_limiting_behavior(
     
     # Validação robusta: pelo menos 100 bem-sucedidas E pelo menos 1 limitada
     assert success_count >= 100, f"Esperava ≥100 sucesso, teve {success_count}"
-    assert rate_limited_count > 0, f"Esperava rate limiting (429), mas nenhuma requisição foi limitada"
+    assert rate_limited_count > 0, "Esperava rate limiting (429), mas nenhuma requisição foi limitada"
     
     # Validar payload do erro 429
     for response in responses:
@@ -1521,7 +1520,6 @@ def test_contrato_resumo_diario_schema(
     ENTÃO todos campos obrigatórios devem estar presentes e com tipos corretos
     """
     # Arrange - Mock com dados válidos
-    from datetime import date
     mock_data = {
         "id": 1,
         "data": date(2026, 2, 8),
@@ -1584,7 +1582,6 @@ def test_contrato_resumo_periodo_schema(
     ENTÃO deve retornar lista de resumos diários com campos corretos
     """
     # Arrange - A rota retorna LISTA de resumos diários
-    from datetime import date
     mock_data = [
         {
             "id": 1,
@@ -1714,7 +1711,6 @@ def test_contrato_receita_mensal_schema(
     ENTÃO todos campos obrigatórios devem estar presentes
     """
     # Arrange
-    from datetime import date
     mock_data = {
         "mes": date(2026, 2, 1),
         "receita_total": 50000.00,
@@ -1761,7 +1757,6 @@ def test_contrato_ultimos_dias_schema(
     ENTÃO deve retornar lista de resumos diários
     """
     # Arrange
-    from datetime import date
     mock_data = [
         {
             "data": date(2026, 2, 8),
@@ -1822,7 +1817,6 @@ def test_contrato_estatisticas_gerais_schema(
     ENTÃO deve retornar estatísticas agregadas
     """
     # Arrange
-    from datetime import date
     mock_data = {
         "mes_atual": {
             "mes": date(2026, 2, 1),
@@ -1887,7 +1881,6 @@ def test_contrato_comparativo_receita_schema(
     ENTÃO deve retornar lista de receitas mensais com variação
     """
     # Arrange - A rota retorna LISTA de receitas mensais e usa obter_comparativo_mensal
-    from datetime import date
     mock_data = [
         {
             "mes": date(2026, 2, 1),
