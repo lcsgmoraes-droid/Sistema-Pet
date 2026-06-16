@@ -21,10 +21,10 @@ from app.kit_config_fiscal_models import KitConfigFiscal  # noqa
 from app.produto_config_fiscal_models import ProdutoConfigFiscal  # noqa
 
 __all__ = [
-    'EmpresaConfigFiscal',
-    'FiscalCatalogoProdutos',
-    'FiscalEstadoPadrao',
-    'KitComposicao',
-    'KitConfigFiscal',
-    'ProdutoConfigFiscal',
+    "EmpresaConfigFiscal",
+    "FiscalCatalogoProdutos",
+    "FiscalEstadoPadrao",
+    "KitComposicao",
+    "KitConfigFiscal",
+    "ProdutoConfigFiscal",
 ]

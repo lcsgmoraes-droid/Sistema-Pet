@@ -85,11 +85,7 @@ from .produtos_comprados_juntos import ProdutosCompradosJuntosReadModel
 from .clientes_recorrentes import ClientesRecorrentesReadModel
 
 # Read Models persistidos (legado)
-from .models import (
-    VendasResumoDiario,
-    PerformanceParceiro,
-    ReceitaMensal
-)
+from .models import VendasResumoDiario, PerformanceParceiro, ReceitaMensal
 
 from .handlers import VendaReadModelHandler
 
@@ -97,29 +93,25 @@ from .queries import (
     obter_resumo_diario,
     obter_ranking_parceiros,
     obter_receita_mensal,
-    obter_receita_por_periodo
+    obter_receita_por_periodo,
 )
 
 __all__ = [
     # Read Models baseados em eventos (NOVOS - Sprint 5)
-    'BaseReadModel',
-    'ProdutosMaisVendidosReadModel',
-    'KitsMaisVendidosReadModel',
-    'ProdutosCompradosJuntosReadModel',
-    'ClientesRecorrentesReadModel',
-    
+    "BaseReadModel",
+    "ProdutosMaisVendidosReadModel",
+    "KitsMaisVendidosReadModel",
+    "ProdutosCompradosJuntosReadModel",
+    "ClientesRecorrentesReadModel",
     # Models persistidos (LEGADO)
     "VendasResumoDiario",
     "PerformanceParceiro",
     "ReceitaMensal",
-    
     # Handlers
     "VendaReadModelHandler",
-    
     # Queries
     "obter_resumo_diario",
     "obter_ranking_parceiros",
     "obter_receita_mensal",
     "obter_receita_por_periodo",
 ]
-

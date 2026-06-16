@@ -1,6 +1,17 @@
 """Modelos de cadastros e parametrizacoes do Banho & Tosa."""
 
-from sqlalchemy import Boolean, Column, ForeignKey, Index, Integer, JSON, Numeric, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean,
+    Column,
+    ForeignKey,
+    Index,
+    Integer,
+    JSON,
+    Numeric,
+    String,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import relationship
 
 from app.base_models import BaseTenantModel
@@ -34,7 +45,9 @@ class BanhoTosaConfiguracao(BaseTenantModel):
 
 class BanhoTosaRecurso(BaseTenantModel):
     __tablename__ = "banho_tosa_recursos"
-    __table_args__ = (Index("ix_bt_recursos_tenant_tipo_ativo", "tenant_id", "tipo", "ativo"),)
+    __table_args__ = (
+        Index("ix_bt_recursos_tenant_tipo_ativo", "tenant_id", "tipo", "ativo"),
+    )
 
     nome = Column(String(120), nullable=False, index=True)
     tipo = Column(String(30), nullable=False, index=True)
@@ -62,13 +75,17 @@ class BanhoTosaServico(BaseTenantModel):
     permite_pacote = Column(Boolean, nullable=False, default=True)
     ativo = Column(Boolean, nullable=False, default=True)
 
-    precos = relationship("BanhoTosaPrecoServico", back_populates="servico", cascade="all, delete-orphan")
+    precos = relationship(
+        "BanhoTosaPrecoServico", back_populates="servico", cascade="all, delete-orphan"
+    )
 
 
 class BanhoTosaParametroPorte(BaseTenantModel):
     __tablename__ = "banho_tosa_parametros_porte"
     __table_args__ = (
-        UniqueConstraint("tenant_id", "porte", name="uq_bt_parametros_porte_tenant_porte"),
+        UniqueConstraint(
+            "tenant_id", "porte", name="uq_bt_parametros_porte_tenant_porte"
+        ),
         Index("ix_bt_parametros_porte_tenant_ativo", "tenant_id", "ativo"),
     )
 
@@ -92,12 +109,25 @@ class BanhoTosaParametroPorte(BaseTenantModel):
 class BanhoTosaPrecoServico(BaseTenantModel):
     __tablename__ = "banho_tosa_precos_servico"
     __table_args__ = (
-        UniqueConstraint("tenant_id", "servico_id", "porte_id", "tipo_pelagem", name="uq_bt_preco_servico_porte_pelagem"),
+        UniqueConstraint(
+            "tenant_id",
+            "servico_id",
+            "porte_id",
+            "tipo_pelagem",
+            name="uq_bt_preco_servico_porte_pelagem",
+        ),
         Index("ix_bt_precos_tenant_servico", "tenant_id", "servico_id"),
     )
 
-    servico_id = Column(Integer, ForeignKey("banho_tosa_servicos.id"), nullable=False, index=True)
-    porte_id = Column(Integer, ForeignKey("banho_tosa_parametros_porte.id"), nullable=False, index=True)
+    servico_id = Column(
+        Integer, ForeignKey("banho_tosa_servicos.id"), nullable=False, index=True
+    )
+    porte_id = Column(
+        Integer,
+        ForeignKey("banho_tosa_parametros_porte.id"),
+        nullable=False,
+        index=True,
+    )
     tipo_pelagem = Column(String(40), nullable=False, default="padrao")
     preco_base = Column(Numeric(12, 2), nullable=False, default=0)
     tempo_estimado_minutos = Column(Integer, nullable=False, default=0)

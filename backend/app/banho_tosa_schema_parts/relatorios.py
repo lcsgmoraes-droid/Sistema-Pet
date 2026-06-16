@@ -69,7 +69,11 @@ class BanhoTosaRelatorioOperacionalResponse(BaseModel):
     resumo: BanhoTosaRelatorioResumo
     margem_por_servico: list[BanhoTosaRelatorioMargemItem] = Field(default_factory=list)
     margem_por_porte: list[BanhoTosaRelatorioMargemItem] = Field(default_factory=list)
-    produtividade: list[BanhoTosaRelatorioProdutividadeItem] = Field(default_factory=list)
-    ocupacao_recursos: list[BanhoTosaRelatorioOcupacaoItem] = Field(default_factory=list)
+    produtividade: list[BanhoTosaRelatorioProdutividadeItem] = Field(
+        default_factory=list
+    )
+    ocupacao_recursos: list[BanhoTosaRelatorioOcupacaoItem] = Field(
+        default_factory=list
+    )
     desperdicios: list[BanhoTosaRelatorioDesperdicioItem] = Field(default_factory=list)
     alertas: list[str] = Field(default_factory=list)
