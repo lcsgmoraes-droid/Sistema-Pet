@@ -662,6 +662,17 @@ def test_backend_ci_has_blocking_backend_platform_packages_format_step():
     ) in source
 
 
+def test_backend_ci_has_blocking_backend_access_config_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend access config format (blocking)" in source
+    assert (
+        "ruff format --check app/canais.py app/partner_utils.py "
+        "app/permissions_routes.py app/cargo_models.py app/empresa_config_fiscal_models.py "
+        "app/empresa_config_geral_models.py app/config.py app/constants.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_backend_ai_packages_format_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
