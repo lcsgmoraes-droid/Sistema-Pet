@@ -3,7 +3,7 @@ Rotas para Classificação Automática DRE
 APIs de sugestão, aplicação e gestão de lançamentos pendentes
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel, Field

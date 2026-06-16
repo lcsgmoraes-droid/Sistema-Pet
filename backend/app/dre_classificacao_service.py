@@ -4,10 +4,8 @@ Motor de sugestões baseado em regras e aprendizado de máquina simples
 """
 
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, func
-from typing import List, Dict, Optional, Tuple
-from decimal import Decimal
-from datetime import datetime
+from sqlalchemy import or_, func
+from typing import List, Dict, Optional
 
 from app.dre_regras_models import (
     RegraClassificacaoDRE,
@@ -242,7 +240,7 @@ class ClassificadorDRE:
                     'confianca': regra.confianca,
                     'regra_id': regra.id,
                     'regra_nome': regra.nome,
-                    'motivo': f'Todas as palavras-chave encontradas',
+                    'motivo': 'Todas as palavras-chave encontradas',
                     'aplicar_automaticamente': not regra.sugerir_apenas
                 })
         

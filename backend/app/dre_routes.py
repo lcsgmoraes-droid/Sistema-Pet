@@ -5,19 +5,17 @@ Sistema automatizado com categorização inteligente
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, extract, or_
-from datetime import datetime, date
+from sqlalchemy import and_, extract, or_
+from datetime import datetime
 from decimal import Decimal
 from typing import Optional, List
 from pydantic import BaseModel
 from io import BytesIO
 
 from .db import get_session
-from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
-from .models import User
-from .vendas_models import Venda, VendaItem, VendaPagamento
-from .financeiro_models import ContaPagar, ContaReceber
+from .vendas_models import Venda, VendaItem
+from .financeiro_models import ContaPagar
 from .dre_plano_contas_models import DRESubcategoria
 
 router = APIRouter(prefix="/financeiro/dre", tags=["DRE"])
@@ -157,7 +155,7 @@ def obter_despesas_por_categoria(db: Session, mes: int, ano: int) -> dict:
     subcategorias_taxas_ids = [
         s.id for s in db.query(DRESubcategoria).filter(
             DRESubcategoria.categoria_id == 7,
-            DRESubcategoria.ativo == True
+            DRESubcategoria.ativo.is_(True)
         ).all()
     ]
 
@@ -220,7 +218,7 @@ def calcular_taxas_cartao(db: Session, mes: int, ano: int) -> Decimal:
     subcategorias_taxas = db.query(DRESubcategoria).filter(
         and_(
             DRESubcategoria.categoria_id == 7,
-            DRESubcategoria.ativo == True
+            DRESubcategoria.ativo.is_(True)
         )
     ).all()
 
@@ -389,7 +387,7 @@ def gerar_dre_detalhado(
     """
 
     # Gera o DRE básico
-    dre = gerar_dre(ano=ano, mes=mes, db=db, current_user=current_user)
+    dre = gerar_dre(ano=ano, mes=mes, db=db, user_and_tenant=user_and_tenant)
 
     # Busca detalhes das despesas (EXCLUINDO fornecedores)
     # ✅ USA DATA_EMISSAO (regime de competência)
@@ -436,13 +434,18 @@ def gerar_dre_detalhado(
     ano_anterior = ano if mes > 1 else ano - 1
 
     try:
-        dre_anterior = gerar_dre(ano=ano_anterior, mes=mes_anterior, db=db, current_user=current_user)
+        dre_anterior = gerar_dre(
+            ano=ano_anterior,
+            mes=mes_anterior,
+            db=db,
+            user_and_tenant=user_and_tenant,
+        )
         comparacao = {
             'receita_bruta_variacao': float(dre.receita_bruta - dre_anterior.receita_bruta),
             'lucro_liquido_variacao': float(dre.lucro_liquido - dre_anterior.lucro_liquido),
             'margem_liquida_variacao': dre.margem_liquida - dre_anterior.margem_liquida
         }
-    except:
+    except Exception:
         comparacao = None
 
     return DREDetalhado(
@@ -467,7 +470,7 @@ async def exportar_dre_pdf(
         from reportlab.lib.units import mm
         from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+        from reportlab.lib.enums import TA_CENTER
     except ImportError:
         raise HTTPException(
             status_code=500,
@@ -475,7 +478,7 @@ async def exportar_dre_pdf(
         )
 
     # Buscar dados da DRE
-    dre = gerar_dre(ano=ano, mes=mes, db=db, current_user=current_user)
+    dre = gerar_dre(ano=ano, mes=mes, db=db, user_and_tenant=user_and_tenant)
 
     # Nomes dos meses
     meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
@@ -620,7 +623,7 @@ async def exportar_dre_excel(
         )
 
     # Buscar dados da DRE
-    dre = gerar_dre(ano=ano, mes=mes, db=db, current_user=current_user)
+    dre = gerar_dre(ano=ano, mes=mes, db=db, user_and_tenant=user_and_tenant)
 
     # Nomes dos meses
     meses = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',

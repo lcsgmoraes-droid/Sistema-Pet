@@ -7,15 +7,14 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
-from datetime import date, datetime
-from io import BytesIO
+from datetime import date
 
 from app.db import get_session as get_db
 from app.auth import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
 from app.models import User
 from app.ia.aba7_dre import DREService
-from app.ia.aba7_models import DREPeriodo, DREProduto, DREInsight
+from app.ia.aba7_models import DREPeriodo
 
 router = APIRouter(prefix="/ia/dre", tags=["IA - DRE Inteligente"])
 
@@ -279,7 +278,7 @@ async def obter_indices_mercado(
     
     indices = db.query(IndicesMercado).filter(
         IndicesMercado.setor == setor,
-        IndicesMercado.ativo == True
+        IndicesMercado.ativo.is_(True)
     ).first()
     
     if not indices:
@@ -339,7 +338,7 @@ async def listar_setores(
     from app.ia.aba7_models import IndicesMercado
     
     setores = db.query(IndicesMercado).filter(
-        IndicesMercado.ativo == True
+        IndicesMercado.ativo.is_(True)
     ).all()
     
     return {
@@ -361,7 +360,6 @@ async def calcular_mes_atual(
 ):
     """Calcula DRE do mês atual (atalho)"""
     from datetime import date
-    from dateutil.relativedelta import relativedelta
     
     usuario_id = current_user.id
     hoje = date.today()
@@ -652,7 +650,7 @@ def calcular_dre_por_canal(
 
 
 @router.post("/calcular-consolidado")
-def calcular_dre_consolidado(
+def calcular_dre_consolidado_canais(
     dados: CalcularDREConsolidadoRequest,
     current_user: dict = Depends(_usuario_dre),
     db: Session = Depends(get_db)

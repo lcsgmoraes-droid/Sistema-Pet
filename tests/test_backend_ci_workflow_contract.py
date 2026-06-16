@@ -298,6 +298,18 @@ def test_backend_ci_has_blocking_clean_package_lint_steps():
         assert command in source
 
 
+def test_backend_ci_has_blocking_dre_root_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "DRE root lint (blocking)" in source
+    assert (
+        "ruff check app/dre_canais_routes.py app/dre_classificacao_routes.py "
+        "app/dre_classificacao_service.py app/dre_ia_routes.py "
+        "app/dre_plano_contas_models.py app/dre_plano_contas_routes.py "
+        "app/dre_regras_models.py app/dre_routes.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_services_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
