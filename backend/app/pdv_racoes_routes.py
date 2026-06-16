@@ -8,7 +8,7 @@ Versão: 1.0.0 (2026-02-14)
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, or_
+from sqlalchemy import func, or_
 from typing import List, Optional, Dict, Any
 from pydantic import BaseModel
 
@@ -127,7 +127,7 @@ async def verificar_alergia_produto(
     
     pets = db.query(Pet).filter(
         Pet.cliente_id == cliente_id,
-        Pet.ativo == True
+        Pet.ativo.is_(True)
     ).all()
     
     # Verificar alergias
@@ -228,7 +228,7 @@ async def obter_produtos_similares(
     # Query para produtos similares
     query = db.query(Produto).filter(
         Produto.tenant_id == tenant_id,
-        Produto.ativo == True,
+        Produto.ativo.is_(True),
         Produto.id != produto_id,
         Produto.tipo == 'ração'
     )
@@ -373,7 +373,7 @@ async def obter_cross_sell(
             Venda.id.in_(vendas_com_produto),
             VendaItem.produto_id != produto_id,  # Excluir o produto atual
             VendaItem.produto_id.notin_(produtos_carrinho),  # Excluir produtos já no carrinho
-            Produto.ativo == True,
+            Produto.ativo.is_(True),
             Produto.tipo == 'ração'
         ).group_by(
             VendaItem.produto_id,
@@ -461,7 +461,7 @@ async def obter_produtos_complementares(
     # Buscar produtos complementares
     complementares = db.query(Produto).filter(
         Produto.tenant_id == tenant_id,
-        Produto.ativo == True,
+        Produto.ativo.is_(True),
         Produto.categoria_id.in_(categoria_ids)
     ).limit(limite).all()
     

@@ -9,15 +9,14 @@ Versão: 1.0.0 (2026-02-14)
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, and_, or_
-from typing import List, Optional, Dict, Any
+from typing import List, Dict, Any
 from pydantic import BaseModel
 from difflib import SequenceMatcher
 from datetime import datetime
-import re
 
 from .db import get_session
 from .auth.dependencies import get_current_user_and_tenant
-from .produtos_models import Produto, Marca, Categoria
+from .produtos_models import Produto, Marca
 from .opcoes_racao_models import PorteAnimal, FasePublico, SaborProteina, TipoTratamento
 from .vendas_models import VendaItem, Venda
 from .duplicatas_ignoradas_models import DuplicataIgnorada
@@ -129,7 +128,7 @@ async def detectar_duplicatas(
     )
     
     if apenas_ativas:
-        query = query.filter(Produto.ativo == True)
+        query = query.filter(Produto.ativo.is_(True))
     
     produtos = query.all()
     
@@ -377,7 +376,7 @@ async def mesclar_produtos(
         try:
             from app.bling_estoque_sync import sincronizar_bling_background
             sincronizar_bling_background(prod_manter.id, prod_manter.estoque_atual or 0, "mesclagem_produto")
-        except Exception as e_sync:
+        except Exception:
             pass
     
     return {
@@ -419,7 +418,7 @@ async def sugerir_padronizacao_nomes(
     produtos = db.query(Produto).filter(
         Produto.tenant_id == tenant_id,
         _produto_eh_racao_expr(),
-        Produto.ativo == True
+        Produto.ativo.is_(True)
     ).limit(limite).all()
     
     sugestoes = []
@@ -578,7 +577,7 @@ async def identificar_gaps_estoque(
     produtos = db.query(Produto).filter(
         Produto.tenant_id == tenant_id,
         Produto.tipo == 'ração',
-        Produto.ativo == True
+        Produto.ativo.is_(True)
     ).all()
     
     # Agrupar por segmento
@@ -700,7 +699,7 @@ async def obter_relatorio_completo(
     total_produtos = db.query(func.count(Produto.id)).filter(
         Produto.tenant_id == tenant_id,
         Produto.tipo == 'ração',
-        Produto.ativo == True
+        Produto.ativo.is_(True)
     ).scalar() or 0
     
     # Detectar duplicatas (limitado)

@@ -382,6 +382,19 @@ def test_backend_ci_has_blocking_estoque_root_lint_step():
     assert f"ruff check {' '.join(estoque_files)}" in source
 
 
+def test_backend_ci_has_blocking_racoes_root_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+    racoes_files = sorted(
+        f"app/{path.name}"
+        for path in (ROOT / "backend" / "app").glob("*.py")
+        if any(token in path.name for token in ("_racao.", "_racao_", "_racoes_"))
+        if path.name != "calculadora_racao.py"
+    )
+
+    assert "Racoes root lint (blocking)" in source
+    assert f"ruff check {' '.join(racoes_files)}" in source
+
+
 def test_backend_ci_has_blocking_comissoes_root_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
