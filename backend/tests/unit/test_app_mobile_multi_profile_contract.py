@@ -40,7 +40,9 @@ def test_mobile_login_and_profile_render_profile_switching_controls():
 
 def test_operational_mobile_navigators_expose_profile_switch_in_header():
     actions_path = REPO_ROOT / "app-mobile/src/components/HeaderProfileActions.tsx"
-    assert actions_path.exists(), "operational app headers need an in-session profile switch"
+    assert actions_path.exists(), (
+        "operational app headers need an in-session profile switch"
+    )
 
     actions = actions_path.read_text(encoding="utf-8")
     funcionario = read_repo("app-mobile/src/navigation/FuncionarioNavigator.tsx")

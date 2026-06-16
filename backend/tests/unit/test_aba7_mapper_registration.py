@@ -1,4 +1,6 @@
-from app.services.bling_flow_monitor_service import _garantir_registry_sqlalchemy_auditoria
+from app.services.bling_flow_monitor_service import (
+    _garantir_registry_sqlalchemy_auditoria,
+)
 
 
 def test_auditoria_bootstrapa_registry_sqlalchemy_sem_depender_do_main():

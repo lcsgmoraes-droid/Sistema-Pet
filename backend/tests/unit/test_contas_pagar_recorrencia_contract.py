@@ -16,7 +16,10 @@ def test_recorrencia_usa_janela_rolante_de_12_meses():
     assert "_gerar_contas_recorrentes_ate_janela(" in source
     assert "limite_recorrencia = calcular_limite_janela_recorrencia(hoje)" in source
     assert "ContaPagar.proxima_recorrencia <= limite_recorrencia" in source
-    assert "while conta_origem.proxima_recorrencia and conta_origem.proxima_recorrencia <= limite_recorrencia:" in source
+    assert (
+        "while conta_origem.proxima_recorrencia and conta_origem.proxima_recorrencia <= limite_recorrencia:"
+        in source
+    )
 
 
 def test_recorrencia_gerada_preserva_classificacao_financeira_e_competencia():
@@ -48,7 +51,9 @@ def test_pagamento_de_recorrencia_reabastece_janela_de_12_meses():
 def test_edicao_de_conta_pagar_pode_ativar_recorrencia():
     source = _source("app/contas_pagar_routes.py")
 
-    update_model = source.split("class ContaPagarUpdate", 1)[1].split("class ContaPagarResponse", 1)[0]
+    update_model = source.split("class ContaPagarUpdate", 1)[1].split(
+        "class ContaPagarResponse", 1
+    )[0]
     for field in [
         "eh_recorrente",
         "tipo_recorrencia",
@@ -65,7 +70,9 @@ def test_edicao_de_conta_pagar_pode_ativar_recorrencia():
     )[0]
 
     assert "recorrencia_alterada" in update_endpoint
-    assert "conta.proxima_recorrencia = calcular_proxima_recorrencia(" in update_endpoint
+    assert (
+        "conta.proxima_recorrencia = calcular_proxima_recorrencia(" in update_endpoint
+    )
     assert "_garantir_janela_recorrencia_conta(" in update_endpoint
     assert "conta.eh_recorrente = False" in update_endpoint
 

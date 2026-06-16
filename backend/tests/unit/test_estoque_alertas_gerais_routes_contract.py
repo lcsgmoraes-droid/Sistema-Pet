@@ -21,8 +21,7 @@ def test_alertas_gerais_fica_em_router_dedicado():
 
     module = importlib.import_module("app.estoque_alertas_gerais_routes")
     routes = {
-        (route.path, ",".join(sorted(route.methods)))
-        for route in module.router.routes
+        (route.path, ",".join(sorted(route.methods))) for route in module.router.routes
     }
 
     assert ("/estoque/alertas", "GET") in routes
@@ -38,5 +37,11 @@ def test_estoque_routes_nao_expoe_mais_alertas_gerais():
 def test_main_registra_router_de_alertas_gerais():
     main_source = _source("app/main.py")
 
-    assert "from app.estoque_alertas_gerais_routes import router as estoque_alertas_gerais_router" in main_source
-    assert 'app.include_router(estoque_alertas_gerais_router, tags=["Estoque - Alertas Gerais"])' in main_source
+    assert (
+        "from app.estoque_alertas_gerais_routes import router as estoque_alertas_gerais_router"
+        in main_source
+    )
+    assert (
+        'app.include_router(estoque_alertas_gerais_router, tags=["Estoque - Alertas Gerais"])'
+        in main_source
+    )

@@ -33,8 +33,12 @@ def test_monta_item_de_catalogo_com_custo_preco_e_margem_estimados():
         ],
     )
     produtos = {
-        11: SimpleNamespace(id=11, nome="Seringa", unidade="un", preco_custo=4, preco_venda=10),
-        12: SimpleNamespace(id=12, nome="Medicamento", unidade="ml", preco_custo=20, preco_venda=35),
+        11: SimpleNamespace(
+            id=11, nome="Seringa", unidade="un", preco_custo=4, preco_venda=10
+        ),
+        12: SimpleNamespace(
+            id=12, nome="Medicamento", unidade="ml", preco_custo=20, preco_venda=35
+        ),
     }
 
     item = orcamentos.montar_item_orcamento_catalogo(catalogo, produtos, quantidade=2)
@@ -82,10 +86,12 @@ def test_monta_item_de_produto_usa_custo_e_preco_de_venda_sem_baixar_estoque():
 def test_calcula_totais_do_orcamento_a_partir_dos_itens():
     orcamentos = _orcamentos()
 
-    totais = orcamentos.calcular_totais_orcamento([
-        {"custo_total_estimado": 36, "preco_total": 300},
-        {"custo_total_estimado": 186.75, "preco_total": 299.7},
-    ])
+    totais = orcamentos.calcular_totais_orcamento(
+        [
+            {"custo_total_estimado": 36, "preco_total": 300},
+            {"custo_total_estimado": 186.75, "preco_total": 299.7},
+        ]
+    )
 
     assert totais == {
         "custo_total_estimado": 222.75,

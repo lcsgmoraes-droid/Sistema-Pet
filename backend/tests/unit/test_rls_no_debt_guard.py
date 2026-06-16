@@ -7,7 +7,9 @@ import pytest
 def test_no_rls_allowlist_matches_intentionally_global_tables():
     from app.tenancy.filters import TENANT_WHITELIST_TABLES
     from app.tenancy.rls_no_debt import INTENTIONALLY_GLOBAL_NO_RLS_TABLES
-    from tests.multi_tenant.test_tenant_model_registry import INTENTIONALLY_GLOBAL_TENANT_TABLES
+    from tests.multi_tenant.test_tenant_model_registry import (
+        INTENTIONALLY_GLOBAL_TENANT_TABLES,
+    )
 
     assert INTENTIONALLY_GLOBAL_NO_RLS_TABLES == INTENTIONALLY_GLOBAL_TENANT_TABLES
     assert INTENTIONALLY_GLOBAL_NO_RLS_TABLES.issubset(TENANT_WHITELIST_TABLES)

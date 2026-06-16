@@ -7,7 +7,10 @@ from app.financeiro.contas_pagar_origem import (
 
 
 def test_extrair_caixa_referencia_aceita_formatos_do_pdv():
-    assert _extrair_caixa_referencia("Gerada automaticamente pelo PDV - Caixa #123") == "Caixa #123"
+    assert (
+        _extrair_caixa_referencia("Gerada automaticamente pelo PDV - Caixa #123")
+        == "Caixa #123"
+    )
     assert _extrair_caixa_referencia("Caixa 987 fechado") == "Caixa #987"
     assert _extrair_caixa_referencia("sem caixa") is None
     assert _extrair_caixa_referencia(None) is None

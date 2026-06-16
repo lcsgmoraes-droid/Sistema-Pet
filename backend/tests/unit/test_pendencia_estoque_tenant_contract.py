@@ -79,7 +79,9 @@ def _has_tenant_condition(conditions):
     )
 
 
-def test_verificar_e_notificar_pendencias_syncs_explicit_tenant_before_query(monkeypatch):
+def test_verificar_e_notificar_pendencias_syncs_explicit_tenant_before_query(
+    monkeypatch,
+):
     events = []
     db = _FakeDB(events, first_result=None)
     _capture_rls_sync(monkeypatch, events)
@@ -112,7 +114,9 @@ def test_marcar_pendencia_finalizada_syncs_and_filters_by_explicit_tenant(monkey
         tenant_id=TENANT_ID,
     )
 
-    filter_event = next(event for event in events if isinstance(event, tuple) and event[0] == "filter")
+    filter_event = next(
+        event for event in events if isinstance(event, tuple) and event[0] == "filter"
+    )
     assert result is True
     assert events[:2] == [("sync", db, TENANT_ID), "query"]
     assert _has_tenant_condition(filter_event[1])
@@ -128,6 +132,8 @@ def test_dashboard_product_detail_lookup_uses_explicit_tenant_filter():
     dashboard_start = source.index("def dashboard_pendencias(")
     dashboard_source = source[dashboard_start:]
     query_start = dashboard_source.index("db.query(Produto)")
-    query_block = dashboard_source[query_start:dashboard_source.index("if produto:", query_start)]
+    query_block = dashboard_source[
+        query_start : dashboard_source.index("if produto:", query_start)
+    ]
 
     assert "Produto.tenant_id == tenant" in query_block

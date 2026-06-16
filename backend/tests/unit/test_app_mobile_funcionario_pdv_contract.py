@@ -65,8 +65,14 @@ def test_funcionario_pdv_reuses_open_erp_cash_register_for_tenant():
     assert 'Caixa.status == "aberto"' in helper_block
     assert "case((Caixa.usuario_id == current_user.id, 0), else_=1)" in helper_block
 
-    assert "_obter_caixa_aberto_funcionario_pdv(db, tenant_id, current_user)" in caixa_block
-    assert "_obter_caixa_aberto_funcionario_pdv(db, tenant_id, current_user)" in finalizar_block
+    assert (
+        "_obter_caixa_aberto_funcionario_pdv(db, tenant_id, current_user)"
+        in caixa_block
+    )
+    assert (
+        "_obter_caixa_aberto_funcionario_pdv(db, tenant_id, current_user)"
+        in finalizar_block
+    )
     assert "caixa_id=caixa.id" in finalizar_block
     assert "permitir_caixa_tenant=True" in finalizar_block
 
@@ -89,10 +95,7 @@ def test_funcionario_pdv_searches_sellable_erp_products_not_app_catalog():
 
     for block in (search_block, barcode_block):
         assert "Produto.tenant_id == tenant_id" in block
-        assert (
-            "Produto.ativo.is_(True)" in block
-            or "Produto.ativo == true()" in block
-        )
+        assert "Produto.ativo.is_(True)" in block or "Produto.ativo == true()" in block
         assert "Produto.tipo_produto.in_" in block
         assert "Produto.anunciar_app" not in block
         assert "Produto.is_sellable" not in block
@@ -197,8 +200,8 @@ def test_funcionario_pdv_finalization_passes_coupon_and_cashback_to_official_sal
     assert '"cupom_code": beneficios["cupom_code"]' in block
     assert '"cupom_discount_applied": beneficios["desconto_cupom"]' in block
     assert '"forma_pagamento": "Cashback"' in block
-    assert "cupom_code=beneficios[\"cupom_code\"]" in block
-    assert "cupom_discount_applied=beneficios[\"desconto_cupom\"]" in block
+    assert 'cupom_code=beneficios["cupom_code"]' in block
+    assert 'cupom_discount_applied=beneficios["desconto_cupom"]' in block
 
 
 def test_funcionario_pdv_supports_credit_installments_from_erp_payment_rules():
@@ -231,7 +234,13 @@ def test_funcionario_pdv_collects_card_brand_nsu_and_erp_payment_rule():
     formas_block = extract_block(backend, "def listar_formas_pagamento_funcionario_pdv")
     finalizar_block = extract_block(backend, "def finalizar_venda_funcionario_pdv")
 
-    for field in ["bandeira", "operadora", "requer_nsu", "tipo_cartao", "split_parcelas"]:
+    for field in [
+        "bandeira",
+        "operadora",
+        "requer_nsu",
+        "tipo_cartao",
+        "split_parcelas",
+    ]:
         assert field in backend
         assert field in types
         assert field in service

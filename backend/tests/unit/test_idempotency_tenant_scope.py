@@ -98,7 +98,9 @@ async def test_idempotent_uses_user_and_tenant_dependency_to_create_scoped_key()
     assert db.added.tenant_id == TENANT_ID
     assert db.added.user_id == 42
     assert db.added.chave_idempotencia == "tenant-key-123456"
-    assert any("idempotency_keys.tenant_id" in fragment for fragment in db.queries[-1].filters)
+    assert any(
+        "idempotency_keys.tenant_id" in fragment for fragment in db.queries[-1].filters
+    )
 
 
 def test_cleanup_expired_keys_filters_by_tenant_id():
@@ -113,4 +115,6 @@ def test_cleanup_expired_keys_filters_by_tenant_id():
 
     assert db.queries
     assert db.queries[0].deleted is True
-    assert any("idempotency_keys.tenant_id" in fragment for fragment in db.queries[0].filters)
+    assert any(
+        "idempotency_keys.tenant_id" in fragment for fragment in db.queries[0].filters
+    )

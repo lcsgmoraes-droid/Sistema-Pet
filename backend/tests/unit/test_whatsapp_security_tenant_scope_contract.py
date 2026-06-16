@@ -68,16 +68,27 @@ def test_whatsapp_security_background_callers_manage_tenant_context():
     privacy_ops_source = _source("backend/app/services/lgpd_service.py")
     notification_source = _source("backend/app/campaigns/notification_service.py")
 
-    assert "from app.whatsapp.tenant_context import whatsapp_tenant_context" in security_source
+    assert (
+        "from app.whatsapp.tenant_context import whatsapp_tenant_context"
+        in security_source
+    )
     assert "with whatsapp_tenant_context(self.tenant_id)" in security_source
-    assert "from app.whatsapp.tenant_context import whatsapp_tenant_context" in privacy_ops_source
+    assert (
+        "from app.whatsapp.tenant_context import whatsapp_tenant_context"
+        in privacy_ops_source
+    )
     assert "with whatsapp_tenant_context(self.tenant_id)" in privacy_ops_source
-    assert "from app.whatsapp.tenant_context import whatsapp_tenant_context" in notification_source
+    assert (
+        "from app.whatsapp.tenant_context import whatsapp_tenant_context"
+        in notification_source
+    )
     assert "with whatsapp_tenant_context(tenant_id)" in notification_source
 
 
 def test_whatsapp_security_tenant_uuid_migration_exists():
-    source = _source("backend/alembic/versions/pp20260611a1_whatsapp_security_tenant_uuid.py")
+    source = _source(
+        "backend/alembic/versions/pp20260611a1_whatsapp_security_tenant_uuid.py"
+    )
 
     for table_name in (
         "data_privacy_consents",
@@ -87,5 +98,5 @@ def test_whatsapp_security_tenant_uuid_migration_exists():
     ):
         assert table_name in source
 
-    assert "postgresql_using=\"tenant_id::uuid\"" in source
+    assert 'postgresql_using="tenant_id::uuid"' in source
     assert "type_=postgresql.UUID(as_uuid=True)" in source

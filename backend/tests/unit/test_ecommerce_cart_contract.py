@@ -29,7 +29,9 @@ def test_quantidade_reservada_sem_status_ativo_retorna_zero_sem_consultar_db():
 
 
 def test_frontend_carrinho_atualiza_servidor_por_produto_id_e_nao_item_id():
-    source = (ROOT / "frontend/src/pages/ecommerce/useEcommerceCart.js").read_text(encoding="utf-8")
+    source = (ROOT / "frontend/src/pages/ecommerce/useEcommerceCart.js").read_text(
+        encoding="utf-8"
+    )
 
     assert "const produtoId = itemAtual?.produto_id" in source
     assert "'/api/carrinho/atualizar'" in source

@@ -9,12 +9,15 @@ Bugs originais — ``AttributeError`` em runtime, agora que a tabela existe em p
 
 Estes testes são leves (sem banco) e falhariam no código antigo.
 """
+
 import os
 import pathlib
 
 os.environ.setdefault("DATABASE_URL", "sqlite://")
 os.environ.setdefault("ENVIRONMENT", "test")
-os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-min-32-chars-long-for-security")
+os.environ.setdefault(
+    "JWT_SECRET_KEY", "test-secret-key-min-32-chars-long-for-security"
+)
 
 SERVICOS = pathlib.Path(__file__).resolve().parents[2] / "app" / "services"
 

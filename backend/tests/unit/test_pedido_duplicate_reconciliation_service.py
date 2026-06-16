@@ -8,8 +8,12 @@ def teardown_function():
     clear_context()
 
 
-def test_reconciliar_duplicidades_recentes_retorna_sem_execucao_quando_nao_ha_grupos(monkeypatch):
-    monkeypatch.setattr(service, "listar_grupos_duplicados_pedido_loja", lambda *args, **kwargs: [])
+def test_reconciliar_duplicidades_recentes_retorna_sem_execucao_quando_nao_ha_grupos(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        service, "listar_grupos_duplicados_pedido_loja", lambda *args, **kwargs: []
+    )
 
     resultado = service.reconciliar_duplicidades_recentes_pedido_loja(
         object(),
@@ -40,7 +44,9 @@ def test_reconciliar_duplicidades_recentes_consolida_grupo_seguro(monkeypatch):
     )
     chamadas = []
 
-    def fake_consolidar(db, *, tenant_id, pedido_id, source, auto_fix_applied, resolution_note):
+    def fake_consolidar(
+        db, *, tenant_id, pedido_id, source, auto_fix_applied, resolution_note
+    ):
         chamadas.append(
             {
                 "tenant_id": tenant_id,
@@ -59,7 +65,9 @@ def test_reconciliar_duplicidades_recentes_consolida_grupo_seguro(monkeypatch):
             "pedidos_bloqueados_ids": [],
         }
 
-    monkeypatch.setattr(service, "consolidar_duplicidades_seguras_pedido", fake_consolidar)
+    monkeypatch.setattr(
+        service, "consolidar_duplicidades_seguras_pedido", fake_consolidar
+    )
 
     resultado = service.reconciliar_duplicidades_recentes_pedido_loja(
         object(),
@@ -83,7 +91,9 @@ def test_reconciliar_duplicidades_recentes_consolida_grupo_seguro(monkeypatch):
     ]
 
 
-def test_reconciliar_duplicidades_recentes_mantem_grupo_bloqueado_sem_consolidar(monkeypatch):
+def test_reconciliar_duplicidades_recentes_mantem_grupo_bloqueado_sem_consolidar(
+    monkeypatch,
+):
     monkeypatch.setattr(
         service,
         "listar_grupos_duplicados_pedido_loja",
@@ -101,7 +111,9 @@ def test_reconciliar_duplicidades_recentes_mantem_grupo_bloqueado_sem_consolidar
     monkeypatch.setattr(
         service,
         "consolidar_duplicidades_seguras_pedido",
-        lambda *args, **kwargs: (_ for _ in ()).throw(AssertionError("nao deveria consolidar")),
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("nao deveria consolidar")
+        ),
     )
 
     resultado = service.reconciliar_duplicidades_recentes_pedido_loja(
@@ -119,7 +131,11 @@ def test_reconciliar_duplicidades_recentes_mantem_grupo_bloqueado_sem_consolidar
 
 
 def test_executar_reconciliacao_automatica_duplicidades_agrega_tenants(monkeypatch):
-    monkeypatch.setattr(service, "listar_tenants_com_duplicidades_recentes", lambda *args, **kwargs: ["tenant-1", "tenant-2"])
+    monkeypatch.setattr(
+        service,
+        "listar_tenants_com_duplicidades_recentes",
+        lambda *args, **kwargs: ["tenant-1", "tenant-2"],
+    )
     monkeypatch.setattr(
         service,
         "reconciliar_duplicidades_recentes_pedido_loja",
@@ -139,7 +155,9 @@ def test_executar_reconciliacao_automatica_duplicidades_agrega_tenants(monkeypat
     )
 
     assert resultado["tenants_processados"] == 2
-    assert resultado["correlation_id"].startswith("job.pedido-duplicate-reconciliation-")
+    assert resultado["correlation_id"].startswith(
+        "job.pedido-duplicate-reconciliation-"
+    )
     assert get_request_id() is None
     assert resultado["tenants_com_duplicidades"] == 2
     assert resultado["grupos_mapeados_total"] == 3

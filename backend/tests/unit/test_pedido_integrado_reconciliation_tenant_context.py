@@ -2,7 +2,11 @@ from uuid import UUID
 
 import app.services.pedido_duplicate_reconciliation_service as duplicate_service
 import app.services.pedido_status_reconciliation_service as status_service
-from app.tenancy.context import clear_current_tenant, get_current_tenant, set_current_tenant
+from app.tenancy.context import (
+    clear_current_tenant,
+    get_current_tenant,
+    set_current_tenant,
+)
 
 
 TENANT_A = UUID("11111111-1111-4111-8111-111111111111")
@@ -14,14 +18,18 @@ def teardown_function():
     clear_current_tenant()
 
 
-def test_status_reconciliation_discovers_tenants_with_authorized_global_sql(monkeypatch):
+def test_status_reconciliation_discovers_tenants_with_authorized_global_sql(
+    monkeypatch,
+):
     chamadas = []
 
     def fake_execute(db, sql, params=None, **kwargs):
         chamadas.append({"db": db, "sql": str(sql), "params": params or {}, **kwargs})
         return [("tenant-a",), ("tenant-b",)]
 
-    monkeypatch.setattr(status_service, "execute_tenant_safe_all", fake_execute, raising=False)
+    monkeypatch.setattr(
+        status_service, "execute_tenant_safe_all", fake_execute, raising=False
+    )
 
     db = object()
     resultado = status_service.listar_tenants_com_pedidos_reconciliaveis(db, dias=5)
@@ -48,7 +56,9 @@ def test_status_reconciliation_batch_ativa_contexto_por_tenant(monkeypatch):
         vistos.append((str(tenant_id), get_current_tenant()))
         return {"tenant_id": str(tenant_id), "pedidos_processados": 0}
 
-    monkeypatch.setattr(status_service, "reconciliar_status_pedidos_recentes", fake_reconciliar)
+    monkeypatch.setattr(
+        status_service, "reconciliar_status_pedidos_recentes", fake_reconciliar
+    )
 
     set_current_tenant(PREVIOUS_TENANT)
 
@@ -63,14 +73,18 @@ def test_status_reconciliation_batch_ativa_contexto_por_tenant(monkeypatch):
     assert get_current_tenant() == PREVIOUS_TENANT
 
 
-def test_duplicate_reconciliation_discovers_tenants_with_authorized_global_sql(monkeypatch):
+def test_duplicate_reconciliation_discovers_tenants_with_authorized_global_sql(
+    monkeypatch,
+):
     chamadas = []
 
     def fake_execute(db, sql, params=None, **kwargs):
         chamadas.append({"db": db, "sql": str(sql), "params": params or {}, **kwargs})
         return [("tenant-a",), ("tenant-b",)]
 
-    monkeypatch.setattr(duplicate_service, "execute_tenant_safe_all", fake_execute, raising=False)
+    monkeypatch.setattr(
+        duplicate_service, "execute_tenant_safe_all", fake_execute, raising=False
+    )
 
     db = object()
     resultado = duplicate_service.listar_tenants_com_duplicidades_recentes(db, dias=4)
@@ -97,14 +111,20 @@ def test_duplicate_reconciliation_batch_ativa_contexto_por_tenant(monkeypatch):
         vistos.append((str(tenant_id), get_current_tenant()))
         return {"tenant_id": str(tenant_id), "grupos_mapeados": 0}
 
-    monkeypatch.setattr(duplicate_service, "reconciliar_duplicidades_recentes_pedido_loja", fake_reconciliar)
+    monkeypatch.setattr(
+        duplicate_service,
+        "reconciliar_duplicidades_recentes_pedido_loja",
+        fake_reconciliar,
+    )
 
     set_current_tenant(PREVIOUS_TENANT)
 
-    resultado = duplicate_service.executar_reconciliacao_automatica_duplicidades_pedidos(
-        object(),
-        dias=3,
-        _correlation_context_applied=True,
+    resultado = (
+        duplicate_service.executar_reconciliacao_automatica_duplicidades_pedidos(
+            object(),
+            dias=3,
+            _correlation_context_applied=True,
+        )
     )
 
     assert resultado["tenants_processados"] == 2

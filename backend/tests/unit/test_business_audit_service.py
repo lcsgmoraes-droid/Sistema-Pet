@@ -7,7 +7,9 @@ from app.middlewares.request_context import clear_request_context, set_request_i
 from app.services import business_audit_service
 
 
-def test_log_business_event_records_request_id_and_redacts_sensitive_metadata(monkeypatch):
+def test_log_business_event_records_request_id_and_redacts_sensitive_metadata(
+    monkeypatch,
+):
     captured = {}
     structured_logs = []
 
@@ -101,13 +103,17 @@ def test_log_business_event_truncates_action_name(monkeypatch):
 def test_calculate_manual_discount_amount_ignores_coupon_discount():
     venda = SimpleNamespace(desconto_valor=40, cupom_discount_applied=15)
 
-    assert business_audit_service.calculate_manual_discount_amount(venda) == pytest.approx(25.0)
+    assert business_audit_service.calculate_manual_discount_amount(
+        venda
+    ) == pytest.approx(25.0)
 
 
 def test_calculate_manual_discount_amount_returns_zero_when_discount_is_coupon_only():
     venda = SimpleNamespace(desconto_valor=20, cupom_discount_applied=20)
 
-    assert business_audit_service.calculate_manual_discount_amount(venda) == pytest.approx(0.0)
+    assert business_audit_service.calculate_manual_discount_amount(
+        venda
+    ) == pytest.approx(0.0)
 
 
 def test_build_sale_reopened_metadata_keeps_reversal_results():
@@ -190,7 +196,9 @@ def test_build_user_access_metadata_normalizes_actor_target_and_role():
 
 
 def test_build_module_activation_metadata_records_before_after_state():
-    tenant = SimpleNamespace(id=UUID("11111111-1111-1111-1111-111111111111"), plan="basico")
+    tenant = SimpleNamespace(
+        id=UUID("11111111-1111-1111-1111-111111111111"), plan="basico"
+    )
 
     metadata = business_audit_service.build_module_activation_metadata(
         tenant=tenant,

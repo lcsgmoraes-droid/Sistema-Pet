@@ -42,8 +42,14 @@ def test_whatsapp_core_models_are_tenant_scoped_with_uuid_tenant_id():
 
 def test_handoff_session_ids_match_legacy_whatsapp_session_text_ids():
     assert str(WhatsAppSession.__table__.c.id.type).upper() in {"VARCHAR", "TEXT"}
-    assert str(WhatsAppHandoff.__table__.c.session_id.type).upper() in {"VARCHAR", "TEXT"}
-    assert str(WhatsAppInternalNote.__table__.c.session_id.type).upper() in {"VARCHAR", "TEXT"}
+    assert str(WhatsAppHandoff.__table__.c.session_id.type).upper() in {
+        "VARCHAR",
+        "TEXT",
+    }
+    assert str(WhatsAppInternalNote.__table__.c.session_id.type).upper() in {
+        "VARCHAR",
+        "TEXT",
+    }
 
 
 def test_whatsapp_config_routes_use_selected_tenant_dependency():
@@ -102,21 +108,45 @@ def test_whatsapp_public_and_background_paths_manage_tenant_context():
     tools_source = _source("backend/app/whatsapp/tools.py")
     vet_exam_files_source = _source("backend/app/veterinario_exames_arquivos.py")
 
-    assert "from app.whatsapp.tenant_context import whatsapp_tenant_context" in webhook_source
+    assert (
+        "from app.whatsapp.tenant_context import whatsapp_tenant_context"
+        in webhook_source
+    )
     assert webhook_source.count("with whatsapp_tenant_context(tenant_id)") >= 4
-    assert "from app.whatsapp.tenant_context import whatsapp_tenant_context" in sender_source
+    assert (
+        "from app.whatsapp.tenant_context import whatsapp_tenant_context"
+        in sender_source
+    )
     assert "with whatsapp_tenant_context(tenant_id)" in sender_source
-    assert "from app.whatsapp.tenant_context import whatsapp_tenant_context" in processor_source
+    assert (
+        "from app.whatsapp.tenant_context import whatsapp_tenant_context"
+        in processor_source
+    )
     assert processor_source.count("with whatsapp_tenant_context(self.tenant_id)") >= 2
-    assert "from app.whatsapp.tenant_context import whatsapp_tenant_context" in context_builder_source
+    assert (
+        "from app.whatsapp.tenant_context import whatsapp_tenant_context"
+        in context_builder_source
+    )
     assert "with whatsapp_tenant_context(tenant_id)" in context_builder_source
-    assert "from app.whatsapp.tenant_context import whatsapp_tenant_context" in context_manager_source
+    assert (
+        "from app.whatsapp.tenant_context import whatsapp_tenant_context"
+        in context_manager_source
+    )
     assert "with whatsapp_tenant_context(tenant_id)" in context_manager_source
-    assert "from app.whatsapp.tenant_context import whatsapp_tenant_context" in function_handlers_source
+    assert (
+        "from app.whatsapp.tenant_context import whatsapp_tenant_context"
+        in function_handlers_source
+    )
     assert "with whatsapp_tenant_context(tenant_id)" in function_handlers_source
-    assert "from app.whatsapp.tenant_context import whatsapp_tenant_context" in tools_source
+    assert (
+        "from app.whatsapp.tenant_context import whatsapp_tenant_context"
+        in tools_source
+    )
     assert "with whatsapp_tenant_context(self.tenant_id)" in tools_source
-    assert "from .whatsapp.tenant_context import whatsapp_tenant_context" in vet_exam_files_source
+    assert (
+        "from .whatsapp.tenant_context import whatsapp_tenant_context"
+        in vet_exam_files_source
+    )
     assert "with whatsapp_tenant_context(tenant_id)" in vet_exam_files_source
 
 

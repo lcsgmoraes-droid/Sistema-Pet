@@ -25,12 +25,18 @@ def test_transferencia_parceiro_routes_ficam_em_router_dedicado():
     assert ("/estoque/transferencia-parceiro/historico", "GET") in routes
     assert ("/estoque/transferencia-parceiro/{conta_receber_id}/pdf", "GET") in routes
     assert ("/estoque/transferencia-parceiro/pdf-consolidado", "POST") in routes
-    assert ("/estoque/transferencia-parceiro/{conta_receber_id}/enviar-email", "POST") in routes
+    assert (
+        "/estoque/transferencia-parceiro/{conta_receber_id}/enviar-email",
+        "POST",
+    ) in routes
     assert (
         "/estoque/transferencia-parceiro/{conta_receber_id}/contas-pagar-compensacao",
         "GET",
     ) in routes
-    assert ("/estoque/transferencia-parceiro/{conta_receber_id}/receber", "POST") in routes
+    assert (
+        "/estoque/transferencia-parceiro/{conta_receber_id}/receber",
+        "POST",
+    ) in routes
     assert ("/estoque/transferencia-parceiro/{conta_receber_id}", "DELETE") in routes
 
 
@@ -52,6 +58,6 @@ def test_main_registra_router_de_transferencia_parceiro():
         "router as estoque_transferencia_parceiro_router"
     ) in main_source
     assert (
-        'app.include_router(estoque_transferencia_parceiro_router, '
+        "app.include_router(estoque_transferencia_parceiro_router, "
         'tags=["Estoque - Transferencia Parceiro"])'
     ) in main_source

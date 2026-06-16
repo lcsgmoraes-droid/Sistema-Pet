@@ -41,7 +41,9 @@ class FakeDb:
 
 
 def _produto(estoque=10):
-    return SimpleNamespace(id=10, nome="Racao Teste", estoque_atual=float(estoque), preco_custo=8.5)
+    return SimpleNamespace(
+        id=10, nome="Racao Teste", estoque_atual=float(estoque), preco_custo=8.5
+    )
 
 
 def _lote(validade, quantidade=3, status="ativo"):
@@ -57,7 +59,11 @@ def _lote(validade, quantidade=3, status="ativo"):
 
 
 def test_bloquear_lote_reduz_vendavel_e_marca_lote_como_bloqueado(monkeypatch):
-    monkeypatch.setattr(EstoqueService, "_resolver_user_id_operacao", staticmethod(lambda **kwargs: kwargs["user_id"]))
+    monkeypatch.setattr(
+        EstoqueService,
+        "_resolver_user_id_operacao",
+        staticmethod(lambda **kwargs: kwargs["user_id"]),
+    )
     db = FakeDb()
     produto = _produto(estoque=10)
     lote = _lote(datetime(2026, 6, 5, tzinfo=timezone.utc), quantidade=3)
@@ -80,10 +86,18 @@ def test_bloquear_lote_reduz_vendavel_e_marca_lote_como_bloqueado(monkeypatch):
 
 
 def test_descartar_bloqueio_nao_reduz_vendavel_duas_vezes(monkeypatch):
-    monkeypatch.setattr(EstoqueService, "_resolver_user_id_operacao", staticmethod(lambda **kwargs: kwargs["user_id"]))
+    monkeypatch.setattr(
+        EstoqueService,
+        "_resolver_user_id_operacao",
+        staticmethod(lambda **kwargs: kwargs["user_id"]),
+    )
     db = FakeDb()
     produto = _produto(estoque=7)
-    lote = _lote(datetime(2026, 6, 5, tzinfo=timezone.utc), quantidade=3, status="bloqueado_validade")
+    lote = _lote(
+        datetime(2026, 6, 5, tzinfo=timezone.utc),
+        quantidade=3,
+        status="bloqueado_validade",
+    )
     bloqueio = SimpleNamespace(
         id=99,
         produto=produto,

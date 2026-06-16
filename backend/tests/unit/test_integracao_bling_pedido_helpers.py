@@ -85,7 +85,9 @@ def test_resumir_ultima_nf_do_pedido_bling_enriquece_detalhes_via_api(monkeypatc
 
 
 def test_resumir_ultima_nf_do_pedido_bling_ignora_id_zero_sem_chamar_api(monkeypatch):
-    bling_factory = Mock(side_effect=AssertionError("nao deveria consultar Bling para NF 0"))
+    bling_factory = Mock(
+        side_effect=AssertionError("nao deveria consultar Bling para NF 0")
+    )
     monkeypatch.setattr("app.bling_integration.BlingAPI", bling_factory)
 
     resumo = _resumir_ultima_nf_do_pedido_bling(
@@ -183,8 +185,13 @@ def test_montar_payload_pedido_substitui_placeholder_ultima_nf_por_nf_real():
 
 
 def test_numero_pedido_loja_do_payload_prioriza_pedido_e_faz_fallback():
-    assert numero_pedido_loja_do_payload({"pedido": {"numeroPedidoLoja": "LOJA-1"}}) == "LOJA-1"
-    assert numero_pedido_loja_do_payload({"webhook": {"numeroLoja": "LOJA-2"}}) == "LOJA-2"
+    assert (
+        numero_pedido_loja_do_payload({"pedido": {"numeroPedidoLoja": "LOJA-1"}})
+        == "LOJA-1"
+    )
+    assert (
+        numero_pedido_loja_do_payload({"webhook": {"numeroLoja": "LOJA-2"}}) == "LOJA-2"
+    )
 
 
 def test_ultima_nf_do_payload_ignora_placeholder_e_faz_fallback_para_nota_fiscal_do_pedido():
@@ -223,7 +230,9 @@ def test_registrar_alias_bling_no_payload_evita_duplicidade():
 
 
 def test_marcar_payload_como_mesclado_sinaliza_canonico():
-    pedido_canonico = SimpleNamespace(id=10, pedido_bling_id="25438349686", pedido_bling_numero="11629")
+    pedido_canonico = SimpleNamespace(
+        id=10, pedido_bling_id="25438349686", pedido_bling_numero="11629"
+    )
 
     payload = marcar_payload_como_mesclado(
         {"pedido": {"numeroPedidoLoja": "260330GDQVHGXX"}},
@@ -414,10 +423,17 @@ def test_confirmar_pedido_so_marca_item_vendido_apos_baixa(monkeypatch):
     )
     monkeypatch.setattr(
         "app.integracao_bling_pedido_routes.EstoqueReservaService.confirmar_venda",
-        lambda db_arg, item_arg: (confirmados.append(item_arg.sku), setattr(item_arg, "vendido_em", "ok")),
+        lambda db_arg, item_arg: (
+            confirmados.append(item_arg.sku),
+            setattr(item_arg, "vendido_em", "ok"),
+        ),
     )
-    monkeypatch.setattr("app.integracao_bling_pedido_routes.registrar_evento", lambda **kwargs: None)
-    monkeypatch.setattr("app.integracao_bling_pedido_routes.abrir_incidente", lambda **kwargs: None)
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes.registrar_evento", lambda **kwargs: None
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes.abrir_incidente", lambda **kwargs: None
+    )
 
     erros = _confirmar_pedido(
         db=db,
@@ -453,8 +469,12 @@ def test_confirmar_pedido_mantem_reserva_quando_baixa_falha(monkeypatch):
         "app.integracao_bling_pedido_routes.EstoqueReservaService.confirmar_venda",
         lambda db_arg, item_arg: confirmados.append(item_arg.sku),
     )
-    monkeypatch.setattr("app.integracao_bling_pedido_routes.registrar_evento", lambda **kwargs: None)
-    monkeypatch.setattr("app.integracao_bling_pedido_routes.abrir_incidente", lambda **kwargs: None)
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes.registrar_evento", lambda **kwargs: None
+    )
+    monkeypatch.setattr(
+        "app.integracao_bling_pedido_routes.abrir_incidente", lambda **kwargs: None
+    )
 
     erros = _confirmar_pedido(
         db=db,

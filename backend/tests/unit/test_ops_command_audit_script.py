@@ -10,7 +10,9 @@ BASH = Path("C:/Program Files/Git/bin/bash.exe")
 SCRIPT = ROOT / "scripts" / "auditar_comando_producao.sh"
 
 
-def _run_audited_command(tmp_path: Path, *args: str) -> tuple[subprocess.CompletedProcess[str], Path]:
+def _run_audited_command(
+    tmp_path: Path, *args: str
+) -> tuple[subprocess.CompletedProcess[str], Path]:
     log_path = tmp_path / "ops_command_events.jsonl"
     env = os.environ.copy()
     env["OPS_COMMAND_AUDIT_LOG_PATH"] = log_path.as_posix()

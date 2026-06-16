@@ -32,7 +32,9 @@ def _agenda_item(status="agendado"):
         lembrete_minutos=30,
         observacoes_agenda="Administrar apos alimentacao",
         executado_por="Dra. Ana" if status == "concluido" else None,
-        horario_execucao=datetime(2026, 4, 24, 10, 35) if status == "concluido" else None,
+        horario_execucao=datetime(2026, 4, 24, 10, 35)
+        if status == "concluido"
+        else None,
         observacao_execucao="Sem reacao" if status == "concluido" else None,
         status=status,
         procedimento_evolucao_id=99 if status == "concluido" else None,
@@ -53,7 +55,9 @@ def test_serializa_agenda_de_internacao_no_contrato_do_frontend():
 
 
 def test_payload_clinico_da_agenda_nao_marca_baixa_de_estoque_automatica():
-    payload = _build_payload_procedimento_agenda_internacao(_agenda_item(status="concluido"))
+    payload = _build_payload_procedimento_agenda_internacao(
+        _agenda_item(status="concluido")
+    )
 
     assert payload["status"] == "concluido"
     assert payload["tipo_registro"] == "procedimento_agendado"
@@ -67,7 +71,9 @@ def test_consulta_finalizada_bloqueia_novos_lancamentos_satelites():
     consulta = SimpleNamespace(status="finalizada")
 
     with pytest.raises(HTTPException) as exc:
-        _bloquear_lancamento_em_consulta_finalizada(consulta, "nova prescricao vinculada")
+        _bloquear_lancamento_em_consulta_finalizada(
+            consulta, "nova prescricao vinculada"
+        )
 
     assert exc.value.status_code == 409
     assert "Consulta finalizada" in exc.value.detail

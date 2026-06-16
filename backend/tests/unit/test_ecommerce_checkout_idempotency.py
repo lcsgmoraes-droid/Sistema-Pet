@@ -82,7 +82,9 @@ def test_checkout_idempotency_hash_muda_ao_alterar_retirada_drive():
 def test_checkout_aceita_somente_pagamentos_online():
     assert _classificar_forma_pagamento_online("PIX") == "pix"
     assert _classificar_forma_pagamento_online("Débito Visa") == "cartao_debito"
-    assert _classificar_forma_pagamento_online("Credito Mastercard 3x") == "cartao_credito"
+    assert (
+        _classificar_forma_pagamento_online("Credito Mastercard 3x") == "cartao_credito"
+    )
     assert _classificar_forma_pagamento_online("Dinheiro") is None
     assert _classificar_forma_pagamento_online(None) is None
 

@@ -10,7 +10,10 @@ from app import notas_entrada_routes as routes  # noqa: E402
 
 BACKEND_ROOT = Path(__file__).resolve().parents[2]
 MIGRATION_EAN_TRIBUTARIO = (
-    BACKEND_ROOT / "alembic" / "versions" / "pg20260604a1_add_ean_tributario_notas_entrada.py"
+    BACKEND_ROOT
+    / "alembic"
+    / "versions"
+    / "pg20260604a1_add_ean_tributario_notas_entrada.py"
 )
 
 
@@ -118,7 +121,9 @@ def test_parse_nfe_xml_extrai_ean_comercial_e_ean_tributario():
 
 def test_migration_ean_tributario_aumenta_coluna_antes_do_backfill():
     source = MIGRATION_EAN_TRIBUTARIO.read_text(encoding="utf-8")
-    upgrade_source = source[source.index("def upgrade()") : source.index("def downgrade()")]
+    upgrade_source = source[
+        source.index("def upgrade()") : source.index("def downgrade()")
+    ]
 
     alter_gtin_tributario = upgrade_source.index('"gtin_ean_tributario"')
     backfill = upgrade_source.index("_preencher_codigos_existentes()")
@@ -188,7 +193,9 @@ def test_monta_lotes_entrada_com_multiplos_rastros_do_xml():
     </nfeProc>
     """
     lotes_por_item = routes._mapear_lotes_rastro_xml(xml)
-    item = SimpleNamespace(numero_item=10, lote="86925", data_validade=date(2027, 11, 29))
+    item = SimpleNamespace(
+        numero_item=10, lote="86925", data_validade=date(2027, 11, 29)
+    )
     nota = SimpleNamespace(numero_nota="231564")
 
     lotes = routes._montar_lotes_entrada_item(

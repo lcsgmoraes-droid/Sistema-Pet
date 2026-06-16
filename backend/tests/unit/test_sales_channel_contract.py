@@ -42,30 +42,47 @@ def test_normalize_sales_channel_aplica_default_explicito():
 
 
 def test_resolve_checkout_sales_channel_prioriza_payload_depois_headers():
-    assert resolve_checkout_sales_channel(
-        SimpleNamespace(origem="app"),
-        SimpleNamespace(headers={"X-Client-Channel": "web"}),
-    ) == CANAL_APP
+    assert (
+        resolve_checkout_sales_channel(
+            SimpleNamespace(origem="app"),
+            SimpleNamespace(headers={"X-Client-Channel": "web"}),
+        )
+        == CANAL_APP
+    )
 
-    assert resolve_checkout_sales_channel(
-        SimpleNamespace(origem=None),
-        SimpleNamespace(headers={"X-Client-Channel": "mobile", "X-Canal-Venda": "web"}),
-    ) == CANAL_APP
+    assert (
+        resolve_checkout_sales_channel(
+            SimpleNamespace(origem=None),
+            SimpleNamespace(
+                headers={"X-Client-Channel": "mobile", "X-Canal-Venda": "web"}
+            ),
+        )
+        == CANAL_APP
+    )
 
-    assert resolve_checkout_sales_channel(
-        SimpleNamespace(origem=None),
-        SimpleNamespace(headers={"X-Canal-Venda": "site"}),
-    ) == CANAL_ECOMMERCE
+    assert (
+        resolve_checkout_sales_channel(
+            SimpleNamespace(origem=None),
+            SimpleNamespace(headers={"X-Canal-Venda": "site"}),
+        )
+        == CANAL_ECOMMERCE
+    )
 
-    assert resolve_checkout_sales_channel(
-        SimpleNamespace(origem=None),
-        SimpleNamespace(headers={}),
-    ) == CANAL_ECOMMERCE
+    assert (
+        resolve_checkout_sales_channel(
+            SimpleNamespace(origem=None),
+            SimpleNamespace(headers={}),
+        )
+        == CANAL_ECOMMERCE
+    )
 
-    assert resolve_checkout_sales_channel(
-        SimpleNamespace(origem="pdv"),
-        SimpleNamespace(headers={}),
-    ) == CANAL_ECOMMERCE
+    assert (
+        resolve_checkout_sales_channel(
+            SimpleNamespace(origem="pdv"),
+            SimpleNamespace(headers={}),
+        )
+        == CANAL_ECOMMERCE
+    )
 
 
 def test_online_sales_channel_e_campanhas_usam_mesma_normalizacao():

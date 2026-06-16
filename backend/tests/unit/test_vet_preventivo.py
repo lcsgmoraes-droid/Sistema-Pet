@@ -35,22 +35,30 @@ def test_normalizar_especie_calendario_aliases():
 
 
 def test_montar_calendario_preventivo_mescla_base_e_personalizado_canino():
-    db = _FakeDb([
-        SimpleNamespace(
-            id=5,
-            nome="V10 personalizada",
-            especie="cao",
-            dose_inicial_semanas=8,
-            intervalo_doses_dias=21,
-            numero_doses_serie=3,
-            reforco_anual=True,
-            observacoes="Protocolo da clinica",
-        )
-    ])
+    db = _FakeDb(
+        [
+            SimpleNamespace(
+                id=5,
+                nome="V10 personalizada",
+                especie="cao",
+                dose_inicial_semanas=8,
+                intervalo_doses_dias=21,
+                numero_doses_serie=3,
+                reforco_anual=True,
+                observacoes="Protocolo da clinica",
+            )
+        ]
+    )
 
     calendario = montar_calendario_preventivo(db, "tenant-a", "canino")
 
     assert calendario["especie_filtro"] == "cão"
     assert calendario["total"] > 1
-    assert any(item["fonte"] == "padrao" and item["especie"] == "cão" for item in calendario["items"])
-    assert any(item["fonte"] == "personalizado" and item["vacina"] == "V10 personalizada" for item in calendario["items"])
+    assert any(
+        item["fonte"] == "padrao" and item["especie"] == "cão"
+        for item in calendario["items"]
+    )
+    assert any(
+        item["fonte"] == "personalizado" and item["vacina"] == "V10 personalizada"
+        for item in calendario["items"]
+    )

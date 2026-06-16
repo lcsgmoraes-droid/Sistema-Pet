@@ -81,7 +81,9 @@ def test_extrato_contabiliza_insumo_manual_quando_procedimento_nao_tem_valor():
         produtos_por_id={11: produto},
     )
 
-    contabilizadas = [linha for linha in extrato["linhas"] if linha["contabilizar_total"]]
+    contabilizadas = [
+        linha for linha in extrato["linhas"] if linha["contabilizar_total"]
+    ]
     assert len(contabilizadas) == 1
     assert contabilizadas[0]["origem"] == "insumo_consulta"
     assert contabilizadas[0]["preco_total"] == 7.5
@@ -92,7 +94,10 @@ def test_extrato_contabiliza_insumo_manual_quando_procedimento_nao_tem_valor():
 def test_colunas_do_extrato_sao_normalizadas_sem_duplicar():
     extratos = _extratos()
 
-    assert extratos.normalizar_colunas_extrato("nome,preco_total,nome,x") == ["nome", "preco_total"]
+    assert extratos.normalizar_colunas_extrato("nome,preco_total,nome,x") == [
+        "nome",
+        "preco_total",
+    ]
     assert extratos.normalizar_colunas_extrato([]) == extratos.EXTRATO_COLUNAS_DEFAULT
 
 

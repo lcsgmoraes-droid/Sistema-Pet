@@ -67,7 +67,9 @@ def test_registrar_evento_syncs_rls_tenant_before_flush(monkeypatch):
     def fake_sync(db, tenant_id):
         session.events.append(("sync", db, tenant_id))
 
-    monkeypatch.setattr(bling_flow_monitor_service, "sync_rls_tenant", fake_sync, raising=False)
+    monkeypatch.setattr(
+        bling_flow_monitor_service, "sync_rls_tenant", fake_sync, raising=False
+    )
 
     event_id = bling_flow_monitor_service.registrar_evento(
         tenant_id="11111111-1111-1111-1111-111111111111",
@@ -77,7 +79,11 @@ def test_registrar_evento_syncs_rls_tenant_before_flush(monkeypatch):
     )
 
     assert event_id == 123
-    assert session.events[0] == ("sync", session, "11111111-1111-1111-1111-111111111111")
+    assert session.events[0] == (
+        "sync",
+        session,
+        "11111111-1111-1111-1111-111111111111",
+    )
     assert session.events[-1] == "flush"
 
 
@@ -87,7 +93,9 @@ def test_abrir_incidente_syncs_rls_tenant_before_query(monkeypatch):
     def fake_sync(db, tenant_id):
         session.events.append(("sync", db, tenant_id))
 
-    monkeypatch.setattr(bling_flow_monitor_service, "sync_rls_tenant", fake_sync, raising=False)
+    monkeypatch.setattr(
+        bling_flow_monitor_service, "sync_rls_tenant", fake_sync, raising=False
+    )
 
     incidente = bling_flow_monitor_service.abrir_incidente(
         tenant_id="22222222-2222-2222-2222-222222222222",
@@ -101,7 +109,11 @@ def test_abrir_incidente_syncs_rls_tenant_before_query(monkeypatch):
     )
 
     assert incidente is session.added[0]
-    assert session.events[0] == ("sync", session, "22222222-2222-2222-2222-222222222222")
+    assert session.events[0] == (
+        "sync",
+        session,
+        "22222222-2222-2222-2222-222222222222",
+    )
     assert session.events[1] == "query"
 
 
@@ -137,7 +149,9 @@ def test_diagnosticar_pedido_confirmado_sem_baixa_e_item_nao_confirmado():
     pedido = SimpleNamespace(id=2, pedido_bling_id="BL-2", status="confirmado")
     itens = [
         SimpleNamespace(sku="SKU-1", vendido_em=None, liberado_em=None),
-        SimpleNamespace(sku="SKU-2", vendido_em="2026-03-28T10:00:00", liberado_em=None),
+        SimpleNamespace(
+            sku="SKU-2", vendido_em="2026-03-28T10:00:00", liberado_em=None
+        ),
     ]
 
     incidentes = diagnosticar_pedido_integrado(
@@ -160,7 +174,9 @@ def test_diagnosticar_pedido_confirmado_sem_baixa_e_item_nao_confirmado():
 def test_diagnosticar_pedido_confirmado_aponta_saida_sem_nf_atual():
     pedido = SimpleNamespace(id=22, pedido_bling_id="BL-22", status="confirmado")
     itens = [
-        SimpleNamespace(sku="SKU-1", vendido_em="2026-03-31T04:00:00", liberado_em=None),
+        SimpleNamespace(
+            sku="SKU-1", vendido_em="2026-03-31T04:00:00", liberado_em=None
+        ),
     ]
 
     incidentes = diagnosticar_pedido_integrado(
@@ -171,7 +187,11 @@ def test_diagnosticar_pedido_confirmado_aponta_saida_sem_nf_atual():
         movimentacoes_saida_nf=0,
     )
 
-    incidente = next(item for item in incidentes if item["code"] == "PEDIDO_CONFIRMADO_SEM_BAIXA_ESTOQUE")
+    incidente = next(
+        item
+        for item in incidentes
+        if item["code"] == "PEDIDO_CONFIRMADO_SEM_BAIXA_ESTOQUE"
+    )
 
     assert incidente["details"]["movimentacoes_saida"] == 1
     assert incidente["details"]["movimentacoes_saida_nf"] == 0
@@ -179,9 +199,13 @@ def test_diagnosticar_pedido_confirmado_aponta_saida_sem_nf_atual():
 
 
 def test_diagnosticar_pedido_confirmado_usa_nf_detectada_do_cache_para_apontar_baixa_faltante():
-    pedido = SimpleNamespace(id=23, pedido_bling_id="BL-23", status="confirmado", payload={})
+    pedido = SimpleNamespace(
+        id=23, pedido_bling_id="BL-23", status="confirmado", payload={}
+    )
     itens = [
-        SimpleNamespace(sku="SKU-1", vendido_em="2026-03-31T04:00:00", liberado_em=None),
+        SimpleNamespace(
+            sku="SKU-1", vendido_em="2026-03-31T04:00:00", liberado_em=None
+        ),
     ]
 
     incidentes = diagnosticar_pedido_integrado(
@@ -200,7 +224,11 @@ def test_diagnosticar_pedido_confirmado_usa_nf_detectada_do_cache_para_apontar_b
         ],
     )
 
-    incidente = next(item for item in incidentes if item["code"] == "PEDIDO_CONFIRMADO_SEM_BAIXA_ESTOQUE")
+    incidente = next(
+        item
+        for item in incidentes
+        if item["code"] == "PEDIDO_CONFIRMADO_SEM_BAIXA_ESTOQUE"
+    )
 
     assert incidente["nf_bling_id"] == "NF-23"
     assert incidente["details"]["nf_detectada"]["numero"] == "011100"
@@ -303,7 +331,9 @@ def test_nf_detectada_combina_com_pedido_rejeita_loja_divergente():
     assert detalhes["motivo"] == "loja_divergente"
 
 
-def test_obter_nfs_recentes_bling_enriquece_resumo_quando_lista_nao_traz_pedido_loja(monkeypatch):
+def test_obter_nfs_recentes_bling_enriquece_resumo_quando_lista_nao_traz_pedido_loja(
+    monkeypatch,
+):
     class _FakeBlingAPI:
         def listar_nfes(self, data_inicial=None, data_final=None):
             return {
@@ -380,7 +410,9 @@ def test_obter_nfs_recentes_bling_prefere_cache_local(monkeypatch):
             return _FakeQuery()
 
     def _bling_nao_deveria_ser_usado():
-        raise AssertionError("Nao deveria consultar a API quando o cache local ja possui as NFs")
+        raise AssertionError(
+            "Nao deveria consultar a API quando o cache local ja possui as NFs"
+        )
 
     monkeypatch.setattr("app.bling_integration.BlingAPI", _bling_nao_deveria_ser_usado)
     _nf_recentes_cache.clear()
@@ -413,7 +445,10 @@ def test_registrar_vinculo_nf_pedido_monta_payload_com_relacao(monkeypatch):
         capturado.update(kwargs)
         return 77
 
-    monkeypatch.setattr("app.services.bling_flow_monitor_service.registrar_evento", _fake_registrar_evento)
+    monkeypatch.setattr(
+        "app.services.bling_flow_monitor_service.registrar_evento",
+        _fake_registrar_evento,
+    )
     pedido = SimpleNamespace(
         id=15,
         tenant_id="tenant-1",
@@ -457,7 +492,10 @@ def test_registrar_vinculo_nf_pedido_resolve_incidentes_quando_recebe_db(monkeyp
         capturado_resolucao.update(kwargs)
         return 3
 
-    monkeypatch.setattr("app.services.bling_flow_monitor_service.registrar_evento", _fake_registrar_evento)
+    monkeypatch.setattr(
+        "app.services.bling_flow_monitor_service.registrar_evento",
+        _fake_registrar_evento,
+    )
     monkeypatch.setattr(
         "app.services.bling_flow_monitor_service.resolver_incidentes_relacionados",
         _fake_resolver_incidentes_relacionados,
@@ -521,7 +559,9 @@ def test_reconciliar_pedido_confirmado_so_confirma_item_apos_baixa(monkeypatch):
     assert detalhes["nf_id"] == "NF-11598"
 
 
-def test_reconciliar_pedido_confirmado_nao_confirma_item_quando_baixa_falha(monkeypatch):
+def test_reconciliar_pedido_confirmado_nao_confirma_item_quando_baixa_falha(
+    monkeypatch,
+):
     db = Mock()
     pedido = SimpleNamespace(
         id=1088,
@@ -653,7 +693,9 @@ def test_reconciliar_pedido_confirmado_busca_nf_autorizada_no_cache_local(monkey
     assert chamadas["nf_id"] == "25428517969"
 
 
-def test_reconciliar_pedido_confirmado_trata_nf_conflitante_como_remediacao_sucesso(monkeypatch):
+def test_reconciliar_pedido_confirmado_trata_nf_conflitante_como_remediacao_sucesso(
+    monkeypatch,
+):
     pedido = SimpleNamespace(
         id=1099,
         tenant_id="tenant-1",
@@ -662,7 +704,11 @@ def test_reconciliar_pedido_confirmado_trata_nf_conflitante_como_remediacao_suce
         status="confirmado",
         confirmado_em=None,
         payload={
-            "ultima_nf": {"id": "25441651448", "numero": "011089", "situacao": "Autorizada"},
+            "ultima_nf": {
+                "id": "25441651448",
+                "numero": "011089",
+                "situacao": "Autorizada",
+            },
         },
     )
     item = SimpleNamespace(sku="019516.1/1", quantidade=1, vendido_em=None)

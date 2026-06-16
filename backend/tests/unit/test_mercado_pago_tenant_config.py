@@ -104,7 +104,9 @@ def test_save_config_preserva_valores_sensiveis_quando_campos_vazios(monkeypatch
 
     import app.services.ecommerce_payment_config as service
 
-    monkeypatch.setattr(service, "get_mercado_pago_config", lambda db, tenant_id: config)
+    monkeypatch.setattr(
+        service, "get_mercado_pago_config", lambda db, tenant_id: config
+    )
     db = Db()
 
     saved = save_mercado_pago_config(
@@ -124,11 +126,15 @@ def test_save_config_preserva_valores_sensiveis_quando_campos_vazios(monkeypatch
     assert decrypt_secret(saved.access_token_encrypted) == "existing-access-token"
     assert decrypt_secret(saved.webhook_secret_encrypted) == "existing-webhook-secret"
     assert saved.oauth_client_id == "existing-client-id"
-    assert decrypt_secret(saved.oauth_client_secret_encrypted) == "existing-client-secret"
+    assert (
+        decrypt_secret(saved.oauth_client_secret_encrypted) == "existing-client-secret"
+    )
     assert db.committed is True
 
 
-def test_save_config_ativa_com_oauth_sem_access_token_para_permitir_conectar(monkeypatch):
+def test_save_config_ativa_com_oauth_sem_access_token_para_permitir_conectar(
+    monkeypatch,
+):
     monkeypatch.setenv("JWT_SECRET_KEY", "tenant-secret-for-oauth-save-tests")
     config = SimpleNamespace(
         enabled=False,
@@ -157,7 +163,9 @@ def test_save_config_ativa_com_oauth_sem_access_token_para_permitir_conectar(mon
 
     import app.services.ecommerce_payment_config as service
 
-    monkeypatch.setattr(service, "get_mercado_pago_config", lambda db, tenant_id: config)
+    monkeypatch.setattr(
+        service, "get_mercado_pago_config", lambda db, tenant_id: config
+    )
 
     saved = save_mercado_pago_config(
         Db(),
@@ -279,12 +287,12 @@ def test_webhook_tenant_ativa_contexto_antes_de_carregar_runtime_config():
     source = inspect.getsource(ecommerce_webhooks.webhook_mercadopago_tenant)
 
     assert "resolve_mercado_pago_tenant_id_from_webhook_token" in source
-    assert source.index("resolve_mercado_pago_tenant_id_from_webhook_token") < source.index(
-        "runtime_config_from_webhook_token"
-    )
-    assert source.index("set_current_tenant(UUID(str(webhook_tenant_id)))") < source.index(
-        "runtime_config_from_webhook_token"
-    )
+    assert source.index(
+        "resolve_mercado_pago_tenant_id_from_webhook_token"
+    ) < source.index("runtime_config_from_webhook_token")
+    assert source.index(
+        "set_current_tenant(UUID(str(webhook_tenant_id)))"
+    ) < source.index("runtime_config_from_webhook_token")
 
 
 def test_create_preference_usa_access_token_do_tenant(monkeypatch):
@@ -303,7 +311,9 @@ def test_create_preference_usa_access_token_do_tenant(monkeypatch):
             }
 
     def http_post(url, headers, json, timeout):
-        captured.update({"url": url, "headers": headers, "json": json, "timeout": timeout})
+        captured.update(
+            {"url": url, "headers": headers, "json": json, "timeout": timeout}
+        )
         return Response()
 
     preference = create_preference(

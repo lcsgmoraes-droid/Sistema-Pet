@@ -9,7 +9,9 @@ from app.api.whatsapp_orchestrator_internal_routes import (
 
 
 def test_build_message_content_text_returns_plain_text():
-    payload = InternalIngestRequest(phone="5511999999999", message_type="text", text="Ola")
+    payload = InternalIngestRequest(
+        phone="5511999999999", message_type="text", text="Ola"
+    )
 
     assert _build_message_content(payload) == "Ola"
 

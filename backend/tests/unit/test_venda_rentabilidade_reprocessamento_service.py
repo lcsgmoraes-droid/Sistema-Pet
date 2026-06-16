@@ -41,7 +41,9 @@ class _FakeDb:
 
 def test_reprocessamento_usa_custo_atual_e_corrige_movimentacao(monkeypatch):
     tenant_id = "tenant-reprocessamento"
-    produto = SimpleNamespace(id=10, nome="Produto com custo corrigido", preco_custo=12.5)
+    produto = SimpleNamespace(
+        id=10, nome="Produto com custo corrigido", preco_custo=12.5
+    )
     venda = SimpleNamespace(
         id=100,
         tenant_id=tenant_id,
@@ -97,7 +99,9 @@ def test_reprocessamento_usa_custo_atual_e_corrige_movimentacao(monkeypatch):
         venda_arg.rentabilidade_snapshot = snapshot
         return snapshot
 
-    monkeypatch.setattr(service, "get_or_build_venda_rentabilidade_snapshot", fake_get_or_build)
+    monkeypatch.setattr(
+        service, "get_or_build_venda_rentabilidade_snapshot", fake_get_or_build
+    )
 
     resultado = service.reprocessar_rentabilidade_vendas(
         _FakeDb(vendas=[venda], movimentos=[movimento]),
@@ -110,4 +114,6 @@ def test_reprocessamento_usa_custo_atual_e_corrige_movimentacao(monkeypatch):
     assert movimento.valor_total == pytest.approx(25)
     assert venda.rentabilidade_snapshot["custo_produtos"] == pytest.approx(25)
     assert venda.rentabilidade_snapshot["lucro"] == pytest.approx(35)
-    assert venda.rentabilidade_snapshot["itens"][0]["custo_unitario"] == pytest.approx(12.5)
+    assert venda.rentabilidade_snapshot["itens"][0]["custo_unitario"] == pytest.approx(
+        12.5
+    )

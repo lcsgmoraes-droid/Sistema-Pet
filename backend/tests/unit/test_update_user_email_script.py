@@ -71,7 +71,9 @@ def _script_session():
 
 def test_update_user_email_dry_run_does_not_persist(monkeypatch, capsys):
     session = _script_session()
-    monkeypatch.setattr(update_user_email, "SessionLocal", lambda: _SessionProxy(session))
+    monkeypatch.setattr(
+        update_user_email, "SessionLocal", lambda: _SessionProxy(session)
+    )
 
     code = update_user_email.main(["--old-email", OLD_EMAIL, "--new-email", NEW_EMAIL])
 
@@ -84,16 +86,24 @@ def test_update_user_email_dry_run_does_not_persist(monkeypatch, capsys):
     assert payload["before"]["id"] == payload["after"]["id"]
     assert payload["before"]["tenant_id"] == payload["after"]["tenant_id"]
 
-    old_row = session.execute(text("SELECT id FROM users WHERE email = :email"), {"email": OLD_EMAIL}).first()
-    new_row = session.execute(text("SELECT id FROM users WHERE email = :email"), {"email": NEW_EMAIL}).first()
+    old_row = session.execute(
+        text("SELECT id FROM users WHERE email = :email"), {"email": OLD_EMAIL}
+    ).first()
+    new_row = session.execute(
+        text("SELECT id FROM users WHERE email = :email"), {"email": NEW_EMAIL}
+    ).first()
     assert old_row is not None
     assert new_row is None
     session.close()
 
 
-def test_update_user_email_apply_persists_and_clears_pending_tokens(monkeypatch, capsys):
+def test_update_user_email_apply_persists_and_clears_pending_tokens(
+    monkeypatch, capsys
+):
     session = _script_session()
-    monkeypatch.setattr(update_user_email, "SessionLocal", lambda: _SessionProxy(session))
+    monkeypatch.setattr(
+        update_user_email, "SessionLocal", lambda: _SessionProxy(session)
+    )
 
     code = update_user_email.main(
         [
@@ -113,16 +123,20 @@ def test_update_user_email_apply_persists_and_clears_pending_tokens(monkeypatch,
     assert payload["dry_run"] is False
     assert payload["after"]["email"] == NEW_EMAIL
 
-    row = session.execute(
-        text(
-            """
+    row = (
+        session.execute(
+            text(
+                """
             SELECT id, email, tenant_id, email_verification_token_hash, reset_token
             FROM users
             WHERE id = :id
             """
-        ),
-        {"id": payload["after"]["id"]},
-    ).mappings().first()
+            ),
+            {"id": payload["after"]["id"]},
+        )
+        .mappings()
+        .first()
+    )
     assert row["email"] == NEW_EMAIL
     assert row["tenant_id"] == SOURCE_TENANT
     assert row["email_verification_token_hash"] is None
@@ -137,9 +151,13 @@ def test_update_user_email_rejects_duplicate_new_email(monkeypatch, capsys):
         {"email": NEW_EMAIL, "tenant": SOURCE_TENANT},
     )
     session.commit()
-    monkeypatch.setattr(update_user_email, "SessionLocal", lambda: _SessionProxy(session))
+    monkeypatch.setattr(
+        update_user_email, "SessionLocal", lambda: _SessionProxy(session)
+    )
 
-    code = update_user_email.main(["--old-email", OLD_EMAIL, "--new-email", NEW_EMAIL, "--apply"])
+    code = update_user_email.main(
+        ["--old-email", OLD_EMAIL, "--new-email", NEW_EMAIL, "--apply"]
+    )
 
     captured = capsys.readouterr()
     payload = json.loads(captured.err)
@@ -148,10 +166,14 @@ def test_update_user_email_rejects_duplicate_new_email(monkeypatch, capsys):
     session.close()
 
 
-def test_update_user_email_blocks_production_apply_without_override(monkeypatch, capsys):
+def test_update_user_email_blocks_production_apply_without_override(
+    monkeypatch, capsys
+):
     monkeypatch.setenv("APP_ENV", "production")
 
-    code = update_user_email.main(["--old-email", OLD_EMAIL, "--new-email", NEW_EMAIL, "--apply"])
+    code = update_user_email.main(
+        ["--old-email", OLD_EMAIL, "--new-email", NEW_EMAIL, "--apply"]
+    )
 
     captured = capsys.readouterr()
     payload = json.loads(captured.err)

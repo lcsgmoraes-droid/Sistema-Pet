@@ -44,9 +44,7 @@ def test_basic_plan_route_files_use_selected_tenant_dependency():
     ]
 
     offenders = [
-        path
-        for path in route_files
-        if "Depends(get_current_user)" in _source(path)
+        path for path in route_files if "Depends(get_current_user)" in _source(path)
     ]
 
     assert offenders == []
@@ -80,9 +78,11 @@ def test_racao_calculadora_uses_tenant_selected_in_token():
 
 
 def test_racao_calculadora_info_also_requires_selected_tenant():
-    default = inspect.signature(racao_calculadora_routes.info_calculadora).parameters[
-        "_user_and_tenant"
-    ].default
+    default = (
+        inspect.signature(racao_calculadora_routes.info_calculadora)
+        .parameters["_user_and_tenant"]
+        .default
+    )
 
     assert getattr(default, "dependency", None) is get_current_user_and_tenant
 
@@ -182,7 +182,9 @@ def test_modulos_admin_activation_sets_target_tenant_context(monkeypatch):
         lambda tenant_id: tenant_context_calls.append(str(tenant_id)),
         raising=False,
     )
-    monkeypatch.setattr(modulos_routes, "get_current_tenant", lambda: None, raising=False)
+    monkeypatch.setattr(
+        modulos_routes, "get_current_tenant", lambda: None, raising=False
+    )
     monkeypatch.setattr(
         modulos_routes,
         "clear_current_tenant",
@@ -201,7 +203,11 @@ def test_modulos_admin_activation_sets_target_tenant_context(monkeypatch):
         db=db,
     )
 
-    assert response == {"ok": True, "modulo": "campanhas", "tenant_id": TENANT_ALVO_MODULO}
+    assert response == {
+        "ok": True,
+        "modulo": "campanhas",
+        "tenant_id": TENANT_ALVO_MODULO,
+    }
     assert tenant_context_calls == [TENANT_ALVO_MODULO]
     assert db.added[0].tenant_id == TENANT_ALVO_MODULO
     assert db.committed is True
@@ -273,7 +279,10 @@ def test_racao_catalog_and_calculator_routes_require_product_permissions():
         '@router.post("/comparar-racoes", response_model=ComparativoRacoesResponse)\n'
         '@require_permission("produtos.visualizar")'
     ) in calculadora_source
-    assert '@require_permission("produtos.visualizar")\nasync def calcular_consumo_racao' in internal_source
+    assert (
+        '@require_permission("produtos.visualizar")\nasync def calcular_consumo_racao'
+        in internal_source
+    )
 
 
 def test_product_auxiliary_catalog_routes_require_product_permissions():
@@ -365,49 +374,82 @@ def test_company_configuration_routes_require_configuration_permissions():
     app_source = _source("frontend/src/App.jsx")
     configuracoes_source = _source("frontend/src/pages/Configuracoes.jsx")
 
-    assert empresa_fiscal_source.count(
-        '@require_any_permission(("configuracoes.empresa", "configuracoes.editar"))'
-    ) >= 4
-    assert empresa_routes_source.count(
-        '@require_any_permission(("configuracoes.empresa", "configuracoes.editar"))'
-    ) >= 4
-    assert empresa_routes_source.count('@require_permission("configuracoes.editar")') >= 2
-    assert "def _buscar_tenant_por_contexto(db: Session, tenant_id)" in empresa_routes_source
+    assert (
+        empresa_fiscal_source.count(
+            '@require_any_permission(("configuracoes.empresa", "configuracoes.editar"))'
+        )
+        >= 4
+    )
+    assert (
+        empresa_routes_source.count(
+            '@require_any_permission(("configuracoes.empresa", "configuracoes.editar"))'
+        )
+        >= 4
+    )
+    assert (
+        empresa_routes_source.count('@require_permission("configuracoes.editar")') >= 2
+    )
+    assert (
+        "def _buscar_tenant_por_contexto(db: Session, tenant_id)"
+        in empresa_routes_source
+    )
     assert "Tenant.id == str(tenant_id)" in empresa_routes_source
     assert "Tenant.id == tenant_id" not in empresa_routes_source
-    assert empresa_config_source.count('@require_permission("configuracoes.editar")') >= 4
-    assert 'op.create_table(\n            "empresa_config_geral"' in empresa_config_geral_migration
+    assert (
+        empresa_config_source.count('@require_permission("configuracoes.editar")') >= 4
+    )
+    assert (
+        'op.create_table(\n            "empresa_config_geral"'
+        in empresa_config_geral_migration
+    )
     assert "ix_empresa_config_geral_tenant_id" in empresa_config_geral_migration
 
-    assert 'anyOfPermissions={["configuracoes.empresa", "configuracoes.editar"]}' in app_source
+    assert (
+        'anyOfPermissions={["configuracoes.empresa", "configuracoes.editar"]}'
+        in app_source
+    )
     assert '<ProtectedRoute permission="configuracoes.editar">' in app_source
     assert 'path="admin/roles"' in app_source
     assert 'permission="usuarios.manage"' in app_source
-    assert 'card.modulo && !moduloAtivo(card.modulo)' in configuracoes_source
+    assert "card.modulo && !moduloAtivo(card.modulo)" in configuracoes_source
 
 
 def test_protected_route_enforces_any_of_permissions():
     protected_route_source = _source("frontend/src/components/ProtectedRoute.jsx")
 
-    assert "permission || requiredPermissions || anyOfPermissions" in protected_route_source
+    assert (
+        "permission || requiredPermissions || anyOfPermissions"
+        in protected_route_source
+    )
 
 
 def test_basic_finance_sales_menu_matches_direct_route_permissions():
-    layout_source = (
-        _source("frontend/src/components/Layout.jsx")
-        + _source("frontend/src/components/layout/menuConfig.js")
+    layout_source = _source("frontend/src/components/Layout.jsx") + _source(
+        "frontend/src/components/layout/menuConfig.js"
     )
     app_source = _source("frontend/src/App.jsx")
 
     assert "const itemLiberadoPorPermissao = (item) => {" in layout_source
-    assert "if (item.anyOfPermissions) return hasAnyPermission(item.anyOfPermissions);" in layout_source
+    assert (
+        "if (item.anyOfPermissions) return hasAnyPermission(item.anyOfPermissions);"
+        in layout_source
+    )
 
     finance_menu_start = layout_source.index('path: "/financeiro"')
-    finance_sales_start = layout_source.index('path: "/financeiro/vendas"', finance_menu_start)
-    finance_sales_end = layout_source.index('path: "/financeiro/fluxo-caixa"', finance_sales_start)
+    finance_sales_start = layout_source.index(
+        'path: "/financeiro/vendas"', finance_menu_start
+    )
+    finance_sales_end = layout_source.index(
+        'path: "/financeiro/fluxo-caixa"', finance_sales_start
+    )
     finance_sales_menu = layout_source[finance_sales_start:finance_sales_end]
 
-    for permission in ["relatorios.financeiro", "financeiro.vendas", "clientes.visualizar", "vendas.criar"]:
+    for permission in [
+        "relatorios.financeiro",
+        "financeiro.vendas",
+        "clientes.visualizar",
+        "vendas.criar",
+    ]:
         assert f'"{permission}"' in finance_sales_menu
 
     assert '"clientes.visualizar"' in app_source
@@ -417,7 +459,10 @@ def test_basic_finance_sales_menu_matches_direct_route_permissions():
 def test_financeiro_mixed_router_keeps_premium_endpoints_module_gated():
     financeiro_source = _source("backend/app/financeiro_routes.py")
 
-    assert 'financeiro_erp_required = Depends(require_active_module("financeiro_erp"))' in financeiro_source
+    assert (
+        'financeiro_erp_required = Depends(require_active_module("financeiro_erp"))'
+        in financeiro_source
+    )
 
     premium_functions = [
         "def listar_categorias(",
@@ -433,10 +478,17 @@ def test_financeiro_mixed_router_keeps_premium_endpoints_module_gated():
         signature = financeiro_source[start:end]
         assert "_module_access: None = financeiro_erp_required" in signature
 
-    cliente_history_start = financeiro_source.index("def get_historico_financeiro_cliente(")
+    cliente_history_start = financeiro_source.index(
+        "def get_historico_financeiro_cliente("
+    )
     cliente_history_end = financeiro_source.index("):", cliente_history_start)
-    cliente_history_signature = financeiro_source[cliente_history_start:cliente_history_end]
-    assert "_module_access: None = financeiro_erp_required" not in cliente_history_signature
+    cliente_history_signature = financeiro_source[
+        cliente_history_start:cliente_history_end
+    ]
+    assert (
+        "_module_access: None = financeiro_erp_required"
+        not in cliente_history_signature
+    )
 
 
 def test_cliente_financeiro_remains_basic_but_tenant_scoped():
@@ -469,14 +521,16 @@ def test_rh_simulation_page_is_module_gated_on_direct_url():
     app_source = _source("frontend/src/App.jsx")
 
     assert 'path="simulacao-contratacao"' in app_source
-    assert 'element={<ModuleGate modulo="rh"><SimulacaoContratacao /></ModuleGate>}' in app_source
+    assert (
+        'element={<ModuleGate modulo="rh"><SimulacaoContratacao /></ModuleGate>}'
+        in app_source
+    )
 
 
 def test_basic_direct_urls_apply_same_frontend_permissions_as_menu():
     app_source = _source("frontend/src/App.jsx")
-    layout_source = (
-        _source("frontend/src/components/Layout.jsx")
-        + _source("frontend/src/components/layout/menuConfig.js")
+    layout_source = _source("frontend/src/components/Layout.jsx") + _source(
+        "frontend/src/components/layout/menuConfig.js"
     )
 
     expected_route_guards = [
@@ -507,9 +561,8 @@ def test_basic_direct_urls_apply_same_frontend_permissions_as_menu():
 def test_financial_chat_ia_is_not_available_in_basic_without_premium_module():
     main_source = _source("backend/app/main.py")
     app_source = _source("frontend/src/App.jsx")
-    layout_source = (
-        _source("frontend/src/components/Layout.jsx")
-        + _source("frontend/src/components/layout/menuConfig.js")
+    layout_source = _source("frontend/src/components/Layout.jsx") + _source(
+        "frontend/src/components/layout/menuConfig.js"
     )
     modulo_bloqueado_source = _source("frontend/src/components/ModuloBloqueado.jsx")
 
@@ -518,7 +571,10 @@ def test_financial_chat_ia_is_not_available_in_basic_without_premium_module():
         'dependencies=_module_dependencies("financeiro_erp"))'
     ) in main_source
     assert 'path="ia/chat"' in app_source
-    assert 'element={<ModuleGate modulo="financeiro_erp"><ChatIA /></ModuleGate>}' in app_source
+    assert (
+        'element={<ModuleGate modulo="financeiro_erp"><ChatIA /></ModuleGate>}'
+        in app_source
+    )
 
     chat_menu_start = layout_source.index('path: "/ia/chat"')
     chat_menu_end = layout_source.index('path: "/ia/fluxo-caixa"', chat_menu_start)
@@ -526,7 +582,9 @@ def test_financial_chat_ia_is_not_available_in_basic_without_premium_module():
     assert 'modulo: "financeiro_erp"' in chat_menu
 
     loading_gate_start = modulo_bloqueado_source.index("if (modulosAtivos === null)")
-    loading_gate_end = modulo_bloqueado_source.index("if (moduloAtivo(modulo))", loading_gate_start)
+    loading_gate_end = modulo_bloqueado_source.index(
+        "if (moduloAtivo(modulo))", loading_gate_start
+    )
     loading_gate = modulo_bloqueado_source[loading_gate_start:loading_gate_end]
     assert "return children" not in loading_gate
 
@@ -543,12 +601,24 @@ def test_chat_ia_conversation_history_uses_selected_tenant_context():
     chat_routes_source = _source("backend/app/chat_routes.py")
     chat_service_source = _source("backend/app/ia/aba6_chat_ia.py")
 
-    assert "listar_conversas_service(db, usuario_id, tenant_id, limit)" in chat_routes_source
-    assert "service.obter_conversa(conversa_id, usuario_id, tenant_id)" in chat_routes_source
+    assert (
+        "listar_conversas_service(db, usuario_id, tenant_id, limit)"
+        in chat_routes_source
+    )
+    assert (
+        "service.obter_conversa(conversa_id, usuario_id, tenant_id)"
+        in chat_routes_source
+    )
     assert "service.obter_historico(conversa_id, tenant_id)" in chat_routes_source
-    assert "deletar_conversa_service(db, conversa_id, usuario_id, tenant_id)" in chat_routes_source
+    assert (
+        "deletar_conversa_service(db, conversa_id, usuario_id, tenant_id)"
+        in chat_routes_source
+    )
 
-    assert "def listar_conversas(self, usuario_id: int, tenant_id: Optional[str]" in chat_service_source
+    assert (
+        "def listar_conversas(self, usuario_id: int, tenant_id: Optional[str]"
+        in chat_service_source
+    )
     assert "Conversa.tenant_id == tenant_id_resolvido" in chat_service_source
     assert "MensagemChat.tenant_id == str(tenant_id)" in chat_service_source
 
@@ -558,43 +628,78 @@ def test_ia_fluxo_caixa_uses_selected_tenant_context():
     fluxo_source = _source("backend/app/ia/aba5_fluxo_caixa.py")
     chat_service_source = _source("backend/app/ia/aba6_chat_ia.py")
 
-    assert "calcular_indices_saude(usuario_id, db, tenant_id=tenant_id)" in ia_routes_source
-    assert "obter_projecoes_proximos_dias(usuario_id, dias, db, tenant_id=tenant_id)" in ia_routes_source
-    assert "projetar_fluxo_15_dias(usuario_id, db, tenant_id=tenant_id)" in ia_routes_source
-    assert "simular_cenario(usuario_id, request.cenario, db, tenant_id=tenant_id)" in ia_routes_source
-    assert "gerar_alertas_caixa(usuario_id, db, tenant_id=tenant_id)" in ia_routes_source
+    assert (
+        "calcular_indices_saude(usuario_id, db, tenant_id=tenant_id)"
+        in ia_routes_source
+    )
+    assert (
+        "obter_projecoes_proximos_dias(usuario_id, dias, db, tenant_id=tenant_id)"
+        in ia_routes_source
+    )
+    assert (
+        "projetar_fluxo_15_dias(usuario_id, db, tenant_id=tenant_id)"
+        in ia_routes_source
+    )
+    assert (
+        "simular_cenario(usuario_id, request.cenario, db, tenant_id=tenant_id)"
+        in ia_routes_source
+    )
+    assert (
+        "gerar_alertas_caixa(usuario_id, db, tenant_id=tenant_id)" in ia_routes_source
+    )
     assert "tenant_id=tenant_id" in ia_routes_source
 
-    assert "def _resolve_tenant_id(usuario_id: int, db: Session, tenant_id: Optional[str] = None)" in fluxo_source
+    assert (
+        "def _resolve_tenant_id(usuario_id: int, db: Session, tenant_id: Optional[str] = None)"
+        in fluxo_source
+    )
     assert "FluxoCaixa.tenant_id == tenant_id_resolvido" in fluxo_source
     assert "IndicesSaudeCaixa.tenant_id == tenant_id_resolvido" in fluxo_source
     assert "ProjecaoFluxoCaixa.tenant_id == tenant_id_resolvido" in fluxo_source
     assert "tenant_id=tenant_id_resolvido" in fluxo_source
 
-    assert "calcular_indices_saude(usuario_id, self.db, tenant_id=tenant_id_resolvido)" in chat_service_source
+    assert (
+        "calcular_indices_saude(usuario_id, self.db, tenant_id=tenant_id_resolvido)"
+        in chat_service_source
+    )
     assert "tenant_id=tenant_id_resolvido" in chat_service_source
-    assert "gerar_alertas_caixa(usuario_id, self.db, tenant_id=tenant_id_resolvido)" in chat_service_source
+    assert (
+        "gerar_alertas_caixa(usuario_id, self.db, tenant_id=tenant_id_resolvido)"
+        in chat_service_source
+    )
 
 
 def test_product_catalog_auxiliary_pages_are_basic_catalog_not_premium_modules():
     app_source = _source("frontend/src/App.jsx")
-    layout_source = (
-        _source("frontend/src/components/Layout.jsx")
-        + _source("frontend/src/components/layout/menuConfig.js")
+    layout_source = _source("frontend/src/components/Layout.jsx") + _source(
+        "frontend/src/components/layout/menuConfig.js"
     )
 
-    assert 'path="cadastros/departamentos" element={<ProtectedRoute permission="cadastros.categorias_produtos"><Departamentos /></ProtectedRoute>}' in app_source
-    assert 'path="cadastros/marcas" element={<ProtectedRoute permission="cadastros.categorias_produtos"><Marcas /></ProtectedRoute>}' in app_source
-    assert 'path="cadastros/categorias" element={<ProtectedRoute permission="cadastros.categorias_produtos"><Categorias /></ProtectedRoute>}' in app_source
+    assert (
+        'path="cadastros/departamentos" element={<ProtectedRoute permission="cadastros.categorias_produtos"><Departamentos /></ProtectedRoute>}'
+        in app_source
+    )
+    assert (
+        'path="cadastros/marcas" element={<ProtectedRoute permission="cadastros.categorias_produtos"><Marcas /></ProtectedRoute>}'
+        in app_source
+    )
+    assert (
+        'path="cadastros/categorias" element={<ProtectedRoute permission="cadastros.categorias_produtos"><Categorias /></ProtectedRoute>}'
+        in app_source
+    )
 
     departamentos_menu_start = layout_source.index('path: "/cadastros/departamentos"')
-    departamentos_menu_end = layout_source.index('path: "/cadastros/marcas"', departamentos_menu_start)
+    departamentos_menu_end = layout_source.index(
+        'path: "/cadastros/marcas"', departamentos_menu_start
+    )
     departamentos_menu = layout_source[departamentos_menu_start:departamentos_menu_end]
     marcas_menu_start = layout_source.index('path: "/cadastros/marcas"')
-    marcas_menu_end = layout_source.index('path: "/cadastros/categorias"', marcas_menu_start)
+    marcas_menu_end = layout_source.index(
+        'path: "/cadastros/categorias"', marcas_menu_start
+    )
     marcas_menu = layout_source[marcas_menu_start:marcas_menu_end]
 
     assert 'modulo: "rh"' not in departamentos_menu
-    assert 'modulo:' not in marcas_menu
+    assert "modulo:" not in marcas_menu
     assert 'permission: "cadastros.categorias_produtos"' in departamentos_menu
     assert 'permission: "cadastros.categorias_produtos"' in marcas_menu

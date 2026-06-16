@@ -49,7 +49,9 @@ def test_contas_pagar_tem_cancelamento_sem_apagar_historico():
 
     assert '@router.post("/{conta_id}/cancelar")' in source
 
-    cancelar_endpoint = source.split('@router.post("/{conta_id}/cancelar")', 1)[1].split(
+    cancelar_endpoint = source.split('@router.post("/{conta_id}/cancelar")', 1)[
+        1
+    ].split(
         '@router.get("/{conta_id}")',
         1,
     )[0]

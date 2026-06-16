@@ -26,7 +26,10 @@ def test_transferencia_simples_fica_em_router_dedicado():
 def test_estoque_routes_nao_expõe_mais_transferencia_simples():
     source = _source("app/estoque_routes.py")
 
-    assert '@router.post("/transferencia", status_code=status.HTTP_201_CREATED)' not in source
+    assert (
+        '@router.post("/transferencia", status_code=status.HTTP_201_CREATED)'
+        not in source
+    )
     assert "def transferencia_estoque(" not in source
     assert "class TransferenciaEstoqueRequest" not in source
 
@@ -34,5 +37,11 @@ def test_estoque_routes_nao_expõe_mais_transferencia_simples():
 def test_main_registra_router_de_transferencia_simples():
     main_source = _source("app/main.py")
 
-    assert "from app.estoque_transferencia_routes import router as estoque_transferencia_router" in main_source
-    assert 'app.include_router(estoque_transferencia_router, tags=["Estoque - Transferencia"])' in main_source
+    assert (
+        "from app.estoque_transferencia_routes import router as estoque_transferencia_router"
+        in main_source
+    )
+    assert (
+        'app.include_router(estoque_transferencia_router, tags=["Estoque - Transferencia"])'
+        in main_source
+    )

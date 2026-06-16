@@ -44,7 +44,9 @@ def test_smoke_script_accepts_email_channel_without_webhook(monkeypatch, capsys)
 
 
 def test_smoke_script_does_not_print_secret_webhook(monkeypatch, capsys):
-    monkeypatch.setenv("OPS_ALERT_WEBHOOK_URL", "https://hooks.example.test/super-secret-token")
+    monkeypatch.setenv(
+        "OPS_ALERT_WEBHOOK_URL", "https://hooks.example.test/super-secret-token"
+    )
     calls = []
 
     def fake_notify(alerts):

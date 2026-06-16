@@ -94,8 +94,12 @@ def test_fornecedor_nome_produto_prioriza_vinculo_principal_ativo():
     produto = SimpleNamespace(
         fornecedor=None,
         fornecedores_alternativos=[
-            SimpleNamespace(ativo=True, e_principal=False, fornecedor=fornecedor_secundario),
-            SimpleNamespace(ativo=True, e_principal=True, fornecedor=fornecedor_principal),
+            SimpleNamespace(
+                ativo=True, e_principal=False, fornecedor=fornecedor_secundario
+            ),
+            SimpleNamespace(
+                ativo=True, e_principal=True, fornecedor=fornecedor_principal
+            ),
         ],
     )
 
@@ -139,7 +143,9 @@ def test_palavras_busca_produto_aceita_termo_vazio():
 
 
 def test_tipos_base_listagem_preserva_variacoes_apenas_em_busca():
-    assert _tipos_base_listagem(include_variations=False, termo_busca="racao") == ["SIMPLES"]
+    assert _tipos_base_listagem(include_variations=False, termo_busca="racao") == [
+        "SIMPLES"
+    ]
     assert _tipos_base_listagem(include_variations=True, termo_busca=None) == [
         "SIMPLES",
         "PAI",
@@ -279,11 +285,16 @@ def test_normalizar_paginacao_produtos_corrige_valores_minimos():
 
 def test_load_options_listagem_produtos_monta_lista_nova_com_relacionamentos_base():
     opcoes = _load_options_listagem_produtos(incluir_imagens=True, incluir_lotes=False)
-    outra_lista = _load_options_listagem_produtos(incluir_imagens=True, incluir_lotes=False)
+    outra_lista = _load_options_listagem_produtos(
+        incluir_imagens=True, incluir_lotes=False
+    )
 
     assert opcoes is not outra_lista
     assert len(opcoes) == 4
-    assert all(str(opcao.path).startswith("ORM Path[Mapper[Produto(produtos)]") for opcao in opcoes)
+    assert all(
+        str(opcao.path).startswith("ORM Path[Mapper[Produto(produtos)]")
+        for opcao in opcoes
+    )
 
 
 def test_load_options_listagem_produtos_preserva_quantidade_ao_alternar_flags():

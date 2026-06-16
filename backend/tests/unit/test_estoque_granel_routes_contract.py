@@ -34,13 +34,25 @@ def test_estoque_routes_nao_expõe_mais_decorators_de_granel():
     assert '@router.get("/granel/produtos")' not in source
     assert '@router.get("/granel/vinculos/origem/{produto_origem_id}")' not in source
     assert '@router.get("/granel/alertas-preco")' not in source
-    assert '@router.post("/granel/vinculos", status_code=status.HTTP_201_CREATED)' not in source
+    assert (
+        '@router.post("/granel/vinculos", status_code=status.HTTP_201_CREATED)'
+        not in source
+    )
     assert '@router.delete("/granel/vinculos/{vinculo_id}")' not in source
-    assert '@router.post("/granel/converter", status_code=status.HTTP_201_CREATED)' not in source
+    assert (
+        '@router.post("/granel/converter", status_code=status.HTTP_201_CREATED)'
+        not in source
+    )
 
 
 def test_main_registra_router_de_granel():
     main_source = _source("app/main.py")
 
-    assert "from app.estoque_granel_routes import router as estoque_granel_router" in main_source
-    assert 'app.include_router(estoque_granel_router, tags=["Estoque - Granel"])' in main_source
+    assert (
+        "from app.estoque_granel_routes import router as estoque_granel_router"
+        in main_source
+    )
+    assert (
+        'app.include_router(estoque_granel_router, tags=["Estoque - Granel"])'
+        in main_source
+    )

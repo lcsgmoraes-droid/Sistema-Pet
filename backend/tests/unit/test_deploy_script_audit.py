@@ -40,7 +40,9 @@ def test_deploy_script_audits_sensitive_steps():
         start = script.index(marker)
         next_marker = script.find("\nmark_step ", start + len(marker))
         block = script[start : next_marker if next_marker != -1 else len(script)]
-        assert "audit_step" in block, f"Step {step} must emit a running deploy audit event"
+        assert "audit_step" in block, (
+            f"Step {step} must emit a running deploy audit event"
+        )
 
 
 def test_deploy_step_audit_does_not_suppress_failure_trap():
@@ -53,6 +55,9 @@ def test_deploy_step_audit_does_not_suppress_failure_trap():
 def test_deploy_script_keeps_manual_ops_audit_log_writable():
     script = _deploy_script_text()
 
-    assert 'ops_command_audit_log_path="$APP_DIR/backend/logs/ops_command_events.jsonl"' in script
+    assert (
+        'ops_command_audit_log_path="$APP_DIR/backend/logs/ops_command_events.jsonl"'
+        in script
+    )
     assert 'touch "$ops_command_audit_log_path"' in script
     assert 'chmod 0666 "$ops_command_audit_log_path"' in script

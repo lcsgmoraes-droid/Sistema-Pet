@@ -11,14 +11,23 @@ from app.integracao_bling_nf_routes import (
     _remover_nf_do_pedido,
     _nf_webhook_autorizada,
 )
-from app.services.bling_nf_service import processar_nf_autorizada, processar_nf_cancelada
+from app.services.bling_nf_service import (
+    processar_nf_autorizada,
+    processar_nf_cancelada,
+)
 
 
 def test_nf_autorizada_baixa_estoque_uma_vez(monkeypatch):
     db = Mock()
     db.query.return_value.filter.return_value.order_by.return_value.all.side_effect = [
         [],
-        [SimpleNamespace(produto_id=12, documento="010001", observacao="Baixa automatica via NF 010001")],
+        [
+            SimpleNamespace(
+                produto_id=12,
+                documento="010001",
+                observacao="Baixa automatica via NF 010001",
+            )
+        ],
     ]
     pedido = SimpleNamespace(
         status="aberto",
@@ -63,15 +72,23 @@ def test_nf_autorizada_baixa_estoque_uma_vez(monkeypatch):
         "app.services.bling_nf_service.baixar_estoque_item_integrado",
         fake_baixar_item,
     )
-    monkeypatch.setattr("app.services.bling_nf_service.registrar_evento", lambda **kwargs: None)
-    monkeypatch.setattr("app.services.bling_nf_service.abrir_incidente", lambda **kwargs: None)
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.registrar_evento", lambda **kwargs: None
+    )
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.abrir_incidente", lambda **kwargs: None
+    )
     monkeypatch.setattr(
         "app.services.bling_nf_service.resolver_incidentes_relacionados",
         lambda *args, **kwargs: 0,
     )
 
-    resposta_1 = processar_nf_autorizada(db=db, pedido=pedido, itens=[item], nf_id="98765")
-    resposta_2 = processar_nf_autorizada(db=db, pedido=pedido, itens=[item], nf_id="98765")
+    resposta_1 = processar_nf_autorizada(
+        db=db, pedido=pedido, itens=[item], nf_id="98765"
+    )
+    resposta_2 = processar_nf_autorizada(
+        db=db, pedido=pedido, itens=[item], nf_id="98765"
+    )
 
     assert resposta_1 == "venda_confirmada"
     assert resposta_2 == "venda_ja_confirmada"
@@ -93,7 +110,9 @@ def test_nf_autorizada_reaproveita_baixa_legada_e_normaliza_para_nf(monkeypatch)
         observacao="Baixa automatica via webhook Bling (Atendido)",
         status="confirmado",
     )
-    db.query.return_value.filter.return_value.order_by.return_value.all.return_value = [movimento_legado]
+    db.query.return_value.filter.return_value.order_by.return_value.all.return_value = [
+        movimento_legado
+    ]
     pedido = SimpleNamespace(
         status="confirmado",
         confirmado_em=None,
@@ -112,7 +131,9 @@ def test_nf_autorizada_reaproveita_baixa_legada_e_normaliza_para_nf(monkeypatch)
     )
     monkeypatch.setattr(
         "app.services.bling_nf_service.EstoqueReservaService.confirmar_venda",
-        lambda db_arg, item_arg: setattr(item_arg, "vendido_em", "2026-03-31T01:00:00Z"),
+        lambda db_arg, item_arg: setattr(
+            item_arg, "vendido_em", "2026-03-31T01:00:00Z"
+        ),
     )
     monkeypatch.setattr(
         "app.services.bling_nf_service._obter_usuario_padrao_tenant",
@@ -124,16 +145,25 @@ def test_nf_autorizada_reaproveita_baixa_legada_e_normaliza_para_nf(monkeypatch)
     )
     monkeypatch.setattr(
         "app.services.bling_nf_service.baixar_estoque_item_integrado",
-        lambda **kwargs: chamadas_baixa.append(kwargs) or {"movimentos": [{"produto_id": 12, "quantidade": 1.0}]},
+        lambda **kwargs: (
+            chamadas_baixa.append(kwargs)
+            or {"movimentos": [{"produto_id": 12, "quantidade": 1.0}]}
+        ),
     )
-    monkeypatch.setattr("app.services.bling_nf_service.registrar_evento", lambda **kwargs: None)
-    monkeypatch.setattr("app.services.bling_nf_service.abrir_incidente", lambda **kwargs: None)
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.registrar_evento", lambda **kwargs: None
+    )
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.abrir_incidente", lambda **kwargs: None
+    )
     monkeypatch.setattr(
         "app.services.bling_nf_service.resolver_incidentes_relacionados",
         lambda *args, **kwargs: 0,
     )
 
-    resposta = processar_nf_autorizada(db=db, pedido=pedido, itens=[item], nf_id="25441651448")
+    resposta = processar_nf_autorizada(
+        db=db, pedido=pedido, itens=[item], nf_id="25441651448"
+    )
 
     assert resposta == "venda_confirmada"
     assert chamadas_baixa == []
@@ -195,14 +225,20 @@ def test_nf_autorizada_autocadastra_produto_e_baixa(monkeypatch):
         "app.services.bling_nf_service.baixar_estoque_item_integrado",
         fake_baixar_item,
     )
-    monkeypatch.setattr("app.services.bling_nf_service.registrar_evento", lambda **kwargs: None)
-    monkeypatch.setattr("app.services.bling_nf_service.abrir_incidente", lambda **kwargs: None)
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.registrar_evento", lambda **kwargs: None
+    )
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.abrir_incidente", lambda **kwargs: None
+    )
     monkeypatch.setattr(
         "app.services.bling_nf_service.resolver_incidentes_relacionados",
         lambda *args, **kwargs: 0,
     )
 
-    resposta = processar_nf_autorizada(db=db, pedido=pedido, itens=[item], nf_id="99100")
+    resposta = processar_nf_autorizada(
+        db=db, pedido=pedido, itens=[item], nf_id="99100"
+    )
 
     assert resposta == "venda_confirmada"
     assert len(chamadas_baixa) == 1
@@ -222,7 +258,9 @@ def test_nf_autorizada_baixa_componentes_do_produto_composto(monkeypatch):
         payload={"ultima_nf": {"numero": "010003"}},
     )
     item = SimpleNamespace(sku="022860.1/2", quantidade=1, vendido_em=None)
-    produto_composto = SimpleNamespace(id=6814, tipo_kit="VIRTUAL", tipo_produto="VARIACAO")
+    produto_composto = SimpleNamespace(
+        id=6814, tipo_kit="VIRTUAL", tipo_produto="VARIACAO"
+    )
     chamadas_baixa = []
 
     monkeypatch.setattr(
@@ -239,7 +277,9 @@ def test_nf_autorizada_baixa_componentes_do_produto_composto(monkeypatch):
     )
     monkeypatch.setattr(
         "app.services.bling_nf_service.EstoqueReservaService.confirmar_venda",
-        lambda db_arg, item_arg: setattr(item_arg, "vendido_em", "2026-03-28T22:03:22Z"),
+        lambda db_arg, item_arg: setattr(
+            item_arg, "vendido_em", "2026-03-28T22:03:22Z"
+        ),
     )
 
     def fake_baixar_item(**kwargs):
@@ -254,14 +294,20 @@ def test_nf_autorizada_baixa_componentes_do_produto_composto(monkeypatch):
         "app.services.bling_nf_service.baixar_estoque_item_integrado",
         fake_baixar_item,
     )
-    monkeypatch.setattr("app.services.bling_nf_service.registrar_evento", lambda **kwargs: None)
-    monkeypatch.setattr("app.services.bling_nf_service.abrir_incidente", lambda **kwargs: None)
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.registrar_evento", lambda **kwargs: None
+    )
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.abrir_incidente", lambda **kwargs: None
+    )
     monkeypatch.setattr(
         "app.services.bling_nf_service.resolver_incidentes_relacionados",
         lambda *args, **kwargs: 0,
     )
 
-    resposta = processar_nf_autorizada(db=db, pedido=pedido, itens=[item], nf_id="25428294101")
+    resposta = processar_nf_autorizada(
+        db=db, pedido=pedido, itens=[item], nf_id="25428294101"
+    )
 
     assert resposta == "venda_confirmada"
     assert len(chamadas_baixa) == 1
@@ -356,7 +402,9 @@ def test_nf_autorizada_bloqueia_quando_cache_aponta_outro_pedido(monkeypatch):
                 return FakeQuery(SimpleNamespace(pedido_bling_id_ref="25441648396"))
             if getattr(model, "__name__", "") == "EstoqueMovimentacao":
                 return FakeQuery([])
-            raise AssertionError(f"Consulta inesperada para {getattr(model, '__name__', model)}")
+            raise AssertionError(
+                f"Consulta inesperada para {getattr(model, '__name__', model)}"
+            )
 
         def add(self, obj):
             return None
@@ -379,7 +427,10 @@ def test_nf_autorizada_bloqueia_quando_cache_aponta_outro_pedido(monkeypatch):
     item = SimpleNamespace(sku="019516.1/1", quantidade=1, vendido_em=None)
     eventos = []
 
-    monkeypatch.setattr("app.services.bling_nf_service.registrar_evento", lambda **kwargs: eventos.append(kwargs))
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.registrar_evento",
+        lambda **kwargs: eventos.append(kwargs),
+    )
     monkeypatch.setattr(
         "app.services.bling_nf_service.resolver_incidentes_relacionados",
         lambda *args, **kwargs: 0,
@@ -458,11 +509,16 @@ def test_nf_autorizada_remove_baixa_legada_de_pedido_incorreto(monkeypatch):
         pedido_bling_numero="11585",
         payload={"ultima_nf": {"id": "25438627877", "numero": "011073"}},
     )
-    item = SimpleNamespace(sku="013210.1", quantidade=1, vendido_em="2026-03-30T17:09:05Z")
+    item = SimpleNamespace(
+        sku="013210.1", quantidade=1, vendido_em="2026-03-30T17:09:05Z"
+    )
     eventos = []
     estornos = []
 
-    monkeypatch.setattr("app.services.bling_nf_service.registrar_evento", lambda **kwargs: eventos.append(kwargs))
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.registrar_evento",
+        lambda **kwargs: eventos.append(kwargs),
+    )
     monkeypatch.setattr(
         "app.services.bling_nf_service.resolver_incidentes_relacionados",
         lambda *args, **kwargs: 0,
@@ -599,13 +655,16 @@ def test_remover_nf_do_pedido_limpa_payload_principal_e_nota_embutida():
 
 
 def test_nf_webhook_considera_autorizada_quando_texto_da_nf_diz_autorizada_mesmo_com_codigo_6():
-    assert _nf_webhook_autorizada(
-        {
-            "situacao": {"id": 6, "descricao": "Autorizada"},
-            "numero": "011099",
-        },
-        situacao_num=6,
-    ) is True
+    assert (
+        _nf_webhook_autorizada(
+            {
+                "situacao": {"id": 6, "descricao": "Autorizada"},
+                "numero": "011099",
+            },
+            situacao_num=6,
+        )
+        is True
+    )
 
 
 def test_nf_autorizada_nao_faz_fallback_para_numero_do_pedido_no_documento(monkeypatch):
@@ -630,7 +689,9 @@ def test_nf_autorizada_nao_faz_fallback_para_numero_do_pedido_no_documento(monke
     )
     monkeypatch.setattr(
         "app.services.bling_nf_service.EstoqueReservaService.confirmar_venda",
-        lambda db_arg, item_arg: setattr(item_arg, "vendido_em", "2026-03-31T01:00:00Z"),
+        lambda db_arg, item_arg: setattr(
+            item_arg, "vendido_em", "2026-03-31T01:00:00Z"
+        ),
     )
     monkeypatch.setattr(
         "app.services.bling_nf_service._obter_usuario_padrao_tenant",
@@ -642,16 +703,25 @@ def test_nf_autorizada_nao_faz_fallback_para_numero_do_pedido_no_documento(monke
     )
     monkeypatch.setattr(
         "app.services.bling_nf_service.baixar_estoque_item_integrado",
-        lambda **kwargs: chamadas_baixa.append(kwargs) or {"movimentos": [{"produto_id": 346, "quantidade": 1.0}]},
+        lambda **kwargs: (
+            chamadas_baixa.append(kwargs)
+            or {"movimentos": [{"produto_id": 346, "quantidade": 1.0}]}
+        ),
     )
-    monkeypatch.setattr("app.services.bling_nf_service.registrar_evento", lambda **kwargs: None)
-    monkeypatch.setattr("app.services.bling_nf_service.abrir_incidente", lambda **kwargs: None)
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.registrar_evento", lambda **kwargs: None
+    )
+    monkeypatch.setattr(
+        "app.services.bling_nf_service.abrir_incidente", lambda **kwargs: None
+    )
     monkeypatch.setattr(
         "app.services.bling_nf_service.resolver_incidentes_relacionados",
         lambda *args, **kwargs: 0,
     )
 
-    resposta = processar_nf_autorizada(db=db, pedido=pedido, itens=[item], nf_id="25443132613")
+    resposta = processar_nf_autorizada(
+        db=db, pedido=pedido, itens=[item], nf_id="25443132613"
+    )
 
     assert resposta == "venda_confirmada"
     assert len(chamadas_baixa) == 1
@@ -736,10 +806,14 @@ def test_nf_cancelada_estorna_baixa_e_reabre_lote(monkeypatch):
         chamadas_estorno.append(kwargs)
         return {"sucesso": True}
 
-    monkeypatch.setattr("app.estoque.service.EstoqueService.estornar_estoque", fake_estornar)
+    monkeypatch.setattr(
+        "app.estoque.service.EstoqueService.estornar_estoque", fake_estornar
+    )
 
     db = FakeDB([movimentacao], lote)
-    resposta = processar_nf_cancelada(db=db, pedido=pedido, itens=[item], nf_id="25432772133")
+    resposta = processar_nf_cancelada(
+        db=db, pedido=pedido, itens=[item], nf_id="25432772133"
+    )
 
     assert resposta == "venda_cancelada_com_estorno"
     assert pedido.status == "cancelado"

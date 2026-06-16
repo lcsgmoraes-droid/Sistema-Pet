@@ -28,7 +28,9 @@ class _FakeContaPagar:
 def test_criar_contas_pagar_da_nota_usa_tipo_tenant_e_classificacao(monkeypatch):
     chamadas_classificacao = []
     monkeypatch.setattr(financeiro, "ContaPagar", _FakeContaPagar)
-    monkeypatch.setattr(financeiro, "_obter_tipo_produto_revenda_id", lambda db, tenant_id: 123)
+    monkeypatch.setattr(
+        financeiro, "_obter_tipo_produto_revenda_id", lambda db, tenant_id: 123
+    )
     monkeypatch.setattr(
         financeiro,
         "aplicar_classificacao_aprendida_conta_pagar",
@@ -52,7 +54,9 @@ def test_criar_contas_pagar_da_nota_usa_tipo_tenant_e_classificacao(monkeypatch)
     }
     db = _FakeDb()
 
-    ids = financeiro.criar_contas_pagar_da_nota(nota, dados_xml, db, user_id=42, tenant_id="tenant-1")
+    ids = financeiro.criar_contas_pagar_da_nota(
+        nota, dados_xml, db, user_id=42, tenant_id="tenant-1"
+    )
 
     assert ids == [1, 2]
     assert db.flushes == 2

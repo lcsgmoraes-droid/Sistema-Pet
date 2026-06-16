@@ -49,11 +49,14 @@ def test_calculadora_informa_bloqueio_quando_falta_peso_ou_preco():
 def test_calculadora_aceita_peso_e_preco_de_fallback_do_item_selecionado():
     produto = _produto(peso_embalagem=None, preco_venda=0)
 
-    assert _campos_bloqueantes_calculadora(
-        produto,
-        peso_fallback=15,
-        preco_fallback=120,
-    ) == []
+    assert (
+        _campos_bloqueantes_calculadora(
+            produto,
+            peso_fallback=15,
+            preco_fallback=120,
+        )
+        == []
+    )
 
 
 def test_calculadora_bloqueia_produto_sem_tabela_consumo():
@@ -65,7 +68,10 @@ def test_calculadora_bloqueia_produto_sem_tabela_consumo():
 def test_calculadora_permite_quantidade_manual_sem_tabela_consumo():
     produto = _produto(tabela_consumo=None)
 
-    assert _campos_bloqueantes_calculadora(
-        produto,
-        exigir_tabela_consumo=False,
-    ) == []
+    assert (
+        _campos_bloqueantes_calculadora(
+            produto,
+            exigir_tabela_consumo=False,
+        )
+        == []
+    )

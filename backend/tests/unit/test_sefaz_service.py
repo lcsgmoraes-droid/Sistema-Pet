@@ -64,10 +64,20 @@ def test_consultar_nfe_real_chama_fluxo_real(monkeypatch: pytest.MonkeyPatch) ->
         "aviso": "Consulta real realizada na SEFAZ via distribuição DF-e.",
     }
 
-    monkeypatch.setattr(SefazService, "garantir_pronto_para_consulta_real", classmethod(lambda cls, _cfg=None: None))
-    monkeypatch.setattr(SefazService, "_consultar_por_chave_real", classmethod(lambda cls, chave, _cfg: {**esperado, "chave_acesso": chave}))
+    monkeypatch.setattr(
+        SefazService,
+        "garantir_pronto_para_consulta_real",
+        classmethod(lambda cls, _cfg=None: None),
+    )
+    monkeypatch.setattr(
+        SefazService,
+        "_consultar_por_chave_real",
+        classmethod(lambda cls, chave, _cfg: {**esperado, "chave_acesso": chave}),
+    )
 
-    resultado = SefazService.consultar_nfe_por_chave("35250112345678000195550010000001231234567890", cfg)
+    resultado = SefazService.consultar_nfe_por_chave(
+        "35250112345678000195550010000001231234567890", cfg
+    )
 
     assert resultado["aviso"].startswith("Consulta real")
     assert resultado["numero_nf"] == "123"
@@ -77,8 +87,16 @@ def test_sincronizar_nsu_caso_feliz(monkeypatch: pytest.MonkeyPatch) -> None:
     set_request_id("req-sefaz-sync")
     cfg = _config_real_base()
 
-    monkeypatch.setattr(SefazService, "garantir_pronto_para_consulta_real", classmethod(lambda cls, _cfg=None: None))
-    monkeypatch.setattr(SefazService, "_post_soap_dist_dfe", classmethod(lambda cls, _cfg, _xml: "<xml />"))
+    monkeypatch.setattr(
+        SefazService,
+        "garantir_pronto_para_consulta_real",
+        classmethod(lambda cls, _cfg=None: None),
+    )
+    monkeypatch.setattr(
+        SefazService,
+        "_post_soap_dist_dfe",
+        classmethod(lambda cls, _cfg, _xml: "<xml />"),
+    )
     monkeypatch.setattr(
         SefazService,
         "_parse_retorno_dist_dfe",
@@ -88,7 +106,9 @@ def test_sincronizar_nsu_caso_feliz(monkeypatch: pytest.MonkeyPatch) -> None:
                 "x_motivo": "Documento localizado",
                 "ult_nsu": "000000000000010",
                 "max_nsu": "000000000000010",
-                "docs": [{"nsu": "10", "schema": "resNFe_v1.01.xsd", "xml": "<resNFe />"}],
+                "docs": [
+                    {"nsu": "10", "schema": "resNFe_v1.01.xsd", "xml": "<resNFe />"}
+                ],
             }
         ),
     )
@@ -101,11 +121,21 @@ def test_sincronizar_nsu_caso_feliz(monkeypatch: pytest.MonkeyPatch) -> None:
     assert resultado["ultimo_nsu"] == "000000000000010"
 
 
-def test_sincronizar_nsu_retorno_inesperado_gera_502(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_sincronizar_nsu_retorno_inesperado_gera_502(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     cfg = _config_real_base()
 
-    monkeypatch.setattr(SefazService, "garantir_pronto_para_consulta_real", classmethod(lambda cls, _cfg=None: None))
-    monkeypatch.setattr(SefazService, "_post_soap_dist_dfe", classmethod(lambda cls, _cfg, _xml: "<xml />"))
+    monkeypatch.setattr(
+        SefazService,
+        "garantir_pronto_para_consulta_real",
+        classmethod(lambda cls, _cfg=None: None),
+    )
+    monkeypatch.setattr(
+        SefazService,
+        "_post_soap_dist_dfe",
+        classmethod(lambda cls, _cfg, _xml: "<xml />"),
+    )
     monkeypatch.setattr(
         SefazService,
         "_parse_retorno_dist_dfe",
@@ -127,11 +157,21 @@ def test_sincronizar_nsu_retorno_inesperado_gera_502(monkeypatch: pytest.MonkeyP
     assert "cStat 999" in str(exc.value.detail)
 
 
-def test_sincronizar_nsu_cstat_656_retorna_excecao_com_nsu(monkeypatch: pytest.MonkeyPatch) -> None:
+def test_sincronizar_nsu_cstat_656_retorna_excecao_com_nsu(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
     cfg = _config_real_base()
 
-    monkeypatch.setattr(SefazService, "garantir_pronto_para_consulta_real", classmethod(lambda cls, _cfg=None: None))
-    monkeypatch.setattr(SefazService, "_post_soap_dist_dfe", classmethod(lambda cls, _cfg, _xml: "<xml />"))
+    monkeypatch.setattr(
+        SefazService,
+        "garantir_pronto_para_consulta_real",
+        classmethod(lambda cls, _cfg=None: None),
+    )
+    monkeypatch.setattr(
+        SefazService,
+        "_post_soap_dist_dfe",
+        classmethod(lambda cls, _cfg, _xml: "<xml />"),
+    )
     monkeypatch.setattr(
         SefazService,
         "_parse_retorno_dist_dfe",

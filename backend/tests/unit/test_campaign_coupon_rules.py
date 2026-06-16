@@ -42,5 +42,11 @@ def test_calculate_coupon_discount_fixo_limitado_ao_total():
 def test_coupon_is_expired_alinha_datetime_naive_e_aware():
     coupon = SimpleNamespace(valid_until=datetime(2026, 5, 16, 10, 0))
 
-    assert _coupon_is_expired(coupon, datetime(2026, 5, 16, 10, 1, tzinfo=timezone.utc)) is True
-    assert _coupon_is_expired(coupon, datetime(2026, 5, 16, 9, 59, tzinfo=timezone.utc)) is False
+    assert (
+        _coupon_is_expired(coupon, datetime(2026, 5, 16, 10, 1, tzinfo=timezone.utc))
+        is True
+    )
+    assert (
+        _coupon_is_expired(coupon, datetime(2026, 5, 16, 9, 59, tzinfo=timezone.utc))
+        is False
+    )

@@ -20,8 +20,12 @@ def test_servico_importacao_extrato_exige_tenant_id_nos_fluxos_publicos():
         ServicoImportacaoExtrato.listar_lancamentos_pendentes
     )
     assert "tenant_id" in _parameters(ServicoImportacaoExtrato.validar_lote)
-    assert "tenant_id" in _parameters(ServicoImportacaoExtrato.criar_lancamento_financeiro)
-    assert "tenant_id" in _parameters(ServicoImportacaoExtrato.obter_historico_importacoes)
+    assert "tenant_id" in _parameters(
+        ServicoImportacaoExtrato.criar_lancamento_financeiro
+    )
+    assert "tenant_id" in _parameters(
+        ServicoImportacaoExtrato.obter_historico_importacoes
+    )
 
 
 def test_motor_categorizacao_ia_recebe_tenant_id_no_construtor():

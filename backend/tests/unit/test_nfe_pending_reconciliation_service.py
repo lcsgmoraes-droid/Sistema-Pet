@@ -4,7 +4,11 @@ from uuid import UUID
 
 import app.services.nfe_pending_reconciliation_service as service
 from app.middlewares.request_context import clear_request_context, get_request_id
-from app.tenancy.context import clear_current_tenant, get_current_tenant, set_current_tenant
+from app.tenancy.context import (
+    clear_current_tenant,
+    get_current_tenant,
+    set_current_tenant,
+)
 from app.utils.logger import clear_context
 
 
@@ -27,11 +31,19 @@ def test_planejar_janela_reconciliacao_usa_datas_minima_e_maxima():
     assert data_final == "2026-03-30"
 
 
-def test_reconciliar_nfes_pendentes_recentes_retorna_sem_execucao_quando_nao_ha_registros(monkeypatch):
-    monkeypatch.setattr(service, "_contar_nfes_pendentes_recentes", lambda *args, **kwargs: 0)
-    monkeypatch.setattr(service, "_buscar_nfes_pendentes_recentes", lambda *args, **kwargs: [])
+def test_reconciliar_nfes_pendentes_recentes_retorna_sem_execucao_quando_nao_ha_registros(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        service, "_contar_nfes_pendentes_recentes", lambda *args, **kwargs: 0
+    )
+    monkeypatch.setattr(
+        service, "_buscar_nfes_pendentes_recentes", lambda *args, **kwargs: []
+    )
 
-    resultado = service.reconciliar_nfes_pendentes_recentes(object(), "tenant-1", dias=3, limite_notas=50)
+    resultado = service.reconciliar_nfes_pendentes_recentes(
+        object(), "tenant-1", dias=3, limite_notas=50
+    )
 
     assert resultado["executada"] is False
     assert resultado["motivo"] == "sem_nfs_pendentes_recentes"
@@ -47,8 +59,14 @@ def test_reconciliar_nfes_pendentes_recentes_executa_sync_incremental(monkeypatc
     contagens = iter([5, 1])
     sync_args = {}
 
-    monkeypatch.setattr(service, "_contar_nfes_pendentes_recentes", lambda *args, **kwargs: next(contagens))
-    monkeypatch.setattr(service, "_buscar_nfes_pendentes_recentes", lambda *args, **kwargs: registros)
+    monkeypatch.setattr(
+        service,
+        "_contar_nfes_pendentes_recentes",
+        lambda *args, **kwargs: next(contagens),
+    )
+    monkeypatch.setattr(
+        service, "_buscar_nfes_pendentes_recentes", lambda *args, **kwargs: registros
+    )
 
     def fake_sync(db, tenant_id, *, data_inicial, data_final):
         sync_args["tenant_id"] = tenant_id
@@ -58,7 +76,9 @@ def test_reconciliar_nfes_pendentes_recentes_executa_sync_incremental(monkeypatc
 
     monkeypatch.setattr(service, "_executar_sync_incremental", fake_sync)
 
-    resultado = service.reconciliar_nfes_pendentes_recentes(object(), "tenant-1", dias=3, limite_notas=50)
+    resultado = service.reconciliar_nfes_pendentes_recentes(
+        object(), "tenant-1", dias=3, limite_notas=50
+    )
 
     assert resultado["executada"] is True
     assert resultado["bling_ok"] is True
@@ -73,16 +93,26 @@ def test_reconciliar_nfes_pendentes_recentes_executa_sync_incremental(monkeypatc
     }
 
 
-def test_executar_reconciliacao_automatica_nfes_pendentes_inclui_correlacao(monkeypatch):
-    monkeypatch.setattr(service, "listar_tenants_com_nfes_pendentes_recentes", lambda *args, **kwargs: [])
+def test_executar_reconciliacao_automatica_nfes_pendentes_inclui_correlacao(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        service,
+        "listar_tenants_com_nfes_pendentes_recentes",
+        lambda *args, **kwargs: [],
+    )
 
-    resultado = service.executar_reconciliacao_automatica_nfes_pendentes(object(), dias=3)
+    resultado = service.executar_reconciliacao_automatica_nfes_pendentes(
+        object(), dias=3
+    )
 
     assert resultado["correlation_id"].startswith("job.nfe-pending-reconciliation-")
     assert get_request_id() is None
 
 
-def test_executar_reconciliacao_automatica_nfes_pendentes_ativa_contexto_por_tenant(monkeypatch):
+def test_executar_reconciliacao_automatica_nfes_pendentes_ativa_contexto_por_tenant(
+    monkeypatch,
+):
     tenant_a = UUID("11111111-1111-4111-8111-111111111111")
     tenant_b = UUID("22222222-2222-4222-8222-222222222222")
     previous_tenant = UUID("99999999-9999-4999-8999-999999999999")
@@ -103,7 +133,9 @@ def test_executar_reconciliacao_automatica_nfes_pendentes_ativa_contexto_por_ten
             "pendentes_atualizadas": 0,
         }
 
-    monkeypatch.setattr(service, "reconciliar_nfes_pendentes_recentes", fake_reconciliar)
+    monkeypatch.setattr(
+        service, "reconciliar_nfes_pendentes_recentes", fake_reconciliar
+    )
 
     set_current_tenant(previous_tenant)
 
@@ -118,7 +150,9 @@ def test_executar_reconciliacao_automatica_nfes_pendentes_ativa_contexto_por_ten
     assert get_current_tenant() == previous_tenant
 
 
-def test_listar_tenants_com_nfes_pendentes_recentes_usa_sql_global_autorizado(monkeypatch):
+def test_listar_tenants_com_nfes_pendentes_recentes_usa_sql_global_autorizado(
+    monkeypatch,
+):
     chamadas = []
 
     def fake_execute(db, sql, params=None, **kwargs):

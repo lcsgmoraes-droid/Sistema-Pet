@@ -19,7 +19,9 @@ def test_campaign_engine_sets_tenant_context_while_processing_event():
     checks = []
 
     class _Engine(CampaignEngine):
-        def _get_active_campaigns(self, *, tenant_id: object, event_type: str, sale_channel=None):
+        def _get_active_campaigns(
+            self, *, tenant_id: object, event_type: str, sale_channel=None
+        ):
             checks.append(("list", get_current_tenant()))
             return [SimpleNamespace(id=1, campaign_type="loyalty_stamp")]
 

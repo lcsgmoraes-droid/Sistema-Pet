@@ -2,7 +2,11 @@ from types import SimpleNamespace
 from uuid import UUID
 
 import app.notas_entrada.sefaz_importer as importer
-from app.tenancy.context import clear_current_tenant, get_current_tenant, set_current_tenant
+from app.tenancy.context import (
+    clear_current_tenant,
+    get_current_tenant,
+    set_current_tenant,
+)
 
 
 TARGET_TENANT = UUID("11111111-1111-4111-8111-111111111111")

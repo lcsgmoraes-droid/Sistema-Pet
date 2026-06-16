@@ -12,7 +12,9 @@ class FakeResult:
         return self._row
 
 
-def test_buscar_configuracao_comissao_nao_depende_da_ordem_fisica_da_tabela(monkeypatch):
+def test_buscar_configuracao_comissao_nao_depende_da_ordem_fisica_da_tabela(
+    monkeypatch,
+):
     tenant_id = "11111111-1111-1111-1111-111111111111"
 
     def fake_execute_tenant_safe(db, query, params, **kwargs):
@@ -22,44 +24,50 @@ def test_buscar_configuracao_comissao_nao_depende_da_ordem_fisica_da_tabela(monk
         if "SELECT *" in query:
             # Ordem fisica criada pela migration base:
             # percentual vem antes de ativo/tipo_calculo.
-            return FakeResult((
+            return FakeResult(
+                (
+                    10,
+                    7,
+                    "produto",
+                    99,
+                    Decimal("12.5"),
+                    True,
+                    "percentual",
+                    True,
+                    True,
+                    False,
+                    True,
+                    Decimal("0"),
+                    True,
+                    "obs",
+                    datetime(2026, 1, 1),
+                    datetime(2026, 1, 1),
+                    tenant_id,
+                )
+            )
+
+        return FakeResult(
+            (
                 10,
                 7,
                 "produto",
                 99,
-                Decimal("12.5"),
-                True,
                 "percentual",
+                Decimal("12.5"),
+                Decimal("0"),
                 True,
                 True,
                 False,
                 True,
-                Decimal("0"),
                 True,
                 "obs",
-                datetime(2026, 1, 1),
-                datetime(2026, 1, 1),
-                tenant_id,
-            ))
+                True,
+            )
+        )
 
-        return FakeResult((
-            10,
-            7,
-            "produto",
-            99,
-            "percentual",
-            Decimal("12.5"),
-            Decimal("0"),
-            True,
-            True,
-            False,
-            True,
-            True,
-            "obs",
-            True,
-        ))
-
-    monkeypatch.setattr(comissoes_service, "execute_tenant_safe", fake_execute_tenant_safe)
+    monkeypatch.setattr(
+        comissoes_service, "execute_tenant_safe", fake_execute_tenant_safe
+    )
 
     config = comissoes_service.buscar_configuracao_comissao(
         db=object(),

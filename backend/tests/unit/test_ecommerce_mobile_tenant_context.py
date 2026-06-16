@@ -163,7 +163,9 @@ def test_get_current_ecommerce_user_sets_tenant_context_from_token():
     credentials = SimpleNamespace(credentials=_token(user.id, tenant_id))
     clear_current_tenant()
 
-    current_user = _get_current_ecommerce_user(credentials=credentials, db=_Db(user, user_tenant, tenant))
+    current_user = _get_current_ecommerce_user(
+        credentials=credentials, db=_Db(user, user_tenant, tenant)
+    )
 
     assert current_user is user
     assert get_current_tenant() == tenant_id
@@ -231,7 +233,9 @@ def test_app_mobile_rastreio_entrega_sql_cru_filtra_gps_por_tenant():
 def test_get_entregador_cliente_uses_validated_ecommerce_user_context():
     tenant_id = uuid4()
     user = SimpleNamespace(id=123, tenant_id=tenant_id, is_active=True)
-    cliente = SimpleNamespace(id=456, tenant_id=str(tenant_id), user_id=user.id, is_entregador=True)
+    cliente = SimpleNamespace(
+        id=456, tenant_id=str(tenant_id), user_id=user.id, is_entregador=True
+    )
     clear_current_tenant()
 
     entregador = _get_entregador_cliente(current_user=user, db=_Db(cliente))
@@ -242,7 +246,9 @@ def test_get_entregador_cliente_uses_validated_ecommerce_user_context():
 
 def test_obter_rota_entregador_validates_driver_before_delegating(monkeypatch):
     tenant_id = uuid4()
-    cliente = SimpleNamespace(id=456, tenant_id=str(tenant_id), user_id=123, is_entregador=True)
+    cliente = SimpleNamespace(
+        id=456, tenant_id=str(tenant_id), user_id=123, is_entregador=True
+    )
     rota = SimpleNamespace(id=789, tenant_id=str(tenant_id), entregador_id=cliente.id)
     delegated = {}
     clear_current_tenant()
@@ -336,7 +342,9 @@ def test_get_or_create_cliente_for_user_prefers_operational_profile_by_email():
     )
     clear_current_tenant()
 
-    result = _get_or_create_cliente_for_user(_Db([cliente_vinculado], [funcionario_por_email]), user)
+    result = _get_or_create_cliente_for_user(
+        _Db([cliente_vinculado], [funcionario_por_email]), user
+    )
 
     assert result is funcionario_por_email
     assert funcionario_por_email.user_id == user.id
@@ -380,7 +388,9 @@ def test_get_or_create_cliente_for_user_prefers_active_linked_customer():
     )
     clear_current_tenant()
 
-    result = _get_or_create_cliente_for_user(_Db([inactive_duplicate, active_customer], []), user)
+    result = _get_or_create_cliente_for_user(
+        _Db([inactive_duplicate, active_customer], []), user
+    )
 
     assert result is active_customer
     assert get_current_tenant() == tenant_id
@@ -429,7 +439,9 @@ def test_get_or_create_cliente_for_user_reactivates_old_erp_customer_when_all_ma
     )
     clear_current_tenant()
 
-    result = _get_or_create_cliente_for_user(_Db([ecommerce_duplicate, erp_customer], []), user)
+    result = _get_or_create_cliente_for_user(
+        _Db([ecommerce_duplicate, erp_customer], []), user
+    )
 
     assert result is erp_customer
     assert erp_customer.ativo is True
@@ -491,10 +503,14 @@ def test_atualizar_perfil_detaches_duplicate_customer_instead_of_deleting_histor
     assert "db.delete(previous_cliente)" not in source
 
 
-def test_ecommerce_profile_merge_uses_generic_reference_transfer_before_detaching_duplicate(monkeypatch):
+def test_ecommerce_profile_merge_uses_generic_reference_transfer_before_detaching_duplicate(
+    monkeypatch,
+):
     calls = {}
 
-    def fake_transferir_referencias_pessoa(db, *, tenant_id, principal_id, duplicado_id):
+    def fake_transferir_referencias_pessoa(
+        db, *, tenant_id, principal_id, duplicado_id
+    ):
         calls["args"] = {
             "db": db,
             "tenant_id": tenant_id,
@@ -530,7 +546,9 @@ def test_ecommerce_profile_merge_uses_generic_reference_transfer_before_detachin
     assert transferred == 6
 
 
-def test_app_mobile_cliente_helper_uses_profile_resolution_for_duplicate_customer_rows(monkeypatch):
+def test_app_mobile_cliente_helper_uses_profile_resolution_for_duplicate_customer_rows(
+    monkeypatch,
+):
     tenant_id = uuid4()
     user = SimpleNamespace(
         id=123,
@@ -647,7 +665,9 @@ def test_delivery_actor_ecommerce_token_sets_tenant_context():
     user = SimpleNamespace(id=123, tenant_id=tenant_id, is_active=True)
     user_tenant = SimpleNamespace(user_id=user.id, tenant_id=tenant_id, is_active=True)
     tenant = SimpleNamespace(id=tenant_id, status="active")
-    cliente = SimpleNamespace(id=456, tenant_id=str(tenant_id), user_id=user.id, is_entregador=True)
+    cliente = SimpleNamespace(
+        id=456, tenant_id=str(tenant_id), user_id=user.id, is_entregador=True
+    )
     credentials = SimpleNamespace(credentials=_token(user.id, tenant_id))
     clear_current_tenant()
 
@@ -664,7 +684,9 @@ def test_delivery_actor_ecommerce_token_sets_tenant_context():
 
 def test_delivery_route_helpers_reactivate_tenant_context_from_actor():
     tenant_id = uuid4()
-    actor = DeliveryActor(user=SimpleNamespace(id=123), tenant_id=tenant_id, entregador=None)
+    actor = DeliveryActor(
+        user=SimpleNamespace(id=123), tenant_id=tenant_id, entregador=None
+    )
     clear_current_tenant()
 
     assert _activate_delivery_actor_tenant(actor) == tenant_id

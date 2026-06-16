@@ -41,5 +41,11 @@ def test_estoque_routes_nao_expõe_mais_rotas_saida_full():
 def test_main_registra_router_de_saida_full():
     main_source = _source("app/main.py")
 
-    assert "from app.estoque_saida_full_routes import router as estoque_saida_full_router" in main_source
-    assert 'app.include_router(estoque_saida_full_router, tags=["Estoque - Saida FULL"])' in main_source
+    assert (
+        "from app.estoque_saida_full_routes import router as estoque_saida_full_router"
+        in main_source
+    )
+    assert (
+        'app.include_router(estoque_saida_full_router, tags=["Estoque - Saida FULL"])'
+        in main_source
+    )

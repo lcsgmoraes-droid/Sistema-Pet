@@ -15,4 +15,3 @@ def test_cashback_disponivel_clause_usa_or_sqlalchemy():
     assert " OR " in sql
     assert "EXPIRES_AT IS NULL" in sql
     assert "TX_TYPE" in sql
-

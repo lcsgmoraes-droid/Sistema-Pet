@@ -37,7 +37,10 @@ def _pessoa(**kwargs):
 
 
 def test_normalizar_nome_pessoa_ignora_acentos_caixa_e_espacos():
-    assert normalizar_nome_pessoa("  LUCAS   Guerra de Morães  ") == "lucas guerra de moraes"
+    assert (
+        normalizar_nome_pessoa("  LUCAS   Guerra de Morães  ")
+        == "lucas guerra de moraes"
+    )
 
 
 def test_avaliar_par_permite_fusao_automatica_com_nome_igual_e_sem_conflitos():

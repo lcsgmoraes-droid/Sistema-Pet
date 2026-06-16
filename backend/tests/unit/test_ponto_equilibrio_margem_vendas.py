@@ -3,6 +3,8 @@ from types import SimpleNamespace
 
 import os
 
+import pytest
+
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test.db")
 
@@ -69,27 +71,37 @@ def test_ponto_equilibrio_soma_margem_pelo_snapshot_da_venda():
         ],
     )
 
-    assert resultado["faturamento"] == 112.0
-    assert resultado["receita_produtos_servicos"] == 100.0
-    assert resultado["receita_entrega"] == 12.0
-    assert resultado["descontos"] == 5.0
-    assert resultado["beneficios_campanhas"] == 3.0
-    assert resultado["taxas_cartao"] == 4.0
-    assert resultado["repasse_entrega"] == 7.0
-    assert resultado["custo_operacional_entrega"] == 2.0
-    assert resultado["comissoes"] == 6.0
-    assert resultado["custo_fiscal"] == 8.0
-    assert resultado["cmv_estimado"] == 40.0
-    assert resultado["outros_variaveis"] == 9.0
-    assert resultado["custos_variaveis"] == 84.0
-    assert resultado["margem_contribuicao"] == 28.0
-    assert resultado["margem_contribuicao_percentual"] == 25.0
-    assert resultado["detalhes_margem"]["subtotais"][0]["id"] == "receita_produtos_servicos"
-    assert resultado["detalhes_margem"]["componentes"]["custo_fiscal"][0]["valor"] == 8.0
-    assert resultado["detalhes_margem"]["componentes"]["outros_variaveis"][0]["descricao"] == "Embalagens"
+    assert resultado["faturamento"] == pytest.approx(112.0)
+    assert resultado["receita_produtos_servicos"] == pytest.approx(100.0)
+    assert resultado["receita_entrega"] == pytest.approx(12.0)
+    assert resultado["descontos"] == pytest.approx(5.0)
+    assert resultado["beneficios_campanhas"] == pytest.approx(3.0)
+    assert resultado["taxas_cartao"] == pytest.approx(4.0)
+    assert resultado["repasse_entrega"] == pytest.approx(7.0)
+    assert resultado["custo_operacional_entrega"] == pytest.approx(2.0)
+    assert resultado["comissoes"] == pytest.approx(6.0)
+    assert resultado["custo_fiscal"] == pytest.approx(8.0)
+    assert resultado["cmv_estimado"] == pytest.approx(40.0)
+    assert resultado["outros_variaveis"] == pytest.approx(9.0)
+    assert resultado["custos_variaveis"] == pytest.approx(84.0)
+    assert resultado["margem_contribuicao"] == pytest.approx(28.0)
+    assert resultado["margem_contribuicao_percentual"] == pytest.approx(25.0)
+    assert (
+        resultado["detalhes_margem"]["subtotais"][0]["id"]
+        == "receita_produtos_servicos"
+    )
+    assert resultado["detalhes_margem"]["componentes"]["custo_fiscal"][0][
+        "valor"
+    ] == pytest.approx(8.0)
+    assert (
+        resultado["detalhes_margem"]["componentes"]["outros_variaveis"][0]["descricao"]
+        == "Embalagens"
+    )
 
 
-def test_ponto_equilibrio_calcula_snapshots_em_lote_sem_get_or_build_por_venda(monkeypatch):
+def test_ponto_equilibrio_calcula_snapshots_em_lote_sem_get_or_build_por_venda(
+    monkeypatch,
+):
     vendas = [
         SimpleNamespace(
             id=1,
@@ -133,9 +145,9 @@ def test_ponto_equilibrio_calcula_snapshots_em_lote_sem_get_or_build_por_venda(m
     def build_rapido(venda, db, tenant_id, **kwargs):
         chamados["build"] += 1
         assert kwargs["formas_pagamento_map"] == {}
-        assert kwargs["impostos_percentual"] == 7.0
-        assert kwargs["comissao_total"] == 0.0
-        assert kwargs["taxa_operacional_entrega"] == 0.0
+        assert kwargs["impostos_percentual"] == pytest.approx(7.0)
+        assert kwargs["comissao_total"] == pytest.approx(0.0)
+        assert kwargs["taxa_operacional_entrega"] == pytest.approx(0.0)
         assert kwargs["estoque_custos_por_produto"] == {}
         return {
             "venda_id": venda.id,
@@ -154,15 +166,70 @@ def test_ponto_equilibrio_calcula_snapshots_em_lote_sem_get_or_build_por_venda(m
             "custo_produtos": 10.0,
         }
 
-    monkeypatch.setattr(dashboard_routes, "get_or_build_venda_rentabilidade_snapshot", falha_get_or_build, raising=False)
-    monkeypatch.setattr(dashboard_routes, "build_venda_rentabilidade_snapshot", build_rapido, raising=False)
-    monkeypatch.setattr(dashboard_routes, "_formas_pagamento_map", lambda db, tenant_id: chamados.update(formas=chamados["formas"] + 1) or {}, raising=False)
-    monkeypatch.setattr(dashboard_routes, "_impostos_percentual", lambda db, tenant_id: chamados.update(impostos=chamados["impostos"] + 1) or 7.0, raising=False)
-    monkeypatch.setattr(dashboard_routes, "_bulk_comissoes_por_venda", lambda db, tenant_id, venda_ids: chamados.update(comissoes=chamados["comissoes"] + 1) or {}, raising=False)
-    monkeypatch.setattr(dashboard_routes, "_bulk_cupons_por_venda", lambda db, tenant_id, vendas: chamados.update(cupons=chamados["cupons"] + 1) or {}, raising=False)
-    monkeypatch.setattr(dashboard_routes, "_bulk_cashback_por_venda", lambda db, tenant_id, venda_ids: chamados.update(cashback=chamados["cashback"] + 1) or {}, raising=False)
-    monkeypatch.setattr(dashboard_routes, "_bulk_taxa_operacional_por_venda", lambda db, tenant_id, vendas: chamados.update(taxa_operacional=chamados["taxa_operacional"] + 1) or {}, raising=False)
-    monkeypatch.setattr(dashboard_routes, "_bulk_estoque_custos_por_venda", lambda db, tenant_id, venda_ids: chamados.update(estoque=chamados["estoque"] + 1) or {}, raising=False)
+    monkeypatch.setattr(
+        dashboard_routes,
+        "get_or_build_venda_rentabilidade_snapshot",
+        falha_get_or_build,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        dashboard_routes,
+        "build_venda_rentabilidade_snapshot",
+        build_rapido,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        dashboard_routes,
+        "_formas_pagamento_map",
+        lambda db, tenant_id: chamados.update(formas=chamados["formas"] + 1) or {},
+        raising=False,
+    )
+    monkeypatch.setattr(
+        dashboard_routes,
+        "_impostos_percentual",
+        lambda db, tenant_id: chamados.update(impostos=chamados["impostos"] + 1) or 7.0,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        dashboard_routes,
+        "_bulk_comissoes_por_venda",
+        lambda db, tenant_id, venda_ids: (
+            chamados.update(comissoes=chamados["comissoes"] + 1) or {}
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        dashboard_routes,
+        "_bulk_cupons_por_venda",
+        lambda db, tenant_id, vendas: (
+            chamados.update(cupons=chamados["cupons"] + 1) or {}
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        dashboard_routes,
+        "_bulk_cashback_por_venda",
+        lambda db, tenant_id, venda_ids: (
+            chamados.update(cashback=chamados["cashback"] + 1) or {}
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        dashboard_routes,
+        "_bulk_taxa_operacional_por_venda",
+        lambda db, tenant_id, vendas: (
+            chamados.update(taxa_operacional=chamados["taxa_operacional"] + 1) or {}
+        ),
+        raising=False,
+    )
+    monkeypatch.setattr(
+        dashboard_routes,
+        "_bulk_estoque_custos_por_venda",
+        lambda db, tenant_id, venda_ids: (
+            chamados.update(estoque=chamados["estoque"] + 1) or {}
+        ),
+        raising=False,
+    )
 
     resultado = dashboard_routes._calcular_margem_periodo_ponto_equilibrio(
         _FakeDb(vendas),
@@ -174,8 +241,8 @@ def test_ponto_equilibrio_calcula_snapshots_em_lote_sem_get_or_build_por_venda(m
     )
 
     assert resultado["quantidade_vendas"] == 2
-    assert resultado["faturamento"] == 150.0
-    assert resultado["cmv_estimado"] == 20.0
+    assert resultado["faturamento"] == pytest.approx(150.0)
+    assert resultado["cmv_estimado"] == pytest.approx(20.0)
     assert chamados == {
         "build": 2,
         "formas": 1,
@@ -203,22 +270,26 @@ def test_ponto_equilibrio_modo_documentos_emitidos_remove_custo_fiscal_sem_nf():
         "custo_produtos": 50.0,
     }
 
-    ajustado = ajustar(snapshot, venda_tem_documento=False, modo_custo_fiscal="documentos_emitidos")
+    ajustado = ajustar(
+        snapshot, venda_tem_documento=False, modo_custo_fiscal="documentos_emitidos"
+    )
     resultado = somar([{"snapshot": ajustado, "nf_emitida": False}])
 
-    assert ajustado["imposto"] == 0.0
-    assert ajustado["custo_fiscal_original"] == 7.0
-    assert ajustado["custo_fiscal_desconsiderado"] == 7.0
-    assert resultado["custo_fiscal"] == 0.0
-    assert resultado["cmv_estimado"] == 50.0
-    assert resultado["margem_contribuicao"] == 50.0
-    assert resultado["detalhes_margem"]["componentes"]["custo_fiscal"][0]["observacao"] == (
-        "Custo fiscal estimado desconsiderado nesta visao"
-    )
+    assert ajustado["imposto"] == pytest.approx(0.0)
+    assert ajustado["custo_fiscal_original"] == pytest.approx(7.0)
+    assert ajustado["custo_fiscal_desconsiderado"] == pytest.approx(7.0)
+    assert resultado["custo_fiscal"] == pytest.approx(0.0)
+    assert resultado["cmv_estimado"] == pytest.approx(50.0)
+    assert resultado["margem_contribuicao"] == pytest.approx(50.0)
+    assert resultado["detalhes_margem"]["componentes"]["custo_fiscal"][0][
+        "observacao"
+    ] == ("Custo fiscal estimado desconsiderado nesta visao")
 
 
 def test_ponto_equilibrio_identifica_conta_variavel_ja_coberta_pelo_snapshot():
-    func = getattr(dashboard_routes, "_conta_variavel_ja_coberta_pelo_snapshot_pe", None)
+    func = getattr(
+        dashboard_routes, "_conta_variavel_ja_coberta_pelo_snapshot_pe", None
+    )
     assert func is not None
 
     taxa_cartao = SimpleNamespace(descricao="Taxa Credito - Venda 202604130015")
