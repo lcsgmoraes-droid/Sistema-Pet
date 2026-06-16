@@ -6,17 +6,19 @@ Dashboard dinâmico com filtros, gráficos e insights inteligentes
 Versão: 1.0.0 (2026-02-14)
 """
 
+import traceback
+
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, or_, case, desc, asc, distinct
+from sqlalchemy import func, and_, or_, desc
 from typing import List, Optional, Dict, Any
-from datetime import datetime, timedelta
-from decimal import Decimal
+from datetime import datetime
 
 from .db import get_session
 from .auth.dependencies import get_current_user_and_tenant
 from .produtos_models import Produto, Marca, Categoria
-from .opcoes_racao_models import LinhaRacao, PorteAnimal, FasePublico, TipoTratamento, SaborProteina
+from .opcoes_racao_models import LinhaRacao, PorteAnimal, FasePublico, TipoTratamento
 from .vendas_models import VendaItem, Venda
 
 router = APIRouter(prefix="/racoes/analises", tags=["Análises Rações"])
@@ -61,9 +63,6 @@ def _produto_eh_racao_expr():
             classificacao_normalizada != "nao",
         ),
     )
-
-from pydantic import BaseModel
-
 
 class FiltrosAnalise(BaseModel):
     """Filtros dinâmicos para análises"""
@@ -236,14 +235,14 @@ async def obter_resumo_dashboard(
     # Total de rações
     total_racoes = db.query(func.count(Produto.id)).filter(
         Produto.tenant_id == tenant_id,
-        Produto.ativo == True,
+        Produto.ativo.is_(True),
         _produto_eh_racao_expr()
     ).scalar() or 0
     
     # Total classificadas (com pelo menos um campo preenchido)
     total_classificadas = db.query(func.count(Produto.id)).filter(
         Produto.tenant_id == tenant_id,
-        Produto.ativo == True,
+        Produto.ativo.is_(True),
         _produto_eh_racao_expr(),
         or_(
             Produto.porte_animal.isnot(None),
@@ -260,7 +259,7 @@ async def obter_resumo_dashboard(
         Produto, Produto.marca_id == Marca.id
     ).filter(
         Produto.tenant_id == tenant_id,
-        Produto.ativo == True,
+        Produto.ativo.is_(True),
         _produto_eh_racao_expr()
     ).scalar() or 0
     
@@ -271,7 +270,7 @@ async def obter_resumo_dashboard(
         )
     ).filter(
         Produto.tenant_id == tenant_id,
-        Produto.ativo == True,
+        Produto.ativo.is_(True),
         _produto_eh_racao_expr(),
         Produto.preco_venda > 0
     )
@@ -332,7 +331,7 @@ async def obter_resumo_dashboard(
         ).label('margem_media')
     ).filter(
         Produto.tenant_id == tenant_id,
-        Produto.ativo == True,
+        Produto.ativo.is_(True),
         _produto_eh_racao_expr(),
         Produto.porte_animal.isnot(None),
         Produto.preco_venda > 0
@@ -394,7 +393,7 @@ async def analisar_margem_por_segmento(
     # Query base
     query = db.query(Produto).filter(
         Produto.tenant_id == tenant_id,
-        Produto.ativo == True,
+        Produto.ativo.is_(True),
         _produto_eh_racao_expr(),
         campo.isnot(None)
     )
@@ -505,7 +504,7 @@ async def comparar_marcas(
     # Query base
     query = db.query(Produto).filter(
         Produto.tenant_id == tenant_id,
-        Produto.ativo == True,
+        Produto.ativo.is_(True),
         _produto_eh_racao_expr(),
         Produto.marca_id.isnot(None)
     )
@@ -663,7 +662,7 @@ async def obter_opcoes_filtros(
         current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
         
         # Buscar valores únicos de cada campo JSONB
-        from sqlalchemy import distinct, text
+        from sqlalchemy import distinct
         import logging
         
         logger = logging.getLogger(__name__)
@@ -730,11 +729,11 @@ async def obter_opcoes_filtros(
                 ).filter(
                     Produto.tenant_id == tenant_id,
                     _produto_eh_racao_expr(),
-                    LinhaRacao.ativo == True
+                    LinhaRacao.ativo.is_(True)
                 ).distinct().all()
                 logger.info(f"[opcoes-filtros] Linhas encontradas: {len(linhas)}")
             else:
-                logger.warning(f"[opcoes-filtros] Coluna 'linha_racao_id' não existe no modelo Produto")
+                logger.warning("[opcoes-filtros] Coluna 'linha_racao_id' não existe no modelo Produto")
         except Exception as e:
             logger.error(f"[opcoes-filtros] Erro ao buscar linhas: {str(e)}\n{traceback.format_exc()}")
         
@@ -748,11 +747,11 @@ async def obter_opcoes_filtros(
                 ).filter(
                     Produto.tenant_id == tenant_id,
                     _produto_eh_racao_expr(),
-                    PorteAnimal.ativo == True
+                    PorteAnimal.ativo.is_(True)
                 ).distinct().all()
                 logger.info(f"[opcoes-filtros] Portes encontrados: {len(portes)}")
             else:
-                logger.warning(f"[opcoes-filtros] Coluna 'porte_animal_id' não existe no modelo Produto")
+                logger.warning("[opcoes-filtros] Coluna 'porte_animal_id' não existe no modelo Produto")
         except Exception as e:
             logger.error(f"[opcoes-filtros] Erro ao buscar portes: {str(e)}\n{traceback.format_exc()}")
         
@@ -766,11 +765,11 @@ async def obter_opcoes_filtros(
                 ).filter(
                     Produto.tenant_id == tenant_id,
                     _produto_eh_racao_expr(),
-                    FasePublico.ativo == True
+                    FasePublico.ativo.is_(True)
                 ).distinct().all()
                 logger.info(f"[opcoes-filtros] Fases encontradas: {len(fases)}")
             else:
-                logger.warning(f"[opcoes-filtros] Coluna 'fase_publico_id' não existe no modelo Produto")
+                logger.warning("[opcoes-filtros] Coluna 'fase_publico_id' não existe no modelo Produto")
         except Exception as e:
             logger.error(f"[opcoes-filtros] Erro ao buscar fases: {str(e)}\n{traceback.format_exc()}")
         
@@ -784,11 +783,11 @@ async def obter_opcoes_filtros(
                 ).filter(
                     Produto.tenant_id == tenant_id,
                     _produto_eh_racao_expr(),
-                    TipoTratamento.ativo == True
+                    TipoTratamento.ativo.is_(True)
                 ).distinct().all()
                 logger.info(f"[opcoes-filtros] Tratamentos encontrados: {len(tratamentos)}")
             else:
-                logger.warning(f"[opcoes-filtros] Coluna 'tipo_tratamento_id' não existe no modelo Produto")
+                logger.warning("[opcoes-filtros] Coluna 'tipo_tratamento_id' não existe no modelo Produto")
         except Exception as e:
             logger.error(f"[opcoes-filtros] Erro ao buscar tratamentos: {str(e)}\n{traceback.format_exc()}")
         
@@ -805,13 +804,13 @@ async def obter_opcoes_filtros(
         except Exception as e:
             logger.error(f"[opcoes-filtros] Erro ao buscar pesos: {str(e)}")
         
-        logger.info(f"[opcoes-filtros] Busca concluída com sucesso")
+        logger.info("[opcoes-filtros] Busca concluída com sucesso")
         
         return {
             "marcas": [{"id": m.id, "nome": m.nome} for m in marcas],
             "categorias": [{"id": c.id, "nome": c.nome} for c in categorias],
             "especies": sorted(list(set(especies))),
-            "linhas": [{"id": l.id, "nome": l.nome} for l in linhas],
+            "linhas": [{"id": linha.id, "nome": linha.nome} for linha in linhas],
             "portes": [{"id": p.id, "nome": p.nome} for p in portes],
             "fases": [{"id": f.id, "nome": f.nome} for f in fases],
             "tratamentos": [{"id": t.id, "nome": t.nome} for t in tratamentos],
@@ -821,8 +820,6 @@ async def obter_opcoes_filtros(
     
     except Exception as error:
         import logging
-        import traceback
-        
         logger = logging.getLogger(__name__)
         logger.error(f"[opcoes-filtros] ERRO CRÍTICO: {str(error)}")
         logger.error(f"[opcoes-filtros] Stack trace:\n{traceback.format_exc()}")
@@ -860,7 +857,7 @@ async def obter_produtos_para_comparacao(
         Marca, Produto.marca_id == Marca.id, isouter=True
     ).filter(
         Produto.tenant_id == tenant_id,
-        Produto.ativo == True,
+        Produto.ativo.is_(True),
         _produto_eh_racao_expr()
     )
     

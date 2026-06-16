@@ -107,6 +107,10 @@ jobs:
         run: |
           ruff check app/caixa_models.py app/caixa_routes.py app/calculadora_racao.py
 
+      - name: Racoes root lint (blocking)
+        run: |
+          ruff check app/analise_racoes_routes.py app/classificador_racao.py app/ml_racoes_routes.py app/opcoes_racao_models.py app/opcoes_racao_routes.py app/pdv_racoes_routes.py app/sugestoes_racoes_routes.py
+
       - name: Parsers lint (blocking)
         run: |
           ruff check app/parsers

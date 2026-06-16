@@ -8,17 +8,16 @@ Versão: 1.0.0 (2026-02-14)
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, or_, desc
-from typing import List, Optional, Dict, Any
+from typing import List, Optional
 from pydantic import BaseModel
 from datetime import datetime, timedelta
+from pathlib import Path
 import json
 
 from .db import get_session
 from .auth.dependencies import get_current_user_and_tenant
-from .produtos_models import Produto, Marca
+from .produtos_models import Produto
 from .utils.tenant_safe_sql import execute_tenant_safe
-from .vendas_models import VendaItem, Venda
 
 router = APIRouter(prefix="/racoes/ml", tags=["Machine Learning - Rações"])
 
@@ -31,6 +30,12 @@ def _validar_tenant_e_obter_usuario(user_and_tenant):
     """Desempacota e valida user_and_tenant"""
     current_user, tenant_id = user_and_tenant
     return current_user, tenant_id
+
+
+def _obter_usuario_id(current_user):
+    if isinstance(current_user, dict):
+        return current_user.get("id")
+    return getattr(current_user, "id", None)
 
 
 # ============================================================================
@@ -74,9 +79,6 @@ class PrevisaoDemanda(BaseModel):
 
 # Armazenar feedbacks em arquivo JSON (simples para MVP)
 # Em produção, usar tabela no banco de dados
-import os
-from pathlib import Path
-
 FEEDBACK_FILE = Path("data/feedback_classificacao.json")
 
 def carregar_feedbacks():
@@ -88,7 +90,7 @@ def carregar_feedbacks():
     try:
         with open(FEEDBACK_FILE, 'r', encoding='utf-8') as f:
             return json.load(f)
-    except:
+    except Exception:
         return []
 
 
@@ -151,7 +153,7 @@ async def registrar_feedback(
     novo_feedback = {
         "timestamp": datetime.now().isoformat(),
         "tenant_id": tenant_id,
-        "usuario_id": usuario.get('id'),
+        "usuario_id": _obter_usuario_id(current_user),
         "produto_id": feedback.produto_id,
         "campo": feedback.campo,
         "valor_ia": feedback.valor_ia,
@@ -293,7 +295,7 @@ async def aplicar_padroes_aprendidos(
     padroes = await obter_padroes_aprendidos(
         campo=None,
         min_frequencia=5,
-        usuario=usuario,
+        user_and_tenant=user_and_tenant,
         db=db
     )
     
@@ -373,7 +375,7 @@ async def prever_demanda(
     produtos = db.query(Produto).filter(
         Produto.tenant_id == tenant_id,
         Produto.tipo == 'ração',
-        Produto.ativo == True
+        Produto.ativo.is_(True)
     ).all()
     
     # Agrupar produtos por segmento
@@ -454,7 +456,7 @@ async def prever_demanda(
         if tendencia == "crescente":
             recomendacao = f"📈 Segmento em crescimento! Aumentar estoque em {int(percentual)}%"
         elif tendencia == "decrescente":
-            recomendacao = f"📉 Segmento em queda. Reduzir compras ou fazer promoções."
+            recomendacao = "📉 Segmento em queda. Reduzir compras ou fazer promoções."
         else:
             recomendacao = "➡️ Segmento estável. Manter níveis atuais de estoque."
         
@@ -507,7 +509,7 @@ async def obter_estatisticas_ml(
     padroes = await obter_padroes_aprendidos(
         campo=None,
         min_frequencia=2,
-        usuario=usuario,
+        user_and_tenant=user_and_tenant,
         db=db
     )
     

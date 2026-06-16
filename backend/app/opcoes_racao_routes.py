@@ -86,7 +86,7 @@ async def listar_linhas_racao(
     query = db.query(LinhaRacao).filter(LinhaRacao.tenant_id == tenant_id)
     
     if apenas_ativos:
-        query = query.filter(LinhaRacao.ativo == True)
+        query = query.filter(LinhaRacao.ativo.is_(True))
     
     return query.order_by(LinhaRacao.ordem, LinhaRacao.nome).all()
 
@@ -191,7 +191,7 @@ async def listar_portes(
     query = db.query(PorteAnimal).filter(PorteAnimal.tenant_id == tenant_id)
     
     if apenas_ativos:
-        query = query.filter(PorteAnimal.ativo == True)
+        query = query.filter(PorteAnimal.ativo.is_(True))
     
     return query.order_by(PorteAnimal.ordem, PorteAnimal.nome).all()
 
@@ -296,7 +296,7 @@ async def listar_fases(
     query = db.query(FasePublico).filter(FasePublico.tenant_id == tenant_id)
     
     if apenas_ativos:
-        query = query.filter(FasePublico.ativo == True)
+        query = query.filter(FasePublico.ativo.is_(True))
     
     return query.order_by(FasePublico.ordem, FasePublico.nome).all()
 
@@ -401,7 +401,7 @@ async def listar_tratamentos(
     query = db.query(TipoTratamento).filter(TipoTratamento.tenant_id == tenant_id)
     
     if apenas_ativos:
-        query = query.filter(TipoTratamento.ativo == True)
+        query = query.filter(TipoTratamento.ativo.is_(True))
     
     return query.order_by(TipoTratamento.ordem, TipoTratamento.nome).all()
 
@@ -506,7 +506,7 @@ async def listar_sabores(
     query = db.query(SaborProteina).filter(SaborProteina.tenant_id == tenant_id)
     
     if apenas_ativos:
-        query = query.filter(SaborProteina.ativo == True)
+        query = query.filter(SaborProteina.ativo.is_(True))
     
     return query.order_by(SaborProteina.ordem, SaborProteina.nome).all()
 
@@ -611,7 +611,7 @@ async def listar_apresentacoes(
     query = db.query(ApresentacaoPeso).filter(ApresentacaoPeso.tenant_id == tenant_id)
     
     if apenas_ativos:
-        query = query.filter(ApresentacaoPeso.ativo == True)
+        query = query.filter(ApresentacaoPeso.ativo.is_(True))
     
     return query.order_by(ApresentacaoPeso.ordem, ApresentacaoPeso.peso_kg).all()
 
