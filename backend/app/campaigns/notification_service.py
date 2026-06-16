@@ -76,7 +76,9 @@ def _customer_allows_contact(
     return bool(latest.consent_given) and latest.revoked_at is None
 
 
-def can_send_marketing_email(db: Session, *, tenant_id, customer_id: int | None) -> bool:
+def can_send_marketing_email(
+    db: Session, *, tenant_id, customer_id: int | None
+) -> bool:
     return _customer_allows_contact(
         db,
         tenant_id=tenant_id,
@@ -94,7 +96,9 @@ def can_send_marketing_push(db: Session, *, tenant_id, customer_id: int | None) 
     )
 
 
-def can_send_marketing_whatsapp(db: Session, *, tenant_id, customer_id: int | None) -> bool:
+def can_send_marketing_whatsapp(
+    db: Session, *, tenant_id, customer_id: int | None
+) -> bool:
     return _customer_allows_contact(
         db,
         tenant_id=tenant_id,
@@ -131,8 +135,12 @@ def enqueue_push(
     Não usa try/except + rollback para não quebrar a transação externa.
     Usa SELECT antes do INSERT para verificar duplicata.
     """
-    consent_customer_id = privacy_customer_id if privacy_customer_id is not None else customer_id
-    if not can_send_marketing_push(db, tenant_id=tenant_id, customer_id=consent_customer_id):
+    consent_customer_id = (
+        privacy_customer_id if privacy_customer_id is not None else customer_id
+    )
+    if not can_send_marketing_push(
+        db, tenant_id=tenant_id, customer_id=consent_customer_id
+    ):
         logger.info(
             "[notification_service] Push bloqueado por preferencia LGPD: customer_id=%s key=%s",
             consent_customer_id,
@@ -185,8 +193,12 @@ def enqueue_email(
     Retorna True se adicionado, False se já existia (skip silencioso).
     Não precisa de commit — o caller gerencia a transação.
     """
-    consent_customer_id = privacy_customer_id if privacy_customer_id is not None else customer_id
-    if not can_send_marketing_email(db, tenant_id=tenant_id, customer_id=consent_customer_id):
+    consent_customer_id = (
+        privacy_customer_id if privacy_customer_id is not None else customer_id
+    )
+    if not can_send_marketing_email(
+        db, tenant_id=tenant_id, customer_id=consent_customer_id
+    ):
         logger.info(
             "[notification_service] E-mail bloqueado por preferencia LGPD: customer_id=%s key=%s",
             consent_customer_id,

@@ -30,7 +30,9 @@ def calcular_totais_venda(
     }
 
 
-def _resolver_status_entrega_atualizacao(tem_entrega: bool, status_atual: Optional[str]) -> Optional[str]:
+def _resolver_status_entrega_atualizacao(
+    tem_entrega: bool, status_atual: Optional[str]
+) -> Optional[str]:
     if not tem_entrega:
         return None
     return status_atual or "pendente"

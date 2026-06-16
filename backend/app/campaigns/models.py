@@ -45,6 +45,7 @@ from app.base_models import TenantScoped
 # ENUMs
 # ---------------------------------------------------------------------------
 
+
 class EventOriginEnum(str, enum.Enum):
     user_action = "user_action"
     system_scheduled = "system_scheduled"
@@ -133,28 +134,31 @@ class CashbackSourceTypeEnum(str, enum.Enum):
     campaign = "campaign"
     manual = "manual"
     reversal = "reversal"
-    expiration = "expiration"   # lançamento negativo ao expirar
-    redemption = "redemption"   # lançamento negativo ao resgatar no caixa
+    expiration = "expiration"  # lançamento negativo ao expirar
+    redemption = "redemption"  # lançamento negativo ao resgatar no caixa
 
 
 # ---------------------------------------------------------------------------
 # Allowlist de event_types que entram no motor (proteção contra event storm)
 # ---------------------------------------------------------------------------
 
-CAMPAIGN_TRIGGER_EVENTS = frozenset({
-    "purchase_completed",
-    "customer_registered",
-    "cpf_linked",
-    "daily_birthday_check",
-    "weekly_inactivity_check",
-    "monthly_ranking_recalc",
-    "drawing_execution",
-})
+CAMPAIGN_TRIGGER_EVENTS = frozenset(
+    {
+        "purchase_completed",
+        "customer_registered",
+        "cpf_linked",
+        "daily_birthday_check",
+        "weekly_inactivity_check",
+        "monthly_ranking_recalc",
+        "drawing_execution",
+    }
+)
 
 
 # ---------------------------------------------------------------------------
 # 1. campaign_event_queue — fila de eventos SKIP LOCKED
 # ---------------------------------------------------------------------------
+
 
 class CampaignEventQueue(Base):
     """
@@ -165,6 +169,7 @@ class CampaignEventQueue(Base):
     - Worker descarta event_depth > 1 e event_type fora de CAMPAIGN_TRIGGER_EVENTS
     - SKIP LOCKED garante que 2 workers não processem o mesmo evento
     """
+
     __tablename__ = "campaign_event_queue"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
@@ -202,6 +207,7 @@ class CampaignEventQueue(Base):
 # 2. campaigns — configuração de campanhas (parâmetros no banco, não em código)
 # ---------------------------------------------------------------------------
 
+
 class Campaign(TenantScoped, Base):
     """
     Configuração de campanhas. Mudar parâmetro não exige deploy.
@@ -210,6 +216,7 @@ class Campaign(TenantScoped, Base):
       Ex: {"inactivity_days": 30, "coupon_value": 20.00}
     - priority: campanhas com menor número rodam primeiro no mesmo evento
     """
+
     __tablename__ = "campaigns"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
@@ -248,6 +255,7 @@ class Campaign(TenantScoped, Base):
 # 3. campaign_executions — recompensas concedidas (imutável, idempotente)
 # ---------------------------------------------------------------------------
 
+
 class CampaignExecution(TenantScoped, Base):
     """
     Registro imutável de cada recompensa concedida.
@@ -260,6 +268,7 @@ class CampaignExecution(TenantScoped, Base):
     - reward_type / reward_value: o que foi concedido
     - source_event_id: FK para campaign_event_queue (rastreabilidade)
     """
+
     __tablename__ = "campaign_executions"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
@@ -277,20 +286,28 @@ class CampaignExecution(TenantScoped, Base):
 
     __table_args__ = (
         UniqueConstraint(
-            "tenant_id", "campaign_id", "customer_id", "reference_period",
+            "tenant_id",
+            "campaign_id",
+            "customer_id",
+            "reference_period",
             name="uq_campaign_execution_idempotency",
         ),
         Index(
             "ix_ce_tenant_campaign_customer",
-            "tenant_id", "campaign_id", "customer_id",
+            "tenant_id",
+            "campaign_id",
+            "customer_id",
         ),
-        Index("ix_ce_tenant_customer_created", "tenant_id", "customer_id", "created_at"),
+        Index(
+            "ix_ce_tenant_customer_created", "tenant_id", "customer_id", "created_at"
+        ),
     )
 
 
 # ---------------------------------------------------------------------------
 # 4. campaign_run_log — resumo por execução de job
 # ---------------------------------------------------------------------------
+
 
 class CampaignRunLog(TenantScoped, Base):
     """
@@ -301,6 +318,7 @@ class CampaignRunLog(TenantScoped, Base):
     - errors: falhas individuais
     - cursor_last_id: último ID processado (para jobs retomáveis)
     """
+
     __tablename__ = "campaign_run_log"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
@@ -324,6 +342,7 @@ class CampaignRunLog(TenantScoped, Base):
 # 5. campaign_locks — mutex de campanhas
 # ---------------------------------------------------------------------------
 
+
 class CampaignLock(TenantScoped, Base):
     """
     Mutex para garantir que apenas 1 worker execute um tipo de campanha
@@ -332,6 +351,7 @@ class CampaignLock(TenantScoped, Base):
     PK composta (tenant_id, campaign_type). Worker tenta UPDATE expires_at;
     se o registro expirou ou não existe, assume o lock.
     """
+
     __tablename__ = "campaign_locks"
 
     tenant_id = Column(UUID(as_uuid=True), primary_key=True, nullable=False)
@@ -349,6 +369,7 @@ class CampaignLock(TenantScoped, Base):
 # 6. loyalty_stamps — carimbos de fidelidade
 # ---------------------------------------------------------------------------
 
+
 class LoyaltyStamp(TenantScoped, Base):
     """
     Cada linha representa 1 carimbo ganho pelo cliente.
@@ -359,6 +380,7 @@ class LoyaltyStamp(TenantScoped, Base):
     - is_manual: carimbo lançado manualmente pelo operador (cartão físico)
     - campaign_execution_id: FK para rastreabilidade da recompensa gerada
     """
+
     __tablename__ = "loyalty_stamps"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
@@ -376,17 +398,26 @@ class LoyaltyStamp(TenantScoped, Base):
 
     __table_args__ = (
         UniqueConstraint(
-            "tenant_id", "campaign_id", "customer_id", "venda_id", "stamp_index",
+            "tenant_id",
+            "campaign_id",
+            "customer_id",
+            "venda_id",
+            "stamp_index",
             name="uq_loyalty_stamp_venda",
         ),
-        Index("ix_ls_tenant_customer_created", "tenant_id", "customer_id", "created_at"),
-        Index("ix_ls_tenant_campaign_customer", "tenant_id", "campaign_id", "customer_id"),
+        Index(
+            "ix_ls_tenant_customer_created", "tenant_id", "customer_id", "created_at"
+        ),
+        Index(
+            "ix_ls_tenant_campaign_customer", "tenant_id", "campaign_id", "customer_id"
+        ),
     )
 
 
 # ---------------------------------------------------------------------------
 # 7. cashback_transactions — ledger append-only
 # ---------------------------------------------------------------------------
+
 
 class CashbackTransaction(TenantScoped, Base):
     """
@@ -396,6 +427,7 @@ class CashbackTransaction(TenantScoped, Base):
     - amount: positivo = crédito, negativo = resgate/estorno
     - NUNCA fazer UPDATE nesta tabela — correção é um novo registro negativo
     """
+
     __tablename__ = "cashback_transactions"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
@@ -419,7 +451,9 @@ class CashbackTransaction(TenantScoped, Base):
     __table_args__ = (
         Index(
             "ix_ct_tenant_customer_created",
-            "tenant_id", "customer_id", "created_at",
+            "tenant_id",
+            "customer_id",
+            "created_at",
         ),
         Index("ix_ct_tenant_source", "tenant_id", "source_type", "source_id"),
     )
@@ -428,6 +462,7 @@ class CashbackTransaction(TenantScoped, Base):
 # ---------------------------------------------------------------------------
 # 8. coupons — configuração de cupons
 # ---------------------------------------------------------------------------
+
 
 class Coupon(TenantScoped, Base):
     """
@@ -438,6 +473,7 @@ class Coupon(TenantScoped, Base):
     - customer_id: FK opcional (cupons nominais)
     - valid_until: NULL = indeterminado
     """
+
     __tablename__ = "coupons"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
@@ -480,6 +516,7 @@ class Coupon(TenantScoped, Base):
 # 9. coupon_redemptions — uso real de cupons (append-only)
 # ---------------------------------------------------------------------------
 
+
 class CouponRedemption(TenantScoped, Base):
     """
     Registro imutável de cada uso de cupom.
@@ -487,6 +524,7 @@ class CouponRedemption(TenantScoped, Base):
     - voided_at: não nulo = estorno. Nunca deletar o registro.
     - venda_id: venda onde o cupom foi aplicado
     """
+
     __tablename__ = "coupon_redemptions"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
@@ -503,13 +541,16 @@ class CouponRedemption(TenantScoped, Base):
 
     __table_args__ = (
         Index("ix_cr_tenant_coupon", "tenant_id", "coupon_id"),
-        Index("ix_cr_tenant_customer_redeemed", "tenant_id", "customer_id", "redeemed_at"),
+        Index(
+            "ix_cr_tenant_customer_redeemed", "tenant_id", "customer_id", "redeemed_at"
+        ),
     )
 
 
 # ---------------------------------------------------------------------------
 # 10. customer_rank_history — histórico mensal de ranking
 # ---------------------------------------------------------------------------
+
 
 class CustomerRankHistory(TenantScoped, Base):
     """
@@ -519,6 +560,7 @@ class CustomerRankHistory(TenantScoped, Base):
     - rank_level: nível calculado naquele período
     - total_spent / total_purchases / active_months: métricas do período
     """
+
     __tablename__ = "customer_rank_history"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
@@ -539,7 +581,9 @@ class CustomerRankHistory(TenantScoped, Base):
 
     __table_args__ = (
         UniqueConstraint(
-            "tenant_id", "customer_id", "period",
+            "tenant_id",
+            "customer_id",
+            "period",
             name="uq_customer_rank_period",
         ),
         Index("ix_crh_tenant_period_rank", "tenant_id", "period", "rank_level"),
@@ -551,6 +595,7 @@ class CustomerRankHistory(TenantScoped, Base):
 # 11. notification_queue — fila de envio
 # ---------------------------------------------------------------------------
 
+
 class NotificationQueue(Base):
     """
     Fila de notificações a enviar (push FCM + e-mail).
@@ -560,6 +605,7 @@ class NotificationQueue(Base):
     - status: pending → sent | failed | skipped
     - retry_count: até max_retries tentativas
     """
+
     __tablename__ = "notification_queue"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
@@ -593,7 +639,9 @@ class NotificationQueue(Base):
         ),
         Index(
             "ix_nq_tenant_status_created",
-            "tenant_id", "status", "created_at",
+            "tenant_id",
+            "status",
+            "created_at",
         ),
     )
 
@@ -602,6 +650,7 @@ class NotificationQueue(Base):
 # 12. notification_log — histórico de envios (imutável)
 # ---------------------------------------------------------------------------
 
+
 class NotificationLog(TenantScoped, Base):
     """
     Histórico imutável de cada tentativa de envio.
@@ -609,6 +658,7 @@ class NotificationLog(TenantScoped, Base):
     - idempotency_key: mesmo da fila — garante que o log não seja duplicado
     - provider_response: resposta do FCM / provedor de e-mail
     """
+
     __tablename__ = "notification_log"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
@@ -621,9 +671,7 @@ class NotificationLog(TenantScoped, Base):
     )
     status = Column(String(50), nullable=False)  # sent / failed / skipped
     provider_response = Column(JSONB, nullable=True)
-    sent_at = Column(
-        DateTime(timezone=True), nullable=False, server_default=func.now()
-    )
+    sent_at = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
 
     __table_args__ = (
         UniqueConstraint(
@@ -632,7 +680,9 @@ class NotificationLog(TenantScoped, Base):
         ),
         Index(
             "ix_nl_tenant_customer_sent",
-            "tenant_id", "customer_id", "sent_at",
+            "tenant_id",
+            "customer_id",
+            "sent_at",
         ),
     )
 
@@ -640,6 +690,7 @@ class NotificationLog(TenantScoped, Base):
 # ---------------------------------------------------------------------------
 # 13. drawings — sorteios
 # ---------------------------------------------------------------------------
+
 
 class Drawing(TenantScoped, Base):
     """
@@ -650,6 +701,7 @@ class Drawing(TenantScoped, Base):
     - entries_frozen_at: momento em que a lista foi congelada (não aceita mais entradas)
     - winner_entry_id: FK para drawing_entries do ganhador
     """
+
     __tablename__ = "drawings"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
@@ -667,7 +719,9 @@ class Drawing(TenantScoped, Base):
         default=DrawingStatusEnum.draft,
     )
     draw_date = Column(DateTime(timezone=True), nullable=True)
-    auto_execute = Column(Boolean, nullable=False, default=False)  # True = executar automaticamente na data
+    auto_execute = Column(
+        Boolean, nullable=False, default=False
+    )  # True = executar automaticamente na data
     entries_frozen_at = Column(DateTime(timezone=True), nullable=True)
     entries_hash = Column(String(64), nullable=True)  # SHA-256
     seed_uuid = Column(UUID(as_uuid=True), nullable=True)
@@ -687,12 +741,14 @@ class Drawing(TenantScoped, Base):
 # 14. drawing_entries — participantes do sorteio
 # ---------------------------------------------------------------------------
 
+
 class DrawingEntry(TenantScoped, Base):
     """
     Cada participante confirmado em um sorteio.
 
     - ticket_count: peso do participante (mais tickets = mais chances)
     """
+
     __tablename__ = "drawing_entries"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
@@ -710,7 +766,9 @@ class DrawingEntry(TenantScoped, Base):
 
     __table_args__ = (
         UniqueConstraint(
-            "tenant_id", "drawing_id", "customer_id",
+            "tenant_id",
+            "drawing_id",
+            "customer_id",
             name="uq_drawing_entry_customer",
         ),
         Index("ix_de_tenant_drawing", "tenant_id", "drawing_id"),
@@ -721,18 +779,22 @@ class DrawingEntry(TenantScoped, Base):
 # Customer Merge Log — registro de unificações cross-canal
 # ---------------------------------------------------------------------------
 
+
 class CustomerMergeLog(TenantScoped, Base):
     """
     Registra cada unificação de clientes feita via CPF/telefone/e-mail.
     O campo snapshot_json guarda os IDs das linhas movidas, permitindo desfazer.
     """
+
     __tablename__ = "customer_merge_logs"
 
     id = Column(BigInteger, primary_key=True, autoincrement=True)
     tenant_id = Column(UUID(as_uuid=True), nullable=False, index=False)
     customer_keep_id = Column(BigInteger, nullable=False)
     customer_remove_id = Column(BigInteger, nullable=False)
-    motivo = Column(String(100), nullable=True)  # "mesmo_cpf" | "mesmo_telefone" | "manual"
+    motivo = Column(
+        String(100), nullable=True
+    )  # "mesmo_cpf" | "mesmo_telefone" | "manual"
     merged_at = Column(
         DateTime(timezone=True), nullable=False, server_default=func.now()
     )

@@ -12,10 +12,7 @@ def trace_event(source, event_name, payload=None):
     elif isinstance(payload, dict):
         serialized_payload = payload
     elif hasattr(payload, "__dict__"):
-        serialized_payload = {
-            k: v
-            for k, v in vars(payload).items()
-        }
+        serialized_payload = {k: v for k, v in vars(payload).items()}
     else:
         serialized_payload = str(payload)[:300]
 

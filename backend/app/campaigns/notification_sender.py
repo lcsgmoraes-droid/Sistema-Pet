@@ -36,23 +36,26 @@ EXPO_PUSH_URL = "https://exp.host/--/api/v2/push/send"
 def _smtp_config_ok() -> bool:
     """Retorna True somente se as variáveis SMTP estiverem configuradas."""
     from app.ia_config import SMTP_SERVER, SMTP_EMAIL, SMTP_PASSWORD
+
     return bool(SMTP_SERVER and SMTP_EMAIL and SMTP_PASSWORD)
 
 
-def _render_email_html(subject: str, body_text: str, campaign_type: str | None = None) -> str:
+def _render_email_html(
+    subject: str, body_text: str, campaign_type: str | None = None
+) -> str:
     """
     Gera HTML bonito para o e-mail, com cor de destaque conforme o tipo de campanha.
     """
     COLOR_MAP = {
         "birthday_customer": ("#e91e8c", "#fff0f7"),
-        "birthday_pet":      ("#8e44ad", "#f8f0ff"),
-        "welcome_app":       ("#1976d2", "#f0f6ff"),
+        "birthday_pet": ("#8e44ad", "#f8f0ff"),
+        "welcome_app": ("#1976d2", "#f0f6ff"),
         "welcome_ecommerce": ("#1976d2", "#f0f6ff"),
-        "inactivity":        ("#e67e22", "#fff8f0"),
-        "quick_repurchase":  ("#2e7d32", "#f0fff4"),
-        "loyalty_stamp":     ("#f9a825", "#fffde7"),
-        "cashback":          ("#00838f", "#e0f7fa"),
-        "ranking_monthly":   ("#37474f", "#f5f5f5"),
+        "inactivity": ("#e67e22", "#fff8f0"),
+        "quick_repurchase": ("#2e7d32", "#f0fff4"),
+        "loyalty_stamp": ("#f9a825", "#fffde7"),
+        "cashback": ("#00838f", "#e0f7fa"),
+        "ranking_monthly": ("#37474f", "#f5f5f5"),
     }
     accent, bg = COLOR_MAP.get(campaign_type or "", ("#1565c0", "#f0f6ff"))
 
@@ -63,7 +66,10 @@ def _render_email_html(subject: str, body_text: str, campaign_type: str | None =
         if line_stripped:
             # Negrito para **texto**
             import re
-            line_stripped = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", line_stripped)
+
+            line_stripped = re.sub(
+                r"\*\*(.+?)\*\*", r"<strong>\1</strong>", line_stripped
+            )
             paragraphs += f"<p style='margin:0 0 12px 0;color:#333;font-size:15px;line-height:1.6'>{line_stripped}</p>\n"
 
     return f"""<!DOCTYPE html>
@@ -100,7 +106,9 @@ def _render_email_html(subject: str, body_text: str, campaign_type: str | None =
 </html>"""
 
 
-def _send_email(to_address: str, subject: str, body_text: str, campaign_type: str | None = None) -> None:
+def _send_email(
+    to_address: str, subject: str, body_text: str, campaign_type: str | None = None
+) -> None:
     """
     Envia um e-mail via SMTP TLS com template HTML bonito por tipo de campanha.
 
@@ -128,7 +136,9 @@ def _send_email(to_address: str, subject: str, body_text: str, campaign_type: st
         server.sendmail(SMTP_EMAIL, to_address, msg.as_string())
 
 
-def _send_push(push_token: str, title: str, body_text: str, data: dict | None = None) -> None:
+def _send_push(
+    push_token: str, title: str, body_text: str, data: dict | None = None
+) -> None:
     """Envia push usando Expo Push API."""
     if not push_token:
         raise ValueError("Notificação sem push_token")
@@ -216,7 +226,10 @@ class NotificationSender:
                     else:
                         logger.warning(
                             "[NotifSender] Tentativa %d/%d falhou id=%d: %s",
-                            notif.retry_count, notif.max_retries, notif.id, exc,
+                            notif.retry_count,
+                            notif.max_retries,
+                            notif.id,
+                            exc,
                         )
                     stats["failed"] += 1
 

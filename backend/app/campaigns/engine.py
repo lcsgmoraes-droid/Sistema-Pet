@@ -105,7 +105,9 @@ class CampaignEngine:
                 self.db.commit()
 
             except Exception as exc:
-                logger.exception("[CampaignEngine] Erro ao processar evento %d: %s", event.id, exc)
+                logger.exception(
+                    "[CampaignEngine] Erro ao processar evento %d: %s", event.id, exc
+                )
                 event.retry_count = (event.retry_count or 0) + 1
                 event.error_message = str(exc)
                 if event.retry_count >= event.max_retries:
@@ -149,7 +151,9 @@ class CampaignEngine:
         normalized_channel = normalize_benefit_channel(sale_channel)
         filtered: list[Campaign] = []
         for campaign in campaigns:
-            if is_purchase_benefit_campaign(campaign) and not campaign_allows_sale_channel(
+            if is_purchase_benefit_campaign(
+                campaign
+            ) and not campaign_allows_sale_channel(
                 campaign,
                 normalized_channel,
             ):

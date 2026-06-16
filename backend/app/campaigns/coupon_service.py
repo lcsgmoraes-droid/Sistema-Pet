@@ -207,8 +207,12 @@ def preview_coupon_redemption(
     return {
         "code": coupon.code,
         "coupon_type": coupon.coupon_type.value,
-        "discount_value": float(coupon.discount_value) if coupon.discount_value else None,
-        "discount_percent": float(coupon.discount_percent) if coupon.discount_percent else None,
+        "discount_value": float(coupon.discount_value)
+        if coupon.discount_value
+        else None,
+        "discount_percent": float(coupon.discount_percent)
+        if coupon.discount_percent
+        else None,
         "discount_applied": float(discount_applied),
         "preview_only": True,
         "message": f"Cupom validado. Desconto previsto de R$ {float(discount_applied):.2f}",
@@ -465,7 +469,9 @@ def backfill_coupon_redemptions_venda_ids(
             skipped.extend(parcial["skipped"])
         return {"filled": filled, "ambiguous": ambiguous, "skipped": skipped}
 
-    set_current_tenant(tenant_id if isinstance(tenant_id, _UUID) else _UUID(str(tenant_id)))
+    set_current_tenant(
+        tenant_id if isinstance(tenant_id, _UUID) else _UUID(str(tenant_id))
+    )
     try:
         redemptions = (
             db.query(CouponRedemption)

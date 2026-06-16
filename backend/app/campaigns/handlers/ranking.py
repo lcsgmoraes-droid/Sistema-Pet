@@ -76,7 +76,8 @@ class RankingHandler:
         if event.event_type not in _SUPPORTED_EVENTS:
             return {"evaluated": 0, "rewarded": 0, "errors": 0}
         if campaign.campaign_type not in (
-            CampaignTypeEnum.ranking_monthly, CampaignTypeEnum.monthly_highlight
+            CampaignTypeEnum.ranking_monthly,
+            CampaignTypeEnum.monthly_highlight,
         ):
             return {"evaluated": 0, "rewarded": 0, "errors": 0}
 
@@ -86,8 +87,10 @@ class RankingHandler:
         params = campaign.params or {}
         now = datetime.now(timezone.utc)
         # Período de referência = mês anterior
-        first_day_this_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-        last_month = (first_day_this_month - timedelta(days=1))
+        first_day_this_month = now.replace(
+            day=1, hour=0, minute=0, second=0, microsecond=0
+        )
+        last_month = first_day_this_month - timedelta(days=1)
         period = last_month.strftime("%Y-%m")
         # Rolling window: últimos 12 meses
         window_start = first_day_this_month - timedelta(days=365)
@@ -156,15 +159,15 @@ class RankingHandler:
                         total_purchases=total_purchases,
                         active_months=active_months,
                     )
-                    .on_conflict_do_nothing(
-                        constraint="uq_customer_rank_period"
-                    )
+                    .on_conflict_do_nothing(constraint="uq_customer_rank_period")
                 )
                 db.execute(stmt)
 
                 # Notifica upgrade de nível
                 if _RANK_ORDER.index(new_rank) > _RANK_ORDER.index(prev_rank):
-                    cliente = db.query(Cliente).filter(Cliente.id == row.cliente_id).first()
+                    cliente = (
+                        db.query(Cliente).filter(Cliente.id == row.cliente_id).first()
+                    )
                     if cliente and cliente.email:
                         enqueue_email(
                             db,
@@ -191,7 +194,11 @@ class RankingHandler:
 
         logger.info(
             "[RankingHandler] tenant=%s period=%s avaliados=%d upgrades=%d erros=%d",
-            campaign.tenant_id, period, evaluated, rewarded, errors,
+            campaign.tenant_id,
+            period,
+            evaluated,
+            rewarded,
+            errors,
         )
         return {"evaluated": evaluated, "rewarded": rewarded, "errors": errors}
 

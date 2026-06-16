@@ -129,7 +129,9 @@ def count_loyalty_completed_cycles(
         campaign_id=campaign_id,
         customer_id=customer_id,
     )
-    return sum(1 for execution in executions if _is_effective_cycle_execution(execution))
+    return sum(
+        1 for execution in executions if _is_effective_cycle_execution(execution)
+    )
 
 
 def get_loyalty_balance_for_campaign(
@@ -303,8 +305,7 @@ def sync_loyalty_stamps_for_sale(
     )
 
     stamps_by_index = {
-        int(stamp.stamp_index or 1): stamp
-        for stamp in existing_auto_stamps
+        int(stamp.stamp_index or 1): stamp for stamp in existing_auto_stamps
     }
     now = datetime.now(timezone.utc)
     added = 0
@@ -350,7 +351,13 @@ def sync_loyalty_stamps_for_sale(
         customer_id=customer_id,
         source_event_id=source_event_id,
     )
-    if added or reactivated or voided or reward_sync["awarded"] or reward_sync["revoked"]:
+    if (
+        added
+        or reactivated
+        or voided
+        or reward_sync["awarded"]
+        or reward_sync["revoked"]
+    ):
         log_campaign_event(
             db=db,
             tenant_id=campaign.tenant_id,
@@ -701,10 +708,14 @@ def backfill_loyalty_reward_consumption_meta(
                 tid = _UUID(str(tid_raw))
             except (TypeError, ValueError):
                 continue
-            updated_total += backfill_loyalty_reward_consumption_meta(db, tenant_id=tid)["updated"]
+            updated_total += backfill_loyalty_reward_consumption_meta(
+                db, tenant_id=tid
+            )["updated"]
         return {"updated": updated_total}
 
-    set_current_tenant(tenant_id if isinstance(tenant_id, _UUID) else _UUID(str(tenant_id)))
+    set_current_tenant(
+        tenant_id if isinstance(tenant_id, _UUID) else _UUID(str(tenant_id))
+    )
     try:
         executions = (
             db.query(CampaignExecution)
@@ -719,7 +730,10 @@ def backfill_loyalty_reward_consumption_meta(
 
         for execution in executions:
             reward_meta = dict(execution.reward_meta or {})
-            if "consumed_stamps" in reward_meta and "stamps_to_complete_snapshot" in reward_meta:
+            if (
+                "consumed_stamps" in reward_meta
+                and "stamps_to_complete_snapshot" in reward_meta
+            ):
                 continue
 
             campaign = (
@@ -731,7 +745,10 @@ def backfill_loyalty_reward_consumption_meta(
                 .first()
             )
             stamps_to_complete = int(
-                ((campaign.params if campaign else {}) or {}).get("stamps_to_complete", 10) or 0
+                ((campaign.params if campaign else {}) or {}).get(
+                    "stamps_to_complete", 10
+                )
+                or 0
             )
             reward_meta["consumed_stamps"] = max(stamps_to_complete, 0)
             reward_meta["stamps_to_complete_snapshot"] = max(stamps_to_complete, 0)
@@ -794,7 +811,9 @@ def _give_loyalty_reward(
             meta={
                 "reference_period": ref_period,
                 "consumed_stamps": reward_meta["consumed_stamps"],
-                "stamps_to_complete_snapshot": reward_meta["stamps_to_complete_snapshot"],
+                "stamps_to_complete_snapshot": reward_meta[
+                    "stamps_to_complete_snapshot"
+                ],
             },
         )
         code = coupon.code
@@ -847,9 +866,7 @@ def _give_loyalty_reward(
 
     if cliente and cliente.email:
         if reward_tp == "credit":
-            body = (
-                f"Ola, {cliente.nome}! Voce ganhou {code} de cashback no programa de fidelidade."
-            )
+            body = f"Ola, {cliente.nome}! Voce ganhou {code} de cashback no programa de fidelidade."
         else:
             body = notif_msg.format_map(
                 defaultdict(
@@ -925,7 +942,15 @@ def _revoke_loyalty_reward(
             }
             return 1
 
-        if coupon.status in (CouponStatusEnum.active, CouponStatusEnum.used, CouponStatusEnum.expired) or force:
+        if (
+            coupon.status
+            in (
+                CouponStatusEnum.active,
+                CouponStatusEnum.used,
+                CouponStatusEnum.expired,
+            )
+            or force
+        ):
             coupon.status = CouponStatusEnum.voided
             coupon.meta = {
                 **(coupon.meta or {}),
@@ -1018,7 +1043,14 @@ def _resolve_consumed_stamps(
         return max(int(reward_meta.get("consumed_stamps") or 0), 0)
 
     if str(execution.reference_period or "").startswith("cycle-"):
-        return max(int(reward_meta.get("stamps_to_complete_snapshot") or default_stamps_to_complete or 0), 0)
+        return max(
+            int(
+                reward_meta.get("stamps_to_complete_snapshot")
+                or default_stamps_to_complete
+                or 0
+            ),
+            0,
+        )
 
     return 0
 
@@ -1069,10 +1101,9 @@ def _is_execution_suppressed(execution: CampaignExecution) -> bool:
 
 
 def _is_effective_cycle_execution(execution: CampaignExecution) -> bool:
-    return (
-        str(execution.reference_period or "").startswith("cycle-")
-        and not _is_execution_suppressed(execution)
-    )
+    return str(execution.reference_period or "").startswith(
+        "cycle-"
+    ) and not _is_execution_suppressed(execution)
 
 
 def _sort_loyalty_ref_key(ref: str) -> tuple[int, int]:

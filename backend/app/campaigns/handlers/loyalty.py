@@ -117,8 +117,14 @@ class LoyaltyHandler:
                 if latest is not None:
                     return 0
             else:
-                req_idx = rank_order.index(rank_filter) if rank_filter in rank_order else 0
-                cust_idx = rank_order.index(customer_rank) if customer_rank in rank_order else 0
+                req_idx = (
+                    rank_order.index(rank_filter) if rank_filter in rank_order else 0
+                )
+                cust_idx = (
+                    rank_order.index(customer_rank)
+                    if customer_rank in rank_order
+                    else 0
+                )
                 if cust_idx < req_idx:
                     return 0
 

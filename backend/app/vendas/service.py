@@ -115,7 +115,11 @@ import json
 from uuid import UUID
 
 from app.produtos_models import Produto as Produto
-from app.vendas_models import Venda as Venda, VendaItem as VendaItem, VendaPagamento as VendaPagamento
+from app.vendas_models import (
+    Venda as Venda,
+    VendaItem as VendaItem,
+    VendaPagamento as VendaPagamento,
+)
 
 # Timezone Brasília
 from app.utils.timezone import now_brasilia
@@ -140,55 +144,55 @@ def _calcular_pagamentos_finalizacao(
 ) -> Dict[str, float]:
     total_venda_float = float(total_venda or 0)
     total_ja_pago = sum(float(p.valor) for p in pagamentos_existentes)
-    total_novos_pagamentos = sum(float(p.get('valor') or 0) for p in pagamentos_novos)
+    total_novos_pagamentos = sum(float(p.get("valor") or 0) for p in pagamentos_novos)
     valor_restante_bruto = total_venda_float - total_ja_pago
 
     if not pagamentos_novos and total_ja_pago < total_venda_float - 0.01:
-        raise HTTPException(status_code=400, detail='Informe pelo menos uma forma de pagamento')
+        raise HTTPException(
+            status_code=400, detail="Informe pelo menos uma forma de pagamento"
+        )
 
     if valor_restante_bruto <= 0.01 and total_novos_pagamentos > 0.01:
-        raise HTTPException(status_code=400, detail='Venda já está totalmente paga')
+        raise HTTPException(status_code=400, detail="Venda já está totalmente paga")
 
     if total_novos_pagamentos > valor_restante_bruto + 0.01:
         raise HTTPException(
             status_code=400,
             detail=(
-                f'Valor dos pagamentos excede o saldo da venda. '
-                f'Saldo: R$ {max(0, valor_restante_bruto):.2f}, '
-                f'informado: R$ {total_novos_pagamentos:.2f}.'
-            )
+                f"Valor dos pagamentos excede o saldo da venda. "
+                f"Saldo: R$ {max(0, valor_restante_bruto):.2f}, "
+                f"informado: R$ {total_novos_pagamentos:.2f}."
+            ),
         )
 
     return {
-        'total_ja_pago': total_ja_pago,
-        'total_novos_pagamentos': total_novos_pagamentos,
-        'total_pagamentos': total_ja_pago + total_novos_pagamentos,
-        'valor_restante': max(0, valor_restante_bruto),
+        "total_ja_pago": total_ja_pago,
+        "total_novos_pagamentos": total_novos_pagamentos,
+        "total_pagamentos": total_ja_pago + total_novos_pagamentos,
+        "valor_restante": max(0, valor_restante_bruto),
     }
 
 
 class VendaService:
     """
     Serviço orquestrador para vendas com transação atômica.
-    
+
     Este serviço coordena EstoqueService, CaixaService, ContasReceberService e ComissoesService
     em transações únicas, garantindo atomicidade (tudo ou nada).
-    
+
     Métodos principais:
     - criar_venda: Cria uma nova venda com validações e cálculos
     - finalizar_venda: Finaliza venda com pagamentos e baixa de estoque
     - cancelar_venda: Cancela venda com estorno completo
     """
-    
+
     @staticmethod
     def criar_venda(
-        payload: Dict[str, Any],
-        user_id: int,
-        db: Session
+        payload: Dict[str, Any], user_id: int, db: Session
     ) -> Dict[str, Any]:
         """
         Cria uma nova venda com todas as validações e cálculos necessários.
-        
+
         Operações executadas:
         1. Validar payload (itens obrigatórios, cliente, etc)
         2. Gerar número sequencial da venda
@@ -199,7 +203,7 @@ class VendaService:
         7. Criar conta a receber inicial
         8. COMMIT
         9. Retornar venda criada
-        
+
         Args:
             payload: Dict com dados da venda:
                 - cliente_id: Optional[int]
@@ -216,70 +220,97 @@ class VendaService:
                 - endereco_entrega: Optional[str]
             user_id: ID do usuário criando a venda
             db: Sessão do SQLAlchemy
-            
+
         Returns:
             Dict com venda criada (formato to_dict())
-            
+
         Raises:
             HTTPException(400): Validação falhou (sem itens, etc)
         """
         from app.vendas_models import Venda, VendaItem
         from app.financeiro_models import LancamentoManual, CategoriaFinanceira
         from app.audit_log import log_action
-        
+
         logger.info(f"📝 Criando nova venda para user_id={user_id}")
-        
+
         try:
             # ============================================================
             # ETAPA 1: VALIDAÇÕES
             # ============================================================
-            
-            itens = payload.get('itens', [])
+
+            itens = payload.get("itens", [])
             if not itens or len(itens) == 0:
-                raise HTTPException(status_code=400, detail='A venda deve ter pelo menos um item')
-            
+                raise HTTPException(
+                    status_code=400, detail="A venda deve ter pelo menos um item"
+                )
+
             logger.debug(f"✅ Validação OK: {len(itens)} itens")
-            
+
             # ============================================================
             # ETAPA 2: GERAR NÚMERO DA VENDA
             # ============================================================
-            
+
             numero_venda = VendaService._gerar_numero_venda(
                 db,
-                tenant_id=payload.get('tenant_id'),
+                tenant_id=payload.get("tenant_id"),
                 user_id=user_id,
             )
             logger.debug(f"✅ Número gerado: {numero_venda}")
-            
+
             # ============================================================
             # ETAPA 3: CALCULAR TOTAIS
             # ============================================================
-            
-            subtotal_itens = sum(item['subtotal'] for item in itens)
-            desconto_itens = sum(float(item.get('desconto_item') or 0) for item in itens)
-            desconto_valor = desconto_itens if desconto_itens > 0 else float(payload.get('desconto_valor', 0) or 0)
-            tem_entrega = bool(payload.get('tem_entrega', False))
-            taxa_entrega = (payload.get('taxa_entrega', 0) or 0) if tem_entrega else 0
+
+            subtotal_itens = sum(item["subtotal"] for item in itens)
+            desconto_itens = sum(
+                float(item.get("desconto_item") or 0) for item in itens
+            )
+            desconto_valor = (
+                desconto_itens
+                if desconto_itens > 0
+                else float(payload.get("desconto_valor", 0) or 0)
+            )
+            tem_entrega = bool(payload.get("tem_entrega", False))
+            taxa_entrega = (payload.get("taxa_entrega", 0) or 0) if tem_entrega else 0
             total = subtotal_itens + taxa_entrega
-            
+
             # 🚚 Calcular distribuição da taxa de entrega
             percentual_taxa_entregador = (
-                payload.get('percentual_taxa_entregador', 0) or 0
-            ) if tem_entrega else 0
+                (payload.get("percentual_taxa_entregador", 0) or 0)
+                if tem_entrega
+                else 0
+            )
             percentual_taxa_loja = (
-                payload.get('percentual_taxa_loja', 100 if taxa_entrega > 0 else 0) or 0
-            ) if tem_entrega else 0
-            
-            logger.info(f"📥 PAYLOAD RECEBIDO - percentual_taxa_entregador: {percentual_taxa_entregador}, percentual_taxa_loja: {percentual_taxa_loja}")
-            
+                (
+                    payload.get("percentual_taxa_loja", 100 if taxa_entrega > 0 else 0)
+                    or 0
+                )
+                if tem_entrega
+                else 0
+            )
+
+            logger.info(
+                f"📥 PAYLOAD RECEBIDO - percentual_taxa_entregador: {percentual_taxa_entregador}, percentual_taxa_loja: {percentual_taxa_loja}"
+            )
+
             # Se não foi informado percentual mas tem taxa, assumir 100% para loja (compatibilidade)
-            if taxa_entrega > 0 and percentual_taxa_entregador == 0 and percentual_taxa_loja == 0:
+            if (
+                taxa_entrega > 0
+                and percentual_taxa_entregador == 0
+                and percentual_taxa_loja == 0
+            ):
                 percentual_taxa_loja = 100
-            
+
             # Calcular valores baseados nos percentuais
-            valor_taxa_entregador = (taxa_entrega * percentual_taxa_entregador / 100) if taxa_entrega > 0 else 0
-            valor_taxa_loja = (taxa_entrega * percentual_taxa_loja / 100) if taxa_entrega > 0 else 0
-            
+            valor_taxa_entregador = (
+                (taxa_entrega * percentual_taxa_entregador / 100)
+                if taxa_entrega > 0
+                else 0
+            )
+            valor_taxa_loja = (
+                (taxa_entrega * percentual_taxa_loja / 100) if taxa_entrega > 0 else 0
+            )
+
             logger.info(
                 f"💰 Totais: Subtotal=R$ {subtotal_itens:.2f}, "
                 f"Frete=R$ {taxa_entrega:.2f}, Total=R$ {total:.2f}"
@@ -289,209 +320,248 @@ class VendaService:
                     f"🚚 Taxa entrega: Loja {percentual_taxa_loja}% (R$ {valor_taxa_loja:.2f}), "
                     f"Entregador {percentual_taxa_entregador}% (R$ {valor_taxa_entregador:.2f})"
                 )
-            
+
             # ============================================================
             # ETAPA 4: CRIAR VENDA
             # ============================================================
-            
+
             venda = Venda(
                 numero_venda=numero_venda,
-                cliente_id=payload.get('cliente_id'),
-                vendedor_id=payload.get('vendedor_id') or user_id,
-                funcionario_id=payload.get('funcionario_id'),
+                cliente_id=payload.get("cliente_id"),
+                vendedor_id=payload.get("vendedor_id") or user_id,
+                funcionario_id=payload.get("funcionario_id"),
                 subtotal=float(subtotal_itens),
                 desconto_valor=float(desconto_valor),  # Desconto aplicado na venda
-                desconto_percentual=payload.get('desconto_percentual', 0) or 0,
-                cupom_code=(str(payload.get('cupom_code')).strip().upper() if payload.get('cupom_code') else None),
-                cupom_discount_applied=payload.get('cupom_discount_applied'),
+                desconto_percentual=payload.get("desconto_percentual", 0) or 0,
+                cupom_code=(
+                    str(payload.get("cupom_code")).strip().upper()
+                    if payload.get("cupom_code")
+                    else None
+                ),
+                cupom_discount_applied=payload.get("cupom_discount_applied"),
                 total=float(total),
-                observacoes=payload.get('observacoes'),
+                observacoes=payload.get("observacoes"),
                 tem_entrega=tem_entrega,
                 taxa_entrega=float(taxa_entrega),
                 percentual_taxa_entregador=float(percentual_taxa_entregador),
                 percentual_taxa_loja=float(percentual_taxa_loja),
                 valor_taxa_entregador=float(valor_taxa_entregador),
                 valor_taxa_loja=float(valor_taxa_loja),
-                entregador_id=payload.get('entregador_id') if tem_entrega else None,
-                loja_origem=payload.get('loja_origem') if tem_entrega else None,
-                endereco_entrega=payload.get('endereco_entrega') if tem_entrega else None,
-                distancia_km=payload.get('distancia_km') if tem_entrega else None,
-                valor_por_km=payload.get('valor_por_km') if tem_entrega else None,
-                observacoes_entrega=payload.get('observacoes_entrega') if tem_entrega else None,
-                status_entrega='pendente' if tem_entrega else None,
-                canal=payload.get('canal', 'loja_fisica'),  # Canal de venda para DRE
-                status='aberta',
+                entregador_id=payload.get("entregador_id") if tem_entrega else None,
+                loja_origem=payload.get("loja_origem") if tem_entrega else None,
+                endereco_entrega=payload.get("endereco_entrega")
+                if tem_entrega
+                else None,
+                distancia_km=payload.get("distancia_km") if tem_entrega else None,
+                valor_por_km=payload.get("valor_por_km") if tem_entrega else None,
+                observacoes_entrega=payload.get("observacoes_entrega")
+                if tem_entrega
+                else None,
+                status_entrega="pendente" if tem_entrega else None,
+                canal=payload.get("canal", "loja_fisica"),  # Canal de venda para DRE
+                status="aberta",
                 data_venda=now_brasilia(),
                 user_id=user_id,
-                tenant_id=payload.get('tenant_id')
+                tenant_id=payload.get("tenant_id"),
             )
-            
+
             # 🔒 BLINDAGEM FINAL (obrigatória) - Garante que PostgreSQL gere o ID
             venda.id = None
-            
+
             db.add(venda)
             db.flush()  # Para obter o ID
-            
+
             logger.info(f"✅ Venda criada: ID={venda.id}, Número={numero_venda}")
-            
+
             # ============================================================
             # ETAPA 5: CRIAR ITENS
             # ============================================================
-            
+
             from app.produtos_models import Produto
-            
+
             for item_data in itens:
                 # 🔒 VALIDAÇÃO CRÍTICA: XOR entre produto_id e product_variation_id
-                produto_id = item_data.get('produto_id')
-                product_variation_id = item_data.get('product_variation_id')
-                
-                if item_data.get('tipo') == 'produto':
+                produto_id = item_data.get("produto_id")
+                product_variation_id = item_data.get("product_variation_id")
+
+                if item_data.get("tipo") == "produto":
                     # Valida XOR: OU produto_id OU product_variation_id
                     if not produto_id and not product_variation_id:
                         raise HTTPException(
                             status_code=400,
-                            detail="Item de venda deve conter product_id ou product_variation_id"
+                            detail="Item de venda deve conter product_id ou product_variation_id",
                         )
-                    
+
                     if produto_id and product_variation_id:
                         raise HTTPException(
                             status_code=400,
-                            detail="Item de venda não pode conter product_id e product_variation_id ao mesmo tempo"
+                            detail="Item de venda não pode conter product_id e product_variation_id ao mesmo tempo",
                         )
-                    
+
                     # Se for produto simples, valida e busca preço
                     if produto_id:
-                        produto = db.query(Produto).filter(
-                            Produto.id == produto_id,
-                            Produto.tenant_id == payload.get('tenant_id')
-                        ).first()
-                        
+                        produto = (
+                            db.query(Produto)
+                            .filter(
+                                Produto.id == produto_id,
+                                Produto.tenant_id == payload.get("tenant_id"),
+                            )
+                            .first()
+                        )
+
                         if not produto:
                             raise HTTPException(
                                 status_code=404,
-                                detail=f"Produto ID {produto_id} não encontrado"
+                                detail=f"Produto ID {produto_id} não encontrado",
                             )
-                        
-                        if produto.tipo_produto == 'PAI':
+
+                        if produto.tipo_produto == "PAI":
                             raise HTTPException(
                                 status_code=400,
-                                detail=f"Produto '{produto.nome}' é do tipo PAI e não pode ser vendido. Selecione uma variação."
+                                detail=f"Produto '{produto.nome}' é do tipo PAI e não pode ser vendido. Selecione uma variação.",
                             )
-                    
+
                     # Se for variação, valida e busca preço
                     if product_variation_id:
                         from app.produtos_models import Produto
-                        variacao = db.query(Produto).filter(
-                            Produto.id == product_variation_id,
-                            Produto.tipo_produto == 'VARIACAO'
-                        ).first()
-                        
+
+                        variacao = (
+                            db.query(Produto)
+                            .filter(
+                                Produto.id == product_variation_id,
+                                Produto.tipo_produto == "VARIACAO",
+                            )
+                            .first()
+                        )
+
                         if not variacao:
                             raise HTTPException(
                                 status_code=404,
-                                detail=f"Variação de produto ID {product_variation_id} não encontrada"
+                                detail=f"Variação de produto ID {product_variation_id} não encontrada",
                             )
-                
+
                 # 🔒 ISOLAMENTO MULTI-TENANT: tenant_id obrigatório
                 item = VendaItem(
                     venda_id=venda.id,
-                    tenant_id=payload.get('tenant_id'),  # ✅ Dupla proteção: injeção automática + explícita
-                    tipo=item_data.get('tipo', 'produto'),
+                    tenant_id=payload.get(
+                        "tenant_id"
+                    ),  # ✅ Dupla proteção: injeção automática + explícita
+                    tipo=item_data.get("tipo", "produto"),
                     produto_id=produto_id,
                     product_variation_id=product_variation_id,
-                    servico_descricao=item_data.get('servico_descricao'),
-                    quantidade=item_data['quantidade'],
-                    preco_unitario=item_data['preco_unitario'],
-                    desconto_item=item_data.get('desconto_item', 0) or 0,
-                    subtotal=item_data['subtotal'],
-                    lote_id=item_data.get('lote_id'),
-                    pet_id=item_data.get('pet_id')
+                    servico_descricao=item_data.get("servico_descricao"),
+                    quantidade=item_data["quantidade"],
+                    preco_unitario=item_data["preco_unitario"],
+                    desconto_item=item_data.get("desconto_item", 0) or 0,
+                    subtotal=item_data["subtotal"],
+                    lote_id=item_data.get("lote_id"),
+                    pet_id=item_data.get("pet_id"),
                 )
                 db.add(item)
-            
+
             # 🔥 CRÍTICO: Flush para persistir os itens antes de baixar estoque
             db.flush()
-            
+
             logger.debug(f"✅ {len(itens)} itens adicionados")
-            
+
             # ============================================================
             # ETAPA 6: CRIAR LANÇAMENTO PREVISTO E CONTA A RECEBER
             # ============================================================
-            
+
             # Buscar ou criar categoria de receitas
-            tenant_id = payload.get('tenant_id')
-            categoria_receitas = db.query(CategoriaFinanceira).filter(
-                CategoriaFinanceira.nome.ilike('%vendas%'),
-                CategoriaFinanceira.tipo == 'receita',
-                CategoriaFinanceira.user_id == user_id,
-                CategoriaFinanceira.tenant_id == tenant_id
-            ).first()
-            
+            tenant_id = payload.get("tenant_id")
+            categoria_receitas = (
+                db.query(CategoriaFinanceira)
+                .filter(
+                    CategoriaFinanceira.nome.ilike("%vendas%"),
+                    CategoriaFinanceira.tipo == "receita",
+                    CategoriaFinanceira.user_id == user_id,
+                    CategoriaFinanceira.tenant_id == tenant_id,
+                )
+                .first()
+            )
+
             if not categoria_receitas:
                 categoria_receitas = CategoriaFinanceira(
                     nome="Receitas de Vendas",
                     tipo="receita",
                     user_id=user_id,
-                    tenant_id=tenant_id
+                    tenant_id=tenant_id,
                 )
                 db.add(categoria_receitas)
                 db.flush()
-            
+
             # Criar lançamento previsto (30 dias)
             prazo_dias = 30
             data_prevista = date.today() + timedelta(days=prazo_dias)
-            
+
             lancamento = LancamentoManual(
-                tipo='entrada',
+                tipo="entrada",
                 valor=Decimal(str(total)),
                 descricao=f"Venda {numero_venda} - A receber",
                 data_lancamento=data_prevista,
-                status='previsto',
+                status="previsto",
                 categoria_id=categoria_receitas.id,
                 documento=f"VENDA-{venda.id}",
-                fornecedor_cliente=venda.cliente.nome if venda.cliente else "Cliente Avulso",
+                fornecedor_cliente=venda.cliente.nome
+                if venda.cliente
+                else "Cliente Avulso",
                 user_id=user_id,
-                tenant_id=tenant_id
+                tenant_id=tenant_id,
             )
             db.add(lancamento)
-            
+
             # ⚠️ IMPORTANTE: Contas a receber NÃO são criadas aqui!
             # Elas são criadas durante a FINALIZAÇÃO da venda (ContasReceberService.criar_de_venda)
             # Isso evita duplicação e permite tratamento correto de parcelamento
-            
-            logger.info(f"📊 Lançamento previsto criado (R$ {total:.2f} em {data_prevista})")
-            
+
+            logger.info(
+                f"📊 Lançamento previsto criado (R$ {total:.2f} em {data_prevista})"
+            )
+
             # ============================================================
             # ETAPA 6.5: BAIXAR ESTOQUE IMEDIATAMENTE (PRODUTOS SEPARADOS)
             # ============================================================
             # 🎯 NOVO FLUXO: Estoque é baixado no momento da criação da venda
             # Motivo: Produtos são fisicamente separados ao criar a venda (pedido/entrega)
-            
-            logger.info(f"🔍 Iniciando baixa de estoque para venda #{venda.id} ({numero_venda})")
-            
+
+            logger.info(
+                f"🔍 Iniciando baixa de estoque para venda #{venda.id} ({numero_venda})"
+            )
+
             estoque_baixado = []
-            
+
             # Buscar itens recém-criados
             itens_criados = db.query(VendaItem).filter_by(venda_id=venda.id).all()
-            logger.info(f"📋 Encontrados {len(itens_criados)} itens para processar estoque")
-            
+            logger.info(
+                f"📋 Encontrados {len(itens_criados)} itens para processar estoque"
+            )
+
             for item in itens_criados:
-                logger.info(f"  → Item: tipo={item.tipo}, produto_id={item.produto_id}, qtd={item.quantidade}")
-                
-                if item.tipo == 'produto' and item.produto_id:
+                logger.info(
+                    f"  → Item: tipo={item.tipo}, produto_id={item.produto_id}, qtd={item.quantidade}"
+                )
+
+                if item.tipo == "produto" and item.produto_id:
                     try:
                         from app.produtos_models import Produto
-                        
+
                         # Buscar produto
-                        produto = db.query(Produto).filter(
-                            Produto.id == item.produto_id,
-                            Produto.tenant_id == tenant_id
-                        ).first()
-                        
+                        produto = (
+                            db.query(Produto)
+                            .filter(
+                                Produto.id == item.produto_id,
+                                Produto.tenant_id == tenant_id,
+                            )
+                            .first()
+                        )
+
                         if not produto:
-                            logger.warning(f"⚠️  Produto {item.produto_id} não encontrado ao criar venda")
+                            logger.warning(
+                                f"⚠️  Produto {item.produto_id} não encontrado ao criar venda"
+                            )
                             continue
-                        
+
                         # Baixar estoque
                         resultados = VendaService._processar_baixa_estoque_item(
                             produto=produto,
@@ -501,50 +571,59 @@ class VendaService:
                             tenant_id=tenant_id,
                             db=db,
                             product_variation_id=None,
-                            venda_codigo=numero_venda
+                            venda_codigo=numero_venda,
                         )
-                        
+
                         estoque_baixado.extend(resultados)
-                        logger.info(f"📦 Estoque baixado ao criar venda: {produto.nome} -{item.quantidade}")
-                        
+                        logger.info(
+                            f"📦 Estoque baixado ao criar venda: {produto.nome} -{item.quantidade}"
+                        )
+
                     except Exception as e:
-                        logger.error(f"❌ Erro ao baixar estoque do produto {item.produto_id}: {e}")
+                        logger.error(
+                            f"❌ Erro ao baixar estoque do produto {item.produto_id}: {e}"
+                        )
                         # Reverter transação se falhar baixa de estoque
                         db.rollback()
                         raise HTTPException(
-                            status_code=400,
-                            detail=f"Erro ao baixar estoque: {str(e)}"
+                            status_code=400, detail=f"Erro ao baixar estoque: {str(e)}"
                         )
-            
+
             if estoque_baixado:
-                logger.info(f"✅ Estoque baixado: {len(estoque_baixado)} item(ns) processado(s)")
-            
+                logger.info(
+                    f"✅ Estoque baixado: {len(estoque_baixado)} item(ns) processado(s)"
+                )
+
             # ============================================================
             # ETAPA 7: COMMIT
             # ============================================================
-            
+
             db.commit()
             db.refresh(venda)
-            
+
             logger.info(f"✅ ✅ ✅ Venda {numero_venda} criada com sucesso! ✅ ✅ ✅")
-            
+
             # ============================================================
             # ETAPA 8: AUDITORIA
             # ============================================================
-            
+
             log_action(
-                db, user_id, 'CREATE', 'vendas', venda.id,
-                details=f'Venda {numero_venda} criada - Total: R$ {total:.2f}'
+                db,
+                user_id,
+                "CREATE",
+                "vendas",
+                venda.id,
+                details=f"Venda {numero_venda} criada - Total: R$ {total:.2f}",
             )
-            
+
             # ============================================================
             # ETAPA 9: EMITIR EVENTO DE DOMÍNIO
             # ============================================================
-            
+
             # 🔒 EVENTOS DESABILITADOS TEMPORARIAMENTE (publish_event não exportado)
             # try:
             #     from app.domain.events import VendaCriada, publish_event
-            #     
+            #
             #     evento = VendaCriada(
             #         venda_id=venda.id,
             #         numero_venda=venda.numero_venda,
@@ -559,48 +638,47 @@ class VendaService:
             #             'subtotal': float(subtotal_itens)
             #         }
             #     )
-            #     
+            #
             #     publish_event(evento)
             #     logger.debug(f"📢 Evento VendaCriada publicado (venda_id={venda.id})")
-            #     
+            #
             # except Exception as e:
             #     logger.error(f"⚠️  Erro ao publicar evento VendaCriada: {str(e)}", exc_info=True)
             #     # Não aborta a criação da venda
-            
+
             return venda.to_dict()
-            
+
         except HTTPException:
             db.rollback()
             logger.error("❌ HTTPException ao criar venda - Rollback executado")
             raise
-            
+
         except Exception as e:
             db.rollback()
             logger.error(f"❌ ERRO CRÍTICO ao criar venda: {str(e)}", exc_info=True)
             raise HTTPException(
-                status_code=500,
-                detail=f"Erro ao criar venda: {str(e)}"
+                status_code=500, detail=f"Erro ao criar venda: {str(e)}"
             )
-    
+
     @staticmethod
     def _processar_baixa_estoque_item(
-        produto: 'Produto',
+        produto: "Produto",
         quantidade_vendida: float,
         venda_id: int,
         user_id: int,
         tenant_id: str,
         db: Session,
         product_variation_id: int = None,
-        venda_codigo: str = None
+        venda_codigo: str = None,
     ) -> List[Dict[str, Any]]:
         """
         Processa a baixa de estoque de um item de venda.
-        
+
         Comportamento por tipo de produto:
         - SIMPLES/VARIACAO: Baixa estoque do próprio produto (ou da variação se product_variation_id fornecido)
         - KIT FÍSICO: Baixa estoque do KIT (tratado como produto simples)
         - KIT VIRTUAL: Baixa estoque de cada componente em cascata
-        
+
         Args:
             produto: Objeto Produto (com tipo_produto e tipo_kit)
             quantidade_vendida: Quantidade vendida do produto
@@ -608,189 +686,212 @@ class VendaService:
             user_id: ID do usuário (tenant)
             db: Sessão do banco (NÃO faz commit)
             product_variation_id: ID da variação do produto (se aplicável)
-            
+
         Returns:
             List[Dict] com resultados da baixa de estoque para cada produto afetado
-            
+
         Raises:
             ValueError: Se estoque insuficiente ou componente inválido
         """
         resultados = []
-        
+
         # Se tiver product_variation_id, usar o produto da variação
         if product_variation_id:
             from app.produtos_models import Produto
-            variacao = db.query(Produto).filter(
-                Produto.id == product_variation_id,
-                Produto.tipo_produto == 'VARIACAO'
-            ).first()
-            
+
+            variacao = (
+                db.query(Produto)
+                .filter(
+                    Produto.id == product_variation_id,
+                    Produto.tipo_produto == "VARIACAO",
+                )
+                .first()
+            )
+
             if variacao:
-                produto = variacao  # A variação é o próprio produto a ser baixado do estoque
-        
+                produto = (
+                    variacao  # A variação é o próprio produto a ser baixado do estoque
+                )
+
         # ============================================================
         # CASO 1: PRODUTO SIMPLES OU VARIAÇÃO
         # ============================================================
-        if produto.tipo_produto in ('SIMPLES', 'VARIACAO'):
+        if produto.tipo_produto in ("SIMPLES", "VARIACAO"):
             resultado_estoque = EstoqueService.baixar_estoque(
                 produto_id=produto.id,
                 quantidade=quantidade_vendida,
-                motivo='venda',
+                motivo="venda",
                 referencia_id=venda_id,
-                referencia_tipo='venda',
+                referencia_tipo="venda",
                 user_id=user_id,
                 tenant_id=tenant_id,
                 db=db,
                 documento=venda_codigo,
-                observacao=None
+                observacao=None,
             )
-            
-            resultados.append({
-                'produto': resultado_estoque['produto_nome'],
-                'produto_id': produto.id,
-                'tipo_produto': produto.tipo_produto,
-                'quantidade': quantidade_vendida,
-                'estoque_anterior': resultado_estoque['estoque_anterior'],
-                'estoque_novo': resultado_estoque['estoque_novo']
-            })
-            
+
+            resultados.append(
+                {
+                    "produto": resultado_estoque["produto_nome"],
+                    "produto_id": produto.id,
+                    "tipo_produto": produto.tipo_produto,
+                    "quantidade": quantidade_vendida,
+                    "estoque_anterior": resultado_estoque["estoque_anterior"],
+                    "estoque_novo": resultado_estoque["estoque_novo"],
+                }
+            )
+
             logger.info(
                 f"📦 Estoque baixado: {resultado_estoque['produto_nome']} - "
                 f"Qtd: {quantidade_vendida} ({resultado_estoque['estoque_anterior']} → {resultado_estoque['estoque_novo']})"
             )
-            
+
             return resultados
-        
+
         # ============================================================
         # CASO 2: PRODUTO KIT
         # ============================================================
-        if produto.tipo_produto == 'KIT':
-            tipo_kit = produto.tipo_kit or 'VIRTUAL'  # Default VIRTUAL se não definido
-            
+        if produto.tipo_produto == "KIT":
+            tipo_kit = produto.tipo_kit or "VIRTUAL"  # Default VIRTUAL se não definido
+
             # --------------------------------------------------------
             # CASO 2.1: KIT FÍSICO (tratado como produto simples)
             # LÓGICA: Venda de kit físico só baixa o estoque do KIT
             # Os componentes já foram baixados quando o kit foi montado (entrada)
             # Portanto, NÃO sensibiliza os componentes novamente
             # --------------------------------------------------------
-            if tipo_kit == 'FISICO':
+            if tipo_kit == "FISICO":
                 resultado_estoque = EstoqueService.baixar_estoque(
                     produto_id=produto.id,
                     quantidade=quantidade_vendida,
-                    motivo='venda',
+                    motivo="venda",
                     referencia_id=venda_id,
-                    referencia_tipo='venda',
+                    referencia_tipo="venda",
                     user_id=user_id,
                     tenant_id=tenant_id,
                     db=db,
                     documento=venda_codigo,
-                    observacao="KIT FÍSICO - Estoque próprio (componentes já foram baixados na montagem)"
+                    observacao="KIT FÍSICO - Estoque próprio (componentes já foram baixados na montagem)",
                 )
-                
-                resultados.append({
-                    'produto': resultado_estoque['produto_nome'],
-                    'produto_id': produto.id,
-                    'tipo_produto': 'KIT',
-                    'tipo_kit': 'FISICO',
-                    'quantidade': quantidade_vendida,
-                    'estoque_anterior': resultado_estoque['estoque_anterior'],
-                    'estoque_novo': resultado_estoque['estoque_novo']
-                })
-                
+
+                resultados.append(
+                    {
+                        "produto": resultado_estoque["produto_nome"],
+                        "produto_id": produto.id,
+                        "tipo_produto": "KIT",
+                        "tipo_kit": "FISICO",
+                        "quantidade": quantidade_vendida,
+                        "estoque_anterior": resultado_estoque["estoque_anterior"],
+                        "estoque_novo": resultado_estoque["estoque_novo"],
+                    }
+                )
+
                 logger.info(
                     f"📦 KIT FÍSICO vendido: {resultado_estoque['produto_nome']} - "
                     f"Qtd: {quantidade_vendida} ({resultado_estoque['estoque_anterior']} → {resultado_estoque['estoque_novo']}) "
                     f"[Componentes NÃO sensibilizados - já foram baixados na montagem]"
                 )
-                
+
                 return resultados
-            
+
             # --------------------------------------------------------
             # CASO 2.2: KIT VIRTUAL (baixa em cascata dos componentes)
             # --------------------------------------------------------
-            if tipo_kit == 'VIRTUAL':
+            if tipo_kit == "VIRTUAL":
                 from app.produtos_models import ProdutoKitComponente, Produto
-                
+
                 # Buscar componentes do KIT
-                componentes = db.query(ProdutoKitComponente).filter(
-                    ProdutoKitComponente.kit_id == produto.id
-                ).all()
-                
+                componentes = (
+                    db.query(ProdutoKitComponente)
+                    .filter(ProdutoKitComponente.kit_id == produto.id)
+                    .all()
+                )
+
                 if not componentes:
                     raise ValueError(
                         f"KIT VIRTUAL '{produto.nome}' não possui componentes cadastrados. "
                         f"Não é possível processar a venda."
                     )
-                
+
                 logger.info(
                     f"📦 KIT VIRTUAL: {produto.nome} - "
                     f"Processando {len(componentes)} componentes (Qtd vendida: {quantidade_vendida})"
                 )
-                
+
                 # Baixar estoque de cada componente
                 for componente in componentes:
                     # Calcular quantidade total do componente
                     quantidade_componente = quantidade_vendida * componente.quantidade
-                    
+
                     # Buscar dados do produto componente
-                    produto_componente = db.query(Produto).filter(
-                        Produto.id == componente.produto_componente_id,
-                        Produto.user_id == user_id
-                    ).first()
-                    
+                    produto_componente = (
+                        db.query(Produto)
+                        .filter(
+                            Produto.id == componente.produto_componente_id,
+                            Produto.user_id == user_id,
+                        )
+                        .first()
+                    )
+
                     if not produto_componente:
                         raise ValueError(
                             f"Componente ID {componente.produto_componente_id} não encontrado"
                         )
-                    
+
                     # Validar tipo do componente (apenas SIMPLES ou VARIACAO)
-                    if produto_componente.tipo_produto not in ('SIMPLES', 'VARIACAO'):
+                    if produto_componente.tipo_produto not in ("SIMPLES", "VARIACAO"):
                         raise ValueError(
                             f"Componente '{produto_componente.nome}' possui tipo inválido: {produto_componente.tipo_produto}. "
                             f"KIT VIRTUAL aceita apenas componentes SIMPLES ou VARIACAO."
                         )
-                    
+
                     # Validar se componente está ativo (apenas warning, não bloqueia venda)
                     if not produto_componente.situacao:
                         logger.warning(
                             f"⚠️ Componente '{produto_componente.nome}' (ID: {produto_componente.id}) está INATIVO. "
                             f"Venda do KIT '{produto.nome}' será processada normalmente."
                         )
-                    
+
                     # Baixar estoque do componente
                     resultado_componente = EstoqueService.baixar_estoque(
                         produto_id=produto_componente.id,
                         quantidade=quantidade_componente,
-                        motivo='venda',
+                        motivo="venda",
                         referencia_id=venda_id,
-                        referencia_tipo='venda',
+                        referencia_tipo="venda",
                         user_id=user_id,
                         tenant_id=tenant_id,
                         db=db,
                         documento=venda_codigo,
-                        observacao=f"Componente do KIT VIRTUAL '{produto.nome}' (vendido: {quantidade_vendida}x)"
+                        observacao=f"Componente do KIT VIRTUAL '{produto.nome}' (vendido: {quantidade_vendida}x)",
                     )
-                    
-                    resultados.append({
-                        'produto': resultado_componente['produto_nome'],
-                        'produto_id': produto_componente.id,
-                        'tipo_produto': produto_componente.tipo_produto,
-                        'quantidade': quantidade_componente,
-                        'estoque_anterior': resultado_componente['estoque_anterior'],
-                        'estoque_novo': resultado_componente['estoque_novo'],
-                        'kit_origem': produto.nome,
-                        'kit_id': produto.id
-                    })
-                    
+
+                    resultados.append(
+                        {
+                            "produto": resultado_componente["produto_nome"],
+                            "produto_id": produto_componente.id,
+                            "tipo_produto": produto_componente.tipo_produto,
+                            "quantidade": quantidade_componente,
+                            "estoque_anterior": resultado_componente[
+                                "estoque_anterior"
+                            ],
+                            "estoque_novo": resultado_componente["estoque_novo"],
+                            "kit_origem": produto.nome,
+                            "kit_id": produto.id,
+                        }
+                    )
+
                     logger.info(
                         f"   ↳ Componente: {resultado_componente['produto_nome']} - "
                         f"Qtd: {quantidade_componente} ({resultado_componente['estoque_anterior']} → {resultado_componente['estoque_novo']})"
                     )
-                
-                logger.info(f"✅ KIT VIRTUAL '{produto.nome}' processado: {len(componentes)} componentes baixados")
-                
+
+                logger.info(
+                    f"✅ KIT VIRTUAL '{produto.nome}' processado: {len(componentes)} componentes baixados"
+                )
+
                 return resultados
-        
+
         # ============================================================
         # CASO 3: TIPO DE PRODUTO NÃO SUPORTADO
         # ============================================================
@@ -798,18 +899,14 @@ class VendaService:
             f"Tipo de produto '{produto.tipo_produto}' não suportado para baixa de estoque. "
             f"Tipos válidos: SIMPLES, VARIACAO, KIT"
         )
-    
+
     @staticmethod
     def cancelar_venda(
-        venda_id: int,
-        motivo: str,
-        user_id: int,
-        tenant_id: str,
-        db: Session
+        venda_id: int, motivo: str, user_id: int, tenant_id: str, db: Session
     ) -> Dict[str, Any]:
         """
         Cancela uma venda realizando estorno completo de todas as operações.
-        
+
         Operações executadas (ordem de execução):
         1. Validar venda e permissões
         2. Estornar estoque de todos os itens
@@ -821,20 +918,20 @@ class VendaService:
         8. Marcar venda como cancelada
         9. COMMIT
         10. Auditoria
-        
+
         GARANTIAS:
         - ✅ Transação atômica (tudo ou nada)
         - ✅ Rollback automático em caso de erro
         - ✅ Segurança: apenas vendas do user_id atual
         - ✅ Idempotente: pode chamar múltiplas vezes
         - ✅ Histórico mantido (status='cancelado' em vez de delete)
-        
+
         Args:
             venda_id: ID da venda a ser cancelada
             motivo: Motivo do cancelamento (obrigatório)
             user_id: ID do usuário cancelando
             db: Sessão do SQLAlchemy
-            
+
         Returns:
             Dict com resultado do cancelamento:
             {
@@ -847,7 +944,7 @@ class VendaService:
                     'movimentacoes_bancarias_estornadas': int
                 }
             }
-            
+
         Raises:
             HTTPException(404): Venda não encontrada
             HTTPException(400): Venda já está cancelada
@@ -855,53 +952,59 @@ class VendaService:
         from app.vendas_models import Venda, VendaItem
         from app.estoque.service import EstoqueService
         from app.caixa_models import MovimentacaoCaixa
-        from app.financeiro_models import ContaReceber, LancamentoManual, MovimentacaoFinanceira, ContaBancaria
+        from app.financeiro_models import (
+            ContaReceber,
+            LancamentoManual,
+            MovimentacaoFinanceira,
+            ContaBancaria,
+        )
         from app.audit_log import log_action
         from app.tenancy.context import set_tenant_context
 
-        set_tenant_context(tenant_id if isinstance(tenant_id, UUID) else UUID(str(tenant_id)))
-        
+        set_tenant_context(
+            tenant_id if isinstance(tenant_id, UUID) else UUID(str(tenant_id))
+        )
+
         logger.info(f"🔴 Iniciando cancelamento ATÔMICO da venda #{venda_id}")
-        
+
         with transactional_session(db):
             # ============================================================
             # ETAPA 1: VALIDAR VENDA E PERMISSÕES
             # ============================================================
-            
-            venda = db.query(Venda).filter_by(
-                id=venda_id,
-                tenant_id=tenant_id
-            ).first()
-            
+
+            venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
+
             if not venda:
-                raise HTTPException(status_code=404, detail='Venda não encontrada')
-            
-            if venda.status == 'cancelada':
-                raise HTTPException(status_code=400, detail='Venda já está cancelada')
-            
-            logger.info(f"📋 Cancelando venda #{venda.numero_venda} (Status: {venda.status})")
-            
+                raise HTTPException(status_code=404, detail="Venda não encontrada")
+
+            if venda.status == "cancelada":
+                raise HTTPException(status_code=400, detail="Venda já está cancelada")
+
+            logger.info(
+                f"📋 Cancelando venda #{venda.numero_venda} (Status: {venda.status})"
+            )
+
             # ============================================================
             # ETAPA 2: ESTORNAR ESTOQUE DE TODOS OS ITENS
             # ============================================================
-            
+
             itens = db.query(VendaItem).filter_by(venda_id=venda_id).all()
             itens_estornados = 0
-            
+
             for item in itens:
                 if item.produto_id:  # Apenas produtos físicos têm estoque
                     try:
                         resultado = EstoqueService.estornar_estoque(
                             produto_id=item.produto_id,
                             quantidade=item.quantidade,
-                            motivo='cancelamento_venda',
+                            motivo="cancelamento_venda",
                             referencia_id=venda_id,
-                            referencia_tipo='venda',
+                            referencia_tipo="venda",
                             user_id=user_id,
                             tenant_id=tenant_id,
                             db=db,
                             documento=venda.numero_venda,
-                            observacao=f"Cancelamento: {motivo}"
+                            observacao=f"Cancelamento: {motivo}",
                         )
                         itens_estornados += 1
                         logger.info(
@@ -912,72 +1015,78 @@ class VendaService:
                         logger.error(f"  ❌ Erro ao estornar estoque: {e}")
                         raise HTTPException(
                             status_code=500,
-                            detail=f'Erro ao estornar estoque: {str(e)}'
+                            detail=f"Erro ao estornar estoque: {str(e)}",
                         )
-            
-            logger.info(f"📦 Total de itens estornados: {itens_estornados}/{len(itens)}")
-            
+
+            logger.info(
+                f"📦 Total de itens estornados: {itens_estornados}/{len(itens)}"
+            )
+
             # ============================================================
             # ETAPA 3: CANCELAR CONTAS A RECEBER VINCULADAS
             # ============================================================
-            
+
             contas_receber = db.query(ContaReceber).filter_by(venda_id=venda_id).all()
             contas_canceladas = 0
-            
+
             for conta in contas_receber:
-                if conta.status == 'pendente' or conta.status == 'parcial':
+                if conta.status == "pendente" or conta.status == "parcial":
                     logger.info(
                         f"  💳 Removendo conta a receber pendente: {conta.descricao} - "
                         f"R$ {conta.valor_original}"
                     )
                     db.delete(conta)
-                elif conta.status == 'recebido':
-                    conta.status = 'cancelado'
+                elif conta.status == "recebido":
+                    conta.status = "cancelado"
                     logger.info(
                         f"  💳 Cancelando conta já recebida: {conta.descricao} - "
                         f"R$ {conta.valor_recebido}"
                     )
                 contas_canceladas += 1
-            
+
             logger.info(f"💳 Total de contas canceladas: {contas_canceladas}")
-            
+
             # ============================================================
             # ETAPA 4: CANCELAR LANÇAMENTOS MANUAIS
             # ============================================================
-            
-            lancamentos = db.query(LancamentoManual).filter(
-                or_(
-                    LancamentoManual.documento == f"VENDA-{venda_id}",
-                    LancamentoManual.documento.like(f"VENDA-{venda_id}-%")
+
+            lancamentos = (
+                db.query(LancamentoManual)
+                .filter(
+                    or_(
+                        LancamentoManual.documento == f"VENDA-{venda_id}",
+                        LancamentoManual.documento.like(f"VENDA-{venda_id}-%"),
+                    )
                 )
-            ).all()
-            
+                .all()
+            )
+
             lancamentos_cancelados = 0
             for lanc in lancamentos:
-                if lanc.status == 'previsto':
+                if lanc.status == "previsto":
                     logger.info(
                         f"  📊 Removendo lançamento previsto: {lanc.descricao} - "
                         f"R$ {lanc.valor}"
                     )
                     db.delete(lanc)
-                elif lanc.status == 'realizado':
-                    lanc.status = 'cancelado'
+                elif lanc.status == "realizado":
+                    lanc.status = "cancelado"
                     logger.info(
                         f"  📊 Cancelando lançamento realizado: {lanc.descricao} - "
                         f"R$ {lanc.valor}"
                     )
                 lancamentos_cancelados += 1
-            
+
             logger.info(f"📊 Total de lançamentos cancelados: {lancamentos_cancelados}")
-            
+
             # ============================================================
             # ETAPA 5: REMOVER MOVIMENTAÇÕES DE CAIXA
             # ============================================================
-            
-            movimentacoes_caixa = db.query(MovimentacaoCaixa).filter_by(
-                venda_id=venda_id
-            ).all()
-            
+
+            movimentacoes_caixa = (
+                db.query(MovimentacaoCaixa).filter_by(venda_id=venda_id).all()
+            )
+
             movimentacoes_removidas = 0
             for mov in movimentacoes_caixa:
                 logger.info(
@@ -985,97 +1094,112 @@ class VendaService:
                 )
                 db.delete(mov)
                 movimentacoes_removidas += 1
-            
-            logger.info(f"💵 Total de movimentações de caixa removidas: {movimentacoes_removidas}")
-            
+
+            logger.info(
+                f"💵 Total de movimentações de caixa removidas: {movimentacoes_removidas}"
+            )
+
             # ============================================================
             # ETAPA 6: ESTORNAR MOVIMENTAÇÕES BANCÁRIAS
             # ============================================================
-            
-            movimentacoes_bancarias = db.query(MovimentacaoFinanceira).filter(
-                MovimentacaoFinanceira.tenant_id == tenant_id,
-                MovimentacaoFinanceira.origem_tipo == 'venda',
-                MovimentacaoFinanceira.origem_id == venda_id
-            ).all()
-            
+
+            movimentacoes_bancarias = (
+                db.query(MovimentacaoFinanceira)
+                .filter(
+                    MovimentacaoFinanceira.tenant_id == tenant_id,
+                    MovimentacaoFinanceira.origem_tipo == "venda",
+                    MovimentacaoFinanceira.origem_id == venda_id,
+                )
+                .all()
+            )
+
             movimentacoes_estornadas = 0
             for mov_banc in movimentacoes_bancarias:
-                conta_bancaria = db.query(ContaBancaria).filter_by(
-                    id=mov_banc.conta_bancaria_id,
-                    user_id=user_id
-                ).first()
-                
+                conta_bancaria = (
+                    db.query(ContaBancaria)
+                    .filter_by(id=mov_banc.conta_bancaria_id, user_id=user_id)
+                    .first()
+                )
+
                 if conta_bancaria:
-                    if mov_banc.tipo in ('receita', 'entrada'):
+                    if mov_banc.tipo in ("receita", "entrada"):
                         conta_bancaria.saldo_atual -= mov_banc.valor
                         logger.info(
                             f"  🏦 Estornando saldo bancário: {conta_bancaria.nome} "
                             f"-R$ {mov_banc.valor}"
                         )
-                    elif mov_banc.tipo in ('despesa', 'saida'):
+                    elif mov_banc.tipo in ("despesa", "saida"):
                         conta_bancaria.saldo_atual += mov_banc.valor
                         logger.info(
                             f"  🏦 Estornando saldo bancário: {conta_bancaria.nome} "
                             f"+R$ {mov_banc.valor}"
                         )
-                    
+
                     db.delete(mov_banc)
                     movimentacoes_estornadas += 1
-            
-            logger.info(f"🏦 Total de movimentações bancárias estornadas: {movimentacoes_estornadas}")
-            
+
+            logger.info(
+                f"🏦 Total de movimentações bancárias estornadas: {movimentacoes_estornadas}"
+            )
+
             # ============================================================
             # ETAPA 6.5: REMOVER PARADAS DE ENTREGA
             # ============================================================
-            
+
             from app.rotas_entrega_models import RotaEntregaParada
+
             paradas_removidas = 0
-            
+
             paradas = db.query(RotaEntregaParada).filter_by(venda_id=venda_id).all()
             for parada in paradas:
                 logger.info(f"🚚 Removendo parada de entrega da rota #{parada.rota_id}")
                 db.delete(parada)
                 paradas_removidas += 1
-            
+
             if paradas_removidas > 0:
-                logger.info(f"📋 Total de paradas de entrega removidas: {paradas_removidas}")
+                logger.info(
+                    f"📋 Total de paradas de entrega removidas: {paradas_removidas}"
+                )
                 # Reverter status de entrega
                 venda.status_entrega = None
-            
+
             # ============================================================
             # ETAPA 7: ESTORNAR COMISSÕES
             # ============================================================
-            
+
             try:
                 from app.comissoes_estorno import estornar_comissoes_venda
-                
+
                 resultado_estorno = estornar_comissoes_venda(
                     venda_id=venda_id,
                     motivo=f"Venda cancelada: {motivo}",
                     usuario_id=user_id,
-                    db=db
+                    db=db,
                 )
-                
-                if resultado_estorno['success'] and resultado_estorno['comissoes_estornadas'] > 0:
+
+                if (
+                    resultado_estorno["success"]
+                    and resultado_estorno["comissoes_estornadas"] > 0
+                ):
                     logger.info(
                         f"  💰 Estornadas {resultado_estorno['comissoes_estornadas']} "
                         f"comissões (R$ {resultado_estorno['valor_estornado']:.2f})"
                     )
             except Exception as e:
                 logger.warning(f"  ⚠️  Erro ao estornar comissões: {str(e)}")
-            
+
             # ============================================================
             # ETAPA 8: MARCAR VENDA COMO CANCELADA
             # ============================================================
-            
+
             status_anterior = venda.status
-            venda.status = 'cancelada'
+            venda.status = "cancelada"
             venda.cancelada_por = user_id
             venda.motivo_cancelamento = motivo
             venda.data_cancelamento = now_brasilia()
             venda.updated_at = now_brasilia()
 
-            if status_anterior in ['baixa_parcial', 'finalizada']:
+            if status_anterior in ["baixa_parcial", "finalizada"]:
                 get_or_build_venda_rentabilidade_snapshot(
                     venda,
                     db,
@@ -1102,39 +1226,39 @@ class VendaService:
                 venda_id=venda_id,
                 reason=f"Venda cancelada: {motivo}",
             )
-            
+
             db.flush()
-            
+
             logger.info(
                 f"🔒 Venda marcada como cancelada: {venda.numero_venda} "
                 f"(status: {status_anterior} → cancelada)"
             )
-            
+
             # ============================================================
             # ETAPA 9: AUDITORIA
             # ============================================================
-            
+
             log_action(
                 db=db,
                 user_id=user_id,
-                action='UPDATE',
-                entity_type='vendas',
+                action="UPDATE",
+                entity_type="vendas",
                 entity_id=venda.id,
                 details=(
-                    f'Venda {venda.numero_venda} CANCELADA (ATÔMICO) - '
-                    f'Motivo: {motivo} - '
-                    f'Itens estornados: {itens_estornados} - '
-                    f'Contas canceladas: {contas_canceladas}'
+                    f"Venda {venda.numero_venda} CANCELADA (ATÔMICO) - "
+                    f"Motivo: {motivo} - "
+                    f"Itens estornados: {itens_estornados} - "
+                    f"Contas canceladas: {contas_canceladas}"
                 ),
                 tenant_id=tenant_id,
                 commit=False,
             )
-            
+
             # Commit automático pelo context manager
-        
+
         # Refresh após commit
         db.refresh(venda)
-        
+
         logger.info(
             f"✅ ✅ ✅ CANCELAMENTO CONCLUÍDO: Venda #{venda.numero_venda} ✅ ✅ ✅\n"
             f"   📦 Estoque estornado: {itens_estornados} itens\n"
@@ -1143,15 +1267,15 @@ class VendaService:
             f"   💵 Movimentações caixa removidas: {movimentacoes_removidas}\n"
             f"   🏦 Movimentações bancárias estornadas: {movimentacoes_estornadas}"
         )
-        
+
         # ============================================================
         # ETAPA 10: EMITIR EVENTO DE DOMÍNIO
         # ============================================================
-        
+
         # 🔒 EVENTOS DESABILITADOS TEMPORARIAMENTE (publish_event não exportado)
         # try:
         #     from app.domain.events import VendaCancelada, publish_event
-        #     
+        #
         #     evento = VendaCancelada(
         #         venda_id=venda.id,
         #         numero_venda=venda.numero_venda,
@@ -1170,48 +1294,54 @@ class VendaService:
         #             'movimentacoes_bancarias_estornadas': movimentacoes_estornadas
         #         }
         #     )
-        #     
+        #
         #     publish_event(evento)
         #     logger.debug(f"📢 Evento VendaCancelada publicado (venda_id={venda.id})")
-        #     
+        #
         # except Exception as e:
         #     logger.error(f"⚠️  Erro ao publicar evento VendaCancelada: {str(e)}", exc_info=True)
         #     # Não aborta o cancelamento
-        
+
         return {
-            'venda': venda.to_dict(),
-            'estornos': {
-                'itens_estornados': itens_estornados,
-                'contas_canceladas': contas_canceladas,
-                'lancamentos_cancelados': lancamentos_cancelados,
-                'movimentacoes_removidas': movimentacoes_removidas,
-                'movimentacoes_bancarias_estornadas': movimentacoes_estornadas
-            }
+            "venda": venda.to_dict(),
+            "estornos": {
+                "itens_estornados": itens_estornados,
+                "contas_canceladas": contas_canceladas,
+                "lancamentos_cancelados": lancamentos_cancelados,
+                "movimentacoes_removidas": movimentacoes_removidas,
+                "movimentacoes_bancarias_estornadas": movimentacoes_estornadas,
+            },
         }
-    
+
     @staticmethod
-    def _gerar_numero_venda(db: Session, tenant_id: str, user_id: int | None = None) -> str:
+    def _gerar_numero_venda(
+        db: Session, tenant_id: str, user_id: int | None = None
+    ) -> str:
         """
         Gera um número sequencial para a venda no formato YYYYMMDDNNNN.
-        
+
         Args:
             db: Sessão do SQLAlchemy
             user_id: ID do usuário
-            
+
         Returns:
             String no formato YYYYMMDDNNNN (ex: 202501230001)
         """
         from app.vendas_models import Venda
-        
+
         hoje = now_brasilia()
-        prefixo = hoje.strftime('%Y%m%d')
-        
+        prefixo = hoje.strftime("%Y%m%d")
+
         # A numeracao pode repetir entre tenants, mas nunca dentro do mesmo tenant.
-        ultima_venda = db.query(Venda).filter(
-            Venda.numero_venda.like(f'{prefixo}%'),
-            Venda.tenant_id == tenant_id
-        ).order_by(desc(Venda.numero_venda)).first()
-        
+        ultima_venda = (
+            db.query(Venda)
+            .filter(
+                Venda.numero_venda.like(f"{prefixo}%"), Venda.tenant_id == tenant_id
+            )
+            .order_by(desc(Venda.numero_venda))
+            .first()
+        )
+
         if ultima_venda:
             try:
                 seq = int(ultima_venda.numero_venda[-4:]) + 1
@@ -1219,9 +1349,9 @@ class VendaService:
                 seq = 1
         else:
             seq = 1
-        
-        return f'{prefixo}{seq:04d}'
-    
+
+        return f"{prefixo}{seq:04d}"
+
     @staticmethod
     def finalizar_venda(
         venda_id: int,
@@ -1237,7 +1367,7 @@ class VendaService:
     ) -> Dict[str, Any]:
         """
         Finaliza uma venda com transação atômica.
-        
+
         Esta é a operação MAIS CRÍTICA do sistema. Executa em ordem:
         1. Validações (venda, caixa, status, pagamentos)
         2. Processamento de pagamentos (crédito cliente, caixa)
@@ -1247,19 +1377,19 @@ class VendaService:
         6. Baixa de contas a receber existentes
         7. COMMIT ÚNICO ✅
         8. Operações pós-commit (contas novas, comissões, lembretes)
-        
+
         TRANSAÇÃO ATÔMICA:
         - Se qualquer etapa 1-6 falhar → ROLLBACK completo
         - Apenas após commit bem-sucedido → etapa 8
         - Erros na etapa 8 não abortam a venda (já commitada)
-        
+
         Args:
             venda_id: ID da venda a ser finalizada
             pagamentos: Lista de dicts com forma_pagamento, valor, numero_parcelas
             user_id: ID do usuário que está finalizando
             user_nome: Nome do usuário (para auditoria)
             db: Sessão do SQLAlchemy (será commitada AQUI)
-            
+
         Returns:
             Dict com resultado completo:
             {
@@ -1282,11 +1412,11 @@ class VendaService:
                     'lembretes_criados': int
                 }
             }
-            
+
         Raises:
             HTTPException(404): Venda não encontrada
             HTTPException(400): Status inválido, pagamento inválido, estoque insuficiente
-            
+
         Exemplo:
             >>> resultado = VendaService.finalizar_venda(
             ...     venda_id=120,
@@ -1312,14 +1442,16 @@ class VendaService:
             calculate_manual_discount_amount,
             log_business_event,
         )
-        
-        logger.info(f"🚀 Iniciando finalização da venda #{venda_id} - {len(pagamentos)} pagamento(s)")
-        
+
+        logger.info(
+            f"🚀 Iniciando finalização da venda #{venda_id} - {len(pagamentos)} pagamento(s)"
+        )
+
         try:
             # ============================================================
             # ETAPA 1: VALIDAÇÕES INICIAIS
             # ============================================================
-            
+
             # Validar caixa aberto
             caixa_info = CaixaService.validar_caixa_aberto(
                 user_id=user_id,
@@ -1328,44 +1460,50 @@ class VendaService:
                 caixa_id=caixa_id,
                 permitir_caixa_tenant=permitir_caixa_tenant,
             )
-            caixa_aberto_id = caixa_info['caixa_id']
+            caixa_aberto_id = caixa_info["caixa_id"]
             logger.debug(f"✅ Caixa validado: ID={caixa_aberto_id}")
-            
+
             # Buscar venda
             venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_id).first()
             if not venda:
-                raise HTTPException(status_code=404, detail='Venda não encontrada')
-            
+                raise HTTPException(status_code=404, detail="Venda não encontrada")
+
             # Validar status
-            if venda.status not in ['aberta', 'baixa_parcial']:
+            if venda.status not in ["aberta", "baixa_parcial"]:
                 raise HTTPException(
                     status_code=400,
-                    detail=f'Apenas vendas abertas ou com baixa parcial podem receber pagamentos (status atual: {venda.status})'
+                    detail=f"Apenas vendas abertas ou com baixa parcial podem receber pagamentos (status atual: {venda.status})",
                 )
-            
+
             # Calcular totais
-            pagamentos_existentes = db.query(VendaPagamento).filter_by(venda_id=venda.id).all()
+            pagamentos_existentes = (
+                db.query(VendaPagamento).filter_by(venda_id=venda.id).all()
+            )
             total_venda = float(venda.total)
             totais_pagamento = _calcular_pagamentos_finalizacao(
                 total_venda=total_venda,
                 pagamentos_existentes=pagamentos_existentes,
                 pagamentos_novos=pagamentos,
             )
-            total_ja_pago = totais_pagamento['total_ja_pago']
-            total_novos_pagamentos = totais_pagamento['total_novos_pagamentos']
-            total_pagamentos = totais_pagamento['total_pagamentos']
-            
+            total_ja_pago = totais_pagamento["total_ja_pago"]
+            total_novos_pagamentos = totais_pagamento["total_novos_pagamentos"]
+            total_pagamentos = totais_pagamento["total_pagamentos"]
+
             logger.info(
                 f"💰 Totais: Venda=R$ {total_venda:.2f}, "
                 f"Já pago=R$ {total_ja_pago:.2f}, "
                 f"Novos=R$ {total_novos_pagamentos:.2f}"
             )
 
-            cupom_code_resolvido = (str(cupom_code).strip().upper() if cupom_code else venda.cupom_code)
+            cupom_code_resolvido = (
+                str(cupom_code).strip().upper() if cupom_code else venda.cupom_code
+            )
             cupom_discount_resolvido = (
                 cupom_discount_applied
                 if cupom_discount_applied is not None
-                else float(venda.cupom_discount_applied or 0) if venda.cupom_discount_applied is not None else None
+                else float(venda.cupom_discount_applied or 0)
+                if venda.cupom_discount_applied is not None
+                else None
             )
 
             cupom_consumido = None
@@ -1384,98 +1522,112 @@ class VendaService:
                 )
                 venda.cupom_code = cupom_code_resolvido
                 venda.cupom_discount_applied = cupom_consumido.get("discount_applied")
-            
+
             # ============================================================
             # ETAPA 2: PROCESSAR PAGAMENTOS
             # ============================================================
-            
+
             movimentacoes_caixa_ids = []
-            
+
             for pag_data in pagamentos:
                 # ⚠️ ALERTA 1: VALIDAR PARCELAS CONTRA OPERADORA
                 # Garante que número de parcelas não exceda o máximo da operadora
-                operadora_id = pag_data.get('operadora_id')
-                numero_parcelas = pag_data.get('numero_parcelas', 1)
-                
+                operadora_id = pag_data.get("operadora_id")
+                numero_parcelas = pag_data.get("numero_parcelas", 1)
+
                 if operadora_id and numero_parcelas > 1:
                     from app.operadoras_models import OperadoraCartao
-                    
-                    operadora = db.query(OperadoraCartao).filter(
-                        OperadoraCartao.id == operadora_id,
-                        OperadoraCartao.tenant_id == tenant_id
-                    ).first()
+
+                    operadora = (
+                        db.query(OperadoraCartao)
+                        .filter(
+                            OperadoraCartao.id == operadora_id,
+                            OperadoraCartao.tenant_id == tenant_id,
+                        )
+                        .first()
+                    )
                     if not operadora:
                         raise HTTPException(
                             status_code=400,
-                            detail=f"❌ Operadora não encontrada (ID: {operadora_id})"
+                            detail=f"❌ Operadora não encontrada (ID: {operadora_id})",
                         )
-                    
+
                     if numero_parcelas > operadora.max_parcelas:
                         raise HTTPException(
                             status_code=400,
                             detail=f"❌ PARCELAS EXCEDIDAS: {operadora.nome} permite no máximo "
-                                   f"{operadora.max_parcelas}x. Você tentou {numero_parcelas}x."
+                            f"{operadora.max_parcelas}x. Você tentou {numero_parcelas}x.",
                         )
-                
+
                 # ⚠️ ALERTA 2: VALIDAR NSU DUPLICADO
                 # Garante que o mesmo NSU não seja usado duas vezes na mesma operadora
-                nsu_informado = pag_data.get('nsu_cartao')
+                nsu_informado = pag_data.get("nsu_cartao")
                 if nsu_informado and operadora_id:
-                    nsu_duplicado = db.query(VendaPagamento).filter(
-                        VendaPagamento.tenant_id == tenant_id,
-                        VendaPagamento.nsu_cartao == nsu_informado,
-                        VendaPagamento.operadora_id == operadora_id
-                    ).first()
-                    
+                    nsu_duplicado = (
+                        db.query(VendaPagamento)
+                        .filter(
+                            VendaPagamento.tenant_id == tenant_id,
+                            VendaPagamento.nsu_cartao == nsu_informado,
+                            VendaPagamento.operadora_id == operadora_id,
+                        )
+                        .first()
+                    )
+
                     if nsu_duplicado:
-                        venda_duplicada = db.query(Venda).filter_by(id=nsu_duplicado.venda_id).first()
+                        venda_duplicada = (
+                            db.query(Venda).filter_by(id=nsu_duplicado.venda_id).first()
+                        )
                         raise HTTPException(
                             status_code=400,
                             detail=f"❌ NSU DUPLICADO: O NSU '{nsu_informado}' já está vinculado à "
-                                   f"Venda {venda_duplicada.numero_venda if venda_duplicada else nsu_duplicado.venda_id}. "
-                                   f"Cada NSU deve ser usado apenas uma vez por operadora."
+                            f"Venda {venda_duplicada.numero_venda if venda_duplicada else nsu_duplicado.venda_id}. "
+                            f"Cada NSU deve ser usado apenas uma vez por operadora.",
                         )
-                
+
                 # Criar registro de pagamento
                 # 🔒 ISOLAMENTO MULTI-TENANT: tenant_id obrigatório
                 pagamento = VendaPagamento(
                     venda_id=venda.id,
                     tenant_id=tenant_id,  # ✅ Garantir isolamento entre empresas
-                    forma_pagamento=pag_data['forma_pagamento'],
-                    valor=pag_data['valor'],
+                    forma_pagamento=pag_data["forma_pagamento"],
+                    valor=pag_data["valor"],
                     numero_parcelas=numero_parcelas,
-                    bandeira=pag_data.get('bandeira'),  # ✅ Bandeira do cartão
-                    nsu_cartao=pag_data.get('nsu_cartao'),  # ✅ NSU para conciliação
-                    operadora_id=operadora_id  # ✅ Operadora de cartão
+                    bandeira=pag_data.get("bandeira"),  # ✅ Bandeira do cartão
+                    nsu_cartao=pag_data.get("nsu_cartao"),  # ✅ NSU para conciliação
+                    operadora_id=operadora_id,  # ✅ Operadora de cartão
                 )
                 db.add(pagamento)
                 db.flush()
-                
+
                 # Processar crédito de cliente
                 forma_eh_credito = (
-                    pag_data['forma_pagamento'].lower() == 'credito_cliente' or
-                    pag_data['forma_pagamento'] == 'Crédito Cliente'
+                    pag_data["forma_pagamento"].lower() == "credito_cliente"
+                    or pag_data["forma_pagamento"] == "Crédito Cliente"
                 )
-                
+
                 if forma_eh_credito:
                     if not venda.cliente_id:
                         raise HTTPException(
                             status_code=400,
-                            detail='Crédito só pode ser usado em vendas com cliente vinculado'
+                            detail="Crédito só pode ser usado em vendas com cliente vinculado",
                         )
-                    
+
                     cliente = db.query(Cliente).filter_by(id=venda.cliente_id).first()
                     if not cliente:
-                        raise HTTPException(status_code=404, detail='Cliente não encontrado')
-                    
+                        raise HTTPException(
+                            status_code=404, detail="Cliente não encontrado"
+                        )
+
                     credito_disponivel = float(cliente.credito or 0)
-                    if pag_data['valor'] > credito_disponivel + 0.01:
+                    if pag_data["valor"] > credito_disponivel + 0.01:
                         raise HTTPException(
                             status_code=400,
-                            detail=f'Crédito insuficiente. Disponível: R$ {credito_disponivel:.2f}'
+                            detail=f"Crédito insuficiente. Disponível: R$ {credito_disponivel:.2f}",
                         )
-                    
-                    cliente.credito = Decimal(str(credito_disponivel - pag_data['valor']))
+
+                    cliente.credito = Decimal(
+                        str(credito_disponivel - pag_data["valor"])
+                    )
                     db.add(cliente)
                     logger.info(
                         f"🎁 Crédito utilizado: R$ {pag_data['valor']:.2f} - "
@@ -1485,35 +1637,42 @@ class VendaService:
 
                 # Processar cashback de campanhas
                 forma_eh_cashback = (
-                    pag_data['forma_pagamento'].lower() == 'cashback' or
-                    pag_data['forma_pagamento'] == 'Cashback'
+                    pag_data["forma_pagamento"].lower() == "cashback"
+                    or pag_data["forma_pagamento"] == "Cashback"
                 )
 
                 if forma_eh_cashback:
                     if not venda.cliente_id:
                         raise HTTPException(
                             status_code=400,
-                            detail='Cashback só pode ser usado em vendas com cliente vinculado'
+                            detail="Cashback só pode ser usado em vendas com cliente vinculado",
                         )
 
-                    from app.campaigns.models import CashbackTransaction, CashbackSourceTypeEnum
+                    from app.campaigns.models import (
+                        CashbackTransaction,
+                        CashbackSourceTypeEnum,
+                    )
 
-                    saldo_raw = db.query(func.sum(CashbackTransaction.amount)).filter(
-                        CashbackTransaction.tenant_id == tenant_id,
-                        CashbackTransaction.customer_id == venda.cliente_id,
-                    ).scalar()
+                    saldo_raw = (
+                        db.query(func.sum(CashbackTransaction.amount))
+                        .filter(
+                            CashbackTransaction.tenant_id == tenant_id,
+                            CashbackTransaction.customer_id == venda.cliente_id,
+                        )
+                        .scalar()
+                    )
                     saldo_disponivel = float(saldo_raw or 0)
 
-                    if pag_data['valor'] > saldo_disponivel + 0.01:
+                    if pag_data["valor"] > saldo_disponivel + 0.01:
                         raise HTTPException(
                             status_code=400,
-                            detail=f'Cashback insuficiente. Disponível: R$ {saldo_disponivel:.2f}'
+                            detail=f"Cashback insuficiente. Disponível: R$ {saldo_disponivel:.2f}",
                         )
 
                     debit = CashbackTransaction(
                         tenant_id=tenant_id,
                         customer_id=venda.cliente_id,
-                        amount=-Decimal(str(pag_data['valor'])),
+                        amount=-Decimal(str(pag_data["valor"])),
                         source_type=CashbackSourceTypeEnum.redemption,
                         source_id=venda.id,  # FK para rastreamento por venda
                         description=f"Resgate em venda {venda.numero_venda}",
@@ -1523,14 +1682,21 @@ class VendaService:
 
                     # ── DRE: registrar como despesa de campanhas/marketing ──
                     # Não gera fluxo de caixa (conta_bancaria_id=None)
-                    from app.financeiro_models import LancamentoManual, CategoriaFinanceira
+                    from app.financeiro_models import (
+                        LancamentoManual,
+                        CategoriaFinanceira,
+                    )
                     from datetime import date as _date
 
-                    cat_campanha = db.query(CategoriaFinanceira).filter(
-                        CategoriaFinanceira.nome.ilike('%campanha%'),
-                        CategoriaFinanceira.tipo == 'despesa',
-                        CategoriaFinanceira.tenant_id == tenant_id,
-                    ).first()
+                    cat_campanha = (
+                        db.query(CategoriaFinanceira)
+                        .filter(
+                            CategoriaFinanceira.nome.ilike("%campanha%"),
+                            CategoriaFinanceira.tipo == "despesa",
+                            CategoriaFinanceira.tenant_id == tenant_id,
+                        )
+                        .first()
+                    )
                     if not cat_campanha:
                         cat_campanha = CategoriaFinanceira(
                             nome="Campanhas / Marketing",
@@ -1544,12 +1710,14 @@ class VendaService:
                     cliente_nome = venda.cliente.nome if venda.cliente else "Cliente"
                     lancamento_campanha = LancamentoManual(
                         tipo="saida",
-                        valor=Decimal(str(pag_data['valor'])),
+                        valor=Decimal(str(pag_data["valor"])),
                         descricao=f"Cashback resgatado — {cliente_nome} — Venda {venda.numero_venda}",
-                        data_lancamento=venda.data_venda.date() if hasattr(venda.data_venda, 'date') else _date.today(),
+                        data_lancamento=venda.data_venda.date()
+                        if hasattr(venda.data_venda, "date")
+                        else _date.today(),
                         status="realizado",
                         categoria_id=cat_campanha.id,
-                        conta_bancaria_id=None,   # sem movimentação de caixa
+                        conta_bancaria_id=None,  # sem movimentação de caixa
                         fornecedor_cliente=cliente_nome,
                         documento=f"CASHBACK-{venda.numero_venda}",
                         gerado_automaticamente=True,
@@ -1559,83 +1727,96 @@ class VendaService:
                     db.add(lancamento_campanha)
                     logger.info(
                         "💰 Cashback utilizado: R$ %.2f — DRE despesa campanha criada — venda=%s",
-                        pag_data['valor'], venda.numero_venda,
+                        pag_data["valor"],
+                        venda.numero_venda,
                     )
                     continue
 
                 # Registrar no caixa (apenas dinheiro)
-                if CaixaService.eh_forma_dinheiro(pag_data['forma_pagamento']):
+                if CaixaService.eh_forma_dinheiro(pag_data["forma_pagamento"]):
                     mov_info = CaixaService.registrar_movimentacao_venda(
                         caixa_id=caixa_aberto_id,
                         venda_id=venda.id,
                         venda_numero=venda.numero_venda,
-                        valor=pag_data['valor'],
+                        valor=pag_data["valor"],
                         user_id=user_id,
                         user_nome=user_nome,
                         tenant_id=tenant_id,  # 🔒 Isolamento multi-tenant
-                        db=db
+                        db=db,
                     )
-                    movimentacoes_caixa_ids.append(mov_info['movimentacao_id'])
-                    logger.info(f"💵 Caixa: Movimentação #{mov_info['movimentacao_id']} criada")
-            
+                    movimentacoes_caixa_ids.append(mov_info["movimentacao_id"])
+                    logger.info(
+                        f"💵 Caixa: Movimentação #{mov_info['movimentacao_id']} criada"
+                    )
+
             # ============================================================
             # ETAPA 3: ATUALIZAR STATUS DA VENDA
             # ============================================================
-            
+
             # 🎯 GUARDAR STATUS ANTERIOR (para decisão de baixa de estoque)
             status_anterior = venda.status
             logger.info(f"📋 Status anterior: {status_anterior}")
-            
+
             if total_pagamentos >= total_venda - 0.01:
                 # Pagamento completo
-                venda.status = 'finalizada'
+                venda.status = "finalizada"
                 venda.data_finalizacao = now_brasilia()
                 logger.info("✅ Venda FINALIZADA - Pagamento completo")
             elif total_pagamentos > 0:
                 # Pagamento parcial
-                venda.status = 'baixa_parcial'
-                logger.info(f"📊 Venda BAIXA PARCIAL - R$ {total_pagamentos:.2f} de R$ {total_venda:.2f}")
-                
+                venda.status = "baixa_parcial"
+                logger.info(
+                    f"📊 Venda BAIXA PARCIAL - R$ {total_pagamentos:.2f} de R$ {total_venda:.2f}"
+                )
+
                 # Criar lançamento previsto para saldo em aberto
                 saldo_em_aberto = total_venda - total_pagamentos
                 if saldo_em_aberto > 0.01:
-                    categoria_receitas = db.query(CategoriaFinanceira).filter(
-                        CategoriaFinanceira.nome.ilike('%vendas%'),
-                        CategoriaFinanceira.tipo == 'receita',
-                        CategoriaFinanceira.tenant_id == tenant_id
-                    ).first()
-                    
+                    categoria_receitas = (
+                        db.query(CategoriaFinanceira)
+                        .filter(
+                            CategoriaFinanceira.nome.ilike("%vendas%"),
+                            CategoriaFinanceira.tipo == "receita",
+                            CategoriaFinanceira.tenant_id == tenant_id,
+                        )
+                        .first()
+                    )
+
                     if not categoria_receitas:
                         categoria_receitas = CategoriaFinanceira(
                             nome="Receitas de Vendas",
                             tipo="receita",
                             user_id=user_id,
-                            tenant_id=tenant_id  # ✅ Garantir isolamento multi-tenant
+                            tenant_id=tenant_id,  # ✅ Garantir isolamento multi-tenant
                         )
                         db.add(categoria_receitas)
                         db.flush()
-                    
+
                     data_prevista = date.today() + timedelta(days=30)
                     lancamento_saldo = LancamentoManual(
-                        tipo='entrada',
+                        tipo="entrada",
                         valor=Decimal(str(saldo_em_aberto)),
                         descricao=f"Venda {venda.numero_venda} - Saldo em aberto",
                         data_lancamento=data_prevista,
-                        status='previsto',
+                        status="previsto",
                         categoria_id=categoria_receitas.id,
                         documento=f"VENDA-{venda.id}-SALDO",
-                        fornecedor_cliente=venda.cliente.nome if venda.cliente else "Cliente Avulso",
+                        fornecedor_cliente=venda.cliente.nome
+                        if venda.cliente
+                        else "Cliente Avulso",
                         user_id=user_id,
-                        tenant_id=tenant_id  # ✅ Garantir isolamento multi-tenant
+                        tenant_id=tenant_id,  # ✅ Garantir isolamento multi-tenant
                     )
                     db.add(lancamento_saldo)
-                    logger.info(f"📝 Lançamento previsto criado: R$ {saldo_em_aberto:.2f} em {data_prevista}")
+                    logger.info(
+                        f"📝 Lançamento previsto criado: R$ {saldo_em_aberto:.2f} em {data_prevista}"
+                    )
             else:
-                venda.status = 'aberta'
-            
+                venda.status = "aberta"
+
             venda.updated_at = now_brasilia()
 
-            if venda.status in ['baixa_parcial', 'finalizada']:
+            if venda.status in ["baixa_parcial", "finalizada"]:
                 get_or_build_venda_rentabilidade_snapshot(
                     venda,
                     db,
@@ -1645,32 +1826,29 @@ class VendaService:
                 )
             else:
                 invalidate_venda_rentabilidade_snapshot(venda)
-            
+
             # ============================================================
             # ETAPA 3.5: GERAR DRE POR COMPETÊNCIA (PASSO 1 - Sprint 5)
             # ============================================================
-            
+
             # 🎯 EVENTO DE EFETIVAÇÃO: Venda passou de 'aberta' para qualquer status com pagamento
             # Condições para gerar DRE:
             # 1. Venda tem pagamento (parcial ou total)
             # 2. DRE ainda não foi gerada (venda.dre_gerada == False)
             # 3. Status é 'baixa_parcial' ou 'finalizada' (não 'aberta')
-            
-            if venda.status in ['baixa_parcial', 'finalizada'] and not venda.dre_gerada:
+
+            if venda.status in ["baixa_parcial", "finalizada"] and not venda.dre_gerada:
                 logger.info(
                     f"🎯 EVENTO DE EFETIVAÇÃO DETECTADO: Venda #{venda.numero_venda} "
                     f"mudou para status '{venda.status}' - Gerando DRE por competência..."
                 )
-                
+
                 try:
                     resultado_dre = gerar_dre_competencia_venda(
-                        venda_id=venda.id,
-                        user_id=user_id,
-                        tenant_id=tenant_id,
-                        db=db
+                        venda_id=venda.id, user_id=user_id, tenant_id=tenant_id, db=db
                     )
-                    
-                    if resultado_dre['success']:
+
+                    if resultado_dre["success"]:
                         logger.info(
                             f"✅ DRE gerada com sucesso: {resultado_dre['lancamentos_criados']} lançamentos "
                             f"(Receita: R$ {resultado_dre['receita_gerada']:.2f}, "
@@ -1679,62 +1857,73 @@ class VendaService:
                         )
                     else:
                         logger.info(f"ℹ️  DRE: {resultado_dre['message']}")
-                        
+
                 except Exception as e:
                     # ⚠️  Erro na DRE NÃO deve abortar a venda
                     logger.error(
                         f"⚠️  Erro ao gerar DRE por competência (venda {venda.id}): {str(e)}",
-                        exc_info=True
+                        exc_info=True,
                     )
                     # Continua a finalização da venda normalmente
-            
+
             # ============================================================
             # ETAPA 4: BAIXAR ESTOQUE (COM SUPORTE A KIT)
             # ============================================================
             # 🎯 LÓGICA CRÍTICA: Só baixa estoque se venda NÃO veio de status 'aberta'
             # - Se status_anterior = 'aberta': estoque JÁ foi baixado na criação
             # - Se status_anterior != 'aberta': venda criada direto como finalizada, baixar agora
-            
+
             estoque_baixado = []
-            deve_baixar_estoque = (status_anterior != 'aberta')
-            
+            deve_baixar_estoque = status_anterior != "aberta"
+
             if deve_baixar_estoque:
                 logger.info("📦 Baixando estoque (venda não veio de status aberta)")
             else:
-                logger.info("ℹ️  Estoque NÃO será baixado (já foi baixado quando venda estava aberta)")
-            
+                logger.info(
+                    "ℹ️  Estoque NÃO será baixado (já foi baixado quando venda estava aberta)"
+                )
+
             for item in venda.itens:
-                if item.tipo == 'produto':
+                if item.tipo == "produto":
                     # Determinar se é produto simples ou variação
                     produto_id = item.produto_id
                     product_variation_id = item.product_variation_id
-                    
+
                     # Buscar produto (simples ou da variação)
                     from app.produtos_models import Produto
-                    
+
                     if product_variation_id:
                         # Item com variação: buscar o produto da variação
-                        variacao = db.query(Produto).filter(
-                            Produto.id == product_variation_id,
-                            Produto.tipo_produto == 'VARIACAO'
-                        ).first()
-                        
+                        variacao = (
+                            db.query(Produto)
+                            .filter(
+                                Produto.id == product_variation_id,
+                                Produto.tipo_produto == "VARIACAO",
+                            )
+                            .first()
+                        )
+
                         if not variacao:
-                            raise ValueError(f"Variação ID {product_variation_id} não encontrada")
-                        
+                            raise ValueError(
+                                f"Variação ID {product_variation_id} não encontrada"
+                            )
+
                         produto = variacao
                     elif produto_id:
                         # Item com produto simples
-                        produto = db.query(Produto).filter(
-                            Produto.id == produto_id,
-                            Produto.tenant_id == tenant_id
-                        ).first()
-                        
+                        produto = (
+                            db.query(Produto)
+                            .filter(
+                                Produto.id == produto_id, Produto.tenant_id == tenant_id
+                            )
+                            .first()
+                        )
+
                         if not produto:
                             raise ValueError(f"Produto ID {produto_id} não encontrado")
                     else:
                         continue  # Item sem produto (serviço)
-                    
+
                     # 🎯 Só baixar se deve_baixar_estoque=True
                     if deve_baixar_estoque:
                         # Baixar estoque conforme tipo do produto
@@ -1746,32 +1935,32 @@ class VendaService:
                             tenant_id=tenant_id,
                             db=db,
                             product_variation_id=product_variation_id,
-                            venda_codigo=venda.numero_venda
+                            venda_codigo=venda.numero_venda,
                         )
-                        
+
                         # Acumular resultados
                         estoque_baixado.extend(resultados)
-            
+
             # ============================================================
             # ETAPA 5: VINCULAR AO CAIXA
             # ============================================================
-            
+
             if not venda.caixa_id:
                 CaixaService.vincular_venda_ao_caixa(
-                    venda_id=venda.id,
-                    caixa_id=caixa_aberto_id,
-                    db=db
+                    venda_id=venda.id, caixa_id=caixa_aberto_id, db=db
                 )
                 logger.info(f"🔗 Venda vinculada ao caixa #{caixa_aberto_id}")
-            
+
             # ============================================================
             # ETAPA 6: BAIXAR CONTAS A RECEBER EXISTENTES
             # ============================================================
-            
+
             contas_baixadas = []
             if total_novos_pagamentos > 0.01:
-                forma_pag_nome = pagamentos[0]['forma_pagamento'] if pagamentos else "Diversos"
-                
+                forma_pag_nome = (
+                    pagamentos[0]["forma_pagamento"] if pagamentos else "Diversos"
+                )
+
                 resultado_baixa = ContasReceberService.baixar_contas_da_venda(
                     venda_id=venda.id,
                     venda_numero=venda.numero_venda,
@@ -1779,38 +1968,40 @@ class VendaService:
                     forma_pagamento_nome=forma_pag_nome,
                     user_id=user_id,
                     tenant_id=tenant_id,
-                    db=db
+                    db=db,
                 )
-                
-                contas_baixadas = resultado_baixa['contas_baixadas']
-                
+
+                contas_baixadas = resultado_baixa["contas_baixadas"]
+
                 if contas_baixadas:
                     logger.info(
                         f"💰 Contas baixadas: {len(contas_baixadas)} conta(s), "
                         f"R$ {float(resultado_baixa['valor_distribuido']):.2f} distribuído"
                     )
-                
+
                 # Atualizar lançamentos manuais
                 total_recebido_venda = total_ja_pago + total_novos_pagamentos
-                resultado_lancamentos = ContasReceberService.atualizar_lancamentos_venda(
-                    venda_id=venda.id,
-                    venda_numero=venda.numero_venda,
-                    total_venda=total_venda,
-                    total_recebido=total_recebido_venda,
-                    user_id=user_id,
-                    tenant_id=tenant_id,
-                    db=db
+                resultado_lancamentos = (
+                    ContasReceberService.atualizar_lancamentos_venda(
+                        venda_id=venda.id,
+                        venda_numero=venda.numero_venda,
+                        total_venda=total_venda,
+                        total_recebido=total_recebido_venda,
+                        user_id=user_id,
+                        tenant_id=tenant_id,
+                        db=db,
+                    )
                 )
-                
+
                 logger.info(
                     f"📝 Lançamentos: {len(resultado_lancamentos['lancamentos_atualizados'])} atualizado(s), "
                     f"Status: {resultado_lancamentos['status']}"
                 )
-            
+
             # ============================================================
             # 🔥 COMMIT ÚNICO - TRANSAÇÃO ATÔMICA 🔥
             # ============================================================
-            
+
             if cupom_consumido:
                 log_business_event(
                     db=db,
@@ -1849,17 +2040,19 @@ class VendaService:
                 )
 
             db.commit()
-            logger.info(f"✅ ✅ ✅ COMMIT REALIZADO - Venda #{venda.numero_venda} finalizada com sucesso! ✅ ✅ ✅")
-            
+            logger.info(
+                f"✅ ✅ ✅ COMMIT REALIZADO - Venda #{venda.numero_venda} finalizada com sucesso! ✅ ✅ ✅"
+            )
+
             # ============================================================
             # ETAPA 7: EMITIR EVENTOS DE DOMÍNIO
             # ============================================================
-            
+
             # Evento principal: Venda finalizada (sistema legado)
             # 🔒 EVENTOS DESABILITADOS TEMPORARIAMENTE (publish_event não exportado)
             # try:
             #     from app.domain.events import VendaFinalizada, publish_event as publish_legacy
-            #     
+            #
             #     evento = VendaFinalizada(
             #         venda_id=venda.id,
             #         numero_venda=venda.numero_venda,
@@ -1879,24 +2072,33 @@ class VendaService:
             #             'tem_entrega': venda.tem_entrega
             #         }
             #     )
-            #     
+            #
             #     publish_legacy(evento)
             #     logger.debug(f"📢 Evento VendaFinalizada publicado (venda_id={venda.id})")
-            #     
+            #
             # except Exception as e:
             #     logger.error(f"⚠️  Erro ao publicar evento VendaFinalizada: {str(e)}", exc_info=True)
-            
+
             # Novos eventos: VendaRealizadaEvent + eventos por produto/KIT
             try:
-                from app.events import VendaRealizadaEvent, ProdutoVendidoEvent, KitVendidoEvent, publish_event
-                
+                from app.events import (
+                    VendaRealizadaEvent,
+                    ProdutoVendidoEvent,
+                    KitVendidoEvent,
+                    publish_event,
+                )
+
                 # 1. Evento principal da venda
-                forma_pagamento_principal = pagamentos[0]['forma_pagamento'] if pagamentos else "Não especificado"
+                forma_pagamento_principal = (
+                    pagamentos[0]["forma_pagamento"]
+                    if pagamentos
+                    else "Não especificado"
+                )
                 tem_kit = any(
-                    resultado.get('kit_origem') or resultado.get('tipo_kit') 
+                    resultado.get("kit_origem") or resultado.get("tipo_kit")
                     for resultado in estoque_baixado
                 )
-                
+
                 evento_venda = VendaRealizadaEvent(
                     venda_id=venda.id,
                     numero_venda=venda.numero_venda,
@@ -1909,205 +2111,233 @@ class VendaService:
                     tem_kit=tem_kit,
                     user_id=user_id,
                     metadados={
-                        'status': venda.status,
-                        'total_pago': total_pagamentos,
-                        'formas_pagamento': [p['forma_pagamento'] for p in pagamentos],
-                        'tem_entrega': venda.tem_entrega
-                    }
+                        "status": venda.status,
+                        "total_pago": total_pagamentos,
+                        "formas_pagamento": [p["forma_pagamento"] for p in pagamentos],
+                        "tem_entrega": venda.tem_entrega,
+                    },
                 )
                 publish_event(evento_venda)
                 logger.debug(f"📢 VendaRealizadaEvent publicado (venda_id={venda.id})")
-                
+
                 # 2. Eventos por produto/KIT vendido
                 # Agrupar resultados por produto (pode ter múltiplas entradas para KIT VIRTUAL)
                 produtos_processados = {}
                 kits_processados = {}
-                
+
                 for resultado in estoque_baixado:
-                    produto_id = resultado.get('produto_id')
-                    
+                    produto_id = resultado.get("produto_id")
+
                     # Se é componente de KIT VIRTUAL
-                    if resultado.get('kit_origem'):
-                        kit_id = resultado.get('kit_id')
-                        kit_nome = resultado.get('kit_origem')
-                        
+                    if resultado.get("kit_origem"):
+                        kit_id = resultado.get("kit_id")
+                        kit_nome = resultado.get("kit_origem")
+
                         # Acumular componentes do KIT
                         if kit_id not in kits_processados:
                             kits_processados[kit_id] = {
-                                'kit_nome': kit_nome,
-                                'tipo_kit': 'VIRTUAL',
-                                'componentes': []
+                                "kit_nome": kit_nome,
+                                "tipo_kit": "VIRTUAL",
+                                "componentes": [],
                             }
-                        
-                        kits_processados[kit_id]['componentes'].append({
-                            'produto_id': produto_id,
-                            'nome': resultado.get('produto'),
-                            'quantidade': resultado.get('quantidade'),
-                            'estoque_anterior': resultado.get('estoque_anterior'),
-                            'estoque_novo': resultado.get('estoque_novo')
-                        })
-                    
+
+                        kits_processados[kit_id]["componentes"].append(
+                            {
+                                "produto_id": produto_id,
+                                "nome": resultado.get("produto"),
+                                "quantidade": resultado.get("quantidade"),
+                                "estoque_anterior": resultado.get("estoque_anterior"),
+                                "estoque_novo": resultado.get("estoque_novo"),
+                            }
+                        )
+
                     # Se é KIT FÍSICO
-                    elif resultado.get('tipo_kit') == 'FISICO':
+                    elif resultado.get("tipo_kit") == "FISICO":
                         kit_id = produto_id
-                        kit_nome = resultado.get('produto')
-                        
+                        kit_nome = resultado.get("produto")
+
                         kits_processados[kit_id] = {
-                            'kit_nome': kit_nome,
-                            'tipo_kit': 'FISICO',
-                            'quantidade': resultado.get('quantidade'),
-                            'estoque_anterior': resultado.get('estoque_anterior'),
-                            'estoque_novo': resultado.get('estoque_novo'),
-                            'componentes': []
+                            "kit_nome": kit_nome,
+                            "tipo_kit": "FISICO",
+                            "quantidade": resultado.get("quantidade"),
+                            "estoque_anterior": resultado.get("estoque_anterior"),
+                            "estoque_novo": resultado.get("estoque_novo"),
+                            "componentes": [],
                         }
-                    
+
                     # Se é produto SIMPLES/VARIACAO (não é componente de KIT)
-                    elif not resultado.get('kit_origem'):
+                    elif not resultado.get("kit_origem"):
                         produtos_processados[produto_id] = resultado
-                
+
                 # Publicar eventos de produtos SIMPLES/VARIACAO
                 for produto_id, resultado in produtos_processados.items():
                     # Buscar item da venda para obter preços
                     item_venda = next(
                         (item for item in venda.itens if item.produto_id == produto_id),
-                        None
+                        None,
                     )
-                    
+
                     if item_venda:
                         evento_produto = ProdutoVendidoEvent(
                             venda_id=venda.id,
                             produto_id=produto_id,
-                            produto_nome=resultado.get('produto'),
-                            tipo_produto=resultado.get('tipo_produto', 'SIMPLES'),
-                            quantidade=float(resultado.get('quantidade')),
+                            produto_nome=resultado.get("produto"),
+                            tipo_produto=resultado.get("tipo_produto", "SIMPLES"),
+                            quantidade=float(resultado.get("quantidade")),
                             preco_unitario=float(item_venda.preco_unitario or 0),
                             preco_total=float(item_venda.subtotal or 0),
-                            estoque_anterior=float(resultado.get('estoque_anterior')),
-                            estoque_novo=float(resultado.get('estoque_novo')),
-                            user_id=user_id
+                            estoque_anterior=float(resultado.get("estoque_anterior")),
+                            estoque_novo=float(resultado.get("estoque_novo")),
+                            user_id=user_id,
                         )
                         publish_event(evento_produto)
-                        logger.debug(f"📢 ProdutoVendidoEvent publicado (produto_id={produto_id})")
-                
+                        logger.debug(
+                            f"📢 ProdutoVendidoEvent publicado (produto_id={produto_id})"
+                        )
+
                 # Publicar eventos de KITs
                 for kit_id, kit_info in kits_processados.items():
                     # Buscar item da venda para obter preços
                     item_venda = next(
                         (item for item in venda.itens if item.produto_id == kit_id),
-                        None
+                        None,
                     )
-                    
+
                     if item_venda:
                         evento_kit = KitVendidoEvent(
                             venda_id=venda.id,
                             kit_id=kit_id,
-                            kit_nome=kit_info['kit_nome'],
-                            tipo_kit=kit_info['tipo_kit'],
-                            quantidade=float(kit_info.get('quantidade', item_venda.quantidade)),
+                            kit_nome=kit_info["kit_nome"],
+                            tipo_kit=kit_info["tipo_kit"],
+                            quantidade=float(
+                                kit_info.get("quantidade", item_venda.quantidade)
+                            ),
                             preco_unitario=float(item_venda.preco_unitario or 0),
                             preco_total=float(item_venda.preco_total or 0),
-                            componentes_baixados=kit_info.get('componentes', []),
-                            estoque_kit_anterior=float(kit_info.get('estoque_anterior')) if kit_info.get('estoque_anterior') else None,
-                            estoque_kit_novo=float(kit_info.get('estoque_novo')) if kit_info.get('estoque_novo') else None,
-                            user_id=user_id
+                            componentes_baixados=kit_info.get("componentes", []),
+                            estoque_kit_anterior=float(kit_info.get("estoque_anterior"))
+                            if kit_info.get("estoque_anterior")
+                            else None,
+                            estoque_kit_novo=float(kit_info.get("estoque_novo"))
+                            if kit_info.get("estoque_novo")
+                            else None,
+                            user_id=user_id,
                         )
                         publish_event(evento_kit)
-                        logger.debug(f"📢 KitVendidoEvent publicado (kit_id={kit_id}, tipo={kit_info['tipo_kit']})")
-                
+                        logger.debug(
+                            f"📢 KitVendidoEvent publicado (kit_id={kit_id}, tipo={kit_info['tipo_kit']})"
+                        )
+
                 logger.info(
                     f"📢 Eventos publicados: 1 VendaRealizadaEvent, "
                     f"{len(produtos_processados)} ProdutoVendidoEvent, "
                     f"{len(kits_processados)} KitVendidoEvent"
                 )
-                
+
             except Exception as e:
-                logger.error(f"⚠️  Erro ao publicar novos eventos de domínio: {str(e)}", exc_info=True)
+                logger.error(
+                    f"⚠️  Erro ao publicar novos eventos de domínio: {str(e)}",
+                    exc_info=True,
+                )
                 # Não aborta a finalização
-            
+
             # ============================================================
             # ETAPA 8: OPERAÇÕES PÓS-COMMIT (não abortam se falharem)
             # ============================================================
-            
+
             # Criar novas contas a receber
             contas_criadas_ids = []
             try:
                 resultado_contas = ContasReceberService.criar_de_venda(
-                    venda=venda,
-                    pagamentos=pagamentos,
-                    user_id=user_id,
-                    db=db
+                    venda=venda, pagamentos=pagamentos, user_id=user_id, db=db
                 )
-                contas_criadas_ids = resultado_contas['contas_criadas']
+                contas_criadas_ids = resultado_contas["contas_criadas"]
                 db.commit()  # Commit separado para contas
                 logger.info(
                     f"📋 Contas a receber criadas: {resultado_contas['total_contas']} conta(s), "
                     f"{len(resultado_contas['lancamentos_criados'])} lançamento(s)"
                 )
             except Exception as e:
-                logger.error(f"⚠️ Erro ao criar contas a receber: {str(e)}", exc_info=True)
+                logger.error(
+                    f"⚠️ Erro ao criar contas a receber: {str(e)}", exc_info=True
+                )
                 db.rollback()  # Rollback apenas das contas (venda já commitada)
-            
+
             # 🚚 Criar contas a pagar de entrega (taxa entregador + custo operacional)
             try:
                 resultado_entrega = processar_contas_pagar_entrega(
-                    venda=venda,
-                    user_id=user_id,
-                    tenant_id=tenant_id,
-                    db=db
+                    venda=venda, user_id=user_id, tenant_id=tenant_id, db=db
                 )
-                if resultado_entrega['success']:
+                if resultado_entrega["success"]:
                     db.commit()  # Commit separado para contas a pagar
                     logger.info(
                         f"🚚 Contas a pagar de entrega criadas: {resultado_entrega['total_contas']} conta(s), "
                         f"R$ {resultado_entrega['valor_total']:.2f}"
                     )
             except Exception as e:
-                logger.error(f"⚠️ Erro ao criar contas a pagar de entrega: {str(e)}", exc_info=True)
+                logger.error(
+                    f"⚠️ Erro ao criar contas a pagar de entrega: {str(e)}",
+                    exc_info=True,
+                )
                 db.rollback()  # Rollback apenas das contas (venda já commitada)
-            
+
             # 💳 Criar contas a pagar de taxas de pagamento
-            logger.info(f"💳 Iniciando processamento de taxas de pagamento - Venda #{venda.numero_venda}")
+            logger.info(
+                f"💳 Iniciando processamento de taxas de pagamento - Venda #{venda.numero_venda}"
+            )
             try:
                 pagamentos_para_taxas = [
-                    type('obj', (object,), {
-                        'forma_pagamento': p['forma_pagamento'],
-                        'valor': p['valor'],
-                        'numero_parcelas': p.get('numero_parcelas', 1)
-                    })() for p in pagamentos
+                    type(
+                        "obj",
+                        (object,),
+                        {
+                            "forma_pagamento": p["forma_pagamento"],
+                            "valor": p["valor"],
+                            "numero_parcelas": p.get("numero_parcelas", 1),
+                        },
+                    )()
+                    for p in pagamentos
                 ]
-                
-                logger.info(f"💳 Total de pagamentos a processar: {len(pagamentos_para_taxas)}")
+
+                logger.info(
+                    f"💳 Total de pagamentos a processar: {len(pagamentos_para_taxas)}"
+                )
                 for pag in pagamentos_para_taxas:
                     logger.info(f"  - {pag.forma_pagamento}: R$ {pag.valor}")
-                
+
                 resultado_taxas = processar_contas_pagar_taxas(
                     venda=venda,
                     pagamentos=pagamentos_para_taxas,
                     user_id=user_id,
                     tenant_id=tenant_id,
-                    db=db
+                    db=db,
                 )
-                
+
                 logger.info(f"💳 Resultado do processamento: {resultado_taxas}")
-                
-                if resultado_taxas['success']:
+
+                if resultado_taxas["success"]:
                     db.commit()  # Commit separado para contas a pagar
                     logger.info(
                         f"💳 Contas a pagar de taxas criadas: {resultado_taxas['total_contas']} conta(s), "
                         f"R$ {resultado_taxas['valor_total']:.2f}"
                     )
                 else:
-                    logger.warning(f"⚠️ Processamento de taxas falhou: {resultado_taxas.get('error', 'Erro desconhecido')}")
+                    logger.warning(
+                        f"⚠️ Processamento de taxas falhou: {resultado_taxas.get('error', 'Erro desconhecido')}"
+                    )
                     db.rollback()  # Limpa falha secundaria; a venda ja foi commitada antes dos efeitos financeiros
             except Exception as e:
-                logger.error(f"⚠️ Erro ao criar contas a pagar de taxas: {str(e)}", exc_info=True)
+                logger.error(
+                    f"⚠️ Erro ao criar contas a pagar de taxas: {str(e)}", exc_info=True
+                )
                 db.rollback()  # Rollback apenas das contas (venda já commitada)
-            
+
             # 📢 Enfileirar evento de campanha (purchase_completed)
-            if venda.status == 'finalizada' and venda.cliente_id:
+            if venda.status == "finalizada" and venda.cliente_id:
                 try:
                     from app.campaigns.models import CampaignEventQueue, EventOriginEnum
                     import uuid as _uuid
+
                     evento_campanha = CampaignEventQueue(
                         tenant_id=_uuid.UUID(str(tenant_id)),
                         event_type="purchase_completed",
@@ -2125,49 +2355,60 @@ class VendaService:
                     logger.info(
                         "📢 [Campanhas] purchase_completed enfileirado: "
                         "venda=%s cliente_id=%d total=R$%.2f",
-                        venda.numero_venda, venda.cliente_id, float(venda.total)
+                        venda.numero_venda,
+                        venda.cliente_id,
+                        float(venda.total),
                     )
                 except Exception as e:
-                    logger.warning("[Campanhas] Falha ao enfileirar purchase_completed (não crítico): %s", e)
+                    logger.warning(
+                        "[Campanhas] Falha ao enfileirar purchase_completed (não crítico): %s",
+                        e,
+                    )
                     db.rollback()
 
             # Preparar retorno
             return {
-                'venda': {
-                    'id': venda.id,
-                    'numero_venda': venda.numero_venda,
-                    'status': venda.status,
-                    'total': float(venda.total),
-                    'total_pago': total_pagamentos,
-                    'data_finalizacao': venda.data_finalizacao.isoformat() if venda.data_finalizacao else None
+                "venda": {
+                    "id": venda.id,
+                    "numero_venda": venda.numero_venda,
+                    "status": venda.status,
+                    "total": float(venda.total),
+                    "total_pago": total_pagamentos,
+                    "data_finalizacao": venda.data_finalizacao.isoformat()
+                    if venda.data_finalizacao
+                    else None,
                 },
-                'operacoes': {
-                    'estoque_baixado': estoque_baixado,
-                    'caixa_movimentacoes': movimentacoes_caixa_ids,
-                    'contas_baixadas': contas_baixadas,
-                    'contas_criadas': contas_criadas_ids,
-                    'cupom_consumido': cupom_consumido,
+                "operacoes": {
+                    "estoque_baixado": estoque_baixado,
+                    "caixa_movimentacoes": movimentacoes_caixa_ids,
+                    "contas_baixadas": contas_baixadas,
+                    "contas_criadas": contas_criadas_ids,
+                    "cupom_consumido": cupom_consumido,
                 },
-                'pos_commit': {
-                    'contas_novas': len(contas_criadas_ids),
-                    'comissoes_geradas': False,  # Será processado na rota
-                    'lembretes_criados': 0  # Será processado na rota
-                }
+                "pos_commit": {
+                    "contas_novas": len(contas_criadas_ids),
+                    "comissoes_geradas": False,  # Será processado na rota
+                    "lembretes_criados": 0,  # Será processado na rota
+                },
             }
-            
+
         except HTTPException:
             # Re-lançar HTTPException (já tem mensagem amigável)
             db.rollback()
-            logger.error(f"❌ HTTPException na finalização da venda #{venda_id} - Rollback executado")
+            logger.error(
+                f"❌ HTTPException na finalização da venda #{venda_id} - Rollback executado"
+            )
             raise
-            
+
         except Exception as e:
             # Rollback em caso de erro inesperado
             db.rollback()
-            logger.error(f"❌ ERRO CRÍTICO na finalização da venda #{venda_id}: {str(e)}", exc_info=True)
+            logger.error(
+                f"❌ ERRO CRÍTICO na finalização da venda #{venda_id}: {str(e)}",
+                exc_info=True,
+            )
             raise HTTPException(
-                status_code=500,
-                detail=f"Erro ao finalizar venda: {str(e)}"
+                status_code=500, detail=f"Erro ao finalizar venda: {str(e)}"
             )
 
 
@@ -2175,66 +2416,63 @@ class VendaService:
 # FUNÇÕES AUXILIARES
 # ============================================================================
 
+
 def processar_comissoes_venda(
     venda_id: int,
     funcionario_id: Optional[int],
     valor_pago: Optional[float],
     user_id: int,
-    db: Session
+    db: Session,
 ) -> Dict[str, Any]:
     """
     Processa comissões de uma venda (operação pós-commit).
-    
+
     Esta função é chamada APÓS o commit da venda principal,
     portanto erros aqui não abortam a venda.
-    
+
     Args:
         venda_id: ID da venda
         funcionario_id: ID do funcionário (se houver)
         valor_pago: Valor pago (para parciais)
         user_id: ID do usuário
         db: Sessão do SQLAlchemy
-        
+
     Returns:
         Dict com resultado do processamento
     """
     if not funcionario_id:
-        return {
-            'success': False,
-            'message': 'Venda sem funcionário vinculado'
-        }
-    
+        return {"success": False, "message": "Venda sem funcionário vinculado"}
+
     try:
         from app.comissoes_service import gerar_comissoes_venda
         from decimal import Decimal
-        
+
         valor_pago_decimal = Decimal(str(valor_pago)) if valor_pago else None
-        
+
         resultado = gerar_comissoes_venda(
             venda_id=venda_id,
             funcionario_id=funcionario_id,
             valor_pago=valor_pago_decimal,
-            db=db
+            db=db,
         )
-        
-        if resultado and resultado.get('success'):
+
+        if resultado and resultado.get("success"):
             return {
-                'success': True,
-                'total_comissao': float(resultado.get('total_comissao', 0)),
-                'duplicated': resultado.get('duplicated', False)
+                "success": True,
+                "total_comissao": float(resultado.get("total_comissao", 0)),
+                "duplicated": resultado.get("duplicated", False),
             }
         else:
             return {
-                'success': False,
-                'message': 'Nenhuma comissão gerada (sem configuração)'
+                "success": False,
+                "message": "Nenhuma comissão gerada (sem configuração)",
             }
-            
+
     except Exception as e:
-        logger.error(f"⚠️ Erro ao processar comissões (venda {venda_id}): {str(e)}", exc_info=True)
-        return {
-            'success': False,
-            'error': str(e)
-        }
+        logger.error(
+            f"⚠️ Erro ao processar comissões (venda {venda_id}): {str(e)}", exc_info=True
+        )
+        return {"success": False, "error": str(e)}
 
 
 def processar_lembretes_venda(
@@ -2242,80 +2480,80 @@ def processar_lembretes_venda(
     cliente_id: Optional[int],
     itens: List[Any],
     user_id: int,
-    db: Session
+    db: Session,
 ) -> Dict[str, Any]:
     """
     Processa lembretes/recorrências de uma venda (operação pós-commit).
-    
+
     Esta função é chamada APÓS o commit da venda principal,
     portanto erros aqui não abortam a venda.
-    
+
     Args:
         venda_id: ID da venda
         cliente_id: ID do cliente (se houver)
         itens: Lista de itens da venda
         user_id: ID do usuário
         db: Sessão do SQLAlchemy
-        
+
     Returns:
         Dict com resultado do processamento
     """
     if not cliente_id:
-        return {
-            'success': False,
-            'message': 'Venda sem cliente vinculado'
-        }
-    
+        return {"success": False, "message": "Venda sem cliente vinculado"}
+
     try:
         from app.produtos_models import Produto
         from app.models import Pet
-        
+
         lembretes_criados = []
         lembretes_atualizados = []
-        
+
         for item in itens:
-            if item.tipo == 'produto' and item.produto_id and item.pet_id:
+            if item.tipo == "produto" and item.produto_id and item.pet_id:
                 produto = db.query(Produto).get(item.produto_id)
                 pet = db.query(Pet).get(item.pet_id)
-                
-                if produto and pet and produto.tem_recorrencia and produto.intervalo_dias:
+
+                if (
+                    produto
+                    and pet
+                    and produto.tem_recorrencia
+                    and produto.intervalo_dias
+                ):
                     # Processar lembrete (lógica simplificada - detalhes na rota)
-                    logger.info(f"🔔 Processando lembrete: {produto.nome} para {pet.nome}")
+                    logger.info(
+                        f"🔔 Processando lembrete: {produto.nome} para {pet.nome}"
+                    )
                     lembretes_criados.append(produto.nome)
-        
+
         return {
-            'success': True,
-            'lembretes_criados': len(lembretes_criados),
-            'lembretes_atualizados': len(lembretes_atualizados)
+            "success": True,
+            "lembretes_criados": len(lembretes_criados),
+            "lembretes_atualizados": len(lembretes_atualizados),
         }
-        
+
     except Exception as e:
-        logger.error(f"⚠️ Erro ao processar lembretes (venda {venda_id}): {str(e)}", exc_info=True)
-        return {
-            'success': False,
-            'error': str(e)
-        }
+        logger.error(
+            f"⚠️ Erro ao processar lembretes (venda {venda_id}): {str(e)}", exc_info=True
+        )
+        return {"success": False, "error": str(e)}
 
 
 def processar_contas_pagar_entrega(
-    venda: 'Venda',
-    user_id: int,
-    tenant_id: str,
-    db: Session
+    venda: "Venda", user_id: int, tenant_id: str, db: Session
 ) -> Dict[str, Any]:
     """
     Cria contas a pagar relacionadas à entrega (operação pós-commit).
-    
+
     Cria 2 tipos de contas a pagar:
     1. Taxa do entregador (parte da taxa de entrega que vai para ele)
     2. Custo operacional (fixo ou controla_rh - KM rodado é criado ao fechar rota)
-    
+
     Args:
         venda: Objeto Venda (já commitada)
         user_id: ID do usuário
         tenant_id: UUID do tenant
         db: Sessão do SQLAlchemy
-        
+
     Returns:
         Dict com resultado:
         {
@@ -2330,36 +2568,40 @@ def processar_contas_pagar_entrega(
     from app.models import User
     from decimal import Decimal
     from datetime import date, timedelta
-    
+
     if not venda.tem_entrega or not venda.entregador_id:
         return {
-            'success': True,
-            'total_contas': 0,
-            'valor_total': 0.0,
-            'contas_criadas': [],
-            'detalhes': ['Venda sem entrega ou sem entregador']
+            "success": True,
+            "total_contas": 0,
+            "valor_total": 0.0,
+            "contas_criadas": [],
+            "detalhes": ["Venda sem entrega ou sem entregador"],
         }
-    
+
     contas_criadas_ids = []
-    valor_total = Decimal('0')
+    valor_total = Decimal("0")
     detalhes = []
-    
+
     try:
         # Buscar entregador
-        entregador = db.query(User).filter_by(id=venda.entregador_id, tenant_id=tenant_id).first()
+        entregador = (
+            db.query(User)
+            .filter_by(id=venda.entregador_id, tenant_id=tenant_id)
+            .first()
+        )
         if not entregador:
             logger.warning(f"⚠️ Entregador ID {venda.entregador_id} não encontrado")
             return {
-                'success': False,
-                'message': f'Entregador ID {venda.entregador_id} não encontrado'
+                "success": False,
+                "message": f"Entregador ID {venda.entregador_id} não encontrado",
             }
-        
+
         # Calcula a próxima segunda-feira de pagamento
         # Lógica: Vendas de domingo a sábado são pagas na segunda-feira seguinte
         # Ex: Venda em 08/02 (domingo) → Fecha 14/02 (sábado) → Paga 16/02 (segunda)
         data_venda = date.today()
         dia_semana = data_venda.weekday()  # 0=Segunda, 6=Domingo
-        
+
         # Calcular dias até o próximo sábado (fim da semana)
         if dia_semana == 6:  # Domingo
             dias_ate_sabado = 6
@@ -2367,34 +2609,45 @@ def processar_contas_pagar_entrega(
             dias_ate_sabado = 0
         else:  # Segunda a Sexta
             dias_ate_sabado = 5 - dia_semana
-        
+
         proximo_sabado = data_venda + timedelta(days=dias_ate_sabado)
-        data_vencimento = proximo_sabado + timedelta(days=2)  # Segunda-feira = sábado + 2
-        
+        data_vencimento = proximo_sabado + timedelta(
+            days=2
+        )  # Segunda-feira = sábado + 2
+
         # Mapear canal para nome legível (sem acentos para compatibilidade)
         CANAIS_NOMES = {
-            'loja_fisica': 'Loja Fisica',
-            'mercado_livre': 'Mercado Livre',
-            'shopee': 'Shopee',
-            'amazon': 'Amazon'
+            "loja_fisica": "Loja Fisica",
+            "mercado_livre": "Mercado Livre",
+            "shopee": "Shopee",
+            "amazon": "Amazon",
         }
-        canal = venda.canal or 'loja_fisica'
-        canal_nome = CANAIS_NOMES.get(canal, 'Loja Física')
-        
+        canal = venda.canal or "loja_fisica"
+        canal_nome = CANAIS_NOMES.get(canal, "Loja Física")
+
         # 1️⃣ CONTA A PAGAR: Taxa do entregador (Comissão)
         if venda.valor_taxa_entregador and float(venda.valor_taxa_entregador) > 0:
             # Buscar subcategoria "Comissao Entregador - {Canal}" (sem acentos)
             from app.dre_plano_contas_models import DRESubcategoria
-            subcategoria_comissao = db.query(DRESubcategoria).filter(
-                DRESubcategoria.tenant_id == tenant_id,
-                DRESubcategoria.nome == f"Comissao Entregador - {canal_nome}"
-            ).first()
-            
+
+            subcategoria_comissao = (
+                db.query(DRESubcategoria)
+                .filter(
+                    DRESubcategoria.tenant_id == tenant_id,
+                    DRESubcategoria.nome == f"Comissao Entregador - {canal_nome}",
+                )
+                .first()
+            )
+
             if not subcategoria_comissao:
-                logger.warning(f"❌ Subcategoria não encontrada: 'Comissão Entregador - {canal_nome}' (tenant: {tenant_id})")
+                logger.warning(
+                    f"❌ Subcategoria não encontrada: 'Comissão Entregador - {canal_nome}' (tenant: {tenant_id})"
+                )
             else:
-                logger.info(f"✅ Subcategoria encontrada: ID {subcategoria_comissao.id}")
-            
+                logger.info(
+                    f"✅ Subcategoria encontrada: ID {subcategoria_comissao.id}"
+                )
+
             conta_taxa = ContaPagar(
                 descricao=f"Taxa de entrega - {entregador.nome} - Venda {venda.numero_venda}",
                 fornecedor_id=venda.entregador_id,
@@ -2402,41 +2655,64 @@ def processar_contas_pagar_entrega(
                 valor_final=venda.valor_taxa_entregador,
                 data_emissao=date.today(),
                 data_vencimento=data_vencimento,
-                status='pendente',
+                status="pendente",
                 user_id=user_id,
                 tenant_id=tenant_id,
                 canal=canal,
-                dre_subcategoria_id=subcategoria_comissao.id if subcategoria_comissao else None,
-                observacoes=f"Taxa de entrega ref. venda {venda.numero_venda} - {venda.percentual_taxa_entregador}% da taxa de R$ {venda.taxa_entrega} - Acerto semanal (segunda-feira {data_vencimento.strftime('%d/%m/%Y')})"
+                dre_subcategoria_id=subcategoria_comissao.id
+                if subcategoria_comissao
+                else None,
+                observacoes=f"Taxa de entrega ref. venda {venda.numero_venda} - {venda.percentual_taxa_entregador}% da taxa de R$ {venda.taxa_entrega} - Acerto semanal (segunda-feira {data_vencimento.strftime('%d/%m/%Y')})",
             )
             db.add(conta_taxa)
             db.flush()
             contas_criadas_ids.append(conta_taxa.id)
             valor_total += venda.valor_taxa_entregador
             detalhes.append(f"Taxa entregador: R$ {venda.valor_taxa_entregador:.2f}")
-            logger.info(f"✅ Conta a pagar criada: Taxa entregador R$ {venda.valor_taxa_entregador:.2f}")
-        
+            logger.info(
+                f"✅ Conta a pagar criada: Taxa entregador R$ {venda.valor_taxa_entregador:.2f}"
+            )
+
         # 2️⃣ CONTA A PAGAR: Custo operacional (apenas fixo ou controla_rh)
-        if entregador.custo_operacional_tipo in ['fixo', 'controla_rh']:
-            if entregador.custo_operacional_valor and float(entregador.custo_operacional_valor) > 0:
-                tipo_descricao = 'Custo fixo' if entregador.custo_operacional_tipo == 'fixo' else 'Controla RH'
-                
+        if entregador.custo_operacional_tipo in ["fixo", "controla_rh"]:
+            if (
+                entregador.custo_operacional_valor
+                and float(entregador.custo_operacional_valor) > 0
+            ):
+                tipo_descricao = (
+                    "Custo fixo"
+                    if entregador.custo_operacional_tipo == "fixo"
+                    else "Controla RH"
+                )
+
                 observacoes = f"Custo operacional ({entregador.custo_operacional_tipo}) ref. venda {venda.numero_venda} - Acerto semanal (segunda-feira {data_vencimento.strftime('%d/%m/%Y')})"
-                if entregador.custo_operacional_tipo == 'controla_rh' and entregador.custo_operacional_controla_rh_id:
+                if (
+                    entregador.custo_operacional_tipo == "controla_rh"
+                    and entregador.custo_operacional_controla_rh_id
+                ):
                     observacoes += f" - ID Controla RH: {entregador.custo_operacional_controla_rh_id}"
-                
+
                 # Buscar subcategoria "Frete Operacional - {Canal}"
                 from app.dre_plano_contas_models import DRESubcategoria
-                subcategoria_frete_op = db.query(DRESubcategoria).filter(
-                    DRESubcategoria.tenant_id == tenant_id,
-                    DRESubcategoria.nome == f"Frete Operacional - {canal_nome}"
-                ).first()
-                
+
+                subcategoria_frete_op = (
+                    db.query(DRESubcategoria)
+                    .filter(
+                        DRESubcategoria.tenant_id == tenant_id,
+                        DRESubcategoria.nome == f"Frete Operacional - {canal_nome}",
+                    )
+                    .first()
+                )
+
                 if not subcategoria_frete_op:
-                    logger.warning(f"❌ Subcategoria não encontrada: 'Frete Operacional - {canal_nome}' (tenant: {tenant_id})")
+                    logger.warning(
+                        f"❌ Subcategoria não encontrada: 'Frete Operacional - {canal_nome}' (tenant: {tenant_id})"
+                    )
                 else:
-                    logger.info(f"✅ Subcategoria encontrada: ID {subcategoria_frete_op.id}")
-                
+                    logger.info(
+                        f"✅ Subcategoria encontrada: ID {subcategoria_frete_op.id}"
+                    )
+
                 conta_custo = ContaPagar(
                     descricao=f"{tipo_descricao} entrega - {entregador.nome} - Venda {venda.numero_venda}",
                     fornecedor_id=venda.entregador_id,
@@ -2444,71 +2720,75 @@ def processar_contas_pagar_entrega(
                     valor_final=entregador.custo_operacional_valor,
                     data_emissao=date.today(),
                     data_vencimento=data_vencimento,
-                    status='pendente',
+                    status="pendente",
                     user_id=user_id,
                     tenant_id=tenant_id,
                     canal=canal,
-                    dre_subcategoria_id=subcategoria_frete_op.id if subcategoria_frete_op else None,
-                    observacoes=observacoes
+                    dre_subcategoria_id=subcategoria_frete_op.id
+                    if subcategoria_frete_op
+                    else None,
+                    observacoes=observacoes,
                 )
-                
+
                 db.add(conta_custo)
                 db.flush()
                 contas_criadas_ids.append(conta_custo.id)
                 valor_total += entregador.custo_operacional_valor
-                detalhes.append(f"{tipo_descricao}: R$ {entregador.custo_operacional_valor:.2f}")
-                logger.info(f"✅ Conta a pagar criada: {tipo_descricao} R$ {entregador.custo_operacional_valor:.2f}")
-        
+                detalhes.append(
+                    f"{tipo_descricao}: R$ {entregador.custo_operacional_valor:.2f}"
+                )
+                logger.info(
+                    f"✅ Conta a pagar criada: {tipo_descricao} R$ {entregador.custo_operacional_valor:.2f}"
+                )
+
         # Nota: KM rodado será criado ao fechar a rota, não aqui
-        if entregador.custo_operacional_tipo == 'km_rodado':
-            detalhes.append(f"Custo por KM (R$ {entregador.custo_operacional_valor:.2f}/km) - será criado ao fechar rota")
-        
+        if entregador.custo_operacional_tipo == "km_rodado":
+            detalhes.append(
+                f"Custo por KM (R$ {entregador.custo_operacional_valor:.2f}/km) - será criado ao fechar rota"
+            )
+
         return {
-            'success': True,
-            'total_contas': len(contas_criadas_ids),
-            'valor_total': float(valor_total),
-            'contas_criadas': contas_criadas_ids,
-            'detalhes': detalhes
+            "success": True,
+            "total_contas": len(contas_criadas_ids),
+            "valor_total": float(valor_total),
+            "contas_criadas": contas_criadas_ids,
+            "detalhes": detalhes,
         }
-        
+
     except Exception as e:
-        logger.error(f"❌ Erro ao criar contas a pagar de entrega (venda {venda.id}): {str(e)}", exc_info=True)
-        return {
-            'success': False,
-            'error': str(e)
-        }
+        logger.error(
+            f"❌ Erro ao criar contas a pagar de entrega (venda {venda.id}): {str(e)}",
+            exc_info=True,
+        )
+        return {"success": False, "error": str(e)}
 
 
 def processar_contas_pagar_taxas(
-    venda: 'Venda',
-    pagamentos: List[Any],
-    user_id: int,
-    tenant_id: str,
-    db: Session
+    venda: "Venda", pagamentos: List[Any], user_id: int, tenant_id: str, db: Session
 ) -> Dict[str, Any]:
     """
     Cria contas a pagar para taxas de pagamento (operação pós-commit).
-    
+
     Para cada pagamento da venda:
     1. Busca a forma de pagamento e suas taxas (taxa_percentual, taxa_fixa, taxas_por_parcela)
     2. Calcula o valor da taxa
     3. Identifica a subcategoria DRE apropriada (baseado no tipo e canal)
     4. Cria conta a pagar na DRE
-    
+
     Tipos de taxa suportados:
     - Cartão de crédito (com ou sem parcelamento)
     - Cartão de débito
     - PIX
     - Transferência
     - Boleto
-    
+
     Args:
         venda: Objeto Venda (já commitada)
         pagamentos: Lista de objetos de pagamento (VendaPagamento)
         user_id: ID do usuário
         tenant_id: UUID do tenant
         db: Sessão do SQLAlchemy
-        
+
     Returns:
         Dict com resultado:
         {
@@ -2520,157 +2800,194 @@ def processar_contas_pagar_taxas(
         }
     """
     from app.financeiro_models import ContaPagar, FormaPagamento
-    from app.financeiro.contas_pagar_classificacao import aplicar_classificacao_aprendida_conta_pagar
+    from app.financeiro.contas_pagar_classificacao import (
+        aplicar_classificacao_aprendida_conta_pagar,
+    )
     from app.dre_plano_contas_models import DRESubcategoria
     from decimal import Decimal
     from datetime import date
-    
+
     if not pagamentos:
         return {
-            'success': True,
-            'total_contas': 0,
-            'valor_total': 0.0,
-            'contas_criadas': [],
-            'detalhes': ['Nenhum pagamento para processar']
+            "success": True,
+            "total_contas": 0,
+            "valor_total": 0.0,
+            "contas_criadas": [],
+            "detalhes": ["Nenhum pagamento para processar"],
         }
-    
+
     contas_criadas_ids = []
-    valor_total = Decimal('0')
+    valor_total = Decimal("0")
     detalhes = []
-    
+
     try:
         # Mapear canal para determinar subcategoria DRE apropriada
-        canal = venda.canal or 'loja_fisica'
-        
+        canal = venda.canal or "loja_fisica"
+
         # Mapear tipo de pagamento para nome da subcategoria DRE
         MAPA_SUBCATEGORIAS = {
-            'cartao_credito': 'Taxas de Cartao de Credito',
-            'credito': 'Taxas de Cartao de Credito',
-            'Cartão Crédito': 'Taxas de Cartao de Credito',
-            'cartao_debito': 'Taxas de Cartao de Debito',
-            'debito': 'Taxas de Cartao de Debito',
-            'Cartão Débito': 'Taxas de Cartao de Debito',
-            'pix': 'Taxa de PIX',
-            'PIX': 'Taxa de PIX',
-            'Pix': 'Taxa de PIX',
-            'boleto': 'Taxas de Boleto',
+            "cartao_credito": "Taxas de Cartao de Credito",
+            "credito": "Taxas de Cartao de Credito",
+            "Cartão Crédito": "Taxas de Cartao de Credito",
+            "cartao_debito": "Taxas de Cartao de Debito",
+            "debito": "Taxas de Cartao de Debito",
+            "Cartão Débito": "Taxas de Cartao de Debito",
+            "pix": "Taxa de PIX",
+            "PIX": "Taxa de PIX",
+            "Pix": "Taxa de PIX",
+            "boleto": "Taxas de Boleto",
         }
-        
+
         # Mapear canal para sufixo da subcategoria
         MAPA_CANAIS = {
-            'loja_fisica': 'Loja Fisica',
-            'pdv': 'Loja Fisica',  # PDV = Loja Fisica
-            'ecommerce': 'E-commerce',
-            'mercado_livre': 'Mercado Livre',
-            'shopee': 'Shopee',
-            'amazon': 'Amazon'
+            "loja_fisica": "Loja Fisica",
+            "pdv": "Loja Fisica",  # PDV = Loja Fisica
+            "ecommerce": "E-commerce",
+            "mercado_livre": "Mercado Livre",
+            "shopee": "Shopee",
+            "amazon": "Amazon",
         }
-        
-        canal_sufixo = MAPA_CANAIS.get(canal, 'Loja Fisica')  # Default: Loja Fisica
-        
+
+        canal_sufixo = MAPA_CANAIS.get(canal, "Loja Fisica")  # Default: Loja Fisica
+
         # Processar cada pagamento
         for pagamento in pagamentos:
             # Pular formas de pagamento sem taxa (dinheiro, crédito cliente)
             forma_pag_nome = pagamento.forma_pagamento.lower()
-            if 'dinheiro' in forma_pag_nome or 'credito_cliente' in forma_pag_nome:
+            if "dinheiro" in forma_pag_nome or "credito_cliente" in forma_pag_nome:
                 continue
-            
+
             # Buscar configuração da forma de pagamento
-            forma_pag = db.query(FormaPagamento).filter(
-                FormaPagamento.tenant_id == tenant_id,
-                FormaPagamento.ativo.is_(True)
-            ).filter(
-                (FormaPagamento.nome == pagamento.forma_pagamento) |
-                (FormaPagamento.tipo == pagamento.forma_pagamento) |
-                (func.lower(FormaPagamento.nome).like(f'%{forma_pag_nome}%'))
-            ).first()
-            
+            forma_pag = (
+                db.query(FormaPagamento)
+                .filter(
+                    FormaPagamento.tenant_id == tenant_id,
+                    FormaPagamento.ativo.is_(True),
+                )
+                .filter(
+                    (FormaPagamento.nome == pagamento.forma_pagamento)
+                    | (FormaPagamento.tipo == pagamento.forma_pagamento)
+                    | (func.lower(FormaPagamento.nome).like(f"%{forma_pag_nome}%"))
+                )
+                .first()
+            )
+
             if not forma_pag:
-                logger.warning(f"⚠️ Forma de pagamento não encontrada: {pagamento.forma_pagamento}")
+                logger.warning(
+                    f"⚠️ Forma de pagamento não encontrada: {pagamento.forma_pagamento}"
+                )
                 continue
-            
+
             # Verificar se tem taxa configurada
             taxa_percentual = Decimal(str(forma_pag.taxa_percentual or 0))
             taxa_fixa = Decimal(str(forma_pag.taxa_fixa or 0))
-            
+
             if taxa_percentual == 0 and taxa_fixa == 0:
                 logger.debug(f"✓ Forma de pagamento sem taxa: {forma_pag.nome}")
                 continue
-            
+
             # Verificar se tem taxa específica para número de parcelas
-            num_parcelas = getattr(pagamento, 'numero_parcelas', 1) or 1
-            
+            num_parcelas = getattr(pagamento, "numero_parcelas", 1) or 1
+
             if num_parcelas > 1 and forma_pag.taxas_por_parcela:
                 try:
                     taxas_por_parcela_dict = json.loads(forma_pag.taxas_por_parcela)
                     if str(num_parcelas) in taxas_por_parcela_dict:
                         taxa_parcela_config = taxas_por_parcela_dict[str(num_parcelas)]
-                        taxa_percentual = Decimal(str(taxa_parcela_config.get('taxa_percentual', taxa_percentual)))
-                        taxa_fixa = Decimal(str(taxa_parcela_config.get('taxa_fixa', taxa_fixa)))
-                        logger.info(f"💳 Taxa específica para {num_parcelas}x: {taxa_percentual}% + R$ {taxa_fixa}")
+                        taxa_percentual = Decimal(
+                            str(
+                                taxa_parcela_config.get(
+                                    "taxa_percentual", taxa_percentual
+                                )
+                            )
+                        )
+                        taxa_fixa = Decimal(
+                            str(taxa_parcela_config.get("taxa_fixa", taxa_fixa))
+                        )
+                        logger.info(
+                            f"💳 Taxa específica para {num_parcelas}x: {taxa_percentual}% + R$ {taxa_fixa}"
+                        )
                 except (json.JSONDecodeError, KeyError, ValueError) as e:
                     logger.warning(f"⚠️ Erro ao processar taxas_por_parcela: {str(e)}")
-            
+
             # Calcular valor da taxa
             valor_pagamento = Decimal(str(pagamento.valor))
-            valor_taxa = (valor_pagamento * taxa_percentual / Decimal('100')) + taxa_fixa
-            
+            valor_taxa = (
+                valor_pagamento * taxa_percentual / Decimal("100")
+            ) + taxa_fixa
+
             if valor_taxa <= 0:
                 continue
-            
+
             # Determinar nome da subcategoria DRE
             tipo_pagamento_base = forma_pag.tipo or pagamento.forma_pagamento
             nome_subcategoria_base = MAPA_SUBCATEGORIAS.get(
                 tipo_pagamento_base,
-                MAPA_SUBCATEGORIAS.get(pagamento.forma_pagamento, None)
+                MAPA_SUBCATEGORIAS.get(pagamento.forma_pagamento, None),
             )
-            
+
             if not nome_subcategoria_base:
-                logger.warning(f"⚠️ Tipo de pagamento não mapeado: {tipo_pagamento_base}")
+                logger.warning(
+                    f"⚠️ Tipo de pagamento não mapeado: {tipo_pagamento_base}"
+                )
                 continue
-            
+
             # Montar nome completo da subcategoria (com canal)
             nome_subcategoria = f"{nome_subcategoria_base} - {canal_sufixo}"
-            
+
             # Buscar subcategoria DRE
-            subcategoria_taxa = db.query(DRESubcategoria).filter(
-                DRESubcategoria.tenant_id == tenant_id,
-                DRESubcategoria.nome == nome_subcategoria,
-                DRESubcategoria.ativo.is_(True)
-            ).first()
-            
+            subcategoria_taxa = (
+                db.query(DRESubcategoria)
+                .filter(
+                    DRESubcategoria.tenant_id == tenant_id,
+                    DRESubcategoria.nome == nome_subcategoria,
+                    DRESubcategoria.ativo.is_(True),
+                )
+                .first()
+            )
+
             # Se não encontrar com canal, tentar genérico
             if not subcategoria_taxa:
-                subcategoria_taxa = db.query(DRESubcategoria).filter(
-                    DRESubcategoria.tenant_id == tenant_id,
-                    DRESubcategoria.nome == nome_subcategoria_base,
-                    DRESubcategoria.ativo.is_(True)
-                ).first()
-            
+                subcategoria_taxa = (
+                    db.query(DRESubcategoria)
+                    .filter(
+                        DRESubcategoria.tenant_id == tenant_id,
+                        DRESubcategoria.nome == nome_subcategoria_base,
+                        DRESubcategoria.ativo.is_(True),
+                    )
+                    .first()
+                )
+
             if not subcategoria_taxa:
-                logger.warning(f"❌ Subcategoria DRE não encontrada: {nome_subcategoria} (tentou também {nome_subcategoria_base})")
+                logger.warning(
+                    f"❌ Subcategoria DRE não encontrada: {nome_subcategoria} (tentou também {nome_subcategoria_base})"
+                )
                 continue
-            
-            logger.info(f"✅ Subcategoria DRE encontrada: {subcategoria_taxa.nome} (ID: {subcategoria_taxa.id})")
-            
+
+            logger.info(
+                f"✅ Subcategoria DRE encontrada: {subcategoria_taxa.nome} (ID: {subcategoria_taxa.id})"
+            )
+
             # Criar conta a pagar
             descricao = f"Taxa {forma_pag.nome}"
             if num_parcelas > 1:
                 descricao += f" {num_parcelas}x"
             descricao += f" - Venda {venda.numero_venda}"
-            
+
             observacoes = f"Taxa de pagamento ref. venda {venda.numero_venda}"
             if taxa_percentual > 0 and taxa_fixa > 0:
-                observacoes += f" - {taxa_percentual}% + R$ {taxa_fixa} sobre R$ {valor_pagamento}"
+                observacoes += (
+                    f" - {taxa_percentual}% + R$ {taxa_fixa} sobre R$ {valor_pagamento}"
+                )
             elif taxa_percentual > 0:
                 observacoes += f" - {taxa_percentual}% sobre R$ {valor_pagamento}"
             else:
                 observacoes += f" - Taxa fixa de R$ {taxa_fixa}"
-            
+
             # Data de vencimento: assumindo 30 dias (pode ser ajustado pelo campo prazo_dias)
             prazo_dias = forma_pag.prazo_dias or forma_pag.prazo_recebimento or 30
             data_vencimento = date.today() + timedelta(days=prazo_dias)
-            
+
             conta_taxa = ContaPagar(
                 descricao=descricao,
                 fornecedor_id=None,  # Taxa não tem fornecedor específico
@@ -2678,69 +2995,68 @@ def processar_contas_pagar_taxas(
                 valor_final=valor_taxa,
                 data_emissao=date.today(),
                 data_vencimento=data_vencimento,
-                status='pendente',
+                status="pendente",
                 user_id=user_id,
                 tenant_id=tenant_id,
                 canal=canal,
                 dre_subcategoria_id=subcategoria_taxa.id,
-                observacoes=observacoes
+                observacoes=observacoes,
             )
             aplicar_classificacao_aprendida_conta_pagar(db, tenant_id, conta_taxa)
-            
+
             db.add(conta_taxa)
             db.flush()
-            
+
             contas_criadas_ids.append(conta_taxa.id)
             valor_total += valor_taxa
             detalhes.append(f"{forma_pag.nome}: R$ {valor_taxa:.2f}")
-            
-            logger.info(f"✅ Conta a pagar criada: Taxa {forma_pag.nome} R$ {valor_taxa:.2f}")
-        
+
+            logger.info(
+                f"✅ Conta a pagar criada: Taxa {forma_pag.nome} R$ {valor_taxa:.2f}"
+            )
+
         return {
-            'success': True,
-            'total_contas': len(contas_criadas_ids),
-            'valor_total': float(valor_total),
-            'contas_criadas': contas_criadas_ids,
-            'detalhes': detalhes
+            "success": True,
+            "total_contas": len(contas_criadas_ids),
+            "valor_total": float(valor_total),
+            "contas_criadas": contas_criadas_ids,
+            "detalhes": detalhes,
         }
-        
+
     except Exception as e:
-        logger.error(f"❌ Erro ao criar contas a pagar de taxas (venda {venda.id}): {str(e)}", exc_info=True)
-        return {
-            'success': False,
-            'error': str(e)
-        }
+        logger.error(
+            f"❌ Erro ao criar contas a pagar de taxas (venda {venda.id}): {str(e)}",
+            exc_info=True,
+        )
+        return {"success": False, "error": str(e)}
 
 
 def gerar_dre_competencia_venda(
-    venda_id: int,
-    user_id: int,
-    tenant_id: str,
-    db: Session
+    venda_id: int, user_id: int, tenant_id: str, db: Session
 ) -> Dict[str, Any]:
     """
     Gera lançamentos de DRE por competência para uma venda (PASSO 1 - Sprint 5).
-    
+
     Esta função é chamada no PRIMEIRO MOMENTO em que a venda se torna EFETIVADA
     (ou seja, quando passa a ter qualquer valor recebido, parcial ou total).
-    
+
     Operações executadas:
     1. Lançar RECEITA (100% do valor bruto) na DRE
     2. Lançar CMV (custo total dos produtos) na DRE
     3. Lançar DESCONTO (se houver) na DRE
-    
+
     GARANTIAS:
     - ✅ Idempotente: verifica se DRE já foi gerada (campo venda.dre_gerada)
     - ✅ Multi-tenant: todos os lançamentos isolados por tenant_id
     - ✅ Regime de competência: gera no momento da efetivação, não no pagamento
     - ✅ Atomicidade: chamada dentro da transação principal
-    
+
     Args:
         venda_id: ID da venda
         user_id: ID do usuário (para auditoria)
         tenant_id: UUID do tenant (isolamento multi-tenant)
         db: Sessão do SQLAlchemy (NÃO faz commit, apenas flush)
-        
+
     Returns:
         Dict com resultado:
         {
@@ -2751,10 +3067,10 @@ def gerar_dre_competencia_venda(
             'desconto_gerado': float,
             'message': str
         }
-        
+
     Raises:
         HTTPException: Se venda não encontrada ou subcategorias DRE inválidas
-        
+
     Exemplo:
         >>> resultado = gerar_dre_competencia_venda(
         ...     venda_id=120,
@@ -2767,14 +3083,14 @@ def gerar_dre_competencia_venda(
     from app.vendas_models import Venda
     from app.domain.dre.lancamento_dre_sync import atualizar_dre_por_lancamento
     from app.dre_plano_contas_models import DRESubcategoria, NaturezaDRE
-    
+
     logger.info(f"📊 Iniciando geração de DRE por competência - Venda #{venda_id}")
-    
+
     try:
         # ============================================================
         # ETAPA 0: GARANTIR TENANT_ID COMO UUID
         # ============================================================
-        
+
         # Converter tenant_id para UUID se necessário (fix PostgreSQL cast error)
         if tenant_id and not isinstance(tenant_id, UUID):
             try:
@@ -2783,19 +3099,16 @@ def gerar_dre_competencia_venda(
                 tenant_uuid = tenant_id
         else:
             tenant_uuid = tenant_id
-        
+
         # ============================================================
         # ETAPA 1: BUSCAR VENDA E VALIDAR
         # ============================================================
-        
-        venda = db.query(Venda).filter_by(
-            id=venda_id,
-            tenant_id=tenant_uuid
-        ).first()
-        
+
+        venda = db.query(Venda).filter_by(id=venda_id, tenant_id=tenant_uuid).first()
+
         if not venda:
-            raise HTTPException(status_code=404, detail='Venda não encontrada')
-        
+            raise HTTPException(status_code=404, detail="Venda não encontrada")
+
         # ✅ IDEMPOTÊNCIA: Verificar se DRE já foi gerada
         if venda.dre_gerada:
             logger.info(
@@ -2803,95 +3116,126 @@ def gerar_dre_competencia_venda(
                 f"em {venda.data_geracao_dre}"
             )
             return {
-                'success': False,
-                'lancamentos_criados': 0,
-                'receita_gerada': 0,
-                'cmv_gerado': 0,
-                'desconto_gerado': 0,
-                'message': 'DRE já foi gerada anteriormente (idempotência)'
+                "success": False,
+                "lancamentos_criados": 0,
+                "receita_gerada": 0,
+                "cmv_gerado": 0,
+                "desconto_gerado": 0,
+                "message": "DRE já foi gerada anteriormente (idempotência)",
             }
-        
-        canal = venda.canal or 'loja_fisica'
+
+        canal = venda.canal or "loja_fisica"
         canal_labels = {
-            'loja_fisica': 'Loja Fisica',
-            'pdv': 'Loja Fisica',
-            'mercado_livre': 'Mercado Livre',
-            'shopee': 'Shopee',
-            'amazon': 'Amazon',
-            'ecommerce': 'E-commerce',
-            'app': 'App',
+            "loja_fisica": "Loja Fisica",
+            "pdv": "Loja Fisica",
+            "mercado_livre": "Mercado Livre",
+            "shopee": "Shopee",
+            "amazon": "Amazon",
+            "ecommerce": "E-commerce",
+            "app": "App",
         }
-        canal_label = canal_labels.get(canal, 'Loja Fisica')
+        canal_label = canal_labels.get(canal, "Loja Fisica")
 
         # ============================================================
         # ETAPA 2: BUSCAR SUBCATEGORIAS DRE
         # ============================================================
-        
+
         # Buscar subcategoria de RECEITA
-        subcat_receita = db.query(DRESubcategoria).filter(
-            DRESubcategoria.tenant_id == tenant_uuid,
-            DRESubcategoria.nome.ilike('%receita%venda%'),
-            DRESubcategoria.ativo.is_(True)
-        ).first()
-        
+        subcat_receita = (
+            db.query(DRESubcategoria)
+            .filter(
+                DRESubcategoria.tenant_id == tenant_uuid,
+                DRESubcategoria.nome.ilike("%receita%venda%"),
+                DRESubcategoria.ativo.is_(True),
+            )
+            .first()
+        )
+
         if not subcat_receita:
             # Tentar buscar qualquer receita
-            subcat_receita = db.query(DRESubcategoria).filter(
-                DRESubcategoria.tenant_id == tenant_uuid,
-                DRESubcategoria.ativo.is_(True)
-            ).join(DRESubcategoria.categoria).filter(
-                func.lower(func.cast(DRESubcategoria.categoria.property.mapper.class_.natureza, String)).like('%receita%')
-            ).first()
-        
+            subcat_receita = (
+                db.query(DRESubcategoria)
+                .filter(
+                    DRESubcategoria.tenant_id == tenant_uuid,
+                    DRESubcategoria.ativo.is_(True),
+                )
+                .join(DRESubcategoria.categoria)
+                .filter(
+                    func.lower(
+                        func.cast(
+                            DRESubcategoria.categoria.property.mapper.class_.natureza,
+                            String,
+                        )
+                    ).like("%receita%")
+                )
+                .first()
+            )
+
         if not subcat_receita:
             raise HTTPException(
                 status_code=500,
-                detail='Subcategoria DRE de Receita não encontrada. Configure o plano de contas DRE.'
+                detail="Subcategoria DRE de Receita não encontrada. Configure o plano de contas DRE.",
             )
-        
+
         # Buscar subcategoria de CMV
-        subcat_cmv = db.query(DRESubcategoria).filter(
-            DRESubcategoria.tenant_id == tenant_uuid,
-            DRESubcategoria.nome.ilike('%cmv%'),
-            DRESubcategoria.ativo.is_(True)
-        ).first()
-        
+        subcat_cmv = (
+            db.query(DRESubcategoria)
+            .filter(
+                DRESubcategoria.tenant_id == tenant_uuid,
+                DRESubcategoria.nome.ilike("%cmv%"),
+                DRESubcategoria.ativo.is_(True),
+            )
+            .first()
+        )
+
         if not subcat_cmv:
             # Tentar buscar "Custo dos Produtos Vendidos"
-            subcat_cmv = db.query(DRESubcategoria).filter(
-                DRESubcategoria.tenant_id == tenant_uuid,
-                DRESubcategoria.nome.ilike('%custo%produto%'),
-                DRESubcategoria.ativo.is_(True)
-            ).first()
-        
+            subcat_cmv = (
+                db.query(DRESubcategoria)
+                .filter(
+                    DRESubcategoria.tenant_id == tenant_uuid,
+                    DRESubcategoria.nome.ilike("%custo%produto%"),
+                    DRESubcategoria.ativo.is_(True),
+                )
+                .first()
+            )
+
         if not subcat_cmv:
             raise HTTPException(
                 status_code=500,
-                detail='Subcategoria DRE de CMV não encontrada. Configure o plano de contas DRE.'
+                detail="Subcategoria DRE de CMV não encontrada. Configure o plano de contas DRE.",
             )
-        
+
         # Buscar subcategoria de DESCONTO (opcional)
-        subcat_desconto = db.query(DRESubcategoria).filter(
-            DRESubcategoria.tenant_id == tenant_uuid,
-            DRESubcategoria.nome.ilike('%desconto%'),
-            DRESubcategoria.ativo.is_(True)
-        ).first()
-        
+        subcat_desconto = (
+            db.query(DRESubcategoria)
+            .filter(
+                DRESubcategoria.tenant_id == tenant_uuid,
+                DRESubcategoria.nome.ilike("%desconto%"),
+                DRESubcategoria.ativo.is_(True),
+            )
+            .first()
+        )
+
         if not subcat_desconto:
             # Tentar buscar "Deduções de Receita"
-            subcat_desconto = db.query(DRESubcategoria).filter(
-                DRESubcategoria.tenant_id == tenant_uuid,
-                DRESubcategoria.nome.ilike('%dedu%'),
-                DRESubcategoria.ativo.is_(True)
-            ).first()
-        
+            subcat_desconto = (
+                db.query(DRESubcategoria)
+                .filter(
+                    DRESubcategoria.tenant_id == tenant_uuid,
+                    DRESubcategoria.nome.ilike("%dedu%"),
+                    DRESubcategoria.ativo.is_(True),
+                )
+                .first()
+            )
+
         logger.info(
             f"✅ Subcategorias DRE localizadas: "
             f"Receita (ID={subcat_receita.id}), "
             f"CMV (ID={subcat_cmv.id}), "
             f"Desconto (ID={subcat_desconto.id if subcat_desconto else 'N/A'})"
         )
-        
+
         def buscar_subcategoria(padroes, natureza=None):
             for padrao in padroes:
                 query = db.query(DRESubcategoria).filter(
@@ -2900,7 +3244,9 @@ def gerar_dre_competencia_venda(
                     DRESubcategoria.ativo.is_(True),
                 )
                 if natureza is not None:
-                    query = query.filter(DRESubcategoria.categoria.has(natureza=natureza))
+                    query = query.filter(
+                        DRESubcategoria.categoria.has(natureza=natureza)
+                    )
                 subcategoria = query.first()
                 if subcategoria:
                     return subcategoria
@@ -2911,7 +3257,15 @@ def gerar_dre_competencia_venda(
             NaturezaDRE.RECEITA,
         )
         subcat_imposto = buscar_subcategoria(
-            ["%Simples Nacional%", "%ICMS%", "%PIS%", "%COFINS%", "%ISS%", "%impost%", "%tribut%"],
+            [
+                "%Simples Nacional%",
+                "%ICMS%",
+                "%PIS%",
+                "%COFINS%",
+                "%ISS%",
+                "%impost%",
+                "%tribut%",
+            ],
             NaturezaDRE.DESPESA,
         )
         subcat_taxa_cartao = buscar_subcategoria(
@@ -2919,7 +3273,11 @@ def gerar_dre_competencia_venda(
             None,
         )
         subcat_entrega = buscar_subcategoria(
-            [f"%Frete Operacional%{canal_label}%", "%Frete Operacional%", "%Fretes sobre Vendas%"],
+            [
+                f"%Frete Operacional%{canal_label}%",
+                "%Frete Operacional%",
+                "%Fretes sobre Vendas%",
+            ],
             None,
         )
         subcat_comissao = buscar_subcategoria(
@@ -2934,7 +3292,7 @@ def gerar_dre_competencia_venda(
         # ============================================================
         # ETAPA 3: CALCULAR VALORES
         # ============================================================
-        
+
         snapshot = get_or_build_venda_rentabilidade_snapshot(
             venda,
             db,
@@ -2944,53 +3302,82 @@ def gerar_dre_competencia_venda(
         )
 
         # Receita, CMV e desconto passam a seguir a fotografia financeira da venda.
-        receita_bruta = Decimal(str(snapshot.get('venda_bruta', 0) or 0))
-        receita_frete = Decimal(str(snapshot.get('taxa_loja', 0) or 0))
-        cmv_total = Decimal(str(snapshot.get('custo_produtos', 0) or 0))
-        desconto_total = Decimal(str(snapshot.get('desconto', 0) or 0))
-        imposto_total = Decimal(str(snapshot.get('imposto', 0) or 0))
-        taxa_cartao_total = Decimal(str(snapshot.get('taxa_cartao', 0) or 0))
-        repasse_entrega_total = Decimal(str(snapshot.get('taxa_entrega', 0) or 0))
-        taxa_operacional_total = Decimal(str(snapshot.get('taxa_operacional', 0) or 0))
-        comissao_total = Decimal(str(snapshot.get('comissao', 0) or 0))
-        campanha_total = Decimal(str(snapshot.get('custo_campanha', 0) or 0))
-        
+        receita_bruta = Decimal(str(snapshot.get("venda_bruta", 0) or 0))
+        receita_frete = Decimal(str(snapshot.get("taxa_loja", 0) or 0))
+        cmv_total = Decimal(str(snapshot.get("custo_produtos", 0) or 0))
+        desconto_total = Decimal(str(snapshot.get("desconto", 0) or 0))
+        imposto_total = Decimal(str(snapshot.get("imposto", 0) or 0))
+        taxa_cartao_total = Decimal(str(snapshot.get("taxa_cartao", 0) or 0))
+        repasse_entrega_total = Decimal(str(snapshot.get("taxa_entrega", 0) or 0))
+        taxa_operacional_total = Decimal(str(snapshot.get("taxa_operacional", 0) or 0))
+        comissao_total = Decimal(str(snapshot.get("comissao", 0) or 0))
+        campanha_total = Decimal(str(snapshot.get("custo_campanha", 0) or 0))
+
         # Canal da venda (para DRE por canal)
-        canal = venda.canal or 'loja_fisica'
-        
+        canal = venda.canal or "loja_fisica"
+
         # Data da venda (para identificar período DRE)
-        data_venda = venda.data_venda.date() if isinstance(venda.data_venda, datetime) else venda.data_venda
-        
+        data_venda = (
+            venda.data_venda.date()
+            if isinstance(venda.data_venda, datetime)
+            else venda.data_venda
+        )
+
         logger.info(
             f"💰 Valores calculados: "
             f"Receita=R$ {float(receita_bruta):.2f}, "
             f"CMV=R$ {float(cmv_total):.2f}, "
             f"Desconto=R$ {float(desconto_total):.2f}"
         )
-        
+
         # ============================================================
         # ETAPA 4: GERAR LANÇAMENTOS NA DRE
         # ============================================================
-        
+
         lancamentos_criados = 0
         receita_bruta_retorno = receita_bruta
         cmv_total_retorno = cmv_total
         desconto_total_retorno = desconto_total
 
         componentes_dre = [
-            ("Receita de produtos/servicos", subcat_receita, receita_bruta, 'RECEITA'),
-            ("Receita de frete", subcat_receita_frete, receita_frete, 'RECEITA'),
-            ("Descontos concedidos", subcat_desconto, desconto_total, 'DESPESA'),
-            ("Impostos sobre vendas", subcat_imposto, imposto_total, 'DESPESA'),
-            ("CMV", subcat_cmv, cmv_total, 'DESPESA'),
-            ("Taxas de cartao/meios de pagamento", subcat_taxa_cartao, taxa_cartao_total, 'DESPESA'),
-            ("Repasse/custo de entrega", subcat_entrega, repasse_entrega_total, 'DESPESA'),
-            ("Custo operacional de entrega", subcat_entrega, taxa_operacional_total, 'DESPESA'),
-            ("Comissoes de venda", subcat_comissao, comissao_total, 'DESPESA'),
-            ("Campanhas, cupons e cashback", subcat_campanha, campanha_total, 'DESPESA'),
+            ("Receita de produtos/servicos", subcat_receita, receita_bruta, "RECEITA"),
+            ("Receita de frete", subcat_receita_frete, receita_frete, "RECEITA"),
+            ("Descontos concedidos", subcat_desconto, desconto_total, "DESPESA"),
+            ("Impostos sobre vendas", subcat_imposto, imposto_total, "DESPESA"),
+            ("CMV", subcat_cmv, cmv_total, "DESPESA"),
+            (
+                "Taxas de cartao/meios de pagamento",
+                subcat_taxa_cartao,
+                taxa_cartao_total,
+                "DESPESA",
+            ),
+            (
+                "Repasse/custo de entrega",
+                subcat_entrega,
+                repasse_entrega_total,
+                "DESPESA",
+            ),
+            (
+                "Custo operacional de entrega",
+                subcat_entrega,
+                taxa_operacional_total,
+                "DESPESA",
+            ),
+            ("Comissoes de venda", subcat_comissao, comissao_total, "DESPESA"),
+            (
+                "Campanhas, cupons e cashback",
+                subcat_campanha,
+                campanha_total,
+                "DESPESA",
+            ),
         ]
 
-        for descricao_componente, subcategoria_dre, valor_componente, tipo_movimentacao in componentes_dre:
+        for (
+            descricao_componente,
+            subcategoria_dre,
+            valor_componente,
+            tipo_movimentacao,
+        ) in componentes_dre:
             if valor_componente <= 0:
                 continue
             if not subcategoria_dre:
@@ -3012,16 +3399,25 @@ def gerar_dre_competencia_venda(
                     tipo_movimentacao=tipo_movimentacao,
                 )
                 lancamentos_criados += 1
-                logger.info("  DRE: %s lancado: R$ %.2f", descricao_componente, float(valor_componente))
+                logger.info(
+                    "  DRE: %s lancado: R$ %.2f",
+                    descricao_componente,
+                    float(valor_componente),
+                )
             except Exception as e:
-                logger.error("  Erro ao lancar %s na DRE: %s", descricao_componente, str(e), exc_info=True)
+                logger.error(
+                    "  Erro ao lancar %s na DRE: %s",
+                    descricao_componente,
+                    str(e),
+                    exc_info=True,
+                )
                 raise
 
         # Os blocos legados abaixo ficam desativados para evitar duplicidade.
         receita_bruta = Decimal("0")
         cmv_total = Decimal("0")
         desconto_total = Decimal("0")
-        
+
         # 4.1 - Lançamento de RECEITA (100%)
         if receita_bruta > 0:
             try:
@@ -3032,14 +3428,14 @@ def gerar_dre_competencia_venda(
                     canal=canal,
                     valor=receita_bruta,
                     data_lancamento=data_venda,
-                    tipo_movimentacao='RECEITA'
+                    tipo_movimentacao="RECEITA",
                 )
                 lancamentos_criados += 1
                 logger.info(f"  ✅ Receita lançada: R$ {float(receita_bruta):.2f}")
             except Exception as e:
                 logger.error(f"  ❌ Erro ao lançar receita: {str(e)}", exc_info=True)
                 raise
-        
+
         # 4.2 - Lançamento de CMV
         if cmv_total > 0:
             try:
@@ -3050,14 +3446,14 @@ def gerar_dre_competencia_venda(
                     canal=canal,
                     valor=cmv_total,
                     data_lancamento=data_venda,
-                    tipo_movimentacao='DESPESA'  # CMV é um custo
+                    tipo_movimentacao="DESPESA",  # CMV é um custo
                 )
                 lancamentos_criados += 1
                 logger.info(f"  ✅ CMV lançado: R$ {float(cmv_total):.2f}")
             except Exception as e:
                 logger.error(f"  ❌ Erro ao lançar CMV: {str(e)}", exc_info=True)
                 raise
-        
+
         # 4.3 - Lançamento de DESCONTO (se houver e se tiver subcategoria)
         if desconto_total > 0 and subcat_desconto:
             try:
@@ -3068,7 +3464,7 @@ def gerar_dre_competencia_venda(
                     canal=canal,
                     valor=desconto_total,
                     data_lancamento=data_venda,
-                    tipo_movimentacao='DESPESA'  # Desconto reduz receita
+                    tipo_movimentacao="DESPESA",  # Desconto reduz receita
                 )
                 lancamentos_criados += 1
                 logger.info(f"  ✅ Desconto lançado: R$ {float(desconto_total):.2f}")
@@ -3076,8 +3472,10 @@ def gerar_dre_competencia_venda(
                 logger.error(f"  ❌ Erro ao lançar desconto: {str(e)}", exc_info=True)
                 raise
         elif desconto_total > 0:
-            logger.warning(f"  ⚠️  Desconto de R$ {float(desconto_total):.2f} não lançado (subcategoria não encontrada)")
-        
+            logger.warning(
+                f"  ⚠️  Desconto de R$ {float(desconto_total):.2f} não lançado (subcategoria não encontrada)"
+            )
+
         receita_bruta = receita_bruta_retorno
         cmv_total = cmv_total_retorno
         desconto_total = desconto_total_retorno
@@ -3085,11 +3483,11 @@ def gerar_dre_competencia_venda(
         # ============================================================
         # ETAPA 5: MARCAR VENDA COMO DRE GERADA
         # ============================================================
-        
+
         venda.dre_gerada = True
         venda.data_geracao_dre = now_brasilia()
         db.flush()
-        
+
         logger.info(
             f"✅ ✅ ✅ DRE POR COMPETÊNCIA GERADA: Venda #{venda.numero_venda} ✅ ✅ ✅\n"
             f"   📊 Lançamentos criados: {lancamentos_criados}\n"
@@ -3098,24 +3496,22 @@ def gerar_dre_competencia_venda(
             f"   🎁 Desconto: R$ {float(desconto_total):.2f}\n"
             f"   🏪 Canal: {canal}"
         )
-        
+
         return {
-            'success': True,
-            'lancamentos_criados': lancamentos_criados,
-            'receita_gerada': float(receita_bruta),
-            'cmv_gerado': float(cmv_total),
-            'desconto_gerado': float(desconto_total),
-            'message': f'{lancamentos_criados} lançamentos criados na DRE'
+            "success": True,
+            "lancamentos_criados": lancamentos_criados,
+            "receita_gerada": float(receita_bruta),
+            "cmv_gerado": float(cmv_total),
+            "desconto_gerado": float(desconto_total),
+            "message": f"{lancamentos_criados} lançamentos criados na DRE",
         }
-        
+
     except HTTPException:
         # Re-lançar HTTPException
         raise
-        
-    except Exception as e:
-        logger.error(f"❌ ERRO CRÍTICO ao gerar DRE por competência: {str(e)}", exc_info=True)
-        raise HTTPException(
-            status_code=500,
-            detail=f"Erro ao gerar DRE: {str(e)}"
-        )
 
+    except Exception as e:
+        logger.error(
+            f"❌ ERRO CRÍTICO ao gerar DRE por competência: {str(e)}", exc_info=True
+        )
+        raise HTTPException(status_code=500, detail=f"Erro ao gerar DRE: {str(e)}")

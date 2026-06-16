@@ -29,17 +29,18 @@ logger = logging.getLogger(__name__)
 # LOG EVENT HANDLER
 # ============================================================================
 
+
 class LogEventHandler:
     """
     Handler que registra eventos em logs estruturados.
-    
+
     Útil para:
     - Debugging
     - Monitoramento
     - Análise de fluxo
     - Troubleshooting
     """
-    
+
     @staticmethod
     def on_venda_criada(event: VendaCriada) -> None:
         """Loga criação de venda"""
@@ -51,7 +52,7 @@ class LogEventHandler:
             f"Cliente: {event.cliente_id or 'Avulso'} | "
             f"Entrega: {'Sim' if event.tem_entrega else 'Não'}"
         )
-    
+
     @staticmethod
     def on_venda_finalizada(event: VendaFinalizada) -> None:
         """Loga finalização de venda"""
@@ -65,7 +66,7 @@ class LogEventHandler:
             f"Formas: {', '.join(event.formas_pagamento)} | "
             f"Vendedor: {event.user_nome}"
         )
-    
+
     @staticmethod
     def on_venda_cancelada(event: VendaCancelada) -> None:
         """Loga cancelamento de venda"""
@@ -83,29 +84,30 @@ class LogEventHandler:
 # AUDITORIA EVENT HANDLER
 # ============================================================================
 
+
 class AuditoriaEventHandler:
     """
     Handler que persiste eventos no banco de dados.
-    
+
     Salva uma cópia de cada evento em uma tabela de auditoria,
     permitindo rastreamento completo e análises posteriores.
-    
+
     IMPORTANTE: Este handler precisa de uma sessão do banco.
     """
-    
+
     def __init__(self, db_session_factory: Optional[callable] = None):
         """
         Inicializa o handler com factory de sessões do banco.
-        
+
         Args:
             db_session_factory: Função que retorna uma Session do SQLAlchemy
         """
         self.db_session_factory = db_session_factory
-    
+
     def _save_event(self, event: DomainEvent, categoria: str, detalhes: str) -> None:
         """
         Salva evento no banco de dados (tabela audit_log).
-        
+
         Args:
             event: Evento de domínio
             categoria: Categoria do evento (venda_criada, etc)
@@ -114,33 +116,37 @@ class AuditoriaEventHandler:
         if not self.db_session_factory:
             logger.debug("⚠️  DB session factory não configurada, pulando persistência")
             return
-        
+
         try:
             from app.audit_log import log_action
-            
+
             # Obter sessão do banco
             db = self.db_session_factory()
-            
+
             # Extrair user_id do evento (todos eventos de venda têm)
-            user_id = getattr(event, 'user_id', None)
-            venda_id = getattr(event, 'venda_id', None)
-            
+            user_id = getattr(event, "user_id", None)
+            venda_id = getattr(event, "venda_id", None)
+
             if user_id and venda_id:
                 log_action(
                     db=db,
                     user_id=user_id,
-                    action='EVENT',
-                    entity_type='vendas',
+                    action="EVENT",
+                    entity_type="vendas",
                     entity_id=venda_id,
-                    details=f"[{categoria}] {detalhes}"
+                    details=f"[{categoria}] {detalhes}",
                 )
                 db.commit()
-                logger.debug(f"💾 Evento {categoria} persistido no banco (venda_id={venda_id})")
-            
+                logger.debug(
+                    f"💾 Evento {categoria} persistido no banco (venda_id={venda_id})"
+                )
+
         except Exception as e:
-            logger.error(f"❌ Erro ao persistir evento {categoria}: {str(e)}", exc_info=True)
+            logger.error(
+                f"❌ Erro ao persistir evento {categoria}: {str(e)}", exc_info=True
+            )
             # Não re-raise: erro na auditoria não deve afetar fluxo
-    
+
     def on_venda_criada(self, event: VendaCriada) -> None:
         """Persiste evento de venda criada"""
         detalhes = (
@@ -148,8 +154,8 @@ class AuditoriaEventHandler:
             f"Total: R$ {event.total:.2f} | "
             f"Itens: {event.quantidade_itens}"
         )
-        self._save_event(event, 'venda_criada', detalhes)
-    
+        self._save_event(event, "venda_criada", detalhes)
+
     def on_venda_finalizada(self, event: VendaFinalizada) -> None:
         """Persiste evento de venda finalizada"""
         detalhes = (
@@ -158,8 +164,8 @@ class AuditoriaEventHandler:
             f"Pago: R$ {event.total_pago:.2f} | "
             f"Status: {event.status}"
         )
-        self._save_event(event, 'venda_finalizada', detalhes)
-    
+        self._save_event(event, "venda_finalizada", detalhes)
+
     def on_venda_cancelada(self, event: VendaCancelada) -> None:
         """Persiste evento de venda cancelada"""
         detalhes = (
@@ -167,17 +173,18 @@ class AuditoriaEventHandler:
             f"Motivo: {event.motivo} | "
             f"Estornos: {event.itens_estornados} itens"
         )
-        self._save_event(event, 'venda_cancelada', detalhes)
+        self._save_event(event, "venda_cancelada", detalhes)
 
 
 # ============================================================================
 # IA EVENT HANDLER (PLACEHOLDER PARA FUTURO)
 # ============================================================================
 
+
 class IAEventHandler:
     """
     Placeholder para handlers de IA futura.
-    
+
     Casos de uso futuros:
     - Análise preditiva de vendas
     - Recomendação de produtos
@@ -185,7 +192,7 @@ class IAEventHandler:
     - Previsão de demanda
     - Análise de comportamento
     """
-    
+
     @staticmethod
     def on_venda_criada(event: VendaCriada) -> None:
         """Placeholder: Análise de IA ao criar venda"""
@@ -194,7 +201,7 @@ class IAEventHandler:
         # - Recomendar produtos complementares
         # - Prever probabilidade de finalização
         # - Sugerir upsell/cross-sell
-    
+
     @staticmethod
     def on_venda_finalizada(event: VendaFinalizada) -> None:
         """Placeholder: Análise de IA ao finalizar venda"""
@@ -203,7 +210,7 @@ class IAEventHandler:
         # - Atualizar modelo de previsão de vendas
         # - Analisar padrões de compra do cliente
         # - Atualizar scoring de clientes
-    
+
     @staticmethod
     def on_venda_cancelada(event: VendaCancelada) -> None:
         """Placeholder: Análise de IA ao cancelar venda"""
@@ -218,30 +225,35 @@ class IAEventHandler:
 # NOTIFICAÇÃO EVENT HANDLER (PLACEHOLDER PARA FUTURO)
 # ============================================================================
 
+
 class NotificacaoEventHandler:
     """
     Placeholder para sistema de notificações futuro.
-    
+
     Casos de uso futuros:
     - Enviar e-mail para cliente
     - Enviar SMS/WhatsApp
     - Notificações push
     - Integração com CRM
     """
-    
+
     @staticmethod
     def on_venda_finalizada(event: VendaFinalizada) -> None:
         """Placeholder: Enviar notificação de venda finalizada"""
-        logger.debug(f"📧 [NOTIFICAÇÃO] Venda {event.numero_venda} finalizada (placeholder)")
+        logger.debug(
+            f"📧 [NOTIFICAÇÃO] Venda {event.numero_venda} finalizada (placeholder)"
+        )
         # TODO: Implementar notificações
         # - Enviar e-mail de confirmação
         # - Enviar comprovante por WhatsApp
         # - Atualizar CRM
-    
+
     @staticmethod
     def on_venda_cancelada(event: VendaCancelada) -> None:
         """Placeholder: Enviar notificação de cancelamento"""
-        logger.debug(f"📧 [NOTIFICAÇÃO] Venda {event.numero_venda} cancelada (placeholder)")
+        logger.debug(
+            f"📧 [NOTIFICAÇÃO] Venda {event.numero_venda} cancelada (placeholder)"
+        )
         # TODO: Implementar notificações
         # - Enviar e-mail de cancelamento
         # - Notificar gestão
@@ -251,21 +263,24 @@ class NotificacaoEventHandler:
 # INTEGRAÇÃO EVENT HANDLER (PLACEHOLDER PARA FUTURO)
 # ============================================================================
 
+
 class IntegracaoEventHandler:
     """
     Placeholder para integrações com sistemas externos.
-    
+
     Casos de uso futuros:
     - ERP
     - Sistema de delivery
     - Nota fiscal eletrônica
     - Marketplace
     """
-    
+
     @staticmethod
     def on_venda_finalizada(event: VendaFinalizada) -> None:
         """Placeholder: Integrar com sistemas externos"""
-        logger.debug(f"🔗 [INTEGRAÇÃO] Venda {event.numero_venda} finalizada (placeholder)")
+        logger.debug(
+            f"🔗 [INTEGRAÇÃO] Venda {event.numero_venda} finalizada (placeholder)"
+        )
         # TODO: Implementar integrações
         # - Enviar para ERP
         # - Disparar emissão de NF-e

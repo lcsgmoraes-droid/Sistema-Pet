@@ -4,6 +4,7 @@ _EVENT_FLOW = []
 _STAGE_COUNTERS = {}
 PERF_ALERT_THRESHOLD_MS = 80
 
+
 def log_event(stage: str, event: str, source: str):
     now = datetime.utcnow()
 
@@ -24,16 +25,19 @@ def log_event(stage: str, event: str, source: str):
     except Exception:
         pass
 
-    _EVENT_FLOW.append({
-        "timestamp": now.isoformat(),
-        "stage": stage,
-        "event": event,
-        "source": source,
-        "duration_ms": duration_ms
-    })
+    _EVENT_FLOW.append(
+        {
+            "timestamp": now.isoformat(),
+            "stage": stage,
+            "event": event,
+            "source": source,
+            "duration_ms": duration_ms,
+        }
+    )
 
     if len(_EVENT_FLOW) > 200:
         _EVENT_FLOW.pop(0)
+
 
 def get_flow():
     return list(_EVENT_FLOW)
@@ -44,6 +48,7 @@ def get_stage_counters():
         return dict(_STAGE_COUNTERS)
     except Exception:
         return {}
+
 
 def clear_flow():
     _EVENT_FLOW.clear()

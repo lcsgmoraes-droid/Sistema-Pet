@@ -77,7 +77,12 @@ from app.campaigns.models import (
     NotificationStatusEnum,
     CustomerMergeLog,
 )
-from app.campaigns.models import CampaignTypeEnum, CampaignExecution, CampaignEventQueue, EventStatusEnum
+from app.campaigns.models import (
+    CampaignTypeEnum,
+    CampaignExecution,
+    CampaignEventQueue,
+    EventStatusEnum,
+)
 from app.campaigns.audit import (
     build_coupon_audit_metadata,
     build_loyalty_stamp_audit_metadata,
@@ -190,6 +195,7 @@ class CampanhaValidadeExclusaoBody(BaseModel):
 # Health
 # ---------------------------------------------------------------------------
 
+
 @router.get("/health")
 def campaigns_health():
     """Healthcheck do módulo de campanhas."""
@@ -228,11 +234,12 @@ def salvar_config_campanha_validade(
     config.desconto_60_dias = min(max(float(body.desconto_60_dias or 0), 0.0), 95.0)
     config.desconto_30_dias = min(max(float(body.desconto_30_dias or 0), 0.0), 95.0)
     config.desconto_7_dias = min(max(float(body.desconto_7_dias or 0), 0.0), 95.0)
-    config.rotulo_publico = (body.rotulo_publico or "Validade proxima").strip() or "Validade proxima"
+    config.rotulo_publico = (
+        body.rotulo_publico or "Validade proxima"
+    ).strip() or "Validade proxima"
     config.mensagem_publica = (
-        (body.mensagem_publica or "Oferta por lote com quantidade limitada.").strip()
-        or "Oferta por lote com quantidade limitada."
-    )
+        body.mensagem_publica or "Oferta por lote com quantidade limitada."
+    ).strip() or "Oferta por lote com quantidade limitada."
 
     db.commit()
     db.refresh(config)
@@ -334,6 +341,7 @@ def remover_exclusao_campanha_validade(
 # Campanhas — listagem e gestão
 # ---------------------------------------------------------------------------
 
+
 @router.get("")
 def listar_campanhas(
     db: Session = Depends(get_db),
@@ -395,6 +403,7 @@ def pausar_campanha(
 # Campanhas — atualizar parâmetros
 # ---------------------------------------------------------------------------
 
+
 class AtualizarParametrosBody(BaseModel):
     params: dict
     name: Optional[str] = None
@@ -432,14 +441,23 @@ def atualizar_parametros(
 # Cupons — listagem
 # ---------------------------------------------------------------------------
 
+
 @router.get("/cupons")
 def listar_cupons(
-    status: Optional[str] = Query(None, description="Filtrar por status: active, used, expired"),
+    status: Optional[str] = Query(
+        None, description="Filtrar por status: active, used, expired"
+    ),
     customer_id: Optional[int] = Query(None),
     campaign_id: Optional[int] = Query(None),
-    busca: Optional[str] = Query(None, description="Busca por código ou nome do cliente"),
-    data_inicio: Optional[str] = Query(None, description="Data de criação inicial YYYY-MM-DD"),
-    data_fim: Optional[str] = Query(None, description="Data de criação final YYYY-MM-DD"),
+    busca: Optional[str] = Query(
+        None, description="Busca por código ou nome do cliente"
+    ),
+    data_inicio: Optional[str] = Query(
+        None, description="Data de criação inicial YYYY-MM-DD"
+    ),
+    data_fim: Optional[str] = Query(
+        None, description="Data de criação final YYYY-MM-DD"
+    ),
     db: Session = Depends(get_db),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
@@ -466,16 +484,22 @@ def listar_cupons(
     if data_fim:
         try:
             from datetime import timedelta as _td
-            q = q.filter(Coupon.created_at < datetime.fromisoformat(data_fim) + _td(days=1))
+
+            q = q.filter(
+                Coupon.created_at < datetime.fromisoformat(data_fim) + _td(days=1)
+            )
         except ValueError:
             pass
     if busca:
         busca_like = f"%{busca}%"
         matching_ids = [
-            c.id for c in db.query(Cliente.id).filter(
+            c.id
+            for c in db.query(Cliente.id)
+            .filter(
                 Cliente.tenant_id == tenant_id,
                 Cliente.nome.ilike(busca_like),
-            ).all()
+            )
+            .all()
         ]
         if matching_ids:
             q = q.filter(
@@ -497,7 +521,9 @@ def listar_cupons(
     camp_ids = [c.campaign_id for c in cupons if c.campaign_id]
     campanhas_map: dict = {}
     if camp_ids:
-        for camp in db.query(CampaignModel).filter(CampaignModel.id.in_(camp_ids)).all():
+        for camp in (
+            db.query(CampaignModel).filter(CampaignModel.id.in_(camp_ids)).all()
+        ):
             campanhas_map[camp.id] = camp.name
 
     # Enriquecer com data de uso (redeemed_at) de cada cupom
@@ -518,17 +544,23 @@ def listar_cupons(
             "code": c.code,
             "coupon_type": c.coupon_type.value,
             "discount_value": float(c.discount_value) if c.discount_value else None,
-            "discount_percent": float(c.discount_percent) if c.discount_percent else None,
+            "discount_percent": float(c.discount_percent)
+            if c.discount_percent
+            else None,
             "channel": c.channel.value,
             "status": c.status.value,
             "valid_until": c.valid_until.isoformat() if c.valid_until else None,
-            "min_purchase_value": float(c.min_purchase_value) if c.min_purchase_value else None,
+            "min_purchase_value": float(c.min_purchase_value)
+            if c.min_purchase_value
+            else None,
             "customer_id": c.customer_id,
             "nome_cliente": clientes_map.get(c.customer_id),
             "campaign_id": c.campaign_id,
             "nome_campanha": campanhas_map.get(c.campaign_id),
             "created_at": c.created_at.isoformat() if c.created_at else None,
-            "used_at": redeemed_at_map[c.id].isoformat() if c.id in redeemed_at_map else None,
+            "used_at": redeemed_at_map[c.id].isoformat()
+            if c.id in redeemed_at_map
+            else None,
             "meta": c.meta,
         }
         for c in cupons
@@ -538,6 +570,7 @@ def listar_cupons(
 # ---------------------------------------------------------------------------
 # Cupons — criar cupom manual
 # ---------------------------------------------------------------------------
+
 
 def _build_manual_coupon_meta(
     *,
@@ -585,7 +618,9 @@ def criar_cupom_manual(
     try:
         tipo = CouponTypeEnum(body.coupon_type)
     except ValueError:
-        raise HTTPException(status_code=400, detail=f"coupon_type inválido: {body.coupon_type}")
+        raise HTTPException(
+            status_code=400, detail=f"coupon_type inválido: {body.coupon_type}"
+        )
 
     try:
         canal = CouponChannelEnum(body.channel)
@@ -593,9 +628,14 @@ def criar_cupom_manual(
         raise HTTPException(status_code=400, detail=f"channel inválido: {body.channel}")
 
     if tipo == CouponTypeEnum.percent and not body.discount_percent:
-        raise HTTPException(status_code=400, detail="discount_percent é obrigatório para cupom de %")
+        raise HTTPException(
+            status_code=400, detail="discount_percent é obrigatório para cupom de %"
+        )
     if tipo == CouponTypeEnum.fixed and not body.discount_value:
-        raise HTTPException(status_code=400, detail="discount_value é obrigatório para cupom de valor fixo")
+        raise HTTPException(
+            status_code=400,
+            detail="discount_value é obrigatório para cupom de valor fixo",
+        )
 
     # Gerar código único
     code = f"MAN-{_uuid.uuid4().hex[:8].upper()}"
@@ -603,9 +643,13 @@ def criar_cupom_manual(
     valid_until = None
     if body.valid_until:
         try:
-            valid_until = datetime.fromisoformat(body.valid_until).replace(tzinfo=timezone.utc)
+            valid_until = datetime.fromisoformat(body.valid_until).replace(
+                tzinfo=timezone.utc
+            )
         except ValueError:
-            raise HTTPException(status_code=400, detail="valid_until deve ser YYYY-MM-DD")
+            raise HTTPException(
+                status_code=400, detail="valid_until deve ser YYYY-MM-DD"
+            )
 
     customer_id_resolvido = (
         _resolver_customer_id_campanhas(
@@ -658,11 +702,15 @@ def criar_cupom_manual(
         "code": cupom.code,
         "coupon_type": cupom.coupon_type.value,
         "discount_value": float(cupom.discount_value) if cupom.discount_value else None,
-        "discount_percent": float(cupom.discount_percent) if cupom.discount_percent else None,
+        "discount_percent": float(cupom.discount_percent)
+        if cupom.discount_percent
+        else None,
         "channel": cupom.channel.value,
         "status": cupom.status.value,
         "valid_until": cupom.valid_until.isoformat() if cupom.valid_until else None,
-        "min_purchase_value": float(cupom.min_purchase_value) if cupom.min_purchase_value else None,
+        "min_purchase_value": float(cupom.min_purchase_value)
+        if cupom.min_purchase_value
+        else None,
         "customer_id": cupom.customer_id,
         "meta": cupom.meta,
     }
@@ -671,6 +719,7 @@ def criar_cupom_manual(
 # ---------------------------------------------------------------------------
 # Cupons — resgate no PDV
 # ---------------------------------------------------------------------------
+
 
 class ResgateBody(BaseModel):
     venda_total: Optional[float] = None
@@ -713,6 +762,7 @@ def resgatar_cupom(
 # ---------------------------------------------------------------------------
 # Busca de clientes (para o Gestor de Benefícios — sem exigir clientes.visualizar)
 # ---------------------------------------------------------------------------
+
 
 @router.get("/clientes/buscar")
 def buscar_clientes_campanhas(
@@ -809,7 +859,13 @@ def gestor_clientes_por_tipo(
         rows = rows[:limit]
         return {
             "clientes": [
-                {"id": c.id, "nome": c.nome, "cpf": c.cpf, "telefone": c.telefone or c.celular, "detalhe": f"{total} carimbo(s)"}
+                {
+                    "id": c.id,
+                    "nome": c.nome,
+                    "cpf": c.cpf,
+                    "telefone": c.telefone or c.celular,
+                    "detalhe": f"{total} carimbo(s)",
+                }
                 for c, total in rows
             ]
         }
@@ -835,7 +891,13 @@ def gestor_clientes_por_tipo(
         )
         return {
             "clientes": [
-                {"id": c.id, "nome": c.nome, "cpf": c.cpf, "telefone": c.telefone or c.celular, "detalhe": f"R$ {float(saldo):.2f}".replace('.', ',')}
+                {
+                    "id": c.id,
+                    "nome": c.nome,
+                    "cpf": c.cpf,
+                    "telefone": c.telefone or c.celular,
+                    "detalhe": f"R$ {float(saldo):.2f}".replace(".", ","),
+                }
                 for c, saldo in rows
             ]
         }
@@ -863,16 +925,25 @@ def gestor_clientes_por_tipo(
         )
         return {
             "clientes": [
-                {"id": c.id, "nome": c.nome, "cpf": c.cpf, "telefone": c.telefone or c.celular, "detalhe": f"{total} cupom(ns) ativo(s)"}
+                {
+                    "id": c.id,
+                    "nome": c.nome,
+                    "cpf": c.cpf,
+                    "telefone": c.telefone or c.celular,
+                    "detalhe": f"{total} cupom(ns) ativo(s)",
+                }
                 for c, total in rows
             ]
         }
 
     else:  # ranking
         from datetime import date
+
         periodo_atual = date.today().strftime("%Y-%m")
         rows = (
-            db.query(Cliente, CustomerRankHistory.rank_level, CustomerRankHistory.total_spent)
+            db.query(
+                Cliente, CustomerRankHistory.rank_level, CustomerRankHistory.total_spent
+            )
             .join(CustomerRankHistory, Cliente.id == CustomerRankHistory.customer_id)
             .filter(
                 CustomerRankHistory.tenant_id == tenant_id,
@@ -883,10 +954,21 @@ def gestor_clientes_por_tipo(
             .limit(limit)
             .all()
         )
-        rank_map = {"platinum": "🏆 Platinum", "gold": "🥇 Ouro", "silver": "🥈 Prata", "bronze": "🥉 Bronze"}
+        rank_map = {
+            "platinum": "🏆 Platinum",
+            "gold": "🥇 Ouro",
+            "silver": "🥈 Prata",
+            "bronze": "🥉 Bronze",
+        }
         return {
             "clientes": [
-                {"id": c.id, "nome": c.nome, "cpf": c.cpf, "telefone": c.telefone or c.celular, "detalhe": rank_map.get(str(rank), str(rank))}
+                {
+                    "id": c.id,
+                    "nome": c.nome,
+                    "cpf": c.cpf,
+                    "telefone": c.telefone or c.celular,
+                    "detalhe": rank_map.get(str(rank), str(rank)),
+                }
                 for c, rank, _ in rows
             ]
         }
@@ -986,11 +1068,15 @@ def saldo_cliente(
                 "code": c.code,
                 "coupon_type": c.coupon_type.value,
                 "discount_value": float(c.discount_value) if c.discount_value else None,
-                "discount_percent": float(c.discount_percent) if c.discount_percent else None,
+                "discount_percent": float(c.discount_percent)
+                if c.discount_percent
+                else None,
                 "channel": c.channel.value,
                 "status": c.status.value,
                 "valid_until": c.valid_until.isoformat() if c.valid_until else None,
-                "min_purchase_value": float(c.min_purchase_value) if c.min_purchase_value else None,
+                "min_purchase_value": float(c.min_purchase_value)
+                if c.min_purchase_value
+                else None,
                 "customer_id": c.customer_id,
                 "campaign_id": c.campaign_id,
                 "nome_campanha": (
@@ -1018,6 +1104,7 @@ def saldo_cliente(
 # ---------------------------------------------------------------------------
 # Extrato unificado de campanhas por cliente
 # ---------------------------------------------------------------------------
+
 
 @router.get("/clientes/{customer_id}/extrato")
 def extrato_campanhas_cliente(
@@ -1062,6 +1149,7 @@ def extrato_campanhas_cliente(
 # ---------------------------------------------------------------------------
 # Cashback — extrato do cliente
 # ---------------------------------------------------------------------------
+
 
 @router.get("/clientes/{customer_id}/cashback/extrato")
 def extrato_cashback(
@@ -1113,16 +1201,18 @@ def extrato_cashback(
             and t.expires_at is not None
             and t.expires_at <= now_utc
         )
-        items.append({
-            "id": t.id,
-            "amount": float(t.amount),
-            "tx_type": t.tx_type,   # 'credit' | 'debit' | 'expired'
-            "source_type": t.source_type.value,
-            "description": t.description,
-            "created_at": t.created_at.isoformat() if t.created_at else None,
-            "expires_at": t.expires_at.isoformat() if t.expires_at else None,
-            "expired": is_expired_credit,
-        })
+        items.append(
+            {
+                "id": t.id,
+                "amount": float(t.amount),
+                "tx_type": t.tx_type,  # 'credit' | 'debit' | 'expired'
+                "source_type": t.source_type.value,
+                "description": t.description,
+                "created_at": t.created_at.isoformat() if t.created_at else None,
+                "expires_at": t.expires_at.isoformat() if t.expires_at else None,
+                "expired": is_expired_credit,
+            }
+        )
 
     return {
         "customer_id": customer_id,
@@ -1134,6 +1224,7 @@ def extrato_cashback(
 # ---------------------------------------------------------------------------
 # Cashback — sugestão de pedido inteligente
 # ---------------------------------------------------------------------------
+
 
 @router.get("/clientes/{customer_id}/cashback/sugestao")
 def sugestao_cashback(
@@ -1181,7 +1272,9 @@ def sugestao_cashback(
     # Usa a descrição para extrair o valor original (cashback é % do valor)
     # Alternativa: usar média dos valores de cashback como proxy
     if ultimas_compras:
-        ticket_medio_cashback = sum(float(t.amount) for t in ultimas_compras) / len(ultimas_compras)
+        ticket_medio_cashback = sum(float(t.amount) for t in ultimas_compras) / len(
+            ultimas_compras
+        )
         # Estimativa groossa: se o cashback médio é ~2%, ticket médio é ~50x
         # Mas sem acesso direto às vendas, usamos o valor de cashback como referência
         ticket_sugerido = round(ticket_medio_cashback * 50, 2)  # fallback heurístico
@@ -1213,7 +1306,9 @@ def sugestao_cashback(
             "amount": float(proximo_expirando.amount),
             "expires_at": proximo_expirando.expires_at.isoformat(),
             "dias_restantes": max(0, (proximo_expirando.expires_at - now_utc).days),
-        } if proximo_expirando else None,
+        }
+        if proximo_expirando
+        else None,
     }
 
 
@@ -1221,10 +1316,13 @@ def sugestao_cashback(
 # Carimbos — listagem por cliente
 # ---------------------------------------------------------------------------
 
+
 @router.get("/clientes/{customer_id}/carimbos")
 def listar_carimbos_cliente(
     customer_id: int,
-    incluir_estornados: bool = Query(False, description="Inclui carimbos já estornados"),
+    incluir_estornados: bool = Query(
+        False, description="Inclui carimbos já estornados"
+    ),
     db: Session = Depends(get_db),
     user_and_tenant=Depends(get_current_user_and_tenant),
 ):
@@ -1296,10 +1394,15 @@ def listar_carimbos_cliente(
 # Ranking — listagem de clientes por nível
 # ---------------------------------------------------------------------------
 
+
 @router.get("/ranking")
 def listar_ranking(
-    nivel: Optional[str] = Query(None, description="bronze | silver | gold | diamond | platinum"),
-    periodo: Optional[str] = Query(None, description="Período YYYY-MM (padrão: mais recente)"),
+    nivel: Optional[str] = Query(
+        None, description="bronze | silver | gold | diamond | platinum"
+    ),
+    periodo: Optional[str] = Query(
+        None, description="Período YYYY-MM (padrão: mais recente)"
+    ),
     limit: int = Query(100, le=500),
     db: Session = Depends(get_db),
     user_and_tenant=Depends(get_current_user_and_tenant),
@@ -1339,11 +1442,18 @@ def listar_ranking(
     customer_ids = [r.customer_id for r in registros]
     clientes_map = {}
     if customer_ids:
-        clientes = db.query(Cliente).filter(
-            Cliente.id.in_(customer_ids),
-            Cliente.tenant_id == tenant_id,
-        ).all()
-        clientes_map = {c.id: {"nome": c.nome, "telefone": getattr(c, "telefone", None)} for c in clientes}
+        clientes = (
+            db.query(Cliente)
+            .filter(
+                Cliente.id.in_(customer_ids),
+                Cliente.tenant_id == tenant_id,
+            )
+            .all()
+        )
+        clientes_map = {
+            c.id: {"nome": c.nome, "telefone": getattr(c, "telefone", None)}
+            for c in clientes
+        }
 
     # Distribuição por nível (todos os clientes do período)
     dist = (
@@ -1363,7 +1473,9 @@ def listar_ranking(
         "clientes": [
             {
                 "customer_id": r.customer_id,
-                "nome": clientes_map.get(r.customer_id, {}).get("nome", f"Cliente #{r.customer_id}"),
+                "nome": clientes_map.get(r.customer_id, {}).get(
+                    "nome", f"Cliente #{r.customer_id}"
+                ),
                 "telefone": clientes_map.get(r.customer_id, {}).get("telefone"),
                 "rank_level": r.rank_level.value,
                 "total_spent": float(r.total_spent),
@@ -1379,6 +1491,7 @@ def listar_ranking(
 # ---------------------------------------------------------------------------
 # Dashboard — alertas do dia e resumo de campanhas
 # ---------------------------------------------------------------------------
+
 
 @router.get("/dashboard")
 def dashboard_campanhas(
@@ -1446,40 +1559,58 @@ def dashboard_campanhas(
     # Aniversários de cliente hoje
     aniversarios_clientes = []
     try:
-        todos_clientes = db.query(Cliente).filter(
-            Cliente.tenant_id == tenant_id,
-            Cliente.data_nascimento.isnot(None),
-        ).all()
+        todos_clientes = (
+            db.query(Cliente)
+            .filter(
+                Cliente.tenant_id == tenant_id,
+                Cliente.data_nascimento.isnot(None),
+            )
+            .all()
+        )
         for c in todos_clientes:
             if c.data_nascimento:
                 dn = c.data_nascimento
-                if hasattr(dn, 'month') and f"{dn.month:02d}-{dn.day:02d}" == hoje_mm_dd:
-                    aniversarios_clientes.append({
-                        "id": c.id,
-                        "nome": c.nome,
-                        "tipo": "cliente",
-                        "idade": hoje.year - dn.year,
-                    })
+                if (
+                    hasattr(dn, "month")
+                    and f"{dn.month:02d}-{dn.day:02d}" == hoje_mm_dd
+                ):
+                    aniversarios_clientes.append(
+                        {
+                            "id": c.id,
+                            "nome": c.nome,
+                            "tipo": "cliente",
+                            "idade": hoje.year - dn.year,
+                        }
+                    )
     except Exception:
         pass
 
     # Aniversários de pet hoje
     aniversarios_pets = []
     try:
-        todos_pets = db.query(Pet).filter(
-            Pet.tenant_id == tenant_id,
-            Pet.data_nascimento.isnot(None),
-        ).all()
+        todos_pets = (
+            db.query(Pet)
+            .filter(
+                Pet.tenant_id == tenant_id,
+                Pet.data_nascimento.isnot(None),
+            )
+            .all()
+        )
         for p in todos_pets:
             if p.data_nascimento:
                 dn = p.data_nascimento
-                if hasattr(dn, 'month') and f"{dn.month:02d}-{dn.day:02d}" == hoje_mm_dd:
-                    aniversarios_pets.append({
-                        "id": p.id,
-                        "nome": p.nome,
-                        "tipo": "pet",
-                        "dono_id": p.cliente_id,
-                    })
+                if (
+                    hasattr(dn, "month")
+                    and f"{dn.month:02d}-{dn.day:02d}" == hoje_mm_dd
+                ):
+                    aniversarios_pets.append(
+                        {
+                            "id": p.id,
+                            "nome": p.nome,
+                            "tipo": "pet",
+                            "dono_id": p.cliente_id,
+                        }
+                    )
     except Exception:
         pass
 
@@ -1505,12 +1636,18 @@ def dashboard_campanhas(
         for c in todos_clientes:
             if c.data_nascimento:
                 dn = c.data_nascimento
-                if hasattr(dn, 'month') and f"{dn.month:02d}-{dn.day:02d}" == amanha_mm_dd:
+                if (
+                    hasattr(dn, "month")
+                    and f"{dn.month:02d}-{dn.day:02d}" == amanha_mm_dd
+                ):
                     aniversarios_amanha.append({"nome": c.nome, "tipo": "cliente"})
         for p in todos_pets:
             if p.data_nascimento:
                 dn = p.data_nascimento
-                if hasattr(dn, 'month') and f"{dn.month:02d}-{dn.day:02d}" == amanha_mm_dd:
+                if (
+                    hasattr(dn, "month")
+                    and f"{dn.month:02d}-{dn.day:02d}" == amanha_mm_dd
+                ):
                     aniversarios_amanha.append({"nome": p.nome, "tipo": "pet"})
     except Exception:
         pass
@@ -1520,35 +1657,45 @@ def dashboard_campanhas(
     inativos_60d = 0
     try:
         from app.vendas_models import Venda as VendaModel
+
         corte_30 = datetime.combine(hoje - timedelta(days=30), datetime.min.time())
         corte_60 = datetime.combine(hoje - timedelta(days=60), datetime.min.time())
 
         # IDs de clientes que compraram na janela recente
         ativos_30d_ids = set(
-            r[0] for r in db.query(VendaModel.cliente_id)
+            r[0]
+            for r in db.query(VendaModel.cliente_id)
             .filter(
                 VendaModel.tenant_id == tenant_id,
                 VendaModel.cliente_id.isnot(None),
                 VendaModel.status == "finalizada",
                 VendaModel.data_venda >= corte_30,
-            ).distinct().all()
+            )
+            .distinct()
+            .all()
         )
         ativos_60d_ids = set(
-            r[0] for r in db.query(VendaModel.cliente_id)
+            r[0]
+            for r in db.query(VendaModel.cliente_id)
             .filter(
                 VendaModel.tenant_id == tenant_id,
                 VendaModel.cliente_id.isnot(None),
                 VendaModel.status == "finalizada",
                 VendaModel.data_venda >= corte_60,
-            ).distinct().all()
+            )
+            .distinct()
+            .all()
         )
         todos_com_venda_ids = set(
-            r[0] for r in db.query(VendaModel.cliente_id)
+            r[0]
+            for r in db.query(VendaModel.cliente_id)
             .filter(
                 VendaModel.tenant_id == tenant_id,
                 VendaModel.cliente_id.isnot(None),
                 VendaModel.status == "finalizada",
-            ).distinct().all()
+            )
+            .distinct()
+            .all()
         )
         inativos_30d = len(todos_com_venda_ids - ativos_30d_ids)
         inativos_60d = len(todos_com_venda_ids - ativos_60d_ids)
@@ -1583,10 +1730,16 @@ def dashboard_campanhas(
     # ── Sorteios pendentes (não concluídos) ───────────────────────────────
     sorteios_pendentes = []
     try:
-        sp = db.query(Drawing).filter(
-            Drawing.tenant_id == tenant_id,
-            Drawing.status != DrawingStatusEnum.done,
-        ).order_by(Drawing.draw_date.asc().nullsfirst()).limit(10).all()
+        sp = (
+            db.query(Drawing)
+            .filter(
+                Drawing.tenant_id == tenant_id,
+                Drawing.status != DrawingStatusEnum.done,
+            )
+            .order_by(Drawing.draw_date.asc().nullsfirst())
+            .limit(10)
+            .all()
+        )
         sorteios_pendentes = [
             {
                 "id": s.id,
@@ -1603,12 +1756,18 @@ def dashboard_campanhas(
     sorteios_semana = []
     try:
         semana = hoje + timedelta(days=7)
-        ss = db.query(Drawing).filter(
-            Drawing.tenant_id == tenant_id,
-            Drawing.draw_date >= datetime.combine(hoje, datetime.min.time()),
-            Drawing.draw_date <= datetime.combine(semana, datetime.max.time()),
-            Drawing.status != DrawingStatusEnum.done,
-        ).order_by(Drawing.draw_date.asc()).limit(5).all()
+        ss = (
+            db.query(Drawing)
+            .filter(
+                Drawing.tenant_id == tenant_id,
+                Drawing.draw_date >= datetime.combine(hoje, datetime.min.time()),
+                Drawing.draw_date <= datetime.combine(semana, datetime.max.time()),
+                Drawing.status != DrawingStatusEnum.done,
+            )
+            .order_by(Drawing.draw_date.asc())
+            .limit(5)
+            .all()
+        )
         sorteios_semana = [
             {
                 "id": s.id,
@@ -1624,6 +1783,7 @@ def dashboard_campanhas(
     brindes_pendentes = []
     try:
         from app.models import Cliente as ClienteModel
+
         brindes_q = (
             db.query(Coupon)
             .filter(
@@ -1658,6 +1818,7 @@ def dashboard_campanhas(
 
     # ── Dias até o fim do mês (para destaque mensal) ──────────────────────
     import calendar as _calendar
+
     _, ultimo_dia = _calendar.monthrange(hoje.year, hoje.month)
     fim_mes = date(hoje.year, hoje.month, ultimo_dia)
     dias_ate_fim_mes = (fim_mes - hoje).days
@@ -1696,6 +1857,7 @@ def dashboard_campanhas(
 # Cashback — ajuste manual (Gestor de Benefícios)
 # ---------------------------------------------------------------------------
 
+
 class CashbackManualBody(BaseModel):
     customer_id: int
     amount: float  # positivo = crédito, negativo = débito
@@ -1715,7 +1877,9 @@ def cashback_manual(
     """
     _, tenant_id = user_and_tenant
     if body.amount == 0:
-        raise HTTPException(status_code=400, detail="O valor do ajuste não pode ser zero.")
+        raise HTTPException(
+            status_code=400, detail="O valor do ajuste não pode ser zero."
+        )
 
     transacao = CashbackTransaction(
         tenant_id=tenant_id,
@@ -1735,12 +1899,16 @@ def cashback_manual(
             CashbackTransaction.tenant_id == tenant_id,
             CashbackTransaction.customer_id == body.customer_id,
         )
-        .scalar() or 0
+        .scalar()
+        or 0
     )
 
     logger.info(
         "[Campanhas] Cashback manual: customer_id=%d amount=%.2f tenant=%s novo_saldo=%.2f",
-        body.customer_id, body.amount, tenant_id, novo_saldo,
+        body.customer_id,
+        body.amount,
+        tenant_id,
+        novo_saldo,
     )
     return {
         "ok": True,
@@ -1754,6 +1922,7 @@ def cashback_manual(
 # ---------------------------------------------------------------------------
 # Anular cupom (Sprint 9)
 # ---------------------------------------------------------------------------
+
 
 @router.delete("/cupons/{code}", status_code=200)
 def anular_cupom(
@@ -1776,7 +1945,10 @@ def anular_cupom(
     if not cupom:
         raise HTTPException(404, detail="Cupão não encontrado.")
     if cupom.status != CouponStatusEnum.active:
-        raise HTTPException(400, detail=f"Não é possível anular um cupão com status '{cupom.status.value}'.")
+        raise HTTPException(
+            400,
+            detail=f"Não é possível anular um cupão com status '{cupom.status.value}'.",
+        )
 
     loyalty_reversal = revoke_loyalty_reward_by_coupon(
         db,
@@ -1824,6 +1996,7 @@ def anular_cupom(
 # Relátorio de campanhas — histórico de cashback (créditos e resgates)
 # ---------------------------------------------------------------------------
 
+
 @router.get("/relatorio")
 def relatorio_campanhas(
     data_inicio: Optional[date] = Query(None),
@@ -1847,9 +2020,15 @@ def relatorio_campanhas(
     )
 
     if data_inicio:
-        q = q.filter(CashbackTransaction.created_at >= datetime.combine(data_inicio, datetime.min.time()))
+        q = q.filter(
+            CashbackTransaction.created_at
+            >= datetime.combine(data_inicio, datetime.min.time())
+        )
     if data_fim:
-        q = q.filter(CashbackTransaction.created_at <= datetime.combine(data_fim, datetime.max.time()))
+        q = q.filter(
+            CashbackTransaction.created_at
+            <= datetime.combine(data_fim, datetime.max.time())
+        )
     if tipo == "credito":
         q = q.filter(CashbackTransaction.amount > 0)
     elif tipo == "resgate":
@@ -1861,37 +2040,51 @@ def relatorio_campanhas(
     customer_ids = list({t.customer_id for t in transacoes})
     clientes_map = {}
     if customer_ids:
-        clientes = db.query(Cliente).filter(
-            Cliente.id.in_(customer_ids),
-            Cliente.tenant_id == tenant_id,
-        ).all()
+        clientes = (
+            db.query(Cliente)
+            .filter(
+                Cliente.id.in_(customer_ids),
+                Cliente.tenant_id == tenant_id,
+            )
+            .all()
+        )
         clientes_map = {c.id: c.nome for c in clientes}
 
     # Buscar números de venda em lote (source_id é venda_id para resgates)
     venda_ids = list({t.source_id for t in transacoes if t.source_id and t.amount < 0})
     vendas_map = {}
     if venda_ids:
-        vendas = db.query(Venda).filter(
-            Venda.id.in_(venda_ids),
-            Venda.tenant_id == tenant_id,
-        ).all()
+        vendas = (
+            db.query(Venda)
+            .filter(
+                Venda.id.in_(venda_ids),
+                Venda.tenant_id == tenant_id,
+            )
+            .all()
+        )
         vendas_map = {v.id: v.numero_venda for v in vendas}
 
     resultado = []
     for t in transacoes:
         eh_resgate = t.amount < 0
-        resultado.append({
-            "id": t.id,
-            "data": t.created_at.isoformat(),
-            "cliente_id": t.customer_id,
-            "cliente_nome": clientes_map.get(t.customer_id, f"Cliente #{t.customer_id}"),
-            "tipo": "resgate" if eh_resgate else "credito",
-            "valor": float(abs(t.amount)),
-            "source_type": t.source_type.value if t.source_type else None,
-            "venda_id": t.source_id if eh_resgate else None,
-            "numero_venda": vendas_map.get(t.source_id) if eh_resgate and t.source_id else None,
-            "descricao": t.description,
-        })
+        resultado.append(
+            {
+                "id": t.id,
+                "data": t.created_at.isoformat(),
+                "cliente_id": t.customer_id,
+                "cliente_nome": clientes_map.get(
+                    t.customer_id, f"Cliente #{t.customer_id}"
+                ),
+                "tipo": "resgate" if eh_resgate else "credito",
+                "valor": float(abs(t.amount)),
+                "source_type": t.source_type.value if t.source_type else None,
+                "venda_id": t.source_id if eh_resgate else None,
+                "numero_venda": vendas_map.get(t.source_id)
+                if eh_resgate and t.source_id
+                else None,
+                "descricao": t.description,
+            }
+        )
 
     # Totais
     total_creditado = sum(r["valor"] for r in resultado if r["tipo"] == "credito")
@@ -1908,6 +2101,7 @@ def relatorio_campanhas(
 # ---------------------------------------------------------------------------
 # Carimbos — lançamento manual
 # ---------------------------------------------------------------------------
+
 
 class LancarCarimboManualBody(BaseModel):
     customer_id: int
@@ -2029,7 +2223,9 @@ def lancar_carimbo_manual(
 
     logger.info(
         "[Campanhas] Carimbo manual lançado customer_id=%d tenant=%s total=%d",
-        customer_id, tenant_id, saldo["total_carimbos"],
+        customer_id,
+        tenant_id,
+        saldo["total_carimbos"],
     )
 
     return {
@@ -2049,6 +2245,7 @@ def lancar_carimbo_manual(
 # ---------------------------------------------------------------------------
 # Carimbos — estorno (remoção) de carimbo individual
 # ---------------------------------------------------------------------------
+
 
 @router.delete("/carimbos/{stamp_id}", status_code=200)
 def estornar_carimbo(
@@ -2121,7 +2318,10 @@ def estornar_carimbo(
 
     logger.info(
         "[Campanhas] Carimbo #%d estornado customer_id=%d tenant=%s restantes=%d",
-        stamp_id, stamp.customer_id, tenant_id, saldo["total_carimbos"],
+        stamp_id,
+        stamp.customer_id,
+        tenant_id,
+        saldo["total_carimbos"],
     )
     return {
         "ok": True,
@@ -2137,6 +2337,7 @@ def estornar_carimbo(
 # ---------------------------------------------------------------------------
 # Ranking — configurar critérios por nível
 # ---------------------------------------------------------------------------
+
 
 class RankingConfigBody(BaseModel):
     silver_min_spent: float = 300
@@ -2190,7 +2391,10 @@ def salvar_ranking_config(
         .first()
     )
     if not campanha:
-        raise HTTPException(status_code=404, detail="Campanha de ranking não encontrada. Execute o seed primeiro.")
+        raise HTTPException(
+            status_code=404,
+            detail="Campanha de ranking não encontrada. Execute o seed primeiro.",
+        )
     campanha.params = {**(campanha.params or {}), **body.model_dump()}
     db.commit()
     return {"ok": True, "params": campanha.params}
@@ -2200,15 +2404,18 @@ def salvar_ranking_config(
 # Configuração global de horários do scheduler
 # ---------------------------------------------------------------------------
 
+
 class SchedulerConfigBody(BaseModel):
-    birthday_send_hour: int = 8          # hora de envio das mensagens de aniversário (0-23)
-    inactivity_send_hour: int = 9        # hora de envio das mensagens de inatividade (0-23)
+    birthday_send_hour: int = 8  # hora de envio das mensagens de aniversário (0-23)
+    inactivity_send_hour: int = 9  # hora de envio das mensagens de inatividade (0-23)
     inactivity_day_of_week: str = "mon"  # dia da semana: mon/tue/wed/thu/fri/sat/sun
-    ranking_send_day: int = 1            # dia do mês para recálculo do ranking (1-28)
-    ranking_send_hour: int = 6           # hora do recálculo de ranking (0-23)
-    auto_destaque_mensal: bool = False   # True = enviar destaque mensal automaticamente no dia 1
+    ranking_send_day: int = 1  # dia do mês para recálculo do ranking (1-28)
+    ranking_send_hour: int = 6  # hora do recálculo de ranking (0-23)
+    auto_destaque_mensal: bool = (
+        False  # True = enviar destaque mensal automaticamente no dia 1
+    )
     auto_destaque_coupon_value: float = 50.0  # valor do cupom do destaque automático
-    auto_destaque_coupon_days: int = 10       # validade do cupom do destaque automático
+    auto_destaque_coupon_days: int = 10  # validade do cupom do destaque automático
 
 
 @router.get("/config/horarios")
@@ -2248,7 +2455,10 @@ def salvar_scheduler_config(
         .first()
     )
     if not campanha:
-        raise HTTPException(status_code=404, detail="Campanha de aniversário não encontrada. Execute o seed primeiro.")
+        raise HTTPException(
+            status_code=404,
+            detail="Campanha de aniversário não encontrada. Execute o seed primeiro.",
+        )
     campanha.params = {**(campanha.params or {}), **body.model_dump()}
 
     # Salvar params de destaque automático na campanha ranking_monthly também
@@ -2276,6 +2486,7 @@ def salvar_scheduler_config(
 # Ranking — forçar recálculo
 # ---------------------------------------------------------------------------
 
+
 @router.post("/ranking/recalcular")
 def recalcular_ranking(
     db: Session = Depends(get_db),
@@ -2294,12 +2505,18 @@ def recalcular_ranking(
         event_type="monthly_ranking_recalc",
         event_origin=EventOriginEnum.user_action,
         event_depth=0,
-        payload={"triggered_by": "manual", "triggered_at": datetime.now(timezone.utc).isoformat()},
+        payload={
+            "triggered_by": "manual",
+            "triggered_at": datetime.now(timezone.utc).isoformat(),
+        },
     )
     db.add(evento)
     db.commit()
 
-    return {"ok": True, "message": "Recálculo de ranking enfileirado. O worker processará em até 10 segundos."}
+    return {
+        "ok": True,
+        "message": "Recálculo de ranking enfileirado. O worker processará em até 10 segundos.",
+    }
 
 
 # ---------------------------------------------------------------------------
@@ -2340,7 +2557,9 @@ def criar_campanha(
     try:
         tipo = CampaignTypeEnum(body.campaign_type)
     except ValueError:
-        raise HTTPException(400, detail=f"Tipo de campanha inválido: {body.campaign_type}")
+        raise HTTPException(
+            400, detail=f"Tipo de campanha inválido: {body.campaign_type}"
+        )
 
     if tipo not in _USER_CREATABLE_TYPES:
         raise HTTPException(
@@ -2404,6 +2623,7 @@ def deletar_campanha(
 # ---------------------------------------------------------------------------
 # Retenção Dinâmica — CRUD dedicado (filtra por campaign_type = inactivity)
 # ---------------------------------------------------------------------------
+
 
 class RetencaoBody(BaseModel):
     name: str
@@ -2539,6 +2759,7 @@ def deletar_retencao(
 # Destaque Mensal
 # ---------------------------------------------------------------------------
 
+
 @router.get("/destaque-mensal")
 def calcular_destaque_mensal(
     db: Session = Depends(get_db),
@@ -2615,13 +2836,15 @@ def calcular_destaque_mensal(
                 usados.add(candidato["customer_id"])
                 # Se não foi o 1º colocado, houve desempate
                 if i > 0:
-                    desempate_info.append({
-                        "categoria": categoria,
-                        "pulado": lista[0],
-                        "eleito": candidato,
-                        "posicao_eleito": i + 1,  # 2, 3, ...
-                        "motivo": "1º colocado já venceu em outra categoria",
-                    })
+                    desempate_info.append(
+                        {
+                            "categoria": categoria,
+                            "pulado": lista[0],
+                            "eleito": candidato,
+                            "posicao_eleito": i + 1,  # 2, 3, ...
+                            "motivo": "1º colocado já venceu em outra categoria",
+                        }
+                    )
                 break
 
     return {
@@ -2637,12 +2860,12 @@ def calcular_destaque_mensal(
 class EnviarDestaqueBody(BaseModel):
     vencedores: dict  # cada entrada: { "customer_id": X, "tipo_premio": T, "coupon_value": V, ... }
     # Fallbacks globais (mantidos por compatibilidade)
-    tipo_premio: str = "cupom"          # "cupom" | "mensagem"
+    tipo_premio: str = "cupom"  # "cupom" | "mensagem"
     coupon_value: float = 50.0
     coupon_valid_days: int = 10
     mensagem_brinde: Optional[str] = None
-    retirar_de: Optional[str] = None    # data string YYYY-MM-DD
-    retirar_ate: Optional[str] = None   # data string YYYY-MM-DD
+    retirar_de: Optional[str] = None  # data string YYYY-MM-DD
+    retirar_ate: Optional[str] = None  # data string YYYY-MM-DD
     mensagem_personalizada: Optional[str] = None
 
 
@@ -2665,7 +2888,8 @@ def enviar_destaque_mensal(
     now = datetime.now(timezone.utc)
     first_day_this_month = now.replace(day=1)
     from datetime import timedelta
-    last_month = (first_day_this_month - timedelta(days=1))
+
+    last_month = first_day_this_month - timedelta(days=1)
     period = last_month.strftime("%Y-%m")
 
     resultados = []
@@ -2728,18 +2952,22 @@ def enviar_destaque_mensal(
             else:
                 ja_existia_brinde = True
 
-            resultados.append({
-                "categoria": categoria,
-                "customer_id": customer_id,
-                "tipo_premio": "mensagem",
-                "mensagem": mensagem,
-                "retirar_de": retirar_de,
-                "retirar_ate": retirar_ate,
-                "ja_existia": ja_existia_brinde,
-            })
+            resultados.append(
+                {
+                    "categoria": categoria,
+                    "customer_id": customer_id,
+                    "tipo_premio": "mensagem",
+                    "mensagem": mensagem,
+                    "retirar_de": retirar_de,
+                    "retirar_ate": retirar_ate,
+                    "ja_existia": ja_existia_brinde,
+                }
+            )
             logger.info(
                 "[DestaqueEnviar] Brinde registrado — cliente %s, categoria %s, periodo %s",
-                customer_id, categoria, period,
+                customer_id,
+                categoria,
+                period,
             )
             continue
 
@@ -2755,14 +2983,16 @@ def enviar_destaque_mensal(
             .first()
         )
         if already:
-            resultados.append({
-                "categoria": categoria,
-                "customer_id": customer_id,
-                "tipo_premio": "cupom",
-                "coupon_code": already.code,
-                "coupon_value": float(already.discount_value or 0),
-                "ja_existia": True,
-            })
+            resultados.append(
+                {
+                    "categoria": categoria,
+                    "customer_id": customer_id,
+                    "tipo_premio": "cupom",
+                    "coupon_code": already.code,
+                    "coupon_value": float(already.discount_value or 0),
+                    "ja_existia": True,
+                }
+            )
             continue
 
         try:
@@ -2784,14 +3014,16 @@ def enviar_destaque_mensal(
                     "mensagem": mensagem,
                 },
             )
-            resultados.append({
-                "categoria": categoria,
-                "customer_id": customer_id,
-                "tipo_premio": "cupom",
-                "coupon_code": coupon.code,
-                "coupon_value": val_cupom,
-                "ja_existia": False,
-            })
+            resultados.append(
+                {
+                    "categoria": categoria,
+                    "customer_id": customer_id,
+                    "tipo_premio": "cupom",
+                    "coupon_code": coupon.code,
+                    "coupon_value": val_cupom,
+                    "ja_existia": False,
+                }
+            )
         except Exception as exc:
             logger.warning("[DestaqueEnviar] Erro cliente %s: %s", customer_id, exc)
 
@@ -2802,6 +3034,7 @@ def enviar_destaque_mensal(
 # ---------------------------------------------------------------------------
 # Seed — criar campanhas padrão para o tenant
 # ---------------------------------------------------------------------------
+
 
 @router.post("/seed")
 def seed_campanhas(
@@ -2815,12 +3048,15 @@ def seed_campanhas(
     _, tenant_id = user_and_tenant
 
     from app.campaigns.scheduler import seed_campaigns_for_tenant
+
     criadas = seed_campaigns_for_tenant(db, tenant_id)
 
     return {
         "ok": True,
         "campanhas_criadas": criadas,
-        "message": f"{criadas} campanha(s) criada(s)" if criadas else "Todas as campanhas padrão já existem",
+        "message": f"{criadas} campanha(s) criada(s)"
+        if criadas
+        else "Todas as campanhas padrão já existem",
     }
 
 
@@ -2828,13 +3064,16 @@ def seed_campanhas(
 # SPRINT 7 — Sorteios
 # ---------------------------------------------------------------------------
 
+
 class CriarSorteioBody(BaseModel):
     name: str
     description: Optional[str] = None
     prize_description: Optional[str] = None
-    rank_filter: Optional[str] = None   # bronze | silver | gold | diamond | platinum | None = todos
-    draw_date: Optional[str] = None     # ISO 8601 date string
-    auto_execute: bool = False          # True = executar automaticamente na draw_date
+    rank_filter: Optional[str] = (
+        None  # bronze | silver | gold | diamond | platinum | None = todos
+    )
+    draw_date: Optional[str] = None  # ISO 8601 date string
+    auto_execute: bool = False  # True = executar automaticamente na draw_date
 
 
 class EditarSorteioBody(BaseModel):
@@ -2856,7 +3095,9 @@ def _drawing_to_dict(d: Drawing, entry_count: int = 0) -> dict:
         "status": d.status.value,
         "draw_date": d.draw_date.isoformat() if d.draw_date else None,
         "auto_execute": d.auto_execute,
-        "entries_frozen_at": d.entries_frozen_at.isoformat() if d.entries_frozen_at else None,
+        "entries_frozen_at": d.entries_frozen_at.isoformat()
+        if d.entries_frozen_at
+        else None,
         "entries_hash": d.entries_hash,
         "seed_uuid": str(d.seed_uuid) if d.seed_uuid else None,
         "winner_entry_id": d.winner_entry_id,
@@ -2909,12 +3150,15 @@ def criar_sorteio(
         try:
             rank_filter = RankLevelEnum(body.rank_filter)
         except ValueError:
-            raise HTTPException(400, detail=f"Nível de ranking inválido: {body.rank_filter}")
+            raise HTTPException(
+                400, detail=f"Nível de ranking inválido: {body.rank_filter}"
+            )
 
     draw_date = None
     if body.draw_date:
         try:
             from datetime import datetime as _dt
+
             draw_date = _dt.fromisoformat(body.draw_date).replace(tzinfo=timezone.utc)
         except ValueError:
             raise HTTPException(400, detail="draw_date inválido (use ISO 8601)")
@@ -2963,13 +3207,20 @@ def editar_sorteio(
         drawing.prize_description = body.prize_description
     if body.rank_filter is not None:
         try:
-            drawing.rank_filter = RankLevelEnum(body.rank_filter) if body.rank_filter else None
+            drawing.rank_filter = (
+                RankLevelEnum(body.rank_filter) if body.rank_filter else None
+            )
         except ValueError:
             raise HTTPException(400, detail=f"Nível inválido: {body.rank_filter}")
     if body.draw_date is not None:
         try:
             from datetime import datetime as _dt
-            drawing.draw_date = _dt.fromisoformat(body.draw_date).replace(tzinfo=timezone.utc) if body.draw_date else None
+
+            drawing.draw_date = (
+                _dt.fromisoformat(body.draw_date).replace(tzinfo=timezone.utc)
+                if body.draw_date
+                else None
+            )
         except ValueError:
             raise HTTPException(400, detail="draw_date inválido (use ISO 8601)")
     if body.auto_execute is not None:
@@ -2978,7 +3229,9 @@ def editar_sorteio(
     db.commit()
     db.refresh(drawing)
 
-    entry_count = db.query(DrawingEntry).filter(DrawingEntry.drawing_id == drawing_id).count()
+    entry_count = (
+        db.query(DrawingEntry).filter(DrawingEntry.drawing_id == drawing_id).count()
+    )
     return _drawing_to_dict(drawing, entry_count)
 
 
@@ -3003,7 +3256,10 @@ def inscrever_participantes(
     if not drawing:
         raise HTTPException(404, detail="Sorteio não encontrado.")
     if drawing.status in (DrawingStatusEnum.drawn, DrawingStatusEnum.cancelled):
-        raise HTTPException(400, detail=f"Sorteio em status '{drawing.status.value}' não aceita inscrições.")
+        raise HTTPException(
+            400,
+            detail=f"Sorteio em status '{drawing.status.value}' não aceita inscrições.",
+        )
 
     # Descobrir período mais recente do ranking
     ultimo_periodo = (
@@ -3013,7 +3269,10 @@ def inscrever_participantes(
         .first()
     )
     if not ultimo_periodo:
-        raise HTTPException(400, detail="Nenhum dado de ranking disponível. Execute o recálculo primeiro.")
+        raise HTTPException(
+            400,
+            detail="Nenhum dado de ranking disponível. Execute o recálculo primeiro.",
+        )
     periodo = ultimo_periodo[0]
 
     # Filtrar clientes elegíveis
@@ -3134,11 +3393,17 @@ def executar_sorteio(
 
     # Buscar nome do ganhador
     from app.models import Cliente
-    cliente = db.query(Cliente).filter(Cliente.id == winner_entry.customer_id, Cliente.tenant_id == tenant_id).first()
+
+    cliente = (
+        db.query(Cliente)
+        .filter(Cliente.id == winner_entry.customer_id, Cliente.tenant_id == tenant_id)
+        .first()
+    )
 
     # Enfileirar notificação de parabéns para o ganhador
     if cliente and cliente.email:
         from app.campaigns.notification_service import enqueue_email
+
         prize_text = drawing.prize_description or "o prêmio"
         enqueue_email(
             db,
@@ -3160,7 +3425,9 @@ def executar_sorteio(
         "ok": True,
         "winner_entry_id": winner_entry.id,
         "winner_customer_id": winner_entry.customer_id,
-        "winner_name": cliente.nome if cliente else f"Cliente #{winner_entry.customer_id}",
+        "winner_name": cliente.nome
+        if cliente
+        else f"Cliente #{winner_entry.customer_id}",
         "total_participantes": len(entries),
         "seed_uuid": str(seed_uuid),
         "entries_hash": entries_hash,
@@ -3196,21 +3463,29 @@ def resultado_sorteio(
     customer_ids = [e.customer_id for e in entries]
     clientes_map = {}
     if customer_ids:
-        clientes = db.query(Cliente).filter(
-            Cliente.id.in_(customer_ids), Cliente.tenant_id == tenant_id
-        ).all()
+        clientes = (
+            db.query(Cliente)
+            .filter(Cliente.id.in_(customer_ids), Cliente.tenant_id == tenant_id)
+            .all()
+        )
         clientes_map = {c.id: c.nome for c in clientes}
 
     winner_customer_id = None
     if drawing.winner_entry_id:
-        winner_entry = next((e for e in entries if e.id == drawing.winner_entry_id), None)
+        winner_entry = next(
+            (e for e in entries if e.id == drawing.winner_entry_id), None
+        )
         if winner_entry:
             winner_customer_id = winner_entry.customer_id
 
     return {
         "drawing": _drawing_to_dict(drawing, len(entries)),
         "winner_customer_id": winner_customer_id,
-        "winner_name": clientes_map.get(winner_customer_id, f"Cliente #{winner_customer_id}") if winner_customer_id else None,
+        "winner_name": clientes_map.get(
+            winner_customer_id, f"Cliente #{winner_customer_id}"
+        )
+        if winner_customer_id
+        else None,
         "participantes": [
             {
                 "entry_id": e.id,
@@ -3257,7 +3532,11 @@ def codigos_offline_sorteio(
     cids = [e.customer_id for e in entries]
     clientes_map = {}
     if cids:
-        for cl in db.query(Cliente).filter(Cliente.id.in_(cids), Cliente.tenant_id == tenant_id).all():
+        for cl in (
+            db.query(Cliente)
+            .filter(Cliente.id.in_(cids), Cliente.tenant_id == tenant_id)
+            .all()
+        ):
             clientes_map[cl.id] = cl.nome
 
     # Gera lista com 1 linha por ticket
@@ -3266,12 +3545,14 @@ def codigos_offline_sorteio(
     for e in entries:
         nome = clientes_map.get(e.customer_id, f"Cliente #{e.customer_id}")
         for _ in range(max(1, e.ticket_count)):
-            tickets.append({
-                "numero": numero,
-                "customer_id": e.customer_id,
-                "nome": nome,
-                "rank_level": e.rank_level.value if e.rank_level else None,
-            })
+            tickets.append(
+                {
+                    "numero": numero,
+                    "customer_id": e.customer_id,
+                    "nome": nome,
+                    "rank_level": e.rank_level.value if e.rank_level else None,
+                }
+            )
             numero += 1
 
     return {
@@ -3312,10 +3593,11 @@ def cancelar_sorteio(
 # SPRINT 7 — Envio em lote por nível de ranking
 # ---------------------------------------------------------------------------
 
+
 class EnvioLoteBody(BaseModel):
-    nivel: str                     # bronze | silver | gold | diamond | platinum | todos
+    nivel: str  # bronze | silver | gold | diamond | platinum | todos
     assunto: str
-    mensagem: str                  # corpo do e-mail / notificação
+    mensagem: str  # corpo do e-mail / notificação
     periodo: Optional[str] = None  # YYYY-MM (padrão: mais recente)
 
 
@@ -3353,7 +3635,9 @@ def envio_em_lote(
             .first()
         )
         if not ultimo:
-            raise HTTPException(400, detail="Nenhum dado de ranking. Execute o recálculo primeiro.")
+            raise HTTPException(
+                400, detail="Nenhum dado de ranking. Execute o recálculo primeiro."
+            )
         periodo = ultimo[0]
 
     # Buscar clientes elegíveis
@@ -3369,11 +3653,15 @@ def envio_em_lote(
         return {"ok": True, "enfileirados": 0, "sem_email": 0, "periodo": periodo}
 
     customer_ids = [r.customer_id for r in registros]
-    clientes = db.query(Cliente).filter(
-        Cliente.id.in_(customer_ids),
-        Cliente.tenant_id == tenant_id,
-        Cliente.email.isnot(None),
-    ).all()
+    clientes = (
+        db.query(Cliente)
+        .filter(
+            Cliente.id.in_(customer_ids),
+            Cliente.tenant_id == tenant_id,
+            Cliente.email.isnot(None),
+        )
+        .all()
+    )
     clientes_map = {c.id: c for c in clientes}
 
     enfileirados = 0
@@ -3411,6 +3699,7 @@ def envio_em_lote(
 # ---------------------------------------------------------------------------
 # SPRINT 8 — Unificação Cross-Canal via CPF/Telefone
 # ---------------------------------------------------------------------------
+
 
 def _serialize_cliente_resumo(c):
     return {
@@ -3459,11 +3748,13 @@ def listar_sugestoes_unificacao(
                 key = (min(a.id, b.id), max(a.id, b.id))
                 if key not in seen_pairs:
                     seen_pairs.add(key)
-                    sugestoes.append({
-                        "motivo": "mesmo_cpf",
-                        "cliente_a": _serialize_cliente_resumo(a),
-                        "cliente_b": _serialize_cliente_resumo(b),
-                    })
+                    sugestoes.append(
+                        {
+                            "motivo": "mesmo_cpf",
+                            "cliente_a": _serialize_cliente_resumo(a),
+                            "cliente_b": _serialize_cliente_resumo(b),
+                        }
+                    )
 
     # Agrupar clientes com mesmo telefone não-nulo
     tel_groups: dict = {}
@@ -3489,11 +3780,13 @@ def listar_sugestoes_unificacao(
                 key = (min(a.id, b.id), max(a.id, b.id))
                 if key not in seen_pairs:
                     seen_pairs.add(key)
-                    sugestoes.append({
-                        "motivo": "mesmo_telefone",
-                        "cliente_a": _serialize_cliente_resumo(a),
-                        "cliente_b": _serialize_cliente_resumo(b),
-                    })
+                    sugestoes.append(
+                        {
+                            "motivo": "mesmo_telefone",
+                            "cliente_a": _serialize_cliente_resumo(a),
+                            "cliente_b": _serialize_cliente_resumo(b),
+                        }
+                    )
 
     return sugestoes
 
@@ -3519,38 +3812,58 @@ def confirmar_unificacao(
 
     user, tenant_id = user_and_tenant
 
-    keep = db.query(Cliente).filter(
-        Cliente.id == body.customer_keep_id,
-        Cliente.tenant_id == tenant_id,
-    ).first()
-    remove = db.query(Cliente).filter(
-        Cliente.id == body.customer_remove_id,
-        Cliente.tenant_id == tenant_id,
-    ).first()
+    keep = (
+        db.query(Cliente)
+        .filter(
+            Cliente.id == body.customer_keep_id,
+            Cliente.tenant_id == tenant_id,
+        )
+        .first()
+    )
+    remove = (
+        db.query(Cliente)
+        .filter(
+            Cliente.id == body.customer_remove_id,
+            Cliente.tenant_id == tenant_id,
+        )
+        .first()
+    )
 
     if not keep or not remove:
-        raise HTTPException(status_code=404, detail="Cliente não encontrado neste tenant.")
+        raise HTTPException(
+            status_code=404, detail="Cliente não encontrado neste tenant."
+        )
     if keep.id == remove.id:
         raise HTTPException(status_code=400, detail="Os clientes devem ser diferentes.")
 
     # Verificar se já existe merge não desfeito envolvendo estes dois
-    existing = db.query(CustomerMergeLog).filter(
-        CustomerMergeLog.tenant_id == tenant_id,
-        CustomerMergeLog.customer_keep_id == keep.id,
-        CustomerMergeLog.customer_remove_id == remove.id,
-        CustomerMergeLog.undone.is_(False),
-    ).first()
+    existing = (
+        db.query(CustomerMergeLog)
+        .filter(
+            CustomerMergeLog.tenant_id == tenant_id,
+            CustomerMergeLog.customer_keep_id == keep.id,
+            CustomerMergeLog.customer_remove_id == remove.id,
+            CustomerMergeLog.undone.is_(False),
+        )
+        .first()
+    )
     if existing:
-        raise HTTPException(status_code=400, detail="Estes clientes já foram unificados. Desfaça antes de refazer.")
+        raise HTTPException(
+            status_code=400,
+            detail="Estes clientes já foram unificados. Desfaça antes de refazer.",
+        )
 
     snapshot: dict = {}
 
     # Transfere CashbackTransaction
     cashback_ids = [
-        r.id for r in db.query(CashbackTransaction.id).filter(
+        r.id
+        for r in db.query(CashbackTransaction.id)
+        .filter(
             CashbackTransaction.tenant_id == tenant_id,
             CashbackTransaction.customer_id == remove.id,
-        ).all()
+        )
+        .all()
     ]
     if cashback_ids:
         db.query(CashbackTransaction).filter(
@@ -3560,36 +3873,45 @@ def confirmar_unificacao(
 
     # Transfere LoyaltyStamp
     stamp_ids = [
-        r.id for r in db.query(LoyaltyStamp.id).filter(
+        r.id
+        for r in db.query(LoyaltyStamp.id)
+        .filter(
             LoyaltyStamp.tenant_id == tenant_id,
             LoyaltyStamp.customer_id == remove.id,
-        ).all()
+        )
+        .all()
     ]
     if stamp_ids:
-        db.query(LoyaltyStamp).filter(
-            LoyaltyStamp.id.in_(stamp_ids)
-        ).update({"customer_id": keep.id}, synchronize_session=False)
+        db.query(LoyaltyStamp).filter(LoyaltyStamp.id.in_(stamp_ids)).update(
+            {"customer_id": keep.id}, synchronize_session=False
+        )
     snapshot["stamp_ids"] = stamp_ids
 
     # Transfere Coupon (nominais do cliente removido)
     coupon_ids = [
-        r.id for r in db.query(Coupon.id).filter(
+        r.id
+        for r in db.query(Coupon.id)
+        .filter(
             Coupon.tenant_id == tenant_id,
             Coupon.customer_id == remove.id,
-        ).all()
+        )
+        .all()
     ]
     if coupon_ids:
-        db.query(Coupon).filter(
-            Coupon.id.in_(coupon_ids)
-        ).update({"customer_id": keep.id}, synchronize_session=False)
+        db.query(Coupon).filter(Coupon.id.in_(coupon_ids)).update(
+            {"customer_id": keep.id}, synchronize_session=False
+        )
     snapshot["coupon_ids"] = coupon_ids
 
     # Transfere CustomerRankHistory (remove duplicatas combinando os dados)
     rank_ids = [
-        r.id for r in db.query(CustomerRankHistory.id).filter(
+        r.id
+        for r in db.query(CustomerRankHistory.id)
+        .filter(
             CustomerRankHistory.tenant_id == tenant_id,
             CustomerRankHistory.customer_id == remove.id,
-        ).all()
+        )
+        .all()
     ]
     if rank_ids:
         db.query(CustomerRankHistory).filter(
@@ -3599,42 +3921,52 @@ def confirmar_unificacao(
 
     # Transfere DrawingEntry
     drawing_ids = [
-        r.id for r in db.query(DrawingEntry.id).filter(
+        r.id
+        for r in db.query(DrawingEntry.id)
+        .filter(
             DrawingEntry.tenant_id == tenant_id,
             DrawingEntry.customer_id == remove.id,
-        ).all()
+        )
+        .all()
     ]
     if drawing_ids:
-        db.query(DrawingEntry).filter(
-            DrawingEntry.id.in_(drawing_ids)
-        ).update({"customer_id": keep.id}, synchronize_session=False)
+        db.query(DrawingEntry).filter(DrawingEntry.id.in_(drawing_ids)).update(
+            {"customer_id": keep.id}, synchronize_session=False
+        )
     snapshot["drawing_ids"] = drawing_ids
 
     # Transfere NotificationQueue (pendentes)
     notif_ids = [
-        r.id for r in db.query(NotificationQueue.id).filter(
+        r.id
+        for r in db.query(NotificationQueue.id)
+        .filter(
             NotificationQueue.tenant_id == tenant_id,
             NotificationQueue.customer_id == remove.id,
             NotificationQueue.status == NotificationStatusEnum.pending,
-        ).all()
+        )
+        .all()
     ]
     if notif_ids:
-        db.query(NotificationQueue).filter(
-            NotificationQueue.id.in_(notif_ids)
-        ).update({"customer_id": keep.id}, synchronize_session=False)
+        db.query(NotificationQueue).filter(NotificationQueue.id.in_(notif_ids)).update(
+            {"customer_id": keep.id}, synchronize_session=False
+        )
     snapshot["notif_ids"] = notif_ids
 
     # Transfere Vendas (para ranking e destaque mensal contarem o histórico completo)
     from app.vendas_models import Venda
+
     venda_ids = [
-        r.id for r in db.query(Venda.id).filter(
+        r.id
+        for r in db.query(Venda.id)
+        .filter(
             Venda.cliente_id == remove.id,
-        ).all()
+        )
+        .all()
     ]
     if venda_ids:
-        db.query(Venda).filter(
-            Venda.id.in_(venda_ids)
-        ).update({"cliente_id": keep.id}, synchronize_session=False)
+        db.query(Venda).filter(Venda.id.in_(venda_ids)).update(
+            {"cliente_id": keep.id}, synchronize_session=False
+        )
     snapshot["venda_ids"] = venda_ids
 
     # Transfere CampaignExecution (idempotência: evita remissolicitada duplicada)
@@ -3642,17 +3974,25 @@ def confirmar_unificacao(
     # apenas descarta a do remove (não podemos ter duplicata pela constraint UNIQUE).
     exec_transferidos = []
     exec_descartados = []
-    executions_remove = db.query(CampaignExecution).filter(
-        CampaignExecution.tenant_id == tenant_id,
-        CampaignExecution.customer_id == remove.id,
-    ).all()
-    for exc_row in executions_remove:
-        conflito = db.query(CampaignExecution).filter(
+    executions_remove = (
+        db.query(CampaignExecution)
+        .filter(
             CampaignExecution.tenant_id == tenant_id,
-            CampaignExecution.campaign_id == exc_row.campaign_id,
-            CampaignExecution.customer_id == keep.id,
-            CampaignExecution.reference_period == exc_row.reference_period,
-        ).first()
+            CampaignExecution.customer_id == remove.id,
+        )
+        .all()
+    )
+    for exc_row in executions_remove:
+        conflito = (
+            db.query(CampaignExecution)
+            .filter(
+                CampaignExecution.tenant_id == tenant_id,
+                CampaignExecution.campaign_id == exc_row.campaign_id,
+                CampaignExecution.customer_id == keep.id,
+                CampaignExecution.reference_period == exc_row.reference_period,
+            )
+            .first()
+        )
         if conflito:
             # keep já tem esse registro — descarta o do remove
             exec_descartados.append(exc_row.id)
@@ -3665,14 +4005,21 @@ def confirmar_unificacao(
 
     # Transfere CampaignEventQueue (eventos pendentes do cliente removido)
     event_ids = [
-        r.id for r in db.query(CampaignEventQueue.id).filter(
+        r.id
+        for r in db.query(CampaignEventQueue.id)
+        .filter(
             CampaignEventQueue.tenant_id == tenant_id,
             CampaignEventQueue.status == EventStatusEnum.pending,
             CampaignEventQueue.payload["customer_id"].astext == str(remove.id),
-        ).all()
+        )
+        .all()
     ]
     if event_ids:
-        for ev in db.query(CampaignEventQueue).filter(CampaignEventQueue.id.in_(event_ids)).all():
+        for ev in (
+            db.query(CampaignEventQueue)
+            .filter(CampaignEventQueue.id.in_(event_ids))
+            .all()
+        ):
             payload = dict(ev.payload)
             payload["customer_id"] = keep.id
             ev.payload = payload
@@ -3727,10 +4074,14 @@ def desfazer_unificacao(
     """
     _, tenant_id = user_and_tenant
 
-    merge_log = db.query(CustomerMergeLog).filter(
-        CustomerMergeLog.id == merge_id,
-        CustomerMergeLog.tenant_id == tenant_id,
-    ).first()
+    merge_log = (
+        db.query(CustomerMergeLog)
+        .filter(
+            CustomerMergeLog.id == merge_id,
+            CustomerMergeLog.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not merge_log:
         raise HTTPException(status_code=404, detail="Merge não encontrado.")
     if merge_log.undone:
@@ -3747,15 +4098,15 @@ def desfazer_unificacao(
 
     stamp_ids = snap.get("stamp_ids", [])
     if stamp_ids:
-        db.query(LoyaltyStamp).filter(
-            LoyaltyStamp.id.in_(stamp_ids)
-        ).update({"customer_id": remove_id}, synchronize_session=False)
+        db.query(LoyaltyStamp).filter(LoyaltyStamp.id.in_(stamp_ids)).update(
+            {"customer_id": remove_id}, synchronize_session=False
+        )
 
     coupon_ids = snap.get("coupon_ids", [])
     if coupon_ids:
-        db.query(Coupon).filter(
-            Coupon.id.in_(coupon_ids)
-        ).update({"customer_id": remove_id}, synchronize_session=False)
+        db.query(Coupon).filter(Coupon.id.in_(coupon_ids)).update(
+            {"customer_id": remove_id}, synchronize_session=False
+        )
 
     rank_ids = snap.get("rank_ids", [])
     if rank_ids:
@@ -3765,23 +4116,24 @@ def desfazer_unificacao(
 
     drawing_ids = snap.get("drawing_ids", [])
     if drawing_ids:
-        db.query(DrawingEntry).filter(
-            DrawingEntry.id.in_(drawing_ids)
-        ).update({"customer_id": remove_id}, synchronize_session=False)
+        db.query(DrawingEntry).filter(DrawingEntry.id.in_(drawing_ids)).update(
+            {"customer_id": remove_id}, synchronize_session=False
+        )
 
     notif_ids = snap.get("notif_ids", [])
     if notif_ids:
-        db.query(NotificationQueue).filter(
-            NotificationQueue.id.in_(notif_ids)
-        ).update({"customer_id": remove_id}, synchronize_session=False)
+        db.query(NotificationQueue).filter(NotificationQueue.id.in_(notif_ids)).update(
+            {"customer_id": remove_id}, synchronize_session=False
+        )
 
     # Restaura Vendas
     from app.vendas_models import Venda
+
     venda_ids = snap.get("venda_ids", [])
     if venda_ids:
-        db.query(Venda).filter(
-            Venda.id.in_(venda_ids)
-        ).update({"cliente_id": remove_id}, synchronize_session=False)
+        db.query(Venda).filter(Venda.id.in_(venda_ids)).update(
+            {"cliente_id": remove_id}, synchronize_session=False
+        )
 
     # Restaura CampaignExecution (apenas os transferidos; os descartados são perdidos)
     exec_transferidos = snap.get("exec_transferidos", [])
@@ -3793,7 +4145,11 @@ def desfazer_unificacao(
     # Restaura CampaignEventQueue (recoloca customer_id original no payload)
     event_ids = snap.get("event_ids", [])
     if event_ids:
-        for ev in db.query(CampaignEventQueue).filter(CampaignEventQueue.id.in_(event_ids)).all():
+        for ev in (
+            db.query(CampaignEventQueue)
+            .filter(CampaignEventQueue.id.in_(event_ids))
+            .all()
+        ):
             payload = dict(ev.payload)
             payload["customer_id"] = remove_id
             ev.payload = payload
@@ -3808,6 +4164,7 @@ def desfazer_unificacao(
 # ---------------------------------------------------------------------------
 # Sprint 9 — Envio Escalonado para Clientes Inativos
 # ---------------------------------------------------------------------------
+
 
 class EnvioInativosBody(BaseModel):
     dias_sem_compra: int = 30  # 30 ou 60
@@ -3841,42 +4198,50 @@ def envio_escalonado_inativos(
 
     # IDs ativos (compraram depois do corte)
     ativos_ids = set(
-        r[0] for r in db.query(VendaModel.cliente_id)
+        r[0]
+        for r in db.query(VendaModel.cliente_id)
         .filter(
             VendaModel.tenant_id == tenant_id,
             VendaModel.cliente_id.isnot(None),
             VendaModel.status == "finalizada",
             VendaModel.data_venda >= corte,
-        ).distinct().all()
+        )
+        .distinct()
+        .all()
     )
 
     # Todos com pelo menos 1 venda
     todos_ids = set(
-        r[0] for r in db.query(VendaModel.cliente_id)
+        r[0]
+        for r in db.query(VendaModel.cliente_id)
         .filter(
             VendaModel.tenant_id == tenant_id,
             VendaModel.cliente_id.isnot(None),
             VendaModel.status == "finalizada",
-        ).distinct().all()
+        )
+        .distinct()
+        .all()
     )
 
     inativos_ids = list(todos_ids - ativos_ids)
     if not inativos_ids:
         return {"ok": True, "enfileirados": 0, "sem_email": 0, "total_inativos": 0}
 
-    clientes = db.query(Cliente).filter(
-        Cliente.id.in_(inativos_ids),
-        Cliente.tenant_id == tenant_id,
-        Cliente.email.isnot(None),
-    ).all()
+    clientes = (
+        db.query(Cliente)
+        .filter(
+            Cliente.id.in_(inativos_ids),
+            Cliente.tenant_id == tenant_id,
+            Cliente.email.isnot(None),
+        )
+        .all()
+    )
 
     enfileirados = 0
     sem_email = len(inativos_ids) - len(clientes)
 
     for cliente in clientes:
-        idempotency_key = (
-            f"inativos:{tenant_id}:{body.dias_sem_compra}:{cliente.id}:{date.today().isoformat()}"
-        )
+        idempotency_key = f"inativos:{tenant_id}:{body.dias_sem_compra}:{cliente.id}:{date.today().isoformat()}"
         from app.campaigns.notification_service import enqueue_email
 
         if enqueue_email(
@@ -3898,4 +4263,3 @@ def envio_escalonado_inativos(
         "total_inativos": len(inativos_ids),
         "dias_sem_compra": body.dias_sem_compra,
     }
-

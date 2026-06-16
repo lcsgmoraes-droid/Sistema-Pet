@@ -88,7 +88,9 @@ class CashbackHandler:
 
         if not customer_id or not venda_id or venda_total is None:
             logger.warning(
-                "[CashbackHandler] Payload incompleto event_id=%d: %s", event.id, payload
+                "[CashbackHandler] Payload incompleto event_id=%d: %s",
+                event.id,
+                payload,
             )
             return {"evaluated": 0, "rewarded": 0, "errors": 1}
 
@@ -99,9 +101,12 @@ class CashbackHandler:
 
         try:
             rewarded = self._process(
-                db=db, campaign=campaign,
-                customer_id=customer_id, venda_id=venda_id,
-                venda_total=venda_total, source_event_id=event.id,
+                db=db,
+                campaign=campaign,
+                customer_id=customer_id,
+                venda_id=venda_id,
+                venda_total=venda_total,
+                source_event_id=event.id,
                 canal=canal,
             )
         except Exception as exc:
@@ -110,7 +115,16 @@ class CashbackHandler:
 
         return {"evaluated": 1, "rewarded": rewarded, "errors": 0}
 
-    def _process(self, db, campaign, customer_id, venda_id, venda_total, source_event_id, canal="pdv") -> int:
+    def _process(
+        self,
+        db,
+        campaign,
+        customer_id,
+        venda_id,
+        venda_total,
+        source_event_id,
+        canal="pdv",
+    ) -> int:
         ref_period = str(venda_id)  # Idempotência por venda
 
         # Já processou esta venda?
@@ -165,13 +179,16 @@ class CashbackHandler:
         if amount <= 0:
             return 0
 
-        canal_label = f"+{bonus_pct}% canal {canal}" if bonus_pct > 0 else f"canal {canal}"
+        canal_label = (
+            f"+{bonus_pct}% canal {canal}" if bonus_pct > 0 else f"canal {canal}"
+        )
 
         # Prazo de validade do cashback (em dias, configurável em campaign.params)
         valid_days = int(params.get("cashback_valid_days") or 0)
         expires_at = None
         if valid_days > 0:
             from datetime import datetime, timezone
+
             expires_at = datetime.now(timezone.utc) + timedelta(days=valid_days)
 
         # Registra transação de cashback (ledger append-only)
@@ -195,7 +212,13 @@ class CashbackHandler:
             reference_period=ref_period,
             reward_type="cashback",
             reward_value=amount,
-            reward_meta={"percent": float(pct_total), "rank": rank.value, "venda_id": venda_id, "canal": canal, "bonus_percent": float(bonus_pct)},
+            reward_meta={
+                "percent": float(pct_total),
+                "rank": rank.value,
+                "venda_id": venda_id,
+                "canal": canal,
+                "bonus_percent": float(bonus_pct),
+            },
             source_event_id=source_event_id,
         )
         db.add(execution)
@@ -204,6 +227,7 @@ class CashbackHandler:
 
         # Notificação
         from app.models import Cliente
+
         cliente = db.query(Cliente).filter(Cliente.id == customer_id).first()
         if cliente and cliente.email:
             body = (
@@ -212,14 +236,20 @@ class CashbackHandler:
             ).replace(".", ",")
             enqueue_email(
                 db,
-                tenant_id=campaign.tenant_id, customer_id=customer_id,
+                tenant_id=campaign.tenant_id,
+                customer_id=customer_id,
                 subject="Você ganhou cashback! 💰",
-                body=body, email_address=cliente.email,
+                body=body,
+                email_address=cliente.email,
                 idempotency_key=f"cashback:{campaign.id}:{customer_id}:{ref_period}:email",
             )
 
         logger.info(
             "[CashbackHandler] customer=%d venda=%d rank=%s pct=%s amount=%s",
-            customer_id, venda_id, rank.value, pct, amount,
+            customer_id,
+            venda_id,
+            rank.value,
+            pct,
+            amount,
         )
         return 1
