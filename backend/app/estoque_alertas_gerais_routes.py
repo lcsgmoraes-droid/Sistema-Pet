@@ -42,7 +42,7 @@ def alertas_estoque(
     zerados = db.query(Produto).filter(
         or_(
             Produto.estoque_atual == 0,
-            Produto.estoque_atual == None,
+            Produto.estoque_atual.is_(None),
         ),
         Produto.tipo == "produto",
         Produto.status == "ativo",
@@ -104,30 +104,30 @@ def alertas_estoque(
             "total": len(lotes_vencendo),
             "lotes": [
                 {
-                    "id": l.id,
-                    "produto_id": l.produto_id,
-                    "produto_nome": l.produto.nome,
-                    "numero_lote": l.numero_lote,
-                    "quantidade": l.quantidade,
-                    "data_validade": l.data_validade.isoformat(),
-                    "dias_restantes": (l.data_validade - hoje).days,
+                    "id": lote.id,
+                    "produto_id": lote.produto_id,
+                    "produto_nome": lote.produto.nome,
+                    "numero_lote": lote.numero_lote,
+                    "quantidade": lote.quantidade,
+                    "data_validade": lote.data_validade.isoformat(),
+                    "dias_restantes": (lote.data_validade - hoje).days,
                 }
-                for l in lotes_vencendo[:20]
+                for lote in lotes_vencendo[:20]
             ],
         },
         "lotes_vencidos": {
             "total": len(lotes_vencidos),
             "lotes": [
                 {
-                    "id": l.id,
-                    "produto_id": l.produto_id,
-                    "produto_nome": l.produto.nome,
-                    "numero_lote": l.numero_lote,
-                    "quantidade": l.quantidade,
-                    "data_validade": l.data_validade.isoformat(),
-                    "dias_vencido": (hoje - l.data_validade).days,
+                    "id": lote.id,
+                    "produto_id": lote.produto_id,
+                    "produto_nome": lote.produto.nome,
+                    "numero_lote": lote.numero_lote,
+                    "quantidade": lote.quantidade,
+                    "data_validade": lote.data_validade.isoformat(),
+                    "dias_vencido": (hoje - lote.data_validade).days,
                 }
-                for l in lotes_vencidos[:20]
+                for lote in lotes_vencidos[:20]
             ],
         },
     }

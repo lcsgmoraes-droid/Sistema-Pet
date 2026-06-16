@@ -3,7 +3,6 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 from app.estoque_local_models import EstoqueLocal
-from app.local_estoque_models import LocalEstoque
 
 class EstoqueTransferenciaService:
     """

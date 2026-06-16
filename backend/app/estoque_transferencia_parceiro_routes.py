@@ -230,8 +230,8 @@ def _obter_dre_subcategoria_receita_padrao(db: Session, tenant_id) -> int:
     ).filter(
         DRESubcategoria.tenant_id == str(tenant_id),
         DRECategoria.tenant_id == str(tenant_id),
-        DRESubcategoria.ativo == True,
-        DRECategoria.ativo == True,
+        DRESubcategoria.ativo.is_(True),
+        DRECategoria.ativo.is_(True),
         DRECategoria.natureza == NaturezaDRE.RECEITA,
     ).order_by(DRECategoria.ordem.asc(), DRESubcategoria.id.asc()).first()
     return subcategoria.id if subcategoria else 1
@@ -719,7 +719,7 @@ def _gerar_pdf_transferencia_parceiro_bytes(
         from reportlab.lib import colors
         from reportlab.lib.units import mm
         from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.lib.enums import TA_CENTER, TA_RIGHT
+        from reportlab.lib.enums import TA_CENTER
         from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
     except ImportError:
         raise HTTPException(
@@ -1286,7 +1286,7 @@ def _montar_email_transferencia_parceiro(
         f"Vencimento: {conta.data_vencimento.strftime('%d/%m/%Y') if conta.data_vencimento else '-'}\n"
         + (f"Total: R$ {valor_original:.2f}\n" if opcoes["mostrar_totais"] else "")
         + "\n"
-        f"Itens:\n" + "\n".join(linhas_itens)
+        "Itens:\n" + "\n".join(linhas_itens)
     )
     if observacoes:
         text_body += f"\n\nObservacoes:\n{observacoes}"

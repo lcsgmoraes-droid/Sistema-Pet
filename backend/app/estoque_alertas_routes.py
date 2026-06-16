@@ -135,7 +135,7 @@ def listar_alertas_pendentes(
     )
     
     if apenas_criticos:
-        query = query.filter(AlertaEstoqueNegativo.critico == True)
+        query = query.filter(AlertaEstoqueNegativo.critico.is_(True))
     
     alertas = query.order_by(
         desc(AlertaEstoqueNegativo.critico),
@@ -204,7 +204,7 @@ def dashboard_alertas(
         and_(
             AlertaEstoqueNegativo.tenant_id == tenant_id,
             AlertaEstoqueNegativo.status == 'pendente',
-            AlertaEstoqueNegativo.critico == True
+            AlertaEstoqueNegativo.critico.is_(True)
         )
     ).count()
     

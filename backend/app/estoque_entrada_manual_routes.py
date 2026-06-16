@@ -245,8 +245,8 @@ def entrada_estoque(
     ultima_entrada = db.query(EstoqueMovimentacao).filter(
         EstoqueMovimentacao.produto_id == produto.id,
         EstoqueMovimentacao.tipo == 'entrada',
-        EstoqueMovimentacao.custo_unitario != None,
-        EstoqueMovimentacao.id != None  # Excluir a entrada atual
+        EstoqueMovimentacao.custo_unitario.is_not(None),
+        EstoqueMovimentacao.id.is_not(None)  # Excluir a entrada atual
     ).order_by(desc(EstoqueMovimentacao.created_at)).first()
 
     custo_anterior = ultima_entrada.custo_unitario if ultima_entrada else produto.preco_custo
@@ -362,7 +362,6 @@ def entrada_estoque(
         "variacao_preco": variacao_preco,
         "quantidade_anterior": movimentacao.quantidade_anterior,
         "quantidade_nova": movimentacao.quantidade_nova,
-        "custo_unitario": movimentacao.custo_unitario,
         "valor_total": movimentacao.valor_total,
         "documento": movimentacao.documento,
         "observacao": movimentacao.observacao,

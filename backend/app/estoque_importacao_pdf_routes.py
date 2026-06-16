@@ -27,7 +27,7 @@ async def importar_pdf(
         raise HTTPException(status_code=400, detail="Local de destino obrigatório")
 
     origem = db.query(LocalEstoque).filter(
-        LocalEstoque.origem_padrao == True
+        LocalEstoque.origem_padrao.is_(True)
     ).first()
 
     if not origem:

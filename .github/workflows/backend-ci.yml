@@ -235,6 +235,10 @@ jobs:
         run: |
           ruff check app/contas_bancarias_routes.py app/contas_pagar_routes.py app/contas_receber_routes.py app/lancamentos_routes.py app/operadoras_models.py app/operadoras_routes.py app/formas_pagamento_models.py app/formas_pagamento_routes.py
 
+      - name: Estoque root lint (blocking)
+        run: |
+          ruff check app/estoque_alertas_gerais_routes.py app/estoque_alertas_routes.py app/estoque_entrada_manual_routes.py app/estoque_granel_routes.py app/estoque_importacao_csv_routes.py app/estoque_importacao_pdf_routes.py app/estoque_local_models.py app/estoque_models.py app/estoque_movimentacoes_consulta_routes.py app/estoque_movimentacoes_context.py app/estoque_movimentacoes_edicao_routes.py app/estoque_movimentacoes_manuais_routes.py app/estoque_relatorios_routes.py app/estoque_reserva_service.py app/estoque_routes.py app/estoque_saida_full_routes.py app/estoque_saida_manual_routes.py app/estoque_transferencia_parceiro_routes.py app/estoque_transferencia_routes.py app/estoque_transferencia_service.py app/estoque_validade_models.py app/estoque_validade_routes.py app/estoque_validade_service.py
+
       - name: Comissoes root lint (blocking)
         run: |
           ruff check app/comissoes_avancadas_models.py app/comissoes_avancadas_routes.py app/comissoes_demonstrativo_routes.py app/comissoes_diagnostico_routes.py app/comissoes_estorno.py app/comissoes_models.py app/comissoes_provisao.py app/comissoes_routes.py app/comissoes_service.py
