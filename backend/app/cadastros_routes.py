@@ -1,7 +1,7 @@
 """
 Routes para gerenciamento de Espécies e Raças
 """
-from fastapi import APIRouter, Depends, HTTPException, status, Query
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 from typing import List, Optional
@@ -10,7 +10,7 @@ from pydantic import BaseModel
 import logging
 
 from app.db import get_session
-from app.models import User, Especie, Raca
+from app.models import Especie, Raca
 from app.auth.dependencies import get_current_user_and_tenant
 from app.audit_log import log_create, log_update, log_delete
 
@@ -321,7 +321,7 @@ def deletar_especie(
     # Verificar se existem raças ativas vinculadas
     racas_ativas = db.query(Raca).filter(
         Raca.especie_id == especie_id,
-        Raca.ativo == True
+        Raca.ativo
     ).count()
     
     if racas_ativas > 0:

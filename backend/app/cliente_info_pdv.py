@@ -3,19 +3,19 @@ Endpoint especializado para informações do cliente no PDV
 """
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from sqlalchemy import func, desc
-from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional
+from sqlalchemy import desc
+from datetime import datetime
+from typing import List, Optional
 from collections import Counter, defaultdict
 from pydantic import BaseModel
 import os
 import json
 
 from app.db import get_session
-from app.models import User, Cliente, Pet
+from app.models import Cliente, Pet
 from app.vendas_models import Venda, VendaItem
 from app.produtos_models import Produto
-from app.auth import get_current_user, get_current_user_and_tenant
+from app.auth import get_current_user_and_tenant
 from app.veterinario_models import ExameVet
 from app.services.cliente_alertas_pdv import alertas_pdv_ativos
 
@@ -53,7 +53,7 @@ def alertas_carrinho_pdv(
     """
     _, tenant_id = user_and_tenant
 
-    pets = db.query(Pet).filter(Pet.cliente_id == cliente_id, Pet.ativo == True).all()
+    pets = db.query(Pet).filter(Pet.cliente_id == cliente_id, Pet.ativo).all()
     alertas = []
     infos = []
 
@@ -145,7 +145,7 @@ def get_cliente_info_pdv(
     cliente = db.query(Cliente).filter(
         Cliente.id == cliente_id,
         Cliente.tenant_id == tenant_id,
-        Cliente.ativo == True
+        Cliente.ativo
     ).first()
     
     if not cliente:
@@ -186,7 +186,7 @@ def get_cliente_info_pdv(
     # ========== 2. PETS REGISTRADOS ==========
     pets = db.query(Pet).filter(
         Pet.cliente_id == cliente_id,
-        Pet.ativo == True
+        Pet.ativo
     ).all()
     
     pets_info = []
@@ -455,7 +455,7 @@ async def chat_pdv_cliente(
     cliente = db.query(Cliente).filter(
         Cliente.id == cliente_id,
         Cliente.tenant_id == tenant_id,
-        Cliente.ativo == True
+        Cliente.ativo
     ).first()
 
     if not cliente:
@@ -534,7 +534,7 @@ async def chat_pdv_cliente(
                 )
 
     # ── 5. PETS (detalhes completos com saúde) ────────────────────────────
-    pets = db.query(Pet).filter(Pet.cliente_id == cliente_id, Pet.ativo == True).all()
+    pets = db.query(Pet).filter(Pet.cliente_id == cliente_id, Pet.ativo).all()
     pets_lines = []
     pets_data = []  # usado nas análises do carrinho
     for pet in pets:
@@ -738,7 +738,7 @@ Regras:
 
         else:
             resposta_ia = gerar_resposta_sem_ia(request.mensagem, cliente, vendas,
-                                                [l.strip('- ') for l in top_produtos_lines[:5]], pets_lines)
+                                                [linha.strip('- ') for linha in top_produtos_lines[:5]], pets_lines)
 
         return {
             "resposta": resposta_ia,
@@ -748,7 +748,7 @@ Regras:
     except Exception as e:
         return {
             "resposta": gerar_resposta_sem_ia(request.mensagem, cliente, vendas,
-                                              [l.strip('- ') for l in top_produtos_lines[:5]], pets_lines),
+                                              [linha.strip('- ') for linha in top_produtos_lines[:5]], pets_lines),
             "ia_disponivel": False,
             "erro": str(e)
         }

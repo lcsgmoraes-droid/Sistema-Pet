@@ -6,15 +6,14 @@ from datetime import date
 
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import or_, and_, func
+from sqlalchemy import or_
 from typing import List, Optional
 from datetime import datetime as dt
 import secrets
 
 from .db import get_session
-from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
-from .models import User, Pet, Cliente
+from .models import Pet, Cliente
 from .pet_clinical_utils import normalize_pet_clinical_payload
 from app.partner_utils import get_all_accessible_tenant_ids
 
@@ -497,7 +496,7 @@ def listar_pets_por_cliente(
     )
     
     if not incluir_inativos:
-        query = query.filter(Pet.ativo == True)
+        query = query.filter(Pet.ativo)
     
     pets = query.order_by(Pet.ativo.desc(), Pet.nome.asc()).all()
     
