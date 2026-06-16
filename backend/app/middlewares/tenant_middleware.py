@@ -1,5 +1,5 @@
 from fastapi import Request, status
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from jose import JWTError, jwt
 from starlette.middleware.base import BaseHTTPMiddleware
 import logging
@@ -76,6 +76,14 @@ class TenantSecurityMiddleware(BaseHTTPMiddleware):
 
             return await call_next(request)
 
+        except RuntimeError as e:
+            if str(e) == "No response returned." and await request.is_disconnected():
+                return Response(status_code=status.HTTP_204_NO_CONTENT)
+            logger.error(
+                f"[TenantSecurityMiddleware] ❌ Erro inesperado: {str(e)}",
+                exc_info=True,
+            )
+            raise
         except Exception as e:
             logger.error(
                 f"[TenantSecurityMiddleware] ❌ Erro inesperado: {str(e)}",
