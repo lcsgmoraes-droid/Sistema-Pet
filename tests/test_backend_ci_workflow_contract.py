@@ -183,6 +183,18 @@ def test_backend_ci_has_blocking_pedidos_pendencias_root_lint_step():
     ) in source
 
 
+def test_backend_ci_has_blocking_admin_lgpd_simples_ops_root_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Admin LGPD simples ops root lint (blocking)" in source
+    assert (
+        "ruff check app/admin_fix_routes.py app/admin_routes.py "
+        "app/lgpd_models.py app/lgpd_routes.py app/simples_nacional_models.py "
+        "app/simples_routes.py app/opportunities_models.py "
+        "app/opportunity_events_models.py app/ops_models.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_produtos_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
