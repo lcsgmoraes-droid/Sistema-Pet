@@ -355,6 +355,10 @@ jobs:
         run: |
           ruff format --check app/ai app/ai_core
 
+      - name: Backend domain campaigns vendas format (blocking)
+        run: |
+          ruff format --check app/domain app/campaigns app/vendas
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"

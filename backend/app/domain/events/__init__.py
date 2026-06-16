@@ -18,12 +18,12 @@ from .dispatcher import EventDispatcher, event_dispatcher
 from .handlers import LogEventHandler, AuditoriaEventHandler
 
 __all__ = [
-    'DomainEvent',
-    'VendaCriada',
-    'VendaFinalizada',
-    'VendaCancelada',
-    'EventDispatcher',
-    'event_dispatcher',
-    'LogEventHandler',
-    'AuditoriaEventHandler',
+    "DomainEvent",
+    "VendaCriada",
+    "VendaFinalizada",
+    "VendaCancelada",
+    "EventDispatcher",
+    "event_dispatcher",
+    "LogEventHandler",
+    "AuditoriaEventHandler",
 ]

@@ -26,16 +26,10 @@ def fechar_periodo_dre(
     )
 
     if not periodo:
-        raise HTTPException(
-            status_code=404,
-            detail="Período DRE não encontrado."
-        )
+        raise HTTPException(status_code=404, detail="Período DRE não encontrado.")
 
     if periodo.fechado:
-        raise HTTPException(
-            status_code=400,
-            detail="Período DRE já está fechado."
-        )
+        raise HTTPException(status_code=400, detail="Período DRE já está fechado.")
 
     canais = (
         db.query(DREDetalheCanal)
@@ -48,8 +42,7 @@ def fechar_periodo_dre(
 
     if not canais:
         raise HTTPException(
-            status_code=400,
-            detail="Não existem canais para consolidar."
+            status_code=400, detail="Não existem canais para consolidar."
         )
 
     consolidado = DREConsolidado(

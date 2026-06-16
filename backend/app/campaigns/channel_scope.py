@@ -69,7 +69,10 @@ def campaign_type_value(campaign_type: Any) -> str:
 
 
 def is_purchase_benefit_campaign(campaign: Any) -> bool:
-    return campaign_type_value(getattr(campaign, "campaign_type", campaign)) in PURCHASE_BENEFIT_CAMPAIGN_TYPES
+    return (
+        campaign_type_value(getattr(campaign, "campaign_type", campaign))
+        in PURCHASE_BENEFIT_CAMPAIGN_TYPES
+    )
 
 
 def _extract_scope(params: Mapping[str, Any]) -> Any:

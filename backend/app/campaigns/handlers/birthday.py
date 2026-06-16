@@ -313,13 +313,16 @@ class BirthdayHandler:
         db.add(execution)
 
         # Enfileira notificação usando format_map com defaultdict (seguro contra variáveis desconhecidas)
-        fmt_vars = defaultdict(str, {
-            "code": coupon_code,
-            "nome": customer_name,
-            "extra": notification_extra,
-            "desconto": desconto_fmt,
-            "nome_pet": nome_pet,
-        })
+        fmt_vars = defaultdict(
+            str,
+            {
+                "code": coupon_code,
+                "nome": customer_name,
+                "extra": notification_extra,
+                "desconto": desconto_fmt,
+                "nome_pet": nome_pet,
+            },
+        )
         body = notification_msg.format_map(fmt_vars)
         notif_key = f"bday:{campaign.id}:{customer_id}:{reference_period}"
 

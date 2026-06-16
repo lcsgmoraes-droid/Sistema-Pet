@@ -42,12 +42,10 @@ def calcular_rateio_dre(
 
     if not canais:
         raise HTTPException(
-            status_code=400,
-            detail="Nenhum canal encontrado para rateio."
+            status_code=400, detail="Nenhum canal encontrado para rateio."
         )
 
     for sub in subcategorias:
-
         if sub.base_rateio == BaseRateio.MANUAL:
             continue
 
@@ -70,7 +68,4 @@ def calcular_rateio_dre(
             else:
                 continue
 
-            canal.aplicar_rateio(
-                subcategoria_id=sub.id,
-                proporcao=proporcao
-            )
+            canal.aplicar_rateio(subcategoria_id=sub.id, proporcao=proporcao)

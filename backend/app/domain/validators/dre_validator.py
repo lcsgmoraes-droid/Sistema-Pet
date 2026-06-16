@@ -10,7 +10,7 @@ def validar_categoria_financeira_dre(
     *,
     categoria_financeira_id: int,
     dre_subcategoria_id: int | None,
-    tenant_id
+    tenant_id,
 ) -> None:
     """
     Garante que a DRESubcategoria pertence ao mesmo tenant
@@ -33,7 +33,7 @@ def validar_categoria_financeira_dre(
     if not subcategoria:
         raise HTTPException(
             status_code=400,
-            detail="Subcategoria DRE inválida ou não pertence a este tenant."
+            detail="Subcategoria DRE inválida ou não pertence a este tenant.",
         )
 
     categoria = (
@@ -48,5 +48,5 @@ def validar_categoria_financeira_dre(
     if not categoria:
         raise HTTPException(
             status_code=400,
-            detail="Categoria financeira inválida ou não pertence a este tenant."
+            detail="Categoria financeira inválida ou não pertence a este tenant.",
         )

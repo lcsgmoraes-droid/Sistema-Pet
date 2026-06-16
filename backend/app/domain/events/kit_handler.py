@@ -26,23 +26,17 @@ class KitEstoqueEventHandler:
         Busca os produtos da venda e recalcula todos os KITs
         que utilizam esses produtos como componentes.
         """
-        itens = (
-            db.query(VendaItem)
-            .filter(VendaItem.venda_id == venda_id)
-            .all()
-        )
+        itens = db.query(VendaItem).filter(VendaItem.venda_id == venda_id).all()
 
         produtos_afetados = {item.produto_id for item in itens}
 
         for produto_id in produtos_afetados:
             kits_recalculados = KitEstoqueService.recalcular_kits_que_usam_produto(
-                db=db,
-                produto_id=produto_id
+                db=db, produto_id=produto_id
             )
 
             logger.info(
-                f"♻️ KIT | Produto {produto_id} afetou "
-                f"{len(kits_recalculados)} KIT(s)"
+                f"♻️ KIT | Produto {produto_id} afetou {len(kits_recalculados)} KIT(s)"
             )
 
     @staticmethod
@@ -54,13 +48,11 @@ class KitEstoqueEventHandler:
         try:
             db = next(get_session())
             KitEstoqueEventHandler._recalcular_kits_por_venda(
-                db=db,
-                venda_id=event.venda_id
+                db=db, venda_id=event.venda_id
             )
         except Exception as e:
             logger.error(
-                f"❌ Erro ao recalcular KITs após venda finalizada: {e}",
-                exc_info=True
+                f"❌ Erro ao recalcular KITs após venda finalizada: {e}", exc_info=True
             )
 
     @staticmethod
@@ -72,11 +64,10 @@ class KitEstoqueEventHandler:
         try:
             db = next(get_session())
             KitEstoqueEventHandler._recalcular_kits_por_venda(
-                db=db,
-                venda_id=event.venda_id
+                db=db, venda_id=event.venda_id
             )
         except Exception as e:
             logger.error(
                 f"❌ Erro ao recalcular KITs após cancelamento de venda: {e}",
-                exc_info=True
+                exc_info=True,
             )

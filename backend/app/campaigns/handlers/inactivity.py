@@ -129,14 +129,26 @@ class InactivityHandler:
 
         logger.info(
             "[InactivityHandler] tenant=%s days=%d period=%s avaliados=%d recompensados=%d erros=%d",
-            campaign.tenant_id, inactivity_days, reference_period,
-            evaluated, rewarded, errors,
+            campaign.tenant_id,
+            inactivity_days,
+            reference_period,
+            evaluated,
+            rewarded,
+            errors,
         )
         return {"evaluated": evaluated, "rewarded": rewarded, "errors": errors}
 
     def _reward_customer(
-        self, db, campaign, customer_id, customer_name, customer_email,
-        reference_period, params, source_event_id, inactivity_days,
+        self,
+        db,
+        campaign,
+        customer_id,
+        customer_name,
+        customer_email,
+        reference_period,
+        params,
+        source_event_id,
+        inactivity_days,
     ) -> int:
         # Idempotência: já recebeu nesta semana?
         existing = (
@@ -175,19 +187,24 @@ class InactivityHandler:
             channel=coupon_channel,
             valid_days=coupon_valid_days,
             prefix="VOLTA",
-            meta={"reference_period": reference_period, "inactivity_days": inactivity_days},
+            meta={
+                "reference_period": reference_period,
+                "inactivity_days": inactivity_days,
+            },
         )
 
-        db.add(CampaignExecution(
-            tenant_id=campaign.tenant_id,
-            campaign_id=campaign.id,
-            customer_id=customer_id,
-            reference_period=reference_period,
-            reward_type=f"coupon:{coupon_type}",
-            reward_value=coupon_value,
-            reward_meta={"coupon_id": coupon.id, "coupon_code": coupon.code},
-            source_event_id=source_event_id,
-        ))
+        db.add(
+            CampaignExecution(
+                tenant_id=campaign.tenant_id,
+                campaign_id=campaign.id,
+                customer_id=customer_id,
+                reference_period=reference_period,
+                reward_type=f"coupon:{coupon_type}",
+                reward_value=coupon_value,
+                reward_meta={"coupon_id": coupon.id, "coupon_code": coupon.code},
+                source_event_id=source_event_id,
+            )
+        )
 
         body = notification_msg.format(code=coupon.code, nome=customer_name)
         notif_key = f"inactivity:{campaign.id}:{customer_id}:{reference_period}"

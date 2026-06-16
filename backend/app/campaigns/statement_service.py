@@ -46,7 +46,9 @@ def _end_of_day(value: date | None) -> datetime | None:
     return datetime.combine(value, time.max) if value else None
 
 
-def _date_in_range(value: datetime | None, start: datetime | None, end: datetime | None) -> bool:
+def _date_in_range(
+    value: datetime | None, start: datetime | None, end: datetime | None
+) -> bool:
     if value is None:
         return False
     if value.tzinfo is not None:
@@ -312,7 +314,10 @@ def _add_loyalty_stamp_events(
                     "venda_id": int(stamp.venda_id) if stamp.venda_id else None,
                     "status": "estornado" if stamp.voided_at else "ativo",
                     "origem": "manual" if stamp.is_manual else "venda",
-                    "metadata": {"stamp_id": int(stamp.id), "stamp_index": int(stamp.stamp_index or 1)},
+                    "metadata": {
+                        "stamp_id": int(stamp.id),
+                        "stamp_index": int(stamp.stamp_index or 1),
+                    },
                     **_campaign_fields(campaign),
                 },
             )
@@ -331,7 +336,10 @@ def _add_loyalty_stamp_events(
                     "venda_id": int(stamp.venda_id) if stamp.venda_id else None,
                     "status": "estornado",
                     "origem": "cancelamento" if stamp.venda_id else "manual",
-                    "metadata": {"stamp_id": int(stamp.id), "stamp_index": int(stamp.stamp_index or 1)},
+                    "metadata": {
+                        "stamp_id": int(stamp.id),
+                        "stamp_index": int(stamp.stamp_index or 1),
+                    },
                     **_campaign_fields(campaign),
                 },
             )
@@ -379,12 +387,18 @@ def _add_coupon_events(
         .all()
     )
     for coupon in coupons:
-        campaign = campaign_map.get(int(coupon.campaign_id)) if coupon.campaign_id else None
+        campaign = (
+            campaign_map.get(int(coupon.campaign_id)) if coupon.campaign_id else None
+        )
         meta = dict(coupon.meta or {})
         consumed_stamps = _consumed_stamps_from_meta(meta)
         coupon_redemptions = redemptions_by_coupon.get(int(coupon.id), [])
 
-        if include_stamp_conversion_events and consumed_stamps > 0 and _date_in_range(coupon.created_at, start_dt, end_dt):
+        if (
+            include_stamp_conversion_events
+            and consumed_stamps > 0
+            and _date_in_range(coupon.created_at, start_dt, end_dt)
+        ):
             _append_event(
                 events,
                 {
@@ -405,7 +419,9 @@ def _add_coupon_events(
                 },
             )
 
-        if include_coupon_events and _date_in_range(coupon.created_at, start_dt, end_dt):
+        if include_coupon_events and _date_in_range(
+            coupon.created_at, start_dt, end_dt
+        ):
             _append_event(
                 events,
                 {
@@ -433,7 +449,9 @@ def _add_coupon_events(
             )
 
         for redemption in coupon_redemptions:
-            if include_coupon_events and _date_in_range(redemption.redeemed_at, start_dt, end_dt):
+            if include_coupon_events and _date_in_range(
+                redemption.redeemed_at, start_dt, end_dt
+            ):
                 _append_event(
                     events,
                     {
@@ -445,7 +463,9 @@ def _add_coupon_events(
                         "titulo": "Cupom usado",
                         "descricao": f"Cupom {coupon.code} usado em venda.",
                         "valor": -abs(_money(redemption.discount_applied) or 0),
-                        "venda_id": int(redemption.venda_id) if redemption.venda_id else None,
+                        "venda_id": int(redemption.venda_id)
+                        if redemption.venda_id
+                        else None,
                         "cupom_id": int(coupon.id),
                         "cupom_codigo": coupon.code,
                         "status": "estornado" if redemption.voided_at else "usado",
@@ -455,7 +475,11 @@ def _add_coupon_events(
                     },
                 )
 
-            if redemption.voided_at and include_coupon_events and _date_in_range(redemption.voided_at, start_dt, end_dt):
+            if (
+                redemption.voided_at
+                and include_coupon_events
+                and _date_in_range(redemption.voided_at, start_dt, end_dt)
+            ):
                 _append_event(
                     events,
                     {
@@ -465,9 +489,12 @@ def _add_coupon_events(
                         "tipo": "estorno",
                         "direcao": "credito",
                         "titulo": "Uso de cupom estornado",
-                        "descricao": redemption.voided_reason or f"Uso do cupom {coupon.code} estornado.",
+                        "descricao": redemption.voided_reason
+                        or f"Uso do cupom {coupon.code} estornado.",
                         "valor": abs(_money(redemption.discount_applied) or 0),
-                        "venda_id": int(redemption.venda_id) if redemption.venda_id else None,
+                        "venda_id": int(redemption.venda_id)
+                        if redemption.venda_id
+                        else None,
                         "cupom_id": int(coupon.id),
                         "cupom_codigo": coupon.code,
                         "status": "estornado",
@@ -495,7 +522,8 @@ def _add_coupon_events(
                         "tipo": "anulacao",
                         "direcao": "debito",
                         "titulo": "Cupom anulado",
-                        "descricao": meta.get("voided_reason") or f"Cupom {coupon.code} anulado.",
+                        "descricao": meta.get("voided_reason")
+                        or f"Cupom {coupon.code} anulado.",
                         "valor": -abs(_coupon_value(coupon) or 0),
                         "cupom_id": int(coupon.id),
                         "cupom_codigo": coupon.code,
@@ -552,7 +580,11 @@ def _add_loyalty_execution_events(
         reward_type = str(execution.reward_type or "")
         is_coupon_reward = reward_type.startswith("coupon")
 
-        if consumed_stamps > 0 and not is_coupon_reward and _date_in_range(execution.created_at, start_dt, end_dt):
+        if (
+            consumed_stamps > 0
+            and not is_coupon_reward
+            and _date_in_range(execution.created_at, start_dt, end_dt)
+        ):
             _append_event(
                 events,
                 {
@@ -566,13 +598,20 @@ def _add_loyalty_execution_events(
                     "quantidade": -consumed_stamps,
                     "status": "convertido",
                     "origem": "fidelidade",
-                    "metadata": {"execution_id": int(execution.id), "reward_meta": meta},
+                    "metadata": {
+                        "execution_id": int(execution.id),
+                        "reward_meta": meta,
+                    },
                     **_campaign_fields(campaign),
                 },
             )
 
         revoked_at = _parse_datetime(meta.get("revoked_at"))
-        if meta.get("revoked_after_use") and revoked_at and _date_in_range(revoked_at, start_dt, end_dt):
+        if (
+            meta.get("revoked_after_use")
+            and revoked_at
+            and _date_in_range(revoked_at, start_dt, end_dt)
+        ):
             restored = _consumed_stamps_from_meta(
                 {"consumed_stamps": meta.get("original_consumed_stamps")}
             )
@@ -586,11 +625,15 @@ def _add_loyalty_execution_events(
                         "tipo": "restauracao",
                         "direcao": "credito",
                         "titulo": "Carimbos restaurados apos estorno de cupom usado",
-                        "descricao": meta.get("revoked_reason") or "Recompensa de fidelidade estornada.",
+                        "descricao": meta.get("revoked_reason")
+                        or "Recompensa de fidelidade estornada.",
                         "quantidade": restored,
                         "status": "restaurado",
                         "origem": "cancelamento",
-                        "metadata": {"execution_id": int(execution.id), "reward_meta": meta},
+                        "metadata": {
+                            "execution_id": int(execution.id),
+                            "reward_meta": meta,
+                        },
                         **_campaign_fields(campaign),
                     },
                 )
@@ -643,7 +686,12 @@ def _add_cashback_events(
             venda_id = int(reward_meta.get("venda_id") or 0) or None
         except (TypeError, ValueError):
             venda_id = None
-        if venda_id is None and amount < 0 and tx.source_id and source_type in {"manual", "redemption"}:
+        if (
+            venda_id is None
+            and amount < 0
+            and tx.source_id
+            and source_type in {"manual", "redemption"}
+        ):
             venda_id = int(tx.source_id)
         tx_type = tx.tx_type or ("credit" if amount >= 0 else "debit")
         title = "Cashback creditado" if amount >= 0 else "Cashback debitado"
@@ -723,11 +771,7 @@ def _add_ranking_events(
 
 def _enrich_sales(db: Session, events: list[dict[str, Any]], *, tenant_id) -> None:
     venda_ids = sorted(
-        {
-            int(event["venda_id"])
-            for event in events
-            if event.get("venda_id")
-        }
+        {int(event["venda_id"]) for event in events if event.get("venda_id")}
     )
     if not venda_ids:
         return

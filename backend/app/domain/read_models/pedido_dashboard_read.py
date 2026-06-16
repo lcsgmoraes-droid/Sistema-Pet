@@ -2,6 +2,7 @@ from sqlalchemy import Column, Integer, Float, DateTime
 from app.db.base_class import Base
 from datetime import datetime
 
+
 class PedidoDashboardRead(Base):
     __tablename__ = "pedido_dashboard_read"
 

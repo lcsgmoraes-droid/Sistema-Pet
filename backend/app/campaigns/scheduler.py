@@ -173,6 +173,7 @@ class CampaignScheduler:
         """Despacha notificações pendentes (e-mail, push)."""
         try:
             from app.campaigns.notification_sender import NotificationSender
+
             sender = NotificationSender(db_factory=SessionLocal)
             stats = sender.process_batch()
             if stats["processed"] > 0:
@@ -223,7 +224,10 @@ class CampaignScheduler:
                         .all()
                     )
                     if not entries:
-                        logger.warning("[AutoDrawings] Sorteio %d sem participantes, pulando.", drawing.id)
+                        logger.warning(
+                            "[AutoDrawings] Sorteio %d sem participantes, pulando.",
+                            drawing.id,
+                        )
                         continue
 
                     ids_csv = ",".join(str(e.id) for e in entries)
@@ -245,10 +249,15 @@ class CampaignScheduler:
 
                     # Notificar ganhador
                     from app.models import Cliente
-                    cliente = db.query(Cliente).filter(
-                        Cliente.id == winner_entry.customer_id,
-                        Cliente.tenant_id == drawing.tenant_id,
-                    ).first()
+
+                    cliente = (
+                        db.query(Cliente)
+                        .filter(
+                            Cliente.id == winner_entry.customer_id,
+                            Cliente.tenant_id == drawing.tenant_id,
+                        )
+                        .first()
+                    )
                     if cliente and cliente.email:
                         prize_text = drawing.prize_description or "o prêmio"
                         enqueue_email(
@@ -267,10 +276,13 @@ class CampaignScheduler:
                         )
                     logger.info(
                         "[AutoDrawings] Sorteio %d executado. Ganhador: customer_id=%d",
-                        drawing.id, winner_entry.customer_id,
+                        drawing.id,
+                        winner_entry.customer_id,
                     )
                 except Exception as draw_exc:
-                    logger.exception("[AutoDrawings] Erro no sorteio %d: %s", drawing.id, draw_exc)
+                    logger.exception(
+                        "[AutoDrawings] Erro no sorteio %d: %s", drawing.id, draw_exc
+                    )
                 finally:
                     clear_current_tenant()
             db.commit()
@@ -295,8 +307,10 @@ class CampaignScheduler:
         try:
             tenants = db.query(Tenant).filter(Tenant.status == "active").all()
             now = datetime.now(_tz.utc)
-            first_day_this_month = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
-            last_month = (first_day_this_month - timedelta(days=1))
+            first_day_this_month = now.replace(
+                day=1, hour=0, minute=0, second=0, microsecond=0
+            )
+            last_month = first_day_this_month - timedelta(days=1)
             period = last_month.strftime("%Y-%m")
 
             for tenant in tenants:
@@ -334,7 +348,8 @@ class CampaignScheduler:
                             User.tenant_id == tenant.id,
                             Venda.status == "finalizada",
                             Venda.cliente_id.isnot(None),
-                            Venda.data_finalizacao >= first_day_this_month - timedelta(days=31),
+                            Venda.data_finalizacao
+                            >= first_day_this_month - timedelta(days=31),
                             Venda.data_finalizacao < first_day_this_month,
                         )
                         .group_by(Venda.cliente_id)
@@ -351,12 +366,19 @@ class CampaignScheduler:
                         }
                         for r in agg
                     ]
-                    by_spent = sorted(rows, key=lambda x: x["total_spent"], reverse=True)
-                    by_purchases = sorted(rows, key=lambda x: x["total_purchases"], reverse=True)
+                    by_spent = sorted(
+                        rows, key=lambda x: x["total_spent"], reverse=True
+                    )
+                    by_purchases = sorted(
+                        rows, key=lambda x: x["total_purchases"], reverse=True
+                    )
 
                     vencedores = {}
                     usados = set()
-                    for categoria, lista in [("maior_gasto", by_spent), ("mais_compras", by_purchases)]:
+                    for categoria, lista in [
+                        ("maior_gasto", by_spent),
+                        ("mais_compras", by_purchases),
+                    ]:
                         for candidato in lista:
                             if candidato["customer_id"] not in usados:
                                 vencedores[categoria] = candidato
@@ -370,13 +392,19 @@ class CampaignScheduler:
                         customer_id = info["customer_id"]
                         meta_key = f"destaque:{period}:{categoria}"
                         # Anti-duplicidade
-                        existing = db.query(Coupon).filter(
-                            Coupon.tenant_id == tenant.id,
-                            Coupon.meta["destaque_key"].astext == meta_key,
-                        ).first()
+                        existing = (
+                            db.query(Coupon)
+                            .filter(
+                                Coupon.tenant_id == tenant.id,
+                                Coupon.meta["destaque_key"].astext == meta_key,
+                            )
+                            .first()
+                        )
                         if existing:
                             continue
-                        cliente = db.query(Cliente).filter(Cliente.id == customer_id).first()
+                        cliente = (
+                            db.query(Cliente).filter(Cliente.id == customer_id).first()
+                        )
                         if not cliente:
                             continue
 
@@ -390,10 +418,18 @@ class CampaignScheduler:
                             channel="all",
                             valid_days=coupon_days,
                             prefix="DEST",
-                            meta={"destaque_key": meta_key, "categoria": categoria, "periodo": period},
+                            meta={
+                                "destaque_key": meta_key,
+                                "categoria": categoria,
+                                "periodo": period,
+                            },
                         )
                         if cliente.email:
-                            cat_label = "Maior Destaque do Mês" if categoria == "maior_gasto" else "Mais Compras do Mês"
+                            cat_label = (
+                                "Maior Destaque do Mês"
+                                if categoria == "maior_gasto"
+                                else "Mais Compras do Mês"
+                            )
                             enqueue_email(
                                 db,
                                 tenant_id=tenant.id,
@@ -410,11 +446,17 @@ class CampaignScheduler:
                             )
                         logger.info(
                             "[AutoDestaque] tenant=%s period=%s categoria=%s customer=%d cupom=%s",
-                            tenant.id, period, categoria, customer_id, coupon.code,
+                            tenant.id,
+                            period,
+                            categoria,
+                            customer_id,
+                            coupon.code,
                         )
                     db.commit()
                 except Exception as tenant_exc:
-                    logger.exception("[AutoDestaque] Erro no tenant %s: %s", tenant.id, tenant_exc)
+                    logger.exception(
+                        "[AutoDestaque] Erro no tenant %s: %s", tenant.id, tenant_exc
+                    )
                     db.rollback()
                 finally:
                     clear_current_tenant()
@@ -428,6 +470,7 @@ class CampaignScheduler:
         db = SessionLocal()
         try:
             from app.models import Tenant
+
             tenants = db.query(Tenant).filter(Tenant.status == "active").all()
             seeded = 0
             for tenant in tenants:
@@ -438,14 +481,20 @@ class CampaignScheduler:
                         seeded += count
                         logger.info(
                             "[CampaignScheduler] Auto-seed: %d campanha(s) criada(s) para tenant %s",
-                            count, tenant.id,
+                            count,
+                            tenant.id,
                         )
                 except Exception as exc:
-                    logger.warning("[CampaignScheduler] Erro ao seed tenant %s: %s", tenant.id, exc)
+                    logger.warning(
+                        "[CampaignScheduler] Erro ao seed tenant %s: %s", tenant.id, exc
+                    )
                 finally:
                     clear_current_tenant()
             if seeded:
-                logger.info("[CampaignScheduler] Auto-seed concluído: %d campanha(s) criada(s) no total", seeded)
+                logger.info(
+                    "[CampaignScheduler] Auto-seed concluído: %d campanha(s) criada(s) no total",
+                    seeded,
+                )
         except Exception as exc:
             logger.exception("[CampaignScheduler] Erro no auto-seed: %s", exc)
         finally:
@@ -496,8 +545,11 @@ class CampaignScheduler:
         """
         from datetime import timedelta, timezone
         from app.campaigns.models import (
-            CashbackTransaction, CashbackSourceTypeEnum,
-            Campaign, CampaignTypeEnum, NotificationQueue,
+            CashbackTransaction,
+            CashbackSourceTypeEnum,
+            Campaign,
+            CampaignTypeEnum,
+            NotificationQueue,
         )
         from app.campaigns.notification_service import enqueue_email
         from app.models import Cliente, Tenant
@@ -543,7 +595,8 @@ class CampaignScheduler:
                             .filter(
                                 CashbackTransaction.tenant_id == tenant.id,
                                 CashbackTransaction.customer_id == tx.customer_id,
-                                CashbackTransaction.source_type == CashbackSourceTypeEnum.expiration,
+                                CashbackTransaction.source_type
+                                == CashbackSourceTypeEnum.expiration,
                                 CashbackTransaction.source_id == tx.id,
                             )
                             .first()
@@ -551,17 +604,23 @@ class CampaignScheduler:
                         if ja_expirou:
                             continue
                         # Insere lançamento negativo (estorna o crédito expirado)
-                        db.add(CashbackTransaction(
-                            tenant_id=tenant.id,
-                            customer_id=tx.customer_id,
-                            amount=-tx.amount,
-                            source_type=CashbackSourceTypeEnum.expiration,
-                            source_id=tx.id,
-                            description=f"Expiração do cashback #CBTX-{tx.id} (R$ {float(tx.amount):.2f})",
-                            tx_type="expired",
-                        ))
+                        db.add(
+                            CashbackTransaction(
+                                tenant_id=tenant.id,
+                                customer_id=tx.customer_id,
+                                amount=-tx.amount,
+                                source_type=CashbackSourceTypeEnum.expiration,
+                                source_id=tx.id,
+                                description=f"Expiração do cashback #CBTX-{tx.id} (R$ {float(tx.amount):.2f})",
+                                tx_type="expired",
+                            )
+                        )
                         # Notifica o cliente
-                        cliente = db.query(Cliente).filter(Cliente.id == tx.customer_id).first()
+                        cliente = (
+                            db.query(Cliente)
+                            .filter(Cliente.id == tx.customer_id)
+                            .first()
+                        )
                         if cliente and cliente.email:
                             enqueue_email(
                                 db,
@@ -584,7 +643,8 @@ class CampaignScheduler:
                         .filter(
                             CashbackTransaction.tenant_id == tenant.id,
                             CashbackTransaction.tx_type == "credit",
-                            CashbackTransaction.expires_at > today_end,   # ainda não expirou hoje
+                            CashbackTransaction.expires_at
+                            > today_end,  # ainda não expirou hoje
                             CashbackTransaction.expires_at <= alerta_limite,
                         )
                         .all()
@@ -604,7 +664,11 @@ class CampaignScheduler:
                         if ja_alertou:
                             alertados.add(tx.customer_id)
                             continue
-                        cliente = db.query(Cliente).filter(Cliente.id == tx.customer_id).first()
+                        cliente = (
+                            db.query(Cliente)
+                            .filter(Cliente.id == tx.customer_id)
+                            .first()
+                        )
                         if not cliente:
                             continue
                         dias_rest = max(0, (tx.expires_at - now_utc).days)
@@ -625,17 +689,25 @@ class CampaignScheduler:
                         alertados.add(tx.customer_id)
                         logger.info(
                             "[CashbackExpiration] Alerta enviado: tenant=%s customer=%d dias=%d",
-                            tenant.id, tx.customer_id, dias_rest,
+                            tenant.id,
+                            tx.customer_id,
+                            dias_rest,
                         )
 
                     db.commit()
                     logger.info(
                         "[CashbackExpiration] tenant=%s: %d expirado(s), %d alertado(s)",
-                        tenant.id, len(expirados_hoje), len(alertados),
+                        tenant.id,
+                        len(expirados_hoje),
+                        len(alertados),
                     )
 
                 except Exception as tenant_exc:
-                    logger.exception("[CashbackExpiration] Erro no tenant %s: %s", tenant.id, tenant_exc)
+                    logger.exception(
+                        "[CashbackExpiration] Erro no tenant %s: %s",
+                        tenant.id,
+                        tenant_exc,
+                    )
                     db.rollback()
                 finally:
                     clear_current_tenant()

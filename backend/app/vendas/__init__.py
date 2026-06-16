@@ -11,4 +11,4 @@ IMPORTANTE: Este é o ÚNICO lugar onde commits de venda devem acontecer.
 
 from .service import VendaService
 
-__all__ = ['VendaService']
+__all__ = ["VendaService"]

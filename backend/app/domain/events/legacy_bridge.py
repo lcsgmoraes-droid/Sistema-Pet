@@ -31,22 +31,17 @@ def _legacy_to_domain(event: VendaRealizadaEvent):
             contas_baixadas=0,
             metadados={
                 "bridge": "legacy_to_domain",
-                "source_event": "VendaRealizadaEvent"
-            }
+                "source_event": "VendaRealizadaEvent",
+            },
         )
 
         trace_event("legacy_bridge", "VendaRealizadaEvent", event)
         publish_event(novo_evento)
 
-        logger.info(
-            f"🌉 Bridge legado→domain executado venda_id={event.venda_id}"
-        )
+        logger.info(f"🌉 Bridge legado→domain executado venda_id={event.venda_id}")
 
     except Exception as e:
-        logger.error(
-            f"Erro no bridge legado→domain: {e}",
-            exc_info=True
-        )
+        logger.error(f"Erro no bridge legado→domain: {e}", exc_info=True)
 
 
 def setup_legacy_bridge():

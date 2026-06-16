@@ -94,10 +94,15 @@ def build_coupon_redemption_audit_metadata(
     extra: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     metadata = {
-        "coupon_id": _serializable_id(getattr(redemption, "coupon_id", None) or getattr(coupon, "id", None)),
+        "coupon_id": _serializable_id(
+            getattr(redemption, "coupon_id", None) or getattr(coupon, "id", None)
+        ),
         "coupon_code": getattr(coupon, "code", None),
         "campaign_id": _serializable_id(getattr(coupon, "campaign_id", None)),
-        "customer_id": _serializable_id(getattr(redemption, "customer_id", None) or getattr(coupon, "customer_id", None)),
+        "customer_id": _serializable_id(
+            getattr(redemption, "customer_id", None)
+            or getattr(coupon, "customer_id", None)
+        ),
         "redemption_id": _serializable_id(getattr(redemption, "id", None)),
         "venda_id": _serializable_id(getattr(redemption, "venda_id", None)),
         "discount_applied": _money(getattr(redemption, "discount_applied", None)),
@@ -122,7 +127,9 @@ def build_loyalty_stamp_audit_metadata(
         "stamp_id": _serializable_id(getattr(stamp, "id", None)),
         "campaign_id": _serializable_id(getattr(stamp, "campaign_id", None)),
         "campaign_name": getattr(campaign, "name", None) if campaign else None,
-        "campaign_type": _enum_value(getattr(campaign, "campaign_type", None)) if campaign else None,
+        "campaign_type": _enum_value(getattr(campaign, "campaign_type", None))
+        if campaign
+        else None,
         "customer_id": _serializable_id(getattr(stamp, "customer_id", None)),
         "venda_id": _serializable_id(getattr(stamp, "venda_id", None)),
         "stamp_index": _serializable_id(getattr(stamp, "stamp_index", None)),
