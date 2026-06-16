@@ -1,4 +1,5 @@
 import os
+from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
@@ -40,6 +41,18 @@ async def _call_next(_request: Request):
     return PlainTextResponse("ok")
 
 
+async def _call_next_no_response(_request: Request):
+    raise RuntimeError("No response returned.")
+
+
+class _DisconnectedRequest:
+    headers = {}
+    url = SimpleNamespace(path="/produtos/vendaveis")
+
+    async def is_disconnected(self) -> bool:
+        return True
+
+
 @pytest.mark.asyncio
 async def test_tenant_security_blocks_valid_jwt_without_tenant():
     middleware = TenantSecurityMiddleware(app=lambda scope, receive, send: None)
@@ -64,3 +77,11 @@ async def test_tenant_security_allows_select_tenant_without_tenant():
     response = await middleware.dispatch(_request("/api/auth/select-tenant", token), _call_next)
 
     assert response.status_code == 200
+
+
+@pytest.mark.asyncio
+async def test_tenant_security_returns_no_content_when_client_disconnects():
+    middleware = TenantSecurityMiddleware(app=lambda scope, receive, send: None)
+    response = await middleware.dispatch(_DisconnectedRequest(), _call_next_no_response)
+
+    assert response.status_code == 204
