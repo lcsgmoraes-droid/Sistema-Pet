@@ -251,6 +251,10 @@ jobs:
         run: |
           ruff check app/ia
 
+      - name: IA root lint (blocking)
+        run: |
+          ruff check app/ia_config.py app/ia_fluxo_routes.py app/ia_routes.py
+
       - name: API lint (blocking)
         run: |
           ruff check app/api

@@ -4,16 +4,13 @@ Endpoints para projeções, alertas e análises inteligentes
 """
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import func, and_, or_, extract
+from sqlalchemy import func, and_
 from datetime import datetime, date, timedelta
-from decimal import Decimal
-from typing import Optional, List
+from typing import Optional
 
 from .db import get_session
-from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
-from .models import User
-from .financeiro_models import ContaPagar, ContaReceber, ContaBancaria, LancamentoManual
+from .financeiro_models import ContaPagar, ContaReceber, ContaBancaria
 
 router = APIRouter(tags=["IA Fluxo Caixa"])
 
@@ -89,7 +86,7 @@ def obter_saldo_atual(
     current_user, tenant_id = user_and_tenant
     contas = db.query(ContaBancaria).filter(
         ContaBancaria.user_id == current_user.id,
-        ContaBancaria.ativa == True
+        ContaBancaria.ativa.is_(True)
     ).all()
 
     saldo_total = sum([float(conta.saldo_atual or 0) for conta in contas])
@@ -223,7 +220,7 @@ def listar_recorrencias_proximas(
     recorrencias = db.query(ContaPagar).filter(
         and_(
             ContaPagar.user_id == current_user.id,
-            ContaPagar.eh_recorrente == True,
+            ContaPagar.eh_recorrente.is_(True),
             ContaPagar.proxima_recorrencia >= hoje,
             ContaPagar.proxima_recorrencia <= data_limite
         )
@@ -252,7 +249,7 @@ def projecao_saldo(
     # Buscar saldo atual
     contas = db.query(ContaBancaria).filter(
         ContaBancaria.user_id == current_user.id,
-        ContaBancaria.ativa == True
+        ContaBancaria.ativa.is_(True)
     ).all()
     saldo_atual = sum([float(conta.saldo_atual or 0) for conta in contas])
 
