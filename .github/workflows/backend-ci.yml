@@ -163,6 +163,10 @@ jobs:
         run: |
           ruff check app/financeiro_routes.py app/conciliacao_routes.py app/conciliacao_aba1_routes.py app/conciliacao_bancaria_routes.py app/conciliacao_services.py app/conciliacao_historico_routes.py
 
+      - name: Conciliacao adquirentes root lint (blocking)
+        run: |
+          ruff check app/conciliacao_cartao_routes.py app/conciliacao_helpers.py app/conciliacao_models.py app/conciliacao_operadora_detector.py app/stone_models.py app/operadoras_cartao_models.py app/duplicatas_ignoradas_models.py app/controle_processamento_models.py
+
       - name: Routers lint (blocking)
         run: |
           ruff check app/routers

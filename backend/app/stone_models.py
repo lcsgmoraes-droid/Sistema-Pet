@@ -6,8 +6,6 @@ Armazena transações e logs de pagamentos Stone
 from sqlalchemy import Column, Integer, String, Numeric, Boolean, DateTime, Text, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from datetime import datetime
-from decimal import Decimal
-from .db import Base
 from .base_models import BaseTenantModel
 from app.utils.serialization import safe_decimal_to_float, safe_datetime_to_iso
 

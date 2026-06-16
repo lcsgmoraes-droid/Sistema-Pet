@@ -20,7 +20,7 @@ Models criados:
 
 from sqlalchemy import Column, Integer, String, Boolean, DateTime, Date, Text, ForeignKey, Numeric, BigInteger
 from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import UUID, JSONB
+from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
 from decimal import Decimal
 
