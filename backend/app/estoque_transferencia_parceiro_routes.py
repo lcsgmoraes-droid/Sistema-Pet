@@ -10,7 +10,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from sqlalchemy import desc, or_
+from sqlalchemy import and_, desc, or_
 from sqlalchemy.orm import Session, joinedload
 
 from .auth.dependencies import get_current_user_and_tenant
@@ -230,8 +230,7 @@ def _obter_dre_subcategoria_receita_padrao(db: Session, tenant_id) -> int:
     ).filter(
         DRESubcategoria.tenant_id == str(tenant_id),
         DRECategoria.tenant_id == str(tenant_id),
-        DRESubcategoria.ativo.is_(True),
-        DRECategoria.ativo.is_(True),
+        and_(DRESubcategoria.ativo.is_(True), DRECategoria.ativo.is_(True)),
         DRECategoria.natureza == NaturezaDRE.RECEITA,
     ).order_by(DRECategoria.ordem.asc(), DRESubcategoria.id.asc()).first()
     return subcategoria.id if subcategoria else 1
