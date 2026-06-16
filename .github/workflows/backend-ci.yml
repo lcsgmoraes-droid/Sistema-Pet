@@ -379,6 +379,10 @@ jobs:
         run: |
           ruff format --check tests/unit
 
+      - name: Backend remaining tests format (blocking)
+        run: |
+          ruff format --check ../tests tests/domain
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"

@@ -18,7 +18,10 @@ def test_backend_ci_has_blocking_auth_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
     assert "Auth lint (blocking)" in source
-    assert "ruff check app/auth app/auth_routes_multitenant.py app/usuarios_routes.py" in source
+    assert (
+        "ruff check app/auth app/auth_routes_multitenant.py app/usuarios_routes.py"
+        in source
+    )
 
 
 def test_backend_ci_has_blocking_db_lint_step():
@@ -116,7 +119,10 @@ def test_backend_ci_has_blocking_caixa_root_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
     assert "Caixa root lint (blocking)" in source
-    assert "ruff check app/caixa_models.py app/caixa_routes.py app/calculadora_racao.py" in source
+    assert (
+        "ruff check app/caixa_models.py app/caixa_routes.py app/calculadora_racao.py"
+        in source
+    )
 
 
 def test_backend_ci_has_blocking_parsers_lint_step():
@@ -399,7 +405,9 @@ def test_backend_ci_has_blocking_ia_root_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
     assert "IA root lint (blocking)" in source
-    assert "ruff check app/ia_config.py app/ia_fluxo_routes.py app/ia_routes.py" in source
+    assert (
+        "ruff check app/ia_config.py app/ia_fluxo_routes.py app/ia_routes.py" in source
+    )
 
 
 def test_backend_ci_has_blocking_api_lint_step():
@@ -697,6 +705,13 @@ def test_backend_ci_has_blocking_backend_unit_tests_format_step():
 
     assert "Backend unit tests format (blocking)" in source
     assert "ruff format --check tests/unit" in source
+
+
+def test_backend_ci_has_blocking_backend_remaining_tests_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend remaining tests format (blocking)" in source
+    assert "ruff format --check ../tests tests/domain" in source
 
 
 def test_backend_ci_has_blocking_alembic_env_lint_step():

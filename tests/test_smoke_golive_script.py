@@ -27,10 +27,14 @@ class FakePublicClient:
 
     def request(self, method: str, path: str, **kwargs):
         self.calls.append((method, path))
-        return self.result_class(name=f"{method} {path}", ok=True, status=200, detail="ok"), {}
+        return self.result_class(
+            name=f"{method} {path}", ok=True, status=200, detail="ok"
+        ), {}
 
 
-def test_public_only_mode_skips_authenticated_login_without_credentials(monkeypatch, capsys):
+def test_public_only_mode_skips_authenticated_login_without_credentials(
+    monkeypatch, capsys
+):
     smoke = _load_smoke_module()
     FakePublicClient.calls = []
     FakePublicClient.result_class = smoke.CheckResult

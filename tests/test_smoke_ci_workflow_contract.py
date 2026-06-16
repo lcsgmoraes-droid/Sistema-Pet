@@ -12,4 +12,6 @@ def test_smoke_ci_runs_all_root_contract_tests():
 
     assert "python -m pytest tests -q" in source
     assert "tests/**" in source
-    assert "tests/test_ci_smoke_script.py tests/test_smoke_golive_script.py" not in source
+    assert (
+        "tests/test_ci_smoke_script.py tests/test_smoke_golive_script.py" not in source
+    )
