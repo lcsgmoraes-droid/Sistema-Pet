@@ -2,6 +2,7 @@
 Sistema de Auditoria - LGPD Compliance
 Registra todas as ações importantes no sistema
 """
+
 from sqlalchemy.orm import Session as DBSession
 from app.models import AuditLog
 from datetime import datetime, timezone
@@ -37,7 +38,7 @@ def log_action(
 ):
     """
     Registra uma ação no log de auditoria.
-    
+
     Args:
         db: Sessão do banco
         user_id: ID do usuário (None para ações do sistema)
@@ -75,7 +76,7 @@ def log_action(
             timestamp=datetime.now(timezone.utc),
             tenant_id=tenant_id_resolvido,
         )
-        
+
         db.add(log)
         if commit:
             db.commit()
@@ -83,7 +84,11 @@ def log_action(
             db.flush()
         return log
     except Exception as e:
-        logger.warning("audit_log_error", f"Erro ao registrar log de auditoria: {e}", exception=str(e))
+        logger.warning(
+            "audit_log_error",
+            f"Erro ao registrar log de auditoria: {e}",
+            exception=str(e),
+        )
         if commit:
             db.rollback()
         else:
@@ -92,61 +97,91 @@ def log_action(
 
 # Atalhos para ações comuns
 
-def log_login(db: DBSession, user_id: int, ip: str, user_agent: str, success: bool = True):
+
+def log_login(
+    db: DBSession, user_id: int, ip: str, user_agent: str, success: bool = True
+):
     """Registra tentativa de login"""
     log_action(
-        db, user_id,
+        db,
+        user_id,
         action="login_success" if success else "login_failed",
         entity_type="user",
         entity_id=user_id,
         ip_address=ip,
-        user_agent=user_agent
+        user_agent=user_agent,
     )
 
 
 def log_logout(db: DBSession, user_id: int, ip: str):
     """Registra logout"""
     log_action(
-        db, user_id,
+        db,
+        user_id,
         action="logout",
         entity_type="user",
         entity_id=user_id,
-        ip_address=ip
+        ip_address=ip,
     )
 
 
-def log_create(db: DBSession, user_id: int, entity_type: str, entity_id: int, data: dict, ip: str = None):
+def log_create(
+    db: DBSession,
+    user_id: int,
+    entity_type: str,
+    entity_id: int,
+    data: dict,
+    ip: str = None,
+):
     """Registra criação de entidade"""
     log_action(
-        db, user_id,
+        db,
+        user_id,
         action=f"create_{entity_type}",
         entity_type=entity_type,
         entity_id=entity_id,
         new_value=data,
-        ip_address=ip
+        ip_address=ip,
     )
 
 
-def log_update(db: DBSession, user_id: int, entity_type: str, entity_id: int, old_data: dict, new_data: dict, ip: str = None):
+def log_update(
+    db: DBSession,
+    user_id: int,
+    entity_type: str,
+    entity_id: int,
+    old_data: dict,
+    new_data: dict,
+    ip: str = None,
+):
     """Registra atualização de entidade"""
     log_action(
-        db, user_id,
+        db,
+        user_id,
         action=f"update_{entity_type}",
         entity_type=entity_type,
         entity_id=entity_id,
         old_value=old_data,
         new_value=new_data,
-        ip_address=ip
+        ip_address=ip,
     )
 
 
-def log_delete(db: DBSession, user_id: int, entity_type: str, entity_id: int, data: dict, ip: str = None):
+def log_delete(
+    db: DBSession,
+    user_id: int,
+    entity_type: str,
+    entity_id: int,
+    data: dict,
+    ip: str = None,
+):
     """Registra exclusão de entidade"""
     log_action(
-        db, user_id,
+        db,
+        user_id,
         action=f"delete_{entity_type}",
         entity_type=entity_type,
         entity_id=entity_id,
         old_value=data,
-        ip_address=ip
+        ip_address=ip,
     )

@@ -79,11 +79,11 @@ logger = logging.getLogger(__name__)
 class CaixaService:
     """
     Serviço isolado para gerenciar operações de CAIXA físico (dinheiro em espécie).
-    
+
     Este serviço é STATELESS e todos os métodos são estáticos.
     Não mantém estado entre chamadas.
     """
-    
+
     @staticmethod
     def validar_caixa_aberto(
         user_id: int,
@@ -94,16 +94,16 @@ class CaixaService:
     ) -> Dict[str, Any]:
         """
         Valida se existe um caixa aberto para o usuário.
-        
+
         Esta validação é OBRIGATÓRIA antes de:
         - Finalizar qualquer venda
         - Registrar movimentações manuais
         - Processar devoluções
-        
+
         Args:
             user_id: ID do usuário/funcionário
             db: Sessão do SQLAlchemy (não será commitada)
-            
+
         Returns:
             Dict com informações do caixa:
             {
@@ -112,20 +112,20 @@ class CaixaService:
                 'data_abertura': datetime,
                 'usuario_id': int
             }
-            
+
         Raises:
             HTTPException(400): Se não houver caixa aberto para o usuário
-            
+
         Exemplo:
             >>> caixa_info = CaixaService.validar_caixa_aberto(user_id=1, db=db)
             >>> logger.info(f"Caixa ID: {caixa_info['caixa_id']}")
         """
         # Import local para evitar circular dependency
         from app.caixa_models import Caixa
-        
+
         logger.debug(f"🔍 Validando caixa aberto para user_id={user_id}")
-        
-        query = db.query(Caixa).filter(Caixa.status == 'aberto')
+
+        query = db.query(Caixa).filter(Caixa.status == "aberto")
         if tenant_id:
             query = query.filter(Caixa.tenant_id == tenant_id)
 
@@ -139,38 +139,40 @@ class CaixaService:
             query = query.filter(Caixa.usuario_id == user_id)
 
         caixa_aberto = query.first()
-        
+
         if not caixa_aberto:
-            logger.warning(f"⚠️ Tentativa de operação sem caixa aberto - user_id={user_id}")
+            logger.warning(
+                f"⚠️ Tentativa de operação sem caixa aberto - user_id={user_id}"
+            )
             raise HTTPException(
                 status_code=400,
-                detail='Não há caixa aberto. Abra um caixa antes de realizar vendas.'
+                detail="Não há caixa aberto. Abra um caixa antes de realizar vendas.",
             )
-        
+
         logger.info(f"✅ Caixa válido - ID={caixa_aberto.id}, user_id={user_id}")
-        
+
         return {
-            'caixa_id': caixa_aberto.id,
-            'valor_abertura': caixa_aberto.valor_abertura,
-            'data_abertura': caixa_aberto.data_abertura,
-            'usuario_id': caixa_aberto.usuario_id
+            "caixa_id": caixa_aberto.id,
+            "valor_abertura": caixa_aberto.valor_abertura,
+            "data_abertura": caixa_aberto.data_abertura,
+            "usuario_id": caixa_aberto.usuario_id,
         }
-    
+
     @staticmethod
     def eh_forma_dinheiro(forma_pagamento: Any) -> bool:
         """
         Verifica se a forma de pagamento é DINHEIRO em ESPÉCIE.
-        
+
         Esta função normaliza diferentes representações de "Dinheiro":
         - String: "Dinheiro", "dinheiro", "DINHEIRO"
         - ID: 1 (int ou string)
-        
+
         Args:
             forma_pagamento: Pode ser string, int ou qualquer tipo
-            
+
         Returns:
             True se for dinheiro, False caso contrário
-            
+
         Exemplo:
             >>> CaixaService.eh_forma_dinheiro("Dinheiro")
             True
@@ -180,14 +182,14 @@ class CaixaService:
             False
         """
         if isinstance(forma_pagamento, str):
-            return forma_pagamento.lower() == 'dinheiro'
-        
+            return forma_pagamento.lower() == "dinheiro"
+
         if isinstance(forma_pagamento, int):
             return forma_pagamento == 1
-        
+
         # Tentar converter para string e comparar
-        return str(forma_pagamento) == '1'
-    
+        return str(forma_pagamento) == "1"
+
     @staticmethod
     def registrar_movimentacao_venda(
         caixa_id: int,
@@ -197,14 +199,14 @@ class CaixaService:
         user_id: int,
         user_nome: str,
         tenant_id,  # UUID do tenant (obrigatório para isolamento)
-        db: Session
+        db: Session,
     ) -> Dict[str, Any]:
         """
         Registra movimentação de ENTRADA no caixa referente a venda em DINHEIRO.
-        
+
         Este método deve ser chamado APENAS para pagamentos em dinheiro vivo.
         PIX, cartões e outras formas vão para o módulo financeiro.
-        
+
         Args:
             caixa_id: ID do caixa aberto
             venda_id: ID da venda (FK)
@@ -214,7 +216,7 @@ class CaixaService:
             user_nome: Nome do usuário (para auditoria)
             tenant_id: UUID do tenant (isolamento multi-tenant)
             db: Sessão do SQLAlchemy (não será commitada)
-            
+
         Returns:
             Dict com informações da movimentação:
             {
@@ -223,10 +225,10 @@ class CaixaService:
                 'valor': Decimal,
                 'descricao': str
             }
-            
+
         Raises:
             ValueError: Se o valor for <= 0
-            
+
         Exemplo:
             >>> mov = CaixaService.registrar_movimentacao_venda(
             ...     caixa_id=5,
@@ -241,43 +243,44 @@ class CaixaService:
         """
         # Import local para evitar circular dependency
         from app.caixa_models import MovimentacaoCaixa
-        
+
         if valor <= 0:
             raise ValueError("Valor da movimentação deve ser maior que zero")
-        
+
         logger.debug(
             f"💰 Registrando movimentação de venda: "
             f"caixa_id={caixa_id}, venda_id={venda_id}, valor={valor:.2f}"
         )
-        
+
         # 🔒 ISOLAMENTO MULTI-TENANT: tenant_id obrigatório
         movimentacao = MovimentacaoCaixa(
             caixa_id=caixa_id,
-            tipo='venda',
+            tipo="venda",
             valor=valor,
-            forma_pagamento='Dinheiro',  # Sempre "Dinheiro" (não ID)
-            descricao=f'Venda #{venda_numero}',
+            forma_pagamento="Dinheiro",  # Sempre "Dinheiro" (não ID)
+            descricao=f"Venda #{venda_numero}",
             venda_id=venda_id,
             usuario_id=user_id,
-            usuario_nome=user_nome or 'Usuário',  # fallback: usuario sem nome cadastrado
-            tenant_id=tenant_id  # ✅ Garantir isolamento entre empresas
+            usuario_nome=user_nome
+            or "Usuário",  # fallback: usuario sem nome cadastrado
+            tenant_id=tenant_id,  # ✅ Garantir isolamento entre empresas
         )
-        
+
         db.add(movimentacao)
         db.flush()  # Para obter o ID, mas não commitar
-        
+
         logger.info(
             f"✅ Movimentação de caixa criada: "
             f"ID={movimentacao.id}, Venda={venda_numero}, Valor=R$ {valor:.2f}"
         )
-        
+
         return {
-            'movimentacao_id': movimentacao.id,
-            'tipo': 'venda',
-            'valor': Decimal(str(valor)),
-            'descricao': movimentacao.descricao
+            "movimentacao_id": movimentacao.id,
+            "tipo": "venda",
+            "valor": Decimal(str(valor)),
+            "descricao": movimentacao.descricao,
         }
-    
+
     @staticmethod
     def registrar_devolucao(
         caixa_id: int,
@@ -288,14 +291,14 @@ class CaixaService:
         user_id: int,
         user_nome: str,
         tenant_id,  # UUID do tenant (obrigatório para isolamento)
-        db: Session
+        db: Session,
     ) -> Dict[str, Any]:
         """
         Registra movimentação de SAÍDA no caixa referente a devolução em DINHEIRO.
-        
+
         Este método registra devoluções onde o dinheiro sai fisicamente do caixa
         para devolver ao cliente.
-        
+
         Args:
             caixa_id: ID do caixa aberto
             venda_id: ID da venda original (FK)
@@ -306,7 +309,7 @@ class CaixaService:
             user_nome: Nome do usuário (para auditoria)
             tenant_id: UUID do tenant (isolamento multi-tenant)
             db: Sessão do SQLAlchemy (não será commitada)
-            
+
         Returns:
             Dict com informações da movimentação:
             {
@@ -315,10 +318,10 @@ class CaixaService:
                 'valor': Decimal,
                 'descricao': str
             }
-            
+
         Raises:
             ValueError: Se o valor for <= 0
-            
+
         Exemplo:
             >>> dev = CaixaService.registrar_devolucao(
             ...     caixa_id=5,
@@ -334,61 +337,59 @@ class CaixaService:
         """
         # Import local para evitar circular dependency
         from app.caixa_models import MovimentacaoCaixa
-        
+
         if valor <= 0:
             raise ValueError("Valor da devolução deve ser maior que zero")
-        
+
         logger.debug(
             f"🔄 Registrando devolução em dinheiro: "
             f"caixa_id={caixa_id}, venda_id={venda_id}, valor={valor:.2f}, motivo={motivo}"
         )
-        
+
         # 🔒 ISOLAMENTO MULTI-TENANT: tenant_id obrigatório
         movimentacao = MovimentacaoCaixa(
             caixa_id=caixa_id,
-            tipo='devolucao',
+            tipo="devolucao",
             valor=valor,
-            forma_pagamento='Dinheiro',
-            descricao=f'Devolução Venda #{venda_numero}: {motivo}',
+            forma_pagamento="Dinheiro",
+            descricao=f"Devolução Venda #{venda_numero}: {motivo}",
             venda_id=venda_id,
             usuario_id=user_id,
             usuario_nome=user_nome,
-            tenant_id=tenant_id  # ✅ Garantir isolamento entre empresas
+            tenant_id=tenant_id,  # ✅ Garantir isolamento entre empresas
         )
-        
+
         db.add(movimentacao)
         db.flush()  # Para obter o ID, mas não commitar
-        
+
         logger.info(
             f"✅ Devolução em caixa registrada: "
             f"ID={movimentacao.id}, Venda={venda_numero}, Valor=R$ {valor:.2f}"
         )
-        
+
         return {
-            'movimentacao_id': movimentacao.id,
-            'tipo': 'devolucao',
-            'valor': Decimal(str(valor)),
-            'descricao': movimentacao.descricao
+            "movimentacao_id": movimentacao.id,
+            "tipo": "devolucao",
+            "valor": Decimal(str(valor)),
+            "descricao": movimentacao.descricao,
         }
-    
+
     @staticmethod
     def vincular_venda_ao_caixa(
-        venda_id: int,
-        caixa_id: int,
-        db: Session
+        venda_id: int, caixa_id: int, db: Session
     ) -> Dict[str, Any]:
         """
         Vincula uma venda ao caixa aberto (atualiza venda.caixa_id).
-        
+
         Este método é chamado após finalizar a venda com sucesso,
         criando o vínculo entre a venda e o caixa que estava aberto
         no momento da venda.
-        
+
         Args:
             venda_id: ID da venda
             caixa_id: ID do caixa aberto
             db: Sessão do SQLAlchemy (não será commitada)
-            
+
         Returns:
             Dict confirmando o vínculo:
             {
@@ -396,10 +397,10 @@ class CaixaService:
                 'caixa_id': int,
                 'vinculado': bool
             }
-            
+
         Raises:
             HTTPException(404): Se a venda não for encontrada
-            
+
         Exemplo:
             >>> vinculo = CaixaService.vincular_venda_ao_caixa(
             ...     venda_id=120,
@@ -410,66 +411,64 @@ class CaixaService:
         """
         # Import local para evitar circular dependency
         from app.vendas_models import Venda
-        
+
         logger.debug(f"🔗 Vinculando venda_id={venda_id} ao caixa_id={caixa_id}")
-        
+
         venda = db.query(Venda).filter(Venda.id == venda_id).first()
-        
+
         if not venda:
             logger.error(f"❌ Venda não encontrada: ID={venda_id}")
             raise HTTPException(
-                status_code=404,
-                detail=f'Venda ID {venda_id} não encontrada'
+                status_code=404, detail=f"Venda ID {venda_id} não encontrada"
             )
-        
+
         venda.caixa_id = caixa_id
         db.add(venda)
         db.flush()
-        
-        logger.info(f"✅ Venda vinculada ao caixa: venda_id={venda_id}, caixa_id={caixa_id}")
-        
-        return {
-            'venda_id': venda_id,
-            'caixa_id': caixa_id,
-            'vinculado': True
-        }
+
+        logger.info(
+            f"✅ Venda vinculada ao caixa: venda_id={venda_id}, caixa_id={caixa_id}"
+        )
+
+        return {"venda_id": venda_id, "caixa_id": caixa_id, "vinculado": True}
 
 
 # ============================================================================
 # FUNÇÕES AUXILIARES (se necessário no futuro)
 # ============================================================================
 
+
 def calcular_saldo_caixa(caixa_id: int, db: Session) -> Decimal:
     """
     Calcula o saldo atual do caixa somando todas as movimentações.
-    
+
     NOTA: Esta função pode ser útil no futuro para relatórios,
     mas não é usada no fluxo de vendas (apenas no fechamento).
-    
+
     Args:
         caixa_id: ID do caixa
         db: Sessão do SQLAlchemy
-        
+
     Returns:
         Saldo calculado (saldo_inicial + entradas - saídas)
     """
     from app.caixa_models import Caixa, MovimentacaoCaixa
-    
+
     caixa = db.query(Caixa).filter(Caixa.id == caixa_id).first()
     if not caixa:
-        return Decimal('0.00')
-    
+        return Decimal("0.00")
+
     # Somar movimentações
-    movimentacoes = db.query(MovimentacaoCaixa).filter(
-        MovimentacaoCaixa.caixa_id == caixa_id
-    ).all()
-    
+    movimentacoes = (
+        db.query(MovimentacaoCaixa).filter(MovimentacaoCaixa.caixa_id == caixa_id).all()
+    )
+
     saldo = Decimal(str(caixa.valor_abertura or 0))
-    
+
     for mov in movimentacoes:
-        if mov.tipo in ['venda', 'entrada', 'sangria_entrada']:
+        if mov.tipo in ["venda", "entrada", "sangria_entrada"]:
             saldo += Decimal(str(mov.valor))
-        elif mov.tipo in ['devolucao', 'saida', 'sangria']:
+        elif mov.tipo in ["devolucao", "saida", "sangria"]:
             saldo -= Decimal(str(mov.valor))
-    
+
     return saldo
