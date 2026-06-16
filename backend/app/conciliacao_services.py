@@ -23,10 +23,9 @@ CORREÇÕES CRÍTICAS APLICADAS (Revisão Fase 2):
 """
 
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, func
 from decimal import Decimal
 from datetime import datetime, date
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Dict, List, Optional, Any
 import logging
 
 from .conciliacao_models import (
@@ -34,7 +33,6 @@ from .conciliacao_models import (
     AdquirenteTemplate,
     ArquivoEvidencia,
     ConciliacaoImportacao,
-    ConciliacaoLote,
     ConciliacaoValidacao,
     ConciliacaoLog
 )
@@ -44,14 +42,11 @@ from .conciliacao_helpers import (
     detectar_duplicata_por_hash,
     calcular_confianca,
     calcular_percentual_divergencia,
-    agrupar_parcelas_por_lote,
-    calcular_totais_lote,
     aplicar_template_csv,
     gerar_alertas_validacao,
     validar_duplicata_nsu,
     validar_data_futura,
-    validar_valor_razoavel,
-    sanitizar_data
+    validar_valor_razoavel
 )
 
 logger = logging.getLogger(__name__)
@@ -135,7 +130,7 @@ def importar_arquivo_operadora(
         template_obj = db.query(AdquirenteTemplate).filter(
             AdquirenteTemplate.id == adquirente_template_id,
             AdquirenteTemplate.tenant_id == tenant_id,
-            AdquirenteTemplate.ativo == True
+            AdquirenteTemplate.ativo.is_(True)
         ).first()
         
         if not template_obj:
@@ -827,9 +822,6 @@ def conciliar_vendas_stone(
         orfaos_stone = []
         divergencias = []
         
-        # Criar set de NSUs Stone para detecção de órfãos
-        nsus_stone = {v['nsu'] for v in vendas_stone if v.get('nsu')}
-        
         # 1. Buscar vendas do PDV (mesmo período)
         # Filtra por operadora_id OU vendas antigas sem operadora (NULL)
         from .vendas_models import VendaPagamento
@@ -1120,7 +1112,7 @@ def processar_upload_conciliacao_vendas(
         template_obj = db.query(AdquirenteTemplate).filter(
             AdquirenteTemplate.tenant_id == tenant_id,
             AdquirenteTemplate.nome == 'STONE',
-            AdquirenteTemplate.ativo == True
+            AdquirenteTemplate.ativo.is_(True)
         ).first()
         
         if not template_obj:
@@ -1445,8 +1437,8 @@ def amarrar_recebimentos_vendas(
         recebimentos_query = db.query(ConciliacaoRecebimento).filter(
             ConciliacaoRecebimento.tenant_id == tenant_id,
             ConciliacaoRecebimento.data_recebimento == data_recebimento,
-            ConciliacaoRecebimento.validado == True,  # Obrigatório Aba 2
-            ConciliacaoRecebimento.amarrado == False  # Ainda não processado
+            ConciliacaoRecebimento.validado.is_(True),  # Obrigatório Aba 2
+            ConciliacaoRecebimento.amarrado.is_(False)  # Ainda não processado
         )
 
         if operadora:
@@ -1487,7 +1479,7 @@ def amarrar_recebimentos_vendas(
             venda = db.query(Venda).filter(
                 Venda.tenant_id == tenant_id,
                 Venda.id == venda_pagamento.venda_id,
-                Venda.conciliado_vendas == True  # Obrigatório Aba 1!
+                Venda.conciliado_vendas.is_(True)  # Obrigatório Aba 1!
             ).first()
             
             if not venda:

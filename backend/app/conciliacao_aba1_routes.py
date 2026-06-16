@@ -9,20 +9,19 @@ Arquitetura de Duas Colunas:
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, Form
 from fastapi.responses import JSONResponse
-from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
-from sqlalchemy import and_, or_, func
+from sqlalchemy import or_
 from typing import Optional, List
-from datetime import date, datetime
+from datetime import datetime
 from pydantic import BaseModel
 import logging
 
 from .db import get_session
 from .auth.dependencies import get_current_user_and_tenant
 from .vendas_models import Venda, VendaPagamento
-from .conciliacao_models import ConciliacaoImportacao, ArquivoEvidencia
-from .conciliacao_helpers import serialize_for_json, calcular_hash_arquivo, aplicar_template_csv
-from .conciliacao_models import AdquirenteTemplate
+from .conciliacao_models import ConciliacaoImportacao
+from .conciliacao_helpers import serialize_for_json
+from app.operadoras_models import OperadoraCartao
 
 logger = logging.getLogger(__name__)
 
@@ -95,14 +94,14 @@ async def listar_vendas_pdv(
         if status == "pendentes":
             # Apenas não conciliadas (independente de ter NSU ou não)
             query = query.filter(VendaPagamento.status_conciliacao == 'nao_conciliado')
-            logger.info(f"[Vendas PDV] Filtro: status_conciliacao = 'nao_conciliado'")
+            logger.info("[Vendas PDV] Filtro: status_conciliacao = 'nao_conciliado'")
         elif status == "com_nsu":
             # Vendas que já têm NSU
             query = query.filter(VendaPagamento.nsu_cartao.isnot(None))
         elif status == "conciliadas":
             # Vendas já conciliadas
             query = query.filter(VendaPagamento.status_conciliacao == 'conciliado')
-            logger.info(f"[Vendas PDV] Filtro: status_conciliacao = 'conciliado'")
+            logger.info("[Vendas PDV] Filtro: status_conciliacao = 'conciliado'")
         # Se status == "todas", não aplica filtro de NSU
         
         # Filtro por operadora
@@ -473,7 +472,7 @@ async def confirmar_matches(
             raise HTTPException(status_code=400, detail="Nenhum match OK para salvar")
         
         # PREVENIR confirmar vendas JÁ conciliadas
-        from .vendas_models import Venda, VendaPagamento
+        from .vendas_models import Venda
         vendas_ja_conciliadas = []
         
         for match in matches_ok:
@@ -586,7 +585,7 @@ async def confirmar_matches(
         # FORÇAR detecção de mudança no campo JSONB
         flag_modified(importacao, 'resumo')
         
-        logger.info(f"[Confirmar Matches] 💾 Salvando mudanças no banco...")
+        logger.info("[Confirmar Matches] 💾 Salvando mudanças no banco...")
         
         # COMMIT
         db.commit()

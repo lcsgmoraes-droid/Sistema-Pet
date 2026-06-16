@@ -13,7 +13,6 @@ PRINCÍPIOS (RISCOS_E_MITIGACOES_CONCILIACAO.md):
 
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException, Query, Form
 from fastapi.responses import JSONResponse
-from sqlalchemy.orm import Session
 from typing import Optional, List
 from datetime import date
 from pydantic import BaseModel, Field
@@ -619,10 +618,10 @@ def extrair_data_referencia_recebimentos(recebimentos: List[dict]) -> Optional[s
                                 dt = datetime.strptime(rec[campo], fmt)
                                 datas.append(dt.date().isoformat())
                                 break
-                            except:
+                            except Exception:
                                 continue
                     break
-                except:
+                except Exception:
                     continue
     
     if not datas:
@@ -739,7 +738,7 @@ async def listar_historico_conciliacoes(
     
     Retorna lista de importações anteriores com resumo.
     """
-    from .conciliacao_models import ConciliacaoImportacao, ArquivoEvidencia
+    from .conciliacao_models import ConciliacaoImportacao
     from datetime import datetime as dt
     
     user, tenant_id = auth
@@ -794,7 +793,7 @@ async def listar_vendas_com_status(
     
     Retorna vendas com indicador visual de status.
     """
-    from .vendas_models import Venda, VendaPagamento
+    from .vendas_models import Venda
     from datetime import datetime as dt
     
     user, tenant_id = auth
@@ -807,10 +806,10 @@ async def listar_vendas_com_status(
         )
         
         if status == 'conferidas':
-            query = query.filter(Venda.conciliado_vendas == True)
+            query = query.filter(Venda.conciliado_vendas.is_(True))
         elif status == 'pendentes':
             query = query.filter(
-                (Venda.conciliado_vendas == False) | 
+                Venda.conciliado_vendas.is_(False) |
                 (Venda.conciliado_vendas.is_(None))
             )
         
@@ -878,7 +877,6 @@ async def validar_recebimentos_endpoint(
     - ja_conciliado: Se essa data/operadora já foi conciliada antes
     """
     from .conciliacao_services import validar_recebimentos_cascata_v2
-    from .conciliacao_operadora_detector import detectar_operadora_automatico
     from .conciliacao_models import HistoricoConciliacao
     from datetime import datetime
     from sqlalchemy import and_
@@ -1135,8 +1133,8 @@ async def preview_amarracao_endpoint(
         recebimentos_query = db.query(ConciliacaoRecebimento).filter(
             ConciliacaoRecebimento.tenant_id == str(tenant_id),
             ConciliacaoRecebimento.data_recebimento == data_rec,
-            ConciliacaoRecebimento.validado == True,
-            ConciliacaoRecebimento.amarrado == False
+            ConciliacaoRecebimento.validado.is_(True),
+            ConciliacaoRecebimento.amarrado.is_(False)
         )
 
         if operadora:
@@ -1162,7 +1160,7 @@ async def preview_amarracao_endpoint(
             venda = db.query(Venda).filter(
                 Venda.tenant_id == str(tenant_id),
                 Venda.id == venda_pagamento.venda_id,
-                Venda.conciliado_vendas == True
+                Venda.conciliado_vendas.is_(True)
             ).first()
             
             if venda:
