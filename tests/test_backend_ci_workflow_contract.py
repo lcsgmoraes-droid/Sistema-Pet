@@ -457,6 +457,16 @@ def test_backend_ci_has_blocking_clientes_root_lint_step():
     ) in source
 
 
+def test_backend_ci_has_blocking_cadastros_operacionais_root_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Cadastros operacionais root lint (blocking)" in source
+    assert (
+        "ruff check app/fornecedor_grupos_routes.py app/funcionarios_routes.py "
+        "app/tipo_despesa_routes.py app/tributacao_routes.py app/variacoes_routes.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_empresa_root_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

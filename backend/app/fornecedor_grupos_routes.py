@@ -6,7 +6,7 @@ operacoes de compra por um grupo comercial.
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 from typing import List, Optional
 
 from app.auth.dependencies import get_current_user_and_tenant

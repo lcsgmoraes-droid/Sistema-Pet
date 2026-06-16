@@ -279,6 +279,10 @@ jobs:
         run: |
           ruff check app/clientes_routes.py app/cliente_info_pdv.py app/pets_routes.py app/cadastros_routes.py app/importacao_pessoas.py
 
+      - name: Cadastros operacionais root lint (blocking)
+        run: |
+          ruff check app/fornecedor_grupos_routes.py app/funcionarios_routes.py app/tipo_despesa_routes.py app/tributacao_routes.py app/variacoes_routes.py
+
       - name: Empresa root lint (blocking)
         run: |
           ruff check app/empresa_routes.py app/empresa_config_routes.py app/empresa_config_fiscal_models.py app/empresa_config_geral_models.py app/config.py app/constants.py
