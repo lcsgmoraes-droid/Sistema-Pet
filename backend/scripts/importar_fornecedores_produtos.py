@@ -12,6 +12,8 @@ Para aplicar de fato, use --apply.
 
 from __future__ import annotations
 
+# ruff: noqa: E402
+
 import argparse
 import csv
 import re

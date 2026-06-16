@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# ruff: noqa: E402
+
 """Enriquece produtos do Sistema Pet com dados do Bling por SKU.
 
 Regra importante (pedido do usuario):

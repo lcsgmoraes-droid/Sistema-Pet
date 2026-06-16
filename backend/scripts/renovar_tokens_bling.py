@@ -4,7 +4,6 @@ Requer autorização manual via navegador
 """
 import requests
 import base64
-import json
 from pathlib import Path
 
 # Suas credenciais (do .env)

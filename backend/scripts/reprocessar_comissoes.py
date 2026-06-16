@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# ruff: noqa: E402
+
 """Script para reprocessar comissões de vendas"""
 
 import sys
@@ -73,13 +75,13 @@ try:
             if resultado.get('duplicated'):
                 print(f"ℹ️ Comissões já existiam (R$ {total_comissao:.2f})")
             else:
-                print(f"✅ Comissões geradas com sucesso!")
+                print("✅ Comissões geradas com sucesso!")
                 print(f"   💰 Total comissão: R$ {total_comissao:.2f}")
         else:
             print(f"❌ Erro: {resultado.get('error', 'Erro desconhecido')}")
     
     print(f"\n{'='*60}")
-    print(f"✅ Reprocessamento concluído!")
+    print("✅ Reprocessamento concluído!")
     print(f"{'='*60}")
     
 except Exception as e:

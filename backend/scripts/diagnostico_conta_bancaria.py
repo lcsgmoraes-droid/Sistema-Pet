@@ -18,7 +18,7 @@ print("=" * 60)
 print("\n1️⃣ Testando conexão com database...")
 try:
     # Import minimal - só o que precisamos
-    from sqlalchemy import create_engine, inspect, text, MetaData, Table, Column
+    from sqlalchemy import create_engine, inspect, text
     from sqlalchemy.orm import sessionmaker
     
     # Pegar database URL do ambiente ou default
@@ -150,7 +150,6 @@ print("\n4️⃣ Simulando criação de conta bancária...")
 try:
     from decimal import Decimal
     from datetime import datetime
-    import uuid
     
     # Dados do teste (igual ao que o frontend envia)
     conta_data = {
@@ -168,7 +167,7 @@ try:
         "updated_at": datetime.utcnow()
     }
     
-    print(f"   Dados da conta:")
+    print("   Dados da conta:")
     for key, value in conta_data.items():
         print(f"      {key}: {value!r} ({type(value).__name__})")
     
