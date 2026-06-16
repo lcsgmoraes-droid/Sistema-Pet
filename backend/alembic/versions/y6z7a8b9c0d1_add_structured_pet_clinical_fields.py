@@ -34,7 +34,10 @@ def upgrade() -> None:
             "restricoes_alimentares_lista",
             sa.Column("restricoes_alimentares_lista", sa.JSON(), nullable=True),
         ),
-        ("tipo_sanguineo", sa.Column("tipo_sanguineo", sa.String(length=20), nullable=True)),
+        (
+            "tipo_sanguineo",
+            sa.Column("tipo_sanguineo", sa.String(length=20), nullable=True),
+        ),
         (
             "pedigree_registro",
             sa.Column("pedigree_registro", sa.String(length=100), nullable=True),

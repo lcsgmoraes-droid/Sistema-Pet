@@ -30,16 +30,32 @@ def upgrade() -> None:
     if "failed_login_attempts" not in columns:
         op.add_column(
             "users",
-            sa.Column("failed_login_attempts", sa.Integer(), nullable=False, server_default=sa.text("0")),
+            sa.Column(
+                "failed_login_attempts",
+                sa.Integer(),
+                nullable=False,
+                server_default=sa.text("0"),
+            ),
         )
     if "locked_until" not in columns:
-        op.add_column("users", sa.Column("locked_until", sa.DateTime(timezone=True), nullable=True))
+        op.add_column(
+            "users",
+            sa.Column("locked_until", sa.DateTime(timezone=True), nullable=True),
+        )
     if "last_login_at" not in columns:
-        op.add_column("users", sa.Column("last_login_at", sa.DateTime(timezone=True), nullable=True))
+        op.add_column(
+            "users",
+            sa.Column("last_login_at", sa.DateTime(timezone=True), nullable=True),
+        )
     if "last_login_ip" not in columns:
-        op.add_column("users", sa.Column("last_login_ip", sa.String(length=50), nullable=True))
+        op.add_column(
+            "users", sa.Column("last_login_ip", sa.String(length=50), nullable=True)
+        )
     if "password_changed_at" not in columns:
-        op.add_column("users", sa.Column("password_changed_at", sa.DateTime(timezone=True), nullable=True))
+        op.add_column(
+            "users",
+            sa.Column("password_changed_at", sa.DateTime(timezone=True), nullable=True),
+        )
 
     op.execute(
         """
@@ -52,7 +68,9 @@ def upgrade() -> None:
     if inspector.has_table("user_sessions"):
         session_columns = _column_names(inspector, "user_sessions")
         if "tenant_id" not in session_columns:
-            op.add_column("user_sessions", sa.Column("tenant_id", sa.UUID(), nullable=True))
+            op.add_column(
+                "user_sessions", sa.Column("tenant_id", sa.UUID(), nullable=True)
+            )
             op.execute(
                 "CREATE INDEX IF NOT EXISTS ix_user_sessions_tenant_id "
                 "ON user_sessions (tenant_id)"
@@ -60,7 +78,12 @@ def upgrade() -> None:
         if "updated_at" not in session_columns:
             op.add_column(
                 "user_sessions",
-                sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+                sa.Column(
+                    "updated_at",
+                    sa.DateTime(timezone=True),
+                    server_default=sa.text("now()"),
+                    nullable=False,
+                ),
             )
 
 

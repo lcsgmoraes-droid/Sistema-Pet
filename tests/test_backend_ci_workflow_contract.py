@@ -671,6 +671,13 @@ def test_backend_ci_has_blocking_backend_multi_tenant_tests_format_step():
     assert "ruff format --check tests/multi_tenant" in source
 
 
+def test_backend_ci_has_blocking_backend_alembic_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend alembic format (blocking)" in source
+    assert "ruff format --check alembic" in source
+
+
 def test_backend_ci_has_blocking_alembic_env_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

@@ -28,28 +28,98 @@ def upgrade() -> None:
         sa.Column("status", sa.String(length=24), nullable=False),
         sa.Column("attempts", sa.Integer(), nullable=False),
         sa.Column("max_attempts", sa.Integer(), nullable=False),
-        sa.Column("next_attempt_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "next_attempt_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.Column("started_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("processed_at", sa.DateTime(timezone=True), nullable=True),
         sa.Column("payload", sa.JSON(), nullable=False),
         sa.Column("response_payload", sa.JSON(), nullable=True),
         sa.Column("last_error", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.text("now()"), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.text("now()"),
+            nullable=False,
+        ),
         sa.PrimaryKeyConstraint("id"),
         sa.UniqueConstraint("dedupe_key"),
     )
-    op.create_index(op.f("ix_bling_pedido_webhook_events_id"), "bling_pedido_webhook_events", ["id"], unique=False)
-    op.create_index(op.f("ix_bling_pedido_webhook_events_tenant_id"), "bling_pedido_webhook_events", ["tenant_id"], unique=False)
-    op.create_index(op.f("ix_bling_pedido_webhook_events_dedupe_key"), "bling_pedido_webhook_events", ["dedupe_key"], unique=False)
-    op.create_index(op.f("ix_bling_pedido_webhook_events_event_id"), "bling_pedido_webhook_events", ["event_id"], unique=False)
-    op.create_index(op.f("ix_bling_pedido_webhook_events_event_type"), "bling_pedido_webhook_events", ["event_type"], unique=False)
-    op.create_index(op.f("ix_bling_pedido_webhook_events_pedido_bling_id"), "bling_pedido_webhook_events", ["pedido_bling_id"], unique=False)
-    op.create_index(op.f("ix_bling_pedido_webhook_events_status"), "bling_pedido_webhook_events", ["status"], unique=False)
-    op.create_index(op.f("ix_bling_pedido_webhook_events_next_attempt_at"), "bling_pedido_webhook_events", ["next_attempt_at"], unique=False)
-    op.create_index("ix_bling_pedido_webhook_status_next", "bling_pedido_webhook_events", ["status", "next_attempt_at"], unique=False)
-    op.create_index("ix_bling_pedido_webhook_tenant_status", "bling_pedido_webhook_events", ["tenant_id", "status"], unique=False)
-    op.create_index("ix_bling_pedido_webhook_pedido_status", "bling_pedido_webhook_events", ["pedido_bling_id", "status"], unique=False)
+    op.create_index(
+        op.f("ix_bling_pedido_webhook_events_id"),
+        "bling_pedido_webhook_events",
+        ["id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_bling_pedido_webhook_events_tenant_id"),
+        "bling_pedido_webhook_events",
+        ["tenant_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_bling_pedido_webhook_events_dedupe_key"),
+        "bling_pedido_webhook_events",
+        ["dedupe_key"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_bling_pedido_webhook_events_event_id"),
+        "bling_pedido_webhook_events",
+        ["event_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_bling_pedido_webhook_events_event_type"),
+        "bling_pedido_webhook_events",
+        ["event_type"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_bling_pedido_webhook_events_pedido_bling_id"),
+        "bling_pedido_webhook_events",
+        ["pedido_bling_id"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_bling_pedido_webhook_events_status"),
+        "bling_pedido_webhook_events",
+        ["status"],
+        unique=False,
+    )
+    op.create_index(
+        op.f("ix_bling_pedido_webhook_events_next_attempt_at"),
+        "bling_pedido_webhook_events",
+        ["next_attempt_at"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_bling_pedido_webhook_status_next",
+        "bling_pedido_webhook_events",
+        ["status", "next_attempt_at"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_bling_pedido_webhook_tenant_status",
+        "bling_pedido_webhook_events",
+        ["tenant_id", "status"],
+        unique=False,
+    )
+    op.create_index(
+        "ix_bling_pedido_webhook_pedido_status",
+        "bling_pedido_webhook_events",
+        ["pedido_bling_id", "status"],
+        unique=False,
+    )
 
     op.execute(
         "CREATE INDEX IF NOT EXISTS ix_pedidos_integrados_tenant_bling_id "
@@ -81,15 +151,47 @@ def downgrade() -> None:
     op.execute("DROP INDEX IF EXISTS ix_pedidos_integrados_tenant_bling_numero")
     op.execute("DROP INDEX IF EXISTS ix_pedidos_integrados_tenant_bling_id")
 
-    op.drop_index("ix_bling_pedido_webhook_pedido_status", table_name="bling_pedido_webhook_events")
-    op.drop_index("ix_bling_pedido_webhook_tenant_status", table_name="bling_pedido_webhook_events")
-    op.drop_index("ix_bling_pedido_webhook_status_next", table_name="bling_pedido_webhook_events")
-    op.drop_index(op.f("ix_bling_pedido_webhook_events_next_attempt_at"), table_name="bling_pedido_webhook_events")
-    op.drop_index(op.f("ix_bling_pedido_webhook_events_status"), table_name="bling_pedido_webhook_events")
-    op.drop_index(op.f("ix_bling_pedido_webhook_events_pedido_bling_id"), table_name="bling_pedido_webhook_events")
-    op.drop_index(op.f("ix_bling_pedido_webhook_events_event_type"), table_name="bling_pedido_webhook_events")
-    op.drop_index(op.f("ix_bling_pedido_webhook_events_event_id"), table_name="bling_pedido_webhook_events")
-    op.drop_index(op.f("ix_bling_pedido_webhook_events_dedupe_key"), table_name="bling_pedido_webhook_events")
-    op.drop_index(op.f("ix_bling_pedido_webhook_events_tenant_id"), table_name="bling_pedido_webhook_events")
-    op.drop_index(op.f("ix_bling_pedido_webhook_events_id"), table_name="bling_pedido_webhook_events")
+    op.drop_index(
+        "ix_bling_pedido_webhook_pedido_status",
+        table_name="bling_pedido_webhook_events",
+    )
+    op.drop_index(
+        "ix_bling_pedido_webhook_tenant_status",
+        table_name="bling_pedido_webhook_events",
+    )
+    op.drop_index(
+        "ix_bling_pedido_webhook_status_next", table_name="bling_pedido_webhook_events"
+    )
+    op.drop_index(
+        op.f("ix_bling_pedido_webhook_events_next_attempt_at"),
+        table_name="bling_pedido_webhook_events",
+    )
+    op.drop_index(
+        op.f("ix_bling_pedido_webhook_events_status"),
+        table_name="bling_pedido_webhook_events",
+    )
+    op.drop_index(
+        op.f("ix_bling_pedido_webhook_events_pedido_bling_id"),
+        table_name="bling_pedido_webhook_events",
+    )
+    op.drop_index(
+        op.f("ix_bling_pedido_webhook_events_event_type"),
+        table_name="bling_pedido_webhook_events",
+    )
+    op.drop_index(
+        op.f("ix_bling_pedido_webhook_events_event_id"),
+        table_name="bling_pedido_webhook_events",
+    )
+    op.drop_index(
+        op.f("ix_bling_pedido_webhook_events_dedupe_key"),
+        table_name="bling_pedido_webhook_events",
+    )
+    op.drop_index(
+        op.f("ix_bling_pedido_webhook_events_tenant_id"),
+        table_name="bling_pedido_webhook_events",
+    )
+    op.drop_index(
+        op.f("ix_bling_pedido_webhook_events_id"),
+        table_name="bling_pedido_webhook_events",
+    )
     op.drop_table("bling_pedido_webhook_events")

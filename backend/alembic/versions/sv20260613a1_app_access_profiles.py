@@ -29,8 +29,18 @@ def upgrade() -> None:
         sa.Column("is_active", sa.Boolean(), nullable=False, server_default="true"),
         sa.Column("granted_by_user_id", sa.Integer(), nullable=True),
         sa.Column("notes", sa.Text(), nullable=True),
-        sa.Column("created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
-        sa.Column("updated_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False),
+        sa.Column(
+            "created_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
+        sa.Column(
+            "updated_at",
+            sa.DateTime(timezone=True),
+            server_default=sa.func.now(),
+            nullable=False,
+        ),
         sa.ForeignKeyConstraint(["cliente_id"], ["clientes.id"]),
         sa.ForeignKeyConstraint(["granted_by_user_id"], ["users.id"]),
         sa.ForeignKeyConstraint(["user_id"], ["users.id"]),
@@ -70,8 +80,12 @@ def upgrade() -> None:
 
 
 def downgrade() -> None:
-    op.drop_index("ix_app_access_profiles_tenant_user_profile", table_name="app_access_profiles")
-    op.drop_index("ix_app_access_profiles_profile_type", table_name="app_access_profiles")
+    op.drop_index(
+        "ix_app_access_profiles_tenant_user_profile", table_name="app_access_profiles"
+    )
+    op.drop_index(
+        "ix_app_access_profiles_profile_type", table_name="app_access_profiles"
+    )
     op.drop_index("ix_app_access_profiles_cliente_id", table_name="app_access_profiles")
     op.drop_index("ix_app_access_profiles_user_id", table_name="app_access_profiles")
     op.drop_index("ix_app_access_profiles_tenant_id", table_name="app_access_profiles")

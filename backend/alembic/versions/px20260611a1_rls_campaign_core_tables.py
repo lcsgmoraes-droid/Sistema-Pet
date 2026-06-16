@@ -26,7 +26,9 @@ CAMPAIGN_CORE_TABLES = (
     "campaign_locks",
 )
 
-TENANT_POLICY_SQL = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid"
+TENANT_POLICY_SQL = (
+    "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid"
+)
 
 
 def postgresql_bind():

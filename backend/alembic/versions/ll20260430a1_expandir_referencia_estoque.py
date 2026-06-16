@@ -23,7 +23,9 @@ def upgrade() -> None:
     if not inspector.has_table("estoque_movimentacoes"):
         return
 
-    colunas = {coluna["name"] for coluna in inspector.get_columns("estoque_movimentacoes")}
+    colunas = {
+        coluna["name"] for coluna in inspector.get_columns("estoque_movimentacoes")
+    }
 
     if "motivo" in colunas:
         op.alter_column(
@@ -51,7 +53,9 @@ def downgrade() -> None:
     if not inspector.has_table("estoque_movimentacoes"):
         return
 
-    colunas = {coluna["name"] for coluna in inspector.get_columns("estoque_movimentacoes")}
+    colunas = {
+        coluna["name"] for coluna in inspector.get_columns("estoque_movimentacoes")
+    }
 
     if "referencia_tipo" in colunas:
         op.alter_column(
