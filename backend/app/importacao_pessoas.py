@@ -5,8 +5,6 @@ from fastapi import APIRouter, UploadFile, File, Depends
 from sqlalchemy.orm import Session
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
-from decimal import Decimal
-from datetime import datetime
 import io
 
 from .models import Cliente
@@ -32,7 +30,7 @@ def converter_float(valor):
     
     try:
         return float(valor_str)
-    except:
+    except Exception:
         return None
 
 

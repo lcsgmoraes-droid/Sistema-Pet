@@ -10,7 +10,7 @@ Routes para gerenciamento de Clientes e Pets
 """
 from fastapi import APIRouter, Depends, HTTPException, status, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import case, or_, func, cast, String
+from sqlalchemy import case, or_, func
 from sqlalchemy.exc import IntegrityError
 from typing import Dict, List, Optional
 from datetime import datetime as dt, date, timedelta
@@ -20,7 +20,6 @@ import logging
 
 from app.db import get_session
 from app.models import User, Cliente, Pet, Raca
-from app.auth import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
 from app.audit_log import log_create, log_update, log_delete
 from app.pet_clinical_utils import normalize_pet_clinical_payload
@@ -158,7 +157,7 @@ def gerar_codigo_cliente(db: Session, tipo_cadastro: str, tipo_pessoa: str, tena
     Pega o maior código numérico existente (ativo ou inativo) e soma 1.
     Código nunca é reutilizado mesmo se o cliente for inativado.
     """
-    from sqlalchemy import func as sqlfunc, cast as sqcast, String as SqString
+    from sqlalchemy import func as sqlfunc, cast as sqcast
     from sqlalchemy.dialects.postgresql import BIGINT
 
     resultado = db.query(sqlfunc.max(sqcast(Cliente.codigo, BIGINT))).filter(
@@ -566,7 +565,7 @@ class ClienteResponse(BaseModel):
             import json
             try:
                 return json.loads(v)
-            except:
+            except Exception:
                 return None
         return v
 
@@ -585,7 +584,7 @@ class ClienteResponse(BaseModel):
                     ativo = pet.ativo if hasattr(pet, 'ativo') else pet.get('ativo', True)
                     if ativo:
                         result.append(pet)
-                except:
+                except Exception:
                     # Em caso de erro, incluir o pet
                     result.append(pet)
             return result
@@ -616,7 +615,7 @@ def create_cliente(
             existing = db.query(Cliente).filter(
                 Cliente.tenant_id == tenant_id,
                 Cliente.cpf == cliente_data.cpf,
-                Cliente.ativo == True
+                Cliente.ativo
             ).first()
             if existing:
                 raise HTTPException(
@@ -634,7 +633,7 @@ def create_cliente(
         existing = db.query(Cliente).filter(
             Cliente.tenant_id == tenant_id,
             Cliente.cnpj == cliente_data.cnpj,
-            Cliente.ativo == True
+            Cliente.ativo
         ).first()
         if existing:
             raise HTTPException(
@@ -647,7 +646,7 @@ def create_cliente(
         existing_crmv = db.query(Cliente).filter(
             Cliente.tenant_id == tenant_id,
             Cliente.crmv == cliente_data.crmv,
-            Cliente.ativo == True
+            Cliente.ativo
         ).first()
         if existing_crmv:
             raise HTTPException(
@@ -660,7 +659,7 @@ def create_cliente(
         existing_cel = db.query(Cliente).filter(
             Cliente.tenant_id == tenant_id,
             Cliente.celular == cliente_data.celular,
-            Cliente.ativo == True
+            Cliente.ativo
         ).first()
         if existing_cel:
             raise HTTPException(
@@ -673,7 +672,7 @@ def create_cliente(
         existing_tel = db.query(Cliente).filter(
             Cliente.tenant_id == tenant_id,
             Cliente.telefone == cliente_data.telefone,
-            Cliente.ativo == True
+            Cliente.ativo
         ).first()
         if existing_tel:
             raise HTTPException(
@@ -692,8 +691,8 @@ def create_cliente(
         # Verificar se jÃ¡ existe outro entregador padrÃ£o
         entregador_padrao_atual = db.query(Cliente).filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.entregador_padrao == True,
-            Cliente.ativo == True
+            Cliente.entregador_padrao,
+            Cliente.ativo
         ).first()
         
         if entregador_padrao_atual:
@@ -917,7 +916,7 @@ def verificar_duplicata(
         query = db.query(Cliente).filter(
             Cliente.tenant_id == tenant_id,
             Cliente.cpf == cpf,
-            Cliente.ativo == True
+            Cliente.ativo
         )
         if cliente_id:
             query = query.filter(Cliente.id != cliente_id)
@@ -944,7 +943,7 @@ def verificar_duplicata(
         query = db.query(Cliente).filter(
             Cliente.tenant_id == tenant_id,
             Cliente.cnpj == cnpj,
-            Cliente.ativo == True
+            Cliente.ativo
         )
         if cliente_id:
             query = query.filter(Cliente.id != cliente_id)
@@ -972,7 +971,7 @@ def verificar_duplicata(
         query = db.query(Cliente).filter(
             Cliente.tenant_id == tenant_id,
             Cliente.celular == celular,
-            Cliente.ativo == True
+            Cliente.ativo
         )
         if cliente_id:
             query = query.filter(Cliente.id != cliente_id)
@@ -997,7 +996,7 @@ def verificar_duplicata(
         query = db.query(Cliente).filter(
             Cliente.tenant_id == tenant_id,
             Cliente.telefone == telefone,
-            Cliente.ativo == True
+            Cliente.ativo
         )
         if cliente_id:
             query = query.filter(Cliente.id != cliente_id)
@@ -1022,7 +1021,7 @@ def verificar_duplicata(
         query = db.query(Cliente).filter(
             Cliente.tenant_id == tenant_id,
             Cliente.crmv == crmv,
-            Cliente.ativo == True
+            Cliente.ativo
         )
         if cliente_id:
             query = query.filter(Cliente.id != cliente_id)
@@ -1165,7 +1164,7 @@ def list_racas(
 ):
     """Listar raÃ§as cadastradas (filtro por espÃ©cie)"""
     
-    query = db.query(Raca).filter(Raca.ativo == True)
+    query = db.query(Raca).filter(Raca.ativo)
     
     if especie:
         query = query.filter(Raca.especie == especie)
@@ -1217,7 +1216,7 @@ def update_cliente(
             Cliente.tenant_id == tenant_id,
             Cliente.cpf == cliente_data.cpf,
             Cliente.id != cliente_id,
-            Cliente.ativo == True
+            Cliente.ativo
         ).first()
         if existing:
             raise HTTPException(
@@ -1231,7 +1230,7 @@ def update_cliente(
             Cliente.tenant_id == tenant_id,
             Cliente.cnpj == cliente_data.cnpj,
             Cliente.id != cliente_id,
-            Cliente.ativo == True
+            Cliente.ativo
         ).first()
         if existing:
             raise HTTPException(
@@ -1245,7 +1244,7 @@ def update_cliente(
             Cliente.tenant_id == tenant_id,
             Cliente.crmv == cliente_data.crmv,
             Cliente.id != cliente_id,
-            Cliente.ativo == True
+            Cliente.ativo
         ).first()
         if existing:
             raise HTTPException(
@@ -1259,7 +1258,7 @@ def update_cliente(
             Cliente.tenant_id == tenant_id,
             Cliente.celular == cliente_data.celular,
             Cliente.id != cliente_id,
-            Cliente.ativo == True
+            Cliente.ativo
         ).first()
         if existing_cel:
             raise HTTPException(
@@ -1273,7 +1272,7 @@ def update_cliente(
             Cliente.tenant_id == tenant_id,
             Cliente.telefone == cliente_data.telefone,
             Cliente.id != cliente_id,
-            Cliente.ativo == True
+            Cliente.ativo
         ).first()
         if existing_tel:
             raise HTTPException(
@@ -1289,9 +1288,9 @@ def update_cliente(
         # Verificar se jÃ¡ existe outro entregador padrÃ£o
         entregador_padrao_atual = db.query(Cliente).filter(
             Cliente.tenant_id == tenant_id,
-            Cliente.entregador_padrao == True,
+            Cliente.entregador_padrao,
             Cliente.id != cliente_id,
-            Cliente.ativo == True
+            Cliente.ativo
         ).first()
         
         if entregador_padrao_atual:
@@ -1315,7 +1314,6 @@ def update_cliente(
             parceiro_desativado = True
             
             # Desativar todas as comissÃµes ativas dessa pessoa
-            from sqlalchemy import text
             
             # Contar comissÃµes ativas antes de desativar
             result = execute_tenant_safe(
@@ -1672,7 +1670,7 @@ def list_pets_by_cliente(
 ):
     """Listar pets de um cliente"""
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
-    cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
+    _obter_cliente_ou_404(db, cliente_id, tenant_id)
     
     query = db.query(Pet).filter(Pet.cliente_id == cliente_id)
     
@@ -1706,7 +1704,6 @@ def get_pet(
     # Calcular idade em meses se tiver data de nascimento
     idade_meses = None
     if pet.data_nascimento:
-        from datetime import datetime
         hoje = dt.now()
         idade_meses = (hoje.year - pet.data_nascimento.year) * 12 + (hoje.month - pet.data_nascimento.month)
     
@@ -1817,7 +1814,6 @@ def update_pet(
     # Calcular idade em meses se tiver data de nascimento
     idade_meses = None
     if pet.data_nascimento:
-        from datetime import datetime
         hoje = dt.now()
         idade_meses = (hoje.year - pet.data_nascimento.year) * 12 + (hoje.month - pet.data_nascimento.month)
     
@@ -2156,7 +2152,7 @@ async def get_historico_compras(
 ):
     """Retorna o histÃ³rico de compras do cliente"""
     from .vendas_models import Venda
-    from sqlalchemy import func, desc
+    from sqlalchemy import desc
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
     
@@ -2240,7 +2236,6 @@ async def get_vendas_em_aberto(
 ):
     """Retorna vendas em aberto (pendentes) do cliente"""
     from .vendas_models import Venda
-    from sqlalchemy import desc
     current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
     
@@ -2321,7 +2316,7 @@ async def baixar_vendas_lote(
     try:
         current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
         
-        logger.info(f"\n=== BAIXAR VENDAS LOTE ===")
+        logger.info("\n=== BAIXAR VENDAS LOTE ===")
         logger.info(f"Cliente ID: {cliente_id}")
         logger.info(f"Dados recebidos: {dados}")
         
@@ -2335,7 +2330,6 @@ async def baixar_vendas_lote(
         valor_total = float(dados.get('valor_total', 0))
         forma_pagamento = dados.get('forma_pagamento', '')
         numero_transacao = dados.get('numero_transacao')
-        observacoes = dados.get('observacoes')
         
         logger.info(f"Vendas IDs: {vendas_ids}")
         logger.info(f"Valor total: {valor_total}")
@@ -2570,7 +2564,7 @@ async def baixar_vendas_lote(
         
         db.commit()
         
-        logger.info(f"Commit realizado com sucesso!")
+        logger.info("Commit realizado com sucesso!")
         if eventos_campanha_enfileirados:
             logger.info(
                 "[Campanhas] %d purchase_completed enfileirado(s) pela baixa em lote",
@@ -2639,8 +2633,7 @@ async def get_cliente_historico(
     - Contas a receber (em aberto e pagas)
     - Recebimentos
     """
-    current_user, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
-    user = current_user  # Definir variÃ¡vel user para uso posterior
+    _, tenant_id = _validar_tenant_e_obter_usuario(user_and_tenant)
     cliente = _obter_cliente_ou_404(db, cliente_id, tenant_id)
     
     # Importar modelos necessÃ¡rios
@@ -2985,7 +2978,7 @@ def obter_custo_operacional_entregador(
     entregador = db.query(Cliente).filter(
         Cliente.id == entregador_id,
         Cliente.tenant_id == tenant_id,
-        Cliente.is_entregador == True
+        Cliente.is_entregador
     ).first()
     
     if not entregador:
