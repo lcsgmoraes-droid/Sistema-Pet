@@ -9,15 +9,13 @@ Funcionalidades:
 - Entrada automÃ¡tica no estoque
 - GestÃ£o de produtos nÃ£o vinculados
 """
-from fastapi import APIRouter, Depends, HTTPException, status, UploadFile, File, Query, Form
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query, Form
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import and_, desc
-from typing import List, Optional, Dict, Any
+from sqlalchemy import desc
+from typing import List, Optional
 from datetime import datetime, timedelta
-import re
 
 from .db import get_session
-from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
 from .models import Cliente
 from .produtos_models import (
@@ -33,11 +31,9 @@ from .notas_entrada_pdf_parser import (
     parse_pedido_pdf_text,
 )
 from .notas_entrada.conferencia import (
-    ACOES_CONFERENCIA_VALIDAS,
     CONFERENCIA_STATUS_COM_DIVERGENCIA,
     CONFERENCIA_STATUS_NAO_INICIADA,
     CONFERENCIA_STATUS_SEM_DIVERGENCIA,
-    _data_para_datetime,
     _mapear_lotes_rastro_xml,
     _montar_lotes_entrada_item,
     _montar_payload_nota,
@@ -45,56 +41,37 @@ from .notas_entrada.conferencia import (
     _normalizar_texto_curto,
     _obter_acao_conferencia,
     _obter_override_mapa,
-    _parse_data_validade_texto,
-    _quantidades_conferencia_item,
     _resumir_conferencia_nota,
     _round_quantity,
     _serializar_conferencia_item,
-    _status_conferencia_item,
 )
 from .notas_entrada.fiscal import (
-    COST_COMPONENT_KEYS,
-    TOTAL_PRECISION,
-    UNIT_PRECISION,
-    ZERO_DECIMAL,
-    _decimal_to_float,
-    _round_decimal,
-    _to_decimal,
     calcular_composicao_custos_nota,
     calcular_quantidade_custo_efetivos,
-    detectar_multiplicador_pack,
-    extrair_resumo_fiscal_xml,
 )
 from .notas_entrada.financeiro import (
-    _obter_tipo_produto_revenda_id,
     criar_contas_pagar_da_nota,
 )
 from .notas_entrada.fornecedores import (
     criar_fornecedor_automatico,
-    gerar_prefixo_fornecedor,
 )
 from .notas_entrada.itens_produto_routes import router as itens_produto_router
 from .notas_entrada.produtos import (
     _aplicar_codigos_barras_item_no_produto,
     _aplicar_dados_fiscais_item_no_produto,
-    _codigo_barras_valido_nf,
     _montar_divergencia_codigo_barras_item,
-    _montar_sugestao_sku_produto,
-    calcular_similaridade,
+    _montar_sugestao_sku_produto,  # noqa: F401 - reexport legado usado por testes/integrações
     encontrar_produto_similar,
     gerar_sku_automatico,
-    normalizar_codigo_barras,
     obter_detalhe_vinculo_item,
 )
 from .notas_entrada.schemas import (
     AtualizarPrecoRequest,
-    ConferenciaItemPayload,
     ConferenciaNotaPayload,
     NotaEntradaResponse,
     ProcessarConfig,
 )
 from .notas_entrada.rateio_routes import router as rateio_router
-from .notas_entrada.sefaz_importer import importar_docs_sefaz
 from .notas_entrada.xml_parser import parse_nfe_xml
 
 import logging
@@ -174,7 +151,7 @@ async def upload_xml(
         fornecedor = db.query(Cliente).filter(
             Cliente.cnpj == dados_nfe['fornecedor_cnpj'],
             Cliente.tenant_id == tenant_id,
-            Cliente.ativo == True
+            Cliente.ativo
         ).first()
         
         fornecedor_criado_automaticamente = False
@@ -182,7 +159,7 @@ async def upload_xml(
         if fornecedor:
             logger.info(f"âœ… Fornecedor encontrado: {fornecedor.nome} (ID: {fornecedor.id})")
         else:
-            logger.warning(f"âš ï¸ Fornecedor nÃ£o cadastrado, criando automaticamente...")
+            logger.warning("âš ï¸ Fornecedor nÃ£o cadastrado, criando automaticamente...")
             try:
                 fornecedor, fornecedor_criado_automaticamente = criar_fornecedor_automatico(dados_nfe, db, current_user, tenant_id)
                 logger.info(f"âœ… Fornecedor criado: {fornecedor.nome} (ID: {fornecedor.id})")
@@ -362,7 +339,7 @@ async def upload_pdf(
             Cliente.id == fornecedor_id,
             Cliente.tenant_id == tenant_id,
             Cliente.tipo_cadastro == "fornecedor",
-            Cliente.ativo == True,
+            Cliente.ativo,
         ).first()
 
         if not fornecedor:
@@ -716,7 +693,7 @@ async def upload_lote_xml(
         resultados.append(resultado)
     
     logger.info(f"\n{'='*60}")
-    logger.info(f"ðŸ“Š RESUMO DO LOTE:")
+    logger.info("ðŸ“Š RESUMO DO LOTE:")
     logger.info(f"   - Total de arquivos: {len(files)}")
     logger.info(f"   - âœ… Sucessos: {sucessos}")
     logger.info(f"   - âŒ Erros: {erros}")
@@ -1610,7 +1587,6 @@ def processar_entrada_estoque(
     contas_ids = []
     try:
         # Buscar dados do XML salvos na nota para pegar duplicatas
-        import xml.etree.ElementTree as ET
         dados_xml = parse_nfe_xml(nota.xml_content)
         
         contas_ids = criar_contas_pagar_da_nota(nota, dados_xml, db, current_user.id, tenant_id)
@@ -1771,7 +1747,7 @@ def reverter_entrada_estoque(
                             
                             try:
                                 logger.info(f"  💰 Revertendo preço de custo: R$ {float(produto.preco_custo or 0):.2f} → R$ {preco_custo_revertido:.2f}")
-                            except:
+                            except Exception:
                                 logger.info(f"  💰 Revertendo preços do produto {produto.id}")
                             
                             produto.preco_custo = preco_custo_revertido

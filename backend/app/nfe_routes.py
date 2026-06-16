@@ -7,7 +7,7 @@ import xml.etree.ElementTree as ET
 from copy import deepcopy
 from time import monotonic, sleep
 
-from fastapi import APIRouter, Depends, HTTPException, status, Request, Query
+from fastapi import APIRouter, Depends, HTTPException, Request, Query
 import requests
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
@@ -1814,7 +1814,7 @@ async def emitir_nfe(
                 detail=f"Esta venda já possui nota fiscal emitida (NF #{venda.nfe_numero}). Cancele a nota existente antes de emitir uma nova."
             )
         
-        logger.info("emitir_nfe", f"\n=== EMITINDO NF-e ===")
+        logger.info("emitir_nfe", "\n=== EMITINDO NF-e ===")
         logger.info("emitir_nfe", f"Venda ID: {venda.id}")
         logger.info("emitir_nfe", f"Tipo: {tipo_nota}")
 
@@ -1923,9 +1923,9 @@ async def emitir_nfe(
                     "detalhe": erro_msg,
                 },
             )
-        logger.error("emitir_nfe_error", f"❌ ERRO AO EMITIR NF-e:")
+        logger.error("emitir_nfe_error", "❌ ERRO AO EMITIR NF-e:")
         logger.error("emitir_nfe_error", f"Erro: {str(e)}")
-        logger.error("emitir_nfe_error", f"Traceback completo:")
+        logger.error("emitir_nfe_error", "Traceback completo:")
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Erro ao emitir NF-e: {str(e)}")
 
@@ -2110,142 +2110,6 @@ async def reconciliar_fluxo_nfe(
         logger.warning("reconciliar_fluxo_nfe", f"Falha ao reconciliar NF {nfe_id}: {exc}")
         raise HTTPException(status_code=500, detail=f"Erro ao reconciliar fluxo da NF: {exc}")
 
-    notas: list[dict] = []
-    bling_ok = False
-
-    # ── 1. Buscar do Bling (NF-e modelo 55) ──────────────────────────────────
-    try:
-        bling = BlingAPI()
-        resp_nfe = bling.listar_nfes(
-            data_inicial=data_inicial,
-            data_final=data_final,
-        )
-        for item in (resp_nfe.get("data") or []):
-            nota = _normalizar_nota_bling(item, modelo=55)
-            if situacao and nota["status"].lower() != situacao.lower():
-                continue
-            notas.append(nota)
-        bling_ok = True
-    except Exception as e:
-        logger.warning("listar_nfes", f"Bling NF-e não disponível: {e}")
-
-    # ── 2. Buscar do Bling (NFC-e modelo 65) ─────────────────────────────────
-    try:
-        if not bling_ok:
-            bling = BlingAPI()
-            bling_ok = True
-        resp_nfce = bling.listar_nfces(
-            data_inicial=data_inicial,
-            data_final=data_final,
-        )
-        ids_ja_adicionados = {n["id"] for n in notas}
-        for item in (resp_nfce.get("data") or []):
-            nota = _normalizar_nota_bling(item, modelo=65)
-            if str(nota["id"]) in ids_ja_adicionados:
-                continue
-            if situacao and nota["status"].lower() != situacao.lower():
-                continue
-            notas.append(nota)
-    except Exception as e:
-        logger.warning("listar_nfes", f"Bling NFC-e não disponível: {e}")
-
-    if notas:
-        _enriquecer_notas_com_vendas(db, tenant_id, notas)
-
-    # ── 3. Fallback / complemento: NFs emitidas via PDV local ────────────────
-    # Só incluídas se Bling não respondeu OU se têm ID que não veio do Bling
-    try:
-        query = db.query(Venda).filter(
-            Venda.tenant_id == tenant_id,
-            Venda.nfe_bling_id.isnot(None),
-        )
-        if situacao:
-            query = query.filter(Venda.nfe_status == situacao)
-        if data_inicial:
-            query = query.filter(Venda.nfe_data_emissao >= data_inicial)
-        if data_final:
-            query = query.filter(Venda.nfe_data_emissao <= data_final)
-
-        ids_bling = {n["id"] for n in notas}
-        for venda in query.order_by(Venda.nfe_data_emissao.desc()).all():
-            if str(venda.nfe_bling_id) in ids_bling:
-                continue  # já veio do Bling
-            canal_slug = _canal_slug(venda.canal)
-            notas.append({
-                "id": str(venda.nfe_bling_id),
-                "venda_id": venda.id,
-                "numero": venda.nfe_numero,
-                "serie": venda.nfe_serie,
-                "tipo": "nfce" if _venda_usa_nfce(venda) else "nfe",
-                "tipo_codigo": 1 if _venda_usa_nfce(venda) else 0,
-                "modelo": venda.nfe_modelo,
-                "chave": venda.nfe_chave,
-                "status": venda.nfe_status or "Pendente",
-                "data_emissao": venda.nfe_data_emissao.isoformat() if venda.nfe_data_emissao else None,
-                "valor": float(venda.total or 0),
-                "cliente": {
-                    "id": venda.cliente.id if venda.cliente else None,
-                    "nome": venda.cliente.nome if venda.cliente else None,
-                    "cpf_cnpj": (venda.cliente.cpf or venda.cliente.cnpj) if venda.cliente else None,
-                },
-                "canal": _texto(venda.canal),
-                "canal_label": _canal_label(canal_slug, venda.canal),
-                "loja": {
-                    "id": None,
-                    "nome": _texto(venda.loja_origem),
-                },
-                "unidade_negocio": {
-                    "id": None,
-                    "nome": None,
-                },
-                "numero_loja_virtual": None,
-                "origem_loja_virtual": None,
-                "origem_canal_venda": _texto(venda.canal),
-                "numero_pedido_loja": _texto(venda.numero_venda),
-                "origem": "local",
-            })
-    except Exception as e:
-        logger.warning("listar_nfes", f"Erro ao consultar NFs locais: {e}")
-
-    # ── 4. Fallback / complemento: NFs já vinculadas nos pedidos integrados ─
-    # Mantém a tela útil mesmo quando a listagem direta do Bling estiver sob rate limit.
-    try:
-        _adicionar_notas_de_pedidos_integrados(
-            db,
-            tenant_id,
-            notas,
-            situacao=situacao,
-            data_inicial=data_inicial,
-            data_final=data_final,
-        )
-    except Exception as e:
-        logger.warning("listar_nfes", f"Erro ao complementar NFs via pedidos integrados: {e}")
-
-    # Ordenar por data (mais recente primeiro)
-    def _key_data(n):
-        return n.get("data_emissao") or ""
-
-    notas.sort(key=_key_data, reverse=True)
-
-    _enriquecer_notas_com_pedidos_integrados(db, tenant_id, notas)
-    if bling_ok:
-        _enriquecer_notas_com_detalhes_bling(bling, tenant_id, notas[:20], limite_consultas=8)
-
-    payload = {
-        "success": True,
-        "total": len(notas),
-        "notas": notas,
-        "fonte": "bling" if bling_ok else "local",
-        "cache_utilizado": False,
-        "cache_idade_segundos": 0,
-    }
-    _nfe_list_cache[cache_key] = {
-        "ts_monotonic": monotonic(),
-        "payload": deepcopy(payload),
-    }
-    return payload
-
-
 @router.get("/{nfe_id}")
 async def consultar_nfe(
     nfe_id: int,
@@ -2411,7 +2275,7 @@ async def webhook_bling(
         # Pegar dados do webhook
         dados = await request.json()
         
-        logger.info("webhook_bling", f"\n=== WEBHOOK BLING RECEBIDO ===")
+        logger.info("webhook_bling", "\n=== WEBHOOK BLING RECEBIDO ===")
         logger.info("webhook_bling", f"Dados: {dados}")
         
         # Extrair informações do webhook
@@ -2614,7 +2478,7 @@ async def sincronizar_todos_status(
         
         return {
             "success": True,
-            "message": f"Sincronização concluída",
+            "message": "Sincronização concluída",
             "total": len(vendas),
             "atualizados": atualizados,
             "erros": erros
