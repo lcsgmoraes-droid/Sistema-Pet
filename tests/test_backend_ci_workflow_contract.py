@@ -171,6 +171,18 @@ def test_backend_ci_has_blocking_fiscal_nf_rateio_root_lint_step():
     ) in source
 
 
+def test_backend_ci_has_blocking_pedidos_pendencias_root_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Pedidos pendencias root lint (blocking)" in source
+    assert (
+        "ruff check app/compras_pendencias_models.py "
+        "app/compras_pendencias_routes.py app/pedido_integrado_item_models.py "
+        "app/pedido_integrado_models.py app/pedido_models.py "
+        "app/pendencia_estoque_models.py app/pendencia_estoque_routes.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_produtos_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
