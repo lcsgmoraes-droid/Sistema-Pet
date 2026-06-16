@@ -22,7 +22,9 @@ from app.veterinario_core import _get_tenant
 router = APIRouter()
 
 
-@router.get("/retornos/templates", response_model=List[BanhoTosaRetornoTemplateResponse])
+@router.get(
+    "/retornos/templates", response_model=List[BanhoTosaRetornoTemplateResponse]
+)
 def listar_templates(
     tipo_retorno: Optional[str] = Query(None),
     canal: Optional[str] = Query(None),
@@ -41,7 +43,11 @@ def listar_templates(
     return [serializar_template_retorno(item) for item in templates]
 
 
-@router.post("/retornos/templates", response_model=BanhoTosaRetornoTemplateResponse, status_code=201)
+@router.post(
+    "/retornos/templates",
+    response_model=BanhoTosaRetornoTemplateResponse,
+    status_code=201,
+)
 def criar_template(
     body: BanhoTosaRetornoTemplateCreate,
     db: Session = Depends(get_session),
@@ -51,7 +57,9 @@ def criar_template(
     return criar_template_retorno(db, tenant_id, body.model_dump())
 
 
-@router.patch("/retornos/templates/{template_id}", response_model=BanhoTosaRetornoTemplateResponse)
+@router.patch(
+    "/retornos/templates/{template_id}", response_model=BanhoTosaRetornoTemplateResponse
+)
 def atualizar_template(
     template_id: int,
     body: BanhoTosaRetornoTemplateUpdate,
@@ -59,4 +67,6 @@ def atualizar_template(
     current=Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = _get_tenant(current)
-    return atualizar_template_retorno(db, tenant_id, template_id, body.model_dump(exclude_unset=True))
+    return atualizar_template_retorno(
+        db, tenant_id, template_id, body.model_dump(exclude_unset=True)
+    )

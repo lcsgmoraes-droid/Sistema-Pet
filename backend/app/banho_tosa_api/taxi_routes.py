@@ -44,7 +44,11 @@ def listar_taxi_dog(
     if data_fim:
         query = query.filter(BanhoTosaTaxiDog.janela_inicio <= _fim_dia(data_fim))
 
-    itens = query.order_by(BanhoTosaTaxiDog.janela_inicio.asc(), BanhoTosaTaxiDog.id.desc()).limit(limit).all()
+    itens = (
+        query.order_by(BanhoTosaTaxiDog.janela_inicio.asc(), BanhoTosaTaxiDog.id.desc())
+        .limit(limit)
+        .all()
+    )
     return [_serializar_taxi(item) for item in itens]
 
 
@@ -143,7 +147,11 @@ def _query_taxi_completo(db: Session, tenant_id):
 
 
 def _obter_taxi_ou_404(db: Session, tenant_id, taxi_id: int) -> BanhoTosaTaxiDog:
-    taxi = _query_taxi_completo(db, tenant_id).filter(BanhoTosaTaxiDog.id == taxi_id).first()
+    taxi = (
+        _query_taxi_completo(db, tenant_id)
+        .filter(BanhoTosaTaxiDog.id == taxi_id)
+        .first()
+    )
     if not taxi:
         raise HTTPException(status_code=404, detail="Taxi dog nao encontrado")
     return taxi
@@ -152,22 +160,32 @@ def _obter_taxi_ou_404(db: Session, tenant_id, taxi_id: int) -> BanhoTosaTaxiDog
 def _obter_agendamento(db: Session, tenant_id, agendamento_id: int | None):
     if not agendamento_id:
         return None
-    agendamento = db.query(BanhoTosaAgendamento).filter(
-        BanhoTosaAgendamento.id == agendamento_id,
-        BanhoTosaAgendamento.tenant_id == tenant_id,
-    ).first()
+    agendamento = (
+        db.query(BanhoTosaAgendamento)
+        .filter(
+            BanhoTosaAgendamento.id == agendamento_id,
+            BanhoTosaAgendamento.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not agendamento:
         raise HTTPException(status_code=404, detail="Agendamento nao encontrado")
     if agendamento.taxi_dog_id:
-        raise HTTPException(status_code=409, detail="Agendamento ja possui taxi dog vinculado")
+        raise HTTPException(
+            status_code=409, detail="Agendamento ja possui taxi dog vinculado"
+        )
     return agendamento
 
 
-def _resolver_cliente_pet(db: Session, tenant_id, body: BanhoTosaTaxiDogCreate, agendamento):
+def _resolver_cliente_pet(
+    db: Session, tenant_id, body: BanhoTosaTaxiDogCreate, agendamento
+):
     if agendamento:
         return agendamento.cliente_id, agendamento.pet_id
     if not body.cliente_id or not body.pet_id:
-        raise HTTPException(status_code=422, detail="Informe agendamento ou cliente/pet.")
+        raise HTTPException(
+            status_code=422, detail="Informe agendamento ou cliente/pet."
+        )
     cliente, pet = validar_cliente_pet(db, tenant_id, body.cliente_id, body.pet_id)
     return cliente.id, pet.id
 
@@ -175,23 +193,33 @@ def _resolver_cliente_pet(db: Session, tenant_id, body: BanhoTosaTaxiDogCreate, 
 def _validar_motorista(db: Session, tenant_id, motorista_id: int | None):
     if not motorista_id:
         return
-    motorista = db.query(Cliente).filter(Cliente.id == motorista_id, Cliente.tenant_id == tenant_id).first()
+    motorista = (
+        db.query(Cliente)
+        .filter(Cliente.id == motorista_id, Cliente.tenant_id == tenant_id)
+        .first()
+    )
     if not motorista:
         raise HTTPException(status_code=404, detail="Motorista nao encontrado")
 
 
 def _validar_janela(taxi: BanhoTosaTaxiDog):
     if taxi.janela_inicio and taxi.janela_fim and taxi.janela_fim <= taxi.janela_inicio:
-        raise HTTPException(status_code=422, detail="Janela final deve ser maior que a inicial")
+        raise HTTPException(
+            status_code=422, detail="Janela final deve ser maior que a inicial"
+        )
 
 
 def _recalcular_custo_vinculado(db: Session, tenant_id, taxi: BanhoTosaTaxiDog):
     if not taxi.agendamento_id:
         return
-    atendimento = db.query(BanhoTosaAtendimento).filter(
-        BanhoTosaAtendimento.tenant_id == tenant_id,
-        BanhoTosaAtendimento.agendamento_id == taxi.agendamento_id,
-    ).first()
+    atendimento = (
+        db.query(BanhoTosaAtendimento)
+        .filter(
+            BanhoTosaAtendimento.tenant_id == tenant_id,
+            BanhoTosaAtendimento.agendamento_id == taxi.agendamento_id,
+        )
+        .first()
+    )
     if atendimento:
         recalcular_snapshot_atendimento(db, tenant_id, atendimento.id)
 

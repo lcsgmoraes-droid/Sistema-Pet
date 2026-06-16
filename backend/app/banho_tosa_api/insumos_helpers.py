@@ -13,7 +13,10 @@ from app.produtos_models import Produto
 def query_insumos(db: Session, tenant_id, atendimento_id: int):
     return (
         db.query(BanhoTosaInsumoUsado)
-        .options(joinedload(BanhoTosaInsumoUsado.produto), joinedload(BanhoTosaInsumoUsado.responsavel))
+        .options(
+            joinedload(BanhoTosaInsumoUsado.produto),
+            joinedload(BanhoTosaInsumoUsado.responsavel),
+        )
         .filter(
             BanhoTosaInsumoUsado.tenant_id == tenant_id,
             BanhoTosaInsumoUsado.atendimento_id == atendimento_id,
@@ -22,28 +25,40 @@ def query_insumos(db: Session, tenant_id, atendimento_id: int):
 
 
 def obter_atendimento_ou_404(db: Session, tenant_id, atendimento_id: int):
-    atendimento = db.query(BanhoTosaAtendimento).filter(
-        BanhoTosaAtendimento.id == atendimento_id,
-        BanhoTosaAtendimento.tenant_id == tenant_id,
-    ).first()
+    atendimento = (
+        db.query(BanhoTosaAtendimento)
+        .filter(
+            BanhoTosaAtendimento.id == atendimento_id,
+            BanhoTosaAtendimento.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not atendimento:
         raise HTTPException(status_code=404, detail="Atendimento nao encontrado")
     return atendimento
 
 
 def obter_insumo_ou_404(db: Session, tenant_id, atendimento_id: int, insumo_id: int):
-    insumo = query_insumos(db, tenant_id, atendimento_id).filter(BanhoTosaInsumoUsado.id == insumo_id).first()
+    insumo = (
+        query_insumos(db, tenant_id, atendimento_id)
+        .filter(BanhoTosaInsumoUsado.id == insumo_id)
+        .first()
+    )
     if not insumo:
         raise HTTPException(status_code=404, detail="Insumo nao encontrado")
     return insumo
 
 
 def obter_produto_ou_404(db: Session, tenant_id, produto_id: int):
-    produto = db.query(Produto).filter(
-        Produto.id == produto_id,
-        Produto.tenant_id == str(tenant_id),
-        Produto.ativo.is_(True),
-    ).first()
+    produto = (
+        db.query(Produto)
+        .filter(
+            Produto.id == produto_id,
+            Produto.tenant_id == str(tenant_id),
+            Produto.ativo.is_(True),
+        )
+        .first()
+    )
     if not produto:
         raise HTTPException(status_code=404, detail="Produto nao encontrado")
     return produto
@@ -52,7 +67,11 @@ def obter_produto_ou_404(db: Session, tenant_id, produto_id: int):
 def validar_responsavel(db: Session, tenant_id, responsavel_id: int | None):
     if not responsavel_id:
         return
-    pessoa = db.query(Cliente).filter(Cliente.id == responsavel_id, Cliente.tenant_id == tenant_id).first()
+    pessoa = (
+        db.query(Cliente)
+        .filter(Cliente.id == responsavel_id, Cliente.tenant_id == tenant_id)
+        .first()
+    )
     if not pessoa:
         raise HTTPException(status_code=404, detail="Responsavel nao encontrado")
 
@@ -60,7 +79,11 @@ def validar_responsavel(db: Session, tenant_id, responsavel_id: int | None):
 def validar_edicao_insumo(insumo: BanhoTosaInsumoUsado, payload: dict):
     if not insumo.movimentacao_estoque_id or insumo.movimentacao_estorno_id:
         return
-    campos_protegidos = {"quantidade_usada", "quantidade_desperdicio", "custo_unitario_snapshot"}
+    campos_protegidos = {
+        "quantidade_usada",
+        "quantidade_desperdicio",
+        "custo_unitario_snapshot",
+    }
     if campos_protegidos.intersection(payload):
         raise HTTPException(
             status_code=422,
@@ -68,7 +91,15 @@ def validar_edicao_insumo(insumo: BanhoTosaInsumoUsado, payload: dict):
         )
 
 
-def baixar_estoque_insumo(user, tenant_id, atendimento_id: int, produto, quantidade, custo_unitario, db: Session):
+def baixar_estoque_insumo(
+    user,
+    tenant_id,
+    atendimento_id: int,
+    produto,
+    quantidade,
+    custo_unitario,
+    db: Session,
+):
     try:
         movimento = EstoqueService.baixar_estoque(
             produto_id=produto.id,
@@ -88,10 +119,14 @@ def baixar_estoque_insumo(user, tenant_id, atendimento_id: int, produto, quantid
         raise HTTPException(status_code=422, detail=str(exc)) from exc
 
 
-def estornar_estoque_insumo_registrado(user, tenant_id, atendimento_id: int, insumo, db: Session):
+def estornar_estoque_insumo_registrado(
+    user, tenant_id, atendimento_id: int, insumo, db: Session
+):
     quantidade_total = dec(insumo.quantidade_usada) + dec(insumo.quantidade_desperdicio)
     if quantidade_total <= 0:
-        raise HTTPException(status_code=422, detail="Insumo sem quantidade para estornar.")
+        raise HTTPException(
+            status_code=422, detail="Insumo sem quantidade para estornar."
+        )
 
     try:
         movimento = EstoqueService.estornar_estoque(

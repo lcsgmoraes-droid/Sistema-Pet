@@ -24,7 +24,9 @@ from app.whatsapp.handoff_manager import HandoffManager
 from app.whatsapp.models import WhatsAppSession, TenantWhatsAppConfig
 
 
-router = APIRouter(prefix="/internal/whatsapp-orchestrator", tags=["whatsapp-orchestrator-internal"])
+router = APIRouter(
+    prefix="/internal/whatsapp-orchestrator", tags=["whatsapp-orchestrator-internal"]
+)
 
 
 class InternalIngestRequest(BaseModel):
@@ -78,9 +80,7 @@ async def _transcribe_audio_from_media_url(media_url: str, api_key: str) -> str:
         stream = io.BytesIO(audio_bytes)
         stream.name = "audio.ogg"
         result = client.audio.transcriptions.create(
-            model="gpt-4o-mini-transcribe",
-            file=stream,
-            language="pt"
+            model="gpt-4o-mini-transcribe", file=stream, language="pt"
         )
         text = getattr(result, "text", "") or ""
         return text.strip()
@@ -91,7 +91,9 @@ async def _transcribe_audio_from_media_url(media_url: str, api_key: str) -> str:
         return ""
 
 
-async def _analyze_image_from_media_url(media_url: str, caption: str, api_key: str) -> str:
+async def _analyze_image_from_media_url(
+    media_url: str, caption: str, api_key: str
+) -> str:
     if not media_url or not api_key:
         return ""
 
@@ -199,14 +201,20 @@ def _parse_tenant_uuid(tenant_id: str) -> _uuid_mod.UUID:
 
 
 async def _enrich_payload_media(payload: InternalIngestRequest, api_key: str) -> None:
-    if payload.message_type == "audio" and not (payload.transcription_text or "").strip():
+    if (
+        payload.message_type == "audio"
+        and not (payload.transcription_text or "").strip()
+    ):
         payload.transcription_text = await _transcribe_audio_from_media_url(
             media_url=(payload.media_url or "").strip(),
             api_key=api_key,
         )
         return
 
-    if payload.message_type == "image" and not (payload.image_analysis_text or "").strip():
+    if (
+        payload.message_type == "image"
+        and not (payload.image_analysis_text or "").strip()
+    ):
         payload.image_analysis_text = await _analyze_image_from_media_url(
             media_url=(payload.media_url or "").strip(),
             caption=(payload.caption or "").strip(),
@@ -304,7 +312,9 @@ async def _ingest_message_inner(
     if not message_content:
         raise HTTPException(status_code=400, detail="Conteudo vazio")
 
-    whatsapp_msg_id = payload.external_message_id or f"internal_{tenant_id}_{normalized_phone}"
+    whatsapp_msg_id = (
+        payload.external_message_id or f"internal_{tenant_id}_{normalized_phone}"
+    )
 
     await process_incoming_message(
         tenant_id=tenant_id,

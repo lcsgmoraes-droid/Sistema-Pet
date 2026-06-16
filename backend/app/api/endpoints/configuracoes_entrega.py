@@ -2,6 +2,7 @@
 Endpoints para ConfiguracaoEntrega
 Sprint 1 BLOCO 3 - Configuração Global de Entregas
 """
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import text
@@ -19,9 +20,18 @@ router = APIRouter(prefix="/configuracoes/entregas", tags=["Configurações - En
 
 def ensure_configuracoes_entrega_schema(db: Session) -> None:
     """Compatibilidade de schema em ambiente legado (sem migrations completas)."""
-    db.execute(text("ALTER TABLE configuracoes_entrega ADD COLUMN IF NOT EXISTS user_id INTEGER"))
-    db.execute(text("ALTER TABLE configuracoes_entrega ADD COLUMN IF NOT EXISTS metodo_km_entrega VARCHAR(20) DEFAULT 'auto_rota'"))
-    db.execute(text("""
+    db.execute(
+        text(
+            "ALTER TABLE configuracoes_entrega ADD COLUMN IF NOT EXISTS user_id INTEGER"
+        )
+    )
+    db.execute(
+        text(
+            "ALTER TABLE configuracoes_entrega ADD COLUMN IF NOT EXISTS metodo_km_entrega VARCHAR(20) DEFAULT 'auto_rota'"
+        )
+    )
+    db.execute(
+        text("""
         UPDATE configuracoes_entrega ce
         SET user_id = u.id
         FROM (
@@ -31,18 +41,21 @@ def ensure_configuracoes_entrega_schema(db: Session) -> None:
         ) u
         WHERE ce.tenant_id = u.tenant_id
           AND ce.user_id IS NULL
-    """))
-    db.execute(text(
-        "CREATE INDEX IF NOT EXISTS ix_configuracoes_entrega_user_id "
-        "ON configuracoes_entrega (user_id)"
-    ))
+    """)
+    )
+    db.execute(
+        text(
+            "CREATE INDEX IF NOT EXISTS ix_configuracoes_entrega_user_id "
+            "ON configuracoes_entrega (user_id)"
+        )
+    )
     db.commit()
 
 
 @router.get("", response_model=ConfiguracaoEntregaResponse)
 def get_configuracao_entrega(
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Retorna a configuração de entrega do tenant atual.
@@ -69,12 +82,17 @@ def get_configuracao_entrega(
     if not config:
         # Buscar entregador padrão automaticamente
         from app.models import Cliente
-        entregador_padrao = db.query(Cliente).filter(
-            Cliente.tenant_id == tenant_id,
-            Cliente.entregador_padrao.is_(True),
-            Cliente.entregador_ativo.is_(True),
-            Cliente.ativo.is_(True)
-        ).first()
+
+        entregador_padrao = (
+            db.query(Cliente)
+            .filter(
+                Cliente.tenant_id == tenant_id,
+                Cliente.entregador_padrao.is_(True),
+                Cliente.entregador_ativo.is_(True),
+                Cliente.ativo.is_(True),
+            )
+            .first()
+        )
 
         # Cria configuração padrão com entregador padrão se existir
         config = ConfiguracaoEntrega(
@@ -87,7 +105,7 @@ def get_configuracao_entrega(
             complemento=None,
             bairro=None,
             cidade=None,
-            estado=None
+            estado=None,
         )
         db.add(config)
         db.commit()
@@ -95,12 +113,17 @@ def get_configuracao_entrega(
     elif config.entregador_padrao_id is None or config.user_id is None:
         # Se já existe mas não tem entregador padrão definido, buscar automaticamente
         from app.models import Cliente
-        entregador_padrao = db.query(Cliente).filter(
-            Cliente.tenant_id == tenant_id,
-            Cliente.entregador_padrao.is_(True),
-            Cliente.entregador_ativo.is_(True),
-            Cliente.ativo.is_(True)
-        ).first()
+
+        entregador_padrao = (
+            db.query(Cliente)
+            .filter(
+                Cliente.tenant_id == tenant_id,
+                Cliente.entregador_padrao.is_(True),
+                Cliente.entregador_ativo.is_(True),
+                Cliente.ativo.is_(True),
+            )
+            .first()
+        )
 
         updated = False
         if entregador_padrao:
@@ -120,7 +143,7 @@ def get_configuracao_entrega(
 def update_configuracao_entrega(
     payload: ConfiguracaoEntregaUpdate,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Atualiza a configuração de entrega do tenant atual.
@@ -146,10 +169,7 @@ def update_configuracao_entrega(
 
     if not config:
         # Cria se não existe
-        config = ConfiguracaoEntrega(
-            tenant_id=tenant_id,
-            user_id=current_user.id
-        )
+        config = ConfiguracaoEntrega(tenant_id=tenant_id, user_id=current_user.id)
         db.add(config)
     elif config.user_id is None:
         config.user_id = current_user.id

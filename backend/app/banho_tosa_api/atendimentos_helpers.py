@@ -27,26 +27,40 @@ def query_atendimento_completo(db: Session, tenant_id):
             joinedload(BanhoTosaAtendimento.cliente),
             joinedload(BanhoTosaAtendimento.pet),
             joinedload(BanhoTosaAtendimento.agendamento),
-            joinedload(BanhoTosaAtendimento.pacote_credito).joinedload(BanhoTosaPacoteCredito.pacote),
+            joinedload(BanhoTosaAtendimento.pacote_credito).joinedload(
+                BanhoTosaPacoteCredito.pacote
+            ),
             joinedload(BanhoTosaAtendimento.venda).joinedload(Venda.pagamentos),
-            joinedload(BanhoTosaAtendimento.etapas).joinedload(BanhoTosaEtapa.responsavel),
+            joinedload(BanhoTosaAtendimento.etapas).joinedload(
+                BanhoTosaEtapa.responsavel
+            ),
             joinedload(BanhoTosaAtendimento.etapas).joinedload(BanhoTosaEtapa.recurso),
         )
         .filter(BanhoTosaAtendimento.tenant_id == tenant_id)
     )
 
 
-def obter_atendimento_ou_404(db: Session, tenant_id, atendimento_id: int) -> BanhoTosaAtendimento:
-    atendimento = query_atendimento_completo(db, tenant_id).filter(BanhoTosaAtendimento.id == atendimento_id).first()
+def obter_atendimento_ou_404(
+    db: Session, tenant_id, atendimento_id: int
+) -> BanhoTosaAtendimento:
+    atendimento = (
+        query_atendimento_completo(db, tenant_id)
+        .filter(BanhoTosaAtendimento.id == atendimento_id)
+        .first()
+    )
     if not atendimento:
         raise HTTPException(status_code=404, detail="Atendimento nao encontrado")
     return atendimento
 
 
-def obter_etapa_ou_404(db: Session, tenant_id, atendimento_id: int, etapa_id: int) -> BanhoTosaEtapa:
+def obter_etapa_ou_404(
+    db: Session, tenant_id, atendimento_id: int, etapa_id: int
+) -> BanhoTosaEtapa:
     etapa = (
         db.query(BanhoTosaEtapa)
-        .options(joinedload(BanhoTosaEtapa.responsavel), joinedload(BanhoTosaEtapa.recurso))
+        .options(
+            joinedload(BanhoTosaEtapa.responsavel), joinedload(BanhoTosaEtapa.recurso)
+        )
         .filter(
             BanhoTosaEtapa.id == etapa_id,
             BanhoTosaEtapa.tenant_id == tenant_id,
@@ -59,26 +73,41 @@ def obter_etapa_ou_404(db: Session, tenant_id, atendimento_id: int, etapa_id: in
     return etapa
 
 
-def validar_responsavel_recurso(db: Session, tenant_id, responsavel_id: Optional[int], recurso_id: Optional[int]):
+def validar_responsavel_recurso(
+    db: Session, tenant_id, responsavel_id: Optional[int], recurso_id: Optional[int]
+):
     if responsavel_id:
-        responsavel = db.query(Cliente).filter(Cliente.id == responsavel_id, Cliente.tenant_id == tenant_id).first()
+        responsavel = (
+            db.query(Cliente)
+            .filter(Cliente.id == responsavel_id, Cliente.tenant_id == tenant_id)
+            .first()
+        )
         if not responsavel:
             raise HTTPException(status_code=404, detail="Responsavel nao encontrado")
 
     if recurso_id:
-        recurso = db.query(BanhoTosaRecurso).filter(
-            BanhoTosaRecurso.id == recurso_id,
-            BanhoTosaRecurso.tenant_id == tenant_id,
-            BanhoTosaRecurso.ativo.is_(True),
-        ).first()
+        recurso = (
+            db.query(BanhoTosaRecurso)
+            .filter(
+                BanhoTosaRecurso.id == recurso_id,
+                BanhoTosaRecurso.tenant_id == tenant_id,
+                BanhoTosaRecurso.ativo.is_(True),
+            )
+            .first()
+        )
         if not recurso:
             raise HTTPException(status_code=404, detail="Recurso nao encontrado")
 
 
-def aplicar_status_atendimento(db: Session, tenant_id, atendimento: BanhoTosaAtendimento, novo_status: str):
+def aplicar_status_atendimento(
+    db: Session, tenant_id, atendimento: BanhoTosaAtendimento, novo_status: str
+):
     agora = datetime.now()
     atendimento.status = novo_status
-    if novo_status in {"em_banho", "em_tosa", "em_secagem"} and not atendimento.inicio_em:
+    if (
+        novo_status in {"em_banho", "em_tosa", "em_secagem"}
+        and not atendimento.inicio_em
+    ):
         atendimento.inicio_em = agora
     if novo_status == "pronto" and not atendimento.fim_em:
         atendimento.fim_em = agora
@@ -88,10 +117,14 @@ def aplicar_status_atendimento(db: Session, tenant_id, atendimento: BanhoTosaAte
     if not atendimento.agendamento_id:
         return
 
-    agendamento = db.query(BanhoTosaAgendamento).filter(
-        BanhoTosaAgendamento.id == atendimento.agendamento_id,
-        BanhoTosaAgendamento.tenant_id == tenant_id,
-    ).first()
+    agendamento = (
+        db.query(BanhoTosaAgendamento)
+        .filter(
+            BanhoTosaAgendamento.id == atendimento.agendamento_id,
+            BanhoTosaAgendamento.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not agendamento:
         return
 

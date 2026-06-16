@@ -59,7 +59,10 @@ def avancar_retornos_recorrencia(
     )
 
 
-@router.post("/retornos/notificacoes/enfileirar", response_model=BanhoTosaNotificarRetornosResponse)
+@router.post(
+    "/retornos/notificacoes/enfileirar",
+    response_model=BanhoTosaNotificarRetornosResponse,
+)
 def enfileirar_notificacoes(
     body: BanhoTosaNotificarRetornosInput,
     db: Session = Depends(get_session),

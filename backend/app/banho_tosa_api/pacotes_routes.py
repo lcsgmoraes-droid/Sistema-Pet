@@ -51,12 +51,17 @@ def listar_pacotes(
     current=Depends(get_current_user_and_tenant),
 ):
     _, tenant_id = _get_tenant(current)
-    query = db.query(BanhoTosaPacote).options(joinedload(BanhoTosaPacote.servico)).filter(
-        BanhoTosaPacote.tenant_id == tenant_id
+    query = (
+        db.query(BanhoTosaPacote)
+        .options(joinedload(BanhoTosaPacote.servico))
+        .filter(BanhoTosaPacote.tenant_id == tenant_id)
     )
     if ativos_only:
         query = query.filter(BanhoTosaPacote.ativo.is_(True))
-    return [serializar_pacote(item) for item in query.order_by(BanhoTosaPacote.nome.asc()).all()]
+    return [
+        serializar_pacote(item)
+        for item in query.order_by(BanhoTosaPacote.nome.asc()).all()
+    ]
 
 
 @router.post("/pacotes", response_model=BanhoTosaPacoteResponse, status_code=201)
@@ -115,7 +120,9 @@ def atualizar_pacote(
     payload = body.model_dump(exclude_unset=True)
     if "nome" in payload:
         payload["nome"] = (payload["nome"] or "").strip()
-        validar_nome_pacote_disponivel(db, tenant_id, payload["nome"], ignorar_id=pacote.id)
+        validar_nome_pacote_disponivel(
+            db, tenant_id, payload["nome"], ignorar_id=pacote.id
+        )
     if "servico_id" in payload:
         validar_servico(db, tenant_id, payload["servico_id"])
     for campo, valor in payload.items():
@@ -140,23 +147,40 @@ def listar_creditos(
     if cliente_id:
         query = query.filter(BanhoTosaPacoteCredito.cliente_id == cliente_id)
     if pet_id:
-        query = query.filter(or_(BanhoTosaPacoteCredito.pet_id == pet_id, BanhoTosaPacoteCredito.pet_id.is_(None)))
+        query = query.filter(
+            or_(
+                BanhoTosaPacoteCredito.pet_id == pet_id,
+                BanhoTosaPacoteCredito.pet_id.is_(None),
+            )
+        )
     if status:
         query = query.filter(BanhoTosaPacoteCredito.status == status)
     if disponiveis_only:
-        query = query.filter(BanhoTosaPacoteCredito.status == "ativo", BanhoTosaPacoteCredito.data_validade >= date.today())
-    creditos = query.order_by(BanhoTosaPacoteCredito.data_validade.asc()).limit(limit).all()
+        query = query.filter(
+            BanhoTosaPacoteCredito.status == "ativo",
+            BanhoTosaPacoteCredito.data_validade >= date.today(),
+        )
+    creditos = (
+        query.order_by(BanhoTosaPacoteCredito.data_validade.asc()).limit(limit).all()
+    )
     return [serializar_credito(item) for item in creditos]
 
 
 def _pacote_tem_creditos(db: Session, tenant_id, pacote_id: int) -> bool:
-    return db.query(BanhoTosaPacoteCredito.id).filter(
-        BanhoTosaPacoteCredito.tenant_id == tenant_id,
-        BanhoTosaPacoteCredito.pacote_id == pacote_id,
-    ).first() is not None
+    return (
+        db.query(BanhoTosaPacoteCredito.id)
+        .filter(
+            BanhoTosaPacoteCredito.tenant_id == tenant_id,
+            BanhoTosaPacoteCredito.pacote_id == pacote_id,
+        )
+        .first()
+        is not None
+    )
 
 
-@router.post("/pacotes/creditos", response_model=BanhoTosaPacoteCreditoResponse, status_code=201)
+@router.post(
+    "/pacotes/creditos", response_model=BanhoTosaPacoteCreditoResponse, status_code=201
+)
 def criar_credito(
     body: BanhoTosaPacoteCreditoCreate,
     db: Session = Depends(get_session),
@@ -166,9 +190,14 @@ def criar_credito(
     pacote = obter_pacote(db, tenant_id, body.pacote_id, ativo=True)
     validar_cliente_pet_credito(db, tenant_id, body.cliente_id, body.pet_id)
     data_inicio = body.data_inicio or date.today()
-    data_validade = body.data_validade or calcular_validade_pacote(data_inicio, pacote.validade_dias)
+    data_validade = body.data_validade or calcular_validade_pacote(
+        data_inicio, pacote.validade_dias
+    )
     if data_validade < data_inicio:
-        raise HTTPException(status_code=422, detail="Validade do pacote nao pode ser anterior ao inicio.")
+        raise HTTPException(
+            status_code=422,
+            detail="Validade do pacote nao pode ser anterior ao inicio.",
+        )
     credito = BanhoTosaPacoteCredito(
         tenant_id=tenant_id,
         pacote_id=pacote.id,
@@ -184,11 +213,18 @@ def criar_credito(
     db.add(credito)
     db.commit()
     db.refresh(credito)
-    credito = query_creditos(db, tenant_id).filter(BanhoTosaPacoteCredito.id == credito.id).first()
+    credito = (
+        query_creditos(db, tenant_id)
+        .filter(BanhoTosaPacoteCredito.id == credito.id)
+        .first()
+    )
     return serializar_credito(credito)
 
 
-@router.post("/pacotes/creditos/{credito_id}/consumir", response_model=BanhoTosaPacoteConsumoResponse)
+@router.post(
+    "/pacotes/creditos/{credito_id}/consumir",
+    response_model=BanhoTosaPacoteConsumoResponse,
+)
 def consumir_credito(
     credito_id: int,
     body: BanhoTosaPacoteConsumoInput,
@@ -205,11 +241,22 @@ def consumir_credito(
         user_id=getattr(current_user, "id", None),
         observacoes=body.observacoes,
     )
-    credito = query_creditos(db, tenant_id).filter(BanhoTosaPacoteCredito.id == credito.id).first()
-    return {"credito": serializar_credito(credito), "movimento": serializar_movimento(movimento), "ja_existia": ja_existia}
+    credito = (
+        query_creditos(db, tenant_id)
+        .filter(BanhoTosaPacoteCredito.id == credito.id)
+        .first()
+    )
+    return {
+        "credito": serializar_credito(credito),
+        "movimento": serializar_movimento(movimento),
+        "ja_existia": ja_existia,
+    }
 
 
-@router.post("/pacotes/creditos/{credito_id}/estornar", response_model=BanhoTosaPacoteConsumoResponse)
+@router.post(
+    "/pacotes/creditos/{credito_id}/estornar",
+    response_model=BanhoTosaPacoteConsumoResponse,
+)
 def estornar_credito(
     credito_id: int,
     body: BanhoTosaPacoteEstornoInput,
@@ -226,5 +273,13 @@ def estornar_credito(
         user_id=getattr(current_user, "id", None),
         observacoes=body.observacoes,
     )
-    credito = query_creditos(db, tenant_id).filter(BanhoTosaPacoteCredito.id == credito.id).first()
-    return {"credito": serializar_credito(credito), "movimento": serializar_movimento(movimento), "ja_existia": ja_existia}
+    credito = (
+        query_creditos(db, tenant_id)
+        .filter(BanhoTosaPacoteCredito.id == credito.id)
+        .first()
+    )
+    return {
+        "credito": serializar_credito(credito),
+        "movimento": serializar_movimento(movimento),
+        "ja_existia": ja_existia,
+    }

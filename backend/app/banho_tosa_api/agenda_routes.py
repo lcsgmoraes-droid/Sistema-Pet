@@ -60,17 +60,27 @@ def listar_agendamentos(
     )
 
     if data_inicio:
-        query = query.filter(BanhoTosaAgendamento.data_hora_inicio >= datetime.combine(data_inicio, time.min))
+        query = query.filter(
+            BanhoTosaAgendamento.data_hora_inicio
+            >= datetime.combine(data_inicio, time.min)
+        )
     if data_fim:
-        query = query.filter(BanhoTosaAgendamento.data_hora_inicio <= datetime.combine(data_fim, time.max))
+        query = query.filter(
+            BanhoTosaAgendamento.data_hora_inicio
+            <= datetime.combine(data_fim, time.max)
+        )
     if status:
         query = query.filter(BanhoTosaAgendamento.status == status)
 
-    agendamentos = query.order_by(BanhoTosaAgendamento.data_hora_inicio.asc()).limit(limit).all()
+    agendamentos = (
+        query.order_by(BanhoTosaAgendamento.data_hora_inicio.asc()).limit(limit).all()
+    )
     return [serializar_agendamento(item) for item in agendamentos]
 
 
-@router.post("/agendamentos", response_model=BanhoTosaAgendamentoResponse, status_code=201)
+@router.post(
+    "/agendamentos", response_model=BanhoTosaAgendamentoResponse, status_code=201
+)
 def criar_agendamento(
     body: BanhoTosaAgendamentoCreate,
     db: Session = Depends(get_session),
@@ -84,11 +94,15 @@ def criar_agendamento(
     for item in body.servicos:
         servico = None
         if item.servico_id:
-            servico = db.query(BanhoTosaServico).filter(
-                BanhoTosaServico.id == item.servico_id,
-                BanhoTosaServico.tenant_id == tenant_id,
-                BanhoTosaServico.ativo.is_(True),
-            ).first()
+            servico = (
+                db.query(BanhoTosaServico)
+                .filter(
+                    BanhoTosaServico.id == item.servico_id,
+                    BanhoTosaServico.tenant_id == tenant_id,
+                    BanhoTosaServico.ativo.is_(True),
+                )
+                .first()
+            )
             if not servico:
                 raise HTTPException(status_code=404, detail="Servico nao encontrado")
 
@@ -117,9 +131,13 @@ def criar_agendamento(
     if duracao_total <= 0:
         duracao_total = 60
 
-    fim_previsto = body.data_hora_fim_prevista or (body.data_hora_inicio + timedelta(minutes=duracao_total))
+    fim_previsto = body.data_hora_fim_prevista or (
+        body.data_hora_inicio + timedelta(minutes=duracao_total)
+    )
     if fim_previsto <= body.data_hora_inicio:
-        raise HTTPException(status_code=422, detail="Fim previsto deve ser maior que o inicio")
+        raise HTTPException(
+            status_code=422, detail="Fim previsto deve ser maior que o inicio"
+        )
 
     validar_capacidade_agenda(
         db,
@@ -173,7 +191,9 @@ def criar_agendamento(
     return serializar_agendamento(agendamento)
 
 
-@router.patch("/agendamentos/{agendamento_id}/status", response_model=BanhoTosaAgendamentoResponse)
+@router.patch(
+    "/agendamentos/{agendamento_id}/status", response_model=BanhoTosaAgendamentoResponse
+)
 def atualizar_status_agendamento(
     agendamento_id: int,
     body: BanhoTosaAgendamentoStatusUpdate,
@@ -198,7 +218,10 @@ def atualizar_status_agendamento(
     return serializar_agendamento(agendamento)
 
 
-@router.post("/agendamentos/{agendamento_id}/check-in", response_model=BanhoTosaAtendimentoResponse)
+@router.post(
+    "/agendamentos/{agendamento_id}/check-in",
+    response_model=BanhoTosaAtendimentoResponse,
+)
 def realizar_checkin_agendamento(
     agendamento_id: int,
     db: Session = Depends(get_session),
@@ -207,19 +230,31 @@ def realizar_checkin_agendamento(
     _, tenant_id = _get_tenant(current)
     agendamento = (
         db.query(BanhoTosaAgendamento)
-        .options(joinedload(BanhoTosaAgendamento.pet), joinedload(BanhoTosaAgendamento.cliente))
-        .filter(BanhoTosaAgendamento.id == agendamento_id, BanhoTosaAgendamento.tenant_id == tenant_id)
+        .options(
+            joinedload(BanhoTosaAgendamento.pet),
+            joinedload(BanhoTosaAgendamento.cliente),
+        )
+        .filter(
+            BanhoTosaAgendamento.id == agendamento_id,
+            BanhoTosaAgendamento.tenant_id == tenant_id,
+        )
         .first()
     )
     if not agendamento:
         raise HTTPException(status_code=404, detail="Agendamento nao encontrado")
     if agendamento.status in STATUS_AGENDAMENTO_FINAIS:
-        raise HTTPException(status_code=422, detail="Agendamento finalizado nao pode receber check-in")
+        raise HTTPException(
+            status_code=422, detail="Agendamento finalizado nao pode receber check-in"
+        )
 
-    atendimento = db.query(BanhoTosaAtendimento).filter(
-        BanhoTosaAtendimento.tenant_id == tenant_id,
-        BanhoTosaAtendimento.agendamento_id == agendamento.id,
-    ).first()
+    atendimento = (
+        db.query(BanhoTosaAtendimento)
+        .filter(
+            BanhoTosaAtendimento.tenant_id == tenant_id,
+            BanhoTosaAtendimento.agendamento_id == agendamento.id,
+        )
+        .first()
+    )
 
     if not atendimento:
         agora = datetime.now()

@@ -17,7 +17,15 @@ from app.banho_tosa_models import (
 
 DEFAULT_FLUXO_ETAPAS = ["chegou", "banho", "secagem", "tosa", "pronto"]
 ETAPAS_OPERACIONAIS = {"banho", "secagem", "tosa", "higiene", "preparo"}
-ETAPAS_PERMITIDAS = {"chegou", "banho", "secagem", "tosa", "higiene", "preparo", "pronto"}
+ETAPAS_PERMITIDAS = {
+    "chegou",
+    "banho",
+    "secagem",
+    "tosa",
+    "higiene",
+    "preparo",
+    "pronto",
+}
 ETAPA_LABELS = {
     "chegou": "Chegou",
     "banho": "Banho",
@@ -88,7 +96,9 @@ def etapa_ativa(atendimento: BanhoTosaAtendimento) -> Optional[BanhoTosaEtapa]:
     ]
     if not abertas:
         return None
-    return sorted(abertas, key=lambda etapa: etapa.inicio_em or datetime.min, reverse=True)[0]
+    return sorted(
+        abertas, key=lambda etapa: etapa.inicio_em or datetime.min, reverse=True
+    )[0]
 
 
 def etapa_atual_codigo(atendimento: BanhoTosaAtendimento) -> str:
@@ -98,7 +108,9 @@ def etapa_atual_codigo(atendimento: BanhoTosaAtendimento) -> str:
     return ETAPA_POR_STATUS.get(atendimento.status, atendimento.status)
 
 
-def proxima_etapa_codigo(atendimento: BanhoTosaAtendimento, fluxo: list[str]) -> Optional[str]:
+def proxima_etapa_codigo(
+    atendimento: BanhoTosaAtendimento, fluxo: list[str]
+) -> Optional[str]:
     atual = etapa_atual_codigo(atendimento)
     if atendimento.status == "pronto":
         return "entregue"
@@ -130,7 +142,9 @@ def fechar_etapa_aberta(
         etapa.observacoes = observacoes
 
 
-def calcular_tempos_etapa(etapa: BanhoTosaEtapa, agora: Optional[datetime] = None) -> dict:
+def calcular_tempos_etapa(
+    etapa: BanhoTosaEtapa, agora: Optional[datetime] = None
+) -> dict:
     previsto_min = int(etapa.tempo_previsto_minutos or 0)
     inicio = etapa.inicio_em
     fim = etapa.fim_em
@@ -161,7 +175,9 @@ def _datetime_compativel(valor: datetime, referencia: Optional[datetime]) -> dat
         return valor
 
     valor_tem_tz = valor.tzinfo is not None and valor.utcoffset() is not None
-    referencia_tem_tz = referencia.tzinfo is not None and referencia.utcoffset() is not None
+    referencia_tem_tz = (
+        referencia.tzinfo is not None and referencia.utcoffset() is not None
+    )
 
     if valor_tem_tz == referencia_tem_tz:
         return valor
@@ -184,7 +200,9 @@ def estado_operacional_atendimento(
         "etapa_atual_label": etiqueta_etapa(atual),
         "proxima_etapa_codigo": proxima,
         "proxima_etapa_label": etiqueta_etapa(proxima),
-        "tempo_previsto_minutos": getattr(aberta, "tempo_previsto_minutos", None) if aberta else None,
+        "tempo_previsto_minutos": getattr(aberta, "tempo_previsto_minutos", None)
+        if aberta
+        else None,
         "tempo_decorrido_segundos": tempos.get("tempo_decorrido_segundos"),
         "tempo_restante_segundos": tempos.get("tempo_restante_segundos"),
         "atraso_segundos": tempos.get("atraso_segundos") or 0,
@@ -232,14 +250,24 @@ def ordem_fluxo_para(tipo: str, fluxo: list[str]) -> Optional[int]:
         return None
 
 
-def _parametro_porte_atendimento(db: Session, tenant_id, atendimento: BanhoTosaAtendimento):
-    porte = (atendimento.porte_snapshot or getattr(atendimento.pet, "porte", None) or "").strip().lower()
+def _parametro_porte_atendimento(
+    db: Session, tenant_id, atendimento: BanhoTosaAtendimento
+):
+    porte = (
+        (atendimento.porte_snapshot or getattr(atendimento.pet, "porte", None) or "")
+        .strip()
+        .lower()
+    )
     if not porte:
         return None
-    return db.query(BanhoTosaParametroPorte).filter(
-        BanhoTosaParametroPorte.tenant_id == tenant_id,
-        func.lower(BanhoTosaParametroPorte.porte) == porte,
-    ).first()
+    return (
+        db.query(BanhoTosaParametroPorte)
+        .filter(
+            BanhoTosaParametroPorte.tenant_id == tenant_id,
+            func.lower(BanhoTosaParametroPorte.porte) == porte,
+        )
+        .first()
+    )
 
 
 def _pelagem_longa(atendimento: BanhoTosaAtendimento) -> bool:

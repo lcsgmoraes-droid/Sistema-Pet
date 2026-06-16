@@ -6,7 +6,9 @@ from sqlalchemy.orm import Session
 from app.auth.dependencies import get_current_tenant
 from app.db import get_session as get_db
 from app.produtos_models import Produto
-from app.services.fiscal_config_service import obter_ou_criar_config_fiscal_empresa_padrao
+from app.services.fiscal_config_service import (
+    obter_ou_criar_config_fiscal_empresa_padrao,
+)
 from app.services.pdv_fiscal_calculo import calcular_fiscal_item_pdv
 from app.services.pdv_fiscal_resolver import resolver_fiscal_item_pdv
 

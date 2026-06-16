@@ -5,7 +5,10 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from app.auth.dependencies import get_current_user_and_tenant
-from app.banho_tosa_schemas import BanhoTosaPessoaApoioResponse, BanhoTosaProdutoEstoqueResponse
+from app.banho_tosa_schemas import (
+    BanhoTosaPessoaApoioResponse,
+    BanhoTosaProdutoEstoqueResponse,
+)
 from app.db import get_session
 from app.models import Cliente
 from app.produtos_models import Produto
@@ -31,7 +34,9 @@ def listar_funcionarios_apoio(
 
     if busca:
         termo = f"%{busca.strip()}%"
-        query = query.filter(or_(Cliente.nome.ilike(termo), Cliente.codigo.ilike(termo)))
+        query = query.filter(
+            or_(Cliente.nome.ilike(termo), Cliente.codigo.ilike(termo))
+        )
 
     pessoas = query.order_by(Cliente.nome.asc()).limit(limit).all()
     return [
@@ -44,7 +49,9 @@ def listar_funcionarios_apoio(
     ]
 
 
-@router.get("/apoios/produtos-estoque", response_model=List[BanhoTosaProdutoEstoqueResponse])
+@router.get(
+    "/apoios/produtos-estoque", response_model=List[BanhoTosaProdutoEstoqueResponse]
+)
 def listar_produtos_estoque_apoio(
     busca: Optional[str] = Query(None),
     limit: int = Query(100, ge=1, le=200),
@@ -60,7 +67,9 @@ def listar_produtos_estoque_apoio(
 
     if busca:
         termo = f"%{busca.strip()}%"
-        query = query.filter(or_(Produto.nome.ilike(termo), Produto.codigo.ilike(termo)))
+        query = query.filter(
+            or_(Produto.nome.ilike(termo), Produto.codigo.ilike(termo))
+        )
 
     produtos = query.order_by(Produto.nome.asc()).limit(limit).all()
     return [

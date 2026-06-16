@@ -1,6 +1,10 @@
 from sqlalchemy.orm import Session, joinedload
 
-from app.banho_tosa_models import BanhoTosaAgendamento, BanhoTosaAtendimento, BanhoTosaPacoteCredito
+from app.banho_tosa_models import (
+    BanhoTosaAgendamento,
+    BanhoTosaAtendimento,
+    BanhoTosaPacoteCredito,
+)
 
 
 def buscar_agendamento_completo(db: Session, tenant_id, agendamento_id: int):
@@ -12,7 +16,10 @@ def buscar_agendamento_completo(db: Session, tenant_id, agendamento_id: int):
             joinedload(BanhoTosaAgendamento.recurso),
             joinedload(BanhoTosaAgendamento.servicos),
         )
-        .filter(BanhoTosaAgendamento.id == agendamento_id, BanhoTosaAgendamento.tenant_id == tenant_id)
+        .filter(
+            BanhoTosaAgendamento.id == agendamento_id,
+            BanhoTosaAgendamento.tenant_id == tenant_id,
+        )
         .first()
     )
 
@@ -24,8 +31,13 @@ def buscar_atendimento_completo(db: Session, tenant_id, atendimento_id: int):
             joinedload(BanhoTosaAtendimento.cliente),
             joinedload(BanhoTosaAtendimento.pet),
             joinedload(BanhoTosaAtendimento.agendamento),
-            joinedload(BanhoTosaAtendimento.pacote_credito).joinedload(BanhoTosaPacoteCredito.pacote),
+            joinedload(BanhoTosaAtendimento.pacote_credito).joinedload(
+                BanhoTosaPacoteCredito.pacote
+            ),
         )
-        .filter(BanhoTosaAtendimento.id == atendimento_id, BanhoTosaAtendimento.tenant_id == tenant_id)
+        .filter(
+            BanhoTosaAtendimento.id == atendimento_id,
+            BanhoTosaAtendimento.tenant_id == tenant_id,
+        )
         .first()
     )
