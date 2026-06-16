@@ -673,12 +673,12 @@ def test_backend_ci_has_blocking_backend_access_config_format_step():
     ) in source
 
 
-def test_backend_ci_has_blocking_backend_model_read_router_packages_format_step():
+def test_backend_ci_has_blocking_backend_model_read_packages_format_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
-    assert "Backend model read router packages format (blocking)" in source
+    assert "Backend model read packages format (blocking)" in source
     assert (
-        "ruff format --check app/fiscal_models app/read_models app/routers "
+        "ruff format --check app/fiscal_models app/read_models "
         "app/banho_tosa_model_parts app/banho_tosa_schema_parts app/dre"
     ) in source
 

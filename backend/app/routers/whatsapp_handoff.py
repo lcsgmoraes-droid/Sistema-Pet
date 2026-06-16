@@ -17,11 +17,7 @@ from datetime import UTC, datetime
 from app.db import get_session as get_db
 from app.auth.dependencies import get_current_user_and_tenant
 from app.models import User
-from app.whatsapp.models_handoff import (
-    WhatsAppAgent,
-    WhatsAppHandoff,
-    WhatsAppInternalNote,
-)
+from app.whatsapp.models_handoff import WhatsAppAgent, WhatsAppHandoff, WhatsAppInternalNote
 from app.whatsapp.schemas_handoff import (
     WhatsAppAgentCreate,
     WhatsAppAgentUpdate,
@@ -31,21 +27,18 @@ from app.whatsapp.schemas_handoff import (
     WhatsAppHandoffResolve,
     WhatsAppInternalNoteCreate,
     WhatsAppInternalNoteResponse,
-    HandoffStats,
+    HandoffStats
 )
 from app.whatsapp.sentiment import SentimentAnalyzer
 from app.whatsapp.websocket import (
     emit_handoff_assigned,
-    emit_handoff_resolved,
-    emit_agent_status_change,
+    emit_handoff_resolved, emit_agent_status_change
 )
 
 router = APIRouter(prefix="/whatsapp", tags=["WhatsApp Handoff - Sprint 4"])
 
 
-async def _usuario_handoff(
-    user_and_tenant=Depends(get_current_user_and_tenant),
-) -> User:
+async def _usuario_handoff(user_and_tenant=Depends(get_current_user_and_tenant)) -> User:
     return user_and_tenant[0]
 
 
@@ -90,33 +83,26 @@ def _serialize_note(note: WhatsAppInternalNote) -> dict:
 # AGENTS (Atendentes)
 # ========================================
 
-
 @router.post("/agents", response_model=WhatsAppAgentResponse, status_code=201)
 async def create_agent(
     agent_data: WhatsAppAgentCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(_usuario_handoff),
+    current_user: User = Depends(_usuario_handoff)
 ):
     """
     Criar novo agente (atendente humano)
     """
     # Verificar se email já existe
-    existing = (
-        db.query(WhatsAppAgent)
-        .filter(
-            and_(
-                WhatsAppAgent.tenant_id == current_user.tenant_id,
-                WhatsAppAgent.email == agent_data.email,
-            )
+    existing = db.query(WhatsAppAgent).filter(
+        and_(
+            WhatsAppAgent.tenant_id == current_user.tenant_id,
+            WhatsAppAgent.email == agent_data.email
         )
-        .first()
-    )
-
+    ).first()
+    
     if existing:
-        raise HTTPException(
-            status_code=400, detail="Agent with this email already exists"
-        )
-
+        raise HTTPException(status_code=400, detail="Agent with this email already exists")
+    
     # Criar agent
     agent = WhatsAppAgent(
         tenant_id=current_user.tenant_id,
@@ -124,23 +110,21 @@ async def create_agent(
         name=agent_data.name,
         email=agent_data.email,
         status=agent_data.status,
-        max_concurrent_chats=agent_data.max_concurrent_chats or 5,
+        max_concurrent_chats=agent_data.max_concurrent_chats or 5
     )
-
+    
     db.add(agent)
     db.commit()
     db.refresh(agent)
-
+    
     return agent
 
 
 @router.get("/agents", response_model=List[WhatsAppAgentResponse])
 async def list_agents(
-    status: Optional[str] = Query(
-        None, description="Filtrar por status: available, busy, offline"
-    ),
+    status: Optional[str] = Query(None, description="Filtrar por status: available, busy, offline"),
     db: Session = Depends(get_db),
-    current_user: User = Depends(_usuario_handoff),
+    current_user: User = Depends(_usuario_handoff)
 ):
     """
     Listar todos os agentes
@@ -148,10 +132,10 @@ async def list_agents(
     query = db.query(WhatsAppAgent).filter(
         WhatsAppAgent.tenant_id == current_user.tenant_id
     )
-
+    
     if status:
         query = query.filter(WhatsAppAgent.status == status)
-
+    
     agents = query.order_by(WhatsAppAgent.name).all()
     return agents
 
@@ -160,25 +144,21 @@ async def list_agents(
 async def get_agent(
     agent_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(_usuario_handoff),
+    current_user: User = Depends(_usuario_handoff)
 ):
     """
     Buscar agente por ID
     """
-    agent = (
-        db.query(WhatsAppAgent)
-        .filter(
-            and_(
-                WhatsAppAgent.id == agent_id,
-                WhatsAppAgent.tenant_id == current_user.tenant_id,
-            )
+    agent = db.query(WhatsAppAgent).filter(
+        and_(
+            WhatsAppAgent.id == agent_id,
+            WhatsAppAgent.tenant_id == current_user.tenant_id
         )
-        .first()
-    )
-
+    ).first()
+    
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
-
+    
     return agent
 
 
@@ -187,44 +167,37 @@ async def update_agent(
     agent_id: str,
     agent_data: WhatsAppAgentUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(_usuario_handoff),
+    current_user: User = Depends(_usuario_handoff)
 ):
     """
     Atualizar dados do agente
     """
-    agent = (
-        db.query(WhatsAppAgent)
-        .filter(
-            and_(
-                WhatsAppAgent.id == agent_id,
-                WhatsAppAgent.tenant_id == current_user.tenant_id,
-            )
+    agent = db.query(WhatsAppAgent).filter(
+        and_(
+            WhatsAppAgent.id == agent_id,
+            WhatsAppAgent.tenant_id == current_user.tenant_id
         )
-        .first()
-    )
-
+    ).first()
+    
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
-
+    
     # Atualizar campos
     for field, value in agent_data.dict(exclude_unset=True).items():
         setattr(agent, field, value)
-
+    
     db.commit()
     db.refresh(agent)
-
+    
     # Emit agent status change event if status changed
-    if "status" in agent_data.dict(exclude_unset=True):
-        await emit_agent_status_change(
-            {
-                "id": str(agent.id),
-                "name": agent.name,
-                "status": agent.status,
-                "current_chats": agent.current_chats,
-            },
-            db,
-        )
-
+    if 'status' in agent_data.dict(exclude_unset=True):
+        await emit_agent_status_change({
+            "id": str(agent.id),
+            "name": agent.name,
+            "status": agent.status,
+            "current_chats": agent.current_chats
+        }, db)
+    
     return agent
 
 
@@ -232,46 +205,38 @@ async def update_agent(
 async def delete_agent(
     agent_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(_usuario_handoff),
+    current_user: User = Depends(_usuario_handoff)
 ):
     """
     Deletar agente
     """
-    agent = (
-        db.query(WhatsAppAgent)
-        .filter(
-            and_(
-                WhatsAppAgent.id == agent_id,
-                WhatsAppAgent.tenant_id == current_user.tenant_id,
-            )
+    agent = db.query(WhatsAppAgent).filter(
+        and_(
+            WhatsAppAgent.id == agent_id,
+            WhatsAppAgent.tenant_id == current_user.tenant_id
         )
-        .first()
-    )
-
+    ).first()
+    
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
-
+    
     # Verificar se tem handoffs ativos
-    active_handoffs = (
-        db.query(WhatsAppHandoff)
-        .filter(
-            and_(
-                WhatsAppHandoff.assigned_to == agent_id,
-                WhatsAppHandoff.status.in_(["pending", "active"]),
-            )
+    active_handoffs = db.query(WhatsAppHandoff).filter(
+        and_(
+            WhatsAppHandoff.assigned_to == agent_id,
+            WhatsAppHandoff.status.in_(["pending", "active"])
         )
-        .count()
-    )
-
+    ).count()
+    
     if active_handoffs > 0:
         raise HTTPException(
-            status_code=400,
-            detail=f"Cannot delete agent with {active_handoffs} active handoffs",
+            status_code=400, 
+            detail=f"Cannot delete agent with {active_handoffs} active handoffs"
         )
-
+    
     db.delete(agent)
     db.commit()
-
+    
     return None
 
 
@@ -279,18 +244,15 @@ async def delete_agent(
 # HANDOFFS (Transferências)
 # ========================================
 
-
 @router.get("/handoffs", response_model=List[WhatsAppHandoffResponse])
 async def list_handoffs(
-    status: Optional[str] = Query(
-        None, description="pending, active, resolved, cancelled"
-    ),
+    status: Optional[str] = Query(None, description="pending, active, resolved, cancelled"),
     priority: Optional[str] = Query(None, description="low, medium, high, urgent"),
     agent_id: Optional[str] = Query(None, description="Filtrar por agente atribuído"),
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user: User = Depends(_usuario_handoff),
+    current_user: User = Depends(_usuario_handoff)
 ):
     """
     Listar handoffs (transferências para humano)
@@ -298,25 +260,21 @@ async def list_handoffs(
     query = db.query(WhatsAppHandoff).filter(
         WhatsAppHandoff.tenant_id == current_user.tenant_id
     )
-
+    
     if status:
         query = query.filter(WhatsAppHandoff.status == status)
-
+    
     if priority:
         query = query.filter(WhatsAppHandoff.priority == priority)
-
+    
     if agent_id:
         query = query.filter(WhatsAppHandoff.assigned_to == agent_id)
-
-    handoffs = (
-        query.order_by(
-            WhatsAppHandoff.priority.desc(), WhatsAppHandoff.created_at.desc()
-        )
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
-
+    
+    handoffs = query.order_by(
+        WhatsAppHandoff.priority.desc(),
+        WhatsAppHandoff.created_at.desc()
+    ).offset(skip).limit(limit).all()
+    
     return [_serialize_handoff(handoff) for handoff in handoffs]
 
 
@@ -325,25 +283,21 @@ async def list_pending_handoffs(
     skip: int = Query(0, ge=0),
     limit: int = Query(50, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user: User = Depends(_usuario_handoff),
+    current_user: User = Depends(_usuario_handoff)
 ):
     """
     Listar apenas handoffs pendentes (aguardando atendimento)
     """
-    handoffs = (
-        db.query(WhatsAppHandoff)
-        .filter(
-            and_(
-                WhatsAppHandoff.tenant_id == current_user.tenant_id,
-                WhatsAppHandoff.status == "pending",
-            )
+    handoffs = db.query(WhatsAppHandoff).filter(
+        and_(
+            WhatsAppHandoff.tenant_id == current_user.tenant_id,
+            WhatsAppHandoff.status == "pending"
         )
-        .order_by(WhatsAppHandoff.priority.desc(), WhatsAppHandoff.created_at.asc())
-        .offset(skip)
-        .limit(limit)
-        .all()
-    )
-
+    ).order_by(
+        WhatsAppHandoff.priority.desc(),
+        WhatsAppHandoff.created_at.asc()
+    ).offset(skip).limit(limit).all()
+    
     return [_serialize_handoff(handoff) for handoff in handoffs]
 
 
@@ -351,25 +305,21 @@ async def list_pending_handoffs(
 async def get_handoff(
     handoff_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(_usuario_handoff),
+    current_user: User = Depends(_usuario_handoff)
 ):
     """
     Buscar handoff por ID
     """
-    handoff = (
-        db.query(WhatsAppHandoff)
-        .filter(
-            and_(
-                WhatsAppHandoff.id == handoff_id,
-                WhatsAppHandoff.tenant_id == current_user.tenant_id,
-            )
+    handoff = db.query(WhatsAppHandoff).filter(
+        and_(
+            WhatsAppHandoff.id == handoff_id,
+            WhatsAppHandoff.tenant_id == current_user.tenant_id
         )
-        .first()
-    )
-
+    ).first()
+    
     if not handoff:
         raise HTTPException(status_code=404, detail="Handoff not found")
-
+    
     return _serialize_handoff(handoff)
 
 
@@ -378,94 +328,79 @@ async def assign_handoff(
     handoff_id: str,
     assign_data: WhatsAppHandoffAssign,
     db: Session = Depends(get_db),
-    current_user: User = Depends(_usuario_handoff),
+    current_user: User = Depends(_usuario_handoff)
 ):
     """
     Atribuir handoff para um agente
     """
-    handoff = (
-        db.query(WhatsAppHandoff)
-        .filter(
-            and_(
-                WhatsAppHandoff.id == handoff_id,
-                WhatsAppHandoff.tenant_id == current_user.tenant_id,
-            )
+    handoff = db.query(WhatsAppHandoff).filter(
+        and_(
+            WhatsAppHandoff.id == handoff_id,
+            WhatsAppHandoff.tenant_id == current_user.tenant_id
         )
-        .first()
-    )
-
+    ).first()
+    
     if not handoff:
         raise HTTPException(status_code=404, detail="Handoff not found")
-
+    
     if handoff.status not in ["pending", "active"]:
         raise HTTPException(
-            status_code=400,
-            detail=f"Cannot assign handoff with status: {handoff.status}",
+            status_code=400, 
+            detail=f"Cannot assign handoff with status: {handoff.status}"
         )
-
+    
     # Verificar se agente existe e está disponível
-    agent = (
-        db.query(WhatsAppAgent)
-        .filter(
-            and_(
-                WhatsAppAgent.id == assign_data.agent_id,
-                WhatsAppAgent.tenant_id == current_user.tenant_id,
-            )
+    agent = db.query(WhatsAppAgent).filter(
+        and_(
+            WhatsAppAgent.id == assign_data.agent_id,
+            WhatsAppAgent.tenant_id == current_user.tenant_id
         )
-        .first()
-    )
-
+    ).first()
+    
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
-
+    
     if agent.status == "offline":
         raise HTTPException(status_code=400, detail="Agent is offline")
-
+    
     # Verificar capacidade do agente
-    active_count = (
-        db.query(WhatsAppHandoff)
-        .filter(
-            and_(
-                WhatsAppHandoff.assigned_to == agent.id,
-                WhatsAppHandoff.status == "active",
-            )
+    active_count = db.query(WhatsAppHandoff).filter(
+        and_(
+            WhatsAppHandoff.assigned_to == agent.id,
+            WhatsAppHandoff.status == "active"
         )
-        .count()
-    )
-
+    ).count()
+    
     if active_count >= agent.max_concurrent_chats:
         raise HTTPException(
-            status_code=400,
-            detail=f"Agent has reached max concurrent chats ({agent.max_concurrent_chats})",
+            status_code=400, 
+            detail=f"Agent has reached max concurrent chats ({agent.max_concurrent_chats})"
         )
-
+    
     # Atribuir
     handoff.assigned_to = agent.id
     handoff.status = "active"
     handoff.assigned_at = datetime.now(UTC)
     agent.current_chats = active_count + 1
-
+    
     # Atualizar status do agente
     if active_count + 1 >= agent.max_concurrent_chats:
         agent.status = "busy"
-
+    
     db.commit()
     db.refresh(handoff)
-
+    
     # Emit WebSocket event
-    await emit_handoff_assigned(
-        {
-            "id": str(handoff.id),
-            "session_id": handoff.session_id,
-            "phone_number": handoff.phone_number,
-            "customer_name": handoff.customer_name,
-            "status": handoff.status,
-            "assigned_agent_id": str(handoff.assigned_to),
-            "priority": handoff.priority,
-        },
-        str(agent.id),
-    )
-
+    await emit_handoff_assigned({
+        "id": str(handoff.id),
+        "session_id": handoff.session_id,
+        "phone_number": handoff.phone_number,
+        "customer_name": handoff.customer_name,
+        "status": handoff.status,
+        "assigned_agent_id": str(handoff.assigned_to),
+        "priority": handoff.priority
+    }, str(agent.id))
+    
     return _serialize_handoff(handoff)
 
 
@@ -474,61 +409,51 @@ async def resolve_handoff(
     handoff_id: str,
     resolve_data: WhatsAppHandoffResolve,
     db: Session = Depends(get_db),
-    current_user: User = Depends(_usuario_handoff),
+    current_user: User = Depends(_usuario_handoff)
 ):
     """
     Marcar handoff como resolvido
     """
-    handoff = (
-        db.query(WhatsAppHandoff)
-        .filter(
-            and_(
-                WhatsAppHandoff.id == handoff_id,
-                WhatsAppHandoff.tenant_id == current_user.tenant_id,
-            )
+    handoff = db.query(WhatsAppHandoff).filter(
+        and_(
+            WhatsAppHandoff.id == handoff_id,
+            WhatsAppHandoff.tenant_id == current_user.tenant_id
         )
-        .first()
-    )
-
+    ).first()
+    
     if not handoff:
         raise HTTPException(status_code=404, detail="Handoff not found")
-
+    
     handoff.status = "resolved"
     handoff.resolved_at = datetime.now(UTC)
     handoff.resolution_notes = resolve_data.resolution_notes
-
+    
     # Liberar capacidade do agente
     if handoff.assigned_to:
-        agent = (
-            db.query(WhatsAppAgent)
-            .filter(WhatsAppAgent.id == handoff.assigned_to)
-            .first()
-        )
-
+        agent = db.query(WhatsAppAgent).filter(
+            WhatsAppAgent.id == handoff.assigned_to
+        ).first()
+        
         if agent:
-            active_count = (
-                db.query(WhatsAppHandoff)
-                .filter(
-                    and_(
-                        WhatsAppHandoff.assigned_to == agent.id,
-                        WhatsAppHandoff.status == "active",
-                        WhatsAppHandoff.id != handoff_id,
-                    )
+            active_count = db.query(WhatsAppHandoff).filter(
+                and_(
+                    WhatsAppHandoff.assigned_to == agent.id,
+                    WhatsAppHandoff.status == "active",
+                    WhatsAppHandoff.id != handoff_id
                 )
-                .count()
-            )
+            ).count()
 
             agent.current_chats = active_count
-
+            
             if active_count < agent.max_concurrent_chats and agent.status == "busy":
                 agent.status = "online"
-
+    
     db.commit()
     db.refresh(handoff)
-
+    
     # Emit WebSocket event
     await emit_handoff_resolved(handoff_id, db)
-
+    
     return _serialize_handoff(handoff)
 
 
@@ -536,98 +461,76 @@ async def resolve_handoff(
 # INTERNAL NOTES (Notas Internas)
 # ========================================
 
-
-@router.post(
-    "/handoffs/{handoff_id}/notes",
-    response_model=WhatsAppInternalNoteResponse,
-    status_code=201,
-)
+@router.post("/handoffs/{handoff_id}/notes", response_model=WhatsAppInternalNoteResponse, status_code=201)
 async def create_note(
     handoff_id: str,
     note_data: WhatsAppInternalNoteCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(_usuario_handoff),
+    current_user: User = Depends(_usuario_handoff)
 ):
     """
     Adicionar nota interna ao handoff
     """
-    handoff = (
-        db.query(WhatsAppHandoff)
-        .filter(
-            and_(
-                WhatsAppHandoff.id == handoff_id,
-                WhatsAppHandoff.tenant_id == current_user.tenant_id,
-            )
+    handoff = db.query(WhatsAppHandoff).filter(
+        and_(
+            WhatsAppHandoff.id == handoff_id,
+            WhatsAppHandoff.tenant_id == current_user.tenant_id
         )
-        .first()
-    )
-
+    ).first()
+    
     if not handoff:
         raise HTTPException(status_code=404, detail="Handoff not found")
 
-    current_agent = (
-        db.query(WhatsAppAgent)
-        .filter(
-            and_(
-                WhatsAppAgent.tenant_id == current_user.tenant_id,
-                WhatsAppAgent.user_id == current_user.id,
-            )
+    current_agent = db.query(WhatsAppAgent).filter(
+        and_(
+            WhatsAppAgent.tenant_id == current_user.tenant_id,
+            WhatsAppAgent.user_id == current_user.id
         )
-        .first()
-    )
+    ).first()
 
     if not current_agent:
         raise HTTPException(status_code=400, detail="Agente atual não encontrado")
-
+    
     note = WhatsAppInternalNote(
         tenant_id=current_user.tenant_id,
         handoff_id=handoff_id,
         session_id=handoff.session_id,
         agent_id=current_agent.id,
         note=note_data.content,
-        note_type=note_data.note_type or "info",
+        note_type=note_data.note_type or "info"
     )
-
+    
     db.add(note)
     db.commit()
     db.refresh(note)
-
+    
     return _serialize_note(note)
 
 
-@router.get(
-    "/handoffs/{handoff_id}/notes", response_model=List[WhatsAppInternalNoteResponse]
-)
+@router.get("/handoffs/{handoff_id}/notes", response_model=List[WhatsAppInternalNoteResponse])
 async def list_notes(
     handoff_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(_usuario_handoff),
+    current_user: User = Depends(_usuario_handoff)
 ):
     """
     Listar notas de um handoff
     """
     # Verificar se handoff existe
-    handoff = (
-        db.query(WhatsAppHandoff)
-        .filter(
-            and_(
-                WhatsAppHandoff.id == handoff_id,
-                WhatsAppHandoff.tenant_id == current_user.tenant_id,
-            )
+    handoff = db.query(WhatsAppHandoff).filter(
+        and_(
+            WhatsAppHandoff.id == handoff_id,
+            WhatsAppHandoff.tenant_id == current_user.tenant_id
         )
-        .first()
-    )
-
+    ).first()
+    
     if not handoff:
         raise HTTPException(status_code=404, detail="Handoff not found")
-
-    notes = (
-        db.query(WhatsAppInternalNote)
-        .filter(WhatsAppInternalNote.handoff_id == handoff_id)
-        .order_by(WhatsAppInternalNote.created_at)
-        .all()
-    )
-
+    
+    notes = db.query(WhatsAppInternalNote).filter(
+        WhatsAppInternalNote.handoff_id == handoff_id
+    ).order_by(WhatsAppInternalNote.created_at).all()
+    
     return [_serialize_note(note) for note in notes]
 
 
@@ -635,76 +538,63 @@ async def list_notes(
 # DASHBOARD & STATS
 # ========================================
 
-
 @router.get("/handoffs/dashboard/stats", response_model=HandoffStats)
 async def get_handoff_stats(
-    db: Session = Depends(get_db), current_user: User = Depends(_usuario_handoff)
+    db: Session = Depends(get_db),
+    current_user: User = Depends(_usuario_handoff)
 ):
     """
     Estatísticas do dashboard de handoffs
     """
     tenant_id = current_user.tenant_id
-
+    
     # Total de handoffs
-    total_handoffs = (
-        db.query(WhatsAppHandoff).filter(WhatsAppHandoff.tenant_id == tenant_id).count()
-    )
-
+    total_handoffs = db.query(WhatsAppHandoff).filter(
+        WhatsAppHandoff.tenant_id == tenant_id
+    ).count()
+    
     # Pendentes
-    pending_count = (
-        db.query(WhatsAppHandoff)
-        .filter(
-            and_(
-                WhatsAppHandoff.tenant_id == tenant_id,
-                WhatsAppHandoff.status == "pending",
-            )
+    pending_count = db.query(WhatsAppHandoff).filter(
+        and_(
+            WhatsAppHandoff.tenant_id == tenant_id,
+            WhatsAppHandoff.status == "pending"
         )
-        .count()
-    )
-
+    ).count()
+    
     # Ativos
-    active_count = (
-        db.query(WhatsAppHandoff)
-        .filter(
-            and_(
-                WhatsAppHandoff.tenant_id == tenant_id,
-                WhatsAppHandoff.status == "active",
-            )
+    active_count = db.query(WhatsAppHandoff).filter(
+        and_(
+            WhatsAppHandoff.tenant_id == tenant_id,
+            WhatsAppHandoff.status == "active"
         )
-        .count()
-    )
-
+    ).count()
+    
     # Resolvidos
-    resolved_count = (
-        db.query(WhatsAppHandoff)
-        .filter(
-            and_(
-                WhatsAppHandoff.tenant_id == tenant_id,
-                WhatsAppHandoff.status == "resolved",
-            )
+    resolved_count = db.query(WhatsAppHandoff).filter(
+        and_(
+            WhatsAppHandoff.tenant_id == tenant_id,
+            WhatsAppHandoff.status == "resolved"
         )
-        .count()
-    )
-
+    ).count()
+    
     # Agentes disponíveis
-    available_agents = (
-        db.query(WhatsAppAgent)
-        .filter(
-            and_(WhatsAppAgent.tenant_id == tenant_id, WhatsAppAgent.status == "online")
+    available_agents = db.query(WhatsAppAgent).filter(
+        and_(
+            WhatsAppAgent.tenant_id == tenant_id,
+            WhatsAppAgent.status == "online"
         )
-        .count()
-    )
-
+    ).count()
+    
     # Tempo médio de resposta (simplificado)
     avg_response_time = 120  # TODO: Calcular real
-
+    
     return HandoffStats(
         total_handoffs=total_handoffs,
         pending_count=pending_count,
         active_count=active_count,
         resolved_count=resolved_count,
         available_agents=available_agents,
-        avg_response_time_seconds=avg_response_time,
+        avg_response_time_seconds=avg_response_time
     )
 
 
@@ -712,20 +602,22 @@ async def get_handoff_stats(
 # SENTIMENT TESTING (Debug)
 # ========================================
 
-
 @router.post("/test-sentiment")
-async def test_sentiment(data: dict, current_user: User = Depends(_usuario_handoff)):
+async def test_sentiment(
+    data: dict,
+    current_user: User = Depends(_usuario_handoff)
+):
     """
     Testar análise de sentimento (debug)
     """
     message = data.get("message", "")
-
+    
     if not message:
         raise HTTPException(status_code=400, detail="Message is required")
-
+    
     analyzer = SentimentAnalyzer()
     result = analyzer.analyze(message)
-
+    
     return {
         "message": message,
         "score": float(result["score"]),
@@ -734,5 +626,5 @@ async def test_sentiment(data: dict, current_user: User = Depends(_usuario_hando
         "emotions": result["emotions"],
         "keywords_found": result["triggers"],
         "should_handoff": result["should_handoff"],
-        "handoff_reason": result["handoff_reason"],
+        "handoff_reason": result["handoff_reason"]
     }

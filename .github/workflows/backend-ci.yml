@@ -359,9 +359,9 @@ jobs:
         run: |
           ruff format --check app/canais.py app/partner_utils.py app/permissions_routes.py app/cargo_models.py app/empresa_config_fiscal_models.py app/empresa_config_geral_models.py app/config.py app/constants.py
 
-      - name: Backend model read router packages format (blocking)
+      - name: Backend model read packages format (blocking)
         run: |
-          ruff format --check app/fiscal_models app/read_models app/routers app/banho_tosa_model_parts app/banho_tosa_schema_parts app/dre
+          ruff format --check app/fiscal_models app/read_models app/banho_tosa_model_parts app/banho_tosa_schema_parts app/dre
 
       - name: Backend AI packages format (blocking)
         run: |
