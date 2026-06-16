@@ -198,7 +198,9 @@ def test_sync_loyalty_rewards_reissues_after_used_coupon_reversal_using_configur
                 "completed_cycles": 1,
             },
         ),
-        patch("app.campaigns.loyalty_service._give_loyalty_reward", return_value=1) as give_reward,
+        patch(
+            "app.campaigns.loyalty_service._give_loyalty_reward", return_value=1
+        ) as give_reward,
         patch("app.campaigns.loyalty_service._revoke_loyalty_reward") as revoke_reward,
     ):
         result = sync_loyalty_rewards_for_customer(

@@ -16,9 +16,9 @@ ECOMMERCE_NOTIFY = ROOT / "backend" / "app" / "routes" / "ecommerce_notify_route
 
 def test_prod_nginx_accepts_corepet_and_legacy_domains():
     nginx_conf = NGINX_CONF.read_text(encoding="utf-8")
-    app_locations = (ROOT / "nginx" / "includes" / "app-server-locations.conf").read_text(
-        encoding="utf-8"
-    )
+    app_locations = (
+        ROOT / "nginx" / "includes" / "app-server-locations.conf"
+    ).read_text(encoding="utf-8")
 
     assert "server_name mlprohub.com.br www.mlprohub.com.br;" in nginx_conf
     assert "server_name corepet.com.br www.corepet.com.br;" in nginx_conf
@@ -38,9 +38,9 @@ def test_prod_nginx_accepts_corepet_and_legacy_domains():
 
 def test_prod_nginx_allows_direct_corepet_without_exposing_legacy_origin():
     nginx_conf = NGINX_CONF.read_text(encoding="utf-8")
-    cloudflare_allowlist = (ROOT / "nginx" / "includes" / "cloudflare-allowlist.conf").read_text(
-        encoding="utf-8"
-    )
+    cloudflare_allowlist = (
+        ROOT / "nginx" / "includes" / "cloudflare-allowlist.conf"
+    ).read_text(encoding="utf-8")
 
     legacy_https_start = nginx_conf.index(
         "listen 443 ssl;\n        http2 on;\n        server_name mlprohub.com.br www.mlprohub.com.br;"
@@ -52,19 +52,32 @@ def test_prod_nginx_allows_direct_corepet_without_exposing_legacy_origin():
     corepet_server = nginx_conf[corepet_https_start:]
 
     assert "include /etc/nginx/includes/cloudflare-allowlist.conf;" in legacy_server
-    assert "include /etc/nginx/includes/cloudflare-allowlist.conf;" not in corepet_server
+    assert (
+        "include /etc/nginx/includes/cloudflare-allowlist.conf;" not in corepet_server
+    )
     assert "deny all;" in cloudflare_allowlist
 
 
 def test_prod_nginx_preserves_frontend_redirects_from_api_routes():
-    app_locations = (ROOT / "nginx" / "includes" / "app-server-locations.conf").read_text(
-        encoding="utf-8"
-    )
+    app_locations = (
+        ROOT / "nginx" / "includes" / "app-server-locations.conf"
+    ).read_text(encoding="utf-8")
 
-    assert "proxy_redirect http://localhost:8000/ https://$http_host/api/;" in app_locations
-    assert "proxy_redirect http://backend:8000/ https://$http_host/api/;" in app_locations
-    assert "proxy_redirect http://$http_host/ https://$http_host/api/;" not in app_locations
-    assert "proxy_redirect https://$http_host/ https://$http_host/api/;" not in app_locations
+    assert (
+        "proxy_redirect http://localhost:8000/ https://$http_host/api/;"
+        in app_locations
+    )
+    assert (
+        "proxy_redirect http://backend:8000/ https://$http_host/api/;" in app_locations
+    )
+    assert (
+        "proxy_redirect http://$http_host/ https://$http_host/api/;"
+        not in app_locations
+    )
+    assert (
+        "proxy_redirect https://$http_host/ https://$http_host/api/;"
+        not in app_locations
+    )
 
 
 def test_prod_nginx_mounts_certbot_webroot_for_corepet_renewal():
@@ -100,7 +113,10 @@ def test_prod_generates_public_links_with_corepet_domain():
 
     assert "SYSTEM_NAME: ${SYSTEM_NAME:-CorePet ERP}" in compose_text
     assert "FRONTEND_URL: ${FRONTEND_URL:-https://corepet.com.br}" in compose_text
-    assert "ECOMMERCE_BASE_URL: ${ECOMMERCE_BASE_URL:-https://corepet.com.br}" in compose_text
+    assert (
+        "ECOMMERCE_BASE_URL: ${ECOMMERCE_BASE_URL:-https://corepet.com.br}"
+        in compose_text
+    )
     assert "SMTP_FROM" not in compose_text
 
 
@@ -131,7 +147,9 @@ def test_runtime_defaults_use_corepet_domain():
 def test_prod_serves_product_images_from_corepet_domain():
     nginx_conf = NGINX_CONF.read_text(encoding="utf-8")
     compose_text = COMPOSE_PROD.read_text(encoding="utf-8")
-    image_locations_path = ROOT / "nginx" / "includes" / "product-image-server-locations.conf"
+    image_locations_path = (
+        ROOT / "nginx" / "includes" / "product-image-server-locations.conf"
+    )
 
     assert image_locations_path.exists()
     image_locations = image_locations_path.read_text(encoding="utf-8")
@@ -139,8 +157,12 @@ def test_prod_serves_product_images_from_corepet_domain():
     assert "server_name img.corepet.com.br;" in nginx_conf
     assert "ssl_certificate /etc/nginx/ssl/corepet-img/fullchain.pem;" in nginx_conf
     assert "ssl_certificate_key /etc/nginx/ssl/corepet-img/privkey.pem;" in nginx_conf
-    assert "include /etc/nginx/includes/product-image-server-locations.conf;" in nginx_conf
-    assert "proxy_pass http://backend/public/product-images/produtos/;" in image_locations
+    assert (
+        "include /etc/nginx/includes/product-image-server-locations.conf;" in nginx_conf
+    )
+    assert (
+        "proxy_pass http://backend/public/product-images/produtos/;" in image_locations
+    )
     assert 'add_header Access-Control-Allow-Origin "*";' in image_locations
     assert (
         "PRODUCT_IMAGE_S3_PUBLIC_BASE_URL: "

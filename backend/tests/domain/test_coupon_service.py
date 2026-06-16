@@ -8,7 +8,12 @@ from app.campaigns.coupon_service import (
     preview_coupon_redemption,
     reverse_coupon_redemptions_for_sale,
 )
-from app.campaigns.models import Coupon, CouponRedemption, CouponStatusEnum, CouponTypeEnum
+from app.campaigns.models import (
+    Coupon,
+    CouponRedemption,
+    CouponStatusEnum,
+    CouponTypeEnum,
+)
 
 
 def test_preview_coupon_redemption_only_validates_and_never_consumes():
@@ -146,13 +151,16 @@ def test_reverse_coupon_redemptions_for_sale_voids_loyalty_and_restores_regular(
 
     db.query.side_effect = query_side_effect
 
-    with patch(
-        "app.campaigns.loyalty_service.revoke_loyalty_reward_by_coupon",
-        side_effect=lambda _db, tenant_id, coupon_id, reason: {
-            "matched": coupon_id == 101,
-            "revoked": coupon_id == 101,
-        },
-    ), patch("app.campaigns.coupon_service.log_campaign_event") as audit_mock:
+    with (
+        patch(
+            "app.campaigns.loyalty_service.revoke_loyalty_reward_by_coupon",
+            side_effect=lambda _db, tenant_id, coupon_id, reason: {
+                "matched": coupon_id == 101,
+                "revoked": coupon_id == 101,
+            },
+        ),
+        patch("app.campaigns.coupon_service.log_campaign_event") as audit_mock,
+    ):
         result = reverse_coupon_redemptions_for_sale(
             db,
             tenant_id="tenant-1",
