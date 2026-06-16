@@ -1,6 +1,6 @@
-
 from sqlalchemy import Column, String, JSON
 from app.database.base import BaseTenantModel
+
 
 class ConfiguracaoSistema(BaseTenantModel):
     """
@@ -13,6 +13,7 @@ class ConfiguracaoSistema(BaseTenantModel):
     - ia
     - whatsapp
     """
+
     __tablename__ = "configuracoes_sistema"
 
     chave = Column(String(50), nullable=False, index=True)

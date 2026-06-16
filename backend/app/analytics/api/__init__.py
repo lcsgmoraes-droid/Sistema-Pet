@@ -9,4 +9,4 @@ Exporta o router principal para registro no FastAPI app.
 
 from app.analytics.api.routes import router
 
-__all__ = ['router']
+__all__ = ["router"]

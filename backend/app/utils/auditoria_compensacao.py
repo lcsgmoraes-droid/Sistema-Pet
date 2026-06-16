@@ -29,11 +29,11 @@ def criar_json_auditoria_compensacao(
     valor_liquido_pago: float,
     dividas_compensadas: List[Dict[str, Any]],
     usuario_id: int,
-    ip_address: Optional[str] = None
+    ip_address: Optional[str] = None,
 ) -> str:
     """
     Cria JSON estruturado para auditoria de compensação
-    
+
     Args:
         fechamento_id: ID do fechamento de comissão
         funcionario_id: ID do funcionário/parceiro
@@ -44,10 +44,10 @@ def criar_json_auditoria_compensacao(
         dividas_compensadas: Lista de dívidas compensadas com detalhes
         usuario_id: ID do usuário que executou a operação
         ip_address: IP do usuário (opcional)
-    
+
     Returns:
         String JSON formatada
-    
+
     Example:
         >>> dividas = [
         ...     {
@@ -73,25 +73,28 @@ def criar_json_auditoria_compensacao(
         "tipo": "compensacao_automatica",
         "fechamento_id": fechamento_id,
         "data_compensacao": datetime.now().isoformat(),
-        "funcionario": {
-            "id": funcionario_id,
-            "nome": funcionario_nome
-        },
+        "funcionario": {"id": funcionario_id, "nome": funcionario_nome},
         "valores": {
-            "bruto_comissao": float(valor_bruto_comissao) if isinstance(valor_bruto_comissao, Decimal) else valor_bruto_comissao,
-            "compensado": float(valor_compensado) if isinstance(valor_compensado, Decimal) else valor_compensado,
-            "liquido_pago": float(valor_liquido_pago) if isinstance(valor_liquido_pago, Decimal) else valor_liquido_pago
+            "bruto_comissao": float(valor_bruto_comissao)
+            if isinstance(valor_bruto_comissao, Decimal)
+            else valor_bruto_comissao,
+            "compensado": float(valor_compensado)
+            if isinstance(valor_compensado, Decimal)
+            else valor_compensado,
+            "liquido_pago": float(valor_liquido_pago)
+            if isinstance(valor_liquido_pago, Decimal)
+            else valor_liquido_pago,
         },
         "dividas_compensadas": dividas_compensadas,
         "auditoria": {
             "usuario_id": usuario_id,
-            "timestamp": datetime.now().isoformat()
-        }
+            "timestamp": datetime.now().isoformat(),
+        },
     }
-    
+
     if ip_address:
         auditoria["auditoria"]["ip_address"] = ip_address
-    
+
     return json.dumps(auditoria, ensure_ascii=False, indent=2, default=decimal_to_float)
 
 
@@ -101,11 +104,11 @@ def criar_json_estorno_comissao(
     valor_estornado: float,
     motivo: str,
     usuario_id: int,
-    ip_address: Optional[str] = None
+    ip_address: Optional[str] = None,
 ) -> str:
     """
     Cria JSON para auditoria de estorno de comissão
-    
+
     Args:
         venda_id: ID da venda estornada
         comissao_item_id: ID do item de comissão
@@ -113,7 +116,7 @@ def criar_json_estorno_comissao(
         motivo: Motivo do estorno
         usuario_id: ID do usuário
         ip_address: IP (opcional)
-    
+
     Returns:
         String JSON formatada
     """
@@ -122,17 +125,19 @@ def criar_json_estorno_comissao(
         "venda_id": venda_id,
         "comissao_item_id": comissao_item_id,
         "data_estorno": datetime.now().isoformat(),
-        "valor_estornado": float(valor_estornado) if isinstance(valor_estornado, Decimal) else valor_estornado,
+        "valor_estornado": float(valor_estornado)
+        if isinstance(valor_estornado, Decimal)
+        else valor_estornado,
         "motivo": motivo,
         "auditoria": {
             "usuario_id": usuario_id,
-            "timestamp": datetime.now().isoformat()
-        }
+            "timestamp": datetime.now().isoformat(),
+        },
     }
-    
+
     if ip_address:
         auditoria["auditoria"]["ip_address"] = ip_address
-    
+
     return json.dumps(auditoria, ensure_ascii=False, indent=2, default=decimal_to_float)
 
 
@@ -143,11 +148,11 @@ def criar_json_ajuste_retroativo(
     usuario_id: int,
     referencia_tipo: Optional[str] = None,
     referencia_id: Optional[int] = None,
-    ip_address: Optional[str] = None
+    ip_address: Optional[str] = None,
 ) -> str:
     """
     Cria JSON para auditoria de ajuste retroativo
-    
+
     Args:
         funcionario_id: ID do funcionário
         valor_ajuste: Valor do ajuste (positivo ou negativo)
@@ -156,7 +161,7 @@ def criar_json_ajuste_retroativo(
         referencia_tipo: Tipo da referência (opcional)
         referencia_id: ID da referência (opcional)
         ip_address: IP (opcional)
-    
+
     Returns:
         String JSON formatada
     """
@@ -164,39 +169,38 @@ def criar_json_ajuste_retroativo(
         "tipo": "ajuste_retroativo",
         "funcionario_id": funcionario_id,
         "data_ajuste": datetime.now().isoformat(),
-        "valor_ajuste": float(valor_ajuste) if isinstance(valor_ajuste, Decimal) else valor_ajuste,
+        "valor_ajuste": float(valor_ajuste)
+        if isinstance(valor_ajuste, Decimal)
+        else valor_ajuste,
         "motivo": motivo,
         "auditoria": {
             "usuario_id": usuario_id,
-            "timestamp": datetime.now().isoformat()
-        }
+            "timestamp": datetime.now().isoformat(),
+        },
     }
-    
+
     if referencia_tipo and referencia_id:
-        auditoria["referencia"] = {
-            "tipo": referencia_tipo,
-            "id": referencia_id
-        }
-    
+        auditoria["referencia"] = {"tipo": referencia_tipo, "id": referencia_id}
+
     if ip_address:
         auditoria["auditoria"]["ip_address"] = ip_address
-    
+
     return json.dumps(auditoria, ensure_ascii=False, indent=2, default=decimal_to_float)
 
 
 def extrair_info_compensacao(observacoes_json: str) -> Optional[Dict]:
     """
     Extrai informações de compensação de um JSON em observacoes
-    
+
     Args:
         observacoes_json: String JSON de observações
-    
+
     Returns:
         Dicionário com dados ou None se não for JSON válido
     """
     if not observacoes_json:
         return None
-    
+
     try:
         data = json.loads(observacoes_json)
         if isinstance(data, dict) and data.get("tipo") == "compensacao_automatica":
@@ -207,16 +211,15 @@ def extrair_info_compensacao(observacoes_json: str) -> Optional[Dict]:
 
 
 def formatar_observacao_simples_compensacao(
-    valor_compensado: float,
-    divida_ids: List[int]
+    valor_compensado: float, divida_ids: List[int]
 ) -> str:
     """
     Cria observação simples em texto para campos que não suportam JSON complexo
-    
+
     Args:
         valor_compensado: Valor compensado
         divida_ids: Lista de IDs das dívidas
-    
+
     Returns:
         String formatada para exibição
     """
@@ -229,14 +232,14 @@ def formatar_observacao_simples_compensacao(
 # ============================================================================
 
 if __name__ == "__main__":
-    print("="*80)
+    print("=" * 80)
     logger.info("EXEMPLOS DE USO - Helper Auditoria Compensação")
-    print("="*80)
-    
+    print("=" * 80)
+
     # Exemplo 1: Compensação
     logger.info("\n1. JSON de Compensação:")
-    print("-"*80)
-    
+    print("-" * 80)
+
     dividas_exemplo = [
         {
             "divida_id": 45,
@@ -244,10 +247,10 @@ if __name__ == "__main__":
             "valor_compensado": 800.00,
             "saldo_restante": 0.00,
             "tipo": "estorno_venda",
-            "venda_id": 148
+            "venda_id": 148,
         }
     ]
-    
+
     json_comp = criar_json_auditoria_compensacao(
         fechamento_id=90,
         funcionario_id=25,
@@ -257,49 +260,48 @@ if __name__ == "__main__":
         valor_liquido_pago=700.00,
         dividas_compensadas=dividas_exemplo,
         usuario_id=1,
-        ip_address="192.168.1.100"
+        ip_address="192.168.1.100",
     )
-    
+
     print(json_comp)
-    
+
     # Exemplo 2: Estorno
     logger.info("\n\n2. JSON de Estorno:")
-    print("-"*80)
-    
+    print("-" * 80)
+
     json_estorno = criar_json_estorno_comissao(
         venda_id=148,
         comissao_item_id=101,
         valor_estornado=300.00,
         motivo="Devolução total da venda",
-        usuario_id=1
+        usuario_id=1,
     )
-    
+
     print(json_estorno)
-    
+
     # Exemplo 3: Ajuste Retroativo
     logger.info("\n\n3. JSON de Ajuste Retroativo:")
-    print("-"*80)
-    
+    print("-" * 80)
+
     json_ajuste = criar_json_ajuste_retroativo(
         funcionario_id=25,
         valor_ajuste=-150.00,
         motivo="Correção de cálculo de comissão do mês anterior",
         usuario_id=1,
         referencia_tipo="fechamento",
-        referencia_id=85
+        referencia_id=85,
     )
-    
+
     print(json_ajuste)
-    
+
     # Exemplo 4: Observação Simples
     logger.info("\n\n4. Observação Simples (texto):")
-    print("-"*80)
-    
+    print("-" * 80)
+
     obs_simples = formatar_observacao_simples_compensacao(
-        valor_compensado=800.00,
-        divida_ids=[45, 46]
+        valor_compensado=800.00, divida_ids=[45, 46]
     )
-    
+
     print(obs_simples)
-    
-    print("\n" + "="*80)
+
+    print("\n" + "=" * 80)

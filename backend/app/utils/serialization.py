@@ -11,13 +11,13 @@ from typing import Optional, Any
 def safe_decimal_to_float(value: Optional[Decimal]) -> Optional[float]:
     """
     Converte Decimal para float de forma segura.
-    
+
     Args:
         value: Valor Decimal ou None
-        
+
     Returns:
         float se valor válido, None se None
-        
+
     Examples:
         >>> safe_decimal_to_float(Decimal("10.50"))
         10.5
@@ -38,13 +38,13 @@ def safe_decimal_to_float_zero(value: Optional[Decimal]) -> float:
     """
     Converte Decimal para float, retornando 0.0 se None.
     Útil para campos que nunca devem ser None no JSON.
-    
+
     Args:
         value: Valor Decimal ou None
-        
+
     Returns:
         float (0.0 se None)
-        
+
     Examples:
         >>> safe_decimal_to_float_zero(Decimal("10.50"))
         10.5
@@ -62,13 +62,13 @@ def safe_datetime_to_iso(value: Optional[datetime]) -> Optional[str]:
     """
     Converte datetime para string ISO 8601 de forma segura.
     Datas naive (sem timezone) são assumidas como horário de Brasília.
-    
+
     Args:
         value: Valor datetime ou None
-        
+
     Returns:
         String ISO com timezone de Brasília ou None
-        
+
     Examples:
         >>> safe_datetime_to_iso(datetime(2026, 2, 13, 23, 30))
         '2026-02-13T23:30:00-03:00'  # Assume Brasília e adiciona timezone
@@ -79,12 +79,12 @@ def safe_datetime_to_iso(value: Optional[datetime]) -> Optional[str]:
         return None
     if isinstance(value, datetime):
         from app.utils.timezone import BRASILIA_TZ
-        
+
         # Se não tem timezone, assume que JÁ está em horário de Brasília
         # (por causa do now_brasilia() que salva naive no banco)
         if value.tzinfo is None:
             value = value.replace(tzinfo=BRASILIA_TZ)
-        
+
         return value.isoformat()
     if isinstance(value, date):
         return value.isoformat()
@@ -94,10 +94,10 @@ def safe_datetime_to_iso(value: Optional[datetime]) -> Optional[str]:
 def safe_int(value: Any) -> Optional[int]:
     """
     Converte para int de forma segura.
-    
+
     Args:
         value: Qualquer valor
-        
+
     Returns:
         int ou None
     """
@@ -112,10 +112,10 @@ def safe_int(value: Any) -> Optional[int]:
 def safe_str(value: Any) -> Optional[str]:
     """
     Converte para string de forma segura.
-    
+
     Args:
         value: Qualquer valor
-        
+
     Returns:
         str ou None
     """
@@ -127,10 +127,10 @@ def safe_str(value: Any) -> Optional[str]:
 def safe_bool(value: Any) -> bool:
     """
     Converte para bool de forma segura.
-    
+
     Args:
         value: Qualquer valor
-        
+
     Returns:
         bool (False se None)
     """

@@ -26,10 +26,7 @@ class CheckoutService:
         itens = items or []
         items_count = len(itens)
         subtotal_items = round(
-            sum(
-                i.get("quantidade", 1) * i.get("preco_unitario", 0)
-                for i in itens
-            ),
+            sum(i.get("quantidade", 1) * i.get("preco_unitario", 0) for i in itens),
             2,
         )
         return items_count, subtotal_items
@@ -42,7 +39,9 @@ class CheckoutService:
             "tenant_id": command.tenant_id,
             "items": command.items,
         }
-        normalized = json.dumps(payload, sort_keys=True, ensure_ascii=False, default=str)
+        normalized = json.dumps(
+            payload, sort_keys=True, ensure_ascii=False, default=str
+        )
         return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
     @staticmethod
@@ -60,12 +59,16 @@ class CheckoutService:
         if not command.idempotency_key:
             return None
 
-        existente = self.db.query(IdempotencyKey).filter(
-            IdempotencyKey.user_id == command.cliente_id,
-            IdempotencyKey.endpoint == "POST /ecommerce/checkout",
-            IdempotencyKey.chave_idempotencia == command.idempotency_key,
-            IdempotencyKey.tenant_id == tenant_uuid,
-        ).first()
+        existente = (
+            self.db.query(IdempotencyKey)
+            .filter(
+                IdempotencyKey.user_id == command.cliente_id,
+                IdempotencyKey.endpoint == "POST /ecommerce/checkout",
+                IdempotencyKey.chave_idempotencia == command.idempotency_key,
+                IdempotencyKey.tenant_id == tenant_uuid,
+            )
+            .first()
+        )
 
         if not existente:
             return None
@@ -81,10 +84,14 @@ class CheckoutService:
                 payload = json.loads(existente.response_body)
                 pedido_id = payload.get("pedido_id")
                 if pedido_id:
-                    pedido = self.db.query(Pedido).filter(
-                        Pedido.pedido_id == pedido_id,
-                        Pedido.tenant_id == tenant_uuid,
-                    ).first()
+                    pedido = (
+                        self.db.query(Pedido)
+                        .filter(
+                            Pedido.pedido_id == pedido_id,
+                            Pedido.tenant_id == tenant_uuid,
+                        )
+                        .first()
+                    )
                     if pedido:
                         return pedido
             except Exception:

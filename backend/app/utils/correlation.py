@@ -69,7 +69,9 @@ def operation_correlation_context(
     path: str | None = None,
 ) -> Iterator[str]:
     """Temporarily expose a job/integration correlation id through request contextvars."""
-    resolved = current_correlation_id(source, reference=reference, correlation_id=correlation_id)
+    resolved = current_correlation_id(
+        source, reference=reference, correlation_id=correlation_id
+    )
     endpoint = path or source
 
     request_id_token = request_context.request_id_ctx.set(resolved)

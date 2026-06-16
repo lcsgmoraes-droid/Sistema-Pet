@@ -351,6 +351,10 @@ jobs:
         run: |
           ruff format --check app/core app/tenancy app/auth app/db app/schemas app/security
 
+      - name: Backend platform packages format (blocking)
+        run: |
+          ruff format --check app/analytics app/application app/cache app/configuracoes app/constants app/database app/events app/migrations app/replay app/utils
+
       - name: Backend AI packages format (blocking)
         run: |
           ruff format --check app/ai app/ai_core
