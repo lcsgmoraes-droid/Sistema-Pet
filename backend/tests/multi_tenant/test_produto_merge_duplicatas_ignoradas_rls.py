@@ -56,17 +56,34 @@ def test_fusao_produtos_remove_duplicatas_ignoradas_com_sql_tenant_safe(monkeypa
     monkeypatch.setattr(produto_merge_service, "_mesclar_fornecedores", lambda *args: 0)
     monkeypatch.setattr(produto_merge_service, "_mesclar_listas_preco", lambda *args: 0)
     monkeypatch.setattr(produto_merge_service, "_mesclar_bling_sync", lambda *args: 0)
-    monkeypatch.setattr(produto_merge_service, "_mesclar_config_fiscal", lambda *args: 0)
-    monkeypatch.setattr(produto_merge_service, "_mesclar_componentes_kit", lambda *args: 0)
-    monkeypatch.setattr(produto_merge_service, "_mesclar_vinculos_granel", lambda *args: 0)
-    monkeypatch.setattr(produto_merge_service, "_transferir_referencias_genericas", lambda *args, **kwargs: [])
-    monkeypatch.setattr(produto_merge_service, "_gerar_codigo_merged_unico", lambda *args: "MERGED-20")
+    monkeypatch.setattr(
+        produto_merge_service, "_mesclar_config_fiscal", lambda *args: 0
+    )
+    monkeypatch.setattr(
+        produto_merge_service, "_mesclar_componentes_kit", lambda *args: 0
+    )
+    monkeypatch.setattr(
+        produto_merge_service, "_mesclar_vinculos_granel", lambda *args: 0
+    )
+    monkeypatch.setattr(
+        produto_merge_service,
+        "_transferir_referencias_genericas",
+        lambda *args, **kwargs: [],
+    )
+    monkeypatch.setattr(
+        produto_merge_service, "_gerar_codigo_merged_unico", lambda *args: "MERGED-20"
+    )
 
     def fake_execute_tenant_safe(db, sql, params, *, tenant_id):
         chamadas.append((sql, params, tenant_id))
         return SimpleNamespace(rowcount=1)
 
-    monkeypatch.setattr(produto_merge_service, "execute_tenant_safe", fake_execute_tenant_safe, raising=False)
+    monkeypatch.setattr(
+        produto_merge_service,
+        "execute_tenant_safe",
+        fake_execute_tenant_safe,
+        raising=False,
+    )
 
     produto_merge_service.executar_fusao_produtos(
         _FakeDB(),

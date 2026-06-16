@@ -7,7 +7,9 @@ MIGRATION_PATH = Path(__file__).resolve().parents[2] / Path(
 )
 
 RLS_TABLES = ("formas_pagamento", "especies", "racas")
-TENANT_PREDICATE = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid"
+TENANT_PREDICATE = (
+    "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid"
+)
 
 
 def _load_migration():
@@ -21,7 +23,9 @@ def _run_and_collect(monkeypatch, action: str, tables=RLS_TABLES) -> str:
     migration_globals = migration[action].__globals__
 
     monkeypatch.setitem(migration_globals, "_postgresql_bind", lambda: fake_bind)
-    monkeypatch.setitem(migration_globals, "_existing_targets", lambda bind: list(tables))
+    monkeypatch.setitem(
+        migration_globals, "_existing_targets", lambda bind: list(tables)
+    )
     monkeypatch.setattr(migration_globals["op"], "execute", commands.append)
 
     migration[action]()
@@ -46,7 +50,9 @@ def test_rls_core_onboarding_migration_is_linear_successor_of_template_canary():
         assert snippet in source
 
 
-def test_rls_core_onboarding_upgrade_emits_tenant_policy_for_existing_targets(monkeypatch):
+def test_rls_core_onboarding_upgrade_emits_tenant_policy_for_existing_targets(
+    monkeypatch,
+):
     emitted_sql = _run_and_collect(monkeypatch, "upgrade")
 
     assert emitted_sql.count("ENABLE ROW LEVEL SECURITY") == len(RLS_TABLES)
@@ -63,12 +69,15 @@ def test_rls_core_onboarding_upgrade_emits_tenant_policy_for_existing_targets(mo
 def test_rls_core_onboarding_downgrade_removes_child_policy_first(monkeypatch):
     emitted_sql = _run_and_collect(monkeypatch, "downgrade")
 
-    assert emitted_sql.index("DROP POLICY IF EXISTS racas_tenant_isolation") < emitted_sql.index(
-        "DROP POLICY IF EXISTS especies_tenant_isolation"
-    )
+    assert emitted_sql.index(
+        "DROP POLICY IF EXISTS racas_tenant_isolation"
+    ) < emitted_sql.index("DROP POLICY IF EXISTS especies_tenant_isolation")
 
     for table_name in RLS_TABLES:
-        assert f"DROP POLICY IF EXISTS {table_name}_tenant_isolation ON {table_name}" in emitted_sql
+        assert (
+            f"DROP POLICY IF EXISTS {table_name}_tenant_isolation ON {table_name}"
+            in emitted_sql
+        )
         assert f"ALTER TABLE {table_name} NO FORCE ROW LEVEL SECURITY" in emitted_sql
         assert f"ALTER TABLE {table_name} DISABLE ROW LEVEL SECURITY" in emitted_sql
 

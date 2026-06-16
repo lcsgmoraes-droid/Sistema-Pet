@@ -2,10 +2,15 @@ from pathlib import Path
 import runpy
 
 
-MIGRATION_FILE = Path(__file__).resolve().parents[2].joinpath(
-    "alembic",
-    "versions",
-    "pw20260611a1_rls_product_tax_config_tables.py",
+MIGRATION_FILE = (
+    Path(__file__)
+    .resolve()
+    .parents[2]
+    .joinpath(
+        "alembic",
+        "versions",
+        "pw20260611a1_rls_product_tax_config_tables.py",
+    )
 )
 
 TAX_CONFIG_TABLES = (
@@ -30,8 +35,12 @@ def _capture(monkeypatch, action: str, existing_tables=TAX_CONFIG_TABLES) -> lis
     captured: list[str] = []
 
     monkeypatch.setitem(globals_, "get_postgresql_bind", lambda: object())
-    monkeypatch.setitem(globals_, "existing_tax_config_tables", lambda bind: set(existing_tables))
-    monkeypatch.setattr(globals_["op"], "execute", lambda statement: captured.append(str(statement)))
+    monkeypatch.setitem(
+        globals_, "existing_tax_config_tables", lambda bind: set(existing_tables)
+    )
+    monkeypatch.setattr(
+        globals_["op"], "execute", lambda statement: captured.append(str(statement))
+    )
 
     action_fn()
 
@@ -73,12 +82,17 @@ def test_product_tax_config_upgrade_emits_policy_for_available_tables(monkeypatc
 def test_product_tax_config_downgrade_starts_with_variation_table(monkeypatch):
     emitted_sql = "\n".join(_capture(monkeypatch, "downgrade"))
 
-    assert emitted_sql.index("DROP POLICY IF EXISTS variacao_config_fiscal_tenant_isolation") < emitted_sql.index(
+    assert emitted_sql.index(
+        "DROP POLICY IF EXISTS variacao_config_fiscal_tenant_isolation"
+    ) < emitted_sql.index(
         "DROP POLICY IF EXISTS produto_config_fiscal_tenant_isolation"
     )
 
     for table_name in TAX_CONFIG_TABLES:
-        assert f"DROP POLICY IF EXISTS {table_name}_tenant_isolation ON {table_name}" in emitted_sql
+        assert (
+            f"DROP POLICY IF EXISTS {table_name}_tenant_isolation ON {table_name}"
+            in emitted_sql
+        )
         assert f"ALTER TABLE {table_name} NO FORCE ROW LEVEL SECURITY" in emitted_sql
         assert f"ALTER TABLE {table_name} DISABLE ROW LEVEL SECURITY" in emitted_sql
 

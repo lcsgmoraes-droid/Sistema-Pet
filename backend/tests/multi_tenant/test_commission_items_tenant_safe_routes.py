@@ -46,7 +46,10 @@ def _direct_db_execute_calls_touching_commission_items(path: Path) -> list[int]:
 
         first_arg = node.args[0]
         sql = ""
-        if isinstance(first_arg, ast.Call) and getattr(first_arg.func, "id", None) == "text":
+        if (
+            isinstance(first_arg, ast.Call)
+            and getattr(first_arg.func, "id", None) == "text"
+        ):
             text_arg = first_arg.args[0] if first_arg.args else None
             if isinstance(text_arg, ast.Name):
                 sql = assigned_sql.get(text_arg.id, "")

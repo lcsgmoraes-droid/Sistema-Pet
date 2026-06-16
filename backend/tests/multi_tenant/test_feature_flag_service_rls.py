@@ -52,7 +52,9 @@ def _capture_rls_sync(monkeypatch, events):
         events.append(("sync", db, tenant_id))
         return True
 
-    monkeypatch.setattr(feature_flag_service, "sync_rls_tenant", fake_sync_rls_tenant, raising=False)
+    monkeypatch.setattr(
+        feature_flag_service, "sync_rls_tenant", fake_sync_rls_tenant, raising=False
+    )
 
 
 def test_is_feature_enabled_syncs_explicit_tenant_before_query(monkeypatch):
@@ -61,7 +63,12 @@ def test_is_feature_enabled_syncs_explicit_tenant_before_query(monkeypatch):
     feature_flag_service.clear_cache()
     _capture_rls_sync(monkeypatch, events)
 
-    assert feature_flag_service.is_feature_enabled(db, TENANT_ID, "PDV_IA_OPORTUNIDADES", use_cache=False) is True
+    assert (
+        feature_flag_service.is_feature_enabled(
+            db, TENANT_ID, "PDV_IA_OPORTUNIDADES", use_cache=False
+        )
+        is True
+    )
 
     assert events[:2] == [("sync", db, TENANT_ID), "query"]
 
@@ -71,7 +78,9 @@ def test_set_feature_flag_syncs_explicit_tenant_before_upsert(monkeypatch):
     db = _FakeDB(events, first_result=None)
     _capture_rls_sync(monkeypatch, events)
 
-    feature_flag = feature_flag_service.set_feature_flag(db, TENANT_ID, "PDV_IA_OPORTUNIDADES", True)
+    feature_flag = feature_flag_service.set_feature_flag(
+        db, TENANT_ID, "PDV_IA_OPORTUNIDADES", True
+    )
 
     assert events[:2] == [("sync", db, TENANT_ID), "query"]
     assert db.added is feature_flag

@@ -41,6 +41,7 @@ Ao migrar um modelo legado com esquema próprio: troque ``class X(Base)`` por
 (UUID, NOT NULL, indexada), NÃO há mudança de schema/Alembic. Depois REMOVA a
 tabela daqui.
 """
+
 import importlib
 import os
 
@@ -49,7 +50,9 @@ import pytest
 # Garante defaults de ambiente caso o teste rode isolado (fora do conftest raiz).
 os.environ.setdefault("DATABASE_URL", "sqlite://")
 os.environ.setdefault("ENVIRONMENT", "test")
-os.environ.setdefault("JWT_SECRET_KEY", "test-secret-key-min-32-chars-long-for-security")
+os.environ.setdefault(
+    "JWT_SECRET_KEY", "test-secret-key-min-32-chars-long-for-security"
+)
 
 
 # ---------------------------------------------------------------------------
@@ -173,6 +176,7 @@ KNOWN_NULLABLE_TENANT_DEBT = frozenset(
 # Introspecção
 # ---------------------------------------------------------------------------
 
+
 def _load_all_models():
     """Força o registro de todos os modelos importando app.main (entrypoint real)."""
     try:
@@ -213,6 +217,7 @@ def _exposed_tenant_models() -> dict:
 # ---------------------------------------------------------------------------
 # Testes
 # ---------------------------------------------------------------------------
+
 
 def test_nenhum_modelo_novo_com_tenant_id_herda_base_direto():
     """Falha se um modelo NOVO com tenant_id herdar Base em vez de BaseTenantModel."""

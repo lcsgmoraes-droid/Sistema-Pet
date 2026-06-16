@@ -438,7 +438,9 @@ def test_reexecucao_nao_duplica_comissao_no_mesmo_tenant(db_session):
     assert len(_commission_rows(db_session)) == 1
 
 
-def test_mesmo_funcionario_e_referencia_em_tenants_diferentes_nao_cruza_config(db_session):
+def test_mesmo_funcionario_e_referencia_em_tenants_diferentes_nao_cruza_config(
+    db_session,
+):
     config_a = buscar_configuracao_comissao(
         db_session,
         FUNCIONARIO_ID,
@@ -462,7 +464,9 @@ def test_comissao_configuracao_model_declares_tenant_id():
     assert "tenant_id" in ComissaoConfiguracao.__table__.columns
 
 
-def test_legacy_comissoes_config_busca_respeita_tenant_explicito(db_session, monkeypatch):
+def test_legacy_comissoes_config_busca_respeita_tenant_explicito(
+    db_session, monkeypatch
+):
     import app.comissoes_models as comissoes_models
 
     monkeypatch.setattr(db_session, "close", lambda: None)

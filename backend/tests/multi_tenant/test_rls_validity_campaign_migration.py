@@ -3,8 +3,11 @@ import runpy
 from types import SimpleNamespace
 
 
-MIGRATION_FILE = Path(__file__).resolve().parents[2] / "alembic" / "versions" / (
-    "qb20260611a1_rls_validity_campaign_tables.py"
+MIGRATION_FILE = (
+    Path(__file__).resolve().parents[2]
+    / "alembic"
+    / "versions"
+    / ("qb20260611a1_rls_validity_campaign_tables.py")
 )
 
 VALIDITY_CAMPAIGN_TABLES = (
@@ -19,7 +22,9 @@ def _load_migration():
     return runpy.run_path(str(MIGRATION_FILE))
 
 
-def _capture_statements(monkeypatch, action: str, *, dialect="postgresql", existing=VALIDITY_CAMPAIGN_TABLES):
+def _capture_statements(
+    monkeypatch, action: str, *, dialect="postgresql", existing=VALIDITY_CAMPAIGN_TABLES
+):
     migration = _load_migration()
     statements: list[str] = []
 
@@ -29,7 +34,9 @@ def _capture_statements(monkeypatch, action: str, *, dialect="postgresql", exist
 
     bind = SimpleNamespace(dialect=SimpleNamespace(name=dialect))
     monkeypatch.setattr(migration["op"], "get_bind", lambda: bind)
-    monkeypatch.setattr(migration["op"], "execute", lambda sql: statements.append(str(sql)))
+    monkeypatch.setattr(
+        migration["op"], "execute", lambda sql: statements.append(str(sql))
+    )
     monkeypatch.setattr(migration["sa"], "inspect", lambda bind: _Inspector())
 
     migration[action]()
@@ -47,7 +54,9 @@ def test_validity_campaign_rls_migration_is_next_head():
     assert "produtos" not in source
 
 
-def test_validity_campaign_upgrade_skips_tables_missing_from_older_databases(monkeypatch):
+def test_validity_campaign_upgrade_skips_tables_missing_from_older_databases(
+    monkeypatch,
+):
     statements = _capture_statements(
         monkeypatch,
         "upgrade",
@@ -59,13 +68,17 @@ def test_validity_campaign_upgrade_skips_tables_missing_from_older_databases(mon
     assert emitted.count("ENABLE ROW LEVEL SECURITY") == 1
     assert emitted.count("FORCE ROW LEVEL SECURITY") == 1
     assert emitted.count("CREATE POLICY") == 1
-    assert "DROP POLICY IF EXISTS campanha_validade_exclusoes_tenant_isolation" in emitted
+    assert (
+        "DROP POLICY IF EXISTS campanha_validade_exclusoes_tenant_isolation" in emitted
+    )
     assert f"USING ({TENANT_POLICY}) WITH CHECK ({TENANT_POLICY})" in emitted
 
 
 def test_validity_campaign_downgrade_unwinds_exclusions_before_config(monkeypatch):
     statements = _capture_statements(monkeypatch, "downgrade")
-    policy_drops = [sql for sql in statements if sql.startswith("DROP POLICY IF EXISTS")]
+    policy_drops = [
+        sql for sql in statements if sql.startswith("DROP POLICY IF EXISTS")
+    ]
 
     assert policy_drops == [
         (

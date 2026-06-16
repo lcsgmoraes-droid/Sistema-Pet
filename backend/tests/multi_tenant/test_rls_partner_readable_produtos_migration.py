@@ -36,14 +36,19 @@ def test_partner_readable_produtos_rls_migration_metadata_and_scope():
 
     assert migration["revision"] == "ty20260614a1"
     assert migration["down_revision"] == "tx20260614a1"
-    assert migration["PARTNER_READABLE_PRODUCT_RLS_TABLES"] == PARTNER_READABLE_PRODUCT_RLS_TABLES
+    assert (
+        migration["PARTNER_READABLE_PRODUCT_RLS_TABLES"]
+        == PARTNER_READABLE_PRODUCT_RLS_TABLES
+    )
     assert migration["TENANT_SETTING_UUID"] == TENANT_SETTING_UUID
     assert migration["OWN_TENANT_GUARD"] == OWN_TENANT_GUARD
     assert migration["PARTNER_LINK_EXISTS_GUARD"] == PARTNER_LINK_EXISTS_GUARD
     assert migration["PARTNER_SELECT_GUARD"] == PARTNER_SELECT_GUARD
 
 
-def test_partner_readable_produtos_rls_upgrade_enables_partner_read_and_own_writes(monkeypatch):
+def test_partner_readable_produtos_rls_upgrade_enables_partner_read_and_own_writes(
+    monkeypatch,
+):
     assert _capture(monkeypatch, "upgrade") == _upgrade_sql_for("produtos")
 
 

@@ -14,6 +14,7 @@ FISCAL_COMPANY_RLS_TABLES = (
     "simples_nacional_mensal",
 )
 
+
 def _capture(monkeypatch, action_name: str, *, dialect="postgresql", existing=None):
     return capture_migration_sql(
         monkeypatch,
@@ -35,7 +36,9 @@ def test_fiscal_company_rls_migration_metadata_and_scope():
     )
 
 
-def test_fiscal_company_rls_upgrade_targets_existing_tables_in_declared_order(monkeypatch):
+def test_fiscal_company_rls_upgrade_targets_existing_tables_in_declared_order(
+    monkeypatch,
+):
     assert_upgrade_emits_rls_for_declared_tables(
         _capture(monkeypatch, "upgrade"),
         FISCAL_COMPANY_RLS_TABLES,
@@ -50,7 +53,9 @@ def test_fiscal_company_rls_upgrade_skips_missing_tables(monkeypatch):
     assert "simples_nacional_mensal" not in emitted_sql
 
 
-def test_fiscal_company_rls_downgrade_unwinds_existing_tables_in_reverse_order(monkeypatch):
+def test_fiscal_company_rls_downgrade_unwinds_existing_tables_in_reverse_order(
+    monkeypatch,
+):
     assert_downgrade_unwinds_in_reverse_order(
         _capture(monkeypatch, "downgrade"),
         FISCAL_COMPANY_RLS_TABLES,

@@ -253,7 +253,11 @@ def _seed_dre_data(session):
                 (1, :tenant_a, 501, '2026-05-01', '2026-05-31', 5, 2026, :canal),
                 (2, :tenant_b, 501, '2026-05-01', '2026-05-31', 5, 2026, :canal)
         """),
-        {"canal": CANAL, "tenant_a": _tenant_hex(TENANT_A), "tenant_b": _tenant_hex(TENANT_B)},
+        {
+            "canal": CANAL,
+            "tenant_a": _tenant_hex(TENANT_A),
+            "tenant_b": _tenant_hex(TENANT_B),
+        },
     )
 
     for categoria_id, tenant_id, categoria_nome, subcategoria_nome in (
@@ -334,7 +338,11 @@ def _seed_comissao_data(session):
                 900, 'VA-900', :data_venda, :canal, 123, 'finalizada', :tenant_id
             )
         """),
-        {"data_venda": DATA_LANCAMENTO, "canal": CANAL, "tenant_id": _tenant_str(TENANT_A)},
+        {
+            "data_venda": DATA_LANCAMENTO,
+            "canal": CANAL,
+            "tenant_id": _tenant_str(TENANT_A),
+        },
     )
     session.execute(
         text("""

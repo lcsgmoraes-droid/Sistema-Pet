@@ -1,4 +1,3 @@
-
 import pytest
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
@@ -336,10 +335,18 @@ def catalog_session():
     for statement in ddl:
         session.execute(text(statement))
 
-    session.execute(text("INSERT INTO tenants (id, status) VALUES (:id, 'active')"), {"id": SOURCE_TENANT})
-    session.execute(text("INSERT INTO tenants (id, status) VALUES (:id, 'active')"), {"id": TARGET_TENANT})
     session.execute(
-        text("INSERT INTO users (id, email, tenant_id, is_active) VALUES (10, 'admin@destino.test', :tenant, 1)"),
+        text("INSERT INTO tenants (id, status) VALUES (:id, 'active')"),
+        {"id": SOURCE_TENANT},
+    )
+    session.execute(
+        text("INSERT INTO tenants (id, status) VALUES (:id, 'active')"),
+        {"id": TARGET_TENANT},
+    )
+    session.execute(
+        text(
+            "INSERT INTO users (id, email, tenant_id, is_active) VALUES (10, 'admin@destino.test', :tenant, 1)"
+        ),
         {"tenant": TARGET_TENANT},
     )
     session.commit()
@@ -358,10 +365,16 @@ def count(session, table, tenant_id):
 
 
 def one_target_product(session, codigo="BASE-001"):
-    row = session.execute(
-        text("SELECT * FROM produtos WHERE tenant_id = :tenant_id AND codigo = :codigo"),
-        {"tenant_id": TARGET_TENANT, "codigo": codigo},
-    ).mappings().one()
+    row = (
+        session.execute(
+            text(
+                "SELECT * FROM produtos WHERE tenant_id = :tenant_id AND codigo = :codigo"
+            ),
+            {"tenant_id": TARGET_TENANT, "codigo": codigo},
+        )
+        .mappings()
+        .one()
+    )
     return dict(row)
 
 
@@ -424,7 +437,9 @@ def _insert_base_options(session):
     )
 
 
-def _insert_source_product(session, *, product_id=101, codigo="BASE-001", nome="Racao Base", **overrides):
+def _insert_source_product(
+    session, *, product_id=101, codigo="BASE-001", nome="Racao Base", **overrides
+):
     values = {
         "id": product_id,
         "tenant_id": SOURCE_TENANT,
@@ -494,21 +509,29 @@ def _seed_basic_catalog(session):
         },
     )
     session.execute(
-        text("INSERT INTO produto_lotes (tenant_id, produto_id, quantidade_disponivel) VALUES (:tenant, 101, 5)"),
+        text(
+            "INSERT INTO produto_lotes (tenant_id, produto_id, quantidade_disponivel) VALUES (:tenant, 101, 5)"
+        ),
         {"tenant": SOURCE_TENANT},
     )
     session.execute(
-        text("INSERT INTO produto_fornecedores (tenant_id, produto_id, fornecedor_id, preco_custo) VALUES (:tenant, 101, 900, 123.45)"),
+        text(
+            "INSERT INTO produto_fornecedores (tenant_id, produto_id, fornecedor_id, preco_custo) VALUES (:tenant, 101, 900, 123.45)"
+        ),
         {"tenant": SOURCE_TENANT},
     )
     session.execute(
-        text("INSERT INTO produtos_historico_precos (tenant_id, produto_id, preco_custo_novo, preco_venda_novo) VALUES (:tenant, 101, 123.45, 199.9)"),
+        text(
+            "INSERT INTO produtos_historico_precos (tenant_id, produto_id, preco_custo_novo, preco_venda_novo) VALUES (:tenant, 101, 123.45, 199.9)"
+        ),
         {"tenant": SOURCE_TENANT},
     )
     session.commit()
 
 
-def fake_image_copier(url, *, source_tenant_id, source_product_id, target_tenant_id, target_product_id):
+def fake_image_copier(
+    url, *, source_tenant_id, source_product_id, target_tenant_id, target_product_id
+):
     return (
         str(url)
         .replace(str(source_tenant_id), str(target_tenant_id))
@@ -540,7 +563,9 @@ def test_import_base_catalog_dry_run_does_not_create_rows(catalog_session):
     assert count(catalog_session, "produto_fornecedores", TARGET_TENANT) == 0
 
 
-def test_import_base_catalog_apply_sanitizes_operational_product_fields(catalog_session):
+def test_import_base_catalog_apply_sanitizes_operational_product_fields(
+    catalog_session,
+):
     _seed_basic_catalog(catalog_session)
 
     result = import_base_catalog(
@@ -586,7 +611,9 @@ def test_import_remaps_catalog_support_records(catalog_session):
         {"tenant": SOURCE_TENANT},
     )
     catalog_session.execute(
-        text("UPDATE produtos SET categoria_id = 12 WHERE id = 101 AND tenant_id = :tenant"),
+        text(
+            "UPDATE produtos SET categoria_id = 12 WHERE id = 101 AND tenant_id = :tenant"
+        ),
         {"tenant": SOURCE_TENANT},
     )
     catalog_session.commit()
@@ -607,14 +634,24 @@ def test_import_remaps_catalog_support_records(catalog_session):
     assert target_product["marca_id"] != 21
     assert target_product["linha_racao_id"] != 31
 
-    category = catalog_session.execute(
-        text("SELECT * FROM categorias WHERE tenant_id=:tenant AND nome='Racoes Secas'"),
-        {"tenant": TARGET_TENANT},
-    ).mappings().one()
-    parent = catalog_session.execute(
-        text("SELECT * FROM categorias WHERE tenant_id=:tenant AND nome='Racoes'"),
-        {"tenant": TARGET_TENANT},
-    ).mappings().one()
+    category = (
+        catalog_session.execute(
+            text(
+                "SELECT * FROM categorias WHERE tenant_id=:tenant AND nome='Racoes Secas'"
+            ),
+            {"tenant": TARGET_TENANT},
+        )
+        .mappings()
+        .one()
+    )
+    parent = (
+        catalog_session.execute(
+            text("SELECT * FROM categorias WHERE tenant_id=:tenant AND nome='Racoes'"),
+            {"tenant": TARGET_TENANT},
+        )
+        .mappings()
+        .one()
+    )
     assert category["categoria_pai_id"] == parent["id"]
     assert category["departamento_id"] == target_product["departamento_id"]
 
@@ -690,31 +727,50 @@ def test_import_remaps_product_relations_and_images(catalog_session):
     assert filho["produto_pai_id"] == pai["id"]
     assert filho["produto_predecessor_id"] == predecessor["id"]
 
-    kit_component = catalog_session.execute(
-        text("SELECT * FROM produto_kit_componentes WHERE tenant_id=:tenant"),
-        {"tenant": TARGET_TENANT},
-    ).mappings().one()
-    assert kit_component["kit_id"] == one_target_product(catalog_session, "BASE-KIT")["id"]
+    kit_component = (
+        catalog_session.execute(
+            text("SELECT * FROM produto_kit_componentes WHERE tenant_id=:tenant"),
+            {"tenant": TARGET_TENANT},
+        )
+        .mappings()
+        .one()
+    )
+    assert (
+        kit_component["kit_id"] == one_target_product(catalog_session, "BASE-KIT")["id"]
+    )
     assert kit_component["produto_componente_id"] == predecessor["id"]
 
-    granel = catalog_session.execute(
-        text("SELECT * FROM produto_granel_vinculos WHERE tenant_id=:tenant"),
-        {"tenant": TARGET_TENANT},
-    ).mappings().one()
+    granel = (
+        catalog_session.execute(
+            text("SELECT * FROM produto_granel_vinculos WHERE tenant_id=:tenant"),
+            {"tenant": TARGET_TENANT},
+        )
+        .mappings()
+        .one()
+    )
     assert granel["produto_origem_id"] == predecessor["id"]
-    assert granel["produto_granel_id"] == one_target_product(catalog_session, "BASE-GRANEL")["id"]
+    assert (
+        granel["produto_granel_id"]
+        == one_target_product(catalog_session, "BASE-GRANEL")["id"]
+    )
 
-    image = catalog_session.execute(
-        text("SELECT * FROM produto_imagens WHERE tenant_id=:tenant"),
-        {"tenant": TARGET_TENANT},
-    ).mappings().one()
+    image = (
+        catalog_session.execute(
+            text("SELECT * FROM produto_imagens WHERE tenant_id=:tenant"),
+            {"tenant": TARGET_TENANT},
+        )
+        .mappings()
+        .one()
+    )
     assert SOURCE_TENANT not in image["url"]
     assert TARGET_TENANT in image["url"]
     assert f"/{predecessor['id']}/" in image["url"]
     assert one_target_product(catalog_session)["imagem_principal"] == image["url"]
 
 
-def test_import_syncs_rls_context_for_source_and_target_product_relations(catalog_session, monkeypatch):
+def test_import_syncs_rls_context_for_source_and_target_product_relations(
+    catalog_session, monkeypatch
+):
     _seed_basic_catalog(catalog_session)
     _insert_source_product(
         catalog_session,
@@ -792,7 +848,9 @@ def test_import_is_idempotent_and_preserves_target_edits(catalog_session):
     catalog_session.commit()
     target_id = one_target_product(catalog_session)["id"]
     catalog_session.execute(
-        text("UPDATE produtos SET nome='Nome editado no cliente', preco_venda=55 WHERE id=:id"),
+        text(
+            "UPDATE produtos SET nome='Nome editado no cliente', preco_venda=55 WHERE id=:id"
+        ),
         {"id": target_id},
     )
     catalog_session.commit()

@@ -52,7 +52,9 @@ def test_ecommerce_payment_gateway_configs_rls_migration_metadata_and_scope():
     assert migration["POLICY_NAMES"] == POLICY_NAMES
 
 
-def test_ecommerce_payment_gateway_configs_rls_upgrade_adds_tenant_and_webhook_select(monkeypatch):
+def test_ecommerce_payment_gateway_configs_rls_upgrade_adds_tenant_and_webhook_select(
+    monkeypatch,
+):
     emitted = _capture(monkeypatch, "upgrade")
 
     assert emitted == [
@@ -90,7 +92,9 @@ def test_ecommerce_payment_gateway_configs_rls_upgrade_skips_missing_table(monke
     assert _capture(monkeypatch, "upgrade", existing=()) == []
 
 
-def test_ecommerce_payment_gateway_configs_rls_downgrade_removes_custom_policies(monkeypatch):
+def test_ecommerce_payment_gateway_configs_rls_downgrade_removes_custom_policies(
+    monkeypatch,
+):
     emitted = _capture(monkeypatch, "downgrade")
 
     assert emitted == [

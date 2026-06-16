@@ -3,10 +3,15 @@ import importlib.util
 from types import SimpleNamespace
 
 
-MIGRATION_PATH = Path(__file__).resolve().parents[2].joinpath(
-    "alembic",
-    "versions",
-    "py20260611a1_rls_campaign_rewards_tables.py",
+MIGRATION_PATH = (
+    Path(__file__)
+    .resolve()
+    .parents[2]
+    .joinpath(
+        "alembic",
+        "versions",
+        "py20260611a1_rls_campaign_rewards_tables.py",
+    )
 )
 
 REWARD_TABLES = (
@@ -20,14 +25,18 @@ TENANT_SCOPE = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::
 
 
 def _load_module():
-    spec = importlib.util.spec_from_file_location("campaign_rewards_rls", MIGRATION_PATH)
+    spec = importlib.util.spec_from_file_location(
+        "campaign_rewards_rls", MIGRATION_PATH
+    )
     module = importlib.util.module_from_spec(spec)
     assert spec and spec.loader
     spec.loader.exec_module(module)
     return module
 
 
-def _patch_alembic(monkeypatch, module, *, dialect="postgresql", existing=REWARD_TABLES):
+def _patch_alembic(
+    monkeypatch, module, *, dialect="postgresql", existing=REWARD_TABLES
+):
     class _Bind:
         def __init__(self, dialect_name):
             self.dialect = SimpleNamespace(name=dialect_name)
@@ -69,7 +78,10 @@ def test_campaign_rewards_upgrade_emits_tenant_policies_for_present_tables(monke
     assert joined.count("CREATE POLICY") == len(present_tables)
 
     for table_name in present_tables:
-        assert f"DROP POLICY IF EXISTS {table_name}_tenant_isolation ON {table_name}" in joined
+        assert (
+            f"DROP POLICY IF EXISTS {table_name}_tenant_isolation ON {table_name}"
+            in joined
+        )
         assert f"USING ({TENANT_SCOPE}) WITH CHECK ({TENANT_SCOPE})" in joined
 
 
@@ -79,7 +91,9 @@ def test_campaign_rewards_downgrade_disables_tables_from_child_to_parent(monkeyp
 
     module.downgrade()
 
-    drop_policy_sql = [sql for sql in emitted if sql.startswith("DROP POLICY IF EXISTS")]
+    drop_policy_sql = [
+        sql for sql in emitted if sql.startswith("DROP POLICY IF EXISTS")
+    ]
     assert drop_policy_sql == [
         f"DROP POLICY IF EXISTS {table_name}_tenant_isolation ON {table_name}"
         for table_name in reversed(REWARD_TABLES)

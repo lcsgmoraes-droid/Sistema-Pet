@@ -42,7 +42,9 @@ def test_configuracao_tributaria_tenant_key_migration_metadata():
     assert migration["revision"] == "tp20260614a1"
     assert migration["down_revision"] == "to20260614a1"
     assert migration["CONFIGURACAO_TRIBUTARIA_TABLE"] == "configuracao_tributaria"
-    assert migration["LEGACY_USUARIO_UNIQUE"] == "configuracao_tributaria_usuario_id_key"
+    assert (
+        migration["LEGACY_USUARIO_UNIQUE"] == "configuracao_tributaria_usuario_id_key"
+    )
     assert migration["TENANT_UNIQUE"] == "uq_configuracao_tributaria_tenant_id"
 
 

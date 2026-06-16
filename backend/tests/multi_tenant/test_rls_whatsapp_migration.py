@@ -3,8 +3,11 @@ from pathlib import Path
 from types import SimpleNamespace
 
 
-MIGRATION_FILE = Path(__file__).resolve().parents[2] / "alembic" / "versions" / (
-    "qf20260611a1_rls_whatsapp_tables.py"
+MIGRATION_FILE = (
+    Path(__file__).resolve().parents[2]
+    / "alembic"
+    / "versions"
+    / ("qf20260611a1_rls_whatsapp_tables.py")
 )
 
 WHATSAPP_RLS_TABLES = (
@@ -36,7 +39,9 @@ def _capture(monkeypatch, action_name: str, *, dialect="postgresql", existing=No
     inspector = SimpleNamespace(has_table=lambda table_name: table_name in present)
 
     monkeypatch.setattr(migration["op"], "get_bind", lambda: bind)
-    monkeypatch.setattr(migration["op"], "execute", lambda sql: emitted.append(str(sql)))
+    monkeypatch.setattr(
+        migration["op"], "execute", lambda sql: emitted.append(str(sql))
+    )
     monkeypatch.setattr(migration["sa"], "inspect", lambda _bind: inspector)
 
     migration[action_name]()
@@ -102,7 +107,9 @@ def test_whatsapp_rls_downgrade_unwinds_existing_tables_in_reverse_order(monkeyp
     ]
 
 
-def test_whatsapp_rls_migration_skips_when_bind_or_tables_are_not_applicable(monkeypatch):
+def test_whatsapp_rls_migration_skips_when_bind_or_tables_are_not_applicable(
+    monkeypatch,
+):
     for kwargs in ({"dialect": "sqlite"}, {"existing": ()}):
         assert _capture(monkeypatch, "upgrade", **kwargs) == []
         assert _capture(monkeypatch, "downgrade", **kwargs) == []

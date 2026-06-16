@@ -11,6 +11,7 @@ com o contexto da loja setado, devolve o período (mês/ano) da loja e nunca o d
 Pré-requisito da migração: backfill 100% de `tenant_id` (migration pn20260610a1) — sem
 linhas órfãs, o ramo `usuario_id` do OR do helper fica redundante, mas inócuo.
 """
+
 from uuid import UUID
 
 import pytest
@@ -39,7 +40,9 @@ def _engine():
     clear_current_tenant()
     engine = create_engine("sqlite:///:memory:")
     with engine.begin() as conn:
-        conn.execute(text("CREATE TABLE users (id INTEGER PRIMARY KEY, tenant_id TEXT NULL)"))
+        conn.execute(
+            text("CREATE TABLE users (id INTEGER PRIMARY KEY, tenant_id TEXT NULL)")
+        )
         conn.execute(
             text(
                 """

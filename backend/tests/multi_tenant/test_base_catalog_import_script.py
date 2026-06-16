@@ -43,7 +43,9 @@ def _script_session():
         )
     )
     session.execute(
-        text("INSERT INTO users (email, tenant_id, is_active) VALUES ('atacadaopetpp@gmail.com', :tenant, 1)"),
+        text(
+            "INSERT INTO users (email, tenant_id, is_active) VALUES ('atacadaopetpp@gmail.com', :tenant, 1)"
+        ),
         {"tenant": SOURCE_TENANT},
     )
     session.commit()
@@ -68,8 +70,12 @@ def test_base_catalog_script_defaults_to_dry_run(monkeypatch, capsys):
             "errors": [],
         }
 
-    monkeypatch.setattr(run_base_catalog_import, "SessionLocal", lambda: _SessionProxy(session))
-    monkeypatch.setattr(run_base_catalog_import, "import_base_catalog", fake_import_base_catalog)
+    monkeypatch.setattr(
+        run_base_catalog_import, "SessionLocal", lambda: _SessionProxy(session)
+    )
+    monkeypatch.setattr(
+        run_base_catalog_import, "import_base_catalog", fake_import_base_catalog
+    )
 
     code = run_base_catalog_import.main(
         ["--target-tenant-id", TARGET_TENANT, "--target-user-id", "10"]
@@ -86,7 +92,9 @@ def test_base_catalog_script_defaults_to_dry_run(monkeypatch, capsys):
     session.close()
 
 
-def test_base_catalog_script_apply_blocks_production_without_override(monkeypatch, capsys):
+def test_base_catalog_script_apply_blocks_production_without_override(
+    monkeypatch, capsys
+):
     monkeypatch.setenv("APP_ENV", "production")
 
     code = run_base_catalog_import.main(
@@ -102,7 +110,9 @@ def test_base_catalog_script_apply_blocks_production_without_override(monkeypatc
 
 def test_base_catalog_script_reports_missing_source_email(monkeypatch, capsys):
     session = _script_session()
-    monkeypatch.setattr(run_base_catalog_import, "SessionLocal", lambda: _SessionProxy(session))
+    monkeypatch.setattr(
+        run_base_catalog_import, "SessionLocal", lambda: _SessionProxy(session)
+    )
 
     code = run_base_catalog_import.main(
         [

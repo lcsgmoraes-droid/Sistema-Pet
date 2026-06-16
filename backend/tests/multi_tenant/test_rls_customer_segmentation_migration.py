@@ -16,7 +16,9 @@ def _migration():
     return runpy.run_path(str(MIGRATION_FILE))
 
 
-def _run_migration(monkeypatch, action_name: str, *, table_exists: bool = True) -> list[str]:
+def _run_migration(
+    monkeypatch, action_name: str, *, table_exists: bool = True
+) -> list[str]:
     migration = _migration()
     action = migration[action_name]
     action_globals = action.__globals__

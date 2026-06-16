@@ -7,16 +7,16 @@ MIGRATION_PATH = Path(__file__).resolve().parents[2] / Path(
 )
 
 PRODUCT_CATALOG_TABLES = ("departamentos", "marcas", "categorias")
-TENANT_MATCH = (
-    "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid"
-)
+TENANT_MATCH = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid"
 
 
 def _migration_namespace():
     return runpy.run_path(str(MIGRATION_PATH))
 
 
-def _capture_sql(monkeypatch, action: str, existing_tables=PRODUCT_CATALOG_TABLES) -> list[str]:
+def _capture_sql(
+    monkeypatch, action: str, existing_tables=PRODUCT_CATALOG_TABLES
+) -> list[str]:
     namespace = _migration_namespace()
     globals_for_action = namespace[action].__globals__
     statements = []
@@ -72,12 +72,15 @@ def test_rls_product_catalog_downgrade_disables_child_tables_first(monkeypatch):
     statements = _capture_sql(monkeypatch, "downgrade")
     joined = "\n".join(statements)
 
-    assert joined.index("DROP POLICY IF EXISTS categorias_tenant_isolation") < joined.index(
-        "DROP POLICY IF EXISTS departamentos_tenant_isolation"
-    )
+    assert joined.index(
+        "DROP POLICY IF EXISTS categorias_tenant_isolation"
+    ) < joined.index("DROP POLICY IF EXISTS departamentos_tenant_isolation")
 
     for table_name in PRODUCT_CATALOG_TABLES:
-        assert f"DROP POLICY IF EXISTS {table_name}_tenant_isolation ON {table_name}" in joined
+        assert (
+            f"DROP POLICY IF EXISTS {table_name}_tenant_isolation ON {table_name}"
+            in joined
+        )
         assert f"ALTER TABLE {table_name} NO FORCE ROW LEVEL SECURITY" in joined
         assert f"ALTER TABLE {table_name} DISABLE ROW LEVEL SECURITY" in joined
 

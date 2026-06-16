@@ -454,7 +454,9 @@ def test_onboarding_apply_creates_default_copy_for_tenant(onboarding_session):
     assert _count(onboarding_session, "apresentacoes_peso", TENANT_A) == 11
     assert _count(onboarding_session, "produtos", TENANT_A) == 0
     enum_values = onboarding_session.execute(
-        text("SELECT DISTINCT tipo_custo, escopo_rateio FROM dre_subcategorias WHERE tenant_id = :tenant_id"),
+        text(
+            "SELECT DISTINCT tipo_custo, escopo_rateio FROM dre_subcategorias WHERE tenant_id = :tenant_id"
+        ),
         {"tenant_id": TENANT_A},
     ).all()
     assert enum_values
@@ -463,10 +465,14 @@ def test_onboarding_apply_creates_default_copy_for_tenant(onboarding_session):
 
 
 def test_onboarding_is_idempotent_for_same_tenant(onboarding_session):
-    onboard_tenant_defaults(onboarding_session, tenant_id=TENANT_A, user_id=1, dry_run=False)
+    onboard_tenant_defaults(
+        onboarding_session, tenant_id=TENANT_A, user_id=1, dry_run=False
+    )
     onboarding_session.commit()
 
-    second = onboard_tenant_defaults(onboarding_session, tenant_id=TENANT_A, user_id=1, dry_run=False)
+    second = onboard_tenant_defaults(
+        onboarding_session, tenant_id=TENANT_A, user_id=1, dry_run=False
+    )
     onboarding_session.commit()
 
     assert second["created"] == {}
@@ -481,8 +487,12 @@ def test_onboarding_is_idempotent_for_same_tenant(onboarding_session):
 
 
 def test_onboarding_item_mapping_survives_tenant_payment_edit(onboarding_session):
-    onboard_tenant_defaults(onboarding_session, tenant_id=TENANT_A, user_id=1, dry_run=False)
-    onboard_tenant_defaults(onboarding_session, tenant_id=TENANT_B, user_id=2, dry_run=False)
+    onboard_tenant_defaults(
+        onboarding_session, tenant_id=TENANT_A, user_id=1, dry_run=False
+    )
+    onboard_tenant_defaults(
+        onboarding_session, tenant_id=TENANT_B, user_id=2, dry_run=False
+    )
     onboarding_session.commit()
 
     pix_id = onboarding_session.execute(
@@ -501,7 +511,9 @@ def test_onboarding_item_mapping_survives_tenant_payment_edit(onboarding_session
     )
     onboarding_session.commit()
 
-    second = onboard_tenant_defaults(onboarding_session, tenant_id=TENANT_A, user_id=1, dry_run=False)
+    second = onboard_tenant_defaults(
+        onboarding_session, tenant_id=TENANT_A, user_id=1, dry_run=False
+    )
     onboarding_session.commit()
 
     assert second["created"] == {}
@@ -510,21 +522,27 @@ def test_onboarding_item_mapping_survives_tenant_payment_edit(onboarding_session
     assert _count(onboarding_session, "formas_pagamento", TENANT_B) == 4
     assert (
         onboarding_session.execute(
-            text("SELECT COUNT(*) FROM formas_pagamento WHERE tenant_id = :tenant_id AND tipo = 'pix'"),
+            text(
+                "SELECT COUNT(*) FROM formas_pagamento WHERE tenant_id = :tenant_id AND tipo = 'pix'"
+            ),
             {"tenant_id": TENANT_A},
         ).scalar()
         == 1
     )
     assert (
         onboarding_session.execute(
-            text("SELECT nome FROM formas_pagamento WHERE tenant_id = :tenant_id AND tipo = 'pix'"),
+            text(
+                "SELECT nome FROM formas_pagamento WHERE tenant_id = :tenant_id AND tipo = 'pix'"
+            ),
             {"tenant_id": TENANT_A},
         ).scalar()
         == "PIX Loja Centro"
     )
     assert (
         onboarding_session.execute(
-            text("SELECT nome FROM formas_pagamento WHERE tenant_id = :tenant_id AND tipo = 'pix'"),
+            text(
+                "SELECT nome FROM formas_pagamento WHERE tenant_id = :tenant_id AND tipo = 'pix'"
+            ),
             {"tenant_id": TENANT_B},
         ).scalar()
         == "PIX"
@@ -535,24 +553,23 @@ def test_onboarding_item_mapping_survives_tenant_payment_edit(onboarding_session
         ).scalar()
         == "PIX"
     )
-    assert (
-        onboarding_session.execute(
-            text(
-                """
+    assert onboarding_session.execute(
+        text(
+            """
                 SELECT target_table, target_id
                 FROM tenant_template_item_installs
                 WHERE tenant_id IN (:tenant_id, :tenant_id_hex)
                   AND template_code = 'payment_pix'
                 """
-            ),
-            _tenant_params(TENANT_A),
-        ).one()
-        == ("formas_pagamento", pix_id)
-    )
+        ),
+        _tenant_params(TENANT_A),
+    ).one() == ("formas_pagamento", pix_id)
 
 
 def test_onboarding_item_mapping_survives_tenant_dre_category_edit(onboarding_session):
-    onboard_tenant_defaults(onboarding_session, tenant_id=TENANT_A, user_id=1, dry_run=False)
+    onboard_tenant_defaults(
+        onboarding_session, tenant_id=TENANT_A, user_id=1, dry_run=False
+    )
     onboarding_session.commit()
 
     receitas_id = onboarding_session.execute(
@@ -567,12 +584,16 @@ def test_onboarding_item_mapping_survives_tenant_dre_category_edit(onboarding_se
         _tenant_params(TENANT_A),
     ).scalar_one()
     onboarding_session.execute(
-        text("UPDATE dre_categorias SET nome = 'Receitas Loja Principal' WHERE id = :id"),
+        text(
+            "UPDATE dre_categorias SET nome = 'Receitas Loja Principal' WHERE id = :id"
+        ),
         {"id": receitas_id},
     )
     onboarding_session.commit()
 
-    second = onboard_tenant_defaults(onboarding_session, tenant_id=TENANT_A, user_id=1, dry_run=False)
+    second = onboard_tenant_defaults(
+        onboarding_session, tenant_id=TENANT_A, user_id=1, dry_run=False
+    )
     onboarding_session.commit()
 
     assert second["created"] == {}
@@ -596,8 +617,12 @@ def test_onboarding_item_mapping_survives_tenant_dre_category_edit(onboarding_se
 
 
 def test_onboarding_creates_isolated_copies_for_each_tenant(onboarding_session):
-    onboard_tenant_defaults(onboarding_session, tenant_id=TENANT_A, user_id=1, dry_run=False)
-    onboard_tenant_defaults(onboarding_session, tenant_id=TENANT_B, user_id=2, dry_run=False)
+    onboard_tenant_defaults(
+        onboarding_session, tenant_id=TENANT_A, user_id=1, dry_run=False
+    )
+    onboard_tenant_defaults(
+        onboarding_session, tenant_id=TENANT_B, user_id=2, dry_run=False
+    )
     onboarding_session.commit()
 
     assert _count(onboarding_session, "formas_pagamento", TENANT_A) == 4
@@ -624,7 +649,9 @@ def test_onboarding_creates_isolated_copies_for_each_tenant(onboarding_session):
     assert names_a == names_b
 
 
-def test_onboarding_include_products_dry_run_does_not_create_catalog(onboarding_session):
+def test_onboarding_include_products_dry_run_does_not_create_catalog(
+    onboarding_session,
+):
     result = onboard_tenant_defaults(
         onboarding_session,
         tenant_id=TENANT_A,
@@ -637,7 +664,9 @@ def test_onboarding_include_products_dry_run_does_not_create_catalog(onboarding_
     assert _count(onboarding_session, "produtos", TENANT_A) == 0
 
 
-def test_onboarding_include_products_apply_creates_inactive_reference_catalog(onboarding_session):
+def test_onboarding_include_products_apply_creates_inactive_reference_catalog(
+    onboarding_session,
+):
     result = onboard_tenant_defaults(
         onboarding_session,
         tenant_id=TENANT_A,
@@ -726,7 +755,9 @@ def test_onboarding_strict_required_fails_when_operational_schema_is_absent():
     session = SessionLocal()
 
     try:
-        with pytest.raises(TenantOnboardingError, match="Onboarding obrigatorio incompleto"):
+        with pytest.raises(
+            TenantOnboardingError, match="Onboarding obrigatorio incompleto"
+        ):
             onboard_tenant_defaults(
                 session,
                 tenant_id=TENANT_A,
@@ -738,8 +769,12 @@ def test_onboarding_strict_required_fails_when_operational_schema_is_absent():
         session.close()
 
 
-def test_template_contract_check_is_read_only_and_accepts_complete_builtin_contract(onboarding_session):
-    result = validate_onboarding_template_contract(onboarding_session, include_products=True)
+def test_template_contract_check_is_read_only_and_accepts_complete_builtin_contract(
+    onboarding_session,
+):
+    result = validate_onboarding_template_contract(
+        onboarding_session, include_products=True
+    )
 
     assert result["ok"] is True
     assert result["mode"] == "template_contract_check"
@@ -819,12 +854,29 @@ def test_onboarding_script_apply_persists(monkeypatch, capsys, onboarding_sessio
     assert _count(onboarding_session, "formas_pagamento", TENANT_A) == 4
 
 
-def test_onboarding_script_all_active_tenants_dry_run(monkeypatch, capsys, onboarding_session):
-    onboarding_session.execute(text("INSERT INTO tenants (id, status) VALUES (:id, 'active')"), {"id": TENANT_A})
-    onboarding_session.execute(text("INSERT INTO tenants (id, status) VALUES (:id, 'active')"), {"id": TENANT_B})
-    onboarding_session.execute(text("INSERT INTO tenants (id, status) VALUES (:id, 'inactive')"), {"id": "33333333-3333-3333-3333-333333333333"})
-    onboarding_session.execute(text("INSERT INTO users (tenant_id, is_active) VALUES (:tenant_id, 1)"), {"tenant_id": TENANT_A})
-    onboarding_session.execute(text("INSERT INTO users (tenant_id, is_active) VALUES (:tenant_id, 1)"), {"tenant_id": TENANT_B})
+def test_onboarding_script_all_active_tenants_dry_run(
+    monkeypatch, capsys, onboarding_session
+):
+    onboarding_session.execute(
+        text("INSERT INTO tenants (id, status) VALUES (:id, 'active')"),
+        {"id": TENANT_A},
+    )
+    onboarding_session.execute(
+        text("INSERT INTO tenants (id, status) VALUES (:id, 'active')"),
+        {"id": TENANT_B},
+    )
+    onboarding_session.execute(
+        text("INSERT INTO tenants (id, status) VALUES (:id, 'inactive')"),
+        {"id": "33333333-3333-3333-3333-333333333333"},
+    )
+    onboarding_session.execute(
+        text("INSERT INTO users (tenant_id, is_active) VALUES (:tenant_id, 1)"),
+        {"tenant_id": TENANT_A},
+    )
+    onboarding_session.execute(
+        text("INSERT INTO users (tenant_id, is_active) VALUES (:tenant_id, 1)"),
+        {"tenant_id": TENANT_B},
+    )
     onboarding_session.commit()
     monkeypatch.setattr(
         run_tenant_onboarding,
@@ -850,8 +902,14 @@ def test_onboarding_script_future_tenant_check_does_not_read_or_update_existing_
     capsys,
     onboarding_session,
 ):
-    onboarding_session.execute(text("INSERT INTO tenants (id, status) VALUES (:id, 'active')"), {"id": TENANT_A})
-    onboarding_session.execute(text("INSERT INTO users (tenant_id, is_active) VALUES (:tenant_id, 1)"), {"tenant_id": TENANT_A})
+    onboarding_session.execute(
+        text("INSERT INTO tenants (id, status) VALUES (:id, 'active')"),
+        {"id": TENANT_A},
+    )
+    onboarding_session.execute(
+        text("INSERT INTO users (tenant_id, is_active) VALUES (:tenant_id, 1)"),
+        {"tenant_id": TENANT_A},
+    )
     onboarding_session.commit()
     monkeypatch.setattr(
         run_tenant_onboarding,
@@ -880,8 +938,14 @@ def test_onboarding_script_all_active_tenants_apply_blocks_bulk_existing_by_defa
     capsys,
     onboarding_session,
 ):
-    onboarding_session.execute(text("INSERT INTO tenants (id, status) VALUES (:id, 'active')"), {"id": TENANT_A})
-    onboarding_session.execute(text("INSERT INTO users (tenant_id, is_active) VALUES (:tenant_id, 1)"), {"tenant_id": TENANT_A})
+    onboarding_session.execute(
+        text("INSERT INTO tenants (id, status) VALUES (:id, 'active')"),
+        {"id": TENANT_A},
+    )
+    onboarding_session.execute(
+        text("INSERT INTO users (tenant_id, is_active) VALUES (:tenant_id, 1)"),
+        {"tenant_id": TENANT_A},
+    )
     onboarding_session.commit()
     monkeypatch.setattr(
         run_tenant_onboarding,
@@ -899,11 +963,24 @@ def test_onboarding_script_all_active_tenants_apply_blocks_bulk_existing_by_defa
     assert _count(onboarding_session, "formas_pagamento", TENANT_A) == 0
 
 
-def test_onboarding_script_all_active_tenants_apply_with_explicit_override(monkeypatch, capsys, onboarding_session):
-    onboarding_session.execute(text("INSERT INTO tenants (id, status) VALUES (:id, 'active')"), {"id": TENANT_A})
-    onboarding_session.execute(text("INSERT INTO tenants (id, status) VALUES (:id, 'ativo')"), {"id": TENANT_B})
-    onboarding_session.execute(text("INSERT INTO users (tenant_id, is_active) VALUES (:tenant_id, 1)"), {"tenant_id": TENANT_A})
-    onboarding_session.execute(text("INSERT INTO users (tenant_id, is_active) VALUES (:tenant_id, 1)"), {"tenant_id": TENANT_B})
+def test_onboarding_script_all_active_tenants_apply_with_explicit_override(
+    monkeypatch, capsys, onboarding_session
+):
+    onboarding_session.execute(
+        text("INSERT INTO tenants (id, status) VALUES (:id, 'active')"),
+        {"id": TENANT_A},
+    )
+    onboarding_session.execute(
+        text("INSERT INTO tenants (id, status) VALUES (:id, 'ativo')"), {"id": TENANT_B}
+    )
+    onboarding_session.execute(
+        text("INSERT INTO users (tenant_id, is_active) VALUES (:tenant_id, 1)"),
+        {"tenant_id": TENANT_A},
+    )
+    onboarding_session.execute(
+        text("INSERT INTO users (tenant_id, is_active) VALUES (:tenant_id, 1)"),
+        {"tenant_id": TENANT_B},
+    )
     onboarding_session.commit()
     monkeypatch.setattr(
         run_tenant_onboarding,
@@ -925,13 +1002,29 @@ def test_onboarding_script_all_active_tenants_apply_with_explicit_override(monke
     assert _count(onboarding_session, "formas_pagamento", TENANT_B) == 4
 
 
-def test_onboarding_script_health_check_reports_incomplete_and_complete(monkeypatch, capsys, onboarding_session):
-    onboarding_session.execute(text("INSERT INTO tenants (id, status) VALUES (:id, 'active')"), {"id": TENANT_A})
-    onboarding_session.execute(text("INSERT INTO tenants (id, status) VALUES (:id, 'active')"), {"id": TENANT_B})
-    onboarding_session.execute(text("INSERT INTO users (tenant_id, is_active) VALUES (:tenant_id, 1)"), {"tenant_id": TENANT_A})
-    onboarding_session.execute(text("INSERT INTO users (tenant_id, is_active) VALUES (:tenant_id, 1)"), {"tenant_id": TENANT_B})
+def test_onboarding_script_health_check_reports_incomplete_and_complete(
+    monkeypatch, capsys, onboarding_session
+):
+    onboarding_session.execute(
+        text("INSERT INTO tenants (id, status) VALUES (:id, 'active')"),
+        {"id": TENANT_A},
+    )
+    onboarding_session.execute(
+        text("INSERT INTO tenants (id, status) VALUES (:id, 'active')"),
+        {"id": TENANT_B},
+    )
+    onboarding_session.execute(
+        text("INSERT INTO users (tenant_id, is_active) VALUES (:tenant_id, 1)"),
+        {"tenant_id": TENANT_A},
+    )
+    onboarding_session.execute(
+        text("INSERT INTO users (tenant_id, is_active) VALUES (:tenant_id, 1)"),
+        {"tenant_id": TENANT_B},
+    )
     onboarding_session.commit()
-    onboard_tenant_defaults(onboarding_session, tenant_id=TENANT_A, user_id=1, dry_run=False)
+    onboard_tenant_defaults(
+        onboarding_session, tenant_id=TENANT_A, user_id=1, dry_run=False
+    )
     onboarding_session.commit()
     monkeypatch.setattr(
         run_tenant_onboarding,
@@ -955,11 +1048,21 @@ def test_onboarding_script_health_check_reports_incomplete_and_complete(monkeypa
     assert _count(onboarding_session, "formas_pagamento", TENANT_B) == 0
 
 
-def test_onboarding_script_health_check_can_include_optional_products(monkeypatch, capsys, onboarding_session):
-    onboarding_session.execute(text("INSERT INTO tenants (id, status) VALUES (:id, 'active')"), {"id": TENANT_A})
-    onboarding_session.execute(text("INSERT INTO users (tenant_id, is_active) VALUES (:tenant_id, 1)"), {"tenant_id": TENANT_A})
+def test_onboarding_script_health_check_can_include_optional_products(
+    monkeypatch, capsys, onboarding_session
+):
+    onboarding_session.execute(
+        text("INSERT INTO tenants (id, status) VALUES (:id, 'active')"),
+        {"id": TENANT_A},
+    )
+    onboarding_session.execute(
+        text("INSERT INTO users (tenant_id, is_active) VALUES (:tenant_id, 1)"),
+        {"tenant_id": TENANT_A},
+    )
     onboarding_session.commit()
-    onboard_tenant_defaults(onboarding_session, tenant_id=TENANT_A, user_id=1, dry_run=False)
+    onboard_tenant_defaults(
+        onboarding_session, tenant_id=TENANT_A, user_id=1, dry_run=False
+    )
     onboarding_session.commit()
     monkeypatch.setattr(
         run_tenant_onboarding,
@@ -1012,7 +1115,9 @@ def test_onboarding_script_future_tenant_check_rejects_apply(capsys):
     assert "somente leitura" in payload["error"]
 
 
-def test_onboarding_script_template_check_reports_contract(monkeypatch, capsys, onboarding_session):
+def test_onboarding_script_template_check_reports_contract(
+    monkeypatch, capsys, onboarding_session
+):
     monkeypatch.setattr(
         run_tenant_onboarding,
         "SessionLocal",
@@ -1045,10 +1150,16 @@ def test_onboarding_script_template_check_rejects_apply(capsys):
 
 
 def test_migration_status_reports_pending_head(monkeypatch, onboarding_session):
-    onboarding_session.execute(text("CREATE TABLE alembic_version (version_num TEXT NOT NULL)"))
-    onboarding_session.execute(text("INSERT INTO alembic_version (version_num) VALUES ('old_head')"))
+    onboarding_session.execute(
+        text("CREATE TABLE alembic_version (version_num TEXT NOT NULL)")
+    )
+    onboarding_session.execute(
+        text("INSERT INTO alembic_version (version_num) VALUES ('old_head')")
+    )
     onboarding_session.commit()
-    monkeypatch.setattr(run_tenant_onboarding, "_get_alembic_heads", lambda: ["new_head"])
+    monkeypatch.setattr(
+        run_tenant_onboarding, "_get_alembic_heads", lambda: ["new_head"]
+    )
 
     status = run_tenant_onboarding._migration_status(onboarding_session)
 
@@ -1064,17 +1175,25 @@ def test_onboarding_script_signup_readiness_check_combines_migrations_and_templa
     capsys,
     onboarding_session,
 ):
-    onboarding_session.execute(text("CREATE TABLE alembic_version (version_num TEXT NOT NULL)"))
-    onboarding_session.execute(text("INSERT INTO alembic_version (version_num) VALUES ('test_head')"))
+    onboarding_session.execute(
+        text("CREATE TABLE alembic_version (version_num TEXT NOT NULL)")
+    )
+    onboarding_session.execute(
+        text("INSERT INTO alembic_version (version_num) VALUES ('test_head')")
+    )
     onboarding_session.commit()
     monkeypatch.setattr(
         run_tenant_onboarding,
         "SessionLocal",
         lambda: _SessionProxy(onboarding_session),
     )
-    monkeypatch.setattr(run_tenant_onboarding, "_get_alembic_heads", lambda: ["test_head"])
+    monkeypatch.setattr(
+        run_tenant_onboarding, "_get_alembic_heads", lambda: ["test_head"]
+    )
 
-    code = run_tenant_onboarding.main(["--signup-readiness-check", "--include-products"])
+    code = run_tenant_onboarding.main(
+        ["--signup-readiness-check", "--include-products"]
+    )
 
     captured = capsys.readouterr()
     payload = json.loads(captured.out)
@@ -1131,7 +1250,9 @@ def test_onboarding_syncs_postgres_sequence_before_known_table_insert(monkeypatc
     def _fake_execute_tenant_safe(db, sql, params, tenant_id, require_tenant):
         calls.append(("execute_tenant_safe", sql, params, tenant_id, require_tenant))
 
-    monkeypatch.setattr(onboarding_service, "execute_tenant_safe", _fake_execute_tenant_safe)
+    monkeypatch.setattr(
+        onboarding_service, "execute_tenant_safe", _fake_execute_tenant_safe
+    )
 
     onboarding_service._execute_insert(
         _FakeSession(),

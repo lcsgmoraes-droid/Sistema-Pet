@@ -3,8 +3,11 @@ import runpy
 from types import SimpleNamespace
 
 
-MIGRATION = Path(__file__).resolve().parents[2] / "alembic" / "versions" / (
-    "qc20260611a1_rls_store_config_tables.py"
+MIGRATION = (
+    Path(__file__).resolve().parents[2]
+    / "alembic"
+    / "versions"
+    / ("qc20260611a1_rls_store_config_tables.py")
 )
 TARGETS = ("empresa_config_geral", "configuracoes_custo_moto")
 TENANT_POLICY = "tenant_id = NULLIF(current_setting('app.tenant_id', true), '')::uuid"
@@ -23,11 +26,15 @@ def _fake_alembic(monkeypatch, module, *, present=TARGETS, dialect="postgresql")
         "get_bind",
         lambda: SimpleNamespace(dialect=SimpleNamespace(name=dialect)),
     )
-    monkeypatch.setattr(module["op"], "execute", lambda sql: statements.append(str(sql)))
+    monkeypatch.setattr(
+        module["op"], "execute", lambda sql: statements.append(str(sql))
+    )
     monkeypatch.setattr(
         module["sa"],
         "inspect",
-        lambda _bind: SimpleNamespace(has_table=lambda table_name: table_name in available),
+        lambda _bind: SimpleNamespace(
+            has_table=lambda table_name: table_name in available
+        ),
     )
     return statements
 

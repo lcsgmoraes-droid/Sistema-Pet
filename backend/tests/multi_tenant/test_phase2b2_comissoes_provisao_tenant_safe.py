@@ -141,7 +141,15 @@ def _create_schema(session):
 
 
 def _seed_data(session):
-    for tenant_id, numero_venda, comissao_id, subcat_id, user_id, cliente_nome, valor in (
+    for (
+        tenant_id,
+        numero_venda,
+        comissao_id,
+        subcat_id,
+        user_id,
+        cliente_nome,
+        valor,
+    ) in (
         (TENANT_A, "VA-900", 1, 10, 1, "Parceiro Tenant A", 25),
         (TENANT_B, "VB-900", 2, 20, 2, "Parceiro Tenant B", 250),
     ):
@@ -258,7 +266,9 @@ def test_reexecucao_nao_duplica_provisao_no_mesmo_tenant(db_session):
     assert len(_contas(db_session)) == 1
 
 
-def test_cria_subcategoria_comissoes_quando_tenant_tem_apenas_categoria_despesa(db_session):
+def test_cria_subcategoria_comissoes_quando_tenant_tem_apenas_categoria_despesa(
+    db_session,
+):
     db_session.execute(
         text("DELETE FROM dre_subcategorias WHERE tenant_id = :tenant_id"),
         {"tenant_id": TENANT_A},

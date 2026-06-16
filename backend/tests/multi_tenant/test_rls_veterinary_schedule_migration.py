@@ -39,7 +39,9 @@ def test_veterinary_schedule_rls_migration_metadata_and_scope():
 def test_veterinary_schedule_rls_upgrade_targets_declared_tables(monkeypatch):
     emitted = _capture(monkeypatch, "upgrade")
 
-    assert_upgrade_emits_rls_for_declared_tables(emitted, VETERINARY_SCHEDULE_RLS_TABLES)
+    assert_upgrade_emits_rls_for_declared_tables(
+        emitted, VETERINARY_SCHEDULE_RLS_TABLES
+    )
 
 
 def test_veterinary_schedule_rls_upgrade_skips_missing_tables(monkeypatch):

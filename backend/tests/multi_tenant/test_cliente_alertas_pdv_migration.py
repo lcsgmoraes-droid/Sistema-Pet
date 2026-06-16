@@ -3,8 +3,11 @@ import runpy
 from types import SimpleNamespace
 
 
-MIGRATION = Path(__file__).resolve().parents[2] / "alembic" / "versions" / (
-    "qe20260611a1_add_cliente_alertas_pdv.py"
+MIGRATION = (
+    Path(__file__).resolve().parents[2]
+    / "alembic"
+    / "versions"
+    / ("qe20260611a1_add_cliente_alertas_pdv.py")
 )
 
 
@@ -33,7 +36,9 @@ def test_cliente_alertas_pdv_upgrade_adds_json_column_when_table_exists(monkeypa
     monkeypatch.setattr(
         module["sa"],
         "inspect",
-        lambda _bind: SimpleNamespace(has_table=lambda table_name: table_name == "clientes"),
+        lambda _bind: SimpleNamespace(
+            has_table=lambda table_name: table_name == "clientes"
+        ),
     )
     monkeypatch.setattr(
         module["op"],
@@ -60,8 +65,12 @@ def test_cliente_alertas_pdv_migration_skips_missing_legacy_table(monkeypatch):
         "inspect",
         lambda _bind: SimpleNamespace(has_table=lambda _table_name: False),
     )
-    monkeypatch.setattr(module["op"], "add_column", lambda *_args: operations.append("add"))
-    monkeypatch.setattr(module["op"], "drop_column", lambda *_args: operations.append("drop"))
+    monkeypatch.setattr(
+        module["op"], "add_column", lambda *_args: operations.append("add")
+    )
+    monkeypatch.setattr(
+        module["op"], "drop_column", lambda *_args: operations.append("drop")
+    )
 
     module["upgrade"]()
     module["downgrade"]()

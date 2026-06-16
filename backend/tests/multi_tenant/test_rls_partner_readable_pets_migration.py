@@ -40,7 +40,9 @@ def _policy_names(table_name: str) -> tuple[str, ...]:
 
 
 def _upgrade_sql_for(table_name: str) -> list[str]:
-    select_policy, insert_policy, update_policy, delete_policy = _policy_names(table_name)
+    select_policy, insert_policy, update_policy, delete_policy = _policy_names(
+        table_name
+    )
     return [
         f"ALTER TABLE {table_name} ENABLE ROW LEVEL SECURITY",
         f"ALTER TABLE {table_name} FORCE ROW LEVEL SECURITY",
@@ -90,17 +92,23 @@ def test_partner_readable_pets_rls_migration_metadata_and_scope():
     assert migration["TENANT_GUARD"] == TENANT_RLS_GUARD
 
 
-def test_partner_readable_pets_rls_upgrade_enables_partner_read_and_own_writes(monkeypatch):
+def test_partner_readable_pets_rls_upgrade_enables_partner_read_and_own_writes(
+    monkeypatch,
+):
     assert _capture(monkeypatch, "upgrade") == (
         _upgrade_sql_for("clientes") + _upgrade_sql_for("pets")
     )
 
 
 def test_partner_readable_pets_rls_upgrade_skips_missing_tables(monkeypatch):
-    assert _capture(monkeypatch, "upgrade", existing=("clientes",)) == _upgrade_sql_for("clientes")
+    assert _capture(monkeypatch, "upgrade", existing=("clientes",)) == _upgrade_sql_for(
+        "clientes"
+    )
 
 
-def test_partner_readable_pets_rls_downgrade_restores_clientes_and_unwinds_pets(monkeypatch):
+def test_partner_readable_pets_rls_downgrade_restores_clientes_and_unwinds_pets(
+    monkeypatch,
+):
     assert _capture(monkeypatch, "downgrade") == [
         *_drop_custom_sql_for("pets"),
         "ALTER TABLE pets NO FORCE ROW LEVEL SECURITY",
