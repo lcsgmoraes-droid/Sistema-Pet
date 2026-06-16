@@ -11,14 +11,14 @@ ROTAS DE CATEGORIAS FINANCEIRAS E FORMAS DE PAGAMENTO
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
-from sqlalchemy import func
+from sqlalchemy import and_, desc, func
 from typing import List, Optional
 from pydantic import BaseModel
+from datetime import date, datetime, timedelta
+from decimal import Decimal
 
 from .db import get_session
-from .auth import get_current_user
 from .auth.dependencies import get_current_user_and_tenant
-from .models import User
 from .financeiro_models import CategoriaFinanceira, FormaPagamento
 from .security.module_access import require_active_module
 from .security.permissions_decorator import require_any_permission, require_permission
@@ -241,7 +241,7 @@ def listar_formas_pagamento(
     )
     
     if apenas_ativas:
-        query = query.filter(FormaPagamento.ativo == True)
+        query = query.filter(FormaPagamento.ativo.is_(True))
     
     formas = query.order_by(FormaPagamento.nome).all()
     
@@ -388,9 +388,6 @@ def excluir_forma_pagamento(
 # FLUXO DE CAIXA
 # ============================================================================
 
-from datetime import date, datetime, timedelta
-from decimal import Decimal
-
 class FluxoCaixaMovimentacao(BaseModel):
     """Uma movimentação no fluxo de caixa"""
     data: date
@@ -468,8 +465,7 @@ def get_fluxo_caixa(
     """
     current_user, tenant_id = current_user_and_tenant
     from .vendas_models import Venda
-    from .financeiro_models import ContaPagar, ContaReceber, Recebimento, ContaBancaria, LancamentoManual
-    from sqlalchemy import func, and_, or_
+    from .financeiro_models import ContaPagar, ContaReceber, ContaBancaria, LancamentoManual
     
     # Converter strings para date
     try:
@@ -1007,9 +1003,6 @@ def _agrupar_por_periodo(
 # HISTÓRICO FINANCEIRO DO CLIENTE - ROTAS DEDICADAS E PERFORMÁTICAS
 # ============================================================================
 
-from datetime import date, timedelta
-from sqlalchemy import desc, or_, and_
-
 @router.get("/cliente/{cliente_id}")
 async def get_historico_financeiro_cliente(
     cliente_id: int,
@@ -1057,7 +1050,7 @@ async def get_historico_financeiro_cliente(
     """
     # Importar modelos
     from app.vendas_models import Venda
-    from app.financeiro_models import ContaReceber, Recebimento
+    from app.financeiro_models import ContaReceber
     
     # Extrair usuário e tenant
     current_user, tenant_id = user_and_tenant

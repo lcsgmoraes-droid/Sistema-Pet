@@ -203,6 +203,17 @@ def test_backend_ci_has_blocking_financeiro_lint_step():
     assert "ruff check app/financeiro" in source
 
 
+def test_backend_ci_has_blocking_conciliacao_financeiro_root_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Conciliacao financeiro root lint (blocking)" in source
+    assert (
+        "ruff check app/financeiro_routes.py app/conciliacao_routes.py "
+        "app/conciliacao_aba1_routes.py app/conciliacao_bancaria_routes.py "
+        "app/conciliacao_services.py app/conciliacao_historico_routes.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_routers_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

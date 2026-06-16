@@ -5,20 +5,16 @@ Upload OFX, classificação automática, regras de aprendizado
 
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Query
 from sqlalchemy.orm import Session
-from sqlalchemy import and_, or_, desc, func, text
+from sqlalchemy import and_, desc, text
 from sqlalchemy.exc import NoReferencedTableError
-from typing import List, Optional, Dict
+from typing import List, Optional
 from datetime import datetime, date
-from decimal import Decimal
-import uuid
-import json
 
 from app.db import get_session as get_db
 from app.auth.dependencies import get_current_user_and_tenant
 from .financeiro_models import (
-    ContaBancaria, ContaPagar, ContaReceber,
-    ExtratoBancario, MovimentacaoBancaria, RegraConciliacao,
-    ProvisaoAutomatica, TemplateAdquirente
+    ContaBancaria, ExtratoBancario, MovimentacaoBancaria, RegraConciliacao,
+    TemplateAdquirente
 )
 from .parsers.ofx_parser import OFXParser, validar_extrato
 from pydantic import BaseModel
@@ -188,7 +184,7 @@ async def upload_ofx(
     regras = db.query(RegraConciliacao).filter(
         and_(
             RegraConciliacao.tenant_id == tenant_id,
-            RegraConciliacao.ativo == True
+            RegraConciliacao.ativo.is_(True)
         )
     ).all()
     
@@ -462,7 +458,7 @@ async def listar_regras(
     )
     
     if ativas_apenas:
-        query = query.filter(RegraConciliacao.ativo == True)
+        query = query.filter(RegraConciliacao.ativo.is_(True))
     
     query = query.order_by(desc(RegraConciliacao.confianca))
     regras = query.all()
@@ -569,7 +565,7 @@ async def obter_estatisticas(
     regras_ativas = db.query(RegraConciliacao).filter(
         and_(
             RegraConciliacao.tenant_id == tenant_id,
-            RegraConciliacao.ativo == True
+            RegraConciliacao.ativo.is_(True)
         )
     ).count()
     

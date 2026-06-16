@@ -11,7 +11,7 @@ Endpoints:
 7. GET /api/conciliacao/historico/{id} - Detalhes de uma conciliação
 """
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, desc
 from datetime import datetime, date
