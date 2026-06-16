@@ -395,6 +395,13 @@ def test_backend_ci_has_blocking_ia_lint_step():
     assert "ruff check app/ia" in source
 
 
+def test_backend_ci_has_blocking_ia_root_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "IA root lint (blocking)" in source
+    assert "ruff check app/ia_config.py app/ia_fluxo_routes.py app/ia_routes.py" in source
+
+
 def test_backend_ci_has_blocking_api_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

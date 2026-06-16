@@ -19,7 +19,6 @@ from pydantic import BaseModel
 from app.auth import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
 from app.db import get_session
-from app.models import User
 from app.ia.aba5_fluxo_caixa import (
     calcular_indices_saude,
     projetar_fluxo_15_dias,
