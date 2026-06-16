@@ -29,7 +29,10 @@ def _build_produto_search_order_clause(termo_busca: Optional[str]):
         return [
             case(
                 (func.lower(func.coalesce(Produto.codigo, "")) == termo_lower, 1),
-                (func.lower(func.coalesce(Produto.codigo_barras, "")) == termo_lower, 2),
+                (
+                    func.lower(func.coalesce(Produto.codigo_barras, "")) == termo_lower,
+                    2,
+                ),
                 (func.lower(func.coalesce(Produto.nome, "")) == termo_lower, 3),
                 (Produto.codigo.ilike(f"{termo}%"), 4),
                 (Produto.codigo_barras.ilike(f"{termo}%"), 5),
@@ -109,7 +112,10 @@ def _produto_search_conditions(palavra: str):
             [
                 _digits_expr(Produto.codigo).ilike(digitos_pattern),
                 _digits_expr(Produto.codigo_barras).ilike(digitos_pattern),
-                *[_digits_expr(column).ilike(digitos_pattern) for column in PRODUTO_GTIN_COLUMNS],
+                *[
+                    _digits_expr(column).ilike(digitos_pattern)
+                    for column in PRODUTO_GTIN_COLUMNS
+                ],
             ]
         )
 
@@ -147,7 +153,10 @@ def _produto_search_conditions_fast(palavra: str):
                 *[column == termo for column in PRODUTO_GTIN_COLUMNS],
                 _digits_expr(Produto.codigo).like(digits_prefix),
                 _digits_expr(Produto.codigo_barras).like(digits_prefix),
-                *[_digits_expr(column).like(digits_prefix) for column in PRODUTO_GTIN_COLUMNS],
+                *[
+                    _digits_expr(column).like(digits_prefix)
+                    for column in PRODUTO_GTIN_COLUMNS
+                ],
             ]
         )
         if PRODUTO_SKU_COLUMN is not None:
@@ -159,4 +168,3 @@ def _produto_search_conditions_fast(palavra: str):
             )
 
     return or_(*conditions)
-

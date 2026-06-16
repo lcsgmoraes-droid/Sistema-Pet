@@ -170,17 +170,23 @@ def main() -> int:
         )
         portes = mapa_por_nome(
             db.query(PorteAnimal)
-            .filter(PorteAnimal.tenant_id == args.tenant_id, PorteAnimal.ativo.is_(True))
+            .filter(
+                PorteAnimal.tenant_id == args.tenant_id, PorteAnimal.ativo.is_(True)
+            )
             .all()
         )
         fases = mapa_por_nome(
             db.query(FasePublico)
-            .filter(FasePublico.tenant_id == args.tenant_id, FasePublico.ativo.is_(True))
+            .filter(
+                FasePublico.tenant_id == args.tenant_id, FasePublico.ativo.is_(True)
+            )
             .all()
         )
         sabores = mapa_por_nome(
             db.query(SaborProteina)
-            .filter(SaborProteina.tenant_id == args.tenant_id, SaborProteina.ativo.is_(True))
+            .filter(
+                SaborProteina.tenant_id == args.tenant_id, SaborProteina.ativo.is_(True)
+            )
             .all()
         )
         apresentacoes = (
@@ -246,7 +252,9 @@ def main() -> int:
             if not produto.linha_racao_id and linha:
                 produto.linha_racao_id = linha.id
                 alteracoes.append("linha_racao_id")
-            if not produto.classificacao_racao and (linha or resultado.get("linha_racao")):
+            if not produto.classificacao_racao and (
+                linha or resultado.get("linha_racao")
+            ):
                 produto.classificacao_racao = normalizar_classificacao(
                     getattr(linha, "nome", None) or resultado.get("linha_racao")
                 )
@@ -283,7 +291,10 @@ def main() -> int:
             if resultado.get("sabor_proteina"):
                 sabor = opcao_por_nome(
                     sabores,
-                    [resultado["sabor_proteina"], "Salmao" if resultado["sabor_proteina"] == "Peixe" else ""],
+                    [
+                        resultado["sabor_proteina"],
+                        "Salmao" if resultado["sabor_proteina"] == "Peixe" else "",
+                    ],
                 )
             if not sabor:
                 sabor = opcao_por_nome(sabores, ["Mix"])

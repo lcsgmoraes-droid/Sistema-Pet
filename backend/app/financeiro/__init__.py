@@ -17,4 +17,4 @@ IMPORTANTE: Este módulo NÃO trata de:
 
 from .contas_receber_service import ContasReceberService
 
-__all__ = ['ContasReceberService']
+__all__ = ["ContasReceberService"]

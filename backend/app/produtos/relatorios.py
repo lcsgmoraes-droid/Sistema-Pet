@@ -13,7 +13,9 @@ from app.produtos_models import EstoqueMovimentacao
 from app.vendas_models import Venda, VendaItem
 
 
-def _parse_relatorio_datetime(valor: Optional[str], *, end_of_day: bool = False) -> Optional[datetime]:
+def _parse_relatorio_datetime(
+    valor: Optional[str], *, end_of_day: bool = False
+) -> Optional[datetime]:
     texto = (valor or "").strip()
     if not texto:
         return None
@@ -61,15 +63,21 @@ def _mapear_promocoes_movimentacoes(
     if not venda_ids or not produto_ids:
         return {}
 
-    itens = db.query(VendaItem).options(
-        joinedload(VendaItem.produto),
-        joinedload(VendaItem.venda),
-    ).join(Venda, Venda.id == VendaItem.venda_id).filter(
-        Venda.tenant_id == tenant_id,
-        VendaItem.tenant_id == tenant_id,
-        VendaItem.venda_id.in_(venda_ids),
-        VendaItem.produto_id.in_(produto_ids),
-    ).all()
+    itens = (
+        db.query(VendaItem)
+        .options(
+            joinedload(VendaItem.produto),
+            joinedload(VendaItem.venda),
+        )
+        .join(Venda, Venda.id == VendaItem.venda_id)
+        .filter(
+            Venda.tenant_id == tenant_id,
+            VendaItem.tenant_id == tenant_id,
+            VendaItem.venda_id.in_(venda_ids),
+            VendaItem.produto_id.in_(produto_ids),
+        )
+        .all()
+    )
 
     mapa = {}
     for item in itens:
@@ -83,7 +91,9 @@ def _mapear_promocoes_movimentacoes(
         if info.get("em_promocao"):
             motivos = [
                 parte.strip()
-                for parte in f"{atual.get('promocao_origem') or ''}, {info.get('promocao_origem') or ''}".split(",")
+                for parte in f"{atual.get('promocao_origem') or ''}, {info.get('promocao_origem') or ''}".split(
+                    ","
+                )
                 if parte.strip()
             ]
             atual.update(
@@ -133,7 +143,9 @@ def _serializar_movimentacao_relatorio(
         "valor_total": float(mov.valor_total or 0),
         "usuario": mov.user.nome if mov.user else "Sistema",
         "numero_pedido": mov.documento,
-        "lancamento": mov.created_at.strftime("%d/%m/%Y %H:%M:%S") if mov.created_at else None,
+        "lancamento": mov.created_at.strftime("%d/%m/%Y %H:%M:%S")
+        if mov.created_at
+        else None,
         "observacoes": mov.observacao,
         "lotes_consumidos": mov.lotes_consumidos,
         "em_promocao": bool(promocao_info.get("em_promocao")),

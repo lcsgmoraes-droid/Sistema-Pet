@@ -1,4 +1,5 @@
 """Importacao automatica de documentos SEFAZ para notas de entrada."""
+
 from datetime import datetime
 import logging
 from uuid import UUID
@@ -19,7 +20,12 @@ def importar_docs_sefaz(docs: list, tenant_id_str: str, db) -> dict:
         tenant_uuid = UUID(tenant_id_str)
     except ValueError:
         logger.warning(f"[SEFAZ] tenant_id invalido: {tenant_id_str}")
-        return {"importadas": 0, "duplicadas": 0, "erros": len(docs), "saidas_descartadas": 0}
+        return {
+            "importadas": 0,
+            "duplicadas": 0,
+            "erros": len(docs),
+            "saidas_descartadas": 0,
+        }
 
     with tenant_context(tenant_uuid):
         return _importar_docs_sefaz_scoped(docs, tenant_id_str, db)
@@ -47,16 +53,18 @@ def _importar_docs_sefaz_scoped(docs: list, tenant_id_str: str, db) -> dict:
     tenant_cnpj = ""
     try:
         cfg_tenant = SefazTenantConfigService.load_config(UUID(tenant_id_str))
-        tenant_cnpj = "".join(ch for ch in str(cfg_tenant.get("cnpj", "")) if ch.isdigit())
+        tenant_cnpj = "".join(
+            ch for ch in str(cfg_tenant.get("cnpj", "")) if ch.isdigit()
+        )
     except Exception as exc_cfg:
         logger.warning(
             f"[SEFAZ] Nao foi possivel carregar CNPJ do tenant {tenant_id_str}: {exc_cfg}"
         )
 
     # Buscar um usuario sistema do tenant para associar as notas
-    user_sistema = db.query(User).filter(
-        User.tenant_id == tenant_id_str
-    ).order_by(User.id).first()
+    user_sistema = (
+        db.query(User).filter(User.tenant_id == tenant_id_str).order_by(User.id).first()
+    )
 
     if not user_sistema:
         logger.warning(f"[SEFAZ] Nenhum usuario encontrado para tenant {tenant_id_str}")
@@ -86,7 +94,9 @@ def _importar_docs_sefaz_scoped(docs: list, tenant_id_str: str, db) -> dict:
                 ch for ch in str(dados_nfe.get("fornecedor_cnpj", "")) if ch.isdigit()
             )
             if cnpj_emitente and cnpj_emitente == tenant_cnpj:
-                logger.debug(f"[SEFAZ] NSU {nsu}: NF de saida descartada (emitente == tenant)")
+                logger.debug(
+                    f"[SEFAZ] NSU {nsu}: NF de saida descartada (emitente == tenant)"
+                )
                 saidas_descartadas += 1
                 continue
 
@@ -97,20 +107,24 @@ def _importar_docs_sefaz_scoped(docs: list, tenant_id_str: str, db) -> dict:
             continue
 
         # Verificar se ja existe
-        existente = db.query(NotaEntrada).filter(
-            NotaEntrada.chave_acesso == chave
-        ).first()
+        existente = (
+            db.query(NotaEntrada).filter(NotaEntrada.chave_acesso == chave).first()
+        )
         if existente:
             duplicadas += 1
             continue
 
         try:
             # Buscar ou criar fornecedor
-            fornecedor = db.query(Cliente).filter(
-                Cliente.cnpj == dados_nfe["fornecedor_cnpj"],
-                Cliente.tenant_id == tenant_id_str,
-                Cliente.ativo.is_(True)
-            ).first()
+            fornecedor = (
+                db.query(Cliente)
+                .filter(
+                    Cliente.cnpj == dados_nfe["fornecedor_cnpj"],
+                    Cliente.tenant_id == tenant_id_str,
+                    Cliente.ativo.is_(True),
+                )
+                .first()
+            )
 
             if not fornecedor:
                 fornecedor, _ = criar_fornecedor_automatico(
@@ -196,7 +210,9 @@ def _importar_docs_sefaz_scoped(docs: list, tenant_id_str: str, db) -> dict:
 
         except Exception as exc:
             db.rollback()
-            logger.warning(f"[SEFAZ] NSU {nsu}: erro ao salvar nota {chave[:10]}... - {exc}")
+            logger.warning(
+                f"[SEFAZ] NSU {nsu}: erro ao salvar nota {chave[:10]}... - {exc}"
+            )
             erros += 1
 
     return {

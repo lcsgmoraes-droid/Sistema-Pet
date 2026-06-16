@@ -39,7 +39,11 @@ def _tenant_id_arg(value: str | None) -> str:
 
 
 def _prefixes_arg(values: list[str] | None) -> tuple[str, ...]:
-    prefixes = tuple(value.strip() for value in (values or list(DEFAULT_PATH_PREFIXES)) if value.strip())
+    prefixes = tuple(
+        value.strip()
+        for value in (values or list(DEFAULT_PATH_PREFIXES))
+        if value.strip()
+    )
     if not prefixes:
         raise SystemExit("Informe ao menos um --path-prefix.")
     return prefixes
@@ -74,7 +78,9 @@ def backfill_ops_events(
             payload = dict(row.payload or {})
             payload["tenant_id"] = tenant_id
             payload["tenant_source"] = "ops_backfill_path_prefix"
-            payload["tenant_backfilled_at"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            payload["tenant_backfilled_at"] = (
+                datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+            )
             row.tenant_id = UUID(tenant_id)
             row.payload = payload
             db.add(row)
@@ -94,7 +100,9 @@ def backfill_ops_events(
             for alert in alert_query.yield_per(100):
                 payload = dict(alert.payload or {})
                 payload["resolved_by"] = "ops_tenant_backfill"
-                payload["resolved_reason"] = "Eventos sem tenant foram reatribuidos por prefixo de rota."
+                payload["resolved_reason"] = (
+                    "Eventos sem tenant foram reatribuidos por prefixo de rota."
+                )
                 alert.status = "resolved"
                 alert.resolved_at = now
                 alert.updated_at = now
@@ -123,7 +131,12 @@ def main() -> None:
     )
     parser.add_argument("--tenant-id", default=None)
     parser.add_argument("--path-prefix", action="append", default=None)
-    parser.add_argument("--hours", type=int, default=72, help="Janela a corrigir. Use 0 para todo o historico.")
+    parser.add_argument(
+        "--hours",
+        type=int,
+        default=72,
+        help="Janela a corrigir. Use 0 para todo o historico.",
+    )
     parser.add_argument("--keep-alerts-open", action="store_true")
     args = parser.parse_args()
 

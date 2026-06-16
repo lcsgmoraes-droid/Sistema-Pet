@@ -43,16 +43,76 @@ from app.utils.logger import logger
 
 
 MATERIAIS_BASE = [
-    {"codigo": "MASK-DESC", "nome": "Mascara descartavel tripla", "unidade": "UN", "custo": 0.65, "venda": 1.20},
-    {"codigo": "LUVA-LATEX-M", "nome": "Luva procedimento latex M", "unidade": "CX", "custo": 28.00, "venda": 39.90},
-    {"codigo": "GAZE-EST-75", "nome": "Gaze esteril 7.5x7.5", "unidade": "PCT", "custo": 7.40, "venda": 11.90},
-    {"codigo": "ALGODAO-HID", "nome": "Algodao hidrofilo 500g", "unidade": "PCT", "custo": 12.50, "venda": 18.00},
-    {"codigo": "MICROPORE-25", "nome": "Fita micropore 25mm", "unidade": "UN", "custo": 4.20, "venda": 7.50},
-    {"codigo": "ATADURA-10", "nome": "Atadura crepe 10cm", "unidade": "UN", "custo": 2.10, "venda": 3.90},
-    {"codigo": "SERINGA-3ML", "nome": "Seringa descartavel 3ml", "unidade": "UN", "custo": 0.42, "venda": 0.90},
-    {"codigo": "AGULHA-25X7", "nome": "Agulha hipodermica 25x7", "unidade": "UN", "custo": 0.18, "venda": 0.45},
-    {"codigo": "SORO-500", "nome": "Soro fisiologico 0.9% 500ml", "unidade": "UN", "custo": 6.30, "venda": 11.90},
-    {"codigo": "COLETOR-PERF", "nome": "Coletor perfurocortante 7L", "unidade": "UN", "custo": 8.90, "venda": 14.90},
+    {
+        "codigo": "MASK-DESC",
+        "nome": "Mascara descartavel tripla",
+        "unidade": "UN",
+        "custo": 0.65,
+        "venda": 1.20,
+    },
+    {
+        "codigo": "LUVA-LATEX-M",
+        "nome": "Luva procedimento latex M",
+        "unidade": "CX",
+        "custo": 28.00,
+        "venda": 39.90,
+    },
+    {
+        "codigo": "GAZE-EST-75",
+        "nome": "Gaze esteril 7.5x7.5",
+        "unidade": "PCT",
+        "custo": 7.40,
+        "venda": 11.90,
+    },
+    {
+        "codigo": "ALGODAO-HID",
+        "nome": "Algodao hidrofilo 500g",
+        "unidade": "PCT",
+        "custo": 12.50,
+        "venda": 18.00,
+    },
+    {
+        "codigo": "MICROPORE-25",
+        "nome": "Fita micropore 25mm",
+        "unidade": "UN",
+        "custo": 4.20,
+        "venda": 7.50,
+    },
+    {
+        "codigo": "ATADURA-10",
+        "nome": "Atadura crepe 10cm",
+        "unidade": "UN",
+        "custo": 2.10,
+        "venda": 3.90,
+    },
+    {
+        "codigo": "SERINGA-3ML",
+        "nome": "Seringa descartavel 3ml",
+        "unidade": "UN",
+        "custo": 0.42,
+        "venda": 0.90,
+    },
+    {
+        "codigo": "AGULHA-25X7",
+        "nome": "Agulha hipodermica 25x7",
+        "unidade": "UN",
+        "custo": 0.18,
+        "venda": 0.45,
+    },
+    {
+        "codigo": "SORO-500",
+        "nome": "Soro fisiologico 0.9% 500ml",
+        "unidade": "UN",
+        "custo": 6.30,
+        "venda": 11.90,
+    },
+    {
+        "codigo": "COLETOR-PERF",
+        "nome": "Coletor perfurocortante 7L",
+        "unidade": "UN",
+        "custo": 8.90,
+        "venda": 14.90,
+    },
 ]
 
 MEDICAMENTOS_BASE = [
@@ -175,11 +235,51 @@ MEDICAMENTOS_BASE = [
 ]
 
 PROTOCOLOS_VACINA_BASE = [
-    {"nome": "V8 / V10", "especie": "cao", "dose_inicial_semanas": 6, "intervalo_doses_dias": 21, "numero_doses_serie": 3, "reforco_anual": True, "observacoes": "Serie primaria em filhotes com reforco anual."},
-    {"nome": "Antirrabica", "especie": "cao", "dose_inicial_semanas": 12, "intervalo_doses_dias": 365, "numero_doses_serie": 1, "reforco_anual": True, "observacoes": "Obrigatoria por legislacao local."},
-    {"nome": "Bordetella", "especie": "cao", "dose_inicial_semanas": 8, "intervalo_doses_dias": 365, "numero_doses_serie": 1, "reforco_anual": True, "observacoes": "Indicada para cao com convivencia coletiva."},
-    {"nome": "V3 / V4 Felina", "especie": "gato", "dose_inicial_semanas": 8, "intervalo_doses_dias": 21, "numero_doses_serie": 3, "reforco_anual": True, "observacoes": "Serie primaria felina e reforco anual."},
-    {"nome": "FeLV", "especie": "gato", "dose_inicial_semanas": 8, "intervalo_doses_dias": 28, "numero_doses_serie": 2, "reforco_anual": True, "observacoes": "Recomendado para felinos com acesso externo."},
+    {
+        "nome": "V8 / V10",
+        "especie": "cao",
+        "dose_inicial_semanas": 6,
+        "intervalo_doses_dias": 21,
+        "numero_doses_serie": 3,
+        "reforco_anual": True,
+        "observacoes": "Serie primaria em filhotes com reforco anual.",
+    },
+    {
+        "nome": "Antirrabica",
+        "especie": "cao",
+        "dose_inicial_semanas": 12,
+        "intervalo_doses_dias": 365,
+        "numero_doses_serie": 1,
+        "reforco_anual": True,
+        "observacoes": "Obrigatoria por legislacao local.",
+    },
+    {
+        "nome": "Bordetella",
+        "especie": "cao",
+        "dose_inicial_semanas": 8,
+        "intervalo_doses_dias": 365,
+        "numero_doses_serie": 1,
+        "reforco_anual": True,
+        "observacoes": "Indicada para cao com convivencia coletiva.",
+    },
+    {
+        "nome": "V3 / V4 Felina",
+        "especie": "gato",
+        "dose_inicial_semanas": 8,
+        "intervalo_doses_dias": 21,
+        "numero_doses_serie": 3,
+        "reforco_anual": True,
+        "observacoes": "Serie primaria felina e reforco anual.",
+    },
+    {
+        "nome": "FeLV",
+        "especie": "gato",
+        "dose_inicial_semanas": 8,
+        "intervalo_doses_dias": 28,
+        "numero_doses_serie": 2,
+        "reforco_anual": True,
+        "observacoes": "Recomendado para felinos com acesso externo.",
+    },
 ]
 
 PROCEDIMENTOS_BASE = [
@@ -190,7 +290,11 @@ PROCEDIMENTOS_BASE = [
         "duracao_minutos": 30,
         "requer_anestesia": False,
         "observacoes": "Avaliacao clinica completa com sinais vitais.",
-        "insumos_codigos": [("LUVA-LATEX-M", 0.1), ("MASK-DESC", 1), ("GAZE-EST-75", 1)],
+        "insumos_codigos": [
+            ("LUVA-LATEX-M", 0.1),
+            ("MASK-DESC", 1),
+            ("GAZE-EST-75", 1),
+        ],
     },
     {
         "nome": "Curativo simples",
@@ -199,7 +303,13 @@ PROCEDIMENTOS_BASE = [
         "duracao_minutos": 25,
         "requer_anestesia": False,
         "observacoes": "Higienizacao e cobertura de lesao superficial.",
-        "insumos_codigos": [("LUVA-LATEX-M", 0.1), ("GAZE-EST-75", 2), ("MICROPORE-25", 0.3), ("ATADURA-10", 1), ("SORO-500", 0.1)],
+        "insumos_codigos": [
+            ("LUVA-LATEX-M", 0.1),
+            ("GAZE-EST-75", 2),
+            ("MICROPORE-25", 0.3),
+            ("ATADURA-10", 1),
+            ("SORO-500", 0.1),
+        ],
     },
     {
         "nome": "Aplicacao de vacinas",
@@ -208,7 +318,12 @@ PROCEDIMENTOS_BASE = [
         "duracao_minutos": 15,
         "requer_anestesia": False,
         "observacoes": "Aplicacao de vacina conforme protocolo da clinica.",
-        "insumos_codigos": [("LUVA-LATEX-M", 0.1), ("SERINGA-3ML", 1), ("AGULHA-25X7", 1), ("ALGODAO-HID", 0.05)],
+        "insumos_codigos": [
+            ("LUVA-LATEX-M", 0.1),
+            ("SERINGA-3ML", 1),
+            ("AGULHA-25X7", 1),
+            ("ALGODAO-HID", 0.05),
+        ],
     },
     {
         "nome": "Coleta de sangue",
@@ -217,7 +332,13 @@ PROCEDIMENTOS_BASE = [
         "duracao_minutos": 20,
         "requer_anestesia": False,
         "observacoes": "Coleta para hemograma e bioquimica.",
-        "insumos_codigos": [("LUVA-LATEX-M", 0.1), ("SERINGA-3ML", 1), ("AGULHA-25X7", 1), ("GAZE-EST-75", 1), ("MICROPORE-25", 0.1)],
+        "insumos_codigos": [
+            ("LUVA-LATEX-M", 0.1),
+            ("SERINGA-3ML", 1),
+            ("AGULHA-25X7", 1),
+            ("GAZE-EST-75", 1),
+            ("MICROPORE-25", 0.1),
+        ],
     },
 ]
 
@@ -243,7 +364,11 @@ def _primary_user_for_tenant(db: Session, tenant_id: str) -> User | None:
 
 
 def _find_product(db: Session, tenant_id: str, codigo: str) -> Produto | None:
-    return db.query(Produto).filter(Produto.tenant_id == _tenant_str(tenant_id), Produto.codigo == codigo).first()
+    return (
+        db.query(Produto)
+        .filter(Produto.tenant_id == _tenant_str(tenant_id), Produto.codigo == codigo)
+        .first()
+    )
 
 
 def _upsert_materiais(db: Session, tenant_id: str, user_id: int) -> dict[str, Produto]:
@@ -296,7 +421,10 @@ def _upsert_medicamentos(db: Session, tenant_id: str) -> None:
     for item in MEDICAMENTOS_BASE:
         existente = (
             db.query(MedicamentoCatalogo)
-            .filter(MedicamentoCatalogo.tenant_id == tenant_key, MedicamentoCatalogo.nome == item["nome"])
+            .filter(
+                MedicamentoCatalogo.tenant_id == tenant_key,
+                MedicamentoCatalogo.nome == item["nome"],
+            )
             .first()
         )
         if existente:
@@ -310,7 +438,11 @@ def _upsert_protocolos(db: Session, tenant_id: str) -> None:
     for item in PROTOCOLOS_VACINA_BASE:
         existente = (
             db.query(ProtocoloVacina)
-            .filter(ProtocoloVacina.tenant_id == tenant_key, ProtocoloVacina.nome == item["nome"], ProtocoloVacina.especie == item["especie"])
+            .filter(
+                ProtocoloVacina.tenant_id == tenant_key,
+                ProtocoloVacina.nome == item["nome"],
+                ProtocoloVacina.especie == item["especie"],
+            )
             .first()
         )
         if existente:
@@ -319,12 +451,17 @@ def _upsert_protocolos(db: Session, tenant_id: str) -> None:
         db.add(ProtocoloVacina(tenant_id=tenant_key, ativo=True, **item))
 
 
-def _upsert_procedimentos(db: Session, tenant_id: str, materiais: dict[str, Produto]) -> None:
+def _upsert_procedimentos(
+    db: Session, tenant_id: str, materiais: dict[str, Produto]
+) -> None:
     tenant_key = _tenant_str(tenant_id)
     for item in PROCEDIMENTOS_BASE:
         existente = (
             db.query(CatalogoProcedimento)
-            .filter(CatalogoProcedimento.tenant_id == tenant_key, CatalogoProcedimento.nome == item["nome"])
+            .filter(
+                CatalogoProcedimento.tenant_id == tenant_key,
+                CatalogoProcedimento.nome == item["nome"],
+            )
             .first()
         )
 
@@ -354,29 +491,59 @@ def _upsert_procedimentos(db: Session, tenant_id: str, materiais: dict[str, Prod
         }
 
         if not existente:
-            db.add(CatalogoProcedimento(tenant_id=tenant_key, nome=item["nome"], **payload))
+            db.add(
+                CatalogoProcedimento(tenant_id=tenant_key, nome=item["nome"], **payload)
+            )
         else:
             existente.ativo = True
             existente.categoria = existente.categoria or payload["categoria"]
             existente.valor_padrao = existente.valor_padrao or payload["valor_padrao"]
-            existente.duracao_minutos = existente.duracao_minutos or payload["duracao_minutos"]
+            existente.duracao_minutos = (
+                existente.duracao_minutos or payload["duracao_minutos"]
+            )
             existente.insumos = payload["insumos"]
 
 
 def _seed_test_launches(db: Session, tenant_id: str, user_id: int) -> int:
     """Cria poucos lancamentos teste para treino de fluxo (somente DEV)."""
     tenant_key = _tenant_str(tenant_id)
-    pets = db.query(Pet).filter(Pet.tenant_id == tenant_key, Pet.ativo == True).order_by(Pet.id.asc()).limit(2).all()  # noqa: E712
+    pets = (
+        db.query(Pet)
+        .filter(Pet.tenant_id == tenant_key, Pet.ativo.is_(True))
+        .order_by(Pet.id.asc())
+        .limit(2)
+        .all()
+    )
     if not pets:
         return 0
 
-    protocolo_v8 = db.query(ProtocoloVacina).filter(ProtocoloVacina.tenant_id == tenant_key, ProtocoloVacina.nome == "V8 / V10").first()
-    proc_consulta = db.query(CatalogoProcedimento).filter(CatalogoProcedimento.tenant_id == tenant_key, CatalogoProcedimento.nome == "Consulta clinica geral").first()
+    protocolo_v8 = (
+        db.query(ProtocoloVacina)
+        .filter(
+            ProtocoloVacina.tenant_id == tenant_key, ProtocoloVacina.nome == "V8 / V10"
+        )
+        .first()
+    )
+    proc_consulta = (
+        db.query(CatalogoProcedimento)
+        .filter(
+            CatalogoProcedimento.tenant_id == tenant_key,
+            CatalogoProcedimento.nome == "Consulta clinica geral",
+        )
+        .first()
+    )
 
     created = 0
     for pet in pets:
         marcador = f"SEED_VET_BASE_TESTE_PET_{pet.id}"
-        ja_existe = db.query(ConsultaVet).filter(ConsultaVet.tenant_id == tenant_key, ConsultaVet.observacoes_internas == marcador).first()
+        ja_existe = (
+            db.query(ConsultaVet)
+            .filter(
+                ConsultaVet.tenant_id == tenant_key,
+                ConsultaVet.observacoes_internas == marcador,
+            )
+            .first()
+        )
         if ja_existe:
             continue
 
@@ -478,7 +645,9 @@ def run_seed(tenant_id: str | None, with_test_launches: bool) -> None:
             try:
                 user = _primary_user_for_tenant(db, tenant.id)
                 if not user:
-                    logger.warning(f"Tenant {tenant.id} sem usuario ativo; seed ignorado.")
+                    logger.warning(
+                        f"Tenant {tenant.id} sem usuario ativo; seed ignorado."
+                    )
                     continue
 
                 materiais = _upsert_materiais(db, tenant.id, user.id)
@@ -494,7 +663,9 @@ def run_seed(tenant_id: str | None, with_test_launches: bool) -> None:
                 clear_tenant_context()
 
         db.commit()
-        logger.info(f"Seed veterinario concluido. Tenants processados: {total_tenants}.")
+        logger.info(
+            f"Seed veterinario concluido. Tenants processados: {total_tenants}."
+        )
         if with_test_launches:
             logger.info(f"Lancamentos teste criados: {total_tests}.")
     except Exception as exc:
@@ -507,7 +678,12 @@ def run_seed(tenant_id: str | None, with_test_launches: bool) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description="Seed veterinario base")
-    parser.add_argument("--tenant-id", dest="tenant_id", default=None, help="Tenant especifico para seed")
+    parser.add_argument(
+        "--tenant-id",
+        dest="tenant_id",
+        default=None,
+        help="Tenant especifico para seed",
+    )
     parser.add_argument(
         "--with-test-launches",
         dest="with_test_launches",

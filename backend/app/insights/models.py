@@ -39,25 +39,25 @@ import json
 class TipoInsight(str, Enum):
     """
     Tipos de insights que o sistema pode gerar.
-    
+
     Cada tipo representa uma observação/recomendação específica.
     """
-    
+
     # Insights de clientes
     CLIENTE_RECORRENTE_ATRASADO = "CLIENTE_RECORRENTE_ATRASADO"
     CLIENTE_INATIVO = "CLIENTE_INATIVO"
     CLIENTE_VIP = "CLIENTE_VIP"
     CLIENTE_EM_RISCO_CHURN = "CLIENTE_EM_RISCO_CHURN"
-    
+
     # Insights de produtos
     PRODUTO_TOP_VENDAS = "PRODUTO_TOP_VENDAS"
     PRODUTO_BAIXO_MOVIMENTO = "PRODUTO_BAIXO_MOVIMENTO"
     PRODUTOS_COMPRADOS_JUNTOS = "PRODUTOS_COMPRADOS_JUNTOS"
-    
+
     # Insights de kits
     KIT_TOP_VENDAS = "KIT_TOP_VENDAS"
     KIT_MAIS_VANTAJOSO = "KIT_MAIS_VANTAJOSO"
-    
+
     # Insights gerais
     TENDENCIA_VENDAS = "TENDENCIA_VENDAS"
     OPORTUNIDADE_COMBO = "OPORTUNIDADE_COMBO"
@@ -66,10 +66,10 @@ class TipoInsight(str, Enum):
 class SeveridadeInsight(str, Enum):
     """
     Nível de severidade/prioridade de um insight.
-    
+
     Define a urgência e importância da ação sugerida.
     """
-    
+
     INFO = "INFO"  # Informação geral, sem urgência
     ATENCAO = "ATENCAO"  # Requer atenção, possível problema
     OPORTUNIDADE = "OPORTUNIDADE"  # Chance de ganho, não urgente
@@ -80,7 +80,7 @@ class EntidadeInsight(str, Enum):
     """
     Tipo de entidade sobre a qual o insight trata.
     """
-    
+
     CLIENTE = "CLIENTE"
     PRODUTO = "PRODUTO"
     KIT = "KIT"
@@ -92,14 +92,14 @@ class EntidadeInsight(str, Enum):
 class Insight:
     """
     Representa um insight gerado automaticamente pelo sistema.
-    
+
     Insights são observações/recomendações baseadas em análise de dados
     históricos. São imutáveis e servem como base para:
     - Alertas automáticos
     - Recomendações ao usuário
     - Entrada para IA generativa (Sprint 6)
     - Dashboards de insights
-    
+
     Atributos:
         id: Identificador único do insight
         tipo: Tipo do insight (TipoInsight enum)
@@ -113,7 +113,7 @@ class Insight:
         timestamp: Momento em que o insight foi gerado
         acao_sugerida: Sugestão de ação (opcional)
         metricas: Métricas relevantes (opcional)
-    
+
     Exemplo:
     ```python
     insight = Insight(
@@ -135,71 +135,71 @@ class Insight:
     )
     ```
     """
-    
+
     # Identificação
     id: str
     tipo: TipoInsight
-    
+
     # Conteúdo
     titulo: str
     descricao: str
-    
+
     # Classificação
     severidade: SeveridadeInsight
     entidade: EntidadeInsight
     entidade_id: Optional[int] = None
-    
+
     # Dados contextuais
     dados_contexto: Dict[str, Any] = field(default_factory=dict)
     metricas: Dict[str, float] = field(default_factory=dict)
-    
+
     # Ação recomendada
     acao_sugerida: Optional[str] = None
-    
+
     # Multi-tenancy
     user_id: int = None
-    
+
     # Timestamp
     timestamp: datetime = field(default_factory=datetime.now)
-    
+
     def __post_init__(self):
         """Validações básicas"""
         if self.user_id is None:
             raise ValueError("user_id é obrigatório para multi-tenancy")
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """
         Converte insight para dicionário.
-        
+
         Útil para serialização JSON, envio via API, etc.
-        
+
         Returns:
             Dict com todos os campos do insight
         """
         return {
-            'id': self.id,
-            'tipo': self.tipo.value,
-            'titulo': self.titulo,
-            'descricao': self.descricao,
-            'severidade': self.severidade.value,
-            'entidade': self.entidade.value,
-            'entidade_id': self.entidade_id,
-            'dados_contexto': self.dados_contexto,
-            'metricas': self.metricas,
-            'acao_sugerida': self.acao_sugerida,
-            'user_id': self.user_id,
-            'timestamp': self.timestamp.isoformat() if self.timestamp else None
+            "id": self.id,
+            "tipo": self.tipo.value,
+            "titulo": self.titulo,
+            "descricao": self.descricao,
+            "severidade": self.severidade.value,
+            "entidade": self.entidade.value,
+            "entidade_id": self.entidade_id,
+            "dados_contexto": self.dados_contexto,
+            "metricas": self.metricas,
+            "acao_sugerida": self.acao_sugerida,
+            "user_id": self.user_id,
+            "timestamp": self.timestamp.isoformat() if self.timestamp else None,
         }
-    
+
     def to_json(self) -> str:
         """
         Converte insight para JSON.
-        
+
         Returns:
             String JSON formatada
         """
         return json.dumps(self.to_dict(), indent=2, ensure_ascii=False)
-    
+
     def __str__(self) -> str:
         """Representação em string para logs"""
         return (

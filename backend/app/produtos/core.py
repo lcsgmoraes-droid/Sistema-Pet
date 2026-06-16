@@ -37,7 +37,9 @@ def _normalizar_promocao_erp_payload(
 ) -> dict[str, Any]:
     campos_promocao = {"preco_promocional", "promocao_inicio", "promocao_fim"}
 
-    if produto_atual is not None and not any(campo in dados for campo in campos_promocao):
+    if produto_atual is not None and not any(
+        campo in dados for campo in campos_promocao
+    ):
         return dados
 
     preco_promocional = (

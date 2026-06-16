@@ -13,7 +13,9 @@ def _serializar_lote_consumido(lote: Any, quantidade_consumida: Any) -> dict[str
     }
 
 
-def _consumir_lotes_fifo_produto(lotes: Iterable[Any], quantidade: Any) -> list[dict[str, Any]]:
+def _consumir_lotes_fifo_produto(
+    lotes: Iterable[Any], quantidade: Any
+) -> list[dict[str, Any]]:
     """Consome lotes na ordem recebida preservando o payload legado da rota FIFO."""
     quantidade_restante = quantidade
     lotes_consumidos: list[dict[str, Any]] = []

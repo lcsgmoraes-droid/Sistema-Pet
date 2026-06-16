@@ -9,7 +9,9 @@ from app.produtos_models import Produto
 
 def _produto_eh_racao_expr():
     tipo_normalizado = func.lower(func.coalesce(Produto.tipo, ""))
-    classificacao_normalizada = func.lower(func.coalesce(Produto.classificacao_racao, ""))
+    classificacao_normalizada = func.lower(
+        func.coalesce(Produto.classificacao_racao, "")
+    )
     return or_(
         tipo_normalizado.like("ra%"),
         and_(
@@ -78,4 +80,3 @@ def _normalizar_payload_racao(dados: dict[str, Any]) -> dict[str, Any]:
                 dados[campo] = None
 
     return dados
-

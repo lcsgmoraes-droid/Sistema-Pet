@@ -674,6 +674,17 @@ def test_backend_ci_has_blocking_backend_services_format_step():
     )
 
 
+def test_backend_ci_has_blocking_backend_business_support_scripts_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend business support scripts format (blocking)" in source
+    assert (
+        "ruff format --check app/audit app/financeiro app/insights app/schedulers "
+        "app/parsers app/scripts app/middlewares app/notas_entrada app/produtos "
+        "scripts"
+    ) in source
+
+
 def test_backend_ci_has_blocking_backend_multi_tenant_tests_format_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

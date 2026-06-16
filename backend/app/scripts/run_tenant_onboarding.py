@@ -66,8 +66,12 @@ def _build_parser() -> argparse.ArgumentParser:
         type=int,
         help="Admin/user id used as owner of copied rows. Required with --tenant-id.",
     )
-    parser.add_argument("--bundle-code", default="petshop-br", help="Template bundle code.")
-    parser.add_argument("--bundle-version", default="v1", help="Template bundle version.")
+    parser.add_argument(
+        "--bundle-code", default="petshop-br", help="Template bundle code."
+    )
+    parser.add_argument(
+        "--bundle-version", default="v1", help="Template bundle version."
+    )
     parser.add_argument(
         "--apply",
         action="store_true",
@@ -122,7 +126,9 @@ def _active_owner_condition(dialect_name: str) -> str:
     return "(is_active IS NULL OR is_active = 1)"
 
 
-def _find_active_tenants_with_owner(db) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+def _find_active_tenants_with_owner(
+    db,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     inspector = inspect(db.connection())
     if not inspector.has_table("tenants"):
         return [], [{"tenant_id": None, "reason": "Tabela tenants ausente."}]
@@ -145,9 +151,10 @@ def _find_active_tenants_with_owner(db) -> tuple[list[dict[str, Any]], list[dict
     skipped: list[dict[str, Any]] = []
     for tenant in tenants:
         tenant_id = str(tenant["id"])
-        owner = db.execute(
-            text(
-                f"""
+        owner = (
+            db.execute(
+                text(
+                    f"""
                 SELECT id
                 FROM users
                 WHERE CAST(tenant_id AS TEXT) = :tenant_id
@@ -155,11 +162,16 @@ def _find_active_tenants_with_owner(db) -> tuple[list[dict[str, Any]], list[dict
                 ORDER BY id
                 LIMIT 1
                 """
-            ),
-            {"tenant_id": tenant_id},
-        ).mappings().first()
+                ),
+                {"tenant_id": tenant_id},
+            )
+            .mappings()
+            .first()
+        )
         if owner is None:
-            skipped.append({"tenant_id": tenant_id, "reason": "Tenant sem usuario ativo."})
+            skipped.append(
+                {"tenant_id": tenant_id, "reason": "Tenant sem usuario ativo."}
+            )
             continue
         targets.append({"tenant_id": tenant_id, "user_id": int(owner["id"])})
 
@@ -188,7 +200,9 @@ def _literal_name_from_assignment(node: ast.AST, variable_name: str) -> str | No
     target_names: list[str] = []
     value_node: ast.AST | None = None
     if isinstance(node, ast.Assign):
-        target_names = [target.id for target in node.targets if isinstance(target, ast.Name)]
+        target_names = [
+            target.id for target in node.targets if isinstance(target, ast.Name)
+        ]
         value_node = node.value
     elif isinstance(node, ast.AnnAssign):
         if isinstance(node.target, ast.Name):
@@ -208,7 +222,9 @@ def _literal_down_revisions(node: ast.AST) -> set[str]:
     target_names: list[str] = []
     value_node: ast.AST | None = None
     if isinstance(node, ast.Assign):
-        target_names = [target.id for target in node.targets if isinstance(target, ast.Name)]
+        target_names = [
+            target.id for target in node.targets if isinstance(target, ast.Name)
+        ]
         value_node = node.value
     elif isinstance(node, ast.AnnAssign):
         if isinstance(node.target, ast.Name):
@@ -403,7 +419,8 @@ def _run_future_tenant_check(db, args) -> dict[str, Any]:
     missing_sections = sorted(
         section
         for section in required_sections
-        if int(would_create.get(section, 0)) <= 0 and int(result.get("skipped", {}).get(section, 0)) <= 0
+        if int(would_create.get(section, 0)) <= 0
+        and int(result.get("skipped", {}).get(section, 0)) <= 0
     )
     warnings = result.get("warnings", [])
 
@@ -463,19 +480,27 @@ def main(argv: list[str] | None = None) -> int:
     dry_run = not args.apply
 
     if args.tenant_id and args.user_id is None:
-        return _fail("--user-id e obrigatorio quando --tenant-id e usado.", dry_run=dry_run)
+        return _fail(
+            "--user-id e obrigatorio quando --tenant-id e usado.", dry_run=dry_run
+        )
 
     if args.health_check and args.apply:
         return _fail("--health-check e somente leitura; remova --apply.", dry_run=True)
 
     if args.future_tenant_check and args.apply:
-        return _fail("--future-tenant-check e somente leitura; remova --apply.", dry_run=True)
+        return _fail(
+            "--future-tenant-check e somente leitura; remova --apply.", dry_run=True
+        )
 
     if args.template_check and args.apply:
-        return _fail("--template-check e somente leitura; remova --apply.", dry_run=True)
+        return _fail(
+            "--template-check e somente leitura; remova --apply.", dry_run=True
+        )
 
     if args.signup_readiness_check and args.apply:
-        return _fail("--signup-readiness-check e somente leitura; remova --apply.", dry_run=True)
+        return _fail(
+            "--signup-readiness-check e somente leitura; remova --apply.", dry_run=True
+        )
 
     if args.all_active_tenants and args.apply and not args.allow_existing_tenant_apply:
         return _fail(
@@ -485,7 +510,11 @@ def main(argv: list[str] | None = None) -> int:
         )
 
     environment = _environment_name()
-    if args.apply and environment in PRODUCTION_ENVS and not args.allow_production_apply:
+    if (
+        args.apply
+        and environment in PRODUCTION_ENVS
+        and not args.allow_production_apply
+    ):
         return _fail(
             "Ambiente production/prod detectado; --apply bloqueado sem --allow-production-apply.",
             dry_run=dry_run,

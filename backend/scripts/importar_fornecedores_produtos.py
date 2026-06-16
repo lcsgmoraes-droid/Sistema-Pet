@@ -95,7 +95,9 @@ def parse_items(rows: list[dict]) -> list[CsvItem]:
     for row in rows:
         codigo = first_not_empty(row, ["Código", "Codigo", "codigo", "CODIGO"])
         produto_nome = first_not_empty(row, ["Produto", "produto", "NOME", "Nome"])
-        fornecedor_nome = first_not_empty(row, ["Fornecedor", "fornecedor", "FORNECEDOR"])
+        fornecedor_nome = first_not_empty(
+            row, ["Fornecedor", "fornecedor", "FORNECEDOR"]
+        )
         marca_nome = first_not_empty(row, ["Marca", "marca", "MARCA"])
 
         if not fornecedor_nome and not marca_nome:
@@ -135,7 +137,9 @@ def detect_tenant_id(db: Session, items: list[CsvItem]) -> UUID:
     codigos = [i.codigo for i in items if i.codigo]
     codigos = list(dict.fromkeys(codigos))[:2000]
     if not codigos:
-        raise RuntimeError("Nao foi possivel detectar tenant automaticamente sem codigos de produto no CSV.")
+        raise RuntimeError(
+            "Nao foi possivel detectar tenant automaticamente sem codigos de produto no CSV."
+        )
 
     rows = (
         db.query(Produto.tenant_id, func.count(Produto.id).label("qtd"))
@@ -171,7 +175,9 @@ def get_next_supplier_code(db: Session, tenant_id: UUID) -> str:
 def resolve_session(database_url: Optional[str]) -> Session:
     if database_url:
         engine = create_engine(database_url, pool_pre_ping=True)
-        local = sessionmaker(bind=engine, autocommit=False, autoflush=False, expire_on_commit=False)
+        local = sessionmaker(
+            bind=engine, autocommit=False, autoflush=False, expire_on_commit=False
+        )
         return local()
     return SessionLocal()
 
@@ -211,7 +217,9 @@ def run(args: argparse.Namespace) -> None:
         sync_sequence(db, "marcas")
         sync_sequence(db, "produto_fornecedores")
 
-        tenant_id = UUID(args.tenant_id) if args.tenant_id else detect_tenant_id(db, items)
+        tenant_id = (
+            UUID(args.tenant_id) if args.tenant_id else detect_tenant_id(db, items)
+        )
 
         user = (
             db.query(User)
@@ -238,7 +246,9 @@ def run(args: argparse.Namespace) -> None:
             )
             .all()
         )
-        fornecedores_by_name = {normalize_text(f.nome): f for f in fornecedores if f.nome}
+        fornecedores_by_name = {
+            normalize_text(f.nome): f for f in fornecedores if f.nome
+        }
 
         marcas = db.query(Marca).filter(Marca.tenant_id == tenant_id).all()
         marcas_by_name = {normalize_text(m.nome): m for m in marcas if m.nome}
@@ -258,7 +268,11 @@ def run(args: argparse.Namespace) -> None:
         nao_encontrados = []
         for item in items:
             produto = None
-            if item.codigo and item.codigo in by_code and len(by_code[item.codigo]) == 1:
+            if (
+                item.codigo
+                and item.codigo in by_code
+                and len(by_code[item.codigo]) == 1
+            ):
                 produto = by_code[item.codigo][0]
             elif item.produto_nome:
                 key_nome = normalize_text(item.produto_nome)
@@ -270,7 +284,9 @@ def run(args: argparse.Namespace) -> None:
                 continue
 
             marca_csv = item.marca_nome.strip()
-            forcar_pets_mar = should_force_pets_mar_by_name(item.produto_nome or produto.nome)
+            forcar_pets_mar = should_force_pets_mar_by_name(
+                item.produto_nome or produto.nome
+            )
             marca_final = PETS_MAR_MARCA if forcar_pets_mar else marca_csv
 
             fornecedor_final = item.fornecedor_nome.strip()
@@ -282,14 +298,18 @@ def run(args: argparse.Namespace) -> None:
         produto_ids_resolvidos = {p.id for p, _, _ in produtos_resolvidos}
 
         pets_mar_marca = marcas_by_name.get(normalize_text(PETS_MAR_MARCA))
-        produto_ids_pets_mar_nome = {p.id for p in produtos if should_force_pets_mar_by_name(p.nome)}
+        produto_ids_pets_mar_nome = {
+            p.id for p in produtos if should_force_pets_mar_by_name(p.nome)
+        }
         produto_ids_pets_mar_marca = {
-            p.id
-            for p in produtos
-            if pets_mar_marca and p.marca_id == pets_mar_marca.id
+            p.id for p in produtos if pets_mar_marca and p.marca_id == pets_mar_marca.id
         }
 
-        produto_ids = list(produto_ids_resolvidos | produto_ids_pets_mar_nome | produto_ids_pets_mar_marca)
+        produto_ids = list(
+            produto_ids_resolvidos
+            | produto_ids_pets_mar_nome
+            | produto_ids_pets_mar_marca
+        )
         associacoes = (
             db.query(ProdutoFornecedor)
             .filter(
@@ -397,7 +417,9 @@ def run(args: argparse.Namespace) -> None:
                 fornecedor_principal_ids[produto.id] = fornecedor.id
                 updated_produto_fornecedor_id += 1
 
-            marca_e_pets_mar = normalize_text(marca_nome) == normalize_text(PETS_MAR_MARCA)
+            marca_e_pets_mar = normalize_text(marca_nome) == normalize_text(
+                PETS_MAR_MARCA
+            )
             if marca_e_pets_mar and produto.fornecedor_id != fornecedor.id:
                 produto.fornecedor_id = fornecedor.id
                 fornecedor_principal_ids[produto.id] = fornecedor.id
@@ -457,15 +479,21 @@ def run(args: argparse.Namespace) -> None:
         if nao_encontrados:
             print("\n=== AMOSTRA PRODUTOS NAO ENCONTRADOS (max 20) ===")
             for item in nao_encontrados[:20]:
-                print(f"codigo={item.codigo!r} | produto={item.produto_nome!r} | fornecedor={item.fornecedor_nome!r}")
+                print(
+                    f"codigo={item.codigo!r} | produto={item.produto_nome!r} | fornecedor={item.fornecedor_nome!r}"
+                )
 
     finally:
         db.close()
 
 
 def build_arg_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Importar fornecedores e associar aos produtos via CSV")
-    parser.add_argument("--csv", required=True, help="Caminho do CSV (ex.: ../Fornecedor.csv)")
+    parser = argparse.ArgumentParser(
+        description="Importar fornecedores e associar aos produtos via CSV"
+    )
+    parser.add_argument(
+        "--csv", required=True, help="Caminho do CSV (ex.: ../Fornecedor.csv)"
+    )
     parser.add_argument(
         "--tenant-id",
         required=False,

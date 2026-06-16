@@ -83,7 +83,11 @@ def map_origem(value: Optional[str]) -> Optional[str]:
     text = normalize_text(value)
     if not text:
         return None
-    if text.isdigit() and len(text) == 1 and text in {"0", "1", "2", "3", "4", "5", "6", "7", "8"}:
+    if (
+        text.isdigit()
+        and len(text) == 1
+        and text in {"0", "1", "2", "3", "4", "5", "6", "7", "8"}
+    ):
         return text
     upper = text.upper()
     if "NACIONAL" in upper:
@@ -144,7 +148,9 @@ class FamilyDefaults:
 def choose_most_common_text(values: Dict[str, int]) -> str:
     if not values:
         return ""
-    return sorted(values.items(), key=lambda item: (-item[1], -len(item[0]), item[0]))[0][0]
+    return sorted(values.items(), key=lambda item: (-item[1], -len(item[0]), item[0]))[
+        0
+    ][0]
 
 
 def choose_most_common_int(values: Dict[int, int]) -> Optional[int]:
@@ -154,7 +160,9 @@ def choose_most_common_int(values: Dict[int, int]) -> Optional[int]:
 
 
 def build_family_defaults(rows: List[BlingRow]) -> Dict[str, FamilyDefaults]:
-    counters: Dict[str, Dict[str, Dict[str, int]]] = defaultdict(lambda: defaultdict(lambda: defaultdict(int)))
+    counters: Dict[str, Dict[str, Dict[str, int]]] = defaultdict(
+        lambda: defaultdict(lambda: defaultdict(int))
+    )
     fields = [
         "marca",
         "fornecedor",
@@ -185,16 +193,22 @@ def build_family_defaults(rows: List[BlingRow]) -> Dict[str, FamilyDefaults]:
             categoria=choose_most_common_text(field_counts["categoria"]),
             departamento=choose_most_common_text(field_counts["departamento"]),
             descricao_curta=choose_most_common_text(field_counts["descricao_curta"]),
-            descricao_complementar=choose_most_common_text(field_counts["descricao_complementar"]),
+            descricao_complementar=choose_most_common_text(
+                field_counts["descricao_complementar"]
+            ),
             ncm=choose_most_common_text(field_counts["ncm"]),
             cest=choose_most_common_text(field_counts["cest"]),
             origem=choose_most_common_text(field_counts["origem"]),
-            perfil_tributario=choose_most_common_text(field_counts["perfil_tributario"]),
+            perfil_tributario=choose_most_common_text(
+                field_counts["perfil_tributario"]
+            ),
         )
     return defaults
 
 
-def build_existing_classification_defaults(produtos: List[Produto]) -> Tuple[Dict[str, Optional[int]], Dict[str, Optional[int]]]:
+def build_existing_classification_defaults(
+    produtos: List[Produto],
+) -> Tuple[Dict[str, Optional[int]], Dict[str, Optional[int]]]:
     department_counts: Dict[str, Dict[int, int]] = defaultdict(lambda: defaultdict(int))
     category_counts: Dict[str, Dict[int, int]] = defaultdict(lambda: defaultdict(int))
 
@@ -223,7 +237,7 @@ def load_bling_rows(csv_path: Path) -> List[BlingRow]:
     with csv_path.open("r", encoding="utf-8-sig", newline="") as handle:
         reader = csv.DictReader(handle, delimiter=";")
         for raw in reader:
-            sku = pick(raw, ["Código", "Codigo", "codigo"]) 
+            sku = pick(raw, ["Código", "Codigo", "codigo"])
             if not normalize_key(sku):
                 continue
             rows.append(
@@ -231,18 +245,45 @@ def load_bling_rows(csv_path: Path) -> List[BlingRow]:
                     sku=sku,
                     nome=pick(raw, ["Descrição", "Descricao", "descricao"]),
                     descricao_curta=pick(raw, ["Descrição Curta", "Descricao Curta"]),
-                    descricao_complementar=pick(raw, ["Descrição Complementar", "Descricao Complementar", "Observações", "Observacoes"]),
+                    descricao_complementar=pick(
+                        raw,
+                        [
+                            "Descrição Complementar",
+                            "Descricao Complementar",
+                            "Observações",
+                            "Observacoes",
+                        ],
+                    ),
                     marca=pick(raw, ["Marca", "marca"]),
                     fornecedor=pick(raw, ["Fornecedor", "fornecedor"]),
-                    categoria=pick(raw, ["Categoria do produto", "Grupo de produtos", "Grupo", "grupo"]),
+                    categoria=pick(
+                        raw,
+                        ["Categoria do produto", "Grupo de produtos", "Grupo", "grupo"],
+                    ),
                     departamento=pick(raw, ["Departamento", "departamento"]),
-                    codigo_barras=pick(raw, ["GTIN/EAN", "Código Barra", "Codigo Barra", "codigo_barras"]),
+                    codigo_barras=pick(
+                        raw,
+                        ["GTIN/EAN", "Código Barra", "Codigo Barra", "codigo_barras"],
+                    ),
                     ncm=pick(raw, ["NCM", "Código NCM", "Codigo NCM"]),
                     cest=pick(raw, ["CEST"]),
                     origem=pick(raw, ["Origem", "Origem da mercadoria"]),
-                    perfil_tributario=pick(raw, ["Tributos", "Perfil Tributário", "Perfil Tributario"]),
+                    perfil_tributario=pick(
+                        raw, ["Tributos", "Perfil Tributário", "Perfil Tributario"]
+                    ),
                     preco_custo=(
-                        parse_decimal(pick(raw, ["Preço de custo", "Preco de custo", "Preço de Compra", "Preco de Compra", "Custo"]))
+                        parse_decimal(
+                            pick(
+                                raw,
+                                [
+                                    "Preço de custo",
+                                    "Preco de custo",
+                                    "Preço de Compra",
+                                    "Preco de Compra",
+                                    "Custo",
+                                ],
+                            )
+                        )
                     ),
                 )
             )
@@ -280,7 +321,12 @@ def detect_single_tenant_id(db) -> UUID:
 
 
 def find_user_id(db, tenant_id: UUID) -> int:
-    user = db.query(User).filter(User.tenant_id == tenant_id).order_by(User.id.asc()).first()
+    user = (
+        db.query(User)
+        .filter(User.tenant_id == tenant_id)
+        .order_by(User.id.asc())
+        .first()
+    )
     if user:
         return user.id
 
@@ -296,7 +342,14 @@ def find_user_id(db, tenant_id: UUID) -> int:
     raise RuntimeError(f"Nenhum usuario encontrado para tenant {tenant_id}")
 
 
-def get_or_create_marca(db, tenant_id: UUID, user_id: int, cache: Dict[str, Marca], nome: str, apply_mode: bool) -> Optional[Marca]:
+def get_or_create_marca(
+    db,
+    tenant_id: UUID,
+    user_id: int,
+    cache: Dict[str, Marca],
+    nome: str,
+    apply_mode: bool,
+) -> Optional[Marca]:
     nome = normalize_text(nome)
     if not nome:
         return None
@@ -305,7 +358,11 @@ def get_or_create_marca(db, tenant_id: UUID, user_id: int, cache: Dict[str, Marc
     if key in cache:
         return cache[key]
 
-    marca = db.query(Marca).filter(Marca.tenant_id == tenant_id, Marca.nome.ilike(nome)).first()
+    marca = (
+        db.query(Marca)
+        .filter(Marca.tenant_id == tenant_id, Marca.nome.ilike(nome))
+        .first()
+    )
     if not marca and apply_mode:
         marca = Marca(nome=nome, tenant_id=tenant_id, user_id=user_id, ativo=True)
         db.add(marca)
@@ -315,7 +372,14 @@ def get_or_create_marca(db, tenant_id: UUID, user_id: int, cache: Dict[str, Marc
     return marca
 
 
-def get_or_create_departamento(db, tenant_id: UUID, user_id: int, cache: Dict[str, Departamento], nome: str, apply_mode: bool) -> Optional[Departamento]:
+def get_or_create_departamento(
+    db,
+    tenant_id: UUID,
+    user_id: int,
+    cache: Dict[str, Departamento],
+    nome: str,
+    apply_mode: bool,
+) -> Optional[Departamento]:
     nome = normalize_text(nome)
     if not nome:
         return None
@@ -324,7 +388,11 @@ def get_or_create_departamento(db, tenant_id: UUID, user_id: int, cache: Dict[st
     if key in cache:
         return cache[key]
 
-    dep = db.query(Departamento).filter(Departamento.tenant_id == tenant_id, Departamento.nome.ilike(nome)).first()
+    dep = (
+        db.query(Departamento)
+        .filter(Departamento.tenant_id == tenant_id, Departamento.nome.ilike(nome))
+        .first()
+    )
     if not dep and apply_mode:
         dep = Departamento(nome=nome, tenant_id=tenant_id, user_id=user_id, ativo=True)
         db.add(dep)
@@ -351,9 +419,14 @@ def get_or_create_categoria(
     if key in cache:
         return cache[key]
 
-    query = db.query(Categoria).filter(Categoria.tenant_id == tenant_id, Categoria.nome.ilike(nome))
+    query = db.query(Categoria).filter(
+        Categoria.tenant_id == tenant_id, Categoria.nome.ilike(nome)
+    )
     if departamento_id:
-        query = query.filter((Categoria.departamento_id == departamento_id) | (Categoria.departamento_id.is_(None)))
+        query = query.filter(
+            (Categoria.departamento_id == departamento_id)
+            | (Categoria.departamento_id.is_(None))
+        )
     cat = query.order_by(Categoria.id.asc()).first()
 
     if not cat and apply_mode:
@@ -374,7 +447,14 @@ def get_or_create_categoria(
     return cat
 
 
-def get_or_create_fornecedor(db, tenant_id: UUID, user_id: int, cache: Dict[str, Cliente], nome: str, apply_mode: bool) -> Optional[Cliente]:
+def get_or_create_fornecedor(
+    db,
+    tenant_id: UUID,
+    user_id: int,
+    cache: Dict[str, Cliente],
+    nome: str,
+    apply_mode: bool,
+) -> Optional[Cliente]:
     nome = normalize_text(nome)
     if not nome:
         return None
@@ -385,7 +465,11 @@ def get_or_create_fornecedor(db, tenant_id: UUID, user_id: int, cache: Dict[str,
 
     forn = (
         db.query(Cliente)
-        .filter(Cliente.tenant_id == tenant_id, Cliente.tipo_cadastro == "fornecedor", Cliente.nome.ilike(nome))
+        .filter(
+            Cliente.tenant_id == tenant_id,
+            Cliente.tipo_cadastro == "fornecedor",
+            Cliente.nome.ilike(nome),
+        )
         .first()
     )
 
@@ -431,7 +515,9 @@ def run(args: argparse.Namespace) -> int:
         if not estrutura_csv.is_absolute():
             estrutura_csv = repo_root / estrutura_csv
         if not estrutura_csv.exists():
-            print(f"AVISO: CSV estrutura nao encontrado, seguindo sem custo de kit: {estrutura_csv}")
+            print(
+                f"AVISO: CSV estrutura nao encontrado, seguindo sem custo de kit: {estrutura_csv}"
+            )
             estrutura_csv = None
 
     output_dir = Path(args.output_dir)
@@ -444,10 +530,20 @@ def run(args: argparse.Namespace) -> int:
 
     db = SessionLocal()
     try:
-        tenant_id = UUID(args.tenant_id) if args.tenant_id else detect_single_tenant_id(db)
+        tenant_id = (
+            UUID(args.tenant_id) if args.tenant_id else detect_single_tenant_id(db)
+        )
         user_id = find_user_id(db, tenant_id)
 
-        produtos = db.query(Produto).filter(Produto.tenant_id == tenant_id, Produto.codigo.isnot(None), Produto.codigo != "").all()
+        produtos = (
+            db.query(Produto)
+            .filter(
+                Produto.tenant_id == tenant_id,
+                Produto.codigo.isnot(None),
+                Produto.codigo != "",
+            )
+            .all()
+        )
         by_sku: Dict[str, List[Produto]] = {}
         for p in produtos:
             key = normalize_key(p.codigo)
@@ -459,7 +555,9 @@ def run(args: argparse.Namespace) -> int:
         dep_cache: Dict[str, Departamento] = {}
         cat_cache: Dict[str, Categoria] = {}
         forn_cache: Dict[str, Cliente] = {}
-        family_dep_ids, family_cat_ids = build_existing_classification_defaults(produtos)
+        family_dep_ids, family_cat_ids = build_existing_classification_defaults(
+            produtos
+        )
 
         preview_rows: List[Dict[str, object]] = []
         update_rows: List[Dict[str, object]] = []
@@ -509,19 +607,39 @@ def run(args: argparse.Namespace) -> int:
             resolved_categoria = row.categoria or family_default.categoria
             resolved_marca = row.marca or family_default.marca
             resolved_fornecedor = row.fornecedor or family_default.fornecedor
-            resolved_descricao_curta = row.descricao_curta or family_default.descricao_curta
-            resolved_descricao_complementar = row.descricao_complementar or family_default.descricao_complementar
+            resolved_descricao_curta = (
+                row.descricao_curta or family_default.descricao_curta
+            )
+            resolved_descricao_complementar = (
+                row.descricao_complementar or family_default.descricao_complementar
+            )
             resolved_ncm = row.ncm or family_default.ncm
             resolved_cest = row.cest or family_default.cest
             resolved_origem = row.origem or family_default.origem
-            resolved_perfil_tributario = row.perfil_tributario or family_default.perfil_tributario
+            resolved_perfil_tributario = (
+                row.perfil_tributario or family_default.perfil_tributario
+            )
 
-            dep = get_or_create_departamento(db, tenant_id, user_id, dep_cache, resolved_departamento, args.apply)
+            dep = get_or_create_departamento(
+                db, tenant_id, user_id, dep_cache, resolved_departamento, args.apply
+            )
             inferred_dep_id = dep.id if dep else family_dep_ids.get(family_key)
-            cat = get_or_create_categoria(db, tenant_id, user_id, cat_cache, resolved_categoria, inferred_dep_id, args.apply)
+            cat = get_or_create_categoria(
+                db,
+                tenant_id,
+                user_id,
+                cat_cache,
+                resolved_categoria,
+                inferred_dep_id,
+                args.apply,
+            )
             inferred_cat_id = cat.id if cat else family_cat_ids.get(family_key)
-            marca = get_or_create_marca(db, tenant_id, user_id, marca_cache, resolved_marca, args.apply)
-            forn = get_or_create_fornecedor(db, tenant_id, user_id, forn_cache, resolved_fornecedor, args.apply)
+            marca = get_or_create_marca(
+                db, tenant_id, user_id, marca_cache, resolved_marca, args.apply
+            )
+            forn = get_or_create_fornecedor(
+                db, tenant_id, user_id, forn_cache, resolved_fornecedor, args.apply
+            )
 
             new_preco_custo = row.preco_custo
             kit_cost = kit_costs.get(sku_key)
@@ -532,20 +650,31 @@ def run(args: argparse.Namespace) -> int:
             changes: List[str] = []
 
             # IMPORTANTE: nao mexer em preco_venda
-            if new_preco_custo is not None and (produto.preco_custo or 0.0) != float(new_preco_custo):
-                changes.append(f"preco_custo: {produto.preco_custo} -> {new_preco_custo}")
+            if new_preco_custo is not None and (produto.preco_custo or 0.0) != float(
+                new_preco_custo
+            ):
+                changes.append(
+                    f"preco_custo: {produto.preco_custo} -> {new_preco_custo}"
+                )
                 if args.apply:
                     produto.preco_custo = float(new_preco_custo)
 
             target_departamento_id = dep.id if dep else inferred_dep_id
-            if target_departamento_id and produto.departamento_id != target_departamento_id:
-                changes.append(f"departamento_id: {produto.departamento_id} -> {target_departamento_id}")
+            if (
+                target_departamento_id
+                and produto.departamento_id != target_departamento_id
+            ):
+                changes.append(
+                    f"departamento_id: {produto.departamento_id} -> {target_departamento_id}"
+                )
                 if args.apply:
                     produto.departamento_id = target_departamento_id
 
             target_categoria_id = cat.id if cat else inferred_cat_id
             if target_categoria_id and produto.categoria_id != target_categoria_id:
-                changes.append(f"categoria_id: {produto.categoria_id} -> {target_categoria_id}")
+                changes.append(
+                    f"categoria_id: {produto.categoria_id} -> {target_categoria_id}"
+                )
                 if args.apply:
                     produto.categoria_id = target_categoria_id
 
@@ -560,7 +689,10 @@ def run(args: argparse.Namespace) -> int:
                     produto.fornecedor_id = forn.id
 
             codigo_barras_digits = only_digits(row.codigo_barras)[:13]
-            if codigo_barras_digits and normalize_text(produto.codigo_barras) != codigo_barras_digits:
+            if (
+                codigo_barras_digits
+                and normalize_text(produto.codigo_barras) != codigo_barras_digits
+            ):
                 changes.append("codigo_barras atualizado")
                 if args.apply:
                     produto.codigo_barras = codigo_barras_digits
@@ -583,17 +715,28 @@ def run(args: argparse.Namespace) -> int:
                 if args.apply:
                     produto.origem = origem
 
-            if resolved_perfil_tributario and normalize_text(produto.perfil_tributario) != resolved_perfil_tributario:
+            if (
+                resolved_perfil_tributario
+                and normalize_text(produto.perfil_tributario)
+                != resolved_perfil_tributario
+            ):
                 changes.append("perfil_tributario atualizado")
                 if args.apply:
                     produto.perfil_tributario = resolved_perfil_tributario
 
-            if resolved_descricao_curta and normalize_text(produto.descricao_curta) != resolved_descricao_curta:
+            if (
+                resolved_descricao_curta
+                and normalize_text(produto.descricao_curta) != resolved_descricao_curta
+            ):
                 changes.append("descricao_curta atualizada")
                 if args.apply:
                     produto.descricao_curta = resolved_descricao_curta
 
-            if resolved_descricao_complementar and normalize_text(produto.descricao_completa) != resolved_descricao_complementar:
+            if (
+                resolved_descricao_complementar
+                and normalize_text(produto.descricao_completa)
+                != resolved_descricao_complementar
+            ):
                 changes.append("descricao_completa atualizada")
                 if args.apply:
                     produto.descricao_completa = resolved_descricao_complementar
@@ -628,7 +771,9 @@ def run(args: argparse.Namespace) -> int:
 
         if args.apply:
             if args.sample_limit and args.sample_limit > 0:
-                sample_ids = {int(r["produto_id"]) for r in update_rows if r.get("produto_id")}
+                sample_ids = {
+                    int(r["produto_id"]) for r in update_rows if r.get("produto_id")
+                }
                 # rollback parcial: aplica somente amostra
                 for produto in produtos:
                     if produto.id not in sample_ids:
@@ -649,30 +794,55 @@ def run(args: argparse.Namespace) -> int:
                     candidates = by_sku.get(normalize_key(row.sku), [])
                     if len(candidates) != 1:
                         continue
-                    produto = db.query(Produto).filter(Produto.id == candidates[0].id).first()
+                    produto = (
+                        db.query(Produto).filter(Produto.id == candidates[0].id).first()
+                    )
                     if not produto:
                         continue
 
                     family_key = build_family_key(row.nome or produto.nome)
                     family_default = family_defaults.get(family_key, FamilyDefaults())
 
-                    resolved_departamento = row.departamento or family_default.departamento
+                    resolved_departamento = (
+                        row.departamento or family_default.departamento
+                    )
                     resolved_categoria = row.categoria or family_default.categoria
                     resolved_marca = row.marca or family_default.marca
                     resolved_fornecedor = row.fornecedor or family_default.fornecedor
-                    resolved_descricao_curta = row.descricao_curta or family_default.descricao_curta
-                    resolved_descricao_complementar = row.descricao_complementar or family_default.descricao_complementar
+                    resolved_descricao_curta = (
+                        row.descricao_curta or family_default.descricao_curta
+                    )
+                    resolved_descricao_complementar = (
+                        row.descricao_complementar
+                        or family_default.descricao_complementar
+                    )
                     resolved_ncm = row.ncm or family_default.ncm
                     resolved_cest = row.cest or family_default.cest
                     resolved_origem = row.origem or family_default.origem
-                    resolved_perfil_tributario = row.perfil_tributario or family_default.perfil_tributario
+                    resolved_perfil_tributario = (
+                        row.perfil_tributario or family_default.perfil_tributario
+                    )
 
-                    dep = get_or_create_departamento(db, tenant_id, user_id, dep_cache, resolved_departamento, True)
+                    dep = get_or_create_departamento(
+                        db, tenant_id, user_id, dep_cache, resolved_departamento, True
+                    )
                     inferred_dep_id = dep.id if dep else family_dep_ids.get(family_key)
-                    cat = get_or_create_categoria(db, tenant_id, user_id, cat_cache, resolved_categoria, inferred_dep_id, True)
+                    cat = get_or_create_categoria(
+                        db,
+                        tenant_id,
+                        user_id,
+                        cat_cache,
+                        resolved_categoria,
+                        inferred_dep_id,
+                        True,
+                    )
                     inferred_cat_id = cat.id if cat else family_cat_ids.get(family_key)
-                    marca = get_or_create_marca(db, tenant_id, user_id, marca_cache, resolved_marca, True)
-                    forn = get_or_create_fornecedor(db, tenant_id, user_id, forn_cache, resolved_fornecedor, True)
+                    marca = get_or_create_marca(
+                        db, tenant_id, user_id, marca_cache, resolved_marca, True
+                    )
+                    forn = get_or_create_fornecedor(
+                        db, tenant_id, user_id, forn_cache, resolved_fornecedor, True
+                    )
 
                     new_preco_custo = row.preco_custo
                     kit_cost = kit_costs.get(normalize_key(row.sku))
@@ -758,7 +928,9 @@ def run(args: argparse.Namespace) -> int:
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description="Enriquecer produtos por SKU a partir do Bling")
+    parser = argparse.ArgumentParser(
+        description="Enriquecer produtos por SKU a partir do Bling"
+    )
     parser.add_argument(
         "--bling-csv",
         type=str,
@@ -772,7 +944,9 @@ def main() -> int:
         help="CSV de estrutura/composicao para custo de kit",
     )
     parser.add_argument("--tenant-id", type=str, default="", help="Tenant alvo")
-    parser.add_argument("--apply", action="store_true", help="Aplica alteracoes no banco")
+    parser.add_argument(
+        "--apply", action="store_true", help="Aplica alteracoes no banco"
+    )
     parser.add_argument(
         "--sample-limit",
         type=int,

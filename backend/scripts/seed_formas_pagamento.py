@@ -19,8 +19,7 @@ import os
 
 # Configuração do banco
 database_url = os.getenv(
-    "DATABASE_URL",
-    "postgresql://postgres:postgres@localhost:5433/petshop_dev"
+    "DATABASE_URL", "postgresql://postgres:postgres@localhost:5433/petshop_dev"
 )
 
 engine = create_engine(database_url)
@@ -31,14 +30,16 @@ print("🏦 SEED: Formas de Pagamento")
 print("=" * 60)
 
 # Obter IDs das contas e tenant
-result = session.execute(text("""
+result = session.execute(
+    text("""
     SELECT 
         (SELECT id FROM contas_bancarias WHERE nome = 'Caixa' LIMIT 1) as caixa_id,
         (SELECT id FROM contas_bancarias WHERE nome = 'Santander' LIMIT 1) as santander_id,
         (SELECT id FROM contas_bancarias WHERE nome = 'Stone' LIMIT 1) as stone_id,
         (SELECT id FROM users LIMIT 1) as user_id,
         (SELECT tenant_id FROM users LIMIT 1) as tenant_id
-"""))
+""")
+)
 ids = result.first()
 
 caixa_id = ids[0]
@@ -88,9 +89,8 @@ formas_pagamento = [
         "cor": "#22C55E",
         "permite_antecipacao": False,
         "dias_recebimento_antecipado": None,
-        "taxa_antecipacao_percentual": None
+        "taxa_antecipacao_percentual": None,
     },
-    
     # =====================================================
     # PIX - Santander (recebimento instantâneo)
     # =====================================================
@@ -112,9 +112,8 @@ formas_pagamento = [
         "cor": "#0EA5E9",
         "permite_antecipacao": False,
         "dias_recebimento_antecipado": None,
-        "taxa_antecipacao_percentual": None
+        "taxa_antecipacao_percentual": None,
     },
-    
     # =====================================================
     # DÉBITO - Stone (taxa 2%, recebe em 1 dia)
     # =====================================================
@@ -136,9 +135,8 @@ formas_pagamento = [
         "cor": "#3B82F6",
         "permite_antecipacao": True,
         "dias_recebimento_antecipado": 0,
-        "taxa_antecipacao_percentual": Decimal("0.50")
+        "taxa_antecipacao_percentual": Decimal("0.50"),
     },
-    
     # =====================================================
     # CRÉDITO À VISTA - Stone (taxa 3%, recebe em 30 dias)
     # =====================================================
@@ -160,9 +158,8 @@ formas_pagamento = [
         "cor": "#8B5CF6",
         "permite_antecipacao": True,
         "dias_recebimento_antecipado": 0,
-        "taxa_antecipacao_percentual": Decimal("2.50")
+        "taxa_antecipacao_percentual": Decimal("2.50"),
     },
-    
     # =====================================================
     # CRÉDITO PARCELADO - Stone
     # Taxa base 3% + 0.8% por parcela adicional
@@ -172,27 +169,29 @@ formas_pagamento = [
 # Adicionar opções parceladas (2x a 12x)
 for parcelas in range(2, 13):
     taxa = Decimal("3.00") + (Decimal("0.80") * (parcelas - 1))
-    formas_pagamento.append({
-        "nome": f"Crédito {parcelas}x",
-        "tipo": "cartao_credito",
-        "taxa_percentual": taxa,
-        "taxa_fixa": Decimal("0.00"),
-        "prazo_dias": 30,
-        "operadora": "Stone",
-        "gera_contas_receber": True,
-        "split_parcelas": True,
-        "conta_bancaria_destino_id": stone_id,
-        "requer_nsu": True,
-        "tipo_cartao": "credito",
-        "bandeira": None,
-        "permite_parcelamento": True,
-        "max_parcelas": parcelas,
-        "icone": "💳",
-        "cor": "#A855F7",
-        "permite_antecipacao": True,
-        "dias_recebimento_antecipado": 0,
-        "taxa_antecipacao_percentual": Decimal("2.50")
-    })
+    formas_pagamento.append(
+        {
+            "nome": f"Crédito {parcelas}x",
+            "tipo": "cartao_credito",
+            "taxa_percentual": taxa,
+            "taxa_fixa": Decimal("0.00"),
+            "prazo_dias": 30,
+            "operadora": "Stone",
+            "gera_contas_receber": True,
+            "split_parcelas": True,
+            "conta_bancaria_destino_id": stone_id,
+            "requer_nsu": True,
+            "tipo_cartao": "credito",
+            "bandeira": None,
+            "permite_parcelamento": True,
+            "max_parcelas": parcelas,
+            "icone": "💳",
+            "cor": "#A855F7",
+            "permite_antecipacao": True,
+            "dias_recebimento_antecipado": 0,
+            "taxa_antecipacao_percentual": Decimal("2.50"),
+        }
+    )
 
 print(f"\n📝 Criando {len(formas_pagamento)} formas de pagamento...")
 
@@ -209,9 +208,9 @@ for idx, forma in enumerate(formas_pagamento, 1):
             "split_parcelas": forma.get("split_parcelas", False),
             "permite_antecipacao": forma.get("permite_antecipacao", False),
             "dias_recebimento_antecipado": forma.get("dias_recebimento_antecipado"),
-            "taxa_antecipacao_percentual": forma.get("taxa_antecipacao_percentual")
+            "taxa_antecipacao_percentual": forma.get("taxa_antecipacao_percentual"),
         }
-        
+
         # SQL com RETURNING para pegar o ID
         sql = text("""
             INSERT INTO formas_pagamento (
@@ -230,18 +229,32 @@ for idx, forma in enumerate(formas_pagamento, 1):
                 NOW(), NOW()
             ) RETURNING id
         """)
-        
+
         result = session.execute(sql, insert_data)
         forma_id = result.scalar()
         session.commit()
-        
+
         # Exibir resumo
-        taxa_str = f"{forma['taxa_percentual']}%" if forma['taxa_percentual'] > 0 else "sem taxa"
-        prazo_str = f"{forma['prazo_dias']}d" if forma['prazo_dias'] > 0 else "imediato"
-        conta_nome = "Caixa" if forma["conta_bancaria_destino_id"] == caixa_id else ("Santander" if forma["conta_bancaria_destino_id"] == santander_id else "Stone")
-        
-        print(f"   ✅ {idx:2d}. {forma['nome']:<20} - {taxa_str:<10} - {prazo_str:<10} → {conta_nome} (ID: {forma_id})")
-        
+        taxa_str = (
+            f"{forma['taxa_percentual']}%"
+            if forma["taxa_percentual"] > 0
+            else "sem taxa"
+        )
+        prazo_str = f"{forma['prazo_dias']}d" if forma["prazo_dias"] > 0 else "imediato"
+        conta_nome = (
+            "Caixa"
+            if forma["conta_bancaria_destino_id"] == caixa_id
+            else (
+                "Santander"
+                if forma["conta_bancaria_destino_id"] == santander_id
+                else "Stone"
+            )
+        )
+
+        print(
+            f"   ✅ {idx:2d}. {forma['nome']:<20} - {taxa_str:<10} - {prazo_str:<10} → {conta_nome} (ID: {forma_id})"
+        )
+
     except Exception as e:
         print(f"   ❌ Erro ao criar '{forma['nome']}': {e}")
         session.rollback()
@@ -250,7 +263,8 @@ for idx, forma in enumerate(formas_pagamento, 1):
 print("\n" + "=" * 60)
 print("📊 RESUMO:")
 
-result = session.execute(text("""
+result = session.execute(
+    text("""
     SELECT 
         CASE 
             WHEN fp.tipo = 'dinheiro' THEN 'Dinheiro'
@@ -268,7 +282,8 @@ result = session.execute(text("""
     LEFT JOIN contas_bancarias cb ON cb.id = fp.conta_bancaria_destino_id
     GROUP BY categoria, cb.nome
     ORDER BY categoria
-"""))
+""")
+)
 
 for row in result:
     categoria, qtd, taxa_min, taxa_max, conta_destino = row
@@ -276,8 +291,10 @@ for row in result:
         taxa_str = f"{float(taxa_min):.2f}%"
     else:
         taxa_str = f"{float(taxa_min):.2f}% - {float(taxa_max):.2f}%"
-    
-    print(f"   {categoria:<20} - {int(qtd):2d} forma(s) - Taxa: {taxa_str:<12} → {conta_destino}")
+
+    print(
+        f"   {categoria:<20} - {int(qtd):2d} forma(s) - Taxa: {taxa_str:<12} → {conta_destino}"
+    )
 
 print("\n✅ SEED COMPLETO!")
 print("\n💡 Vínculos criados:")

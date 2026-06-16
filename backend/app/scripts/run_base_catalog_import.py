@@ -32,8 +32,15 @@ def _build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description="Importa o catalogo base da loja padrao para um tenant destino."
     )
-    parser.add_argument("--target-tenant-id", required=True, help="Tenant UUID que recebera o catalogo.")
-    parser.add_argument("--target-user-id", type=int, required=True, help="Usuario dono/auditor dos registros criados.")
+    parser.add_argument(
+        "--target-tenant-id", required=True, help="Tenant UUID que recebera o catalogo."
+    )
+    parser.add_argument(
+        "--target-user-id",
+        type=int,
+        required=True,
+        help="Usuario dono/auditor dos registros criados.",
+    )
     parser.add_argument(
         "--source-email",
         default=DEFAULT_BASE_CATALOG_SOURCE_EMAIL,
@@ -101,7 +108,11 @@ def main(argv: list[str] | None = None) -> int:
     dry_run = not args.apply
 
     environment = _environment_name()
-    if args.apply and environment in PRODUCTION_ENVS and not args.allow_production_apply:
+    if (
+        args.apply
+        and environment in PRODUCTION_ENVS
+        and not args.allow_production_apply
+    ):
         return _fail(
             "Ambiente production/prod detectado; --apply bloqueado sem --allow-production-apply.",
             dry_run=False,

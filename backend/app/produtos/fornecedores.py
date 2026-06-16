@@ -21,11 +21,15 @@ def _validar_fornecedor_produto_lote(
     if fornecedor_id is None:
         return None
 
-    fornecedor = db.query(Cliente).filter(
-        Cliente.id == fornecedor_id,
-        Cliente.tenant_id == tenant_id,
-        Cliente.tipo_cadastro == "fornecedor",
-    ).first()
+    fornecedor = (
+        db.query(Cliente)
+        .filter(
+            Cliente.id == fornecedor_id,
+            Cliente.tenant_id == tenant_id,
+            Cliente.tipo_cadastro == "fornecedor",
+        )
+        .first()
+    )
 
     if not fornecedor:
         raise HTTPException(
@@ -42,11 +46,15 @@ def _obter_vinculo_fornecedor_lote(
     fornecedor_id: int,
     tenant_id,
 ) -> Optional[ProdutoFornecedor]:
-    return db.query(ProdutoFornecedor).filter(
-        ProdutoFornecedor.produto_id == produto_id,
-        ProdutoFornecedor.fornecedor_id == fornecedor_id,
-        ProdutoFornecedor.tenant_id == tenant_id,
-    ).first()
+    return (
+        db.query(ProdutoFornecedor)
+        .filter(
+            ProdutoFornecedor.produto_id == produto_id,
+            ProdutoFornecedor.fornecedor_id == fornecedor_id,
+            ProdutoFornecedor.tenant_id == tenant_id,
+        )
+        .first()
+    )
 
 
 def _promover_fornecedor_principal_lote(
@@ -103,7 +111,10 @@ def _remover_fornecedores_produto_lote(
         produto.fornecedor_id = None
         return alterado
 
-    era_principal = any(bool(vinculo.e_principal) for vinculo in vinculos) or produto.fornecedor_id == fornecedor_id
+    era_principal = (
+        any(bool(vinculo.e_principal) for vinculo in vinculos)
+        or produto.fornecedor_id == fornecedor_id
+    )
 
     for vinculo in vinculos:
         db.delete(vinculo)
@@ -148,13 +159,15 @@ def _aplicar_fornecedor_produto_lote(
             vinculo.updated_at = datetime.utcnow()
             return alterado
 
-        db.add(ProdutoFornecedor(
-            produto_id=produto.id,
-            fornecedor_id=fornecedor_id,
-            e_principal=False,
-            ativo=True,
-            tenant_id=tenant_id,
-        ))
+        db.add(
+            ProdutoFornecedor(
+                produto_id=produto.id,
+                fornecedor_id=fornecedor_id,
+                e_principal=False,
+                ativo=True,
+                tenant_id=tenant_id,
+            )
+        )
         return True
 
     if operacao == "definir_principal":
@@ -162,11 +175,15 @@ def _aplicar_fornecedor_produto_lote(
             return False
 
         if remover_outros:
-            outros_vinculos = db.query(ProdutoFornecedor).filter(
-                ProdutoFornecedor.produto_id == produto.id,
-                ProdutoFornecedor.tenant_id == tenant_id,
-                ProdutoFornecedor.fornecedor_id != fornecedor_id,
-            ).all()
+            outros_vinculos = (
+                db.query(ProdutoFornecedor)
+                .filter(
+                    ProdutoFornecedor.produto_id == produto.id,
+                    ProdutoFornecedor.tenant_id == tenant_id,
+                    ProdutoFornecedor.fornecedor_id != fornecedor_id,
+                )
+                .all()
+            )
             for outro_vinculo in outros_vinculos:
                 db.delete(outro_vinculo)
         else:
@@ -181,13 +198,15 @@ def _aplicar_fornecedor_produto_lote(
             vinculo.e_principal = True
             vinculo.updated_at = datetime.utcnow()
         else:
-            db.add(ProdutoFornecedor(
-                produto_id=produto.id,
-                fornecedor_id=fornecedor_id,
-                e_principal=True,
-                ativo=True,
-                tenant_id=tenant_id,
-            ))
+            db.add(
+                ProdutoFornecedor(
+                    produto_id=produto.id,
+                    fornecedor_id=fornecedor_id,
+                    e_principal=True,
+                    ativo=True,
+                    tenant_id=tenant_id,
+                )
+            )
 
         produto.fornecedor_id = fornecedor_id
         return True
@@ -203,13 +222,20 @@ def _aplicar_fornecedor_produto_lote(
     return False
 
 
-def _garantir_fornecedor_principal_quando_unico(db: Session, produto: Produto, tenant_id) -> None:
+def _garantir_fornecedor_principal_quando_unico(
+    db: Session, produto: Produto, tenant_id
+) -> None:
     """Marca automaticamente como principal quando ha um unico fornecedor ativo."""
-    vinculos_ativos = db.query(ProdutoFornecedor).filter(
-        ProdutoFornecedor.produto_id == produto.id,
-        ProdutoFornecedor.tenant_id == tenant_id,
-        ProdutoFornecedor.ativo.is_(True),
-    ).order_by(ProdutoFornecedor.id.asc()).all()
+    vinculos_ativos = (
+        db.query(ProdutoFornecedor)
+        .filter(
+            ProdutoFornecedor.produto_id == produto.id,
+            ProdutoFornecedor.tenant_id == tenant_id,
+            ProdutoFornecedor.ativo.is_(True),
+        )
+        .order_by(ProdutoFornecedor.id.asc())
+        .all()
+    )
 
     if not vinculos_ativos:
         produto.fornecedor_id = None

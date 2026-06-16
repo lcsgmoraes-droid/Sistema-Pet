@@ -13,6 +13,7 @@ from enum import Enum
 
 class AuditStatus(str, Enum):
     """Status de operação de auditoria"""
+
     SUCCESS = "success"
     FAILURE = "failure"
     IN_PROGRESS = "in_progress"
@@ -20,6 +21,7 @@ class AuditStatus(str, Enum):
 
 class AuditAction(str, Enum):
     """Tipos de ação auditada"""
+
     REPLAY_START = "replay_start"
     REPLAY_END = "replay_end"
     REBUILD_START = "rebuild_start"
@@ -31,6 +33,7 @@ class AuditAction(str, Enum):
 
 class ReplayFilters(BaseModel):
     """Filtros aplicados em um replay"""
+
     user_id: Optional[int] = None
     event_type: Optional[str] = None
     aggregate_id: Optional[str] = None
@@ -41,6 +44,7 @@ class ReplayFilters(BaseModel):
 
 class ReplayStats(BaseModel):
     """Estatísticas de um replay"""
+
     total_events: int
     batches_processed: int
     duration_seconds: float
@@ -49,6 +53,7 @@ class ReplayStats(BaseModel):
 
 class ReplayAuditResponse(BaseModel):
     """Resposta de auditoria de replay"""
+
     id: int
     action: str
     timestamp: datetime
@@ -56,16 +61,15 @@ class ReplayAuditResponse(BaseModel):
     filters: Optional[Dict[str, Any]] = None
     stats: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
-    
+
     class Config:
         from_attributes = True
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
+        json_encoders = {datetime: lambda v: v.isoformat()}
 
 
 class RebuildPhase(str, Enum):
     """Fases do rebuild"""
+
     NOT_STARTED = "not_started"
     CREATING_TEMP_SCHEMA = "creating_temp_schema"
     REPLAYING_EVENTS = "replaying_events"
@@ -76,6 +80,7 @@ class RebuildPhase(str, Enum):
 
 class RebuildAuditResponse(BaseModel):
     """Resposta de auditoria de rebuild"""
+
     id: int
     action: str
     timestamp: datetime
@@ -85,16 +90,15 @@ class RebuildAuditResponse(BaseModel):
     tables_updated: Optional[List[str]] = None
     phase_reached: Optional[str] = None
     error: Optional[str] = None
-    
+
     class Config:
         from_attributes = True
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
+        json_encoders = {datetime: lambda v: v.isoformat()}
 
 
 class PaginationMetadata(BaseModel):
     """Metadados de paginação"""
+
     page: int = Field(ge=1, description="Página atual")
     page_size: int = Field(ge=1, le=100, description="Itens por página")
     total_items: int = Field(ge=0, description="Total de itens")
@@ -105,18 +109,21 @@ class PaginationMetadata(BaseModel):
 
 class PaginatedReplayResponse(BaseModel):
     """Resposta paginada de replays"""
+
     items: List[ReplayAuditResponse]
     metadata: PaginationMetadata
 
 
 class PaginatedRebuildResponse(BaseModel):
     """Resposta paginada de rebuilds"""
+
     items: List[RebuildAuditResponse]
     metadata: PaginationMetadata
 
 
 class AuditSummary(BaseModel):
     """Resumo de auditoria (para BI/Analytics)"""
+
     total_replays: int
     total_rebuilds: int
     successful_replays: int
@@ -128,8 +135,6 @@ class AuditSummary(BaseModel):
     total_events_processed: int
     last_replay_at: Optional[datetime] = None
     last_rebuild_at: Optional[datetime] = None
-    
+
     class Config:
-        json_encoders = {
-            datetime: lambda v: v.isoformat()
-        }
+        json_encoders = {datetime: lambda v: v.isoformat()}

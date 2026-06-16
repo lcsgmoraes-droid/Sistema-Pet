@@ -19,10 +19,14 @@ def _validar_tenant_e_obter_usuario(user_and_tenant):
 
 
 def _obter_produto_ou_404(db: Session, produto_id: int, tenant_id: int):
-    produto = db.query(Produto).filter(
-        Produto.id == produto_id,
-        Produto.tenant_id == tenant_id,
-    ).first()
+    produto = (
+        db.query(Produto)
+        .filter(
+            Produto.id == produto_id,
+            Produto.tenant_id == tenant_id,
+        )
+        .first()
+    )
 
     if not produto:
         raise HTTPException(status_code=404, detail="Produto nao encontrado")
@@ -31,10 +35,14 @@ def _obter_produto_ou_404(db: Session, produto_id: int, tenant_id: int):
 
 
 def _obter_categoria_ou_404(db: Session, categoria_id: int, tenant_id: int):
-    categoria = db.query(Categoria).filter(
-        Categoria.id == categoria_id,
-        Categoria.tenant_id == tenant_id,
-    ).first()
+    categoria = (
+        db.query(Categoria)
+        .filter(
+            Categoria.id == categoria_id,
+            Categoria.tenant_id == tenant_id,
+        )
+        .first()
+    )
 
     if not categoria:
         raise HTTPException(status_code=404, detail="Categoria nao encontrada")
@@ -43,10 +51,14 @@ def _obter_categoria_ou_404(db: Session, categoria_id: int, tenant_id: int):
 
 
 def _obter_marca_ou_404(db: Session, marca_id: int, tenant_id: int):
-    marca = db.query(Marca).filter(
-        Marca.id == marca_id,
-        Marca.tenant_id == tenant_id,
-    ).first()
+    marca = (
+        db.query(Marca)
+        .filter(
+            Marca.id == marca_id,
+            Marca.tenant_id == tenant_id,
+        )
+        .first()
+    )
 
     if not marca:
         raise HTTPException(status_code=404, detail="Marca nao encontrada")
@@ -103,11 +115,15 @@ def _validar_pode_inativar_produto(db: Session, produto: Produto, tenant_id):
     if not produto.is_parent:
         return
 
-    variacoes_ativas = db.query(Produto).filter(
-        Produto.produto_pai_id == produto.id,
-        Produto.tenant_id == tenant_id,
-        Produto.ativo.is_(True),
-    ).count()
+    variacoes_ativas = (
+        db.query(Produto)
+        .filter(
+            Produto.produto_pai_id == produto.id,
+            Produto.tenant_id == tenant_id,
+            Produto.ativo.is_(True),
+        )
+        .count()
+    )
 
     if variacoes_ativas > 0:
         raise HTTPException(

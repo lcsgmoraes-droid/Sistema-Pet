@@ -8,7 +8,9 @@ import os
 
 from app.db import SessionLocal
 from app.services.bling_flow_monitor_service import executar_auditoria_background
-from app.services.bling_pedido_webhook_queue_service import process_pending_bling_pedido_webhooks
+from app.services.bling_pedido_webhook_queue_service import (
+    process_pending_bling_pedido_webhooks,
+)
 from app.services.bling_sync_service import BlingSyncService
 from app.services.nfe_authorized_reconciliation_service import (
     executar_reconciliacao_automatica_nfes_autorizadas,
@@ -26,20 +28,42 @@ from app.services.pedido_status_reconciliation_service import (
 logger = logging.getLogger(__name__)
 
 BLING_QUEUE_INTERVAL_SECONDS = int(os.getenv("BLING_QUEUE_INTERVAL_SECONDS", "20"))
-BLING_RECENT_RECONCILE_INTERVAL_MINUTES = int(os.getenv("BLING_RECENT_RECONCILE_INTERVAL_MINUTES", "60"))
+BLING_RECENT_RECONCILE_INTERVAL_MINUTES = int(
+    os.getenv("BLING_RECENT_RECONCILE_INTERVAL_MINUTES", "60")
+)
 BLING_RECENT_RECONCILE_LIMIT = int(os.getenv("BLING_RECENT_RECONCILE_LIMIT", "40"))
-BLING_NFE_PENDING_RECONCILE_INTERVAL_MINUTES = int(os.getenv("BLING_NFE_PENDING_RECONCILE_INTERVAL_MINUTES", "30"))
-BLING_NFE_PENDING_RECONCILE_LIMIT = int(os.getenv("BLING_NFE_PENDING_RECONCILE_LIMIT", "60"))
-BLING_NFE_AUTH_RECONCILE_INTERVAL_MINUTES = int(os.getenv("BLING_NFE_AUTH_RECONCILE_INTERVAL_MINUTES", "30"))
+BLING_NFE_PENDING_RECONCILE_INTERVAL_MINUTES = int(
+    os.getenv("BLING_NFE_PENDING_RECONCILE_INTERVAL_MINUTES", "30")
+)
+BLING_NFE_PENDING_RECONCILE_LIMIT = int(
+    os.getenv("BLING_NFE_PENDING_RECONCILE_LIMIT", "60")
+)
+BLING_NFE_AUTH_RECONCILE_INTERVAL_MINUTES = int(
+    os.getenv("BLING_NFE_AUTH_RECONCILE_INTERVAL_MINUTES", "30")
+)
 BLING_NFE_AUTH_RECONCILE_LIMIT = int(os.getenv("BLING_NFE_AUTH_RECONCILE_LIMIT", "120"))
-BLING_ORDER_STATUS_RECONCILE_INTERVAL_MINUTES = int(os.getenv("BLING_ORDER_STATUS_RECONCILE_INTERVAL_MINUTES", "60"))
-BLING_ORDER_STATUS_RECONCILE_LIMIT = int(os.getenv("BLING_ORDER_STATUS_RECONCILE_LIMIT", "15"))
-BLING_DUPLICATES_RECONCILE_INTERVAL_MINUTES = int(os.getenv("BLING_DUPLICATES_RECONCILE_INTERVAL_MINUTES", "60"))
-BLING_DUPLICATES_RECONCILE_LIMIT = int(os.getenv("BLING_DUPLICATES_RECONCILE_LIMIT", "10"))
-BLING_FLOW_AUDIT_INTERVAL_MINUTES = int(os.getenv("BLING_FLOW_AUDIT_INTERVAL_MINUTES", "60"))
+BLING_ORDER_STATUS_RECONCILE_INTERVAL_MINUTES = int(
+    os.getenv("BLING_ORDER_STATUS_RECONCILE_INTERVAL_MINUTES", "60")
+)
+BLING_ORDER_STATUS_RECONCILE_LIMIT = int(
+    os.getenv("BLING_ORDER_STATUS_RECONCILE_LIMIT", "15")
+)
+BLING_DUPLICATES_RECONCILE_INTERVAL_MINUTES = int(
+    os.getenv("BLING_DUPLICATES_RECONCILE_INTERVAL_MINUTES", "60")
+)
+BLING_DUPLICATES_RECONCILE_LIMIT = int(
+    os.getenv("BLING_DUPLICATES_RECONCILE_LIMIT", "10")
+)
+BLING_FLOW_AUDIT_INTERVAL_MINUTES = int(
+    os.getenv("BLING_FLOW_AUDIT_INTERVAL_MINUTES", "60")
+)
 BLING_FLOW_AUDIT_LIMIT = int(os.getenv("BLING_FLOW_AUDIT_LIMIT", "80"))
-BLING_PEDIDO_WEBHOOK_QUEUE_INTERVAL_SECONDS = int(os.getenv("BLING_PEDIDO_WEBHOOK_QUEUE_INTERVAL_SECONDS", "5"))
-BLING_PEDIDO_WEBHOOK_QUEUE_LIMIT = int(os.getenv("BLING_PEDIDO_WEBHOOK_QUEUE_LIMIT", "20"))
+BLING_PEDIDO_WEBHOOK_QUEUE_INTERVAL_SECONDS = int(
+    os.getenv("BLING_PEDIDO_WEBHOOK_QUEUE_INTERVAL_SECONDS", "5")
+)
+BLING_PEDIDO_WEBHOOK_QUEUE_LIMIT = int(
+    os.getenv("BLING_PEDIDO_WEBHOOK_QUEUE_LIMIT", "20")
+)
 
 
 class BlingSyncScheduler:
@@ -52,7 +76,9 @@ class BlingSyncScheduler:
     def _configure_jobs(self) -> None:
         self.scheduler.add_job(
             func=self.processar_webhooks_pedidos,
-            trigger=IntervalTrigger(seconds=max(BLING_PEDIDO_WEBHOOK_QUEUE_INTERVAL_SECONDS, 2)),
+            trigger=IntervalTrigger(
+                seconds=max(BLING_PEDIDO_WEBHOOK_QUEUE_INTERVAL_SECONDS, 2)
+            ),
             id="bling_pedido_webhook_queue",
             name="Bling Pedido Webhook Queue",
             replace_existing=True,
@@ -70,7 +96,9 @@ class BlingSyncScheduler:
         )
         self.scheduler.add_job(
             func=self.reconciliar_recentes,
-            trigger=IntervalTrigger(minutes=max(BLING_RECENT_RECONCILE_INTERVAL_MINUTES, 5)),
+            trigger=IntervalTrigger(
+                minutes=max(BLING_RECENT_RECONCILE_INTERVAL_MINUTES, 5)
+            ),
             id="bling_sync_recent_reconcile",
             name="Bling Reconcile Recent",
             replace_existing=True,
@@ -79,7 +107,9 @@ class BlingSyncScheduler:
         )
         self.scheduler.add_job(
             func=self.reconciliar_nfes_pendentes,
-            trigger=IntervalTrigger(minutes=max(BLING_NFE_PENDING_RECONCILE_INTERVAL_MINUTES, 5)),
+            trigger=IntervalTrigger(
+                minutes=max(BLING_NFE_PENDING_RECONCILE_INTERVAL_MINUTES, 5)
+            ),
             id="bling_nfe_pending_reconcile",
             name="Bling NF Pending Reconcile",
             replace_existing=True,
@@ -88,7 +118,9 @@ class BlingSyncScheduler:
         )
         self.scheduler.add_job(
             func=self.reconciliar_nfes_autorizadas,
-            trigger=IntervalTrigger(minutes=max(BLING_NFE_AUTH_RECONCILE_INTERVAL_MINUTES, 5)),
+            trigger=IntervalTrigger(
+                minutes=max(BLING_NFE_AUTH_RECONCILE_INTERVAL_MINUTES, 5)
+            ),
             id="bling_nfe_authorized_reconcile",
             name="Bling NF Authorized Reconcile",
             replace_existing=True,
@@ -97,7 +129,9 @@ class BlingSyncScheduler:
         )
         self.scheduler.add_job(
             func=self.reconciliar_status_pedidos,
-            trigger=IntervalTrigger(minutes=max(BLING_ORDER_STATUS_RECONCILE_INTERVAL_MINUTES, 5)),
+            trigger=IntervalTrigger(
+                minutes=max(BLING_ORDER_STATUS_RECONCILE_INTERVAL_MINUTES, 5)
+            ),
             id="bling_order_status_reconcile",
             name="Bling Order Status Reconcile",
             replace_existing=True,
@@ -106,7 +140,9 @@ class BlingSyncScheduler:
         )
         self.scheduler.add_job(
             func=self.reconciliar_duplicidades_pedidos,
-            trigger=IntervalTrigger(minutes=max(BLING_DUPLICATES_RECONCILE_INTERVAL_MINUTES, 5)),
+            trigger=IntervalTrigger(
+                minutes=max(BLING_DUPLICATES_RECONCILE_INTERVAL_MINUTES, 5)
+            ),
             id="bling_order_duplicates_reconcile",
             name="Bling Order Duplicate Reconcile",
             replace_existing=True,
@@ -131,14 +167,37 @@ class BlingSyncScheduler:
         )
 
         logger.info("[BLING SYNC] Jobs configurados:")
-        logger.info("   - Webhooks de pedidos: a cada %ss", max(BLING_PEDIDO_WEBHOOK_QUEUE_INTERVAL_SECONDS, 2))
-        logger.info("   - Fila pendente: a cada %ss", max(BLING_QUEUE_INTERVAL_SECONDS, 5))
-        logger.info("   - Reconciliacao recente: a cada %s min", max(BLING_RECENT_RECONCILE_INTERVAL_MINUTES, 5))
-        logger.info("   - NFs pendentes recentes: a cada %s min", max(BLING_NFE_PENDING_RECONCILE_INTERVAL_MINUTES, 5))
-        logger.info("   - NFs autorizadas sem baixa: a cada %s min", max(BLING_NFE_AUTH_RECONCILE_INTERVAL_MINUTES, 5))
-        logger.info("   - Status de pedidos recentes: a cada %s min", max(BLING_ORDER_STATUS_RECONCILE_INTERVAL_MINUTES, 5))
-        logger.info("   - Duplicidades seguras por pedido loja: a cada %s min", max(BLING_DUPLICATES_RECONCILE_INTERVAL_MINUTES, 5))
-        logger.info("   - Fluxo pedido/NF/estoque: a cada %s min", max(BLING_FLOW_AUDIT_INTERVAL_MINUTES, 5))
+        logger.info(
+            "   - Webhooks de pedidos: a cada %ss",
+            max(BLING_PEDIDO_WEBHOOK_QUEUE_INTERVAL_SECONDS, 2),
+        )
+        logger.info(
+            "   - Fila pendente: a cada %ss", max(BLING_QUEUE_INTERVAL_SECONDS, 5)
+        )
+        logger.info(
+            "   - Reconciliacao recente: a cada %s min",
+            max(BLING_RECENT_RECONCILE_INTERVAL_MINUTES, 5),
+        )
+        logger.info(
+            "   - NFs pendentes recentes: a cada %s min",
+            max(BLING_NFE_PENDING_RECONCILE_INTERVAL_MINUTES, 5),
+        )
+        logger.info(
+            "   - NFs autorizadas sem baixa: a cada %s min",
+            max(BLING_NFE_AUTH_RECONCILE_INTERVAL_MINUTES, 5),
+        )
+        logger.info(
+            "   - Status de pedidos recentes: a cada %s min",
+            max(BLING_ORDER_STATUS_RECONCILE_INTERVAL_MINUTES, 5),
+        )
+        logger.info(
+            "   - Duplicidades seguras por pedido loja: a cada %s min",
+            max(BLING_DUPLICATES_RECONCILE_INTERVAL_MINUTES, 5),
+        )
+        logger.info(
+            "   - Fluxo pedido/NF/estoque: a cada %s min",
+            max(BLING_FLOW_AUDIT_INTERVAL_MINUTES, 5),
+        )
         logger.info("   - Auditoria geral: diariamente as 02:00")
 
     def _should_defer_secondary_job(self, job_name: str) -> bool:
@@ -187,7 +246,9 @@ class BlingSyncScheduler:
     def reconciliar_recentes(self) -> None:
         if self._should_defer_secondary_job("bling_sync_recent_reconcile"):
             return
-        result = BlingSyncService.reconcile_recent_products(minutes=30, limit=BLING_RECENT_RECONCILE_LIMIT)
+        result = BlingSyncService.reconcile_recent_products(
+            minutes=30, limit=BLING_RECENT_RECONCILE_LIMIT
+        )
         if result.get("avaliados"):
             logger.info("[BLING SYNC] Reconciliacao recente: %s", result)
 
@@ -202,7 +263,9 @@ class BlingSyncScheduler:
                 limite_notas_por_tenant=BLING_NFE_PENDING_RECONCILE_LIMIT,
             )
             if result.get("tenants_com_pendencias"):
-                logger.info("[BLING SYNC] Reconciliacao automatica de NFs pendentes: %s", result)
+                logger.info(
+                    "[BLING SYNC] Reconciliacao automatica de NFs pendentes: %s", result
+                )
         finally:
             db.close()
 
@@ -215,7 +278,10 @@ class BlingSyncScheduler:
                 limite_notas_por_tenant=BLING_NFE_AUTH_RECONCILE_LIMIT,
             )
             if result.get("notas_reconciliadas_total"):
-                logger.info("[BLING SYNC] Reconciliacao automatica de NFs autorizadas: %s", result)
+                logger.info(
+                    "[BLING SYNC] Reconciliacao automatica de NFs autorizadas: %s",
+                    result,
+                )
         finally:
             db.close()
 
@@ -229,8 +295,15 @@ class BlingSyncScheduler:
                 dias=7,
                 limite_pedidos_por_tenant=BLING_ORDER_STATUS_RECONCILE_LIMIT,
             )
-            if result.get("confirmados_total") or result.get("cancelados_total") or result.get("erros_total"):
-                logger.info("[BLING SYNC] Reconciliacao automatica de status dos pedidos: %s", result)
+            if (
+                result.get("confirmados_total")
+                or result.get("cancelados_total")
+                or result.get("erros_total")
+            ):
+                logger.info(
+                    "[BLING SYNC] Reconciliacao automatica de status dos pedidos: %s",
+                    result,
+                )
         finally:
             db.close()
 
@@ -243,14 +316,19 @@ class BlingSyncScheduler:
                 limite_grupos_por_tenant=BLING_DUPLICATES_RECONCILE_LIMIT,
             )
             if result.get("grupos_consolidados_total") or result.get("erros_total"):
-                logger.info("[BLING SYNC] Reconciliacao automatica de duplicidades dos pedidos: %s", result)
+                logger.info(
+                    "[BLING SYNC] Reconciliacao automatica de duplicidades dos pedidos: %s",
+                    result,
+                )
         finally:
             db.close()
 
     def auditar_fluxo_bling(self) -> None:
         if self._should_defer_secondary_job("bling_flow_audit_autofix"):
             return
-        result = executar_auditoria_background(dias=3, limite=BLING_FLOW_AUDIT_LIMIT, auto_fix=True)
+        result = executar_auditoria_background(
+            dias=3, limite=BLING_FLOW_AUDIT_LIMIT, auto_fix=True
+        )
         if (
             result.get("incidentes_detectados")
             or result.get("auto_fix_tentados")
@@ -261,5 +339,7 @@ class BlingSyncScheduler:
     def reconciliar_geral(self) -> None:
         if self._should_defer_secondary_job("bling_sync_full_reconcile"):
             return
-        result = BlingSyncService.run_nightly_forced_link_and_sync(link_limit=800, sync_limit=1200)
+        result = BlingSyncService.run_nightly_forced_link_and_sync(
+            link_limit=800, sync_limit=1200
+        )
         logger.info("[BLING SYNC] Rotina 02:00 (vinculo+sync forcado): %s", result)

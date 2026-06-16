@@ -35,7 +35,10 @@ def configurar_rateio_nota(
     _, tenant_id = user_and_tenant
 
     if rateio.tipo_rateio not in ["online", "loja", "parcial"]:
-        raise HTTPException(status_code=400, detail="Tipo de rateio invalido. Use: online, loja ou parcial")
+        raise HTTPException(
+            status_code=400,
+            detail="Tipo de rateio invalido. Use: online, loja ou parcial",
+        )
 
     nota = (
         db.query(NotaEntrada)
@@ -154,7 +157,9 @@ def configurar_rateio_item(
     )
 
     if rateio.quantidade_online < 0:
-        raise HTTPException(status_code=400, detail="Quantidade online nao pode ser negativa")
+        raise HTTPException(
+            status_code=400, detail="Quantidade online nao pode ser negativa"
+        )
 
     if rateio.quantidade_online > quantidade_total_disponivel:
         raise HTTPException(
@@ -177,7 +182,9 @@ def configurar_rateio_item(
 
     nota.valor_online = valor_online_total
     nota.valor_loja = nota.valor_total - valor_online_total
-    nota.percentual_online = (valor_online_total / nota.valor_total * 100) if nota.valor_total > 0 else 0
+    nota.percentual_online = (
+        (valor_online_total / nota.valor_total * 100) if nota.valor_total > 0 else 0
+    )
     nota.percentual_loja = 100 - nota.percentual_online
 
     db.commit()

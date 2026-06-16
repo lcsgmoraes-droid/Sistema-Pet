@@ -26,30 +26,25 @@ Arquitetura:
 from typing import List, Optional
 from datetime import datetime
 
-from .models import (
-    Insight,
-    TipoInsight,
-    SeveridadeInsight,
-    EntidadeInsight
-)
+from .models import Insight, TipoInsight, SeveridadeInsight, EntidadeInsight
 
 
 def gerar_id_insight(tipo: TipoInsight, entidade_id: Optional[int] = None) -> str:
     """
     Gera ID único para um insight.
-    
+
     Formato: INS-{tipo}-{timestamp}-{entidade_id}
-    
+
     Args:
         tipo: Tipo do insight
         entidade_id: ID da entidade (opcional)
-        
+
     Returns:
         String com ID único
     """
     timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
     tipo_code = tipo.value[:10].replace("_", "")
-    
+
     if entidade_id:
         return f"INS-{tipo_code}-{timestamp}-{entidade_id}"
     else:
@@ -60,66 +55,64 @@ def gerar_id_insight(tipo: TipoInsight, entidade_id: Optional[int] = None) -> st
 # REGRA 1: Cliente Recorrente Atrasado
 # ============================================================================
 
+
 def regra_cliente_recorrente_atrasado(
-    clientes_rm,
-    user_id: int,
-    dias_analise: int = 90,
-    margem_atraso: float = 1.5
+    clientes_rm, user_id: int, dias_analise: int = 90, margem_atraso: float = 1.5
 ) -> List[Insight]:
     """
     Identifica clientes recorrentes que estão atrasados em sua próxima compra.
-    
+
     Lógica:
     1. Busca clientes recorrentes (2+ compras)
     2. Calcula frequência média de compras (dias entre compras)
     3. Verifica se está atrasado: recencia > frequencia * margem_atraso
     4. Gera insight para cada cliente atrasado
-    
+
     Args:
         clientes_rm: ClientesRecorrentesReadModel
         user_id: Tenant
         dias_analise: Período de análise
         margem_atraso: Multiplicador para considerar atraso (1.5 = 50% de atraso)
-        
+
     Returns:
         Lista de insights de clientes atrasados
     """
     insights = []
-    
+
     # Buscar clientes recorrentes
     clientes = clientes_rm.clientes_recorrentes(
-        dias=dias_analise,
-        user_id=user_id,
-        min_compras=2
+        dias=dias_analise, user_id=user_id, min_compras=2
     )
-    
+
     for cliente in clientes:
         # Dados do cliente
-        cliente_id = cliente['cliente_id']
-        frequencia = cliente['dias_entre_compras']
-        recencia = cliente['recencia']
-        numero_compras = cliente['numero_compras']
-        
+        cliente_id = cliente["cliente_id"]
+        frequencia = cliente["dias_entre_compras"]
+        recencia = cliente["recencia"]
+        numero_compras = cliente["numero_compras"]
+
         # Pular se não tem frequência estabelecida
         if frequencia <= 0:
             continue
-        
+
         # Calcular atraso esperado
         dias_esperado = frequencia * margem_atraso
-        
+
         # Cliente está atrasado?
         if recencia > dias_esperado:
             atraso_dias = int(recencia - frequencia)
-            
+
             # Determinar severidade baseado no atraso
             if atraso_dias > frequencia * 2:
                 severidade = SeveridadeInsight.ATENCAO
             else:
                 severidade = SeveridadeInsight.OPORTUNIDADE
-            
+
             # Criar insight
             insight = Insight(
-                id=gerar_id_insight(TipoInsight.CLIENTE_RECORRENTE_ATRASADO, cliente_id),
+                id=gerar_id_insight(
+                    TipoInsight.CLIENTE_RECORRENTE_ATRASADO, cliente_id
+                ),
                 tipo=TipoInsight.CLIENTE_RECORRENTE_ATRASADO,
                 titulo=f"Cliente #{cliente_id} está atrasado para próxima compra",
                 descricao=(
@@ -131,26 +124,26 @@ def regra_cliente_recorrente_atrasado(
                 entidade=EntidadeInsight.CLIENTE,
                 entidade_id=cliente_id,
                 dados_contexto={
-                    'frequencia_media': frequencia,
-                    'recencia': recencia,
-                    'atraso_dias': atraso_dias,
-                    'numero_compras': numero_compras,
-                    'valor_total': cliente['valor_total']
+                    "frequencia_media": frequencia,
+                    "recencia": recencia,
+                    "atraso_dias": atraso_dias,
+                    "numero_compras": numero_compras,
+                    "valor_total": cliente["valor_total"],
                 },
                 metricas={
-                    'ticket_medio': cliente['ticket_medio'],
-                    'frequencia_dias': frequencia,
-                    'atraso_percentual': (atraso_dias / frequencia) * 100
+                    "ticket_medio": cliente["ticket_medio"],
+                    "frequencia_dias": frequencia,
+                    "atraso_percentual": (atraso_dias / frequencia) * 100,
                 },
                 acao_sugerida=(
                     f"Contatar cliente com oferta personalizada. "
                     f"Última compra foi em {cliente['ultima_compra'][:10]}."
                 ),
-                user_id=user_id
+                user_id=user_id,
             )
-            
+
             insights.append(insight)
-    
+
     return insights
 
 
@@ -158,43 +151,44 @@ def regra_cliente_recorrente_atrasado(
 # REGRA 2: Cliente Inativo
 # ============================================================================
 
+
 def regra_cliente_inativo(
     clientes_rm,
     user_id: int,
     dias_inatividade: int = 60,
-    min_compras_historico: int = 2
+    min_compras_historico: int = 2,
 ) -> List[Insight]:
     """
     Identifica clientes que não compram há muito tempo (risco de churn).
-    
+
     Lógica:
     1. Busca clientes em risco de churn
     2. Filtra por nível de risco
     3. Gera insights com recomendações
-    
+
     Args:
         clientes_rm: ClientesRecorrentesReadModel
         user_id: Tenant
         dias_inatividade: Dias sem comprar para considerar inativo
         min_compras_historico: Mínimo de compras históricas
-        
+
     Returns:
         Lista de insights de clientes inativos
     """
     insights = []
-    
+
     # Buscar clientes em risco
     clientes_risco = clientes_rm.clientes_em_risco_churn(
         dias_inatividade=dias_inatividade,
         user_id=user_id,
-        min_compras_historico=min_compras_historico
+        min_compras_historico=min_compras_historico,
     )
-    
+
     for cliente in clientes_risco:
-        cliente_id = cliente['cliente_id']
-        dias_sem_comprar = cliente['dias_sem_comprar']
-        risco_nivel = cliente['risco_nivel']
-        
+        cliente_id = cliente["cliente_id"]
+        dias_sem_comprar = cliente["dias_sem_comprar"]
+        risco_nivel = cliente["risco_nivel"]
+
         # Determinar severidade
         if risco_nivel == "ALTO":
             severidade = SeveridadeInsight.ATENCAO
@@ -202,7 +196,7 @@ def regra_cliente_inativo(
             severidade = SeveridadeInsight.OPORTUNIDADE
         else:
             severidade = SeveridadeInsight.INFO
-        
+
         # Criar insight
         insight = Insight(
             id=gerar_id_insight(TipoInsight.CLIENTE_INATIVO, cliente_id),
@@ -217,25 +211,25 @@ def regra_cliente_inativo(
             entidade=EntidadeInsight.CLIENTE,
             entidade_id=cliente_id,
             dados_contexto={
-                'dias_sem_comprar': dias_sem_comprar,
-                'risco_nivel': risco_nivel,
-                'numero_compras': cliente['numero_compras_historico'],
-                'valor_total': cliente['valor_total_historico']
+                "dias_sem_comprar": dias_sem_comprar,
+                "risco_nivel": risco_nivel,
+                "numero_compras": cliente["numero_compras_historico"],
+                "valor_total": cliente["valor_total_historico"],
             },
             metricas={
-                'ticket_medio': cliente['ticket_medio'],
-                'dias_inativo': dias_sem_comprar
+                "ticket_medio": cliente["ticket_medio"],
+                "dias_inativo": dias_sem_comprar,
             },
             acao_sugerida=(
                 f"Campanha de reativação urgente. "
                 f"Última compra: {cliente['ultima_compra'][:10]}. "
                 f"Ofereça desconto ou vantagem especial."
             ),
-            user_id=user_id
+            user_id=user_id,
         )
-        
+
         insights.append(insight)
-    
+
     return insights
 
 
@@ -243,52 +237,49 @@ def regra_cliente_inativo(
 # REGRA 3: Produtos Comprados Juntos (Cross-Sell)
 # ============================================================================
 
+
 def regra_produtos_comprados_juntos(
     comprados_rm,
     user_id: int,
     produto_id: int,
     min_confianca: float = 50.0,
-    limit: int = 3
+    limit: int = 3,
 ) -> List[Insight]:
     """
     Identifica oportunidades de cross-sell para um produto específico.
-    
+
     Lógica:
     1. Busca produtos frequentemente comprados junto
     2. Filtra por confiança mínima
     3. Gera insight de oportunidade
-    
+
     Args:
         comprados_rm: ProdutosCompradosJuntosReadModel
         user_id: Tenant
         produto_id: Produto de referência
         min_confianca: Confiança mínima (%) para sugestão
         limit: Máximo de sugestões
-        
+
     Returns:
         Lista de insights de cross-sell
     """
     insights = []
-    
+
     # Buscar produtos comprados juntos
     sugestoes = comprados_rm.produtos_comprados_juntos(
-        produto_id=produto_id,
-        limit=limit,
-        user_id=user_id,
-        min_ocorrencias=2
+        produto_id=produto_id, limit=limit, user_id=user_id, min_ocorrencias=2
     )
-    
+
     # Filtrar por confiança
-    sugestoes_filtradas = [
-        s for s in sugestoes 
-        if s['confianca'] >= min_confianca
-    ]
-    
+    sugestoes_filtradas = [s for s in sugestoes if s["confianca"] >= min_confianca]
+
     if sugestoes_filtradas:
         # Criar um único insight com múltiplas sugestões
-        produtos_sugeridos = [s['produto_nome'] for s in sugestoes_filtradas]
-        confianca_media = sum(s['confianca'] for s in sugestoes_filtradas) / len(sugestoes_filtradas)
-        
+        produtos_sugeridos = [s["produto_nome"] for s in sugestoes_filtradas]
+        confianca_media = sum(s["confianca"] for s in sugestoes_filtradas) / len(
+            sugestoes_filtradas
+        )
+
         insight = Insight(
             id=gerar_id_insight(TipoInsight.PRODUTOS_COMPRADOS_JUNTOS, produto_id),
             tipo=TipoInsight.PRODUTOS_COMPRADOS_JUNTOS,
@@ -302,29 +293,29 @@ def regra_produtos_comprados_juntos(
             entidade=EntidadeInsight.PRODUTO,
             entidade_id=produto_id,
             dados_contexto={
-                'produtos_sugeridos': [
+                "produtos_sugeridos": [
                     {
-                        'id': s['produto_id'],
-                        'nome': s['produto_nome'],
-                        'confianca': s['confianca'],
-                        'frequencia': s['frequencia']
+                        "id": s["produto_id"],
+                        "nome": s["produto_nome"],
+                        "confianca": s["confianca"],
+                        "frequencia": s["frequencia"],
                     }
                     for s in sugestoes_filtradas
                 ]
             },
             metricas={
-                'confianca_media': confianca_media,
-                'numero_sugestoes': len(sugestoes_filtradas)
+                "confianca_media": confianca_media,
+                "numero_sugestoes": len(sugestoes_filtradas),
             },
             acao_sugerida=(
                 "Ofereça combo ou desconto ao comprar estes produtos juntos. "
                 "Exiba sugestões no carrinho/checkout."
             ),
-            user_id=user_id
+            user_id=user_id,
         )
-        
+
         insights.append(insight)
-    
+
     return insights
 
 
@@ -332,47 +323,45 @@ def regra_produtos_comprados_juntos(
 # REGRA 4: Kit Mais Vantajoso que Itens Separados
 # ============================================================================
 
+
 def regra_kit_mais_vantajoso(
-    kits_rm,
-    produtos_rm,
-    user_id: int,
-    desconto_minimo: float = 10.0
+    kits_rm, produtos_rm, user_id: int, desconto_minimo: float = 10.0
 ) -> List[Insight]:
     """
     Identifica kits que têm melhor custo-benefício que comprar itens separados.
-    
+
     Lógica:
     1. Busca top kits vendidos
     2. Calcula preço médio do kit vs componentes (estimativa)
     3. Se economia >= desconto_minimo%, gera insight
-    
+
     NOTA: Esta é uma implementação simplificada pois não temos
     acesso aos componentes individuais dos kits. Em produção,
     seria necessário buscar esses dados do banco.
-    
+
     Args:
         kits_rm: KitsMaisVendidosReadModel
         produtos_rm: ProdutosMaisVendidosReadModel
         user_id: Tenant
         desconto_minimo: Desconto mínimo (%) para gerar insight
-        
+
     Returns:
         Lista de insights de kits vantajosos
     """
     insights = []
-    
+
     # Buscar top kits
     top_kits = kits_rm.top_kits(limit=5, user_id=user_id)
-    
+
     for kit in top_kits:
-        kit_id = kit['kit_id']
-        kit_nome = kit['kit_nome']
-        preco_medio_kit = kit['preco_medio']
-        
+        kit_id = kit["kit_id"]
+        kit_nome = kit["kit_nome"]
+        preco_medio_kit = kit["preco_medio"]
+
         # SIMPLIFICAÇÃO: Assumir que o kit tem economia de ~15%
         # Em produção, calcularia baseado nos componentes reais
         economia_estimada = 15.0  # percentual
-        
+
         if economia_estimada >= desconto_minimo:
             insight = Insight(
                 id=gerar_id_insight(TipoInsight.KIT_MAIS_VANTAJOSO, kit_id),
@@ -387,23 +376,23 @@ def regra_kit_mais_vantajoso(
                 entidade=EntidadeInsight.KIT,
                 entidade_id=kit_id,
                 dados_contexto={
-                    'kit_nome': kit_nome,
-                    'preco_medio': preco_medio_kit,
-                    'quantidade_vendida': kit['quantidade_vendida'],
-                    'tipo_kit': kit['tipo_kit']
+                    "kit_nome": kit_nome,
+                    "preco_medio": preco_medio_kit,
+                    "quantidade_vendida": kit["quantidade_vendida"],
+                    "tipo_kit": kit["tipo_kit"],
                 },
                 metricas={
-                    'economia_percentual': economia_estimada,
-                    'preco_kit': preco_medio_kit,
-                    'vendas': kit['numero_vendas']
+                    "economia_percentual": economia_estimada,
+                    "preco_kit": preco_medio_kit,
+                    "vendas": kit["numero_vendas"],
                 },
                 acao_sugerida=(
                     "Destaque a economia do kit em banners e emails. "
                     "Sugira o kit quando cliente adicionar componentes individuais."
                 ),
-                user_id=user_id
+                user_id=user_id,
             )
-            
+
             insights.append(insight)
-    
+
     return insights

@@ -20,7 +20,10 @@ from app.utils.logger import configure_logging
 
 
 logger = logging.getLogger("bling_worker")
-HEARTBEAT_PATH = Path(os.getenv("BLING_WORKER_HEARTBEAT_PATH", "/tmp/bling_worker_heartbeat"))
+DEFAULT_HEARTBEAT_PATH = ROOT_DIR / "data" / "bling_worker_heartbeat"
+HEARTBEAT_PATH = Path(
+    os.getenv("BLING_WORKER_HEARTBEAT_PATH", str(DEFAULT_HEARTBEAT_PATH))
+)
 _should_stop = False
 
 

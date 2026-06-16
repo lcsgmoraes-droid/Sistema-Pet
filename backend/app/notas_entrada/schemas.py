@@ -1,4 +1,5 @@
 """Schemas Pydantic usados pelas rotas de notas de entrada."""
+
 from datetime import datetime
 from typing import List, Optional
 

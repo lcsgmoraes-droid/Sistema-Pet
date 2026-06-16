@@ -11,18 +11,19 @@ Usage:
 import sys
 import os
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.db import SessionLocal
 from sqlalchemy import text
 
+
 def run_migration():
     """Executa a migration"""
     db = SessionLocal()
-    
+
     try:
         print("🚀 Criando tabela empresa_config_geral...\n")
-        
+
         # SQL para criar a tabela
         create_table_sql = """
         CREATE TABLE IF NOT EXISTS empresa_config_geral (
@@ -84,10 +85,10 @@ def run_migration():
         CREATE INDEX IF NOT EXISTS idx_empresa_config_geral_ativo 
             ON empresa_config_geral(ativo);
         """
-        
+
         db.execute(text(create_table_sql))
         db.commit()
-        
+
         print("✅ Tabela empresa_config_geral criada com sucesso!")
         print("\n📋 Estrutura:")
         print("   • Dados básicos (razão social, CNPJ, etc)")
@@ -96,18 +97,19 @@ def run_migration():
         print("   • Alíquota de imposto padrão")
         print("   • Multi-tenant (tenant_id)")
         print()
-        
+
     except Exception as e:
         db.rollback()
         print(f"\n❌ ERRO ao criar tabela: {str(e)}")
         import traceback
+
         traceback.print_exc()
     finally:
         db.close()
 
 
 if __name__ == "__main__":
-    print("\n" + "="*60)
+    print("\n" + "=" * 60)
     print("🔨 MIGRATION: empresa_config_geral")
-    print("="*60 + "\n")
+    print("=" * 60 + "\n")
     run_migration()

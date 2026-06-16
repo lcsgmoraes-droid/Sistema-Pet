@@ -91,13 +91,17 @@ def vincular_produto(
 
     atualizar_fiscal = _aplicar_dados_fiscais_item_no_produto(produto, item)
     if atualizar_fiscal:
-        logger.info("Dados fiscais do produto %s atualizados com informacoes da NF", produto.id)
+        logger.info(
+            "Dados fiscais do produto %s atualizados com informacoes da NF", produto.id
+        )
 
     nota = db.query(NotaEntrada).filter(NotaEntrada.id == nota_id).first()
     custo_item_vinculo = item.valor_unitario
     if nota:
         composicao_custo = calcular_composicao_custos_nota(nota).get(item.id, {})
-        custo_item_vinculo = composicao_custo.get("custo_aquisicao_unitario", item.valor_unitario)
+        custo_item_vinculo = composicao_custo.get(
+            "custo_aquisicao_unitario", item.valor_unitario
+        )
 
     if nota and nota.fornecedor_id:
         vinculo_principal = (
@@ -119,16 +123,26 @@ def vincular_produto(
                 tenant_id=tenant_id,
             )
             db.add(novo_vinculo)
-            logger.info("Produto %s vinculado ao fornecedor %s como principal", produto_id, nota.fornecedor_id)
+            logger.info(
+                "Produto %s vinculado ao fornecedor %s como principal",
+                produto_id,
+                nota.fornecedor_id,
+            )
         elif vinculo_principal.fornecedor_id == nota.fornecedor_id:
             vinculo_principal.preco_custo = custo_item_vinculo
             vinculo_principal.ativo = True
-            logger.info("Preco do fornecedor principal do produto %s atualizado", produto_id)
+            logger.info(
+                "Preco do fornecedor principal do produto %s atualizado", produto_id
+            )
         else:
             vinculo_principal.fornecedor_id = nota.fornecedor_id
             vinculo_principal.preco_custo = custo_item_vinculo
             vinculo_principal.ativo = True
-            logger.info("Fornecedor principal do produto %s alterado para %s", produto_id, nota.fornecedor_id)
+            logger.info(
+                "Fornecedor principal do produto %s alterado para %s",
+                produto_id,
+                nota.fornecedor_id,
+            )
 
     if foi_nao_vinculado:
         nota.produtos_vinculados += 1
@@ -168,7 +182,9 @@ def desvincular_produto(
         raise HTTPException(status_code=404, detail="Item nao encontrado")
 
     if not item.produto_id:
-        raise HTTPException(status_code=400, detail="Item nao esta vinculado a nenhum produto")
+        raise HTTPException(
+            status_code=400, detail="Item nao esta vinculado a nenhum produto"
+        )
 
     item.produto_id = None
     item.vinculado = False
@@ -240,7 +256,10 @@ def criar_produto_from_item(
             sugestao["sugestoes"][0] if sugestao["sugestoes"] else None,
         )
         if not sugestao_recomendada:
-            raise HTTPException(status_code=409, detail="Nao foi possivel gerar um SKU para o novo produto")
+            raise HTTPException(
+                status_code=409,
+                detail="Nao foi possivel gerar um SKU para o novo produto",
+            )
         sku_final = normalizar_sku_produto(sugestao_recomendada["sku"])
         sku_ajustado_automaticamente = True
 
@@ -260,7 +279,10 @@ def criar_produto_from_item(
             sugestao["sugestoes"][0] if sugestao["sugestoes"] else None,
         )
         if not sugestao_recomendada:
-            raise HTTPException(status_code=409, detail="O SKU informado ja existe e nao foi possivel gerar alternativa")
+            raise HTTPException(
+                status_code=409,
+                detail="O SKU informado ja existe e nao foi possivel gerar alternativa",
+            )
         sku_final = normalizar_sku_produto(sugestao_recomendada["sku"])
         sku_ajustado_automaticamente = True
         logger.info(
@@ -281,20 +303,35 @@ def criar_produto_from_item(
             "cfop": item.cfop if hasattr(item, "cfop") else None,
             "cest": item.cest if hasattr(item, "cest") else None,
             "origem": item.origem if hasattr(item, "origem") else None,
-            "aliquota_icms": item.aliquota_icms if hasattr(item, "aliquota_icms") else None,
-            "aliquota_pis": item.aliquota_pis if hasattr(item, "aliquota_pis") else None,
-            "aliquota_cofins": item.aliquota_cofins if hasattr(item, "aliquota_cofins") else None,
+            "aliquota_icms": item.aliquota_icms
+            if hasattr(item, "aliquota_icms")
+            else None,
+            "aliquota_pis": item.aliquota_pis
+            if hasattr(item, "aliquota_pis")
+            else None,
+            "aliquota_cofins": item.aliquota_cofins
+            if hasattr(item, "aliquota_cofins")
+            else None,
         }
 
-        dados_fiscais = aplicar_inteligencia_fiscal(dados_produto, {
-            "ncm": item.ncm if hasattr(item, "ncm") else None,
-            "cfop": item.cfop if hasattr(item, "cfop") else None,
-            "cest": item.cest if hasattr(item, "cest") else None,
-            "origem": item.origem if hasattr(item, "origem") else None,
-            "aliquota_icms": item.aliquota_icms if hasattr(item, "aliquota_icms") else None,
-            "aliquota_pis": item.aliquota_pis if hasattr(item, "aliquota_pis") else None,
-            "aliquota_cofins": item.aliquota_cofins if hasattr(item, "aliquota_cofins") else None,
-        })
+        dados_fiscais = aplicar_inteligencia_fiscal(
+            dados_produto,
+            {
+                "ncm": item.ncm if hasattr(item, "ncm") else None,
+                "cfop": item.cfop if hasattr(item, "cfop") else None,
+                "cest": item.cest if hasattr(item, "cest") else None,
+                "origem": item.origem if hasattr(item, "origem") else None,
+                "aliquota_icms": item.aliquota_icms
+                if hasattr(item, "aliquota_icms")
+                else None,
+                "aliquota_pis": item.aliquota_pis
+                if hasattr(item, "aliquota_pis")
+                else None,
+                "aliquota_cofins": item.aliquota_cofins
+                if hasattr(item, "aliquota_cofins")
+                else None,
+            },
+        )
 
         if dados_fiscais.get("padrao_fiscal_motivo"):
             logger.info(
@@ -352,7 +389,11 @@ def criar_produto_from_item(
                 tenant_id=tenant_id,
             )
             db.add(novo_vinculo)
-            logger.info("Novo produto %s vinculado ao fornecedor %s", novo_produto.id, nota.fornecedor_id)
+            logger.info(
+                "Novo produto %s vinculado ao fornecedor %s",
+                novo_produto.id,
+                nota.fornecedor_id,
+            )
 
         db.flush()
 
@@ -384,7 +425,11 @@ def criar_produto_from_item(
         logger.error("Erro ao criar produto: %s", str(e))
         raise HTTPException(status_code=500, detail=f"Erro ao criar produto: {str(e)}")
 
-    logger.info("Produto criado a partir da nota: %s - %s", novo_produto.codigo, novo_produto.nome)
+    logger.info(
+        "Produto criado a partir da nota: %s - %s",
+        novo_produto.codigo,
+        novo_produto.nome,
+    )
 
     return {
         "message": (

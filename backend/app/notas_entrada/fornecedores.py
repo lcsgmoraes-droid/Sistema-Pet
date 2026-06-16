@@ -49,7 +49,9 @@ def gerar_prefixo_fornecedor(nome: str) -> str:
     return "".join([p[0] for p in palavras_ordenadas]).upper()
 
 
-def criar_fornecedor_automatico(dados_xml: dict, db: Session, current_user, tenant_id: int) -> tuple:
+def criar_fornecedor_automatico(
+    dados_xml: dict, db: Session, current_user, tenant_id: int
+) -> tuple:
     """
     Cria um fornecedor automaticamente a partir dos dados do XML.
 
@@ -58,10 +60,14 @@ def criar_fornecedor_automatico(dados_xml: dict, db: Session, current_user, tena
     """
     cnpj = dados_xml["fornecedor_cnpj"]
 
-    fornecedor = db.query(Cliente).filter(
-        Cliente.cnpj == cnpj,
-        Cliente.tenant_id == tenant_id,
-    ).first()
+    fornecedor = (
+        db.query(Cliente)
+        .filter(
+            Cliente.cnpj == cnpj,
+            Cliente.tenant_id == tenant_id,
+        )
+        .first()
+    )
 
     if fornecedor:
         if not fornecedor.ativo:
@@ -80,18 +86,28 @@ def criar_fornecedor_automatico(dados_xml: dict, db: Session, current_user, tena
             fornecedor.telefone = dados_xml.get("fornecedor_telefone", "")
 
             if not fornecedor.codigo:
-                fornecedor.codigo = gerar_codigo_cliente(db, "fornecedor", "PJ", tenant_id)
+                fornecedor.codigo = gerar_codigo_cliente(
+                    db, "fornecedor", "PJ", tenant_id
+                )
 
             db.commit()
             db.refresh(fornecedor)
-            logger.info("Fornecedor reativado: %s (Codigo: %s)", fornecedor.nome, fornecedor.codigo)
+            logger.info(
+                "Fornecedor reativado: %s (Codigo: %s)",
+                fornecedor.nome,
+                fornecedor.codigo,
+            )
             return (fornecedor, True)
 
         if not fornecedor.codigo:
             fornecedor.codigo = gerar_codigo_cliente(db, "fornecedor", "PJ", tenant_id)
             db.commit()
             db.refresh(fornecedor)
-            logger.info("Codigo gerado para fornecedor existente: %s (Codigo: %s)", fornecedor.nome, fornecedor.codigo)
+            logger.info(
+                "Codigo gerado para fornecedor existente: %s (Codigo: %s)",
+                fornecedor.nome,
+                fornecedor.codigo,
+            )
 
         return (fornecedor, False)
 

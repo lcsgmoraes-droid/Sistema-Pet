@@ -40,7 +40,7 @@ insights = engine.gerar_insights(user_id=1)
 
 # Filtrar por severidade
 oportunidades = engine.filtrar_por_severidade(
-    insights, 
+    insights,
     SeveridadeInsight.OPORTUNIDADE
 )
 
@@ -63,10 +63,10 @@ for insight in insights:
     Insight: {insight.titulo}
     Descrição: {insight.descricao}
     Contexto: {insight.dados_contexto}
-    
+
     Gere recomendações personalizadas e mensagens para o cliente.
     '''
-    
+
     ia_resposta = await ai_service.enrich_insight(prompt)
 ```
 
@@ -77,12 +77,7 @@ Roadmap:
 - Sprint 8: Persistência e histórico de insights
 """
 
-from .models import (
-    Insight,
-    TipoInsight,
-    SeveridadeInsight,
-    EntidadeInsight
-)
+from .models import Insight, TipoInsight, SeveridadeInsight, EntidadeInsight
 
 from .engine import InsightEngine
 
@@ -91,23 +86,21 @@ from .rules import (
     regra_cliente_inativo,
     regra_produtos_comprados_juntos,
     regra_kit_mais_vantajoso,
-    gerar_id_insight
+    gerar_id_insight,
 )
 
 __all__ = [
     # Models
-    'Insight',
-    'TipoInsight',
-    'SeveridadeInsight',
-    'EntidadeInsight',
-    
+    "Insight",
+    "TipoInsight",
+    "SeveridadeInsight",
+    "EntidadeInsight",
     # Engine
-    'InsightEngine',
-    
+    "InsightEngine",
     # Rules (para uso avançado)
-    'regra_cliente_recorrente_atrasado',
-    'regra_cliente_inativo',
-    'regra_produtos_comprados_juntos',
-    'regra_kit_mais_vantajoso',
-    'gerar_id_insight',
+    "regra_cliente_recorrente_atrasado",
+    "regra_cliente_inativo",
+    "regra_produtos_comprados_juntos",
+    "regra_kit_mais_vantajoso",
+    "gerar_id_insight",
 ]
