@@ -199,6 +199,10 @@ jobs:
         run: |
           ruff check app/dre
 
+      - name: DRE root lint (blocking)
+        run: |
+          ruff check app/dre_canais_routes.py app/dre_classificacao_routes.py app/dre_classificacao_service.py app/dre_ia_routes.py app/dre_plano_contas_models.py app/dre_plano_contas_routes.py app/dre_regras_models.py app/dre_routes.py
+
       - name: Migrations lint (blocking)
         run: |
           ruff check app/migrations

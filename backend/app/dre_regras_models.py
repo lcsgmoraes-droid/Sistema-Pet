@@ -6,7 +6,6 @@ Sistema de aprendizado baseado em histórico de classificações manuais
 from sqlalchemy import Column, String, Integer, Boolean, JSON, ForeignKey, Text, Enum as SQLEnum
 from sqlalchemy.orm import relationship
 from app.base_models import BaseTenantModel
-from datetime import datetime
 import enum
 
 

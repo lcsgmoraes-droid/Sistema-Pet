@@ -12,9 +12,8 @@ from typing import Optional, List, Dict, Any
 from pydantic import BaseModel
 
 from app.db import get_session
-from app.auth import get_current_user
 from app.auth.dependencies import get_current_user_and_tenant
-from app.models import User, Cliente
+from app.models import Cliente
 from app.vendas_models import Venda, VendaItem
 from app.produtos_models import Produto, EstoqueMovimentacao
 from app.financeiro_models import ContaPagar, FormaPagamento
@@ -242,7 +241,7 @@ def _snapshot_pronto(venda: Venda) -> Optional[Dict[str, Any]]:
 
 def _formas_pagamento_map(db: Session, tenant_id: str) -> Dict[str, FormaPagamento]:
     formas = db.query(FormaPagamento).filter(
-        and_(FormaPagamento.tenant_id == tenant_id, FormaPagamento.ativo == True)
+        and_(FormaPagamento.tenant_id == tenant_id, FormaPagamento.ativo.is_(True))
     ).all()
     return {_normalizar_forma_pagamento(forma.nome): forma for forma in formas}
 
