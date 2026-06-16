@@ -5,10 +5,8 @@ Testes de Domínio - Eventos de Vendas
 Testes focados em validar a emissão e processamento de eventos de domínio.
 """
 
-import pytest
-from unittest.mock import MagicMock, patch, call
+from unittest.mock import MagicMock, patch
 from decimal import Decimal
-from datetime import datetime
 
 from app.vendas.service import VendaService
 from app.domain.events import VendaCriada, VendaFinalizada, VendaCancelada

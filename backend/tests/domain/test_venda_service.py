@@ -12,8 +12,7 @@ Foco em REGRAS DE NEGÓCIO e EVENTOS DE DOMÍNIO.
 """
 
 import pytest
-from unittest.mock import MagicMock, patch, call
-from datetime import datetime, date, timedelta
+from unittest.mock import MagicMock, patch
 from decimal import Decimal
 
 from app.vendas.service import VendaService
@@ -44,10 +43,10 @@ class TestCriarVenda:
         """
         # ARRANGE
         with patch('app.vendas.service.Venda') as MockVenda, \
-             patch('app.vendas.service.VendaItem') as MockVendaItem, \
-             patch('app.vendas.service.ContaReceber') as MockContaReceber, \
-             patch('app.vendas.service.LancamentoManual') as MockLancamento, \
-             patch('app.vendas.service.CategoriaFinanceira') as MockCategoria, \
+             patch('app.vendas.service.VendaItem'), \
+             patch('app.vendas.service.ContaReceber'), \
+             patch('app.vendas.service.LancamentoManual'), \
+             patch('app.vendas.service.CategoriaFinanceira'), \
              patch('app.vendas.service.log_action'):
             
             # Configurar mock de Venda
@@ -207,10 +206,10 @@ class TestFinalizarVenda:
         - Evento VendaFinalizada publicado
         """
         # ARRANGE
-        with patch('app.vendas.service.Venda') as MockVenda, \
+        with patch('app.vendas.service.Venda'), \
              patch('app.vendas.service.VendaPagamento') as MockPagamento, \
-             patch('app.vendas.service.VendaItem') as MockItem, \
-             patch('app.financeiro.ContasReceberService') as MockContasService:
+             patch('app.vendas.service.VendaItem'), \
+             patch('app.financeiro.ContasReceberService'):
             
             # Configurar venda existente
             fake_venda_model.status = 'aberta'
@@ -226,7 +225,7 @@ class TestFinalizarVenda:
             mock_db_session.query(MockPagamento).filter_by.return_value.all.return_value = []
             
             # ACT
-            resultado = VendaService.finalizar_venda(
+            VendaService.finalizar_venda(
                 venda_id=100,
                 pagamentos=fake_pagamentos,
                 user_id=1,
@@ -350,7 +349,7 @@ class TestCancelarVenda:
             }
             
             # ACT
-            resultado = VendaService.cancelar_venda(
+            VendaService.cancelar_venda(
                 venda_id=100,
                 motivo='Cliente desistiu',
                 user_id=1,

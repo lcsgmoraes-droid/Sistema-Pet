@@ -25,7 +25,7 @@ VERIFICAÇÕES:
 
 import pytest
 from decimal import Decimal
-from datetime import date, timedelta
+from datetime import date
 from unittest.mock import patch
 from sqlalchemy import create_engine, event, text
 from sqlalchemy.orm import sessionmaker
@@ -363,11 +363,11 @@ def test_provisionar_comissoes_rollback_on_exception(db_session, cenario_venda_c
     print("\n" + "="*80)
     print("✅ TESTE PASSOU: Rollback total confirmado!")
     print("="*80)
-    print(f"✅ 0 contas a pagar criadas (esperado: 0)")
-    print(f"✅ 0 lançamentos DRE registrados (esperado: 0)")
-    print(f"✅ 3 comissões permanecem comissao_provisionada = 0")
-    print(f"✅ 3 comissões permanecem conta_pagar_id = NULL")
-    print(f"✅ 3 comissões permanecem data_provisao = NULL")
+    print("✅ 0 contas a pagar criadas (esperado: 0)")
+    print("✅ 0 lançamentos DRE registrados (esperado: 0)")
+    print("✅ 3 comissões permanecem comissao_provisionada = 0")
+    print("✅ 3 comissões permanecem conta_pagar_id = NULL")
+    print("✅ 3 comissões permanecem data_provisao = NULL")
     print("="*80)
     print("CONCLUSÃO: transactional_session GARANTE atomicidade completa.")
     print("Mesmo com exceção após processar 1 comissão, NADA foi persistido.")
@@ -431,7 +431,7 @@ def test_provisionar_comissoes_sucesso_sem_mock(db_session, cenario_venda_com_co
     print("\n" + "="*80)
     print("✅ TESTE CONTROLE PASSOU: Provisão completa com sucesso!")
     print("="*80)
-    print(f"✅ 3 contas a pagar criadas")
-    print(f"✅ 3 comissões marcadas como provisionadas")
-    print(f"✅ Valor total: R$ 45.00")
+    print("✅ 3 contas a pagar criadas")
+    print("✅ 3 comissões marcadas como provisionadas")
+    print("✅ Valor total: R$ 45.00")
     print("="*80 + "\n")

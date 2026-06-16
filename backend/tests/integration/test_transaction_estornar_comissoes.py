@@ -12,12 +12,14 @@ ESTRATÉGIA:
 4. Verificar que NENHUM dado foi alterado (rollback total)
 """
 
+# ruff: noqa: E402
+
 import pytest
-from unittest.mock import patch, MagicMock, call
+from unittest.mock import patch
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
-from datetime import date, datetime
+from datetime import date
 from decimal import Decimal
 
 # Importações do sistema
@@ -28,7 +30,7 @@ if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
 from app.comissoes_estorno import estornar_comissoes_venda
-from app.vendas_models import Venda, VendaItem
+from app.vendas_models import Venda
 from app.models import User, Tenant
 
 
@@ -291,8 +293,6 @@ class TestTransactionRollbackEstornoComissoes:
         # ============================================================
         
         call_count = {'count': 0}
-        original_execute_tenant_safe = None
-        
         def execute_tenant_safe_mock(db, query, params=None, *args, **kwargs):
             """
             Mock que lança exceção na segunda chamada.
@@ -306,7 +306,7 @@ class TestTransactionRollbackEstornoComissoes:
             
             if call_count['count'] == 1:
                 # Primeira chamada (SELECT): sucesso
-                print(f"\n🔧 MOCK: Primeira chamada (SELECT) - SUCESSO")
+                print("\n🔧 MOCK: Primeira chamada (SELECT) - SUCESSO")
                 
                 # Retornar resultado real do SELECT
                 from sqlalchemy import text
@@ -324,7 +324,7 @@ class TestTransactionRollbackEstornoComissoes:
                 return result
             else:
                 # Segunda chamada (UPDATE): EXCEÇÃO
-                print(f"\n💥 MOCK: Segunda chamada (UPDATE) - LANÇANDO EXCEÇÃO")
+                print("\n💥 MOCK: Segunda chamada (UPDATE) - LANÇANDO EXCEÇÃO")
                 raise Exception("ERRO SIMULADO: Falha ao atualizar status das comissões")
         
         # ============================================================
