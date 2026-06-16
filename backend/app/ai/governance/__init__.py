@@ -2,6 +2,7 @@
 AI Governance Package
 Framework de change management e aprovação de mudanças de IA
 """
+
 from app.ai.governance.models import (
     AIChangeRequest,
     ChangeRequestStatus,

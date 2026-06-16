@@ -2,6 +2,7 @@
 AI Versioning Package
 Framework de versionamento e deployment de IA
 """
+
 from app.ai.versioning.models import (
     AIBehaviorVersion,
     ComponentType,

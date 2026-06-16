@@ -351,6 +351,10 @@ jobs:
         run: |
           ruff format --check app/core app/tenancy app/auth app/db app/schemas app/security
 
+      - name: Backend AI packages format (blocking)
+        run: |
+          ruff format --check app/ai app/ai_core
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"
