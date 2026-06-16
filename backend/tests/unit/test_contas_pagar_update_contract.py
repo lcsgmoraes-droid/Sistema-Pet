@@ -5,7 +5,9 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 
 
 def test_contas_pagar_tem_endpoint_de_edicao_geral():
-    source = (REPO_ROOT / "backend/app/contas_pagar_routes.py").read_text(encoding="utf-8")
+    source = (REPO_ROOT / "backend/app/contas_pagar_routes.py").read_text(
+        encoding="utf-8"
+    )
 
     assert '@router.patch("/{conta_id}")' in source
     assert "def atualizar_conta_pagar(" in source
@@ -17,7 +19,9 @@ def test_contas_pagar_tem_endpoint_de_edicao_geral():
 
 
 def test_busca_conta_pagar_respeita_tenant_na_consulta():
-    source = (REPO_ROOT / "backend/app/contas_pagar_routes.py").read_text(encoding="utf-8")
+    source = (REPO_ROOT / "backend/app/contas_pagar_routes.py").read_text(
+        encoding="utf-8"
+    )
     buscar_conta = source.split("def buscar_conta_pagar(", 1)[1].split(
         "# ============================================================================\n# REGISTRAR PAGAMENTO",
         1,
@@ -28,7 +32,9 @@ def test_busca_conta_pagar_respeita_tenant_na_consulta():
 
 
 def test_registrar_pagamento_normaliza_valores_antigos_e_respeita_tenant():
-    source = (REPO_ROOT / "backend/app/contas_pagar_routes.py").read_text(encoding="utf-8")
+    source = (REPO_ROOT / "backend/app/contas_pagar_routes.py").read_text(
+        encoding="utf-8"
+    )
     registrar_pagamento = source.split("async def registrar_pagamento(", 1)[1].split(
         "# ============================================================================\n# DASHBOARD / RESUMO",
         1,
@@ -37,12 +43,16 @@ def test_registrar_pagamento_normaliza_valores_antigos_e_respeita_tenant():
     assert "_decimal_monetario" in source
     assert "ContaPagar.tenant_id == tenant_id" in registrar_pagamento
     assert "ContaBancaria.tenant_id == tenant_id" in registrar_pagamento
-    assert "conta.valor_pago = _decimal_monetario(conta.valor_pago)" in registrar_pagamento
+    assert (
+        "conta.valor_pago = _decimal_monetario(conta.valor_pago)" in registrar_pagamento
+    )
     assert "valor_centavos = _valor_reais_para_centavos" in registrar_pagamento
 
 
 def test_registrar_pagamento_valida_forma_pagamento_do_tenant_antes_de_gravar():
-    source = (REPO_ROOT / "backend/app/contas_pagar_routes.py").read_text(encoding="utf-8")
+    source = (REPO_ROOT / "backend/app/contas_pagar_routes.py").read_text(
+        encoding="utf-8"
+    )
     registrar_pagamento = source.split("async def registrar_pagamento(", 1)[1].split(
         "# ============================================================================\n# DASHBOARD / RESUMO",
         1,

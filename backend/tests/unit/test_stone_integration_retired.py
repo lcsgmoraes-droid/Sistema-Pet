@@ -20,14 +20,21 @@ def test_stone_online_source_files_were_removed():
     ]
 
     for removed_file in removed_files:
-        assert not removed_file.exists(), f"{removed_file.name} deve permanecer removido"
+        assert not removed_file.exists(), (
+            f"{removed_file.name} deve permanecer removido"
+        )
 
 
 def test_stone_retirement_migration_scrubs_plaintext_secrets():
-    migration = BACKEND_ROOT / "alembic" / "versions" / "pq20260611a1_retire_stone_integration.py"
+    migration = (
+        BACKEND_ROOT
+        / "alembic"
+        / "versions"
+        / "pq20260611a1_retire_stone_integration.py"
+    )
     migration_source = migration.read_text(encoding="utf-8")
 
-    assert "down_revision = \"pp20260611a1\"" in migration_source
+    assert 'down_revision = "pp20260611a1"' in migration_source
     assert "UPDATE stone_configs" in migration_source
     assert "client_id = ''" in migration_source
     assert "client_secret = ''" in migration_source
@@ -43,7 +50,9 @@ def test_stone_retirement_migration_scrubs_plaintext_secrets():
 
 
 def test_stone_config_model_keeps_retired_secret_fields_nullable():
-    model_source = (BACKEND_ROOT / "app" / "stone_models.py").read_text(encoding="utf-8")
+    model_source = (BACKEND_ROOT / "app" / "stone_models.py").read_text(
+        encoding="utf-8"
+    )
 
     assert "client_id = Column(String(200), nullable=True)" in model_source
     assert "client_secret = Column(String(200), nullable=True)" in model_source

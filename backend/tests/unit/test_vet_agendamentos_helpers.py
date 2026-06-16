@@ -16,7 +16,10 @@ from app.veterinario_agendamentos import (
 def test_agendamento_intervalo_usa_30_minutos_por_padrao():
     inicio = datetime(2026, 4, 25, 9, 0)
 
-    assert _agendamento_intervalo(inicio, None) == (inicio, inicio + timedelta(minutes=30))
+    assert _agendamento_intervalo(inicio, None) == (
+        inicio,
+        inicio + timedelta(minutes=30),
+    )
     assert _agendamento_intervalo(inicio, 0) == (inicio, inicio + timedelta(minutes=30))
     assert _agendamento_intervalo(inicio, -5) == (inicio, inicio + timedelta(minutes=1))
 
@@ -34,7 +37,9 @@ def test_agendamento_intervalo_compara_horario_de_parede_do_agendamento():
 
 
 def test_agendamento_intervalo_preserva_horario_de_parede_do_agendamento():
-    inicio, fim = _agendamento_intervalo(datetime(2026, 5, 18, 17, 30, tzinfo=timezone.utc), 30)
+    inicio, fim = _agendamento_intervalo(
+        datetime(2026, 5, 18, 17, 30, tzinfo=timezone.utc), 30
+    )
 
     assert inicio == datetime(2026, 5, 18, 17, 30)
     assert fim == datetime(2026, 5, 18, 18, 0)
@@ -43,7 +48,9 @@ def test_agendamento_intervalo_preserva_horario_de_parede_do_agendamento():
 def test_sincronizar_marcos_agendamento_finalizado_preenche_inicio_e_fim(monkeypatch):
     agora = datetime(2026, 4, 25, 10, 15)
     monkeypatch.setattr(agenda, "_vet_now", lambda: agora)
-    agendamento = SimpleNamespace(status="finalizado", inicio_atendimento=None, fim_atendimento=None)
+    agendamento = SimpleNamespace(
+        status="finalizado", inicio_atendimento=None, fim_atendimento=None
+    )
 
     _sincronizar_marcos_agendamento(agendamento)
 
@@ -65,7 +72,9 @@ def test_sincronizar_marcos_agendamento_agendado_limpa_inicio_e_fim():
 
 
 def test_consulta_tem_conteudo_clinico_detecta_texto_e_numero():
-    assert _consulta_tem_conteudo_clinico(SimpleNamespace(historia_clinica="tutor relata dor"))
+    assert _consulta_tem_conteudo_clinico(
+        SimpleNamespace(historia_clinica="tutor relata dor")
+    )
     assert _consulta_tem_conteudo_clinico(SimpleNamespace(peso_consulta=8.4))
     assert not _consulta_tem_conteudo_clinico(SimpleNamespace())
 

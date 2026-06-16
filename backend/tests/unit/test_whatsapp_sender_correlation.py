@@ -28,4 +28,3 @@ def test_waha_headers_include_active_correlation():
     assert headers["X-Api-Key"] == "waha-key"
     assert headers["X-Correlation-ID"] == "req-waha"
     assert headers["X-Request-ID"] == "req-waha"
-

@@ -31,9 +31,33 @@ def test_calcular_niveis_categorias_interrompe_ciclo():
 
 def test_construir_arvore_categorias_preserva_ordem_recebida():
     categorias = [
-        SimpleNamespace(id=1, nome="Racoes", descricao=None, icone="box", cor="#fff", ordem=1, categoria_pai_id=None),
-        SimpleNamespace(id=2, nome="Gatos", descricao="Cat", icone=None, cor=None, ordem=2, categoria_pai_id=1),
-        SimpleNamespace(id=3, nome="Higiene", descricao=None, icone=None, cor=None, ordem=3, categoria_pai_id=None),
+        SimpleNamespace(
+            id=1,
+            nome="Racoes",
+            descricao=None,
+            icone="box",
+            cor="#fff",
+            ordem=1,
+            categoria_pai_id=None,
+        ),
+        SimpleNamespace(
+            id=2,
+            nome="Gatos",
+            descricao="Cat",
+            icone=None,
+            cor=None,
+            ordem=2,
+            categoria_pai_id=1,
+        ),
+        SimpleNamespace(
+            id=3,
+            nome="Higiene",
+            descricao=None,
+            icone=None,
+            cor=None,
+            ordem=3,
+            categoria_pai_id=None,
+        ),
     ]
 
     assert _construir_arvore_categorias(categorias) == [

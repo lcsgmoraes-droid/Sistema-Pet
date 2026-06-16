@@ -23,8 +23,16 @@ from app.banho_tosa_custos import (
 def test_calcula_custo_insumos_com_desperdicio():
     total = calcular_custo_insumos(
         [
-            InsumoCusto(quantidade_usada="30", quantidade_desperdicio="5", custo_unitario_snapshot="0.08"),
-            InsumoCusto(quantidade_usada="1", quantidade_desperdicio="0", custo_unitario_snapshot="2.50"),
+            InsumoCusto(
+                quantidade_usada="30",
+                quantidade_desperdicio="5",
+                custo_unitario_snapshot="0.08",
+            ),
+            InsumoCusto(
+                quantidade_usada="1",
+                quantidade_desperdicio="0",
+                custo_unitario_snapshot="2.50",
+            ),
         ]
     )
 
@@ -47,7 +55,12 @@ def test_calcula_custo_energia_por_equipamento_e_manutencao():
     total = calcular_custo_energia(
         [
             EquipamentoUso(potencia_watts="1800", minutos_uso="30", custo_kwh="0.95"),
-            EquipamentoUso(potencia_watts="500", minutos_uso="12", custo_kwh="0.95", custo_manutencao_hora="3"),
+            EquipamentoUso(
+                potencia_watts="500",
+                minutos_uso="12",
+                custo_kwh="0.95",
+                custo_manutencao_hora="3",
+            ),
         ]
     )
 
@@ -57,8 +70,16 @@ def test_calcula_custo_energia_por_equipamento_e_manutencao():
 def test_calcula_custo_mao_obra_por_hora_produtiva():
     total = calcular_custo_mao_obra(
         [
-            MaoObraEtapa(custo_mensal_funcionario="3200", horas_produtivas_mes="160", minutos_trabalhados="45"),
-            MaoObraEtapa(custo_mensal_funcionario="2600", horas_produtivas_mes="130", minutos_trabalhados="30"),
+            MaoObraEtapa(
+                custo_mensal_funcionario="3200",
+                horas_produtivas_mes="160",
+                minutos_trabalhados="45",
+            ),
+            MaoObraEtapa(
+                custo_mensal_funcionario="2600",
+                horas_produtivas_mes="130",
+                minutos_trabalhados="30",
+            ),
         ]
     )
 
@@ -88,9 +109,13 @@ def test_calcula_comissao_por_percentual_e_valor_fixo():
 
 def test_calcula_taxi_dog_por_km_ou_custo_real():
     assert calcular_custo_taxi_dog(
-        TaxiDogCusto(km_real="7.5", custo_km="1.80", custo_motorista="8", rateio_manutencao="2")
+        TaxiDogCusto(
+            km_real="7.5", custo_km="1.80", custo_motorista="8", rateio_manutencao="2"
+        )
     ) == Decimal("23.50")
-    assert calcular_custo_taxi_dog(TaxiDogCusto(custo_real_informado="19.999")) == Decimal("20.00")
+    assert calcular_custo_taxi_dog(
+        TaxiDogCusto(custo_real_informado="19.999")
+    ) == Decimal("20.00")
 
 
 def test_calcula_snapshot_com_margem():
@@ -116,4 +141,9 @@ def test_status_final_nao_reabre_sem_permissao():
     with pytest.raises(ValueError, match="nao pode ser reaberto"):
         validar_transicao_status("entregue", "em_banho")
 
-    assert validar_transicao_status("entregue", "em_banho", permitir_reabrir_finalizado=True) == "em_banho"
+    assert (
+        validar_transicao_status(
+            "entregue", "em_banho", permitir_reabrir_finalizado=True
+        )
+        == "em_banho"
+    )

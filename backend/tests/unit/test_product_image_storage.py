@@ -10,7 +10,9 @@ import pytest
 
 os.environ["DEBUG"] = "false"
 if not os.environ.get("DATABASE_URL", "").startswith("postgresql"):
-    os.environ["DATABASE_URL"] = "postgresql://petshop_user:petshop_password@localhost:5432/petshop_db"
+    os.environ["DATABASE_URL"] = (
+        "postgresql://petshop_user:petshop_password@localhost:5432/petshop_db"
+    )
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 if str(BACKEND_DIR) not in sys.path:
@@ -59,8 +61,12 @@ def test_prepare_product_image_variants_generates_webp_and_thumbnail():
         assert thumbnail_image.height <= 240
 
 
-def test_save_product_image_variants_local_writes_original_and_thumbnail(tmp_path, monkeypatch):
-    monkeypatch.setattr(storage, "_local_base_dir", lambda: tmp_path / "uploads" / "produtos")
+def test_save_product_image_variants_local_writes_original_and_thumbnail(
+    tmp_path, monkeypatch
+):
+    monkeypatch.setattr(
+        storage, "_local_base_dir", lambda: tmp_path / "uploads" / "produtos"
+    )
     monkeypatch.setattr(storage, "_local_public_prefix", lambda: "/uploads/produtos")
     monkeypatch.setattr(storage.settings, "PRODUCT_IMAGE_STORAGE_BACKEND", "local")
 
@@ -77,7 +83,9 @@ def test_save_product_image_variants_local_writes_original_and_thumbnail(tmp_pat
         image_token="foto-principal",
     )
 
-    assert saved.url == "/uploads/produtos/tenant-teste/42/originais/foto-principal.webp"
+    assert (
+        saved.url == "/uploads/produtos/tenant-teste/42/originais/foto-principal.webp"
+    )
     assert (
         saved.thumbnail_url
         == "/uploads/produtos/tenant-teste/42/thumbs/foto-principal.webp"
@@ -130,7 +138,9 @@ def test_read_public_s3_product_image_fetches_allowed_key(monkeypatch):
     fake_client = _FakeS3Client()
     monkeypatch.setattr(storage, "_get_s3_client", lambda: fake_client)
     monkeypatch.setattr(storage.settings, "PRODUCT_IMAGE_STORAGE_BACKEND", "s3")
-    monkeypatch.setattr(storage.settings, "PRODUCT_IMAGE_S3_BUCKET", "petshop-produtos-prod")
+    monkeypatch.setattr(
+        storage.settings, "PRODUCT_IMAGE_S3_BUCKET", "petshop-produtos-prod"
+    )
     monkeypatch.setattr(storage.settings, "PRODUCT_IMAGE_S3_PREFIX", "produtos")
 
     image = storage.read_public_s3_product_image(
@@ -158,7 +168,9 @@ def test_read_public_s3_product_image_fetches_allowed_key(monkeypatch):
 )
 def test_read_public_s3_product_image_rejects_untrusted_keys(storage_key, monkeypatch):
     monkeypatch.setattr(storage.settings, "PRODUCT_IMAGE_STORAGE_BACKEND", "s3")
-    monkeypatch.setattr(storage.settings, "PRODUCT_IMAGE_S3_BUCKET", "petshop-produtos-prod")
+    monkeypatch.setattr(
+        storage.settings, "PRODUCT_IMAGE_S3_BUCKET", "petshop-produtos-prod"
+    )
     monkeypatch.setattr(storage.settings, "PRODUCT_IMAGE_S3_PREFIX", "produtos")
 
     with pytest.raises(ValueError):

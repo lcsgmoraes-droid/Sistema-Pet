@@ -37,4 +37,7 @@ def test_status_conferencia_identifica_falta_e_avaria():
 
 def test_acao_conferencia_volta_para_sem_acao_quando_nao_tem_divergencia():
     assert _obter_acao_conferencia("nf_devolucao", tem_divergencia=False) == "sem_acao"
-    assert _obter_acao_conferencia("acao_invalida", tem_divergencia=True) == "contatar_fornecedor"
+    assert (
+        _obter_acao_conferencia("acao_invalida", tem_divergencia=True)
+        == "contatar_fornecedor"
+    )

@@ -24,7 +24,9 @@ def _client_com_modulo_bling(path: str) -> TestClient:
     app = FastAPI()
     app.dependency_overrides[module_access.get_session] = lambda: object()
 
-    @app.post(path, dependencies=[Depends(module_access.require_active_module("bling"))])
+    @app.post(
+        path, dependencies=[Depends(module_access.require_active_module("bling"))]
+    )
     def endpoint_teste():
         return {"status": "ok"}
 
@@ -32,7 +34,9 @@ def _client_com_modulo_bling(path: str) -> TestClient:
 
 
 def _patch_auth(monkeypatch, user, tenant_id):
-    monkeypatch.setattr(module_access, "get_current_user", lambda credentials, session: user)
+    monkeypatch.setattr(
+        module_access, "get_current_user", lambda credentials, session: user
+    )
 
     async def fake_get_current_user_and_tenant(credentials, user, db):
         return user, tenant_id
@@ -64,7 +68,9 @@ async def test_require_active_module_blocks_tenant_without_module(monkeypatch):
 async def test_require_active_module_allows_tenant_with_module(monkeypatch):
     user = _user()
     _patch_auth(monkeypatch, user, "tenant-1")
-    monkeypatch.setattr(module_access, "_load_active_modules", lambda db, tenant_id: ["compras"])
+    monkeypatch.setattr(
+        module_access, "_load_active_modules", lambda db, tenant_id: ["compras"]
+    )
 
     dependency = module_access.require_active_module("compras")
 
@@ -90,7 +96,9 @@ async def test_require_active_module_superadmin_bypasses_plan(monkeypatch):
 async def test_require_active_module_requires_tenant_context(monkeypatch):
     user = _user()
     _patch_auth(monkeypatch, user, None)
-    monkeypatch.setattr(module_access, "_load_active_modules", lambda db, tenant_id: ["compras"])
+    monkeypatch.setattr(
+        module_access, "_load_active_modules", lambda db, tenant_id: ["compras"]
+    )
 
     dependency = module_access.require_active_module("compras")
 

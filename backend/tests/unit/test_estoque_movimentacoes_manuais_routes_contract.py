@@ -21,8 +21,7 @@ def test_entrada_manual_fica_em_router_dedicado():
 
     module = importlib.import_module("app.estoque_entrada_manual_routes")
     routes = {
-        (route.path, ",".join(sorted(route.methods)))
-        for route in module.router.routes
+        (route.path, ",".join(sorted(route.methods))) for route in module.router.routes
     }
 
     assert ("/estoque/entrada", "POST") in routes
@@ -35,8 +34,7 @@ def test_saida_manual_fica_em_router_dedicado():
 
     module = importlib.import_module("app.estoque_saida_manual_routes")
     routes = {
-        (route.path, ",".join(sorted(route.methods)))
-        for route in module.router.routes
+        (route.path, ",".join(sorted(route.methods))) for route in module.router.routes
     }
 
     assert ("/estoque/saida", "POST") in routes
@@ -65,7 +63,19 @@ def test_agregador_manual_nao_expoe_mais_entrada_e_saida():
 def test_main_registra_router_de_movimentacoes_manuais():
     main_source = _source("app/main.py")
 
-    assert "from app.estoque_entrada_manual_routes import router as estoque_entrada_manual_router" in main_source
-    assert "from app.estoque_saida_manual_routes import router as estoque_saida_manual_router" in main_source
-    assert 'app.include_router(estoque_entrada_manual_router, tags=["Estoque - Entrada Manual"])' in main_source
-    assert 'app.include_router(estoque_saida_manual_router, tags=["Estoque - Saida Manual"])' in main_source
+    assert (
+        "from app.estoque_entrada_manual_routes import router as estoque_entrada_manual_router"
+        in main_source
+    )
+    assert (
+        "from app.estoque_saida_manual_routes import router as estoque_saida_manual_router"
+        in main_source
+    )
+    assert (
+        'app.include_router(estoque_entrada_manual_router, tags=["Estoque - Entrada Manual"])'
+        in main_source
+    )
+    assert (
+        'app.include_router(estoque_saida_manual_router, tags=["Estoque - Saida Manual"])'
+        in main_source
+    )

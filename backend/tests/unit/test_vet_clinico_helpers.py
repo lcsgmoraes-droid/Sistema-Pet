@@ -76,7 +76,9 @@ def test_aliases_especie_e_idade_inicio_vacina():
 
 def test_status_vacinal_pet_monta_carteira_vencida_e_pendente():
     hoje = date.today()
-    pet = SimpleNamespace(id=1, especie="canino", data_nascimento=hoje - timedelta(days=365))
+    pet = SimpleNamespace(
+        id=1, especie="canino", data_nascimento=hoje - timedelta(days=365)
+    )
     protocolos = [
         SimpleNamespace(nome="V10", especie="cao", dose_inicial_semanas=8),
         SimpleNamespace(nome="Raiva", especie="todos", dose_inicial_semanas=12),
@@ -93,9 +95,15 @@ def test_status_vacinal_pet_monta_carteira_vencida_e_pendente():
         )
     ]
 
-    status = _status_vacinal_pet(_FakeDb(protocolos=protocolos, vacinas=vacinas), pet, "tenant-a")
+    status = _status_vacinal_pet(
+        _FakeDb(protocolos=protocolos, vacinas=vacinas), pet, "tenant-a"
+    )
 
-    assert status["resumo"] == {"total_aplicadas": 1, "total_pendentes": 1, "total_vencidas": 1}
+    assert status["resumo"] == {
+        "total_aplicadas": 1,
+        "total_pendentes": 1,
+        "total_vencidas": 1,
+    }
     assert status["carteira"][0]["status"] == "atrasada"
     assert status["pendentes"][0]["nome"] == "Raiva"
     assert status["pendentes"][0]["idade_inicio_meses"] == 3.0
@@ -124,7 +132,9 @@ def test_montar_alertas_pet_inclui_alergia_vacina_e_exame():
     ]
     exames = [SimpleNamespace(nome="Hemograma", status="solicitado")]
 
-    alertas = _montar_alertas_pet(_FakeDb(vacinas=vacinas, exames=exames), pet, "tenant-a")
+    alertas = _montar_alertas_pet(
+        _FakeDb(vacinas=vacinas, exames=exames), pet, "tenant-a"
+    )
 
     tipos = {alerta["tipo"] for alerta in alertas}
     assert {"alergia", "restricao", "vacina_atrasada", "exame_pendente"}.issubset(tipos)

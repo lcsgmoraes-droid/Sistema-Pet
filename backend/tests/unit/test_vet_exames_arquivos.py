@@ -34,7 +34,9 @@ def test_salvar_arquivo_exame_upload_persiste_e_atualiza_status(tmp_path, monkey
     caminho_salvo = tmp_path / "tenant-a" / Path(exame.arquivo_url).name
     assert nome_original == "Laudo Clinico.pdf"
     assert exame.arquivo_nome == "Laudo Clinico.pdf"
-    assert exame.arquivo_url.startswith("/uploads/veterinario/exames/tenant-a/exame_12_")
+    assert exame.arquivo_url.startswith(
+        "/uploads/veterinario/exames/tenant-a/exame_12_"
+    )
     assert exame.status == "disponivel"
     assert exame.data_resultado is not None
     assert caminho_salvo.read_bytes() == b"%PDF-1.4"
@@ -45,7 +47,9 @@ def test_salvar_arquivo_exame_upload_rejeita_extensao_invalida(tmp_path, monkeyp
     exame = SimpleNamespace(id=12, data_resultado=None, status="solicitado")
 
     with pytest.raises(HTTPException) as exc:
-        arquivos.salvar_arquivo_exame_upload(exame, "tenant-a", _upload("laudo.exe", b"abc"))
+        arquivos.salvar_arquivo_exame_upload(
+            exame, "tenant-a", _upload("laudo.exe", b"abc")
+        )
 
     assert exc.value.status_code == 400
     assert "Formato inválido" in exc.value.detail

@@ -79,7 +79,9 @@ def _aplicar_composicao_custo_final(monkeypatch):
             }
         }
 
-    monkeypatch.setattr(notas_entrada_routes, "calcular_composicao_custos_nota", _composicao)
+    monkeypatch.setattr(
+        notas_entrada_routes, "calcular_composicao_custos_nota", _composicao
+    )
 
 
 def _assert_custo_final_nf(item, confronto):

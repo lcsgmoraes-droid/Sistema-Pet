@@ -21,8 +21,7 @@ def test_consulta_movimentacoes_fica_em_router_dedicado():
 
     module = importlib.import_module("app.estoque_movimentacoes_consulta_routes")
     routes = {
-        (route.path, ",".join(sorted(route.methods)))
-        for route in module.router.routes
+        (route.path, ",".join(sorted(route.methods))) for route in module.router.routes
     }
 
     assert ("/estoque/movimentacoes/produto/{produto_id}", "GET") in routes
@@ -41,5 +40,11 @@ def test_estoque_routes_nao_expoe_mais_consulta_movimentacoes():
 def test_main_registra_router_de_consulta_movimentacoes():
     main_source = _source("app/main.py")
 
-    assert "from app.estoque_movimentacoes_consulta_routes import router as estoque_movimentacoes_consulta_router" in main_source
-    assert 'app.include_router(estoque_movimentacoes_consulta_router, tags=["Estoque - Movimentacoes Consulta"])' in main_source
+    assert (
+        "from app.estoque_movimentacoes_consulta_routes import router as estoque_movimentacoes_consulta_router"
+        in main_source
+    )
+    assert (
+        'app.include_router(estoque_movimentacoes_consulta_router, tags=["Estoque - Movimentacoes Consulta"])'
+        in main_source
+    )

@@ -13,7 +13,9 @@ class _FakeResponse:
 
     def raise_for_status(self):
         if self.status_code >= 400:
-            raise requests.exceptions.HTTPError(f"{self.status_code} Error", response=self)
+            raise requests.exceptions.HTTPError(
+                f"{self.status_code} Error", response=self
+            )
 
     def json(self):
         return self._payload
@@ -170,7 +172,9 @@ def test_request_nao_renova_para_erro_diferente_de_invalid_token(monkeypatch):
         )
 
     monkeypatch.setattr("requests.get", fake_get)
-    monkeypatch.setattr(api, "_renovar_token_automatico", lambda: renovacoes.append(True))
+    monkeypatch.setattr(
+        api, "_renovar_token_automatico", lambda: renovacoes.append(True)
+    )
 
     try:
         api._request("GET", "/nfe")

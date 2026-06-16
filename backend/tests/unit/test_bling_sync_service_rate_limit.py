@@ -79,7 +79,9 @@ def test_get_pending_queue_snapshot_uses_global_safe_sql(monkeypatch):
             "processing": 3,
         }
 
-    monkeypatch.setattr(bling_sync_service, "execute_tenant_safe_one", fake_execute, raising=False)
+    monkeypatch.setattr(
+        bling_sync_service, "execute_tenant_safe_one", fake_execute, raising=False
+    )
 
     db = object()
     resultado = BlingSyncService.get_pending_queue_snapshot(db=db)

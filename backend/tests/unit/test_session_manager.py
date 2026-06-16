@@ -40,11 +40,16 @@ class _FakeQuery:
         for criterion in self.criteria:
             field = getattr(getattr(criterion, "left", None), "name", None)
             value = getattr(getattr(criterion, "right", None), "value", None)
-            if value is None and str(getattr(criterion, "right", "")).lower() == "false":
+            if (
+                value is None
+                and str(getattr(criterion, "right", "")).lower() == "false"
+            ):
                 value = False
             if value is None and str(getattr(criterion, "right", "")).lower() == "true":
                 value = True
-            operator_name = getattr(getattr(criterion, "operator", None), "__name__", "")
+            operator_name = getattr(
+                getattr(criterion, "operator", None), "__name__", ""
+            )
             if not field:
                 continue
             if operator_name == "ne":
@@ -81,4 +86,3 @@ def test_revoke_all_sessions_can_be_limited_to_tenant():
         for criterion in query.criteria
     )
     db.commit.assert_called_once()
-

@@ -26,8 +26,12 @@ def test_build_actionable_alerts_flags_recurrent_watchdog_failures():
         deploy_events=[],
     )
 
-    recurrent = next(alert for alert in alerts if alert["id"] == "system:watchdog:recurrent_failures")
-    worker = next(alert for alert in alerts if alert["id"] == "system:job:worker_bling_unhealthy")
+    recurrent = next(
+        alert for alert in alerts if alert["id"] == "system:watchdog:recurrent_failures"
+    )
+    worker = next(
+        alert for alert in alerts if alert["id"] == "system:job:worker_bling_unhealthy"
+    )
 
     assert recurrent["severity"] == "warning"
     assert recurrent["kind"] == "watchdog_recurrent_failure"
@@ -99,9 +103,21 @@ def test_build_actionable_alerts_flags_recurrent_5xx_and_slow_routes():
         deploy_events=[],
     )
 
-    route_5xx = next(alert for alert in alerts if alert["id"] == "route:/api/vendas:route_5xx_recurrent")
-    route_slow = next(alert for alert in alerts if alert["id"] == "route:/api/relatorios:route_slow_recurrent")
-    tenant_5xx = next(alert for alert in alerts if alert["id"] == "tenant:sem_tenant:tenant_5xx_recurrent")
+    route_5xx = next(
+        alert
+        for alert in alerts
+        if alert["id"] == "route:/api/vendas:route_5xx_recurrent"
+    )
+    route_slow = next(
+        alert
+        for alert in alerts
+        if alert["id"] == "route:/api/relatorios:route_slow_recurrent"
+    )
+    tenant_5xx = next(
+        alert
+        for alert in alerts
+        if alert["id"] == "tenant:sem_tenant:tenant_5xx_recurrent"
+    )
 
     assert route_5xx["severity"] == "critical"
     assert route_5xx["errors_5xx"] == 2

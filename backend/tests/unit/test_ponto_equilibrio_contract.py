@@ -65,7 +65,9 @@ def test_frontend_tem_tela_financeira_de_ponto_equilibrio():
     impact_utils = _frontend_source("src/pages/pontoEquilibrioImpactoUtils.js")
     dashboard = _frontend_source("src/pages/DashboardFinanceiro.jsx")
 
-    assert 'const PontoEquilibrio = lazy(() => import("./pages/PontoEquilibrio"))' in app
+    assert (
+        'const PontoEquilibrio = lazy(() => import("./pages/PontoEquilibrio"))' in app
+    )
     assert 'path="financeiro/ponto-equilibrio"' in app
     assert 'path: "/financeiro/ponto-equilibrio"' in menu
     assert 'label: "Ponto de Equilibrio"' in menu

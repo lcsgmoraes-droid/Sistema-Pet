@@ -119,7 +119,9 @@ def test_resposta_interacao_detecta_principio_duplicado():
 
 
 def test_exame_ia_extrai_valores_laboratoriais_do_texto():
-    dados = _basic_lab_values_from_text("Creatinina: 2,4 mg/dL\nUreia: 72\nPlaquetas: 190000")
+    dados = _basic_lab_values_from_text(
+        "Creatinina: 2,4 mg/dL\nUreia: 72\nPlaquetas: 190000"
+    )
 
     assert dados["creatinina"] == 2.4
     assert dados["ureia"] == 72
@@ -127,17 +129,21 @@ def test_exame_ia_extrai_valores_laboratoriais_do_texto():
 
 
 def test_exame_ia_parse_json_com_markdown():
-    payload = _parse_llm_json_payload('```json\n{"resumo": "ok", "confianca": 0.8}\n```')
+    payload = _parse_llm_json_payload(
+        '```json\n{"resumo": "ok", "confianca": 0.8}\n```'
+    )
 
     assert payload == {"resumo": "ok", "confianca": 0.8}
 
 
 def test_exame_ia_normaliza_alertas_texto_e_dict():
-    alertas = _normalize_ai_alerts([
-        "Revisar creatinina",
-        {"campo": "ureia", "status": "alto", "mensagem": "Ureia elevada"},
-        {"campo": "sem mensagem"},
-    ])
+    alertas = _normalize_ai_alerts(
+        [
+            "Revisar creatinina",
+            {"campo": "ureia", "status": "alto", "mensagem": "Ureia elevada"},
+            {"campo": "sem mensagem"},
+        ]
+    )
 
     assert alertas == [
         {"campo": "atencao", "status": "atencao", "mensagem": "Revisar creatinina"},

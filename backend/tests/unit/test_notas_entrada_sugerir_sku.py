@@ -6,7 +6,9 @@ from types import SimpleNamespace
 
 os.environ["DEBUG"] = "false"
 if not os.environ.get("DATABASE_URL", "").startswith("postgresql"):
-    os.environ["DATABASE_URL"] = "postgresql://petshop_user:petshop_password@localhost:5432/petshop_db"
+    os.environ["DATABASE_URL"] = (
+        "postgresql://petshop_user:petshop_password@localhost:5432/petshop_db"
+    )
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 if str(BACKEND_DIR) not in sys.path:

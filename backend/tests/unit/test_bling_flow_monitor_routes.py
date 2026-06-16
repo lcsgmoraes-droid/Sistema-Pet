@@ -1,6 +1,9 @@
 from types import SimpleNamespace
 
-from app.bling_flow_monitor_routes import _enriquecer_registros_contexto, _mapa_numeros_notas_cache
+from app.bling_flow_monitor_routes import (
+    _enriquecer_registros_contexto,
+    _mapa_numeros_notas_cache,
+)
 
 
 class _FakeQuery:
@@ -68,7 +71,9 @@ def test_mapa_numeros_notas_cache_usa_payload_quando_coluna_numero_vem_vazia():
     assert mapa["25443301148"]["nf_numero"] == "011101"
 
 
-def test_enriquecer_registros_contexto_inclui_nf_humana_e_dados_de_duplicidade(monkeypatch):
+def test_enriquecer_registros_contexto_inclui_nf_humana_e_dados_de_duplicidade(
+    monkeypatch,
+):
     monkeypatch.setattr(
         "app.bling_flow_monitor_routes._mapa_numeros_pedidos",
         lambda db, tenant_id, registros: {
@@ -96,7 +101,11 @@ def test_enriquecer_registros_contexto_inclui_nf_humana_e_dados_de_duplicidade(m
                 "tem_duplicados": True,
                 "numero_pedido_loja": "260330GDQVHGXX",
                 "pedido_atual_eh_canonico": True,
-                "pedido_canonico": {"id": 10, "pedido_bling_numero": "11680", "nf_numero": "011100"},
+                "pedido_canonico": {
+                    "id": 10,
+                    "pedido_bling_numero": "11680",
+                    "nf_numero": "011100",
+                },
                 "pedidos_duplicados": [{"id": 11, "pedido_bling_numero": "11681"}],
                 "pedidos_seguro_ids": [11],
                 "pedidos_bloqueados_ids": [],

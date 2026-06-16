@@ -6,7 +6,9 @@ from types import SimpleNamespace
 
 os.environ["DEBUG"] = "false"
 if not os.environ.get("DATABASE_URL", "").startswith("postgresql"):
-    os.environ["DATABASE_URL"] = "postgresql://petshop_user:petshop_password@localhost:5432/petshop_db"
+    os.environ["DATABASE_URL"] = (
+        "postgresql://petshop_user:petshop_password@localhost:5432/petshop_db"
+    )
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]
 if str(BACKEND_DIR) not in sys.path:
@@ -58,8 +60,12 @@ def test_attach_remote_image_to_product_marks_first_image_as_primary(monkeypatch
         image_token="demo",
     )
 
-    monkeypatch.setattr(service, "_download_remote_image_bytes", lambda image_url: b"conteudo")
-    monkeypatch.setattr(service, "prepare_product_image_variants", lambda file_bytes: prepared)
+    monkeypatch.setattr(
+        service, "_download_remote_image_bytes", lambda image_url: b"conteudo"
+    )
+    monkeypatch.setattr(
+        service, "prepare_product_image_variants", lambda file_bytes: prepared
+    )
     monkeypatch.setattr(service, "save_product_image_variants", lambda **kwargs: stored)
 
     fake_db = SimpleNamespace(added=[])

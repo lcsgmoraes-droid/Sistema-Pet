@@ -13,7 +13,9 @@ def read_backend(path: str) -> str:
 def load_service_module():
     service_path = BACKEND_ROOT / "app/services/app_access_profile_service.py"
     assert service_path.exists()
-    spec = importlib.util.spec_from_file_location("app_access_profile_service_contract", service_path)
+    spec = importlib.util.spec_from_file_location(
+        "app_access_profile_service_contract", service_path
+    )
     module = importlib.util.module_from_spec(spec)
     assert spec and spec.loader
     spec.loader.exec_module(module)

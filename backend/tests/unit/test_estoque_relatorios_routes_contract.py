@@ -21,8 +21,7 @@ def test_relatorio_valorizado_fica_em_router_dedicado():
 
     module = importlib.import_module("app.estoque_relatorios_routes")
     routes = {
-        (route.path, ",".join(sorted(route.methods)))
-        for route in module.router.routes
+        (route.path, ",".join(sorted(route.methods))) for route in module.router.routes
     }
 
     assert ("/estoque/relatorio/valorizado", "GET") in routes
@@ -38,5 +37,11 @@ def test_estoque_routes_nao_expoe_mais_relatorio_valorizado():
 def test_main_registra_router_de_relatorios_estoque():
     main_source = _source("app/main.py")
 
-    assert "from app.estoque_relatorios_routes import router as estoque_relatorios_router" in main_source
-    assert 'app.include_router(estoque_relatorios_router, tags=["Estoque - Relatorios"])' in main_source
+    assert (
+        "from app.estoque_relatorios_routes import router as estoque_relatorios_router"
+        in main_source
+    )
+    assert (
+        'app.include_router(estoque_relatorios_router, tags=["Estoque - Relatorios"])'
+        in main_source
+    )

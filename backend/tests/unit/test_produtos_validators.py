@@ -49,7 +49,9 @@ def test_validar_tenant_e_obter_usuario_desempacota_contexto():
 def test_obter_produto_ou_404_retorna_produto_existente():
     produto = ProdutoFake(id=1)
 
-    assert _obter_produto_ou_404(FakeDb(FakeQuery(first_result=produto)), 1, 10) is produto
+    assert (
+        _obter_produto_ou_404(FakeDb(FakeQuery(first_result=produto)), 1, 10) is produto
+    )
 
 
 def test_obter_produto_ou_404_dispara_404_quando_nao_encontra():
@@ -65,7 +67,9 @@ def test_validar_sku_unico_aceita_sku_livre():
 
 def test_validar_sku_unico_bloqueia_duplicado():
     with pytest.raises(HTTPException) as exc_info:
-        _validar_sku_unico(FakeDb(FakeQuery(first_result=ProdutoFake(id=2))), "SKU-1", 10)
+        _validar_sku_unico(
+            FakeDb(FakeQuery(first_result=ProdutoFake(id=2))), "SKU-1", 10
+        )
 
     assert exc_info.value.status_code == 400
     assert "SKU-1" in exc_info.value.detail

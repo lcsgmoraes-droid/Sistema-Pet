@@ -2,6 +2,8 @@ from types import SimpleNamespace
 from unittest.mock import Mock
 from datetime import datetime
 
+import pytest
+
 from app.nfe_routes import (
     _normalizar_nota_pedido_integrado,
     _enriquecer_notas_com_pedidos_integrados,
@@ -36,12 +38,14 @@ def test_normalizar_nota_bling_mapeia_autorizada_sem_confundir_com_inutilizada()
     )
 
     assert nota["status"] == "Autorizada"
-    assert nota["valor"] == 439.30
+    assert nota["valor"] == pytest.approx(439.30)
     assert nota["cliente"]["nome"] == "Livia"
 
 
 def test_extrair_valor_nota_aceita_totais_aninhados():
-    assert _extrair_valor_nota({"totais": {"valorTotal": "42.90"}}) == 42.90
+    assert _extrair_valor_nota({"totais": {"valorTotal": "42.90"}}) == pytest.approx(
+        42.90
+    )
 
 
 def test_extrair_valor_nota_aceita_valor_nota_do_detalhe():
@@ -59,7 +63,7 @@ def test_extrair_valor_nota_calcula_total_a_partir_dos_componentes():
                 "valorDesconto": 64.03,
             }
         }
-    ) == 134.97
+    ) == pytest.approx(134.97)
 
 
 def test_status_nota_bling_trata_situacao_5_como_autorizada_no_payload_real():
@@ -92,7 +96,10 @@ def test_normalizar_resumo_canal_expoe_loja_e_marketplace():
             "origemLojaVirtual": "Shopee",
             "origemCanalVenda": "Outros",
             "numeroPedidoLoja": "260329CDGSH41N",
-            "intermediador": {"cnpj": "35.635.824/0001-12", "identificacao": "1189728757"},
+            "intermediador": {
+                "cnpj": "35.635.824/0001-12",
+                "identificacao": "1189728757",
+            },
         }
     )
 
@@ -180,7 +187,7 @@ def test_normalizar_nota_pedido_integrado_usa_ultima_nf_salva_no_payload():
     assert nota["id"] == "25432772133"
     assert nota["numero"] == "011008"
     assert nota["status"] == "Autorizada"
-    assert nota["valor"] == 440.13
+    assert nota["valor"] == pytest.approx(440.13)
     assert nota["numero_pedido_loja"] == "2000015755197092"
     assert nota["cliente"]["nome"] == "Leonardo Marcal Valles"
 
@@ -228,7 +235,9 @@ def test_sort_key_nota_por_numero_desc_prioriza_numero_maior():
     assert [nota["numero"] for nota in notas] == ["011127", "011086", "011083", ""]
 
 
-def test_enriquecer_notas_com_detalhes_bling_preenche_numero_quando_cache_veio_incompleto(monkeypatch):
+def test_enriquecer_notas_com_detalhes_bling_preenche_numero_quando_cache_veio_incompleto(
+    monkeypatch,
+):
     class FakeBling:
         pass
 
@@ -260,9 +269,17 @@ def test_enriquecer_notas_com_detalhes_bling_preenche_numero_quando_cache_veio_i
     }
     upserts = []
 
-    monkeypatch.setattr("app.nfe_routes._obter_detalhe_nfe_cache", lambda tenant_id, nfe_id, modelo=None: detalhe)
-    monkeypatch.setattr("app.nfe_routes.obter_detalhe_nota_cache", lambda **kwargs: detalhe)
-    monkeypatch.setattr("app.nfe_routes.upsert_nota_cache", lambda *args, **kwargs: upserts.append(kwargs))
+    monkeypatch.setattr(
+        "app.nfe_routes._obter_detalhe_nfe_cache",
+        lambda tenant_id, nfe_id, modelo=None: detalhe,
+    )
+    monkeypatch.setattr(
+        "app.nfe_routes.obter_detalhe_nota_cache", lambda **kwargs: detalhe
+    )
+    monkeypatch.setattr(
+        "app.nfe_routes.upsert_nota_cache",
+        lambda *args, **kwargs: upserts.append(kwargs),
+    )
 
     _enriquecer_notas_com_detalhes_bling(
         FakeBling(),
@@ -285,7 +302,9 @@ def test_normalizar_detalhe_nota_bling_expoe_campos_ricos():
         canal="shopee",
         numero_venda="202603280001",
         loja_origem="Shopee Atacado",
-        cliente=SimpleNamespace(nome="Adna Alves Da Silva Santos", cpf="10842775650", cnpj=None),
+        cliente=SimpleNamespace(
+            nome="Adna Alves Da Silva Santos", cpf="10842775650", cnpj=None
+        ),
         vendedor=SimpleNamespace(nome=""),
     )
     detalhe = _normalizar_detalhe_nota_bling(
@@ -385,7 +404,7 @@ def test_normalizar_detalhe_nota_bling_expoe_campos_ricos():
     assert detalhe["unidade_negocio"]["nome"] == "Matriz"
     assert detalhe["cliente"]["tipo_pessoa"] == "Fisica"
     assert detalhe["itens"][0]["codigo"] == "018631.1"
-    assert detalhe["totais"]["valor_total"] == 68.93
+    assert detalhe["totais"]["valor_total"] == pytest.approx(68.93)
     assert detalhe["pagamento"]["parcelas"][0]["forma"] == "Dinheiro"
     assert detalhe["intermediador"]["cnpj"] == "35.635.824/0001-12"
     assert detalhe["informacoes_adicionais"]["numero_pedido_loja"] == "260329CDGSH41N"
@@ -421,9 +440,12 @@ def test_normalizar_detalhe_nota_bling_formata_objetos_aninhados_sem_exibir_dict
     )
 
     assert detalhe["natureza_operacao"] == "ID 15103736276"
-    assert detalhe["cliente"]["endereco"] == "Avenida Bandeirantes, 308 - Alianca, Osasco, SP"
+    assert (
+        detalhe["cliente"]["endereco"]
+        == "Avenida Bandeirantes, 308 - Alianca, Osasco, SP"
+    )
     assert detalhe["cliente"]["vendedor"] is None
-    assert detalhe["totais"]["valor_total"] == 134.97
+    assert detalhe["totais"]["valor_total"] == pytest.approx(134.97)
     assert detalhe["canal_label"] == "Shopee"
 
 
@@ -497,7 +519,9 @@ def test_enriquecer_notas_com_pedidos_integrados_preenche_valor_total_do_pedido(
         },
         created_at="2026-03-28T22:03:22",
     )
-    db.query.return_value.filter.return_value.order_by.return_value.limit.return_value.all.return_value = [pedido]
+    db.query.return_value.filter.return_value.order_by.return_value.limit.return_value.all.return_value = [
+        pedido
+    ]
     notas = [
         {
             "id": "25428294101",
@@ -512,7 +536,7 @@ def test_enriquecer_notas_com_pedidos_integrados_preenche_valor_total_do_pedido(
 
     _enriquecer_notas_com_pedidos_integrados(db, "tenant-1", notas)
 
-    assert notas[0]["valor"] == 158.74
+    assert notas[0]["valor"] == pytest.approx(158.74)
     assert notas[0]["canal_label"] == "Shopee"
     assert notas[0]["origem_loja_virtual"] == "Shopee"
 
@@ -536,7 +560,9 @@ def test_enriquecer_notas_com_pedidos_integrados_relaciona_por_id_da_nf_quando_r
         },
         created_at="2026-03-28T22:12:52",
     )
-    db.query.return_value.filter.return_value.order_by.return_value.limit.return_value.all.return_value = [pedido]
+    db.query.return_value.filter.return_value.order_by.return_value.limit.return_value.all.return_value = [
+        pedido
+    ]
     notas = [
         {
             "id": "25428517969",
@@ -552,21 +578,23 @@ def test_enriquecer_notas_com_pedidos_integrados_relaciona_por_id_da_nf_quando_r
 
     _enriquecer_notas_com_pedidos_integrados(db, "tenant-1", notas)
 
-    assert notas[0]["valor"] == 490.99
+    assert notas[0]["valor"] == pytest.approx(490.99)
     assert notas[0]["canal_label"] == "Mercado Livre"
     assert notas[0]["origem_loja_virtual"] == "Mercado Livre"
 
 
 def test_planejar_sincronizacao_bling_nfes_faz_bootstrap_quando_cache_esta_vazio():
-    deve_sincronizar, data_inicial, data_final, estrategia = _planejar_sincronizacao_bling_nfes(
-        force_refresh=False,
-        data_inicial=None,
-        data_final=None,
-        cache_total=0,
-        cache_intervalo_tem_dados=False,
-        ultimo_sync=None,
-        ultima_data_emissao=None,
-        agora=datetime(2026, 3, 30, 9, 0, 0),
+    deve_sincronizar, data_inicial, data_final, estrategia = (
+        _planejar_sincronizacao_bling_nfes(
+            force_refresh=False,
+            data_inicial=None,
+            data_final=None,
+            cache_total=0,
+            cache_intervalo_tem_dados=False,
+            ultimo_sync=None,
+            ultima_data_emissao=None,
+            agora=datetime(2026, 3, 30, 9, 0, 0),
+        )
     )
 
     assert deve_sincronizar is True
@@ -576,15 +604,17 @@ def test_planejar_sincronizacao_bling_nfes_faz_bootstrap_quando_cache_esta_vazio
 
 
 def test_planejar_sincronizacao_bling_nfes_reduz_para_janela_incremental_quando_cache_existe():
-    deve_sincronizar, data_inicial, data_final, estrategia = _planejar_sincronizacao_bling_nfes(
-        force_refresh=False,
-        data_inicial=None,
-        data_final=None,
-        cache_total=18,
-        cache_intervalo_tem_dados=True,
-        ultimo_sync=datetime(2026, 3, 30, 8, 45, 0),
-        ultima_data_emissao=datetime(2026, 3, 29, 17, 30, 0),
-        agora=datetime(2026, 3, 30, 9, 0, 0),
+    deve_sincronizar, data_inicial, data_final, estrategia = (
+        _planejar_sincronizacao_bling_nfes(
+            force_refresh=False,
+            data_inicial=None,
+            data_final=None,
+            cache_total=18,
+            cache_intervalo_tem_dados=True,
+            ultimo_sync=datetime(2026, 3, 30, 8, 45, 0),
+            ultima_data_emissao=datetime(2026, 3, 29, 17, 30, 0),
+            agora=datetime(2026, 3, 30, 9, 0, 0),
+        )
     )
 
     assert deve_sincronizar is True
@@ -594,15 +624,17 @@ def test_planejar_sincronizacao_bling_nfes_reduz_para_janela_incremental_quando_
 
 
 def test_planejar_sincronizacao_bling_nfes_nao_reconsulta_intervalo_quando_cache_esta_recente():
-    deve_sincronizar, data_inicial, data_final, estrategia = _planejar_sincronizacao_bling_nfes(
-        force_refresh=False,
-        data_inicial="2026-03-28",
-        data_final="2026-03-30",
-        cache_total=18,
-        cache_intervalo_tem_dados=True,
-        ultimo_sync=datetime(2026, 3, 30, 8, 58, 0),
-        ultima_data_emissao=datetime(2026, 3, 29, 17, 30, 0),
-        agora=datetime(2026, 3, 30, 9, 0, 0),
+    deve_sincronizar, data_inicial, data_final, estrategia = (
+        _planejar_sincronizacao_bling_nfes(
+            force_refresh=False,
+            data_inicial="2026-03-28",
+            data_final="2026-03-30",
+            cache_total=18,
+            cache_intervalo_tem_dados=True,
+            ultimo_sync=datetime(2026, 3, 30, 8, 58, 0),
+            ultima_data_emissao=datetime(2026, 3, 29, 17, 30, 0),
+            agora=datetime(2026, 3, 30, 9, 0, 0),
+        )
     )
 
     assert deve_sincronizar is False

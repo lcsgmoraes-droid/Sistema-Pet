@@ -56,7 +56,9 @@ class _DisconnectedRequest:
 @pytest.mark.asyncio
 async def test_tenant_security_blocks_valid_jwt_without_tenant():
     middleware = TenantSecurityMiddleware(app=lambda scope, receive, send: None)
-    response = await middleware.dispatch(_request("/vendas", _token({"sub": "1"})), _call_next)
+    response = await middleware.dispatch(
+        _request("/vendas", _token({"sub": "1"})), _call_next
+    )
 
     assert response.status_code == 401
 
@@ -74,7 +76,9 @@ async def test_tenant_security_allows_valid_jwt_with_tenant():
 async def test_tenant_security_allows_select_tenant_without_tenant():
     middleware = TenantSecurityMiddleware(app=lambda scope, receive, send: None)
     token = _token({"sub": "1", "tenant_id": None})
-    response = await middleware.dispatch(_request("/api/auth/select-tenant", token), _call_next)
+    response = await middleware.dispatch(
+        _request("/api/auth/select-tenant", token), _call_next
+    )
 
     assert response.status_code == 200
 

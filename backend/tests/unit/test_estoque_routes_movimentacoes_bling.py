@@ -48,7 +48,9 @@ def test_canal_pedido_integrado_recalcula_shopee_pelo_payload():
     assert _canal_pedido_integrado(Pedido()) == "shopee"
 
 
-def test_contexto_venda_pedido_integrado_prioriza_total_da_nf_quando_ha_um_item(monkeypatch):
+def test_contexto_venda_pedido_integrado_prioriza_total_da_nf_quando_ha_um_item(
+    monkeypatch,
+):
     class FakeQuery:
         def __init__(self, produto):
             self.produto = produto
@@ -66,7 +68,9 @@ def test_contexto_venda_pedido_integrado_prioriza_total_da_nf_quando_ha_um_item(
         def query(self, model):
             return FakeQuery(self.produto)
 
-    produto = SimpleNamespace(id=6396, tenant_id="tenant-1", codigo="013264.1/1", codigo_barras=None)
+    produto = SimpleNamespace(
+        id=6396, tenant_id="tenant-1", codigo="013264.1/1", codigo_barras=None
+    )
     pedido = SimpleNamespace(
         tenant_id="tenant-1",
         canal="bling",
@@ -103,7 +107,9 @@ def test_contexto_venda_pedido_integrado_prioriza_total_da_nf_quando_ha_um_item(
     assert contexto["preco_venda_unitario"] == 42.90
 
 
-def test_contexto_venda_pedido_integrado_ler_total_da_nota_embutida_no_payload(monkeypatch):
+def test_contexto_venda_pedido_integrado_ler_total_da_nota_embutida_no_payload(
+    monkeypatch,
+):
     class FakeQuery:
         def __init__(self, produto):
             self.produto = produto
@@ -121,7 +127,9 @@ def test_contexto_venda_pedido_integrado_ler_total_da_nota_embutida_no_payload(m
         def query(self, model):
             return FakeQuery(self.produto)
 
-    produto = SimpleNamespace(id=6762, tenant_id="tenant-1", codigo="018366.1", codigo_barras=None)
+    produto = SimpleNamespace(
+        id=6762, tenant_id="tenant-1", codigo="018366.1", codigo_barras=None
+    )
     pedido = SimpleNamespace(
         tenant_id="tenant-1",
         canal="bling",
@@ -180,7 +188,9 @@ def test_contexto_venda_pedido_integrado_prioriza_item_da_nf_em_cache(monkeypatc
         def query(self, model):
             return FakeQuery(self.produto)
 
-    produto = SimpleNamespace(id=6762, tenant_id="tenant-1", codigo="018366.1", codigo_barras=None)
+    produto = SimpleNamespace(
+        id=6762, tenant_id="tenant-1", codigo="018366.1", codigo_barras=None
+    )
     pedido = SimpleNamespace(
         tenant_id="tenant-1",
         canal="bling",
@@ -231,7 +241,9 @@ def test_contexto_venda_pedido_integrado_prioriza_item_da_nf_em_cache(monkeypatc
     assert contexto["preco_venda_unitario"] == 166.90
 
 
-def test_contexto_venda_pedido_integrado_nao_faz_fallback_para_valor_do_pedido(monkeypatch):
+def test_contexto_venda_pedido_integrado_nao_faz_fallback_para_valor_do_pedido(
+    monkeypatch,
+):
     class FakeQuery:
         def __init__(self, produto):
             self.produto = produto
@@ -249,7 +261,9 @@ def test_contexto_venda_pedido_integrado_nao_faz_fallback_para_valor_do_pedido(m
         def query(self, model):
             return FakeQuery(self.produto)
 
-    produto = SimpleNamespace(id=6762, tenant_id="tenant-1", codigo="018366.1", codigo_barras=None)
+    produto = SimpleNamespace(
+        id=6762, tenant_id="tenant-1", codigo="018366.1", codigo_barras=None
+    )
     pedido = SimpleNamespace(
         tenant_id="tenant-1",
         canal="bling",
@@ -290,7 +304,9 @@ def test_contexto_venda_pedido_integrado_nao_faz_fallback_para_valor_do_pedido(m
     assert contexto["preco_venda_unitario"] is None
 
 
-def test_contexto_venda_pedido_integrado_usa_itens_salvos_quando_payload_nao_tem_itens(monkeypatch):
+def test_contexto_venda_pedido_integrado_usa_itens_salvos_quando_payload_nao_tem_itens(
+    monkeypatch,
+):
     class FakeQuery:
         def __init__(self, *, produto=None, itens=None):
             self.produto = produto
@@ -318,7 +334,9 @@ def test_contexto_venda_pedido_integrado_usa_itens_salvos_quando_payload_nao_tem
                 return FakeQuery(itens=self.itens_salvos)
             return FakeQuery(produto=self.produto)
 
-    produto = SimpleNamespace(id=6762, tenant_id="tenant-1", codigo="018366.1", codigo_barras=None)
+    produto = SimpleNamespace(
+        id=6762, tenant_id="tenant-1", codigo="018366.1", codigo_barras=None
+    )
     itens_salvos = [
         SimpleNamespace(
             id=945,
@@ -345,7 +363,9 @@ def test_contexto_venda_pedido_integrado_usa_itens_salvos_quando_payload_nao_tem
         lambda db, produto: [6762],
     )
 
-    contexto = _contexto_venda_pedido_integrado(FakeDB(produto, itens_salvos), pedido, 6762)
+    contexto = _contexto_venda_pedido_integrado(
+        FakeDB(produto, itens_salvos), pedido, 6762
+    )
 
     assert contexto["canal"] == "mercado_livre"
     assert contexto["nf_numero"] == "010984"
@@ -377,7 +397,9 @@ def test_contexto_venda_pedido_integrado_resolve_nf_pelo_cache_do_pedido(monkeyp
                 return FakeQuery(cache=self.cache)
             return FakeQuery(produto=self.produto)
 
-    produto = SimpleNamespace(id=6398, tenant_id="tenant-1", codigo="SKU-TESTE", codigo_barras=None)
+    produto = SimpleNamespace(
+        id=6398, tenant_id="tenant-1", codigo="SKU-TESTE", codigo_barras=None
+    )
     cache = SimpleNamespace(
         bling_id="25441572688",
         numero="011087",
@@ -479,7 +501,9 @@ def test_contexto_venda_pedido_integrado_ignora_nf_cache_de_outro_pedido():
     assert contexto["preco_venda_unitario"] is None
 
 
-def test_listar_movimentacoes_produto_nao_relabel_movimento_legado_com_nf_atual(monkeypatch):
+def test_listar_movimentacoes_produto_nao_relabel_movimento_legado_com_nf_atual(
+    monkeypatch,
+):
     class FakeQuery:
         def __init__(self, *, first_result=None, all_result=None):
             self.first_result = first_result
@@ -542,9 +566,15 @@ def test_listar_movimentacoes_produto_nao_relabel_movimento_legado_com_nf_atual(
         payload={
             "pedido": {
                 "loja": {"id": 205367939},
-                "itens": [{"codigo": "SKU-1", "quantidade": 1, "valor": 41.18, "total": 41.18}],
+                "itens": [
+                    {"codigo": "SKU-1", "quantidade": 1, "valor": 41.18, "total": 41.18}
+                ],
             },
-            "ultima_nf": {"id": "25441651448", "numero": "011089", "valor_total": 41.18},
+            "ultima_nf": {
+                "id": "25441651448",
+                "numero": "011089",
+                "valor_total": 41.18,
+            },
         },
     )
 
@@ -562,4 +592,7 @@ def test_listar_movimentacoes_produto_nao_relabel_movimento_legado_com_nf_atual(
     assert len(resultado) == 1
     assert resultado[0]["documento"] == "11733"
     assert resultado[0]["nf_numero"] is None
-    assert resultado[0]["observacao_exibicao"] == "Baixa automatica via webhook Bling (Atendido)"
+    assert (
+        resultado[0]["observacao_exibicao"]
+        == "Baixa automatica via webhook Bling (Atendido)"
+    )

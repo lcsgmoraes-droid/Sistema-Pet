@@ -1,4 +1,4 @@
-﻿from app.veterinario_routes import router
+from app.veterinario_routes import router
 
 
 def _method_routes() -> list[tuple[str, str]]:
@@ -60,5 +60,9 @@ def test_vet_router_nao_duplica_metodo_e_path():
 def test_rotas_estaticas_de_internacao_vem_antes_da_dinamica():
     paths = [route.path for route in router.routes if hasattr(route, "path")]
 
-    assert paths.index("/vet/internacoes/config") < paths.index("/vet/internacoes/{internacao_id}")
-    assert paths.index("/vet/internacoes/procedimentos-agenda") < paths.index("/vet/internacoes/{internacao_id}")
+    assert paths.index("/vet/internacoes/config") < paths.index(
+        "/vet/internacoes/{internacao_id}"
+    )
+    assert paths.index("/vet/internacoes/procedimentos-agenda") < paths.index(
+        "/vet/internacoes/{internacao_id}"
+    )

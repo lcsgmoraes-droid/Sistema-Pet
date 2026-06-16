@@ -10,4 +10,9 @@ def test_prioridade_retorno_por_dias():
 
 def test_ordem_prioridade_retorno():
     prioridades = ["baixa", "critica", "media", "alta"]
-    assert sorted(prioridades, key=_ordem_prioridade) == ["critica", "alta", "media", "baixa"]
+    assert sorted(prioridades, key=_ordem_prioridade) == [
+        "critica",
+        "alta",
+        "media",
+        "baixa",
+    ]

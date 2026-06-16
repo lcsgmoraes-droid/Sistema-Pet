@@ -10,7 +10,10 @@ from app import estoque_validade_routes
 
 
 def test_validade_routes_expose_processing_actions_and_report():
-    routes = {(route.path, ",".join(sorted(route.methods))) for route in estoque_validade_routes.router.routes}
+    routes = {
+        (route.path, ",".join(sorted(route.methods)))
+        for route in estoque_validade_routes.router.routes
+    }
 
     assert ("/estoque/validade/processar", "POST") in routes
     assert ("/estoque/validade/pendencias", "GET") in routes

@@ -14,11 +14,11 @@ def test_host_watchdog_counts_only_http_status_5xx_not_response_size():
     script = _watchdog_script_text()
     status_pattern = re.compile(r'" 50[0-9] ')
     response_200_with_500_bytes = (
-        '203.0.113.10 - - [25/May/2026:21:00:05 +0000] '
+        "203.0.113.10 - - [25/May/2026:21:00:05 +0000] "
         '"POST /api/formas-pagamento/analisar-venda HTTP/2.0" 200 500 "-" "-" "-"'
     )
     real_502_response = (
-        '203.0.113.10 - - [25/May/2026:21:02:13 +0000] '
+        "203.0.113.10 - - [25/May/2026:21:02:13 +0000] "
         '"GET /api/produtos HTTP/2.0" 502 559 "-" "-" "-"'
     )
 

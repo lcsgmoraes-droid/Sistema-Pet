@@ -70,11 +70,19 @@ def test_regime_sem_encargos_lanca_valor_direto():
 
 
 def test_modelos_rotas_e_telas_expoem_composicao_remuneracao():
-    cargo_model = (REPO_ROOT / "backend/app/cargo_models.py").read_text(encoding="utf-8")
+    cargo_model = (REPO_ROOT / "backend/app/cargo_models.py").read_text(
+        encoding="utf-8"
+    )
     cliente_model = (REPO_ROOT / "backend/app/models.py").read_text(encoding="utf-8")
-    funcionarios_routes = (REPO_ROOT / "backend/app/funcionarios_routes.py").read_text(encoding="utf-8")
-    cargos_page = (REPO_ROOT / "frontend/src/pages/Cadastros/Cargos.jsx").read_text(encoding="utf-8")
-    funcionarios_page = (REPO_ROOT / "frontend/src/pages/RH/Funcionarios.jsx").read_text(encoding="utf-8")
+    funcionarios_routes = (REPO_ROOT / "backend/app/funcionarios_routes.py").read_text(
+        encoding="utf-8"
+    )
+    cargos_page = (REPO_ROOT / "frontend/src/pages/Cadastros/Cargos.jsx").read_text(
+        encoding="utf-8"
+    )
+    funcionarios_page = (
+        REPO_ROOT / "frontend/src/pages/RH/Funcionarios.jsx"
+    ).read_text(encoding="utf-8")
 
     assert "regime_remuneracao" in cargo_model
     assert "inss_funcionario_valor" in cargo_model

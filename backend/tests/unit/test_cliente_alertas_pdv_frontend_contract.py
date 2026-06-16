@@ -9,7 +9,9 @@ def _read(path: str) -> str:
 
 
 def test_cadastro_cliente_expõe_editor_de_alertas_pdv():
-    source = _read("frontend/src/components/clientes/ClientesNovoComplementaresStep.jsx")
+    source = _read(
+        "frontend/src/components/clientes/ClientesNovoComplementaresStep.jsx"
+    )
 
     assert "Alertas do PDV" in source
     assert "Adicionar alerta" in source
@@ -24,7 +26,10 @@ def test_formulario_cliente_normaliza_alertas_pdv_antes_de_salvar():
     assert "normalizeClienteAlertasPdv" in source
     assert "alertas_pdv: []" in source
     assert "alertas_pdv: normalizeClienteAlertasPdv(cliente.alertas_pdv)" in source
-    assert "clienteData.alertas_pdv = normalizeClienteAlertasPdv(clienteData.alertas_pdv)" in source
+    assert (
+        "clienteData.alertas_pdv = normalizeClienteAlertasPdv(clienteData.alertas_pdv)"
+        in source
+    )
 
 
 def test_pdv_exibe_alertas_ativos_do_cliente_selecionado():

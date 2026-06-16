@@ -38,5 +38,11 @@ def test_mensagens_do_cadastro_rapido_nao_voltam_com_mojibake():
 
     assert "Cadastro rápido para continuar o fluxo." in selector
     assert "CNPJ é obrigatório para Pessoa Jurídica" in clientes_routes
-    assert "Já existe um {cliente_data.tipo_cadastro} cadastrado com este CPF" in clientes_routes
-    assert "Já existe um {cliente_data.tipo_cadastro} cadastrado com este CNPJ" in clientes_routes
+    assert (
+        "Já existe um {cliente_data.tipo_cadastro} cadastrado com este CPF"
+        in clientes_routes
+    )
+    assert (
+        "Já existe um {cliente_data.tipo_cadastro} cadastrado com este CNPJ"
+        in clientes_routes
+    )

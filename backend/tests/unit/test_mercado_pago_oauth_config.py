@@ -39,11 +39,15 @@ def test_callback_oauth_mercado_pago_nao_exige_token_do_erp():
     )
 
     assert response.status_code == 303
-    assert response.headers["location"].startswith("https://corepet.com.br/ecommerce/configuracoes")
+    assert response.headers["location"].startswith(
+        "https://corepet.com.br/ecommerce/configuracoes"
+    )
     assert "mercadopago_oauth=error" in response.headers["location"]
 
 
-def test_callback_oauth_mercado_pago_ativa_contexto_tenant_antes_de_consultar_config(monkeypatch):
+def test_callback_oauth_mercado_pago_ativa_contexto_tenant_antes_de_consultar_config(
+    monkeypatch,
+):
     monkeypatch.setenv("JWT_SECRET_KEY", "oauth-callback-context-secret")
     state = encode_mercado_pago_oauth_state(tenant_id=TENANT_ID, user_id=42)
     config = SimpleNamespace(
@@ -60,7 +64,9 @@ def test_callback_oauth_mercado_pago_ativa_contexto_tenant_antes_de_consultar_co
         assert get_current_tenant() == UUID(TENANT_ID)
         return config
 
-    monkeypatch.setattr(ecommerce_payment_config_routes, "_ensure_config", ensure_config)
+    monkeypatch.setattr(
+        ecommerce_payment_config_routes, "_ensure_config", ensure_config
+    )
     monkeypatch.setattr(
         ecommerce_payment_config_routes,
         "exchange_mercado_pago_oauth_code",
@@ -82,7 +88,9 @@ def test_callback_oauth_mercado_pago_ativa_contexto_tenant_antes_de_consultar_co
         clear_current_tenant()
 
     assert response.status_code == 303
-    assert response.headers["location"].startswith("https://corepet.com.br/ecommerce/configuracoes")
+    assert response.headers["location"].startswith(
+        "https://corepet.com.br/ecommerce/configuracoes"
+    )
     assert "mercadopago_oauth=connected" in response.headers["location"]
 
 
@@ -92,7 +100,10 @@ def test_oauth_return_url_remove_prefixo_api_do_frontend(monkeypatch):
 
     return_url = build_mercado_pago_oauth_return_url("connected")
 
-    assert return_url == "https://corepet.com.br/ecommerce/configuracoes?mercadopago_oauth=connected"
+    assert (
+        return_url
+        == "https://corepet.com.br/ecommerce/configuracoes?mercadopago_oauth=connected"
+    )
 
 
 def test_oauth_authorization_url_usa_client_id_redirect_e_state_assinado(monkeypatch):
@@ -187,7 +198,9 @@ def test_exchange_oauth_usa_client_secret_do_tenant(monkeypatch):
             return {"access_token": "oauth-access-token", "expires_in": 21600}
 
     def http_post(url, headers, json, timeout):
-        captured.update({"url": url, "headers": headers, "json": json, "timeout": timeout})
+        captured.update(
+            {"url": url, "headers": headers, "json": json, "timeout": timeout}
+        )
         return Response()
 
     payload = exchange_mercado_pago_oauth_code(
@@ -279,7 +292,9 @@ def test_refresh_oauth_atualiza_access_token_expirado(monkeypatch):
             }
 
     def http_post(url, headers, json, timeout):
-        captured.update({"url": url, "headers": headers, "json": json, "timeout": timeout})
+        captured.update(
+            {"url": url, "headers": headers, "json": json, "timeout": timeout}
+        )
         return Response()
 
     class Db:
@@ -316,11 +331,17 @@ def test_serialize_informa_status_oauth_sem_expor_tokens(monkeypatch):
     )
     save_mercado_pago_oauth_tokens(
         config,
-        {"access_token": "oauth-access", "refresh_token": "oauth-refresh", "expires_in": 21600},
+        {
+            "access_token": "oauth-access",
+            "refresh_token": "oauth-refresh",
+            "expires_in": 21600,
+        },
         connected_at=datetime(2026, 6, 1, 10, 0, 0),
     )
 
-    serialized = serialize_mercado_pago_config(config, base_url="https://corepet.com.br")
+    serialized = serialize_mercado_pago_config(
+        config, base_url="https://corepet.com.br"
+    )
 
     assert serialized["oauth_available"] is False
     assert serialized["oauth_connected"] is True

@@ -36,12 +36,16 @@ def test_normalizar_filtro_ativo_respeita_incluir_inativos():
 
 
 def test_normalizar_promocao_payload_marca_ativo_por_preco_promocional():
-    assert _normalizar_promocao_erp_payload({"preco_promocional": "12.90"})[
-        "promocao_ativa"
-    ] is True
-    assert _normalizar_promocao_erp_payload({"preco_promocional": ""})[
-        "promocao_ativa"
-    ] is False
+    assert (
+        _normalizar_promocao_erp_payload({"preco_promocional": "12.90"})[
+            "promocao_ativa"
+        ]
+        is True
+    )
+    assert (
+        _normalizar_promocao_erp_payload({"preco_promocional": ""})["promocao_ativa"]
+        is False
+    )
 
 
 def test_normalizar_promocao_payload_preserva_edicao_sem_campos_de_promocao():

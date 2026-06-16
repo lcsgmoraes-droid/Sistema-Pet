@@ -1,4 +1,8 @@
-from app.middlewares.request_context import clear_request_context, get_request_id, set_request_id
+from app.middlewares.request_context import (
+    clear_request_context,
+    get_request_id,
+    set_request_id,
+)
 from app.utils.logger import clear_context, get_trace_id, set_trace_id
 
 
@@ -26,7 +30,9 @@ def test_operation_correlation_context_sets_and_restores_request_and_trace():
     set_request_id("req-http-1")
     set_trace_id("trace-http-1")
 
-    with operation_correlation_context("job.test", correlation_id="job-test-123") as correlation_id:
+    with operation_correlation_context(
+        "job.test", correlation_id="job-test-123"
+    ) as correlation_id:
         assert correlation_id == "job-test-123"
         assert get_request_id() == "job-test-123"
         assert get_trace_id() == "job-test-123"
@@ -41,4 +47,3 @@ def test_current_correlation_id_reuses_active_request_id():
     set_request_id("req-active")
 
     assert current_correlation_id("job.any") == "req-active"
-

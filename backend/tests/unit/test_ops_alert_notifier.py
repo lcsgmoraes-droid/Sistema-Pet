@@ -19,7 +19,9 @@ def _critical_alert() -> dict:
 def test_notify_ops_alerts_disabled_without_webhook(monkeypatch, tmp_path):
     monkeypatch.delenv("OPS_ALERT_WEBHOOK_URL", raising=False)
     monkeypatch.delenv("OPS_ALERT_EMAIL_TO", raising=False)
-    monkeypatch.setenv("OPS_ALERT_NOTIFICATION_LOG_PATH", str(tmp_path / "notifications.jsonl"))
+    monkeypatch.setenv(
+        "OPS_ALERT_NOTIFICATION_LOG_PATH", str(tmp_path / "notifications.jsonl")
+    )
 
     result = ops_alert_notifier.notify_ops_alerts([_critical_alert()])
 
@@ -67,7 +69,9 @@ def test_notify_ops_alerts_sends_email_when_webhook_is_absent(monkeypatch, tmp_p
     assert log_path.exists()
 
 
-def test_notify_ops_alerts_sends_critical_once_and_redacts_result(monkeypatch, tmp_path):
+def test_notify_ops_alerts_sends_critical_once_and_redacts_result(
+    monkeypatch, tmp_path
+):
     calls = []
 
     class _Response:
@@ -79,7 +83,9 @@ def test_notify_ops_alerts_sends_critical_once_and_redacts_result(monkeypatch, t
         return _Response()
 
     log_path = tmp_path / "notifications.jsonl"
-    monkeypatch.setenv("OPS_ALERT_WEBHOOK_URL", "https://hooks.example.test/secret-token")
+    monkeypatch.setenv(
+        "OPS_ALERT_WEBHOOK_URL", "https://hooks.example.test/secret-token"
+    )
     monkeypatch.setenv("OPS_ALERT_NOTIFICATION_LOG_PATH", str(log_path))
     monkeypatch.setattr(ops_alert_notifier.httpx, "post", fake_post)
 

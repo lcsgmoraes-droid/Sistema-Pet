@@ -48,13 +48,12 @@ def test_normalizar_payload_racao_aceita_sim_nao_herdados():
         "classificacao_racao": None,
         "tipo": "ração",
     }
-    assert _normalizar_payload_racao({"classificacao_racao": "não"})[
-        "tipo"
-    ] == "produto"
+    assert (
+        _normalizar_payload_racao({"classificacao_racao": "não"})["tipo"] == "produto"
+    )
 
 
 def test_produto_eh_racao_expr_is_sql_expression():
     expr = _produto_eh_racao_expr()
 
     assert hasattr(expr, "compile")
-

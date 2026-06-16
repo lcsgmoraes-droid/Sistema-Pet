@@ -27,12 +27,15 @@ def test_capacidade_calcula_duracao_e_pico_com_datetimes_mistos():
     fim_sem_timezone = datetime(2026, 4, 26, 10, 0)
 
     assert _duracao_minutos(inicio_com_timezone, fim_sem_timezone) == 60
-    assert _calcular_pico(
-        [
-            (inicio_com_timezone, fim_sem_timezone),
-            (
-                datetime(2026, 4, 26, 9, 30),
-                datetime(2026, 4, 26, 10, 30, tzinfo=timezone.utc),
-            ),
-        ]
-    ) == 2
+    assert (
+        _calcular_pico(
+            [
+                (inicio_com_timezone, fim_sem_timezone),
+                (
+                    datetime(2026, 4, 26, 9, 30),
+                    datetime(2026, 4, 26, 10, 30, tzinfo=timezone.utc),
+                ),
+            ]
+        )
+        == 2
+    )

@@ -42,10 +42,13 @@ def test_anular_cupom_reverte_fidelidade_e_marca_voided():
     )
     db = _FakeDB(cupom)
 
-    with patch(
-        "app.campaigns.routes.revoke_loyalty_reward_by_coupon",
-        return_value={"matched": True, "revoked": True},
-    ) as revoke_mock, patch("app.campaigns.routes.log_campaign_event") as audit_mock:
+    with (
+        patch(
+            "app.campaigns.routes.revoke_loyalty_reward_by_coupon",
+            return_value={"matched": True, "revoked": True},
+        ) as revoke_mock,
+        patch("app.campaigns.routes.log_campaign_event") as audit_mock,
+    ):
         response = anular_cupom(
             code="FIEL-ABC",
             db=db,

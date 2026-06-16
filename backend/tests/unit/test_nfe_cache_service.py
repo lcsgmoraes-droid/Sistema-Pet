@@ -36,8 +36,12 @@ def test_upsert_nota_cache_reaproveita_registro_pendente_na_mesma_sessao():
         "status": "Autorizada",
     }
 
-    primeiro = upsert_nota_cache(db, tenant_id, nota, source="bling_api", resumo_payload=nota)
-    segundo = upsert_nota_cache(db, tenant_id, nota, source="bling_api", resumo_payload=nota)
+    primeiro = upsert_nota_cache(
+        db, tenant_id, nota, source="bling_api", resumo_payload=nota
+    )
+    segundo = upsert_nota_cache(
+        db, tenant_id, nota, source="bling_api", resumo_payload=nota
+    )
 
     assert primeiro is segundo
     assert len(db.new) == 1
@@ -63,7 +67,9 @@ def test_upsert_nota_cache_nao_rebaixa_autorizada_do_bling_para_pendente_do_pedi
         "status": "Pendente",
     }
 
-    registro = upsert_nota_cache(db, "tenant-1", nota, source="pedido_integrado", resumo_payload=nota)
+    registro = upsert_nota_cache(
+        db, "tenant-1", nota, source="pedido_integrado", resumo_payload=nota
+    )
 
     assert registro is persistido
     assert registro.status == "Autorizada"
@@ -90,7 +96,9 @@ def test_upsert_nota_cache_permite_upgrade_de_pendente_para_autorizada():
         "status": "Autorizada",
     }
 
-    registro = upsert_nota_cache(db, "tenant-1", nota, source="bling_api", resumo_payload=nota)
+    registro = upsert_nota_cache(
+        db, "tenant-1", nota, source="bling_api", resumo_payload=nota
+    )
 
     assert registro is persistido
     assert registro.status == "Autorizada"

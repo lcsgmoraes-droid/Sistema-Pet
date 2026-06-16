@@ -26,7 +26,9 @@ def test_atualizacao_de_venda_define_pendente_apenas_para_entrega_nova():
 def test_sincronizar_parada_entregue_atualiza_venda_para_pdv():
     entrega_em = datetime(2026, 4, 24, 10, 30)
     parada = SimpleNamespace(venda_id=10, status="pendente", data_entrega=None)
-    venda = SimpleNamespace(id=10, tenant_id="tenant-1", status_entrega="em_rota", data_entrega=None)
+    venda = SimpleNamespace(
+        id=10, tenant_id="tenant-1", status_entrega="em_rota", data_entrega=None
+    )
 
     class QueryFake:
         def filter(self, *args, **kwargs):
@@ -39,7 +41,9 @@ def test_sincronizar_parada_entregue_atualiza_venda_para_pdv():
         def query(self, _model):
             return QueryFake()
 
-    retorno = _sincronizar_venda_entregue_por_parada(DbFake(), parada, "tenant-1", entrega_em)
+    retorno = _sincronizar_venda_entregue_por_parada(
+        DbFake(), parada, "tenant-1", entrega_em
+    )
 
     assert retorno is venda
     assert parada.status == "entregue"
@@ -113,7 +117,9 @@ def test_nao_entregue_remove_rota_quando_ultima_parada_fica_fora_da_rota():
         observacoes=None,
     )
     venda = SimpleNamespace(id=20, tenant_id=tenant_id, status_entrega="em_rota")
-    db = _EntregaDbFake(rota=rota, parada=parada, venda=venda, paradas_restantes=[parada])
+    db = _EntregaDbFake(
+        rota=rota, parada=parada, venda=venda, paradas_restantes=[parada]
+    )
 
     resposta = marcar_parada_nao_entregue(
         rota_id=str(rota.id),
@@ -165,4 +171,3 @@ def test_nao_entregue_preserva_rota_quando_ainda_tem_paradas():
     assert parada_removida in db.deleted
     assert rota not in db.deleted
     assert resposta["rota_removida"] is False
-

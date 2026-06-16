@@ -54,7 +54,9 @@ def _capture_rls_sync(monkeypatch, events):
     )
 
 
-def test_registrar_alerta_estoque_negativo_syncs_explicit_tenant_before_query(monkeypatch):
+def test_registrar_alerta_estoque_negativo_syncs_explicit_tenant_before_query(
+    monkeypatch,
+):
     events = []
     db = _FakeDB(events, first_result=SimpleNamespace(permite_estoque_negativo=True))
     produto = SimpleNamespace(id=77, nome="Racao especial")

@@ -25,7 +25,7 @@ def test_chave_de_classificacao_remove_numero_variavel_da_venda():
 
 def test_classificar_conta_pagar_aprende_regra_e_aplica_similares():
     source = _source("backend/app/contas_pagar_routes.py")
-    endpoint = source.split('def classificar_conta_pagar(', 1)[1].split(
+    endpoint = source.split("def classificar_conta_pagar(", 1)[1].split(
         "# ============================================================================\n# BUSCAR CONTA",
         1,
     )[0]
@@ -47,7 +47,7 @@ def test_criacao_manual_de_conta_pagar_usa_classificacao_aprendida():
 def test_contas_de_nf_entrada_usam_classificacao_aprendida_por_fornecedor():
     source = _source("backend/app/notas_entrada/financeiro.py")
     gerar_contas = source.split("def criar_contas_pagar_da_nota(", 1)[1].split(
-        "logger.info(\"Total de contas criadas:",
+        'logger.info("Total de contas criadas:',
         1,
     )[0]
 
@@ -66,7 +66,9 @@ def test_contas_de_taxa_pdv_usam_classificacao_aprendida_por_descricao():
 
 def test_falha_ao_criar_taxa_do_pdv_limpa_transacao_da_venda_finalizada():
     source = _source("backend/app/vendas/service.py")
-    bloco_taxas = source.split("resultado_taxas = processar_contas_pagar_taxas(", 1)[1].split(
+    bloco_taxas = source.split("resultado_taxas = processar_contas_pagar_taxas(", 1)[
+        1
+    ].split(
         "if venda.status == 'finalizada' and venda.cliente_id:",
         1,
     )[0]

@@ -9,7 +9,9 @@ def _read_mobile_source(relative_path: str) -> str:
 
 
 def test_checkout_success_screen_keeps_payment_link_visible_when_available():
-    source = _read_mobile_source("app-mobile/src/screens/shop/CheckoutSucessoScreen.tsx")
+    source = _read_mobile_source(
+        "app-mobile/src/screens/shop/CheckoutSucessoScreen.tsx"
+    )
 
     assert "pedido.payment_url" in source
     assert "abrirPagamento" in source
@@ -29,11 +31,13 @@ def test_orders_screen_can_reopen_pending_payment_link():
 
     assert "Linking.openURL(item.payment_url)" in source
     assert "Pagar agora" in source
-    assert "item.status === \"pendente\"" in source
+    assert 'item.status === "pendente"' in source
 
 
 def test_checkout_success_screen_does_not_tell_online_customer_to_pay_on_delivery():
-    source = _read_mobile_source("app-mobile/src/screens/shop/CheckoutSucessoScreen.tsx")
+    source = _read_mobile_source(
+        "app-mobile/src/screens/shop/CheckoutSucessoScreen.tsx"
+    )
 
     assert "Pague ao receber ou conforme combinado" not in source
     assert "Acompanhe o status em Meus Pedidos" in source

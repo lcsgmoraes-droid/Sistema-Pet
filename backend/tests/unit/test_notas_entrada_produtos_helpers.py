@@ -39,5 +39,11 @@ def test_montar_divergencia_codigo_barras_item_compara_codigo_principal_e_fiscal
     divergencia = _montar_divergencia_codigo_barras_item(item)
 
     assert divergencia["tem_divergencia"] is True
-    assert "Codigo de barras principal: NF=9998242030076 vs cadastro=7898242030076" in divergencia["mensagens"]
-    assert "EAN fiscal: NF=9998242030076 vs cadastro=7898242030076" in divergencia["mensagens"]
+    assert (
+        "Codigo de barras principal: NF=9998242030076 vs cadastro=7898242030076"
+        in divergencia["mensagens"]
+    )
+    assert (
+        "EAN fiscal: NF=9998242030076 vs cadastro=7898242030076"
+        in divergencia["mensagens"]
+    )

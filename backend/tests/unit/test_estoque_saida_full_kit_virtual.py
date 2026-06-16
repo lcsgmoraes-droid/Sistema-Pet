@@ -86,7 +86,9 @@ def test_validacao_saida_full_usa_estoque_virtual_do_kit(monkeypatch):
     assert problemas == []
 
 
-def test_processar_saida_full_kit_virtual_baixa_componentes_e_registra_fluxo_virtual(monkeypatch):
+def test_processar_saida_full_kit_virtual_baixa_componentes_e_registra_fluxo_virtual(
+    monkeypatch,
+):
     kit = _produto(
         id=6936,
         codigo="RA1091-3",

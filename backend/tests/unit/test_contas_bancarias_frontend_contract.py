@@ -19,8 +19,8 @@ def test_contas_bancarias_renderiza_icones_textuais_com_lucide():
 def test_contas_bancarias_limita_textos_do_card():
     source = SOURCE.read_text(encoding="utf-8")
 
-    assert "className=\"flex min-w-0 items-start justify-between" in source
-    assert "className=\"flex min-w-0 items-center gap-3" in source
+    assert 'className="flex min-w-0 items-start justify-between' in source
+    assert 'className="flex min-w-0 items-center gap-3' in source
     assert "title={conta.nome}" in source
-    assert "className=\"truncate font-bold text-gray-800" in source
+    assert 'className="truncate font-bold text-gray-800' in source
     assert "title={conta.banco}" in source

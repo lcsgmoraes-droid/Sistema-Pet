@@ -8,7 +8,11 @@ from app.services.nfe_authorized_reconciliation_service import (
     reconciliar_nf_autorizada_cache,
 )
 from app.middlewares.request_context import clear_request_context, get_request_id
-from app.tenancy.context import clear_current_tenant, get_current_tenant, set_current_tenant
+from app.tenancy.context import (
+    clear_current_tenant,
+    get_current_tenant,
+    set_current_tenant,
+)
 from app.utils.logger import clear_context
 
 
@@ -59,7 +63,9 @@ class _FakeDB:
         if nome == "PedidoIntegradoItem":
             return _FakeQuery(all_result=self.itens)
         if nome == "EstoqueMovimentacao":
-            return _FakeQuery(all_result=self.movimentos, count_result=len(self.movimentos))
+            return _FakeQuery(
+                all_result=self.movimentos, count_result=len(self.movimentos)
+            )
         raise AssertionError(f"Modelo inesperado na query: {nome}")
 
     def add(self, obj):
@@ -115,7 +121,10 @@ def test_reconciliar_nf_autorizada_cache_vincula_por_numero_pedido_loja(monkeypa
     )
     monkeypatch.setattr(
         "app.services.bling_nf_service.processar_nf_autorizada",
-        lambda **kwargs: (capturado.setdefault("processou_nf", kwargs), "venda_confirmada")[1],
+        lambda **kwargs: (
+            capturado.setdefault("processou_nf", kwargs),
+            "venda_confirmada",
+        )[1],
     )
     monkeypatch.setattr(
         "app.services.bling_flow_monitor_service.registrar_vinculo_nf_pedido",
@@ -145,7 +154,9 @@ def test_reconciliar_nf_autorizada_cache_vincula_por_numero_pedido_loja(monkeypa
     assert db.commit_calls == 1
 
 
-def test_reconciliar_nf_autorizada_cache_reprocessa_quando_so_existe_baixa_legada(monkeypatch):
+def test_reconciliar_nf_autorizada_cache_reprocessa_quando_so_existe_baixa_legada(
+    monkeypatch,
+):
     pedido = SimpleNamespace(
         id=1225,
         tenant_id="tenant-1",
@@ -160,7 +171,11 @@ def test_reconciliar_nf_autorizada_cache_reprocessa_quando_so_existe_baixa_legad
         numero="011089",
         numero_pedido_loja="260331HQ17M377",
         pedido_bling_id_ref="25441648396",
-        detalhe_payload={"numero": "011089", "numeroPedidoLoja": "260331HQ17M377", "situacao": 5},
+        detalhe_payload={
+            "numero": "011089",
+            "numeroPedidoLoja": "260331HQ17M377",
+            "situacao": 5,
+        },
         resumo_payload={},
         status="Autorizada",
     )
@@ -187,7 +202,10 @@ def test_reconciliar_nf_autorizada_cache_reprocessa_quando_so_existe_baixa_legad
     )
     monkeypatch.setattr(
         "app.services.bling_nf_service.processar_nf_autorizada",
-        lambda **kwargs: (capturado.setdefault("processou_nf", kwargs), "venda_confirmada")[1],
+        lambda **kwargs: (
+            capturado.setdefault("processou_nf", kwargs),
+            "venda_confirmada",
+        )[1],
     )
     monkeypatch.setattr(
         "app.services.bling_flow_monitor_service.registrar_vinculo_nf_pedido",
@@ -213,8 +231,14 @@ def test_reconciliar_nf_autorizada_cache_reprocessa_quando_so_existe_baixa_legad
     assert capturado["processou_nf"]["nf_id"] == "25441651448"
 
 
-def test_executar_reconciliacao_automatica_nfes_autorizadas_inclui_correlacao(monkeypatch):
-    monkeypatch.setattr(service, "listar_tenants_com_nfes_autorizadas_recentes", lambda *args, **kwargs: [])
+def test_executar_reconciliacao_automatica_nfes_autorizadas_inclui_correlacao(
+    monkeypatch,
+):
+    monkeypatch.setattr(
+        service,
+        "listar_tenants_com_nfes_autorizadas_recentes",
+        lambda *args, **kwargs: [],
+    )
 
     resultado = executar_reconciliacao_automatica_nfes_autorizadas(object(), dias=3)
 
@@ -222,7 +246,9 @@ def test_executar_reconciliacao_automatica_nfes_autorizadas_inclui_correlacao(mo
     assert get_request_id() is None
 
 
-def test_executar_reconciliacao_automatica_nfes_autorizadas_ativa_contexto_por_tenant(monkeypatch):
+def test_executar_reconciliacao_automatica_nfes_autorizadas_ativa_contexto_por_tenant(
+    monkeypatch,
+):
     tenant_a = UUID("33333333-3333-4333-8333-333333333333")
     tenant_b = UUID("44444444-4444-4444-8444-444444444444")
     previous_tenant = UUID("99999999-9999-4999-8999-999999999999")
@@ -241,7 +267,9 @@ def test_executar_reconciliacao_automatica_nfes_autorizadas_ativa_contexto_por_t
             "notas_reconciliadas": 0,
         }
 
-    monkeypatch.setattr(service, "reconciliar_nfes_autorizadas_recentes", fake_reconciliar)
+    monkeypatch.setattr(
+        service, "reconciliar_nfes_autorizadas_recentes", fake_reconciliar
+    )
 
     set_current_tenant(previous_tenant)
 
@@ -256,14 +284,18 @@ def test_executar_reconciliacao_automatica_nfes_autorizadas_ativa_contexto_por_t
     assert get_current_tenant() == previous_tenant
 
 
-def test_listar_tenants_com_nfes_autorizadas_recentes_usa_sql_global_autorizado(monkeypatch):
+def test_listar_tenants_com_nfes_autorizadas_recentes_usa_sql_global_autorizado(
+    monkeypatch,
+):
     chamadas = []
 
     def fake_execute(db, sql, params=None, **kwargs):
         chamadas.append({"db": db, "sql": sql, "params": params or {}, **kwargs})
         return [("tenant-a",), ("tenant-b",)]
 
-    monkeypatch.setattr(service, "_garantir_registry_sqlalchemy_reconciliacao", lambda: None)
+    monkeypatch.setattr(
+        service, "_garantir_registry_sqlalchemy_reconciliacao", lambda: None
+    )
     monkeypatch.setattr(service, "execute_tenant_safe_all", fake_execute, raising=False)
 
     db = object()

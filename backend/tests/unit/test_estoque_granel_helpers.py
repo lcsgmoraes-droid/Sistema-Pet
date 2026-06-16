@@ -14,9 +14,16 @@ from app.estoque.granel import (
 
 def test_produto_e_granel_considera_flag_ou_nome():
     assert _produto_e_granel(None) is False
-    assert _produto_e_granel(SimpleNamespace(e_granel=True, nome="Produto comum")) is True
-    assert _produto_e_granel(SimpleNamespace(e_granel=False, nome="Racao a granel")) is True
-    assert _produto_e_granel(SimpleNamespace(e_granel=False, nome="Racao pacote")) is False
+    assert (
+        _produto_e_granel(SimpleNamespace(e_granel=True, nome="Produto comum")) is True
+    )
+    assert (
+        _produto_e_granel(SimpleNamespace(e_granel=False, nome="Racao a granel"))
+        is True
+    )
+    assert (
+        _produto_e_granel(SimpleNamespace(e_granel=False, nome="Racao pacote")) is False
+    )
 
 
 def test_normalizar_produto_granel_preserva_simples_e_remove_kit():
@@ -42,7 +49,9 @@ def test_validar_produto_origem_granel_rejeita_origem_invalida():
 
     with pytest.raises(HTTPException) as granel:
         _validar_produto_origem_granel(
-            SimpleNamespace(e_granel=True, nome="Produto granel", tipo_produto="SIMPLES")
+            SimpleNamespace(
+                e_granel=True, nome="Produto granel", tipo_produto="SIMPLES"
+            )
         )
     assert granel.value.status_code == 400
 

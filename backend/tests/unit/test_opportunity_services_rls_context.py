@@ -48,8 +48,16 @@ def test_opportunity_event_persistence_sets_and_clears_rls_tenant(monkeypatch):
     )
 
     monkeypatch.setattr(opportunity_event_service, "SessionLocal", lambda: fake_session)
-    monkeypatch.setattr(opportunity_event_service, "set_current_tenant", lambda value: calls.append(("set", value)))
-    monkeypatch.setattr(opportunity_event_service, "clear_current_tenant", lambda: calls.append(("clear", None)))
+    monkeypatch.setattr(
+        opportunity_event_service,
+        "set_current_tenant",
+        lambda value: calls.append(("set", value)),
+    )
+    monkeypatch.setattr(
+        opportunity_event_service,
+        "clear_current_tenant",
+        lambda: calls.append(("clear", None)),
+    )
 
     assert opportunity_event_service._persist_event(payload, "evt_test") is True
 
@@ -65,9 +73,19 @@ def test_opportunity_metrics_sets_and_clears_rls_tenant(monkeypatch):
     fake_session = _FakeSession(rows=[(OpportunityEventTypeEnum.CONVERTIDA, 2)])
     calls = []
 
-    monkeypatch.setattr(opportunity_metrics_service, "SessionLocal", lambda: fake_session)
-    monkeypatch.setattr(opportunity_metrics_service, "set_current_tenant", lambda value: calls.append(("set", value)))
-    monkeypatch.setattr(opportunity_metrics_service, "clear_current_tenant", lambda: calls.append(("clear", None)))
+    monkeypatch.setattr(
+        opportunity_metrics_service, "SessionLocal", lambda: fake_session
+    )
+    monkeypatch.setattr(
+        opportunity_metrics_service,
+        "set_current_tenant",
+        lambda value: calls.append(("set", value)),
+    )
+    monkeypatch.setattr(
+        opportunity_metrics_service,
+        "clear_current_tenant",
+        lambda: calls.append(("clear", None)),
+    )
 
     assert opportunity_metrics_service.count_events_by_type(tenant_id) == {
         "oportunidade_convertida": 2

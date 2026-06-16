@@ -70,7 +70,9 @@ def test_mobile_app_routes_employee_users_to_balance_screen():
 
 def test_mobile_employee_stock_service_and_screen_exist():
     service = read_repo("app-mobile/src/services/funcionarioEstoque.service.ts")
-    screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioBalancoScreen.tsx")
+    screen = read_repo(
+        "app-mobile/src/screens/funcionario/FuncionarioBalancoScreen.tsx"
+    )
     navigator = read_repo("app-mobile/src/navigation/FuncionarioNavigator.tsx")
 
     assert "/app/funcionario/estoque/produtos/barcode" in service
@@ -85,7 +87,9 @@ def test_mobile_employee_stock_service_and_screen_exist():
 
 
 def test_mobile_employee_stock_adjustment_hides_current_stock_and_uses_autocomplete():
-    screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioBalancoScreen.tsx")
+    screen = read_repo(
+        "app-mobile/src/screens/funcionario/FuncionarioBalancoScreen.tsx"
+    )
 
     assert "autocompleteProdutosTimer" in screen
     assert "buscarManual(false)" in screen
@@ -107,7 +111,9 @@ def test_employee_stock_search_ranks_full_phrase_before_loose_code_digits():
 
 def test_mobile_employee_stock_uses_keyboard_safe_scroll_and_product_images():
     service = read_repo("app-mobile/src/services/funcionarioEstoque.service.ts")
-    screen = read_repo("app-mobile/src/screens/funcionario/FuncionarioBalancoScreen.tsx")
+    screen = read_repo(
+        "app-mobile/src/screens/funcionario/FuncionarioBalancoScreen.tsx"
+    )
 
     assert "resolveMediaUrl" in service
     assert "imagem_url: resolveMediaUrl" in service

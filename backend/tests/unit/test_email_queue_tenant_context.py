@@ -7,7 +7,11 @@ import inspect
 import app.routes.acertos_routes as acertos_routes
 import app.services.acerto_service as acerto_service
 from app.services.acerto_service import EmailQueueService
-from app.tenancy.context import clear_current_tenant, get_current_tenant, set_current_tenant
+from app.tenancy.context import (
+    clear_current_tenant,
+    get_current_tenant,
+    set_current_tenant,
+)
 
 
 TENANT_A = UUID("11111111-1111-4111-8111-111111111111")
@@ -108,7 +112,9 @@ def test_processar_fila_aplica_contexto_filtro_e_rls_do_tenant(monkeypatch):
         tenant_visto_no_envio.append(get_current_tenant())
         return {"sucesso": True}
 
-    monkeypatch.setattr(acerto_service.EmailService, "enviar_email", staticmethod(fake_enviar_email))
+    monkeypatch.setattr(
+        acerto_service.EmailService, "enviar_email", staticmethod(fake_enviar_email)
+    )
 
     set_current_tenant(PREVIOUS_TENANT)
 
@@ -160,7 +166,9 @@ def test_processar_fila_global_processa_tenants_ativos_com_contexto(monkeypatch)
         processados = 2 if tenant_id == TENANT_A else 1
         return {"processados": processados, "enviados": processados, "erros": 0}
 
-    monkeypatch.setattr(EmailQueueService, "processar_fila", staticmethod(fake_processar_fila))
+    monkeypatch.setattr(
+        EmailQueueService, "processar_fila", staticmethod(fake_processar_fila)
+    )
 
     resultado = EmailQueueService.processar_fila_global(db, limite=3)
 
@@ -193,7 +201,9 @@ def test_gerar_acerto_usa_tenant_id_no_contrato_filtros_e_escrita():
 def test_rotas_e_scheduler_usam_api_de_email_com_tenant_explicito():
     reenviar_source = inspect.getsource(acertos_routes.reenviar_email)
     manual_source = inspect.getsource(acertos_routes.processar_fila_manual)
-    scheduler_source = Path("app/schedulers/acerto_scheduler.py").read_text(encoding="utf-8")
+    scheduler_source = Path("app/schedulers/acerto_scheduler.py").read_text(
+        encoding="utf-8"
+    )
 
     assert "tenant_id=tenant_id" in reenviar_source
     assert "tenant_id=tenant_id" in manual_source
