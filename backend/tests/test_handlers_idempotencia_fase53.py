@@ -17,21 +17,16 @@ COBERTURA:
 
 import pytest
 import sqlite3
-from datetime import date, datetime
-from decimal import Decimal
-from dataclasses import dataclass
-from typing import Optional
+from datetime import date
 from pathlib import Path
 
 # Imports do sistema
 import sys
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from app.domain.events.base import DomainEvent
 from app.domain.events.venda_events import VendaCriada, VendaFinalizada, VendaCancelada
 from app.read_models.handlers_v53_idempotente import VendaReadModelHandler
 from app.core.side_effects_guard import suppress_in_replay
-from app.core.replay_context import enable_replay_mode, disable_replay_mode
 from app.core.replay_context import enable_replay_mode, disable_replay_mode
 
 
@@ -92,8 +87,6 @@ def test_db():
 @pytest.fixture
 def mock_db_session(test_db):
     """Mock de Session SQLAlchemy"""
-    from sqlalchemy.orm import Session
-    from unittest.mock import MagicMock
     
     class MockSession:
         def __init__(self, conn):
@@ -307,7 +300,7 @@ def test_side_effects_suprimidos_em_replay():
     # Modo normal
     disable_replay_mode()
     handler.send_notification()
-    assert handler.side_effect_executed == True, "Side effect deveria executar em modo normal"
+    assert handler.side_effect_executed, "Side effect deveria executar em modo normal"
     
     # Reset
     handler.side_effect_executed = False
@@ -315,7 +308,7 @@ def test_side_effects_suprimidos_em_replay():
     # Modo replay
     enable_replay_mode()
     handler.send_notification()
-    assert handler.side_effect_executed == False, "Side effect NÃO deveria executar em modo replay"
+    assert not handler.side_effect_executed, "Side effect NÃO deveria executar em modo replay"
     
     # Cleanup
     disable_replay_mode()

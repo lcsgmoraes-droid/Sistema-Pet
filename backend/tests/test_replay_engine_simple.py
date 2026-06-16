@@ -7,7 +7,7 @@ Testa as funcionalidades essenciais do motor de replay.
 
 import pytest
 from datetime import datetime
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import Mock, patch
 from sqlalchemy.orm import Session
 
 from app.replay import replay_events, ReplayStats

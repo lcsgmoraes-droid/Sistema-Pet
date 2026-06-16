@@ -133,7 +133,7 @@ class TestConfidenceCalculator:
             ConfidenceInput(ConfidenceSource.RULE_BASED, 90.0, 0.5, "R"),
             ConfidenceInput(ConfidenceSource.PATTERN_LEARNED, 92.0, 0.5, "P")
         ]
-        score_high = calculator.calculate(inputs_high)
+        calculator.calculate(inputs_high)
         
         # Grande discordância (com penalidade)
         inputs_low = [
@@ -156,7 +156,7 @@ class TestDecisionPolicy:
         
         assert result.confidence_level == ConfidenceLevel.VERY_HIGH
         assert result.action == DecisionAction.EXECUTE
-        assert result.requires_human_review == False
+        assert not result.requires_human_review
         assert result.audit_level == "basic"
     
     def test_evaluate_high(self):
@@ -166,7 +166,7 @@ class TestDecisionPolicy:
         
         assert result.confidence_level == ConfidenceLevel.HIGH
         assert result.action == DecisionAction.EXECUTE_WITH_AUDIT
-        assert result.requires_human_review == False
+        assert not result.requires_human_review
         assert result.audit_level == "detailed"
     
     def test_evaluate_medium(self):
@@ -176,7 +176,7 @@ class TestDecisionPolicy:
         
         assert result.confidence_level == ConfidenceLevel.MEDIUM
         assert result.action == DecisionAction.REQUIRE_REVIEW
-        assert result.requires_human_review == True
+        assert result.requires_human_review
         assert result.audit_level == "full"
     
     def test_evaluate_low(self):
@@ -186,7 +186,7 @@ class TestDecisionPolicy:
         
         assert result.confidence_level == ConfidenceLevel.LOW
         assert result.action == DecisionAction.SUGGEST_ONLY
-        assert result.requires_human_review == True
+        assert result.requires_human_review
     
     def test_evaluate_very_low(self):
         """Testa política para VERY_LOW (0-39)"""
@@ -195,23 +195,23 @@ class TestDecisionPolicy:
         
         assert result.confidence_level == ConfidenceLevel.VERY_LOW
         assert result.action == DecisionAction.IGNORE
-        assert result.requires_human_review == False
+        assert not result.requires_human_review
     
     def test_can_execute_automatically(self):
         """Testa helper can_execute_automatically"""
-        assert DecisionPolicy.can_execute_automatically(95) == True  # VERY_HIGH
-        assert DecisionPolicy.can_execute_automatically(85) == True  # HIGH
-        assert DecisionPolicy.can_execute_automatically(70) == False  # MEDIUM
-        assert DecisionPolicy.can_execute_automatically(50) == False  # LOW
-        assert DecisionPolicy.can_execute_automatically(30) == False  # VERY_LOW
+        assert DecisionPolicy.can_execute_automatically(95)  # VERY_HIGH
+        assert DecisionPolicy.can_execute_automatically(85)  # HIGH
+        assert not DecisionPolicy.can_execute_automatically(70)  # MEDIUM
+        assert not DecisionPolicy.can_execute_automatically(50)  # LOW
+        assert not DecisionPolicy.can_execute_automatically(30)  # VERY_LOW
     
     def test_requires_human_review(self):
         """Testa helper requires_human_review"""
-        assert DecisionPolicy.requires_human_review(95) == False  # VERY_HIGH
-        assert DecisionPolicy.requires_human_review(85) == False  # HIGH
-        assert DecisionPolicy.requires_human_review(70) == True  # MEDIUM
-        assert DecisionPolicy.requires_human_review(50) == True  # LOW
-        assert DecisionPolicy.requires_human_review(30) == False  # VERY_LOW
+        assert not DecisionPolicy.requires_human_review(95)  # VERY_HIGH
+        assert not DecisionPolicy.requires_human_review(85)  # HIGH
+        assert DecisionPolicy.requires_human_review(70)  # MEDIUM
+        assert DecisionPolicy.requires_human_review(50)  # LOW
+        assert not DecisionPolicy.requires_human_review(30)  # VERY_LOW
     
     def test_strict_mode(self):
         """Testa modo estrito"""
@@ -224,10 +224,10 @@ class TestDecisionPolicy:
         
         # Modo normal permite execução com auditoria para chat
         assert result_normal.action == DecisionAction.EXECUTE_WITH_AUDIT
-        assert result_normal.requires_human_review == False
+        assert not result_normal.requires_human_review
         
         # Estrito sempre exige revisão
-        assert result_strict.requires_human_review == True
+        assert result_strict.requires_human_review
     
     def test_decision_type_overrides(self):
         """Testa overrides por tipo de decisão"""
@@ -269,7 +269,7 @@ class TestIntegration:
             DecisionAction.EXECUTE,
             DecisionAction.EXECUTE_WITH_AUDIT
         ]
-        assert policy_result.requires_human_review == False
+        assert not policy_result.requires_human_review
     
     def test_full_flow_low_confidence(self):
         """Testa fluxo completo com baixa confiança"""

@@ -77,9 +77,9 @@ def test_multiple_users_same_tenant(db_session, tenant_factory, user_factory):
     """
     tenant = tenant_factory(nome="Pet Shop XYZ")
     
-    user1 = user_factory(tenant_id=tenant.id, email="user1@test.com")
-    user2 = user_factory(tenant_id=tenant.id, email="user2@test.com")
-    user3 = user_factory(tenant_id=tenant.id, email="user3@test.com")
+    user_factory(tenant_id=tenant.id, email="user1@test.com")
+    user_factory(tenant_id=tenant.id, email="user2@test.com")
+    user_factory(tenant_id=tenant.id, email="user3@test.com")
     
     users = db_session.query(User).filter_by(tenant_id=_tenant_uuid(tenant)).all()
     

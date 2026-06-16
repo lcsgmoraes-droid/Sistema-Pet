@@ -11,7 +11,7 @@ from fastapi import status
 from sqlalchemy.orm import Session
 import json
 
-from app.models import AuditLog, User
+from app.models import AuditLog
 from app.audit.queries import (
     get_replays,
     get_replay_by_id,
@@ -338,7 +338,7 @@ def test_get_replay_by_id_admin_success(client, db: Session, admin_user_token, s
     assert data['action'] == 'replay_end'
 
 
-def test_get_replay_by_id_not_found(client, db: Session, admin_user_token):
+def test_get_replay_by_id_not_found_api(client, db: Session, admin_user_token):
     """Testa busca de replay inexistente"""
     headers = {"Authorization": f"Bearer {admin_user_token}"}
     response = client.get("/audit/replays/9999", headers=headers)

@@ -29,17 +29,13 @@ DATA: 2026-01-27
 """
 
 import pytest
-from uuid import uuid4, UUID
-from datetime import datetime
-from decimal import Decimal
-from sqlalchemy.orm import Session
-from fastapi import HTTPException
+from uuid import UUID
 
-from app.db import Base, engine, SessionLocal
-from app.tenancy.context import set_current_tenant, clear_current_tenant, get_current_tenant
+from app.db import SessionLocal
+from app.tenancy.context import set_current_tenant, clear_current_tenant
 from app.vendas_models import Venda, VendaItem, VendaPagamento
 from app.vendas.service import VendaService
-from app.models import User, Tenant
+from app.models import User
 from app.produtos_models import Produto
 
 
@@ -54,7 +50,7 @@ def db_session():
     # Limpar dados criados no teste
     try:
         session.rollback()
-    except:
+    except Exception:
         pass
     
     session.close()
@@ -260,7 +256,7 @@ def test_venda_item_herda_tenant_da_venda(db_session):
                 erros.append(f"Venda {venda.id}, Item {item.id}: tenant_id diferente da venda")
     
     if erros:
-        pytest.fail(f"❌ ERROS ENCONTRADOS:\n" + "\n".join(erros))
+        pytest.fail("❌ ERROS ENCONTRADOS:\n" + "\n".join(erros))
     
     print(f"✅ TESTE 4 PASSOU: {len(vendas_com_itens)} vendas verificadas, todos os itens têm tenant_id correto!")
 
@@ -286,7 +282,7 @@ def test_venda_pagamento_herda_tenant_da_venda(db_session):
                 erros.append(f"Venda {venda.id}, Pagamento {pagamento.id}: tenant_id diferente da venda")
     
     if erros:
-        pytest.fail(f"❌ ERROS ENCONTRADOS:\n" + "\n".join(erros))
+        pytest.fail("❌ ERROS ENCONTRADOS:\n" + "\n".join(erros))
     
     print(f"✅ TESTE 5 PASSOU: {len(vendas_com_pagamentos)} vendas verificadas, todos os pagamentos têm tenant_id correto!")
 

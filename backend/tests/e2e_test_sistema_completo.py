@@ -22,10 +22,9 @@ Para executar um teste específico:
 
 import pytest
 import requests
-from datetime import datetime, timedelta
+from datetime import datetime
 from decimal import Decimal
-from typing import Dict, Any, List
-import json
+from typing import Dict
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -81,7 +80,7 @@ def auth_headers():
     if not token:
         pytest.skip("Token não retornado na autenticação")
     
-    print(f"✅ Autenticado com sucesso!")
+    print("✅ Autenticado com sucesso!")
     
     return {
         "Authorization": f"Bearer {token}",
@@ -181,10 +180,14 @@ def validar_fluxo_caixa(venda_id: int, esperado: Dict, headers: Dict) -> bool:
     # Se esperado que tenha, valida
     if esperado.get("deve_existir", True):
         if not lancamentos:
-            print(f"❌ Nenhum lançamento de fluxo de caixa encontrado")
+            print("❌ Nenhum lançamento de fluxo de caixa encontrado")
             return False
         
-        total_recebido = sum(Decimal(str(l.get("valor", 0))) for l in lancamentos if l.get("tipo") == "entrada")
+        total_recebido = sum(
+            Decimal(str(lancamento.get("valor", 0)))
+            for lancamento in lancamentos
+            if lancamento.get("tipo") == "entrada"
+        )
         valor_esperado = Decimal(str(esperado.get("valor_recebido", 0)))
         
         if abs(total_recebido - valor_esperado) > Decimal("0.01"):
@@ -196,7 +199,7 @@ def validar_fluxo_caixa(venda_id: int, esperado: Dict, headers: Dict) -> bool:
         if lancamentos:
             print(f"❌ Não deveria existir fluxo de caixa, mas foram encontrados {len(lancamentos)} lançamentos")
             return False
-        print(f"✅ Fluxo de caixa OK: nenhum lançamento (como esperado)")
+        print("✅ Fluxo de caixa OK: nenhum lançamento (como esperado)")
     
     return True
 
@@ -230,7 +233,7 @@ def validar_dre(venda_id: int, esperado: Dict, headers: Dict) -> bool:
     
     # Valida receita bruta
     if "receita_bruta" in esperado:
-        receita_esperada = Decimal(str(esperado["receita_bruta"]))
+        Decimal(str(esperado["receita_bruta"]))
         receita_atual = Decimal(str(dre.get("receita_bruta", 0)))
         
         # Não valida valor exato (pode ter outras vendas), apenas se aumentou
@@ -238,7 +241,7 @@ def validar_dre(venda_id: int, esperado: Dict, headers: Dict) -> bool:
     
     # Valida descontos
     if "descontos" in esperado:
-        descontos_esperados = Decimal(str(esperado["descontos"]))
+        Decimal(str(esperado["descontos"]))
         descontos_atuais = Decimal(str(dre.get("descontos", 0)))
         print(f"✅ DRE OK: Descontos R$ {descontos_atuais}")
     
@@ -276,10 +279,10 @@ def validar_comissoes(venda_id: int, esperado: Dict, headers: Dict) -> bool:
     if response.status_code == 404:
         # Sem comissões é OK se não era esperado
         if not esperado.get("deve_existir", False):
-            print(f"✅ Comissões OK: nenhuma (como esperado)")
+            print("✅ Comissões OK: nenhuma (como esperado)")
             return True
         else:
-            print(f"❌ Esperado comissões, mas nenhuma foi encontrada")
+            print("❌ Esperado comissões, mas nenhuma foi encontrada")
             return False
     
     if response.status_code != 200:
@@ -604,7 +607,7 @@ class TestVendasVista:
         
         print(f"✅ Venda débito criada: ID {venda_id}")
         print(f"   Total: R$ {venda['total']}")
-        print(f"   Taxa esperada: R$ 1.60 (2% de R$ 80)")
+        print("   Taxa esperada: R$ 1.60 (2% de R$ 80)")
         
         # Validações - o recebido deve ser R$ 78,40 (R$ 80 - 2%)
         valor_liquido = 80.00 * 0.98  # 78.40
@@ -666,7 +669,7 @@ class TestVendasParceladas:
         
         print(f"✅ Venda parcelada criada: ID {venda_id}")
         print(f"   Total: R$ {venda['total']}")
-        print(f"   Parcelas: 3x de R$ 100,00")
+        print("   Parcelas: 3x de R$ 100,00")
         
         # Validações
         # Contas a receber: 3 parcelas de R$ 100,00 cada (NÃO liquidadas)
@@ -753,14 +756,19 @@ class TestOperacoesVendas:
         response = requests.get(f"{BASE_URL}/financeiro/fluxo-caixa", headers=auth_headers, params={"venda_id": venda_id})
         if response.status_code == 200:
             lancamentos = response.json()
-            estornos = [l for l in lancamentos if l.get("tipo") == "estorno" or l.get("valor", 0) < 0]
+            estornos = [
+                lancamento
+                for lancamento in lancamentos
+                if lancamento.get("tipo") == "estorno"
+                or lancamento.get("valor", 0) < 0
+            ]
             print(f"✅ Estornos no fluxo de caixa: {len(estornos)}")
         
         # 3. Estoque deve retornar
         assert validar_estoque(produto_id, {"estoque_final": estoque_inicial}, auth_headers)
         
         # 4. DRE deve ter lançamento de cancelamento
-        print(f"✅ DRE atualizada com cancelamento")
+        print("✅ DRE atualizada com cancelamento")
         
         print("\n🎉 TESTE PASSOU! Cancelamento completo validado!")
     
@@ -800,7 +808,7 @@ class TestOperacoesVendas:
         venda = response.json()
         venda_id = venda["id"]
         
-        print(f"✅ Venda criada com 2 itens: Total R$ 250,00")
+        print("✅ Venda criada com 2 itens: Total R$ 250,00")
         
         # Remove o produto 2
         item_id = venda["itens"][1]["id"]  # ID do segundo item
@@ -817,8 +825,8 @@ class TestOperacoesVendas:
         response = requests.get(f"{BASE_URL}/vendas/{venda_id}", headers=auth_headers)
         venda_atualizada = response.json()
         
-        print(f"✅ Item removido!")
-        print(f"   Total anterior: R$ 250,00")
+        print("✅ Item removido!")
+        print("   Total anterior: R$ 250,00")
         print(f"   Total atual: R$ {venda_atualizada['total']}")
         
         assert float(venda_atualizada["total"]) == 100.00, "Total não recalculado corretamente"
@@ -870,9 +878,9 @@ class TestFluxosComplexos:
         venda_id = venda["id"]
         
         print(f"✅ Venda com múltiplos pagamentos criada: ID {venda_id}")
-        print(f"   Dinheiro: R$ 200,00")
-        print(f"   PIX: R$ 150,00")
-        print(f"   Débito: R$ 150,00 (taxa 2% = R$ 3,00)")
+        print("   Dinheiro: R$ 200,00")
+        print("   PIX: R$ 150,00")
+        print("   Débito: R$ 150,00 (taxa 2% = R$ 3,00)")
         print(f"   Total: R$ {venda['total']}")
         
         # Validações
@@ -915,12 +923,12 @@ class TestFluxosComplexos:
         venda = response.json()
         
         print(f"✅ Venda com entrega criada: ID {venda['id']}")
-        print(f"   Subtotal produtos: R$ 100,00")
-        print(f"   Taxa entrega: R$ 15,00")
+        print("   Subtotal produtos: R$ 100,00")
+        print("   Taxa entrega: R$ 15,00")
         print(f"   Total: R$ {venda['total']}")
         
         assert float(venda["total"]) == 115.00
-        assert venda.get("tem_entrega") == True
+        assert venda.get("tem_entrega")
         
         print("\n🎉 TESTE PASSOU! Entrega incluída corretamente!")
 
