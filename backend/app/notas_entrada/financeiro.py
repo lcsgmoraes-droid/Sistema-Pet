@@ -10,7 +10,9 @@ from typing import List, Optional
 from sqlalchemy import func
 from sqlalchemy.orm import Session
 
-from app.financeiro.contas_pagar_classificacao import aplicar_classificacao_aprendida_conta_pagar
+from app.financeiro.contas_pagar_classificacao import (
+    aplicar_classificacao_aprendida_conta_pagar,
+)
 from app.financeiro_models import ContaPagar, TipoDespesa
 from app.produtos_models import NotaEntrada
 
@@ -23,23 +25,34 @@ def _obter_tipo_produto_revenda_id(db: Session, tenant_id) -> Optional[int]:
         "Fornecedor de Produto para Revenda",
     ]
     for nome in nomes_prioritarios:
-        tipo = db.query(TipoDespesa).filter(
-            TipoDespesa.tenant_id == tenant_id,
-            func.lower(TipoDespesa.nome) == nome.lower(),
-            TipoDespesa.ativo.is_(True),
-        ).first()
+        tipo = (
+            db.query(TipoDespesa)
+            .filter(
+                TipoDespesa.tenant_id == tenant_id,
+                func.lower(TipoDespesa.nome) == nome.lower(),
+                TipoDespesa.ativo.is_(True),
+            )
+            .first()
+        )
         if tipo:
             return tipo.id
 
-    tipo = db.query(TipoDespesa).filter(
-        TipoDespesa.tenant_id == tenant_id,
-        TipoDespesa.nome.ilike("%produto%revenda%"),
-        TipoDespesa.ativo.is_(True),
-    ).order_by(TipoDespesa.nome.asc()).first()
+    tipo = (
+        db.query(TipoDespesa)
+        .filter(
+            TipoDespesa.tenant_id == tenant_id,
+            TipoDespesa.nome.ilike("%produto%revenda%"),
+            TipoDespesa.ativo.is_(True),
+        )
+        .order_by(TipoDespesa.nome.asc())
+        .first()
+    )
     return tipo.id if tipo else None
 
 
-def criar_contas_pagar_da_nota(nota: NotaEntrada, dados_xml: dict, db: Session, user_id: int, tenant_id: str) -> List[int]:
+def criar_contas_pagar_da_nota(
+    nota: NotaEntrada, dados_xml: dict, db: Session, user_id: int, tenant_id: str
+) -> List[int]:
     """
     Cria contas a pagar automaticamente com base nas duplicatas do XML.
 
@@ -51,12 +64,16 @@ def criar_contas_pagar_da_nota(nota: NotaEntrada, dados_xml: dict, db: Session, 
     duplicatas = dados_xml.get("duplicatas", [])
 
     if not duplicatas:
-        logger.info("Sem duplicatas no XML, criando conta unica com vencimento +30 dias")
-        duplicatas = [{
-            "numero": f"{nota.numero_nota}-1",
-            "vencimento": datetime.now() + timedelta(days=30),
-            "valor": nota.valor_total,
-        }]
+        logger.info(
+            "Sem duplicatas no XML, criando conta unica com vencimento +30 dias"
+        )
+        duplicatas = [
+            {
+                "numero": f"{nota.numero_nota}-1",
+                "vencimento": datetime.now() + timedelta(days=30),
+                "valor": nota.valor_total,
+            }
+        ]
 
     total_duplicatas = len(duplicatas)
     eh_parcelado = total_duplicatas > 1
@@ -101,7 +118,9 @@ def criar_contas_pagar_da_nota(nota: NotaEntrada, dados_xml: dict, db: Session, 
                 dup["vencimento"].strftime("%d/%m/%Y"),
             )
         except Exception as exc:
-            logger.error("Erro ao criar conta da duplicata %s: %s", dup.get("numero"), exc)
+            logger.error(
+                "Erro ao criar conta da duplicata %s: %s", dup.get("numero"), exc
+            )
             raise
 
     logger.info("Total de contas criadas: %s", len(contas_criadas))

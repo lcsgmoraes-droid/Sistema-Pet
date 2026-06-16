@@ -14,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 # SCHEMAS - CATEGORIAS
 # ==========================================
 
+
 class CategoriaBase(BaseModel):
     nome: str
     categoria_pai_id: Optional[int] = None
@@ -49,6 +50,7 @@ class CategoriaResponse(CategoriaBase):
 # SCHEMAS - MARCAS
 # ==========================================
 
+
 class MarcaBase(BaseModel):
     nome: str
     descricao: Optional[str] = None
@@ -76,6 +78,7 @@ class MarcaResponse(MarcaBase):
 # SCHEMAS - DEPARTAMENTOS
 # ==========================================
 
+
 class DepartamentoBase(BaseModel):
     nome: str
     descricao: Optional[str] = None
@@ -102,6 +105,7 @@ class DepartamentoResponse(DepartamentoBase):
 # SCHEMAS - GERADOR DE CÃ“DIGO DE BARRAS
 # ==========================================
 
+
 class GerarCodigoBarrasRequest(BaseModel):
     sku: str  # CÃ³digo do produto (ex: PROD-00123)
 
@@ -117,8 +121,10 @@ class GerarCodigoBarrasResponse(BaseModel):
 # SCHEMAS - KIT COMPONENTES
 # ==========================================
 
+
 class KitComponenteBase(BaseModel):
     """Schema base para componente de KIT"""
+
     produto_componente_id: int  # ID do produto que faz parte do KIT
     quantidade: float  # Quantidade necessÃ¡ria do componente no KIT
     ordem: int = 0
@@ -127,11 +133,13 @@ class KitComponenteBase(BaseModel):
 
 class KitComponenteCreate(KitComponenteBase):
     """Schema para criar componente de KIT (enviado pelo frontend)"""
+
     pass
 
 
 class KitComponenteResponse(BaseModel):
     """Schema de resposta com dados completos do componente"""
+
     model_config = ConfigDict(from_attributes=True)
 
     id: int
@@ -151,6 +159,7 @@ class KitComponenteResponse(BaseModel):
 # ==========================================
 # SCHEMAS - PRODUTOS
 # ==========================================
+
 
 class ProdutoBase(BaseModel):
     codigo: str  # SKU
@@ -215,10 +224,12 @@ class ProdutoBase(BaseModel):
     sabor_proteina_id: Optional[int] = None
     apresentacao_peso_id: Optional[int] = None
     # Sprint 2: Produtos com variaÃ§Ã£o
-    tipo_produto: Optional[str] = 'SIMPLES'  # SIMPLES, PAI, VARIACAO, KIT
+    tipo_produto: Optional[str] = "SIMPLES"  # SIMPLES, PAI, VARIACAO, KIT
     produto_pai_id: Optional[int] = None  # FK para produto PAI (se for VARIACAO)
     # Sprint 4: Produtos KIT
-    tipo_kit: Optional[str] = None  # VIRTUAL (estoque calculado) ou FISICO (estoque prÃ³prio)
+    tipo_kit: Optional[str] = (
+        None  # VIRTUAL (estoque calculado) ou FISICO (estoque prÃ³prio)
+    )
     e_kit_fisico: Optional[bool] = None  # Alias para tipo_kit (usado pelo frontend)
     # Sistema Predecessor/Sucessor
     produto_predecessor_id: Optional[int] = None  # ID do produto que este substitui
@@ -236,6 +247,7 @@ class ProdutoCreate(ProdutoBase):
     - Se e_kit_fisico=False (padrÃ£o), estoque serÃ¡ calculado automaticamente
     - Se e_kit_fisico=True, terÃ¡ estoque prÃ³prio controlado manualmente
     """
+
     composicao_kit: Optional[List[KitComponenteCreate]] = Field(default_factory=list)
 
 
@@ -331,6 +343,7 @@ class ProdutoFusaoExecutarRequest(ProdutoFusaoPreviewRequest):
 # SCHEMAS - IMAGENS (deve vir antes de ProdutoResponse)
 # ==========================================
 
+
 class ImagemUploadResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -349,6 +362,7 @@ class ImagemUploadResponse(BaseModel):
 # ==========================================
 # SCHEMAS - LOTES
 # ==========================================
+
 
 class LoteResponse(BaseModel):
     model_config = ConfigDict(from_attributes=True)
@@ -389,7 +403,9 @@ class ProdutoResponse(ProdutoBase):
     created_at: datetime
     updated_at: datetime
     categoria: Optional[CategoriaResponse] = None
-    categoria_nome: Optional[str] = None  # ðŸ†• Nome da categoria (para facilitar uso no frontend)
+    categoria_nome: Optional[str] = (
+        None  # ðŸ†• Nome da categoria (para facilitar uso no frontend)
+    )
     marca: Optional[MarcaResponse] = None
     imagens: List[ImagemUploadResponse] = Field(default_factory=list)
     lotes: List[LoteResponse] = Field(default_factory=list)
@@ -397,17 +413,27 @@ class ProdutoResponse(ProdutoBase):
     imagem_principal_thumbnail: Optional[str] = None
     total_variacoes: Optional[int] = 0  # NÃºmero de variaÃ§Ãµes (para produtos PAI)
     # Sprint 4: KIT - ComposiÃ§Ã£o e estoque virtual
-    composicao_kit: List[KitComponenteResponse] = Field(default_factory=list)  # Componentes do KIT
+    composicao_kit: List[KitComponenteResponse] = Field(
+        default_factory=list
+    )  # Componentes do KIT
     estoque_virtual: Optional[int] = None  # Estoque calculado (apenas para KIT virtual)
-    estoque_reservado: Optional[float] = 0  # Unidades reservadas por pedidos Bling em aberto
+    estoque_reservado: Optional[float] = (
+        0  # Unidades reservadas por pedidos Bling em aberto
+    )
     estoque_disponivel: Optional[float] = 0  # Estoque livre apos reservas
     validade_proxima: Optional[datetime] = None
     validade_proxima_listagem: Optional[datetime] = None
     lote_validade_proxima: Optional[str] = None
-    lotes_validade_resumo: List[LoteValidadeResumoResponse] = Field(default_factory=list)
+    lotes_validade_resumo: List[LoteValidadeResumoResponse] = Field(
+        default_factory=list
+    )
     # Sistema Predecessor/Sucessor
-    data_descontinuacao: Optional[datetime] = None  # Data em que foi marcado como descontinuado
-    predecessor_nome: Optional[str] = None  # Nome do produto predecessor (populado manualmente)
+    data_descontinuacao: Optional[datetime] = (
+        None  # Data em que foi marcado como descontinuado
+    )
+    predecessor_nome: Optional[str] = (
+        None  # Nome do produto predecessor (populado manualmente)
+    )
     sucessor_nome: Optional[str] = None  # Nome do sucessor (se existir)
     # Campo de parceria (True = pertence ao tenant parceiro)
     de_parceiro: bool = False
@@ -419,7 +445,7 @@ class ProdutoResponse(ProdutoBase):
     promocao_origem_pdv: Optional[str] = None
     desconto_promocional_pdv: Optional[float] = 0
 
-    @field_validator('categoria_nome', mode='before')
+    @field_validator("categoria_nome", mode="before")
     @classmethod
     def set_categoria_nome(cls, v, info) -> Optional[str]:
         # Se jÃ¡ tem valor, retornar
@@ -427,13 +453,13 @@ class ProdutoResponse(ProdutoBase):
             return v
 
         # Tentar pegar da categoria
-        if hasattr(info, 'data') and 'categoria' in info.data:
-            categoria = info.data['categoria']
-            if categoria and hasattr(categoria, 'nome'):
+        if hasattr(info, "data") and "categoria" in info.data:
+            categoria = info.data["categoria"]
+            if categoria and hasattr(categoria, "nome"):
                 return categoria.nome
         return None
 
-    @field_validator('imagem_principal', mode='before')
+    @field_validator("imagem_principal", mode="before")
     @classmethod
     def set_imagem_principal(cls, v, info) -> Optional[str]:
         # Se já tem valor, retornar
@@ -441,21 +467,33 @@ class ProdutoResponse(ProdutoBase):
             return v
 
         # Tentar pegar das imagens (se disponível no contexto)
-        imagens = info.data.get('imagens', []) or []
+        imagens = info.data.get("imagens", []) or []
         if not imagens:
             return None
 
         # Primeiro: buscar a marcada como principal
         for img in imagens:
-            e_principal = getattr(img, 'e_principal', None) if hasattr(img, 'e_principal') else (img.get('e_principal') if isinstance(img, dict) else None)
+            e_principal = (
+                getattr(img, "e_principal", None)
+                if hasattr(img, "e_principal")
+                else (img.get("e_principal") if isinstance(img, dict) else None)
+            )
             if e_principal:
-                url = getattr(img, 'url', None) if hasattr(img, 'url') else (img.get('url') if isinstance(img, dict) else None)
+                url = (
+                    getattr(img, "url", None)
+                    if hasattr(img, "url")
+                    else (img.get("url") if isinstance(img, dict) else None)
+                )
                 if url:
                     return url
 
         # Fallback: retornar a primeira imagem
         img = imagens[0]
-        url = getattr(img, 'url', None) if hasattr(img, 'url') else (img.get('url') if isinstance(img, dict) else None)
+        url = (
+            getattr(img, "url", None)
+            if hasattr(img, "url")
+            else (img.get("url") if isinstance(img, dict) else None)
+        )
         return url
 
 
@@ -578,6 +616,7 @@ class RelatorioValidadeProximaResponse(BaseModel):
 # SCHEMAS - LOTES
 # ==========================================
 
+
 class LoteBase(BaseModel):
     nome_lote: str
     quantidade_inicial: float
@@ -617,6 +656,7 @@ class SaidaEstoqueRequest(BaseModel):
     numero_pedido: Optional[str] = None
     observacoes: Optional[str] = None
 
+
 class AtualizacaoLoteRequest(BaseModel):
     produto_ids: List[int]
     ativo: Optional[bool] = None
@@ -642,9 +682,11 @@ class AtualizacaoLoteRequest(BaseModel):
     anunciar_ecommerce: Optional[bool] = None
     anunciar_app: Optional[bool] = None
 
+
 class ImagemUpdateRequest(BaseModel):
     ordem: Optional[int] = None
     principal: Optional[bool] = None
+
 
 class FornecedorVinculoCreate(BaseModel):
     fornecedor_id: int
@@ -682,6 +724,7 @@ class FornecedorVinculoResponse(BaseModel):
     fornecedor_cpf_cnpj: Optional[str] = None
     fornecedor_email: Optional[str] = None
     fornecedor_telefone: Optional[str] = None
+
 
 class HistoricoPrecoResponse(BaseModel):
     id: int

@@ -25,7 +25,13 @@ BACKEND_ROOT = Path(__file__).resolve().parents[1]
 if str(BACKEND_ROOT) not in sys.path:
     sys.path.insert(0, str(BACKEND_ROOT))
 
-if str(os.environ.get("DEBUG", "")).strip().lower() not in {"", "0", "1", "true", "false"}:
+if str(os.environ.get("DEBUG", "")).strip().lower() not in {
+    "",
+    "0",
+    "1",
+    "true",
+    "false",
+}:
     os.environ["DEBUG"] = "false"
 
 from sqlalchemy.orm import joinedload
@@ -89,10 +95,14 @@ def _preview_target(tenant_id: str, produto_id: int, current_url: str) -> str:
     )
     backend = get_product_image_storage_backend()
     if backend == "s3":
-        base_url = str(settings.PRODUCT_IMAGE_S3_PUBLIC_BASE_URL or "").strip().rstrip("/")
+        base_url = (
+            str(settings.PRODUCT_IMAGE_S3_PUBLIC_BASE_URL or "").strip().rstrip("/")
+        )
         if base_url:
             prefix = str(settings.PRODUCT_IMAGE_S3_PREFIX or "").strip().strip("/")
-            path = f"{prefix}/{original_relative_key}" if prefix else original_relative_key
+            path = (
+                f"{prefix}/{original_relative_key}" if prefix else original_relative_key
+            )
             return f"{base_url}/{path}".replace("//", "/").replace(":/", "://")
         return f"s3://{settings.PRODUCT_IMAGE_S3_BUCKET}/{original_relative_key}"
     return f"/uploads/produtos/{original_relative_key}"
@@ -134,7 +144,9 @@ def migrate_one(db, imagem: ProdutoImagem, args: argparse.Namespace) -> tuple[st
         db.rollback()
         return "failed", f"imagem {imagem.id}: erro ao preparar ({exc})"
 
-    preview_target = _preview_target(str(imagem.tenant_id), int(imagem.produto_id), current_url)
+    preview_target = _preview_target(
+        str(imagem.tenant_id), int(imagem.produto_id), current_url
+    )
     if args.dry_run:
         return (
             "preview",
@@ -165,12 +177,18 @@ def migrate_one(db, imagem: ProdutoImagem, args: argparse.Namespace) -> tuple[st
         imagem.altura = prepared.height
 
         produto: Produto | None = imagem.produto
-        if produto and (bool(imagem.e_principal) or produto.imagem_principal == old_url):
+        if produto and (
+            bool(imagem.e_principal) or produto.imagem_principal == old_url
+        ):
             produto.imagem_principal = saved.url
 
         db.commit()
 
-        if args.cleanup_local and old_url != saved.url and is_local_product_image_url(old_url):
+        if (
+            args.cleanup_local
+            and old_url != saved.url
+            and is_local_product_image_url(old_url)
+        ):
             delete_product_image_assets(old_url)
 
         return (

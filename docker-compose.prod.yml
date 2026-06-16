@@ -188,6 +188,7 @@ services:
       BLING_PEDIDO_WEBHOOK_QUEUE_LIMIT: ${BLING_PEDIDO_WEBHOOK_QUEUE_LIMIT:-20}
       BLING_PEDIDO_WEBHOOK_MAX_ATTEMPTS: ${BLING_PEDIDO_WEBHOOK_MAX_ATTEMPTS:-6}
       BLING_SNAPSHOT_DIR: ${BLING_SNAPSHOT_DIR:-/app/data/bling_snapshots}
+      BLING_WORKER_HEARTBEAT_PATH: ${BLING_WORKER_HEARTBEAT_PATH:-/app/data/bling_worker_heartbeat}
       BLING_CLIENT_ID: ${BLING_CLIENT_ID}
       BLING_CLIENT_SECRET: ${BLING_CLIENT_SECRET}
       BLING_ACCESS_TOKEN: ${BLING_ACCESS_TOKEN:-}
@@ -211,7 +212,7 @@ services:
     networks:
       - petshop-network
     healthcheck:
-      test: ["CMD-SHELL", "test -f /tmp/bling_worker_heartbeat && find /tmp/bling_worker_heartbeat -mmin -2 | grep -q ."]
+      test: ["CMD-SHELL", "heartbeat_path=\"$${BLING_WORKER_HEARTBEAT_PATH:-/app/data/bling_worker_heartbeat}\"; test -f \"$${heartbeat_path}\" && find \"$${heartbeat_path}\" -mmin -2 | grep -q ."]
       interval: 30s
       timeout: 10s
       retries: 3

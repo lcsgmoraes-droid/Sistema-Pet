@@ -367,6 +367,10 @@ jobs:
         run: |
           ruff format --check app/services --exclude app/services/sefaz_service.py
 
+      - name: Backend business support scripts format (blocking)
+        run: |
+          ruff format --check app/audit app/financeiro app/insights app/schedulers app/parsers app/scripts app/middlewares app/notas_entrada app/produtos scripts
+
       - name: Backend multi tenant tests format (blocking)
         run: |
           ruff format --check tests/multi_tenant

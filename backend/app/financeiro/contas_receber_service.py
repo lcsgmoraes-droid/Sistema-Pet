@@ -79,10 +79,7 @@ class ContasReceberService:
 
     @staticmethod
     def criar_de_venda(
-        venda: Any,
-        pagamentos: List[Any],
-        user_id: int,
-        db: Session
+        venda: Any, pagamentos: List[Any], user_id: int, db: Session
     ) -> Dict[str, Any]:
         """
         Cria contas a receber automaticamente a partir de uma venda.
@@ -123,9 +120,7 @@ class ContasReceberService:
             >>> logger.info(f"Criadas {len(resultado['contas_criadas'])} contas")
         """
         # Imports locais para evitar circular dependency
-        from app.financeiro_models import (
-            FormaPagamento, CategoriaFinanceira
-        )
+        from app.financeiro_models import FormaPagamento, CategoriaFinanceira
 
         logger.debug(
             f"🏦 Criando contas a receber para venda #{venda.numero_venda} - "
@@ -134,19 +129,21 @@ class ContasReceberService:
 
         contas_criadas = []
         lancamentos_criados = []
-        total_valor = Decimal('0')
+        total_valor = Decimal("0")
 
         # Buscar ou criar categoria de receitas
-        categoria_receitas = db.query(CategoriaFinanceira).filter(
-            CategoriaFinanceira.nome.ilike('%vendas%'),
-            CategoriaFinanceira.tipo == 'receita'
-        ).first()
+        categoria_receitas = (
+            db.query(CategoriaFinanceira)
+            .filter(
+                CategoriaFinanceira.nome.ilike("%vendas%"),
+                CategoriaFinanceira.tipo == "receita",
+            )
+            .first()
+        )
 
         if not categoria_receitas:
             categoria_receitas = CategoriaFinanceira(
-                nome="Receitas de Vendas",
-                tipo="receita",
-                user_id=user_id
+                nome="Receitas de Vendas", tipo="receita", user_id=user_id
             )
             db.add(categoria_receitas)
             db.flush()
@@ -154,20 +151,28 @@ class ContasReceberService:
 
         for pag in pagamentos:
             # Suportar tanto dict quanto objeto
-            forma_pag_nome = pag.get('forma_pagamento') if isinstance(pag, dict) else getattr(pag, 'forma_pagamento', None)
+            forma_pag_nome = (
+                pag.get("forma_pagamento")
+                if isinstance(pag, dict)
+                else getattr(pag, "forma_pagamento", None)
+            )
 
             # Buscar configuração da forma de pagamento
-            forma_pag = db.query(FormaPagamento).filter(
-                FormaPagamento.nome.ilike(f"%{forma_pag_nome}%")
-            ).first()
+            forma_pag = (
+                db.query(FormaPagamento)
+                .filter(FormaPagamento.nome.ilike(f"%{forma_pag_nome}%"))
+                .first()
+            )
 
             # Verificar se é cartão parcelado
-            numero_parcelas = pag.get('numero_parcelas', 1) if isinstance(pag, dict) else getattr(pag, 'numero_parcelas', 1)
+            numero_parcelas = (
+                pag.get("numero_parcelas", 1)
+                if isinstance(pag, dict)
+                else getattr(pag, "numero_parcelas", 1)
+            )
             numero_parcelas = numero_parcelas or 1
             eh_cartao_parcelado = (
-                forma_pag and
-                forma_pag.tipo == 'cartao_credito' and
-                numero_parcelas > 1
+                forma_pag and forma_pag.tipo == "cartao_credito" and numero_parcelas > 1
             )
 
             if eh_cartao_parcelado:
@@ -179,12 +184,12 @@ class ContasReceberService:
                     numero_parcelas=numero_parcelas,
                     categoria_receitas=categoria_receitas,
                     user_id=user_id,
-                    db=db
+                    db=db,
                 )
 
-                contas_criadas.extend(resultado_parcelado['contas_ids'])
-                lancamentos_criados.extend(resultado_parcelado['lancamentos_ids'])
-                total_valor += resultado_parcelado['total_valor']
+                contas_criadas.extend(resultado_parcelado["contas_ids"])
+                lancamentos_criados.extend(resultado_parcelado["lancamentos_ids"])
+                total_valor += resultado_parcelado["total_valor"]
 
             else:
                 # PAGAMENTO SIMPLES (à vista ou a prazo)
@@ -194,14 +199,14 @@ class ContasReceberService:
                     forma_pag=forma_pag,
                     categoria_receitas=categoria_receitas,
                     user_id=user_id,
-                    db=db
+                    db=db,
                 )
 
                 # Sempre adicionar conta (agora todas as vendas geram contas)
-                contas_criadas.append(resultado_simples['conta_id'])
-                if resultado_simples.get('lancamento_id'):
-                    lancamentos_criados.append(resultado_simples['lancamento_id'])
-                total_valor += resultado_simples['valor']
+                contas_criadas.append(resultado_simples["conta_id"])
+                if resultado_simples.get("lancamento_id"):
+                    lancamentos_criados.append(resultado_simples["lancamento_id"])
+                total_valor += resultado_simples["valor"]
 
         logger.info(
             f"✅ Contas a receber criadas: {len(contas_criadas)} conta(s), "
@@ -209,10 +214,10 @@ class ContasReceberService:
         )
 
         return {
-            'contas_criadas': contas_criadas,
-            'lancamentos_criados': lancamentos_criados,
-            'total_contas': len(contas_criadas),
-            'total_valor': total_valor
+            "contas_criadas": contas_criadas,
+            "lancamentos_criados": lancamentos_criados,
+            "total_contas": len(contas_criadas),
+            "total_valor": total_valor,
         }
 
     @staticmethod
@@ -223,7 +228,7 @@ class ContasReceberService:
         numero_parcelas: int,
         categoria_receitas: Any,
         user_id: int,
-        db: Session
+        db: Session,
     ) -> Dict[str, Any]:
         """
         Cria múltiplas contas a receber para pagamento parcelado.
@@ -232,7 +237,11 @@ class ContasReceberService:
         """
         from app.financeiro_models import ContaReceber
 
-        valor = pagamento.get('valor') if isinstance(pagamento, dict) else getattr(pagamento, 'valor', 0)
+        valor = (
+            pagamento.get("valor")
+            if isinstance(pagamento, dict)
+            else getattr(pagamento, "valor", 0)
+        )
         valor_total = Decimal(str(valor))
         valor_parcela = valor_total / numero_parcelas
 
@@ -249,7 +258,7 @@ class ContasReceberService:
 
             # Criar conta a receber
             # Garantir valores não-nulos para campos obrigatórios
-            canal_venda = getattr(venda, 'canal', None) or 'loja_fisica'
+            canal_venda = getattr(venda, "canal", None) or "loja_fisica"
             dre_subcategoria = 1  # TODO: Mapear por forma_pagamento ou categoria
 
             conta = ContaReceber(
@@ -261,7 +270,7 @@ class ContasReceberService:
                 canal=canal_venda,
                 # ======================================
                 valor_original=valor_parcela,
-                valor_recebido=Decimal('0'),
+                valor_recebido=Decimal("0"),
                 valor_final=valor_parcela,
                 data_emissao=date.today(),
                 data_vencimento=data_vencimento,
@@ -270,21 +279,25 @@ class ContasReceberService:
                 documento=f"VENDA-{venda.id}",
                 numero_parcela=i,
                 total_parcelas=numero_parcelas,
-                status='pendente',
+                status="pendente",
                 user_id=user_id,
-                tenant_id=getattr(venda, 'tenant_id', None)  # Propagar tenant_id da venda
+                tenant_id=getattr(
+                    venda, "tenant_id", None
+                ),  # Propagar tenant_id da venda
             )
 
             db.add(conta)
             db.flush()
             contas_ids.append(conta.id)
 
-            logger.debug(f"💳 Parcela {i}/{numero_parcelas}: Conta #{conta.id}, Venc: {data_vencimento}")
+            logger.debug(
+                f"💳 Parcela {i}/{numero_parcelas}: Conta #{conta.id}, Venc: {data_vencimento}"
+            )
 
         return {
-            'contas_ids': contas_ids,
-            'lancamentos_ids': lancamentos_ids,
-            'total_valor': valor_total
+            "contas_ids": contas_ids,
+            "lancamentos_ids": lancamentos_ids,
+            "total_valor": valor_total,
         }
 
     @staticmethod
@@ -294,7 +307,7 @@ class ContasReceberService:
         forma_pag: Optional[Any],
         categoria_receitas: Any,
         user_id: int,
-        db: Session
+        db: Session,
     ) -> Dict[str, Any]:
         """
         Cria conta a receber para pagamento simples (à vista ou a prazo).
@@ -304,16 +317,24 @@ class ContasReceberService:
         from app.financeiro_models import ContaReceber
 
         # Suportar tanto dict quanto objeto
-        valor = pagamento.get('valor') if isinstance(pagamento, dict) else getattr(pagamento, 'valor', 0)
-        forma_pag_nome = pagamento.get('forma_pagamento') if isinstance(pagamento, dict) else getattr(pagamento, 'forma_pagamento', '')
+        valor = (
+            pagamento.get("valor")
+            if isinstance(pagamento, dict)
+            else getattr(pagamento, "valor", 0)
+        )
+        forma_pag_nome = (
+            pagamento.get("forma_pagamento")
+            if isinstance(pagamento, dict)
+            else getattr(pagamento, "forma_pagamento", "")
+        )
 
         # Determinar prazo
         prazo_dias = 0
         if forma_pag and forma_pag.prazo_dias:
             prazo_dias = forma_pag.prazo_dias
-        elif forma_pag_nome.lower() in ['credito', 'crédito', 'cartao_credito']:
+        elif forma_pag_nome.lower() in ["credito", "crédito", "cartao_credito"]:
             prazo_dias = 30  # Padrão cartão de crédito
-        elif forma_pag_nome.lower() in ['debito', 'débito', 'pix', 'dinheiro']:
+        elif forma_pag_nome.lower() in ["debito", "débito", "pix", "dinheiro"]:
             prazo_dias = 0  # Recebimento imediato
 
         valor = Decimal(str(valor))
@@ -321,25 +342,31 @@ class ContasReceberService:
         # LancamentoManual NÃO é criado aqui para evitar duplicação.
         # O lançamento previsto é criado no service.py (criação da venda)
         # e atualizado para 'realizado' por atualizar_lancamentos_venda (finalização).
-        logger.debug(f"💰 ContaReceber {'à vista' if prazo_dias == 0 else 'a prazo'}: R$ {float(valor):.2f} - {forma_pag_nome}")
+        logger.debug(
+            f"💰 ContaReceber {'à vista' if prazo_dias == 0 else 'a prazo'}: R$ {float(valor):.2f} - {forma_pag_nome}"
+        )
 
         # SEMPRE criar conta a receber (inclusive à vista, para rastreabilidade)
-        data_vencimento = date.today() if prazo_dias == 0 else (date.today() + timedelta(days=prazo_dias))
+        data_vencimento = (
+            date.today()
+            if prazo_dias == 0
+            else (date.today() + timedelta(days=prazo_dias))
+        )
 
         # Se for à vista (prazo = 0), criar conta já recebida
         if prazo_dias == 0:
-            status_conta = 'recebido'
+            status_conta = "recebido"
             valor_recebido = valor
             data_recebimento = date.today()
             logger.debug("✅ Pagamento à vista: criando conta recebida automaticamente")
         else:
-            status_conta = 'pendente'
-            valor_recebido = Decimal('0')
+            status_conta = "pendente"
+            valor_recebido = Decimal("0")
             data_recebimento = None
             logger.debug("⏳ Pagamento a prazo: criando conta pendente")
 
         # Garantir valores não-nulos para campos obrigatórios
-        canal_venda = getattr(venda, 'canal', None) or 'loja_fisica'
+        canal_venda = getattr(venda, "canal", None) or "loja_fisica"
         dre_subcategoria = 1  # TODO: Mapear por forma_pagamento ou categoria
 
         conta = ContaReceber(
@@ -359,13 +386,15 @@ class ContasReceberService:
             status=status_conta,
             venda_id=venda.id,
             user_id=user_id,
-            tenant_id=getattr(venda, 'tenant_id', None)  # Propagar tenant_id da venda
+            tenant_id=getattr(venda, "tenant_id", None),  # Propagar tenant_id da venda
         )
         db.add(conta)
         db.flush()
         conta_id = conta.id
 
-        logger.debug(f"📋 ContaReceber criada: #{conta_id}, R$ {float(valor):.2f}, Status: {status_conta}, Venc: {data_vencimento}")
+        logger.debug(
+            f"📋 ContaReceber criada: #{conta_id}, R$ {float(valor):.2f}, Status: {status_conta}, Venc: {data_vencimento}"
+        )
 
         # Se for à vista, criar registro de recebimento imediato
         recebimento_id = None
@@ -379,7 +408,7 @@ class ContasReceberService:
                 forma_pagamento_id=forma_pag.id if forma_pag else None,
                 observacoes=f"Recebimento automático - Venda à vista #{venda.numero_venda}",
                 user_id=user_id,
-                tenant_id=getattr(venda, 'tenant_id', None)
+                tenant_id=getattr(venda, "tenant_id", None),
             )
             db.add(recebimento)
             db.flush()
@@ -388,10 +417,10 @@ class ContasReceberService:
             logger.debug(f"💵 Recebimento automático criado: #{recebimento_id}")
 
         return {
-            'conta_id': conta_id,
-            'lancamento_id': None,  # LancamentoManual gerenciado pelo service.py
-            'recebimento_id': recebimento_id,
-            'valor': valor
+            "conta_id": conta_id,
+            "lancamento_id": None,  # LancamentoManual gerenciado pelo service.py
+            "recebimento_id": recebimento_id,
+            "valor": valor,
         }
 
     @staticmethod
@@ -402,7 +431,7 @@ class ContasReceberService:
         forma_pagamento_nome: str,
         user_id: int,
         tenant_id: str,
-        db: Session
+        db: Session,
     ) -> Dict[str, Any]:
         """
         Baixa contas a receber pendentes de uma venda (parcial ou total).
@@ -452,24 +481,33 @@ class ContasReceberService:
         )
 
         # Buscar contas pendentes/parciais da venda
-        contas_originais = db.query(ContaReceber).filter(
-            ContaReceber.venda_id == venda_id,
-            ContaReceber.status.in_(['pendente', 'parcial', 'vencido'])
-        ).order_by(ContaReceber.data_vencimento).all()
+        contas_originais = (
+            db.query(ContaReceber)
+            .filter(
+                ContaReceber.venda_id == venda_id,
+                ContaReceber.status.in_(["pendente", "parcial", "vencido"]),
+            )
+            .order_by(ContaReceber.data_vencimento)
+            .all()
+        )
 
         if not contas_originais:
-            logger.warning(f"⚠️ Nenhuma conta pendente encontrada para venda ID {venda_id}")
+            logger.warning(
+                f"⚠️ Nenhuma conta pendente encontrada para venda ID {venda_id}"
+            )
             return {
-                'contas_baixadas': [],
-                'recebimentos_criados': [],
-                'valor_distribuido': Decimal('0'),
-                'valor_restante': Decimal(str(valor_total_pagamento))
+                "contas_baixadas": [],
+                "recebimentos_criados": [],
+                "valor_distribuido": Decimal("0"),
+                "valor_restante": Decimal(str(valor_total_pagamento)),
             }
 
         # Buscar forma de pagamento
-        forma_pag = db.query(FormaPagamento).filter(
-            FormaPagamento.nome.ilike(f"%{forma_pagamento_nome}%")
-        ).first()
+        forma_pag = (
+            db.query(FormaPagamento)
+            .filter(FormaPagamento.nome.ilike(f"%{forma_pagamento_nome}%"))
+            .first()
+        )
         forma_pag_id = forma_pag.id if forma_pag else None
 
         valor_disponivel = valor_total_pagamento
@@ -481,7 +519,9 @@ class ContasReceberService:
                 break
 
             # Calcular quanto ainda falta nesta conta
-            valor_pendente_conta = float(conta.valor_final) - float(conta.valor_recebido or 0)
+            valor_pendente_conta = float(conta.valor_final) - float(
+                conta.valor_recebido or 0
+            )
 
             # Calcular quanto pode baixar desta conta
             valor_a_baixar = min(valor_pendente_conta, valor_disponivel)
@@ -500,7 +540,7 @@ class ContasReceberService:
                     forma_pagamento_id=forma_pag_id,
                     observacoes=f"Recebimento venda #{venda_numero}",
                     user_id=user_id,
-                    tenant_id=tenant_id  # ✅ Garantir isolamento entre empresas
+                    tenant_id=tenant_id,  # ✅ Garantir isolamento entre empresas
                 )
                 db.add(recebimento)
                 db.flush()
@@ -509,7 +549,7 @@ class ContasReceberService:
                 # Atualizar status
                 if abs(novo_valor_recebido - float(conta.valor_final)) < 0.01:
                     # Conta totalmente paga
-                    conta.status = 'recebido'
+                    conta.status = "recebido"
                     conta.data_recebimento = date.today()
                     logger.info(
                         f"✅ Conta #{conta.id} TOTALMENTE baixada - "
@@ -517,7 +557,7 @@ class ContasReceberService:
                     )
                 else:
                     # Conta parcialmente paga
-                    conta.status = 'parcial'
+                    conta.status = "parcial"
                     logger.info(
                         f"📊 Conta #{conta.id} baixa PARCIAL - "
                         f"R$ {valor_a_baixar:.2f} (total recebido: R$ {novo_valor_recebido:.2f})"
@@ -525,14 +565,16 @@ class ContasReceberService:
 
                 db.add(conta)
 
-                contas_baixadas.append({
-                    'conta_id': conta.id,
-                    'descricao': conta.descricao,
-                    'valor_baixado': Decimal(str(valor_a_baixar)),
-                    'valor_total': conta.valor_final,
-                    'valor_recebido': conta.valor_recebido,
-                    'status': conta.status
-                })
+                contas_baixadas.append(
+                    {
+                        "conta_id": conta.id,
+                        "descricao": conta.descricao,
+                        "valor_baixado": Decimal(str(valor_a_baixar)),
+                        "valor_total": conta.valor_final,
+                        "valor_recebido": conta.valor_recebido,
+                        "status": conta.status,
+                    }
+                )
 
                 # Diminuir valor disponível
                 valor_disponivel -= valor_a_baixar
@@ -545,10 +587,10 @@ class ContasReceberService:
         )
 
         return {
-            'contas_baixadas': contas_baixadas,
-            'recebimentos_criados': recebimentos_criados,
-            'valor_distribuido': Decimal(str(valor_distribuido)),
-            'valor_restante': Decimal(str(valor_disponivel))
+            "contas_baixadas": contas_baixadas,
+            "recebimentos_criados": recebimentos_criados,
+            "valor_distribuido": Decimal(str(valor_distribuido)),
+            "valor_restante": Decimal(str(valor_disponivel)),
         }
 
     @staticmethod
@@ -559,7 +601,7 @@ class ContasReceberService:
         total_recebido: float,
         user_id: int,
         tenant_id: str,
-        db: Session
+        db: Session,
     ) -> Dict[str, Any]:
         """
         Atualiza lançamentos manuais previstos após pagamento de venda.
@@ -594,18 +636,22 @@ class ContasReceberService:
         )
 
         # Buscar lançamentos previstos
-        lancamentos_previstos = db.query(LancamentoManual).filter(
-            LancamentoManual.documento == f"VENDA-{venda_id}",
-            LancamentoManual.status == 'previsto',
-            LancamentoManual.tipo == 'entrada'
-        ).all()
+        lancamentos_previstos = (
+            db.query(LancamentoManual)
+            .filter(
+                LancamentoManual.documento == f"VENDA-{venda_id}",
+                LancamentoManual.status == "previsto",
+                LancamentoManual.tipo == "entrada",
+            )
+            .all()
+        )
 
         if not lancamentos_previstos:
             logger.debug("ℹ️ Nenhum lançamento previsto encontrado")
             return {
-                'lancamentos_atualizados': [],
-                'lancamentos_criados': [],
-                'status': 'nenhum'
+                "lancamentos_atualizados": [],
+                "lancamentos_criados": [],
+                "status": "nenhum",
             }
 
         lancamentos_atualizados = []
@@ -615,16 +661,16 @@ class ContasReceberService:
         if total_recebido >= total_venda - 0.01:
             # TOTALMENTE PAGO: Marcar lançamentos como realizados
             for lanc_prev in lancamentos_previstos:
-                lanc_prev.status = 'realizado'
+                lanc_prev.status = "realizado"
                 lanc_prev.data_lancamento = date.today()
                 db.add(lanc_prev)
                 lancamentos_atualizados.append(lanc_prev.id)
                 logger.info(f"✅ Lançamento #{lanc_prev.id} marcado como REALIZADO")
 
             return {
-                'lancamentos_atualizados': lancamentos_atualizados,
-                'lancamentos_criados': [],
-                'status': 'totalmente_pago'
+                "lancamentos_atualizados": lancamentos_atualizados,
+                "lancamentos_criados": [],
+                "status": "totalmente_pago",
             }
 
         elif total_recebido > 0.01:
@@ -632,16 +678,16 @@ class ContasReceberService:
             for lanc_prev in lancamentos_previstos:
                 # Criar lançamento realizado
                 lanc_realizado = LancamentoManual(
-                    tipo='entrada',
+                    tipo="entrada",
                     valor=Decimal(str(total_recebido)),
                     descricao=f"Venda {venda_numero} - Recebido (parcial)",
                     data_lancamento=date.today(),
-                    status='realizado',
+                    status="realizado",
                     categoria_id=lanc_prev.categoria_id,
                     documento=f"VENDA-{venda_id}-REALIZADO",
                     fornecedor_cliente=lanc_prev.fornecedor_cliente,
                     user_id=user_id,
-                    tenant_id=tenant_id
+                    tenant_id=tenant_id,
                 )
                 db.add(lanc_realizado)
                 db.flush()
@@ -661,21 +707,22 @@ class ContasReceberService:
                 )
 
             return {
-                'lancamentos_atualizados': lancamentos_atualizados,
-                'lancamentos_criados': lancamentos_criados,
-                'status': 'parcialmente_pago'
+                "lancamentos_atualizados": lancamentos_atualizados,
+                "lancamentos_criados": lancamentos_criados,
+                "status": "parcialmente_pago",
             }
 
         return {
-            'lancamentos_atualizados': [],
-            'lancamentos_criados': [],
-            'status': 'nenhum'
+            "lancamentos_atualizados": [],
+            "lancamentos_criados": [],
+            "status": "nenhum",
         }
 
 
 # ============================================================================
 # FUNÇÕES AUXILIARES
 # ============================================================================
+
 
 def calcular_total_pendente_venda(venda_id: int, db: Session) -> Decimal:
     """
@@ -690,14 +737,18 @@ def calcular_total_pendente_venda(venda_id: int, db: Session) -> Decimal:
     """
     from app.financeiro_models import ContaReceber
 
-    contas = db.query(ContaReceber).filter(
-        ContaReceber.venda_id == venda_id,
-        ContaReceber.status.in_(['pendente', 'parcial', 'vencido'])
-    ).all()
+    contas = (
+        db.query(ContaReceber)
+        .filter(
+            ContaReceber.venda_id == venda_id,
+            ContaReceber.status.in_(["pendente", "parcial", "vencido"]),
+        )
+        .all()
+    )
 
-    total_pendente = Decimal('0')
+    total_pendente = Decimal("0")
     for conta in contas:
-        pendente_conta = conta.valor_final - (conta.valor_recebido or Decimal('0'))
+        pendente_conta = conta.valor_final - (conta.valor_recebido or Decimal("0"))
         total_pendente += pendente_conta
 
     return total_pendente
@@ -718,25 +769,32 @@ def listar_contas_vencidas(user_id: int, db: Session) -> List[Dict[str, Any]]:
 
     hoje = date.today()
 
-    contas = db.query(ContaReceber).filter(
-        ContaReceber.user_id == user_id,
-        ContaReceber.status.in_(['pendente', 'parcial']),
-        ContaReceber.data_vencimento < hoje
-    ).order_by(ContaReceber.data_vencimento).all()
+    contas = (
+        db.query(ContaReceber)
+        .filter(
+            ContaReceber.user_id == user_id,
+            ContaReceber.status.in_(["pendente", "parcial"]),
+            ContaReceber.data_vencimento < hoje,
+        )
+        .order_by(ContaReceber.data_vencimento)
+        .all()
+    )
 
     resultado = []
     for conta in contas:
         dias_atraso = (hoje - conta.data_vencimento).days
         pendente = float(conta.valor_final) - float(conta.valor_recebido or 0)
 
-        resultado.append({
-            'conta_id': conta.id,
-            'descricao': conta.descricao,
-            'cliente_id': conta.cliente_id,
-            'valor_pendente': Decimal(str(pendente)),
-            'data_vencimento': conta.data_vencimento,
-            'dias_atraso': dias_atraso,
-            'venda_id': conta.venda_id
-        })
+        resultado.append(
+            {
+                "conta_id": conta.id,
+                "descricao": conta.descricao,
+                "cliente_id": conta.cliente_id,
+                "valor_pendente": Decimal(str(pendente)),
+                "data_vencimento": conta.data_vencimento,
+                "dias_atraso": dias_atraso,
+                "venda_id": conta.venda_id,
+            }
+        )
 
     return resultado

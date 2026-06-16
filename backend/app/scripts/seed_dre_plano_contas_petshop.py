@@ -55,7 +55,6 @@ PLANO_CONTAS = [
             ("Outras Receitas Operacionais", TipoCusto.DIRETO, None),
         ],
     },
-    
     # =================================================================
     # 2. DEDUÇÕES DA RECEITA
     # =================================================================
@@ -69,7 +68,6 @@ PLANO_CONTAS = [
             ("Abatimentos", TipoCusto.DIRETO, None),
         ],
     },
-    
     # =================================================================
     # 3. CUSTOS DIRETOS (Custos variáveis ligados às vendas)
     # =================================================================
@@ -102,7 +100,6 @@ PLANO_CONTAS = [
             ("Comissões de Vendas - Afiliados", TipoCusto.DIRETO, None),
         ],
     },
-    
     # =================================================================
     # 4. DESPESAS OPERACIONAIS - PESSOAL
     # =================================================================
@@ -112,30 +109,53 @@ PLANO_CONTAS = [
         "ordem": 6,
         "subcategorias": [
             # Salários
-            ("Salários - Administrativo", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            (
+                "Salários - Administrativo",
+                TipoCusto.INDIRETO_RATEAVEL,
+                BaseRateio.FATURAMENTO,
+            ),
             ("Salários - Vendas", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
-            ("Salários - Operacional", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            (
+                "Salários - Operacional",
+                TipoCusto.INDIRETO_RATEAVEL,
+                BaseRateio.FATURAMENTO,
+            ),
             ("Pró-Labore Sócios", TipoCusto.CORPORATIVO, None),
             # Encargos
             ("INSS Patronal", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
             ("FGTS", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
             ("PIS sobre Folha", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
             ("IRRF sobre Folha", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
-            ("Contribuição Sindical", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            (
+                "Contribuição Sindical",
+                TipoCusto.INDIRETO_RATEAVEL,
+                BaseRateio.FATURAMENTO,
+            ),
             # Benefícios
             ("Vale Transporte", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
-            ("Vale Alimentação/Refeição", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            (
+                "Vale Alimentação/Refeição",
+                TipoCusto.INDIRETO_RATEAVEL,
+                BaseRateio.FATURAMENTO,
+            ),
             ("Plano de Saúde", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
             ("Seguro de Vida", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
             ("Auxílio Creche", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
             # Outros
-            ("Férias e 13º Salário", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            (
+                "Férias e 13º Salário",
+                TipoCusto.INDIRETO_RATEAVEL,
+                BaseRateio.FATURAMENTO,
+            ),
             ("Rescisões", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
-            ("Treinamento e Capacitação", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            (
+                "Treinamento e Capacitação",
+                TipoCusto.INDIRETO_RATEAVEL,
+                BaseRateio.FATURAMENTO,
+            ),
             ("Uniformes", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
         ],
     },
-    
     # =================================================================
     # 5. DESPESAS OPERACIONAIS - OCUPAÇÃO
     # =================================================================
@@ -151,13 +171,20 @@ PLANO_CONTAS = [
             ("Energia Elétrica", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
             ("Água e Esgoto", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
             ("Gás", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
-            ("Internet e Telefonia", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            (
+                "Internet e Telefonia",
+                TipoCusto.INDIRETO_RATEAVEL,
+                BaseRateio.FATURAMENTO,
+            ),
             ("Segurança e Alarme", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
-            ("Limpeza e Conservação", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            (
+                "Limpeza e Conservação",
+                TipoCusto.INDIRETO_RATEAVEL,
+                BaseRateio.FATURAMENTO,
+            ),
             ("Manutenção Predial", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
         ],
     },
-    
     # =================================================================
     # 6. DESPESAS OPERACIONAIS - COMERCIAL/MARKETING
     # =================================================================
@@ -166,18 +193,53 @@ PLANO_CONTAS = [
         "natureza": NaturezaDRE.DESPESA,
         "ordem": 8,
         "subcategorias": [
-            ("Marketing Digital - Google Ads", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
-            ("Marketing Digital - Facebook/Instagram Ads", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
-            ("Marketing Digital - TikTok Ads", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
-            ("Marketing Tradicional - Panfletos/Outdoor", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
-            ("Brindes e Amostras Grátis", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
-            ("Programas de Fidelidade", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
-            ("Eventos e Patrocínios", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
-            ("Material de Ponto de Venda", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
-            ("Agência de Marketing", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            (
+                "Marketing Digital - Google Ads",
+                TipoCusto.INDIRETO_RATEAVEL,
+                BaseRateio.FATURAMENTO,
+            ),
+            (
+                "Marketing Digital - Facebook/Instagram Ads",
+                TipoCusto.INDIRETO_RATEAVEL,
+                BaseRateio.FATURAMENTO,
+            ),
+            (
+                "Marketing Digital - TikTok Ads",
+                TipoCusto.INDIRETO_RATEAVEL,
+                BaseRateio.FATURAMENTO,
+            ),
+            (
+                "Marketing Tradicional - Panfletos/Outdoor",
+                TipoCusto.INDIRETO_RATEAVEL,
+                BaseRateio.FATURAMENTO,
+            ),
+            (
+                "Brindes e Amostras Grátis",
+                TipoCusto.INDIRETO_RATEAVEL,
+                BaseRateio.FATURAMENTO,
+            ),
+            (
+                "Programas de Fidelidade",
+                TipoCusto.INDIRETO_RATEAVEL,
+                BaseRateio.FATURAMENTO,
+            ),
+            (
+                "Eventos e Patrocínios",
+                TipoCusto.INDIRETO_RATEAVEL,
+                BaseRateio.FATURAMENTO,
+            ),
+            (
+                "Material de Ponto de Venda",
+                TipoCusto.INDIRETO_RATEAVEL,
+                BaseRateio.FATURAMENTO,
+            ),
+            (
+                "Agência de Marketing",
+                TipoCusto.INDIRETO_RATEAVEL,
+                BaseRateio.FATURAMENTO,
+            ),
         ],
     },
-    
     # =================================================================
     # 7. DESPESAS OPERACIONAIS - ADMINISTRATIVAS
     # =================================================================
@@ -189,17 +251,24 @@ PLANO_CONTAS = [
             ("Contabilidade", TipoCusto.CORPORATIVO, None),
             ("Assessoria Jurídica", TipoCusto.CORPORATIVO, None),
             ("Softwares e Sistemas - ERP", TipoCusto.CORPORATIVO, None),
-            ("Softwares e Sistemas - E-commerce", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            (
+                "Softwares e Sistemas - E-commerce",
+                TipoCusto.INDIRETO_RATEAVEL,
+                BaseRateio.FATURAMENTO,
+            ),
             ("Softwares e Sistemas - Gestão", TipoCusto.CORPORATIVO, None),
             ("Correios e Sedex", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
             ("Material de Escritório", TipoCusto.CORPORATIVO, None),
-            ("Material de Limpeza", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            (
+                "Material de Limpeza",
+                TipoCusto.INDIRETO_RATEAVEL,
+                BaseRateio.FATURAMENTO,
+            ),
             ("Cópias e Impressões", TipoCusto.CORPORATIVO, None),
             ("Assinaturas e Anuidades", TipoCusto.CORPORATIVO, None),
             ("Taxas e Certificados Digitais", TipoCusto.CORPORATIVO, None),
         ],
     },
-    
     # =================================================================
     # 8. DESPESAS OPERACIONAIS - VEÍCULOS E LOGÍSTICA
     # =================================================================
@@ -209,7 +278,11 @@ PLANO_CONTAS = [
         "ordem": 10,
         "subcategorias": [
             ("Combustível", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
-            ("Manutenção de Veículos", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
+            (
+                "Manutenção de Veículos",
+                TipoCusto.INDIRETO_RATEAVEL,
+                BaseRateio.FATURAMENTO,
+            ),
             ("IPVA", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
             ("Seguro de Veículos", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
             ("Licenciamento", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
@@ -217,7 +290,6 @@ PLANO_CONTAS = [
             ("Pedágios", TipoCusto.INDIRETO_RATEAVEL, BaseRateio.FATURAMENTO),
         ],
     },
-    
     # =================================================================
     # 9. DESPESAS OPERACIONAIS - TRIBUTOS
     # =================================================================
@@ -232,7 +304,6 @@ PLANO_CONTAS = [
             ("ISS", TipoCusto.DIRETO, None),
         ],
     },
-    
     # =================================================================
     # 10. DESPESAS FINANCEIRAS
     # =================================================================
@@ -249,7 +320,6 @@ PLANO_CONTAS = [
             ("Descontos Concedidos Financeiros", TipoCusto.CORPORATIVO, None),
         ],
     },
-    
     # =================================================================
     # 11. OUTRAS DESPESAS
     # =================================================================
@@ -330,7 +400,7 @@ def seed():
     try:
         # Buscar todos os tenants
         tenants = db.query(Tenant).all()
-        
+
         if not tenants:
             logger.warning("⚠️  Nenhum tenant encontrado no sistema")
             return

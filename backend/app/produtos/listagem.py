@@ -23,7 +23,9 @@ def _palavras_busca_produto(termo: Optional[str]) -> list[str]:
     return [palavra.strip() for palavra in termo.split() if palavra.strip()]
 
 
-def _tipos_base_listagem(include_variations: bool, termo_busca: Optional[str]) -> list[str]:
+def _tipos_base_listagem(
+    include_variations: bool, termo_busca: Optional[str]
+) -> list[str]:
     if not include_variations:
         return ["SIMPLES"]
     if (termo_busca or "").strip():
@@ -65,13 +67,19 @@ def _resolver_fornecedor_ids_filtro_produto(
     tenant_ids_fornecedores: Optional[List[str]] = None,
 ) -> tuple[list[int], bool]:
     if fornecedor_grupo_id:
-        grupo = db.query(FornecedorGrupo).filter(
-            FornecedorGrupo.id == fornecedor_grupo_id,
-            FornecedorGrupo.tenant_id == tenant_id,
-            FornecedorGrupo.ativo.is_(True),
-        ).first()
+        grupo = (
+            db.query(FornecedorGrupo)
+            .filter(
+                FornecedorGrupo.id == fornecedor_grupo_id,
+                FornecedorGrupo.tenant_id == tenant_id,
+                FornecedorGrupo.ativo.is_(True),
+            )
+            .first()
+        )
         if not grupo:
-            raise HTTPException(status_code=404, detail="Grupo de fornecedor nao encontrado")
+            raise HTTPException(
+                status_code=404, detail="Grupo de fornecedor nao encontrado"
+            )
 
         tenant_refs = [
             str(tenant_ref)
@@ -81,12 +89,14 @@ def _resolver_fornecedor_ids_filtro_produto(
 
         fornecedor_ids = [
             fornecedor_id_grupo
-            for (fornecedor_id_grupo,) in db.query(Cliente.id).filter(
+            for (fornecedor_id_grupo,) in db.query(Cliente.id)
+            .filter(
                 Cliente.tenant_id.in_(tenant_refs),
                 Cliente.tipo_cadastro == "fornecedor",
                 Cliente.fornecedor_grupo_id == grupo.id,
                 Cliente.ativo.is_(True),
-            ).all()
+            )
+            .all()
         ]
         return fornecedor_ids, True
 
@@ -223,7 +233,9 @@ def _resolver_promocao_erp_produto(
     }
 
 
-def _enriquecer_preco_pdv(produto: Produto, referencia: Optional[datetime] = None) -> Produto:
+def _enriquecer_preco_pdv(
+    produto: Produto, referencia: Optional[datetime] = None
+) -> Produto:
     promocao = _resolver_promocao_erp_produto(produto, referencia)
     produto.preco_venda_original = promocao["preco_regular"]
     produto.preco_venda_pdv = promocao["preco_pdv"]
@@ -234,7 +246,9 @@ def _enriquecer_preco_pdv(produto: Produto, referencia: Optional[datetime] = Non
     return produto
 
 
-def _mapa_reservas_ativas_multitenant(db: Session, tenant_ids: List[str]) -> dict[int, float]:
+def _mapa_reservas_ativas_multitenant(
+    db: Session, tenant_ids: List[str]
+) -> dict[int, float]:
     """Consolida reservas ativas por produto para os tenants acessiveis."""
     try:
         from app.estoque_reserva_service import EstoqueReservaService
@@ -246,10 +260,9 @@ def _mapa_reservas_ativas_multitenant(db: Session, tenant_ids: List[str]) -> dic
                 tenant_ref,
             )
             for produto_id, quantidade in (reservas_tenant or {}).items():
-                reservas_consolidadas[int(produto_id)] = (
-                    float(reservas_consolidadas.get(int(produto_id), 0.0) or 0.0)
-                    + float(quantidade or 0.0)
-                )
+                reservas_consolidadas[int(produto_id)] = float(
+                    reservas_consolidadas.get(int(produto_id), 0.0) or 0.0
+                ) + float(quantidade or 0.0)
         return reservas_consolidadas
     except Exception as exc:
         logger.warning("Nao foi possivel consolidar reservas ativas: %s", exc)
@@ -289,7 +302,9 @@ def _enriquecer_produto_listagem(
                 db,
                 produto.id,
                 tenant_id=tenant_produto,
-                reservas_por_produto=reservas_por_produto if reservas_mesmo_tenant else None,
+                reservas_por_produto=reservas_por_produto
+                if reservas_mesmo_tenant
+                else None,
             )
             produto.composicao_kit = [
                 {
@@ -308,7 +323,9 @@ def _enriquecer_produto_listagem(
                 }
                 for comp in composicao
             ]
-            produto.preco_custo = float(KitCustoService.calcular_custo_kit(produto.id, db))
+            produto.preco_custo = float(
+                KitCustoService.calcular_custo_kit(produto.id, db)
+            )
 
             if produto.tipo_kit == "VIRTUAL":
                 produto.estoque_virtual = int(
@@ -316,7 +333,9 @@ def _enriquecer_produto_listagem(
                         db,
                         produto.id,
                         tenant_id=tenant_produto,
-                        reservas_por_produto=reservas_por_produto if reservas_mesmo_tenant else None,
+                        reservas_por_produto=reservas_por_produto
+                        if reservas_mesmo_tenant
+                        else None,
                     )
                 )
             else:
@@ -333,11 +352,15 @@ def _enriquecer_produto_listagem(
                     db,
                     produto.id,
                     tenant_id=tenant_produto,
-                    reservas_por_produto=reservas_por_produto if reservas_mesmo_tenant else None,
+                    reservas_por_produto=reservas_por_produto
+                    if reservas_mesmo_tenant
+                    else None,
                 )
             )
         except Exception as e:
-            logger.warning(f"Erro ao calcular estoque virtual do produto composto {produto.id}: {e}")
+            logger.warning(
+                f"Erro ao calcular estoque virtual do produto composto {produto.id}: {e}"
+            )
             produto.estoque_virtual = int(produto.estoque_atual or 0)
     elif produto_composto:
         produto.composicao_kit = []
@@ -366,7 +389,9 @@ def _enriquecer_produto_listagem(
 def _nome_area_produto(produto: Produto) -> str:
     if getattr(produto, "departamento", None):
         return produto.departamento.nome
-    if getattr(produto, "categoria", None) and getattr(produto.categoria, "departamento", None):
+    if getattr(produto, "categoria", None) and getattr(
+        produto.categoria, "departamento", None
+    ):
         return produto.categoria.departamento.nome
     return "Sem setor"
 
@@ -401,7 +426,9 @@ def _fornecedor_nome_produto(produto: Produto) -> Optional[str]:
         fornecedor = (
             vinculo_principal.fornecedor
             if vinculo_principal
-            else vinculo_secundario.fornecedor if vinculo_secundario else None
+            else vinculo_secundario.fornecedor
+            if vinculo_secundario
+            else None
         )
     return fornecedor.nome if fornecedor else None
 

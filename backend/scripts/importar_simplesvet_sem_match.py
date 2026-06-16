@@ -105,7 +105,9 @@ def load_rows(csv_path: Path) -> list[dict]:
 def resolve_session(database_url: Optional[str]) -> Session:
     if database_url:
         engine = create_engine(database_url, pool_pre_ping=True)
-        local = sessionmaker(bind=engine, autocommit=False, autoflush=False, expire_on_commit=False)
+        local = sessionmaker(
+            bind=engine, autocommit=False, autoflush=False, expire_on_commit=False
+        )
         return local()
     return SessionLocal()
 
@@ -144,7 +146,9 @@ def get_next_supplier_code(db: Session, tenant_id: UUID) -> str:
 def detect_single_tenant_id(db: Session) -> UUID:
     tenants = [row[0] for row in db.query(User.tenant_id).distinct().all() if row[0]]
     if len(tenants) != 1:
-        raise RuntimeError("Ambiente com mais de um tenant. Informe --tenant-id explicitamente.")
+        raise RuntimeError(
+            "Ambiente com mais de um tenant. Informe --tenant-id explicitamente."
+        )
     return tenants[0]
 
 
@@ -152,13 +156,15 @@ def load_missing_codes(csv_path: Path) -> list[str]:
     rows = load_rows(csv_path)
     codes: list[str] = []
     for row in rows:
-      code = str(row.get("codigo") or "").strip()
-      if code:
-          codes.append(code)
+        code = str(row.get("codigo") or "").strip()
+        if code:
+            codes.append(code)
     return codes
 
 
-def load_source_products(csv_path: Path, target_codes: set[str]) -> dict[str, ProdutoOrigem]:
+def load_source_products(
+    csv_path: Path, target_codes: set[str]
+) -> dict[str, ProdutoOrigem]:
     products: dict[str, ProdutoOrigem] = {}
     for row in load_rows(csv_path):
         codigo = str(row.get("Código") or "").strip()
@@ -178,7 +184,9 @@ def load_source_products(csv_path: Path, target_codes: set[str]) -> dict[str, Pr
             minimo=parse_decimal(row.get("Minimo")),
             maximo=parse_decimal(row.get("Máximo")),
             controlar_estoque=parse_bool_sim(row.get("Controla Estoque")),
-            situacao=str(row.get("Situação tributária") or row.get("Lista de Preço") or "").strip(),
+            situacao=str(
+                row.get("Situação tributária") or row.get("Lista de Preço") or ""
+            ).strip(),
         )
     return products
 
@@ -218,7 +226,8 @@ def run(args: argparse.Namespace) -> None:
     missing_in_source = [code for code in missing_codes if code not in source_products]
     if missing_in_source:
         raise RuntimeError(
-            "Nao foi possivel localizar todos os codigos no arquivo origem: " + ", ".join(missing_in_source)
+            "Nao foi possivel localizar todos os codigos no arquivo origem: "
+            + ", ".join(missing_in_source)
         )
 
     output_dir = Path(args.output_dir).resolve()
@@ -227,7 +236,9 @@ def run(args: argparse.Namespace) -> None:
     skipped_rows: list[dict] = []
 
     try:
-        tenant_id = UUID(args.tenant_id) if args.tenant_id else detect_single_tenant_id(db)
+        tenant_id = (
+            UUID(args.tenant_id) if args.tenant_id else detect_single_tenant_id(db)
+        )
 
         user = (
             db.query(User)
@@ -245,13 +256,17 @@ def run(args: argparse.Namespace) -> None:
 
         existing_products = {
             str(produto.codigo).strip(): produto
-            for produto in db.query(Produto).filter(Produto.tenant_id == tenant_id).all()
+            for produto in db.query(Produto)
+            .filter(Produto.tenant_id == tenant_id)
+            .all()
             if produto.codigo
         }
         fornecedores_by_name = {
             normalize_text(fornecedor.nome): fornecedor
             for fornecedor in db.query(Cliente)
-            .filter(Cliente.tenant_id == tenant_id, Cliente.tipo_cadastro == "fornecedor")
+            .filter(
+                Cliente.tenant_id == tenant_id, Cliente.tipo_cadastro == "fornecedor"
+            )
             .all()
             if fornecedor.nome
         }
@@ -262,7 +277,9 @@ def run(args: argparse.Namespace) -> None:
         }
         categorias_by_name = {
             normalize_text(categoria.nome): categoria
-            for categoria in db.query(Categoria).filter(Categoria.tenant_id == tenant_id).all()
+            for categoria in db.query(Categoria)
+            .filter(Categoria.tenant_id == tenant_id)
+            .all()
             if categoria.nome
         }
 
@@ -395,7 +412,17 @@ def run(args: argparse.Namespace) -> None:
         write_csv(
             output_dir / "produtos_para_criar.csv",
             created_rows,
-            ["codigo", "nome", "categoria", "marca", "fornecedor", "preco_custo", "preco_venda", "estoque_inicial", "modo"],
+            [
+                "codigo",
+                "nome",
+                "categoria",
+                "marca",
+                "fornecedor",
+                "preco_custo",
+                "preco_venda",
+                "estoque_inicial",
+                "modo",
+            ],
         )
         write_csv(
             output_dir / "produtos_pulados.csv",
@@ -426,7 +453,9 @@ def run(args: argparse.Namespace) -> None:
 
 
 def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(description="Cria produtos do SimplesVet que ficaram sem match")
+    parser = argparse.ArgumentParser(
+        description="Cria produtos do SimplesVet que ficaram sem match"
+    )
     parser.add_argument(
         "--report-csv",
         default="backend/reports/simplesvet_match/producao/simplesvet_sem_match.csv",
@@ -444,7 +473,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument("--tenant-id", default="", help="Tenant alvo (UUID)")
     parser.add_argument("--database-url", default="", help="Database URL opcional")
-    parser.add_argument("--apply", action="store_true", help="Cria de fato os produtos no banco")
+    parser.add_argument(
+        "--apply", action="store_true", help="Cria de fato os produtos no banco"
+    )
     return parser
 
 

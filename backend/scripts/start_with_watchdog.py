@@ -36,7 +36,10 @@ def _utcnow_iso() -> str:
 
 
 def _record_event(event_type: str, status: str, message: str, **data) -> None:
-    path = os.getenv("WATCHDOG_EVENT_LOG_PATH", os.path.join(os.getcwd(), "logs", "watchdog_events.jsonl"))
+    path = os.getenv(
+        "WATCHDOG_EVENT_LOG_PATH",
+        os.path.join(os.getcwd(), "logs", "watchdog_events.jsonl"),
+    )
     event = {
         "created_at": _utcnow_iso(),
         "event_type": event_type,
@@ -50,7 +53,9 @@ def _record_event(event_type: str, status: str, message: str, **data) -> None:
     try:
         os.makedirs(os.path.dirname(path), exist_ok=True)
         with open(path, "a", encoding="utf-8") as file:
-            file.write(json.dumps(event, ensure_ascii=False, separators=(",", ":")) + "\n")
+            file.write(
+                json.dumps(event, ensure_ascii=False, separators=(",", ":")) + "\n"
+            )
     except Exception:
         return
 
@@ -207,7 +212,10 @@ def main() -> int:
                 )
                 _stop_process(process, "watchdog health failures")
 
-                if exit_on_restart_loop and len(restart_times) >= max_restarts_per_window:
+                if (
+                    exit_on_restart_loop
+                    and len(restart_times) >= max_restarts_per_window
+                ):
                     _record_event(
                         "restart_loop_guard",
                         "critical",

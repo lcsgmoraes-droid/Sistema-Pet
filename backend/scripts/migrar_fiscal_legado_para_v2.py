@@ -16,8 +16,8 @@ import importlib.util
 
 # Carregar ProdutoConfigFiscal
 spec = importlib.util.spec_from_file_location(
-    "produto_config_fiscal", 
-    os.path.join(backend_dir, "app", "models", "produto_config_fiscal.py")
+    "produto_config_fiscal",
+    os.path.join(backend_dir, "app", "models", "produto_config_fiscal.py"),
 )
 produto_fiscal_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(produto_fiscal_module)
@@ -25,8 +25,8 @@ ProdutoConfigFiscal = produto_fiscal_module.ProdutoConfigFiscal
 
 # Carregar KitConfigFiscal
 spec = importlib.util.spec_from_file_location(
-    "kit_config_fiscal", 
-    os.path.join(backend_dir, "app", "models", "kit_config_fiscal.py")
+    "kit_config_fiscal",
+    os.path.join(backend_dir, "app", "models", "kit_config_fiscal.py"),
 )
 kit_fiscal_module = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(kit_fiscal_module)
@@ -41,21 +41,25 @@ def migrar():
 
     for produto in produtos:
         # verifica se tem algum dado fiscal legado
-        if not any([
-            produto.ncm,
-            produto.cest,
-            produto.cfop,
-            produto.aliquota_icms,
-            produto.aliquota_pis,
-            produto.aliquota_cofins,
-        ]):
+        if not any(
+            [
+                produto.ncm,
+                produto.cest,
+                produto.cfop,
+                produto.aliquota_icms,
+                produto.aliquota_pis,
+                produto.aliquota_cofins,
+            ]
+        ):
             continue
 
         if produto.tipo_produto == "KIT":
             # Verificar usando SQL direto
             result = db.execute(
-                text("SELECT id FROM kit_config_fiscal WHERE produto_kit_id = :produto_id AND tenant_id = :tenant_id LIMIT 1"),
-                {"produto_id": produto.id, "tenant_id": produto.tenant_id}
+                text(
+                    "SELECT id FROM kit_config_fiscal WHERE produto_kit_id = :produto_id AND tenant_id = :tenant_id LIMIT 1"
+                ),
+                {"produto_id": produto.id, "tenant_id": produto.tenant_id},
             ).first()
 
             if result:
@@ -81,8 +85,10 @@ def migrar():
         else:
             # Verificar usando SQL direto
             result = db.execute(
-                text("SELECT id FROM produto_config_fiscal WHERE produto_id = :produto_id AND tenant_id = :tenant_id LIMIT 1"),
-                {"produto_id": produto.id, "tenant_id": produto.tenant_id}
+                text(
+                    "SELECT id FROM produto_config_fiscal WHERE produto_id = :produto_id AND tenant_id = :tenant_id LIMIT 1"
+                ),
+                {"produto_id": produto.id, "tenant_id": produto.tenant_id},
             ).first()
 
             if result:

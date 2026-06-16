@@ -26,7 +26,9 @@ def _valor_preenchido(valor) -> bool:
     return True
 
 
-def _aplicar_dados_fiscais_item_no_produto(produto, item, sobrescrever: bool = False) -> bool:
+def _aplicar_dados_fiscais_item_no_produto(
+    produto, item, sobrescrever: bool = False
+) -> bool:
     """Atualiza dados fiscais somente quando o item realmente trouxe o campo."""
     atualizou = False
 
@@ -68,10 +70,12 @@ def gerar_sku_automatico(prefixo: str, db: Session, user_id: int) -> str:
     Formato: {PREFIXO}-{NUMERO_SEQUENCIAL}
     Exemplo: PROD-00001
     """
-    ultimo_produto = db.query(Produto).filter(
-        Produto.user_id == user_id,
-        Produto.codigo.like(f"{prefixo}-%")
-    ).order_by(Produto.id.desc()).first()
+    ultimo_produto = (
+        db.query(Produto)
+        .filter(Produto.user_id == user_id, Produto.codigo.like(f"{prefixo}-%"))
+        .order_by(Produto.id.desc())
+        .first()
+    )
 
     if ultimo_produto:
         try:
@@ -84,10 +88,11 @@ def gerar_sku_automatico(prefixo: str, db: Session, user_id: int) -> str:
 
     novo_sku = f"{prefixo}-{proximo_numero:05d}"
 
-    existe = db.query(Produto).filter(
-        Produto.codigo == novo_sku,
-        Produto.user_id == user_id
-    ).first()
+    existe = (
+        db.query(Produto)
+        .filter(Produto.codigo == novo_sku, Produto.user_id == user_id)
+        .first()
+    )
 
     if existe:
         novo_sku = f"{prefixo}-{proximo_numero + 1:05d}"
@@ -103,9 +108,13 @@ def _buscar_produto_por_codigo_global(
     if not codigo_limpo:
         return None
 
-    return db.query(Produto).filter(
-        func.lower(func.trim(Produto.codigo)) == codigo_limpo.lower(),
-    ).first()
+    return (
+        db.query(Produto)
+        .filter(
+            func.lower(func.trim(Produto.codigo)) == codigo_limpo.lower(),
+        )
+        .first()
+    )
 
 
 def _produto_pertence_ao_tenant(produto: Optional[Produto], tenant_id) -> bool:
@@ -134,12 +143,14 @@ def _gerar_candidatos_sku_disponiveis(
         if existe:
             return
 
-        sugestoes.append({
-            "sku": sku_limpo,
-            "descricao": descricao,
-            "disponivel": True,
-            "padrao": False,
-        })
+        sugestoes.append(
+            {
+                "sku": sku_limpo,
+                "descricao": descricao,
+                "disponivel": True,
+                "padrao": False,
+            }
+        )
 
     sku_base_limpo = (sku_base or "").strip()
     prefixo_limpo = re.sub(r"[^A-Z0-9]", "", (prefixo or "").upper()) or "PROD"
@@ -190,7 +201,9 @@ def _montar_sugestao_sku_produto(
     sku_base = (sku_base_customizado or item.codigo_produto or "").strip()
     if not sku_base:
         descricao_base = re.sub(r"[^A-Z0-9]", "", (item.descricao or "").upper())
-        sku_base = (descricao_base[:10] or gerar_sku_automatico(prefixo, db, user_id)).strip()
+        sku_base = (
+            descricao_base[:10] or gerar_sku_automatico(prefixo, db, user_id)
+        ).strip()
 
     produto_existente = _buscar_produto_por_codigo_global(db, sku_base)
     composicoes_custo = calcular_composicao_custos_nota(nota)
@@ -205,12 +218,14 @@ def _montar_sugestao_sku_produto(
             user_id=user_id,
         )
     else:
-        sugestoes = [{
-            "sku": sku_base,
-            "descricao": "Codigo original do fornecedor",
-            "disponivel": True,
-            "padrao": True,
-        }]
+        sugestoes = [
+            {
+                "sku": sku_base,
+                "descricao": "Codigo original do fornecedor",
+                "disponivel": True,
+                "padrao": True,
+            }
+        ]
 
     payload: Dict[str, Any] = {
         "item_id": item.id,
@@ -224,7 +239,9 @@ def _montar_sugestao_sku_produto(
         "dados_produto": {
             "nome": item.descricao,
             "unidade": item.unidade,
-            "preco_custo": composicao_item.get("custo_aquisicao_unitario", item.valor_unitario),
+            "preco_custo": composicao_item.get(
+                "custo_aquisicao_unitario", item.valor_unitario
+            ),
             "ncm": item.ncm if hasattr(item, "ncm") else None,
             "ean": item.ean if hasattr(item, "ean") else None,
             "ean_tributario": getattr(item, "ean_tributario", None),
@@ -279,7 +296,9 @@ def _codigos_barras_nf(item: Any) -> Dict[str, str]:
     }
 
 
-def _preencher_campo_codigo_barras_vazio(produto: Produto, campo: str, valor: str) -> bool:
+def _preencher_campo_codigo_barras_vazio(
+    produto: Produto, campo: str, valor: str
+) -> bool:
     if not valor:
         return False
     atual = _codigo_barras_valido_nf(getattr(produto, campo, None))
@@ -289,18 +308,31 @@ def _preencher_campo_codigo_barras_vazio(produto: Produto, campo: str, valor: st
     return True
 
 
-def _aplicar_codigos_barras_item_no_produto(produto: Produto, item: NotaEntradaItem) -> bool:
+def _aplicar_codigos_barras_item_no_produto(
+    produto: Produto, item: NotaEntradaItem
+) -> bool:
     """Preenche codigos vindos da NF-e sem sobrescrever cadastro divergente."""
     codigos = _codigos_barras_nf(item)
     atualizou = False
 
-    atualizou = _preencher_campo_codigo_barras_vazio(produto, "gtin_ean", codigos["ean"]) or atualizou
-    atualizou = _preencher_campo_codigo_barras_vazio(
-        produto,
-        "gtin_ean_tributario",
-        codigos["ean_tributario"],
-    ) or atualizou
-    atualizou = _preencher_campo_codigo_barras_vazio(produto, "codigo_barras", codigos["principal"]) or atualizou
+    atualizou = (
+        _preencher_campo_codigo_barras_vazio(produto, "gtin_ean", codigos["ean"])
+        or atualizou
+    )
+    atualizou = (
+        _preencher_campo_codigo_barras_vazio(
+            produto,
+            "gtin_ean_tributario",
+            codigos["ean_tributario"],
+        )
+        or atualizou
+    )
+    atualizou = (
+        _preencher_campo_codigo_barras_vazio(
+            produto, "codigo_barras", codigos["principal"]
+        )
+        or atualizou
+    )
 
     if atualizou:
         logger.info(
@@ -390,16 +422,14 @@ def encontrar_produto_similar(
 
         if fornecedor_id:
             query_fornecedor = query.join(
-                ProdutoFornecedor,
-                ProdutoFornecedor.produto_id == Produto.id
+                ProdutoFornecedor, ProdutoFornecedor.produto_id == Produto.id
             ).filter(
                 ProdutoFornecedor.fornecedor_id == fornecedor_id,
                 ProdutoFornecedor.ativo.is_(True),
             )
             if tenant_id is not None:
                 query_fornecedor = query.join(
-                    ProdutoFornecedor,
-                    ProdutoFornecedor.produto_id == Produto.id
+                    ProdutoFornecedor, ProdutoFornecedor.produto_id == Produto.id
                 ).filter(
                     ProdutoFornecedor.fornecedor_id == fornecedor_id,
                     ProdutoFornecedor.ativo.is_(True),
@@ -410,7 +440,9 @@ def encontrar_produto_similar(
 
             if produto_com_fornecedor:
                 foi_inativo = not produto_com_fornecedor.ativo
-                logger.info("Match por SKU + Fornecedor: %s", produto_com_fornecedor.nome)
+                logger.info(
+                    "Match por SKU + Fornecedor: %s", produto_com_fornecedor.nome
+                )
                 return (produto_com_fornecedor, 1.0, foi_inativo, "sku", codigo)
 
         produto = query.first()

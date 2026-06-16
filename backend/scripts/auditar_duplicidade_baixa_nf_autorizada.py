@@ -101,7 +101,8 @@ def _movimento_generico_duplicado(mov: EstoqueMovimentacao) -> bool:
         and getattr(mov, "motivo", None) == "venda_bling"
         and getattr(mov, "referencia_tipo", None) == "pedido_integrado"
         and not str(getattr(mov, "documento", None) or "").strip()
-        and _observacao_normalizada(getattr(mov, "observacao", None)) == OBSERVACAO_GENERICA
+        and _observacao_normalizada(getattr(mov, "observacao", None))
+        == OBSERVACAO_GENERICA
     )
 
 
@@ -127,25 +128,25 @@ def _serializar_movimentacao(mov: EstoqueMovimentacao) -> dict[str, Any]:
     }
 
 
-def _buscar_grupos_suspeitos(db, tenant_id: str | None, max_grupos: int | None) -> list[dict[str, Any]]:
-    query = (
-        db.query(
-            EstoqueMovimentacao.tenant_id.label("tenant_id"),
-            EstoqueMovimentacao.referencia_id.label("pedido_integrado_id"),
-            EstoqueMovimentacao.produto_id.label("produto_id"),
-            func.count(EstoqueMovimentacao.id).label("qtd_movs"),
-            func.sum(EstoqueMovimentacao.quantidade).label("qtd_total"),
-            func.min(EstoqueMovimentacao.created_at).label("primeira_baixa"),
-            func.max(EstoqueMovimentacao.created_at).label("ultima_baixa"),
-        )
-        .filter(
-            EstoqueMovimentacao.referencia_tipo == "pedido_integrado",
-            EstoqueMovimentacao.tipo == "saida",
-            EstoqueMovimentacao.status != "cancelado",
-            EstoqueMovimentacao.motivo == "venda_bling",
-            func.coalesce(EstoqueMovimentacao.documento, "") == "",
-            func.lower(func.coalesce(EstoqueMovimentacao.observacao, "")) == OBSERVACAO_GENERICA,
-        )
+def _buscar_grupos_suspeitos(
+    db, tenant_id: str | None, max_grupos: int | None
+) -> list[dict[str, Any]]:
+    query = db.query(
+        EstoqueMovimentacao.tenant_id.label("tenant_id"),
+        EstoqueMovimentacao.referencia_id.label("pedido_integrado_id"),
+        EstoqueMovimentacao.produto_id.label("produto_id"),
+        func.count(EstoqueMovimentacao.id).label("qtd_movs"),
+        func.sum(EstoqueMovimentacao.quantidade).label("qtd_total"),
+        func.min(EstoqueMovimentacao.created_at).label("primeira_baixa"),
+        func.max(EstoqueMovimentacao.created_at).label("ultima_baixa"),
+    ).filter(
+        EstoqueMovimentacao.referencia_tipo == "pedido_integrado",
+        EstoqueMovimentacao.tipo == "saida",
+        EstoqueMovimentacao.status != "cancelado",
+        EstoqueMovimentacao.motivo == "venda_bling",
+        func.coalesce(EstoqueMovimentacao.documento, "") == "",
+        func.lower(func.coalesce(EstoqueMovimentacao.observacao, ""))
+        == OBSERVACAO_GENERICA,
     )
 
     if tenant_id:
@@ -158,7 +159,10 @@ def _buscar_grupos_suspeitos(db, tenant_id: str | None, max_grupos: int | None) 
             EstoqueMovimentacao.produto_id,
         )
         .having(func.count(EstoqueMovimentacao.id) > 1)
-        .order_by(func.count(EstoqueMovimentacao.id).desc(), func.max(EstoqueMovimentacao.created_at).desc())
+        .order_by(
+            func.count(EstoqueMovimentacao.id).desc(),
+            func.max(EstoqueMovimentacao.created_at).desc(),
+        )
     )
 
     if max_grupos:
@@ -166,7 +170,11 @@ def _buscar_grupos_suspeitos(db, tenant_id: str | None, max_grupos: int | None) 
 
     grupos: list[dict[str, Any]] = []
     for row in query.all():
-        pedido = db.query(PedidoIntegrado).filter(PedidoIntegrado.id == row.pedido_integrado_id).first()
+        pedido = (
+            db.query(PedidoIntegrado)
+            .filter(PedidoIntegrado.id == row.pedido_integrado_id)
+            .first()
+        )
         produto = db.query(Produto).filter(Produto.id == row.produto_id).first()
         grupos.append(
             {
@@ -186,7 +194,9 @@ def _buscar_grupos_suspeitos(db, tenant_id: str | None, max_grupos: int | None) 
     return grupos
 
 
-def _buscar_movimentos_saida_pedido_produto(db, tenant_id: str, pedido_id: int, produto_id: int) -> list[EstoqueMovimentacao]:
+def _buscar_movimentos_saida_pedido_produto(
+    db, tenant_id: str, pedido_id: int, produto_id: int
+) -> list[EstoqueMovimentacao]:
     return (
         db.query(EstoqueMovimentacao)
         .filter(
@@ -215,7 +225,10 @@ def _buscar_registro_nf_para_pedido(
         .filter(
             BlingNotaFiscalCache.tenant_id == tenant_id,
             func.lower(BlingNotaFiscalCache.status) == STATUS_NF_AUTORIZADA,
-            func.coalesce(BlingNotaFiscalCache.data_emissao, BlingNotaFiscalCache.last_synced_at) >= limite_data,
+            func.coalesce(
+                BlingNotaFiscalCache.data_emissao, BlingNotaFiscalCache.last_synced_at
+            )
+            >= limite_data,
         )
         .order_by(
             BlingNotaFiscalCache.data_emissao.desc().nullslast(),
@@ -226,13 +239,22 @@ def _buscar_registro_nf_para_pedido(
     )
 
     pedido_bling_id = str(getattr(pedido, "pedido_bling_id", None) or "").strip()
-    pedido_bling_numero = str(getattr(pedido, "pedido_bling_numero", None) or "").strip()
+    pedido_bling_numero = str(
+        getattr(pedido, "pedido_bling_numero", None) or ""
+    ).strip()
 
     for registro in candidatos:
         refs = _extrair_referencias_nf_cache(registro)
-        if pedido_bling_id and str(refs.get("pedido_bling_id") or "").strip() == pedido_bling_id:
+        if (
+            pedido_bling_id
+            and str(refs.get("pedido_bling_id") or "").strip() == pedido_bling_id
+        ):
             return registro
-        if pedido_bling_numero and str(refs.get("pedido_bling_numero") or "").strip() == pedido_bling_numero:
+        if (
+            pedido_bling_numero
+            and str(refs.get("pedido_bling_numero") or "").strip()
+            == pedido_bling_numero
+        ):
             return registro
     return None
 
@@ -277,13 +299,13 @@ def _cancelar_movimento_duplicado(
         ),
     )
 
-    for kit_id, _estoque_virtual in KitEstoqueService.recalcular_kits_que_usam_produto(db, produto_id).items():
+    for kit_id, _estoque_virtual in KitEstoqueService.recalcular_kits_que_usam_produto(
+        db, produto_id
+    ).items():
         _sincronizar_cache_estoque_virtual(db, tenant_id, kit_id)
 
     observacao_original = str(getattr(movimento, "observacao", None) or "").strip()
-    complemento = (
-        f"Cancelada automaticamente por duplicidade de baixa NF {nf_numero or nf_bling_id or 'sem_numero'}"
-    )
+    complemento = f"Cancelada automaticamente por duplicidade de baixa NF {nf_numero or nf_bling_id or 'sem_numero'}"
     movimento.status = "cancelado"
     movimento.observacao = (
         f"{observacao_original} | {complemento}"
@@ -318,7 +340,9 @@ def _processar_grupo(
             "status": "pedido_nao_encontrado",
         }
 
-    movimentos_antes = _buscar_movimentos_saida_pedido_produto(db, tenant_id, pedido_id, produto_id)
+    movimentos_antes = _buscar_movimentos_saida_pedido_produto(
+        db, tenant_id, pedido_id, produto_id
+    )
     snapshot_movimentos = [_serializar_movimentacao(mov) for mov in movimentos_antes]
 
     registro_nf = _buscar_registro_nf_para_pedido(
@@ -336,7 +360,9 @@ def _processar_grupo(
         "nf_bling_id": nf_refs.get("nf_bling_id"),
         "nf_numero": nf_refs.get("nf_numero"),
         "movimentos_antes": snapshot_movimentos,
-        "movimentos_genericos_antes": sum(1 for mov in movimentos_antes if _movimento_generico_duplicado(mov)),
+        "movimentos_genericos_antes": sum(
+            1 for mov in movimentos_antes if _movimento_generico_duplicado(mov)
+        ),
         "movimentos_documentados_antes": sum(
             1
             for mov in movimentos_antes
@@ -367,21 +393,31 @@ def _processar_grupo(
         return resultado
 
     db.expire_all()
-    movimentos_depois_reconciliacao = _buscar_movimentos_saida_pedido_produto(db, tenant_id, pedido_id, produto_id)
+    movimentos_depois_reconciliacao = _buscar_movimentos_saida_pedido_produto(
+        db, tenant_id, pedido_id, produto_id
+    )
     nf_numero = reconciliacao.get("nf_numero") or nf_refs.get("nf_numero")
     nf_bling_id = reconciliacao.get("nf_bling_id") or nf_refs.get("nf_bling_id")
 
     documentados = [
         mov
         for mov in movimentos_depois_reconciliacao
-        if movimento_documentado_por_nf(mov, nf_numero=nf_numero, nf_bling_id=nf_bling_id)
+        if movimento_documentado_por_nf(
+            mov, nf_numero=nf_numero, nf_bling_id=nf_bling_id
+        )
     ]
-    genericos = [mov for mov in movimentos_depois_reconciliacao if _movimento_generico_duplicado(mov)]
+    genericos = [
+        mov
+        for mov in movimentos_depois_reconciliacao
+        if _movimento_generico_duplicado(mov)
+    ]
 
     if not documentados:
         db.rollback()
         resultado["status"] = "sem_movimento_canonico_nf"
-        resultado["movimentos_pos_reconciliacao"] = [_serializar_movimentacao(mov) for mov in movimentos_depois_reconciliacao]
+        resultado["movimentos_pos_reconciliacao"] = [
+            _serializar_movimentacao(mov) for mov in movimentos_depois_reconciliacao
+        ]
         return resultado
 
     cancelamentos = []
@@ -400,16 +436,24 @@ def _processar_grupo(
 
     db.commit()
 
-    movimentos_finais = _buscar_movimentos_saida_pedido_produto(db, tenant_id, pedido_id, produto_id)
+    movimentos_finais = _buscar_movimentos_saida_pedido_produto(
+        db, tenant_id, pedido_id, produto_id
+    )
     resultado["status"] = "corrigido"
     resultado["movimentos_cancelados"] = cancelamentos
-    resultado["movimentos_genericos_restantes"] = sum(1 for mov in movimentos_finais if _movimento_generico_duplicado(mov))
+    resultado["movimentos_genericos_restantes"] = sum(
+        1 for mov in movimentos_finais if _movimento_generico_duplicado(mov)
+    )
     resultado["movimentos_documentados_finais"] = sum(
         1
         for mov in movimentos_finais
-        if movimento_documentado_por_nf(mov, nf_numero=nf_numero, nf_bling_id=nf_bling_id)
+        if movimento_documentado_por_nf(
+            mov, nf_numero=nf_numero, nf_bling_id=nf_bling_id
+        )
     )
-    resultado["movimentos_finais"] = [_serializar_movimentacao(mov) for mov in movimentos_finais]
+    resultado["movimentos_finais"] = [
+        _serializar_movimentacao(mov) for mov in movimentos_finais
+    ]
     return resultado
 
 
@@ -457,7 +501,9 @@ def main() -> int:
         ]
 
         if args.apply_changes:
-            backup_path = Path(args.backup_file) if args.backup_file else _default_backup_path()
+            backup_path = (
+                Path(args.backup_file) if args.backup_file else _default_backup_path()
+            )
             backup_path.parent.mkdir(parents=True, exist_ok=True)
             backup_payload = {
                 "generated_at": datetime.now(),
@@ -466,7 +512,9 @@ def main() -> int:
                 "grupos": preview_resultados,
             }
             backup_path.write_text(
-                json.dumps(backup_payload, ensure_ascii=False, indent=2, default=_json_default),
+                json.dumps(
+                    backup_payload, ensure_ascii=False, indent=2, default=_json_default
+                ),
                 encoding="utf-8",
             )
 

@@ -105,4 +105,3 @@ def _mapa_validade_proxima_produtos(
         )
 
     return validade_por_produto
-

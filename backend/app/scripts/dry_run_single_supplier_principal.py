@@ -24,7 +24,9 @@ def _table_exists(db: Session, table_name: str) -> bool:
 def _columns(db: Session, table_name: str) -> set[str]:
     if not _table_exists(db, table_name):
         return set()
-    return {column["name"] for column in sa_inspect(db.get_bind()).get_columns(table_name)}
+    return {
+        column["name"] for column in sa_inspect(db.get_bind()).get_columns(table_name)
+    }
 
 
 def _has_columns(db: Session, table_name: str, required: set[str]) -> bool:
@@ -268,11 +270,10 @@ def analisar_single_supplier_principal(db: Session) -> dict[str, Any]:
             WHERE c.id IS NULL
             """,
         )
-        report["consistencia"][
-            "produtos_fornecedor_id_sem_cliente_mesmo_tenant"
-        ] = _scalar(
-            db,
-            """
+        report["consistencia"]["produtos_fornecedor_id_sem_cliente_mesmo_tenant"] = (
+            _scalar(
+                db,
+                """
             SELECT COUNT(*)
             FROM produtos p
             LEFT JOIN clientes c
@@ -281,6 +282,7 @@ def analisar_single_supplier_principal(db: Session) -> dict[str, Any]:
             WHERE p.fornecedor_id IS NOT NULL
               AND c.id IS NULL
             """,
+            )
         )
 
     tenant_rows = _rows(

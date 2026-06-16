@@ -132,9 +132,8 @@ def exemplo_venda_completa() -> None:
     valores = resultado["valores"]
     custos = resultado["custos"]
     margens = resultado["margens"]
-    resultado_entrega = (
-        valores.get("taxa_entrega_receita_empresa", 0)
-        - custos.get("custo_operacional_entrega", 0)
+    resultado_entrega = valores.get("taxa_entrega_receita_empresa", 0) - custos.get(
+        "custo_operacional_entrega", 0
     )
 
     print("\nANALISE DETALHADA:")

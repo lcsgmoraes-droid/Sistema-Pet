@@ -1,4 +1,5 @@
 """Parser de XML NF-e para notas de entrada."""
+
 from datetime import date, datetime, timedelta
 import xml.etree.ElementTree as ET
 
@@ -26,8 +27,14 @@ def parse_nfe_xml(xml_content: str) -> dict:
 
         # Identificação da nota
         ide = inf_nfe.find(".//nfe:ide", ns)
-        numero_nota = ide.find("nfe:nNF", ns).text if ide.find("nfe:nNF", ns) is not None else ""
-        serie = ide.find("nfe:serie", ns).text if ide.find("nfe:serie", ns) is not None else "1"
+        numero_nota = (
+            ide.find("nfe:nNF", ns).text if ide.find("nfe:nNF", ns) is not None else ""
+        )
+        serie = (
+            ide.find("nfe:serie", ns).text
+            if ide.find("nfe:serie", ns) is not None
+            else "1"
+        )
         data_emissao_str = (
             ide.find("nfe:dhEmi", ns).text
             if ide.find("nfe:dhEmi", ns) is not None
@@ -41,13 +48,19 @@ def parse_nfe_xml(xml_content: str) -> dict:
         # Emitente (fornecedor) - Dados completos
         emit = inf_nfe.find(".//nfe:emit", ns)
         fornecedor_cnpj = (
-            emit.find("nfe:CNPJ", ns).text if emit.find("nfe:CNPJ", ns) is not None else ""
+            emit.find("nfe:CNPJ", ns).text
+            if emit.find("nfe:CNPJ", ns) is not None
+            else ""
         )
         fornecedor_nome = (
-            emit.find("nfe:xNome", ns).text if emit.find("nfe:xNome", ns) is not None else ""
+            emit.find("nfe:xNome", ns).text
+            if emit.find("nfe:xNome", ns) is not None
+            else ""
         )
         fornecedor_fantasia = (
-            emit.find("nfe:xFant", ns).text if emit.find("nfe:xFant", ns) is not None else ""
+            emit.find("nfe:xFant", ns).text
+            if emit.find("nfe:xFant", ns) is not None
+            else ""
         )
         fornecedor_ie = (
             emit.find("nfe:IE", ns).text if emit.find("nfe:IE", ns) is not None else ""
@@ -136,13 +149,35 @@ def parse_nfe_xml(xml_content: str) -> dict:
                 else ""
             )
             descricao = (
-                prod.find("nfe:xProd", ns).text if prod.find("nfe:xProd", ns) is not None else ""
+                prod.find("nfe:xProd", ns).text
+                if prod.find("nfe:xProd", ns) is not None
+                else ""
             )
-            ncm = prod.find("nfe:NCM", ns).text if prod.find("nfe:NCM", ns) is not None else ""
-            cest = prod.find("nfe:CEST", ns).text if prod.find("nfe:CEST", ns) is not None else ""
-            cfop = prod.find("nfe:CFOP", ns).text if prod.find("nfe:CFOP", ns) is not None else ""
-            origem = prod.find("nfe:orig", ns).text if prod.find("nfe:orig", ns) is not None else "0"
-            unidade = prod.find("nfe:uCom", ns).text if prod.find("nfe:uCom", ns) is not None else "UN"
+            ncm = (
+                prod.find("nfe:NCM", ns).text
+                if prod.find("nfe:NCM", ns) is not None
+                else ""
+            )
+            cest = (
+                prod.find("nfe:CEST", ns).text
+                if prod.find("nfe:CEST", ns) is not None
+                else ""
+            )
+            cfop = (
+                prod.find("nfe:CFOP", ns).text
+                if prod.find("nfe:CFOP", ns) is not None
+                else ""
+            )
+            origem = (
+                prod.find("nfe:orig", ns).text
+                if prod.find("nfe:orig", ns) is not None
+                else "0"
+            )
+            unidade = (
+                prod.find("nfe:uCom", ns).text
+                if prod.find("nfe:uCom", ns) is not None
+                else "UN"
+            )
             quantidade = (
                 float(prod.find("nfe:qCom", ns).text)
                 if prod.find("nfe:qCom", ns) is not None
@@ -158,7 +193,11 @@ def parse_nfe_xml(xml_content: str) -> dict:
                 if prod.find("nfe:vProd", ns) is not None
                 else 0
             )
-            ean = prod.find("nfe:cEAN", ns).text if prod.find("nfe:cEAN", ns) is not None else ""
+            ean = (
+                prod.find("nfe:cEAN", ns).text
+                if prod.find("nfe:cEAN", ns) is not None
+                else ""
+            )
             ean_tributario = (
                 prod.find("nfe:cEANTrib", ns).text
                 if prod.find("nfe:cEANTrib", ns) is not None
@@ -181,7 +220,9 @@ def parse_nfe_xml(xml_content: str) -> dict:
                 validade_elem = rastro.find("nfe:dVal", ns)
                 if validade_elem is not None:
                     try:
-                        data_validade = datetime.strptime(validade_elem.text, "%Y-%m-%d").date()
+                        data_validade = datetime.strptime(
+                            validade_elem.text, "%Y-%m-%d"
+                        ).date()
                     except Exception:
                         pass
 

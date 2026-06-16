@@ -68,23 +68,31 @@ def _criterios_da_regra(regra: RegraClassificacaoDRE) -> dict:
     return criterios if isinstance(criterios, dict) else {}
 
 
-def _regra_compativel_com_conta(conta: ContaPagar, regra: RegraClassificacaoDRE) -> bool:
+def _regra_compativel_com_conta(
+    conta: ContaPagar, regra: RegraClassificacaoDRE
+) -> bool:
     criterios = _criterios_da_regra(regra)
     if not criterios.get("contas_pagar"):
         return False
 
     fornecedor_id = criterios.get("fornecedor_id")
     if fornecedor_id is not None:
-        return conta.fornecedor_id is not None and int(fornecedor_id) == int(conta.fornecedor_id)
+        return conta.fornecedor_id is not None and int(fornecedor_id) == int(
+            conta.fornecedor_id
+        )
 
     descricao_chave = _normalizar_texto(criterios.get("descricao_chave"))
     if descricao_chave:
-        return normalizar_chave_descricao_conta_pagar(conta.descricao) == descricao_chave
+        return (
+            normalizar_chave_descricao_conta_pagar(conta.descricao) == descricao_chave
+        )
 
     return False
 
 
-def _aplicar_regra_na_conta(conta: ContaPagar, regra: RegraClassificacaoDRE, *, sobrescrever: bool = False) -> bool:
+def _aplicar_regra_na_conta(
+    conta: ContaPagar, regra: RegraClassificacaoDRE, *, sobrescrever: bool = False
+) -> bool:
     criterios = _criterios_da_regra(regra)
     alterou = False
 
@@ -120,9 +128,13 @@ def _query_regras_contas_pagar(db: Session, tenant_id):
             RegraClassificacaoDRE.tenant_id == tenant_id,
             RegraClassificacaoDRE.ativo.is_(True),
             RegraClassificacaoDRE.tipo_regra.in_(TIPOS_REGRAS_CONTAS_PAGAR),
-            RegraClassificacaoDRE.origem.in_((OrigemRegra.APRENDIZADO, OrigemRegra.USUARIO)),
+            RegraClassificacaoDRE.origem.in_(
+                (OrigemRegra.APRENDIZADO, OrigemRegra.USUARIO)
+            ),
         )
-        .order_by(RegraClassificacaoDRE.prioridade.desc(), RegraClassificacaoDRE.id.desc())
+        .order_by(
+            RegraClassificacaoDRE.prioridade.desc(), RegraClassificacaoDRE.id.desc()
+        )
     )
 
 

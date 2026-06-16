@@ -28,17 +28,17 @@ QUIET_PATHS = {"/health", "/health/watchdog"}
 
 class RequestLoggingMiddleware(BaseHTTPMiddleware):
     """Middleware para logging estruturado de requests HTTP"""
-    
+
     async def dispatch(self, request: Request, call_next):
         # Capturar timestamp de início
         start_time = time.time()
-        
+
         # Processar request
         response = await call_next(request)
-        
+
         # Calcular tempo de resposta (em ms)
         duration_ms = round((time.time() - start_time) * 1000, 2)
-        
+
         path = request.url.path
         status_code = response.status_code
         request_id = get_request_id() or response.headers.get("X-Request-ID")
@@ -61,7 +61,7 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
             status_code=status_code,
             duration_ms=duration_ms,
             request_id=request_id,
-            client_ip=request.client.host if request.client else None
+            client_ip=request.client.host if request.client else None,
         )
-        
+
         return response

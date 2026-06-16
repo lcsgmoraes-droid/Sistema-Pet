@@ -87,7 +87,9 @@ def _data_para_datetime(value: Any) -> Optional[datetime]:
     return datetime.combine(value, datetime.min.time())
 
 
-def _mapear_lotes_rastro_xml(xml_content: Optional[str]) -> Dict[int, List[Dict[str, Any]]]:
+def _mapear_lotes_rastro_xml(
+    xml_content: Optional[str],
+) -> Dict[int, List[Dict[str, Any]]]:
     if not xml_content:
         return {}
 
@@ -173,7 +175,9 @@ def _montar_lotes_entrada_item(
                 if index == len(rastros) - 1:
                     quantidade_lote = restante
                 else:
-                    proporcao = (lote_xml.get("quantidade_nf", 0) or 0) / soma_quantidade_nf
+                    proporcao = (
+                        lote_xml.get("quantidade_nf", 0) or 0
+                    ) / soma_quantidade_nf
                     quantidade_lote = _round_quantity(quantidade_entrada * proporcao)
                     restante = _round_quantity(restante - quantidade_lote)
 
@@ -182,10 +186,15 @@ def _montar_lotes_entrada_item(
 
                 lotes.append(
                     {
-                        "nome_lote": lote_xml.get("nome_lote") or f"NF{nota.numero_nota}-{item.numero_item}-{index + 1}",
+                        "nome_lote": lote_xml.get("nome_lote")
+                        or f"NF{nota.numero_nota}-{item.numero_item}-{index + 1}",
                         "quantidade": quantidade_lote,
-                        "data_fabricacao": _data_para_datetime(lote_xml.get("data_fabricacao")),
-                        "data_validade": _data_para_datetime(lote_xml.get("data_validade") or item.data_validade),
+                        "data_fabricacao": _data_para_datetime(
+                            lote_xml.get("data_fabricacao")
+                        ),
+                        "data_validade": _data_para_datetime(
+                            lote_xml.get("data_validade") or item.data_validade
+                        ),
                     }
                 )
 
@@ -196,16 +205,23 @@ def _montar_lotes_entrada_item(
             lote_xml = rastros[0]
             return [
                 {
-                    "nome_lote": lote_xml.get("nome_lote") or f"NF{nota.numero_nota}-{item.numero_item}",
+                    "nome_lote": lote_xml.get("nome_lote")
+                    or f"NF{nota.numero_nota}-{item.numero_item}",
                     "quantidade": quantidade_entrada,
-                    "data_fabricacao": _data_para_datetime(lote_xml.get("data_fabricacao")),
-                    "data_validade": _data_para_datetime(lote_xml.get("data_validade") or item.data_validade),
+                    "data_fabricacao": _data_para_datetime(
+                        lote_xml.get("data_fabricacao")
+                    ),
+                    "data_validade": _data_para_datetime(
+                        lote_xml.get("data_validade") or item.data_validade
+                    ),
                 }
             ]
 
     return [
         {
-            "nome_lote": item.lote if item.lote else f"NF{nota.numero_nota}-{item.numero_item}",
+            "nome_lote": item.lote
+            if item.lote
+            else f"NF{nota.numero_nota}-{item.numero_item}",
             "quantidade": quantidade_entrada,
             "data_fabricacao": None,
             "data_validade": _data_para_datetime(item.data_validade),
@@ -246,7 +262,9 @@ def _normalizar_custo_unitario_override(valor: Any, item_id: int) -> Optional[fl
 
 
 def _obter_acao_conferencia(acao: Optional[str], tem_divergencia: bool) -> str:
-    acao_normalizada = (acao or "").strip() or ("contatar_fornecedor" if tem_divergencia else "sem_acao")
+    acao_normalizada = (acao or "").strip() or (
+        "contatar_fornecedor" if tem_divergencia else "sem_acao"
+    )
     if acao_normalizada not in ACOES_CONFERENCIA_VALIDAS:
         return "contatar_fornecedor" if tem_divergencia else "sem_acao"
     if not tem_divergencia:
@@ -259,12 +277,16 @@ def _quantidades_conferencia_item(item: NotaEntradaItem) -> Dict[str, float]:
     quantidade_conferida = item.quantidade_conferida
     if quantidade_conferida is None:
         quantidade_conferida = quantidade_nf
-    quantidade_conferida = max(0.0, min(_round_quantity(quantidade_conferida), quantidade_nf))
+    quantidade_conferida = max(
+        0.0, min(_round_quantity(quantidade_conferida), quantidade_nf)
+    )
 
     quantidade_avariada = max(0.0, _round_quantity(item.quantidade_avariada))
     max_avariada = max(quantidade_nf - quantidade_conferida, 0.0)
     quantidade_avariada = min(quantidade_avariada, max_avariada)
-    quantidade_faltante = max(quantidade_nf - quantidade_conferida - quantidade_avariada, 0.0)
+    quantidade_faltante = max(
+        quantidade_nf - quantidade_conferida - quantidade_avariada, 0.0
+    )
 
     return {
         "quantidade_nf": quantidade_nf,
@@ -309,11 +331,15 @@ def _resumir_conferencia_nota(nota: NotaEntrada) -> Dict[str, Any]:
     itens = list(getattr(nota, "itens", []) or [])
     itens_serializados = [_serializar_conferencia_item(item) for item in itens]
     itens_divergencia = [item for item in itens_serializados if item["tem_divergencia"]]
-    itens_com_avaria = [item for item in itens_serializados if item["quantidade_avariada"] > 0]
+    itens_com_avaria = [
+        item for item in itens_serializados if item["quantidade_avariada"] > 0
+    ]
 
     if nota.conferencia_realizada_em:
         status_conferencia = nota.conferencia_status or (
-            CONFERENCIA_STATUS_COM_DIVERGENCIA if itens_divergencia else CONFERENCIA_STATUS_SEM_DIVERGENCIA
+            CONFERENCIA_STATUS_COM_DIVERGENCIA
+            if itens_divergencia
+            else CONFERENCIA_STATUS_SEM_DIVERGENCIA
         )
     else:
         status_conferencia = CONFERENCIA_STATUS_NAO_INICIADA
@@ -321,15 +347,25 @@ def _resumir_conferencia_nota(nota: NotaEntrada) -> Dict[str, Any]:
     return {
         "status": status_conferencia,
         "observacao_geral": _normalizar_texto_curto(nota.conferencia_observacoes),
-        "conferida_em": nota.conferencia_realizada_em.isoformat() if nota.conferencia_realizada_em else None,
+        "conferida_em": nota.conferencia_realizada_em.isoformat()
+        if nota.conferencia_realizada_em
+        else None,
         "itens_total": len(itens),
         "itens_ok": len(itens_serializados) - len(itens_divergencia),
         "itens_com_divergencia": len(itens_divergencia),
         "itens_com_avaria": len(itens_com_avaria),
-        "quantidade_total_nf": _round_quantity(sum(item["quantidade_nf"] for item in itens_serializados)),
-        "quantidade_total_conferida": _round_quantity(sum(item["quantidade_conferida"] for item in itens_serializados)),
-        "quantidade_total_avariada": _round_quantity(sum(item["quantidade_avariada"] for item in itens_serializados)),
-        "quantidade_total_faltante": _round_quantity(sum(item["quantidade_faltante"] for item in itens_serializados)),
+        "quantidade_total_nf": _round_quantity(
+            sum(item["quantidade_nf"] for item in itens_serializados)
+        ),
+        "quantidade_total_conferida": _round_quantity(
+            sum(item["quantidade_conferida"] for item in itens_serializados)
+        ),
+        "quantidade_total_avariada": _round_quantity(
+            sum(item["quantidade_avariada"] for item in itens_serializados)
+        ),
+        "quantidade_total_faltante": _round_quantity(
+            sum(item["quantidade_faltante"] for item in itens_serializados)
+        ),
         "tem_nf_devolucao_sugerida": len(itens_com_avaria) > 0,
     }
 

@@ -38,7 +38,9 @@ def detectar_multiplicador_pack(descricao: str) -> int:
 
     padroes = [
         # Ex.: 4x1.8kg | 12*0,5kg | 6x3
-        re.compile(r"(?<!\d)(\d{1,3})\s*[X\*\u00d7]\s*(\d+(?:[\.,]\d+)?)(?:\s*(KG|G|GR|ML|L|MG|UN|UND|PCT|PC|SACHE|SACHES|SACH\u00ca))?"),
+        re.compile(
+            r"(?<!\d)(\d{1,3})\s*[X\*\u00d7]\s*(\d+(?:[\.,]\d+)?)(?:\s*(KG|G|GR|ML|L|MG|UN|UND|PCT|PC|SACHE|SACHES|SACH\u00ca))?"
+        ),
         # Ex.: CX 12 UN | CAIXA C/ 12
         re.compile(r"\b(?:CX|CAIXA)\s*(?:C\/)?\s*(\d{1,3})\s*(?:UN|UND|UNID)?\b"),
         re.compile(r"(?<!\d)(\d{1,3})\s*[X\*\u00d7]\s*(\d{1,3})(?!\d)"),
@@ -121,17 +123,61 @@ def extrair_resumo_fiscal_xml(xml_content: str) -> Dict[str, Any]:
 
     total = inf_nfe.find(".//nfe:total/nfe:ICMSTot", ns)
     totais_nota = {
-        "valor_produtos": _to_decimal(total.findtext("nfe:vProd", default="0", namespaces=ns) if total is not None else "0"),
-        "valor_frete": _to_decimal(total.findtext("nfe:vFrete", default="0", namespaces=ns) if total is not None else "0"),
-        "valor_seguro": _to_decimal(total.findtext("nfe:vSeg", default="0", namespaces=ns) if total is not None else "0"),
-        "valor_desconto": _to_decimal(total.findtext("nfe:vDesc", default="0", namespaces=ns) if total is not None else "0"),
-        "valor_outras_despesas": _to_decimal(total.findtext("nfe:vOutro", default="0", namespaces=ns) if total is not None else "0"),
-        "valor_icms": _to_decimal(total.findtext("nfe:vICMS", default="0", namespaces=ns) if total is not None else "0"),
-        "valor_icms_st": _to_decimal(total.findtext("nfe:vST", default="0", namespaces=ns) if total is not None else "0"),
-        "valor_ipi": _to_decimal(total.findtext("nfe:vIPI", default="0", namespaces=ns) if total is not None else "0"),
-        "valor_pis": _to_decimal(total.findtext("nfe:vPIS", default="0", namespaces=ns) if total is not None else "0"),
-        "valor_cofins": _to_decimal(total.findtext("nfe:vCOFINS", default="0", namespaces=ns) if total is not None else "0"),
-        "valor_total": _to_decimal(total.findtext("nfe:vNF", default="0", namespaces=ns) if total is not None else "0"),
+        "valor_produtos": _to_decimal(
+            total.findtext("nfe:vProd", default="0", namespaces=ns)
+            if total is not None
+            else "0"
+        ),
+        "valor_frete": _to_decimal(
+            total.findtext("nfe:vFrete", default="0", namespaces=ns)
+            if total is not None
+            else "0"
+        ),
+        "valor_seguro": _to_decimal(
+            total.findtext("nfe:vSeg", default="0", namespaces=ns)
+            if total is not None
+            else "0"
+        ),
+        "valor_desconto": _to_decimal(
+            total.findtext("nfe:vDesc", default="0", namespaces=ns)
+            if total is not None
+            else "0"
+        ),
+        "valor_outras_despesas": _to_decimal(
+            total.findtext("nfe:vOutro", default="0", namespaces=ns)
+            if total is not None
+            else "0"
+        ),
+        "valor_icms": _to_decimal(
+            total.findtext("nfe:vICMS", default="0", namespaces=ns)
+            if total is not None
+            else "0"
+        ),
+        "valor_icms_st": _to_decimal(
+            total.findtext("nfe:vST", default="0", namespaces=ns)
+            if total is not None
+            else "0"
+        ),
+        "valor_ipi": _to_decimal(
+            total.findtext("nfe:vIPI", default="0", namespaces=ns)
+            if total is not None
+            else "0"
+        ),
+        "valor_pis": _to_decimal(
+            total.findtext("nfe:vPIS", default="0", namespaces=ns)
+            if total is not None
+            else "0"
+        ),
+        "valor_cofins": _to_decimal(
+            total.findtext("nfe:vCOFINS", default="0", namespaces=ns)
+            if total is not None
+            else "0"
+        ),
+        "valor_total": _to_decimal(
+            total.findtext("nfe:vNF", default="0", namespaces=ns)
+            if total is not None
+            else "0"
+        ),
     }
 
     itens = []
@@ -149,33 +195,69 @@ def extrair_resumo_fiscal_xml(xml_content: str) -> Dict[str, Any]:
             icms_group = imposto.find("nfe:ICMS", ns)
             if icms_group is not None and list(icms_group):
                 icms_node = list(icms_group)[0]
-                valor_icms = _to_decimal(icms_node.findtext("nfe:vICMS", default="0", namespaces=ns))
-                valor_icms_st = _to_decimal(icms_node.findtext("nfe:vICMSST", default="0", namespaces=ns))
+                valor_icms = _to_decimal(
+                    icms_node.findtext("nfe:vICMS", default="0", namespaces=ns)
+                )
+                valor_icms_st = _to_decimal(
+                    icms_node.findtext("nfe:vICMSST", default="0", namespaces=ns)
+                )
                 if valor_icms_st == ZERO_DECIMAL:
-                    valor_icms_st = _to_decimal(icms_node.findtext("nfe:vST", default="0", namespaces=ns))
+                    valor_icms_st = _to_decimal(
+                        icms_node.findtext("nfe:vST", default="0", namespaces=ns)
+                    )
 
             ipi_group = imposto.find("nfe:IPI", ns)
             if ipi_group is not None:
-                ipi_node = ipi_group.find("nfe:IPITrib", ns) or ipi_group.find("nfe:IPINT", ns)
+                ipi_node = ipi_group.find("nfe:IPITrib", ns) or ipi_group.find(
+                    "nfe:IPINT", ns
+                )
                 if ipi_node is not None:
-                    valor_ipi = _to_decimal(ipi_node.findtext("nfe:vIPI", default="0", namespaces=ns))
+                    valor_ipi = _to_decimal(
+                        ipi_node.findtext("nfe:vIPI", default="0", namespaces=ns)
+                    )
 
             pis_group = imposto.find("nfe:PIS", ns)
             if pis_group is not None and list(pis_group):
-                valor_pis = _to_decimal(list(pis_group)[0].findtext("nfe:vPIS", default="0", namespaces=ns))
+                valor_pis = _to_decimal(
+                    list(pis_group)[0].findtext("nfe:vPIS", default="0", namespaces=ns)
+                )
 
             cofins_group = imposto.find("nfe:COFINS", ns)
             if cofins_group is not None and list(cofins_group):
-                valor_cofins = _to_decimal(list(cofins_group)[0].findtext("nfe:vCOFINS", default="0", namespaces=ns))
+                valor_cofins = _to_decimal(
+                    list(cofins_group)[0].findtext(
+                        "nfe:vCOFINS", default="0", namespaces=ns
+                    )
+                )
 
         itens.append(
             {
                 "numero_item": int(det.attrib.get("nItem") or idx),
-                "valor_produtos": _to_decimal(prod.findtext("nfe:vProd", default="0", namespaces=ns) if prod is not None else "0"),
-                "valor_frete": _to_decimal(prod.findtext("nfe:vFrete", default="0", namespaces=ns) if prod is not None else "0"),
-                "valor_seguro": _to_decimal(prod.findtext("nfe:vSeg", default="0", namespaces=ns) if prod is not None else "0"),
-                "valor_desconto": _to_decimal(prod.findtext("nfe:vDesc", default="0", namespaces=ns) if prod is not None else "0"),
-                "valor_outras_despesas": _to_decimal(prod.findtext("nfe:vOutro", default="0", namespaces=ns) if prod is not None else "0"),
+                "valor_produtos": _to_decimal(
+                    prod.findtext("nfe:vProd", default="0", namespaces=ns)
+                    if prod is not None
+                    else "0"
+                ),
+                "valor_frete": _to_decimal(
+                    prod.findtext("nfe:vFrete", default="0", namespaces=ns)
+                    if prod is not None
+                    else "0"
+                ),
+                "valor_seguro": _to_decimal(
+                    prod.findtext("nfe:vSeg", default="0", namespaces=ns)
+                    if prod is not None
+                    else "0"
+                ),
+                "valor_desconto": _to_decimal(
+                    prod.findtext("nfe:vDesc", default="0", namespaces=ns)
+                    if prod is not None
+                    else "0"
+                ),
+                "valor_outras_despesas": _to_decimal(
+                    prod.findtext("nfe:vOutro", default="0", namespaces=ns)
+                    if prod is not None
+                    else "0"
+                ),
                 "valor_icms": valor_icms,
                 "valor_icms_st": valor_icms_st,
                 "valor_ipi": valor_ipi,
@@ -214,7 +296,11 @@ def calcular_composicao_custos_nota(nota: NotaEntrada) -> Dict[int, Dict[str, An
                 item.valor_total,
             )["quantidade_efetiva"]
         )
-        proporcao = (valor_produtos_total / total_produtos_nota) if total_produtos_nota > 0 else ZERO_DECIMAL
+        proporcao = (
+            (valor_produtos_total / total_produtos_nota)
+            if total_produtos_nota > 0
+            else ZERO_DECIMAL
+        )
 
         diretos = {
             key: _to_decimal(xml_item.get(key, 0)) for key in COST_COMPONENT_KEYS
@@ -251,11 +337,21 @@ def calcular_composicao_custos_nota(nota: NotaEntrada) -> Dict[int, Dict[str, An
         componentes_total = {}
         componentes_unitario = {}
         for key in COST_COMPONENT_KEYS:
-            valor_total = base["diretos"][key] + (rateios_restantes[key] * base["proporcao"])
+            valor_total = base["diretos"][key] + (
+                rateios_restantes[key] * base["proporcao"]
+            )
             componentes_total[key] = valor_total
-            componentes_unitario[key] = (valor_total / quantidade_efetiva) if quantidade_efetiva > 0 else ZERO_DECIMAL
+            componentes_unitario[key] = (
+                (valor_total / quantidade_efetiva)
+                if quantidade_efetiva > 0
+                else ZERO_DECIMAL
+            )
 
-        custo_bruto_unitario = (valor_produtos_total / quantidade_efetiva) if quantidade_efetiva > 0 else ZERO_DECIMAL
+        custo_bruto_unitario = (
+            (valor_produtos_total / quantidade_efetiva)
+            if quantidade_efetiva > 0
+            else ZERO_DECIMAL
+        )
         custo_aquisicao_total = (
             valor_produtos_total
             + componentes_total["valor_frete"]
@@ -265,32 +361,74 @@ def calcular_composicao_custos_nota(nota: NotaEntrada) -> Dict[int, Dict[str, An
             + componentes_total["valor_ipi"]
             - componentes_total["valor_desconto"]
         )
-        custo_aquisicao_unitario = (custo_aquisicao_total / quantidade_efetiva) if quantidade_efetiva > 0 else ZERO_DECIMAL
+        custo_aquisicao_unitario = (
+            (custo_aquisicao_total / quantidade_efetiva)
+            if quantidade_efetiva > 0
+            else ZERO_DECIMAL
+        )
 
         composicoes[item.id] = {
             "quantidade_efetiva": float(quantidade_efetiva),
-            "custo_bruto_unitario": _decimal_to_float(custo_bruto_unitario, UNIT_PRECISION),
-            "custo_aquisicao_total": _decimal_to_float(custo_aquisicao_total, TOTAL_PRECISION),
-            "custo_aquisicao_unitario": _decimal_to_float(custo_aquisicao_unitario, UNIT_PRECISION),
+            "custo_bruto_unitario": _decimal_to_float(
+                custo_bruto_unitario, UNIT_PRECISION
+            ),
+            "custo_aquisicao_total": _decimal_to_float(
+                custo_aquisicao_total, TOTAL_PRECISION
+            ),
+            "custo_aquisicao_unitario": _decimal_to_float(
+                custo_aquisicao_unitario, UNIT_PRECISION
+            ),
             "componentes_total": {
-                "valor_produtos": _decimal_to_float(valor_produtos_total, TOTAL_PRECISION),
-                "valor_frete": _decimal_to_float(componentes_total["valor_frete"], TOTAL_PRECISION),
-                "valor_seguro": _decimal_to_float(componentes_total["valor_seguro"], TOTAL_PRECISION),
-                "valor_outras_despesas": _decimal_to_float(componentes_total["valor_outras_despesas"], TOTAL_PRECISION),
-                "valor_desconto": _decimal_to_float(componentes_total["valor_desconto"], TOTAL_PRECISION),
-                "valor_icms_st": _decimal_to_float(componentes_total["valor_icms_st"], TOTAL_PRECISION),
-                "valor_ipi": _decimal_to_float(componentes_total["valor_ipi"], TOTAL_PRECISION),
-                "valor_icms": _decimal_to_float(base["tributos_info"]["valor_icms"], TOTAL_PRECISION),
-                "valor_pis": _decimal_to_float(base["tributos_info"]["valor_pis"], TOTAL_PRECISION),
-                "valor_cofins": _decimal_to_float(base["tributos_info"]["valor_cofins"], TOTAL_PRECISION),
+                "valor_produtos": _decimal_to_float(
+                    valor_produtos_total, TOTAL_PRECISION
+                ),
+                "valor_frete": _decimal_to_float(
+                    componentes_total["valor_frete"], TOTAL_PRECISION
+                ),
+                "valor_seguro": _decimal_to_float(
+                    componentes_total["valor_seguro"], TOTAL_PRECISION
+                ),
+                "valor_outras_despesas": _decimal_to_float(
+                    componentes_total["valor_outras_despesas"], TOTAL_PRECISION
+                ),
+                "valor_desconto": _decimal_to_float(
+                    componentes_total["valor_desconto"], TOTAL_PRECISION
+                ),
+                "valor_icms_st": _decimal_to_float(
+                    componentes_total["valor_icms_st"], TOTAL_PRECISION
+                ),
+                "valor_ipi": _decimal_to_float(
+                    componentes_total["valor_ipi"], TOTAL_PRECISION
+                ),
+                "valor_icms": _decimal_to_float(
+                    base["tributos_info"]["valor_icms"], TOTAL_PRECISION
+                ),
+                "valor_pis": _decimal_to_float(
+                    base["tributos_info"]["valor_pis"], TOTAL_PRECISION
+                ),
+                "valor_cofins": _decimal_to_float(
+                    base["tributos_info"]["valor_cofins"], TOTAL_PRECISION
+                ),
             },
             "componentes_unitario": {
-                "valor_frete": _decimal_to_float(componentes_unitario["valor_frete"], UNIT_PRECISION),
-                "valor_seguro": _decimal_to_float(componentes_unitario["valor_seguro"], UNIT_PRECISION),
-                "valor_outras_despesas": _decimal_to_float(componentes_unitario["valor_outras_despesas"], UNIT_PRECISION),
-                "valor_desconto": _decimal_to_float(componentes_unitario["valor_desconto"], UNIT_PRECISION),
-                "valor_icms_st": _decimal_to_float(componentes_unitario["valor_icms_st"], UNIT_PRECISION),
-                "valor_ipi": _decimal_to_float(componentes_unitario["valor_ipi"], UNIT_PRECISION),
+                "valor_frete": _decimal_to_float(
+                    componentes_unitario["valor_frete"], UNIT_PRECISION
+                ),
+                "valor_seguro": _decimal_to_float(
+                    componentes_unitario["valor_seguro"], UNIT_PRECISION
+                ),
+                "valor_outras_despesas": _decimal_to_float(
+                    componentes_unitario["valor_outras_despesas"], UNIT_PRECISION
+                ),
+                "valor_desconto": _decimal_to_float(
+                    componentes_unitario["valor_desconto"], UNIT_PRECISION
+                ),
+                "valor_icms_st": _decimal_to_float(
+                    componentes_unitario["valor_icms_st"], UNIT_PRECISION
+                ),
+                "valor_ipi": _decimal_to_float(
+                    componentes_unitario["valor_ipi"], UNIT_PRECISION
+                ),
                 "valor_icms": _decimal_to_float(
                     (base["tributos_info"]["valor_icms"] / quantidade_efetiva)
                     if quantidade_efetiva > 0
@@ -310,7 +448,9 @@ def calcular_composicao_custos_nota(nota: NotaEntrada) -> Dict[int, Dict[str, An
                     UNIT_PRECISION,
                 ),
             },
-            "tem_rateio": any(rateios_restantes[key] > ZERO_DECIMAL for key in COST_COMPONENT_KEYS),
+            "tem_rateio": any(
+                rateios_restantes[key] > ZERO_DECIMAL for key in COST_COMPONENT_KEYS
+            ),
         }
 
     return composicoes
