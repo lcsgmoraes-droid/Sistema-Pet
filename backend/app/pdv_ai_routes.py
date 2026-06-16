@@ -348,8 +348,8 @@ async def gerar_sugestoes_pdv(
     
     try:
         logger.info(
-            f"[PDV AI] Gerando sugestões para tenant={current_user.id}, "
-            f"vendedor={request.vendedor_nome}, itens={len(request.itens)}"
+            "[PDV AI] Gerando sugestões para venda em andamento "
+            f"(itens={len(request.itens)})"
         )
         
         # Criar contexto do PDV
@@ -450,8 +450,8 @@ async def preview_sugestoes_pdv(
     
     try:
         logger.info(
-            f"[PDV AI Preview] Simulação para tenant={current_user.id}, "
-            f"itens={len(request.itens)}"
+            "[PDV AI Preview] Simulação de sugestões "
+            f"(itens={len(request.itens)})"
         )
         
         # Criar contexto do PDV (preview)
