@@ -17,12 +17,13 @@ Fases:
     4 - Vendas e Itens
 """
 
-import os
+# ruff: noqa: E402
+
 import sys
 import csv
 import argparse
 from datetime import datetime
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional
 from pathlib import Path
 import re
 
@@ -30,12 +31,11 @@ import re
 backend_path = Path(__file__).parent
 sys.path.insert(0, str(backend_path))
 
-from sqlalchemy import create_engine, text
-from sqlalchemy.orm import sessionmaker, Session
+from sqlalchemy import text
+from sqlalchemy.orm import Session
 from app.models import Cliente, Pet, Especie, Raca
-from app.produtos_models import Produto, Marca, Categoria
+from app.produtos_models import Produto, Marca
 from app.vendas_models import Venda, VendaItem
-from app.caixa_models import Caixa  # Necessário para resolver FK de vendas.caixa_id
 from app.db import SessionLocal
 
 
@@ -173,7 +173,7 @@ def parse_decimal(valor: Optional[str]) -> float:
         return 0.0
     try:
         return float(valor.replace(',', '.'))
-    except:
+    except Exception:
         return 0.0
 
 
@@ -200,7 +200,7 @@ def parse_date(data: Optional[str]) -> Optional[datetime]:
     for fmt in formatos:
         try:
             return datetime.strptime(data.strip(), fmt)
-        except:
+        except Exception:
             continue
     
     return None
@@ -242,7 +242,7 @@ def importar_especies(db: Session, limite: Optional[int] = None):
             
             if not row['esp_var_nome'] or row['esp_var_nome'] == 'NULL':
                 STATS['especies']['erro'] += 1
-                log(f"Espécie sem nome, pulando...", 'AVISO')
+                log("Espécie sem nome, pulando...", 'AVISO')
                 continue
             
             especie = Especie(
@@ -624,7 +624,7 @@ def importar_pets(db: Session, limite: Optional[int] = None):
                 log(f"Pet já existe: {row['ani_var_nome']} (#{codigo})", 'AVISO')
                 continue
             
-            sexo_map = {'Macho': 'macho', 'Fêmea': 'fêmea', 'Fêmea': 'fêmea'}
+            sexo_map = {'Macho': 'macho', 'Fêmea': 'fêmea'}
             sexo = sexo_map.get(row.get('ani_var_sexo', ''), None)
             
             especie_nome = row.get('esp_var_nome') if row.get('esp_var_nome') and row['esp_var_nome'] != 'NULL' else None
@@ -836,7 +836,7 @@ def exibir_resumo():
         for entidade, items in NAO_IMPORTADOS.items():
             if items:
                 print(f"  - {entidade.capitalize()}: {len(items)}")
-        print(f"\n📄 Verifique os arquivos CSV em logs_importacao/ para detalhes dos produtos não importados")
+        print("\n📄 Verifique os arquivos CSV em logs_importacao/ para detalhes dos produtos não importados")
     print("="*90 + "\n")
 
 

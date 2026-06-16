@@ -88,7 +88,7 @@ def parse_decimal(valor):
         return 0.0
     try:
         return float(valor.replace(',', '.'))
-    except:
+    except Exception:
         return 0.0
 
 
@@ -100,7 +100,7 @@ def parse_date(data_str):
     for fmt in formatos:
         try:
             return datetime.strptime(data_str.strip(), fmt)
-        except:
+        except Exception:
             continue
     return None
 

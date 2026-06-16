@@ -3,14 +3,12 @@ import sys
 import os
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from sqlalchemy.orm import Session
 from contextlib import contextmanager
 from app.db import get_session
 from app.vendas_models import Venda, VendaPagamento
 from app.financeiro_models import FormaPagamento, ContaPagar
 from app.dre_plano_contas_models import DRESubcategoria
 from app.vendas.service import processar_contas_pagar_taxas
-from app.utils.logger import logger
 
 @contextmanager
 def get_db_session():
@@ -19,7 +17,7 @@ def get_db_session():
     try:
         yield db
         db.commit()
-    except Exception as e:
+    except Exception:
         db.rollback()
         raise
     finally:
@@ -55,20 +53,20 @@ def testar_processar_taxas(venda_id: int):
             print(f"   - {p.forma_pagamento}: R$ {p.valor} ({p.numero_parcelas}x) - Status: {p.status}")
         
         # Verificar formas de pagamento configuradas
-        print(f"\n💳 Formas de Pagamento Configuradas:")
+        print("\n💳 Formas de Pagamento Configuradas:")
         formas = db.query(FormaPagamento).filter(
             FormaPagamento.tenant_id == venda.tenant_id,
-            FormaPagamento.ativo == True
+            FormaPagamento.ativo.is_(True),
         ).all()
         
         for f in formas:
             print(f"   - {f.nome} (tipo: {f.tipo}): {f.taxa_percentual}% + R$ {f.taxa_fixa}")
         
         # Verificar subcategorias DRE
-        print(f"\n📊 Subcategorias DRE de Taxas:")
+        print("\n📊 Subcategorias DRE de Taxas:")
         subcategorias = db.query(DRESubcategoria).filter(
             DRESubcategoria.tenant_id == venda.tenant_id,
-            DRESubcategoria.ativo == True
+            DRESubcategoria.ativo.is_(True),
         ).filter(
             (DRESubcategoria.nome.like('%Taxa%')) |
             (DRESubcategoria.nome.like('%Cartão%'))
@@ -102,7 +100,7 @@ def testar_processar_taxas(venda_id: int):
                 db=db
             )
             
-            print(f"\n✅ PROCESSAMENTO CONCLUÍDO!")
+            print("\n✅ PROCESSAMENTO CONCLUÍDO!")
             print(f"   Total de contas: {resultado['total_contas']}")
             print(f"   Valor total: R$ {resultado['valor_total']:.2f}")
             print(f"   Contas criadas: {resultado['contas_criadas']}")
@@ -124,7 +122,7 @@ def testar_processar_taxas(venda_id: int):
                 print(f"   - ID {c.id}: {c.descricao} - R$ {c.valor_original} (Subcategoria: {subcategoria_nome})")
             
         except Exception as e:
-            print(f"\n❌ ERRO NO PROCESSAMENTO:")
+            print("\n❌ ERRO NO PROCESSAMENTO:")
             print(f"   {type(e).__name__}: {str(e)}")
             import traceback
             print(f"\n{traceback.format_exc()}")

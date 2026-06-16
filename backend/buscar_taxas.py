@@ -60,7 +60,7 @@ try:
     result_cols = db.execute(text("SELECT * FROM formas_pagamento LIMIT  0"))
     col_names = result_cols.keys()
     
-    print(f"\nPrimeiras 5 formas:")
+    print("\nPrimeiras 5 formas:")
     for forma in formas:
         print(f"\n   ID {forma[0]}:")
         for i, col in enumerate(col_names):

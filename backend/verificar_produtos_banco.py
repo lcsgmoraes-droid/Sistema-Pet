@@ -1,4 +1,5 @@
-import os
+# ruff: noqa: E402
+
 import sys
 from pathlib import Path
 
@@ -22,18 +23,18 @@ try:
         Produto.codigo != ''
     ).scalar()
     
-    print(f"═══════════════════════════════════════")
-    print(f"  PRODUTOS NO BANCO DE DADOS")
-    print(f"═══════════════════════════════════════")
+    print("═══════════════════════════════════════")
+    print("  PRODUTOS NO BANCO DE DADOS")
+    print("═══════════════════════════════════════")
     print(f"Total produtos:  {total_produtos:,}")
     print(f"Com SKU válido:  {produtos_com_sku:,}")
-    print(f"═══════════════════════════════════════")
+    print("═══════════════════════════════════════")
     print()
-    print(f"📊 COMPARAÇÃO:")
-    print(f"SimplesVet: 6.358 produtos com SKU")
+    print("📊 COMPARAÇÃO:")
+    print("SimplesVet: 6.358 produtos com SKU")
     print(f"Banco atual: {produtos_com_sku:,} produtos")
     print(f"Faltam importar: {6358 - produtos_com_sku:,} produtos")
-    print(f"═══════════════════════════════════════")
+    print("═══════════════════════════════════════")
     
 finally:
     db.close()

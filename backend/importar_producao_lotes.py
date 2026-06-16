@@ -36,7 +36,7 @@ def importar_em_lotes():
         limite = 50
     
     # Confirmar configurações
-    print(f"\n📊 Configurações:")
+    print("\n📊 Configurações:")
     print(f"   - Banco: {DATABASE_URL_PROD}")
     print(f"   - Tenant: {TENANT_ID_PROD}")
     print(f"   - Limite: {limite} produtos")

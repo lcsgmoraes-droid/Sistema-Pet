@@ -33,7 +33,7 @@ def verificar_tipos_produtos():
         print(f"Total geral de produtos: {total}")
         
         # Por tipo
-        print(f"\nPor tipo_produto:")
+        print("\nPor tipo_produto:")
         tipos = session.query(
             Produto.tipo_produto,
             func.count(Produto.id)
@@ -45,9 +45,9 @@ def verificar_tipos_produtos():
             print(f"  - {tipo or '(NULL)'}: {qtd}")
         
         # Filtro do backend (apenas SIMPLES, PAI, KIT)
-        print(f"\n" + "="*60)
-        print(f"Produtos que o backend MOSTRA na listagem:")
-        print(f"(tipo_produto in ['SIMPLES', 'PAI', 'KIT'])")
+        print("\n" + "="*60)
+        print("Produtos que o backend MOSTRA na listagem:")
+        print("(tipo_produto in ['SIMPLES', 'PAI', 'KIT'])")
         
         mostrados = session.query(func.count(Produto.id)).filter(
             Produto.tenant_id == tenant_id,
@@ -57,9 +57,9 @@ def verificar_tipos_produtos():
         print(f"  Total: {mostrados}")
         
         # Produtos OCULTOS (VARIACAO)
-        print(f"\n" + "="*60)
-        print(f"Produtos OCULTOS na listagem:")
-        print(f"(tipo_produto = 'VARIACAO')")
+        print("\n" + "="*60)
+        print("Produtos OCULTOS na listagem:")
+        print("(tipo_produto = 'VARIACAO')")
         
         ocultos = session.query(func.count(Produto.id)).filter(
             Produto.tenant_id == tenant_id,
@@ -69,8 +69,8 @@ def verificar_tipos_produtos():
         print(f"  Total: {ocultos}")
         
         # Produtos SEM tipo
-        print(f"\n" + "="*60)
-        print(f"Produtos SEM tipo_produto (NULL ou vazio):")
+        print("\n" + "="*60)
+        print("Produtos SEM tipo_produto (NULL ou vazio):")
         
         sem_tipo = session.query(func.count(Produto.id)).filter(
             Produto.tenant_id == tenant_id,
@@ -80,8 +80,8 @@ def verificar_tipos_produtos():
         print(f"  Total: {sem_tipo}")
         
         # Mostrar alguns exemplos de produtos SIMPLES
-        print(f"\n" + "="*60)
-        print(f"Exemplos de produtos SIMPLES:")
+        print("\n" + "="*60)
+        print("Exemplos de produtos SIMPLES:")
         simples = session.query(Produto).filter(
             Produto.tenant_id == tenant_id,
             Produto.tipo_produto == 'SIMPLES'

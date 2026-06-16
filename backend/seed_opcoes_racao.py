@@ -86,7 +86,7 @@ def seed_opcoes_racao_para_tenant(db: Session, tenant_id: str):
     print(f"\n🌱 Iniciando seed de opções de ração para tenant {tenant_id}...")
     
     # Linhas de Ração
-    print(f"  📦 Criando Linhas de Ração...")
+    print("  📦 Criando Linhas de Ração...")
     for item in DADOS_PADRAO["linhas_racao"]:
         existe = db.query(LinhaRacao).filter(
             LinhaRacao.tenant_id == tenant_id,
@@ -101,7 +101,7 @@ def seed_opcoes_racao_para_tenant(db: Session, tenant_id: str):
             print(f"    ⏭️  {item['nome']} (já existe)")
     
     # Portes de Animal
-    print(f"  🐕 Criando Portes de Animal...")
+    print("  🐕 Criando Portes de Animal...")
     for item in DADOS_PADRAO["portes_animal"]:
         existe = db.query(PorteAnimal).filter(
             PorteAnimal.tenant_id == tenant_id,
@@ -116,7 +116,7 @@ def seed_opcoes_racao_para_tenant(db: Session, tenant_id: str):
             print(f"    ⏭️  {item['nome']} (já existe)")
     
     # Fases/Público
-    print(f"  👶 Criando Fases/Público...")
+    print("  👶 Criando Fases/Público...")
     for item in DADOS_PADRAO["fases_publico"]:
         existe = db.query(FasePublico).filter(
             FasePublico.tenant_id == tenant_id,
@@ -131,7 +131,7 @@ def seed_opcoes_racao_para_tenant(db: Session, tenant_id: str):
             print(f"    ⏭️  {item['nome']} (já existe)")
     
     # Tipos de Tratamento
-    print(f"  💊 Criando Tipos de Tratamento...")
+    print("  💊 Criando Tipos de Tratamento...")
     for item in DADOS_PADRAO["tipos_tratamento"]:
         existe = db.query(TipoTratamento).filter(
             TipoTratamento.tenant_id == tenant_id,
@@ -146,7 +146,7 @@ def seed_opcoes_racao_para_tenant(db: Session, tenant_id: str):
             print(f"    ⏭️  {item['nome']} (já existe)")
     
     # Sabores/Proteínas
-    print(f"  🍖 Criando Sabores/Proteínas...")
+    print("  🍖 Criando Sabores/Proteínas...")
     for item in DADOS_PADRAO["sabores_proteina"]:
         existe = db.query(SaborProteina).filter(
             SaborProteina.tenant_id == tenant_id,
@@ -161,7 +161,7 @@ def seed_opcoes_racao_para_tenant(db: Session, tenant_id: str):
             print(f"    ⏭️  {item['nome']} (já existe)")
     
     # Apresentações de Peso
-    print(f"  ⚖️  Criando Apresentações de Peso...")
+    print("  ⚖️  Criando Apresentações de Peso...")
     for item in DADOS_PADRAO["apresentacoes_peso"]:
         existe = db.query(ApresentacaoPeso).filter(
             ApresentacaoPeso.tenant_id == tenant_id,

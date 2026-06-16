@@ -109,10 +109,10 @@ cursor.execute(
 
 conn.commit()
 print("✅ Tabela de consumo inserida no produto Golden Fórmula Filhotes (ID 72)")
-print(f"\n📊 Tabela inserida:")
+print("\n📊 Tabela inserida:")
 print(f"   • Cães adultos: {len(tabela_consumo['peso_adulto'])} faixas de peso (5-45kg)")
-print(f"   • Filhotes: 8 faixas etárias (2-12 meses)")
+print("   • Filhotes: 8 faixas etárias (2-12 meses)")
 print(f"\n💡 Exemplo: Filhote 4 meses, 15kg adulto = {tabela_consumo['filhote_4m']['15']}g/dia")
-print(f"   • Com embalagem 15kg: duração = 15000g / 286g = ~52 dias")
+print("   • Com embalagem 15kg: duração = 15000g / 286g = ~52 dias")
 
 conn.close()

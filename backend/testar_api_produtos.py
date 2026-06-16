@@ -3,7 +3,6 @@
 Script para testar API de produtos e ver quantos retorna
 """
 import requests
-import json
 
 def testar_api():
     url = "http://localhost:8000/produtos/"
@@ -27,14 +26,14 @@ def testar_api():
             pagina = data.get("pagina", None)
             total_paginas = data.get("total_paginas", None)
             
-            print(f"\n✅ API respondeu com sucesso!")
+            print("\n✅ API respondeu com sucesso!")
             print(f"   - Produtos retornados: {len(produtos)}")
             print(f"   - Campo 'total': {total}")
             print(f"   - Campo 'pagina': {pagina}")
             print(f"   - Campo 'total_paginas': {total_paginas}")
             
             if produtos:
-                print(f"\n📦 Exemplo do primeiro produto:")
+                print("\n📦 Exemplo do primeiro produto:")
                 primeiro = produtos[0]
                 print(f"   - ID: {primeiro.get('id')}")
                 print(f"   - Nome: {primeiro.get('nome')}")
@@ -42,12 +41,12 @@ def testar_api():
                 print(f"   - Tipo: {primeiro.get('tipo_produto')}")
         else:
             produtos = data if isinstance(data, list) else []
-            print(f"\n✅ API retornou lista direta!")
+            print("\n✅ API retornou lista direta!")
             print(f"   - Produtos: {len(produtos)}")
         
         # Verificar tipos de produto
         if produtos:
-            print(f"\n📊 Distribuição por tipo:")
+            print("\n📊 Distribuição por tipo:")
             tipos = {}
             for p in produtos:
                 tipo = p.get('tipo_produto', 'DESCONHECIDO')

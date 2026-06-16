@@ -27,7 +27,7 @@ import argparse
 import json
 from datetime import datetime
 from pathlib import Path
-from typing import Dict, List, Optional, Any, Tuple
+from typing import Dict, List, Optional, Any
 from sqlalchemy import create_engine, text
 from sqlalchemy.orm import sessionmaker
 from dataclasses import dataclass, asdict
@@ -231,7 +231,7 @@ class ImportadorProducao:
         for fmt in formatos:
             try:
                 return datetime.strptime(data_str.strip(), fmt)
-            except:
+            except Exception:
                 continue
         
         return None
@@ -243,7 +243,7 @@ class ImportadorProducao:
         
         try:
             return float(str(valor).replace(',', '.'))
-        except:
+        except Exception:
             return 0.0
     
     # =========================================================================

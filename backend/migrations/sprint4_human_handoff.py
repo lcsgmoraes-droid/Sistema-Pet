@@ -16,7 +16,6 @@ from sqlalchemy import create_engine, text
 from app.db import get_database_url, Base
 
 # Importar todos os models para que Base.metadata os conheça
-from app.whatsapp.models import TenantWhatsAppConfig, WhatsAppSession, WhatsAppMessage, WhatsAppMetric
 from app.whatsapp.models_handoff import WhatsAppAgent, WhatsAppHandoff, WhatsAppInternalNote
 
 print("=" * 60)

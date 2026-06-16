@@ -1,5 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
+# ruff: noqa: E402
+
 """
 Script para dar TODAS as permissões ao usuário teste@teste.com
 """
@@ -122,10 +124,10 @@ try:
         print(f"   ✓ {code}: {desc}")
     
     print(f"\n{'='*60}")
-    print(f"   ✅ USUÁRIO teste@teste.com COM TODAS AS PERMISSÕES!")
+    print("   ✅ USUÁRIO teste@teste.com COM TODAS AS PERMISSÕES!")
     print(f"{'='*60}")
-    print(f"\n📧 Email: teste@teste.com")
-    print(f"🔑 Senha: test123")
+    print("\n📧 Email: teste@teste.com")
+    print("🔑 Senha: test123")
     print(f"👤 Nome: {nome}")
     print(f"🏢 Tenant: {tenant_id}")
     print(f"👔 Role: {role_name}")

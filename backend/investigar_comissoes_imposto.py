@@ -45,8 +45,8 @@ try:
             print(f"      - ID {com[0]}: Funcionário {com[1]}, Valor R$ {com[2]}, {com[3]}%, Status: {com[4]}")
     else:
         print("      Nenhuma comissão encontrada")
-except Exception as e:
-    print(f"      ⚠️ Erro: Tabela não existe ou erro na query")
+except Exception:
+    print("      ⚠️ Erro: Tabela não existe ou erro na query")
     db.rollback()
 
 # 2. Verificar TODAS as colunas da tabela empresa_config_fiscal

@@ -3,7 +3,6 @@ Migração: Adicionar campos de ração nos produtos
 FASE 2 - Calculadora de Ração
 """
 import sqlite3
-from datetime import datetime
 
 def migrate():
     conn = sqlite3.connect('petshop.db')

@@ -10,8 +10,10 @@ Tabelas:
 Data: 2026-02-01
 Sprint: 1 - Fundação WhatsApp + IA
 """
+
+# ruff: noqa: E402
+
 import sys
-import os
 from pathlib import Path
 
 # Adicionar o diretório backend ao path

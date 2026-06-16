@@ -17,7 +17,7 @@ for nome_tabela in ['users', 'user', 'usuarios', 'usuario']:
             print(f"\nEncontrado na tabela '{nome_tabela}':")
             print(f"ID: {user[0]}, Username: {user[1]}")
             break
-    except:
+    except Exception:
         continue
 
 conn.close()

@@ -13,7 +13,7 @@ from pathlib import Path
 # Adicionar o diretório pai ao path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from sqlalchemy import create_engine, inspect, MetaData
+from sqlalchemy import inspect
 from app.db import engine, Base
 import logging
 
@@ -24,8 +24,7 @@ def criar_tabela_lembretes():
     """Criar tabela de lembretes se não existir"""
     try:
         # Importar TODOS os modelos para garantir que estão registrados
-        from app.produtos_models import Lembrete, Produto
-        from app.models import User, Cliente, Pet
+        from app.produtos_models import Lembrete
         
         inspector = inspect(engine)
         tabelas_existentes = inspector.get_table_names()
