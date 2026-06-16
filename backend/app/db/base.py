@@ -15,6 +15,7 @@ from app.fiscal_models import (  # noqa
     KitConfigFiscal,
     ProdutoConfigFiscal,
 )
+
 # variacao_config_fiscal não tem cópia em fiscal_models/: importar o módulo canônico
 # direto para registrar a tabela no metadata do Alembic.
 from app.variacao_config_fiscal_models import VariacaoConfigFiscal  # noqa
@@ -41,4 +42,3 @@ from app import bling_pedido_webhook_queue_models  # noqa
 from app.ia import aba7_models  # noqa
 # DESABILITADO TEMPORARIAMENTE: aba7_extrato_models tem dependências circulares
 # from app.ia import aba7_extrato_models  # noqa
-

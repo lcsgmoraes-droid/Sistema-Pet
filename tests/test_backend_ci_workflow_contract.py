@@ -633,6 +633,16 @@ def test_backend_ci_has_blocking_backend_global_lint_step():
     assert "          ruff check .\n" in source
 
 
+def test_backend_ci_has_blocking_backend_critical_packages_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend critical packages format (blocking)" in source
+    assert (
+        "ruff format --check app/core app/tenancy app/auth app/db app/schemas app/security"
+        in source
+    )
+
+
 def test_backend_ci_has_blocking_alembic_env_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

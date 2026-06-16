@@ -32,7 +32,7 @@ security = HTTPBearer()
 
 
 def decode_access_token(
-    credentials: HTTPAuthorizationCredentials = Depends(security)
+    credentials: HTTPAuthorizationCredentials = Depends(security),
 ) -> dict:
     """
     Decodifica o JWT e retorna o payload.
@@ -44,7 +44,7 @@ def decode_access_token(
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
-    
+
     try:
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[ALGORITHM])
         return payload
@@ -57,6 +57,7 @@ class CurrentUser:
     Representa o usuário autenticado no contexto da requisição.
     Esses dados vêm do JWT.
     """
+
     def __init__(self, user_id: str, tenant_id: str, role: str):
         self.user_id = user_id
         self.tenant_id = tenant_id

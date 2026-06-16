@@ -30,23 +30,23 @@ logger = logging.getLogger(__name__)
 # Roles e role_permissions sao tenant-scoped e ficam bloqueadas sem contexto.
 # 3. Tabelas de auditoria que precisam registrar eventos sem tenant (audit_logs)
 TENANT_WHITELIST_TABLES = {
-    'users',           # Necessário para login (antes de selecionar tenant)
-    'tenants',         # Necessário para listar tenants disponíveis
-    'user_sessions',   # Sessões não são tenant-specific
-    'user_tenants',    # Necessário para /auth/select-tenant
-    'permissions',     # Permissões globais do sistema
-    'audit_logs',      # Pode precisar registrar eventos sem tenant
+    "users",  # Necessário para login (antes de selecionar tenant)
+    "tenants",  # Necessário para listar tenants disponíveis
+    "user_sessions",  # Sessões não são tenant-specific
+    "user_tenants",  # Necessário para /auth/select-tenant
+    "permissions",  # Permissões globais do sistema
+    "audit_logs",  # Pode precisar registrar eventos sem tenant
     # Observabilidade/operação — globais POR DESIGN (cross-tenant, tenant_id = etiqueta
     # nullable). Alinhado com INTENTIONALLY_GLOBAL_TENANT_TABLES na catraca
     # (tests/multi_tenant/test_tenant_model_registry.py).
-    'ops_alerts',                  # cockpit admin (require_admin), visão cross-tenant
-    'ops_error_events',            # captura de erros (roda antes de haver tenant)
-    'bling_pedido_webhook_events', # fila de worker: claim cross-tenant sem contexto
+    "ops_alerts",  # cockpit admin (require_admin), visão cross-tenant
+    "ops_error_events",  # captura de erros (roda antes de haver tenant)
+    "bling_pedido_webhook_events",  # fila de worker: claim cross-tenant sem contexto
     # Filas do motor de campanhas: o worker/sender faz claim cross-tenant (SELECT FOR
     # UPDATE SKIP LOCKED) fora de request, sem tenant no contexto. A engine seta o tenant
     # por evento ao processar (engine.py). Alinhado com INTENTIONALLY_GLOBAL_TENANT_TABLES.
-    'campaign_event_queue',        # fila de eventos: worker.process_batch claim cross-tenant
-    'notification_queue',          # fila de notificações: notification_sender claim cross-tenant
+    "campaign_event_queue",  # fila de eventos: worker.process_batch claim cross-tenant
+    "notification_queue",  # fila de notificações: notification_sender claim cross-tenant
 }
 
 
@@ -74,7 +74,9 @@ def _supports_partner_read_filter(session) -> bool:
     try:
         bind = session.get_bind()
     except Exception as exc:
-        logger.debug("[ORM TENANT FILTER] Nao foi possivel obter bind da sessao: %s", exc)
+        logger.debug(
+            "[ORM TENANT FILTER] Nao foi possivel obter bind da sessao: %s", exc
+        )
         return False
 
     return getattr(getattr(bind, "dialect", None), "name", None) == "postgresql"
@@ -83,37 +85,42 @@ def _supports_partner_read_filter(session) -> bool:
 def _get_query_primary_table(execute_state):
     """
     Extrai a tabela principal de uma query SQLAlchemy.
-    
+
     Returns:
         str | None: Nome da tabela ou None se não for possível determinar
     """
     try:
         # Tentar obter do statement context
-        if hasattr(execute_state, 'statement'):
+        if hasattr(execute_state, "statement"):
             statement = execute_state.statement
-            
+
             # Queries ORM têm column_descriptions
-            if hasattr(statement, 'column_descriptions') and statement.column_descriptions:
-                entity = statement.column_descriptions[0].get('entity')
+            if (
+                hasattr(statement, "column_descriptions")
+                and statement.column_descriptions
+            ):
+                entity = statement.column_descriptions[0].get("entity")
                 if entity:
                     return entity.__tablename__
-            
+
             # Tentar via froms
-            if hasattr(statement, 'froms') and statement.froms:
+            if hasattr(statement, "froms") and statement.froms:
                 for from_clause in statement.froms:
-                    if hasattr(from_clause, 'name'):
+                    if hasattr(from_clause, "name"):
                         return from_clause.name
-        
+
         return None
     except Exception as e:
-        logger.warning(f"[ORM FAIL-FAST] Não foi possível determinar tabela da query: {e}")
+        logger.warning(
+            f"[ORM FAIL-FAST] Não foi possível determinar tabela da query: {e}"
+        )
         return None
 
 
 def _add_tenant_filter(execute_state):
     """
     Filtro global automático de tenant com FAIL-FAST.
-    
+
     Comportamento (Phase 1.3):
     1. Se não for SELECT, permite (INSERT/UPDATE/DELETE passam)
     2. Obtém tenant_id do contexto
@@ -124,7 +131,7 @@ def _add_tenant_filter(execute_state):
        - Se tabela na WHITELIST: permite
        - Se tabela herda de BaseTenantModel: FAIL-FAST (RuntimeError)
        - Se não conseguir determinar tabela: FAIL-FAST por segurança
-    
+
     Raises:
         RuntimeError: Query em tabela multi-tenant sem tenant_id no contexto
     """
@@ -145,11 +152,13 @@ def _add_tenant_filter(execute_state):
         # legados que herdam Base direto mas adotam o mixin). Cada entidade casa
         # com exatamente um dos criterios (BaseTenantModel nao herda TenantScoped).
         if _supports_partner_read_filter(execute_state.session):
+
             def base_tenant_filter(cls):
                 return _tenant_read_filter(cls, tenant_id)
 
             track_base_closure_variables = False
         else:
+
             def base_tenant_filter(cls):
                 return cls.tenant_id == tenant_id
 
@@ -169,25 +178,30 @@ def _add_tenant_filter(execute_state):
             ),
         )
         return
-    
+
     # CASO 2: Tenant ausente → validar se é permitido
-    
+
     # Tentar determinar a tabela principal
     table_name = _get_query_primary_table(execute_state)
-    
+
     if table_name:
         # Se tabela está na whitelist, permitir
         if table_name in TENANT_WHITELIST_TABLES:
-            logger.debug(f"[ORM FAIL-FAST] Query em tabela whitelist permitida: {table_name}")
+            logger.debug(
+                f"[ORM FAIL-FAST] Query em tabela whitelist permitida: {table_name}"
+            )
             return
-        
+
         # Se tabela não está na whitelist, verificar se herda de BaseTenantModel
         # Percorrer todas as classes mapeadas para encontrar a tabela
         from app.db import Base
 
         for mapper in Base.registry.mappers:
             mapped_class = mapper.class_
-            if hasattr(mapped_class, '__tablename__') and mapped_class.__tablename__ == table_name:
+            if (
+                hasattr(mapped_class, "__tablename__")
+                and mapped_class.__tablename__ == table_name
+            ):
                 # Verificar se é multi-tenant (BaseTenantModel ou mixin TenantScoped)
                 if issubclass(mapped_class, (BaseTenantModel, TenantScoped)):
                     # FAIL-FAST: Tabela multi-tenant sem tenant_id
@@ -201,9 +215,11 @@ def _add_tenant_filter(execute_state):
                     raise RuntimeError(error_msg)
                 else:
                     # Tabela não herda de BaseTenantModel, permitir
-                    logger.debug(f"[ORM FAIL-FAST] Query em tabela não-tenant permitida: {table_name}")
+                    logger.debug(
+                        f"[ORM FAIL-FAST] Query em tabela não-tenant permitida: {table_name}"
+                    )
                     return
-    
+
     # CASO 3: Não foi possível determinar a tabela
     # Por segurança, FAIL-FAST (melhor falhar do que vazar dados)
     error_msg = (
@@ -234,4 +250,3 @@ def register_tenant_filter_once() -> None:
 
 
 register_tenant_filter_once()
-

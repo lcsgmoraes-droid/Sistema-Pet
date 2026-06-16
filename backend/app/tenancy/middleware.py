@@ -19,15 +19,15 @@ from app.tenancy.context import clear_current_tenant
 class TenancyMiddleware(BaseHTTPMiddleware):
     """
     Middleware minimalista para multi-tenancy.
-    
+
     Após Phase 1.2:
     - Remove toda lógica de extração de tenant
     - Remove todos os fallbacks perigosos
     - Apenas garante limpeza do contexto
-    
+
     Tenant é definido SOMENTE por get_current_user_and_tenant.
     """
-    
+
     async def dispatch(self, request, call_next):
         try:
             # Processar request sem tocar em tenant

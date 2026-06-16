@@ -25,17 +25,23 @@ PUBLIC_BLING_WEBHOOK_PATHS = frozenset(
 )
 
 
-def _is_ecommerce_customer_token(credentials: HTTPAuthorizationCredentials | None) -> bool:
+def _is_ecommerce_customer_token(
+    credentials: HTTPAuthorizationCredentials | None,
+) -> bool:
     if not credentials:
         return False
     try:
-        payload = jwt.decode(credentials.credentials, JWT_SECRET_KEY, algorithms=[ALGORITHM])
+        payload = jwt.decode(
+            credentials.credentials, JWT_SECRET_KEY, algorithms=[ALGORITHM]
+        )
     except JWTError:
         return False
     return payload.get("token_type") == "ecommerce_customer"
 
 
-def _load_active_modules(db: Session, tenant_id: str, agora: datetime | None = None) -> list[str]:
+def _load_active_modules(
+    db: Session, tenant_id: str, agora: datetime | None = None
+) -> list[str]:
     tenant_id_str = str(tenant_id)
     tenant = db.query(Tenant).filter(Tenant.id == tenant_id_str).first()
     if not tenant:
@@ -66,7 +72,9 @@ def _is_public_bling_webhook(modulo: str, request: Request | None) -> bool:
     return request.method.upper() == "POST" and path in PUBLIC_BLING_WEBHOOK_PATHS
 
 
-def require_active_module(modulo: str, *, allow_ecommerce_customer: bool = False) -> Callable:
+def require_active_module(
+    modulo: str, *, allow_ecommerce_customer: bool = False
+) -> Callable:
     """Bloqueia rotas de modulo premium quando o tenant nao tem acesso."""
     if modulo not in MODULOS_PREMIUM:
         raise ValueError(f"Modulo comercial desconhecido: {modulo}")
@@ -82,7 +90,9 @@ def require_active_module(modulo: str, *, allow_ecommerce_customer: bool = False
         if not credentials:
             if _is_public_bling_webhook(modulo, request):
                 return
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Not authenticated")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Not authenticated"
+            )
 
         current_user = get_current_user(credentials=credentials, session=db)
         current_user, tenant_id = await get_current_user_and_tenant(
@@ -93,7 +103,9 @@ def require_active_module(modulo: str, *, allow_ecommerce_customer: bool = False
 
         # Administrador da plataforma pode auditar/suportar sem virar cliente do modulo.
         # Admin do tenant nao tem bypass: o plano do tenant continua mandando.
-        if getattr(current_user, "is_superadmin", False) or getattr(current_user, "is_system_admin", False):
+        if getattr(current_user, "is_superadmin", False) or getattr(
+            current_user, "is_system_admin", False
+        ):
             return
 
         if not tenant_id:

@@ -32,7 +32,9 @@ def _resolve_tenant_value(tenant_id: Any) -> str:
     return str(UUID(str(resolved)))
 
 
-def _set_transaction_setting(db: ORMSession, setting_name: str, setting_value: str) -> bool:
+def _set_transaction_setting(
+    db: ORMSession, setting_name: str, setting_value: str
+) -> bool:
     if _dialect_name(db) != "postgresql":
         return False
 
@@ -54,7 +56,9 @@ def sync_rls_tenant(db: ORMSession, tenant_id: Any = _UNSET) -> bool:
     The setting is transaction-local (third set_config argument = true), so it
     does not leak through pooled connections after commit/rollback.
     """
-    return _set_transaction_setting(db, RLS_TENANT_SETTING, _resolve_tenant_value(tenant_id))
+    return _set_transaction_setting(
+        db, RLS_TENANT_SETTING, _resolve_tenant_value(tenant_id)
+    )
 
 
 def sync_rls_auth_user(db: ORMSession, user_id: Any) -> bool:
