@@ -239,6 +239,10 @@ jobs:
         run: |
           ruff check app/health_router.py app/session_manager.py app/idempotency.py app/idempotency_models.py app/encryption.py app/audit.py app/audit_log.py
 
+      - name: Main root lint (blocking)
+        run: |
+          ruff check app/main.py
+
       - name: Empresa root lint (blocking)
         run: |
           ruff check app/empresa_routes.py app/empresa_config_routes.py app/empresa_config_fiscal_models.py app/empresa_config_geral_models.py app/config.py app/constants.py

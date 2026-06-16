@@ -16,9 +16,7 @@ from fastapi.staticfiles import StaticFiles
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from starlette.middleware.base import BaseHTTPMiddleware
 from sqlalchemy.orm import Session
-from app import db
 from app.db import get_session as get_db
 from app.db.migration_check import ensure_db_ready  # Pré-Prod Block 3: verificação de migrations
 from app.config import (
@@ -27,14 +25,20 @@ from app.config import (
     ALLOWED_ORIGINS,
     print_config,
     ENVIRONMENT,
-    DEBUG,
-    DATABASE_URL,
     JWT_SECRET_KEY,
     GOOGLE_MAPS_API_KEY,
     settings,  # Pré-Prod Block 1: objeto de settings completo
 )
 from app.core.settings_validation import validate_settings  # Pré-Prod Block 1: validação de settings
-from app.utils.logger import generate_trace_id, set_trace_id, set_endpoint, get_trace_id, clear_context, configure_logging
+from app.utils.logger import configure_logging
+from app.middlewares.request_context import RequestContextMiddleware
+from app.middlewares.security_audit import SecurityAuditMiddleware
+from app.middlewares.request_logging import RequestLoggingMiddleware
+from app.middlewares.rate_limit import RateLimitMiddleware
+from app.middlewares.security_headers import SecurityHeadersMiddleware
+from app.tenancy.context import TenantContextMiddleware
+from app.middlewares.tenant_middleware import TenantSecurityMiddleware
+
 from app.auth_routes_multitenant import router as auth_router
 from app.clientes_routes import router as clientes_router
 from app.pets_routes import router as pets_router  # Módulo dedicado de pets
@@ -186,7 +190,7 @@ from app.routes.product_images_public import router as product_images_public_rou
 from app.routes.sefaz_routes import router as sefaz_router
 from app.routes.modulos_routes import router as modulos_router
 from app.security.module_access import require_active_module
-from app.pedido_models import Pedido  # Modelo base ecommerce
+import app.pedido_models  # noqa: F401 - modelo base ecommerce
 from app.veterinario_routes import router as veterinario_router  # Módulo Veterinário
 import app.veterinario_models  # noqa: F401 — garante registro no SQLAlchemy
 from app.banho_tosa_routes import router as banho_tosa_router  # Modulo Banho & Tosa
@@ -203,33 +207,24 @@ import logging
 from pathlib import Path
 
 # Importar modelos para registrar no SQLAlchemy (IMPORTANTE: antes de criar o app)
-from app.models import User, UserSession, AuditLog, AcertoParceiro, EmailTemplate, EmailEnvio  # Modelos principais (removido WhatsAppMessage antigo)
+import app.models  # noqa: F401 - modelos principais
 import app.template_models  # noqa: F401 - templates globais e auditoria de onboarding
-from app.produtos_models import Lembrete  # Modelo de lembretes
-from app.idempotency_models import IdempotencyKey  # Modelo de idempotência
-from app.models_configuracao_custo_moto import ConfiguracaoCustoMoto  # ETAPA 8.2 - Custos da Moto
-from app.pendencia_estoque_models import PendenciaEstoque  # Sistema de Lista de Espera
-from app.ia.aba7_extrato_models import (
-    PadraoCategoriacaoIA,
-    LancamentoImportado,
-    ArquivoExtratoImportado,
-    HistoricoAtualizacaoDRE,
-    ConfiguracaoTributaria
-)
-from app.ia.aba7_models import DREPeriodo, DREProduto
+import app.produtos_models  # noqa: F401 - modelo de lembretes e produtos
+import app.idempotency_models  # noqa: F401 - modelo de idempotência
+import app.models_configuracao_custo_moto  # noqa: F401 - custos da moto
+import app.pendencia_estoque_models  # noqa: F401 - lista de espera
+import app.ia.aba7_extrato_models  # noqa: F401 - modelos IA/DRE
+import app.ia.aba7_models  # noqa: F401 - modelos DRE
 
 # WHATSAPP + IA - NOVOS MODELOS (Sprint 2)
-from app.whatsapp.models import (
-    TenantWhatsAppConfig,
-    WhatsAppSession,
-    WhatsAppMessage,
-    WhatsAppMetric
-)
-from app.whatsapp.models_handoff import WhatsAppAgent, WhatsAppHandoff  # Sprint 4: Handoff models
+import app.whatsapp.models  # noqa: F401 - modelos WhatsApp IA
+import app.whatsapp.models_handoff  # noqa: F401 - modelos handoff
 
 # ============================================================================
 # CONFIGURAR LOGGING ESTRUTURADO GLOBAL
 # ============================================================================
+
+DEBUG = settings.DEBUG
 
 configure_logging()  # Configura formato estruturado para produção
 
@@ -411,7 +406,7 @@ def _loop_renovacao_token_bling():
                 from app.bling_integration import BlingAPI
                 bling = BlingAPI()
                 bling.renovar_access_token()
-                logger.info(f"[BLING] ✅ Token renovado automaticamente")
+                logger.info("[BLING] ✅ Token renovado automaticamente")
 
         except Exception as e:
             logger.warning(f"[BLING] ⚠️ PID {worker_pid} — Falha na renovação automática do token: {e}")
@@ -646,8 +641,6 @@ app = FastAPI(
 # ====================
 # PROXY HEADERS - Para HTTPS atrás de reverse proxy (nginx)
 # ====================
-from fastapi.middleware.trustedhost import TrustedHostMiddleware
-from starlette.middleware.httpsredirect import HTTPSRedirectMiddleware
 
 # Confia nos headers X-Forwarded-* do nginx
 @app.middleware("http")
@@ -675,22 +668,17 @@ async def proxy_headers_middleware(request: Request, call_next):
 # ====================
 
 # 1️⃣ Request Context (Pré-Prod Bloco 4) - request_id e observabilidade
-from app.middlewares.request_context import RequestContextMiddleware
 app.add_middleware(RequestContextMiddleware)
 
 # 2️⃣ Security Audit - detecção de ataques (SQL injection, XSS, etc)
-from app.middlewares.security_audit import SecurityAuditMiddleware
 app.add_middleware(SecurityAuditMiddleware)
 
 # 3️⃣ Request Logging (legacy) - mantido para compatibilidade
-from app.middlewares.request_logging import RequestLoggingMiddleware
 app.add_middleware(RequestLoggingMiddleware)
 
 # 4️⃣ Rate Limit - protege contra brute force e spam
-from app.middlewares.rate_limit import RateLimitMiddleware
 app.add_middleware(RateLimitMiddleware)
 
-from app.middlewares.security_headers import SecurityHeadersMiddleware
 app.add_middleware(SecurityHeadersMiddleware)
 
 # ====================
@@ -699,13 +687,11 @@ app.add_middleware(SecurityHeadersMiddleware)
 
 # 🔒 CAMADA 1: Isolamento de contexto entre requests
 # Garante que cada request tenha seu próprio contexto limpo
-from app.tenancy.context import TenantContextMiddleware
 app.add_middleware(TenantContextMiddleware)
 
 # 🔒 CAMADA 2: Segurança Global de Tenant (NOVO - REFORÇADO)
 # Valida tenant_id em TODAS as requests autenticadas
 # Bloqueia requests com JWT sem tenant_id
-from app.middlewares.tenant_middleware import TenantSecurityMiddleware
 app.add_middleware(TenantSecurityMiddleware)
 
 # 🔒 CAMADA 3: Tenant context com fallback (LEGADO - COMPATIBILIDADE)
@@ -777,7 +763,6 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 async def general_exception_handler(request: Request, exc: Exception):
     # Log estruturado de erro (ERROR)
     from app.utils.logger import logger as structured_logger
-    from app.config import ENVIRONMENT
 
     structured_logger.error(
         event="unhandled_exception",
@@ -1016,7 +1001,7 @@ def validate_environment():
     try:
         validate_settings(settings)
         logger.info("✅ [PRÉ-PROD] Validação de settings concluída com sucesso")
-    except Exception as e:
+    except Exception:
         # A exceção já foi logada pelo validate_settings
         # Apenas re-levanta para impedir inicialização
         raise

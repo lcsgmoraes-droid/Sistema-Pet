@@ -350,6 +350,13 @@ def test_backend_ci_has_blocking_operational_root_lint_step():
     ) in source
 
 
+def test_backend_ci_has_blocking_main_root_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Main root lint (blocking)" in source
+    assert "ruff check app/main.py" in source
+
+
 def test_backend_ci_has_blocking_empresa_root_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
