@@ -13,8 +13,10 @@ ESTRATÉGIA:
 4. Verificar que NENHUM dado foi alterado (rollback total)
 """
 
+# ruff: noqa: E402
+
 import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import patch
 from sqlalchemy.orm import Session
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
@@ -29,7 +31,7 @@ if backend_dir not in sys.path:
     sys.path.insert(0, backend_dir)
 
 from app.vendas.service import VendaService
-from app.vendas_models import Venda, VendaItem, VendaPagamento
+from app.vendas_models import Venda, VendaItem
 from app.produtos_models import Produto, EstoqueMovimentacao
 from app.financeiro_models import ContaReceber, MovimentacaoFinanceira, ContaBancaria, LancamentoManual
 from app.caixa_models import MovimentacaoCaixa
@@ -438,7 +440,7 @@ class TestTransactionRollbackCancelarVenda:
             
             if call_count['count'] == 1:
                 # Primeira chamada: sucesso
-                print(f"\n🔧 MOCK: Primeira chamada (item 1) - SUCESSO")
+                print("\n🔧 MOCK: Primeira chamada (item 1) - SUCESSO")
                 return {
                     'success': True,
                     'produto_nome': 'Produto Teste Cancelar',
@@ -447,7 +449,7 @@ class TestTransactionRollbackCancelarVenda:
                 }
             else:
                 # Segunda chamada: EXCEÇÃO
-                print(f"\n💥 MOCK: Segunda chamada (item 2) - LANÇANDO EXCEÇÃO")
+                print("\n💥 MOCK: Segunda chamada (item 2) - LANÇANDO EXCEÇÃO")
                 raise Exception("ERRO SIMULADO: Falha ao estornar estoque do segundo item durante cancelamento")
         
         # ============================================================

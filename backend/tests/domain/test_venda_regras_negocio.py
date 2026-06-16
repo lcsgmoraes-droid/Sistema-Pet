@@ -9,7 +9,6 @@ Casos de erro, validações e restrições.
 import pytest
 from unittest.mock import MagicMock, patch
 from decimal import Decimal
-from datetime import datetime
 
 from app.vendas.service import VendaService
 from fastapi import HTTPException
@@ -323,7 +322,7 @@ class TestRegrasFinalizacaoVenda:
         with patch('app.vendas.service.Venda'), \
              patch('app.vendas.service.VendaPagamento'), \
              patch('app.vendas.service.VendaItem'), \
-             patch('app.vendas.service.Cliente') as MockCliente:
+             patch('app.vendas.service.Cliente'):
             
             fake_venda_model.status = 'aberta'
             fake_venda_model.cliente_id = 1

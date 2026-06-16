@@ -7,9 +7,8 @@ Mocks e fakes reutilizáveis para todos os testes de domínio.
 
 import pytest
 from unittest.mock import Mock, MagicMock
-from datetime import datetime, date
+from datetime import datetime
 from decimal import Decimal
-from typing import List, Dict, Any
 
 
 # ============================================================
@@ -143,7 +142,7 @@ def mock_contas_receber_service(monkeypatch):
         from app import financeiro
         if hasattr(financeiro, 'ContasReceberService'):
             monkeypatch.setattr(financeiro, 'ContasReceberService', mock)
-    except:
+    except Exception:
         pass
     
     return mock
