@@ -15,6 +15,8 @@ Data: 2026-02-05
 Versão: 1.0.0
 """
 
+# ruff: noqa: E402
+
 import sys
 import os
 
@@ -24,15 +26,13 @@ if _backend_dir not in sys.path:
     sys.path.insert(0, _backend_dir)
 
 import pytest
-from sqlalchemy import text, Column, Integer, String, Boolean
-from sqlalchemy.orm import Session
+from sqlalchemy import text
 from uuid import UUID, uuid4
 
 # Importar helper a ser testado
 from app.utils.tenant_safe_sql import (
     execute_tenant_safe,
     execute_tenant_safe_scalar,
-    execute_tenant_safe_one,
     execute_tenant_safe_first,
     execute_tenant_safe_all,
     TenantSafeSQLError
@@ -407,7 +407,7 @@ class TestTenantSafeSuccess:
         """
         # Criar tabela auxiliar
         db_session.execute(text("DROP TABLE IF EXISTS test_funcionarios"))
-        db_session.execute(text(f"""
+        db_session.execute(text("""
             CREATE TEMPORARY TABLE test_funcionarios (
                 id SERIAL PRIMARY KEY,
                 tenant_id UUID NOT NULL,
@@ -417,7 +417,7 @@ class TestTenantSafeSuccess:
         
         tenant_id = setup_tenant_context
         
-        db_session.execute(text(f"""
+        db_session.execute(text("""
             INSERT INTO test_funcionarios (tenant_id, nome)
             VALUES (:tenant_id, 'João Silva')
         """), {"tenant_id": str(tenant_id)})

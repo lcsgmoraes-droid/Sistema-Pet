@@ -10,8 +10,8 @@ Testa o comportamento do guardião de side effects:
 """
 
 import pytest
-from unittest.mock import Mock, patch, call
-from app.core.replay_context import enable_replay_mode, disable_replay_mode, reset_replay_mode
+from unittest.mock import Mock, patch
+from app.core.replay_context import enable_replay_mode, reset_replay_mode
 from app.core.side_effects_guard import (
     suppress_in_replay,
     forbid_in_replay,

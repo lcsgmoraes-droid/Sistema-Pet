@@ -3,7 +3,6 @@ Teste minimalista para validar import
 """
 import sys
 import os
-import pytest
 
 # Garantir que o diretório backend está no path
 backend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))

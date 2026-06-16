@@ -4,7 +4,7 @@ import inspect
 import app.bling_sync_routes as bling_sync_routes
 import app.services.bling_sync_service as bling_sync_service
 from app.services.bling_sync_service import BlingSyncService
-from app.tenancy.context import clear_current_tenant, get_current_tenant, set_current_tenant
+from app.tenancy.context import clear_current_tenant, get_current_tenant
 
 
 TENANT_A = UUID("11111111-1111-4111-8111-111111111111")
