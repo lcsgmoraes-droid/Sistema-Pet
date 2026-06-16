@@ -64,7 +64,9 @@ def _source_rank(value) -> int:
 
 
 def _status_rank(value) -> int:
-    return _STATUS_PRIORITY.get(str(value or "").strip().lower(), 50 if _texto(value) else 0)
+    return _STATUS_PRIORITY.get(
+        str(value or "").strip().lower(), 50 if _texto(value) else 0
+    )
 
 
 def _mesclar_status(status_atual, status_novo, source_atual, source_novo) -> str | None:
@@ -151,7 +153,9 @@ def serializar_nota_cache(registro: BlingNotaFiscalCache) -> dict:
         "modelo": registro.modelo,
         "chave": registro.chave or "",
         "status": registro.status or "Pendente",
-        "data_emissao": registro.data_emissao.isoformat() if registro.data_emissao else None,
+        "data_emissao": registro.data_emissao.isoformat()
+        if registro.data_emissao
+        else None,
         "valor": valor or 0.0,
         "cliente": registro.cliente or {"id": None, "nome": None, "cpf_cnpj": None},
         "canal": registro.canal,
@@ -176,18 +180,26 @@ def listar_notas_cache(
     situacao: str | None = None,
     limit: int | None = None,
 ) -> list[dict]:
-    query = db.query(BlingNotaFiscalCache).filter(BlingNotaFiscalCache.tenant_id == tenant_id)
+    query = db.query(BlingNotaFiscalCache).filter(
+        BlingNotaFiscalCache.tenant_id == tenant_id
+    )
 
     if situacao:
-        query = query.filter(func.lower(BlingNotaFiscalCache.status) == situacao.strip().lower())
+        query = query.filter(
+            func.lower(BlingNotaFiscalCache.status) == situacao.strip().lower()
+        )
 
     data_inicial_dt = _parse_datetime(data_inicial)
     if data_inicial_dt:
-        query = query.filter(func.date(BlingNotaFiscalCache.data_emissao) >= data_inicial_dt.date())
+        query = query.filter(
+            func.date(BlingNotaFiscalCache.data_emissao) >= data_inicial_dt.date()
+        )
 
     data_final_dt = _parse_datetime(data_final)
     if data_final_dt:
-        query = query.filter(func.date(BlingNotaFiscalCache.data_emissao) <= data_final_dt.date())
+        query = query.filter(
+            func.date(BlingNotaFiscalCache.data_emissao) <= data_final_dt.date()
+        )
 
     query = query.order_by(
         BlingNotaFiscalCache.data_emissao.desc().nullslast(),
@@ -252,10 +264,10 @@ def obter_detalhe_nota_cache(
     if modelo in {55, 65}:
         query = query.filter(BlingNotaFiscalCache.modelo == modelo)
 
-    registro = (
-        query.order_by(BlingNotaFiscalCache.detalhada_em.desc().nullslast(), BlingNotaFiscalCache.id.desc())
-        .first()
-    )
+    registro = query.order_by(
+        BlingNotaFiscalCache.detalhada_em.desc().nullslast(),
+        BlingNotaFiscalCache.id.desc(),
+    ).first()
     if not registro or not isinstance(registro.detalhe_payload, dict):
         return None
     return registro.detalhe_payload
@@ -310,12 +322,18 @@ def upsert_nota_cache(
         )
 
     source_novo = _texto(source) or _texto(nota.get("origem"))
-    registro.tipo = _texto(nota.get("tipo")) or registro.tipo or ("nfce" if modelo == 65 else "nfe")
+    registro.tipo = (
+        _texto(nota.get("tipo")) or registro.tipo or ("nfce" if modelo == 65 else "nfe")
+    )
     registro.numero = _texto(nota.get("numero")) or registro.numero
     registro.serie = _texto(nota.get("serie")) or registro.serie
-    registro.status = _mesclar_status(registro.status, nota.get("status"), registro.source, source_novo)
+    registro.status = _mesclar_status(
+        registro.status, nota.get("status"), registro.source, source_novo
+    )
     registro.chave = _texto(nota.get("chave")) or registro.chave
-    registro.data_emissao = _parse_datetime(nota.get("data_emissao")) or registro.data_emissao
+    registro.data_emissao = (
+        _parse_datetime(nota.get("data_emissao")) or registro.data_emissao
+    )
 
     valor = _coerce_float(nota.get("valor"))
     if valor is not None:
@@ -323,15 +341,27 @@ def upsert_nota_cache(
 
     registro.cliente = _json_dict(nota.get("cliente")) or registro.cliente
     registro.loja = _json_dict(nota.get("loja")) or registro.loja
-    registro.unidade_negocio = _json_dict(nota.get("unidade_negocio")) or registro.unidade_negocio
+    registro.unidade_negocio = (
+        _json_dict(nota.get("unidade_negocio")) or registro.unidade_negocio
+    )
 
     registro.canal = _texto(nota.get("canal")) or registro.canal
     registro.canal_label = _texto(nota.get("canal_label")) or registro.canal_label
-    registro.numero_loja_virtual = _texto(nota.get("numero_loja_virtual")) or registro.numero_loja_virtual
-    registro.origem_loja_virtual = _texto(nota.get("origem_loja_virtual")) or registro.origem_loja_virtual
-    registro.origem_canal_venda = _texto(nota.get("origem_canal_venda")) or registro.origem_canal_venda
-    registro.numero_pedido_loja = _texto(nota.get("numero_pedido_loja")) or registro.numero_pedido_loja
-    registro.pedido_bling_id_ref = _texto(nota.get("pedido_bling_id_ref")) or registro.pedido_bling_id_ref
+    registro.numero_loja_virtual = (
+        _texto(nota.get("numero_loja_virtual")) or registro.numero_loja_virtual
+    )
+    registro.origem_loja_virtual = (
+        _texto(nota.get("origem_loja_virtual")) or registro.origem_loja_virtual
+    )
+    registro.origem_canal_venda = (
+        _texto(nota.get("origem_canal_venda")) or registro.origem_canal_venda
+    )
+    registro.numero_pedido_loja = (
+        _texto(nota.get("numero_pedido_loja")) or registro.numero_pedido_loja
+    )
+    registro.pedido_bling_id_ref = (
+        _texto(nota.get("pedido_bling_id_ref")) or registro.pedido_bling_id_ref
+    )
     registro.source = _mesclar_source(registro.source, source_novo)
 
     if isinstance(resumo_payload, dict) and resumo_payload:

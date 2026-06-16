@@ -36,7 +36,9 @@ def _event_created_at(event: dict[str, Any]) -> datetime | None:
     return _parse_dt(str(event.get("created_at") or ""))
 
 
-def _read_recent_watchdog_events(max_lines: int = WATCHDOG_EVENT_MAX_READ_LINES) -> list[dict[str, Any]]:
+def _read_recent_watchdog_events(
+    max_lines: int = WATCHDOG_EVENT_MAX_READ_LINES,
+) -> list[dict[str, Any]]:
     if not os.path.exists(WATCHDOG_EVENT_LOG_PATH):
         return []
 
@@ -74,9 +76,15 @@ def _filter_watchdog_events(
     filtered: list[dict[str, Any]] = []
 
     for event in events:
-        if normalized_event_type and str(event.get("event_type") or "").lower() != normalized_event_type:
+        if (
+            normalized_event_type
+            and str(event.get("event_type") or "").lower() != normalized_event_type
+        ):
             continue
-        if normalized_status and str(event.get("status") or "").lower() != normalized_status:
+        if (
+            normalized_status
+            and str(event.get("status") or "").lower() != normalized_status
+        ):
             continue
 
         created_at = _event_created_at(event)
@@ -101,7 +109,10 @@ def get_watchdog_events(
     if db is not None:
         events = _read_recent_watchdog_events()
         try:
-            from app.services.ops_persistence_service import query_recovery_actions, sync_watchdog_events_to_db
+            from app.services.ops_persistence_service import (
+                query_recovery_actions,
+                sync_watchdog_events_to_db,
+            )
 
             sync_watchdog_events_to_db(db, events)
             action_type = None
@@ -196,7 +207,13 @@ def summarize_watchdog_events(
         "total": len(events),
         "by_type": by_type.most_common(),
         "by_status": by_status.most_common(),
-        "recoveries": len([event for event in events if str(event.get("event_type") or "").lower() == "restart_triggered"]),
+        "recoveries": len(
+            [
+                event
+                for event in events
+                if str(event.get("event_type") or "").lower() == "restart_triggered"
+            ]
+        ),
         "latest": list(reversed(events))[:10],
         "latest_recovery": list(reversed(recovery_events))[:5],
         "source": {

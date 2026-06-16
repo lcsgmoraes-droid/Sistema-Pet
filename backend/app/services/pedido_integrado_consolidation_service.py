@@ -31,7 +31,9 @@ def _normalizar_resumo_nf(resumo_nf: Any) -> dict:
     if not resumo_nf:
         return {}
 
-    nf_id = _nf_id_valido(_primeiro_preenchido(resumo_nf.get("id"), resumo_nf.get("nfe_id")))
+    nf_id = _nf_id_valido(
+        _primeiro_preenchido(resumo_nf.get("id"), resumo_nf.get("nfe_id"))
+    )
     if nf_id:
         if "id" in resumo_nf or "nfe_id" not in resumo_nf:
             resumo_nf["id"] = nf_id
@@ -44,9 +46,17 @@ def _normalizar_resumo_nf(resumo_nf: Any) -> dict:
     possui_referencia_util = bool(
         nf_id
         or _text(resumo_nf.get("numero"))
-        or _text(_primeiro_preenchido(resumo_nf.get("chaveAcesso"), resumo_nf.get("chave")))
-        or _text(_primeiro_preenchido(resumo_nf.get("situacao"), resumo_nf.get("status")))
-        or _text(_primeiro_preenchido(resumo_nf.get("data_emissao"), resumo_nf.get("dataEmissao")))
+        or _text(
+            _primeiro_preenchido(resumo_nf.get("chaveAcesso"), resumo_nf.get("chave"))
+        )
+        or _text(
+            _primeiro_preenchido(resumo_nf.get("situacao"), resumo_nf.get("status"))
+        )
+        or _text(
+            _primeiro_preenchido(
+                resumo_nf.get("data_emissao"), resumo_nf.get("dataEmissao")
+            )
+        )
         or resumo_nf.get("valor_total") not in (None, "")
     )
     return resumo_nf if possui_referencia_util else {}
@@ -127,7 +137,9 @@ def pedido_mesclado_info(payload_or_pedido: Any) -> dict:
 
 
 def pedido_esta_mesclado(payload_or_pedido: Any) -> bool:
-    return bool(_text(pedido_mesclado_info(payload_or_pedido).get("pedido_canonico_id")))
+    return bool(
+        _text(pedido_mesclado_info(payload_or_pedido).get("pedido_canonico_id"))
+    )
 
 
 def pedido_canonico_id_mescla(payload_or_pedido: Any) -> int | None:
@@ -182,7 +194,9 @@ def registrar_alias_bling_no_payload(
                 "pedido_bling_numero": pedido_bling_numero,
                 "numero_pedido_loja": numero_pedido_loja,
                 "loja_id": loja_id,
-                "merged_at": merged_at.isoformat() if isinstance(merged_at, datetime) else None,
+                "merged_at": merged_at.isoformat()
+                if isinstance(merged_at, datetime)
+                else None,
                 "motivo": motivo,
             }
         )
@@ -202,8 +216,12 @@ def marcar_payload_como_mesclado(
     payload = dict(_dict(getattr(payload_or_pedido, "payload", payload_or_pedido)))
     payload["pedido_mesclado"] = {
         "pedido_canonico_id": getattr(pedido_canonico, "id", None),
-        "pedido_canonico_bling_id": _text(getattr(pedido_canonico, "pedido_bling_id", None)),
-        "pedido_canonico_bling_numero": _text(getattr(pedido_canonico, "pedido_bling_numero", None)),
+        "pedido_canonico_bling_id": _text(
+            getattr(pedido_canonico, "pedido_bling_id", None)
+        ),
+        "pedido_canonico_bling_numero": _text(
+            getattr(pedido_canonico, "pedido_bling_numero", None)
+        ),
         "numero_pedido_loja": _text(numero_pedido_loja),
         "loja_id": _text(loja_id),
         "merged_at": merged_at.isoformat() if isinstance(merged_at, datetime) else None,
@@ -221,7 +239,9 @@ def _ordem_preferencia_pedido(pedido: PedidoIntegrado) -> tuple:
         "cancelado": 0,
         "mesclado": -1,
     }.get(status, 0)
-    created_at = getattr(pedido, "created_at", None) or getattr(pedido, "criado_em", None)
+    created_at = getattr(pedido, "created_at", None) or getattr(
+        pedido, "criado_em", None
+    )
     if isinstance(created_at, datetime):
         created_key = -(
             created_at.toordinal() * 86400
@@ -240,14 +260,18 @@ def _ordem_preferencia_pedido(pedido: PedidoIntegrado) -> tuple:
     )
 
 
-def escolher_pedido_canonico(candidatos: list[PedidoIntegrado]) -> PedidoIntegrado | None:
+def escolher_pedido_canonico(
+    candidatos: list[PedidoIntegrado],
+) -> PedidoIntegrado | None:
     validos = [pedido for pedido in candidatos if pedido is not None]
     if not validos:
         return None
     return max(validos, key=_ordem_preferencia_pedido)
 
 
-def resolver_pedido_canonico(db: Session, pedido: PedidoIntegrado | None) -> PedidoIntegrado | None:
+def resolver_pedido_canonico(
+    db: Session, pedido: PedidoIntegrado | None
+) -> PedidoIntegrado | None:
     atual = pedido
     visitados: set[int] = set()
     while atual and pedido_esta_mesclado(atual):
@@ -279,7 +303,9 @@ def localizar_pedido_por_bling_id(
     if not pedido_bling_id:
         return None
 
-    query = db.query(PedidoIntegrado).filter(PedidoIntegrado.pedido_bling_id == pedido_bling_id)
+    query = db.query(PedidoIntegrado).filter(
+        PedidoIntegrado.pedido_bling_id == pedido_bling_id
+    )
     if tenant_id is not None:
         query = query.filter(PedidoIntegrado.tenant_id == tenant_id)
     pedido = query.first()

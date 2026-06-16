@@ -55,7 +55,9 @@ def _buscar_pedidos_recentes_reconciliaveis(
     )
 
 
-def _contar_pedidos_recentes_reconciliaveis(db: Session, tenant_id, *, dias: int) -> int:
+def _contar_pedidos_recentes_reconciliaveis(
+    db: Session, tenant_id, *, dias: int
+) -> int:
     total = (
         db.query(func.count(PedidoIntegrado.id))
         .filter(
@@ -88,18 +90,16 @@ def listar_tenants_com_pedidos_reconciliaveis(db: Session, *, dias: int) -> list
         allow_global=True,
         global_reason="Job global de pedidos integrados reconciliaveis precisa descobrir tenants antes do contexto ativo.",
     )
-    return [
-        tenant_id
-        for (tenant_id,) in rows
-        if tenant_id is not None
-    ]
+    return [tenant_id for (tenant_id,) in rows if tenant_id is not None]
 
 
 def _aguardar_janela_rate_limit() -> None:
     global _ULTIMA_CONSULTA_PEDIDO_BING_SEGUNDOS
 
     agora = time.monotonic()
-    restante = _INTERVALO_MINIMO_CONSULTA_SEGUNDOS - (agora - _ULTIMA_CONSULTA_PEDIDO_BING_SEGUNDOS)
+    restante = _INTERVALO_MINIMO_CONSULTA_SEGUNDOS - (
+        agora - _ULTIMA_CONSULTA_PEDIDO_BING_SEGUNDOS
+    )
     if restante > 0:
         time.sleep(restante)
     _ULTIMA_CONSULTA_PEDIDO_BING_SEGUNDOS = time.monotonic()
@@ -107,15 +107,12 @@ def _aguardar_janela_rate_limit() -> None:
 
 def _mensagem_rate_limit_diario(texto: str | None) -> bool:
     mensagem = str(texto or "").lower()
-    return (
-        "too_many_requests" in mensagem
-        and (
-            "period': 'day'" in mensagem
-            or '"period": "day"' in mensagem
-            or "por dia" in mensagem
-            or "amanhã" in mensagem
-            or "amanha" in mensagem
-        )
+    return "too_many_requests" in mensagem and (
+        "period': 'day'" in mensagem
+        or '"period": "day"' in mensagem
+        or "por dia" in mensagem
+        or "amanhã" in mensagem
+        or "amanha" in mensagem
     )
 
 
@@ -231,7 +228,9 @@ def reconciliar_status_pedido_local(
 
     if situacao_id and situacao_id in _SITUACOES_PEDIDO_CANCELADO:
         if pedido.status != "cancelado":
-            _cancelar_pedido(db=db, pedido=pedido, itens=itens, processed_at=processed_at)
+            _cancelar_pedido(
+                db=db, pedido=pedido, itens=itens, processed_at=processed_at
+            )
             return {
                 "success": True,
                 "executada": True,
@@ -313,7 +312,9 @@ def reconciliar_status_pedidos_recentes(
     _correlation_context_applied: bool = False,
 ) -> dict:
     if not _correlation_context_applied:
-        with operation_correlation_context("job.pedido_status_reconciliation") as correlation_id:
+        with operation_correlation_context(
+            "job.pedido_status_reconciliation"
+        ) as correlation_id:
             result = reconciliar_status_pedidos_recentes(
                 db,
                 tenant_id,
@@ -334,14 +335,18 @@ def reconciliar_status_pedidos_recentes(
             "motivo": "bling_rate_limit_diario_ativo",
             "dias": dias,
             "limite_pedidos": limite_pedidos,
-            "pedidos_antes": _contar_pedidos_recentes_reconciliaveis(db, tenant_id, dias=dias),
+            "pedidos_antes": _contar_pedidos_recentes_reconciliaveis(
+                db, tenant_id, dias=dias
+            ),
             "pedidos_processados": 0,
             "confirmados": 0,
             "cancelados": 0,
             "sem_mudanca": 0,
             "erros": [],
             "resultados": [],
-            "bloqueado_ate": _RATE_LIMIT_DIARIO_BLOQUEADO_ATE.isoformat() if _RATE_LIMIT_DIARIO_BLOQUEADO_ATE else None,
+            "bloqueado_ate": _RATE_LIMIT_DIARIO_BLOQUEADO_ATE.isoformat()
+            if _RATE_LIMIT_DIARIO_BLOQUEADO_ATE
+            else None,
         }
 
     pedidos_antes = _contar_pedidos_recentes_reconciliaveis(db, tenant_id, dias=dias)
@@ -440,7 +445,9 @@ def executar_reconciliacao_automatica_status_pedidos(
     _correlation_context_applied: bool = False,
 ) -> dict:
     if not _correlation_context_applied:
-        with operation_correlation_context("job.pedido_status_reconciliation_batch") as correlation_id:
+        with operation_correlation_context(
+            "job.pedido_status_reconciliation_batch"
+        ) as correlation_id:
             result = executar_reconciliacao_automatica_status_pedidos(
                 db,
                 dias=dias,
@@ -481,13 +488,23 @@ def executar_reconciliacao_automatica_status_pedidos(
             )
 
     return {
-        "correlation_id": current_correlation_id("job.pedido_status_reconciliation_batch"),
+        "correlation_id": current_correlation_id(
+            "job.pedido_status_reconciliation_batch"
+        ),
         "tenants_processados": len(resultados),
         "tenants_com_pedidos_reconciliaveis": len(tenant_ids),
-        "pedidos_processados_total": sum(int(item.get("pedidos_processados") or 0) for item in resultados),
-        "confirmados_total": sum(int(item.get("confirmados") or 0) for item in resultados),
-        "cancelados_total": sum(int(item.get("cancelados") or 0) for item in resultados),
-        "sem_mudanca_total": sum(int(item.get("sem_mudanca") or 0) for item in resultados),
+        "pedidos_processados_total": sum(
+            int(item.get("pedidos_processados") or 0) for item in resultados
+        ),
+        "confirmados_total": sum(
+            int(item.get("confirmados") or 0) for item in resultados
+        ),
+        "cancelados_total": sum(
+            int(item.get("cancelados") or 0) for item in resultados
+        ),
+        "sem_mudanca_total": sum(
+            int(item.get("sem_mudanca") or 0) for item in resultados
+        ),
         "erros_total": sum(len(item.get("erros") or []) for item in resultados),
         "resultados": resultados,
     }

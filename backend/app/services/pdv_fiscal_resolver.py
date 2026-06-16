@@ -3,7 +3,9 @@ from sqlalchemy.orm import Session
 from app.kit_config_fiscal_models import KitConfigFiscal
 from app.variacao_config_fiscal_models import VariacaoConfigFiscal
 from app.produto_config_fiscal_models import ProdutoConfigFiscal
-from app.services.fiscal_config_service import obter_ou_criar_config_fiscal_empresa_padrao
+from app.services.fiscal_config_service import (
+    obter_ou_criar_config_fiscal_empresa_padrao,
+)
 
 
 def resolver_fiscal_item_pdv(

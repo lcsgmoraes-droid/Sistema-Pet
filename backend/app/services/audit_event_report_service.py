@@ -139,9 +139,17 @@ def list_audit_events(
             )
         )
 
-    rows = query.order_by(desc(AuditLog.timestamp), desc(AuditLog.id)).limit(max(1, min(limit, 500))).all()
+    rows = (
+        query.order_by(desc(AuditLog.timestamp), desc(AuditLog.id))
+        .limit(max(1, min(limit, 500)))
+        .all()
+    )
     if normalized_request_id:
-        rows = [row for row in rows if audit_row_matches_request_id(row, normalized_request_id)]
+        rows = [
+            row
+            for row in rows
+            if audit_row_matches_request_id(row, normalized_request_id)
+        ]
 
     return {
         "items": [row_to_audit_event(row) for row in rows],

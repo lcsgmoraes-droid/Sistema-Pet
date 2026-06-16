@@ -1,6 +1,7 @@
 """
 Serviço de Produto - Centraliza regras de negócio
 """
+
 from typing import Dict, Any
 from sqlalchemy import func
 from sqlalchemy.orm import Session
@@ -49,99 +50,111 @@ def validar_sku_unico_produto(
         query = query.filter(Produto.id != produto_id)
     existente = query.first()
     if existente:
-        raise ValueError(f"SKU '{sku_normalizado}' ja esta em uso no produto #{existente.id}")
+        raise ValueError(
+            f"SKU '{sku_normalizado}' ja esta em uso no produto #{existente.id}"
+        )
 
 
 class ProdutoService:
     """
     Service para gerenciar regras de negócio de produtos
-    
+
     Responsabilidades:
     - Validações de negócio específicas de tipo de produto
     - Criação de produtos com regras aplicadas
     - Gerenciamento de composição de KITs
     - Lógica de domínio isolada de FastAPI
     """
-    
+
     @staticmethod
     def create_produto(dados: Dict[str, Any], db: Session, tenant_id: str) -> Produto:
         """
         Cria um novo produto aplicando regras de negócio
-        
+
         Args:
             dados: Dicionário com dados do produto
             db: Sessão do banco de dados
             tenant_id: ID do tenant (isolamento multi-tenant)
-            
+
         Returns:
             Produto criado e persistido
-            
+
         Raises:
             ValueError: Quando regras de negócio são violadas
         """
-        
+
         dados["codigo"] = normalizar_sku_produto(dados.get("codigo"))
         validar_sku_unico_produto(db, sku=dados["codigo"], tenant_id=tenant_id)
 
         _aplicar_regras_granel(dados)
-        tipo_produto = dados.get('tipo_produto', 'SIMPLES')
-        
+        tipo_produto = dados.get("tipo_produto", "SIMPLES")
+
         # ========================================
         # REGRA 1: Produto PAI não pode ter preços
         # ========================================
-        if tipo_produto == 'PAI':
+        if tipo_produto == "PAI":
             # Produto PAI não tem preços - forçar como 0
-            dados['preco_venda'] = 0
-            dados['preco_custo'] = 0
-            dados['preco_promocional'] = None
-        
+            dados["preco_venda"] = 0
+            dados["preco_custo"] = 0
+            dados["preco_promocional"] = None
+
         # ========================================
         # REGRA 2: Produtos vendáveis precisam de preço (exceto KIT VIRTUAL e VARIACAO-KIT)
         # ========================================
         # VARIACAO pode ser KIT conforme regras oficiais do projeto
-        eh_kit = tipo_produto == 'KIT' or (tipo_produto == 'VARIACAO' and dados.get('tipo_kit'))
-        
-        if tipo_produto not in ('PAI', 'KIT') and not eh_kit:
-            preco = dados.get('preco_venda')
+        eh_kit = tipo_produto == "KIT" or (
+            tipo_produto == "VARIACAO" and dados.get("tipo_kit")
+        )
+
+        if tipo_produto not in ("PAI", "KIT") and not eh_kit:
+            preco = dados.get("preco_venda")
             if preco is None or preco <= 0:
                 raise ValueError(
                     f"Produto do tipo '{tipo_produto}' deve ter preço de venda maior que zero."
                 )
-        
+
         # ========================================
         # REGRA 3: VARIACAO precisa de produto_pai_id
         # ========================================
-        if tipo_produto == 'VARIACAO':
-            if not dados.get('produto_pai_id'):
+        if tipo_produto == "VARIACAO":
+            if not dados.get("produto_pai_id"):
                 raise ValueError(
                     "Produto do tipo VARIACAO deve ter um produto_pai_id informado."
                 )
-        
+
         # ========================================
         # REGRA 4: KIT/VARIACAO-KIT - Processar tipo_kit e composição
         # REGRA OFICIAL: Variação vendável PODE ser marcada como KIT
         # ========================================
-        composicao_kit = dados.pop('composicao_kit', None)  # Extrair composição antes de criar produto
+        composicao_kit = dados.pop(
+            "composicao_kit", None
+        )  # Extrair composição antes de criar produto
 
-        tipo_kit_informado = dados.get('tipo_kit')
-        e_kit_fisico = dados.pop('e_kit_fisico', None)
+        tipo_kit_informado = dados.get("tipo_kit")
+        e_kit_fisico = dados.pop("e_kit_fisico", None)
 
-        if tipo_produto in ('KIT', 'VARIACAO'):
+        if tipo_produto in ("KIT", "VARIACAO"):
             if tipo_kit_informado:
                 tipo_kit_normalizado = str(tipo_kit_informado).upper()
-                dados['tipo_kit'] = 'FISICO' if e_kit_fisico else tipo_kit_normalizado
-            elif tipo_produto == 'KIT' and e_kit_fisico is not None:
-                dados['tipo_kit'] = 'FISICO' if e_kit_fisico else 'VIRTUAL'
+                dados["tipo_kit"] = "FISICO" if e_kit_fisico else tipo_kit_normalizado
+            elif tipo_produto == "KIT" and e_kit_fisico is not None:
+                dados["tipo_kit"] = "FISICO" if e_kit_fisico else "VIRTUAL"
             else:
-                dados['tipo_kit'] = None
+                dados["tipo_kit"] = None
         else:
-            dados['tipo_kit'] = None
+            dados["tipo_kit"] = None
 
         # Se tem tipo_kit definido (KIT ou VARIACAO-KIT), validar composição
-        if dados.get('tipo_kit'):
-            precisa_componentes_agora = tipo_produto != 'VARIACAO'
-            if precisa_componentes_agora and (not composicao_kit or len(composicao_kit) == 0):
-                tipo_desc = f"{tipo_produto}-KIT" if tipo_produto == 'VARIACAO' else tipo_produto
+        if dados.get("tipo_kit"):
+            precisa_componentes_agora = tipo_produto != "VARIACAO"
+            if precisa_componentes_agora and (
+                not composicao_kit or len(composicao_kit) == 0
+            ):
+                tipo_desc = (
+                    f"{tipo_produto}-KIT"
+                    if tipo_produto == "VARIACAO"
+                    else tipo_produto
+                )
                 raise ValueError(
                     f"Produto do tipo {tipo_desc} deve ter pelo menos 1 componente na composição. "
                     "Adicione os produtos que fazem parte do kit antes de salvar."
@@ -150,68 +163,81 @@ class ProdutoService:
         # ========================================
         # CRIAR PRODUTO
         # ========================================
-        
+
         # Forçar controle_lote=True para todos os produtos
-        dados['controle_lote'] = True
-        
+        dados["controle_lote"] = True
+
         # Remover campos None ou vazios (exceto campos numéricos que podem ser 0)
         dados_limpos = {
-            k: v for k, v in dados.items() 
-            if v is not None or k in ['preco_custo', 'estoque_minimo']
+            k: v
+            for k, v in dados.items()
+            if v is not None or k in ["preco_custo", "estoque_minimo"]
         }
-        
+
         # 🔒 ISOLAMENTO MULTI-TENANT: Adicionar tenant_id obrigatório
-        dados_limpos['tenant_id'] = tenant_id
-        
-        logger.info(f"💾 ProdutoService: Criando produto tipo '{tipo_produto}' com {len(dados_limpos)} campos")
-        
+        dados_limpos["tenant_id"] = tenant_id
+
+        logger.info(
+            f"💾 ProdutoService: Criando produto tipo '{tipo_produto}' com {len(dados_limpos)} campos"
+        )
+
         # Criar instância
         novo_produto = Produto(**dados_limpos)
         db.add(novo_produto)
-        
+
         try:
             db.flush()  # Flush para obter ID sem commit completo
-            
+
             # ========================================
             # PROCESSAR COMPOSIÇÃO (KIT e VARIACAO-KIT) - TRANSAÇÃO ATÔMICA
             # ========================================
-            if dados.get('tipo_kit') and composicao_kit:
-                tipo_desc = f"{tipo_produto}-KIT" if tipo_produto == 'VARIACAO' else tipo_produto
-                logger.info(f"🧩 Processando {len(composicao_kit)} componentes da composição para {tipo_desc}")
-                
+            if dados.get("tipo_kit") and composicao_kit:
+                tipo_desc = (
+                    f"{tipo_produto}-KIT"
+                    if tipo_produto == "VARIACAO"
+                    else tipo_produto
+                )
+                logger.info(
+                    f"🧩 Processando {len(composicao_kit)} componentes da composição para {tipo_desc}"
+                )
+
                 # Validar composição
                 from .kit_estoque_service import KitEstoqueService
+
                 valido, erro = KitEstoqueService.validar_componentes_kit(
-                    db=db,
-                    kit_id=novo_produto.id,
-                    componentes=composicao_kit
+                    db=db, kit_id=novo_produto.id, componentes=composicao_kit
                 )
-                
+
                 if not valido:
                     raise ValueError(f"Composição inválida para {tipo_desc}: {erro}")
-                
+
                 # Criar componentes
                 for comp in composicao_kit:
                     componente = ProdutoKitComponente(
                         kit_id=novo_produto.id,
-                        produto_componente_id=comp.get('produto_componente_id'),
-                        quantidade=comp.get('quantidade', 1.0),
-                        ordem=comp.get('ordem', 0),
-                        opcional=comp.get('opcional', False),
+                        produto_componente_id=comp.get("produto_componente_id"),
+                        quantidade=comp.get("quantidade", 1.0),
+                        ordem=comp.get("ordem", 0),
+                        opcional=comp.get("opcional", False),
                         tenant_id=novo_produto.tenant_id,
                     )
                     db.add(componente)
-                
-                logger.info(f"✅ {len(composicao_kit)} componentes adicionados para {tipo_desc}")
+
+                logger.info(
+                    f"✅ {len(composicao_kit)} componentes adicionados para {tipo_desc}"
+                )
 
                 from .kit_custo_service import KitCustoService
+
                 KitCustoService.sincronizar_custo_kit(db, novo_produto.id)
-            
+
             db.commit()
             db.refresh(novo_produto)
-            logger.info(f"✅ ProdutoService: Produto criado com sucesso! ID: {novo_produto.id}")
+            logger.info(
+                f"✅ ProdutoService: Produto criado com sucesso! ID: {novo_produto.id}"
+            )
             return novo_produto
-            
+
         except ValueError as e:
             # Rollback em caso de erro de validação
             db.rollback()

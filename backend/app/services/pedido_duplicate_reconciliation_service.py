@@ -41,11 +41,7 @@ def listar_tenants_com_duplicidades_recentes(db: Session, *, dias: int) -> list:
         allow_global=True,
         global_reason="Job global de duplicidades de pedidos integrados precisa descobrir tenants antes do contexto ativo.",
     )
-    return [
-        tenant_id
-        for (tenant_id,) in rows
-        if tenant_id is not None
-    ]
+    return [tenant_id for (tenant_id,) in rows if tenant_id is not None]
 
 
 def reconciliar_duplicidades_recentes_pedido_loja(
@@ -142,12 +138,15 @@ def reconciliar_duplicidades_recentes_pedido_loja(
             resultados.append(
                 {
                     "pedido_canonico_id": resultado.get("pedido_canonico_id"),
-                    "pedido_canonico_bling_numero": resultado.get("pedido_canonico_bling_numero"),
+                    "pedido_canonico_bling_numero": resultado.get(
+                        "pedido_canonico_bling_numero"
+                    ),
                     "numero_pedido_loja": resultado.get("numero_pedido_loja"),
                     "acao": "consolidado",
                     "success": True,
                     "pedidos_mesclados": len(resultado.get("pedidos_mesclados") or []),
-                    "pedidos_bloqueados_ids": resultado.get("pedidos_bloqueados_ids") or [],
+                    "pedidos_bloqueados_ids": resultado.get("pedidos_bloqueados_ids")
+                    or [],
                 }
             )
             continue
@@ -183,7 +182,9 @@ def executar_reconciliacao_automatica_duplicidades_pedidos(
     _correlation_context_applied: bool = False,
 ) -> dict:
     if not _correlation_context_applied:
-        with operation_correlation_context("job.pedido_duplicate_reconciliation") as correlation_id:
+        with operation_correlation_context(
+            "job.pedido_duplicate_reconciliation"
+        ) as correlation_id:
             result = executar_reconciliacao_automatica_duplicidades_pedidos(
                 db,
                 dias=dias,
@@ -218,7 +219,9 @@ def executar_reconciliacao_automatica_duplicidades_pedidos(
     return {
         "correlation_id": current_correlation_id("job.pedido_duplicate_reconciliation"),
         "tenants_processados": len(tenants),
-        "tenants_com_duplicidades": sum(1 for item in resultados if item.get("grupos_mapeados")),
+        "tenants_com_duplicidades": sum(
+            1 for item in resultados if item.get("grupos_mapeados")
+        ),
         "grupos_mapeados_total": grupos_mapeados_total,
         "grupos_consolidados_total": grupos_consolidados_total,
         "pedidos_mesclados_total": pedidos_mesclados_total,

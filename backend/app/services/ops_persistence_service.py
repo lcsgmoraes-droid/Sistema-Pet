@@ -135,7 +135,9 @@ def _row_to_alert(row: OpsAlert) -> dict[str, Any]:
     data = {
         "id": row.id,
         "alert_key": row.alert_key,
-        "tenant_filter": str(row.tenant_id) if row.tenant_id else payload.get("tenant_filter"),
+        "tenant_filter": str(row.tenant_id)
+        if row.tenant_id
+        else payload.get("tenant_filter"),
         "scope": row.scope,
         "kind": row.kind,
         "severity": row.severity,
@@ -154,7 +156,14 @@ def _row_to_alert(row: OpsAlert) -> dict[str, Any]:
         "score": row.score,
         "payload": payload,
     }
-    for key in ("tone", "errors_5xx", "slow_requests", "total", "tenant_count", "latest_at"):
+    for key in (
+        "tone",
+        "errors_5xx",
+        "slow_requests",
+        "total",
+        "tenant_count",
+        "latest_at",
+    ):
         if key in payload:
             data[key] = payload[key]
     return data
@@ -180,7 +189,9 @@ def _row_to_recovery_action(row: OpsRecoveryAction) -> dict[str, Any]:
     }
 
 
-def persist_error_event(db: Session, event: dict[str, Any], *, commit: bool = False) -> bool:
+def persist_error_event(
+    db: Session, event: dict[str, Any], *, commit: bool = False
+) -> bool:
     event_key = _error_event_key(event)
     if db.query(OpsErrorEvent.id).filter(OpsErrorEvent.event_key == event_key).first():
         return False
@@ -193,16 +204,28 @@ def persist_error_event(db: Session, event: dict[str, Any], *, commit: bool = Fa
             created_at=created_at,
             tenant_id=_tenant_uuid(tenant_raw),
             user_id=str(event.get("user_id")) if event.get("user_id") else None,
-            user_email=str(event.get("user_email")) if event.get("user_email") else None,
-            request_id=str(event.get("request_id")) if event.get("request_id") else None,
+            user_email=str(event.get("user_email"))
+            if event.get("user_email")
+            else None,
+            request_id=str(event.get("request_id"))
+            if event.get("request_id")
+            else None,
             method=str(event.get("method")) if event.get("method") else None,
             path=str(event.get("path"))[:600] if event.get("path") else None,
             status_code=_safe_int(event.get("status_code"), 0) or None,
             duration_ms=_safe_float(event.get("duration_ms")),
-            exception_type=str(event.get("exception_type"))[:160] if event.get("exception_type") else None,
-            exception_message=str(event.get("exception_message")) if event.get("exception_message") else None,
-            client_ip=str(event.get("client_ip"))[:80] if event.get("client_ip") else None,
-            user_agent=str(event.get("user_agent"))[:300] if event.get("user_agent") else None,
+            exception_type=str(event.get("exception_type"))[:160]
+            if event.get("exception_type")
+            else None,
+            exception_message=str(event.get("exception_message"))
+            if event.get("exception_message")
+            else None,
+            client_ip=str(event.get("client_ip"))[:80]
+            if event.get("client_ip")
+            else None,
+            user_agent=str(event.get("user_agent"))[:300]
+            if event.get("user_agent")
+            else None,
             source=str(event.get("source") or "request_context")[:60],
             payload={**event, "tenant_id": str(tenant_raw) if tenant_raw else None},
         )
@@ -221,7 +244,11 @@ def sync_error_events_to_db(db: Session, events: list[dict[str, Any]]) -> int:
     existing: set[str] = set()
     for start in range(0, len(keys), 500):
         chunk = keys[start : start + 500]
-        rows = db.query(OpsErrorEvent.event_key).filter(OpsErrorEvent.event_key.in_(chunk)).all()
+        rows = (
+            db.query(OpsErrorEvent.event_key)
+            .filter(OpsErrorEvent.event_key.in_(chunk))
+            .all()
+        )
         existing.update(row[0] for row in rows)
 
     for event, key in zip(events, keys):
@@ -275,13 +302,23 @@ def query_error_events(
     if until:
         query = query.filter(OpsErrorEvent.created_at <= until)
 
-    rows = query.order_by(OpsErrorEvent.created_at.asc(), OpsErrorEvent.id.asc()).limit(10000).all()
+    rows = (
+        query.order_by(OpsErrorEvent.created_at.asc(), OpsErrorEvent.id.asc())
+        .limit(10000)
+        .all()
+    )
     return [_row_to_error_event(row) for row in rows]
 
 
-def persist_recovery_event(db: Session, event: dict[str, Any], *, commit: bool = False) -> bool:
+def persist_recovery_event(
+    db: Session, event: dict[str, Any], *, commit: bool = False
+) -> bool:
     action_key = _recovery_action_key(event)
-    if db.query(OpsRecoveryAction.id).filter(OpsRecoveryAction.action_key == action_key).first():
+    if (
+        db.query(OpsRecoveryAction.id)
+        .filter(OpsRecoveryAction.action_key == action_key)
+        .first()
+    ):
         return False
 
     event_type = str(event.get("event_type") or "watchdog_event")
@@ -296,7 +333,9 @@ def persist_recovery_event(db: Session, event: dict[str, Any], *, commit: bool =
             message=str(event.get("message")) if event.get("message") else None,
             pid=_safe_int(event.get("pid"), 0) or None,
             uvicorn_pid=_safe_int(event.get("uvicorn_pid"), 0) or None,
-            hostname=str(event.get("hostname"))[:255] if event.get("hostname") else None,
+            hostname=str(event.get("hostname"))[:255]
+            if event.get("hostname")
+            else None,
             started_at=created_at,
             finished_at=created_at,
             created_at=created_at,
@@ -317,7 +356,11 @@ def sync_watchdog_events_to_db(db: Session, events: list[dict[str, Any]]) -> int
     existing: set[str] = set()
     for start in range(0, len(keys), 500):
         chunk = keys[start : start + 500]
-        rows = db.query(OpsRecoveryAction.action_key).filter(OpsRecoveryAction.action_key.in_(chunk)).all()
+        rows = (
+            db.query(OpsRecoveryAction.action_key)
+            .filter(OpsRecoveryAction.action_key.in_(chunk))
+            .all()
+        )
         existing.update(row[0] for row in rows)
 
     for event, key in zip(events, keys):
@@ -354,11 +397,17 @@ def query_recovery_actions(
         query = query.filter(OpsRecoveryAction.created_at >= since)
     if until:
         query = query.filter(OpsRecoveryAction.created_at <= until)
-    rows = query.order_by(OpsRecoveryAction.created_at.asc(), OpsRecoveryAction.id.asc()).limit(limit).all()
+    rows = (
+        query.order_by(OpsRecoveryAction.created_at.asc(), OpsRecoveryAction.id.asc())
+        .limit(limit)
+        .all()
+    )
     return [_row_to_recovery_action(row) for row in rows]
 
 
-def upsert_ops_alerts(db: Session, alerts: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def upsert_ops_alerts(
+    db: Session, alerts: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     now = _utcnow()
     persisted: list[dict[str, Any]] = []
 
@@ -394,10 +443,16 @@ def upsert_ops_alerts(db: Session, alerts: list[dict[str, Any]]) -> list[dict[st
         row.title = str(alert.get("title") or "Alerta operacional")[:255]
         row.detail = str(alert.get("detail")) if alert.get("detail") else None
         row.action = str(alert.get("action")) if alert.get("action") else None
-        row.tenant_id = _tenant_uuid(alert.get("tenant_filter") or alert.get("tenant_id"))
-        row.tenant_name = str(alert.get("tenant_name"))[:255] if alert.get("tenant_name") else None
+        row.tenant_id = _tenant_uuid(
+            alert.get("tenant_filter") or alert.get("tenant_id")
+        )
+        row.tenant_name = (
+            str(alert.get("tenant_name"))[:255] if alert.get("tenant_name") else None
+        )
         row.path = str(alert.get("path"))[:600] if alert.get("path") else None
-        row.request_id = str(alert.get("request_id"))[:80] if alert.get("request_id") else None
+        row.request_id = (
+            str(alert.get("request_id"))[:80] if alert.get("request_id") else None
+        )
         row.latest_event_at = latest_event_at
         row.score = _safe_int(alert.get("score"), 0)
         row.payload = alert
@@ -433,14 +488,18 @@ def list_ops_alerts(
         query = query.filter(OpsAlert.last_seen_at >= since)
 
     rows = (
-        query.order_by(OpsAlert.severity.asc(), OpsAlert.score.desc(), OpsAlert.last_seen_at.desc())
+        query.order_by(
+            OpsAlert.severity.asc(), OpsAlert.score.desc(), OpsAlert.last_seen_at.desc()
+        )
         .limit(max(1, min(limit, 200)))
         .all()
     )
     return [_row_to_alert(row) for row in rows]
 
 
-def summarize_ops_alerts(db: Session, *, since: datetime | None = None) -> dict[str, Any]:
+def summarize_ops_alerts(
+    db: Session, *, since: datetime | None = None
+) -> dict[str, Any]:
     query = db.query(OpsAlert)
     if since:
         query = query.filter(OpsAlert.last_seen_at >= since)
@@ -455,5 +514,10 @@ def summarize_ops_alerts(db: Session, *, since: datetime | None = None) -> dict[
         "warning_open": len([row for row in open_rows if row.severity == "warning"]),
         "by_status": by_status.most_common(),
         "by_severity": by_severity.most_common(),
-        "latest": [_row_to_alert(row) for row in sorted(rows, key=lambda item: item.last_seen_at, reverse=True)[:10]],
+        "latest": [
+            _row_to_alert(row)
+            for row in sorted(rows, key=lambda item: item.last_seen_at, reverse=True)[
+                :10
+            ]
+        ],
     }

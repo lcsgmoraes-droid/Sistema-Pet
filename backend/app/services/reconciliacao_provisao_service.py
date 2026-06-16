@@ -33,9 +33,9 @@ def reconciliar_provisao(
     """
     Substitui provisão por valor real no DRE.
     Usado para INSS, FGTS, Folha, etc.
-    
+
     VERSÃO ATUAL: Registra no DREPeriodo usando despesas_administrativas
-    
+
     Args:
         db: Sessão do banco de dados
         tenant_id: ID do tenant
@@ -46,9 +46,9 @@ def reconciliar_provisao(
         ano: Ano de competência
         observacao_real: Observação para o lançamento real
     """
-    
+
     valor_real = Decimal(str(valor_real))
-    
+
     # Buscar ou criar período DRE
     periodo = (
         db.query(DREPeriodo)
@@ -56,19 +56,19 @@ def reconciliar_provisao(
             and_(
                 DREPeriodo.tenant_id == tenant_id,
                 DREPeriodo.mes == mes,
-                DREPeriodo.ano == ano
+                DREPeriodo.ano == ano,
             )
         )
         .first()
     )
-    
+
     if not periodo:
         # Criar período básico se não existir
         from datetime import date
         import calendar
-        
+
         ultimo_dia = calendar.monthrange(ano, mes)[1]
-        
+
         periodo = DREPeriodo(
             tenant_id=tenant_id,
             data_inicio=date(ano, mes, 1),
@@ -87,51 +87,61 @@ def reconciliar_provisao(
             total_despesas_operacionais=0,
             lucro_operacional=0,
             impostos=0,
-            lucro_liquido=0
+            lucro_liquido=0,
         )
         db.add(periodo)
         db.flush()
-    
+
     # Determinar onde lançar a despesa
     if "INSS" in nome_real or "FGTS" in nome_real:
         # Tributos trabalhistas geralmente vão em despesas administrativas
-        periodo.despesas_administrativas = (periodo.despesas_administrativas or 0) + float(valor_real)
+        periodo.despesas_administrativas = (
+            periodo.despesas_administrativas or 0
+        ) + float(valor_real)
     elif "Folha" in nome_real:
         # Folha também vai em despesas administrativas
-        periodo.despesas_administrativas = (periodo.despesas_administrativas or 0) + float(valor_real)
+        periodo.despesas_administrativas = (
+            periodo.despesas_administrativas or 0
+        ) + float(valor_real)
     else:
         # Outras provisões em outras_despesas
         periodo.outras_despesas = (periodo.outras_despesas or 0) + float(valor_real)
-    
+
     # Recalcular totais
     periodo.total_despesas_operacionais = (
-        (periodo.despesas_vendas or 0) +
-        (periodo.despesas_administrativas or 0) +
-        (periodo.despesas_financeiras or 0) +
-        (periodo.outras_despesas or 0)
+        (periodo.despesas_vendas or 0)
+        + (periodo.despesas_administrativas or 0)
+        + (periodo.despesas_financeiras or 0)
+        + (periodo.outras_despesas or 0)
     )
-    
-    periodo.lucro_operacional = (periodo.lucro_bruto or 0) - periodo.total_despesas_operacionais
+
+    periodo.lucro_operacional = (
+        periodo.lucro_bruto or 0
+    ) - periodo.total_despesas_operacionais
     periodo.lucro_liquido = periodo.lucro_operacional - (periodo.impostos or 0)
-    
+
     # Atualizar margens
     if periodo.receita_liquida and periodo.receita_liquida > 0:
-        periodo.margem_operacional_percent = (periodo.lucro_operacional / periodo.receita_liquida) * 100
-        periodo.margem_liquida_percent = (periodo.lucro_liquido / periodo.receita_liquida) * 100
-    
+        periodo.margem_operacional_percent = (
+            periodo.lucro_operacional / periodo.receita_liquida
+        ) * 100
+        periodo.margem_liquida_percent = (
+            periodo.lucro_liquido / periodo.receita_liquida
+        ) * 100
+
     # Registrar no detalhamento (para rastreabilidade)
     detalhamento_atual = periodo.impostos_detalhamento or ""
-    
+
     novo_lancamento = f"\n[{nome_real}] R$ {valor_real:.2f} - {observacao_real}"
     periodo.impostos_detalhamento = detalhamento_atual + novo_lancamento
-    
+
     db.flush()
-    
+
     return {
         "sucesso": True,
         "periodo_id": periodo.id,
         "valor_lancado": float(valor_real),
         "categoria": nome_real,
         "mes": mes,
-        "ano": ano
+        "ano": ano,
     }

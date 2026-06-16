@@ -77,7 +77,8 @@ def build_sale_coupon_redeemed_metadata(
     return {
         "sale_number": getattr(venda, "numero_venda", None),
         "coupon_id": coupon_consumed.get("coupon_id"),
-        "coupon_code": coupon_consumed.get("coupon_code") or coupon_consumed.get("code"),
+        "coupon_code": coupon_consumed.get("coupon_code")
+        or coupon_consumed.get("code"),
         "redemption_id": coupon_consumed.get("redemption_id"),
         "discount_applied": _to_float(coupon_consumed.get("discount_applied")),
         "customer_id": getattr(venda, "cliente_id", None),
@@ -136,7 +137,9 @@ def build_plan_activation_metadata(
             "plan": getattr(tenant, "plan", None),
             "billing_status": getattr(tenant, "billing_status", None),
             "subscription_source": getattr(tenant, "subscription_source", None),
-            "subscription_activated_at": getattr(tenant, "subscription_activated_at", None).isoformat()
+            "subscription_activated_at": getattr(
+                tenant, "subscription_activated_at", None
+            ).isoformat()
             if getattr(tenant, "subscription_activated_at", None)
             else None,
             "trial_started_at": getattr(tenant, "trial_started_at", None).isoformat()

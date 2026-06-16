@@ -32,7 +32,7 @@ def conciliar_parcela_cartao(
 ):
     """
     Concilia uma parcela de cartão com base no NSU
-    
+
     Args:
         db: Sessão do banco de dados
         tenant_id: ID do tenant (UUID)
@@ -42,14 +42,14 @@ def conciliar_parcela_cartao(
         adquirente: Nome da adquirente (Stone, Cielo, etc)
         usuario_id: ID do usuário que está executando a conciliação
         forma_pagamento_id: ID da forma de pagamento (opcional)
-    
+
     Returns:
         ContaReceber: Conta conciliada
-    
+
     Raises:
         HTTPException: Se conta não encontrada, já conciliada ou valor não confere
     """
-    
+
     # Buscar conta pelo NSU e tenant
     conta = (
         db.query(ContaReceber)
@@ -85,11 +85,11 @@ def conciliar_parcela_cartao(
     conta.nsu = nsu
     conta.adquirente = adquirente
     conta.data_conciliacao = date.today()
-    
+
     db.flush()
 
     # Se já é recebível hoje ou no passado, executa baixa oficial
-    if data_recebimento <= date.today() and conta.status != 'recebido':
+    if data_recebimento <= date.today() and conta.status != "recebido":
         # Criar registro de recebimento oficial
         novo_recebimento = Recebimento(
             conta_receber_id=conta.id,
@@ -98,15 +98,17 @@ def conciliar_parcela_cartao(
             data_recebimento=data_recebimento,
             observacoes=f"Conciliação automática - NSU: {nsu} - Adquirente: {adquirente}",
             user_id=usuario_id,
-            tenant_id=tenant_id
+            tenant_id=tenant_id,
         )
         db.add(novo_recebimento)
-        
+
         # Atualizar conta
-        conta.valor_recebido = (conta.valor_recebido or Decimal(0)) + Decimal(str(valor))
-        conta.status = 'recebido'
+        conta.valor_recebido = (conta.valor_recebido or Decimal(0)) + Decimal(
+            str(valor)
+        )
+        conta.status = "recebido"
         conta.data_recebimento = data_recebimento
-        
+
         db.flush()
 
     logger.info(
@@ -127,14 +129,14 @@ def buscar_contas_nao_conciliadas(
 ):
     """
     Busca contas a receber que ainda não foram conciliadas
-    
+
     Args:
         db: Sessão do banco de dados
         tenant_id: ID do tenant
         data_inicio: Data inicial do filtro (opcional)
         data_fim: Data final do filtro (opcional)
         adquirente: Nome da adquirente para filtrar (opcional)
-    
+
     Returns:
         List[ContaReceber]: Lista de contas não conciliadas
     """
@@ -143,14 +145,14 @@ def buscar_contas_nao_conciliadas(
         ContaReceber.conciliado.is_(False),
         ContaReceber.nsu.isnot(None),  # Apenas contas com NSU
     )
-    
+
     if data_inicio:
         query = query.filter(ContaReceber.data_vencimento >= data_inicio)
-    
+
     if data_fim:
         query = query.filter(ContaReceber.data_vencimento <= data_fim)
-    
+
     if adquirente:
         query = query.filter(ContaReceber.adquirente == adquirente)
-    
+
     return query.order_by(ContaReceber.data_vencimento).all()

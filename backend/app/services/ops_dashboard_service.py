@@ -8,7 +8,10 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from app.models import Tenant
-from app.services.deploy_event_reporter import get_deploy_events, summarize_deploy_events
+from app.services.deploy_event_reporter import (
+    get_deploy_events,
+    summarize_deploy_events,
+)
 from app.services.error_event_reporter import (
     SLOW_REQUEST_EVENT_MS,
     get_error_events,
@@ -27,7 +30,9 @@ from app.services.watchdog_event_reporter import (
 )
 
 try:
-    from app.services.bling_pedido_webhook_queue_service import get_bling_pedido_webhook_queue_snapshot
+    from app.services.bling_pedido_webhook_queue_service import (
+        get_bling_pedido_webhook_queue_snapshot,
+    )
 except Exception:  # pragma: no cover - Ops must stay available during partial deploys
     get_bling_pedido_webhook_queue_snapshot = None
 
@@ -153,7 +158,9 @@ def _event_time_text(event: dict[str, Any] | None) -> str | None:
 
 
 def _tenant_names(db: Session, tenant_ids: set[str]) -> dict[str, str]:
-    real_ids = {tenant_id for tenant_id in tenant_ids if tenant_id and tenant_id != "sem_tenant"}
+    real_ids = {
+        tenant_id for tenant_id in tenant_ids if tenant_id and tenant_id != "sem_tenant"
+    }
     if not real_ids:
         return {}
 
@@ -167,11 +174,15 @@ def _top_paths(events: list[dict[str, Any]], limit: int = 3) -> list[dict[str, A
         grouped[str(event.get("path") or "sem_path")] += 1
     return [
         {"path": path, "total": total}
-        for path, total in sorted(grouped.items(), key=lambda item: item[1], reverse=True)[:limit]
+        for path, total in sorted(
+            grouped.items(), key=lambda item: item[1], reverse=True
+        )[:limit]
     ]
 
 
-def _build_tenant_incidents(db: Session, events: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _build_tenant_incidents(
+    db: Session, events: list[dict[str, Any]]
+) -> list[dict[str, Any]]:
     grouped: dict[str, list[dict[str, Any]]] = defaultdict(list)
     for event in events:
         grouped[str(event.get("tenant_id") or "sem_tenant")].append(event)
@@ -181,13 +192,20 @@ def _build_tenant_incidents(db: Session, events: list[dict[str, Any]]) -> list[d
 
     for tenant_id, tenant_events in grouped.items():
         errors_5xx = sum(1 for event in tenant_events if _status_code(event) >= 500)
-        slow_requests = sum(1 for event in tenant_events if _duration(event) >= SLOW_REQUEST_EVENT_MS)
+        slow_requests = sum(
+            1 for event in tenant_events if _duration(event) >= SLOW_REQUEST_EVENT_MS
+        )
         latest_at = max((_event_dt(event) for event in tenant_events), default=None)
         severity = "critical" if errors_5xx else "warning" if slow_requests else "info"
         incidents.append(
             {
                 "tenant_id": None if tenant_id == "sem_tenant" else tenant_id,
-                "tenant_name": names.get(tenant_id) or ("Sem tenant identificado" if tenant_id == "sem_tenant" else f"Tenant {tenant_id[:8]}"),
+                "tenant_name": names.get(tenant_id)
+                or (
+                    "Sem tenant identificado"
+                    if tenant_id == "sem_tenant"
+                    else f"Tenant {tenant_id[:8]}"
+                ),
                 "severity": severity,
                 "total": len(tenant_events),
                 "errors_5xx": errors_5xx,
@@ -213,8 +231,12 @@ def _build_route_incidents(events: list[dict[str, Any]]) -> list[dict[str, Any]]
     for path, route_events in grouped.items():
         durations = [_duration(event) for event in route_events]
         errors_5xx = sum(1 for event in route_events if _status_code(event) >= 500)
-        slow_requests = sum(1 for event in route_events if _duration(event) >= SLOW_REQUEST_EVENT_MS)
-        tenant_count = len({str(event.get("tenant_id") or "sem_tenant") for event in route_events})
+        slow_requests = sum(
+            1 for event in route_events if _duration(event) >= SLOW_REQUEST_EVENT_MS
+        )
+        tenant_count = len(
+            {str(event.get("tenant_id") or "sem_tenant") for event in route_events}
+        )
         latest_at = max((_event_dt(event) for event in route_events), default=None)
         severity = "critical" if errors_5xx else "warning" if slow_requests else "info"
         incidents.append(
@@ -233,7 +255,11 @@ def _build_route_incidents(events: list[dict[str, Any]]) -> list[dict[str, Any]]
 
     return sorted(
         incidents,
-        key=lambda item: (item["errors_5xx"], item["slow_requests"], item["max_duration_ms"]),
+        key=lambda item: (
+            item["errors_5xx"],
+            item["slow_requests"],
+            item["max_duration_ms"],
+        ),
         reverse=True,
     )[:20]
 
@@ -251,14 +277,28 @@ def _build_actionable_alerts(
     route_error_threshold = _env_int("OPS_ALERT_ROUTE_5XX_CRITICAL", 2)
     route_slow_threshold = _env_int("OPS_ALERT_ROUTE_SLOW_WARNING", 4)
     watchdog_recoveries = int(watchdog_summary.get("recoveries") or 0)
-    watchdog_problem_statuses = {"warning", "cooldown", "restart_loop_guard", "failed", "unhealthy"}
+    watchdog_problem_statuses = {
+        "warning",
+        "cooldown",
+        "restart_loop_guard",
+        "failed",
+        "unhealthy",
+    }
     watchdog_failure_threshold = _env_int("OPS_ALERT_WATCHDOG_FAILURE_WARNING", 2)
-    watchdog_failures = _summary_count(watchdog_summary, "by_status", watchdog_problem_statuses)
+    watchdog_failures = _summary_count(
+        watchdog_summary, "by_status", watchdog_problem_statuses
+    )
     latest_watchdog_event = (watchdog_summary.get("latest") or [None])[0]
-    latest_watchdog_status = str(_event_payload_value(latest_watchdog_event, "status") or "unknown")
-    latest_watchdog_message = str(_event_payload_value(latest_watchdog_event, "message") or "")
+    latest_watchdog_status = str(
+        _event_payload_value(latest_watchdog_event, "status") or "unknown"
+    )
+    latest_watchdog_message = str(
+        _event_payload_value(latest_watchdog_event, "message") or ""
+    )
     latest_watchdog_at = _event_time_text(latest_watchdog_event)
-    worker_health = str(_event_payload_value(latest_watchdog_event, "worker_health") or "").lower()
+    worker_health = str(
+        _event_payload_value(latest_watchdog_event, "worker_health") or ""
+    ).lower()
 
     if watchdog.get("status") != "healthy":
         alerts.append(
@@ -284,7 +324,8 @@ def _build_actionable_alerts(
                 "severity": "warning",
                 "tone": "amber",
                 "title": f"{watchdog_failures} falha(s) recorrente(s) do watchdog externo",
-                "detail": latest_watchdog_message or f"Ultimo status: {latest_watchdog_status}",
+                "detail": latest_watchdog_message
+                or f"Ultimo status: {latest_watchdog_status}",
                 "action": "Abrir eventos do watchdog externo e corrigir a causa recorrente antes que vire restart em loop.",
                 "latest_at": latest_watchdog_at,
                 "total": watchdog_failures,
@@ -334,7 +375,8 @@ def _build_actionable_alerts(
                 "severity": "critical",
                 "tone": "red",
                 "title": "Ultimo deploy registrado falhou",
-                "detail": last_failed.get("message") or f"Etapa: {last_failed.get('step') or '-'}",
+                "detail": last_failed.get("message")
+                or f"Etapa: {last_failed.get('step') or '-'}",
                 "action": "Investigar a falha de deploy antes de empilhar nova mudanca em producao.",
                 "score": 900,
             }
@@ -350,17 +392,28 @@ def _build_actionable_alerts(
 
     for tenant_id, tenant_events in grouped_by_tenant.items():
         errors_5xx = sum(1 for event in tenant_events if _status_code(event) >= 500)
-        slow_requests = sum(1 for event in tenant_events if _duration(event) >= SLOW_REQUEST_EVENT_MS)
-        if errors_5xx < tenant_error_threshold and slow_requests < tenant_slow_threshold:
+        slow_requests = sum(
+            1 for event in tenant_events if _duration(event) >= SLOW_REQUEST_EVENT_MS
+        )
+        if (
+            errors_5xx < tenant_error_threshold
+            and slow_requests < tenant_slow_threshold
+        ):
             continue
 
         latest = _latest_event(tenant_events)
         top_path = _top_path(tenant_events)
         tenant_name = tenant_names.get(tenant_id) or (
-            "Sem tenant identificado" if tenant_id == "sem_tenant" else f"Tenant {tenant_id[:8]}"
+            "Sem tenant identificado"
+            if tenant_id == "sem_tenant"
+            else f"Tenant {tenant_id[:8]}"
         )
         severity = "critical" if errors_5xx >= tenant_error_threshold else "warning"
-        kind = "tenant_5xx_recurrent" if severity == "critical" else "tenant_slow_recurrent"
+        kind = (
+            "tenant_5xx_recurrent"
+            if severity == "critical"
+            else "tenant_slow_recurrent"
+        )
         metric_detail = (
             f"{errors_5xx} erro(s) 5xx"
             if severity == "critical"
@@ -385,20 +438,28 @@ def _build_actionable_alerts(
                 "total": len(tenant_events),
                 "errors_5xx": errors_5xx,
                 "slow_requests": slow_requests,
-                "score": (500 if severity == "critical" else 250) + (errors_5xx * 20) + slow_requests,
+                "score": (500 if severity == "critical" else 250)
+                + (errors_5xx * 20)
+                + slow_requests,
             }
         )
 
     for path, path_events in grouped_by_path.items():
         errors_5xx = sum(1 for event in path_events if _status_code(event) >= 500)
-        slow_requests = sum(1 for event in path_events if _duration(event) >= SLOW_REQUEST_EVENT_MS)
+        slow_requests = sum(
+            1 for event in path_events if _duration(event) >= SLOW_REQUEST_EVENT_MS
+        )
         if errors_5xx < route_error_threshold and slow_requests < route_slow_threshold:
             continue
 
         latest = _latest_event(path_events)
-        tenant_count = len({str(event.get("tenant_id") or "sem_tenant") for event in path_events})
+        tenant_count = len(
+            {str(event.get("tenant_id") or "sem_tenant") for event in path_events}
+        )
         severity = "critical" if errors_5xx >= route_error_threshold else "warning"
-        kind = "route_5xx_recurrent" if severity == "critical" else "route_slow_recurrent"
+        kind = (
+            "route_5xx_recurrent" if severity == "critical" else "route_slow_recurrent"
+        )
         metric_detail = (
             f"{errors_5xx} erro(s) 5xx"
             if severity == "critical"
@@ -421,11 +482,16 @@ def _build_actionable_alerts(
                 "errors_5xx": errors_5xx,
                 "slow_requests": slow_requests,
                 "tenant_count": tenant_count,
-                "score": (450 if severity == "critical" else 220) + (errors_5xx * 18) + slow_requests + tenant_count,
+                "score": (450 if severity == "critical" else 220)
+                + (errors_5xx * 18)
+                + slow_requests
+                + tenant_count,
             }
         )
 
-    return sorted(alerts, key=lambda item: int(item.get("score") or 0), reverse=True)[:20]
+    return sorted(alerts, key=lambda item: int(item.get("score") or 0), reverse=True)[
+        :20
+    ]
 
 
 def _watchdog_now(db: Session) -> dict[str, Any]:
@@ -476,17 +542,31 @@ def _self_healing_status() -> dict[str, Any]:
     }
 
 
-def _last_failed_deploy_after_success(deploy_events: list[dict[str, Any]]) -> dict[str, Any] | None:
+def _last_failed_deploy_after_success(
+    deploy_events: list[dict[str, Any]],
+) -> dict[str, Any] | None:
     latest = list(reversed(deploy_events))
     last_success = next(
-        (event for event in latest if str(event.get("status") or "").lower() == "success"),
+        (
+            event
+            for event in latest
+            if str(event.get("status") or "").lower() == "success"
+        ),
         None,
     )
     last_failed = next(
-        (event for event in latest if str(event.get("status") or "").lower() == "failed"),
+        (
+            event
+            for event in latest
+            if str(event.get("status") or "").lower() == "failed"
+        ),
         None,
     )
-    if last_failed and (not last_success or str(last_failed.get("created_at") or "") > str(last_success.get("created_at") or "")):
+    if last_failed and (
+        not last_success
+        or str(last_failed.get("created_at") or "")
+        > str(last_success.get("created_at") or "")
+    ):
         return last_failed
     return None
 
@@ -522,7 +602,9 @@ def _build_alerts(
 
     if errors_5xx:
         top_route = route_incidents[0]["path"] if route_incidents else "rotas com erro"
-        top_tenant = tenant_incidents[0]["tenant_name"] if tenant_incidents else "tenant afetado"
+        top_tenant = (
+            tenant_incidents[0]["tenant_name"] if tenant_incidents else "tenant afetado"
+        )
         alerts.append(
             {
                 "severity": "critical",
@@ -552,7 +634,8 @@ def _build_alerts(
                 "severity": "critical",
                 "tone": "red",
                 "title": "Ultimo deploy falhou",
-                "detail": last_failed.get("message") or f"Etapa: {last_failed.get('step') or '-'}",
+                "detail": last_failed.get("message")
+                or f"Etapa: {last_failed.get('step') or '-'}",
                 "action": "Nao seguir com novo deploy sem entender a falha anterior.",
                 "source": "deploy",
             }
@@ -620,7 +703,9 @@ def _build_alerts(
             )
 
         for item in by_tenant[:5]:
-            tenant_key = str(item.get("tenant_id") or item.get("tenant_key") or "sem_tenant")
+            tenant_key = str(
+                item.get("tenant_id") or item.get("tenant_key") or "sem_tenant"
+            )
             pending_tenant = int(item.get("pending") or 0)
             processing_tenant = int(item.get("processing") or 0)
             failed_tenant = int(item.get("failed") or 0)
@@ -628,13 +713,22 @@ def _build_alerts(
             total_open = int(item.get("total_open") or 0)
             if total_open <= 0:
                 continue
-            if not (dead_tenant or failed_tenant or pending_tenant >= pending_warning or tenant_key == "sem_tenant"):
+            if not (
+                dead_tenant
+                or failed_tenant
+                or pending_tenant >= pending_warning
+                or tenant_key == "sem_tenant"
+            ):
                 continue
 
             tenant_name = tenant_names.get(tenant_key) or (
-                "Sem tenant identificado" if tenant_key == "sem_tenant" else f"Tenant {tenant_key[:8]}"
+                "Sem tenant identificado"
+                if tenant_key == "sem_tenant"
+                else f"Tenant {tenant_key[:8]}"
             )
-            severity = "critical" if dead_tenant or tenant_key == "sem_tenant" else "warning"
+            severity = (
+                "critical" if dead_tenant or tenant_key == "sem_tenant" else "warning"
+            )
             alerts.append(
                 {
                     "severity": severity,
@@ -727,7 +821,9 @@ def _current_health_status(
     }
 
 
-def build_ops_dashboard(db: Session, *, since: datetime | None = None, until: datetime | None = None) -> dict[str, Any]:
+def build_ops_dashboard(
+    db: Session, *, since: datetime | None = None, until: datetime | None = None
+) -> dict[str, Any]:
     now = _utcnow()
     period_since = since or (now - timedelta(hours=24))
     period_until = until
@@ -738,10 +834,16 @@ def build_ops_dashboard(db: Session, *, since: datetime | None = None, until: da
     deploy_events = get_deploy_events(since=period_since, until=period_until)
     watchdog_events = get_watchdog_events(since=period_since, until=period_until, db=db)
 
-    error_summary = summarize_error_events(since=period_since, until=period_until, db=db)
-    current_error_summary = summarize_error_events(since=current_since, until=now, db=db)
+    error_summary = summarize_error_events(
+        since=period_since, until=period_until, db=db
+    )
+    current_error_summary = summarize_error_events(
+        since=current_since, until=now, db=db
+    )
     deploy_summary = summarize_deploy_events(since=period_since, until=period_until)
-    watchdog_summary = summarize_watchdog_events(since=period_since, until=period_until, db=db)
+    watchdog_summary = summarize_watchdog_events(
+        since=period_since, until=period_until, db=db
+    )
     watchdog = _watchdog_now(db)
     queue_snapshot: dict[str, Any] = {}
     if get_bling_pedido_webhook_queue_snapshot is not None:
@@ -763,9 +865,13 @@ def build_ops_dashboard(db: Session, *, since: datetime | None = None, until: da
             },
         )
         for item in queue_snapshot.get("by_tenant", []):
-            tenant_key = str(item.get("tenant_id") or item.get("tenant_key") or "sem_tenant")
+            tenant_key = str(
+                item.get("tenant_id") or item.get("tenant_key") or "sem_tenant"
+            )
             item["tenant_name"] = queue_tenant_names.get(tenant_key) or (
-                "Sem tenant identificado" if tenant_key == "sem_tenant" else f"Tenant {tenant_key[:8]}"
+                "Sem tenant identificado"
+                if tenant_key == "sem_tenant"
+                else f"Tenant {tenant_key[:8]}"
             )
     current_status = _current_health_status(
         watchdog=watchdog,
@@ -784,7 +890,9 @@ def build_ops_dashboard(db: Session, *, since: datetime | None = None, until: da
     )
     persisted_actionable_alerts = upsert_ops_alerts(db, actionable_alerts)
     try:
-        ops_notification_delivery = notify_ops_alerts(persisted_actionable_alerts or actionable_alerts)
+        ops_notification_delivery = notify_ops_alerts(
+            persisted_actionable_alerts or actionable_alerts
+        )
     except Exception as exc:
         ops_notification_delivery = {
             "enabled": False,
@@ -797,7 +905,9 @@ def build_ops_dashboard(db: Session, *, since: datetime | None = None, until: da
         }
     ops_notifications = summarize_ops_alerts(db, since=period_since)
     active_ops_alerts = list_ops_alerts(db, status="open", since=period_since, limit=20)
-    recovery_actions = query_recovery_actions(db, since=period_since, until=period_until, limit=20)
+    recovery_actions = query_recovery_actions(
+        db, since=period_since, until=period_until, limit=20
+    )
     alerts = _build_alerts(
         db=db,
         watchdog=watchdog,

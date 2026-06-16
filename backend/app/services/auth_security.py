@@ -1,4 +1,5 @@
 """Security helpers for authentication flows."""
+
 from __future__ import annotations
 
 import json
@@ -13,7 +14,11 @@ from sqlalchemy.orm import Session
 from app.audit_log import log_action
 from app.middlewares.request_context import get_request_id
 from app.models import User
-from app.tenancy.context import clear_current_tenant, get_current_tenant, set_current_tenant
+from app.tenancy.context import (
+    clear_current_tenant,
+    get_current_tenant,
+    set_current_tenant,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -100,13 +105,17 @@ def _audit_auth_event(
             commit=False,
         )
     except Exception as exc:
-        logger.warning("auth_audit_log_failed", extra={"action": action, "error": str(exc)})
+        logger.warning(
+            "auth_audit_log_failed", extra={"action": action, "error": str(exc)}
+        )
     finally:
         if temporary_tenant:
             clear_current_tenant()
 
 
-def register_failed_login(db: Session, user: User | None, request: Request | None) -> None:
+def register_failed_login(
+    db: Session, user: User | None, request: Request | None
+) -> None:
     if not user:
         return
 
@@ -148,15 +157,25 @@ def register_email_verified(db: Session, user: User, request: Request | None) ->
         user,
         "auth.email_verified",
         request,
-        {"email_verified_at": user.email_verified_at.isoformat() if user.email_verified_at else None},
+        {
+            "email_verified_at": user.email_verified_at.isoformat()
+            if user.email_verified_at
+            else None
+        },
     )
 
 
-def register_email_verification_resent(db: Session, user: User, request: Request | None) -> None:
-    _audit_auth_event(db, user, "auth.email_verification_resent", request, {"success": True})
+def register_email_verification_resent(
+    db: Session, user: User, request: Request | None
+) -> None:
+    _audit_auth_event(
+        db, user, "auth.email_verification_resent", request, {"success": True}
+    )
 
 
-def register_account_created(db: Session, user: User, request: Request | None, source: str) -> None:
+def register_account_created(
+    db: Session, user: User, request: Request | None, source: str
+) -> None:
     _audit_auth_event(
         db,
         user,
@@ -171,11 +190,17 @@ def register_account_created(db: Session, user: User, request: Request | None, s
     )
 
 
-def register_password_reset_requested(db: Session, user: User, request: Request | None) -> None:
-    _audit_auth_event(db, user, "auth.password_reset_requested", request, {"success": True})
+def register_password_reset_requested(
+    db: Session, user: User, request: Request | None
+) -> None:
+    _audit_auth_event(
+        db, user, "auth.password_reset_requested", request, {"success": True}
+    )
 
 
-def register_password_changed(db: Session, user: User, request: Request | None, reason: str) -> None:
+def register_password_changed(
+    db: Session, user: User, request: Request | None, reason: str
+) -> None:
     user.failed_login_attempts = 0
     user.locked_until = None
     user.password_changed_at = now_utc()
@@ -188,7 +213,9 @@ def register_password_changed(db: Session, user: User, request: Request | None, 
     )
 
 
-def register_logout(db: Session, user: User, request: Request | None, revoked_sessions: int) -> None:
+def register_logout(
+    db: Session, user: User, request: Request | None, revoked_sessions: int
+) -> None:
     _audit_auth_event(
         db,
         user,

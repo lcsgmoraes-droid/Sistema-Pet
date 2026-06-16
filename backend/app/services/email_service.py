@@ -11,6 +11,7 @@ Configuração via variáveis de ambiente:
 Se nenhuma variável estiver configurada, o envio é apenas simulado
 (impresso no log) sem gerar erro.
 """
+
 import logging
 import os
 import smtplib
@@ -140,7 +141,9 @@ def _build_email_message(
     msg["X-Mailer"] = DEFAULT_SENDER_NAME
     msg["X-Correlation-ID"] = resolved_correlation_id
 
-    texto_fallback = text_body or "Seu cliente de e-mail nao exibiu o conteudo HTML desta mensagem."
+    texto_fallback = (
+        text_body or "Seu cliente de e-mail nao exibiu o conteudo HTML desta mensagem."
+    )
     msg.set_content(texto_fallback, subtype="plain", charset="utf-8")
     msg.add_alternative(html_body, subtype="html", charset="utf-8")
 
@@ -167,12 +170,24 @@ def send_email(
     simulate_if_unconfigured: bool = True,
 ) -> bool:
     """Envia um e-mail. Retorna True se enviado com sucesso, False caso contrario."""
-    correlation_id = current_correlation_id("integration.email.smtp", reference=f"{to}:{subject}")
+    correlation_id = current_correlation_id(
+        "integration.email.smtp", reference=f"{to}:{subject}"
+    )
     if not _smtp_configured():
         if simulate_if_unconfigured:
-            logger.info("[EMAIL-SIMULADO] Para: %s | Assunto: %s | correlation_id=%s", to, subject, correlation_id)
+            logger.info(
+                "[EMAIL-SIMULADO] Para: %s | Assunto: %s | correlation_id=%s",
+                to,
+                subject,
+                correlation_id,
+            )
             return True
-        logger.warning("[EMAIL-NAO-CONFIGURADO] Para: %s | Assunto: %s | correlation_id=%s", to, subject, correlation_id)
+        logger.warning(
+            "[EMAIL-NAO-CONFIGURADO] Para: %s | Assunto: %s | correlation_id=%s",
+            to,
+            subject,
+            correlation_id,
+        )
         return False
 
     config = _smtp_settings()
@@ -202,14 +217,26 @@ def send_email(
                 server.ehlo()
             server.login(user, password)
             server.sendmail(envelope_from, [to], msg.as_bytes(policy=policy.SMTP))
-        logger.info("[EMAIL-ENVIADO] Para: %s | Assunto: %s | correlation_id=%s", to, subject, correlation_id)
+        logger.info(
+            "[EMAIL-ENVIADO] Para: %s | Assunto: %s | correlation_id=%s",
+            to,
+            subject,
+            correlation_id,
+        )
         return True
     except Exception as exc:
-        logger.error("[EMAIL-ERRO] Para: %s | Erro: %s | correlation_id=%s", to, exc, correlation_id)
+        logger.error(
+            "[EMAIL-ERRO] Para: %s | Erro: %s | correlation_id=%s",
+            to,
+            exc,
+            correlation_id,
+        )
         return False
 
 
-def send_notify_me_email(to: str, product_name: str, store_name: str, store_url: str) -> bool:
+def send_notify_me_email(
+    to: str, product_name: str, store_name: str, store_url: str
+) -> bool:
     """Envia aviso de produto voltou ao estoque."""
     subject = f"🐾 {product_name} está disponível na {store_name}!"
     html_body = f"""
@@ -233,8 +260,5 @@ def send_notify_me_email(to: str, product_name: str, store_name: str, store_url:
       </div>
     </body></html>
     """
-    text_body = (
-        f"{product_name} está disponível em {store_name}!\n"
-        f"Acesse: {store_url}"
-    )
+    text_body = f"{product_name} está disponível em {store_name}!\nAcesse: {store_url}"
     return send_email(to, subject, html_body, text_body)

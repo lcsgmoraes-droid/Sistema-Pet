@@ -146,7 +146,8 @@ class PrivacyOpsService:
                 consent_type=key,
                 consent_given=bool(preferences[key]),
                 consent_text=f"Preferencia {key} {label} via {source}.",
-                phone_number=getattr(cliente, "telefone", None) or getattr(cliente, "celular", None),
+                phone_number=getattr(cliente, "telefone", None)
+                or getattr(cliente, "celular", None),
                 email=getattr(cliente, "email", None),
                 ip_address=ip_address,
                 user_agent=user_agent,
@@ -185,7 +186,9 @@ class PrivacyOpsService:
                 DataPrivacyConsent.subject_id == str(subject_id),
                 DataPrivacyConsent.consent_type.in_(PREFERENCE_TYPES),
             )
-            .order_by(DataPrivacyConsent.created_at.desc(), DataPrivacyConsent.id.desc())
+            .order_by(
+                DataPrivacyConsent.created_at.desc(), DataPrivacyConsent.id.desc()
+            )
             .all()
         )
         seen: set[str] = set()
@@ -201,7 +204,9 @@ class PrivacyOpsService:
             }
         return result
 
-    def consent_history(self, subject_type: str, subject_id: str, limit: int = 100) -> list[dict[str, Any]]:
+    def consent_history(
+        self, subject_type: str, subject_id: str, limit: int = 100
+    ) -> list[dict[str, Any]]:
         rows = (
             self.db.query(DataPrivacyConsent)
             .filter(
@@ -209,7 +214,9 @@ class PrivacyOpsService:
                 DataPrivacyConsent.subject_type == subject_type,
                 DataPrivacyConsent.subject_id == str(subject_id),
             )
-            .order_by(DataPrivacyConsent.created_at.desc(), DataPrivacyConsent.id.desc())
+            .order_by(
+                DataPrivacyConsent.created_at.desc(), DataPrivacyConsent.id.desc()
+            )
             .limit(max(1, min(limit, 500)))
             .all()
         )
@@ -264,11 +271,15 @@ class PrivacyOpsService:
                 status="pending",
                 contact_phone=requester_phone,
                 contact_email=requester_email,
-                extra_metadata=_json_dump({"data_subject_request_id": subject_request.id}),
+                extra_metadata=_json_dump(
+                    {"data_subject_request_id": subject_request.id}
+                ),
             )
             self.db.add(legacy)
             self.db.flush()
-            subject_request.response_payload = _json_dump({"legacy_deletion_request_id": legacy.id})
+            subject_request.response_payload = _json_dump(
+                {"legacy_deletion_request_id": legacy.id}
+            )
 
         self.log_data_access(
             subject_type=subject_type,
@@ -292,7 +303,9 @@ class PrivacyOpsService:
         subject_id: str | None = None,
         limit: int = 100,
     ) -> list[dict[str, Any]]:
-        query = self.db.query(DataSubjectRequest).filter(DataSubjectRequest.tenant_id == self.tenant_id)
+        query = self.db.query(DataSubjectRequest).filter(
+            DataSubjectRequest.tenant_id == self.tenant_id
+        )
         if status:
             query = query.filter(DataSubjectRequest.status == status)
         if subject_type:
@@ -300,7 +313,9 @@ class PrivacyOpsService:
         if subject_id:
             query = query.filter(DataSubjectRequest.subject_id == str(subject_id))
         rows = (
-            query.order_by(DataSubjectRequest.created_at.desc(), DataSubjectRequest.id.desc())
+            query.order_by(
+                DataSubjectRequest.created_at.desc(), DataSubjectRequest.id.desc()
+            )
             .limit(max(1, min(limit, 500)))
             .all()
         )
@@ -317,13 +332,23 @@ class PrivacyOpsService:
         ip_address: str | None = None,
         user_agent: str | None = None,
     ) -> DataSubjectRequest:
-        allowed = {"pending", "in_review", "waiting_customer", "completed", "rejected", "cancelled"}
+        allowed = {
+            "pending",
+            "in_review",
+            "waiting_customer",
+            "completed",
+            "rejected",
+            "cancelled",
+        }
         if status not in allowed:
             raise ValueError("Status LGPD invalido")
 
         row = (
             self.db.query(DataSubjectRequest)
-            .filter(DataSubjectRequest.tenant_id == self.tenant_id, DataSubjectRequest.id == request_id)
+            .filter(
+                DataSubjectRequest.tenant_id == self.tenant_id,
+                DataSubjectRequest.id == request_id,
+            )
             .first()
         )
         if not row:
@@ -332,7 +357,11 @@ class PrivacyOpsService:
         now = utcnow()
         row.status = status
         row.processed_by_user_id = processed_by_user_id
-        row.processed_at = now if status in {"completed", "rejected", "cancelled"} else row.processed_at
+        row.processed_at = (
+            now
+            if status in {"completed", "rejected", "cancelled"}
+            else row.processed_at
+        )
         row.updated_at = now
         row.resolution_notes = resolution_notes
         if response_payload is not None:
@@ -365,7 +394,10 @@ class PrivacyOpsService:
 
         row = (
             self.db.query(DataSubjectRequest)
-            .filter(DataSubjectRequest.tenant_id == self.tenant_id, DataSubjectRequest.id == request_id)
+            .filter(
+                DataSubjectRequest.tenant_id == self.tenant_id,
+                DataSubjectRequest.id == request_id,
+            )
             .first()
         )
         if not row:
@@ -380,7 +412,9 @@ class PrivacyOpsService:
         try:
             cliente_id = int(row.subject_id)
         except (TypeError, ValueError) as exc:
-            raise ValueError("Titular da solicitacao nao aponta para um cliente valido") from exc
+            raise ValueError(
+                "Titular da solicitacao nao aponta para um cliente valido"
+            ) from exc
 
         cliente = (
             self.db.query(Cliente)
@@ -487,7 +521,9 @@ class PrivacyOpsService:
         previous_payload = _json_load(row.response_payload, {}) or {}
         safe_previous_payload = {}
         if previous_payload.get("legacy_deletion_request_id"):
-            safe_previous_payload["legacy_deletion_request_id"] = previous_payload["legacy_deletion_request_id"]
+            safe_previous_payload["legacy_deletion_request_id"] = previous_payload[
+                "legacy_deletion_request_id"
+            ]
         row.status = "completed"
         row.processed_by_user_id = processed_by_user_id
         row.processed_at = now
@@ -566,15 +602,24 @@ class PrivacyOpsService:
         if getattr(cliente, "user_id", None):
             ecommerce_rows = (
                 self.db.query(Pedido)
-                .filter(Pedido.tenant_id == self.tenant_id, Pedido.cliente_id == cliente.user_id)
+                .filter(
+                    Pedido.tenant_id == self.tenant_id,
+                    Pedido.cliente_id == cliente.user_id,
+                )
                 .order_by(Pedido.created_at.desc(), Pedido.id.desc())
                 .limit(200)
                 .all()
             )
             pedido_ids = [row.pedido_id for row in ecommerce_rows]
-            itens_por_pedido: dict[str, list[PedidoItem]] = {pid: [] for pid in pedido_ids}
+            itens_por_pedido: dict[str, list[PedidoItem]] = {
+                pid: [] for pid in pedido_ids
+            }
             if pedido_ids:
-                for item in self.db.query(PedidoItem).filter(PedidoItem.pedido_id.in_(pedido_ids)).all():
+                for item in (
+                    self.db.query(PedidoItem)
+                    .filter(PedidoItem.pedido_id.in_(pedido_ids))
+                    .all()
+                ):
                     itens_por_pedido.setdefault(item.pedido_id, []).append(item)
             ecommerce_pedidos = [
                 {
@@ -607,9 +652,15 @@ class PrivacyOpsService:
             "vendas": [self._serialize_venda(venda) for venda in vendas],
             "ecommerce_pedidos": ecommerce_pedidos,
             "preferencias": self.current_preferences("customer", str(cliente.id)),
-            "consentimentos": self.consent_history("customer", str(cliente.id), limit=300),
-            "solicitacoes": self.list_subject_requests(subject_type="customer", subject_id=str(cliente.id), limit=300),
-            "solicitacoes_exclusao": self._legacy_deletion_requests("customer", str(cliente.id)),
+            "consentimentos": self.consent_history(
+                "customer", str(cliente.id), limit=300
+            ),
+            "solicitacoes": self.list_subject_requests(
+                subject_type="customer", subject_id=str(cliente.id), limit=300
+            ),
+            "solicitacoes_exclusao": self._legacy_deletion_requests(
+                "customer", str(cliente.id)
+            ),
             "logs_acesso": self._access_logs("customer", str(cliente.id)),
         }
 
@@ -659,7 +710,9 @@ class PrivacyOpsService:
             self.db.commit()
         return log
 
-    def _legacy_deletion_requests(self, subject_type: str, subject_id: str) -> list[dict[str, Any]]:
+    def _legacy_deletion_requests(
+        self, subject_type: str, subject_id: str
+    ) -> list[dict[str, Any]]:
         rows = (
             self.db.query(DataDeletionRequest)
             .filter(
@@ -667,7 +720,9 @@ class PrivacyOpsService:
                 DataDeletionRequest.subject_type == subject_type,
                 DataDeletionRequest.subject_id == str(subject_id),
             )
-            .order_by(DataDeletionRequest.request_date.desc(), DataDeletionRequest.id.desc())
+            .order_by(
+                DataDeletionRequest.request_date.desc(), DataDeletionRequest.id.desc()
+            )
             .limit(100)
             .all()
         )
@@ -683,7 +738,9 @@ class PrivacyOpsService:
             for row in rows
         ]
 
-    def _linked_legacy_deletion_request(self, row: DataSubjectRequest) -> DataDeletionRequest | None:
+    def _linked_legacy_deletion_request(
+        self, row: DataSubjectRequest
+    ) -> DataDeletionRequest | None:
         payload = _json_load(row.response_payload, {}) or {}
         legacy_id = payload.get("legacy_deletion_request_id")
         query = self.db.query(DataDeletionRequest).filter(
@@ -694,7 +751,13 @@ class PrivacyOpsService:
         if legacy_id:
             return query.filter(DataDeletionRequest.id == legacy_id).first()
 
-        candidates = query.order_by(DataDeletionRequest.request_date.desc(), DataDeletionRequest.id.desc()).limit(50).all()
+        candidates = (
+            query.order_by(
+                DataDeletionRequest.request_date.desc(), DataDeletionRequest.id.desc()
+            )
+            .limit(50)
+            .all()
+        )
         for candidate in candidates:
             metadata = _json_load(candidate.extra_metadata, {}) or {}
             if str(metadata.get("data_subject_request_id")) == str(row.id):
@@ -805,7 +868,8 @@ class PrivacyOpsService:
                     "id": item.id,
                     "tipo": item.tipo,
                     "produto_id": item.produto_id,
-                    "descricao": item.servico_descricao or (item.produto.nome if item.produto else None),
+                    "descricao": item.servico_descricao
+                    or (item.produto.nome if item.produto else None),
                     "quantidade": _num(item.quantidade),
                     "preco_unitario": _num(item.preco_unitario),
                     "subtotal": _num(item.subtotal),

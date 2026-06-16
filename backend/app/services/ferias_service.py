@@ -24,6 +24,7 @@ from app.cargo_models import Cargo
 from app.services.remuneracao_service import calcular_composicao_remuneracao
 
 import logging
+
 logger = logging.getLogger(__name__)
 
 
@@ -35,7 +36,7 @@ def conceder_ferias(
     ano: int,
     usuario_id: int = None,
     data_pagamento: date = None,
-    dias_ferias: int = 30
+    dias_ferias: int = 30,
 ) -> dict:
     """
     Concede férias a um funcionário.
@@ -75,7 +76,7 @@ def conceder_ferias(
             Cliente.id == funcionario_id,
             Cliente.tenant_id == tenant_id,
             Cliente.tipo_cadastro == "funcionario",
-            Cliente.ativo.is_(True)
+            Cliente.ativo.is_(True),
         )
         .first()
     )
@@ -89,9 +90,7 @@ def conceder_ferias(
         raise Exception("Funcionário não possui cargo definido")
 
     cargo = (
-        db.query(Cargo)
-        .filter_by(id=funcionario.cargo_id, tenant_id=tenant_id)
-        .first()
+        db.query(Cargo).filter_by(id=funcionario.cargo_id, tenant_id=tenant_id).first()
     )
 
     if not cargo:
@@ -99,8 +98,7 @@ def conceder_ferias(
         raise Exception("Cargo não encontrado")
 
     logger.info(
-        f"[FERIAS] Funcionário: {funcionario.nome}, "
-        f"Salário: R$ {cargo.salario_base}"
+        f"[FERIAS] Funcionário: {funcionario.nome}, Salário: R$ {cargo.salario_base}"
     )
 
     # 2️⃣ Calcular valor real das férias
@@ -120,28 +118,19 @@ def conceder_ferias(
     # 3️⃣ Buscar categorias
     cat_ferias_provisao = (
         db.query(CategoriaFinanceira)
-        .filter_by(
-            tenant_id=tenant_id,
-            nome="Provisão de Férias"
-        )
+        .filter_by(tenant_id=tenant_id, nome="Provisão de Férias")
         .first()
     )
 
     cat_terco_provisao = (
         db.query(CategoriaFinanceira)
-        .filter_by(
-            tenant_id=tenant_id,
-            nome="Provisão 1/3 Constitucional"
-        )
+        .filter_by(tenant_id=tenant_id, nome="Provisão 1/3 Constitucional")
         .first()
     )
 
     cat_ferias_pagas = (
         db.query(CategoriaFinanceira)
-        .filter_by(
-            tenant_id=tenant_id,
-            nome="Férias Pagas"
-        )
+        .filter_by(tenant_id=tenant_id, nome="Férias Pagas")
         .first()
     )
 
@@ -197,7 +186,7 @@ def conceder_ferias(
             data_inicio=date(ano, mes, 1),
             data_fim=ultima_data_mes,
             canal="provisao_consumo",
-            despesas_pessoal=-float(prov_ferias + prov_terco)
+            despesas_pessoal=-float(prov_ferias + prov_terco),
         )
 
         db.add(baixa_ferias)
@@ -218,7 +207,7 @@ def conceder_ferias(
             data_inicio=date(ano, mes, 1),
             data_fim=ultima_data_mes,
             canal="ajuste_ferias",
-            despesas_pessoal=float(diferenca)
+            despesas_pessoal=float(diferenca),
         )
 
         db.add(ajuste)
@@ -249,15 +238,14 @@ def conceder_ferias(
         data_emissao=date(ano, mes, 1),
         data_vencimento=data_pagamento,
         status="pendente",
-        observacoes=f"Férias concedidas - {mes}/{ano}\nProvisão consumida: R$ {total_provisao_ferias:.2f}"
+        observacoes=f"Férias concedidas - {mes}/{ano}\nProvisão consumida: R$ {total_provisao_ferias:.2f}",
     )
 
     db.add(conta)
     db.flush()  # Para obter o ID
 
     logger.info(
-        f"[FERIAS] Conta a pagar gerada - "
-        f"ID={conta.id}, Valor=R$ {valor_total:.2f}"
+        f"[FERIAS] Conta a pagar gerada - ID={conta.id}, Valor=R$ {valor_total:.2f}"
     )
 
     # 8️⃣ Commit
@@ -274,25 +262,25 @@ def conceder_ferias(
         "funcionario": {
             "id": funcionario.id,
             "nome": funcionario.nome,
-            "salario": float(salario)
+            "salario": float(salario),
         },
         "valores": {
             "ferias": float(valor_ferias),
             "terco_constitucional": float(valor_terco),
-            "total": float(valor_total)
+            "total": float(valor_total),
         },
         "provisao": {
             "ferias": float(prov_ferias),
             "terco": float(prov_terco),
-            "total": float(total_provisao_ferias)
+            "total": float(total_provisao_ferias),
         },
         "ajuste": float(diferenca) if abs(diferenca) > Decimal("0.01") else 0,
         "conta_pagar": {
             "id": conta.id,
             "valor": float(valor_total),
             "vencimento": data_pagamento.isoformat(),
-            "status": "pendente"
-        }
+            "status": "pendente",
+        },
     }
 
 
@@ -302,7 +290,7 @@ def cancelar_ferias(
     conta_pagar_id: int,
     mes: int,
     ano: int,
-    usuario_id: int = None
+    usuario_id: int = None,
 ) -> dict:
     """
     Cancela férias concedidas (estorna provisão).
@@ -321,18 +309,11 @@ def cancelar_ferias(
         dict com resultado do cancelamento
     """
 
-    logger.info(
-        f"[FERIAS] Cancelando férias - conta_pagar_id={conta_pagar_id}"
-    )
+    logger.info(f"[FERIAS] Cancelando férias - conta_pagar_id={conta_pagar_id}")
 
     # Buscar conta
     conta = (
-        db.query(ContaPagar)
-        .filter_by(
-            id=conta_pagar_id,
-            tenant_id=tenant_id
-        )
-        .first()
+        db.query(ContaPagar).filter_by(id=conta_pagar_id, tenant_id=tenant_id).first()
     )
 
     if not conta:
@@ -356,19 +337,17 @@ def cancelar_ferias(
         data_inicio=date(ano, mes, 1),
         data_fim=ultima_data_mes,
         canal="estorno_ferias",
-        despesas_pessoal=float(conta.valor_original)  # Devolve provisão
+        despesas_pessoal=float(conta.valor_original),  # Devolve provisão
     )
 
     db.add(estorno)
     db.commit()
 
-    logger.info(
-        f"[FERIAS] ✅ Férias canceladas - conta={conta_pagar_id}"
-    )
+    logger.info(f"[FERIAS] ✅ Férias canceladas - conta={conta_pagar_id}")
 
     return {
         "sucesso": True,
         "mensagem": "Férias canceladas e provisão estornada",
         "conta_id": conta.id,
-        "valor_estornado": float(conta.valor_original)
+        "valor_estornado": float(conta.valor_original),
     }

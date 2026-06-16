@@ -139,7 +139,9 @@ def _pessoa_resumo(pessoa: Cliente) -> dict[str, Any]:
     }
 
 
-def _obter_pessoas(db: Session, tenant_id: Any, principal_id: int, duplicado_id: int) -> tuple[Cliente, Cliente]:
+def _obter_pessoas(
+    db: Session, tenant_id: Any, principal_id: int, duplicado_id: int
+) -> tuple[Cliente, Cliente]:
     if principal_id == duplicado_id:
         raise ValueError("Selecione duas pessoas diferentes para fundir.")
 
@@ -197,15 +199,22 @@ def _consultar_referencias_cliente(db: Session) -> list[dict[str, str]]:
             """
         )
     ).mappings()
-    referencias = [{"table_name": row["table_name"], "column_name": row["column_name"]} for row in rows]
+    referencias = [
+        {"table_name": row["table_name"], "column_name": row["column_name"]}
+        for row in rows
+    ]
     existentes = {(ref["table_name"], ref["column_name"]) for ref in referencias}
     for table_name, column_name in REFERENCIAS_SEM_FK:
-        if (table_name, column_name) not in existentes and _table_has_column(db, table_name, column_name):
+        if (table_name, column_name) not in existentes and _table_has_column(
+            db, table_name, column_name
+        ):
             referencias.append({"table_name": table_name, "column_name": column_name})
     return referencias
 
 
-def _contar_referencias(db: Session, pessoa_id: int, tenant_id: Any) -> list[dict[str, Any]]:
+def _contar_referencias(
+    db: Session, pessoa_id: int, tenant_id: Any
+) -> list[dict[str, Any]]:
     referencias = []
     for fk in _consultar_referencias_cliente(db):
         table_name = fk["table_name"]
@@ -234,7 +243,9 @@ def _contar_referencias(db: Session, pessoa_id: int, tenant_id: Any) -> list[dic
             )
             continue
         if total:
-            referencias.append({"tabela": table_name, "campo": column_name, "total": total})
+            referencias.append(
+                {"tabela": table_name, "campo": column_name, "total": total}
+            )
     return referencias
 
 
@@ -253,8 +264,14 @@ def montar_preview_fusao_pessoas(
         valor_duplicado = getattr(duplicado, campo, None)
         principal_vazio = _valor_vazio(valor_principal)
         duplicado_vazio = _valor_vazio(valor_duplicado)
-        conflito = not principal_vazio and not duplicado_vazio and not _valores_iguais(valor_principal, valor_duplicado)
-        origem_padrao = "duplicado" if principal_vazio and not duplicado_vazio else "principal"
+        conflito = (
+            not principal_vazio
+            and not duplicado_vazio
+            and not _valores_iguais(valor_principal, valor_duplicado)
+        )
+        origem_padrao = (
+            "duplicado" if principal_vazio and not duplicado_vazio else "principal"
+        )
 
         campos.append(
             {
@@ -283,7 +300,9 @@ def montar_preview_fusao_pessoas(
     }
 
 
-def _mesclar_produto_fornecedores(db: Session, principal_id: int, duplicado_id: int, tenant_id: Any) -> int:
+def _mesclar_produto_fornecedores(
+    db: Session, principal_id: int, duplicado_id: int, tenant_id: Any
+) -> int:
     transferidos = 0
     vinculos = (
         db.query(ProdutoFornecedor)
@@ -305,8 +324,15 @@ def _mesclar_produto_fornecedores(db: Session, principal_id: int, duplicado_id: 
             .first()
         )
         if existente:
-            for campo in ("codigo_fornecedor", "preco_custo", "prazo_entrega", "estoque_fornecedor"):
-                if _valor_vazio(getattr(existente, campo, None)) and not _valor_vazio(getattr(vinculo, campo, None)):
+            for campo in (
+                "codigo_fornecedor",
+                "preco_custo",
+                "prazo_entrega",
+                "estoque_fornecedor",
+            ):
+                if _valor_vazio(getattr(existente, campo, None)) and not _valor_vazio(
+                    getattr(vinculo, campo, None)
+                ):
                     setattr(existente, campo, getattr(vinculo, campo))
             existente.e_principal = bool(existente.e_principal or vinculo.e_principal)
             existente.ativo = bool(existente.ativo or vinculo.ativo)
@@ -342,7 +368,9 @@ def _transferir_referencias_genericas(
         )
         result = db.execute(sql, params)
         if result.rowcount:
-            transferencias.append({"tabela": tabela, "campo": campo, "total": int(result.rowcount)})
+            transferencias.append(
+                {"tabela": tabela, "campo": campo, "total": int(result.rowcount)}
+            )
     return transferencias
 
 
@@ -392,13 +420,21 @@ def executar_fusao_pessoas(
         valor_duplicado = getattr(duplicado, campo, None)
         origem = decisoes_campos.get(campo)
         if origem not in {"principal", "duplicado"}:
-            origem = "duplicado" if _valor_vazio(valor_principal) and not _valor_vazio(valor_duplicado) else "principal"
+            origem = (
+                "duplicado"
+                if _valor_vazio(valor_principal) and not _valor_vazio(valor_duplicado)
+                else "principal"
+            )
 
         if origem == "duplicado" and not _valor_vazio(valor_duplicado):
             setattr(principal, campo, valor_duplicado)
-            campos_aplicados.append({"campo": campo, "label": label, "origem": "duplicado"})
+            campos_aplicados.append(
+                {"campo": campo, "label": label, "origem": "duplicado"}
+            )
 
-    principal.credito = Decimal(str(principal.credito or 0)) + Decimal(str(duplicado.credito or 0))
+    principal.credito = Decimal(str(principal.credito or 0)) + Decimal(
+        str(duplicado.credito or 0)
+    )
     duplicado.credito = Decimal("0")
 
     transferencias = transferir_referencias_pessoa(

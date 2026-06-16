@@ -36,12 +36,16 @@ class SefazTenantConfigService:
         try:
             return json.loads(path.read_text(encoding="utf-8"))
         except Exception as exc:  # noqa: BLE001
-            raise HTTPException(status_code=500, detail=f"Falha ao ler configuracao SEFAZ: {exc}") from exc
+            raise HTTPException(
+                status_code=500, detail=f"Falha ao ler configuracao SEFAZ: {exc}"
+            ) from exc
 
     @classmethod
     def save_config(cls, tenant_id: UUID, config: dict[str, Any]) -> dict[str, Any]:
         path = cls._config_path(tenant_id)
-        path.write_text(json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8")
+        path.write_text(
+            json.dumps(config, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
         return config
 
     @staticmethod
@@ -55,7 +59,9 @@ class SefazTenantConfigService:
         filename = upload.filename or "certificado.pfx"
         ext = Path(filename).suffix.lower()
         if ext != ".pfx":
-            raise HTTPException(status_code=422, detail="Envie um certificado A1 com extensao .pfx")
+            raise HTTPException(
+                status_code=422, detail="Envie um certificado A1 com extensao .pfx"
+            )
 
         content = await upload.read()
         if not content:
@@ -63,7 +69,9 @@ class SefazTenantConfigService:
 
         max_size_bytes = 5 * 1024 * 1024
         if len(content) > max_size_bytes:
-            raise HTTPException(status_code=422, detail="Arquivo muito grande. Maximo permitido: 5MB")
+            raise HTTPException(
+                status_code=422, detail="Arquivo muito grande. Maximo permitido: 5MB"
+            )
 
         cert_name = f"cert_{secrets.token_hex(8)}.pfx"
         cert_path = cls._tenant_dir(tenant_id) / cert_name

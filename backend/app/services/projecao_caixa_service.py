@@ -20,12 +20,12 @@ def projetar_caixa(
 ) -> List[Dict]:
     """
     Projeta o caixa considerando histórico e provisões.
-    
+
     Args:
         db: Sessão do banco
         tenant_id: ID do tenant
         meses_a_frente: Número de meses para projetar (padrão: 3)
-    
+
     Returns:
         Lista de dicionários com projeção mês a mês
     """
@@ -38,7 +38,7 @@ def projetar_caixa(
         .filter(
             DREDetalheCanal.tenant_id == tenant_id,
             DREDetalheCanal.origem.in_(["REAL", "PROVISAO"]),
-            DREDetalheCanal.receita_bruta > 0
+            DREDetalheCanal.receita_bruta > 0,
         )
         .scalar()
     )
@@ -51,24 +51,28 @@ def projetar_caixa(
         .filter(
             DREDetalheCanal.tenant_id == tenant_id,
             DREDetalheCanal.origem.in_(["REAL", "PROVISAO"]),
-            DREDetalheCanal.custos > 0
+            DREDetalheCanal.custos > 0,
         )
         .scalar()
     )
 
     despesas_operacionais = (
-        db.query(func.coalesce(func.avg(DREDetalheCanal.despesas_operacionais), Decimal("0")))
+        db.query(
+            func.coalesce(func.avg(DREDetalheCanal.despesas_operacionais), Decimal("0"))
+        )
         .filter(
             DREDetalheCanal.tenant_id == tenant_id,
             DREDetalheCanal.origem.in_(["REAL", "PROVISAO"]),
-            DREDetalheCanal.despesas_operacionais > 0
+            DREDetalheCanal.despesas_operacionais > 0,
         )
         .scalar()
     )
 
     despesas_custos = Decimal(str(despesas_custos)) if despesas_custos else Decimal("0")
-    despesas_operacionais = Decimal(str(despesas_operacionais)) if despesas_operacionais else Decimal("0")
-    
+    despesas_operacionais = (
+        Decimal(str(despesas_operacionais)) if despesas_operacionais else Decimal("0")
+    )
+
     despesas_media = despesas_custos + despesas_operacionais
 
     # 🔹 Alíquota atual do Simples Nacional
@@ -88,11 +92,13 @@ def projetar_caixa(
 
     # 🔹 Folha de pagamento média (despesas com pessoal)
     folha_media = (
-        db.query(func.coalesce(func.avg(DREDetalheCanal.despesas_pessoal), Decimal("0")))
+        db.query(
+            func.coalesce(func.avg(DREDetalheCanal.despesas_pessoal), Decimal("0"))
+        )
         .filter(
             DREDetalheCanal.tenant_id == tenant_id,
             DREDetalheCanal.origem.in_(["REAL", "PROVISAO"]),
-            DREDetalheCanal.despesas_pessoal > 0
+            DREDetalheCanal.despesas_pessoal > 0,
         )
         .scalar()
     )
@@ -127,34 +133,32 @@ def projetar_caixa(
         # Saldo projetado
         saldo = receita - despesas
 
-        resultado.append({
-            "mes": mes,
-            "ano": ano,
-            "mes_futuro": i,
-            "receita_prevista": float(receita),
-            "imposto_simples_previsto": float(imposto_simples),
-            "folha_encargos_previstos": float(folha_total),
-            "despesas_previstas": float(despesas),
-            "saldo_previsto": float(saldo),
-            "saldo_positivo": saldo > 0
-        })
+        resultado.append(
+            {
+                "mes": mes,
+                "ano": ano,
+                "mes_futuro": i,
+                "receita_prevista": float(receita),
+                "imposto_simples_previsto": float(imposto_simples),
+                "folha_encargos_previstos": float(folha_total),
+                "despesas_previstas": float(despesas),
+                "saldo_previsto": float(saldo),
+                "saldo_positivo": saldo > 0,
+            }
+        )
 
     return resultado
 
 
-def obter_resumo_projecao(
-    db: Session,
-    tenant_id: int,
-    meses_a_frente: int = 3
-) -> Dict:
+def obter_resumo_projecao(db: Session, tenant_id: int, meses_a_frente: int = 3) -> Dict:
     """
     Retorna resumo da projeção de caixa.
-    
+
     Returns:
         Dicionário com totais e indicadores
     """
     projecao = projetar_caixa(db, tenant_id, meses_a_frente)
-    
+
     if not projecao:
         return {
             "meses_projetados": 0,
@@ -163,16 +167,16 @@ def obter_resumo_projecao(
             "saldo_total": 0.0,
             "meses_positivos": 0,
             "meses_negativos": 0,
-            "tendencia": "NEUTRO"
+            "tendencia": "NEUTRO",
         }
-    
+
     receita_total = sum(p["receita_prevista"] for p in projecao)
     despesas_totais = sum(p["despesas_previstas"] for p in projecao)
     saldo_total = sum(p["saldo_previsto"] for p in projecao)
-    
+
     meses_positivos = sum(1 for p in projecao if p["saldo_positivo"])
     meses_negativos = len(projecao) - meses_positivos
-    
+
     # Determinar tendência
     if meses_negativos == 0:
         tendencia = "POSITIVO"
@@ -180,7 +184,7 @@ def obter_resumo_projecao(
         tendencia = "NEGATIVO"
     else:
         tendencia = "MISTO"
-    
+
     return {
         "meses_projetados": len(projecao),
         "receita_total": receita_total,
@@ -188,5 +192,5 @@ def obter_resumo_projecao(
         "saldo_total": saldo_total,
         "meses_positivos": meses_positivos,
         "meses_negativos": meses_negativos,
-        "tendencia": tendencia
+        "tendencia": tendencia,
     }

@@ -43,7 +43,9 @@ def _get_access_token() -> str:
 
 
 def is_mercado_pago_provider(provider: str | None = None) -> bool:
-    provider_value = provider if provider is not None else os.getenv("ECOMMERCE_PAYMENT_PROVIDER")
+    provider_value = (
+        provider if provider is not None else os.getenv("ECOMMERCE_PAYMENT_PROVIDER")
+    )
     return str(provider_value or "").strip().lower().replace("-", "_") in {
         "mercado_pago",
         "mercadopago",
@@ -135,11 +137,17 @@ def build_preference_payload(
         "notification_url": notification_url or f"{base_url}/api/webhooks/mercadopago",
         "back_urls": {
             "success": os.getenv("MERCADO_PAGO_BACK_URL_SUCCESS")
-            or _payment_return_url(payment_return_base_url, "success", pedido_id, return_url_params),
+            or _payment_return_url(
+                payment_return_base_url, "success", pedido_id, return_url_params
+            ),
             "pending": os.getenv("MERCADO_PAGO_BACK_URL_PENDING")
-            or _payment_return_url(payment_return_base_url, "pending", pedido_id, return_url_params),
+            or _payment_return_url(
+                payment_return_base_url, "pending", pedido_id, return_url_params
+            ),
             "failure": os.getenv("MERCADO_PAGO_BACK_URL_FAILURE")
-            or _payment_return_url(payment_return_base_url, "failure", pedido_id, return_url_params),
+            or _payment_return_url(
+                payment_return_base_url, "failure", pedido_id, return_url_params
+            ),
         },
         "auto_return": "approved",
         "payment_methods": {
@@ -149,11 +157,21 @@ def build_preference_payload(
     }
 
 
-def select_checkout_url(preference: dict[str, Any], *, use_sandbox: bool | None = None) -> str:
-    sandbox = _env_flag("MERCADO_PAGO_USE_SANDBOX") if use_sandbox is None else bool(use_sandbox)
+def select_checkout_url(
+    preference: dict[str, Any], *, use_sandbox: bool | None = None
+) -> str:
+    sandbox = (
+        _env_flag("MERCADO_PAGO_USE_SANDBOX")
+        if use_sandbox is None
+        else bool(use_sandbox)
+    )
     if sandbox:
-        return str(preference.get("sandbox_init_point") or preference.get("init_point") or "")
-    return str(preference.get("init_point") or preference.get("sandbox_init_point") or "")
+        return str(
+            preference.get("sandbox_init_point") or preference.get("init_point") or ""
+        )
+    return str(
+        preference.get("init_point") or preference.get("sandbox_init_point") or ""
+    )
 
 
 def create_preference(
@@ -222,11 +240,15 @@ def fetch_payment(
     http_get: Callable[..., Any] = requests.get,
 ) -> dict[str, Any]:
     if not payment_id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="payment_id obrigatorio")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST, detail="payment_id obrigatorio"
+        )
 
     response = http_get(
         f"{MERCADO_PAGO_API_BASE_URL}/v1/payments/{payment_id}",
-        headers={"Authorization": f"Bearer {(access_token or '').strip() or _get_access_token()}"},
+        headers={
+            "Authorization": f"Bearer {(access_token or '').strip() or _get_access_token()}"
+        },
         timeout=20,
     )
 
@@ -245,10 +267,14 @@ def _safe_error_detail(response: Any) -> str:
         payload = response.json()
         return str(payload.get("message") or payload.get("error") or payload)[:300]
     except Exception:
-        return str(getattr(response, "text", "") or f"HTTP {response.status_code}")[:300]
+        return str(getattr(response, "text", "") or f"HTTP {response.status_code}")[
+            :300
+        ]
 
 
-def extract_notification_payment_id(payload: dict[str, Any], request: Any) -> str | None:
+def extract_notification_payment_id(
+    payload: dict[str, Any], request: Any
+) -> str | None:
     data = payload.get("data") if isinstance(payload, dict) else None
     body_id = data.get("id") if isinstance(data, dict) else None
     query_id = None
@@ -269,7 +295,10 @@ def validate_webhook_signature(
     request_id = (request.headers.get("x-request-id") or "").strip()
 
     if not signature_header:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Assinatura Mercado Pago ausente")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Assinatura Mercado Pago ausente",
+        )
 
     parts = {}
     for part in signature_header.split(","):
@@ -280,7 +309,10 @@ def validate_webhook_signature(
     ts = parts.get("ts")
     received = parts.get("v1")
     if not ts or not received:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Assinatura Mercado Pago invalida")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Assinatura Mercado Pago invalida",
+        )
 
     query_data_id = None
     try:
@@ -296,21 +328,28 @@ def validate_webhook_signature(
         manifest += f"request-id:{request_id};"
     manifest += f"ts:{ts};"
 
-    expected = hmac.new(secret.encode("utf-8"), manifest.encode("utf-8"), hashlib.sha256).hexdigest()
+    expected = hmac.new(
+        secret.encode("utf-8"), manifest.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
     if not hmac.compare_digest(expected, received):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Assinatura Mercado Pago invalida")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Assinatura Mercado Pago invalida",
+        )
 
     return "validated"
 
 
-def validate_webhook_signature_from_env(request: Any, data_id: str | None = None) -> str:
-    secret = (os.getenv("MERCADO_PAGO_WEBHOOK_SECRET") or os.getenv("MERCADOPAGO_WEBHOOK_SECRET") or "").strip()
-    validate = (
-        _env_flag("MERCADO_PAGO_WEBHOOK_VALIDATE_SIGNATURE")
-        or (
-            _env_flag("ECOMMERCE_PAYMENT_GATEWAY_ENABLED")
-            and is_mercado_pago_provider()
-        )
+def validate_webhook_signature_from_env(
+    request: Any, data_id: str | None = None
+) -> str:
+    secret = (
+        os.getenv("MERCADO_PAGO_WEBHOOK_SECRET")
+        or os.getenv("MERCADOPAGO_WEBHOOK_SECRET")
+        or ""
+    ).strip()
+    validate = _env_flag("MERCADO_PAGO_WEBHOOK_VALIDATE_SIGNATURE") or (
+        _env_flag("ECOMMERCE_PAYMENT_GATEWAY_ENABLED") and is_mercado_pago_provider()
     )
 
     if not validate and not secret:
@@ -349,11 +388,19 @@ def _first_present(*values: Any) -> Any:
 
 def extract_gateway_financials(payment: dict[str, Any]) -> dict[str, Any]:
     source = payment
-    if isinstance(payment.get("mercadopago"), dict) and isinstance(payment["mercadopago"].get("payment"), dict):
+    if isinstance(payment.get("mercadopago"), dict) and isinstance(
+        payment["mercadopago"].get("payment"), dict
+    ):
         source = payment["mercadopago"]["payment"]
 
-    transaction_details = source.get("transaction_details") if isinstance(source.get("transaction_details"), dict) else {}
-    fee_details = source.get("fee_details") if isinstance(source.get("fee_details"), list) else []
+    transaction_details = (
+        source.get("transaction_details")
+        if isinstance(source.get("transaction_details"), dict)
+        else {}
+    )
+    fee_details = (
+        source.get("fee_details") if isinstance(source.get("fee_details"), list) else []
+    )
 
     gateway_payment_id = (
         source.get("gateway_payment_id")
@@ -362,7 +409,9 @@ def extract_gateway_financials(payment: dict[str, Any]) -> dict[str, Any]:
         or payment.get("id")
     )
     gateway_fee_amount = _round_money_or_none(
-        _first_present(source.get("gateway_fee_amount"), payment.get("gateway_fee_amount"))
+        _first_present(
+            source.get("gateway_fee_amount"), payment.get("gateway_fee_amount")
+        )
     )
     if gateway_fee_amount is None and fee_details:
         total_fee = 0.0
@@ -393,21 +442,31 @@ def extract_gateway_financials(payment: dict[str, Any]) -> dict[str, Any]:
             transaction_details.get("net_received_amount"),
         )
     )
-    if gateway_net_amount is None and gateway_gross_amount is not None and gateway_fee_amount is not None:
+    if (
+        gateway_net_amount is None
+        and gateway_gross_amount is not None
+        and gateway_fee_amount is not None
+    ):
         gateway_net_amount = round(gateway_gross_amount - gateway_fee_amount, 2)
 
     return {
         "gateway_provider": "mercadopago",
-        "gateway_payment_id": str(gateway_payment_id) if gateway_payment_id is not None else None,
+        "gateway_payment_id": str(gateway_payment_id)
+        if gateway_payment_id is not None
+        else None,
         "gateway_fee_amount": gateway_fee_amount,
         "gateway_net_amount": gateway_net_amount,
         "gateway_gross_amount": gateway_gross_amount,
     }
 
 
-def normalize_payment_payload(payment: dict[str, Any], notification: dict[str, Any] | None = None) -> dict[str, Any]:
+def normalize_payment_payload(
+    payment: dict[str, Any], notification: dict[str, Any] | None = None
+) -> dict[str, Any]:
     notification = notification or {}
-    metadata = payment.get("metadata") if isinstance(payment.get("metadata"), dict) else {}
+    metadata = (
+        payment.get("metadata") if isinstance(payment.get("metadata"), dict) else {}
+    )
     external_reference = payment.get("external_reference")
     gateway_financials = extract_gateway_financials(payment)
 

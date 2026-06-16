@@ -2,6 +2,7 @@
 Serviço de Acerto Financeiro de Entregas
 ETAPA 7 - Versão Final com Matriz Corrigida
 """
+
 from decimal import Decimal
 from datetime import date, timedelta
 from sqlalchemy.orm import Session
@@ -13,6 +14,7 @@ from sqlalchemy.ext.declarative import declarative_base
 
 # Model simplificado de ContasPagar (enquanto não tem o model completo)
 Base = declarative_base()
+
 
 class ContasPagar(Base):
     __tablename__ = "contas_pagar"
@@ -31,7 +33,7 @@ class ContasPagar(Base):
 def acerto_vence_hoje(entregador: Cliente, hoje: date) -> bool:
     """
     Verifica se o acerto do entregador vence hoje.
-    
+
     Regras:
     - Semanal: verifica dia da semana (1=segunda, 7=domingo)
     - Quinzenal: dias 1 e 15 de cada mês
@@ -39,24 +41,24 @@ def acerto_vence_hoje(entregador: Cliente, hoje: date) -> bool:
     """
     if not entregador.tipo_acerto_entrega:
         return False
-    
+
     # Verifica se já foi processado hoje
     if entregador.data_ultimo_acerto == hoje:
         return False
-    
+
     if entregador.tipo_acerto_entrega == "semanal":
         # 1=segunda, 7=domingo (isoweekday: 1=seg, 7=dom)
         dia_semana_hoje = hoje.isoweekday()
         return dia_semana_hoje == entregador.dia_semana_acerto
-    
+
     elif entregador.tipo_acerto_entrega == "quinzenal":
         # Dias 1 e 15
         return hoje.day in (1, 15)
-    
+
     elif entregador.tipo_acerto_entrega == "mensal":
         # Dia configurado (1-28)
         return hoje.day == entregador.dia_mes_acerto
-    
+
     return False
 
 
@@ -67,11 +69,11 @@ def gerar_conta_pagar(
     valor: Decimal,
     descricao: str,
     tipo: str = "CUSTO_ENTREGA",
-    vencimento: Optional[date] = None
+    vencimento: Optional[date] = None,
 ) -> ContasPagar:
     """
     Cria uma conta a pagar no financeiro.
-    
+
     Args:
         db: Sessão do banco
         tenant_id: ID do tenant
@@ -83,7 +85,7 @@ def gerar_conta_pagar(
     """
     if vencimento is None:
         vencimento = date.today() + timedelta(days=7)
-    
+
     conta = ContasPagar(
         tenant_id=tenant_id,
         fornecedor_id=credor_id,
@@ -93,25 +95,25 @@ def gerar_conta_pagar(
         data_vencimento=vencimento,
         status="pendente",
         tipo_documento="ACERTO_ENTREGA",
-        observacoes=f"Tipo: {tipo}"
+        observacoes=f"Tipo: {tipo}",
     )
-    
+
     db.add(conta)
     db.flush()
-    
+
     return conta
 
 
 def executar_acerto_entregador(db: Session, entregador: Cliente) -> Optional[Dict]:
     """
     Executa acerto financeiro de um entregador.
-    
+
     MATRIZ FINAL IMPLEMENTADA:
     - Funcionário + controla_rh=true  → ❌ Nunca gera CP
     - Funcionário + controla_rh=false + gera_cp_custo=true → ✅ Gera CP
     - Funcionário + controla_rh=false + gera_cp_custo=false → ❌ Não gera CP
     - Fornecedor (terceirizado)       → ✅ Sempre gera CP
-    
+
     Returns:
         Dict com resumo do acerto ou None se não houver processamento
     """
@@ -126,7 +128,7 @@ def executar_acerto_entregador(db: Session, entregador: Cliente) -> Optional[Dic
         and_(
             RotaEntrega.entregador_id == entregador.id,
             RotaEntrega.tenant_id == entregador.tenant_id,
-            RotaEntrega.status == "concluida"
+            RotaEntrega.status == "concluida",
         )
     )
 
@@ -171,7 +173,7 @@ def executar_acerto_entregador(db: Session, entregador: Cliente) -> Optional[Dic
             credor_id=entregador.id,
             valor=total_custo_operacional,
             descricao=f"Acerto de entregas - Custo operacional - Período até {hoje.strftime('%d/%m/%Y')}",
-            tipo="CUSTO_ENTREGA"
+            tipo="CUSTO_ENTREGA",
         )
 
     # 5️⃣ Contas a pagar — REPASSE DA TAXA DO CLIENTE
@@ -182,7 +184,7 @@ def executar_acerto_entregador(db: Session, entregador: Cliente) -> Optional[Dic
             credor_id=entregador.id,
             valor=total_repasse_taxa,
             descricao=f"Acerto de entregas - Repasse taxa cliente - Período até {hoje.strftime('%d/%m/%Y')}",
-            tipo="REPASSE_ENTREGA"
+            tipo="REPASSE_ENTREGA",
         )
 
     # 6️⃣ Atualiza controle
@@ -210,85 +212,101 @@ def executar_acerto_entregador(db: Session, entregador: Cliente) -> Optional[Dic
 def processar_acertos_do_dia(db: Session, tenant_id: int) -> list[Dict]:
     """
     Processa todos os acertos que vencem hoje para um tenant.
-    
+
     Executado pelo job diário.
     Não duplica processamento (verifica data_ultimo_acerto).
     """
     # Busca entregadores ativos com acerto configurado
-    entregadores = db.query(Cliente).filter(
-        and_(
-            Cliente.tenant_id == tenant_id,
-            Cliente.is_entregador.is_(True),
-            Cliente.entregador_ativo.is_(True),
-            Cliente.tipo_acerto_entrega.isnot(None)
+    entregadores = (
+        db.query(Cliente)
+        .filter(
+            and_(
+                Cliente.tenant_id == tenant_id,
+                Cliente.is_entregador.is_(True),
+                Cliente.entregador_ativo.is_(True),
+                Cliente.tipo_acerto_entrega.isnot(None),
+            )
         )
-    ).all()
-    
+        .all()
+    )
+
     resultados = []
-    
+
     for entregador in entregadores:
         resultado = executar_acerto_entregador(db, entregador)
         if resultado:
             resultados.append(resultado)
-    
+
     return resultados
 
 
-def ajustar_media_entregas_mensal(db: Session, tenant_id: int, mes: int, ano: int) -> list[Dict]:
+def ajustar_media_entregas_mensal(
+    db: Session, tenant_id: int, mes: int, ano: int
+) -> list[Dict]:
     """
     Ajusta a média de entregas configurada baseado nas entregas reais do mês.
-    
+
     Deve ser executado no último dia do mês (ou início do próximo mês).
-    
+
     Args:
         db: Sessão do banco
         tenant_id: ID do tenant
         mes: Mês a analisar (1-12)
         ano: Ano a analisar
-    
+
     Returns:
         Lista com resumo dos ajustes realizados
     """
     from datetime import date
     from calendar import monthrange
-    
+
     # Define o período do mês
     primeiro_dia = date(ano, mes, 1)
     ultimo_dia = date(ano, mes, monthrange(ano, mes)[1])
-    
+
     # Busca entregadores funcionários com controla_rh ativo
-    entregadores = db.query(Cliente).filter(
-        and_(
-            Cliente.tenant_id == tenant_id,
-            Cliente.tipo_cadastro == "funcionario",
-            Cliente.is_entregador.is_(True),
-            Cliente.controla_rh.is_(True),
-            Cliente.media_entregas_configurada.isnot(None)
+    entregadores = (
+        db.query(Cliente)
+        .filter(
+            and_(
+                Cliente.tenant_id == tenant_id,
+                Cliente.tipo_cadastro == "funcionario",
+                Cliente.is_entregador.is_(True),
+                Cliente.controla_rh.is_(True),
+                Cliente.media_entregas_configurada.isnot(None),
+            )
         )
-    ).all()
-    
+        .all()
+    )
+
     resultados = []
-    
+
     for entregador in entregadores:
         # Conta entregas concluídas no mês
-        entregas_mes = db.query(RotaEntrega).filter(
-            and_(
-                RotaEntrega.entregador_id == entregador.id,
-                RotaEntrega.tenant_id == tenant_id,
-                RotaEntrega.status == "concluida",
-                RotaEntrega.data_conclusao >= primeiro_dia,
-                RotaEntrega.data_conclusao <= ultimo_dia
+        entregas_mes = (
+            db.query(RotaEntrega)
+            .filter(
+                and_(
+                    RotaEntrega.entregador_id == entregador.id,
+                    RotaEntrega.tenant_id == tenant_id,
+                    RotaEntrega.status == "concluida",
+                    RotaEntrega.data_conclusao >= primeiro_dia,
+                    RotaEntrega.data_conclusao <= ultimo_dia,
+                )
             )
-        ).count()
-        
+            .count()
+        )
+
         # Atualiza média real
         media_anterior = entregador.media_entregas_configurada
         entregador.media_entregas_real = entregas_mes
-        
+
         # Se a diferença for significativa (>20%), sugere ajuste
         if entregas_mes > 0:
-            diferenca_percentual = abs(entregas_mes - media_anterior) / media_anterior * 100
-            
+            diferenca_percentual = (
+                abs(entregas_mes - media_anterior) / media_anterior * 100
+            )
+
             if diferenca_percentual > 20:
                 # Atualiza a média configurada com a média real
                 entregador.media_entregas_configurada = entregas_mes
@@ -298,17 +316,21 @@ def ajustar_media_entregas_mensal(db: Session, tenant_id: int, mes: int, ano: in
         else:
             ajustado = False
             diferenca_percentual = 0
-        
-        resultados.append({
-            "entregador_id": entregador.id,
-            "entregador": entregador.nome,
-            "media_anterior": media_anterior,
-            "entregas_realizadas": entregas_mes,
-            "diferenca_percentual": round(diferenca_percentual, 2),
-            "ajustado": ajustado,
-            "nova_media": entregador.media_entregas_configurada if ajustado else media_anterior
-        })
-    
+
+        resultados.append(
+            {
+                "entregador_id": entregador.id,
+                "entregador": entregador.nome,
+                "media_anterior": media_anterior,
+                "entregas_realizadas": entregas_mes,
+                "diferenca_percentual": round(diferenca_percentual, 2),
+                "ajustado": ajustado,
+                "nova_media": entregador.media_entregas_configurada
+                if ajustado
+                else media_anterior,
+            }
+        )
+
     db.commit()
-    
+
     return resultados

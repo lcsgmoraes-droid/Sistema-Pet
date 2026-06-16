@@ -69,7 +69,10 @@ def produto_ids_estoque_afetados(db: Session, produto: Produto | None) -> list[i
         )
         ids: list[int] = []
         for componente in componentes:
-            if componente.produto_componente_id and componente.produto_componente_id not in ids:
+            if (
+                componente.produto_componente_id
+                and componente.produto_componente_id not in ids
+            ):
                 ids.append(int(componente.produto_componente_id))
         return ids
 
@@ -135,7 +138,9 @@ def movimento_legado_pedido_para_nf(
     nf_numero: str | None = None,
     nf_bling_id: str | None = None,
 ) -> bool:
-    if not mov or movimento_documentado_por_nf(mov, nf_numero=nf_numero, nf_bling_id=nf_bling_id):
+    if not mov or movimento_documentado_por_nf(
+        mov, nf_numero=nf_numero, nf_bling_id=nf_bling_id
+    ):
         return False
 
     documento = _text(getattr(mov, "documento", None))
@@ -203,7 +208,9 @@ def _normalizar_movimentacoes_legadas_para_nf(
     return movimentos_atualizados
 
 
-def _sincronizar_cache_estoque_virtual(db: Session, tenant_id, kit_id: int) -> float | None:
+def _sincronizar_cache_estoque_virtual(
+    db: Session, tenant_id, kit_id: int
+) -> float | None:
     produto_kit = (
         db.query(Produto)
         .filter(Produto.id == kit_id, Produto.tenant_id == tenant_id)
@@ -218,10 +225,14 @@ def _sincronizar_cache_estoque_virtual(db: Session, tenant_id, kit_id: int) -> f
     return estoque_virtual
 
 
-def _numero_nf_pedido(pedido: PedidoIntegrado | None, fallback_nf_id: str | None = None) -> str | None:
+def _numero_nf_pedido(
+    pedido: PedidoIntegrado | None, fallback_nf_id: str | None = None
+) -> str | None:
     payload_bruto = getattr(pedido, "payload", None)
     payload = payload_bruto if isinstance(payload_bruto, dict) else {}
-    pedido_payload = payload.get("pedido") if isinstance(payload.get("pedido"), dict) else {}
+    pedido_payload = (
+        payload.get("pedido") if isinstance(payload.get("pedido"), dict) else {}
+    )
     ultima_nf = (
         payload.get("ultima_nf")
         or pedido_payload.get("notaFiscal")
@@ -345,7 +356,9 @@ def desvincular_nf_de_pedido_incorreto(
     for movimentacao in movimentos_nf:
         lotes_restaurados += _restaurar_lotes_consumidos(db, movimentacao)
 
-        user_id_movimentacao = getattr(movimentacao, "user_id", None) or user_id_execucao
+        user_id_movimentacao = (
+            getattr(movimentacao, "user_id", None) or user_id_execucao
+        )
         if not user_id_movimentacao:
             raise ValueError(
                 f"Nenhum usuario valido disponivel para estornar a movimentacao {movimentacao.id} "
@@ -367,7 +380,10 @@ def desvincular_nf_de_pedido_incorreto(
                 f"do pedido incorreto {pedido.pedido_bling_numero or pedido.pedido_bling_id}"
             ),
         )
-        for kit_id, _estoque_virtual in KitEstoqueService.recalcular_kits_que_usam_produto(
+        for (
+            kit_id,
+            _estoque_virtual,
+        ) in KitEstoqueService.recalcular_kits_que_usam_produto(
             db,
             movimentacao.produto_id,
         ).items():
@@ -460,7 +476,9 @@ def baixar_estoque_item_integrado(
     if quantidade <= 0:
         return {"movimentos": [], "estoques_virtuais": {}}
     if not user_id:
-        raise ValueError("Nenhum usuario valido disponivel para registrar a movimentacao automatica do estoque.")
+        raise ValueError(
+            "Nenhum usuario valido disponivel para registrar a movimentacao automatica do estoque."
+        )
 
     if produto_usa_composicao_virtual(produto):
         componentes = (
@@ -502,8 +520,7 @@ def baixar_estoque_item_integrado(
                 tenant_id=tenant_id,
                 documento=documento,
                 observacao=(
-                    observacao
-                    or f"Componente do produto composto '{produto.nome}'"
+                    observacao or f"Componente do produto composto '{produto.nome}'"
                 ),
             )
             movimentos.append(
@@ -516,14 +533,19 @@ def baixar_estoque_item_integrado(
                 }
             )
 
-            for kit_id, estoque_virtual in KitEstoqueService.recalcular_kits_que_usam_produto(
+            for (
+                kit_id,
+                estoque_virtual,
+            ) in KitEstoqueService.recalcular_kits_que_usam_produto(
                 db,
                 produto_componente.id,
             ).items():
                 kits_recalculados[kit_id] = float(estoque_virtual)
 
         for kit_id, estoque_virtual in list(kits_recalculados.items()):
-            estoque_sincronizado = _sincronizar_cache_estoque_virtual(db, tenant_id, kit_id)
+            estoque_sincronizado = _sincronizar_cache_estoque_virtual(
+                db, tenant_id, kit_id
+            )
             if estoque_sincronizado is not None:
                 kits_recalculados[kit_id] = estoque_sincronizado
 
@@ -602,19 +624,32 @@ def _texto(valor, default: str = "") -> str:
     return str(valor or default).strip()
 
 
-def _montar_produto_local_do_bling(item_bling: dict, tenant_id, user_id: int, sku_padrao: str) -> Produto:
-    codigo = (_texto(item_bling.get("sku") or item_bling.get("codigo"), sku_padrao) or "").upper()[:50]
-    nome = _texto(item_bling.get("nome") or item_bling.get("descricao"), f"Produto {codigo}")[:200]
-    codigo_barras = _texto(item_bling.get("codigoBarras") or item_bling.get("gtin"))[:20] or None
+def _montar_produto_local_do_bling(
+    item_bling: dict, tenant_id, user_id: int, sku_padrao: str
+) -> Produto:
+    codigo = (
+        _texto(item_bling.get("sku") or item_bling.get("codigo"), sku_padrao) or ""
+    ).upper()[:50]
+    nome = _texto(
+        item_bling.get("nome") or item_bling.get("descricao"), f"Produto {codigo}"
+    )[:200]
+    codigo_barras = (
+        _texto(item_bling.get("codigoBarras") or item_bling.get("gtin"))[:20] or None
+    )
     gtin = _texto(item_bling.get("gtin"))[:13] or None
     unidade = _texto(item_bling.get("unidade"), "UN")[:10] or "UN"
 
     preco_venda = max(
-        _to_float(item_bling.get("preco"), _to_float(item_bling.get("precoVenda"), 0.0)),
+        _to_float(
+            item_bling.get("preco"), _to_float(item_bling.get("precoVenda"), 0.0)
+        ),
         0.0,
     )
     estoque_bling = max(
-        _to_float(item_bling.get("estoque"), _to_float(item_bling.get("saldoFisicoTotal"), 0.0)),
+        _to_float(
+            item_bling.get("estoque"),
+            _to_float(item_bling.get("saldoFisicoTotal"), 0.0),
+        ),
         0.0,
     )
 
@@ -651,7 +686,9 @@ def criar_produto_automatico_do_bling_por_item(
     sku_preferencial: str | None = None,
 ):
     item_bling = item_bling or {}
-    sku_limpo = _texto(sku_preferencial or item_bling.get("sku") or item_bling.get("codigo"))
+    sku_limpo = _texto(
+        sku_preferencial or item_bling.get("sku") or item_bling.get("codigo")
+    )
     codigo_barras = _texto(item_bling.get("codigoBarras") or item_bling.get("gtin"))
 
     if sku_limpo:
@@ -660,13 +697,17 @@ def criar_produto_automatico_do_bling_por_item(
             return existente
 
     if codigo_barras:
-        existente = buscar_produto_do_item(db=db, tenant_id=tenant_id, sku=codigo_barras)
+        existente = buscar_produto_do_item(
+            db=db, tenant_id=tenant_id, sku=codigo_barras
+        )
         if existente:
             return existente
 
     usuario = _obter_usuario_padrao_tenant(db=db, tenant_id=tenant_id)
     if not usuario:
-        logger.warning("Produto Bling sem usuario padrao no tenant %s para autocadastro", tenant_id)
+        logger.warning(
+            "Produto Bling sem usuario padrao no tenant %s para autocadastro", tenant_id
+        )
         return None
 
     chave_base = sku_limpo or codigo_barras or _texto(item_bling.get("id"), "BLING")
@@ -679,7 +720,9 @@ def criar_produto_automatico_do_bling_por_item(
 
     if _codigo_ja_existe_global(db, novo_produto.codigo):
         codigo_original = novo_produto.codigo
-        novo_produto.codigo = _gerar_codigo_fallback(db=db, sku=chave_base, tenant_id=tenant_id)
+        novo_produto.codigo = _gerar_codigo_fallback(
+            db=db, sku=chave_base, tenant_id=tenant_id
+        )
         if not (novo_produto.codigo_barras or "").strip():
             novo_produto.codigo_barras = chave_base[:20]
         logger.info(
@@ -697,7 +740,9 @@ def criar_produto_automatico_do_bling_por_item(
     except Exception as e:
         logger.warning("Falha no autocadastro por item do Bling: %s", e)
         if sku_limpo:
-            existente = buscar_produto_do_item(db=db, tenant_id=tenant_id, sku=sku_limpo)
+            existente = buscar_produto_do_item(
+                db=db, tenant_id=tenant_id, sku=sku_limpo
+            )
             if existente:
                 return existente
         if codigo_barras:
@@ -741,12 +786,16 @@ def criar_produto_automatico_do_bling(db: Session, tenant_id, sku: str):
 
     item_bling = _buscar_produto_bling_por_sku(sku_limpo)
     if not item_bling:
-        logger.warning(f"⚠️ SKU {sku_limpo}: produto não encontrado no Bling para autocadastro")
+        logger.warning(
+            f"⚠️ SKU {sku_limpo}: produto não encontrado no Bling para autocadastro"
+        )
         return None
 
     usuario = _obter_usuario_padrao_tenant(db=db, tenant_id=tenant_id)
     if not usuario:
-        logger.warning(f"⚠️ SKU {sku_limpo}: não há usuário no tenant para autocadastro do produto")
+        logger.warning(
+            f"⚠️ SKU {sku_limpo}: não há usuário no tenant para autocadastro do produto"
+        )
         return None
 
     novo_produto = _montar_produto_local_do_bling(
@@ -758,7 +807,9 @@ def criar_produto_automatico_do_bling(db: Session, tenant_id, sku: str):
 
     if _codigo_ja_existe_global(db, novo_produto.codigo):
         codigo_original = novo_produto.codigo
-        novo_produto.codigo = _gerar_codigo_fallback(db=db, sku=sku_limpo, tenant_id=tenant_id)
+        novo_produto.codigo = _gerar_codigo_fallback(
+            db=db, sku=sku_limpo, tenant_id=tenant_id
+        )
         # Mantém o SKU original indexável para busca e baixa por SKU.
         if not (novo_produto.codigo_barras or "").strip():
             novo_produto.codigo_barras = sku_limpo[:20]
@@ -770,7 +821,9 @@ def criar_produto_automatico_do_bling(db: Session, tenant_id, sku: str):
         with db.begin_nested():
             db.add(novo_produto)
             db.flush()
-        logger.info(f"✅ SKU {sku_limpo}: produto criado automaticamente com id={novo_produto.id}")
+        logger.info(
+            f"✅ SKU {sku_limpo}: produto criado automaticamente com id={novo_produto.id}"
+        )
         return novo_produto
     except Exception as e:
         logger.warning(f"⚠️ SKU {sku_limpo}: falha no autocadastro do produto: {e}")
@@ -827,7 +880,9 @@ def _processar_nf_autorizada_legado(
                     observacao=f"Baixa automática via NF Bling #{nf_id}",
                 )
             else:
-                logger.warning(f"⚠️  Produto com código/SKU '{item.sku}' não encontrado para baixa de estoque")
+                logger.warning(
+                    f"⚠️  Produto com código/SKU '{item.sku}' não encontrado para baixa de estoque"
+                )
                 registrar_evento(
                     tenant_id=pedido.tenant_id,
                     source="runtime",
@@ -905,6 +960,7 @@ def _processar_nf_autorizada_legado(
         nf_bling_id=nf_id,
     )
     return "venda_confirmada"
+
 
 def processar_nf_autorizada(
     db: Session,
@@ -1016,7 +1072,9 @@ def processar_nf_autorizada(
             movimentos_legados_por_produto.setdefault(produto_id_int, []).append(mov)
     usuario_padrao = _obter_usuario_padrao_tenant(db=db, tenant_id=pedido.tenant_id)
     user_id_execucao = getattr(usuario_padrao, "id", None)
-    venda_ja_confirmada = pedido.status == "confirmado" and all(item.vendido_em for item in itens)
+    venda_ja_confirmada = pedido.status == "confirmado" and all(
+        item.vendido_em for item in itens
+    )
     itens_confirmados = 0
     baixas_criadas = 0
     baixas_normalizadas = 0
@@ -1041,7 +1099,9 @@ def processar_nf_autorizada(
                 )
 
             if not produto:
-                logger.warning(f"Produto com codigo/SKU '{item.sku}' nao encontrado para baixa de estoque")
+                logger.warning(
+                    f"Produto com codigo/SKU '{item.sku}' nao encontrado para baixa de estoque"
+                )
                 registrar_evento(
                     tenant_id=pedido.tenant_id,
                     source="runtime",
@@ -1185,7 +1245,13 @@ def processar_nf_autorizada(
     if incidentes_resolvidos:
         db.commit()
 
-    if venda_ja_confirmada and itens_confirmados == 0 and baixas_criadas == 0 and baixas_normalizadas == 0 and not houve_erros:
+    if (
+        venda_ja_confirmada
+        and itens_confirmados == 0
+        and baixas_criadas == 0
+        and baixas_normalizadas == 0
+        and not houve_erros
+    ):
         return "venda_ja_confirmada"
 
     registrar_evento(
@@ -1234,7 +1300,9 @@ def processar_nf_cancelada(
     for movimentacao in movimentos_ativos:
         _restaurar_lotes_consumidos(db, movimentacao)
 
-        user_id_movimentacao = getattr(movimentacao, "user_id", None) or user_id_execucao
+        user_id_movimentacao = (
+            getattr(movimentacao, "user_id", None) or user_id_execucao
+        )
         if not user_id_movimentacao:
             raise ValueError(
                 f"Nenhum usuario valido disponivel para estornar a movimentacao de estoque do pedido {pedido.id}"
@@ -1254,7 +1322,10 @@ def processar_nf_cancelada(
                 f"Estorno automatico por cancelamento da NF Bling #{nf_id or _numero_nf_pedido(pedido)}"
             ),
         )
-        for kit_id, _estoque_virtual in KitEstoqueService.recalcular_kits_que_usam_produto(
+        for (
+            kit_id,
+            _estoque_virtual,
+        ) in KitEstoqueService.recalcular_kits_que_usam_produto(
             db,
             movimentacao.produto_id,
         ).items():

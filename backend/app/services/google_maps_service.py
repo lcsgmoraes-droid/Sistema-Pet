@@ -20,7 +20,9 @@ _COMPLEMENTO_LABELS = (
     r"referencia|refer[\u00ea\u00e9]ncia|ponto de referencia|ponto de refer[\u00ea\u00e9]ncia|"
     r"obs\.?|observacao|observa[c\u00e7][a\u00e3]o|condominio|condom[i\u00ed]nio|cond\.?"
 )
-_ROTULO_NUMERO_RE = re.compile(r"\b(?:numero|n\u00famero|n[º°])\s*[:\-]?\s*", re.IGNORECASE)
+_ROTULO_NUMERO_RE = re.compile(
+    r"\b(?:numero|n\u00famero|n[º°])\s*[:\-]?\s*", re.IGNORECASE
+)
 _COMPLEMENTO_RE = re.compile(rf"^(?:{_COMPLEMENTO_LABELS})\b", re.IGNORECASE)
 _COMPLEMENTO_APOS_NUMERO_RE = re.compile(
     rf"^(\d+[A-Za-z]?)\s+(?:{_COMPLEMENTO_LABELS})\b.*$",
@@ -41,7 +43,11 @@ def limpar_endereco_para_maps(endereco: str) -> str:
 
     for parte in partes:
         parte_limpa = re.sub(r"\s+", " ", parte).strip(" -")
-        if not parte_limpa or _CEP_RE.match(parte_limpa) or _COMPLEMENTO_RE.match(parte_limpa):
+        if (
+            not parte_limpa
+            or _CEP_RE.match(parte_limpa)
+            or _COMPLEMENTO_RE.match(parte_limpa)
+        ):
             continue
 
         complemento_numero = _COMPLEMENTO_APOS_NUMERO_RE.match(parte_limpa)
@@ -66,17 +72,17 @@ def limpar_endereco_para_maps(endereco: str) -> str:
 def calcular_distancia_km(origem: str, destino: str) -> Decimal:
     """
     Calcula distância em KM entre origem e destino usando Google Distance Matrix API
-    
+
     Args:
         origem: Endereço de partida (ex: "Av. Paulista, 1578, São Paulo, SP")
         destino: Endereço de chegada
-        
+
     Returns:
         Distância em quilômetros (Decimal)
-        
+
     Raises:
         Exception: Se houver erro na API ou rota inválida
-        
+
     Exemplo:
         >>> distancia = calcular_distancia_km(
         ...     "Av. Paulista, 1578, São Paulo, SP",
@@ -87,7 +93,7 @@ def calcular_distancia_km(origem: str, destino: str) -> Decimal:
     """
     if not GOOGLE_MAPS_API_KEY:
         raise Exception("GOOGLE_MAPS_API_KEY não configurada")
-    
+
     params = {
         "origins": limpar_endereco_para_maps(origem) or origem,
         "destinations": limpar_endereco_para_maps(destino) or destino,
@@ -109,7 +115,7 @@ def calcular_distancia_km(origem: str, destino: str) -> Decimal:
 
     # Validar elemento
     element = data["rows"][0]["elements"][0]
-    
+
     if element.get("status") != "OK":
         raise Exception(f"Rota inválida: {element.get('status')}")
 
@@ -123,25 +129,25 @@ def calcular_distancia_km(origem: str, destino: str) -> Decimal:
 def calcular_distancia_com_duracao(origem: str, destino: str) -> Dict[str, Any]:
     """
     Calcula distância e duração entre origem e destino
-    
+
     Args:
         origem: Endereço de partida
         destino: Endereço de chegada
-        
+
     Returns:
         Dict com:
             - distancia_km (Decimal): Distância em quilômetros
             - duracao_minutos (int): Duração estimada em minutos
             - distancia_texto (str): Distância formatada (ex: "2.4 km")
             - duracao_texto (str): Duração formatada (ex: "11 mins")
-            
+
     Exemplo:
         >>> resultado = calcular_distancia_com_duracao(origem, destino)
         >>> logger.info(f"{resultado['distancia_km']} km em {resultado['duracao_minutos']} minutos")
     """
     if not GOOGLE_MAPS_API_KEY:
         raise Exception("GOOGLE_MAPS_API_KEY não configurada")
-    
+
     params = {
         "origins": limpar_endereco_para_maps(origem) or origem,
         "destinations": limpar_endereco_para_maps(destino) or destino,
@@ -161,7 +167,7 @@ def calcular_distancia_com_duracao(origem: str, destino: str) -> Dict[str, Any]:
         raise Exception(f"Erro Google Maps: {data.get('status')} - {error_message}")
 
     element = data["rows"][0]["elements"][0]
-    
+
     if element.get("status") != "OK":
         raise Exception(f"Rota inválida: {element.get('status')}")
 
@@ -169,7 +175,7 @@ def calcular_distancia_com_duracao(origem: str, destino: str) -> Dict[str, Any]:
     distancia_m = element["distance"]["value"]
     distancia_km = Decimal(distancia_m) / Decimal(1000)
     distancia_texto = element["distance"]["text"]
-    
+
     duracao_segundos = element["duration"]["value"]
     duracao_minutos = int(duracao_segundos / 60)
     duracao_texto = element["duration"]["text"]
@@ -185,14 +191,14 @@ def calcular_distancia_com_duracao(origem: str, destino: str) -> Dict[str, Any]:
 def calcular_tempo_estimado(origem: str, destino: str) -> int:
     """
     ETAPA 10 - Calcula apenas o tempo estimado entre dois pontos
-    
+
     Args:
         origem: Endereço de partida
         destino: Endereço de chegada
-        
+
     Returns:
         Tempo estimado em segundos
-        
+
     Exemplo:
         >>> segundos = calcular_tempo_estimado(origem, destino)
         >>> minutos = segundos / 60
@@ -208,13 +214,13 @@ def calcular_tempo_estimado(origem: str, destino: str) -> int:
 def geocode_endereco(endereco: str) -> Tuple[Decimal, Decimal]:
     """
     Converte endereço em coordenadas (latitude, longitude)
-    
+
     Args:
         endereco: Endereço completo
-        
+
     Returns:
         Tupla (latitude, longitude)
-        
+
     Exemplo:
         >>> lat, lng = geocode_endereco("Av. Paulista, 1578, São Paulo, SP")
         >>> logger.info(f"Lat: {lat}, Lng: {lng}")
@@ -222,7 +228,7 @@ def geocode_endereco(endereco: str) -> Tuple[Decimal, Decimal]:
     """
     if not GOOGLE_MAPS_API_KEY:
         raise Exception("GOOGLE_MAPS_API_KEY não configurada")
-    
+
     params = {
         "address": limpar_endereco_para_maps(endereco) or endereco,
         "key": GOOGLE_MAPS_API_KEY,
@@ -240,7 +246,7 @@ def geocode_endereco(endereco: str) -> Tuple[Decimal, Decimal]:
         raise Exception(f"Erro Geocoding: {data.get('status')} - {error_message}")
 
     location = data["results"][0]["geometry"]["location"]
-    
+
     latitude = Decimal(str(location["lat"]))
     longitude = Decimal(str(location["lng"]))
 
@@ -248,25 +254,23 @@ def geocode_endereco(endereco: str) -> Tuple[Decimal, Decimal]:
 
 
 def calcular_rota_multiplos_pontos(
-    origem: str, 
-    destino: str, 
-    paradas: List[str]
+    origem: str, destino: str, paradas: List[str]
 ) -> Dict[str, Any]:
     """
     Calcula rota otimizada com múltiplas paradas usando Directions API
-    
+
     Args:
         origem: Endereço de partida
         destino: Endereço de chegada
         paradas: Lista de endereços intermediários
-        
+
     Returns:
         Dict com:
             - distancia_total_km (Decimal): Distância total da rota
             - duracao_total_minutos (int): Tempo total estimado
             - segmentos (List): Detalhes de cada trecho
             - ordem_otimizada (List[int]): Índices das paradas na ordem otimizada
-            
+
     Exemplo:
         >>> resultado = calcular_rota_multiplos_pontos(
         ...     origem="Loja",
@@ -277,7 +281,7 @@ def calcular_rota_multiplos_pontos(
     """
     if not GOOGLE_MAPS_API_KEY:
         raise Exception("GOOGLE_MAPS_API_KEY não configurada")
-    
+
     origem_maps = limpar_endereco_para_maps(origem) or origem
     destino_maps = limpar_endereco_para_maps(destino) or destino
     paradas_maps = [limpar_endereco_para_maps(parada) or parada for parada in paradas]
@@ -288,7 +292,7 @@ def calcular_rota_multiplos_pontos(
         "key": GOOGLE_MAPS_API_KEY,
         "units": "metric",
     }
-    
+
     # Adicionar paradas (waypoints)
     if paradas_maps:
         # optimize:true pede ao Google para otimizar a ordem das paradas
@@ -307,25 +311,27 @@ def calcular_rota_multiplos_pontos(
         raise Exception(f"Erro Directions: {data.get('status')} - {error_message}")
 
     route = data["routes"][0]
-    
+
     # Calcular totais
     distancia_total_m = sum(leg["distance"]["value"] for leg in route["legs"])
     distancia_total_km = Decimal(distancia_total_m) / Decimal(1000)
-    
+
     duracao_total_segundos = sum(leg["duration"]["value"] for leg in route["legs"])
     duracao_total_minutos = int(duracao_total_segundos / 60)
-    
+
     # Extrair segmentos
     segmentos = []
     for i, leg in enumerate(route["legs"]):
-        segmentos.append({
-            "ordem": i + 1,
-            "origem": leg["start_address"],
-            "destino": leg["end_address"],
-            "distancia_km": Decimal(leg["distance"]["value"]) / Decimal(1000),
-            "duracao_minutos": int(leg["duration"]["value"] / 60),
-        })
-    
+        segmentos.append(
+            {
+                "ordem": i + 1,
+                "origem": leg["start_address"],
+                "destino": leg["end_address"],
+                "distancia_km": Decimal(leg["distance"]["value"]) / Decimal(1000),
+                "duracao_minutos": int(leg["duration"]["value"] / 60),
+            }
+        )
+
     # Ordem otimizada (se houver paradas)
     ordem_otimizada = []
     if paradas_maps and "waypoint_order" in route:
@@ -339,36 +345,38 @@ def calcular_rota_multiplos_pontos(
     }
 
 
-def calcular_rota_otimizada(origem: str, destinos: List[str]) -> Tuple[List[int], List[Dict[str, Any]]]:
+def calcular_rota_otimizada(
+    origem: str, destinos: List[str]
+) -> Tuple[List[int], List[Dict[str, Any]]]:
     """
     ETAPA 9.3 - Calcula a melhor ordem de entregas usando Google Directions API
-    
+
     Usa optimize:true para que o Google retorne a sequência otimizada que
     minimiza distância/tempo total.
-    
+
     Args:
         origem: Endereço de partida (loja)
         destinos: Lista de endereços de entrega (N entregas)
-        
+
     Returns:
         Tupla com:
             - ordem (List[int]): Índices reordenados (ex: [2, 0, 1] = entregar 3º, depois 1º, depois 2º)
             - legs (List[Dict]): Detalhes de cada trecho com distância e duração
-            
+
     Raises:
         Exception: Se houver erro na API ou rota inválida
-        
+
     Exemplo:
         >>> origem = "Rua da Loja, 100"
         >>> destinos = [
         ...     "Cliente A - Rua X, 10",
-        ...     "Cliente B - Rua Y, 20", 
+        ...     "Cliente B - Rua Y, 20",
         ...     "Cliente C - Rua Z, 30"
         ... ]
         >>> ordem, legs = calcular_rota_otimizada(origem, destinos)
         >>> logger.info(f"Ordem otimizada: {ordem}")  # Ex: [1, 2, 0]
         >>> logger.info(f"1ª parada: Cliente {ordem[0] + 1}")  # Ex: Cliente B
-        
+
     Detalhes dos legs:
         Cada item contém:
         - distance.value: distância em metros
@@ -378,19 +386,21 @@ def calcular_rota_otimizada(origem: str, destinos: List[str]) -> Tuple[List[int]
     """
     if not GOOGLE_MAPS_API_KEY:
         raise Exception("GOOGLE_MAPS_API_KEY não configurada")
-    
+
     if not destinos:
         raise Exception("Lista de destinos está vazia")
-    
+
     origem_maps = limpar_endereco_para_maps(origem) or origem
-    destinos_maps = [limpar_endereco_para_maps(destino) or destino for destino in destinos]
+    destinos_maps = [
+        limpar_endereco_para_maps(destino) or destino for destino in destinos
+    ]
 
     if not destinos_maps:
         raise Exception("Lista de destinos esta vazia apos limpeza dos enderecos")
 
     # Montar waypoints com optimize:true
     waypoints = "|".join(destinos_maps)
-    
+
     params = {
         "origin": origem_maps,
         "destination": destinos_maps[-1],  # Ultimo destino (sera reordenado)
@@ -409,13 +419,15 @@ def calcular_rota_otimizada(origem: str, destinos: List[str]) -> Tuple[List[int]
     # Validar resposta
     if data.get("status") != "OK":
         error_message = data.get("error_message", "Erro desconhecido")
-        raise Exception(f"Erro Google Directions: {data.get('status')} - {error_message}")
+        raise Exception(
+            f"Erro Google Directions: {data.get('status')} - {error_message}"
+        )
 
     route = data["routes"][0]
-    
+
     # Extrair ordem otimizada
     ordem = route.get("waypoint_order", [])
-    
+
     # Extrair legs (trechos da rota)
     legs = route["legs"]
 

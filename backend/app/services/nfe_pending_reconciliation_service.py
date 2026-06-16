@@ -39,7 +39,9 @@ def _buscar_nfes_pendentes_recentes(
             BlingNotaFiscalCache.data_emissao >= _limite_data_recentes(dias),
             func.lower(BlingNotaFiscalCache.status).in_(_NFE_STATUSS_PENDENTES),
         )
-        .order_by(BlingNotaFiscalCache.data_emissao.desc(), BlingNotaFiscalCache.id.desc())
+        .order_by(
+            BlingNotaFiscalCache.data_emissao.desc(), BlingNotaFiscalCache.id.desc()
+        )
         .limit(max(int(limite_notas or 0), 1))
         .all()
     )
@@ -59,7 +61,9 @@ def _contar_nfes_pendentes_recentes(db: Session, tenant_id, *, dias: int) -> int
     return int(total or 0)
 
 
-def _planejar_janela_reconciliacao(registros: list[BlingNotaFiscalCache]) -> tuple[str, str]:
+def _planejar_janela_reconciliacao(
+    registros: list[BlingNotaFiscalCache],
+) -> tuple[str, str]:
     datas = [registro.data_emissao for registro in registros if registro.data_emissao]
     if not datas:
         hoje = _utc_now().date().isoformat()
@@ -165,7 +169,9 @@ def executar_reconciliacao_automatica_nfes_pendentes(
     _correlation_context_applied: bool = False,
 ) -> dict:
     if not _correlation_context_applied:
-        with operation_correlation_context("job.nfe_pending_reconciliation") as correlation_id:
+        with operation_correlation_context(
+            "job.nfe_pending_reconciliation"
+        ) as correlation_id:
             result = executar_reconciliacao_automatica_nfes_pendentes(
                 db,
                 dias=dias,
@@ -209,8 +215,14 @@ def executar_reconciliacao_automatica_nfes_pendentes(
         "correlation_id": current_correlation_id("job.nfe_pending_reconciliation"),
         "tenants_processados": len(resultados),
         "tenants_com_pendencias": len(tenant_ids),
-        "pendentes_antes_total": sum(int(item.get("pendentes_antes") or 0) for item in resultados),
-        "pendentes_depois_total": sum(int(item.get("pendentes_depois") or 0) for item in resultados),
-        "pendentes_atualizadas_total": sum(int(item.get("pendentes_atualizadas") or 0) for item in resultados),
+        "pendentes_antes_total": sum(
+            int(item.get("pendentes_antes") or 0) for item in resultados
+        ),
+        "pendentes_depois_total": sum(
+            int(item.get("pendentes_depois") or 0) for item in resultados
+        ),
+        "pendentes_atualizadas_total": sum(
+            int(item.get("pendentes_atualizadas") or 0) for item in resultados
+        ),
         "resultados": resultados,
     }

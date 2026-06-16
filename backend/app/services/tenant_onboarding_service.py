@@ -247,21 +247,36 @@ BUILTIN_TEMPLATE_ITEMS: list[dict[str, Any]] = [
         "dre_category",
         "dre_receitas",
         NAME_RECEITAS_VENDAS,
-        {"nome": NAME_RECEITAS_VENDAS, "ordem": 1, "natureza": "receita", "ativo": True},
+        {
+            "nome": NAME_RECEITAS_VENDAS,
+            "ordem": 1,
+            "natureza": "receita",
+            "ativo": True,
+        },
         100,
     ),
     _template_item(
         "dre_category",
         "dre_cmv",
         "Custo das Mercadorias Vendidas",
-        {"nome": "Custo das Mercadorias Vendidas", "ordem": 2, "natureza": "custo", "ativo": True},
+        {
+            "nome": "Custo das Mercadorias Vendidas",
+            "ordem": 2,
+            "natureza": "custo",
+            "ativo": True,
+        },
         200,
     ),
     _template_item(
         "dre_category",
         "dre_despesas_operacionais",
         "Despesas Operacionais",
-        {"nome": "Despesas Operacionais", "ordem": 3, "natureza": "despesa", "ativo": True},
+        {
+            "nome": "Despesas Operacionais",
+            "ordem": 3,
+            "natureza": "despesa",
+            "ativo": True,
+        },
         300,
     ),
     _template_item(
@@ -380,7 +395,11 @@ BUILTIN_TEMPLATE_ITEMS: list[dict[str, Any]] = [
         "product_department",
         "dept_produtos",
         "Produtos",
-        {"nome": "Produtos", "descricao": "Produtos comercializados pela loja.", "ativo": True},
+        {
+            "nome": "Produtos",
+            "descricao": "Produtos comercializados pela loja.",
+            "ativo": True,
+        },
         500,
     ),
     _template_item(
@@ -544,14 +563,24 @@ BUILTIN_TEMPLATE_ITEMS.extend(
             "pet_breed",
             "breed_dog_srd",
             "SRD - Cao",
-            {"nome": "SRD", "species_code": "species_dog", "especie": "Cao", "ativo": True},
+            {
+                "nome": "SRD",
+                "species_code": "species_dog",
+                "especie": "Cao",
+                "ativo": True,
+            },
             60,
         ),
         _template_item(
             "pet_breed",
             "breed_cat_srd",
             "SRD - Gato",
-            {"nome": "SRD", "species_code": "species_cat", "especie": "Gato", "ativo": True},
+            {
+                "nome": "SRD",
+                "species_code": "species_cat",
+                "especie": "Gato",
+                "ativo": True,
+            },
             61,
         ),
     ]
@@ -621,7 +650,18 @@ for index, name in enumerate(
     )
 
 for index, name in enumerate(
-    ("Frango", "Carne", "Peixe", "Salmao", "Cordeiro", "Peru", "Porco", "Vegetariano", "Soja", "Mix"),
+    (
+        "Frango",
+        "Carne",
+        "Peixe",
+        "Salmao",
+        "Cordeiro",
+        "Peru",
+        "Porco",
+        "Vegetariano",
+        "Soja",
+        "Mix",
+    ),
     start=1,
 ):
     BUILTIN_TEMPLATE_ITEMS.append(
@@ -700,8 +740,14 @@ def _enforce_required_onboarding(result: OnboardingResult) -> None:
     )
 
 
-def _warn_missing_template_infra_for_strict(db: Session, result: OnboardingResult) -> None:
-    missing = [table_name for table_name in TEMPLATE_INFRA_TABLES if not _table_exists(db, table_name)]
+def _warn_missing_template_infra_for_strict(
+    db: Session, result: OnboardingResult
+) -> None:
+    missing = [
+        table_name
+        for table_name in TEMPLATE_INFRA_TABLES
+        if not _table_exists(db, table_name)
+    ]
     if missing:
         result.warnings.append(
             "Infraestrutura de templates ausente para onboarding estrito "
@@ -721,7 +767,9 @@ def _normalize_user_id(user_id: Any) -> int:
     return int(user_id)
 
 
-def _db_enum_label(value: Any, labels: dict[str, str], field_name: str, allow_none: bool = False) -> str | None:
+def _db_enum_label(
+    value: Any, labels: dict[str, str], field_name: str, allow_none: bool = False
+) -> str | None:
     if value is None:
         if allow_none:
             return None
@@ -749,7 +797,9 @@ def _tables_ready_or_warn(
     section: str,
     table_names: tuple[str, ...],
 ) -> bool:
-    missing = [table_name for table_name in table_names if not _table_exists(db, table_name)]
+    missing = [
+        table_name for table_name in table_names if not _table_exists(db, table_name)
+    ]
     if not missing:
         return True
 
@@ -815,7 +865,9 @@ def ensure_builtin_templates(db: Session) -> None:
     db.flush()
 
 
-def _query_template_items(db: Session, bundle_code: str, bundle_version: str) -> list[dict[str, Any]]:
+def _query_template_items(
+    db: Session, bundle_code: str, bundle_version: str
+) -> list[dict[str, Any]]:
     rows = (
         db.query(TemplateItem)
         .filter(
@@ -838,7 +890,9 @@ def _query_template_items(db: Session, bundle_code: str, bundle_version: str) ->
     ]
 
 
-def _missing_builtin_template_items(db: Session, bundle_code: str, bundle_version: str) -> list[dict[str, Any]]:
+def _missing_builtin_template_items(
+    db: Session, bundle_code: str, bundle_version: str
+) -> list[dict[str, Any]]:
     existing_codes = {
         row[0]
         for row in db.query(TemplateItem.template_code)
@@ -848,7 +902,11 @@ def _missing_builtin_template_items(db: Session, bundle_code: str, bundle_versio
         )
         .all()
     }
-    return [item for item in BUILTIN_TEMPLATE_ITEMS if item["template_code"] not in existing_codes]
+    return [
+        item
+        for item in BUILTIN_TEMPLATE_ITEMS
+        if item["template_code"] not in existing_codes
+    ]
 
 
 def _combine_template_items(
@@ -860,17 +918,23 @@ def _combine_template_items(
     if bundle_code != DEFAULT_BUNDLE_CODE or bundle_version != DEFAULT_BUNDLE_VERSION:
         return None
 
-    missing_builtin_items = _missing_builtin_template_items(db, bundle_code, bundle_version)
+    missing_builtin_items = _missing_builtin_template_items(
+        db, bundle_code, bundle_version
+    )
     if not items and not missing_builtin_items:
         return None
 
     combined = items + missing_builtin_items
-    combined.sort(key=lambda item: (int(item.get("sort_order") or 0), item["template_code"]))
+    combined.sort(
+        key=lambda item: (int(item.get("sort_order") or 0), item["template_code"])
+    )
     source = "database" if not missing_builtin_items else "database+builtin_pending"
     return combined, source
 
 
-def _load_template_items(db: Session, bundle_code: str, bundle_version: str) -> tuple[list[dict[str, Any]], str]:
+def _load_template_items(
+    db: Session, bundle_code: str, bundle_version: str
+) -> tuple[list[dict[str, Any]], str]:
     if _template_tables_ready(db):
         items = _query_template_items(db, bundle_code, bundle_version)
         combined = _combine_template_items(db, bundle_code, bundle_version, items)
@@ -938,7 +1002,9 @@ def _find_template_dependency_errors(
         item_type = item.get("item_type")
         payload = item.get("payload") or {}
         if item_type == "dre_subcategory":
-            _validate_payload_reference(errors, item, "categoria_code", dre_category_codes, "dre_category")
+            _validate_payload_reference(
+                errors, item, "categoria_code", dre_category_codes, "dre_category"
+            )
         elif item_type == "expense_type":
             _validate_payload_reference(
                 errors,
@@ -1007,10 +1073,16 @@ def validate_onboarding_template_contract(
     graph before the strict signup onboarding path is exercised.
     """
     missing_template_tables = [
-        table_name for table_name in TEMPLATE_INFRA_TABLES if not _table_exists(db, table_name)
+        table_name
+        for table_name in TEMPLATE_INFRA_TABLES
+        if not _table_exists(db, table_name)
     ]
     missing_operational_tables = {
-        section: [table_name for table_name in table_names if not _table_exists(db, table_name)]
+        section: [
+            table_name
+            for table_name in table_names
+            if not _table_exists(db, table_name)
+        ]
         for section, table_names in REQUIRED_ONBOARDING_TABLES.items()
     }
     missing_operational_tables = {
@@ -1039,13 +1111,23 @@ def validate_onboarding_template_contract(
     for item in items:
         code = str(item.get("template_code") or "")
         seen_codes[code] = seen_codes.get(code, 0) + 1
-    duplicate_template_codes = sorted(code for code, count in seen_codes.items() if code and count > 1)
+    duplicate_template_codes = sorted(
+        code for code, count in seen_codes.items() if code and count > 1
+    )
 
-    dependency_errors, dependency_warnings = _find_template_dependency_errors(items, include_products)
+    dependency_errors, dependency_warnings = _find_template_dependency_errors(
+        items, include_products
+    )
 
     builtin_pending_count = 0
-    if _template_tables_ready(db) and bundle_code == DEFAULT_BUNDLE_CODE and bundle_version == DEFAULT_BUNDLE_VERSION:
-        builtin_pending_count = len(_missing_builtin_template_items(db, bundle_code, bundle_version))
+    if (
+        _template_tables_ready(db)
+        and bundle_code == DEFAULT_BUNDLE_CODE
+        and bundle_version == DEFAULT_BUNDLE_VERSION
+    ):
+        builtin_pending_count = len(
+            _missing_builtin_template_items(db, bundle_code, bundle_version)
+        )
 
     ok = not (
         missing_template_tables
@@ -1128,7 +1210,9 @@ def _sync_postgres_id_sequence(db: Session, table_name: str) -> None:
     synced_tables.add(table_name)
 
 
-def _execute_insert(db: Session, sql: str, params: dict[str, Any], tenant_id: str) -> None:
+def _execute_insert(
+    db: Session, sql: str, params: dict[str, Any], tenant_id: str
+) -> None:
     target_table = _insert_target_table(sql)
     if target_table:
         _sync_postgres_id_sequence(db, target_table)
@@ -1148,7 +1232,9 @@ def _item_install_tables_ready(db: Session) -> bool:
 
 def _ensure_known_target_table(target_table: str) -> None:
     if target_table not in ITEM_INSTALL_TARGET_TABLES:
-        raise TenantOnboardingError(f"Tabela alvo de template nao permitida: {target_table}.")
+        raise TenantOnboardingError(
+            f"Tabela alvo de template nao permitida: {target_table}."
+        )
 
 
 def _get_template_item_install(
@@ -1258,7 +1344,9 @@ def _copy_payment_methods(
 ) -> None:
     for item in items:
         payload = item["payload"]
-        mapped_id = _mapped_template_row_id(db, tenant_id, result, item, "formas_pagamento")
+        mapped_id = _mapped_template_row_id(
+            db, tenant_id, result, item, "formas_pagamento"
+        )
         if mapped_id:
             result.bump("skipped", "payment_methods")
             continue
@@ -1299,7 +1387,9 @@ def _copy_payment_methods(
             "taxa_percentual": payload.get("taxa_percentual", 0),
             "taxa_fixa": payload.get("taxa_fixa", 0),
             "prazo_dias": payload.get("prazo_dias", 0),
-            "prazo_recebimento": payload.get("prazo_recebimento", payload.get("prazo_dias", 0)),
+            "prazo_recebimento": payload.get(
+                "prazo_recebimento", payload.get("prazo_dias", 0)
+            ),
             "operadora": payload.get("operadora"),
             "gera_contas_receber": bool(payload.get("gera_contas_receber", False)),
             "split_parcelas": bool(payload.get("split_parcelas", False)),
@@ -1309,7 +1399,9 @@ def _copy_payment_methods(
             "ativo": bool(payload.get("ativo", True)),
             "permite_parcelamento": bool(payload.get("permite_parcelamento", False)),
             "max_parcelas": payload.get("max_parcelas", 1),
-            "parcelas_maximas": payload.get("parcelas_maximas", payload.get("max_parcelas", 1)),
+            "parcelas_maximas": payload.get(
+                "parcelas_maximas", payload.get("max_parcelas", 1)
+            ),
             "icone": payload.get("icone"),
             "cor": payload.get("cor"),
         }
@@ -1367,7 +1459,9 @@ def _copy_bank_accounts(
 ) -> None:
     for item in items:
         payload = item["payload"]
-        mapped_id = _mapped_template_row_id(db, tenant_id, result, item, "contas_bancarias")
+        mapped_id = _mapped_template_row_id(
+            db, tenant_id, result, item, "contas_bancarias"
+        )
         if mapped_id:
             result.bump("skipped", "bank_accounts")
             continue
@@ -1556,7 +1650,9 @@ def _copy_pet_breeds(
         payload = item["payload"]
         species_id = species_ids.get(payload.get("species_code"))
         if not species_id:
-            result.warnings.append(f"Especie ausente para raca {item['template_code']}.")
+            result.warnings.append(
+                f"Especie ausente para raca {item['template_code']}."
+            )
             continue
 
         mapped_id = _mapped_template_row_id(db, tenant_id, result, item, "racas")
@@ -1732,7 +1828,9 @@ def _copy_package_weights(
 ) -> None:
     for item in items:
         payload = item["payload"]
-        mapped_id = _mapped_template_row_id(db, tenant_id, result, item, "apresentacoes_peso")
+        mapped_id = _mapped_template_row_id(
+            db, tenant_id, result, item, "apresentacoes_peso"
+        )
         if mapped_id:
             result.bump("skipped", "package_weights")
             continue
@@ -1817,7 +1915,9 @@ def _copy_dre_categories(
     category_ids: dict[str, int] = {}
     for item in items:
         payload = item["payload"]
-        mapped_id = _mapped_template_row_id(db, tenant_id, result, item, "dre_categorias")
+        mapped_id = _mapped_template_row_id(
+            db, tenant_id, result, item, "dre_categorias"
+        )
         if mapped_id:
             category_ids[item["template_code"]] = mapped_id
             result.bump("skipped", "dre_categories")
@@ -1910,10 +2010,14 @@ def _copy_dre_subcategories(
         category_code = payload["categoria_code"]
         category_id = category_ids.get(category_code)
         if not category_id:
-            result.warnings.append(f"Categoria DRE ausente para subcategoria {item['template_code']}.")
+            result.warnings.append(
+                f"Categoria DRE ausente para subcategoria {item['template_code']}."
+            )
             continue
 
-        mapped_id = _mapped_template_row_id(db, tenant_id, result, item, "dre_subcategorias")
+        mapped_id = _mapped_template_row_id(
+            db, tenant_id, result, item, "dre_subcategorias"
+        )
         if mapped_id:
             subcategory_ids[item["template_code"]] = mapped_id
             result.bump("skipped", "dre_subcategories")
@@ -1965,7 +2069,9 @@ def _copy_dre_subcategories(
                 "tenant_id": tenant_id,
                 "categoria_id": category_id,
                 "nome": payload["nome"],
-                "tipo_custo": _db_enum_label(payload["tipo_custo"], TIPO_CUSTO_DB_LABELS, "tipo_custo"),
+                "tipo_custo": _db_enum_label(
+                    payload["tipo_custo"], TIPO_CUSTO_DB_LABELS, "tipo_custo"
+                ),
                 "base_rateio": _db_enum_label(
                     payload.get("base_rateio"),
                     BASE_RATEIO_DB_LABELS,
@@ -2017,7 +2123,9 @@ def _copy_expense_types(
 ) -> None:
     for item in items:
         payload = item["payload"]
-        mapped_id = _mapped_template_row_id(db, tenant_id, result, item, "tipo_despesas")
+        mapped_id = _mapped_template_row_id(
+            db, tenant_id, result, item, "tipo_despesas"
+        )
         if mapped_id:
             result.bump("skipped", "expense_types")
             continue
@@ -2052,7 +2160,9 @@ def _copy_expense_types(
 
         dre_subcategory_id = subcategory_ids.get(payload.get("dre_subcategory_code"))
         if not dre_subcategory_id:
-            result.warnings.append(f"Subcategoria DRE ausente para tipo de despesa {item['template_code']}.")
+            result.warnings.append(
+                f"Subcategoria DRE ausente para tipo de despesa {item['template_code']}."
+            )
             continue
 
         _execute_insert(
@@ -2109,7 +2219,9 @@ def _copy_financial_categories(
 ) -> None:
     for item in items:
         payload = item["payload"]
-        mapped_id = _mapped_template_row_id(db, tenant_id, result, item, "categorias_financeiras")
+        mapped_id = _mapped_template_row_id(
+            db, tenant_id, result, item, "categorias_financeiras"
+        )
         if mapped_id:
             result.bump("skipped", "financial_categories")
             continue
@@ -2163,7 +2275,9 @@ def _copy_financial_categories(
                 "icone": payload.get("icone"),
                 "descricao": payload.get("descricao"),
                 "ativo": bool(payload.get("ativo", True)),
-                "dre_subcategoria_id": subcategory_ids.get(payload.get("dre_subcategory_code")),
+                "dre_subcategoria_id": subcategory_ids.get(
+                    payload.get("dre_subcategory_code")
+                ),
                 "tipo_custo": payload.get("tipo_custo"),
             },
             tenant_id,
@@ -2203,7 +2317,9 @@ def _copy_product_departments(
     department_ids: dict[str, int] = {}
     for item in items:
         payload = item["payload"]
-        mapped_id = _mapped_template_row_id(db, tenant_id, result, item, "departamentos")
+        mapped_id = _mapped_template_row_id(
+            db, tenant_id, result, item, "departamentos"
+        )
         if mapped_id:
             department_ids[item["template_code"]] = mapped_id
             result.bump("skipped", "product_departments")
@@ -2497,9 +2613,13 @@ def _copy_products(
         result.bump("created", "product_references")
 
 
-def _record_install(db: Session, tenant_id: str, user_id: int, result: OnboardingResult) -> None:
+def _record_install(
+    db: Session, tenant_id: str, user_id: int, result: OnboardingResult
+) -> None:
     if not _table_exists(db, "tenant_template_installs"):
-        result.warnings.append("Tabela tenant_template_installs ausente; auditoria de onboarding nao registrada.")
+        result.warnings.append(
+            "Tabela tenant_template_installs ausente; auditoria de onboarding nao registrada."
+        )
         return
 
     tenant_uuid = uuid.UUID(tenant_id)
@@ -2609,7 +2729,9 @@ def _run_onboarding_steps(
             category_ids,
         )
 
-    if _tables_ready_or_warn(db, result, "categorias financeiras", ("categorias_financeiras",)):
+    if _tables_ready_or_warn(
+        db, result, "categorias financeiras", ("categorias_financeiras",)
+    ):
         _copy_financial_categories(
             db,
             _items_by_type(items, "financial_category"),
@@ -2629,7 +2751,9 @@ def _run_onboarding_steps(
 
     department_ids: dict[str, int] = {}
     product_category_ids: dict[str, int] = {}
-    if _tables_ready_or_warn(db, result, "departamentos de produtos", ("departamentos",)):
+    if _tables_ready_or_warn(
+        db, result, "departamentos de produtos", ("departamentos",)
+    ):
         department_ids = _copy_product_departments(
             db,
             _items_by_type(items, "product_department"),
@@ -2651,8 +2775,18 @@ def _run_onboarding_steps(
         ("linhas de racao", "linhas_racao", "ration_line", "ration_lines"),
         ("portes de animal", "portes_animal", "animal_size", "animal_sizes"),
         ("fases/publicos de racao", "fases_publico", "life_stage", "life_stages"),
-        ("tratamentos de racao", "tipos_tratamento", "treatment_type", "treatment_types"),
-        ("sabores/proteinas de racao", "sabores_proteina", "protein_flavor", "protein_flavors"),
+        (
+            "tratamentos de racao",
+            "tipos_tratamento",
+            "treatment_type",
+            "treatment_types",
+        ),
+        (
+            "sabores/proteinas de racao",
+            "sabores_proteina",
+            "protein_flavor",
+            "protein_flavors",
+        ),
     )
     for section_name, table_name, item_type, result_key in ration_option_sections:
         if _tables_ready_or_warn(db, result, section_name, (table_name,)):
@@ -2665,7 +2799,9 @@ def _run_onboarding_steps(
                 result_key,
             )
 
-    if _tables_ready_or_warn(db, result, "apresentacoes de peso", ("apresentacoes_peso",)):
+    if _tables_ready_or_warn(
+        db, result, "apresentacoes de peso", ("apresentacoes_peso",)
+    ):
         _copy_package_weights(
             db,
             _items_by_type(items, "package_weight"),
@@ -2749,7 +2885,9 @@ def onboard_tenant_defaults(
             result,
         )
     except SQLAlchemyError as exc:
-        raise TenantOnboardingError(f"Falha no onboarding do tenant {tenant_id_str}: {exc}") from exc
+        raise TenantOnboardingError(
+            f"Falha no onboarding do tenant {tenant_id_str}: {exc}"
+        ) from exc
     finally:
         if _tenant_anterior is not None:
             _set_tenant(_tenant_anterior)
