@@ -17,6 +17,7 @@ Funcionalidades:
 - Entrada por XML (NF-e fornecedor)
 - Alertas e relatórios
 """
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from typing import Optional
@@ -35,6 +36,7 @@ from .produtos_models import (
 )
 from .bling_estoque_sync import sincronizar_bling_background
 import logging
+
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/estoque", tags=["Estoque"])
@@ -43,11 +45,15 @@ router = APIRouter(prefix="/estoque", tags=["Estoque"])
 # SCHEMAS
 # ============================================================================
 
+
 class SaidaEstoqueRequest(BaseModel):
     """Saída manual de estoque"""
+
     produto_id: int
     quantidade: float = Field(gt=0)
-    motivo: str = Field(default="perda")  # perda, avaria, roubo, amostra, uso_interno, devolucao_fornecedor, ajuste
+    motivo: str = Field(
+        default="perda"
+    )  # perda, avaria, roubo, amostra, uso_interno, devolucao_fornecedor, ajuste
     documento: Optional[str] = None
     observacao: Optional[str] = None
     # Para KIT FÍSICO: se True, desmontou o kit e volta os componentes ao estoque
@@ -60,15 +66,17 @@ class SaidaEstoqueRequest(BaseModel):
     dre_subcategoria_id: Optional[int] = None
     tipo_despesa_id: Optional[int] = None
 
+
 # ============================================================================
 # SAÍDA DE ESTOQUE
 # ============================================================================
+
 
 @router.post("/saida", status_code=status.HTTP_201_CREATED)
 def saida_estoque(
     saida: SaidaEstoqueRequest,
     db: Session = Depends(get_session),
-    user_and_tenant = Depends(get_current_user_and_tenant)
+    user_and_tenant=Depends(get_current_user_and_tenant),
 ):
     """
     Saída manual de estoque
@@ -83,10 +91,16 @@ def saida_estoque(
     - ajuste: Ajuste negativo de inventário
     """
     current_user, tenant_id = user_and_tenant
-    logger.info(f"📤 Saída de estoque - Produto {saida.produto_id}, Qtd: {saida.quantidade}")
+    logger.info(
+        f"📤 Saída de estoque - Produto {saida.produto_id}, Qtd: {saida.quantidade}"
+    )
 
     # Buscar produto
-    produto = db.query(Produto).filter(Produto.id == saida.produto_id, Produto.tenant_id == tenant_id).first()
+    produto = (
+        db.query(Produto)
+        .filter(Produto.id == saida.produto_id, Produto.tenant_id == tenant_id)
+        .first()
+    )
     if not produto:
         raise HTTPException(status_code=404, detail="Produto não encontrado")
 
@@ -96,11 +110,11 @@ def saida_estoque(
     if produto.is_parent:
         raise HTTPException(
             status_code=400,
-            detail=f"❌ Produto '{produto.nome}' possui variações. O estoque deve ser controlado nas variações individuais (cor, tamanho, etc.), não no produto pai."
+            detail=f"❌ Produto '{produto.nome}' possui variações. O estoque deve ser controlado nas variações individuais (cor, tamanho, etc.), não no produto pai.",
         )
 
     # ========== VALIDAÇÃO: KIT VIRTUAL não permite movimentação manual ==========
-    if produto.tipo_produto == 'KIT' and produto.tipo_kit == 'VIRTUAL':
+    if produto.tipo_produto == "KIT" and produto.tipo_kit == "VIRTUAL":
         raise HTTPException(
             status_code=400,
             detail=(
@@ -108,7 +122,7 @@ def saida_estoque(
                 f"O estoque deste kit ('{produto.nome}') é calculado automaticamente "
                 f"com base nos componentes que o compõem. "
                 f"Para reduzir o estoque, movimente os produtos componentes individualmente."
-            )
+            ),
         )
 
     estoque_anterior = produto.estoque_atual or 0
@@ -117,16 +131,21 @@ def saida_estoque(
     if estoque_anterior < saida.quantidade:
         raise HTTPException(
             status_code=400,
-            detail=f"Estoque insuficiente. Disponível: {estoque_anterior}, Solicitado: {saida.quantidade}"
+            detail=f"Estoque insuficiente. Disponível: {estoque_anterior}, Solicitado: {saida.quantidade}",
         )
 
     # Sistema FIFO: consumir lotes mais antigos (se existirem lotes ativos)
     lotes_consumidos = []
-    lotes_ativos = db.query(ProdutoLote).filter(
-        ProdutoLote.produto_id == produto.id,
-        ProdutoLote.quantidade_disponivel > 0,
-        ProdutoLote.status == 'ativo'
-    ).order_by(ProdutoLote.ordem_entrada).all()
+    lotes_ativos = (
+        db.query(ProdutoLote)
+        .filter(
+            ProdutoLote.produto_id == produto.id,
+            ProdutoLote.quantidade_disponivel > 0,
+            ProdutoLote.status == "ativo",
+        )
+        .order_by(ProdutoLote.ordem_entrada)
+        .all()
+    )
 
     if lotes_ativos:
         # Se tem lotes, usar FIFO
@@ -136,25 +155,31 @@ def saida_estoque(
             if quantidade_restante <= 0:
                 break
 
-            saldo_anterior = lote.quantidade_disponivel  # Guardar saldo antes de consumir
+            saldo_anterior = (
+                lote.quantidade_disponivel
+            )  # Guardar saldo antes de consumir
             qtd_consumir = min(lote.quantidade_disponivel, quantidade_restante)
             lote.quantidade_disponivel -= qtd_consumir
             quantidade_restante -= qtd_consumir
 
             if lote.quantidade_disponivel == 0:
-                lote.status = 'esgotado'
+                lote.status = "esgotado"
 
-            lotes_consumidos.append({
-                "lote_id": lote.id,
-                "nome_lote": lote.nome_lote,
-                "quantidade": qtd_consumir,
-                "saldo_anterior": saldo_anterior  # Para mostrar (X/Y)
-            })
+            lotes_consumidos.append(
+                {
+                    "lote_id": lote.id,
+                    "nome_lote": lote.nome_lote,
+                    "quantidade": qtd_consumir,
+                    "saldo_anterior": saldo_anterior,  # Para mostrar (X/Y)
+                }
+            )
 
             logger.info(f"📦 FIFO: Consumido lote {lote.nome_lote}: {qtd_consumir}")
 
         if quantidade_restante > 0:
-            logger.warning(f"⚠️ Lotes insuficientes. Restante será deduzido do estoque geral: {quantidade_restante}")
+            logger.warning(
+                f"⚠️ Lotes insuficientes. Restante será deduzido do estoque geral: {quantidade_restante}"
+            )
 
     # Atualizar estoque do produto
     produto.estoque_atual = estoque_anterior - saida.quantidade
@@ -162,7 +187,7 @@ def saida_estoque(
     # Registrar movimentação
     movimentacao = EstoqueMovimentacao(
         produto_id=produto.id,
-        tipo='saida',
+        tipo="saida",
         motivo=saida.motivo,
         quantidade=saida.quantidade,
         quantidade_anterior=estoque_anterior,
@@ -172,7 +197,8 @@ def saida_estoque(
         lotes_consumidos=json.dumps(lotes_consumidos) if lotes_consumidos else None,
         documento=saida.documento,
         observacao=saida.observacao,
-        user_id=current_user.id, tenant_id=tenant_id
+        user_id=current_user.id,
+        tenant_id=tenant_id,
     )
     db.add(movimentacao)
 
@@ -186,15 +212,16 @@ def saida_estoque(
         )
         data_competencia = saida.data_competencia or date.today()
         descricao_despesa = (
-            saida.descricao_despesa
-            or f"Material de uso interno - {produto.nome}"
+            saida.descricao_despesa or f"Material de uso interno - {produto.nome}"
         ).strip()
         observacoes_uso_interno = (
             "Baixa de estoque para uso interno, sem desembolso financeiro. "
             f"Movimentacao de estoque #{movimentacao.id}."
         )
         if saida.observacao:
-            observacoes_uso_interno = f"{observacoes_uso_interno}\nObservacao: {saida.observacao}"
+            observacoes_uso_interno = (
+                f"{observacoes_uso_interno}\nObservacao: {saida.observacao}"
+            )
 
         conta_pagar_uso_interno = ContaPagar(
             descricao=descricao_despesa,
@@ -222,11 +249,15 @@ def saida_estoque(
     if conta_pagar_uso_interno:
         db.refresh(conta_pagar_uso_interno)
 
-    logger.info(f"✅ Saída registrada - Estoque: {estoque_anterior} → {produto.estoque_atual}")
+    logger.info(
+        f"✅ Saída registrada - Estoque: {estoque_anterior} → {produto.estoque_atual}"
+    )
 
     # Alerta se estoque baixo
     if produto.estoque_atual <= (produto.estoque_minimo or 0):
-        logger.warning(f"⚠️ Estoque abaixo do mínimo! {produto.nome}: {produto.estoque_atual}")
+        logger.warning(
+            f"⚠️ Estoque abaixo do mínimo! {produto.nome}: {produto.estoque_atual}"
+        )
 
     # ========== SENSIBILIZAÇÃO: KIT FÍSICO - SAÍDA pode retornar componentes ==========
     # LÓGICA: Saída no kit físico PODE retornar os componentes ao estoque (se desmontou o kit)
@@ -234,61 +265,79 @@ def saida_estoque(
     # - Desmontou o kit: retornar_componentes=True → componentes AUMENTAM (voltam ao estoque)
     # - Perdeu/vendeu o kit: retornar_componentes=False → componentes NÃO mexem
     componentes_sensibilizados = []
-    if produto.tipo_produto == 'KIT' and produto.tipo_kit == 'FISICO':
+    if produto.tipo_produto == "KIT" and produto.tipo_kit == "FISICO":
         from .produtos_models import ProdutoKitComponente
 
         # Buscar componentes do kit
-        componentes = db.query(ProdutoKitComponente).filter(
-            ProdutoKitComponente.kit_id == produto.id
-        ).all()
+        componentes = (
+            db.query(ProdutoKitComponente)
+            .filter(ProdutoKitComponente.kit_id == produto.id)
+            .all()
+        )
 
         if saida.retornar_componentes:
             # CASO 1: Desmontou o kit - componentes VOLTAM ao estoque
-            logger.info(f"🧩 KIT FÍSICO - DESMONTAGEM: Retornando {len(componentes)} componentes ao estoque (desmontando {saida.quantidade} kits)")
+            logger.info(
+                f"🧩 KIT FÍSICO - DESMONTAGEM: Retornando {len(componentes)} componentes ao estoque (desmontando {saida.quantidade} kits)"
+            )
 
             for comp in componentes:
-                componente_produto = db.query(Produto).filter(
-                    Produto.id == comp.produto_componente_id
-                ).first()
+                componente_produto = (
+                    db.query(Produto)
+                    .filter(Produto.id == comp.produto_componente_id)
+                    .first()
+                )
 
                 if componente_produto:
                     quantidade_componente = saida.quantidade * comp.quantidade
                     estoque_ant_comp = componente_produto.estoque_atual or 0
 
                     # ⚠️ IMPORTANTE: AUMENTA os componentes (voltam ao estoque após desmontagem)
-                    componente_produto.estoque_atual = estoque_ant_comp + quantidade_componente
+                    componente_produto.estoque_atual = (
+                        estoque_ant_comp + quantidade_componente
+                    )
 
                     # Registrar movimentação do componente como ENTRADA (devolução)
                     mov_componente = EstoqueMovimentacao(
                         produto_id=componente_produto.id,
-                        tipo='entrada',
-                        motivo='kit_fisico_desmontagem',
+                        tipo="entrada",
+                        motivo="kit_fisico_desmontagem",
                         quantidade=quantidade_componente,
                         quantidade_anterior=estoque_ant_comp,
                         quantidade_nova=componente_produto.estoque_atual,
                         custo_unitario=componente_produto.preco_custo,
-                        valor_total=quantidade_componente * (componente_produto.preco_custo or 0),
+                        valor_total=quantidade_componente
+                        * (componente_produto.preco_custo or 0),
                         observacao=f"Desmontagem: componente retornado ao estoque após desmontar KIT FÍSICO '{produto.nome}' (desmontados {saida.quantidade} kit(s))",
-                        user_id=current_user.id, tenant_id=tenant_id
+                        user_id=current_user.id,
+                        tenant_id=tenant_id,
                     )
                     db.add(mov_componente)
 
-                    componentes_sensibilizados.append({
-                        "id": componente_produto.id,
-                        "nome": componente_produto.nome,
-                        "quantidade": quantidade_componente,
-                        "estoque_anterior": estoque_ant_comp,
-                        "estoque_novo": componente_produto.estoque_atual,
-                        "acao": "retornado"
-                    })
+                    componentes_sensibilizados.append(
+                        {
+                            "id": componente_produto.id,
+                            "nome": componente_produto.nome,
+                            "quantidade": quantidade_componente,
+                            "estoque_anterior": estoque_ant_comp,
+                            "estoque_novo": componente_produto.estoque_atual,
+                            "acao": "retornado",
+                        }
+                    )
 
-                    logger.info(f"   ↳ {componente_produto.nome}: {estoque_ant_comp} → {componente_produto.estoque_atual} (+{quantidade_componente}) [retornado ao estoque]")
+                    logger.info(
+                        f"   ↳ {componente_produto.nome}: {estoque_ant_comp} → {componente_produto.estoque_atual} (+{quantidade_componente}) [retornado ao estoque]"
+                    )
 
             db.commit()
-            logger.info(f"✅ KIT FÍSICO: {len(componentes_sensibilizados)} componentes retornados ao estoque")
+            logger.info(
+                f"✅ KIT FÍSICO: {len(componentes_sensibilizados)} componentes retornados ao estoque"
+            )
         else:
             # CASO 2: NÃO desmontou - componentes NÃO mexem (perda, roubo, venda, etc)
-            logger.info(f"🧩 KIT FÍSICO - SAÍDA SEM DESMONTAGEM: Componentes NÃO serão retornados ao estoque (perda/roubo/etc de {saida.quantidade} kits)")
+            logger.info(
+                f"🧩 KIT FÍSICO - SAÍDA SEM DESMONTAGEM: Componentes NÃO serão retornados ao estoque (perda/roubo/etc de {saida.quantidade} kits)"
+            )
             # Não faz nada com os componentes
 
     # Retornar dict
@@ -312,8 +361,12 @@ def saida_estoque(
             "conta_pagar_id": conta_pagar_uso_interno.id,
             "valor": float(conta_pagar_uso_interno.valor_original),
             "data_competencia": conta_pagar_uso_interno.data_emissao,
-        } if conta_pagar_uso_interno else None,
-        "componentes_sensibilizados": componentes_sensibilizados if componentes_sensibilizados else None
+        }
+        if conta_pagar_uso_interno
+        else None,
+        "componentes_sensibilizados": componentes_sensibilizados
+        if componentes_sensibilizados
+        else None,
     }
 
     # Sincronizar estoque com Bling automaticamente

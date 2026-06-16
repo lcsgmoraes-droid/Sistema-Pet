@@ -38,17 +38,26 @@ def listar_movimentacoes_produto(
     _current_user, tenant_id = user_and_tenant
     logger.info("Listando movimentacoes do produto %s", produto_id)
 
-    produto = db.query(Produto).filter(
-        Produto.id == produto_id,
-        Produto.tenant_id == tenant_id,
-    ).first()
+    produto = (
+        db.query(Produto)
+        .filter(
+            Produto.id == produto_id,
+            Produto.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not produto:
         raise HTTPException(status_code=404, detail="Produto não encontrado")
 
-    movimentacoes = db.query(EstoqueMovimentacao).filter(
-        EstoqueMovimentacao.produto_id == produto_id,
-        EstoqueMovimentacao.tenant_id == tenant_id,
-    ).order_by(EstoqueMovimentacao.created_at).all()
+    movimentacoes = (
+        db.query(EstoqueMovimentacao)
+        .filter(
+            EstoqueMovimentacao.produto_id == produto_id,
+            EstoqueMovimentacao.tenant_id == tenant_id,
+        )
+        .order_by(EstoqueMovimentacao.created_at)
+        .all()
+    )
 
     pedido_integrado_ids = sorted(
         {
@@ -112,13 +121,19 @@ def listar_movimentacoes_produto(
                             consumo_por_lote[lote_id] = 0
                         consumo_por_lote[lote_id] += primeiro_lote.get("quantidade", 0)
 
-                        lote = db.query(ProdutoLote).filter(ProdutoLote.id == lote_id).first()
+                        lote = (
+                            db.query(ProdutoLote)
+                            .filter(ProdutoLote.id == lote_id)
+                            .first()
+                        )
                         if lote:
                             lote_info = {
                                 "nome": lote.nome_lote,
                                 "consumido_acumulado": consumo_por_lote[lote_id],
                                 "total_lote": lote.quantidade_inicial,
-                                "quantidade_movimento": primeiro_lote.get("quantidade", 0),
+                                "quantidade_movimento": primeiro_lote.get(
+                                    "quantidade", 0
+                                ),
                                 "tipo": "saida",
                             }
             except Exception:
@@ -135,7 +150,11 @@ def listar_movimentacoes_produto(
                     "custo_atual": mov.custo_unitario,
                     "diferenca_valor": diferenca_valor,
                     "diferenca_percentual": diferenca_percentual,
-                    "tipo": "aumento" if diferenca_valor > 0 else "reducao" if diferenca_valor < 0 else "estavel",
+                    "tipo": "aumento"
+                    if diferenca_valor > 0
+                    else "reducao"
+                    if diferenca_valor < 0
+                    else "estavel",
                 }
 
             custo_anterior_entrada = mov.custo_unitario
@@ -146,20 +165,32 @@ def listar_movimentacoes_produto(
         documento_exibicao = mov.documento
         observacao_exibicao = mov.observacao
         if mov.referencia_tipo == "venda" and mov.referencia_id:
-            venda = db.query(Venda.canal, Venda.total).filter(Venda.id == mov.referencia_id).first()
+            venda = (
+                db.query(Venda.canal, Venda.total)
+                .filter(Venda.id == mov.referencia_id)
+                .first()
+            )
             if venda:
                 canal_venda = venda.canal
                 if mov.quantidade and mov.quantidade > 0:
-                    preco_venda_unitario = float(venda.total) / float(mov.quantidade) if venda.total else None
+                    preco_venda_unitario = (
+                        float(venda.total) / float(mov.quantidade)
+                        if venda.total
+                        else None
+                    )
         elif mov.referencia_tipo == "pedido_integrado" and mov.referencia_id:
             pedido_integrado = pedidos_integrados_por_id.get(int(mov.referencia_id))
             if pedido_integrado:
-                contexto_venda = _contexto_venda_pedido_integrado(db, pedido_integrado, produto_id)
+                contexto_venda = _contexto_venda_pedido_integrado(
+                    db, pedido_integrado, produto_id
+                )
                 canal_venda = contexto_venda.get("canal")
                 nf_numero = contexto_venda.get("nf_numero")
                 nf_id = contexto_venda.get("nf_id")
                 try:
-                    from app.services.bling_nf_service import movimento_documentado_por_nf
+                    from app.services.bling_nf_service import (
+                        movimento_documentado_por_nf,
+                    )
                 except Exception:
                     movimento_documentado_por_nf = None
 
@@ -183,34 +214,36 @@ def listar_movimentacoes_produto(
                 else:
                     nf_numero = None
 
-        resultado.append({
-            "id": mov.id,
-            "tipo": mov.tipo,
-            "status": mov.status,
-            "motivo": mov.motivo,
-            "quantidade": mov.quantidade,
-            "quantidade_anterior": mov.quantidade_anterior,
-            "quantidade_nova": mov.quantidade_nova,
-            "saldo_apos_lancamento": saldo_apos_lancamento,
-            "custo_unitario": mov.custo_unitario,
-            "valor_total": mov.valor_total,
-            "documento": documento_exibicao,
-            "documento_original": mov.documento,
-            "referencia_id": mov.referencia_id,
-            "referencia_tipo": mov.referencia_tipo,
-            "observacao": mov.observacao,
-            "observacao_exibicao": observacao_exibicao,
-            "lote_id": mov.lote_id,
-            "lote_nome": lote_nome,
-            "lote_info": lote_info,
-            "variacao_custo": variacao_custo,
-            "canal": canal_venda,
-            "canal_label": _label_canal_movimentacao(canal_venda),
-            "nf_numero": nf_numero,
-            "preco_venda_unitario": preco_venda_unitario,
-            "created_at": mov.created_at.isoformat() if mov.created_at else None,
-            "user_id": mov.user_id,
-        })
+        resultado.append(
+            {
+                "id": mov.id,
+                "tipo": mov.tipo,
+                "status": mov.status,
+                "motivo": mov.motivo,
+                "quantidade": mov.quantidade,
+                "quantidade_anterior": mov.quantidade_anterior,
+                "quantidade_nova": mov.quantidade_nova,
+                "saldo_apos_lancamento": saldo_apos_lancamento,
+                "custo_unitario": mov.custo_unitario,
+                "valor_total": mov.valor_total,
+                "documento": documento_exibicao,
+                "documento_original": mov.documento,
+                "referencia_id": mov.referencia_id,
+                "referencia_tipo": mov.referencia_tipo,
+                "observacao": mov.observacao,
+                "observacao_exibicao": observacao_exibicao,
+                "lote_id": mov.lote_id,
+                "lote_nome": lote_nome,
+                "lote_info": lote_info,
+                "variacao_custo": variacao_custo,
+                "canal": canal_venda,
+                "canal_label": _label_canal_movimentacao(canal_venda),
+                "nf_numero": nf_numero,
+                "preco_venda_unitario": preco_venda_unitario,
+                "created_at": mov.created_at.isoformat() if mov.created_at else None,
+                "user_id": mov.user_id,
+            }
+        )
 
     resultado.reverse()
 
@@ -226,10 +259,14 @@ def listar_reservas_ativas_produto(
     _current_user, tenant_id = user_and_tenant
     logger.info("Listando reservas ativas do produto %s", produto_id)
 
-    produto = db.query(Produto).filter(
-        Produto.id == produto_id,
-        Produto.tenant_id == tenant_id,
-    ).first()
+    produto = (
+        db.query(Produto)
+        .filter(
+            Produto.id == produto_id,
+            Produto.tenant_id == tenant_id,
+        )
+        .first()
+    )
     if not produto:
         raise HTTPException(status_code=404, detail="Produto não encontrado")
 

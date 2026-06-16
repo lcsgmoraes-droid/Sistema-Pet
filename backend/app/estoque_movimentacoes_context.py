@@ -48,7 +48,9 @@ def _resumo_nf_pedido_integrado(pedido: PedidoIntegrado | None) -> dict:
         return {}
 
     payload = pedido.payload
-    pedido_payload = payload.get("pedido") if isinstance(payload.get("pedido"), dict) else payload
+    pedido_payload = (
+        payload.get("pedido") if isinstance(payload.get("pedido"), dict) else payload
+    )
     resumo_nf: dict = {}
 
     for candidato in (
@@ -74,8 +76,12 @@ def _numero_nf_pedido_integrado(pedido: PedidoIntegrado | None) -> str | None:
 def _numero_pedido_loja_integrado(pedido: PedidoIntegrado | None) -> str | None:
     payload_bruto = getattr(pedido, "payload", None)
     payload = payload_bruto if isinstance(payload_bruto, dict) else {}
-    pedido_payload = payload.get("pedido") if isinstance(payload.get("pedido"), dict) else {}
-    webhook_payload = payload.get("webhook") if isinstance(payload.get("webhook"), dict) else {}
+    pedido_payload = (
+        payload.get("pedido") if isinstance(payload.get("pedido"), dict) else {}
+    )
+    webhook_payload = (
+        payload.get("webhook") if isinstance(payload.get("webhook"), dict) else {}
+    )
 
     for candidato in (
         pedido_payload.get("numeroLoja"),
@@ -94,7 +100,10 @@ def _numero_pedido_loja_integrado(pedido: PedidoIntegrado | None) -> str | None:
 
 def _nf_status_autorizado(*, situacao_codigo=None, situacao: str | None = None) -> bool:
     try:
-        if situacao_codigo is not None and int(situacao_codigo) in _NF_STATUS_AUTORIZADA_CODES:
+        if (
+            situacao_codigo is not None
+            and int(situacao_codigo) in _NF_STATUS_AUTORIZADA_CODES
+        ):
             return True
     except (TypeError, ValueError):
         pass
@@ -116,8 +125,12 @@ def _registro_nf_compativel_com_pedido_integrado(
 
     pedido_bling_id = _texto_limpo(getattr(pedido, "pedido_bling_id", None))
     numero_pedido_loja = _numero_pedido_loja_integrado(pedido)
-    registro_pedido_bling_id = _texto_limpo(getattr(registro, "pedido_bling_id_ref", None))
-    registro_numero_pedido_loja = _texto_limpo(getattr(registro, "numero_pedido_loja", None))
+    registro_pedido_bling_id = _texto_limpo(
+        getattr(registro, "pedido_bling_id_ref", None)
+    )
+    registro_numero_pedido_loja = _texto_limpo(
+        getattr(registro, "numero_pedido_loja", None)
+    )
 
     if registro_pedido_bling_id and pedido_bling_id:
         return registro_pedido_bling_id == pedido_bling_id
@@ -206,7 +219,9 @@ def _contexto_nf_pedido_integrado(db: Session, pedido: PedidoIntegrado | None) -
         pedido,
         resumo_nf.get("id") or resumo_nf.get("nfe_id"),
     )
-    if registro_resumo and not _registro_nf_compativel_com_pedido_integrado(pedido, registro_resumo):
+    if registro_resumo and not _registro_nf_compativel_com_pedido_integrado(
+        pedido, registro_resumo
+    ):
         resumo_nf = {}
     registro = _obter_cache_nf_pedido_integrado(db, pedido, resumo_nf)
 
@@ -216,20 +231,21 @@ def _contexto_nf_pedido_integrado(db: Session, pedido: PedidoIntegrado | None) -
         or getattr(registro, "status", None)
     ):
         resumo_nf.setdefault("id", _texto_limpo(getattr(registro, "bling_id", None)))
-        resumo_nf.setdefault("nfe_id", _texto_limpo(getattr(registro, "bling_id", None)))
+        resumo_nf.setdefault(
+            "nfe_id", _texto_limpo(getattr(registro, "bling_id", None))
+        )
         resumo_nf.setdefault("numero", _texto_limpo(getattr(registro, "numero", None)))
         resumo_nf.setdefault("serie", _texto_limpo(getattr(registro, "serie", None)))
-        resumo_nf.setdefault("situacao", _texto_limpo(getattr(registro, "status", None)))
+        resumo_nf.setdefault(
+            "situacao", _texto_limpo(getattr(registro, "status", None))
+        )
         resumo_nf.setdefault("status", _texto_limpo(getattr(registro, "status", None)))
         resumo_nf.setdefault("modelo", getattr(registro, "modelo", None))
 
     nf_id = _texto_limpo(resumo_nf.get("id") or resumo_nf.get("nfe_id"))
     nf_numero = _texto_limpo(resumo_nf.get("numero"))
     situacao_codigo = resumo_nf.get("situacao_codigo")
-    situacao = _texto_limpo(
-        resumo_nf.get("situacao")
-        or resumo_nf.get("status")
-    )
+    situacao = _texto_limpo(resumo_nf.get("situacao") or resumo_nf.get("status"))
 
     return {
         "id": nf_id,
@@ -290,7 +306,9 @@ def _valor_total_nf_pedido_integrado(pedido: PedidoIntegrado | None) -> float | 
     if not resumo_nf:
         return None
 
-    totais_nf = resumo_nf.get("totais") if isinstance(resumo_nf.get("totais"), dict) else {}
+    totais_nf = (
+        resumo_nf.get("totais") if isinstance(resumo_nf.get("totais"), dict) else {}
+    )
 
     for candidato in (
         resumo_nf.get("valor_total"),
@@ -323,7 +341,9 @@ def _itens_nf_pedido_integrado(pedido: PedidoIntegrado | None) -> list[dict]:
     except Exception:
         return []
 
-    itens_resumo = resumo_nf.get("itens") if isinstance(resumo_nf.get("itens"), list) else []
+    itens_resumo = (
+        resumo_nf.get("itens") if isinstance(resumo_nf.get("itens"), list) else []
+    )
     if itens_resumo:
         return [
             _normalizar_item_nota(item_nf)
@@ -370,7 +390,9 @@ def _itens_nf_pedido_integrado(pedido: PedidoIntegrado | None) -> list[dict]:
     if not _detalhe_nota_valido(detalhe_nf):
         return []
 
-    itens_cache = detalhe_nf.get("itens") if isinstance(detalhe_nf.get("itens"), list) else []
+    itens_cache = (
+        detalhe_nf.get("itens") if isinstance(detalhe_nf.get("itens"), list) else []
+    )
     return [
         _normalizar_item_nota(item_nf)
         for item_nf in itens_cache
@@ -398,7 +420,11 @@ def _preco_venda_nf_unitario_pedido_integrado(
         if skus_relacionados and codigo_nf and codigo_nf in skus_relacionados:
             itens_nf_relacionados.append(item_nf)
 
-    if not itens_nf_relacionados and len(itens_nf) == 1 and len(itens_relacionados) == 1:
+    if (
+        not itens_nf_relacionados
+        and len(itens_nf) == 1
+        and len(itens_relacionados) == 1
+    ):
         itens_nf_relacionados = [itens_nf[0]]
 
     if not itens_nf_relacionados:
@@ -436,7 +462,10 @@ def _itens_payload_pedido_integrado(pedido: PedidoIntegrado | None) -> list[dict
         return []
 
     try:
-        from app.integracao_bling_pedido_routes import _normalizar_item_payload, _payload_principal
+        from app.integracao_bling_pedido_routes import (
+            _normalizar_item_payload,
+            _payload_principal,
+        )
 
         pedido_payload = _payload_principal(pedido.payload)
         return [
@@ -490,8 +519,14 @@ def _valor_total_pedido_integrado(pedido: PedidoIntegrado | None) -> float | Non
         return None
 
     payload = pedido.payload
-    pedido_payload = payload.get("pedido") if isinstance(payload.get("pedido"), dict) else payload
-    financeiro = pedido_payload.get("financeiro") if isinstance(pedido_payload.get("financeiro"), dict) else {}
+    pedido_payload = (
+        payload.get("pedido") if isinstance(payload.get("pedido"), dict) else payload
+    )
+    financeiro = (
+        pedido_payload.get("financeiro")
+        if isinstance(pedido_payload.get("financeiro"), dict)
+        else {}
+    )
 
     valor_nf = _valor_total_nf_pedido_integrado(pedido)
     if valor_nf and valor_nf > 0:
@@ -568,14 +603,23 @@ def _contexto_venda_pedido_integrado(
     if not itens_relacionados:
         return contexto
 
-    quantidade_total = sum(float(item.get("quantidade") or 0) for item in itens_relacionados)
-    preco_nf_unitario = _preco_venda_nf_unitario_pedido_integrado(pedido, itens_relacionados)
+    quantidade_total = sum(
+        float(item.get("quantidade") or 0) for item in itens_relacionados
+    )
+    preco_nf_unitario = _preco_venda_nf_unitario_pedido_integrado(
+        pedido, itens_relacionados
+    )
     if preco_nf_unitario and preco_nf_unitario > 0:
         contexto["preco_venda_unitario"] = preco_nf_unitario
         return contexto
 
     total_nf = _valor_total_nf_pedido_integrado(pedido)
-    if len(itens_relacionados) == 1 and len(itens_pedido) == 1 and total_nf and quantidade_total > 0:
+    if (
+        len(itens_relacionados) == 1
+        and len(itens_pedido) == 1
+        and total_nf
+        and quantidade_total > 0
+    ):
         contexto["preco_venda_unitario"] = round(total_nf / quantidade_total, 2)
 
     return contexto
@@ -589,7 +633,10 @@ def _detalhar_reservas_ativas_produto(
 ) -> list[dict]:
     linhas = (
         db.query(PedidoIntegradoItem, PedidoIntegrado)
-        .join(PedidoIntegrado, PedidoIntegrado.id == PedidoIntegradoItem.pedido_integrado_id)
+        .join(
+            PedidoIntegrado,
+            PedidoIntegrado.id == PedidoIntegradoItem.pedido_integrado_id,
+        )
         .filter(
             PedidoIntegradoItem.tenant_id == tenant_id,
             PedidoIntegrado.tenant_id == tenant_id,
@@ -604,9 +651,7 @@ def _detalhar_reservas_ativas_produto(
 
     skus = list(
         dict.fromkeys(
-            _texto_limpo(item.sku)
-            for item, _pedido in linhas
-            if _texto_limpo(item.sku)
+            _texto_limpo(item.sku) for item, _pedido in linhas if _texto_limpo(item.sku)
         )
     )
     produtos_por_sku = EstoqueReservaService._produtos_por_sku(db, tenant_id, skus)
@@ -614,7 +659,8 @@ def _detalhar_reservas_ativas_produto(
         dict.fromkeys(
             int(produto.id)
             for produto in produtos_por_sku.values()
-            if getattr(produto, "id", None) and EstoqueReservaService._usa_composicao_virtual(produto)
+            if getattr(produto, "id", None)
+            and EstoqueReservaService._usa_composicao_virtual(produto)
         )
     )
     componentes_por_kit = EstoqueReservaService._componentes_por_kit(db, kit_ids)
@@ -640,32 +686,39 @@ def _detalhar_reservas_ativas_produto(
             for componente in componentes_por_kit.get(int(produto_item.id), []):
                 if int(componente.produto_componente_id or 0) != alvo_id:
                     continue
-                quantidade_reservada = quantidade_item * float(componente.quantidade or 0)
+                quantidade_reservada = quantidade_item * float(
+                    componente.quantidade or 0
+                )
                 if quantidade_reservada <= 0:
                     continue
-                detalhes_item.append({
+                detalhes_item.append(
+                    {
+                        "item_id": item.id,
+                        "sku": sku,
+                        "descricao": item.descricao,
+                        "quantidade_item": quantidade_item,
+                        "quantidade_reservada_produto": quantidade_reservada,
+                        "origem_reserva": "componente_kit_virtual",
+                        "kit_origem_id": int(produto_item.id),
+                        "kit_origem_sku": _texto_limpo(produto_item.codigo)
+                        or _texto_limpo(produto_item.codigo_barras),
+                        "kit_origem_nome": _texto_limpo(produto_item.nome),
+                    }
+                )
+        elif int(produto_item.id) == alvo_id:
+            detalhes_item.append(
+                {
                     "item_id": item.id,
                     "sku": sku,
                     "descricao": item.descricao,
                     "quantidade_item": quantidade_item,
-                    "quantidade_reservada_produto": quantidade_reservada,
-                    "origem_reserva": "componente_kit_virtual",
-                    "kit_origem_id": int(produto_item.id),
-                    "kit_origem_sku": _texto_limpo(produto_item.codigo) or _texto_limpo(produto_item.codigo_barras),
-                    "kit_origem_nome": _texto_limpo(produto_item.nome),
-                })
-        elif int(produto_item.id) == alvo_id:
-            detalhes_item.append({
-                "item_id": item.id,
-                "sku": sku,
-                "descricao": item.descricao,
-                "quantidade_item": quantidade_item,
-                "quantidade_reservada_produto": quantidade_item,
-                "origem_reserva": "direta",
-                "kit_origem_id": None,
-                "kit_origem_sku": None,
-                "kit_origem_nome": None,
-            })
+                    "quantidade_reservada_produto": quantidade_item,
+                    "origem_reserva": "direta",
+                    "kit_origem_id": None,
+                    "kit_origem_sku": None,
+                    "kit_origem_nome": None,
+                }
+            )
 
         if not detalhes_item:
             continue
@@ -679,17 +732,25 @@ def _detalhar_reservas_ativas_produto(
                 "numero_pedido_loja": _numero_pedido_loja_integrado(pedido),
                 "status": _texto_limpo(pedido.status),
                 "canal": _canal_pedido_integrado(pedido),
-                "canal_label": _label_canal_movimentacao(_canal_pedido_integrado(pedido)),
+                "canal_label": _label_canal_movimentacao(
+                    _canal_pedido_integrado(pedido)
+                ),
                 "nf_numero": _numero_nf_pedido_integrado(pedido),
-                "criado_em": pedido.criado_em.isoformat() if getattr(pedido, "criado_em", None) else None,
-                "expira_em": pedido.expira_em.isoformat() if getattr(pedido, "expira_em", None) else None,
+                "criado_em": pedido.criado_em.isoformat()
+                if getattr(pedido, "criado_em", None)
+                else None,
+                "expira_em": pedido.expira_em.isoformat()
+                if getattr(pedido, "expira_em", None)
+                else None,
                 "quantidade_reservada": 0.0,
                 "itens": [],
             },
         )
 
         for detalhe in detalhes_item:
-            bucket["quantidade_reservada"] += float(detalhe["quantidade_reservada_produto"])
+            bucket["quantidade_reservada"] += float(
+                detalhe["quantidade_reservada_produto"]
+            )
             bucket["itens"].append(detalhe)
 
     return sorted(

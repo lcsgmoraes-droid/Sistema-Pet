@@ -1,8 +1,8 @@
-
 from sqlalchemy.orm import Session
 from datetime import datetime
 
 from app.estoque_local_models import EstoqueLocal
+
 
 class EstoqueTransferenciaService:
     """
@@ -17,7 +17,7 @@ class EstoqueTransferenciaService:
         local_destino_id: str,
         quantidade: int,
         documento: str = None,
-        observacao: str = None
+        observacao: str = None,
     ):
         if quantidade <= 0:
             raise ValueError("Quantidade inválida")
@@ -25,18 +25,26 @@ class EstoqueTransferenciaService:
         if local_origem_id == local_destino_id:
             raise ValueError("Origem e destino não podem ser iguais")
 
-        origem = db.query(EstoqueLocal).filter(
-            EstoqueLocal.sku == sku,
-            EstoqueLocal.local_estoque_id == local_origem_id
-        ).first()
+        origem = (
+            db.query(EstoqueLocal)
+            .filter(
+                EstoqueLocal.sku == sku,
+                EstoqueLocal.local_estoque_id == local_origem_id,
+            )
+            .first()
+        )
 
         if not origem or origem.quantidade < quantidade:
             raise ValueError("Estoque insuficiente no local de origem")
 
-        destino = db.query(EstoqueLocal).filter(
-            EstoqueLocal.sku == sku,
-            EstoqueLocal.local_estoque_id == local_destino_id
-        ).first()
+        destino = (
+            db.query(EstoqueLocal)
+            .filter(
+                EstoqueLocal.sku == sku,
+                EstoqueLocal.local_estoque_id == local_destino_id,
+            )
+            .first()
+        )
 
         # Debita origem
         origem.quantidade -= quantidade
@@ -47,9 +55,7 @@ class EstoqueTransferenciaService:
             destino.quantidade += quantidade
         else:
             destino = EstoqueLocal(
-                sku=sku,
-                local_estoque_id=local_destino_id,
-                quantidade=quantidade
+                sku=sku, local_estoque_id=local_destino_id, quantidade=quantidade
             )
         db.add(destino)
 
@@ -62,5 +68,5 @@ class EstoqueTransferenciaService:
             "destino": local_destino_id,
             "documento": documento,
             "observacao": observacao,
-            "data": datetime.utcnow()
+            "data": datetime.utcnow(),
         }

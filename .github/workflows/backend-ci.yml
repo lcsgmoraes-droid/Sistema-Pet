@@ -375,6 +375,10 @@ jobs:
         run: |
           ruff format --check app/caixa app/estoque app/health_router.py app/session_manager.py app/idempotency.py app/idempotency_models.py app/encryption.py app/audit.py app/audit_log.py
 
+      - name: Backend stock cash support format (blocking)
+        run: |
+          ruff format --check app/caixa_models.py app/estoque_alertas_gerais_routes.py app/estoque_alertas_routes.py app/estoque_entrada_manual_routes.py app/estoque_granel_routes.py app/estoque_importacao_csv_routes.py app/estoque_importacao_pdf_routes.py app/estoque_local_models.py app/estoque_models.py app/estoque_movimentacoes_consulta_routes.py app/estoque_movimentacoes_context.py app/estoque_reserva_service.py app/estoque_saida_manual_routes.py app/estoque_transferencia_routes.py app/estoque_transferencia_service.py app/estoque_validade_models.py app/estoque_validade_routes.py app/estoque_validade_service.py
+
       - name: Backend multi tenant tests format (blocking)
         run: |
           ruff format --check tests/multi_tenant

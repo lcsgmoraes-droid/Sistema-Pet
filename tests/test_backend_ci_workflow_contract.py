@@ -725,6 +725,25 @@ def test_backend_ci_has_blocking_backend_operational_stock_cash_format_step():
     ) in source
 
 
+def test_backend_ci_has_blocking_backend_stock_cash_support_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend stock cash support format (blocking)" in source
+    assert (
+        "ruff format --check app/caixa_models.py "
+        "app/estoque_alertas_gerais_routes.py app/estoque_alertas_routes.py "
+        "app/estoque_entrada_manual_routes.py app/estoque_granel_routes.py "
+        "app/estoque_importacao_csv_routes.py app/estoque_importacao_pdf_routes.py "
+        "app/estoque_local_models.py app/estoque_models.py "
+        "app/estoque_movimentacoes_consulta_routes.py "
+        "app/estoque_movimentacoes_context.py app/estoque_reserva_service.py "
+        "app/estoque_saida_manual_routes.py app/estoque_transferencia_routes.py "
+        "app/estoque_transferencia_service.py "
+        "app/estoque_validade_models.py app/estoque_validade_routes.py "
+        "app/estoque_validade_service.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_alembic_env_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

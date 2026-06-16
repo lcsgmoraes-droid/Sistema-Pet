@@ -55,10 +55,17 @@ class EstoqueValidadeService:
         quantidade_lote = max(_to_float(getattr(lote, "quantidade_disponivel", 0)), 0)
         quantidade_vendavel = max(_to_float(getattr(produto, "estoque_atual", 0)), 0)
         quantidade_bloquear = min(quantidade_lote, quantidade_vendavel)
-        custo_unitario = _to_float(getattr(lote, "custo_unitario", None), _to_float(getattr(produto, "preco_custo", 0)))
+        custo_unitario = _to_float(
+            getattr(lote, "custo_unitario", None),
+            _to_float(getattr(produto, "preco_custo", 0)),
+        )
 
         produto.estoque_atual = quantidade_vendavel - quantidade_bloquear
-        lote.status = "vencido_bloqueado" if _is_vencido(getattr(lote, "data_validade", None), agora) else "bloqueado_validade"
+        lote.status = (
+            "vencido_bloqueado"
+            if _is_vencido(getattr(lote, "data_validade", None), agora)
+            else "bloqueado_validade"
+        )
 
         user_id_movimentacao = EstoqueService._resolver_user_id_operacao(
             db=db,
@@ -117,11 +124,19 @@ class EstoqueValidadeService:
         agora = agora or _agora_utc()
         lote = bloqueio.lote
         produto = bloqueio.produto
-        quantidade = max(_to_float(bloqueio.quantidade_bloqueada) - _to_float(bloqueio.quantidade_resolvida), 0)
-        custo_unitario = _to_float(bloqueio.custo_unitario, _to_float(getattr(produto, "preco_custo", 0)))
+        quantidade = max(
+            _to_float(bloqueio.quantidade_bloqueada)
+            - _to_float(bloqueio.quantidade_resolvida),
+            0,
+        )
+        custo_unitario = _to_float(
+            bloqueio.custo_unitario, _to_float(getattr(produto, "preco_custo", 0))
+        )
         estoque_vendavel = _to_float(getattr(produto, "estoque_atual", 0))
 
-        lote.quantidade_disponivel = max(_to_float(getattr(lote, "quantidade_disponivel", 0)) - quantidade, 0)
+        lote.quantidade_disponivel = max(
+            _to_float(getattr(lote, "quantidade_disponivel", 0)) - quantidade, 0
+        )
         lote.status = "descartado"
 
         user_id_movimentacao = EstoqueService._resolver_user_id_operacao(
@@ -174,7 +189,9 @@ class EstoqueValidadeService:
 
         from datetime import timedelta
 
-        limite = agora + timedelta(days=int(getattr(tenant, "dias_alerta_validade", 15) or 15))
+        limite = agora + timedelta(
+            days=int(getattr(tenant, "dias_alerta_validade", 15) or 15)
+        )
         lotes = (
             db.query(ProdutoLote)
             .join(Produto, Produto.id == ProdutoLote.produto_id)
@@ -253,9 +270,15 @@ class EstoqueValidadeService:
         agora = agora or _agora_utc()
         produto = bloqueio.produto
         lote = bloqueio.lote
-        quantidade = max(_to_float(bloqueio.quantidade_bloqueada) - _to_float(bloqueio.quantidade_resolvida), 0)
+        quantidade = max(
+            _to_float(bloqueio.quantidade_bloqueada)
+            - _to_float(bloqueio.quantidade_resolvida),
+            0,
+        )
 
-        produto.estoque_atual = _to_float(getattr(produto, "estoque_atual", 0)) + quantidade
+        produto.estoque_atual = (
+            _to_float(getattr(produto, "estoque_atual", 0)) + quantidade
+        )
         lote.status = "ativo"
 
         bloqueio.status = "retornado_vendavel"

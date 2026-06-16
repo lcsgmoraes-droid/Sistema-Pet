@@ -17,7 +17,9 @@ class EstoqueValidadeBloqueio(BaseTenantModel):
     )
 
     produto_id = Column(Integer, ForeignKey("produtos.id"), nullable=False, index=True)
-    lote_id = Column(Integer, ForeignKey("produto_lotes.id"), nullable=False, index=True)
+    lote_id = Column(
+        Integer, ForeignKey("produto_lotes.id"), nullable=False, index=True
+    )
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
 
     status = Column(String(30), nullable=False, default="pendente")
@@ -30,8 +32,12 @@ class EstoqueValidadeBloqueio(BaseTenantModel):
     custo_unitario = Column(Float, nullable=True)
     custo_total_estimado = Column(Float, nullable=False, default=0)
 
-    movimentacao_bloqueio_id = Column(Integer, ForeignKey("estoque_movimentacoes.id"), nullable=True)
-    movimentacao_resolucao_id = Column(Integer, ForeignKey("estoque_movimentacoes.id"), nullable=True)
+    movimentacao_bloqueio_id = Column(
+        Integer, ForeignKey("estoque_movimentacoes.id"), nullable=True
+    )
+    movimentacao_resolucao_id = Column(
+        Integer, ForeignKey("estoque_movimentacoes.id"), nullable=True
+    )
 
     decidido_por_user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     decidido_em = Column(DateTime(timezone=True), nullable=True)
