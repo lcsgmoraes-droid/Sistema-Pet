@@ -22,6 +22,8 @@ AUTOR: Sistema Pet Shop Pro
 DATA: Janeiro 2026
 """
 
+# ruff: noqa: E402
+
 import sys
 import os
 from pathlib import Path
@@ -33,11 +35,9 @@ import traceback
 backend_path = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(backend_path))
 
-from sqlalchemy import create_engine, text, MetaData, inspect
-from sqlalchemy.orm import sessionmaker
+from sqlalchemy import create_engine, text, inspect
 
 # Importar configurações diretamente sem carregar todo o app
-import os
 from dotenv import load_dotenv
 
 # Carregar .env
@@ -320,13 +320,13 @@ def migrate_table(
         # Verificar se tabela existe no SQLite
         sqlite_inspector = inspect(sqlite_engine)
         if table_name not in sqlite_inspector.get_table_names():
-            print(f"  Tabela não existe no SQLite")
+            print("  Tabela não existe no SQLite")
             return 0
         
         # Verificar se tabela existe no PostgreSQL
         postgres_inspector = inspect(postgres_engine)
         if table_name not in postgres_inspector.get_table_names():
-            print(f"  Tabela não existe no PostgreSQL (pulando)")
+            print("  Tabela não existe no PostgreSQL (pulando)")
             return 0
         
         # Conectar aos bancos
@@ -340,7 +340,7 @@ def migrate_table(
             total_records = count_result.scalar()
             
             if total_records == 0:
-                print(f" 0 registros")
+                print(" 0 registros")
                 return 0
             
             # Obter colunas de ambos os bancos
@@ -351,7 +351,7 @@ def migrate_table(
             common_columns = [col for col in sqlite_columns if col in postgres_columns]
             
             if not common_columns:
-                print(f"  ERRO: Nenhuma coluna em comum entre SQLite e PostgreSQL!")
+                print("  ERRO: Nenhuma coluna em comum entre SQLite e PostgreSQL!")
                 return 0
             
             # Obter tipos das colunas do PostgreSQL
@@ -414,7 +414,7 @@ def migrate_table(
                             if is_debug_venda:
                                 print(f"\n{'='*80}")
                                 print(f"DEBUG: Tentando inserir venda ID {row_dict['id']}")
-                                print(f"Dados completos:")
+                                print("Dados completos:")
                                 for key, val in row_dict.items():
                                     print(f"  {key}: {val!r} (tipo: {type(val).__name__})")
                                 print(f"Query: INSERT INTO {table_name} ({columns_str}) VALUES (...)")
@@ -441,9 +441,9 @@ def migrate_table(
                                 print(f"\n{'='*80}")
                                 print(f"ERRO DETALHADO - Venda ID {row_dict['id']}")
                                 print(f"Tipo da excecao: {type(e).__name__}")
-                                print(f"Mensagem completa:")
+                                print("Mensagem completa:")
                                 print(f"{error_msg}")
-                                print(f"\nTraceback:")
+                                print("\nTraceback:")
                                 traceback.print_exc()
                                 print(f"{'='*80}\n")
                             
@@ -469,10 +469,7 @@ def migrate_table(
                         pg_get_serial_sequence('{table_name}', 'id'),
                         COALESCE(MAX(id), 1)
                     ) FROM {table_name}
-            if records_skipped > 0:
-                print(f" {records_inserted:,} migrados, {records_skipped:,} já existiam ({elapsed:.2f}s)")
-            else:
-                    """))
+                """))
             except Exception:
                 # Algumas tabelas não têm sequência de ID
                 pass
@@ -481,7 +478,13 @@ def migrate_table(
             postgres_conn.commit()
             
             elapsed = (datetime.now() - start).total_seconds()
-            print(f" {records_inserted:,} registros ({elapsed:.2f}s)")
+            if records_skipped > 0:
+                print(
+                    f" {records_inserted:,} migrados, "
+                    f"{records_skipped:,} ja existiam ({elapsed:.2f}s)"
+                )
+            else:
+                print(f" {records_inserted:,} registros ({elapsed:.2f}s)")
             
             return records_inserted
     
@@ -628,7 +631,7 @@ def main():
             stats.add_table(table_name, records, elapsed)
     
     # Verificar migração
-    comparison = verify_migration(sqlite_engine, postgres_engine)
+    verify_migration(sqlite_engine, postgres_engine)
     
     # Imprimir estatísticas
     stats.print_summary()

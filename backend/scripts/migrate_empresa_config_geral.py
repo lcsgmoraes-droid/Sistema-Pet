@@ -13,7 +13,7 @@ import os
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from app.db import SessionLocal, engine
+from app.db import SessionLocal
 from sqlalchemy import text
 
 def run_migration():

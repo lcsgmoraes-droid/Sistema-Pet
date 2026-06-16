@@ -2,6 +2,9 @@
 Script para popular formas de pagamento com taxas e vínculos
 Vincula: Cartões → Stone, PIX → Santander, Dinheiro → Caixa
 """
+
+# ruff: noqa: E402
+
 import sys
 from pathlib import Path
 from decimal import Decimal
@@ -44,7 +47,7 @@ stone_id = ids[2]
 user_id = ids[3]
 tenant_id = ids[4]
 
-print(f"\n📋 Contas encontradas:")
+print("\n📋 Contas encontradas:")
 print(f"   Caixa: {caixa_id}")
 print(f"   Santander: {santander_id}")
 print(f"   Stone: {stone_id}")

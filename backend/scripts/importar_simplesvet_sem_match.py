@@ -1,4 +1,6 @@
 #!/usr/bin/env python
+# ruff: noqa: E402
+
 """Cria no sistema os produtos do SimplesVet que ficaram sem match.
 
 Fluxo seguro:

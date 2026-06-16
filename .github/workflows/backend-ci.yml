@@ -339,6 +339,10 @@ jobs:
         run: |
           ruff check app tests alembic/env.py
 
+      - name: Backend scripts lint (blocking)
+        run: |
+          ruff check scripts
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"

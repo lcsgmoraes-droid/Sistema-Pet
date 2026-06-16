@@ -10,7 +10,6 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 import uuid
 import json
 from datetime import datetime
-from sqlalchemy.orm import Session
 from sqlalchemy import and_
 from app.db import SessionLocal
 from app.financeiro_models import TemplateAdquirente
