@@ -651,6 +651,17 @@ def test_backend_ci_has_blocking_backend_critical_packages_format_step():
     )
 
 
+def test_backend_ci_has_blocking_backend_platform_packages_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend platform packages format (blocking)" in source
+    assert (
+        "ruff format --check app/analytics app/application app/cache "
+        "app/configuracoes app/constants app/database app/events app/migrations "
+        "app/replay app/utils"
+    ) in source
+
+
 def test_backend_ci_has_blocking_backend_ai_packages_format_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

@@ -1,6 +1,7 @@
 """
 ORM Guards - protecoes automaticas para operacoes de banco de dados.
 """
+
 from uuid import UUID
 
 from sqlalchemy import event

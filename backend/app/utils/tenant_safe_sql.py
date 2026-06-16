@@ -187,7 +187,11 @@ def _tenant_tables_touched(sql: str) -> set[str]:
 
 def _is_insert_with_explicit_tenant(sql: str, params: Mapping[str, Any]) -> bool:
     normalized = _normalized_sql(sql)
-    return normalized.startswith("insert ") and "tenant_id" in normalized and "tenant_id" in params
+    return (
+        normalized.startswith("insert ")
+        and "tenant_id" in normalized
+        and "tenant_id" in params
+    )
 
 
 def _resolve_tenant_id(explicit_tenant_id: Any, require_tenant: bool) -> Any:
@@ -206,7 +210,9 @@ def _ensure_tenant_present(tenant_id: Any) -> None:
         )
 
 
-def _ensure_explicit_insert_tenant_matches(params: Mapping[str, Any], tenant_id: Any) -> None:
+def _ensure_explicit_insert_tenant_matches(
+    params: Mapping[str, Any], tenant_id: Any
+) -> None:
     if tenant_id is None:
         return
     if str(params.get("tenant_id")) != str(tenant_id):

@@ -28,28 +28,28 @@ import json
 class DomainEvent:
     """
     Classe base para todos os eventos de domínio.
-    
+
     Eventos são imutáveis e representam fatos que aconteceram.
     Não devem conter lógica de negócio, apenas dados.
-    
+
     NOTA: timestamp e event_id são opcionais. Se não fornecidos,
     serão gerados automaticamente ao criar o evento.
-    
+
     O uso de kw_only=True permite que classes filhas tenham campos
     obrigatórios mesmo quando a classe base tem campos opcionais.
     """
-    
+
     user_id: int
     timestamp: Optional[datetime] = None
     event_id: Optional[str] = None
-    
+
     def __post_init__(self):
         """Preenche timestamp e event_id se não fornecidos"""
         if self.timestamp is None:
-            object.__setattr__(self, 'timestamp', datetime.now())
+            object.__setattr__(self, "timestamp", datetime.now())
         if self.event_id is None:
-            object.__setattr__(self, 'event_id', datetime.now().isoformat())
-    
+            object.__setattr__(self, "event_id", datetime.now().isoformat())
+
     def to_dict(self) -> Dict[str, Any]:
         """Converte evento para dicionário"""
         data = {}
@@ -61,7 +61,7 @@ class DomainEvent:
             else:
                 data[key] = value
         return data
-    
+
     def to_json(self) -> str:
         """Converte evento para JSON"""
         return json.dumps(self.to_dict(), indent=2, ensure_ascii=False)
@@ -71,9 +71,9 @@ class DomainEvent:
 class VendaRealizadaEvent(DomainEvent):
     """
     Evento disparado quando uma venda é FINALIZADA com sucesso.
-    
+
     Representa o fato: "Uma venda foi concluída no sistema"
-    
+
     Dados incluídos:
     - venda_id: ID da venda finalizada
     - numero_venda: Número sequencial da venda
@@ -86,7 +86,7 @@ class VendaRealizadaEvent(DomainEvent):
     - tem_kit: Se a venda contém algum produto KIT
     - timestamp: Momento da finalização
     - user_id: Tenant que realizou a venda
-    
+
     Uso:
     ```python
     evento = VendaRealizadaEvent(
@@ -99,7 +99,7 @@ class VendaRealizadaEvent(DomainEvent):
     )
     ```
     """
-    
+
     venda_id: int
     numero_venda: str
     total: float
@@ -116,9 +116,9 @@ class VendaRealizadaEvent(DomainEvent):
 class ProdutoVendidoEvent(DomainEvent):
     """
     Evento disparado quando um produto SIMPLES ou VARIACAO é vendido.
-    
+
     Representa o fato: "Um produto foi vendido em uma venda"
-    
+
     Dados incluídos:
     - venda_id: ID da venda que contém o produto
     - produto_id: ID do produto vendido
@@ -131,7 +131,7 @@ class ProdutoVendidoEvent(DomainEvent):
     - estoque_novo: Estoque após a baixa
     - timestamp: Momento da venda
     - user_id: Tenant
-    
+
     Uso:
     ```python
     evento = ProdutoVendidoEvent(
@@ -148,7 +148,7 @@ class ProdutoVendidoEvent(DomainEvent):
     )
     ```
     """
-    
+
     venda_id: int
     produto_id: int
     produto_nome: str
@@ -164,9 +164,9 @@ class ProdutoVendidoEvent(DomainEvent):
 class KitVendidoEvent(DomainEvent):
     """
     Evento disparado quando um produto KIT é vendido.
-    
+
     Representa o fato: "Um KIT foi vendido em uma venda"
-    
+
     Dados incluídos:
     - venda_id: ID da venda que contém o KIT
     - kit_id: ID do produto KIT
@@ -180,7 +180,7 @@ class KitVendidoEvent(DomainEvent):
     - estoque_kit_novo: Estoque do KIT após (apenas FISICO)
     - timestamp: Momento da venda
     - user_id: Tenant
-    
+
     Uso:
     ```python
     evento = KitVendidoEvent(
@@ -199,7 +199,7 @@ class KitVendidoEvent(DomainEvent):
     )
     ```
     """
-    
+
     venda_id: int
     kit_id: int
     kit_nome: str

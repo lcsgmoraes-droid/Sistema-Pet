@@ -2,6 +2,7 @@
 Utilitários para gerenciamento de timezone
 Configurado para Brasília (America/Sao_Paulo) UTC-3
 """
+
 from datetime import datetime, timezone, timedelta
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
@@ -17,10 +18,10 @@ def now_brasilia() -> datetime:
     """
     Retorna datetime atual no timezone de Brasília SEM timezone info.
     Isso evita conversões automáticas do banco de dados para UTC.
-    
+
     Returns:
         datetime: Data/hora atual em Brasília (naive/sem timezone)
-        
+
     Exemplo:
         >>> agora = now_brasilia()
         >>> print(agora)
@@ -35,13 +36,13 @@ def now_brasilia() -> datetime:
 def to_brasilia(dt: datetime) -> datetime:
     """
     Converte um datetime para o timezone de Brasília.
-    
+
     Args:
         dt: Datetime para converter (pode ser naive ou com timezone)
-        
+
     Returns:
         datetime: Data/hora convertida para Brasília
-        
+
     Exemplo:
         >>> utc_time = datetime.utcnow()
         >>> brasilia_time = to_brasilia(utc_time)
@@ -55,14 +56,14 @@ def to_brasilia(dt: datetime) -> datetime:
 def format_brasilia(dt: datetime, fmt: str = "%d/%m/%Y %H:%M:%S") -> str:
     """
     Formata um datetime para string no timezone de Brasília.
-    
+
     Args:
         dt: Datetime para formatar
         fmt: Formato de saída (padrão: dd/mm/yyyy HH:MM:SS)
-        
+
     Returns:
         str: Data/hora formatada
-        
+
     Exemplo:
         >>> dt = now_brasilia()
         >>> format_brasilia(dt)

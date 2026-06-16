@@ -38,26 +38,25 @@ from .domain_events import (
     DomainEvent,
     VendaRealizadaEvent,
     ProdutoVendidoEvent,
-    KitVendidoEvent
+    KitVendidoEvent,
 )
 
 from .event_dispatcher import (
     EventDispatcher,
     publish_event,
     subscribe_event,
-    get_all_events
+    get_all_events,
 )
 
 __all__ = [
     # Eventos
-    'DomainEvent',
-    'VendaRealizadaEvent',
-    'ProdutoVendidoEvent',
-    'KitVendidoEvent',
-    
+    "DomainEvent",
+    "VendaRealizadaEvent",
+    "ProdutoVendidoEvent",
+    "KitVendidoEvent",
     # Dispatcher
-    'EventDispatcher',
-    'publish_event',
-    'subscribe_event',
-    'get_all_events'
+    "EventDispatcher",
+    "publish_event",
+    "subscribe_event",
+    "get_all_events",
 ]
