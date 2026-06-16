@@ -17,63 +17,50 @@ from app.insights.models import TipoInsight
 class InsightPromptLibrary:
     """
     Biblioteca de prompts especializados por tipo de insight.
-    
+
     Cada método retorna um prompt customizado para um tipo específico
     de insight, garantindo que a IA gere explicações contextualizadas.
     """
-    
+
     @staticmethod
-    def get_prompt_for_tipo(
-        tipo: TipoInsight,
-        dados_insight: Dict[str, Any]
-    ) -> str:
+    def get_prompt_for_tipo(tipo: TipoInsight, dados_insight: Dict[str, Any]) -> str:
         """
         Retorna prompt especializado para o tipo de insight.
-        
+
         Args:
             tipo: Tipo do insight
             dados_insight: Dados estruturados do insight
-            
+
         Returns:
             Prompt customizado
         """
         prompts_map = {
-            TipoInsight.CLIENTE_RECORRENTE_ATRASADO: 
-                InsightPromptLibrary._prompt_cliente_atrasado,
-            TipoInsight.CLIENTE_INATIVO:
-                InsightPromptLibrary._prompt_cliente_inativo,
-            TipoInsight.PRODUTOS_COMPRADOS_JUNTOS:
-                InsightPromptLibrary._prompt_produtos_juntos,
-            TipoInsight.KIT_MAIS_VANTAJOSO:
-                InsightPromptLibrary._prompt_kit_vantajoso,
-            TipoInsight.CLIENTE_VIP:
-                InsightPromptLibrary._prompt_cliente_vip,
-            TipoInsight.CLIENTE_EM_RISCO_CHURN:
-                InsightPromptLibrary._prompt_risco_churn,
-            TipoInsight.PRODUTO_TOP_VENDAS:
-                InsightPromptLibrary._prompt_produto_top,
+            TipoInsight.CLIENTE_RECORRENTE_ATRASADO: InsightPromptLibrary._prompt_cliente_atrasado,
+            TipoInsight.CLIENTE_INATIVO: InsightPromptLibrary._prompt_cliente_inativo,
+            TipoInsight.PRODUTOS_COMPRADOS_JUNTOS: InsightPromptLibrary._prompt_produtos_juntos,
+            TipoInsight.KIT_MAIS_VANTAJOSO: InsightPromptLibrary._prompt_kit_vantajoso,
+            TipoInsight.CLIENTE_VIP: InsightPromptLibrary._prompt_cliente_vip,
+            TipoInsight.CLIENTE_EM_RISCO_CHURN: InsightPromptLibrary._prompt_risco_churn,
+            TipoInsight.PRODUTO_TOP_VENDAS: InsightPromptLibrary._prompt_produto_top,
         }
-        
-        prompt_fn = prompts_map.get(
-            tipo,
-            InsightPromptLibrary._prompt_generico
-        )
-        
+
+        prompt_fn = prompts_map.get(tipo, InsightPromptLibrary._prompt_generico)
+
         return prompt_fn(dados_insight)
-    
+
     @staticmethod
     def _prompt_cliente_atrasado(dados: Dict[str, Any]) -> str:
         """
         Prompt para CLIENTE_RECORRENTE_ATRASADO.
-        
+
         Foca em reengajamento sem ser invasivo.
         """
-        titulo = dados.get('titulo', 'N/A')
-        descricao = dados.get('descricao', 'N/A')
-        severidade = dados.get('severidade', 'N/A')
-        contexto = dados.get('dados_contexto', {})
-        metricas = dados.get('metricas', {})
-        
+        titulo = dados.get("titulo", "N/A")
+        descricao = dados.get("descricao", "N/A")
+        severidade = dados.get("severidade", "N/A")
+        contexto = dados.get("dados_contexto", {})
+        metricas = dados.get("metricas", {})
+
         return f"""
 **CONTEXTO:**
 Você está analisando um insight sobre um cliente recorrente que está atrasado em sua frequência de compra habitual.
@@ -112,20 +99,20 @@ Você está analisando um insight sobre um cliente recorrente que está atrasado
 {{contexto}}
 {{objetivo}}
 """
-    
+
     @staticmethod
     def _prompt_cliente_inativo(dados: Dict[str, Any]) -> str:
         """
         Prompt para CLIENTE_INATIVO.
-        
+
         Foca em reconquista estratégica.
         """
-        titulo = dados.get('titulo', 'N/A')
-        descricao = dados.get('descricao', 'N/A')
-        severidade = dados.get('severidade', 'N/A')
-        contexto = dados.get('dados_contexto', {})
-        metricas = dados.get('metricas', {})
-        
+        titulo = dados.get("titulo", "N/A")
+        descricao = dados.get("descricao", "N/A")
+        severidade = dados.get("severidade", "N/A")
+        contexto = dados.get("dados_contexto", {})
+        metricas = dados.get("metricas", {})
+
         return f"""
 **CONTEXTO:**
 Você está analisando um insight sobre um cliente que está inativo há um tempo significativo.
@@ -163,19 +150,19 @@ Você está analisando um insight sobre um cliente que está inativo há um temp
 {{contexto}}
 {{objetivo}}
 """
-    
+
     @staticmethod
     def _prompt_produtos_juntos(dados: Dict[str, Any]) -> str:
         """
         Prompt para PRODUTOS_COMPRADOS_JUNTOS.
-        
+
         Foca em cross-sell natural.
         """
-        titulo = dados.get('titulo', 'N/A')
-        descricao = dados.get('descricao', 'N/A')
-        contexto = dados.get('dados_contexto', {})
-        metricas = dados.get('metricas', {})
-        
+        titulo = dados.get("titulo", "N/A")
+        descricao = dados.get("descricao", "N/A")
+        contexto = dados.get("dados_contexto", {})
+        metricas = dados.get("metricas", {})
+
         return f"""
 **CONTEXTO:**
 Você está analisando um insight sobre produtos que são frequentemente comprados juntos, representando uma oportunidade de cross-sell.
@@ -213,19 +200,19 @@ Você está analisando um insight sobre produtos que são frequentemente comprad
 {{contexto}}
 {{objetivo}}
 """
-    
+
     @staticmethod
     def _prompt_kit_vantajoso(dados: Dict[str, Any]) -> str:
         """
         Prompt para KIT_MAIS_VANTAJOSO.
-        
+
         Foca em comunicação de valor financeiro.
         """
-        titulo = dados.get('titulo', 'N/A')
-        descricao = dados.get('descricao', 'N/A')
-        contexto = dados.get('dados_contexto', {})
-        metricas = dados.get('metricas', {})
-        
+        titulo = dados.get("titulo", "N/A")
+        descricao = dados.get("descricao", "N/A")
+        contexto = dados.get("dados_contexto", {})
+        metricas = dados.get("metricas", {})
+
         return f"""
 **CONTEXTO:**
 Você está analisando um insight sobre um kit que oferece melhor custo-benefício do que comprar os itens separadamente.
@@ -263,19 +250,19 @@ Você está analisando um insight sobre um kit que oferece melhor custo-benefíc
 {{contexto}}
 {{objetivo}}
 """
-    
+
     @staticmethod
     def _prompt_cliente_vip(dados: Dict[str, Any]) -> str:
         """
         Prompt para CLIENTE_VIP.
-        
+
         Foca em tratamento diferenciado.
         """
-        titulo = dados.get('titulo', 'N/A')
-        descricao = dados.get('descricao', 'N/A')
-        contexto = dados.get('dados_contexto', {})
-        metricas = dados.get('metricas', {})
-        
+        titulo = dados.get("titulo", "N/A")
+        descricao = dados.get("descricao", "N/A")
+        contexto = dados.get("dados_contexto", {})
+        metricas = dados.get("metricas", {})
+
         return f"""
 **CONTEXTO:**
 Você está analisando um insight sobre um cliente VIP que merece tratamento especial.
@@ -313,20 +300,20 @@ Você está analisando um insight sobre um cliente VIP que merece tratamento esp
 {{contexto}}
 {{objetivo}}
 """
-    
+
     @staticmethod
     def _prompt_risco_churn(dados: Dict[str, Any]) -> str:
         """
         Prompt para CLIENTE_EM_RISCO_CHURN.
-        
+
         Foca em ação preventiva urgente.
         """
-        titulo = dados.get('titulo', 'N/A')
-        descricao = dados.get('descricao', 'N/A')
-        severidade = dados.get('severidade', 'N/A')
-        contexto = dados.get('dados_contexto', {})
-        metricas = dados.get('metricas', {})
-        
+        titulo = dados.get("titulo", "N/A")
+        descricao = dados.get("descricao", "N/A")
+        severidade = dados.get("severidade", "N/A")
+        contexto = dados.get("dados_contexto", {})
+        metricas = dados.get("metricas", {})
+
         return f"""
 **CONTEXTO:**
 Você está analisando um insight sobre um cliente em risco de churn (abandono).
@@ -365,19 +352,19 @@ Você está analisando um insight sobre um cliente em risco de churn (abandono).
 {{contexto}}
 {{objetivo}}
 """
-    
+
     @staticmethod
     def _prompt_produto_top(dados: Dict[str, Any]) -> str:
         """
         Prompt para PRODUTO_TOP_VENDAS.
-        
+
         Foca em maximização de oportunidade.
         """
-        titulo = dados.get('titulo', 'N/A')
-        descricao = dados.get('descricao', 'N/A')
-        contexto = dados.get('dados_contexto', {})
-        metricas = dados.get('metricas', {})
-        
+        titulo = dados.get("titulo", "N/A")
+        descricao = dados.get("descricao", "N/A")
+        contexto = dados.get("dados_contexto", {})
+        metricas = dados.get("metricas", {})
+
         return f"""
 **CONTEXTO:**
 Você está analisando um insight sobre um produto que está em alta nas vendas.
@@ -415,19 +402,19 @@ Você está analisando um insight sobre um produto que está em alta nas vendas.
 {{contexto}}
 {{objetivo}}
 """
-    
+
     @staticmethod
     def _prompt_generico(dados: Dict[str, Any]) -> str:
         """
         Prompt genérico para tipos não especializados.
         """
-        tipo = dados.get('tipo_insight', 'N/A')
-        titulo = dados.get('titulo', 'N/A')
-        descricao = dados.get('descricao', 'N/A')
-        severidade = dados.get('severidade', 'N/A')
-        contexto = dados.get('dados_contexto', {})
-        metricas = dados.get('metricas', {})
-        
+        tipo = dados.get("tipo_insight", "N/A")
+        titulo = dados.get("titulo", "N/A")
+        descricao = dados.get("descricao", "N/A")
+        severidade = dados.get("severidade", "N/A")
+        contexto = dados.get("dados_contexto", {})
+        metricas = dados.get("metricas", {})
+
         return f"""
 **CONTEXTO:**
 Você está analisando um insight gerado automaticamente pelo sistema.

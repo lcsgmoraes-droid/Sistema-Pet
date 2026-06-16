@@ -19,7 +19,7 @@ from app.utils.logger import logger
 class InMemoryEventStore:
     def __init__(self):
         self.events = []
-    
+
     def append(self, event):
         self.events.append(event)
 
@@ -28,21 +28,21 @@ def example_complete_workflow():
     """
     Exemplo completo: Criar versão -> Rollout Gradual -> Monitorar
     """
-    
+
     # Setup
     event_store = InMemoryEventStore()
     registry = VersionRegistry(event_store)
     orchestrator = RolloutOrchestrator(registry, event_store)
-    
+
     print("=" * 80)
     logger.info("AI VERSIONING & DEPLOYMENT - EXEMPLO COMPLETO")
     print("=" * 80)
-    
+
     # ========================================
     # STEP 1: Criar nova versão
     # ========================================
     logger.info("\n[STEP 1] Criando nova versão de comportamento...")
-    
+
     version = registry.create_version(
         version_name="v2.4.0",
         version_tag="stable",
@@ -54,7 +54,7 @@ def example_complete_workflow():
                     "model": "gpt-4",
                     "temperature": 0.2,
                     "max_tokens": 500,
-                }
+                },
             ),
             ComponentType.CONFIDENCE_FORMULA: ComponentVersion(
                 component_type=ComponentType.CONFIDENCE_FORMULA,
@@ -65,7 +65,7 @@ def example_complete_workflow():
                         "context_relevance": 0.3,
                         "historical_success": 0.3,
                     }
-                }
+                },
             ),
             ComponentType.GUARDRAIL: ComponentVersion(
                 component_type=ComponentType.GUARDRAIL,
@@ -73,7 +73,7 @@ def example_complete_workflow():
                 config={
                     "min_confidence": 0.7,
                     "max_risk_score": 0.3,
-                }
+                },
             ),
         },
         created_by="admin@petshop.com",
@@ -83,40 +83,40 @@ def example_complete_workflow():
         - Reduced temperature from 0.3 to 0.2 for more consistent outputs
         - Updated confidence formula weights
         - Tightened guardrail thresholds
-        """
+        """,
     )
-    
+
     logger.info(f"✓ Versão criada: {version.version_name}")
     logger.info(f"  ID: {version.id}")
     logger.info(f"  Status: {version.status.value}")
     logger.info(f"  Componentes: {list(version.components.keys())}")
-    
+
     # ========================================
     # STEP 2: Promover para ACTIVE
     # ========================================
     logger.info("\n[STEP 2] Promovendo versão para ACTIVE...")
-    
+
     # Em produção, passaria por TESTING primeiro
     version = registry.promote_version(
         version_id=version.id,
         to_status=VersionStatus.TESTING,
-        promoted_by="admin@petshop.com"
+        promoted_by="admin@petshop.com",
     )
     logger.info(f"✓ Versão promovida para: {version.status.value}")
-    
+
     # Depois de testes, promover para ACTIVE
     version = registry.promote_version(
         version_id=version.id,
         to_status=VersionStatus.ACTIVE,
-        promoted_by="admin@petshop.com"
+        promoted_by="admin@petshop.com",
     )
     logger.info(f"✓ Versão promovida para: {version.status.value}")
-    
+
     # ========================================
     # STEP 3: Criar plano de rollout GRADUAL
     # ========================================
     logger.info("\n[STEP 3] Criando plano de rollout gradual...")
-    
+
     rollout_config = RolloutConfig(
         strategy=RolloutStrategy.GRADUAL,
         gradual_steps=[10, 25, 50, 100],  # 10% -> 25% -> 50% -> 100%
@@ -127,35 +127,35 @@ def example_complete_workflow():
         auto_rollback_enabled=True,
         auto_rollback_threshold=0.90,
     )
-    
+
     plan = orchestrator.create_rollout_plan(
         behavior_version_id=version.id,
         config=rollout_config,
-        created_by="admin@petshop.com"
+        created_by="admin@petshop.com",
     )
-    
+
     logger.info(f"✓ Plano de rollout criado: {plan.id}")
     logger.info(f"  Estratégia: {plan.config.strategy.value}")
     logger.info(f"  Steps: {plan.config.gradual_steps}")
     logger.info(f"  Auto-rollback: {plan.config.auto_rollback_enabled}")
-    
+
     # ========================================
     # STEP 4: Iniciar rollout
     # ========================================
     logger.info("\n[STEP 4] Iniciando rollout...")
-    
+
     plan = orchestrator.start_rollout(plan.id)
-    
+
     logger.info("✓ Rollout iniciado!")
     logger.info(f"  Status: {plan.status.value}")
     logger.info(f"  Step atual: {plan.current_step}")
     logger.info(f"  Tenants iniciais: {plan.current_tenant_ids}")
-    
+
     # ========================================
     # STEP 5: Simular monitoramento
     # ========================================
     logger.info("\n[STEP 5] Monitorando rollout...")
-    
+
     # Simular algumas decisões para gerar métricas
     for tenant_id in plan.current_tenant_ids:
         registry.update_tenant_metrics(
@@ -166,56 +166,60 @@ def example_complete_workflow():
             avg_confidence=0.89,
             avg_trust_score=0.87,
         )
-    
+
     # Check health
     health = orchestrator.check_rollout_health(plan.id)
-    
+
     logger.info("✓ Health check concluído:")
     logger.info(f"  Total decisões: {health['total_decisions']}")
     logger.info(f"  Success rate: {health['avg_success_rate']:.2%}")
     logger.info(f"  Fallback rate: {health['avg_fallback_rate']:.2%}")
     logger.info(f"  Meets criteria: {health['meets_criteria']}")
     logger.info(f"  Ação recomendada: {health['action']}")
-    
+
     # ========================================
     # STEP 6: Avançar para próximo step
     # ========================================
-    if health['action'] == 'proceed_next_step':
+    if health["action"] == "proceed_next_step":
         logger.info("\n[STEP 6] Avançando para próximo step...")
-        
+
         plan = orchestrator.proceed_next_step(plan.id)
-        
+
         logger.info(f"✓ Avançado para step {plan.current_step}")
         logger.info(f"  Tenants atuais: {len(plan.current_tenant_ids)}")
         logger.info(f"  Target: {plan.config.gradual_steps[plan.current_step - 1]}%")
-    
+
     # ========================================
     # STEP 7: Listar versões ativas
     # ========================================
     logger.info("\n[STEP 7] Versões ACTIVE no sistema:")
-    
+
     active_versions = registry.list_versions(status=VersionStatus.ACTIVE)
     for v in active_versions:
         logger.info(f"  • {v.version_name} ({v.version_tag})")
         logger.info(f"    Criada em: {v.created_at.strftime('%Y-%m-%d %H:%M')}")
         logger.info(f"    Por: {v.created_by}")
-    
+
     # ========================================
     # STEP 8: Exemplo de decisão com versão
     # ========================================
     logger.info("\n[STEP 8] Exemplo de decisão usando versão:")
-    
+
     # Pegar um tenant que está usando a nova versão
     tenant_id = plan.current_tenant_ids[0]
     assignment = registry.get_tenant_version(tenant_id)
-    
+
     if assignment:
         logger.info(f"  Tenant: {tenant_id}")
         logger.info(f"  Versão ativa: {version.version_name}")
-        logger.info(f"  Ativada em: {assignment.activated_at.strftime('%Y-%m-%d %H:%M')}")
+        logger.info(
+            f"  Ativada em: {assignment.activated_at.strftime('%Y-%m-%d %H:%M')}"
+        )
         logger.info(f"  Decisões: {assignment.decision_count}")
-        logger.info(f"  Success rate: {assignment.success_count / assignment.decision_count:.2%}")
-    
+        logger.info(
+            f"  Success rate: {assignment.success_count / assignment.decision_count:.2%}"
+        )
+
     # ========================================
     # RESUMO
     # ========================================
@@ -229,7 +233,7 @@ def example_complete_workflow():
     logger.info("\nTipos de eventos:")
     for event in event_store.events:
         logger.info(f"  • {event.event_type}")
-    
+
     logger.info("\n✓ Framework de versionamento funcionando corretamente!")
 
 
@@ -237,15 +241,15 @@ def example_canary_rollout():
     """
     Exemplo de rollout CANARY
     """
-    
+
     event_store = InMemoryEventStore()
     registry = VersionRegistry(event_store)
     orchestrator = RolloutOrchestrator(registry, event_store)
-    
+
     print("\n" + "=" * 80)
     logger.info("EXEMPLO: CANARY ROLLOUT")
     print("=" * 80)
-    
+
     # Criar versão experimental
     version = registry.create_version(
         version_name="v2.5.0-canary",
@@ -254,17 +258,17 @@ def example_canary_rollout():
             ComponentType.ANALYZER: ComponentVersion(
                 component_type=ComponentType.ANALYZER,
                 version="1.4.0-experimental",
-                config={"model": "gpt-4-turbo", "temperature": 0.1}
+                config={"model": "gpt-4-turbo", "temperature": 0.1},
             ),
         },
         created_by="dev@petshop.com",
         description="Experimental GPT-4 Turbo test",
-        changelog="Testing new GPT-4 Turbo model"
+        changelog="Testing new GPT-4 Turbo model",
     )
-    
+
     registry.promote_version(version.id, VersionStatus.TESTING, "dev@petshop.com")
     registry.promote_version(version.id, VersionStatus.ACTIVE, "dev@petshop.com")
-    
+
     # Rollout canary com tenants específicos
     plan = orchestrator.create_rollout_plan(
         behavior_version_id=version.id,
@@ -275,11 +279,11 @@ def example_canary_rollout():
             min_success_rate=0.98,  # Mais rigoroso para canary
             auto_rollback_enabled=True,
         ),
-        created_by="dev@petshop.com"
+        created_by="dev@petshop.com",
     )
-    
+
     plan = orchestrator.start_rollout(plan.id)
-    
+
     logger.info(f"✓ Canary iniciado em: {plan.current_tenant_ids}")
     logger.info("  Monitorando performance antes de expandir...")
 
@@ -288,15 +292,15 @@ def example_auto_rollback():
     """
     Exemplo de auto-rollback por regressão
     """
-    
+
     event_store = InMemoryEventStore()
     registry = VersionRegistry(event_store)
     orchestrator = RolloutOrchestrator(registry, event_store)
-    
+
     print("\n" + "=" * 80)
     logger.info("EXEMPLO: AUTO-ROLLBACK")
     print("=" * 80)
-    
+
     # Criar versão com problema (simulado)
     version = registry.create_version(
         version_name="v2.6.0-broken",
@@ -305,17 +309,17 @@ def example_auto_rollback():
             ComponentType.ANALYZER: ComponentVersion(
                 component_type=ComponentType.ANALYZER,
                 version="1.5.0",
-                config={"model": "gpt-3.5", "temperature": 0.9}  # Muito alto!
+                config={"model": "gpt-3.5", "temperature": 0.9},  # Muito alto!
             ),
         },
         created_by="dev@petshop.com",
         description="Version with high temperature (intentional bug for demo)",
-        changelog="Testing auto-rollback"
+        changelog="Testing auto-rollback",
     )
-    
+
     registry.promote_version(version.id, VersionStatus.TESTING, "dev@petshop.com")
     registry.promote_version(version.id, VersionStatus.ACTIVE, "dev@petshop.com")
-    
+
     plan = orchestrator.create_rollout_plan(
         behavior_version_id=version.id,
         config=RolloutConfig(
@@ -324,11 +328,11 @@ def example_auto_rollback():
             auto_rollback_enabled=True,
             auto_rollback_threshold=0.90,  # Rollback se < 90%
         ),
-        created_by="dev@petshop.com"
+        created_by="dev@petshop.com",
     )
-    
+
     plan = orchestrator.start_rollout(plan.id)
-    
+
     # Simular performance ruim
     for tenant_id in plan.current_tenant_ids:
         registry.update_tenant_metrics(
@@ -339,21 +343,22 @@ def example_auto_rollback():
             avg_confidence=0.65,  # Confiança baixa
             avg_trust_score=0.70,
         )
-    
+
     # Check health vai detectar regressão
     health = orchestrator.check_rollout_health(plan.id)
-    
+
     logger.info("✗ Performance detectada:")
     logger.info(f"  Success rate: {health['avg_success_rate']:.2%} (threshold: 90%)")
-    
-    if 'action' in health and health['action'] == 'auto_rollback_triggered':
+
+    if "action" in health and health["action"] == "auto_rollback_triggered":
         logger.info("\n✓ AUTO-ROLLBACK ACIONADO!")
         logger.info(f"  Tenants revertidos: {plan.current_tenant_ids}")
         logger.info(f"  Razão: {plan.rollback_reason}")
-        
+
         # Verificar eventos
         rollback_events = [
-            e for e in event_store.events
+            e
+            for e in event_store.events
             if e.event_type == "rollout.auto_rollback_triggered"
         ]
         if rollback_events:
@@ -365,7 +370,7 @@ if __name__ == "__main__":
     example_complete_workflow()
     example_canary_rollout()
     example_auto_rollback()
-    
+
     print("\n" + "=" * 80)
     logger.info("Todos os exemplos executados com sucesso! ✓")
     print("=" * 80)

@@ -643,6 +643,13 @@ def test_backend_ci_has_blocking_backend_critical_packages_format_step():
     )
 
 
+def test_backend_ci_has_blocking_backend_ai_packages_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend AI packages format (blocking)" in source
+    assert "ruff format --check app/ai app/ai_core" in source
+
+
 def test_backend_ci_has_blocking_alembic_env_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

@@ -16,24 +16,24 @@ Uso básico:
         OperatorChatContext,
         get_operator_chat_service
     )
-    
+
     # Criar mensagem
     mensagem = OperatorMessage(
         pergunta="Esse cliente costuma comprar o quê?",
         operador_id=1,
         operador_nome="João Silva"
     )
-    
+
     # Criar contexto
     contexto = OperatorChatContext(
         tenant_id=1,
         message=mensagem
     )
-    
+
     # Processar
     service = get_operator_chat_service()
     resposta = service.processar_pergunta(contexto)
-    
+
     print(resposta.resposta)
 """
 
@@ -83,7 +83,6 @@ __all__ = [
     "OperatorChatContext",
     "OperatorChatResponse",
     "IntentionDetectionResult",
-    
     # Constantes de Intenção
     "INTENCAO_CLIENTE",
     "INTENCAO_PRODUTO",
@@ -92,22 +91,18 @@ __all__ = [
     "INTENCAO_INSIGHT",
     "INTENCAO_VENDA",
     "INTENCAO_GENERICA",
-    
     # Constantes de Fonte
     "FONTE_PDV_CONTEXT",
     "FONTE_READ_MODEL",
     "FONTE_INSIGHT",
     "FONTE_REGRA_NEGOCIO",
     "FONTE_HEURISTICA",
-    
     # Service
     "OperatorChatService",
     "get_operator_chat_service",
-    
     # Adapter
     "detectar_intencao",
     "preparar_contexto_completo",
-    
     # Prompts
     "selecionar_prompt",
     "formatar_prompt",

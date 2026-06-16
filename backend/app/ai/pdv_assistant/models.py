@@ -13,6 +13,7 @@ from enum import Enum
 
 class TipoPDVSugestao(str, Enum):
     """Tipos de sugestões que a IA pode gerar"""
+
     CROSS_SELL = "cross_sell"  # Sugestão de produto complementar
     KIT_VANTAJOSO = "kit_vantajoso"  # Kit é mais vantajoso
     CLIENTE_RECORRENTE = "cliente_recorrente"  # Info sobre padrão do cliente
@@ -26,6 +27,7 @@ class TipoPDVSugestao(str, Enum):
 
 class PrioridadeSugestao(str, Enum):
     """Prioridade de exibição da sugestão"""
+
     ALTA = "alta"  # Exibir com destaque
     MEDIA = "media"  # Exibir normalmente
     BAIXA = "baixa"  # Exibir se houver espaço
@@ -36,6 +38,7 @@ class ItemVendaPDV:
     """
     Representa um item já adicionado à venda em andamento.
     """
+
     produto_id: int
     nome_produto: str
     quantidade: float
@@ -43,7 +46,7 @@ class ItemVendaPDV:
     valor_total: Decimal
     categoria: Optional[str] = None
     fabricante: Optional[str] = None
-    
+
     def to_dict(self) -> Dict[str, Any]:
         return {
             "produto_id": self.produto_id,
@@ -60,9 +63,9 @@ class ItemVendaPDV:
 class PDVContext:
     """
     Contexto completo de uma venda em andamento no PDV.
-    
+
     Este é o input principal para o PDVAIService.
-    
+
     Attributes:
         tenant_id: ID do tenant (multi-tenant obrigatório)
         timestamp: Momento da análise
@@ -75,6 +78,7 @@ class PDVContext:
         loja_id: ID da loja (se aplicável)
         metadata: Dados adicionais
     """
+
     tenant_id: int
     timestamp: datetime
     itens: List[ItemVendaPDV]
@@ -85,31 +89,31 @@ class PDVContext:
     cliente_nome: Optional[str] = None
     loja_id: Optional[int] = None
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     def __post_init__(self):
         """Validações básicas"""
         if not self.itens:
             # Venda vazia é válida (momento inicial)
             pass
-        
+
         if self.total_parcial < 0:
             raise ValueError("Total parcial não pode ser negativo")
-    
+
     @property
     def tem_cliente_identificado(self) -> bool:
         """Verifica se o cliente foi identificado"""
         return self.cliente_id is not None
-    
+
     @property
     def quantidade_itens(self) -> int:
         """Retorna quantidade de itens na venda"""
         return len(self.itens)
-    
+
     @property
     def produto_ids(self) -> List[int]:
         """Retorna lista de IDs de produtos na venda"""
         return [item.produto_id for item in self.itens]
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Converte para dicionário"""
         return {
@@ -132,13 +136,14 @@ class PDVContext:
 class PDVSugestao:
     """
     Representa uma sugestão gerada pela IA para o operador do PDV.
-    
+
     Sugestões são:
     - Curtas e claras
     - Acionáveis
     - Não-intrusivas
     - Explicáveis
     """
+
     tipo: TipoPDVSugestao
     titulo: str  # Ex: "Kit mais vantajoso"
     mensagem: str  # Ex: "Este kit sai 12% mais barato"
@@ -148,15 +153,15 @@ class PDVSugestao:
     acionavel: bool  # Se tem ação que o operador pode fazer
     acao_sugerida: Optional[str] = None  # Ex: "Oferecer Kit Premium"
     metadata: Dict[str, Any] = field(default_factory=dict)
-    
+
     def __post_init__(self):
         """Validações"""
         if not 0.0 <= self.confianca <= 1.0:
             raise ValueError("Confiança deve estar entre 0.0 e 1.0")
-        
+
         if len(self.mensagem) > 200:
             raise ValueError("Mensagem deve ter no máximo 200 caracteres")
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Converte para dicionário"""
         return {
@@ -170,14 +175,14 @@ class PDVSugestao:
             "acao_sugerida": self.acao_sugerida,
             "metadata": self.metadata,
         }
-    
+
     @classmethod
     def criar_sugestao_simples(
         cls,
         tipo: TipoPDVSugestao,
         mensagem: str,
         prioridade: PrioridadeSugestao = PrioridadeSugestao.MEDIA,
-        confianca: float = 0.8
+        confianca: float = 0.8,
     ) -> "PDVSugestao":
         """
         Factory method para criar sugestões simples rapidamente.

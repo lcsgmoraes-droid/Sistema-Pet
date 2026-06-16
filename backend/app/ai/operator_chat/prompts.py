@@ -265,10 +265,10 @@ PROMPTS_MAP: Dict[str, str] = {
 def selecionar_prompt(intencao: str) -> str:
     """
     Seleciona o prompt adequado baseado na intenção detectada.
-    
+
     Args:
         intencao: Tipo de intenção (cliente, produto, kit, etc)
-        
+
     Returns:
         Template do prompt apropriado
     """
@@ -276,18 +276,16 @@ def selecionar_prompt(intencao: str) -> str:
 
 
 def formatar_prompt(
-    prompt_template: str,
-    pergunta: str,
-    contexto: Dict[str, Any]
+    prompt_template: str, pergunta: str, contexto: Dict[str, Any]
 ) -> str:
     """
     Formata o prompt substituindo os placeholders pelos dados reais.
-    
+
     Args:
         prompt_template: Template do prompt
         pergunta: Pergunta do operador
         contexto: Dicionário com todos os contextos disponíveis
-        
+
     Returns:
         Prompt formatado pronto para envio à IA
     """
@@ -296,7 +294,7 @@ def formatar_prompt(
     contexto_cliente = contexto.get("contexto_cliente", "Não disponível")
     contexto_produto = contexto.get("contexto_produto", "Não disponível")
     contexto_insights = contexto.get("contexto_insights", "Não disponível")
-    
+
     # Formatar contexto geral (para prompt genérico)
     contexto_geral = f"""
 - PDV: {contexto_pdv if contexto_pdv != "Não disponível" else "Nenhuma venda em andamento"}
@@ -304,7 +302,7 @@ def formatar_prompt(
 - Produtos: {contexto_produto if contexto_produto != "Não disponível" else "Nenhum produto na venda"}
 - Insights: {contexto_insights if contexto_insights != "Não disponível" else "Nenhum insight disponível"}
     """.strip()
-    
+
     # Substituir placeholders
     prompt_formatado = prompt_template.format(
         pergunta=pergunta,
@@ -312,21 +310,23 @@ def formatar_prompt(
         contexto_pdv=contexto_pdv,
         contexto_cliente=contexto_cliente,
         contexto_produto=contexto_produto,
-        contexto_insights=contexto_insights
+        contexto_insights=contexto_insights,
     )
-    
+
     return prompt_formatado
 
 
-def obter_prompt_formatado(intencao: str, pergunta: str, contexto: Dict[str, Any]) -> str:
+def obter_prompt_formatado(
+    intencao: str, pergunta: str, contexto: Dict[str, Any]
+) -> str:
     """
     Função de conveniência que seleciona e formata o prompt em uma única chamada.
-    
+
     Args:
         intencao: Tipo de intenção detectada
         pergunta: Pergunta do operador
         contexto: Contextos disponíveis
-        
+
     Returns:
         Prompt pronto para envio à IA
     """

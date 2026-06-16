@@ -37,10 +37,10 @@ logger = logging.getLogger(__name__)
 class InsightExplanation:
     """
     Estrutura de dados para explicação de insight.
-    
+
     Representa a explicação gerada pela IA de forma estruturada e auditável.
     """
-    
+
     def __init__(
         self,
         insight_id: str,
@@ -52,7 +52,7 @@ class InsightExplanation:
         fonte_dados: list,
         tenant_id: int,
         timestamp: datetime,
-        metadata: Dict[str, Any]
+        metadata: Dict[str, Any],
     ):
         self.insight_id = insight_id
         self.tipo_insight = tipo_insight
@@ -64,7 +64,7 @@ class InsightExplanation:
         self.tenant_id = tenant_id
         self.timestamp = timestamp
         self.metadata = metadata
-    
+
     def to_dict(self) -> Dict[str, Any]:
         """Converte para dicionário"""
         return {
@@ -77,26 +77,22 @@ class InsightExplanation:
             "fonte_dados": self.fonte_dados,
             "tenant_id": self.tenant_id,
             "timestamp": self.timestamp.isoformat() if self.timestamp else None,
-            "metadata": self.metadata
+            "metadata": self.metadata,
         }
 
 
 class InsightExplanationService:
     """
     Serviço principal de explicação de insights.
-    
+
     Usa o AI Engine (Passo 1) para transformar insights técnicos
     em explicações compreensíveis para humanos.
     """
-    
-    def __init__(
-        self,
-        ai_engine: Optional[AIEngine] = None,
-        use_mock: bool = True
-    ):
+
+    def __init__(self, ai_engine: Optional[AIEngine] = None, use_mock: bool = True):
         """
         Inicializa o serviço.
-        
+
         Args:
             ai_engine: Motor de IA customizado (opcional)
             use_mock: Se True, usa mock; se False, usa OpenAI (futuro)
@@ -105,26 +101,24 @@ class InsightExplanationService:
             self.ai_engine = AIEngineFactory.create_mock_engine()
         else:
             self.ai_engine = ai_engine
-        
+
         self.adapter = InsightAIAdapter()
         self.prompt_library = InsightPromptLibrary()
         self.use_mock = use_mock
-    
+
     async def explicar_insight(
-        self,
-        insight: Insight,
-        tenant_id: Optional[int] = None
+        self, insight: Insight, tenant_id: Optional[int] = None
     ) -> InsightExplanation:
         """
         Gera explicação compreensível de um insight.
-        
+
         Args:
             insight: Insight do Sprint 5
             tenant_id: ID do tenant (usa do insight se None)
-            
+
         Returns:
             InsightExplanation estruturada
-            
+
         Raises:
             ValueError: Se insight inválido
         """
@@ -133,38 +127,37 @@ class InsightExplanationService:
         if not valido:
             logger.error(f"[InsightExplanationService] Insight inválido: {erro}")
             raise ValueError(f"Insight inválido: {erro}")
-        
+
         # Tenant ID
         tenant_id = tenant_id or insight.user_id
-        
+
         logger.info(
             f"[InsightExplanationService] Explicando insight "
             f"{insight.id} (tipo={insight.tipo.value}, tenant={tenant_id})"
         )
-        
+
         # 1. Converter Insight para AIContext
         ai_context = self.adapter.insight_to_ai_context(insight)
-        
+
         # 2. Obter prompt especializado
         prompt_especializado = self.prompt_library.get_prompt_for_tipo(
-            tipo=insight.tipo,
-            dados_insight=ai_context.dados_estruturados
+            tipo=insight.tipo, dados_insight=ai_context.dados_estruturados
         )
-        
+
         # 3. Substituir placeholders
         prompt_final = prompt_especializado.replace("{{contexto}}", "")
         prompt_final = prompt_final.replace("{{objetivo}}", ai_context.objetivo)
-        
+
         # 4. Gerar resposta
         if self.use_mock:
             # Em modo mock, gerar resposta simulada diretamente
             from app.ai.contracts import AIResponse
-            
+
             # Gerar resposta específica baseada no tipo de insight
             explicacao_mock, sugestao_mock = self._generate_mock_response(
                 insight, ai_context
             )
-            
+
             ai_response = AIResponse(
                 resposta=f"{explicacao_mock}\n\nSugestão: {sugestao_mock}",
                 explicacao=(
@@ -177,7 +170,7 @@ class InsightExplanationService:
                 fonte_dados=[
                     "Insight Engine (Sprint 5)",
                     f"Insight ID: {insight.id}",
-                    "Read Models Cliente/Vendas"
+                    "Read Models Cliente/Vendas",
                 ],
                 confianca=0.85,
                 timestamp=datetime.now(),
@@ -186,8 +179,8 @@ class InsightExplanationService:
                     "modo": "mock",
                     "tipo_insight": insight.tipo.value,
                     "prompt_usado": "especializado",
-                    "insight_id": insight.id
-                }
+                    "insight_id": insight.id,
+                },
             )
         else:
             # Em produção, usar AI Engine real
@@ -195,47 +188,43 @@ class InsightExplanationService:
             ai_response = await self.ai_engine.generate_response(
                 context=ai_context.dados_estruturados,
                 objetivo=prompt_final,
-                tenant_id=tenant_id
+                tenant_id=tenant_id,
             )
-        
+
         # 5. Formatar explicação estruturada
         explicacao = self._format_explanation(
-            insight=insight,
-            ai_response=ai_response,
-            tenant_id=tenant_id
+            insight=insight, ai_response=ai_response, tenant_id=tenant_id
         )
-        
+
         logger.info(
             f"[InsightExplanationService] Explicação gerada com "
             f"confiança {explicacao.confianca * 100:.1f}%"
         )
-        
+
         return explicacao
-    
+
     def _generate_mock_response(
-        self,
-        insight: Insight,
-        ai_context: AIContext
+        self, insight: Insight, ai_context: AIContext
     ) -> tuple[str, str]:
         """
         Gera resposta mock específica baseada no tipo de insight.
-        
+
         Args:
             insight: Insight original
             ai_context: Contexto da IA
-            
+
         Returns:
             (explicacao, sugestao)
         """
         from app.insights.models import TipoInsight
-        
+
         dados = ai_context.dados_estruturados
-        
+
         if insight.tipo == TipoInsight.CLIENTE_RECORRENTE_ATRASADO:
-            cliente_nome = dados.get('cliente_nome', 'Cliente')
-            dias_atraso = dados.get('dias_atraso', 'X')
-            produto_habitual = dados.get('produto_habitual', 'produto')
-            
+            cliente_nome = dados.get("cliente_nome", "Cliente")
+            dias_atraso = dados.get("dias_atraso", "X")
+            produto_habitual = dados.get("produto_habitual", "produto")
+
             explicacao = (
                 f"O cliente {cliente_nome} tem um padrão de compra muito "
                 f"consistente e está {dias_atraso} dias atrasado na próxima "
@@ -243,113 +232,113 @@ class InsightExplanationService:
                 f"pode indicar que o cliente migrou para um concorrente ou "
                 f"está enfrentando alguma dificuldade financeira temporária."
             )
-            
+
             sugestao = (
                 "Entre em contato via WhatsApp em tom amigável, perguntando "
                 "como está o pet dele e oferecendo ajuda. Considere uma "
                 "promoção especial de 'volta' caso ele mencione preço como "
                 "motivo do afastamento."
             )
-            
+
         elif insight.tipo == TipoInsight.CLIENTE_INATIVO:
-            cliente_nome = dados.get('cliente_nome', 'Cliente')
-            dias_inativo = dados.get('dias_desde_ultima_compra', 'X')
-            
+            cliente_nome = dados.get("cliente_nome", "Cliente")
+            dias_inativo = dados.get("dias_desde_ultima_compra", "X")
+
             explicacao = (
                 f"O cliente {cliente_nome} não compra há {dias_inativo} dias, "
                 f"ultrapassando significativamente o padrão normal de retorno. "
                 f"Clientes inativos por mais de 90 dias têm apenas 15% de "
                 f"chance de retorno espontâneo."
             )
-            
+
             sugestao = (
                 "Crie uma campanha de reconquista personalizada com desconto "
                 "especial 'para clientes antigos'. Use múltiplos canais "
                 "(WhatsApp + email) e destaque novidades no estoque desde a "
                 "última visita."
             )
-            
+
         elif insight.tipo == TipoInsight.PRODUTOS_COMPRADOS_JUNTOS:
-            produto1 = dados.get('produto1', 'Produto A')
-            produto2 = dados.get('produto2', 'Produto B')
-            percentual = dados.get('percentual_juntos', 'X')
-            
+            produto1 = dados.get("produto1", "Produto A")
+            produto2 = dados.get("produto2", "Produto B")
+            percentual = dados.get("percentual_juntos", "X")
+
             explicacao = (
                 f"Identificamos que {percentual}% dos clientes que compram "
                 f"{produto1} também compram {produto2}. Esta é uma forte "
                 f"correlação que indica uma necessidade complementar natural."
             )
-            
+
             sugestao = (
                 f"Configure o PDV para sugerir automaticamente {produto2} "
                 f"quando {produto1} for adicionado ao carrinho. Treine a "
                 f"equipe para fazer essa oferta casada de forma natural."
             )
-            
+
         elif insight.tipo == TipoInsight.KIT_MAIS_VANTAJOSO:
-            economia = dados.get('economia_reais', 'X')
-            produtos_kit = dados.get('produtos', 'produtos do kit')
-            
+            economia = dados.get("economia_reais", "X")
+            produtos_kit = dados.get("produtos", "produtos do kit")
+
             explicacao = (
                 f"O cliente está comprando {produtos_kit} separadamente, "
                 f"pagando R$ {economia} a mais do que pagaria no kit. "
                 f"Ele provavelmente não sabe que existe essa opção mais econômica."
             )
-            
+
             sugestao = (
                 f"Na próxima compra, mostre a comparação de preços lado a lado "
                 f"no PDV. Use linguagem: 'Olha, você pode economizar R$ {economia} "
                 f"comprando o kit em vez dos itens separados!'"
             )
-            
+
         elif insight.tipo == TipoInsight.CLIENTE_VIP:
-            cliente_nome = dados.get('cliente_nome', 'Cliente')
-            ltv = dados.get('lifetime_value', 'X')
-            
+            cliente_nome = dados.get("cliente_nome", "Cliente")
+            ltv = dados.get("lifetime_value", "X")
+
             explicacao = (
                 f"O cliente {cliente_nome} tem um LTV de R$ {ltv}, colocando-o "
                 f"no top 5% da base. Clientes VIP merecem tratamento "
                 f"diferenciado para garantir sua fidelidade de longo prazo."
             )
-            
+
             sugestao = (
                 "Ofereça benefícios exclusivos: desconto permanente de 10%, "
                 "prioridade em novos produtos, brindes surpresa ocasionais. "
                 "Mantenha relacionamento próximo e personalizado."
             )
-            
+
         elif insight.tipo == TipoInsight.CLIENTE_EM_RISCO_CHURN:
-            cliente_nome = dados.get('cliente_nome', 'Cliente')
-            sinais = dados.get('sinais_risco', 'comportamento atípico')
-            
+            cliente_nome = dados.get("cliente_nome", "Cliente")
+            sinais = dados.get("sinais_risco", "comportamento atípico")
+
             explicacao = (
                 f"O cliente {cliente_nome} está mostrando {sinais} que "
                 f"historicamente precedem o abandono. A janela de retenção "
                 f"é de apenas 15 dias antes do churn se tornar irreversível."
             )
-            
+
             sugestao = (
                 "Ação urgente: contato imediato da gerência, oferta especial "
                 "de retenção, pesquisa de satisfação para entender problemas. "
                 "Prioridade máxima nas próximas 48 horas."
             )
-            
+
         elif insight.tipo == TipoInsight.PRODUTO_TOP_VENDAS:
-            produto = dados.get('produto_nome', 'Produto')
-            crescimento = dados.get('crescimento_percentual', 'X')
-            
+            produto = dados.get("produto_nome", "Produto")
+            crescimento = dados.get("crescimento_percentual", "X")
+
             explicacao = (
                 f"O produto {produto} teve crescimento de {crescimento}% nas "
                 f"vendas e está se tornando um best-seller. Isso indica forte "
                 f"demanda e alta satisfação dos clientes."
             )
-            
+
             sugestao = (
                 "Garanta estoque adequado, negocie melhores condições com "
                 "fornecedor devido ao volume, considere criar kits com este "
                 "produto como âncora. Use-o como destaque em campanhas."
             )
-            
+
         else:
             # Genérico para tipos não mapeados
             explicacao = (
@@ -357,37 +346,32 @@ class InsightExplanationService:
                 "atenção. Baseado nos dados históricos e comportamento "
                 "observado, há uma oportunidade de ação."
             )
-            
+
             sugestao = (
                 "Analise os dados em detalhes e defina uma ação específica "
                 "baseada no contexto do seu negócio e prioridades atuais."
             )
-        
+
         return explicacao, sugestao
-    
+
     def _format_explanation(
-        self,
-        insight: Insight,
-        ai_response: AIResponse,
-        tenant_id: int
+        self, insight: Insight, ai_response: AIResponse, tenant_id: int
     ) -> InsightExplanation:
         """
         Formata a resposta da IA em InsightExplanation estruturado.
-        
+
         Args:
             insight: Insight original
             ai_response: Resposta do AI Engine
             tenant_id: ID do tenant
-            
+
         Returns:
             InsightExplanation formatado
         """
         # Extrair explicação e sugestão da resposta da IA
         # No mock, a resposta vem em um bloco. Em produção, pode vir estruturada.
-        explicacao_texto, sugestao_texto = self._parse_ai_response(
-            ai_response.resposta
-        )
-        
+        explicacao_texto, sugestao_texto = self._parse_ai_response(ai_response.resposta)
+
         return InsightExplanation(
             insight_id=insight.id,
             tipo_insight=insight.tipo.value,
@@ -404,77 +388,75 @@ class InsightExplanationService:
                 "insight_entidade_id": insight.entidade_id,
                 "ai_explicacao_original": ai_response.explicacao,
                 "ai_metadata": ai_response.metadata,
-                "modo": "mock" if self.use_mock else "production"
-            }
+                "modo": "mock" if self.use_mock else "production",
+            },
         )
-    
+
     def _parse_ai_response(self, resposta: str) -> tuple[str, str]:
         """
         Separa explicação de sugestão na resposta da IA.
-        
+
         Args:
             resposta: Resposta completa da IA
-            
+
         Returns:
             (explicacao, sugestao)
         """
         # Tenta identificar seções na resposta
         # Padrões comuns: "Sugestão:", "Recomendação:", etc.
-        
+
         marcadores_sugestao = [
             "Sugestão:",
             "Recomendação:",
             "Ação sugerida:",
             "O que fazer:",
-            "Próximos passos:"
+            "Próximos passos:",
         ]
-        
+
         explicacao = resposta
         sugestao = ""
-        
+
         for marcador in marcadores_sugestao:
             if marcador in resposta:
                 partes = resposta.split(marcador, 1)
                 explicacao = partes[0].strip()
                 sugestao = partes[1].strip()
                 break
-        
+
         # Se não encontrou marcador, tenta quebrar em 2/3 e 1/3
         if not sugestao:
             linhas = resposta.split(". ")
             ponto_corte = int(len(linhas) * 0.66)
             explicacao = ". ".join(linhas[:ponto_corte]) + "."
             sugestao = ". ".join(linhas[ponto_corte:])
-        
+
         return explicacao, sugestao
-    
+
     async def explicar_multiplos_insights(
-        self,
-        insights: list[Insight],
-        tenant_id: Optional[int] = None
+        self, insights: list[Insight], tenant_id: Optional[int] = None
     ) -> list[InsightExplanation]:
         """
         Explica múltiplos insights em lote.
-        
+
         Args:
             insights: Lista de insights
             tenant_id: ID do tenant (usa do primeiro insight se None)
-            
+
         Returns:
             Lista de explicações
         """
         if not insights:
             return []
-        
+
         tenant_id = tenant_id or insights[0].user_id
-        
+
         logger.info(
             f"[InsightExplanationService] Explicando {len(insights)} insights "
             f"(tenant={tenant_id})"
         )
-        
+
         explicacoes = []
-        
+
         for insight in insights:
             try:
                 explicacao = await self.explicar_insight(insight, tenant_id)
@@ -486,18 +468,18 @@ class InsightExplanationService:
                 )
                 # Continua com os próximos
                 continue
-        
+
         logger.info(
             f"[InsightExplanationService] {len(explicacoes)}/{len(insights)} "
             f"explicações geradas com sucesso"
         )
-        
+
         return explicacoes
-    
+
     def get_statistics(self) -> Dict[str, Any]:
         """
         Retorna estatísticas do serviço.
-        
+
         Returns:
             Dict com estatísticas
         """
@@ -511,25 +493,25 @@ class InsightExplanationService:
 class InsightExplanationServiceFactory:
     """
     Factory para criação de InsightExplanationService.
-    
+
     Facilita testes e permite trocar implementações.
     """
-    
+
     @staticmethod
     def create_mock_service() -> InsightExplanationService:
         """
         Cria serviço com AI Engine mock.
-        
+
         Returns:
             InsightExplanationService em modo mock
         """
         return InsightExplanationService(use_mock=True)
-    
+
     @staticmethod
     def create_production_service() -> InsightExplanationService:
         """
         Cria serviço para produção (futuro OpenAI).
-        
+
         Returns:
             InsightExplanationService configurado
         """

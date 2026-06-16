@@ -20,19 +20,18 @@ from app.ai.pdv_assistant.models import PDVContext, ItemVendaPDV
 class PDVPromptLibrary:
     """
     Biblioteca de prompts especializados para o PDV.
-    
+
     Cada método gera um prompt específico para uma situação
     do PDV, garantindo que as sugestões sejam úteis e acionáveis.
     """
-    
+
     @staticmethod
     def prompt_analise_geral_pdv(
-        pdv_context: PDVContext,
-        insights_selecionados: List[Dict[str, Any]]
+        pdv_context: PDVContext, insights_selecionados: List[Dict[str, Any]]
     ) -> str:
         """
         Prompt geral para análise de contexto do PDV.
-        
+
         Usado quando há múltiplos insights para analisar.
         """
         cliente_info = ""
@@ -42,30 +41,34 @@ class PDVPromptLibrary:
 - Nome: {pdv_context.cliente_nome}
 - ID: {pdv_context.cliente_id}
 """
-        
+
         itens_info = ""
         if pdv_context.itens:
-            itens_lista = "\n".join([
-                f"  - {item.nome_produto} (R$ {item.valor_total:.2f})"
-                for item in pdv_context.itens
-            ])
+            itens_lista = "\n".join(
+                [
+                    f"  - {item.nome_produto} (R$ {item.valor_total:.2f})"
+                    for item in pdv_context.itens
+                ]
+            )
             itens_info = f"""
 **PRODUTOS NA VENDA:**
 {itens_lista}
 **TOTAL PARCIAL:** R$ {pdv_context.total_parcial:.2f}
 """
-        
+
         insights_info = ""
         if insights_selecionados:
-            insights_lista = "\n".join([
-                f"  - {insight.get('tipo', 'N/A')}: {insight.get('titulo', 'N/A')}"
-                for insight in insights_selecionados
-            ])
+            insights_lista = "\n".join(
+                [
+                    f"  - {insight.get('tipo', 'N/A')}: {insight.get('titulo', 'N/A')}"
+                    for insight in insights_selecionados
+                ]
+            )
             insights_info = f"""
 **INSIGHTS DISPONÍVEIS:**
 {insights_lista}
 """
-        
+
         return f"""
 Você é um assistente inteligente para operadores de PDV (Ponto de Venda) de pet shop.
 
@@ -79,7 +82,7 @@ Seu papel é SUGERIR ações úteis ao operador, baseado no contexto da venda em
 
 **CONTEXTO DA VENDA:**
 - Vendedor: {pdv_context.vendedor_nome}
-- Momento: {pdv_context.timestamp.strftime('%H:%M')}
+- Momento: {pdv_context.timestamp.strftime("%H:%M")}
 {cliente_info}
 {itens_info}
 {insights_info}
@@ -107,12 +110,12 @@ Gere até 3 sugestões curtas, claras e úteis para o operador.
 
 Responda APENAS com as sugestões, uma por linha, sem numeração.
 """
-    
+
     @staticmethod
     def prompt_cross_sell(
         produto_atual: ItemVendaPDV,
         produto_sugerido: str,
-        percentual_compra_junto: float
+        percentual_compra_junto: float,
     ) -> str:
         """
         Prompt para sugestão de cross-sell.
@@ -133,19 +136,19 @@ Gere uma sugestão de cross-sell para o operador do PDV.
 
 Responda APENAS com a sugestão.
 """
-    
+
     @staticmethod
     def prompt_kit_vantajoso(
         produtos_venda: List[ItemVendaPDV],
         nome_kit: str,
         economia_percentual: float,
-        economia_valor: float
+        economia_valor: float,
     ) -> str:
         """
         Prompt para sugestão de kit mais vantajoso.
         """
         produtos_lista = ", ".join([p.nome_produto for p in produtos_venda[:3]])
-        
+
         return f"""
 Gere uma sugestão sobre kit mais vantajoso para o operador do PDV.
 
@@ -165,12 +168,10 @@ Gere uma sugestão sobre kit mais vantajoso para o operador do PDV.
 
 Responda APENAS com a sugestão.
 """
-    
+
     @staticmethod
     def prompt_cliente_recorrente(
-        cliente_nome: str,
-        dias_desde_ultima_compra: int,
-        frequencia_media_dias: int
+        cliente_nome: str, dias_desde_ultima_compra: int, frequencia_media_dias: int
     ) -> str:
         """
         Prompt para informação sobre padrão de compra do cliente.
@@ -195,12 +196,9 @@ Gere uma informação útil sobre o padrão de compra do cliente.
 
 Responda APENAS com a informação.
 """
-    
+
     @staticmethod
-    def prompt_cliente_inativo(
-        cliente_nome: str,
-        dias_sem_comprar: int
-    ) -> str:
+    def prompt_cliente_inativo(cliente_nome: str, dias_sem_comprar: int) -> str:
         """
         Prompt para alerta sobre cliente inativo.
         """
@@ -221,12 +219,10 @@ Gere um alerta sutil sobre cliente inativo.
 
 Responda APENAS com o alerta.
 """
-    
+
     @staticmethod
     def prompt_cliente_vip(
-        cliente_nome: str,
-        total_gasto: float,
-        quantidade_compras: int
+        cliente_nome: str, total_gasto: float, quantidade_compras: int
     ) -> str:
         """
         Prompt para identificação de cliente VIP.
@@ -250,12 +246,9 @@ Gere uma informação sobre cliente VIP.
 
 Responda APENAS com a informação.
 """
-    
+
     @staticmethod
-    def prompt_recompra_prevista(
-        produto_nome: str,
-        dias_media_recompra: int
-    ) -> str:
+    def prompt_recompra_prevista(produto_nome: str, dias_media_recompra: int) -> str:
         """
         Prompt para sugestão de produto que cliente costuma recomprar.
         """
@@ -276,12 +269,9 @@ Gere uma sugestão sobre oportunidade de recompra.
 
 Responda APENAS com a sugestão.
 """
-    
+
     @staticmethod
-    def prompt_estoque_critico(
-        produto_nome: str,
-        quantidade_disponivel: int
-    ) -> str:
+    def prompt_estoque_critico(produto_nome: str, quantidade_disponivel: int) -> str:
         """
         Prompt para alerta sobre estoque crítico.
         """

@@ -24,11 +24,7 @@ from .services.decision_service import DecisionService
 from .services.review_service import ReviewService
 from .services.learning_service import LearningService
 from .domain.decision import DecisionResult
-from .domain.review import (
-    ReviewQueueEntry,
-    DecisionReviewStatus,
-    HumanReviewFeedback
-)
+from .domain.review import ReviewQueueEntry, DecisionReviewStatus, HumanReviewFeedback
 from .domain.events import DecisionReviewedEvent
 
 __all__ = [
