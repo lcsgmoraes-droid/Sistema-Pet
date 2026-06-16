@@ -3,27 +3,22 @@ ABA 7: Exportador de DRE para PDF e Excel
 Gera relatórios profissionais do DRE
 """
 
-from typing import Optional
 from sqlalchemy.orm import Session
-from datetime import date
 from io import BytesIO
-import json
 
 # PDF
 from reportlab.lib import colors
-from reportlab.lib.pagesizes import A4, letter
+from reportlab.lib.pagesizes import A4
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, PageBreak
-from reportlab.pdfgen import canvas
-from reportlab.lib.enums import TA_CENTER, TA_RIGHT, TA_LEFT
+from reportlab.lib.enums import TA_CENTER
 
 # Excel
 from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
-from openpyxl.utils import get_column_letter
+from openpyxl.styles import Font, Alignment, PatternFill
 
-from app.ia.aba7_models import DREPeriodo, DREProduto, DRECategoria
+from app.ia.aba7_models import DREPeriodo, DREProduto
 
 
 class ExportadorDRE:
@@ -173,7 +168,6 @@ class ExportadorDRE:
         elementos.append(Paragraph("<b>Indicadores de Performance</b>", styles['Heading2']))
         elementos.append(Spacer(1, 0.1*inch))
         
-        status_color = colors.green if dre.status == "lucro" else colors.red if dre.status == "prejuizo" else colors.orange
         status_texto = dre.status.upper()
         
         dados_indicadores = [
@@ -276,12 +270,6 @@ class ExportadorDRE:
         header_font = Font(bold=True, color="FFFFFF", size=12)
         title_font = Font(bold=True, size=14)
         bold_font = Font(bold=True)
-        border_thin = Border(
-            left=Side(style='thin'),
-            right=Side(style='thin'),
-            top=Side(style='thin'),
-            bottom=Side(style='thin')
-        )
         
         # Título
         ws['A1'] = "DEMONSTRAÇÃO DO RESULTADO DO EXERCÍCIO (DRE)"

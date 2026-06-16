@@ -1,4 +1,3 @@
-from app.base_models import BaseTenantModel
 """
 ABA 6 e ABA 9: Modelos para Chat IA e WhatsApp
 
@@ -8,10 +7,10 @@ Modelos de banco de dados para:
 - ClienteConversaInteligente: Cache de análises
 """
 
-from sqlalchemy import Column, Integer, Float, String, DateTime, Boolean, Text, ForeignKey, JSON
-from sqlalchemy.orm import relationship
+from sqlalchemy import Column, Integer, Float, String, DateTime, Boolean, Text, ForeignKey
 from datetime import datetime
-from app.db import Base
+
+from app.base_models import BaseTenantModel
 
 
 class ConversaWhatsApp(BaseTenantModel):

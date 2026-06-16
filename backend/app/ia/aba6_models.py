@@ -1,4 +1,3 @@
-from app.base_models import BaseTenantModel
 """
 ABA 6: Chat IA - Modelos de Banco de Dados
 
@@ -11,7 +10,8 @@ Tabelas:
 from sqlalchemy import Column, Integer, String, Text, DateTime, Boolean, ForeignKey, JSON
 from sqlalchemy.orm import relationship
 from datetime import datetime
-from app.db import Base
+
+from app.base_models import BaseTenantModel
 
 
 class Conversa(BaseTenantModel):

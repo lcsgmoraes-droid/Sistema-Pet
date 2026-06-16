@@ -7,7 +7,6 @@ Referência: ROADMAP_IA_AMBICOES.md (linhas 80-250)
 
 import re
 from typing import Dict, Optional, List
-from datetime import datetime
 
 
 class ExtratoNLP:

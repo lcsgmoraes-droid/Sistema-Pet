@@ -1,13 +1,13 @@
-from app.base_models import BaseTenantModel
 """
 ABA 7: DRE Detalhada por Canal - Nova Estrutura
 Cada canal em linha separada, com consolidação ao final
 """
 
-from sqlalchemy import Column, Integer, String, Float, Date, ForeignKey, DateTime, Text, Boolean, JSON
+from sqlalchemy import Column, Integer, String, Float, Date, ForeignKey, DateTime, Text, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
-from app.db import Base
+
+from app.base_models import BaseTenantModel
 
 
 class DREDetalheCanal(BaseTenantModel):

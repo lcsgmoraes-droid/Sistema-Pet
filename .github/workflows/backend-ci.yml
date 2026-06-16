@@ -207,6 +207,10 @@ jobs:
         run: |
           ruff check app/whatsapp
 
+      - name: IA lint (blocking)
+        run: |
+          ruff check app/ia
+
       - name: API lint (blocking)
         run: |
           ruff check app/api

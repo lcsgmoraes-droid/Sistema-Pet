@@ -9,9 +9,9 @@ Módulo central para todas as funcionalidades de IA:
 - ABA 9: Robô WhatsApp
 """
 
-from .aba5_fluxo_caixa import *
-from .aba6_chat_ia import *
-from .aba8_entregas import *
+from .aba5_fluxo_caixa import *  # noqa: F403
+from .aba6_chat_ia import *  # noqa: F403
+from .aba8_entregas import *  # noqa: F403
 
 __version__ = "1.0.0"
 __author__ = "Sistema Pet IA"

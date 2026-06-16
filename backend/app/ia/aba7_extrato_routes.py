@@ -8,13 +8,12 @@ from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Form
 from sqlalchemy.orm import Session
 from typing import List, Optional
 from pydantic import BaseModel
-from datetime import datetime
 
 from app.auth import get_current_user_and_tenant
 from app.db import get_session as get_db
 from app.ia.extrato_service import ServicoImportacaoExtrato
 from app.ia.extrato_ia import MotorCategorizacaoIA
-from app.ia.aba7_extrato_models import PadraoCategoriacaoIA, ArquivoExtratoImportado
+from app.ia.aba7_extrato_models import PadraoCategoriacaoIA
 
 
 router = APIRouter(prefix="/api/ia/extrato", tags=["ABA 7 - Extrato Bancário IA"])
@@ -229,7 +228,7 @@ def listar_padroes(
     )
     
     if apenas_ativos:
-        query = query.filter(PadraoCategoriacaoIA.ativo == True)
+        query = query.filter(PadraoCategoriacaoIA.ativo.is_(True))
     
     # Ordenação
     if ordenar_por == "confianca":

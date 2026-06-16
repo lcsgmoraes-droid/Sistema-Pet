@@ -8,8 +8,6 @@ Aqui irão os algoritmos principais:
 - TSP solver (força bruta / greedy + 2opt)
 """
 
-from typing import Dict, List, Optional, Tuple
-from sqlalchemy.orm import Session
 import logging
 
 logger = logging.getLogger(__name__)
