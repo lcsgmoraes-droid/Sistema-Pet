@@ -365,6 +365,16 @@ def test_backend_ci_has_blocking_financial_root_lint_step():
     ) in source
 
 
+def test_backend_ci_has_blocking_estoque_root_lint_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+    estoque_files = sorted(
+        f"app/{path.name}" for path in (ROOT / "backend" / "app").glob("estoque_*.py")
+    )
+
+    assert "Estoque root lint (blocking)" in source
+    assert f"ruff check {' '.join(estoque_files)}" in source
+
+
 def test_backend_ci_has_blocking_comissoes_root_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 
