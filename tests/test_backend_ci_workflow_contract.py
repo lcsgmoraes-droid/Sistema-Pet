@@ -714,6 +714,17 @@ def test_backend_ci_has_blocking_backend_remaining_tests_format_step():
     assert "ruff format --check ../tests tests/domain" in source
 
 
+def test_backend_ci_has_blocking_backend_operational_stock_cash_format_step():
+    source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
+
+    assert "Backend operational stock cash format (blocking)" in source
+    assert (
+        "ruff format --check app/caixa app/estoque app/health_router.py "
+        "app/session_manager.py app/idempotency.py app/idempotency_models.py "
+        "app/encryption.py app/audit.py app/audit_log.py"
+    ) in source
+
+
 def test_backend_ci_has_blocking_alembic_env_lint_step():
     source = BACKEND_CI_WORKFLOW.read_text(encoding="utf-8")
 

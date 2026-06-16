@@ -1,6 +1,7 @@
 """
 Módulo de auditoria simplificado
 """
+
 from datetime import datetime, timezone
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -21,7 +22,7 @@ def log_audit(
     details: Optional[str] = None,
     ip_address: Optional[str] = None,
     user_agent: Optional[str] = None,
-    tenant_id: Optional[UUID] = None
+    tenant_id: Optional[UUID] = None,
 ) -> Optional[AuditLog]:
     """
     Registra um evento de auditoria.
@@ -38,15 +39,15 @@ def log_audit(
             ip_address=ip_address,
             user_agent=user_agent,
             timestamp=datetime.now(timezone.utc),
-            tenant_id=tenant_id
+            tenant_id=tenant_id,
         )
-        
+
         db.add(audit_log)
         db.commit()
         db.refresh(audit_log)
-        
+
         return audit_log
-        
+
     except Exception as e:
         db.rollback()
         logger.info(f"⚠️  Erro ao registrar log de auditoria: {e}")

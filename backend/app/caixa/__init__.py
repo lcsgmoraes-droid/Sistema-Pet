@@ -14,4 +14,4 @@ Isso pertence ao módulo financeiro.
 
 from .service import CaixaService
 
-__all__ = ['CaixaService']
+__all__ = ["CaixaService"]

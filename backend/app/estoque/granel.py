@@ -12,7 +12,10 @@ from app.produtos_models import Produto, ProdutoGranelVinculo
 def _produto_e_granel(produto: Produto | None) -> bool:
     if not produto:
         return False
-    return bool(getattr(produto, "e_granel", False)) or "granel" in str(produto.nome or "").lower()
+    return (
+        bool(getattr(produto, "e_granel", False))
+        or "granel" in str(produto.nome or "").lower()
+    )
 
 
 def _normalizar_produto_granel(produto_granel: Produto) -> None:
@@ -27,9 +30,14 @@ def _validar_produto_origem_granel(produto_origem: Produto | None) -> float:
     if not produto_origem:
         raise HTTPException(status_code=404, detail="Produto de origem nao encontrado")
     if _produto_e_granel(produto_origem):
-        raise HTTPException(status_code=400, detail="Produto de origem nao pode ser outro granel")
+        raise HTTPException(
+            status_code=400, detail="Produto de origem nao pode ser outro granel"
+        )
     if produto_origem.tipo_produto == "PAI":
-        raise HTTPException(status_code=400, detail="Produto pai/agrupador nao possui estoque para fracionar")
+        raise HTTPException(
+            status_code=400,
+            detail="Produto pai/agrupador nao possui estoque para fracionar",
+        )
 
     peso_pacote_kg = float(produto_origem.peso_embalagem or 0)
     if peso_pacote_kg <= 0:
@@ -79,13 +87,19 @@ def _obter_ou_criar_vinculo_granel(
     observacao: str | None = None,
 ) -> ProdutoGranelVinculo:
     if produto_origem.id == produto_granel.id:
-        raise HTTPException(status_code=400, detail="Produto de origem e granel nao podem ser o mesmo")
+        raise HTTPException(
+            status_code=400, detail="Produto de origem e granel nao podem ser o mesmo"
+        )
 
-    vinculo = db.query(ProdutoGranelVinculo).filter(
-        ProdutoGranelVinculo.tenant_id == tenant_id,
-        ProdutoGranelVinculo.produto_origem_id == produto_origem.id,
-        ProdutoGranelVinculo.produto_granel_id == produto_granel.id,
-    ).first()
+    vinculo = (
+        db.query(ProdutoGranelVinculo)
+        .filter(
+            ProdutoGranelVinculo.tenant_id == tenant_id,
+            ProdutoGranelVinculo.produto_origem_id == produto_origem.id,
+            ProdutoGranelVinculo.produto_granel_id == produto_granel.id,
+        )
+        .first()
+    )
 
     if vinculo:
         vinculo.ativo = True
@@ -107,20 +121,30 @@ def _obter_ou_criar_vinculo_granel(
     return vinculo
 
 
-def _resolver_origem_por_payload_granel(db: Session, tenant_id, payload: Any) -> Produto:
+def _resolver_origem_por_payload_granel(
+    db: Session, tenant_id, payload: Any
+) -> Produto:
     if payload.produto_origem_id:
-        produto_origem = db.query(Produto).filter(
-            Produto.id == payload.produto_origem_id,
-            Produto.tenant_id == tenant_id,
-        ).first()
+        produto_origem = (
+            db.query(Produto)
+            .filter(
+                Produto.id == payload.produto_origem_id,
+                Produto.tenant_id == tenant_id,
+            )
+            .first()
+        )
         _validar_produto_origem_granel(produto_origem)
         return produto_origem
 
-    vinculos = db.query(ProdutoGranelVinculo).filter(
-        ProdutoGranelVinculo.tenant_id == tenant_id,
-        ProdutoGranelVinculo.produto_granel_id == payload.produto_granel_id,
-        ProdutoGranelVinculo.ativo.is_(True),
-    ).all()
+    vinculos = (
+        db.query(ProdutoGranelVinculo)
+        .filter(
+            ProdutoGranelVinculo.tenant_id == tenant_id,
+            ProdutoGranelVinculo.produto_granel_id == payload.produto_granel_id,
+            ProdutoGranelVinculo.ativo.is_(True),
+        )
+        .all()
+    )
     if len(vinculos) != 1:
         raise HTTPException(
             status_code=400,

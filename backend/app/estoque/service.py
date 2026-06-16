@@ -32,15 +32,16 @@ def _normalizar_quantidade_estoque(valor) -> float:
 
 
 def _somar_quantidade_estoque(estoque_atual, quantidade) -> float:
-    return _normalizar_quantidade_estoque(estoque_atual) + _normalizar_quantidade_estoque(
-        quantidade
-    )
+    return _normalizar_quantidade_estoque(
+        estoque_atual
+    ) + _normalizar_quantidade_estoque(quantidade)
 
 
 def _agenda_sync_bling(produto_id: int, estoque_novo: float, motivo: str) -> None:
     """Enfileira sync de estoque com o Bling (fila persistente, fire-and-forget)."""
     try:
         from app.bling_estoque_sync import sincronizar_bling_background
+
         sincronizar_bling_background(produto_id, estoque_novo, motivo)
     except Exception:
         pass  # Não deixar erro de import/import-circular travar operações de estoque
@@ -50,7 +51,9 @@ class EstoqueService:
     """Service isolado para operações de estoque"""
 
     @staticmethod
-    def _resolver_user_id_operacao(db: Session, tenant_id: str, user_id: int | None) -> int:
+    def _resolver_user_id_operacao(
+        db: Session, tenant_id: str, user_id: int | None
+    ) -> int:
         """
         Resolve um usuário válido para operações automáticas.
 
@@ -94,12 +97,13 @@ class EstoqueService:
         sync_rls_tenant(db, tenant_id)
 
         from app.models import Tenant
+
         tenant = db.query(Tenant).filter(Tenant.id == tenant_id).first()
 
         if not tenant or not tenant.permite_estoque_negativo:
             raise ValueError(
-                f'Estoque insuficiente para produto {produto.nome}. '
-                f'Disponível: {estoque_anterior}, Necessário: {quantidade}'
+                f"Estoque insuficiente para produto {produto.nome}. "
+                f"Disponível: {estoque_anterior}, Necessário: {quantidade}"
             )
 
         from app.estoque_models import AlertaEstoqueNegativo
@@ -112,31 +116,38 @@ class EstoqueService:
             estoque_anterior=estoque_anterior,
             quantidade_vendida=quantidade,
             estoque_resultante=estoque_resultante,
-            venda_id=referencia_id if referencia_tipo == 'venda' else None,
-            venda_codigo=documento if referencia_tipo == 'venda' else None,
+            venda_id=referencia_id if referencia_tipo == "venda" else None,
+            venda_codigo=documento if referencia_tipo == "venda" else None,
             critico=(estoque_resultante < -5),
-            status='pendente'
+            status="pendente",
         )
         db.add(alerta)
         db.flush()
 
         logger.warning(
-            f'⚠️ ESTOQUE NEGATIVO REGISTRADO [ID: {alerta.id}]: '
-            f'Produto {produto.nome} - '
-            f'Disponível: {estoque_anterior}, Necessário: {quantidade}, '
-            f'Ficará com: {estoque_resultante} '
-            f'{"🔴 CRÍTICO" if alerta.critico else "⚠️ ATENÇÃO"}'
+            f"⚠️ ESTOQUE NEGATIVO REGISTRADO [ID: {alerta.id}]: "
+            f"Produto {produto.nome} - "
+            f"Disponível: {estoque_anterior}, Necessário: {quantidade}, "
+            f"Ficará com: {estoque_resultante} "
+            f"{'🔴 CRÍTICO' if alerta.critico else '⚠️ ATENÇÃO'}"
         )
 
     @staticmethod
-    def _consumir_lotes_fifo(produto_id: int, quantidade: float, db: Session) -> List[Dict]:
+    def _consumir_lotes_fifo(
+        produto_id: int, quantidade: float, db: Session
+    ) -> List[Dict]:
         """Consome lotes ativos em ordem FIFO e retorna o histórico do consumo."""
         lotes_consumidos = []
-        lotes_ativos = db.query(ProdutoLote).filter(
-            ProdutoLote.produto_id == produto_id,
-            ProdutoLote.quantidade_disponivel > 0,
-            ProdutoLote.status == 'ativo'
-        ).order_by(ProdutoLote.ordem_entrada).all()
+        lotes_ativos = (
+            db.query(ProdutoLote)
+            .filter(
+                ProdutoLote.produto_id == produto_id,
+                ProdutoLote.quantidade_disponivel > 0,
+                ProdutoLote.status == "ativo",
+            )
+            .order_by(ProdutoLote.ordem_entrada)
+            .all()
+        )
 
         if not lotes_ativos:
             return lotes_consumidos
@@ -153,14 +164,16 @@ class EstoqueService:
             quantidade_restante -= qtd_consumir
 
             if lote.quantidade_disponivel == 0:
-                lote.status = 'esgotado'
+                lote.status = "esgotado"
 
-            lotes_consumidos.append({
-                "lote_id": lote.id,
-                "nome_lote": lote.nome_lote,
-                "quantidade": qtd_consumir,
-                "saldo_anterior": saldo_anterior
-            })
+            lotes_consumidos.append(
+                {
+                    "lote_id": lote.id,
+                    "nome_lote": lote.nome_lote,
+                    "quantidade": qtd_consumir,
+                    "saldo_anterior": saldo_anterior,
+                }
+            )
 
             logger.info(
                 f"Lote consumido: {lote.nome_lote} - "
@@ -168,21 +181,19 @@ class EstoqueService:
             )
 
         return lotes_consumidos
-    
+
     @staticmethod
     def validar_disponibilidade(
-        produto_id: int,
-        quantidade: float,
-        db: Session
+        produto_id: int, quantidade: float, db: Session
     ) -> Dict:
         """
         Valida se há estoque disponível para um produto
-        
+
         Args:
             produto_id: ID do produto
             quantidade: Quantidade desejada
             db: Sessão do banco (NÃO faz commit)
-            
+
         Returns:
             dict com:
                 - disponivel: bool
@@ -191,25 +202,27 @@ class EstoqueService:
                 - mensagem: str (se indisponível)
         """
         produto = db.query(Produto).get(produto_id)
-        
+
         if not produto:
             return {
-                'disponivel': False,
-                'estoque_atual': 0,
-                'estoque_necessario': quantidade,
-                'mensagem': f'Produto ID {produto_id} não encontrado'
+                "disponivel": False,
+                "estoque_atual": 0,
+                "estoque_necessario": quantidade,
+                "mensagem": f"Produto ID {produto_id} não encontrado",
             }
-        
+
         estoque_atual = produto.estoque_atual or 0
         disponivel = estoque_atual >= quantidade
-        
+
         return {
-            'disponivel': disponivel,
-            'estoque_atual': estoque_atual,
-            'estoque_necessario': quantidade,
-            'mensagem': None if disponivel else f'Estoque insuficiente. Disponível: {estoque_atual}, Necessário: {quantidade}'
+            "disponivel": disponivel,
+            "estoque_atual": estoque_atual,
+            "estoque_necessario": quantidade,
+            "mensagem": None
+            if disponivel
+            else f"Estoque insuficiente. Disponível: {estoque_atual}, Necessário: {quantidade}",
         }
-    
+
     @staticmethod
     def baixar_estoque(
         produto_id: int,
@@ -227,7 +240,7 @@ class EstoqueService:
     ) -> Dict:
         """
         Baixa estoque de um produto com FIFO de lotes
-        
+
         Args:
             produto_id: ID do produto
             quantidade: Quantidade a baixar
@@ -238,7 +251,7 @@ class EstoqueService:
             db: Sessão do banco (NÃO faz commit)
             documento: Número do documento (opcional)
             observacao: Observação adicional (opcional)
-            
+
         Returns:
             dict com:
                 - sucesso: bool
@@ -247,25 +260,25 @@ class EstoqueService:
                 - lotes_consumidos: List[dict]
                 - movimentacao_id: int
                 - mensagem: str (se erro)
-                
+
         Raises:
             ValueError: Se estoque insuficiente ou produto não encontrado
         """
         produto = db.query(Produto).get(produto_id)
-        
+
         if not produto:
-            raise ValueError(f'Produto ID {produto_id} não encontrado')
-        
+            raise ValueError(f"Produto ID {produto_id} não encontrado")
+
         # 🔒 VALIDAÇÃO CRÍTICA: Produto PAI não pode movimentar estoque
-        if produto.tipo_produto == 'PAI':
+        if produto.tipo_produto == "PAI":
             raise ValueError(
                 f"Produto '{produto.nome}' é do tipo PAI e não pode ter estoque movimentado. "
                 f"Movimente o estoque das variações."
             )
-        
+
         quantidade_estoque = _normalizar_quantidade_estoque(quantidade)
         estoque_anterior = _normalizar_quantidade_estoque(produto.estoque_atual)
-        
+
         EstoqueService._validar_ou_registrar_estoque_negativo(
             produto=produto,
             quantidade=quantidade_estoque,
@@ -282,11 +295,11 @@ class EstoqueService:
             quantidade=quantidade_estoque,
             db=db,
         )
-        
+
         # Baixar estoque total do produto
         produto.estoque_atual = estoque_anterior - quantidade_estoque
         estoque_novo = produto.estoque_atual
-        
+
         user_id_movimentacao = EstoqueService._resolver_user_id_operacao(
             db=db,
             tenant_id=tenant_id,
@@ -296,7 +309,7 @@ class EstoqueService:
         # Criar movimentação de estoque
         movimentacao = EstoqueMovimentacao(
             produto_id=produto.id,
-            tipo='saida',
+            tipo="saida",
             motivo=motivo,
             quantidade=quantidade_estoque,
             quantidade_anterior=estoque_anterior,
@@ -322,11 +335,11 @@ class EstoqueService:
             referencia_tipo=referencia_tipo,
             observacao=observacao,
             user_id=user_id_movimentacao,
-            tenant_id=tenant_id
+            tenant_id=tenant_id,
         )
         db.add(movimentacao)
         db.flush()  # Gera ID mas não commita
-        
+
         logger.info(
             f"Estoque baixado: Produto {produto.nome} - "
             f"Qtd: {quantidade_estoque} ({estoque_anterior} → {estoque_novo})"
@@ -336,14 +349,14 @@ class EstoqueService:
         _agenda_sync_bling(produto.id, float(estoque_novo), motivo)
 
         return {
-            'sucesso': True,
-            'estoque_anterior': estoque_anterior,
-            'estoque_novo': estoque_novo,
-            'lotes_consumidos': lotes_consumidos,
-            'movimentacao_id': movimentacao.id,
-            'produto_nome': produto.nome
+            "sucesso": True,
+            "estoque_anterior": estoque_anterior,
+            "estoque_novo": estoque_novo,
+            "lotes_consumidos": lotes_consumidos,
+            "movimentacao_id": movimentacao.id,
+            "produto_nome": produto.nome,
         }
-    
+
     @staticmethod
     def estornar_estoque(
         produto_id: int,
@@ -361,7 +374,7 @@ class EstoqueService:
     ) -> Dict:
         """
         Devolve estoque ao produto (usado em devolução/cancelamento)
-        
+
         Args:
             produto_id: ID do produto
             quantidade: Quantidade a devolver
@@ -372,7 +385,7 @@ class EstoqueService:
             db: Sessão do banco (NÃO faz commit)
             documento: Número do documento (opcional)
             observacao: Observação adicional (opcional)
-            
+
         Returns:
             dict com:
                 - sucesso: bool
@@ -380,33 +393,35 @@ class EstoqueService:
                 - estoque_novo: float
                 - movimentacao_id: int
                 - mensagem: str (se erro)
-                
+
         Raises:
             ValueError: Se produto não encontrado
         """
         produto = db.query(Produto).get(produto_id)
-        
+
         if not produto:
-            raise ValueError(f'Produto ID {produto_id} não encontrado')
-        
+            raise ValueError(f"Produto ID {produto_id} não encontrado")
+
         # 🔒 VALIDAÇÃO CRÍTICA: Produto PAI não pode movimentar estoque
-        if produto.tipo_produto == 'PAI':
+        if produto.tipo_produto == "PAI":
             raise ValueError(
                 f"Produto '{produto.nome}' é do tipo PAI e não pode ter estoque movimentado. "
                 f"Movimente o estoque das variações."
             )
-        
+
         quantidade_estoque = _normalizar_quantidade_estoque(quantidade)
         estoque_anterior = _normalizar_quantidade_estoque(produto.estoque_atual)
-        
+
         # Adicionar ao estoque
-        produto.estoque_atual = _somar_quantidade_estoque(estoque_anterior, quantidade_estoque)
+        produto.estoque_atual = _somar_quantidade_estoque(
+            estoque_anterior, quantidade_estoque
+        )
         estoque_novo = produto.estoque_atual
-        
+
         # Criar movimentação de estoque (entrada)
         movimentacao = EstoqueMovimentacao(
             produto_id=produto.id,
-            tipo='entrada',
+            tipo="entrada",
             motivo=motivo,
             quantidade=quantidade_estoque,
             quantidade_anterior=estoque_anterior,
@@ -432,11 +447,11 @@ class EstoqueService:
             referencia_tipo=referencia_tipo,
             observacao=observacao,
             user_id=user_id,
-            tenant_id=tenant_id
+            tenant_id=tenant_id,
         )
         db.add(movimentacao)
         db.flush()  # Gera ID mas não commita
-        
+
         logger.info(
             f"Estoque estornado: Produto {produto.nome} - "
             f"Qtd: +{quantidade_estoque} ({estoque_anterior} → {estoque_novo})"
@@ -446,25 +461,22 @@ class EstoqueService:
         _agenda_sync_bling(produto.id, float(estoque_novo), motivo)
 
         return {
-            'sucesso': True,
-            'estoque_anterior': estoque_anterior,
-            'estoque_novo': estoque_novo,
-            'movimentacao_id': movimentacao.id,
-            'produto_nome': produto.nome
+            "sucesso": True,
+            "estoque_anterior": estoque_anterior,
+            "estoque_novo": estoque_novo,
+            "movimentacao_id": movimentacao.id,
+            "produto_nome": produto.nome,
         }
-    
+
     @staticmethod
-    def validar_disponibilidade_multiplos(
-        itens: List[Dict],
-        db: Session
-    ) -> Dict:
+    def validar_disponibilidade_multiplos(itens: List[Dict], db: Session) -> Dict:
         """
         Valida disponibilidade de múltiplos produtos de uma vez
-        
+
         Args:
             itens: Lista de dicts com produto_id e quantidade
             db: Sessão do banco
-            
+
         Returns:
             dict com:
                 - todos_disponiveis: bool
@@ -473,35 +485,33 @@ class EstoqueService:
         """
         itens_validados = []
         itens_indisponiveis = []
-        
+
         for item in itens:
-            produto_id = item.get('produto_id')
-            quantidade = item.get('quantidade', 0)
-            
+            produto_id = item.get("produto_id")
+            quantidade = item.get("quantidade", 0)
+
             if not produto_id or quantidade <= 0:
                 continue
-            
+
             validacao = EstoqueService.validar_disponibilidade(
-                produto_id=produto_id,
-                quantidade=quantidade,
-                db=db
+                produto_id=produto_id, quantidade=quantidade, db=db
             )
-            
-            validacao['produto_id'] = produto_id
-            validacao['quantidade_solicitada'] = quantidade
-            
-            if validacao['disponivel']:
+
+            validacao["produto_id"] = produto_id
+            validacao["quantidade_solicitada"] = quantidade
+
+            if validacao["disponivel"]:
                 itens_validados.append(validacao)
             else:
                 itens_indisponiveis.append(validacao)
-        
+
         return {
-            'todos_disponiveis': len(itens_indisponiveis) == 0,
-            'total_itens': len(itens),
-            'itens_validados': itens_validados,
-            'itens_indisponiveis': itens_indisponiveis
+            "todos_disponiveis": len(itens_indisponiveis) == 0,
+            "total_itens": len(itens),
+            "itens_validados": itens_validados,
+            "itens_indisponiveis": itens_indisponiveis,
         }
-    
+
     @staticmethod
     def baixar_estoque_multiplos(
         itens: List[Dict],
@@ -510,11 +520,11 @@ class EstoqueService:
         referencia_tipo: str,
         user_id: int,
         tenant_id: str,
-        db: Session
+        db: Session,
     ) -> Dict:
         """
         Baixa estoque de múltiplos produtos de uma vez (transação única)
-        
+
         Args:
             itens: Lista de dicts com produto_id e quantidade
             motivo: Motivo da baixa
@@ -522,7 +532,7 @@ class EstoqueService:
             referencia_tipo: Tipo da referência
             user_id: ID do usuário
             db: Sessão do banco (NÃO faz commit)
-            
+
         Returns:
             dict com:
                 - sucesso: bool
@@ -532,14 +542,14 @@ class EstoqueService:
         """
         itens_baixados = []
         erros = []
-        
+
         for item in itens:
-            produto_id = item.get('produto_id')
-            quantidade = item.get('quantidade', 0)
-            
+            produto_id = item.get("produto_id")
+            quantidade = item.get("quantidade", 0)
+
             if not produto_id or quantidade <= 0:
                 continue
-            
+
             try:
                 resultado = EstoqueService.baixar_estoque(
                     produto_id=produto_id,
@@ -549,21 +559,19 @@ class EstoqueService:
                     referencia_tipo=referencia_tipo,
                     user_id=user_id,
                     tenant_id=tenant_id,
-                    db=db
+                    db=db,
                 )
                 itens_baixados.append(resultado)
-                
+
             except ValueError as e:
-                erros.append({
-                    'produto_id': produto_id,
-                    'quantidade': quantidade,
-                    'erro': str(e)
-                })
+                erros.append(
+                    {"produto_id": produto_id, "quantidade": quantidade, "erro": str(e)}
+                )
                 logger.error(f"Erro ao baixar estoque produto {produto_id}: {e}")
-        
+
         return {
-            'sucesso': len(erros) == 0,
-            'total_itens': len(itens),
-            'itens_baixados': itens_baixados,
-            'erros': erros
+            "sucesso": len(erros) == 0,
+            "total_itens": len(itens),
+            "itens_baixados": itens_baixados,
+            "erros": erros,
         }
