@@ -437,12 +437,10 @@ def aplicar_template_csv(
                         # Formato completo
                         coluna_origem = config_coluna.get('coluna')
                         transformacao_campo = config_coluna.get('transformacao')
-                        campo_obrigatorio = config_coluna.get('obrigatorio', False)
                     else:
                         # Formato simples (string)
                         coluna_origem = config_coluna
                         transformacao_campo = None
-                        campo_obrigatorio = False
                     
                     # Obter valor do CSV
                     valor_original = linha.get(coluna_origem, '') if tem_header else linha[int(coluna_origem)]
