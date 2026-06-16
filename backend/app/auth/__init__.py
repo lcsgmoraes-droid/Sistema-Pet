@@ -13,21 +13,25 @@ from .core import (
     create_refresh_token,
     get_current_user,
     get_current_user_from_token,
-    get_current_active_superuser
+    get_current_active_superuser,
 )
 
 # Importar dependências locais
-from .dependencies import require_admin, require_active_user, get_current_user_and_tenant
+from .dependencies import (
+    require_admin,
+    require_active_user,
+    get_current_user_and_tenant,
+)
 
 __all__ = [
-    'hash_password',
-    'verify_password',
-    'create_access_token',
-    'create_refresh_token',
-    'get_current_user',
-    'get_current_user_from_token',
-    'get_current_active_superuser',
-    'require_admin',
-    'require_active_user',
-    'get_current_user_and_tenant'
+    "hash_password",
+    "verify_password",
+    "create_access_token",
+    "create_refresh_token",
+    "get_current_user",
+    "get_current_user_from_token",
+    "get_current_active_superuser",
+    "require_admin",
+    "require_active_user",
+    "get_current_user_and_tenant",
 ]

@@ -33,7 +33,7 @@ def check_permission(
 ):
     """
     Verifica se o usuário tem a permissão especificada.
-    
+
     Args:
         db: Sessão do banco de dados
         user_id: ID do usuário
@@ -42,11 +42,11 @@ def check_permission(
     """
     # Administrador de loja e definido por role/permissao no tenant selecionado.
     # O flag global User.is_admin fica reservado para rotas operacionais do sistema.
-    
+
     # Se tenant_id não foi passado, tenta pegar do contexto
     if tenant_id is None:
         tenant_id = get_current_tenant()
-    
+
     if tenant_id is None:
         raise HTTPException(status_code=403, detail="Tenant não definido")
 
@@ -56,4 +56,3 @@ def check_permission(
             status_code=status.HTTP_403_FORBIDDEN,
             detail=f"Permissão negada: {permission}",
         )
-

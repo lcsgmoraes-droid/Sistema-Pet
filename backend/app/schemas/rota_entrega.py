@@ -1,6 +1,7 @@
 """
 Schemas Pydantic para Rotas de Entrega - ETAPA 9.3
 """
+
 from typing import Optional, List
 from decimal import Decimal
 from datetime import datetime
@@ -9,6 +10,7 @@ from pydantic import BaseModel
 
 class ClienteEntregadorResponse(BaseModel):
     """Schema simplificado de Cliente para entregador"""
+
     id: int
     nome: str
     telefone: Optional[str] = None
@@ -19,6 +21,7 @@ class ClienteEntregadorResponse(BaseModel):
 
 class RotaEntregaBase(BaseModel):
     """Schema base para rotas de entrega"""
+
     venda_id: Optional[int] = None
     entregador_id: int
     endereco_destino: Optional[str] = None
@@ -41,6 +44,7 @@ class RotaEntregaBase(BaseModel):
 
 class RotaEntregaCreate(RotaEntregaBase):
     """Schema para criação de rota de entrega"""
+
     # ETAPA 9.3: Criar rota com múltiplas vendas (entregas)
     entregador_id: Optional[int] = None
     vendas_ids: Optional[List[int]] = None  # Lista de vendas para entregar
@@ -49,6 +53,7 @@ class RotaEntregaCreate(RotaEntregaBase):
 
 class RotaEntregaUpdate(BaseModel):
     """Schema para atualização de rota de entrega"""
+
     distancia_real: Optional[Decimal] = None
     tentativas: Optional[int] = None
     observacoes: Optional[str] = None
@@ -59,6 +64,7 @@ class RotaEntregaUpdate(BaseModel):
 
 class RotaEntregaParadaResponse(BaseModel):
     """ETAPA 9.3 - Schema de resposta para parada da rota"""
+
     id: int
     rota_id: int
     venda_id: int
@@ -84,6 +90,7 @@ class RotaEntregaParadaResponse(BaseModel):
 
 class RotaEntregaResponse(RotaEntregaBase):
     """Schema de resposta para rota de entrega"""
+
     id: int
     numero: str
     status: str
@@ -123,6 +130,7 @@ class RotaEntregaResponse(RotaEntregaBase):
 
 class RotaEntregaFechar(BaseModel):
     """Schema para fechamento de rota"""
+
     distancia_real: Decimal
     tentativas: int = 1
     observacoes: Optional[str] = None

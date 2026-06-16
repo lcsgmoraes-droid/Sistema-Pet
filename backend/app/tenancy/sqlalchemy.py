@@ -3,6 +3,7 @@ from sqlalchemy import event
 from app.tenancy.context import get_current_tenant
 from app.base_models import BaseTenantModel
 
+
 def _add_tenant_criteria(execute_state):
     tenant_id = get_current_tenant()
 
@@ -20,6 +21,7 @@ def _add_tenant_criteria(execute_state):
             include_aliases=True,
         )
     )
+
 
 def setup_tenant_criteria(Session):
     event.listen(Session, "do_orm_execute", _add_tenant_criteria)

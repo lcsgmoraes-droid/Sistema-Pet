@@ -347,6 +347,10 @@ jobs:
         run: |
           ruff check .
 
+      - name: Backend critical packages format (blocking)
+        run: |
+          ruff format --check app/core app/tenancy app/auth app/db app/schemas app/security
+
       - name: Lint (non-blocking)
         run: |
           ruff check app/ tests/multi_tenant || echo "Lint warnings found"
