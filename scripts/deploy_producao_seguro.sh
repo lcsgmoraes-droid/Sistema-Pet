@@ -434,7 +434,7 @@ audit_step "Validando heartbeat do worker Bling"
 log "Aguardando worker Bling"
 wait_for \
   "worker Bling" \
-  "cd '$APP_DIR' && docker compose -f '$COMPOSE_FILE' exec -T worker-bling sh -c 'heartbeat_path=\"\${BLING_WORKER_HEARTBEAT_PATH:-/app/data/bling_worker_heartbeat}\"; test -f \"\$heartbeat_path\"'" \
+  "cd '$APP_DIR' && docker compose -f '$COMPOSE_FILE' exec -T worker-bling sh -c 'test -n \"\$BLING_WORKER_HEARTBEAT_PATH\" && test -f \"\$BLING_WORKER_HEARTBEAT_PATH\"'" \
   24 \
   5
 
